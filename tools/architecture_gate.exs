@@ -376,6 +376,21 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     alias_shadow_violations(target, [], path)
   end
 
+  defp node_violations({directive, _meta, [target | _options]}, path)
+       when directive in [:import, :require, :use] do
+    target_name = module_name(target)
+
+    if package_owned_module?(target_name) do
+      []
+    else
+      category_violation(
+        :unapproved_runtime,
+        path,
+        "external #{directive} is forbidden"
+      )
+    end
+  end
+
   defp node_violations({{:., _dot_meta, [module_ast, function]}, _meta, _args}, path)
        when is_atom(function) do
     module_ast
@@ -415,13 +430,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     target_name = module_name(target)
     binding_name = alias_binding_name(target, options)
 
-    target_name = to_string(target_name)
-
-    package_owned? =
-      target_name == "BoundedAuthorityProtocol" or
-        String.starts_with?(target_name, "BoundedAuthorityProtocol.")
-
-    if binding_name == "BoundedAuthorityProtocol" and not package_owned? do
+    if binding_name == "BoundedAuthorityProtocol" and not package_owned_module?(target_name) do
       category_violation(
         :unapproved_runtime,
         path,
@@ -430,6 +439,13 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     else
       []
     end
+  end
+
+  defp package_owned_module?(module) do
+    module = to_string(module)
+
+    module == "BoundedAuthorityProtocol" or
+      String.starts_with?(module, "BoundedAuthorityProtocol.")
   end
 
   defp module_name({:__aliases__, _meta, segments}), do: alias_name(segments)
@@ -754,22 +770,29 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     end
   end
 
-  defp abstract_violations({:call, _line, {:var, _variable_line, _variable}, _arguments}, path) do
-    [violation(:dynamic_dispatch, path, "compiled variable function invocation")]
+  defp abstract_violations(
+         {:call, _line, {:var, _variable_line, _variable}, _arguments} = term,
+         path
+       ) do
+    [violation(:dynamic_dispatch, path, "compiled variable function invocation")] ++
+      abstract_tuple_children(term, path)
   end
 
-  defp abstract_violations({:receive, _line, _clauses}, path) do
-    [violation(:process, path, "compiled mailbox receive")]
+  defp abstract_violations({:receive, _line, _clauses} = term, path) do
+    [violation(:process, path, "compiled mailbox receive")] ++
+      abstract_tuple_children(term, path)
   end
 
-  defp abstract_violations({:receive, _line, _clauses, _timeout, _timeout_body}, path) do
-    [violation(:process, path, "compiled mailbox receive")]
+  defp abstract_violations(
+         {:receive, _line, _clauses, _timeout, _timeout_body} = term,
+         path
+       ) do
+    [violation(:process, path, "compiled mailbox receive")] ++
+      abstract_tuple_children(term, path)
   end
 
   defp abstract_violations(term, path) when is_tuple(term) do
-    term
-    |> Tuple.to_list()
-    |> Enum.flat_map(&abstract_violations(&1, path))
+    abstract_tuple_children(term, path)
   end
 
   defp abstract_violations(term, path) when is_list(term) do
@@ -777,6 +800,12 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   end
 
   defp abstract_violations(_term, _path), do: []
+
+  defp abstract_tuple_children(term, path) do
+    term
+    |> Tuple.to_list()
+    |> Enum.flat_map(&abstract_violations(&1, path))
+  end
 
   defp compiled_mfa_category(module, function) do
     module_name =
