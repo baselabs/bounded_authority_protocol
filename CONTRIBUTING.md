@@ -11,8 +11,10 @@ Before a pull request:
 4. run the complete quality and conformance gates documented by the current roadmap;
 5. update the changelog and every affected contract document.
 
-Do not submit secrets, production credentials, private key fixtures, customer data, proprietary
-consumer code, or QorPay/Beamline product vocabulary.
+Do not submit secrets, production credentials, private key fixtures, customer data, or proprietary
+consumer code. Runtime code, public APIs, wire formats, and conformance artifacts must remain
+provider-neutral; boundary documentation may name consumers only to state exclusions and
+dependency direction.
 
 By contributing, you agree that your contribution is licensed under Apache License 2.0. No
 contributor license agreement or DCO sign-off is currently required.
