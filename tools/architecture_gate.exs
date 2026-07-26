@@ -125,14 +125,16 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   def check(root, opts \\ []) do
     root = Path.expand(root)
 
-    project_violations(root) ++
-      source_violations(root) ++
-      if Keyword.get(opts, :compiled, true),
-        do: check_compiled(root),
-        else:
-          []
-          |> Enum.uniq()
-          |> Enum.sort_by(&{&1.category, &1.path, &1.detail})
+    violations =
+      project_violations(root) ++
+        source_violations(root) ++
+        if Keyword.get(opts, :compiled, true),
+          do: check_compiled(root),
+          else: []
+
+    violations
+    |> Enum.uniq()
+    |> Enum.sort_by(&{&1.category, &1.path, &1.detail})
   end
 
   def check_compiled(root) do
@@ -361,10 +363,17 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp node_violations({:__aliases__, _meta, segments}, path) do
     segments
-    |> List.first()
-    |> to_string()
+    |> alias_root()
     |> module_category()
-    |> category_violation(path, "forbidden module #{Enum.join(segments, ".")}")
+    |> category_violation(path, "forbidden module #{alias_name(segments)}")
+  end
+
+  defp node_violations({:alias, _meta, [target, options]}, path) when is_list(options) do
+    alias_shadow_violations(target, options, path)
+  end
+
+  defp node_violations({:alias, _meta, [target]}, path) do
+    alias_shadow_violations(target, [], path)
   end
 
   defp node_violations({{:., _dot_meta, [module_ast, function]}, _meta, _args}, path)
@@ -389,6 +398,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     category =
       cond do
         function in @local_process_functions -> :process
+        function == :receive -> :process
+        function in @kernel_callback_functions -> :dynamic_dispatch
         function in @local_protocol_dispatch_functions -> :dynamic_dispatch
         function == :apply -> :dynamic_dispatch
         function in [:binary_to_atom, :list_to_atom] -> :dynamic_module
@@ -400,9 +411,58 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp node_violations(_node, _path), do: []
 
-  defp module_name({:__aliases__, _meta, segments}), do: Enum.join(segments, ".")
+  defp alias_shadow_violations(target, options, path) do
+    target_name = module_name(target)
+    binding_name = alias_binding_name(target, options)
+
+    target_name = to_string(target_name)
+
+    package_owned? =
+      target_name == "BoundedAuthorityProtocol" or
+        String.starts_with?(target_name, "BoundedAuthorityProtocol.")
+
+    if binding_name == "BoundedAuthorityProtocol" and not package_owned? do
+      category_violation(
+        :unapproved_runtime,
+        path,
+        "external alias cannot shadow BoundedAuthorityProtocol"
+      )
+    else
+      []
+    end
+  end
+
+  defp module_name({:__aliases__, _meta, segments}), do: alias_name(segments)
   defp module_name(module) when is_atom(module), do: module
   defp module_name(_dynamic), do: :dynamic
+
+  defp alias_root([{:__MODULE__, _meta, _context} | _rest]), do: "BoundedAuthorityProtocol"
+  defp alias_root([segment | _rest]) when is_atom(segment), do: Atom.to_string(segment)
+  defp alias_root(_segments), do: :dynamic
+
+  defp alias_name(segments) do
+    Enum.map_join(segments, ".", fn
+      {:__MODULE__, _meta, _context} -> "BoundedAuthorityProtocol"
+      segment when is_atom(segment) -> Atom.to_string(segment)
+      segment -> Macro.to_string(segment)
+    end)
+  end
+
+  defp alias_binding_name(target, options) when is_list(options) do
+    case Keyword.get(options, :as) do
+      nil ->
+        target
+        |> module_name()
+        |> to_string()
+        |> String.split(".")
+        |> List.last()
+
+      alias_ast ->
+        alias_ast |> module_name() |> to_string() |> String.split(".") |> List.last()
+    end
+  end
+
+  defp alias_binding_name(target, _options), do: alias_binding_name(target, [])
 
   defp mfa_category(:dynamic, _function), do: :dynamic_dispatch
 
@@ -639,7 +699,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp beam_violations(path) do
     case :beam_lib.chunks(String.to_charlist(path), [:imports, :abstract_code]) do
       {:ok, {_module, [imports: imports, abstract_code: {:raw_abstract_v1, forms}]}} ->
-        import_violations(imports, path) ++ abstract_external_fun_violations(forms, path)
+        import_violations(imports, path) ++ abstract_violations(forms, path)
 
       {:error, _module, reason} ->
         [violation(:compiled_artifact, path, "cannot inspect BEAM imports: #{inspect(reason)}")]
@@ -673,7 +733,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     end)
   end
 
-  defp abstract_external_fun_violations(
+  defp abstract_violations(
          {:fun, _line,
           {:function, {:atom, _module_line, module}, {:atom, _function_line, function},
            {:integer, _arity_line, arity}}},
@@ -694,17 +754,29 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     end
   end
 
-  defp abstract_external_fun_violations(term, path) when is_tuple(term) do
+  defp abstract_violations({:call, _line, {:var, _variable_line, _variable}, _arguments}, path) do
+    [violation(:dynamic_dispatch, path, "compiled variable function invocation")]
+  end
+
+  defp abstract_violations({:receive, _line, _clauses}, path) do
+    [violation(:process, path, "compiled mailbox receive")]
+  end
+
+  defp abstract_violations({:receive, _line, _clauses, _timeout, _timeout_body}, path) do
+    [violation(:process, path, "compiled mailbox receive")]
+  end
+
+  defp abstract_violations(term, path) when is_tuple(term) do
     term
     |> Tuple.to_list()
-    |> Enum.flat_map(&abstract_external_fun_violations(&1, path))
+    |> Enum.flat_map(&abstract_violations(&1, path))
   end
 
-  defp abstract_external_fun_violations(term, path) when is_list(term) do
-    Enum.flat_map(term, &abstract_external_fun_violations(&1, path))
+  defp abstract_violations(term, path) when is_list(term) do
+    Enum.flat_map(term, &abstract_violations(&1, path))
   end
 
-  defp abstract_external_fun_violations(_term, _path), do: []
+  defp abstract_violations(_term, _path), do: []
 
   defp compiled_mfa_category(module, function) do
     module_name =

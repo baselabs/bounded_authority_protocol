@@ -76,6 +76,8 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       dynamic_dispatch: "def probe(value, callback), do: Kernel.then(value, callback)",
       dynamic_dispatch:
         "def probe(data, keys, callback), do: Kernel.get_and_update_in(data, keys, callback)",
+      dynamic_dispatch: "def probe(value, callback), do: then(value, callback)",
+      dynamic_dispatch: "def probe(value, callback), do: tap(value, callback)",
       dynamic_dispatch: "def probe(items, callback), do: :lists.map(callback, items)",
       dynamic_dispatch: "def probe(items, callback), do: :lists.foreach(callback, items)",
       dynamic_dispatch: "def probe(map, callback), do: :maps.map(callback, map)",
@@ -85,6 +87,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       unapproved_runtime: "Map.intersect(%{}, %{}, fn _key, left, _right -> left end)",
       unapproved_runtime: "Map.split_with(%{}, fn {_key, _value} -> true end)",
       unapproved_runtime: "MysteryRuntime.perform(:effect)",
+      process: "def probe, do: receive(do: (message -> message))",
       dynamic_module: "Module.concat([\"File\"])",
       code_evaluation: "Code.eval_string(\"File.read!(secret)\")"
     ]
@@ -141,12 +144,53 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     assert [] == ArchitectureGate.check(root, compiled: false)
   end
 
+  test "the source gate handles local module aliases without crashing" do
+    root =
+      fixture_root!("""
+      alias __MODULE__.Value
+      defmodule Value do
+        @moduledoc false
+      end
+      """)
+
+    assert [] == ArchitectureGate.check(root, compiled: false)
+  end
+
+  test "the source gate rejects an external alias shadowing the package root" do
+    bodies = [
+      """
+      alias MysteryRuntime, as: BoundedAuthorityProtocol
+      def effect, do: BoundedAuthorityProtocol.perform(:effect)
+      """,
+      """
+      alias MysteryRuntime.BoundedAuthorityProtocol
+      def effect, do: BoundedAuthorityProtocol.perform(:effect)
+      """,
+      """
+      alias BoundedAuthorityProtocolEvil, as: BoundedAuthorityProtocol
+      def effect, do: BoundedAuthorityProtocol.perform(:effect)
+      """
+    ]
+
+    Enum.each(bodies, fn body ->
+      root = fixture_root!(body)
+
+      assert Enum.any?(ArchitectureGate.check(root, compiled: false), fn violation ->
+               violation.category == :unapproved_runtime and
+                 violation.detail == "external alias cannot shadow BoundedAuthorityProtocol"
+             end)
+    end)
+  end
+
   test "the compiled gate goes red for a forbidden BEAM import" do
     root =
       fixture_root!("""
       def read(path), do: File.read!(path)
       def transport, do: :diameter.add_transport(:service, [])
       def external_callback, do: &MysteryRuntime.perform/1
+      def random, do: :crypto.strong_rand_bytes(32)
+      def callback(value, function), do: then(value, function)
+      def mailbox, do: receive(do: (message -> message), after: (0 -> :empty))
       """)
 
     assert {_output, 0} =
@@ -169,6 +213,21 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
              violation.category == :unapproved_runtime and
                violation.detail =~ "compiled external function MysteryRuntime.perform/1"
+           end)
+
+    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+             violation.category == :randomness and
+               violation.detail =~ "compiled import :crypto.strong_rand_bytes/1"
+           end)
+
+    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+             violation.category == :dynamic_dispatch and
+               violation.detail == "compiled variable function invocation"
+           end)
+
+    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+             violation.category == :process and
+               violation.detail == "compiled mailbox receive"
            end)
   end
 
