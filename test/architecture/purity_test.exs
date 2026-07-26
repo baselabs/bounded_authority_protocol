@@ -182,6 +182,39 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     end)
   end
 
+  test "the source gate rejects external compile-time directives" do
+    bodies = [
+      """
+      require MysteryRuntime, as: BoundedAuthorityProtocol
+      def effect, do: BoundedAuthorityProtocol.perform(:effect)
+      """,
+      """
+      import MysteryRuntime
+      def effect, do: perform(:effect)
+      """,
+      """
+      require MysteryRuntime
+      def effect, do: MysteryRuntime.perform(:effect)
+      """,
+      """
+      use MysteryRuntime
+      """
+    ]
+
+    Enum.each(bodies, fn body ->
+      root = fixture_root!(body)
+
+      assert Enum.any?(ArchitectureGate.check(root, compiled: false), fn violation ->
+               violation.category == :unapproved_runtime and
+                 violation.detail in [
+                   "external import is forbidden",
+                   "external require is forbidden",
+                   "external use is forbidden"
+                 ]
+             end)
+    end)
+  end
+
   test "the compiled gate goes red for a forbidden BEAM import" do
     root =
       fixture_root!("""
