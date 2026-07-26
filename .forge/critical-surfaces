@@ -4,4 +4,6 @@ priv/conformance/**
 test/conformance/**
 docs/design/protocol-charter.md
 docs/design/conformance-contract.md
+docs/design/threat-model.md
+usage-rules.md
 docs/adr/**

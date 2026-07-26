@@ -2,9 +2,7 @@
 
 ## Read first
 
-Before work, read the `Universal Behavioral Memory (index)` in
-`/Users/rp/.claude/CLAUDE.md` and every linked rule whose trigger matches the task. Then read this
-file, [`README.md`](README.md), [`docs/ROADMAP.md`](docs/ROADMAP.md), the accepted ADRs under
+Before work, read this file, [`README.md`](README.md), [`docs/ROADMAP.md`](docs/ROADMAP.md), the accepted ADRs under
 [`docs/adr/`](docs/adr/), and the stable contracts under [`docs/design/`](docs/design/).
 
 When local Forge artifacts exist, they are implementation aids, not the remote cold-start
@@ -54,16 +52,15 @@ quality gates, public CI, and enforceable package-boundary tests.
 8. **Public compatibility is deliberate.** Once released, wire formats and public APIs follow
    SemVer and the contract-major discipline. No permissive compatibility parser is added.
 9. **QorPay is out of bounds.** Do not access its repository. Never edit, import, decode, issue, or
-   promise compatibility with QorPay, `Qorpay.ScopeAxis`, `qorpay_vk_1`, or `qorpay_vc_1`.
+   promise compatibility with private QorPay credentials, schemas, or wire formats.
 10. **Apache-2.0 is the stable release license.** Do not introduce proprietary source, private
     package dependencies, or a timed license conversion.
 
 ## Repository relationships
 
-- Public protocol: `/Users/rp/Developer/Base/bounded_authority_protocol`
-- Public GitHub: `https://github.com/baselabs/bounded_authority_protocol`
-- Private runtime consumer: `/Users/rp/Developer/Base/bounded_authority`
-- First product consumer: `/Users/rp/Developer/Base/beamline/integrations/retired_private_consumer`
+- Public protocol: [`baselabs/bounded_authority_protocol`](https://github.com/baselabs/bounded_authority_protocol)
+- Private runtime consumer: `baselabs/bounded_authority` (private)
+- First product consumer: `baselabs/beamline` package `integrations/retired_private_consumer` (private)
 - QorPay: unchanged and not a dependency
 
 ```text

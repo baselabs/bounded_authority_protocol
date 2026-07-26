@@ -22,8 +22,8 @@ The planned library will provide:
 - fixed, value-free errors and explicit resource limits.
 
 All verification inputs are explicit: already-trusted public key, expected audience and instance,
-server-derived method, normalized URI, operation, cast arguments, evaluation time, and limits.
-A successful result means only that the supplied bytes satisfy those supplied inputs.
+server-derived method, normalized URI, invocation ID, operation, cast arguments, evaluation time,
+and limits. A successful result means only that the supplied bytes satisfy those supplied inputs.
 
 The public package also exposes a bounded `untrusted_key_locator/2` preparse that returns only the
 closed protected-header `kid` as an explicitly untrusted lookup hint. It never selects or marks a
