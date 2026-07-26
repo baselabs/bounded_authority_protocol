@@ -21,10 +21,10 @@ grant operational authority by itself.
 
 ## Current state
 
-Repository and architecture initialization are active. Until `BAP-00` records a verified public
-remote and clean closeout evidence, implementation must not start. The next executable row after
-that closeout is `BAP-01` in [`docs/ROADMAP.md`](docs/ROADMAP.md): create the public Mix package,
-quality gates, public CI, and enforceable package-boundary tests.
+`BAP-00` is complete, with reviewed public authority head `6474c0d`, the public remote, and all
+consuming repository boundaries verified. No Mix package or protocol implementation exists yet.
+The next executable row is `BAP-01` in [`docs/ROADMAP.md`](docs/ROADMAP.md): create the public Mix
+package, quality gates, public CI, and enforceable package-boundary tests.
 
 ## Critical rules
 

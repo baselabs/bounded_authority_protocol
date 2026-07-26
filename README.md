@@ -5,10 +5,10 @@ bounded proof-of-possession authority.
 
 ## Status
 
-Repository initialization and the public/private boundary are active under
-[`BAP-00`](docs/ROADMAP.md). The Mix package and protocol implementation are not yet available.
-After the public remote and closeout gates are verified, `BAP-01` establishes the package, CI,
-quality gates, and architecture tests before protocol behavior is implemented.
+Repository initialization and the public/private boundary are complete under
+[`BAP-00`](docs/ROADMAP.md), with reviewed authority head `6474c0d`. The Mix package and protocol
+implementation are not yet available. `BAP-01` next establishes the package, CI, quality gates, and
+architecture tests before protocol behavior is implemented.
 
 ## Public contract
 

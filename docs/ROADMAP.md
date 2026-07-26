@@ -13,7 +13,7 @@ compatibility.
 
 | Row | Deliverable | Depends on | State | Completion gate |
 |---|---|---|---|---|
-| BAP-00 | Public repository, Apache-2.0 license, Forge boundary, tracked architecture and cold-start authority | — | In progress | Public/private boundary reconciled across all owning repositories; public `baselabs/bounded_authority_protocol` remote verified; clean review and documentation gates |
+| BAP-00 | Public repository, Apache-2.0 license, Forge boundary, tracked architecture and cold-start authority | — | Complete | Evidence recorded below |
 | BAP-01 | Mix package scaffold, pure-library architecture test, quality aliases, public CI, package inspection | BAP-00 | Planned | Zero-config compile; workflow syntax; dependency license/advisory checks; archive rejects private/product/runtime dependencies |
 | BAP-02 | Closed canonical types, bounds, domain separators, RFC 8785 JCS, request digest | BAP-01 | Planned | Exact-byte independent vectors; duplicate/encoding/limit tests; malformed-input properties; mutation-red proof |
 | BAP-03 | Compact EdDSA grant and RFC 9449 DPoP encode/decode/verify | BAP-02 | Planned | Official and independent vectors; meaningful-byte tamper matrix; timing/allocation bounds; no trust-selection path |
@@ -21,6 +21,21 @@ compatibility.
 | BAP-05 | Language-neutral conformance corpus, verifier CLI, property/fuzz/mutation gates | BAP-04 | Planned | A second implementation consumes only published artifacts and agrees on every valid/invalid vector |
 | BAP-06 | Stable public API, guides, security policy, docs, immutable release-candidate archive and automation | BAP-05 | Planned | SemVer/API review; docs; reproducible candidate archive; unpacked consumer; checksum/SBOM/provenance gates; not yet published |
 | BAP-07 | Connected verification and first public release | BAP-06, private BA-14 | Planned | Exact candidate passes private-runtime PG16/17/18 and RetiredPrivateConsumer connected gates; full public quality/conformance; fresh correctness, security, gate-integrity, and cross-vendor reviews; publish that exact archive with zero open findings |
+
+## BAP-00 closeout evidence
+
+- Public repository is `PUBLIC`; reviewed authority head is `6474c0d` and initial authority commit
+  is `9d83914`. This closeout receipt follows those reviewed changes.
+- Owning boundaries are pushed and remote-equal at private runtime `dc4f36a`, Beamline `b8767e4`,
+  and historical redirect `0e400e7`.
+- Beamline documentation tests pass 54/0; formatter and ExDoc gates pass; the changed commercial
+  infographic renders over HTTP with both public and private authority tiers.
+- Public and private Forge plans verify with 0 errors, 0 warnings; changed local links and
+  high-confidence secret scans are clean.
+- Independent correctness, security, and documentation lenses are clean after all admitted
+  findings were fixed. Public/private cross-vendor findings were fixed and reread; Beamline's GLM
+  peer returned no findings. The Beamline Claude peer was unavailable twice because the installed
+  CLI reported retired model aliases, so that peer is a named degraded review, not a zero.
 
 ## Next action
 
