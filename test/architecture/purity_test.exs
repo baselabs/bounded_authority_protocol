@@ -231,7 +231,8 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       "@compile {:parse_transform, MysteryRuntime}",
       "@derive MysteryRuntime",
       "@external_resource \"forbidden.txt\"",
-      "@on_definition MysteryRuntime"
+      "@on_definition MysteryRuntime",
+      "@on_load :initialize"
     ]
 
     Enum.each(attributes, fn attribute ->

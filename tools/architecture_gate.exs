@@ -104,7 +104,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   @public_key_random_functions ~w(generate_key)a
   @local_process_functions ~w(exit make_ref self send spawn spawn_link spawn_monitor)a
   @local_protocol_dispatch_functions ~w(inspect to_string)a
-  @compile_time_hook_attributes ~w(after_compile after_verify before_compile behaviour compile derive external_resource on_definition)a
+  @compile_time_hook_attributes ~w(after_compile after_verify before_compile behaviour compile derive external_resource on_definition on_load)a
   @kernel_callback_functions ~w(get_and_update_in get_in pop_in tap then update_in)a
   @map_callback_functions ~w(filter get_and_update get_and_update! get_lazy merge new put_new_lazy reject replace_lazy update update!)a
   @map_set_callback_functions ~w(filter reject)a
