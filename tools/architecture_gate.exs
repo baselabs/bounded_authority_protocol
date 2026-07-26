@@ -104,6 +104,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   @public_key_random_functions ~w(generate_key)a
   @local_process_functions ~w(exit make_ref self send spawn spawn_link spawn_monitor)a
   @local_protocol_dispatch_functions ~w(inspect to_string)a
+  @compile_time_hook_attributes ~w(after_compile after_verify before_compile behaviour compile derive external_resource on_definition)a
   @kernel_callback_functions ~w(get_and_update_in get_in pop_in tap then update_in)a
   @map_callback_functions ~w(filter get_and_update get_and_update! get_lazy merge new put_new_lazy reject replace_lazy update update!)a
   @map_set_callback_functions ~w(filter reject)a
@@ -362,10 +363,18 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   end
 
   defp node_violations({:__aliases__, _meta, segments}, path) do
-    segments
-    |> alias_root()
-    |> module_category()
-    |> category_violation(path, "forbidden module #{alias_name(segments)}")
+    root = alias_root(segments)
+    name = alias_name(segments)
+
+    category =
+      cond do
+        root == "BoundedAuthorityProtocol" -> nil
+        root == :dynamic -> :dynamic_module
+        category = module_category(root) -> category
+        true -> :unapproved_runtime
+      end
+
+    category_violation(category, path, "forbidden module #{name}")
   end
 
   defp node_violations({:alias, _meta, [target, options]}, path) when is_list(options) do
@@ -389,6 +398,18 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         "external #{directive} is forbidden"
       )
     end
+  end
+
+  defp node_violations(
+         {:@, _meta, [{attribute, _attribute_meta, _arguments}]},
+         path
+       )
+       when attribute in @compile_time_hook_attributes do
+    category_violation(
+      :unapproved_runtime,
+      path,
+      "compile-time hook @#{attribute} is forbidden"
+    )
   end
 
   defp node_violations({{:., _dot_meta, [module_ast, function]}, _meta, _args}, path)

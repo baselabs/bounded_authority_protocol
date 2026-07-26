@@ -148,12 +148,19 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     root =
       fixture_root!("""
       alias __MODULE__.Value
-      defmodule Value do
-        @moduledoc false
-      end
+      def marker, do: :ok
       """)
 
     assert [] == ArchitectureGate.check(root, compiled: false)
+  end
+
+  test "the source gate rejects an otherwise unused external module alias" do
+    root = fixture_root!("alias MysteryRuntime")
+
+    assert Enum.any?(ArchitectureGate.check(root, compiled: false), fn violation ->
+             violation.category == :unapproved_runtime and
+               violation.detail == "forbidden module MysteryRuntime"
+           end)
   end
 
   test "the source gate rejects an external alias shadowing the package root" do
@@ -184,33 +191,55 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
 
   test "the source gate rejects external compile-time directives" do
     bodies = [
-      """
-      require MysteryRuntime, as: BoundedAuthorityProtocol
-      def effect, do: BoundedAuthorityProtocol.perform(:effect)
-      """,
-      """
-      import MysteryRuntime
-      def effect, do: perform(:effect)
-      """,
-      """
-      require MysteryRuntime
-      def effect, do: MysteryRuntime.perform(:effect)
-      """,
-      """
-      use MysteryRuntime
-      """
+      {"external require is forbidden",
+       """
+       require MysteryRuntime, as: BoundedAuthorityProtocol
+       def effect, do: BoundedAuthorityProtocol.perform(:effect)
+       """},
+      {"external import is forbidden",
+       """
+       import MysteryRuntime
+       def effect, do: perform(:effect)
+       """},
+      {"external require is forbidden",
+       """
+       require MysteryRuntime
+       def effect, do: MysteryRuntime.perform(:effect)
+       """},
+      {"external use is forbidden",
+       """
+       use MysteryRuntime
+       """}
     ]
 
-    Enum.each(bodies, fn body ->
+    Enum.each(bodies, fn {expected_detail, body} ->
       root = fixture_root!(body)
 
       assert Enum.any?(ArchitectureGate.check(root, compiled: false), fn violation ->
                violation.category == :unapproved_runtime and
-                 violation.detail in [
-                   "external import is forbidden",
-                   "external require is forbidden",
-                   "external use is forbidden"
-                 ]
+                 violation.detail == expected_detail
+             end)
+    end)
+  end
+
+  test "the source gate rejects compile-time hook attributes" do
+    attributes = [
+      "@after_compile MysteryRuntime",
+      "@after_verify MysteryRuntime",
+      "@before_compile MysteryRuntime",
+      "@behaviour MysteryRuntime",
+      "@compile {:parse_transform, MysteryRuntime}",
+      "@derive MysteryRuntime",
+      "@external_resource \"forbidden.txt\"",
+      "@on_definition MysteryRuntime"
+    ]
+
+    Enum.each(attributes, fn attribute ->
+      root = fixture_root!(attribute)
+
+      assert Enum.any?(ArchitectureGate.check(root, compiled: false), fn violation ->
+               violation.category == :unapproved_runtime and
+                 violation.detail =~ "compile-time hook @"
              end)
     end)
   end
@@ -270,6 +299,36 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     assert [%{category: :parse_failure}] =
              ArchitectureGate.check(root, compiled: false)
              |> Enum.filter(&(&1.category == :parse_failure))
+  end
+
+  test "the compiled walker retains findings nested inside a forbidden node" do
+    root =
+      fixture_root!("""
+      def nested(function) do
+        receive do
+          message -> function.(message)
+        after
+          0 -> &MysteryRuntime.perform/1
+        end
+      end
+      """)
+
+    assert {_output, 0} =
+             System.cmd("mix", ["compile"],
+               cd: root,
+               env: [{"MIX_ENV", "prod"}],
+               stderr_to_stdout: true
+             )
+
+    violations = ArchitectureGate.check_compiled(root)
+
+    assert Enum.any?(violations, &(&1.detail == "compiled mailbox receive"))
+    assert Enum.any?(violations, &(&1.detail == "compiled variable function invocation"))
+
+    assert Enum.any?(
+             violations,
+             &(&1.detail =~ "compiled external function MysteryRuntime.perform/1")
+           )
   end
 
   test "the CI entrypoint goes red for a planted forbidden dependency and green after removal" do
