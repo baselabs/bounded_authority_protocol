@@ -2,6 +2,7 @@
 /deps/
 /doc/
 /cover/
+/artifacts/
 /.elixir_ls/
 /.lexical/
 /.serena/

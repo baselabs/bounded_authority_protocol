@@ -14,7 +14,7 @@ compatibility.
 | Row | Deliverable | Depends on | State | Completion gate |
 |---|---|---|---|---|
 | BAP-00 | Public repository, Apache-2.0 license, Forge boundary, tracked architecture and cold-start authority | — | Complete | Evidence recorded below |
-| BAP-01 | Mix package scaffold, pure-library architecture test, quality aliases, public CI, package inspection | BAP-00 | Planned | Zero-config compile; workflow syntax; dependency license/advisory checks; archive rejects private/product/runtime dependencies |
+| BAP-01 | Mix package scaffold, pure-library architecture test, quality aliases, public CI, package inspection | BAP-00 | In progress | Zero-config compile; workflow syntax; dependency license/advisory checks; archive rejects private/product/runtime dependencies |
 | BAP-02 | Closed canonical types, bounds, domain separators, RFC 8785 JCS, request digest | BAP-01 | Planned | Exact-byte independent vectors; duplicate/encoding/limit tests; malformed-input properties; mutation-red proof |
 | BAP-03 | Compact EdDSA grant and RFC 9449 DPoP encode/decode/verify | BAP-02 | Planned | Official and independent vectors; meaningful-byte tamper matrix; timing/allocation bounds; no trust-selection path |
 | BAP-04 | Consumption-chain, anchor, archive, and historical public-key verification | BAP-03 | Planned | Rollover, truncation, reorder, omission, archive-coverage, and tamper vectors pass independently |
@@ -39,5 +39,7 @@ compatibility.
 
 ## Next action
 
-Execute `BAP-01` from a freshly reviewed Forge plan. The private runtime may scaffold its
-dependency seam after BAP-01; it must not duplicate canonicalization or cryptographic verification.
+Land the reviewed `BAP-01` implementation, then require green public CI and trusted-main package
+attestations before marking the row complete. `BAP-02` must not start before that closeout. The
+private runtime may scaffold its dependency seam after BAP-01; it must not duplicate
+canonicalization or cryptographic verification.

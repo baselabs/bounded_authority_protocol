@@ -21,10 +21,12 @@ grant operational authority by itself.
 
 ## Current state
 
-`BAP-00` is complete, with reviewed public authority head `6474c0d`, the public remote, and all
-consuming repository boundaries verified. No Mix package or protocol implementation exists yet.
-The next executable row is `BAP-01` in [`docs/ROADMAP.md`](docs/ROADMAP.md): create the public Mix
-package, quality gates, public CI, and enforceable package-boundary tests.
+`BAP-00` is complete. The unpublished 0.1.0 Mix scaffold, zero-runtime-dependency policy,
+four-layer purity gate, public CI, package inspection, license/advisory gates, CycloneDX output,
+and provenance automation are implemented locally by `BAP-01`; public CI and trusted-main
+attestation verification remain its closeout boundary. No protocol profile or verifier behavior
+exists yet. Consult [`docs/ROADMAP.md`](docs/ROADMAP.md) for the verified row state and next
+executable row.
 
 ## Critical rules
 
@@ -83,6 +85,8 @@ runtime accepts raw credentials at its public boundary, not a caller-provided `E
   conformance are T2.
 - Write the failing test first. Every security gate requires allow, deny, malformed-input, and
   mutation-red evidence as applicable.
+- Run `mix quality` before landing. It is the complete local package, purity, documentation,
+  advisory, license, SBOM, and unpacked-consumer gate.
 - Update the changelog, roadmap, ADR/design contracts, vectors, and consumer documentation in the
   same landing as a changed public contract.
 - Do not claim interoperability from self-round-trips. Normative vectors require an independent

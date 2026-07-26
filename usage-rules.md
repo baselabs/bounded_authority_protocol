@@ -10,3 +10,5 @@
 6. Never pass private keys, secrets, raw user values, or production credentials into fixtures,
    logs, errors, or telemetry.
 7. Pin released major versions and run the conformance vectors before accepting a new release.
+8. Treat the current 0.1.0 scaffold as unpublished build infrastructure; it exposes no verifier
+   behavior until the versioned protocol profiles land.
