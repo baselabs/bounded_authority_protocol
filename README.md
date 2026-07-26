@@ -40,8 +40,8 @@ consumptions, remove archived evidence, submit witnesses, or run an OTP service.
 
 Those stateful responsibilities belong to the private
 [`bounded_authority`](https://github.com/baselabs/bounded_authority) runtime. Product integration
-belongs to the consuming host. QorPay and `Qorpay.ScopeAxis` are unchanged and are not protocol
-compatibility targets.
+belongs to the consuming host. QorPay is unchanged; its private authority schemas and wire formats
+are not protocol compatibility targets.
 
 ## Dependency direction
 
