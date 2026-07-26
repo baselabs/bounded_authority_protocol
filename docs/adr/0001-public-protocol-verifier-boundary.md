@@ -66,4 +66,5 @@ remain compatible with private commercial consumers.
   revocation, replay, and execution state before minting its private decision/claim.
 - Dependency direction remains one-way: private and product packages may depend on public
   protocol code; public protocol code never depends on them.
-- QorPay and `Qorpay.ScopeAxis` remain unchanged and are not compatibility targets.
+- QorPay remains unchanged; its private authority schemas and wire formats are not compatibility
+  targets.
