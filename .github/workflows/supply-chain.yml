@@ -1,0 +1,65 @@
+name: Supply chain
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: supply-chain-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Build and attest CI package
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          elixir-version: "1.20.2"
+          otp-version: "29.0.3"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Run complete quality gate
+        run: mix quality
+
+      - name: Build exact unpublished archive
+        run: mix hex.build --output artifacts/bounded_authority_protocol-0.1.0.tar
+
+      - name: Record archive checksum
+        working-directory: artifacts
+        run: sha256sum bounded_authority_protocol-0.1.0.tar > SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: artifacts/bounded_authority_protocol-0.1.0.tar
+
+      - name: Attest release SBOM
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: artifacts/bounded_authority_protocol-0.1.0.tar
+          sbom-path: artifacts/release.cdx.json
+
+      - name: Upload CI package evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: bounded-authority-protocol-${{ github.sha }}
+          path: |
+            artifacts/bounded_authority_protocol-0.1.0.tar
+            artifacts/release.cdx.json
+            artifacts/tooling.cdx.json
+            artifacts/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
