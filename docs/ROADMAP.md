@@ -15,7 +15,7 @@ compatibility.
 |---|---|---|---|---|
 | BAP-00 | Public repository, Apache-2.0 license, Forge boundary, tracked architecture and cold-start authority | — | Complete | Evidence recorded below |
 | BAP-01 | Mix package scaffold, pure-library architecture test, quality aliases, public CI, package inspection | BAP-00 | Complete | Evidence recorded below |
-| BAP-02 | Normative v1 tables, bounded ordered decoder, strict base64url, untrusted key locator | BAP-01 | Implemented; closeout pending | Duplicate/encoding/limit tests; malformed-input properties; mutation-red proof; local and trusted-main gates |
+| BAP-02 | Normative v1 tables, bounded ordered decoder, strict base64url, untrusted key locator | BAP-01 | Complete | Evidence recorded below |
 | BAP-03 | Compact EdDSA grant and RFC 9449 DPoP encode/decode/verify | BAP-02 | Planned | Official and independent vectors; meaningful-byte tamper matrix; timing/allocation bounds; no trust-selection path |
 | BAP-04 | Consumption-chain, anchor, archive, and historical public-key verification | BAP-03 | Planned | Rollover, truncation, reorder, omission, archive-coverage, and tamper vectors pass independently |
 | BAP-05 | Language-neutral conformance corpus, verifier CLI, property/fuzz/mutation gates | BAP-04 | Planned | A second implementation consumes only published artifacts and agrees on every valid/invalid vector |
@@ -61,7 +61,32 @@ compatibility.
   signed release commits; the Node 20 artifact-action warning was removed and the replacement
   trusted-main run is clean of Node-runtime deprecation warnings.
 
+## BAP-02 closeout evidence
+
+- Package-bearing implementation head `458c5e6914b0ba2ac6afa6170d30fe576cd7c8e5` is pushed to
+  public `main`. [CI run 30235354342](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30235354342)
+  passed the complete quality/package boundary, workflow syntax, and all supported pairs:
+  Elixir 1.18.4/OTP 27.3.4.14, Elixir 1.19.5/OTP 28.5.0.3, and Elixir
+  1.20.2/OTP 29.0.3.
+- [Supply-chain run 30235354489](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30235354489)
+  built artifact `8641490849`. Its exact unpublished archive has SHA-256
+  `591bb037844060e0662a92a6cf93354ccb72d2ca92b6a2fe926e0a8de8bce1ef`; the downloaded
+  `SHA256SUMS` check passed.
+- `gh attestation verify` accepted separate SLSA provenance and CycloneDX 1.6 SBOM attestations
+  for that exact digest, constrained to this repository, the trusted supply-chain workflow,
+  `refs/heads/main`, source digest `458c5e6914b0ba2ac6afa6170d30fe576cd7c8e5`, and
+  GitHub-hosted runners.
+- Local `mix quality` passed 38 tests with 0 failures and 100.00% coverage, plus format,
+  warnings-as-errors compilation, Credo, Dialyzer, documentation, advisory, retired-package,
+  license, release/tooling SBOM, exact archive, and fresh external-consumer gates. The package
+  retains zero production dependencies, no application callback, and no supervision tree.
+- The duplicate-member, non-canonical base64url, forbidden-runtime-import, and numeric-schema
+  mutation probes each made its owning gate fail before the original was restored. The
+  independent review's three findings were fixed and its delta rereview returned no findings.
+  Fable, Opus, and GLM cross-vendor reviews all timed out without a verdict; their partial logs
+  were mined and contained no actionable finding. They remain named degraded reviews, not
+  zero-finding reviews.
+
 ## Next action
 
-Close BAP-02 after independent review, mutation proof, exact packaged-consumer proof, trusted-main
-compatibility CI, and supply-chain receipt verification. BAP-03 remains unstarted.
+BAP-02 is complete. BAP-03 remains unstarted and requires its own reviewed Forge slice.

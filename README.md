@@ -11,7 +11,8 @@ contains the unpublished `:bounded_authority_protocol` 0.1.0 Mix package scaffol
 release boundary. `BAP-01` is complete: its public CI matrix, complete quality gate, exact archive,
 checksum, SLSA provenance, and CycloneDX attestation passed from trusted `main`. `BAP-02` now
 freezes the v1 wire tables and limits and implements bounded ordered JSON, strict base64url, and
-the protected-header-only untrusted key locator. Cryptographic verification begins in a later
+the protected-header-only untrusted key locator; its local, compatibility-CI, packaged-consumer,
+checksum, provenance, and SBOM gates are complete. Cryptographic verification begins in a later
 row. Nothing in this repository has been published to Hex.
 
 The scaffold has zero production dependencies, no application callback, and no supervision tree.
