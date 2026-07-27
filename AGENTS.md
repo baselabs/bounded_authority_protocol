@@ -21,12 +21,11 @@ grant operational authority by itself.
 
 ## Current state
 
-`BAP-00` is complete. The unpublished 0.1.0 Mix scaffold, zero-runtime-dependency policy,
-four-layer purity gate, public CI, package inspection, license/advisory gates, CycloneDX output,
-and provenance automation are implemented locally by `BAP-01`; public CI and trusted-main
-attestation verification remain its closeout boundary. No protocol profile or verifier behavior
-exists yet. Consult [`docs/ROADMAP.md`](docs/ROADMAP.md) for the verified row state and next
-executable row.
+`BAP-00` and `BAP-01` are complete. The unpublished 0.1.0 Mix scaffold,
+zero-runtime-dependency policy, four-layer purity gate, public CI, package inspection,
+license/advisory gates, CycloneDX output, and trusted-main provenance verification are closed. No
+protocol profile or verifier behavior exists yet. `BAP-02` is the next executable row; consult
+[`docs/ROADMAP.md`](docs/ROADMAP.md) for its completion boundary.
 
 ## Critical rules
 

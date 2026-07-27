@@ -14,7 +14,7 @@ compatibility.
 | Row | Deliverable | Depends on | State | Completion gate |
 |---|---|---|---|---|
 | BAP-00 | Public repository, Apache-2.0 license, Forge boundary, tracked architecture and cold-start authority | — | Complete | Evidence recorded below |
-| BAP-01 | Mix package scaffold, pure-library architecture test, quality aliases, public CI, package inspection | BAP-00 | In progress | Zero-config compile; workflow syntax; dependency license/advisory checks; archive rejects private/product/runtime dependencies |
+| BAP-01 | Mix package scaffold, pure-library architecture test, quality aliases, public CI, package inspection | BAP-00 | Complete | Evidence recorded below |
 | BAP-02 | Closed canonical types, bounds, domain separators, RFC 8785 JCS, request digest | BAP-01 | Planned | Exact-byte independent vectors; duplicate/encoding/limit tests; malformed-input properties; mutation-red proof |
 | BAP-03 | Compact EdDSA grant and RFC 9449 DPoP encode/decode/verify | BAP-02 | Planned | Official and independent vectors; meaningful-byte tamper matrix; timing/allocation bounds; no trust-selection path |
 | BAP-04 | Consumption-chain, anchor, archive, and historical public-key verification | BAP-03 | Planned | Rollover, truncation, reorder, omission, archive-coverage, and tamper vectors pass independently |
@@ -37,9 +37,33 @@ compatibility.
   peer returned no findings. The Beamline Claude peer was unavailable twice because the installed
   CLI reported retired model aliases, so that peer is a named degraded review, not a zero.
 
+## BAP-01 closeout evidence
+
+- Implementation head `884514ef2a4b5e8c1ed5da5297a001f54f0cd9a0` is pushed to public
+  `main`. [CI run 30227229270](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30227229270)
+  passed the complete quality/package boundary, workflow syntax, and all supported pairs:
+  Elixir 1.18.4/OTP 27.3.4.14, Elixir 1.19.5/OTP 28.5.0.3, and Elixir
+  1.20.2/OTP 29.0.3.
+- [Supply-chain run 30227229255](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30227229255)
+  built artifact `8638929020`. Its exact unpublished archive has SHA-256
+  `f101975f06baef809d34b627253c9d9505d15f7ade599a4d4c61807d9a720490`; the downloaded
+  `SHA256SUMS` check passed.
+- `gh attestation verify` accepted separate SLSA provenance and CycloneDX 1.6 SBOM attestations
+  for that exact digest, constrained to this repository, the trusted supply-chain workflow,
+  `refs/heads/main`, source digest `884514ef2a4b5e8c1ed5da5297a001f54f0cd9a0`, and
+  GitHub-hosted runners.
+- Local `mix quality` passed 15 tests with 0 failures and 100.00% coverage, plus format,
+  warnings-as-errors compilation, Credo, Dialyzer, documentation, advisory, retired-package,
+  license, SBOM, exact archive, and fresh external-consumer gates. The package has zero
+  production dependencies, no application callback, and no supervision tree.
+- All admitted correctness, security, gate-integrity, and cross-vendor findings were fixed. Final
+  Claude and GLM code-delta reviews returned no findings. Workflow actions are pinned to exact
+  signed release commits; the Node 20 artifact-action warning was removed and the replacement
+  trusted-main run is clean of Node-runtime deprecation warnings.
+
 ## Next action
 
-Land the reviewed `BAP-01` implementation, then require green public CI and trusted-main package
-attestations before marking the row complete. `BAP-02` must not start before that closeout. The
-private runtime may scaffold its dependency seam after BAP-01; it must not duplicate
-canonicalization or cryptographic verification.
+Execute `BAP-02` from the reviewed Forge plan: freeze the closed v1 tables and bounds, implement
+the bounded protected-header key locator and ordered JSON decoder, and prove malformed and
+over-limit inputs fail closed. The private runtime may scaffold its dependency seam; it must not
+duplicate canonicalization or cryptographic verification.
