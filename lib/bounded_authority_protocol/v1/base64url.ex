@@ -1,5 +1,12 @@
 defmodule BoundedAuthorityProtocol.V1.Base64Url do
-  @moduledoc "Strict unpadded canonical base64url decoding for v1."
+  @moduledoc """
+  Strict bounded canonical base64url decoding for v1.
+
+  `decode/2` accepts only the unpadded `A-Z`, `a-z`, `0-9`, `-`, and `_` alphabet, projects the
+  decoded size before allocation, and requires byte-identical unpadded re-encoding. Caller limits
+  may only tighten the positive-integer hard maxima. Success returns `{:ok, binary}`; every
+  failure returns the fixed value-free `{:error, :invalid}`.
+  """
 
   alias BoundedAuthorityProtocol.V1.Bounds
 

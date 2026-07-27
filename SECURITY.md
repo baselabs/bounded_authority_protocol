@@ -4,7 +4,16 @@
 
 No released version exists yet. This file becomes version-specific with the first public release.
 
-The current 0.1.0 source scaffold is unpublished and contains no protocol verifier behavior.
+The current unpublished 0.1.0 source implements the BAP-02 bounded ordered JSON decoder, strict
+canonical base64url decoder, and protected-header-only untrusted key locator. It does not yet
+implement cryptographic grant or DPoP verification.
+
+Final BAP-02 verification source
+`893680f501d39371c7f1f1f630d8e8e92cd35cf8` passed
+[CI run 30242449363](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30242449363)
+and
+[supply-chain run 30242449390](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30242449390)
+at that exact revision.
 
 ## Reporting a vulnerability
 
