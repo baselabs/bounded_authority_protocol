@@ -9,9 +9,10 @@ The public/private boundary is complete under
 [`BAP-00`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). The source tree now
 contains the unpublished `:bounded_authority_protocol` 0.1.0 Mix package scaffold and its enforced
 release boundary. `BAP-01` is complete: its public CI matrix, complete quality gate, exact archive,
-checksum, SLSA provenance, and CycloneDX attestation passed from trusted `main`. No protocol
-profile or verifier behavior is implemented yet; `BAP-02` is the next executable row. Nothing in
-this repository has been published to Hex.
+checksum, SLSA provenance, and CycloneDX attestation passed from trusted `main`. `BAP-02` now
+freezes the v1 wire tables and limits and implements bounded ordered JSON, strict base64url, and
+the protected-header-only untrusted key locator. Cryptographic verification begins in a later
+row. Nothing in this repository has been published to Hex.
 
 The scaffold has zero production dependencies, no application callback, and no supervision tree.
 Source AST, compiled BEAM imports, generated application metadata, dependency declarations, and
@@ -19,9 +20,16 @@ the unpacked Hex archive are all checked to preserve that boundary.
 
 ## Public contract
 
-The planned library will provide:
+The v1 profile now provides:
 
-- closed, versioned capability-grant and RFC 9449 DPoP data types;
+- immutable protected-header, claim, selector, separator, URI, encoding, and resource-limit tables;
+- ordered JSON decoding with recursive duplicate rejection and no input-name atomization;
+- strict canonical unpadded base64url decoding;
+- a protected-header-only `untrusted_key_locator/2` that returns `trust: :not_evaluated`.
+
+Later rows will provide:
+
+- closed, versioned grant and RFC 9449 DPoP data types;
 - RFC 8785 JCS request digests and exact signing inputs;
 - compact EdDSA grant and holder-proof decoding and verification;
 - consumption-chain and archive verification;
@@ -32,12 +40,9 @@ All verification inputs are explicit: already-trusted public key, expected audie
 server-derived method, normalized URI, invocation ID, operation, cast arguments, evaluation time,
 and limits. A successful result means only that the supplied bytes satisfy those supplied inputs.
 
-The public package also exposes a bounded `untrusted_key_locator/2` preparse that returns only the
-closed protected-header `kid` as an explicitly untrusted lookup hint. It never selects or marks a
-key trusted. The stateful runtime combines that hint with its expected issuer context, resolves a
-candidate-key snapshot, and verifies the complete envelope outside a database transaction. It then
-opens the state transaction, re-resolves and locks the current key/revocation rows, requires the
-same key fingerprint and current eligibility, and only then reserves replay or claims execution.
+The public package exposes a bounded `untrusted_key_locator/2` preparse that returns only the
+closed protected-header `kid` as an explicitly untrusted lookup hint. It does not decode payload
+or signature segments and never selects or marks a key trusted.
 
 ## Deliberate exclusions
 
@@ -58,7 +63,8 @@ retired_private_consumer               -> beamline + bounded_authority + ash + a
 bounded_authority_protocol -> no private or product package
 ```
 
-See the [protocol charter](docs/design/protocol-charter.md), [threat model](docs/design/threat-model.md),
+See the [normative v1 profile](docs/protocol-v1.md),
+[protocol charter](docs/design/protocol-charter.md), [threat model](docs/design/threat-model.md),
 [conformance contract](docs/design/conformance-contract.md), and
 [ADR 0001](docs/adr/0001-public-protocol-verifier-boundary.md).
 

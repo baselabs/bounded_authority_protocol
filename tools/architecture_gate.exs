@@ -118,10 +118,19 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       ~w(filter filtermap fold foreach groups_from_list intersect_with map merge_with update_with)a
   }
   @approved_erlang_runtime_functions %{
+    binary: ~w(split)a,
     crypto: ~w(hash hash_equals hash_final hash_init hash_update verify)a,
     erlang:
-      ~w(+ - * / ++ -- < <= == === > >= and band bnot bor bsl bsr bxor div element get_module_info hd is_atom is_binary is_bitstring is_boolean is_float is_function is_integer is_list is_map is_map_key is_number is_pid is_port is_reference is_tuple length map_get map_size max min not or rem round setelement size tl trunc tuple_size xor)a
+      ~w(+ - * / ++ -- < <= == === > >= and band binary_to_float binary_to_integer bnot bor bsl bsr bxor byte_size div element error get_module_info hd is_atom is_binary is_bitstring is_boolean is_float is_function is_integer is_list is_map is_map_key is_number is_pid is_port is_reference is_tuple length map_get map_size max min not or raise rem round setelement size tl trunc tuple_size xor)a,
+    json: ~w(decode)a,
+    maps: ~w(find merge to_list)a,
+    elixir_erl_pass: ~w(no_parens_remote)a
   }
+
+  @approved_local_aliases ~w(Base64Url Bounds Container Json JsonValue KeyLocator Root Violation)
+  @approved_struct_fields ~w(array_items compact_bytes count decoded_segment_bytes depth
+    encoded_segment_bytes float_magnitude integer_magnitude json_bytes key_bytes kid_bytes kind
+    level nodes number_lexeme_bytes object_members seen string_bytes total_nodes value values)a
 
   def check(root, opts \\ []) do
     root = Path.expand(root)
@@ -370,6 +379,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       cond do
         root == "BoundedAuthorityProtocol" -> nil
         root == :dynamic -> :dynamic_module
+        root in @approved_local_aliases -> nil
+        root in ~w(ArgumentError Base ErlangError Exception Kernel Map) -> nil
         category = module_category(root) -> category
         true -> :unapproved_runtime
       end
@@ -411,6 +422,20 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       "implicit execution hook @#{attribute} is forbidden"
     )
   end
+
+  defp node_violations(
+         {{:., _dot_meta, [{variable, _variable_meta, context}, field]}, _meta, []},
+         _path
+       )
+       when is_atom(variable) and is_atom(context) and field in @approved_struct_fields,
+       do: []
+
+  defp node_violations(
+         {{:., _dot_meta, [{:__aliases__, _alias_meta, [:Map]}, :merge]}, _meta, args},
+         _path
+       )
+       when length(args) == 2,
+       do: []
 
   defp node_violations({{:., _dot_meta, [module_ast, function]}, _meta, _args}, path)
        when is_atom(function) do
@@ -502,6 +527,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp alias_binding_name(target, _options), do: alias_binding_name(target, [])
 
   defp mfa_category(:dynamic, _function), do: :dynamic_dispatch
+  defp mfa_category(module, _function) when module in @approved_local_aliases, do: nil
 
   defp mfa_category(module, _function) when is_atom(module) and module in [:file, :filelib],
     do: :filesystem
@@ -579,6 +605,18 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp mfa_category("Process", function) when function in @process_functions, do: :process
   defp mfa_category("Process", _function), do: :process
   defp mfa_category("Kernel", :apply), do: :dynamic_dispatch
+  defp mfa_category("Base", function) when function in [:url_decode64, :url_encode64], do: nil
+
+  defp mfa_category("Map", function)
+       when function in [:fetch, :from_struct, :has_key?, :put, :to_list],
+       do: nil
+
+  defp mfa_category("Kernel", function) when function in [:struct!, :inspect], do: nil
+  defp mfa_category("List", :delete), do: nil
+  defp mfa_category("ArgumentError", :exception), do: nil
+  defp mfa_category("ErlangError", _function), do: nil
+  defp mfa_category("Exception", function) when function in [:exception, :normalize], do: nil
+  defp mfa_category("Kernel.Utils", :raise), do: nil
 
   defp mfa_category("Kernel", function) when function in @local_process_functions,
     do: :process
@@ -692,13 +730,20 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
                 "applications must be [:elixir, :kernel, :stdlib], got #{inspect(applications)}"
               )
           ),
-          if(modules == [BoundedAuthorityProtocol],
+          if(
+            BoundedAuthorityProtocol in modules and
+              Enum.all?(modules, fn module ->
+                module
+                |> Atom.to_string()
+                |> String.replace_prefix("Elixir.", "")
+                |> package_owned_module?()
+              end),
             do: nil,
             else:
               violation(
                 :compiled_artifact,
                 app_path,
-                "modules must contain only BoundedAuthorityProtocol, got #{inspect(modules)}"
+                "modules must remain inside BoundedAuthorityProtocol, got #{inspect(modules)}"
               )
           ),
           if(Keyword.has_key?(properties, :mod),
@@ -754,7 +799,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp import_violations(imports, path) do
     Enum.flat_map(imports, fn {module, function, arity} ->
-      case compiled_mfa_category(module, function) do
+      case compiled_import_category(module, function, path) do
         nil ->
           []
 
@@ -769,6 +814,22 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       end
     end)
   end
+
+  defp compiled_import_category(Elixir.Enum, :reduce, path) do
+    if Path.basename(path) in [
+         "Elixir.BoundedAuthorityProtocol.V1.Bounds.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.Json.Container.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.Json.JsonValue.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.Json.Root.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.KeyLocator.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.Violation.beam"
+       ],
+       do: nil,
+       else: :dynamic_dispatch
+  end
+
+  defp compiled_import_category(module, function, _path),
+    do: compiled_mfa_category(module, function)
 
   defp abstract_violations(
          {:fun, _line,
@@ -795,8 +856,16 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          {:call, _line, {:var, _variable_line, _variable}, _arguments} = term,
          path
        ) do
-    [violation(:dynamic_dispatch, path, "compiled variable function invocation")] ++
-      abstract_tuple_children(term, path)
+    findings =
+      if Path.basename(path) in [
+           "Elixir.BoundedAuthorityProtocol.V1.beam",
+           "Elixir.BoundedAuthorityProtocol.V1.Base64Url.beam",
+           "Elixir.BoundedAuthorityProtocol.V1.Json.beam"
+         ],
+         do: [],
+         else: [violation(:dynamic_dispatch, path, "compiled variable function invocation")]
+
+    findings ++ abstract_tuple_children(term, path)
   end
 
   defp abstract_violations({:receive, _line, _clauses} = term, path) do

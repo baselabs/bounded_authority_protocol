@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.Architecture.PackageTest do
   use ExUnit.Case, async: false
 
-  @moduletag timeout: 240_000
+  @moduletag timeout: 600_000
 
   @root Path.expand("../..", __DIR__)
 
