@@ -2,69 +2,77 @@
 
 ## Objective
 
-Define and deterministically verify the bytes for one issuer-bounded, holder-proven remote
-invocation and for its value-free append-only evidence. Operational authorization remains outside
-this package.
+Define and deterministically verify the exact bytes for one issuer-bounded, holder-proven remote
+invocation. The package returns cryptographic/contextual facts; operational authorization and live
+state remain outside it.
 
 ## Verification chain
 
-1. The caller supplies raw credentials and an expected issuer context to the stateful runtime.
-2. The library's bounded `untrusted_key_locator/2` returns only the protected-header `kid` as an
-   explicitly untrusted lookup hint.
+1. The caller supplies raw credentials and expected issuer/request context to the private runtime.
+2. The bounded `untrusted_key_locator/2` returns only the protected grant `kid` as an explicitly
+   untrusted lookup hint.
 3. The runtime combines expected issuer context with that hint and resolves a candidate public-key
    snapshot.
-4. Outside a database transaction, the library verifies a closed capability grant against that
-   snapshot, expected audience/instance,
-   explicit time, and explicit bounds.
+4. Outside a database transaction, `verify_grant/3` verifies the raw compact grant against the
+   exact candidate key, issuer, audience, explicit time, skew, and bounds. It returns redacted
+   `GrantFacts{authorization: :not_evaluated}`.
 5. The grant binds an Ed25519 holder key through `cnf.jkt`.
-6. The library verifies an RFC 9449 DPoP proof against the verified grant and server-derived method,
-   normalized URI, invocation ID, operation, and cast-argument digest.
-7. The library returns closed `EnvelopeFacts` with `authorization: :not_evaluated`, or the single
-   fixed production error `:invalid`.
-8. The stateful authority then begins one transaction, re-resolves and locks current key/revocation
-   facts, fingerprint-matches the verified snapshot, requires current eligibility, checks replay,
-   and records a decision and execution
-   claim, and the host independently authorizes the business effect.
+6. `check_envelope/2` accepts raw grant and proof bytes, re-verifies the raw grant rather than
+   accepting the facts, verifies the RFC 9449 proof, and binds holder, grant, method, normalized
+   HTTPS URI, invocation ID, operation, cast-argument digest, time, nonce, and selectors.
+7. The library returns redacted `EnvelopeFacts{authorization: :not_evaluated}`, or exactly
+   `{:error, :invalid}`.
+8. The stateful authority then begins one transaction, re-resolves and locks current
+   key/revocation facts, fingerprint-matches the verified snapshot, requires current eligibility,
+   checks replay, and records its decision/execution claim. The host independently authorizes the
+   business effect.
+
+Neither a decoded struct nor caller-provided `GrantFacts`/`EnvelopeFacts` is accepted as
+credentials.
 
 ## Grant
 
-Protocol v1 uses compact JWS with `alg: EdDSA`, `typ: ba+cap`, an issuer-controlled `kid`, and a
-closed claim schema. Claims cover issuer, audience/consumer instance, grant/token IDs, time
-window, operations, provider-neutral subject and field restrictions through selector paths and
-values, and holder binding. Traversal depth and explicit resource limits are parser/context
-bounds, not additional grant claims.
+Protocol v1 uses standard compact JWS with exact RFC 7515 signing bytes, `alg: EdDSA`,
+`typ: ba+cap`, an issuer-controlled `kid`, and a closed claim schema. Claims cover issuer,
+audience, grant ID, coherent times, unique operations, ordered selectors, and holder binding.
+Deterministic producers emit JCS protected/payload bytes and return a signing input; the package
+never accepts private key material, a signer, or a signing callback.
 
-Unknown versions, algorithms, critical headers, claims, selectors, holder modes, duplicate keys,
-invalid UTF-8, and over-limit structures fail closed. The public verifier does not use `kid` to
-discover trust.
+Unknown versions, algorithms, headers, claims, selectors, duplicate keys, encodings, or
+over-limit structures fail closed. The verifier does not use `kid` to discover trust.
 
 ## Holder proof
 
 Each invocation supplies compact RFC 9449 DPoP:
 
-- protected header: `typ: dpop+jwt`, `alg: EdDSA`, public Ed25519 `jwk`;
-- claims: `jti`, server-derived `htm` and normalized `htu`, `iat`, capability hash `ath`,
-  optional challenged `nonce`, invocation UUID `ba_inv`, stable operation `ba_op`, and request
+- protected header: exact `typ: dpop+jwt`, `alg: EdDSA`, and public Ed25519 JWK;
+- claims: `jti`, server-derived `htm` and normalized hierarchical HTTPS `htu`, `iat`, grant hash
+  `ath`, optional challenged `nonce`, invocation UUID `ba_inv`, operation `ba_op`, and request
   digest `ba_req`;
-- `ba_req = SHA-256("BAP1-REQUEST\0" || JCS([operation, cast_arguments]))`, where the quoted
-  prefix is the exact ASCII domain-separator byte string including its final zero byte.
+- `ba_req = base64url(SHA-256("BAP1-REQUEST\0" ||
+  JCS([operation, typed(cast_arguments)])))`, where the prefix is exact ASCII including its final
+  zero byte and the closed recursive `typed/1` projection preserves every tagged JSON variant,
+  including integer versus integral-float identity.
 
-No unprotected security parameter, embedded private JWK value, caller-selected expected context,
-or bearer fallback is accepted.
+Arguments may be any tagged JSON value. `all` matches any root; path selectors traverse objects
+only and compare tagged JSON semantically, including unordered object members. No unprotected
+security parameter, private JWK member, caller-selected expected context, or bearer fallback is
+accepted.
+
+## Verification results
+
+`GrantFacts` and `EnvelopeFacts` are immutable, closed, bounded, value-bearing, and redacted. Their
+fixed inspection does not expose fields, and they implement no generic encoder. They contain only
+the exact identifiers, times, fingerprints, and hashes required by the private runtime, plus
+`authorization: :not_evaluated`; they exclude arguments, selector values, raw credentials,
+signatures, JWK containers, and nonces.
+
+Those facts are not operational decisions. The private runtime accepts raw credential bytes at
+its public boundary and produces facts internally; it never treats a caller-provided facts struct
+as an execution credential.
 
 ## Evidence verification
 
-Chain and archive functions verify canonical row bytes, sequence, previous-link hashes, anchors,
-public-key rollover, archive coverage, and truncation/omission evidence. They do not read live
-storage, append a row, create an anchor, submit a witness, certify archival deletion, or decide
-retention.
-
-## Verification result
-
-`EnvelopeFacts` is immutable, closed, bounded, value-free, redacted on inspection, and has no
-generic JSON encoder. It carries the exact protocol version and canonical identifiers needed by a
-stateful runtime, plus `authorization: :not_evaluated`. It is not an operational authorization
-decision and cannot grant an effect without adjacent live-state and host-policy checks.
-
-The private runtime accepts raw credential bytes at its public boundary and produces
-`EnvelopeFacts` internally. A caller-provided facts struct is never an execution credential.
+BAP-04 chain/archive functions will verify canonical row bytes, sequence, previous-link hashes,
+anchors, public-key rollover, archive coverage, and truncation/omission evidence. They will not
+read storage, append rows, create anchors, submit witnesses, certify deletion, or decide retention.

@@ -1,44 +1,40 @@
 # Bounded Authority Protocol v1 wire profile
 
-Status: normative and immutable for v1. The package remains unpublished.
+Status: normative for v1. The package remains unpublished. ADR 0003 explicitly supersedes the
+earlier grant/proof separator rows before release; every other change requires the contract-major
+and SemVer process.
 
-This document freezes the byte-level profile. A conforming implementation rejects every
-unlisted member, value, encoding, or extension with the single public result
-`{:error, :invalid}`. A successful parse is not a trust or authorization decision.
+This document freezes the byte-level profile. A conforming implementation rejects every unlisted
+member, value, encoding, or extension with exactly `{:error, :invalid}`. Successful decode or
+verification is not a trust-selection or authorization decision.
 
 ## Normative sources
 
 - [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259): JSON grammar, UTF-8, interoperable integer
   range, and parser resource limits.
-- [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785): I-JSON constraints, duplicate-name
-  prohibition, no Unicode normalization, and later canonical serialization.
-- [RFC 4648](https://www.rfc-editor.org/rfc/rfc4648): base64url alphabet, rejection of
-  non-alphabet bytes, and canonical zero pad bits.
-- [RFC 7515](https://www.rfc-editor.org/rfc/rfc7515): compact JWS shape, unpadded base64url, UTF-8
-  protected headers, and case-sensitive `kid` treatment.
-- [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519): registered claim value types, NumericDate,
-  and case-sensitive StringOrURI comparison.
+- [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785): I-JSON, duplicate-name prohibition, no
+  Unicode normalization, UTF-16 property sorting, and deterministic serialization.
+- [RFC 4648](https://www.rfc-editor.org/rfc/rfc4648): base64url alphabet and canonical pad bits.
+- [RFC 7515](https://www.rfc-editor.org/rfc/rfc7515) and
+  [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519): compact JWS signing input, registered claim
+  types, NumericDate, and case-sensitive StringOrURI comparison.
+- [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638),
+  [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032), and
+  [RFC 8037](https://www.rfc-editor.org/rfc/rfc8037): public OKP JWK thumbprints, Ed25519 keys and
+  signatures, and EdDSA use in JOSE.
 - [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) and
-  [RFC 9449](https://www.rfc-editor.org/rfc/rfc9449): URI syntax normalization and DPoP target
-  URI treatment.
+  [RFC 9449](https://www.rfc-editor.org/rfc/rfc9449): URI normalization and DPoP bindings.
 - [Erlang/OTP `json`](https://www.erlang.org/doc/apps/stdlib/json.html): OTP 27+ ordered decode
   callbacks and incomplete/invalid UTF-8 failures.
 - [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12/json-schema-validation):
   structural validation semantics, including code-point-based string length.
 
-These references supply generic encodings. The closed fields, values, separators, and bounds
+These references supply generic encodings. The closed fields, values, digest prefixes, and bounds
 below are this profile's choices.
 
 ## JSON algebra and decoding
 
-The public bounded decoder is
-`BoundedAuthorityProtocol.V1.Json.decode/2`. The public strict segment decoder is
-`BoundedAuthorityProtocol.V1.Base64Url.decode/2`. Both return `{:error, :invalid}` for every
-failure without including input values. These named submodules are explicit public v1 modules;
-there are no duplicate decoder functions on `BoundedAuthorityProtocol.V1` and no implicit latest
-profile.
-
-The decoder returns exactly:
+`BoundedAuthorityProtocol.V1.Json.decode/2` returns exactly:
 
 | JSON | Elixir value |
 |---|---|
@@ -50,39 +46,37 @@ The decoder returns exactly:
 | array | `{:array, [value]}` |
 | object | `{:object, [{UTF-8_binary, value}]}` |
 
-Objects retain source member order. Names remain binaries and are never atomized. A duplicate
-name at any depth is rejected while the ordered member list is being built, before any map
-conversion. Input must be one complete RFC 8259 value followed only by JSON whitespace. UTF-8 is
-mandatory. Strings are preserved exactly; Unicode normalization is forbidden.
+Objects retain source member order. Names remain binaries and are never atomized. A duplicate name
+at any depth is rejected before map conversion. Input is one complete RFC 8259 value followed only
+by JSON whitespace. UTF-8 is mandatory; strings are preserved without Unicode normalization.
 
-Before OTP converts a number token, the decoder scans its raw RFC 8259 lexeme outside strings,
-enforces the 64-byte ceiling, and compares its exact decimal magnitude without floating-point
-rounding. All numbers are limited symmetrically to
-`-9007199254740991..9007199254740991`, the exact interoperable integer range identified by
-RFC 8259. Floats must also be finite. Thus exponent spellings are bounded by their source bytes,
-and a fractional value outside the limit cannot round inward and pass.
+Before number conversion, the decoder scans raw RFC 8259 number lexemes outside strings, enforces
+the 64-byte ceiling, and compares exact decimal magnitude without floating-point rounding. Integers
+and finite floats are bounded symmetrically to `-9007199254740991..9007199254740991`.
+
+`BoundedAuthorityProtocol.V1.Jcs.encode/2` accepts only this tagged algebra. It enforces every JSON
+and output bound while emitting RFC 8785 bytes: exact string escaping, invalid-Unicode rejection,
+unsigned UTF-16 object-name sorting at every depth, preserved array order, and exact ECMAScript
+binary64 number text, including `-0` as `0`, fixed/exponent thresholds, lowercase `e`, and a
+positive exponent `+`.
 
 ## Structural schemas
 
-The Draft 2020-12 schemas under `priv/conformance/v1/schemas/` are structural companion
-artifacts, validated against the canonical Draft 2020-12 meta-schema. They are not standalone
-byte-level conformance oracles. In particular, JSON Schema `maxLength` counts Unicode code points,
-while this profile's `string bytes`, `object-name bytes`, and `kid bytes` limits count UTF-8
-bytes. The schemas carry `x-bap-maximum-utf8-bytes` annotations for those limits; the normative
-decoder and boundary corpus enforce them. Duplicate rejection, raw numeric-lexeme length,
-decoded-size projection, depth, total-node count, and exact byte encodings likewise remain
-decoder/corpus requirements.
+Draft 2020-12 schemas under `priv/conformance/v1/schemas/` are structural companion artifacts.
+Every schema validates against the canonical Draft 2020-12 meta-schema. They are not standalone
+byte-level oracles: `maxLength` counts code points, while `x-bap-maximum-utf8-bytes` annotations
+name UTF-8 byte ceilings. The bounded decoder and vectors enforce duplicates, raw numeric lexemes,
+decoded-size projection, depth, total nodes, canonical encodings, and every byte limit.
 
 ## Base64url
 
-Segments use only `A-Z`, `a-z`, `0-9`, `-`, and `_`. Padding and whitespace are forbidden.
-Length modulo four equal to one is invalid. Decoding is accepted only when re-encoding the
-decoded bytes without padding reproduces the input exactly; this rejects non-zero unused pad
-bits and alternate encodings.
+Segments use only `A-Z`, `a-z`, `0-9`, `-`, and `_`. Padding and whitespace are forbidden. Length
+modulo four equal to one is invalid. Decoding succeeds only when unpadded re-encoding reproduces
+the input exactly, rejecting non-zero unused pad bits and alternate encodings.
 
 ## Protected headers
 
-Member order is not significant. The set is exact:
+Member order is insignificant and the member sets are exact:
 
 | Compact value | Members |
 |---|---|
@@ -90,43 +84,55 @@ Member order is not significant. The set is exact:
 | proof | `alg: "EdDSA"`, `typ: "dpop+jwt"`, `jwk: public_OKP_JWK` |
 
 `crit`, `b64`, embedded grant keys, unknown algorithms, and every unlisted member are invalid.
-The grant `kid` is a case-sensitive 1–128 byte string containing only ASCII letters, digits,
-`-`, `.`, `_`, or `~`. It is an untrusted hint, not a trust selector.
+Grant `kid` is a case-sensitive 1–128 byte string of ASCII letters, digits, `-`, `.`, `_`, or `~`.
+It is an untrusted hint, not a trust selector.
+
+The proof JWK is exactly `{crv: "Ed25519", kty: "OKP", x: canonical_base64url_32_bytes}` in any
+member order. Every additional member, including private `d`, is invalid. Its RFC 7638 thumbprint
+preimage is exactly:
+
+```json
+{"crv":"Ed25519","kty":"OKP","x":"<canonical-x>"}
+```
+
+The thumbprint is unpadded base64url SHA-256 of those UTF-8 bytes. Verified facts carry the raw
+32-byte digest. Issuer-key fingerprinting uses the same construction over the caller's raw
+32-byte public key; `kid` is excluded.
 
 ## Claims
 
-All claim objects are closed. Claim names and string values are case-sensitive.
+All claim objects are closed. Names and string values are case-sensitive.
 
 | Grant claim | Type |
 |---|---|
 | `v` | integer, exactly `1` |
-| `iss`, `jti` | non-empty StringOrURI |
-| `aud` | non-empty StringOrURI or non-empty array of unique StringOrURI |
+| `iss`, `jti` | non-empty StringOrURI, at most 512 UTF-8 bytes |
+| `aud` | one StringOrURI or a nonempty unique array of at most 64 |
 | `iat`, `nbf`, `exp` | integral NumericDate |
-| `cnf` | exact object `{jkt: base64url_sha256_thumbprint}` |
-| `operations` | non-empty array of operation objects |
+| `cnf` | exact object `{jkt: canonical_base64url_sha256}` |
+| `operations` | nonempty array of at most 64 operation objects |
 
-An operation object is exactly `{name: string, selectors: selector_array}`. Operation names are
-1–128 byte printable ASCII strings. The array is ordered and non-empty.
+An operation is exactly `{name: string, selectors: selector_array}`. Names are unique within the
+grant and contain 1–128 printable ASCII bytes. The ordered selector array has 1–64 members.
 
 | Proof claim | Type |
 |---|---|
 | `v` | integer, exactly `1` |
-| `jti` | non-empty StringOrURI |
-| `htm` | uppercase HTTP method |
-| `htu` | normalized target URI |
+| `jti` | non-empty StringOrURI, at most 512 UTF-8 bytes |
+| `htm` | 1–32 byte uppercase ASCII HTTP method |
+| `htu` | normalized hierarchical HTTPS target URI |
 | `iat` | integral NumericDate |
-| `nonce` | non-empty string; present only when a challenge requires it |
-| `ba_inv` | lowercase RFC 4122 UUID string |
+| `nonce` | optional non-empty string, at most 512 UTF-8 bytes |
+| `ba_inv` | lowercase RFC 4122 UUID |
 | `ba_op` | 1–128 byte printable ASCII operation name |
-| `ath`, `ba_req` | unpadded base64url SHA-256 values |
+| `ath`, `ba_req` | canonical unpadded base64url SHA-256 |
 
-Every proof requires `v`, `jti`, `htm`, `htu`, `iat`, `ba_inv`, `ba_op`, `ath`, and `ba_req`.
-`nonce` is conditionally present only for a challenged proof. No other claim is accepted.
+Every proof requires every row except `nonce`; no other claim is accepted. `ath` is SHA-256 over
+the ASCII bytes of the complete received grant compact value.
 
 ## Selector algebra
 
-Selectors are closed ordered JSON objects:
+Selectors are closed ordered objects:
 
 | Kind | Exact members |
 |---|---|
@@ -134,30 +140,117 @@ Selectors are closed ordered JSON objects:
 | equals | `{kind: "equals", path: path, value: JSON_value}` |
 | one-of | `{kind: "one_of", path: path, values: non_empty_JSON_array}` |
 
-A path is a non-empty array of 1–128 byte UTF-8 object-member names. Paths do not index arrays.
-Selector order is significant. No selector implies business authorization.
+A path has 1–32 object-member names, each 1–128 UTF-8 bytes. Paths traverse objects only and never
+index arrays. `one_of` contains at most 256 values.
+
+Selectors are applied conjunctively to the server-derived tagged arguments. `all` matches any JSON
+root. `equals` and `one_of` require the path to exist. Semantic identity preserves tagged scalar
+distinctions, compares arrays positionally, and compares duplicate-free objects recursively as
+unordered key/value sets. It never gives source member order meaning or collapses integer and float
+tags. No selector grants business authorization.
 
 ## URI normalization
 
-The normalized target URI is absolute and has no user information, fragment, or query. Lowercase
-the scheme and host; uppercase percent-encoding hex digits; decode percent-encoded unreserved
-characters; remove dot segments; replace an empty path with `/`; remove the default port for
-`http` or `https`; preserve all other path bytes. This is syntax normalization, not a network
-lookup. DPoP comparison uses the normalized URI without query or fragment.
+Target URIs are bounded ASCII, hierarchical, and HTTPS-only, with a nonempty authority and host and
+no user information, fragment, or query. Normalization lowercases scheme and host; uppercases
+percent hex; decodes only percent-encoded unreserved octets; preserves percent-encoded reserved
+octets as path data; removes complete dot segments; maps an empty path to `/`; drops port 443; and
+preserves a valid nondefault port and all other path bytes. It performs no DNS, IDNA, or network
+work.
 
-## Domain separators
+HTTP, another scheme, an authority-less form, malformed percent escapes, ambiguous authority/port
+syntax, control/non-ASCII bytes, and out-of-range ports are invalid. Both expected and proof URIs
+must already equal the normal form.
 
-The following ASCII byte strings include the final zero byte:
+## Signing and digest inputs
 
-| Use | Bytes |
+Grant and proof compact values use the exact RFC 7515 signing input:
+
+```text
+ASCII(base64url(protected) || "." || base64url(payload))
+```
+
+No bytes precede or follow it. Verification uses the exact received segments; correctly signed
+closed JSON objects may use any member order. Producers emit one deterministic JCS representation.
+
+The request digest is:
+
+```text
+base64url(SHA-256("BAP1-REQUEST\0" || JCS([operation, typed(cast_arguments)])))
+```
+
+The prefix is exact ASCII including its final zero byte. `typed/1` projects the tagged JSON algebra
+to the following closed JSON form before JCS:
+
+| tagged value | projected JSON |
 |---|---|
-| grant signing | `BAP1-GRANT\0` |
-| proof signing | `BAP1-PROOF\0` |
-| request digest | `BAP1-REQUEST\0` |
-| chain link | `BAP1-CHAIN\0` |
-| archive manifest | `BAP1-ARCHIVE\0` |
+| `:null` | `["null"]` |
+| `{:boolean, value}` | `["boolean", value]` |
+| `{:integer, value}` | `["integer", value]` |
+| `{:float, value}` | `["float", value]` |
+| `{:string, value}` | `["string", value]` |
+| `{:array, values}` | `["array", [typed(value), ...]]` |
+| `{:object, members}` | `["object", {member: typed(value), ...}]` |
 
-No other separator is accepted for v1.
+JCS orders projected object members. The explicit scalar tags preserve the protocol's semantic
+distinction between an integer and an integral float even though RFC 8785 emits both numeric
+payloads with the same JSON number bytes. `cast_arguments` may be any tagged JSON value.
+`BAP1-CHAIN\0` and `BAP1-ARCHIVE\0` remain reserved for BAP-04. The retired
+`BAP1-GRANT\0` and `BAP1-PROOF\0` strings are invalid signing prefixes.
+
+## Public verification contract
+
+The frozen v1 façade is:
+
+```elixir
+grant_signing_input(Grant.t(), Bounds.t() | map())
+proof_signing_input(Proof.t(), Bounds.t() | map())
+assemble_compact(SigningInput.t(), binary())
+decode_grant(binary(), Bounds.t() | map())
+decode_proof(binary(), Bounds.t() | map())
+verify_grant(binary(), TrustedIssuer.t(), ExpectedGrant.t())
+check_envelope(Credentials.t(), ExpectedRequest.t())
+request_digest(binary(), Json.value(), Bounds.t() | map())
+```
+
+Every function returns `{:ok, value}` or exactly `{:error, :invalid}`. Only bounds accept a map;
+all other structured inputs are exact named structs and each public entry revalidates every field.
+`assemble_compact/2` accepts exactly a `SigningInput` and a 64-byte signature, never a key, signer,
+or callback. Decode results carry `verification: :not_evaluated`.
+
+`TrustedIssuer` contains exact `kid` and raw 32-byte public key. `ExpectedGrant` contains issuer,
+audience, integral evaluation time, nonnegative skew, and tightening bounds. Grant verification
+requires exact key ID, signature, issuer, and audience; coherent signed times `iat < exp` and
+`nbf < exp`; and independently:
+
+```text
+iat <= evaluation_time + skew
+nbf <= evaluation_time + skew
+exp > evaluation_time - skew
+```
+
+It does not require `iat <= nbf`. `GrantFacts` contains exactly version, issuer, grant ID, raw
+32-byte issuer-key fingerprint, raw 32-byte holder thumbprint, matched audience, grant times, and
+`authorization: :not_evaluated`.
+
+`ExpectedRequest` additionally contains uppercase method, normalized HTTPS URI, lowercase RFC 4122
+invocation UUID, operation, any tagged JSON cast arguments, positive proof maximum age, and
+`:not_required | {:required, nonce}`. Proof time is inclusive:
+
+```text
+evaluation_time - proof_max_age - skew <= iat <= evaluation_time + skew
+```
+
+Skew is at most 60 seconds and proof maximum age at most 300 seconds. Nonce must be absent in
+`:not_required` mode and present exactly once and equal in required mode. Combined verification
+re-verifies the raw grant; verifies holder signature/thumbprint; and binds `ath`, method, URI,
+invocation, operation, `ba_req`, time, nonce, and every selector.
+
+`GrantFacts` and `EnvelopeFacts` are value-bearing and redacted non-authorizing results with fixed
+redacted inspection and no generic encoder, string, or enumeration protocol. `EnvelopeFacts` adds
+proof ID, invocation ID, operation, normalized URI, raw grant/request hashes, and proof issuance
+time. Neither result contains arguments, selector values, raw credentials, signatures, JWK
+containers, or nonces, and neither is accepted as credentials.
 
 ## Hard maxima
 
@@ -177,24 +270,36 @@ No other separator is accepted for v1.
 | integer magnitude | 9,007,199,254,740,991 |
 | float magnitude | 9,007,199,254,740,991 |
 | `kid` bytes | 128 |
+| JCS output bytes | 65,536 |
+| normalized target URI bytes | 8,192 |
+| issuer, audience, or token identifier bytes | 512 |
+| nonce bytes | 512 |
+| HTTP method bytes | 32 |
+| operation name bytes | 128 |
+| audiences per grant | 64 |
+| operations per grant | 64 |
+| selectors per operation | 64 |
+| selector path segments | 32 |
+| values in `one_of` | 256 |
+| Ed25519 public key / signature bytes | 32 / 64 |
+| SHA-256 digest bytes | 32 |
+| clock skew seconds | 60 |
+| proof maximum age seconds | 300 |
 
-Callers may tighten any maximum with a positive integer. Unknown limits, non-integer,
-zero/negative, or widening values are invalid. Raw and encoded sizes are checked before decoding;
-decoded-size projection precedes allocation; structure and scalar limits are enforced during
-ordered decoding; all precede cryptography.
+Callers may tighten any maximum with a positive integer. Unknown, non-integer, zero, negative, or
+widening limits are invalid. Raw and encoded sizes precede decoding; decoded-size projection
+precedes allocation; structure and scalar limits apply while decoding/emitting; all precede
+cryptography.
 
 ## Untrusted key locator
 
-`BoundedAuthorityProtocol.V1.untrusted_key_locator/2` first bounds the complete compact input,
-requires exactly three dot-separated compact segments, then bounds and decodes only the protected
-grant header and enforces its exact closed table. The opaque payload and signature segments are
-not decoded or independently size-checked by this locator; the complete-input bound still covers
-their bytes. It returns only:
+`BoundedAuthorityProtocol.V1.untrusted_key_locator/2` bounds the complete compact input, requires
+exactly three segments, then bounds, decodes, and validates only the protected grant header. The
+payload and signature stay opaque. It returns only:
 
 ```elixir
 {:ok, %BoundedAuthorityProtocol.V1.KeyLocator{kid: kid, trust: :not_evaluated}}
 ```
 
-It does not decode payload claims or signature bytes. It does not select a trusted key, verify a
-signature, evaluate trust, or authorize. Every failure returns `{:error, :invalid}` without
-including input values.
+It does not select a key, decode claims/signature bytes, verify, evaluate trust, or authorize.
+Every failure returns `{:error, :invalid}` without input values.
