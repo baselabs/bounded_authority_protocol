@@ -341,6 +341,50 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
            )
   end
 
+  test "compiled dynamic-call allowances are bound to exact existing counts" do
+    root = copy_actual_project!()
+
+    assert {_output, 0} =
+             System.cmd("mix", ["compile"],
+               cd: root,
+               env: [{"MIX_ENV", "prod"}],
+               stderr_to_stdout: true
+             )
+
+    refute Enum.any?(
+             ArchitectureGate.check_compiled(root),
+             &(&1.category == :dynamic_dispatch)
+           )
+
+    path = Path.join(root, "lib/bounded_authority_protocol/v1/bounds.ex")
+    original = File.read!(path)
+
+    mutated =
+      String.replace(
+        original,
+        "def new(overrides) when is_map(overrides) do",
+        "def new(overrides) when is_map(overrides) do\n" <>
+          "    _unexpected = Enum.reduce(Map.to_list(overrides), 0, fn {_key, value}, sum -> value + sum end)",
+        global: false
+      )
+
+    assert mutated != original
+    File.write!(path, mutated)
+
+    assert {_output, 0} =
+             System.cmd("mix", ["compile", "--force"],
+               cd: root,
+               env: [{"MIX_ENV", "prod"}],
+               stderr_to_stdout: true
+             )
+
+    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+             violation.category == :dynamic_dispatch and
+               violation.detail =~ "compiled dynamic-call allowance" and
+               violation.detail =~ "{:new, 1}"
+           end)
+  end
+
   test "the CI entrypoint goes red for a planted forbidden dependency and green after removal" do
     root = copy_actual_project!()
     script = Path.join(@root, "scripts/check_architecture.exs")
@@ -400,13 +444,8 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
 
   defp copy_actual_project! do
     root = tmp_root!()
-    File.mkdir_p!(Path.join(root, "lib"))
     File.cp!(Path.join(@root, "mix.exs"), Path.join(root, "mix.exs"))
-
-    File.cp!(
-      Path.join(@root, "lib/bounded_authority_protocol.ex"),
-      Path.join(root, "lib/bounded_authority_protocol.ex")
-    )
+    File.cp_r!(Path.join(@root, "lib"), Path.join(root, "lib"))
 
     root
   end

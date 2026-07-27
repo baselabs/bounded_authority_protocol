@@ -14,6 +14,13 @@ Each released protocol major ships language-neutral JSON fixtures containing:
 Fixtures contain public keys only and no production values. Their schema and ordering are
 versioned with the protocol major.
 
+Draft 2020-12 schemas are structural companion artifacts and must validate against the canonical
+Draft 2020-12 meta-schema with an independent schema validator. They do not replace byte-level
+vectors: JSON Schema string lengths count Unicode code points, while the protocol's annotated
+`x-bap-maximum-utf8-bytes` limits count UTF-8 bytes. Duplicate names, raw numeric lexemes,
+decoded-size projection, depth, total nodes, canonical encodings, and every UTF-8 byte limit remain
+normative decoder-and-corpus checks.
+
 The manifest's public test-key fingerprint set must equal, not merely contain, the fingerprints of
 every key reachable from vectors, fixtures, generators, and the independent implementation. A
 corpus gate derives both sets independently, compares them exactly, and is tamper-proved by

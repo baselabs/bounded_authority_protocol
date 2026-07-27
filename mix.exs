@@ -46,6 +46,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.40.3", only: [:dev, :test], runtime: false},
+      {:jsonschex, "~> 0.8.1", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       {:sbom, "~> 0.10.0", only: [:dev, :test], runtime: false}
     ]
@@ -66,6 +67,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "SECURITY.md",
         "usage-rules.md",
         "docs/adr/0001-public-protocol-verifier-boundary.md",
+        "docs/adr/0002-normative-v1-parsing-profile.md",
         "docs/protocol-v1.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
@@ -94,6 +96,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "usage-rules.md",
         "docs/protocol-v1.md",
         "docs/adr/0001-public-protocol-verifier-boundary.md",
+        "docs/adr/0002-normative-v1-parsing-profile.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
         "docs/design/threat-model.md"

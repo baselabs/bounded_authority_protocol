@@ -2,7 +2,7 @@ defmodule BoundedAuthorityProtocol.DependencyLicenseCheck do
   @moduledoc false
 
   @root Path.expand("..", __DIR__)
-  @direct_tools MapSet.new(~w(credo dialyxir ex_doc mix_audit sbom))
+  @direct_tools MapSet.new(~w(credo dialyxir ex_doc jsonschex mix_audit sbom))
 
   def run!([sbom_path]) do
     allowed = load_allowed_licenses!()
