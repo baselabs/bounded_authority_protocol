@@ -13,6 +13,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "README.md",
                     "SECURITY.md",
                     "docs/adr/0001-public-protocol-verifier-boundary.md",
+                    "docs/adr/0002-normative-v1-parsing-profile.md",
                     "docs/protocol-v1.md",
                     "docs/design/conformance-contract.md",
                     "docs/design/protocol-charter.md",

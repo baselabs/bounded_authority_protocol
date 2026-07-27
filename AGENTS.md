@@ -21,11 +21,13 @@ grant operational authority by itself.
 
 ## Current state
 
-`BAP-00` and `BAP-01` are complete. The unpublished 0.1.0 Mix scaffold,
-zero-runtime-dependency policy, four-layer purity gate, public CI, package inspection,
-license/advisory gates, CycloneDX output, and trusted-main provenance verification are closed. No
-protocol profile or verifier behavior exists yet. `BAP-02` is the next executable row; consult
-[`docs/ROADMAP.md`](docs/ROADMAP.md) for its completion boundary.
+`BAP-00`, `BAP-01`, and `BAP-02` are complete. The unpublished 0.1.0 package retains zero
+production dependencies, no application callback, and no supervision tree. The normative v1
+tables and bounds, raw-number preflight, bounded ordered JSON decoder with recursive duplicate
+rejection, strict base64url decoder, protected-header-only `untrusted_key_locator/2`, Draft
+2020-12 structural schemas, architecture mutation gates, public compatibility CI, exact-package
+consumer proof, CycloneDX output, and trusted-main provenance verification are closed. `BAP-03`
+is the next executable row; consult [`docs/ROADMAP.md`](docs/ROADMAP.md) for its boundary.
 
 ## Critical rules
 

@@ -5,8 +5,40 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     credo: {"~> 1.7", [:dev, :test]},
     dialyxir: {"~> 1.4", [:dev, :test]},
     ex_doc: {"~> 0.40.3", [:dev, :test]},
+    jsonschex: {"~> 0.8.1", [:dev, :test]},
     mix_audit: {"~> 2.1", [:dev, :test]},
     sbom: {"~> 0.10.0", [:dev, :test]}
+  }
+
+  @compiled_dynamic_allowances %{
+    "Elixir.BoundedAuthorityProtocol.V1.Bounds.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.V1.Json.Container.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.V1.Json.JsonValue.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.V1.Json.Root.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.V1.KeyLocator.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.V1.Violation.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.V1.beam" => %{
+      {:untrusted_key_locator, 2} => %{variable_call: 8}
+    },
+    "Elixir.BoundedAuthorityProtocol.V1.Base64Url.beam" => %{
+      {:decode, 2} => %{variable_call: 7}
+    },
+    "Elixir.BoundedAuthorityProtocol.V1.Json.beam" => %{
+      {:decode, 2} => %{variable_call: 2},
+      {:parse_unsigned_number, 1} => %{variable_call: 3}
+    }
   }
 
   @module_categories %{
@@ -118,10 +150,10 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       ~w(filter filtermap fold foreach groups_from_list intersect_with map merge_with update_with)a
   }
   @approved_erlang_runtime_functions %{
-    binary: ~w(split)a,
+    binary: ~w(copy split)a,
     crypto: ~w(hash hash_equals hash_final hash_init hash_update verify)a,
     erlang:
-      ~w(+ - * / ++ -- < <= == === =:= > >= and band binary_to_float binary_to_integer bnot bor bsl bsr bxor byte_size div element error get_module_info hd is_atom is_binary is_bitstring is_boolean is_float is_function is_integer is_list is_map is_map_key is_number is_pid is_port is_reference is_tuple length map_get map_size max min not or raise rem round setelement size tl trunc tuple_size xor)a,
+      ~w(+ - * / ++ -- < <= == === =:= > >= and band binary_part binary_to_float binary_to_integer bnot bor bsl bsr bxor byte_size div element error get_module_info hd integer_to_binary is_atom is_binary is_bitstring is_boolean is_float is_function is_integer is_list is_map is_map_key is_number is_pid is_port is_reference is_tuple length map_get map_size max min not or raise rem round setelement size tl trunc tuple_size xor)a,
     json: ~w(decode)a,
     maps: ~w(find merge put to_list)a,
     elixir_erl_pass: ~w(no_parens_remote)a
@@ -781,7 +813,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp beam_violations(path) do
     case :beam_lib.chunks(String.to_charlist(path), [:imports, :abstract_code]) do
       {:ok, {_module, [imports: imports, abstract_code: {:raw_abstract_v1, forms}]}} ->
-        import_violations(imports, path) ++ abstract_violations(forms, path)
+        import_violations(imports, path) ++
+          abstract_violations(forms, path) ++ dynamic_allowance_violations(forms, path)
 
       {:error, _module, reason} ->
         [violation(:compiled_artifact, path, "cannot inspect BEAM imports: #{inspect(reason)}")]
@@ -830,6 +863,70 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp compiled_import_category(module, function, _path),
     do: compiled_mfa_category(module, function)
+
+  defp dynamic_allowance_violations(forms, path) do
+    case Map.fetch(@compiled_dynamic_allowances, Path.basename(path)) do
+      {:ok, expected} ->
+        actual = dynamic_calls_by_function(forms)
+
+        if actual == expected do
+          []
+        else
+          [
+            violation(
+              :dynamic_dispatch,
+              path,
+              "compiled dynamic-call allowance expected #{inspect(expected)}, got #{inspect(actual)}"
+            )
+          ]
+        end
+
+      :error ->
+        []
+    end
+  end
+
+  defp dynamic_calls_by_function(forms) do
+    Enum.reduce(forms, %{}, fn
+      {:function, _line, name, arity, _clauses} = form, calls ->
+        counts = dynamic_call_counts(form, %{enum_reduce: 0, variable_call: 0})
+        nonzero_counts = Map.reject(counts, fn {_kind, count} -> count == 0 end)
+
+        if nonzero_counts == %{} do
+          calls
+        else
+          Map.put(calls, {name, arity}, nonzero_counts)
+        end
+
+      _form, calls ->
+        calls
+    end)
+  end
+
+  defp dynamic_call_counts(term, counts) when is_tuple(term) do
+    counts =
+      case term do
+        {:call, _line,
+         {:remote, _remote_line, {:atom, _module_line, Elixir.Enum},
+          {:atom, _function_line, :reduce}}, _arguments} ->
+          Map.update!(counts, :enum_reduce, &(&1 + 1))
+
+        {:call, _line, {:var, _variable_line, _variable}, _arguments} ->
+          Map.update!(counts, :variable_call, &(&1 + 1))
+
+        _other ->
+          counts
+      end
+
+    term
+    |> Tuple.to_list()
+    |> Enum.reduce(counts, &dynamic_call_counts/2)
+  end
+
+  defp dynamic_call_counts(term, counts) when is_list(term),
+    do: Enum.reduce(term, counts, &dynamic_call_counts/2)
+
+  defp dynamic_call_counts(_term, counts), do: counts
 
   defp abstract_violations(
          {:fun, _line,

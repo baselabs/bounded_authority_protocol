@@ -29,9 +29,10 @@ this package.
 ## Grant
 
 Protocol v1 uses compact JWS with `alg: EdDSA`, `typ: ba+cap`, an issuer-controlled `kid`, and a
-closed claim schema. Claims cover issuer, audience, grant/token IDs, time window, operations,
-provider-neutral subject selectors, fields, consumer instance, holder binding, traversal depth,
-and explicit limits.
+closed claim schema. Claims cover issuer, audience/consumer instance, grant/token IDs, time
+window, operations, provider-neutral subject and field restrictions through selector paths and
+values, and holder binding. Traversal depth and explicit resource limits are parser/context
+bounds, not additional grant claims.
 
 Unknown versions, algorithms, critical headers, claims, selectors, holder modes, duplicate keys,
 invalid UTF-8, and over-limit structures fail closed. The public verifier does not use `kid` to
@@ -45,7 +46,8 @@ Each invocation supplies compact RFC 9449 DPoP:
 - claims: `jti`, server-derived `htm` and normalized `htu`, `iat`, capability hash `ath`,
   optional challenged `nonce`, invocation UUID `ba_inv`, stable operation `ba_op`, and request
   digest `ba_req`;
-- `ba_req = SHA-256(JCS(["bounded-authority-request-v1", operation, cast_arguments]))`.
+- `ba_req = SHA-256("BAP1-REQUEST\0" || JCS([operation, cast_arguments]))`, where the quoted
+  prefix is the exact ASCII domain-separator byte string including its final zero byte.
 
 No unprotected security parameter, embedded private JWK value, caller-selected expected context,
 or bearer fallback is accepted.

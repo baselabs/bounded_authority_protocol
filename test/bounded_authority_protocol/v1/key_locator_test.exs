@@ -52,21 +52,14 @@ defmodule BoundedAuthorityProtocol.V1.KeyLocatorTest do
     assert {:error, :invalid} =
              V1.untrusted_key_locator(token, %{encoded_segment_bytes: byte_size(encoded) - 1})
 
-    assert {:error, :invalid} =
-             V1.untrusted_key_locator(
-               compact(~s({"alg":"EdDSA","typ":"ba+cap","kid":"a"}), "xx"),
-               %{
-                 encoded_segment_bytes: 1
-               }
-             )
+    opaque = :binary.copy("x", byte_size(encoded) + 1)
+    opaque_token = encoded <> "." <> opaque <> "." <> opaque
 
-    assert {:error, :invalid} =
-             V1.untrusted_key_locator(
-               compact(~s({"alg":"EdDSA","typ":"ba+cap","kid":"a"}), "", "xx"),
-               %{
-                 encoded_segment_bytes: 1
-               }
-             )
+    assert {:ok, %KeyLocator{kid: ^kid}} =
+             V1.untrusted_key_locator(opaque_token, %{
+               compact_bytes: byte_size(opaque_token),
+               encoded_segment_bytes: byte_size(encoded)
+             })
 
     decoded_size = byte_size(Base.url_decode64!(encoded, padding: false))
 
