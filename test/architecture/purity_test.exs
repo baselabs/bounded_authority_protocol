@@ -61,6 +61,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       dynamic_dispatch: "def probe(function, argument), do: function.(argument)",
       dynamic_dispatch: "def probe(module, function), do: Function.capture(module, function, 0)",
       dynamic_dispatch: "def probe(items, callback), do: Enum.map(items, callback)",
+      dynamic_dispatch: "def probe(items, callback), do: Enum.reduce(items, 0, callback)",
       dynamic_dispatch: "def probe(map, callback), do: Map.update(map, :key, nil, callback)",
       dynamic_dispatch: "def probe(map, callback), do: Map.get_lazy(map, :key, callback)",
       dynamic_dispatch: "def probe(left, right, callback), do: Map.merge(left, right, callback)",
@@ -87,6 +88,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       unapproved_runtime: "Map.intersect(%{}, %{}, fn _key, left, _right -> left end)",
       unapproved_runtime: "Map.split_with(%{}, fn {_key, _value} -> true end)",
       unapproved_runtime: "MysteryRuntime.perform(:effect)",
+      unapproved_runtime: ":json.encode(%{})",
       process: "def probe, do: receive(do: (message -> message))",
       dynamic_module: "Module.concat([\"File\"])",
       code_evaluation: "Code.eval_string(\"File.read!(secret)\")"

@@ -15,7 +15,7 @@ compatibility.
 |---|---|---|---|---|
 | BAP-00 | Public repository, Apache-2.0 license, Forge boundary, tracked architecture and cold-start authority | — | Complete | Evidence recorded below |
 | BAP-01 | Mix package scaffold, pure-library architecture test, quality aliases, public CI, package inspection | BAP-00 | Complete | Evidence recorded below |
-| BAP-02 | Closed canonical types, bounds, domain separators, RFC 8785 JCS, request digest | BAP-01 | Planned | Exact-byte independent vectors; duplicate/encoding/limit tests; malformed-input properties; mutation-red proof |
+| BAP-02 | Normative v1 tables, bounded ordered decoder, strict base64url, untrusted key locator | BAP-01 | Implemented; closeout pending | Duplicate/encoding/limit tests; malformed-input properties; mutation-red proof; local and trusted-main gates |
 | BAP-03 | Compact EdDSA grant and RFC 9449 DPoP encode/decode/verify | BAP-02 | Planned | Official and independent vectors; meaningful-byte tamper matrix; timing/allocation bounds; no trust-selection path |
 | BAP-04 | Consumption-chain, anchor, archive, and historical public-key verification | BAP-03 | Planned | Rollover, truncation, reorder, omission, archive-coverage, and tamper vectors pass independently |
 | BAP-05 | Language-neutral conformance corpus, verifier CLI, property/fuzz/mutation gates | BAP-04 | Planned | A second implementation consumes only published artifacts and agrees on every valid/invalid vector |
@@ -63,7 +63,5 @@ compatibility.
 
 ## Next action
 
-Execute `BAP-02` from the reviewed Forge plan: freeze the closed v1 tables and bounds, implement
-the bounded protected-header key locator and ordered JSON decoder, and prove malformed and
-over-limit inputs fail closed. The private runtime may scaffold its dependency seam; it must not
-duplicate canonicalization or cryptographic verification.
+Close BAP-02 after independent review, mutation proof, exact packaged-consumer proof, trusted-main
+compatibility CI, and supply-chain receipt verification. BAP-03 remains unstarted.
