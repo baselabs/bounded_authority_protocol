@@ -179,7 +179,7 @@ defmodule BoundedAuthorityProtocol.V1.Json do
        when byte == ?- or byte in ?0..?9 do
     case number_candidate_length(bytes, 0, bounds.number_lexeme_bytes) do
       {:ok, length} ->
-        <<token::binary-size(length), rest::binary>> = bytes
+        <<token::binary-size(^length), rest::binary>> = bytes
 
         valid_number_lexeme?(token, bounds) and scan_json(rest, bounds)
 
@@ -248,7 +248,7 @@ defmodule BoundedAuthorityProtocol.V1.Json do
 
   defp take_integer_digits(<<byte, _rest::binary>> = bytes) when byte in ?1..?9 do
     length = digit_count(bytes, 0)
-    <<digits::binary-size(length), rest::binary>> = bytes
+    <<digits::binary-size(^length), rest::binary>> = bytes
     {:ok, digits, rest}
   end
 
@@ -258,7 +258,7 @@ defmodule BoundedAuthorityProtocol.V1.Json do
     length = digit_count(rest, 0)
 
     if length > 0 do
-      <<digits::binary-size(length), remainder::binary>> = rest
+      <<digits::binary-size(^length), remainder::binary>> = rest
       {:ok, digits, remainder}
     else
       :error
@@ -272,7 +272,7 @@ defmodule BoundedAuthorityProtocol.V1.Json do
     length = digit_count(digits_and_rest, 0)
 
     if length > 0 do
-      <<digits::binary-size(length), remainder::binary>> = digits_and_rest
+      <<digits::binary-size(^length), remainder::binary>> = digits_and_rest
       {:ok, sign * :erlang.binary_to_integer(digits), remainder}
     else
       :error
