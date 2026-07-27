@@ -63,29 +63,30 @@ compatibility.
 
 ## BAP-02 closeout evidence
 
-- Package-bearing implementation head `458c5e6914b0ba2ac6afa6170d30fe576cd7c8e5` is pushed to
-  public `main`. [CI run 30235354342](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30235354342)
+- Package-bearing implementation head `ad80fcf9201c12010f1fed494224987e7be4b283` is pushed to
+  public `main`. [CI run 30240151612](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30240151612)
   passed the complete quality/package boundary, workflow syntax, and all supported pairs:
   Elixir 1.18.4/OTP 27.3.4.14, Elixir 1.19.5/OTP 28.5.0.3, and Elixir
   1.20.2/OTP 29.0.3.
-- [Supply-chain run 30235354489](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30235354489)
-  built artifact `8641490849`. Its exact unpublished archive has SHA-256
-  `591bb037844060e0662a92a6cf93354ccb72d2ca92b6a2fe926e0a8de8bce1ef`; the downloaded
+- [Supply-chain run 30240151614](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30240151614)
+  built artifact `8643000730`. Its exact unpublished archive has SHA-256
+  `a5fac847517c093f6da0cd27da0a095a6377362219eb8287eb6affe1cedccb36`; the downloaded
   `SHA256SUMS` check passed.
 - `gh attestation verify` accepted separate SLSA provenance and CycloneDX 1.6 SBOM attestations
   for that exact digest, constrained to this repository, the trusted supply-chain workflow,
-  `refs/heads/main`, source digest `458c5e6914b0ba2ac6afa6170d30fe576cd7c8e5`, and
+  `refs/heads/main`, source digest `ad80fcf9201c12010f1fed494224987e7be4b283`, and
   GitHub-hosted runners.
-- Local `mix quality` passed 38 tests with 0 failures and 100.00% coverage, plus format,
+- Local `mix quality` passed 45 tests with 0 failures and 100.00% coverage, plus format,
   warnings-as-errors compilation, Credo, Dialyzer, documentation, advisory, retired-package,
   license, release/tooling SBOM, exact archive, and fresh external-consumer gates. The package
   retains zero production dependencies, no application callback, and no supervision tree.
-- The duplicate-member, non-canonical base64url, forbidden-runtime-import, and numeric-schema
-  mutation probes each made its owning gate fail before the original was restored. The
-  independent review's three findings were fixed and its delta rereview returned no findings.
-  Fable, Opus, and GLM cross-vendor reviews all timed out without a verdict; their partial logs
-  were mined and contained no actionable finding. They remain named degraded reviews, not
-  zero-finding reviews.
+- Raw-number, duplicate-member, exact-bound, non-canonical base64url, forbidden-runtime-import,
+  release-SBOM, and numeric-schema mutation probes each made its owning gate fail before the
+  original was restored. Independent design, gate-integrity, and security/correctness reviews
+  returned no findings after every admitted same-slice finding was fixed.
+- Final-range GLM review returned no findings. Fable and Opus timed out without verdicts; their
+  partial transcripts were mined and contained no actionable finding. The aggregate remains a
+  named degraded review, not a zero-finding cross-vendor review.
 
 ## Next action
 
