@@ -104,7 +104,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   @public_key_random_functions ~w(generate_key)a
   @local_process_functions ~w(exit make_ref self send spawn spawn_link spawn_monitor)a
   @local_protocol_dispatch_functions ~w(inspect to_string)a
-  @compile_time_hook_attributes ~w(after_compile after_verify before_compile behaviour compile derive external_resource on_definition on_load)a
+  @implicit_execution_attributes ~w(after_compile after_verify before_compile behaviour compile derive external_resource on_definition on_load)a
   @kernel_callback_functions ~w(get_and_update_in get_in pop_in tap then update_in)a
   @map_callback_functions ~w(filter get_and_update get_and_update! get_lazy merge new put_new_lazy reject replace_lazy update update!)a
   @map_set_callback_functions ~w(filter reject)a
@@ -404,11 +404,11 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          {:@, _meta, [{attribute, _attribute_meta, _arguments}]},
          path
        )
-       when attribute in @compile_time_hook_attributes do
+       when attribute in @implicit_execution_attributes do
     category_violation(
       :unapproved_runtime,
       path,
-      "compile-time hook @#{attribute} is forbidden"
+      "implicit execution hook @#{attribute} is forbidden"
     )
   end
 
@@ -810,6 +810,10 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
        ) do
     [violation(:process, path, "compiled mailbox receive")] ++
       abstract_tuple_children(term, path)
+  end
+
+  defp abstract_violations({:attribute, _line, :on_load, _callback}, path) do
+    [violation(:unapproved_runtime, path, "compiled module load hook")]
   end
 
   defp abstract_violations(term, path) when is_tuple(term) do
