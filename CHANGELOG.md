@@ -18,8 +18,14 @@ All notable changes to `bounded_authority_protocol` are documented here.
   dependency declarations, and the exact packed/unpacked Hex archive.
 - Add full local quality, coverage, documentation, advisory, closed license, CycloneDX,
   fresh-consumer, public CI, checksum, provenance-attestation, and SBOM-attestation gates.
+- Freeze the normative v1 header, claim, selector, JSON, encoding, URI, domain-separator, bound,
+  and fixed-error tables with primary RFC and OTP provenance.
+- Add bounded ordered JSON decoding with recursive duplicate rejection, strict canonical
+  base64url decoding, and a protected-header-only untrusted key locator.
+- Add allow, deny, malformed, exact-boundary, deterministic malformed-input sweep, symmetric
+  numeric-magnitude, package-consumer, and purity-boundary proof.
 
 ### Not yet available
 
-- Canonical types, cryptographic verifier behavior, conformance vectors, CLI, and a public Hex
-  release are planned and not implemented. The current package scaffold is unpublished.
+- Canonical serialization, cryptographic verifier behavior, signed conformance vectors, CLI, and
+  a public Hex release are planned and not implemented. The current package is unpublished.

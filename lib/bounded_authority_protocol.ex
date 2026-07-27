@@ -3,8 +3,7 @@ defmodule BoundedAuthorityProtocol do
   Deterministic protocol verification for cryptographically bounded
   proof-of-possession authority.
 
-  BAP-01 establishes the package and its enforced purity boundary. Protocol
-  profiles and verification functions begin with BAP-02; this module
-  intentionally exposes no premature protocol API.
+  Protocol behavior is exposed only through explicit version modules such as
+  `BoundedAuthorityProtocol.V1`; there is no implicit latest profile.
   """
 end

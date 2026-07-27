@@ -55,7 +55,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
     [
       maintainers: ["rjpalermo"],
       files: [
-        "lib/bounded_authority_protocol.ex",
+        "lib",
+        "priv/conformance/v1/schemas",
         ".formatter.exs",
         "mix.exs",
         "README.md",
@@ -65,6 +66,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "SECURITY.md",
         "usage-rules.md",
         "docs/adr/0001-public-protocol-verifier-boundary.md",
+        "docs/protocol-v1.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
         "docs/design/threat-model.md"
@@ -90,6 +92,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "NOTICE",
         "SECURITY.md",
         "usage-rules.md",
+        "docs/protocol-v1.md",
         "docs/adr/0001-public-protocol-verifier-boundary.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",

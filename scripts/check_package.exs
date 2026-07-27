@@ -13,12 +13,21 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "README.md",
                     "SECURITY.md",
                     "docs/adr/0001-public-protocol-verifier-boundary.md",
+                    "docs/protocol-v1.md",
                     "docs/design/conformance-contract.md",
                     "docs/design/protocol-charter.md",
                     "docs/design/threat-model.md",
                     "hex_metadata.config",
                     "lib/bounded_authority_protocol.ex",
+                    "lib/bounded_authority_protocol/v1.ex",
+                    "lib/bounded_authority_protocol/v1/base64url.ex",
+                    "lib/bounded_authority_protocol/v1/bounds.ex",
+                    "lib/bounded_authority_protocol/v1/json.ex",
+                    "lib/bounded_authority_protocol/v1/key_locator.ex",
+                    "lib/bounded_authority_protocol/v1/violation.ex",
                     "mix.exs",
+                    "priv/conformance/v1/schemas/grant-header.schema.json",
+                    "priv/conformance/v1/schemas/json-value.schema.json",
                     "usage-rules.md"
                   ])
 
@@ -123,7 +132,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
 
   defp compile_package!(package_root) do
     environment = [{"MIX_ENV", "prod"}]
-    run!("mix", ["deps.get"], package_root, environment)
+    run!("mix", ["deps.get", "--only", "prod"], package_root, environment)
     run!("mix", ["compile", "--warnings-as-errors"], package_root, environment)
   end
 
@@ -163,7 +172,23 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       defmodule BoundedAuthorityProtocolConsumer do
         @moduledoc false
 
-        def protocol_loaded?, do: Code.ensure_loaded?(BoundedAuthorityProtocol)
+        def package_contract? do
+          header =
+            Base.url_encode64(
+              ~s({"alg":"EdDSA","typ":"ba+cap","kid":"package-proof"}),
+              padding: false
+            )
+
+          Code.ensure_loaded?(BoundedAuthorityProtocol) and
+            match?(
+              {:ok,
+               %BoundedAuthorityProtocol.V1.KeyLocator{
+                 kid: "package-proof",
+                 trust: :not_evaluated
+               }},
+              BoundedAuthorityProtocol.V1.untrusted_key_locator(header <> "..")
+            )
+        end
       end
       """
     )
@@ -178,7 +203,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
         "run",
         "--no-start",
         "-e",
-        "unless BoundedAuthorityProtocolConsumer.protocol_loaded?(), do: System.halt(1)"
+        "unless BoundedAuthorityProtocolConsumer.package_contract?(), do: System.halt(1)"
       ],
       consumer_root,
       environment
