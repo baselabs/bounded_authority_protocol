@@ -1,0 +1,17 @@
+{
+  "format": "bounded-authority-protocol-v1-vector-manifest",
+  "vectors": [
+    "grant-holder-proof.json"
+  ],
+  "canonical_public_key_fingerprints": [
+    "0qPOlfSr_giHdRaDK18shLtG5DoQL1a2nrHVDeWruJI",
+    "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk",
+    "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+  ],
+  "discovery_roots": [
+    "priv/conformance/v1/vectors",
+    "priv/conformance/v1/schemas",
+    "conformance",
+    "test"
+  ]
+}

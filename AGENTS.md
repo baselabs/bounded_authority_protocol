@@ -26,16 +26,21 @@ production dependencies, no application callback, and no supervision tree. The n
 tables and bounds, raw-number preflight, bounded ordered JSON decoder with recursive duplicate
 rejection, strict base64url decoder, protected-header-only `untrusted_key_locator/2`, Draft
 2020-12 structural schemas, architecture mutation gates, public compatibility CI, exact-package
-consumer proof, CycloneDX output, and trusted-main provenance verification are closed. `BAP-03`
-is the next executable row; consult [`docs/ROADMAP.md`](docs/ROADMAP.md) for its boundary.
+consumer proof, CycloneDX output, and trusted-main provenance verification are closed. BAP-03's
+approved authority freezes standard RFC 7515 JWS signing, deterministic grant/proof producers,
+standalone raw-grant verification, combined raw-envelope verification, and value-bearing redacted
+facts. Its runtime remains unimplemented until the red conformance contracts are satisfied;
+consult [`docs/ROADMAP.md`](docs/ROADMAP.md) and
+[`ADR 0003`](docs/adr/0003-standard-jws-and-verified-grant-results.md).
 
 ## Critical rules
 
 1. **Verification is not authority.** A successful pure verification result proves only that
    caller-supplied bytes satisfy caller-supplied trusted inputs and expected context. It never
    selects trusted keys, reserves replay, checks live revocation, grants execution, or overrides a
-   host policy. Public results are named `EnvelopeFacts` with
+   host policy. Public verified results are `GrantFacts` and `EnvelopeFacts`, both with
    `authorization: :not_evaluated`; there is no `allowed?`, `authorized?`, `decision`, or receipt.
+   They are value-bearing and redacted, never execution credentials.
 2. **Pure and deterministic.** Runtime code has no database, filesystem, network, environment,
    process dictionary, clock, random-number generator, supervisor, or application callback.
    Time, expected audience, already-trusted public keys, request context, and limits are explicit
@@ -50,8 +55,9 @@ is the next executable row; consult [`docs/ROADMAP.md`](docs/ROADMAP.md) for its
    ScopeAxis, tenant, merchant, asset, partition, or provider-specific semantics.
 6. **No secret material.** The verifier accepts public keys only. Private keys, signing callbacks,
    KMS/HSM clients, credentials, and secrets cannot enter the package or conformance fixtures.
-7. **Canonical bytes are the contract.** Signing inputs, request digests, chain links, archives,
-   duplicate handling, normalization, limits, and errors are versioned and independently tested.
+7. **Canonical bytes are the contract.** Grant and proof signatures use the exact standard JWS
+   signing input. Request digests, chain links, archives, duplicate handling, normalization,
+   limits, and errors are versioned and independently tested.
 8. **Public compatibility is deliberate.** Once released, wire formats and public APIs follow
    SemVer and the contract-major discipline. No permissive compatibility parser is added.
 9. **QorPay is out of bounds.** Do not access its repository. Never edit, import, decode, issue, or
