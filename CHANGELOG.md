@@ -27,6 +27,14 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Enforce raw numeric-lexeme bytes and exact decimal magnitude before OTP conversion; validate the
   companion Draft 2020-12 schemas with an independent validator and distinguish their structural
   code-point limits from the normative UTF-8 byte contract.
+- Align the tracked roadmap with Forge's authored-row contract while preserving BAP-00 through
+  BAP-07 identities and exact dependency labels.
+- Document the exact public `BoundedAuthorityProtocol.V1.Json.decode/2` and
+  `BoundedAuthorityProtocol.V1.Base64Url.decode/2` surfaces, tightening-only positive-integer
+  limits, structural-schema boundary, and fixed value-free errors.
+- Extend the packed external consumer to exercise both decoder success and rejection paths, and
+  add mutation-red proof that escaped string content cannot hide a following over-limit number.
+- Reconcile the BAP-02 final trusted-main receipts and degraded peer-review record.
 
 ### Not yet available
 

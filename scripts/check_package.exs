@@ -167,8 +167,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       """
     )
 
-    File.write!(
-      Path.join(consumer_root, "lib/bounded_authority_protocol_consumer.ex"),
+    consumer_source =
       """
       defmodule BoundedAuthorityProtocolConsumer do
         @moduledoc false
@@ -190,8 +189,32 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
               BoundedAuthorityProtocol.V1.untrusted_key_locator(header <> "..")
             )
         end
+
+        def decoder_contract? do
+          with {:ok, "package-proof"} <-
+                 BoundedAuthorityProtocol.V1.Base64Url.decode("cGFja2FnZS1wcm9vZg", %{}),
+               {:error, :invalid} <-
+                 BoundedAuthorityProtocol.V1.Base64Url.decode("cGFja2FnZS1wcm9vZg=", %{}),
+               {:ok, {:object, [{"answer", {:integer, 42}}]}} <-
+                 BoundedAuthorityProtocol.V1.Json.decode(~s({"answer":42}), %{}),
+               {:error, :invalid} <-
+                 BoundedAuthorityProtocol.V1.Json.decode(
+                   ~s({"answer":42,"answer":43}),
+                   %{}
+                 ) do
+            true
+          else
+            _failure -> false
+          end
+        end
       end
       """
+
+    check_decoder_contract_calls!(consumer_source)
+
+    File.write!(
+      Path.join(consumer_root, "lib/bounded_authority_protocol_consumer.ex"),
+      consumer_source
     )
 
     environment = [{"MIX_ENV", "prod"}]
@@ -204,11 +227,48 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
         "run",
         "--no-start",
         "-e",
-        "unless BoundedAuthorityProtocolConsumer.package_contract?(), do: System.halt(1)"
+        "unless BoundedAuthorityProtocolConsumer.package_contract?() and " <>
+          "BoundedAuthorityProtocolConsumer.decoder_contract?(), do: System.halt(1)"
       ],
       consumer_root,
       environment
     )
+  end
+
+  defp check_decoder_contract_calls!(consumer_source) do
+    expected_calls = [
+      {[:BoundedAuthorityProtocol, :V1, :Base64Url], :decode, 2},
+      {[:BoundedAuthorityProtocol, :V1, :Json], :decode, 2}
+    ]
+
+    target_modules = expected_calls |> Enum.map(&elem(&1, 0)) |> MapSet.new()
+    quoted = Code.string_to_quoted!(consumer_source)
+
+    {_quoted, actual_calls} =
+      Macro.prewalk(quoted, %{}, fn
+        {{:., _dot_meta, [{:__aliases__, _alias_meta, module}, function]}, _call_meta, arguments} =
+            node,
+        counts ->
+          key = {module, function, length(arguments)}
+
+          if function == :decode and MapSet.member?(target_modules, module) do
+            {node, Map.update(counts, key, 1, &(&1 + 1))}
+          else
+            {node, counts}
+          end
+
+        node, counts ->
+          {node, counts}
+      end)
+
+    expected_counts = Map.new(expected_calls, &{&1, 2})
+
+    unless actual_calls == expected_counts do
+      fail!(
+        "packed consumer decoder calls must be #{inspect(expected_counts)}, " <>
+          "got #{inspect(actual_calls)}"
+      )
+    end
   end
 
   defp assert_regular_nonempty!(path) do
