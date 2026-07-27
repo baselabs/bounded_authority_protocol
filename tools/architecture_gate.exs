@@ -121,9 +121,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     binary: ~w(split)a,
     crypto: ~w(hash hash_equals hash_final hash_init hash_update verify)a,
     erlang:
-      ~w(+ - * / ++ -- < <= == === > >= and band binary_to_float binary_to_integer bnot bor bsl bsr bxor byte_size div element error get_module_info hd is_atom is_binary is_bitstring is_boolean is_float is_function is_integer is_list is_map is_map_key is_number is_pid is_port is_reference is_tuple length map_get map_size max min not or raise rem round setelement size tl trunc tuple_size xor)a,
+      ~w(+ - * / ++ -- < <= == === =:= > >= and band binary_to_float binary_to_integer bnot bor bsl bsr bxor byte_size div element error get_module_info hd is_atom is_binary is_bitstring is_boolean is_float is_function is_integer is_list is_map is_map_key is_number is_pid is_port is_reference is_tuple length map_get map_size max min not or raise rem round setelement size tl trunc tuple_size xor)a,
     json: ~w(decode)a,
-    maps: ~w(find merge to_list)a,
+    maps: ~w(find merge put to_list)a,
     elixir_erl_pass: ~w(no_parens_remote)a
   }
 
