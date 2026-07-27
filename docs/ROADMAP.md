@@ -39,18 +39,18 @@ compatibility.
 
 ## BAP-01 closeout evidence
 
-- Implementation head `884514ef2a4b5e8c1ed5da5297a001f54f0cd9a0` is pushed to public
-  `main`. [CI run 30227229270](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30227229270)
+- Package-bearing closeout head `6d8f807be6f4cc76abc2763754542f1ebe91b5be` is pushed to public
+  `main`. [CI run 30227584102](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30227584102)
   passed the complete quality/package boundary, workflow syntax, and all supported pairs:
   Elixir 1.18.4/OTP 27.3.4.14, Elixir 1.19.5/OTP 28.5.0.3, and Elixir
   1.20.2/OTP 29.0.3.
-- [Supply-chain run 30227229255](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30227229255)
-  built artifact `8638929020`. Its exact unpublished archive has SHA-256
-  `f101975f06baef809d34b627253c9d9505d15f7ade599a4d4c61807d9a720490`; the downloaded
+- [Supply-chain run 30227584100](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30227584100)
+  built artifact `8639043791`. Its exact unpublished archive has SHA-256
+  `b018ffd134ce7c52a43d655437c6246bb725f3ac2d4b34adf502f4d69a7efcb5`; the downloaded
   `SHA256SUMS` check passed.
 - `gh attestation verify` accepted separate SLSA provenance and CycloneDX 1.6 SBOM attestations
   for that exact digest, constrained to this repository, the trusted supply-chain workflow,
-  `refs/heads/main`, source digest `884514ef2a4b5e8c1ed5da5297a001f54f0cd9a0`, and
+  `refs/heads/main`, source digest `6d8f807be6f4cc76abc2763754542f1ebe91b5be`, and
   GitHub-hosted runners.
 - Local `mix quality` passed 15 tests with 0 failures and 100.00% coverage, plus format,
   warnings-as-errors compilation, Credo, Dialyzer, documentation, advisory, retired-package,
