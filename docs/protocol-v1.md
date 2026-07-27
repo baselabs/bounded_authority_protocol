@@ -23,6 +23,8 @@ unlisted member, value, encoding, or extension with the single public result
   URI treatment.
 - [Erlang/OTP `json`](https://www.erlang.org/doc/apps/stdlib/json.html): OTP 27+ ordered decode
   callbacks and incomplete/invalid UTF-8 failures.
+- [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12/json-schema-validation):
+  structural validation semantics, including code-point-based string length.
 
 These references supply generic encodings. The closed fields, values, separators, and bounds
 below are this profile's choices.
@@ -46,9 +48,23 @@ name at any depth is rejected while the ordered member list is being built, befo
 conversion. Input must be one complete RFC 8259 value followed only by JSON whitespace. UTF-8 is
 mandatory. Strings are preserved exactly; Unicode normalization is forbidden.
 
-All numbers are limited symmetrically to
+Before OTP converts a number token, the decoder scans its raw RFC 8259 lexeme outside strings,
+enforces the 64-byte ceiling, and compares its exact decimal magnitude without floating-point
+rounding. All numbers are limited symmetrically to
 `-9007199254740991..9007199254740991`, the exact interoperable integer range identified by
-RFC 8259. Floats must also be finite.
+RFC 8259. Floats must also be finite. Thus exponent spellings are bounded by their source bytes,
+and a fractional value outside the limit cannot round inward and pass.
+
+## Structural schemas
+
+The Draft 2020-12 schemas under `priv/conformance/v1/schemas/` are structural companion
+artifacts, validated against the canonical Draft 2020-12 meta-schema. They are not standalone
+byte-level conformance oracles. In particular, JSON Schema `maxLength` counts Unicode code points,
+while this profile's `string bytes`, `object-name bytes`, and `kid bytes` limits count UTF-8
+bytes. The schemas carry `x-bap-maximum-utf8-bytes` annotations for those limits; the normative
+decoder and boundary corpus enforce them. Duplicate rejection, raw numeric-lexeme length,
+decoded-size projection, depth, total-node count, and exact byte encodings likewise remain
+decoder/corpus requirements.
 
 ## Base64url
 
@@ -162,9 +178,11 @@ all precede cryptography.
 
 ## Untrusted key locator
 
-`BoundedAuthorityProtocol.V1.untrusted_key_locator/2` requires exactly three dot-separated compact
-segments. It bounds and decodes only the protected grant header, enforces its exact closed table,
-and returns only:
+`BoundedAuthorityProtocol.V1.untrusted_key_locator/2` first bounds the complete compact input,
+requires exactly three dot-separated compact segments, then bounds and decodes only the protected
+grant header and enforces its exact closed table. The opaque payload and signature segments are
+not decoded or independently size-checked by this locator; the complete-input bound still covers
+their bytes. It returns only:
 
 ```elixir
 {:ok, %BoundedAuthorityProtocol.V1.KeyLocator{kid: kid, trust: :not_evaluated}}

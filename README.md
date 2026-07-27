@@ -12,8 +12,10 @@ release boundary. `BAP-01` is complete: its public CI matrix, complete quality g
 checksum, SLSA provenance, and CycloneDX attestation passed from trusted `main`. `BAP-02` now
 freezes the v1 wire tables and limits and implements bounded ordered JSON, strict base64url, and
 the protected-header-only untrusted key locator; its local, compatibility-CI, packaged-consumer,
-checksum, provenance, and SBOM gates are complete. Cryptographic verification begins in a later
-row. Nothing in this repository has been published to Hex.
+checksum, provenance, and SBOM gates are complete. The raw-number preflight enforces source-byte
+and exact-decimal magnitude limits before OTP numeric conversion; independently validated Draft
+2020-12 schemas accompany, but do not replace, the byte-level decoder contract. Cryptographic
+verification begins in a later row. Nothing in this repository has been published to Hex.
 
 The scaffold has zero production dependencies, no application callback, and no supervision tree.
 Source AST, compiled BEAM imports, generated application metadata, dependency declarations, and
@@ -25,6 +27,7 @@ The v1 profile now provides:
 
 - immutable protected-header, claim, selector, separator, URI, encoding, and resource-limit tables;
 - ordered JSON decoding with recursive duplicate rejection and no input-name atomization;
+- raw numeric-lexeme and exact-decimal magnitude enforcement before numeric conversion;
 - strict canonical unpadded base64url decoding;
 - a protected-header-only `untrusted_key_locator/2` that returns `trust: :not_evaluated`.
 
@@ -67,7 +70,8 @@ bounded_authority_protocol -> no private or product package
 See the [normative v1 profile](docs/protocol-v1.md),
 [protocol charter](docs/design/protocol-charter.md), [threat model](docs/design/threat-model.md),
 [conformance contract](docs/design/conformance-contract.md), and
-[ADR 0001](docs/adr/0001-public-protocol-verifier-boundary.md).
+[ADR 0001](docs/adr/0001-public-protocol-verifier-boundary.md) plus
+[ADR 0002](docs/adr/0002-normative-v1-parsing-profile.md).
 
 ## Development
 

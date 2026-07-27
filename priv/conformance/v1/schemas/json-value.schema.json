@@ -7,8 +7,13 @@
     {"type": "null"},
     {"type": "boolean"},
     {"type": "number", "minimum": -9007199254740991, "maximum": 9007199254740991},
-    {"type": "string", "maxLength": 8192},
+    {"type": "string", "maxLength": 8192, "x-bap-maximum-utf8-bytes": 8192},
     {"type": "array", "maxItems": 256, "items": {"$ref": "#"}},
-    {"type": "object", "maxProperties": 64, "additionalProperties": {"$ref": "#"}}
+    {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": {"maxLength": 128, "x-bap-maximum-utf8-bytes": 128},
+      "additionalProperties": {"$ref": "#"}
+    }
   ]
 }

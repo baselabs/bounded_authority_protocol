@@ -36,7 +36,7 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
           key_bytes: pos_integer(),
           number_lexeme_bytes: pos_integer(),
           integer_magnitude: pos_integer(),
-          float_magnitude: float(),
+          float_magnitude: pos_integer(),
           kid_bytes: pos_integer()
         }
 
@@ -53,7 +53,7 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
     key_bytes: 128,
     number_lexeme_bytes: 64,
     integer_magnitude: 9_007_199_254_740_991,
-    float_magnitude: 9_007_199_254_740_991.0,
+    float_magnitude: 9_007_199_254_740_991,
     kid_bytes: 128
   }
 
@@ -91,9 +91,6 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
       {:ok, maximum} when is_integer(maximum) ->
         valid_integer_override?(value, maximum) and valid_keys_and_values?(rest)
 
-      {:ok, maximum} when is_float(maximum) ->
-        valid_float_override?(value, maximum) and valid_keys_and_values?(rest)
-
       :error ->
         false
     end
@@ -101,7 +98,4 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
 
   defp valid_integer_override?(value, maximum),
     do: is_integer(value) and value > 0 and value <= maximum
-
-  defp valid_float_override?(value, maximum),
-    do: (is_integer(value) or is_float(value)) and value > 0 and value <= maximum
 end

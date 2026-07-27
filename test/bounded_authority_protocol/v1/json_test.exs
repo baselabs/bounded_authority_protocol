@@ -61,6 +61,26 @@ defmodule BoundedAuthorityProtocol.V1.JsonTest do
     assert negative == -9_007_199_254_740_991.0
     assert {:error, :invalid} = Json.decode("9007199254740992.0")
     assert {:error, :invalid} = Json.decode("-9007199254740992.0")
+    assert {:error, :invalid} = Json.decode("9007199254740991.1")
+    assert {:error, :invalid} = Json.decode("-9007199254740991.1")
+    assert {:ok, {:float, _value}} = Json.decode("9007199254740990.9")
+    assert {:ok, {:float, _value}} = Json.decode("-9007199254740990.9")
+    assert {:ok, {:float, 1.0}} = Json.decode("1e0", %{float_magnitude: 1})
+    assert {:error, :invalid} = Json.decode("1.1", %{float_magnitude: 1})
+
+    assert {:ok, {:float, 100.0}} =
+             Json.decode("1e2", %{number_lexeme_bytes: 3})
+
+    assert {:ok, {:float, 100.0}} = Json.decode("1e+2")
+
+    exact_lexeme = "1e-" <> String.duplicate("0", 60) <> "1"
+    assert byte_size(exact_lexeme) == 64
+    assert {:ok, {:float, 0.1}} = Json.decode(exact_lexeme)
+
+    overlong_lexeme = "1e-" <> String.duplicate("0", 61) <> "1"
+    assert byte_size(overlong_lexeme) == 65
+    assert {:error, :invalid} = Json.decode(overlong_lexeme)
+
     assert {:error, :invalid} = Json.decode("123", %{number_lexeme_bytes: 2})
   end
 
@@ -72,6 +92,7 @@ defmodule BoundedAuthorityProtocol.V1.JsonTest do
           ~s({"a":}),
           ~s({"a":[1,]}),
           ~s([{"a":1,}]),
+          "-x",
           "true false",
           <<?", 0xFF, ?">>
         ] do
@@ -83,13 +104,126 @@ defmodule BoundedAuthorityProtocol.V1.JsonTest do
     assert {:error, :invalid} = Json.decode(:not_binary)
   end
 
-  test "deterministic malformed-input sweep terminates with a closed result" do
-    seeds = ["", "{", "[", "0", ~s("x"), ~s({"a":[0]})]
+  test "raw-number preflight mutation is caught by the exact-magnitude boundary" do
+    path = Path.expand("../../../lib/bounded_authority_protocol/v1/json.ex", __DIR__)
+    source = File.read!(path)
 
-    for seed <- seeds, byte <- 0..255 do
-      candidate = seed <> <<byte>>
+    mutant =
+      source
+      |> String.replace(
+        "defmodule BoundedAuthorityProtocol.V1.Json do",
+        "defmodule BoundedAuthorityProtocol.V1.JsonWithoutRawNumberPreflight do",
+        global: false
+      )
+      |> String.replace(
+        "if number_lexemes_valid?(bytes, bounds) do",
+        "if number_lexemes_valid?(bytes, bounds) or true do",
+        global: false
+      )
+
+    assert mutant != source
+    modules = Code.compile_string(mutant, path) |> Enum.map(&elem(&1, 0))
+
+    on_exit(fn ->
+      Enum.each(modules, fn module ->
+        :code.purge(module)
+        :code.delete(module)
+      end)
+    end)
+
+    assert {:error, :invalid} = Json.decode("9007199254740991.1")
+
+    mutant_module = BoundedAuthorityProtocol.V1.JsonWithoutRawNumberPreflight
+    mutant_decode = Function.capture(mutant_module, :decode, 1)
+
+    assert {:ok, {:float, 9_007_199_254_740_991.0}} =
+             mutant_decode.("9007199254740991.1")
+  end
+
+  test "numeric lexeme scanning stops after maximum plus one bytes and the guard is mutation-red" do
+    path = Path.expand("../../../lib/bounded_authority_protocol/v1/json.ex", __DIR__)
+    source = File.read!(path)
+    current_module = BoundedAuthorityProtocol.V1.JsonScanInstrumentation
+    unbounded_module = BoundedAuthorityProtocol.V1.JsonUnboundedScanInstrumentation
+
+    current_source = instrument_number_scan(source, current_module, :current_number_scan)
+
+    unbounded_source =
+      source
+      |> String.replace(
+        "defp number_candidate_length(_bytes, length, maximum) when length > maximum, do: :too_long",
+        "defp number_candidate_length(_bytes, length, maximum)\n" <>
+          "       when length > maximum + 65_536,\n" <>
+          "       do: :too_long",
+        global: false
+      )
+      |> instrument_number_scan(unbounded_module, :unbounded_number_scan)
+
+    assert current_source != source
+    assert unbounded_source != current_source
+
+    modules =
+      Code.compile_string(current_source, path) ++ Code.compile_string(unbounded_source, path)
+
+    on_exit(fn ->
+      Enum.each(modules, fn {module, _bytecode} ->
+        :code.purge(module)
+        :code.delete(module)
+      end)
+    end)
+
+    token = String.duplicate("1", 100)
+
+    assert scan_message_count(current_module, :current_number_scan, token) == 65
+    assert scan_message_count(unbounded_module, :unbounded_number_scan, token) == 100
+  end
+
+  test "generated malformed-input fuzz corpus terminates with a closed result" do
+    alphabet = [0, 1, 9, 10, 13, 34, 44, 48, 58, 91, 92, 93, 123, 125, 127, 128, 255]
+
+    for first <- alphabet, second <- alphabet, third <- alphabet do
+      candidate = <<first, second, third>>
       result = Json.decode(candidate, %{json_bytes: 64})
       assert match?({:ok, _value}, result) or result == {:error, :invalid}
+    end
+
+    structures = ["", "{", "[", "0", ~s("x"), ~s({"a":[0]}), "[[[]]]", ~s({"a":{"b":[]}})]
+
+    for left <- structures, right <- structures, byte <- alphabet do
+      result = Json.decode(left <> <<byte>> <> right, %{json_bytes: 64, depth: 4})
+      assert match?({:ok, _value}, result) or result == {:error, :invalid}
+    end
+  end
+
+  defp instrument_number_scan(source, module, tag) do
+    source
+    |> String.replace(
+      "defmodule BoundedAuthorityProtocol.V1.Json do",
+      "defmodule #{inspect(module)} do",
+      global: false
+    )
+    |> String.replace(
+      "defp number_candidate_length(<<_byte, rest::binary>>, length, maximum),\n" <>
+        "    do: number_candidate_length(rest, length + 1, maximum)",
+      "defp number_candidate_length(<<_byte, rest::binary>>, length, maximum) do\n" <>
+        "    send(self(), #{inspect(tag)})\n" <>
+        "    number_candidate_length(rest, length + 1, maximum)\n" <>
+        "  end",
+      global: false
+    )
+  end
+
+  defp scan_message_count(module, tag, token) do
+    decoder = Function.capture(module, :decode, 2)
+    assert {:error, :invalid} = decoder.(token, %{json_bytes: 128, number_lexeme_bytes: 64})
+    drain_scan_messages(tag, 0)
+  end
+
+  defp drain_scan_messages(tag, count) do
+    receive do
+      ^tag -> drain_scan_messages(tag, count + 1)
+    after
+      0 -> count
     end
   end
 end

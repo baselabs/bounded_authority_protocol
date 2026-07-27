@@ -9,7 +9,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   @doc """
   Parses only the protected grant header and returns its untrusted `kid` hint.
 
-  Payload and signature segments are not decoded or interpreted.
+  The complete compact input is bounded. Payload and signature segments are not decoded,
+  interpreted, or independently size-checked.
   """
   @spec untrusted_key_locator(binary(), Bounds.t() | map()) ::
           {:ok, KeyLocator.t()} | {:error, :invalid}
@@ -18,10 +19,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   def untrusted_key_locator(compact, limits) when is_binary(compact) do
     with {:ok, bounds} <- Bounds.coerce(limits),
          true <- byte_size(compact) <= bounds.compact_bytes,
-         [protected, payload, signature] <- :binary.split(compact, <<".">>, [:global]),
+         [protected, _payload, _signature] <- :binary.split(compact, <<".">>, [:global]),
          true <- byte_size(protected) <= bounds.encoded_segment_bytes,
-         true <- byte_size(payload) <= bounds.encoded_segment_bytes,
-         true <- byte_size(signature) <= bounds.encoded_segment_bytes,
          {:ok, header_bytes} <- Base64Url.decode(protected, bounds),
          {:ok, {:object, members}} <- Json.decode(header_bytes, bounds),
          {:ok, kid} <- closed_header(members, nil, nil, nil),

@@ -24,6 +24,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
   base64url decoding, and a protected-header-only untrusted key locator.
 - Add allow, deny, malformed, exact-boundary, deterministic malformed-input sweep, symmetric
   numeric-magnitude, package-consumer, and purity-boundary proof.
+- Enforce raw numeric-lexeme bytes and exact decimal magnitude before OTP conversion; validate the
+  companion Draft 2020-12 schemas with an independent validator and distinguish their structural
+  code-point limits from the normative UTF-8 byte contract.
 
 ### Not yet available
 
