@@ -36,6 +36,14 @@ fixed public error, and mutation-red proof.
    tooling only and are excluded from the packed runtime dependency surface.
 7. Bind architecture exceptions to exact compiled function/arity call counts and require a
    planted extra dynamic call to make the gate red.
+8. Keep the shipped decoder APIs at their explicit versioned module locations:
+   `BoundedAuthorityProtocol.V1.Json.decode/2` and
+   `BoundedAuthorityProtocol.V1.Base64Url.decode/2`. Do not add duplicate façade functions on
+   `BoundedAuthorityProtocol.V1`; named submodules under that namespace are public v1 modules.
+9. Keep supported-toolchain and trusted-main artifact identity in their executable authorities:
+   `mix.exs` sets the Elixir requirement, the CI workflow enumerates tested Elixir/OTP pairs, and
+   each trusted-main workflow run plus its checksum and attestations identifies its own artifact.
+   A separate ADR would duplicate those facts and introduce a second source that can drift.
 
 ## Consequences
 
@@ -44,6 +52,6 @@ fixed public error, and mutation-red proof.
 - The locator cannot inspect authorization claims, signatures, trust stores, or host state.
 - Schema validation proves structural agreement, while byte-boundary tests prove the stricter wire
   contract without misrepresenting JSON Schema semantics.
-- The parser and locator APIs are public v1/SemVer surfaces; widening accepted fields, values,
-  encodings, bounds, or error behavior requires an explicit new profile or compatible package
-  change under the tracked versioning contract.
+- The two decoder APIs and the locator API are public v1/SemVer surfaces; widening accepted
+  fields, values, encodings, bounds, or error behavior requires an explicit new profile or
+  compatible package change under the tracked versioning contract.

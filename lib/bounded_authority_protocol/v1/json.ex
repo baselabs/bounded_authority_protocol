@@ -1,9 +1,14 @@
 defmodule BoundedAuthorityProtocol.V1.Json do
   @moduledoc """
-  Bounded JSON decoder preserving object order and rejecting duplicate names.
+  Bounded JSON decoder preserving object order and rejecting duplicate binary names.
 
-  Raw numeric lexemes are bounded and magnitude-checked before OTP conversion. The returned
-  algebra is closed and never atomizes an input name.
+  `decode/2` returns the tagged, closed v1 algebra documented by `t:value/0`; it never atomizes an
+  input name. Raw numeric lexemes are byte-bounded and exact-magnitude-checked before OTP
+  conversion. Caller limits may only tighten the positive-integer hard maxima. Every failure is
+  the fixed value-free `{:error, :invalid}`.
+
+  Draft 2020-12 schemas shipped with the package describe structural shape. They do not replace
+  this decoder's duplicate-name, raw-lexeme, UTF-8 byte, depth, node, or exact encoding checks.
   """
 
   alias BoundedAuthorityProtocol.V1.Bounds

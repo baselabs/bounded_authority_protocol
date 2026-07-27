@@ -26,10 +26,19 @@ the unpacked Hex archive are all checked to preserve that boundary.
 The v1 profile now provides:
 
 - immutable protected-header, claim, selector, separator, URI, encoding, and resource-limit tables;
-- ordered JSON decoding with recursive duplicate rejection and no input-name atomization;
+- `BoundedAuthorityProtocol.V1.Json.decode/2`, returning the closed tagged JSON algebra with
+  recursive duplicate rejection and no input-name atomization;
 - raw numeric-lexeme and exact-decimal magnitude enforcement before numeric conversion;
-- strict canonical unpadded base64url decoding;
+- `BoundedAuthorityProtocol.V1.Base64Url.decode/2`, providing strict canonical unpadded
+  base64url decoding;
 - a protected-header-only `untrusted_key_locator/2` that returns `trust: :not_evaluated`.
+
+The two decoder functions live in named public submodules under the explicit
+`BoundedAuthorityProtocol.V1` namespace. There is no duplicate decoder façade and no implicit
+latest profile. Decoder limits are tightening-only positive integers; unknown, non-integer,
+zero/negative, or widening values fail with the fixed value-free `{:error, :invalid}`. The
+structural Draft 2020-12 schemas accompany the decoders but do not replace duplicate-name,
+raw-number, UTF-8 byte, depth, node-count, or canonical-encoding enforcement.
 
 Later rows will provide:
 
@@ -95,6 +104,11 @@ mix audit
 mix package.check
 mix sbom.generate
 ```
+
+`mix.exs` is the executable authority for the supported Elixir floor, and
+`.github/workflows/ci.yml` is the executable authority for tested Elixir/OTP pairs. Each
+trusted-main workflow run, checksum, and attestation identifies its own source revision and
+artifact. These executable facts deliberately have no duplicate lifecycle ADR.
 
 Main-branch CI builds an unpublished package archive, records its SHA-256 checksum, produces
 release and tooling CycloneDX documents, and creates separate GitHub build-provenance and SBOM

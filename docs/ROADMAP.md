@@ -11,16 +11,17 @@ trusted-key discovery, issuance, live revocation state, replay reservation, exec
 evidence writes, archive removal, network client, OTP server, Beamline vocabulary, or QorPay
 compatibility.
 
-| Row | Deliverable | Depends on | State | Completion gate |
+<!-- forge-roadmap-schema: 1 -->
+| ID | What | Acceptance | Depends | Why |
 |---|---|---|---|---|
-| BAP-00 | Public repository, Apache-2.0 license, Forge boundary, tracked architecture and cold-start authority | — | Complete | Evidence recorded below |
-| BAP-01 | Mix package scaffold, pure-library architecture test, quality aliases, public CI, package inspection | BAP-00 | Complete | Evidence recorded below |
-| BAP-02 | Normative v1 tables, bounded ordered decoder, strict base64url, untrusted key locator | BAP-01 | Complete | Evidence recorded below |
-| BAP-03 | Compact EdDSA grant and RFC 9449 DPoP encode/decode/verify | BAP-02 | Planned | Official and independent vectors; meaningful-byte tamper matrix; timing/allocation bounds; no trust-selection path |
-| BAP-04 | Consumption-chain, anchor, archive, and historical public-key verification | BAP-03 | Planned | Rollover, truncation, reorder, omission, archive-coverage, and tamper vectors pass independently |
-| BAP-05 | Language-neutral conformance corpus, verifier CLI, property/fuzz/mutation gates | BAP-04 | Planned | A second implementation consumes only published artifacts and agrees on every valid/invalid vector |
-| BAP-06 | Stable public API, guides, security policy, docs, immutable release-candidate archive and automation | BAP-05 | Planned | SemVer/API review; docs; reproducible candidate archive; unpacked consumer; checksum/SBOM/provenance gates; not yet published |
-| BAP-07 | Connected verification and first public release | BAP-06, private BA-14 | Planned | Exact candidate passes private-runtime PG16/17/18 and RetiredPrivateConsumer connected gates; full public quality/conformance; fresh correctness, security, gate-integrity, and cross-vendor reviews; publish that exact archive with zero open findings |
+| BAP-00 | **Public authority boundary** — Public repository, Apache-2.0 license, Forge boundary, tracked architecture, and cold-start authority, slug:bap-00 | Evidence recorded below | — | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) |
+| BAP-01 | **Pure Mix package** — Mix package scaffold, pure-library architecture test, quality aliases, public CI, and package inspection, slug:bap-01 | Evidence recorded below | BAP-00 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) |
+| BAP-02 | **Normative bounded parsing** — Normative v1 tables, bounded ordered decoder, strict base64url, and untrusted key locator, slug:bap-02 | Evidence recorded below | BAP-01 | [ADR 0002](adr/0002-normative-v1-parsing-profile.md) |
+| BAP-03 | **Grant and holder-proof verification** — Compact EdDSA grant and RFC 9449 DPoP encode, decode, and verify, slug:bap-03 | Official and independent vectors; meaningful-byte tamper matrix; timing/allocation bounds; no trust-selection path | BAP-02 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [normative v1 profile](protocol-v1.md) |
+| BAP-04 | **Chain and historical-key verification** — Consumption-chain, anchor, archive, and historical public-key verification, slug:bap-04 | Rollover, truncation, reorder, omission, archive-coverage, and tamper vectors pass independently | BAP-03 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [normative v1 profile](protocol-v1.md) |
+| BAP-05 | **Portable conformance** — Language-neutral conformance corpus, verifier CLI, and property, fuzz, and mutation gates, slug:bap-05 | A second implementation consumes only published artifacts and agrees on every valid and invalid vector | BAP-04 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
+| BAP-06 | **Release-candidate contract** — Stable public API, guides, security policy, documentation, immutable release-candidate archive, and automation, slug:bap-06 | SemVer/API review; docs; reproducible candidate archive; unpacked consumer; checksum/SBOM/provenance gates; not yet published | BAP-05 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
+| BAP-07 | **Connected verification and release** — Connected verification and first public release, slug:bap-07 | Exact candidate passes private-runtime PG16/17/18 and RetiredPrivateConsumer connected gates; full public quality/conformance; fresh correctness, security, gate-integrity, and cross-vendor reviews; publish that exact archive with zero open findings | BAP-06, private BA-14 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
 
 ## BAP-00 closeout evidence
 
@@ -63,6 +64,10 @@ compatibility.
 
 ## BAP-02 closeout evidence
 
+- Final verification receipt head `893680f501d39371c7f1f1f630d8e8e92cd35cf8` is pushed to
+  public `main`. [CI run 30242449363](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30242449363)
+  and [supply-chain run 30242449390](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30242449390)
+  passed at that exact source revision.
 - Package-bearing implementation head `ad80fcf9201c12010f1fed494224987e7be4b283` is pushed to
   public `main`. [CI run 30240151612](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30240151612)
   passed the complete quality/package boundary, workflow syntax, and all supported pairs:
@@ -84,9 +89,12 @@ compatibility.
   release-SBOM, and numeric-schema mutation probes each made its owning gate fail before the
   original was restored. Independent design, gate-integrity, and security/correctness reviews
   returned no findings after every admitted same-slice finding was fixed.
-- Final-range GLM review returned no findings. Fable and Opus timed out without verdicts; their
-  partial transcripts were mined and contained no actionable finding. The aggregate remains a
-  named degraded review, not a zero-finding cross-vendor review.
+- The earlier closeout account reported a no-finding GLM result and two timed-out Claude peers.
+  A 2026-07-27 exact-range reconciliation supersedes that peer account: Claude fable completed a
+  review and identified two admitted gaps—focused escape-tracking mutation proof and
+  positive-integer bound wording—while GLM timed out without a verdict. Both gaps are fixed in
+  the authority-alignment landing. The aggregate remains a named degraded review, not a
+  zero-finding cross-vendor review.
 
 ## Next action
 

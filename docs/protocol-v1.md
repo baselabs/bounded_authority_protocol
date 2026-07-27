@@ -31,6 +31,13 @@ below are this profile's choices.
 
 ## JSON algebra and decoding
 
+The public bounded decoder is
+`BoundedAuthorityProtocol.V1.Json.decode/2`. The public strict segment decoder is
+`BoundedAuthorityProtocol.V1.Base64Url.decode/2`. Both return `{:error, :invalid}` for every
+failure without including input values. These named submodules are explicit public v1 modules;
+there are no duplicate decoder functions on `BoundedAuthorityProtocol.V1` and no implicit latest
+profile.
+
 The decoder returns exactly:
 
 | JSON | Elixir value |
@@ -171,10 +178,10 @@ No other separator is accepted for v1.
 | float magnitude | 9,007,199,254,740,991 |
 | `kid` bytes | 128 |
 
-Callers may tighten any maximum with a positive value. Unknown limits, zero/negative values, or
-widening attempts are invalid. Raw and encoded sizes are checked before decoding; decoded-size
-projection precedes allocation; structure and scalar limits are enforced during ordered decoding;
-all precede cryptography.
+Callers may tighten any maximum with a positive integer. Unknown limits, non-integer,
+zero/negative, or widening values are invalid. Raw and encoded sizes are checked before decoding;
+decoded-size projection precedes allocation; structure and scalar limits are enforced during
+ordered decoding; all precede cryptography.
 
 ## Untrusted key locator
 

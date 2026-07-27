@@ -178,6 +178,51 @@ defmodule BoundedAuthorityProtocol.V1.JsonTest do
     assert scan_message_count(unbounded_module, :unbounded_number_scan, token) == 100
   end
 
+  test "escape tracking exposes following over-limit numbers and is mutation-red" do
+    inputs = [
+      ~S(["quote: \"",9007199254740991.1]),
+      ~S(["slash: \\",9007199254740991.1])
+    ]
+
+    for bytes <- inputs do
+      assert {:error, :invalid} = Json.decode(bytes)
+    end
+
+    path = Path.expand("../../../lib/bounded_authority_protocol/v1/json.ex", __DIR__)
+    source = File.read!(path)
+
+    mutant =
+      source
+      |> String.replace(
+        "defmodule BoundedAuthorityProtocol.V1.Json do",
+        "defmodule BoundedAuthorityProtocol.V1.JsonWithoutEscapeTracking do",
+        global: false
+      )
+      |> String.replace(
+        "defp scan_string(<<?\\\\, _escaped, rest::binary>>, bounds), do: scan_string(rest, bounds)",
+        "defp scan_string(<<?\\\\, _escaped, _rest::binary>>, _bounds), do: true",
+        global: false
+      )
+
+    assert mutant != source
+    modules = Code.compile_string(mutant, path) |> Enum.map(&elem(&1, 0))
+
+    on_exit(fn ->
+      Enum.each(modules, fn module ->
+        :code.purge(module)
+        :code.delete(module)
+      end)
+    end)
+
+    mutant_decode =
+      Function.capture(BoundedAuthorityProtocol.V1.JsonWithoutEscapeTracking, :decode, 1)
+
+    for bytes <- inputs do
+      assert {:ok, {:array, [{:string, _string}, {:float, 9_007_199_254_740_991.0}]}} =
+               mutant_decode.(bytes)
+    end
+  end
+
   test "generated malformed-input fuzz corpus terminates with a closed result" do
     alphabet = [0, 1, 9, 10, 13, 34, 44, 48, 58, 91, 92, 93, 123, 125, 127, 128, 255]
 
