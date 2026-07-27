@@ -8,9 +8,10 @@ bounded proof-of-possession authority.
 The public/private boundary is complete under
 [`BAP-00`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). The source tree now
 contains the unpublished `:bounded_authority_protocol` 0.1.0 Mix package scaffold and its enforced
-release boundary. BAP-01 remains in progress until public CI and trusted-main attestations pass.
-No protocol profile or verifier behavior is implemented yet; `BAP-02` starts only after that
-closeout. Nothing in this repository has been published to Hex.
+release boundary. `BAP-01` is complete: its public CI matrix, complete quality gate, exact archive,
+checksum, SLSA provenance, and CycloneDX attestation passed from trusted `main`. No protocol
+profile or verifier behavior is implemented yet; `BAP-02` is the next executable row. Nothing in
+this repository has been published to Hex.
 
 The scaffold has zero production dependencies, no application callback, and no supervision tree.
 Source AST, compiled BEAM imports, generated application metadata, dependency declarations, and
