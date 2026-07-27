@@ -240,7 +240,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
 
       assert Enum.any?(ArchitectureGate.check(root, compiled: false), fn violation ->
                violation.category == :unapproved_runtime and
-                 violation.detail =~ "compile-time hook @"
+                 violation.detail =~ "implicit execution hook @"
              end)
     end)
   end
@@ -254,6 +254,8 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       def random, do: :crypto.strong_rand_bytes(32)
       def callback(value, function), do: then(value, function)
       def mailbox, do: receive(do: (message -> message), after: (0 -> :empty))
+      @on_load :initialize
+      def initialize, do: :ok
       """)
 
     assert {_output, 0} =
@@ -291,6 +293,11 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
              violation.category == :process and
                violation.detail == "compiled mailbox receive"
+           end)
+
+    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+             violation.category == :unapproved_runtime and
+               violation.detail == "compiled module load hook"
            end)
   end
 
