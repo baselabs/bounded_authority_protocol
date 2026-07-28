@@ -1111,6 +1111,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       "Elixir.BoundedAuthorityProtocol.V1.RequestDigest.beam" ->
         [
           {Enum, :all?},
+          {Enum, :__in__},
           {Enum, :member?},
           {Enum, :reverse},
           {Range, :new},
@@ -1124,6 +1125,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Enum, :any?},
           {Enum, :filter},
           {Enum, :find_value},
+          {Enum, :__in__},
           {Enum, :map},
           {Enum, :member?},
           {Enum, :reverse},
@@ -1143,6 +1145,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         [
           {Enum, :all?},
           {Enum, :any?},
+          {Enum, :__in__},
           {Enum, :map},
           {Enum, :member?},
           {Enum, :zip},
@@ -1157,6 +1160,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         [
           {Enum, :all?},
           {Enum, :any?},
+          {Enum, :__in__},
           {Enum, :member?},
           {Enum, :reverse},
           {List, :last},
