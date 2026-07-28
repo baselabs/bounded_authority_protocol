@@ -1114,6 +1114,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Enum, :__in__},
           {Enum, :member?},
           {Enum, :reverse},
+          {Function, :identity},
           {Range, :new},
           {:binary, :bin_to_list}
         ]
@@ -1130,6 +1131,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Enum, :member?},
           {Enum, :reverse},
           {Enum, :sort},
+          {Function, :identity},
           {Map, :new},
           {MapSet, :new},
           {MapSet, :size},
@@ -1149,6 +1151,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Enum, :map},
           {Enum, :member?},
           {Enum, :zip},
+          {Function, :identity},
           {List, :keyfind},
           {MapSet, :new},
           {MapSet, :size},
