@@ -210,7 +210,7 @@ defmodule BoundedAuthorityProtocol.V1.Jcs do
     do: digits <> :binary.copy(<<"0">>, decimal_index - byte_size(digits))
 
   defp fixed(digits, decimal_index) do
-    <<integer::binary-size(decimal_index), fraction::binary>> = digits
+    <<integer::binary-size(^decimal_index), fraction::binary>> = digits
     <<integer::binary, ?., fraction::binary>>
   end
 
