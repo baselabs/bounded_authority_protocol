@@ -9,8 +9,9 @@ JWS grant and RFC 9449 holder-proof production, standalone raw-grant verificatio
 raw-envelope verification. It also implements canonical consumption-chain, historical-anchor,
 authenticated rollover, and exact anchored-export verification against caller-supplied
 boundaries, digest, and out-of-band object version. Results are redacted facts with trust and
-authorization explicitly not evaluated; the package does not select trust, reserve replay,
-inspect live revocation state, certify deletion/retention, remove archives, or authorize an effect.
+authorization, where the result carries it, explicitly not evaluated; the package does not select
+trust, reserve replay, inspect live revocation state, certify deletion/retention, remove archives,
+or authorize an effect.
 
 Final BAP-03 package-bearing verification source
 `f322e08bba665374599b9f53c362966b6b59710a` passed

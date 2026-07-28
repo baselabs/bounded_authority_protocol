@@ -43,8 +43,7 @@ defmodule BoundedAuthorityProtocol.V1.ConsumptionChainTest do
               previous_hash: @zero_hash,
               last_hash: ^second_hash,
               verification: :boundary_consistent,
-              trust: :not_evaluated,
-              authorization: :not_evaluated
+              trust: :not_evaluated
             } = facts} = V1.check_chain(%ChainInput{rows: [first.bytes, second.bytes]}, expected)
 
     assert inspect(facts) == "#BoundedAuthorityProtocol.V1.ChainFacts<redacted>"
@@ -77,8 +76,7 @@ defmodule BoundedAuthorityProtocol.V1.ConsumptionChainTest do
             previous_hash: @zero_hash,
             last_hash: second.hash,
             verification: :boundary_consistent,
-            trust: :not_evaluated,
-            authorization: :not_evaluated
+            trust: :not_evaluated
           }
         ] do
       assert {:error, :invalid} = V1.check_chain(input, expected)

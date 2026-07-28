@@ -92,6 +92,8 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
          :ok <- validate_object_versions(archived.version, expected.object_version, bounds),
          {:ok, _chunk_count, _byte_count} <-
            validate_chunks(archived.chunks, bounds, 0, 0),
+         digest <- hash_chunks(archived.chunks),
+         true <- FixedBytes.equal?(digest, expected.digest),
          {:ok, parsed} <- parse_archive(archived.chunks, bounds),
          parsed_header = parsed.header,
          expected_chain = expected.chain,
@@ -142,9 +144,6 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
              %{expected.end_anchor | bounds: bounds}
            ),
          true <- chronological_end?(end_facts.anchored_at, last_transition_at),
-         digest <- hash_chunks(archived.chunks),
-         true <- FixedBytes.equal?(digest, expected.digest),
-         true <- archived.version == expected.object_version,
          {:ok, _chain_facts} <-
            ConsumptionChain.check(
              %ChainInput{rows: parsed.rows},
@@ -642,7 +641,8 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
   defp validate_object_versions(observed, expected, bounds) do
     if is_binary(observed) and byte_size(observed) > 0 and
          byte_size(observed) <= bounds.object_version_bytes and is_binary(expected) and
-         byte_size(expected) > 0 and byte_size(expected) <= bounds.object_version_bytes do
+         byte_size(expected) > 0 and byte_size(expected) <= bounds.object_version_bytes and
+         observed == expected do
       :ok
     else
       {:error, :invalid}

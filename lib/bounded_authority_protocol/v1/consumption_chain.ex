@@ -62,8 +62,7 @@ defmodule BoundedAuthorityProtocol.V1.ConsumptionChain do
          previous_hash: expected.previous_hash,
          last_hash: expected.last_hash,
          verification: :boundary_consistent,
-         trust: :not_evaluated,
-         authorization: :not_evaluated
+         trust: :not_evaluated
        }}
     else
       _failure -> {:error, :invalid}

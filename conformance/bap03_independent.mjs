@@ -499,6 +499,17 @@ function verifyTamperMatrix(fixture, issuerJwk, holderJwk, requestDigest) {
 }
 
 async function verifyManifest(manifest, additionalScanPath) {
+  exactKeys(
+    manifest,
+    [
+      "format",
+      "vectors",
+      "canonical_public_key_fingerprints",
+      "verifier_public_key_fingerprints",
+      "discovery_roots",
+    ],
+    "manifest",
+  );
   assertEqual(manifest.format, "bounded-authority-protocol-v1-vector-manifest", "manifest format");
   const vectors = [...manifest.vectors].sort();
   assertDeepEqual(
@@ -509,6 +520,11 @@ async function verifyManifest(manifest, additionalScanPath) {
       "grant-holder-proof.json",
     ],
     "manifest vectors",
+  );
+  exactKeys(
+    manifest.verifier_public_key_fingerprints,
+    ["bap03_independent.mjs", "chain_archive_independent.mjs"],
+    "manifest verifier fingerprints",
   );
   assertDeepEqual(
     [...manifest.discovery_roots].sort(),
@@ -524,24 +540,33 @@ async function verifyManifest(manifest, additionalScanPath) {
   }
   if (additionalScanPath !== null) await discoverPublicKeys(additionalScanPath, declared);
 
-  const chainArchiveFixture = await readJson(join(vectorsDir, "consumption-chain-archive.json"));
-  discoverJsonKeys(chainArchiveFixture, observedPublicKeyFingerprints);
-  const semanticEdgeFixture = await readJson(join(vectorsDir, "chain-semantic-edge.json"));
-  discoverJsonKeys(semanticEdgeFixture, observedPublicKeyFingerprints);
-
   const listed = [...manifest.canonical_public_key_fingerprints].sort();
   const actual = [...observedPublicKeyFingerprints].sort();
   const declaredKeys = [...declared].sort();
   assertEqual(new Set(listed).size, listed.length, "duplicate manifest fingerprint");
-  assertDeepEqual(
-    declaredKeys,
-    actual,
-    `declared/observed public-key set mismatch declared=${declaredKeys.join(",")} actual=${actual.join(",")}`,
-  );
+  const verifierSets = Object.values(manifest.verifier_public_key_fingerprints);
+  for (const verifierSet of verifierSets) {
+    assertDeepEqual(
+      verifierSet,
+      [...new Set(verifierSet)].sort(),
+      "manifest verifier fingerprint set not sorted",
+    );
+  }
+  const verifierUnion = [...new Set(verifierSets.flat())].sort();
   assertDeepEqual(
     listed,
+    verifierUnion,
+    `manifest public-key fingerprint set mismatch listed=${listed.join(",")} actual=${verifierUnion.join(",")}`,
+  );
+  assertDeepEqual(
     actual,
-    `manifest public-key fingerprint set mismatch listed=${listed.join(",")} actual=${actual.join(",")}`,
+    manifest.verifier_public_key_fingerprints["bap03_independent.mjs"],
+    `manifest verifier import set mismatch listed=${manifest.verifier_public_key_fingerprints["bap03_independent.mjs"].join(",")} actual=${actual.join(",")}`,
+  );
+  assertDeepEqual(
+    declaredKeys,
+    listed,
+    `declared/observed public-key set mismatch declared=${declaredKeys.join(",")} actual=${listed.join(",")}`,
   );
 }
 
