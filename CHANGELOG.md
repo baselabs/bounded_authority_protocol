@@ -35,8 +35,18 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Extend the packed external consumer to exercise both decoder success and rejection paths, and
   add mutation-red proof that escaped string content cannot hide a following over-limit number.
 - Reconcile the BAP-02 final trusted-main receipts and degraded peer-review record.
+- Add deterministic standard compact-JWS grant and RFC 9449 holder-proof producers, exact external
+  signature assembly, and bounded grant/proof decoders.
+- Add RFC 8785 canonical JSON, RFC 7638 public Ed25519 JWK thumbprints, bounded HTTPS URI
+  normalization, type-preserving request digests, and conjunctive selector evaluation.
+- Add standalone raw-grant verification and combined raw-envelope verification with exact
+  issuer/audience/time/holder/request/nonce/operation bindings and redacted, non-authorizing
+  verified facts.
+- Add public-only grant/holder-proof vectors, independent Node verification, exact public-key
+  census, meaningful byte-tamper and duplicate-member cases, portable timing/allocation bounds,
+  architecture census updates, and unpacked external-consumer API proof.
 
 ### Not yet available
 
-- Canonical serialization, cryptographic verifier behavior, signed conformance vectors, CLI, and
-  a public Hex release are planned and not implemented. The current package is unpublished.
+- Chain/archive verification, the portable verifier CLI, and a public Hex release remain planned.
+  The current package is unpublished.

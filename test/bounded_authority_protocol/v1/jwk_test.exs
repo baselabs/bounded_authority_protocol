@@ -41,9 +41,18 @@ defmodule BoundedAuthorityProtocol.V1.JwkTest do
   end
 
   test "all malformed inputs return the fixed public error" do
+    assert {:error, :invalid} = Jwk.encode_public(:not_binary, %{})
     assert {:error, :invalid} = Jwk.decode_public("", %{})
     assert {:error, :invalid} = Jwk.decode_public("[]", %{})
     assert {:error, :invalid} = Jwk.decode_public(@jwk, %{decoded_segment_bytes: 1})
     assert {:error, :invalid} = Jwk.thumbprint(123, %{})
+
+    short_key = Base.url_encode64(:binary.copy(<<0>>, 31), padding: false)
+
+    assert {:error, :invalid} =
+             Jwk.decode_public(
+               ~s({"crv":"Ed25519","kty":"OKP","x":"#{short_key}"}),
+               %{}
+             )
   end
 end

@@ -119,7 +119,7 @@ grant and contain 1–128 printable ASCII bytes. The ordered selector array has 
 |---|---|
 | `v` | integer, exactly `1` |
 | `jti` | non-empty StringOrURI, at most 512 UTF-8 bytes |
-| `htm` | 1–32 byte uppercase ASCII HTTP method |
+| `htm` | 1–32 byte case-sensitive RFC 9110 HTTP method token |
 | `htu` | normalized hierarchical HTTPS target URI |
 | `iat` | integral NumericDate |
 | `nonce` | optional non-empty string, at most 512 UTF-8 bytes |
@@ -128,7 +128,9 @@ grant and contain 1–128 printable ASCII bytes. The ordered selector array has 
 | `ath`, `ba_req` | canonical unpadded base64url SHA-256 |
 
 Every proof requires every row except `nonce`; no other claim is accepted. `ath` is SHA-256 over
-the ASCII bytes of the complete received grant compact value.
+the ASCII bytes of the complete received grant compact value. The method accepts ASCII letters,
+digits, the punctuation bytes `! # $ % & ' * + - . ^ _ | ~`, and grave accent. It is compared
+byte-for-byte and is never case-normalized.
 
 ## Selector algebra
 
@@ -158,6 +160,12 @@ octets as path data; removes complete dot segments; maps an empty path to `/`; d
 preserves a valid nondefault port and all other path bytes. It performs no DNS, IDNA, or network
 work.
 
+The host uses the exact RFC 3986 grammar: `reg-name` contains only unreserved, sub-delim, or valid
+percent-encoded octets; IPv4 uses exact `dec-octet` forms without leading-zero alternatives; and a
+bracketed IP literal contains a complete IPv6address or IPvFuture. A present port is one or more
+decimal digits in `1..65535`; its canonical form removes leading zeroes and omits `443`. Empty ports
+and malformed IPv4, IPv6, or IPvFuture literals are invalid.
+
 HTTP, another scheme, an authority-less form, malformed percent escapes, ambiguous authority/port
 syntax, control/non-ASCII bytes, and out-of-range ports are invalid. Both expected and proof URIs
 must already equal the normal form.
@@ -172,6 +180,11 @@ ASCII(base64url(protected) || "." || base64url(payload))
 
 No bytes precede or follow it. Verification uses the exact received segments; correctly signed
 closed JSON objects may use any member order. Producers emit one deterministic JCS representation.
+
+The verifier validates the fixed 32-byte public-key and 64-byte signature encodings, completes
+all bounded parsing and contextual checks, and then delegates Ed25519 verification to the
+supported OTP `:crypto` backend. A backend rejection or exception returns exactly
+`{:error, :invalid}`.
 
 The request digest is:
 
@@ -203,6 +216,7 @@ payloads with the same JSON number bytes. `cast_arguments` may be any tagged JSO
 The frozen v1 façade is:
 
 ```elixir
+untrusted_key_locator(binary(), Bounds.t() | map())
 grant_signing_input(Grant.t(), Bounds.t() | map())
 proof_signing_input(Proof.t(), Bounds.t() | map())
 assemble_compact(SigningInput.t(), binary())
@@ -217,6 +231,18 @@ Every function returns `{:ok, value}` or exactly `{:error, :invalid}`. Only boun
 all other structured inputs are exact named structs and each public entry revalidates every field.
 `assemble_compact/2` accepts exactly a `SigningInput` and a 64-byte signature, never a key, signer,
 or callback. Decode results carry `verification: :not_evaluated`.
+
+The public versioned primitive modules additionally expose
+`BoundedAuthorityProtocol.V1.Jcs.encode/2`,
+`BoundedAuthorityProtocol.V1.Jwk.encode_public/2`, `decode_public/2`,
+`thumbprint_preimage/2`, `thumbprint/2`, `thumbprint_raw/2`, and
+`public_key_thumbprint_raw/2`, plus `BoundedAuthorityProtocol.V1.Uri.normalize/2`.
+Request-digest, selector, and compact-JWS composition mechanics remain internal implementation
+behind the supported façade; their modules are not additional stable façade contracts.
+The existing BAP-02 `untrusted_key_locator/1` convenience arity uses profile maxima; the BAP-03
+façade functions expose only the arities printed above. `Bounds.maximum/0` returns the immutable
+profile maxima, `Bounds.new/0,1` constructs tightening-only limits, and every limits-taking public
+boundary revalidates a `Bounds` struct or tightening map.
 
 `TrustedIssuer` contains exact `kid` and raw 32-byte public key. `ExpectedGrant` contains issuer,
 audience, integral evaluation time, nonnegative skew, and tightening bounds. Grant verification
@@ -233,7 +259,7 @@ It does not require `iat <= nbf`. `GrantFacts` contains exactly version, issuer,
 32-byte issuer-key fingerprint, raw 32-byte holder thumbprint, matched audience, grant times, and
 `authorization: :not_evaluated`.
 
-`ExpectedRequest` additionally contains uppercase method, normalized HTTPS URI, lowercase RFC 4122
+`ExpectedRequest` additionally contains a case-sensitive RFC 9110 token method, normalized HTTPS URI, lowercase RFC 4122
 invocation UUID, operation, any tagged JSON cast arguments, positive proof maximum age, and
 `:not_required | {:required, nonce}`. Proof time is inclusive:
 
@@ -303,3 +329,5 @@ payload and signature stay opaque. It returns only:
 
 It does not select a key, decode claims/signature bytes, verify, evaluate trust, or authorize.
 Every failure returns `{:error, :invalid}` without input values.
+The locator retains its documented `/1` profile-maximum convenience arity and `/2`
+tightening-limits arity.

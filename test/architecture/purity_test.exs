@@ -383,6 +383,31 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
                violation.detail =~ "compiled dynamic-call allowance" and
                violation.detail =~ "{:new, 1}"
            end)
+
+    runtime_path = Path.join(root, "lib/bounded_authority_protocol/v1/runtime.ex")
+    runtime = File.read!(runtime_path)
+    mutated_runtime = String.replace(runtime, "fun.()", "fun.()\n    fun.()", global: false)
+
+    assert mutated_runtime != runtime
+    File.write!(runtime_path, mutated_runtime)
+
+    assert Enum.any?(ArchitectureGate.check(root, compiled: false), fn violation ->
+             violation.category == :dynamic_dispatch and
+               violation.detail == "source dynamic-call allowance expected 2, got 3"
+           end)
+
+    assert {_output, 0} =
+             System.cmd("mix", ["compile", "--force"],
+               cd: root,
+               env: [{"MIX_ENV", "prod"}],
+               stderr_to_stdout: true
+             )
+
+    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+             violation.category == :dynamic_dispatch and
+               violation.detail =~ "compiled dynamic-call allowance" and
+               violation.detail =~ "{:fixed, 1}"
+           end)
   end
 
   test "the CI entrypoint goes red for a planted forbidden dependency and green after removal" do

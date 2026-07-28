@@ -95,5 +95,15 @@ defmodule BoundedAuthorityProtocol.V1.RequestDigestTest do
     assert {:error, :invalid} = V1.request_digest("op", nil, %{})
     assert {:error, :invalid} = V1.request_digest("op", :null, %{jcs_bytes: 65_537})
     assert {:error, :invalid} = V1.request_digest("op", :null, %{unknown: 1})
+
+    assert {:error, :invalid} =
+             V1.request_digest("op", {:array, [{:integer, 1} | :invalid_tail]}, %{})
+
+    assert {:error, :invalid} =
+             V1.request_digest(
+               "op",
+               {:object, [{"value", {:integer, 1}} | :invalid_tail]},
+               %{}
+             )
   end
 end

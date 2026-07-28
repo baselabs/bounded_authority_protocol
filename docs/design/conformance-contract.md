@@ -22,10 +22,10 @@ decoder-and-corpus checks.
 
 ## Key census integrity
 
-The manifest's canonical public-key fingerprint set equals—not merely contains—the set
-independently discovered from every tracked vector, schema example, generator/verifier reference,
-and test fixture. Discovery parses keyed artifacts and computes RFC 7638 OKP thumbprints; it does
-not trust a fixture's claimed fingerprint.
+The manifest's canonical public-key fingerprint set equals—not merely contains—the set observed at
+the independent verifier's public-key import boundary across every tracked vector. Every fixture
+key occupies a schema-declared key-bearing field, and the boundary computes RFC 7638 OKP
+thumbprints instead of trusting claimed fingerprints.
 
 The gate fails in both directions: when a listed fingerprint is removed while its key remains
 reachable, and when an unreferenced fingerprint is added. Manifest membership is never a substitute
@@ -35,8 +35,13 @@ for signature, holder, or issuer verification.
 
 A vector is normative only after a second implementation that imports no project code independently
 recomputes canonical base64url, SHA-256/JWK thumbprints, standard JWS messages, Ed25519 validation,
-`ath`, request JCS/preimage, `ba_req`, and exact verdicts. A self-round-trip proves only internal
-consistency. Byte drift or a manifest census mismatch exits nonzero.
+`ath`, request JCS/preimage, `ba_req`, selector identity, URI normalization, and exact verdicts.
+A self-round-trip proves only internal consistency. Byte drift or a manifest census mismatch exits
+nonzero.
+
+BAP-03's focused vectors and independent verifier are public repository acceptance evidence. The
+Hex package continues to ship the protocol schemas and Elixir runtime only. BAP-05 owns the
+portable corpus/verifier surface, and BAP-06 owns immutable candidate-archive proof.
 
 ## Public verifier API constraints
 

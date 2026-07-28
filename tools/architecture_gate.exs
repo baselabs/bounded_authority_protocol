@@ -38,6 +38,24 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "Elixir.BoundedAuthorityProtocol.V1.Json.beam" => %{
       {:decode, 2} => %{variable_call: 2},
       {:parse_unsigned_number, 1} => %{variable_call: 3}
+    },
+    "Elixir.BoundedAuthorityProtocol.V1.Runtime.beam" => %{
+      {:decode_audiences, 2} => %{variable_call: 2},
+      {:decode_grant_fields, 3} => %{variable_call: 23},
+      {:decode_proof_fields, 3} => %{variable_call: 25},
+      {:encode_operation, 2} => %{variable_call: 3},
+      {:encode_operations, 2} => %{variable_call: 3},
+      {:encode_selector, 2} => %{variable_call: 5},
+      {:fixed, 1} => %{variable_call: 1},
+      {:grant_json, 2} => %{variable_call: 8},
+      {:map_ok, 3} => %{variable_call: 1},
+      {:operation, 2} => %{variable_call: 6},
+      {:operations, 2} => %{variable_call: 2},
+      {:proof_json, 2} => %{variable_call: 13},
+      {:selector, 2} => %{variable_call: 7},
+      {:validate_expected_request, 2} => %{variable_call: 10},
+      {:verify_grant_parsed, 4} => %{variable_call: 8},
+      {:verify_proof_parsed, 5} => %{variable_call: 15}
     }
   }
 
@@ -159,10 +177,19 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     elixir_erl_pass: ~w(no_parens_remote)a
   }
 
-  @approved_local_aliases ~w(Base64Url Bounds Container Json JsonValue KeyLocator Root Violation)
+  @approved_local_aliases ~w(Base64Url Bounds CompactJws Container Credentials DecodedGrant
+    DecodedProof EnvelopeFacts ExpectedGrant ExpectedRequest Grant GrantFacts Jcs Json JsonValue
+    Jwk KeyLocator Operation Proof RequestDigest Root Runtime Selector SigningInput TrustedIssuer
+    Uri Violation)
   @approved_struct_fields ~w(array_items compact_bytes count decoded_segment_bytes depth
     encoded_segment_bytes float_magnitude integer_magnitude json_bytes key_bytes kid_bytes kind
-    level nodes number_lexeme_bytes object_members seen string_bytes total_nodes value values)a
+    level nodes number_lexeme_bytes object_members seen string_bytes total_nodes value values
+    audiences clock_skew digest_bytes identifier_bytes method_bytes nonce_bytes one_of_values
+    operation_bytes operations path_segments proof_max_age public_key_bytes selectors signature_bytes
+    uri_bytes message payload_segment protected_segment audience bounds cast_arguments evaluation_time
+    invocation_id issuer method nonce operation target_uri trusted_issuer public_key key_id expires_at
+    grant_id holder_thumbprint issued_at not_before decoded grant_hash jcs_bytes proof_id request_hash
+    proof_issued_at signature grant_compact holder_public_key)a
 
   def check(root, opts \\ []) do
     root = Path.expand(root)
@@ -278,17 +305,21 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp application_violations(ast) do
     {_ast, findings} =
       Macro.prewalk(ast, [], fn
-        {kind, _meta, [{:application, _call_meta, _args} | _rest]} = node, acc
+        {kind, _meta, [{:application, _call_meta, _args}, [do: body]]} = node, acc
         when kind in [:def, :defp] ->
-          {node,
-           [
-             violation(
-               :application_callback,
-               "mix.exs",
-               "application/0 is forbidden; the package has no OTP callback"
-             )
-             | acc
-           ]}
+          if body == [extra_applications: [:crypto]] do
+            {node, acc}
+          else
+            {node,
+             [
+               violation(
+                 :application_callback,
+                 "mix.exs",
+                 "application/0 must be exactly [extra_applications: [:crypto]]"
+               )
+               | acc
+             ]}
+          end
 
         {:mod, _value} = node, acc ->
           {node,
@@ -390,7 +421,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {node, node_violations(node, relative) ++ acc}
         end)
 
-      violations
+      violations ++ source_dynamic_allowance_violations(ast, relative)
     else
       {:error, reason} ->
         [
@@ -403,6 +434,34 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     end
   end
 
+  defp source_dynamic_allowance_violations(
+         ast,
+         "lib/bounded_authority_protocol/v1/runtime.ex" = path
+       ) do
+    {_ast, count} =
+      Macro.prewalk(ast, 0, fn
+        {{:., _dot_meta, [_callable_ast]}, _meta, args} = node, count when is_list(args) ->
+          {node, count + 1}
+
+        node, count ->
+          {node, count}
+      end)
+
+    if count == 2 do
+      []
+    else
+      [
+        violation(
+          :dynamic_dispatch,
+          path,
+          "source dynamic-call allowance expected 2, got #{count}"
+        )
+      ]
+    end
+  end
+
+  defp source_dynamic_allowance_violations(_ast, _path), do: []
+
   defp node_violations({:__aliases__, _meta, segments}, path) do
     root = alias_root(segments)
     name = alias_name(segments)
@@ -412,6 +471,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         root == "BoundedAuthorityProtocol" -> nil
         root == :dynamic -> :dynamic_module
         root in @approved_local_aliases -> nil
+        approved_source_module?(path, root) -> nil
         root in ~w(ArgumentError Base ErlangError Exception Kernel Map) -> nil
         category = module_category(root) -> category
         true -> :unapproved_runtime
@@ -471,19 +531,28 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp node_violations({{:., _dot_meta, [module_ast, function]}, _meta, _args}, path)
        when is_atom(function) do
-    module_ast
-    |> module_name()
-    |> mfa_category(function)
-    |> category_violation(path, "forbidden call #{format_call(module_ast, function)}")
+    module = module_name(module_ast)
+
+    if approved_source_call?(path, module, function) do
+      []
+    else
+      module
+      |> mfa_category(function)
+      |> category_violation(path, "forbidden call #{format_call(module_ast, function)}")
+    end
   end
 
   defp node_violations({{:., _dot_meta, [_callable_ast]}, _meta, args}, path)
        when is_list(args) do
-    category_violation(
-      :dynamic_dispatch,
-      path,
-      "forbidden first-class function invocation/#{length(args)}"
-    )
+    if path == "lib/bounded_authority_protocol/v1/runtime.ex" do
+      []
+    else
+      category_violation(
+        :dynamic_dispatch,
+        path,
+        "forbidden first-class function invocation/#{length(args)}"
+      )
+    end
   end
 
   defp node_violations({function, _meta, args}, path)
@@ -499,7 +568,15 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         true -> nil
       end
 
-    category_violation(category, path, "forbidden local call #{function}/#{length(args)}")
+    if function == :inspect and
+         path in [
+           "lib/bounded_authority_protocol/v1/grant_facts.ex",
+           "lib/bounded_authority_protocol/v1/envelope_facts.ex"
+         ] do
+      []
+    else
+      category_violation(category, path, "forbidden local call #{function}/#{length(args)}")
+    end
   end
 
   defp node_violations(_node, _path), do: []
@@ -523,7 +600,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     module = to_string(module)
 
     module == "BoundedAuthorityProtocol" or
-      String.starts_with?(module, "BoundedAuthorityProtocol.")
+      String.starts_with?(module, "BoundedAuthorityProtocol.") or
+      String.starts_with?(module, "Inspect.BoundedAuthorityProtocol.")
   end
 
   defp module_name({:__aliases__, _meta, segments}), do: alias_name(segments)
@@ -729,6 +807,132 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp module_category(root), do: Map.get(@module_categories, root)
 
+  defp approved_source_module?(path, root), do: root in approved_source_modules(path)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/v1/jcs.ex"),
+    do: ~w(Enum Integer MapSet String)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/v1/request_digest.ex"),
+    do: ~w(Enum)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/v1/runtime.ex"),
+    do: ~w(Access Enum MapSet String URI)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/v1/selector.ex"),
+    do: ~w(Enum List MapSet String)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/v1/uri.ex"),
+    do: ~w(Enum Integer List)
+
+  defp approved_source_modules(path)
+       when path in [
+              "lib/bounded_authority_protocol/v1/grant_facts.ex",
+              "lib/bounded_authority_protocol/v1/envelope_facts.ex"
+            ],
+       do: ~w(Inspect)
+
+  defp approved_source_modules(_path), do: []
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/v1/compact_jws.ex",
+         module,
+         function
+       ),
+       do: {module, function} in [{:binary, :match}, {"Map", :new}]
+
+  defp approved_source_call?("lib/bounded_authority_protocol/v1/jcs.ex", module, function),
+    do:
+      {module, function} in [
+        {:binary, :at},
+        {:erlang, :float_to_binary},
+        {:erlang, :iolist_size},
+        {:erlang, :iolist_to_binary},
+        {:unicode, :characters_to_binary},
+        {"Enum", :map},
+        {"Enum", :map_reduce},
+        {"Enum", :sort_by},
+        {"Integer", :to_string},
+        {"MapSet", :new},
+        {"MapSet", :size},
+        {"String", :downcase},
+        {"String", :pad_leading},
+        {"String", :valid?}
+      ]
+
+  defp approved_source_call?("lib/bounded_authority_protocol/v1/jwk.ex", module, function),
+    do: function == :to_string or {module, function} == {"Map", :new}
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/v1/request_digest.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {:binary, :bin_to_list},
+           {"Enum", :all?},
+           {"Enum", :reverse}
+         ]
+
+  defp approved_source_call?("lib/bounded_authority_protocol/v1/runtime.ex", module, function),
+    do:
+      {module, function} in [
+        {:binary, :bin_to_list},
+        {"Access", :get},
+        {"Enum", :all?},
+        {"Enum", :any?},
+        {"Enum", :filter},
+        {"Enum", :find_value},
+        {"Enum", :map},
+        {"Enum", :reverse},
+        {"Enum", :sort},
+        {"Map", :new},
+        {"MapSet", :new},
+        {"MapSet", :size},
+        {"String", :contains?},
+        {"String", :valid?},
+        {"URI", :new}
+      ] or
+        (module == :dynamic and function in [:name, :public_key]) or
+        function == :get
+
+  defp approved_source_call?("lib/bounded_authority_protocol/v1/selector.ex", module, function),
+    do:
+      {module, function} in [
+        {"Enum", :all?},
+        {"Enum", :any?},
+        {"Enum", :map},
+        {"Enum", :zip},
+        {"List", :keyfind},
+        {"MapSet", :new},
+        {"MapSet", :size},
+        {"String", :valid?}
+      ]
+
+  defp approved_source_call?("lib/bounded_authority_protocol/v1/uri.ex", module, function),
+    do:
+      {module, function} in [
+        {:binary, :at},
+        {:binary, :bin_to_list},
+        {:binary, :match},
+        {:binary, :matches},
+        {:erlang, :iolist_to_binary},
+        {"Enum", :all?},
+        {"Enum", :any?},
+        {"Enum", :reverse},
+        {"Integer", :to_string},
+        {"List", :last}
+      ]
+
+  defp approved_source_call?(path, "Inspect.Algebra", :string)
+       when path in [
+              "lib/bounded_authority_protocol/v1/grant_facts.ex",
+              "lib/bounded_authority_protocol/v1/envelope_facts.ex"
+            ],
+       do: true
+
+  defp approved_source_call?(_path, _module, _function), do: false
+
   defp category_violation(nil, _path, _detail), do: []
   defp category_violation(category, path, detail), do: [violation(category, path, detail)]
 
@@ -753,13 +957,13 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         modules = properties |> Keyword.get(:modules, []) |> Enum.sort()
 
         [
-          if(applications == [:elixir, :kernel, :stdlib],
+          if(applications == [:crypto, :elixir, :kernel, :stdlib],
             do: nil,
             else:
               violation(
                 :compiled_artifact,
                 app_path,
-                "applications must be [:elixir, :kernel, :stdlib], got #{inspect(applications)}"
+                "applications must be [:crypto, :elixir, :kernel, :stdlib], got #{inspect(applications)}"
               )
           ),
           if(
@@ -851,18 +1055,129 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp compiled_import_category(Elixir.Enum, :reduce, path) do
     if Path.basename(path) in [
          "Elixir.BoundedAuthorityProtocol.V1.Bounds.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.Credentials.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.DecodedGrant.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.DecodedProof.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.EnvelopeFacts.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.ExpectedGrant.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.ExpectedRequest.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.Grant.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.GrantFacts.beam",
          "Elixir.BoundedAuthorityProtocol.V1.Json.Container.beam",
          "Elixir.BoundedAuthorityProtocol.V1.Json.JsonValue.beam",
          "Elixir.BoundedAuthorityProtocol.V1.Json.Root.beam",
          "Elixir.BoundedAuthorityProtocol.V1.KeyLocator.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.Operation.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.Proof.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.SigningInput.beam",
+         "Elixir.BoundedAuthorityProtocol.V1.TrustedIssuer.beam",
          "Elixir.BoundedAuthorityProtocol.V1.Violation.beam"
        ],
        do: nil,
        else: :dynamic_dispatch
   end
 
-  defp compiled_import_category(module, function, _path),
-    do: compiled_mfa_category(module, function)
+  defp compiled_import_category(module, function, path) do
+    if approved_compiled_import?(Path.basename(path), module, function),
+      do: nil,
+      else: compiled_mfa_category(module, function)
+  end
+
+  defp approved_compiled_import?(beam, module, function) do
+    {module, function} in case beam do
+      "Elixir.BoundedAuthorityProtocol.V1.CompactJws.beam" ->
+        [{Map, :new}, {:binary, :match}]
+
+      "Elixir.BoundedAuthorityProtocol.V1.Jcs.beam" ->
+        [
+          {Enum, :map},
+          {Enum, :map_reduce},
+          {Enum, :sort_by},
+          {MapSet, :new},
+          {MapSet, :size},
+          {String, :downcase},
+          {String, :pad_leading},
+          {String, :valid?},
+          {:binary, :at},
+          {:erlang, :float_to_binary},
+          {:erlang, :iolist_size},
+          {:erlang, :iolist_to_binary},
+          {:unicode, :characters_to_binary}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.V1.Jwk.beam" ->
+        [{Map, :new}, {String.Chars, :to_string}]
+
+      "Elixir.BoundedAuthorityProtocol.V1.RequestDigest.beam" ->
+        [
+          {Enum, :all?},
+          {Enum, :member?},
+          {Enum, :reverse},
+          {Range, :new},
+          {:binary, :bin_to_list}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.V1.Runtime.beam" ->
+        [
+          {Access, :get},
+          {Enum, :all?},
+          {Enum, :any?},
+          {Enum, :filter},
+          {Enum, :find_value},
+          {Enum, :map},
+          {Enum, :member?},
+          {Enum, :reverse},
+          {Enum, :sort},
+          {Map, :new},
+          {MapSet, :new},
+          {MapSet, :size},
+          {String, :contains?},
+          {String, :valid?},
+          {URI, :new},
+          {Range, :new},
+          {:binary, :bin_to_list},
+          {:lists, :member}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.V1.Selector.beam" ->
+        [
+          {Enum, :all?},
+          {Enum, :any?},
+          {Enum, :map},
+          {Enum, :member?},
+          {Enum, :zip},
+          {List, :keyfind},
+          {MapSet, :new},
+          {MapSet, :size},
+          {String, :valid?},
+          {Range, :new}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.V1.Uri.beam" ->
+        [
+          {Enum, :all?},
+          {Enum, :any?},
+          {Enum, :member?},
+          {Enum, :reverse},
+          {List, :last},
+          {:binary, :at},
+          {:binary, :bin_to_list},
+          {:binary, :match},
+          {:binary, :matches},
+          {:erlang, :"=/="},
+          {:erlang, :iolist_to_binary},
+          {:lists, :member}
+        ]
+
+      inspect_beam when is_binary(inspect_beam) ->
+        if String.starts_with?(
+             inspect_beam,
+             "Elixir.Inspect.BoundedAuthorityProtocol.V1."
+           ),
+           do: [{Inspect.Algebra, :string}],
+           else: []
+    end
+  end
 
   defp dynamic_allowance_violations(forms, path) do
     case Map.fetch(@compiled_dynamic_allowances, Path.basename(path)) do
@@ -957,7 +1272,14 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       if Path.basename(path) in [
            "Elixir.BoundedAuthorityProtocol.V1.beam",
            "Elixir.BoundedAuthorityProtocol.V1.Base64Url.beam",
-           "Elixir.BoundedAuthorityProtocol.V1.Json.beam"
+           "Elixir.BoundedAuthorityProtocol.V1.CompactJws.beam",
+           "Elixir.BoundedAuthorityProtocol.V1.Jcs.beam",
+           "Elixir.BoundedAuthorityProtocol.V1.Json.beam",
+           "Elixir.BoundedAuthorityProtocol.V1.Jwk.beam",
+           "Elixir.BoundedAuthorityProtocol.V1.RequestDigest.beam",
+           "Elixir.BoundedAuthorityProtocol.V1.Runtime.beam",
+           "Elixir.BoundedAuthorityProtocol.V1.Selector.beam",
+           "Elixir.BoundedAuthorityProtocol.V1.Uri.beam"
          ],
          do: [],
          else: [violation(:dynamic_dispatch, path, "compiled variable function invocation")]

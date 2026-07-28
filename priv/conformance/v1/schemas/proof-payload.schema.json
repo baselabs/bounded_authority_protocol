@@ -13,7 +13,7 @@
       "minLength": 1,
       "maxLength": 32,
       "x-bap-maximum-utf8-bytes": 32,
-      "pattern": "^[A-Z]+$"
+      "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
     },
     "htu": {
       "type": "string",

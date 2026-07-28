@@ -141,10 +141,13 @@ defmodule BoundedAuthorityProtocol.V1.SelectorTest do
   end
 
   test "malformed selector terms return the fixed error" do
+    assert {:error, :invalid} = Selector.match_all(:not_a_list, :null, %{})
+
     for selectors <- [
           [],
           [:unknown],
           [{:equals, [], :null}],
+          [{:equals, :not_a_path, :null}],
           [{:equals, ["id"]}],
           [{:one_of, ["id"], []}],
           [%{"kind" => "all"}]
@@ -153,8 +156,31 @@ defmodule BoundedAuthorityProtocol.V1.SelectorTest do
     end
   end
 
+  test "semantic equality covers every closed scalar and malformed object shape" do
+    assert Selector.semantic_equal?(:null, :null)
+    assert Selector.semantic_equal?({:integer, 1}, {:integer, 1})
+    assert Selector.semantic_equal?({:float, 1.0}, {:float, 1.0})
+    refute Selector.semantic_equal?({:object, [{"x", :null}]}, {:object, []})
+
+    refute Selector.semantic_equal?(
+             {:object, [{"x", :null}]},
+             {:object, [{"y", :null}]}
+           )
+
+    refute Selector.semantic_equal?(
+             {:object, [:invalid]},
+             {:object, [:invalid]}
+           )
+
+    assert {:error, :invalid} =
+             match(
+               [{:one_of, ["missing"], [:null]}],
+               {:object, []}
+             )
+  end
+
   defp match(selectors, arguments),
-    do: apply(Selector, :match_all, [selectors, arguments, %{}])
+    do: Selector.match_all(selectors, arguments, %{})
 
   defp nested(path, leaf) do
     Enum.reduce(Enum.reverse(path), leaf, fn member, child ->

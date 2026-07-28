@@ -8,6 +8,7 @@ import {
 } from "node:crypto";
 import {readFile, readdir} from "node:fs/promises";
 import {extname, join, resolve} from "node:path";
+import {isIP} from "node:net";
 import {fileURLToPath} from "node:url";
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -15,6 +16,28 @@ const root = resolve(scriptPath, "../..");
 const vectorsDir = join(root, "priv/conformance/v1/vectors");
 const argumentsByName = new Map();
 const missing = Symbol("missing");
+const numberLexemes = new WeakMap();
+const observedPublicKeyFingerprints = new Set();
+const uriProfileCases = [
+  ["https://example.com/", true],
+  ["https://example.com/a/~", true],
+  ["https://example.com:8443/a%2Fb", true],
+  ["https://[2001:db8::1]/", true],
+  ["https://[v1.a:b]/", true],
+  ["https://192.0.2.1/", true],
+  ["https://example.com:0443/", false],
+  ["https://EXAMPLE.com/", false],
+  ["https://example.com:443/", false],
+  ["https://example.com/%7e", false],
+  ["https://example.com/a/../b", false],
+  ["https://example.com/?q=1", false],
+  ["https://example.com:/", false],
+  ["https://[:::]/", false],
+  ["https://[v.a]/", false],
+  ["https://01.2.3.4/", false],
+  ["https://256.2.3.4/", false],
+  ["http://example.com/", false],
+];
 const requiredDiscoveryRoots = [
   "priv/conformance/v1/vectors",
   "priv/conformance/v1/schemas",
@@ -31,23 +54,26 @@ for (let index = 2; index < process.argv.length; index += 2) {
 
 const fixturePath = resolve(argumentsByName.get("--fixture") ?? join(vectorsDir, "grant-holder-proof.json"));
 const manifestPath = resolve(argumentsByName.get("--manifest") ?? join(vectorsDir, "manifest.json"));
+const scanPath = argumentsByName.has("--scan") ? resolve(argumentsByName.get("--scan")) : null;
 
 try {
   const fixture = await readJson(fixturePath);
   const manifest = await readJson(manifestPath);
   verifyFixture(fixture);
-  await verifyManifest(manifest);
+  await verifyManifest(manifest, scanPath);
   process.stdout.write(
     `bap03 independent verification: ok\n` +
       `vectors=${manifest.vectors.length} public_key_fingerprints=` +
       `${manifest.canonical_public_key_fingerprints.length} tamper_cases=` +
-      `${Object.keys(fixture.expected.tamper_verdicts).length}\n`,
+      `${Object.keys(fixture.expected.tamper_verdicts).length} duplicate_cases=1 uri_cases=` +
+      `${uriProfileCases.length}\n`,
   );
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));
 }
 
 function verifyFixture(fixture) {
+  assertNoPrivateMaterial(fixture, "fixture");
   assertEqual(fixture.format, "bounded-authority-protocol-v1-grant-holder-proof", "fixture format");
   assertEqual(fixture.provenance.private_material_tracked, false, "private-material declaration");
   assertEqual(fixture.expected.verdict, "valid", "expected verdict");
@@ -145,7 +171,7 @@ function verifyFixture(fixture) {
   const operations = grantPayload.operations.filter(({name}) => name === expected.operation);
   assertEqual(operations.length, 1, "unique requested operation");
   for (const selector of operations[0].selectors) {
-    assert(selectorAllows(selector, expected.cast_arguments), "selector");
+    assert(selectorAllows(selector, fixture.request.typed_cast_arguments), "selector");
   }
 
   const grantFacts = {
@@ -177,6 +203,8 @@ function verifyFixture(fixture) {
   verifyAuxiliaryCases(fixture, issuerJwk, holderJwk, holderThumbprint, requestDigest);
   verifyOfficialVectors(fixture.official_vectors, issuerJwk);
   verifyTamperMatrix(fixture, issuerJwk, holderJwk, requestDigest);
+  verifyCorrectlySignedDuplicateCase(fixture.negative_cases.duplicate_member);
+  verifyUriProfile();
 }
 
 function verifyAuxiliaryCases(
@@ -205,8 +233,9 @@ function verifyAuxiliaryCases(
   );
 
   const wrongRecord = fixture.negative_cases.wrong_holder.proof;
-  const wrongProtected = JSON.parse(
+  const wrongProtected = parseJsonNoDuplicates(
     decodeBase64Url(wrongRecord.protected_segment).toString("utf8"),
+    "wrong-holder protected header",
   );
   const wrongJwk = exactPublicJwk(wrongProtected.jwk);
   const wrongHolder = verifyCompactRecord(wrongRecord, wrongJwk, "wrong-holder proof");
@@ -260,7 +289,7 @@ function verifyAuxiliaryCases(
     );
     assert(
       operation.selectors.some(
-        (selector) => !selectorAllows(selector, selectorCase.cast_arguments),
+        (selector) => !selectorAllows(selector, selectorCase.typed_cast_arguments),
       ),
       `selector ${name} denial`,
     );
@@ -306,9 +335,39 @@ function verifyCompactRecord(record, jwk, label) {
     `${label} signature`,
   );
   return {
-    header: JSON.parse(record.protected_json),
-    payload: JSON.parse(record.payload_json),
+    header: parseJsonNoDuplicates(record.protected_json, `${label} protected JSON`),
+    payload: parseJsonNoDuplicates(record.payload_json, `${label} payload JSON`),
   };
+}
+
+function verifyCorrectlySignedDuplicateCase(record) {
+  assertEqual(record.expected_verdict, "invalid", "duplicate-member verdict");
+  assertEqual(record.reason, "duplicate_protected_member", "duplicate-member reason");
+  const jwk = exactPublicJwk(record.public_jwk);
+  assertEqual(record.thumbprint_preimage, jwkThumbprintPreimage(jwk), "duplicate key preimage");
+  assertEqual(record.thumbprint_base64url, jwkThumbprint(jwk), "duplicate key thumbprint");
+
+  let error;
+  try {
+    verifyCompactRecord(record, jwk, "duplicate-member");
+  } catch (caught) {
+    error = caught;
+  }
+  assert(error instanceof Error, "duplicate-member rejection");
+  assert(error.message.includes("duplicate JSON member alg"), "duplicate-member cause");
+}
+
+function verifyUriProfile() {
+  for (const [uri, expected] of uriProfileCases) {
+    let valid = false;
+    try {
+      assertEqual(normalizeHttpsUri(uri), uri, `URI profile ${uri}`);
+      valid = true;
+    } catch {
+      valid = false;
+    }
+    assertEqual(valid, expected, `URI profile verdict ${uri}`);
+  }
 }
 
 function verifyPublicKeyRecord(record, expectedThumbprint) {
@@ -439,7 +498,7 @@ function verifyTamperMatrix(fixture, issuerJwk, holderJwk, requestDigest) {
   );
 }
 
-async function verifyManifest(manifest) {
+async function verifyManifest(manifest, additionalScanPath) {
   assertEqual(manifest.format, "bounded-authority-protocol-v1-vector-manifest", "manifest format");
   const vectors = [...manifest.vectors].sort();
   assertDeepEqual(vectors, ["grant-holder-proof.json"], "manifest vectors");
@@ -449,17 +508,28 @@ async function verifyManifest(manifest) {
     "manifest discovery roots",
   );
 
-  const discovered = new Set();
+  const declared = new Set();
   for (const relativeRoot of requiredDiscoveryRoots) {
     const path = resolve(root, relativeRoot);
     assert(path === root || path.startsWith(`${root}/`), "discovery root escape");
-    await discoverPublicKeys(path, discovered);
+    await discoverPublicKeys(path, declared);
   }
+  if (additionalScanPath !== null) await discoverPublicKeys(additionalScanPath, declared);
 
   const listed = [...manifest.canonical_public_key_fingerprints].sort();
-  const actual = [...discovered].sort();
+  const actual = [...observedPublicKeyFingerprints].sort();
+  const declaredKeys = [...declared].sort();
   assertEqual(new Set(listed).size, listed.length, "duplicate manifest fingerprint");
-  assertDeepEqual(listed, actual, "manifest public-key fingerprint set");
+  assertDeepEqual(
+    declaredKeys,
+    actual,
+    `declared/observed public-key set mismatch declared=${declaredKeys.join(",")} actual=${actual.join(",")}`,
+  );
+  assertDeepEqual(
+    listed,
+    actual,
+    `manifest public-key fingerprint set mismatch listed=${listed.join(",")} actual=${actual.join(",")}`,
+  );
 }
 
 async function discoverPublicKeys(path, fingerprints) {
@@ -470,7 +540,10 @@ async function discoverPublicKeys(path, fingerprints) {
     const bytes = await readFile(path);
     if (path === manifestPath || path.endsWith("/manifest.json")) return;
     if (extname(path) === ".json") {
-      discoverJsonKeys(JSON.parse(bytes.toString("utf8")), fingerprints);
+      discoverJsonKeys(
+        parseJsonNoDuplicates(bytes.toString("utf8"), `census JSON ${path}`),
+        fingerprints,
+      );
     } else {
       discoverTextKeys(bytes.toString("utf8"), fingerprints);
     }
@@ -491,31 +564,113 @@ function discoverJsonKeys(value, fingerprints) {
   }
   if (!value || typeof value !== "object") return;
 
+  assertNoPrivateMaterial(value, "census JSON");
   if (value.kty === "OKP" && value.crv === "Ed25519" && typeof value.x === "string") {
     fingerprints.add(jwkThumbprint(exactPublicJwk(value)));
   }
   for (const [key, child] of Object.entries(value)) {
-    if (
-      ["public_key_base64url", "raw_base64url"].includes(key) &&
-      typeof child === "string"
-    ) {
-      fingerprints.add(jwkThumbprint(exactPublicJwk({crv: "Ed25519", kty: "OKP", x: child})));
+    if (isPublicKeyLabel(key)) {
+      const publicKey = decodeRecognizedRawKey(child);
+      if (publicKey !== null) fingerprints.add(rawKeyThumbprint(publicKey));
     }
     discoverJsonKeys(child, fingerprints);
   }
 }
 
 function discoverTextKeys(text, fingerprints) {
-  const pattern =
-    /(?:public_key_base64url|raw_base64url|["']x["']|\bx)\s*(?::|=>)\s*["']([A-Za-z0-9_-]{43})["']/g;
-  for (const match of text.matchAll(pattern)) {
+  const privatePemMarker = ["-----BEGIN ", "PRIVATE KEY-----"].join("");
+  assert(!text.includes(privatePemMarker), "private PEM material");
+  const privatePattern =
+    /(?:private[_-]?(?:key|seed)|secret[_-]?key|["'](?:d|sk)["']|\b(?:d|sk))\s*(?::|=>|=)\s*["']([A-Za-z0-9_-]{43}|[0-9A-Fa-f]{64})["']/gi;
+  assert(!privatePattern.test(text), "private key material");
+
+  const base64Pattern =
+    /(?:public[_-]?key(?:[_-]?base64url)?|raw[_-]?base64url|holder[_-]?public[_-]?key|issuer[_-]?public[_-]?key|verification[_-]?key|["']x["']|\bx)\s*(?::|=>|=)\s*["']([A-Za-z0-9_-]{43})["']/gi;
+  for (const match of text.matchAll(base64Pattern)) {
     try {
-      fingerprints.add(
-        jwkThumbprint(exactPublicJwk({crv: "Ed25519", kty: "OKP", x: match[1]})),
-      );
+      fingerprints.add(rawKeyThumbprint(decodeBase64Url(match[1])));
     } catch {
       // Malformed-key deny fixtures are reachable but are not public keys.
     }
+  }
+
+  const hexPattern =
+    /(?:public[_-]?key(?:[_-]?hex)?|holder[_-]?public[_-]?key|issuer[_-]?public[_-]?key|verification[_-]?key)\s*(?::|=>|=)\s*["']([0-9A-Fa-f]{64})["']/gi;
+  for (const match of text.matchAll(hexPattern)) {
+    fingerprints.add(rawKeyThumbprint(Buffer.from(match[1], "hex")));
+  }
+
+  const arrayPattern =
+    /(?:public[_-]?key(?:[_-]?bytes)?|holder[_-]?public[_-]?key|issuer[_-]?public[_-]?key|verification[_-]?key)\s*(?::|=>|=)\s*(?:<<|\[)([0-9,\s]+)(?:>>|\])/gi;
+  for (const match of text.matchAll(arrayPattern)) {
+    const bytes = match[1].split(",").map((part) => Number(part.trim()));
+    if (bytes.length === 32 && bytes.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255)) {
+      fingerprints.add(rawKeyThumbprint(Buffer.from(bytes)));
+    }
+  }
+}
+
+function isPublicKeyLabel(key) {
+  if (/fingerprint|thumbprint|digest|hash/i.test(key)) return false;
+  return (
+    /public.*key|key.*public|verification.*key|holder.*key|issuer.*key/i.test(key) ||
+    ["raw_base64url", "raw_hex", "raw_bytes"].includes(key)
+  );
+}
+
+function isPrivateKeyLabel(key) {
+  return /(^|[_-])(d|sk)($|[_-])|private|secret|seed/i.test(key);
+}
+
+function decodeRecognizedRawKey(value) {
+  if (typeof value === "string" && /^[A-Za-z0-9_-]{43}$/.test(value)) {
+    const bytes = decodeBase64Url(value);
+    return bytes.length === 32 ? bytes : null;
+  }
+  if (typeof value === "string" && /^[0-9A-Fa-f]{64}$/.test(value)) {
+    return Buffer.from(value, "hex");
+  }
+  if (
+    Array.isArray(value) &&
+    value.length === 32 &&
+    value.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255)
+  ) {
+    return Buffer.from(value);
+  }
+  if (
+    Array.isArray(value) &&
+    value.every((part) => typeof part === "string") &&
+    /^[A-Za-z0-9_-]{43}$/.test(value.join(""))
+  ) {
+    return decodeBase64Url(value.join(""));
+  }
+  return null;
+}
+
+function rawKeyThumbprint(publicKey) {
+  assertEqual(publicKey.length, 32, "raw public-key length");
+  return jwkThumbprint({
+    crv: "Ed25519",
+    kty: "OKP",
+    x: encodeBase64Url(publicKey),
+  });
+}
+
+function assertNoPrivateMaterial(value, label) {
+  if (Array.isArray(value)) {
+    for (const child of value) assertNoPrivateMaterial(child, label);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+
+  for (const [key, child] of Object.entries(value)) {
+    if (isPrivateKeyLabel(key) && decodeRecognizedRawKey(child) !== null) {
+      throw new Error(`${label} private key material`);
+    }
+    if (key === "d" && typeof child === "string" && child.length > 0) {
+      throw new Error(`${label} private JWK material`);
+    }
+    assertNoPrivateMaterial(child, label);
   }
 }
 
@@ -589,21 +744,53 @@ function selectorAllows(selector, input) {
     "selector",
   );
   if (selector.kind === "all") return true;
-  const value = objectPath(input, selector.path);
+  const value = typedObjectPath(input, selector.path);
   if (value === missing) return false;
-  if (selector.kind === "equals") return semanticEqual(value, selector.value);
+  if (selector.kind === "equals") {
+    return semanticEqual(value, typedJsonMember(selector, "value"));
+  }
   if (selector.kind === "one_of") {
-    return selector.values.some((candidate) => semanticEqual(value, candidate));
+    return selector.values.some((candidate, index) =>
+      semanticEqual(value, typedJsonMember(selector.values, index, candidate)),
+    );
   }
   return false;
 }
 
-function objectPath(value, path) {
+function typedObjectPath(value, path) {
   for (const name of path) {
-    if (!isPlainObject(value) || !Object.hasOwn(value, name)) return missing;
-    value = value[name];
+    if (
+      !Array.isArray(value) ||
+      value[0] !== "object" ||
+      !isPlainObject(value[1]) ||
+      !Object.hasOwn(value[1], name)
+    ) {
+      return missing;
+    }
+    value = value[1][name];
   }
   return value;
+}
+
+function typedJsonMember(owner, key, value = owner[key]) {
+  if (value === null) return ["null"];
+  if (typeof value === "boolean") return ["boolean", value];
+  if (typeof value === "number") {
+    const lexeme = numberLexemes.get(owner)?.get(key);
+    assert(typeof lexeme === "string", "selector number lexeme");
+    return [/[.eE]/.test(lexeme) ? "float" : "integer", value];
+  }
+  if (typeof value === "string") return ["string", value];
+  if (Array.isArray(value)) {
+    return ["array", value.map((child, index) => typedJsonMember(value, index, child))];
+  }
+  assert(isPlainObject(value), "selector JSON value");
+  return [
+    "object",
+    Object.fromEntries(
+      Object.entries(value).map(([name, child]) => [name, typedJsonMember(value, name, child)]),
+    ),
+  ];
 }
 
 function semanticEqual(left, right) {
@@ -663,6 +850,7 @@ function jwkThumbprint(jwk) {
 
 function verifyEd25519(jwk, message, signature) {
   if (signature.length !== 64) return false;
+  observedPublicKeyFingerprints.add(jwkThumbprint(exactPublicJwk(jwk)));
   return verify(
     null,
     message,
@@ -672,15 +860,143 @@ function verifyEd25519(jwk, message, signature) {
 }
 
 function assertNormalizedHttps(uri) {
-  assert(/^[\x20-\x7E]+$/.test(uri), "URI ASCII");
-  const parsed = new URL(uri);
-  assertEqual(parsed.protocol, "https:", "URI scheme");
-  assert(parsed.host.length > 0, "URI host");
-  assertEqual(parsed.username, "", "URI username");
-  assertEqual(parsed.password, "", "URI password");
-  assertEqual(parsed.search, "", "URI query");
-  assertEqual(parsed.hash, "", "URI fragment");
-  assertEqual(parsed.href, uri, "URI normalized");
+  assertEqual(normalizeHttpsUri(uri), uri, "URI normalized");
+}
+
+function normalizeHttpsUri(uri) {
+  assert(typeof uri === "string" && /^[\x21-\x7E]+$/.test(uri), "URI ASCII");
+  const match = /^([A-Za-z][A-Za-z0-9+.-]*):\/\/([^/?#]*)([^?#]*)$/.exec(uri);
+  assert(match !== null, "URI hierarchical shape");
+  assertEqual(match[1].toLowerCase(), "https", "URI scheme");
+
+  const authority = match[2];
+  assert(authority.length > 0 && !authority.includes("@"), "URI authority");
+  let host;
+  let port = "";
+
+  if (authority.startsWith("[")) {
+    const close = authority.indexOf("]");
+    assert(close > 1, "URI IPv6 host");
+    const literal = authority.slice(1, close);
+    const ipvFuture = /^v[0-9A-Fa-f]+\.[A-Za-z0-9._~!$&'()*+,;=:-]+$/.test(literal);
+    assert(isIP(literal) === 6 || ipvFuture, "URI IP-literal syntax");
+    host = `[${literal.toLowerCase()}]`;
+    const suffix = authority.slice(close + 1);
+    assert(suffix === "" || /^:\d+$/.test(suffix), "URI IPv6 port");
+    port = suffix.slice(1);
+  } else {
+    assert((authority.match(/:/g) ?? []).length <= 1, "URI host/port ambiguity");
+    const separator = authority.lastIndexOf(":");
+    if (separator >= 0) {
+      host = authority.slice(0, separator);
+      port = authority.slice(separator + 1);
+      assert(port.length > 0, "URI empty port");
+    } else {
+      host = authority;
+    }
+    assert(host.length > 0, "URI host");
+    if (/^[0-9.]+$/.test(host)) {
+      assert(isCanonicalIpv4(host), "URI IPv4 syntax");
+    } else {
+      assertRegName(host);
+      host = lowercaseOutsideEscapes(normalizePercentEncoding(host));
+    }
+  }
+
+  if (port !== "") {
+    assert(/^\d+$/.test(port), "URI port");
+    const portNumber = Number(port);
+    assert(portNumber >= 1 && portNumber <= 65535, "URI port range");
+    port = portNumber === 443 ? "" : `:${portNumber}`;
+  }
+
+  const normalizedPath = removeDotSegments(
+    normalizePercentEncoding(match[3] === "" ? "/" : match[3]),
+  );
+  assert(normalizedPath.startsWith("/"), "URI absolute path");
+  return `https://${host}${port}${normalizedPath}`;
+}
+
+function isCanonicalIpv4(host) {
+  const octets = host.split(".");
+  return (
+    octets.length === 4 &&
+    octets.every(
+      (octet) =>
+        /^(?:0|[1-9]\d{0,2})$/.test(octet) &&
+        Number(octet) <= 255,
+    )
+  );
+}
+
+function assertRegName(host) {
+  for (let index = 0; index < host.length; index += 1) {
+    const character = host[index];
+    if (/[A-Za-z0-9\-._~!$&'()*+,;=]/.test(character)) continue;
+    assert(
+      character === "%" &&
+        index + 2 < host.length &&
+        /^[0-9A-Fa-f]{2}$/.test(host.slice(index + 1, index + 3)),
+      "URI reg-name",
+    );
+    index += 2;
+  }
+}
+
+function normalizePercentEncoding(value) {
+  let result = "";
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] !== "%") {
+      result += value[index];
+      continue;
+    }
+    assert(index + 2 < value.length && /^[0-9A-Fa-f]{2}$/.test(value.slice(index + 1, index + 3)), "URI percent escape");
+    const octet = Number.parseInt(value.slice(index + 1, index + 3), 16);
+    const character = String.fromCharCode(octet);
+    result += /[A-Za-z0-9\-._~]/.test(character)
+      ? character
+      : `%${octet.toString(16).toUpperCase().padStart(2, "0")}`;
+    index += 2;
+  }
+  return result;
+}
+
+function lowercaseOutsideEscapes(value) {
+  let result = "";
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === "%") {
+      result += value.slice(index, index + 3);
+      index += 2;
+    } else {
+      result += value[index].toLowerCase();
+    }
+  }
+  return result;
+}
+
+function removeDotSegments(path) {
+  let input = path;
+  let output = "";
+  while (input.length > 0) {
+    if (input.startsWith("../")) input = input.slice(3);
+    else if (input.startsWith("./")) input = input.slice(2);
+    else if (input.startsWith("/./")) input = input.slice(2);
+    else if (input === "/.") input = "/";
+    else if (input.startsWith("/../")) {
+      input = input.slice(3);
+      output = output.replace(/\/?[^/]*$/, "");
+    } else if (input === "/..") {
+      input = "/";
+      output = output.replace(/\/?[^/]*$/, "");
+    } else if (input === "." || input === "..") input = "";
+    else {
+      const nextSlash = input.indexOf("/", input.startsWith("/") ? 1 : 0);
+      const end = nextSlash === -1 ? input.length : nextSlash;
+      output += input.slice(0, end);
+      input = input.slice(end);
+    }
+  }
+  return output;
 }
 
 function decodeBase64Url(value) {
@@ -739,7 +1055,122 @@ function assert(condition, label) {
 }
 
 async function readJson(path) {
-  return JSON.parse(await readFile(path, "utf8"));
+  return parseJsonNoDuplicates(await readFile(path, "utf8"), `JSON ${path}`);
+}
+
+function parseJsonNoDuplicates(text, label) {
+  let index = 0;
+
+  function skipWhitespace() {
+    while (index < text.length && /[\t\n\r ]/.test(text[index])) index += 1;
+  }
+
+  function parseString() {
+    assert(text[index] === '"', `${label} string`);
+    const start = index;
+    index += 1;
+    while (index < text.length) {
+      if (text[index] === "\\") {
+        index += 2;
+        continue;
+      }
+      if (text[index] === '"') {
+        index += 1;
+        return JSON.parse(text.slice(start, index));
+      }
+      index += 1;
+    }
+    throw new Error(`${label} unterminated string`);
+  }
+
+  function parseValue() {
+    skipWhitespace();
+    if (text[index] === "{") return parseObject();
+    if (text[index] === "[") return parseArray();
+    if (text[index] === '"') return {value: parseString()};
+    for (const [literal, value] of [
+      ["true", true],
+      ["false", false],
+      ["null", null],
+    ]) {
+      if (text.startsWith(literal, index)) {
+        index += literal.length;
+        return {value};
+      }
+    }
+
+    const match = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(text.slice(index));
+    assert(match !== null, `${label} value`);
+    index += match[0].length;
+    assert(index === text.length || /[\t\n\r ,\]}]/.test(text[index]), `${label} number`);
+    const value = Number(match[0]);
+    assert(Number.isFinite(value), `${label} finite number`);
+    return {value, numberLexeme: match[0]};
+  }
+
+  function parseObject() {
+    const names = new Set();
+    const value = {};
+    const lexemes = new Map();
+    index += 1;
+    skipWhitespace();
+    if (text[index] === "}") {
+      index += 1;
+      return {value};
+    }
+    while (index < text.length) {
+      skipWhitespace();
+      const name = parseString();
+      assert(!names.has(name), `${label} duplicate JSON member ${name}`);
+      names.add(name);
+      skipWhitespace();
+      assert(text[index] === ":", `${label} member separator`);
+      index += 1;
+      const child = parseValue();
+      value[name] = child.value;
+      if (child.numberLexeme !== undefined) lexemes.set(name, child.numberLexeme);
+      skipWhitespace();
+      if (text[index] === "}") {
+        index += 1;
+        if (lexemes.size > 0) numberLexemes.set(value, lexemes);
+        return {value};
+      }
+      assert(text[index] === ",", `${label} object separator`);
+      index += 1;
+    }
+    throw new Error(`${label} unterminated object`);
+  }
+
+  function parseArray() {
+    const value = [];
+    const lexemes = new Map();
+    index += 1;
+    skipWhitespace();
+    if (text[index] === "]") {
+      index += 1;
+      return {value};
+    }
+    while (index < text.length) {
+      const child = parseValue();
+      const childIndex = value.length;
+      value.push(child.value);
+      if (child.numberLexeme !== undefined) lexemes.set(childIndex, child.numberLexeme);
+      skipWhitespace();
+      if (text[index] === "]") {
+        index += 1;
+        if (lexemes.size > 0) numberLexemes.set(value, lexemes);
+        return {value};
+      }
+      assert(text[index] === ",", `${label} array separator`);
+      index += 1;
+    }
+    throw new Error(`${label} unterminated array`);
+  }
+
+  const parsed = parseValue();
+  skipWhitespace();
+  assertEqual(index, text.length, `${label} trailing bytes`);
+  return parsed.value;
 }
 
 function fail(message) {

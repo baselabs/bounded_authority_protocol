@@ -29,6 +29,18 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
     assert decoded.verification == :not_evaluated
   end
 
+  test "bounded decode accepts the scalar JWT audience form" do
+    fixture = fixture!()
+
+    compact =
+      replace_json(fixture["grant"]["compact"], 1, fn payload ->
+        Map.put(payload, "aud", "consumer-instance-01")
+      end)
+
+    assert {:ok, decoded} = V1.decode_grant(compact, %{})
+    assert decoded.audiences == ["consumer-instance-01"]
+  end
+
   test "standalone raw grant verification returns exact redacted non-authorizing facts" do
     fixture = fixture!()
 
@@ -69,6 +81,10 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
           replace_json(compact, 1, &Map.put(&1, "v", 2)),
           replace_json(compact, 1, &Map.put(&1, "extra", true)),
           replace_json(compact, 1, &Map.put(&1, "aud", [])),
+          replace_json(compact, 1, &Map.put(&1, "aud", 1)),
+          replace_json(compact, 1, &Map.put(&1, "iss", "bad: space")),
+          replace_json(compact, 1, &Map.put(&1, "jti", "bad: space")),
+          replace_json(compact, 1, &Map.put(&1, "aud", ["bad: space"])),
           replace_json(compact, 1, &put_in(&1, ["cnf", "jkt"], "not-a-digest")),
           replace_json(compact, 1, &Map.put(&1, "operations", []))
         ] do

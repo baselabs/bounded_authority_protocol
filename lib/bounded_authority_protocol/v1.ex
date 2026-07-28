@@ -5,6 +5,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Json
   alias BoundedAuthorityProtocol.V1.KeyLocator
+  alias BoundedAuthorityProtocol.V1.RequestDigest
+  alias BoundedAuthorityProtocol.V1.Runtime
 
   @doc """
   Parses only the protected grant header and returns its untrusted `kid` hint.
@@ -32,6 +34,32 @@ defmodule BoundedAuthorityProtocol.V1 do
   end
 
   def untrusted_key_locator(_compact, _limits), do: {:error, :invalid}
+
+  @doc "Builds the deterministic standard-JWS grant signing input."
+  defdelegate grant_signing_input(grant, limits), to: Runtime
+
+  @doc "Builds the deterministic standard-JWS holder-proof signing input."
+  defdelegate proof_signing_input(proof, limits), to: Runtime
+
+  @doc "Assembles a validated signing input and raw Ed25519 signature."
+  def assemble_compact(signing_input, signature),
+    do: Runtime.assemble_compact(signing_input, signature, %{})
+
+  @doc "Boundedly decodes a raw compact grant without evaluating trust."
+  defdelegate decode_grant(compact, limits), to: Runtime
+
+  @doc "Boundedly decodes a raw compact proof without evaluating trust."
+  defdelegate decode_proof(compact, limits), to: Runtime
+
+  @doc "Verifies one raw compact grant against caller-supplied trust and expected context."
+  defdelegate verify_grant(compact, trusted_issuer, expected_grant), to: Runtime
+
+  @doc "Verifies a raw grant-and-proof envelope against server-derived expected context."
+  defdelegate check_envelope(credentials, expected_request), to: Runtime
+
+  @doc "Returns the canonical type-preserving request digest."
+  def request_digest(operation, cast_arguments, limits),
+    do: RequestDigest.digest(operation, cast_arguments, limits)
 
   defp closed_header([], <<"EdDSA">>, <<"ba+cap">>, kid) when is_binary(kid), do: {:ok, kid}
 

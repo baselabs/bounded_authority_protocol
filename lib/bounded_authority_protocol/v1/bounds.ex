@@ -19,7 +19,23 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
     :number_lexeme_bytes,
     :integer_magnitude,
     :float_magnitude,
-    :kid_bytes
+    :kid_bytes,
+    :jcs_bytes,
+    :uri_bytes,
+    :identifier_bytes,
+    :nonce_bytes,
+    :method_bytes,
+    :operation_bytes,
+    :audiences,
+    :operations,
+    :selectors,
+    :path_segments,
+    :one_of_values,
+    :public_key_bytes,
+    :signature_bytes,
+    :digest_bytes,
+    :clock_skew,
+    :proof_max_age
   ]
   defstruct @enforce_keys
 
@@ -37,7 +53,23 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
           number_lexeme_bytes: pos_integer(),
           integer_magnitude: pos_integer(),
           float_magnitude: pos_integer(),
-          kid_bytes: pos_integer()
+          kid_bytes: pos_integer(),
+          jcs_bytes: pos_integer(),
+          uri_bytes: pos_integer(),
+          identifier_bytes: pos_integer(),
+          nonce_bytes: pos_integer(),
+          method_bytes: pos_integer(),
+          operation_bytes: pos_integer(),
+          audiences: pos_integer(),
+          operations: pos_integer(),
+          selectors: pos_integer(),
+          path_segments: pos_integer(),
+          one_of_values: pos_integer(),
+          public_key_bytes: pos_integer(),
+          signature_bytes: pos_integer(),
+          digest_bytes: pos_integer(),
+          clock_skew: pos_integer(),
+          proof_max_age: pos_integer()
         }
 
   @maximum %{
@@ -54,7 +86,23 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
     number_lexeme_bytes: 64,
     integer_magnitude: 9_007_199_254_740_991,
     float_magnitude: 9_007_199_254_740_991,
-    kid_bytes: 128
+    kid_bytes: 128,
+    jcs_bytes: 65_536,
+    uri_bytes: 8_192,
+    identifier_bytes: 512,
+    nonce_bytes: 512,
+    method_bytes: 32,
+    operation_bytes: 128,
+    audiences: 64,
+    operations: 64,
+    selectors: 64,
+    path_segments: 32,
+    one_of_values: 256,
+    public_key_bytes: 32,
+    signature_bytes: 64,
+    digest_bytes: 32,
+    clock_skew: 60,
+    proof_max_age: 300
   }
 
   @doc "Returns the immutable v1 profile maxima."

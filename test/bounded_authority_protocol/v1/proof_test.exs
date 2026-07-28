@@ -40,7 +40,7 @@ defmodule BoundedAuthorityProtocol.V1.ProofTest do
           replace_json(compact, 0, &put_in(&1, ["jwk", "crv"], "X25519")),
           replace_json(compact, 1, &Map.put(&1, "v", 2)),
           replace_json(compact, 1, &Map.put(&1, "extra", true)),
-          replace_json(compact, 1, &Map.put(&1, "htm", "post")),
+          replace_json(compact, 1, &Map.put(&1, "htm", "POST /")),
           replace_json(compact, 1, &Map.put(&1, "htu", "http://api.example.test/invoke")),
           replace_json(compact, 1, &Map.put(&1, "ath", "not-a-digest")),
           replace_json(compact, 1, &Map.put(&1, "ba_req", "not-a-digest"))
@@ -77,6 +77,9 @@ defmodule BoundedAuthorityProtocol.V1.ProofTest do
 
     assert {:ok, _input} =
              V1.proof_signing_input(%{proof | method: String.duplicate("A", 32)}, %{})
+
+    assert {:ok, _input} =
+             V1.proof_signing_input(%{proof | method: "report-v2"}, %{})
 
     assert {:error, :invalid} =
              V1.proof_signing_input(%{proof | method: String.duplicate("A", 33)}, %{})

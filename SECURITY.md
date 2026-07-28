@@ -4,9 +4,11 @@
 
 No released version exists yet. This file becomes version-specific with the first public release.
 
-The current unpublished 0.1.0 source implements the BAP-02 bounded ordered JSON decoder, strict
-canonical base64url decoder, and protected-header-only untrusted key locator. It does not yet
-implement cryptographic grant or DPoP verification.
+The current unpublished 0.1.0 source implements bounded parsing, deterministic standard compact
+JWS grant and RFC 9449 holder-proof production, standalone raw-grant verification, and combined
+raw-envelope verification. Results are redacted facts with `authorization: :not_evaluated`; the
+package does not select trust, reserve replay, inspect live revocation state, or authorize an
+effect.
 
 Final BAP-02 verification source
 `893680f501d39371c7f1f1f630d8e8e92cd35cf8` passed

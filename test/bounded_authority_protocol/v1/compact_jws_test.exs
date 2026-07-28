@@ -2,6 +2,7 @@ defmodule BoundedAuthorityProtocol.V1.CompactJwsTest do
   use ExUnit.Case, async: true
 
   alias BoundedAuthorityProtocol.V1
+  alias BoundedAuthorityProtocol.V1.CompactJws
   alias BoundedAuthorityProtocol.V1.Grant
   alias BoundedAuthorityProtocol.V1.Operation
   alias BoundedAuthorityProtocol.V1.Proof
@@ -47,6 +48,11 @@ defmodule BoundedAuthorityProtocol.V1.CompactJwsTest do
     assert {:error, :invalid} = V1.assemble_compact(signing_input, binary_part(signature, 0, 63))
     assert {:error, :invalid} = V1.assemble_compact(signing_input, signature <> <<0>>)
     assert {:error, :invalid} = V1.assemble_compact(%{}, signature)
+    assert {:error, :invalid} = CompactJws.assemble(%{}, signature, %{})
+
+    assert {:error, :invalid} = CompactJws.scan(:not_binary, %{})
+
+    assert {:error, :invalid} = CompactJws.scan("no-dots", %{})
   end
 
   test "forged signing-input fields are revalidated" do
@@ -59,6 +65,86 @@ defmodule BoundedAuthorityProtocol.V1.CompactJwsTest do
 
     assert {:error, :invalid} =
              V1.assemble_compact(%{signing_input | kind: :proof}, signature)
+
+    {:ok, proof_input} = V1.proof_signing_input(proof(fixture), %{})
+    assert {:ok, _compact} = V1.assemble_compact(proof_input, signature)
+
+    invalid_header =
+      %{signing_input | protected_segment: Base.url_encode64(~s({"alg":"none"}), padding: false)}
+
+    invalid_header = %{
+      invalid_header
+      | message: invalid_header.protected_segment <> "." <> invalid_header.payload_segment
+    }
+
+    assert {:error, :invalid} = V1.assemble_compact(invalid_header, signature)
+
+    wrong_grant_header =
+      %{
+        signing_input
+        | protected_segment:
+            Base.url_encode64(~s({"alg":"EdDSA","typ":"ba+cap","x":true}), padding: false)
+      }
+
+    wrong_grant_header = %{
+      wrong_grant_header
+      | message: wrong_grant_header.protected_segment <> "." <> wrong_grant_header.payload_segment
+    }
+
+    assert {:error, :invalid} = V1.assemble_compact(wrong_grant_header, signature)
+
+    extra_header =
+      %{
+        signing_input
+        | protected_segment:
+            Base.url_encode64(
+              ~s({"alg":"EdDSA","kid":"#{fixture["grant"]["header"]["kid"]}","typ":"ba+cap","x":true}),
+              padding: false
+            )
+      }
+
+    extra_header = %{
+      extra_header
+      | message: extra_header.protected_segment <> "." <> extra_header.payload_segment
+    }
+
+    assert {:error, :invalid} = V1.assemble_compact(extra_header, signature)
+
+    bad_kid =
+      %{
+        signing_input
+        | protected_segment:
+            Base.url_encode64(~s({"alg":"EdDSA","kid":"bad kid","typ":"ba+cap"}), padding: false)
+      }
+
+    bad_kid = %{
+      bad_kid
+      | message: bad_kid.protected_segment <> "." <> bad_kid.payload_segment
+    }
+
+    assert {:error, :invalid} = V1.assemble_compact(bad_kid, signature)
+
+    incomplete_payload =
+      %{signing_input | payload_segment: Base.url_encode64(~s({"aud":"a"}), padding: false)}
+
+    incomplete_payload = %{
+      incomplete_payload
+      | message: incomplete_payload.protected_segment <> "." <> incomplete_payload.payload_segment
+    }
+
+    assert {:error, :invalid} = V1.assemble_compact(incomplete_payload, signature)
+
+    incomplete_proof_payload =
+      %{proof_input | payload_segment: Base.url_encode64(~s({"v":1}), padding: false)}
+
+    incomplete_proof_payload = %{
+      incomplete_proof_payload
+      | message:
+          incomplete_proof_payload.protected_segment <>
+            "." <> incomplete_proof_payload.payload_segment
+    }
+
+    assert {:error, :invalid} = V1.assemble_compact(incomplete_proof_payload, signature)
   end
 
   defp grant(fixture) do

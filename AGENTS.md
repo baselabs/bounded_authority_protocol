@@ -21,16 +21,17 @@ grant operational authority by itself.
 
 ## Current state
 
-`BAP-00`, `BAP-01`, and `BAP-02` are complete. The unpublished 0.1.0 package retains zero
+`BAP-00`, `BAP-01`, `BAP-02`, and the local BAP-03 implementation are complete. The unpublished
+0.1.0 package retains zero
 production dependencies, no application callback, and no supervision tree. The normative v1
 tables and bounds, raw-number preflight, bounded ordered JSON decoder with recursive duplicate
 rejection, strict base64url decoder, protected-header-only `untrusted_key_locator/2`, Draft
 2020-12 structural schemas, architecture mutation gates, public compatibility CI, exact-package
-consumer proof, CycloneDX output, and trusted-main provenance verification are closed. BAP-03's
-approved authority freezes standard RFC 7515 JWS signing, deterministic grant/proof producers,
-standalone raw-grant verification, combined raw-envelope verification, and value-bearing redacted
-facts. Its runtime remains unimplemented until the red conformance contracts are satisfied;
-consult [`docs/ROADMAP.md`](docs/ROADMAP.md) and
+consumer proof, CycloneDX output, and trusted-main provenance verification are closed. BAP-03 adds
+standard RFC 7515 JWS signing, deterministic grant/proof producers, bounded raw decode,
+standalone raw-grant verification, combined raw-envelope verification, value-bearing redacted
+facts, public-only independently verified vectors, and portable resource bounds. Consult
+[`docs/ROADMAP.md`](docs/ROADMAP.md) and
 [`ADR 0003`](docs/adr/0003-standard-jws-and-verified-grant-results.md).
 
 ## Critical rules
