@@ -243,6 +243,104 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
       from: ~S|importedPublicKeyFingerprints.add(fingerprint(raw).toString("base64url"));|,
       to: ~S|fingerprint(raw);|,
       command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
+    },
+    %{
+      name: "bap03-own-json-members",
+      path: "conformance/bap03_independent.mjs",
+      from: "const value = Object.create(null);",
+      to: "const value = {};",
+      command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
+    },
+    %{
+      name: "bap03-private-pem",
+      path: "conformance/bap03_independent.mjs",
+      from: ~S"!/-----BEGIN (?:ENCRYPTED |ED25519 )?PRIVATE KEY-----/.test(value)",
+      to: ~S"!/-----BEGIN (?:ENCRYPTED |ED25519 )?PRIVATE MATERIAL-----/.test(value)",
+      command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
+    },
+    %{
+      name: "bap03-private-der-byte-array",
+      path: "conformance/bap03_independent.mjs",
+      from: "value.length >= 48 &&",
+      to: "value.length >= 49 &&",
+      command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
+    },
+    %{
+      name: "bap03-private-der-hex",
+      path: "conformance/bap03_independent.mjs",
+      from: ~S|/^[0-9A-Fa-f]{96,}$/.test(value)|,
+      to: ~S|/^[0-9A-Fa-f]{97,}$/.test(value)|,
+      command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
+    },
+    %{
+      name: "bap03-private-der-base64",
+      path: "conformance/bap03_independent.mjs",
+      from: "value.length >= 64 && value.length % 4 === 0",
+      to: "value.length >= 65 && value.length % 4 === 0",
+      command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
+    },
+    %{
+      name: "bap03-private-der-base64url",
+      path: "conformance/bap03_independent.mjs",
+      from: ~S|/^[A-Za-z0-9_-]{64,}$/.test(value)|,
+      to: ~S|/^[A-Za-z0-9_-]{65,}$/.test(value)|,
+      command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
+    },
+    %{
+      name: "bap03-private-der-key-type",
+      path: "conformance/bap03_independent.mjs",
+      from: ~S|return key.asymmetricKeyType === "ed25519";|,
+      to: "return false;",
+      command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
+    },
+    %{
+      name: "bap04-own-json-members",
+      path: "conformance/chain_archive_independent.mjs",
+      from: "const value = Object.create(null);",
+      to: "const value = {};",
+      command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
+    },
+    %{
+      name: "bap04-private-pem",
+      path: "conformance/chain_archive_independent.mjs",
+      from: ~S"!/-----BEGIN (?:ENCRYPTED |ED25519 )?PRIVATE KEY-----/.test(value)",
+      to: ~S"!/-----BEGIN (?:ENCRYPTED |ED25519 )?PRIVATE MATERIAL-----/.test(value)",
+      command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
+    },
+    %{
+      name: "bap04-private-der-byte-array",
+      path: "conformance/chain_archive_independent.mjs",
+      from: "value.length >= 48 &&",
+      to: "value.length >= 49 &&",
+      command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
+    },
+    %{
+      name: "bap04-private-der-hex",
+      path: "conformance/chain_archive_independent.mjs",
+      from: ~S|/^[0-9A-Fa-f]{96,}$/.test(value)|,
+      to: ~S|/^[0-9A-Fa-f]{97,}$/.test(value)|,
+      command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
+    },
+    %{
+      name: "bap04-private-der-base64",
+      path: "conformance/chain_archive_independent.mjs",
+      from: "value.length >= 64 && value.length % 4 === 0",
+      to: "value.length >= 65 && value.length % 4 === 0",
+      command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
+    },
+    %{
+      name: "bap04-private-der-base64url",
+      path: "conformance/chain_archive_independent.mjs",
+      from: ~S|/^[A-Za-z0-9_-]{64,}$/.test(value)|,
+      to: ~S|/^[A-Za-z0-9_-]{65,}$/.test(value)|,
+      command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
+    },
+    %{
+      name: "bap04-private-der-key-type",
+      path: "conformance/chain_archive_independent.mjs",
+      from: ~S|return key.asymmetricKeyType === "ed25519";|,
+      to: "return false;",
+      command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
     }
   ]
 
