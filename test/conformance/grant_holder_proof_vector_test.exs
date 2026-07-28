@@ -134,16 +134,34 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
     end)
   end
 
-  test "self-identifying Ed25519 private DER fails under an unrelated label" do
-    private_der =
-      Base.encode64(
-        <<0x30, 0x2E, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x04, 0x22,
-          0x04, 0x20, 0::256>>
-      )
+  test "self-identifying Ed25519 private material fails in every supported encoding" do
+    for {encoding, value, expected_error} <- private_material_encodings() do
+      with_temp_json(%{"container" => %{"signing_material" => value}}, fn path ->
+        {output, 1} = run_node(["--scan", path])
+        assert output =~ expected_error, "#{encoding} was not rejected"
+      end)
+    end
+  end
 
-    with_temp_json(%{"signing_material" => private_der}, fn path ->
-      {output, 1} = run_node(["--scan", path])
-      assert output =~ "private Ed25519 DER material"
+  test "dangerous JSON property names cannot hide nested private material" do
+    encoded = Base.encode64(private_der())
+
+    with_temp_json(
+      %{"container" => %{"__proto__" => %{"signing_material" => encoded}}},
+      fn path ->
+        {output, 1} = run_node(["--scan", path])
+        assert output =~ "private Ed25519 DER material"
+      end
+    )
+  end
+
+  test "malformed DER-shaped data is not classified as a private key" do
+    malformed =
+      <<0x30, 0x00, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20, 0::296>>
+
+    with_temp_json(%{"signing_material" => Base.encode64(malformed)}, fn path ->
+      {output, 0} = run_node(["--scan", path])
+      assert output =~ "bap03 independent verification: ok"
     end)
   end
 
@@ -202,4 +220,29 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
 
   defp collect_keys(value) when is_list(value), do: Enum.flat_map(value, &collect_keys/1)
   defp collect_keys(_value), do: []
+
+  defp private_material_encodings do
+    der = private_der()
+    base64 = Base.encode64(der)
+    base64url = Base.url_encode64(der, padding: false)
+
+    assert String.contains?(base64, "/")
+    assert String.contains?(base64url, "_")
+
+    pem =
+      "-----BEGIN " <> "PRIVATE KEY-----\n#{base64}\n-----END " <> "PRIVATE KEY-----"
+
+    [
+      {:pem, pem, "private PEM material"},
+      {:hex, Base.encode16(der, case: :lower), "private Ed25519 DER material"},
+      {:base64, base64, "private Ed25519 DER material"},
+      {:base64url, base64url, "private Ed25519 DER material"},
+      {:byte_array, :binary.bin_to_list(der), "private Ed25519 DER material"}
+    ]
+  end
+
+  defp private_der do
+    <<0x30, 0x2E, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x04, 0x22, 0x04,
+      0x20, 0xFF::256>>
+  end
 end

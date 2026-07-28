@@ -96,20 +96,64 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
     end)
   end
 
-  test "independent verifier rejects self-identifying Ed25519 private DER under an unknown label" do
-    private_der =
-      Base.encode64(
-        <<0x30, 0x2E, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x04, 0x22,
-          0x04, 0x20, 0::256>>
+  test "dangerous JSON property names remain visible to closed-member checks" do
+    fixture =
+      @fixture
+      |> File.read!()
+      |> String.replace_prefix(
+        "{",
+        ~s({"__proto__": {"unexpected": true},)
       )
 
-    fixture =
-      fixture!()
-      |> put_in(["provenance", "signing_material"], private_der)
-
-    with_temp_json(fixture, fn path ->
+    with_temp_bytes(fixture, fn path ->
       assert {output, 1} = run_node(path, @manifest)
-      assert output =~ "private Ed25519 DER material"
+      assert output =~ "fixture: closed members"
+    end)
+
+    manifest =
+      @manifest
+      |> File.read!()
+      |> String.replace_prefix(
+        "{",
+        ~s({"__proto__": {"unexpected": true},)
+      )
+
+    with_temp_bytes(manifest, fn path ->
+      assert {output, 1} = run_node(@fixture, path)
+      assert output =~ "manifest: closed members"
+    end)
+  end
+
+  test "independent verifier rejects private material in every supported encoding" do
+    for {encoding, value, expected_error} <- private_material_encodings() do
+      with_temp_json(%{"container" => %{"signing_material" => value}}, fn path ->
+        assert {output, 1} = run_node(@fixture, @manifest, ["--scan", path])
+        assert output =~ expected_error, "#{encoding} was not rejected"
+      end)
+    end
+  end
+
+  test "dangerous nested property names cannot hide private material" do
+    encoded = Base.encode64(private_der())
+
+    with_temp_json(
+      %{"container" => %{"__proto__" => %{"signing_material" => encoded}}},
+      fn path ->
+        assert {output, 1} = run_node(@fixture, @manifest, ["--scan", path])
+        assert output =~ "private Ed25519 DER material"
+      end
+    )
+  end
+
+  test "malformed DER-shaped data is not classified as a private key" do
+    malformed =
+      <<0x30, 0x00, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20, 0::296>>
+
+    refute ed25519_private_der?(malformed)
+
+    with_temp_json(%{"signing_material" => Base.encode64(malformed)}, fn path ->
+      assert {output, 0} = run_node(@fixture, @manifest, ["--scan", path])
+      assert output =~ "bap04 independent verification: ok"
     end)
   end
 
@@ -473,8 +517,8 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
     }
   end
 
-  defp run_node(fixture, manifest) do
-    System.cmd("node", [@script, fixture, manifest], stderr_to_stdout: true)
+  defp run_node(fixture, manifest, extra_arguments \\ []) do
+    System.cmd("node", [@script, fixture, manifest | extra_arguments], stderr_to_stdout: true)
   end
 
   defp expected_chain_fact_json(chain) do
@@ -610,16 +654,43 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
   end
 
   defp ed25519_private_der?(bytes) do
-    oid = <<0x06, 0x03, 0x2B, 0x65, 0x70>>
-    nested_private_octets = <<0x04, 0x22, 0x04, 0x20>>
+    case :public_key.der_decode(:PrivateKeyInfo, bytes) do
+      {:ECPrivateKey, 1, private_key, {:namedCurve, {1, 3, 101, 112}}, :asn1_NOVALUE,
+       :asn1_NOVALUE}
+      when is_binary(private_key) and byte_size(private_key) == 32 ->
+        true
 
-    with true <- byte_size(bytes) >= 48,
-         <<0x30, _rest::binary>> <- bytes,
-         {oid_position, _} <- :binary.match(bytes, oid),
-         {octets_position, _} <- :binary.match(bytes, nested_private_octets) do
-      octets_position > oid_position
-    else
-      _failure -> false
+      _other ->
+        false
     end
+  rescue
+    _error -> false
+  catch
+    _kind, _reason -> false
+  end
+
+  defp private_material_encodings do
+    der = private_der()
+    base64 = Base.encode64(der)
+    base64url = Base.url_encode64(der, padding: false)
+
+    assert String.contains?(base64, "/")
+    assert String.contains?(base64url, "_")
+
+    pem =
+      "-----BEGIN " <> "PRIVATE KEY-----\n#{base64}\n-----END " <> "PRIVATE KEY-----"
+
+    [
+      {:pem, pem, "private PEM material"},
+      {:hex, Base.encode16(der, case: :lower), "private Ed25519 DER material"},
+      {:base64, base64, "private Ed25519 DER material"},
+      {:base64url, base64url, "private Ed25519 DER material"},
+      {:byte_array, :binary.bin_to_list(der), "private Ed25519 DER material"}
+    ]
+  end
+
+  defp private_der do
+    <<0x30, 0x2E, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x04, 0x22, 0x04,
+      0x20, 0xFF::256>>
   end
 end

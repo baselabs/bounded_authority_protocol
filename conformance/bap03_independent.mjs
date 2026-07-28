@@ -2,6 +2,7 @@
 
 import {
   createHash,
+  createPrivateKey,
   createPublicKey,
   timingSafeEqual,
   verify,
@@ -18,8 +19,6 @@ const argumentsByName = new Map();
 const missing = Symbol("missing");
 const numberLexemes = new WeakMap();
 const observedPublicKeyFingerprints = new Set();
-const ED25519_PRIVATE_KEY_OID = Buffer.from("06032b6570", "hex");
-const NESTED_PRIVATE_KEY_OCTETS = Buffer.from("04220420", "hex");
 const uriProfileCases = [
   ["https://example.com/", true],
   ["https://example.com/a/~", true],
@@ -711,12 +710,31 @@ function privateDerCandidates(value) {
 }
 
 function isEd25519PrivateDer(bytes) {
-  return (
-    bytes.length >= 48 &&
-    bytes[0] === 0x30 &&
-    bytes.indexOf(ED25519_PRIVATE_KEY_OID) >= 0 &&
-    bytes.indexOf(NESTED_PRIVATE_KEY_OCTETS) > bytes.indexOf(ED25519_PRIVATE_KEY_OID)
-  );
+  if (!isCompleteDerSequence(bytes)) return false;
+
+  try {
+    const key = createPrivateKey({key: bytes, format: "der", type: "pkcs8"});
+    return key.asymmetricKeyType === "ed25519";
+  } catch {
+    return false;
+  }
+}
+
+function isCompleteDerSequence(bytes) {
+  if (bytes.length < 2 || bytes[0] !== 0x30) return false;
+  const firstLength = bytes[1];
+  if ((firstLength & 0x80) === 0) return bytes.length === firstLength + 2;
+
+  const lengthBytes = firstLength & 0x7f;
+  if (lengthBytes === 0 || lengthBytes > 4 || bytes.length < 2 + lengthBytes) return false;
+  if (bytes[2] === 0) return false;
+
+  let contentLength = 0;
+  for (let index = 0; index < lengthBytes; index += 1) {
+    contentLength = contentLength * 256 + bytes[2 + index];
+  }
+  if (contentLength < 128) return false;
+  return bytes.length === 2 + lengthBytes + contentLength;
 }
 
 function rawKeyThumbprint(publicKey) {
@@ -1192,7 +1210,7 @@ function parseJsonNoDuplicates(text, label) {
 
   function parseObject() {
     const names = new Set();
-    const value = {};
+    const value = Object.create(null);
     const lexemes = new Map();
     index += 1;
     skipWhitespace();
