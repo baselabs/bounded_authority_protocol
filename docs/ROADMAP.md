@@ -98,9 +98,22 @@ compatibility.
 
 ## BAP-03 closeout evidence
 
-- The implementation landing carrying this receipt adds deterministic standard compact-JWS grant
-  and RFC 9449 proof production, bounded raw decode, standalone grant verification, and combined
-  raw-envelope verification without trust selection, state, signing, or operational authority.
+- Package-bearing closeout head `f322e08bba665374599b9f53c362966b6b59710a` is pushed to public
+  `main`. [CI run 30331438234](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30331438234)
+  passed workflow syntax, the complete quality/package boundary, and all supported pairs:
+  Elixir 1.18.4/OTP 27.3.4.14, Elixir 1.19.5/OTP 28.5.0.3, and Elixir
+  1.20.2/OTP 29.0.3.
+- [Supply-chain run 30331438252](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30331438252)
+  built artifact `8677580246`. Its exact unpublished archive has SHA-256
+  `2f09d66c68e3538aa1e0020710d7f2aaca07528ef60fcf571c5006212e3bf056`; the downloaded
+  `SHA256SUMS` check passed. Separate SLSA provenance and CycloneDX SBOM attestations verified for
+  that digest, constrained to this repository, the trusted supply-chain workflow, and source
+  digest `f322e08bba665374599b9f53c362966b6b59710a`.
+- Implementation head `49a9781a8e408c29b12dcd6870d24f61a59f5ed2`, followed by supported
+  Elixir compiler-compatibility fixes through the closeout head, adds deterministic standard
+  compact-JWS grant and RFC 9449 proof production, bounded raw decode, standalone grant
+  verification, and combined raw-envelope verification without trust selection, state, signing,
+  or operational authority.
 - Post-review `mix quality` passed 116 tests with 0 failures and 100.00% coverage, plus format,
   warnings-as-errors compilation, exact source/BEAM architecture accounting, Credo, Dialyzer,
   documentation, advisory, retired-package, license, CycloneDX, exact archive, and fresh

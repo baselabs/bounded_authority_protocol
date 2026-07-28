@@ -8,13 +8,15 @@ bounded proof-of-possession authority.
 The public/private boundary is complete under
 [`BAP-00`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). The source tree now
 contains the unpublished `:bounded_authority_protocol` 0.1.0 Mix package scaffold and its enforced
-release boundary. `BAP-01` and `BAP-02` are complete. `BAP-03` implements deterministic standard
-compact-JWS grant and RFC 9449 holder-proof production, bounded decoding, standalone raw-grant
-verification, and combined raw-envelope verification. Its public-only vectors are independently
-verified and cover exact key census, meaningful byte tampering, duplicate members, holder
-binding, request digests, selectors, time boundaries, and URI normalization. Portable
-timing/allocation bounds and the unpacked external-consumer gate exercise the same public API.
-Nothing in this repository has been published to Hex.
+release boundary. `BAP-01` through `BAP-03` are complete. BAP-03's package-bearing closeout head
+`f322e08bba665374599b9f53c362966b6b59710a` passed the supported CI matrix and exact unpublished
+package, checksum, provenance, and SBOM gates. It implements deterministic standard compact-JWS
+grant and RFC 9449 holder-proof production, bounded decoding, standalone raw-grant verification,
+and combined raw-envelope verification. Its public-only vectors are independently verified and
+cover exact key census, meaningful byte tampering, duplicate members, holder binding, request
+digests, selectors, time boundaries, and URI normalization. Portable timing/allocation bounds and
+the unpacked external-consumer gate exercise the same public API. BAP-04 chain and historical-key
+verification is next. Nothing in this repository has been published to Hex.
 
 The scaffold has zero production dependencies, no application callback, and no supervision tree.
 Source AST, compiled BEAM imports, generated application metadata, dependency declarations, and
@@ -84,7 +86,8 @@ See the [normative v1 profile](docs/protocol-v1.md),
 [protocol charter](docs/design/protocol-charter.md), [threat model](docs/design/threat-model.md),
 [conformance contract](docs/design/conformance-contract.md), and
 [ADR 0001](docs/adr/0001-public-protocol-verifier-boundary.md) plus
-[ADR 0002](docs/adr/0002-normative-v1-parsing-profile.md).
+[ADR 0002](docs/adr/0002-normative-v1-parsing-profile.md) and
+[ADR 0003](docs/adr/0003-standard-jws-and-verified-grant-results.md).
 
 ## Development
 
