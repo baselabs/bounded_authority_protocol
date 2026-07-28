@@ -15,8 +15,11 @@ grant and RFC 9449 holder-proof production, bounded decoding, standalone raw-gra
 and combined raw-envelope verification. Its public-only vectors are independently verified and
 cover exact key census, meaningful byte tampering, duplicate members, holder binding, request
 digests, selectors, time boundaries, and URI normalization. Portable timing/allocation bounds and
-the unpacked external-consumer gate exercise the same public API. BAP-04 chain and historical-key
-verification is next. Nothing in this repository has been published to Hex.
+the unpacked external-consumer gate exercise the same public API. BAP-04 now implements canonical
+consumption chains, signed boundary anchors, authenticated historical-key rollover, deterministic
+anchored archives, and atomic raw-archive verification against mandatory caller boundaries,
+digest, and object version. Its public-only corpus is independently verified. Nothing in this
+repository has been published to Hex.
 
 The scaffold has zero production dependencies, no application callback, and no supervision tree.
 Source AST, compiled BEAM imports, generated application metadata, dependency declarations, and
@@ -41,17 +44,25 @@ The v1 profile now provides:
 - `check_envelope/2`, re-verifying the raw grant and binding the holder signature, request,
   nonce, time, digest, operation, and selectors before returning redacted, non-authorizing
   `EnvelopeFacts`.
+- canonical consumption-row production and raw range checking against exact predecessor/head
+  boundaries;
+- deterministic boundary-anchor and historical-key-transition standard-JWS signing inputs with
+  external signature assembly;
+- deterministic anchored-export framing and `verify_anchored_export/3`, which scans raw chunks to
+  exact EOF, verifies the complete digest and out-of-band object version, authenticates the
+  positional key path and both boundaries, and checks every row;
+- fixed-redacted, non-authorizing chain, anchor, transition, and anchored-export facts.
 
 The two decoder functions live in named public submodules under the explicit
 `BoundedAuthorityProtocol.V1` namespace. There is no duplicate decoder façade and no implicit
-latest profile. Decoder limits are tightening-only positive integers; unknown, non-integer,
-zero/negative, or widening values fail with the fixed value-free `{:error, :invalid}`. The
+latest profile. Resource limits are tightening-only positive integers; the Ed25519 key/signature
+and SHA-256 digest widths are immutable protocol constants. Unknown, non-integer, zero/negative,
+widening, or fixed-width-changing values fail with the fixed value-free `{:error, :invalid}`. The
 structural Draft 2020-12 schemas accompany the decoders but do not replace duplicate-name,
 raw-number, UTF-8 byte, depth, node-count, or canonical-encoding enforcement.
 
 Later rows will provide:
 
-- consumption-chain and archive verification;
 - the portable conformance corpus and verifier CLI;
 - release-candidate and connected-release gates.
 
@@ -87,7 +98,8 @@ See the [normative v1 profile](docs/protocol-v1.md),
 [conformance contract](docs/design/conformance-contract.md), and
 [ADR 0001](docs/adr/0001-public-protocol-verifier-boundary.md) plus
 [ADR 0002](docs/adr/0002-normative-v1-parsing-profile.md) and
-[ADR 0003](docs/adr/0003-standard-jws-and-verified-grant-results.md).
+[ADR 0003](docs/adr/0003-standard-jws-and-verified-grant-results.md), plus
+[ADR 0004](docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md).
 
 ## Development
 
@@ -109,6 +121,7 @@ Useful focused gates are:
 mix architecture
 mix audit
 mix bap03.performance
+mix bap04.performance
 mix package.check
 mix sbom.generate
 ```

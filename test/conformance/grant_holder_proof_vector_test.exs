@@ -12,7 +12,7 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
     assert output =~ "bap03 independent verification: ok"
 
     assert output =~
-             "vectors=1 public_key_fingerprints=4 tamper_cases=7 duplicate_cases=1 uri_cases=18"
+             "vectors=3 public_key_fingerprints=9 tamper_cases=7 duplicate_cases=1 uri_cases=18"
   end
 
   test "fixture contains no private key or seed field" do
@@ -30,9 +30,14 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
 
     assert manifest["canonical_public_key_fingerprints"] == [
              "0qPOlfSr_giHdRaDK18shLtG5DoQL1a2nrHVDeWruJI",
+             "B_luRLoL5T-YfqSCot-qLaUVewraSBu-qaEWqXfMRHI",
              "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk",
+             "TolqHySkTC69-Y7DUVNJP7JPn31VXHfk37ytoM0MZXM",
              "b5dejonEMNbWuAUspTppNgiUa6QUXdzk40kdsDcWK6g",
-             "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+             "gajR1zhnSjnHaH8LRAxglMF1t6aNiIRwljRrGC66UuI",
+             "jNqoeV3u-yTgM-aDSbR90dRdNvOP0aD0J6_anyf0NRI",
+             "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k",
+             "ux6kGmd8C56UOZy4dXGjmqLHQO3PuOmQ5dg89lEO-Ag"
            ]
 
     assert manifest["canonical_public_key_fingerprints"] ==

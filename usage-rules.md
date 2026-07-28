@@ -14,5 +14,11 @@
    `trust: :not_evaluated`; it does not parse claims, verify bytes, select trust, or authorize.
 9. Pass only raw compact credentials to verification boundaries. Decoded values and verified
    facts are evidence outputs, never reusable credentials.
-10. Treat the current 0.1.0 package as unpublished. BAP-03 verification is implemented, but no
+10. Supply chain/archive verification with the intended predecessor/head, both expected anchors,
+    the complete ordered historical-key path, raw archive digest, and exact object-store version.
+    Do not infer those expectations from the archive being verified.
+11. Treat chain consistency as consistency only. It cannot by itself prove that a validly
+    shortened or relinked history omitted nothing.
+12. Keep commitment preimages private. The public row carries only a fixed-width commitment.
+13. Treat the current 0.1.0 package as unpublished. BAP-04 verification is implemented, but no
     public release exists.

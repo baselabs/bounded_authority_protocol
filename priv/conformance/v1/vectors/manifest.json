@@ -1,13 +1,20 @@
 {
   "format": "bounded-authority-protocol-v1-vector-manifest",
   "vectors": [
+    "chain-semantic-edge.json",
+    "consumption-chain-archive.json",
     "grant-holder-proof.json"
   ],
   "canonical_public_key_fingerprints": [
     "0qPOlfSr_giHdRaDK18shLtG5DoQL1a2nrHVDeWruJI",
+    "B_luRLoL5T-YfqSCot-qLaUVewraSBu-qaEWqXfMRHI",
     "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk",
+    "TolqHySkTC69-Y7DUVNJP7JPn31VXHfk37ytoM0MZXM",
     "b5dejonEMNbWuAUspTppNgiUa6QUXdzk40kdsDcWK6g",
-    "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+    "gajR1zhnSjnHaH8LRAxglMF1t6aNiIRwljRrGC66UuI",
+    "jNqoeV3u-yTgM-aDSbR90dRdNvOP0aD0J6_anyf0NRI",
+    "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k",
+    "ux6kGmd8C56UOZy4dXGjmqLHQO3PuOmQ5dg89lEO-Ag"
   ],
   "discovery_roots": [
     "priv/conformance/v1/vectors",

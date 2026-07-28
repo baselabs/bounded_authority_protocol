@@ -225,6 +225,16 @@ decode_proof(binary(), Bounds.t() | map())
 verify_grant(binary(), TrustedIssuer.t(), ExpectedGrant.t())
 check_envelope(Credentials.t(), ExpectedRequest.t())
 request_digest(binary(), Json.value(), Bounds.t() | map())
+encode_consumption_entry(ConsumptionEntry.t(), Bounds.t() | map())
+check_chain(ChainInput.t(), ExpectedChain.t())
+boundary_anchor_signing_input(BoundaryAnchor.t(), Bounds.t() | map())
+key_transition_signing_input(KeyTransition.t(), Bounds.t() | map())
+encode_anchored_export(AnchoredExportInput.t(), ExpectedExport.t())
+verify_historical_anchor(binary(), HistoricalPublicKey.t(), ExpectedAnchor.t())
+verify_key_transition(binary(), HistoricalPublicKey.t(), HistoricalPublicKey.t(),
+  ExpectedKeyTransition.t())
+verify_anchored_export(ArchivedObject.t(), HistoricalKeyChain.t(),
+  ExpectedAnchoredExport.t())
 ```
 
 Every function returns `{:ok, value}` or exactly `{:error, :invalid}`. Only bounds accept a map;
@@ -311,11 +321,20 @@ containers, or nonces, and neither is accepted as credentials.
 | SHA-256 digest bytes | 32 |
 | clock skew seconds | 60 |
 | proof maximum age seconds | 300 |
+| canonical consumption row bytes | 4,096 |
+| consumption rows per range | 65,536 |
+| boundary anchor or key-transition compact bytes | 8,192 |
+| anchored-export header bytes | 8,192 |
+| historical key transitions | 256 |
+| anchored-export chunks | 65,796 |
+| anchored-export bytes | 270,820,384 |
+| object-store version bytes | 512 |
 
-Callers may tighten any maximum with a positive integer. Unknown, non-integer, zero, negative, or
-widening limits are invalid. Raw and encoded sizes precede decoding; decoded-size projection
-precedes allocation; structure and scalar limits apply while decoding/emitting; all precede
-cryptography.
+Callers may tighten resource ceilings with a positive integer. The 32-byte public-key and digest
+widths and 64-byte signature width are protocol constants and must remain exact. Unknown,
+non-integer, zero, negative, widening, or fixed-width-changing limits are invalid. Raw and encoded
+sizes precede decoding; decoded-size projection precedes allocation; structure and scalar limits
+apply while decoding/emitting; all precede cryptography.
 
 ## Untrusted key locator
 
@@ -331,3 +350,21 @@ It does not select a key, decode claims/signature bytes, verify, evaluate trust,
 Every failure returns `{:error, :invalid}` without input values.
 The locator retains its documented `/1` profile-maximum convenience arity and `/2`
 tightening-limits arity.
+
+## Consumption chain and anchored export
+
+The normative consumption row, row-domain hash, boundary-anchor JWS, historical-key-transition
+JWS, archive framing, object-version binding, temporal intervals, and non-authorizing result
+contract are frozen in [ADR 0004](adr/0004-consumption-chain-rollover-and-anchored-export-verification.md).
+
+Chain verification accepts raw canonical row bytes and mandatory caller boundaries. Anchored
+export verification accepts only `%ArchivedObject{chunks: raw_binary_chunks, version: version}`,
+an ordered historical public-key chain, and complete expected chain/anchor/transition/digest/
+object-version context. It scans and hashes the complete archive, requires exact EOF, authenticates
+both boundaries and every positional transition, and then independently checks every row.
+
+The stored-object version is exact out-of-band expected context. Commitment preimages remain
+opaque and private. A self-consistent chain does not certify that no row was deleted: validly
+signed shortened or relinked artifacts fail only when compared with the original caller
+boundaries. Successful facts state the performed cryptographic checks and always retain
+`trust: :not_evaluated` and, where present, `authorization: :not_evaluated`.

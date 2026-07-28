@@ -4,6 +4,8 @@ defmodule BoundedAuthorityProtocol.V1.BoundsTest do
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Violation
 
+  @fixed_widths [:digest_bytes, :public_key_bytes, :signature_bytes]
+
   test "callers can tighten but cannot widen or add bounds" do
     assert {:ok, %Bounds{depth: 32}} = Bounds.new()
     assert {:ok, %Bounds{depth: 4}} = Bounds.new(%{depth: 4})
@@ -11,8 +13,14 @@ defmodule BoundedAuthorityProtocol.V1.BoundsTest do
     for {name, maximum} <- Bounds.maximum() |> Map.from_struct() do
       assert {:ok, %Bounds{} = exact} = Bounds.new(%{name => maximum})
       assert Map.fetch!(Map.from_struct(exact), name) == maximum
-      assert {:ok, %Bounds{} = tightened} = Bounds.new(%{name => 1})
-      assert Map.fetch!(Map.from_struct(tightened), name) == 1
+
+      if name in @fixed_widths do
+        assert {:error, :invalid} = Bounds.new(%{name => maximum - 1})
+      else
+        assert {:ok, %Bounds{} = tightened} = Bounds.new(%{name => 1})
+        assert Map.fetch!(Map.from_struct(tightened), name) == 1
+      end
+
       assert {:error, :invalid} = Bounds.new(%{name => 0})
       assert {:error, :invalid} = Bounds.new(%{name => maximum + 1})
     end

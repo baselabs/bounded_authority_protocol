@@ -49,8 +49,29 @@ All notable changes to `bounded_authority_protocol` are documented here.
   after the supported CI matrix, complete quality/package boundary, independent Node verification,
   exact archive checksum, SLSA provenance, and CycloneDX SBOM attestation passed. The single final
   review admitted five findings; all five were fixed in one pass without review recursion.
+- Add closed canonical consumption rows with domain-separated hashes and mandatory-boundary raw
+  chain verification for genesis and continued ranges.
+- Add deterministic standard-JWS boundary anchors and authenticated historical-key transitions,
+  including derived RFC 7638 fingerprints and lower-inclusive/upper-exclusive validity windows.
+- Add deterministic binary anchored-export framing and atomic raw-chunk verification of complete
+  digest, exact out-of-band object version, exact EOF, ordered key rollover, both signed
+  boundaries, and every canonical row.
+- Add closed fixed-redacted non-authorizing chain, anchor, transition, and anchored-export facts;
+  exact tightening-only archive bounds; constant-time fixed-width comparisons; and expanded
+  source/BEAM architecture accounting.
+- Add five Draft 2020-12 structural schemas and public-only same-key, rollover, shortened,
+  relinked, same-ID/equal-time, signed cross-chain, signed reverse-time, and signed invalid-genesis
+  evidence. The project-independent Node verifier proves an exact two-way nine-key census,
+  27 decoded-byte and structural tamper cases, and five signed semantic-edge cases; the isolated
+  mutation gate proves 26 source-level invariants go red.
+- Add the maximum-count worst-of-20 chain/archive resource gate, ADR 0004, normative documentation,
+  and packed external-consumer coverage.
+- Make Ed25519 public-key/signature and SHA-256 digest widths immutable bounds so tightening cannot
+  produce or admit a structurally nonconforming cryptographic value.
+- Centralize strict StringOrURI validation across grant/proof and BAP-04 identifiers so malformed
+  percent escapes and non-URI bytes cannot enter any producer or verifier path.
 
 ### Not yet available
 
-- Chain/archive verification, the portable verifier CLI, and a public Hex release remain planned.
-  The current package is unpublished.
+- The portable verifier CLI and a public Hex release remain planned. The current package is
+  unpublished.

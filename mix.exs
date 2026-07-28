@@ -33,6 +33,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         architecture: :test,
         audit: :test,
         "bap03.performance": :test,
+        "bap04.performance": :test,
         "license.check": :test,
         "package.check": :test,
         quality: :test,
@@ -74,6 +75,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0001-public-protocol-verifier-boundary.md",
         "docs/adr/0002-normative-v1-parsing-profile.md",
         "docs/adr/0003-standard-jws-and-verified-grant-results.md",
+        "docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md",
         "docs/protocol-v1.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
@@ -104,6 +106,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0001-public-protocol-verifier-boundary.md",
         "docs/adr/0002-normative-v1-parsing-profile.md",
         "docs/adr/0003-standard-jws-and-verified-grant-results.md",
+        "docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
         "docs/design/threat-model.md"
@@ -128,6 +131,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
       "bap03.performance": [
         "run --no-start scripts/check_bap03_performance.exs"
       ],
+      "bap04.performance": [
+        "run --no-start scripts/check_chain_archive_performance.exs"
+      ],
       "license.check": [
         "cmd elixir scripts/check_dependency_licenses.exs artifacts/tooling.cdx.json"
       ],
@@ -147,6 +153,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "architecture",
         "credo --strict",
         "bap03.performance",
+        "bap04.performance",
         "test --cover",
         "dialyzer",
         "docs --warnings-as-errors",
