@@ -69,7 +69,7 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
     case :binary.match(compact, <<".">>) do
       {index, 1} when index > 0 and index <= bounds.encoded_segment_bytes ->
         rest_size = byte_size(compact) - index - 1
-        <<segment::binary-size(index), ?., rest::binary-size(rest_size)>> = compact
+        <<segment::binary-size(^index), ?., rest::binary-size(^rest_size)>> = compact
         {:ok, segment, rest}
 
       _failure ->

@@ -306,7 +306,7 @@ defmodule BoundedAuthorityProtocol.V1.Uri do
 
   defp remove_dot_segments(path, output) do
     length = first_segment_length(path)
-    <<segment::binary-size(length), rest::binary>> = path
+    <<segment::binary-size(^length), rest::binary>> = path
     remove_dot_segments(rest, output <> segment)
   end
 
