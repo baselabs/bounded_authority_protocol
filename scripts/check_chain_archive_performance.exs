@@ -18,13 +18,13 @@ alias BoundedAuthorityProtocol.V1.KeyTransition
 defmodule BoundedAuthorityProtocol.ChainArchivePerformanceGate do
   @iterations 20
   @maximum_wall_microseconds 60_000_000
+  @sample_timeout_milliseconds div(@maximum_wall_microseconds, 1_000) + 5_000
   @maximum_reductions 2_000_000_000
   @maximum_heap_growth_bytes 536_870_912
-  @maximum_count_archive_bytes 44_456_689
+  @maximum_count_archive_bytes 45_188_751
   @chain_id "urn:" <> String.duplicate("a", 508)
   @anchor_id "urn:" <> String.duplicate("n", 508)
   @time_base 9_007_199_254_740_700
-  @zero_hash <<0::256>>
 
   def run do
     bounds = Bounds.maximum()
@@ -41,7 +41,8 @@ defmodule BoundedAuthorityProtocol.ChainArchivePerformanceGate do
 
     assert!(
       encoded.byte_count == @maximum_count_archive_bytes,
-      "maximum-count archive byte size"
+      "maximum-count archive byte size expected=#{@maximum_count_archive_bytes} " <>
+        "actual=#{encoded.byte_count}"
     )
 
     assert!(encoded.byte_count <= bounds.archive_bytes, "archive envelope bound")
@@ -105,27 +106,35 @@ defmodule BoundedAuthorityProtocol.ChainArchivePerformanceGate do
   end
 
   defp maximum_chain(count) do
-    {rows, _hashes, last_hash} =
-      Enum.reduce(1..count, {[], [], @zero_hash}, fn sequence, {rows, hashes, previous} ->
-        entry = %ConsumptionEntry{
-          chain_id: @chain_id,
-          sequence: sequence,
-          previous_hash: previous,
-          commitment: :crypto.hash(:sha256, <<sequence::unsigned-big-integer-size(64)>>)
-        }
+    last_sequence = Bounds.maximum().integer_magnitude
+    first_sequence = last_sequence - count + 1
+    previous_hash = :crypto.hash(:sha256, "maximum-width-continued-range")
 
-        {:ok, encoded} = V1.encode_consumption_entry(entry, Bounds.maximum())
-        {[encoded.bytes | rows], [encoded.hash | hashes], encoded.hash}
-      end)
+    {rows, _hashes, last_hash} =
+      Enum.reduce(
+        first_sequence..last_sequence,
+        {[], [], previous_hash},
+        fn sequence, {rows, hashes, previous} ->
+          entry = %ConsumptionEntry{
+            chain_id: @chain_id,
+            sequence: sequence,
+            previous_hash: previous,
+            commitment: :crypto.hash(:sha256, <<sequence::unsigned-big-integer-size(64)>>)
+          }
+
+          {:ok, encoded} = V1.encode_consumption_entry(entry, Bounds.maximum())
+          {[encoded.bytes | rows], [encoded.hash | hashes], encoded.hash}
+        end
+      )
 
     rows = Enum.reverse(rows)
 
     chain = %ExpectedChain{
       chain_id: @chain_id,
-      first_sequence: 1,
-      last_sequence: count,
+      first_sequence: first_sequence,
+      last_sequence: last_sequence,
       row_count: count,
-      previous_hash: @zero_hash,
+      previous_hash: previous_hash,
       last_hash: last_hash,
       bounds: Bounds.maximum()
     }
@@ -155,7 +164,7 @@ defmodule BoundedAuthorityProtocol.ChainArchivePerformanceGate do
         anchor_id: @anchor_id,
         anchored_at: @time_base,
         chain_id: chain.chain_id,
-        sequence: 0,
+        sequence: chain.first_sequence - 1,
         chain_hash: chain.previous_hash,
         key_id: start_key.id,
         public_key: start_key.public
@@ -287,6 +296,23 @@ defmodule BoundedAuthorityProtocol.ChainArchivePerformanceGate do
     samples =
       Enum.map(1..@iterations, fn iteration ->
         IO.puts("#{name}: sample=#{iteration}/#{@iterations}")
+        isolated_sample(name, function)
+      end)
+
+    %{
+      name: name,
+      wall: samples |> Enum.map(& &1.wall) |> Enum.max(),
+      reductions: samples |> Enum.map(& &1.reductions) |> Enum.max(),
+      heap: samples |> Enum.map(& &1.heap) |> Enum.max()
+    }
+  end
+
+  defp isolated_sample(name, function) do
+    parent = self()
+    reference = make_ref()
+
+    {pid, monitor} =
+      spawn_monitor(fn ->
         :erlang.garbage_collect(self())
         {:reductions, before_reductions} = Process.info(self(), :reductions)
         {:total_heap_size, before_heap} = Process.info(self(), :total_heap_size)
@@ -296,19 +322,45 @@ defmodule BoundedAuthorityProtocol.ChainArchivePerformanceGate do
         {:reductions, after_reductions} = Process.info(self(), :reductions)
         {:total_heap_size, after_heap} = Process.info(self(), :total_heap_size)
 
-        %{
+        sample = %{
           wall: System.convert_time_unit(elapsed, :native, :microsecond),
           reductions: after_reductions - before_reductions,
           heap: max(after_heap - before_heap, 0) * :erlang.system_info(:wordsize)
         }
+
+        send(parent, {reference, self(), sample})
+
+        receive do
+          {^reference, :acknowledged} -> :ok
+        after
+          1_000 -> exit(:sample_acknowledgement_timeout)
+        end
       end)
 
-    %{
-      name: name,
-      wall: samples |> Enum.map(& &1.wall) |> Enum.max(),
-      reductions: samples |> Enum.map(& &1.reductions) |> Enum.max(),
-      heap: samples |> Enum.map(& &1.heap) |> Enum.max()
-    }
+    receive do
+      {^reference, ^pid, sample} ->
+        send(pid, {reference, :acknowledged})
+
+        receive do
+          {:DOWN, ^monitor, :process, ^pid, :normal} ->
+            sample
+
+          {:DOWN, ^monitor, :process, ^pid, reason} ->
+            raise("#{name} sample failed: #{inspect(reason)}")
+        end
+
+      {:DOWN, ^monitor, :process, ^pid, reason} ->
+        raise("#{name} sample failed: #{inspect(reason)}")
+    after
+      @sample_timeout_milliseconds ->
+        Process.exit(pid, :kill)
+
+        receive do
+          {:DOWN, ^monitor, :process, ^pid, _reason} -> :ok
+        end
+
+        raise("#{name} sample timeout")
+    end
   end
 
   defp enforce!(result) do

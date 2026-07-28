@@ -30,7 +30,7 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
 
     assert output =~
              "bap04 independent verification: ok archives=3 boundary_adversaries=2 " <>
-               "public_key_fingerprints=9 tamper_cases=28 semantic_cases=5"
+               "chain_cases=2 public_key_fingerprints=9 tamper_cases=51 semantic_cases=5"
   end
 
   test "published verdict drift and valid opaque object-version mismatch fail independently" do
@@ -43,6 +43,18 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
     end)
 
     archive = hd(fixture["archives"])
+
+    facts_drift =
+      put_in(
+        fixture,
+        ["archives", Access.at(0), "facts", "anchored_export", "row_count"],
+        archive["chain"]["row_count"] + 1
+      )
+
+    with_temp_json(facts_drift, fn path ->
+      assert {output, 1} = run_node(path, @manifest)
+      assert output =~ "exact facts"
+    end)
 
     assert {:error, :invalid} =
              V1.verify_anchored_export(
@@ -60,7 +72,9 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
             %AnchoredExportFacts{
               end_anchored_at: 7000,
               transition_count: 1
-            }} = verify_archive(valid)
+            } = valid_facts} = verify_archive(valid)
+
+    assert fact_json(valid_facts) == valid["facts"]["anchored_export"]
 
     cross = fixture["signed_cross_chain_archive"]
     [current, next] = historical_chain(cross).keys
@@ -129,49 +143,48 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
     for name <- ["genesis", "continuation"] do
       chain = fixture["chains"][name]
 
-      assert {:ok, %ChainFacts{trust: :not_evaluated}} =
+      assert {:ok, %ChainFacts{trust: :not_evaluated} = facts} =
                V1.check_chain(
                  %ChainInput{rows: Enum.map(chain["rows"], &b64!/1)},
                  expected_chain(chain["expected"])
                )
+
+      assert fact_json(facts) == chain["facts"]
     end
 
     for archive <- fixture["archives"] ++ fixture["boundary_adversaries"] do
       keys = historical_chain(archive).keys
 
-      assert match?(
-               {:ok, _facts},
+      assert {:ok, start_anchor_facts} =
                V1.verify_historical_anchor(
                  archive["start_anchor"]["compact"],
                  hd(keys),
                  expected_anchor(archive["start_anchor"])
-               )
-             ),
+               ),
              "#{archive["name"]} start anchor"
 
-      archive["transitions"]
-      |> Enum.zip(Enum.zip(keys, tl(keys)))
-      |> Enum.each(fn {transition, {current, next}} ->
-        assert match?(
-                 {:ok, _facts},
-                 V1.verify_key_transition(
-                   transition["compact"],
-                   current,
-                   next,
-                   expected_transition(transition)
-                 )
-               ),
-               "#{archive["name"]} #{transition["transition_id"]}"
-      end)
+      transition_facts =
+        archive["transitions"]
+        |> Enum.zip(Enum.zip(keys, tl(keys)))
+        |> Enum.map(fn {transition, {current, next}} ->
+          assert {:ok, facts} =
+                   V1.verify_key_transition(
+                     transition["compact"],
+                     current,
+                     next,
+                     expected_transition(transition)
+                   ),
+                 "#{archive["name"]} #{transition["transition_id"]}"
 
-      assert match?(
-               {:ok, _facts},
+          facts
+        end)
+
+      assert {:ok, end_anchor_facts} =
                V1.verify_historical_anchor(
                  archive["end_anchor"]["compact"],
                  List.last(keys),
                  expected_anchor(archive["end_anchor"])
-               )
-             ),
+               ),
              "#{archive["name"]} end anchor"
 
       result = verify_archive(archive)
@@ -190,6 +203,14 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
       {:ok, facts} = result
 
       assert inspect(facts) == "#BoundedAuthorityProtocol.V1.AnchoredExportFacts<redacted>"
+
+      assert archive["facts"] == %{
+               "chain" => expected_chain_fact_json(archive["chain"]),
+               "start_anchor" => fact_json(start_anchor_facts),
+               "transitions" => Enum.map(transition_facts, &fact_json/1),
+               "end_anchor" => fact_json(end_anchor_facts),
+               "anchored_export" => fact_json(facts)
+             }
     end
   end
 
@@ -371,6 +392,47 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
 
   defp run_node(fixture, manifest) do
     System.cmd("node", [@script, fixture, manifest], stderr_to_stdout: true)
+  end
+
+  defp expected_chain_fact_json(chain) do
+    %{
+      "version" => 1,
+      "chain_id" => chain["chain_id"],
+      "first_sequence" => chain["first_sequence"],
+      "last_sequence" => chain["last_sequence"],
+      "row_count" => chain["row_count"],
+      "previous_hash" => chain["previous_hash"],
+      "last_hash" => chain["last_hash"],
+      "verification" => "boundary_consistent",
+      "trust" => "not_evaluated"
+    }
+  end
+
+  @binary_fact_fields [
+    :chain_hash,
+    :current_key_fingerprint,
+    :digest,
+    :end_key_fingerprint,
+    :key_fingerprint,
+    :last_hash,
+    :next_key_fingerprint,
+    :previous_hash,
+    :start_key_fingerprint
+  ]
+
+  defp fact_json(struct) do
+    struct
+    |> Map.from_struct()
+    |> Map.new(fn {key, value} ->
+      encoded =
+        cond do
+          key in @binary_fact_fields -> Base.url_encode64(value, padding: false)
+          is_atom(value) -> Atom.to_string(value)
+          true -> value
+        end
+
+      {Atom.to_string(key), encoded}
+    end)
   end
 
   defp with_temp_json(value, function) do

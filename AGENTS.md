@@ -21,29 +21,32 @@ grant operational authority by itself.
 
 ## Current state
 
-`BAP-00` through `BAP-03` are complete. BAP-03's package-bearing closeout head
-`f322e08bba665374599b9f53c362966b6b59710a` is pushed to public `main`; trusted-main CI,
-checksum, provenance, and SBOM verification are green. The unpublished 0.1.0 package retains zero
-production dependencies, no application callback, and no supervision tree. The normative v1
-tables and bounds, raw-number preflight, bounded ordered JSON decoder with recursive duplicate
-rejection, strict base64url decoder, protected-header-only `untrusted_key_locator/2`, Draft
-2020-12 structural schemas, architecture mutation gates, public compatibility CI, exact-package
-consumer proof, CycloneDX output, and trusted-main provenance verification are closed. BAP-03 adds
-standard RFC 7515 JWS signing, deterministic grant/proof producers, bounded raw decode,
-standalone raw-grant verification, combined raw-envelope verification, value-bearing redacted
-facts, public-only independently verified vectors, and portable resource bounds. Consult
-[`docs/ROADMAP.md`](docs/ROADMAP.md) and
-[`ADR 0003`](docs/adr/0003-standard-jws-and-verified-grant-results.md).
-`BAP-04` chain and historical-key verification is the next roadmap row.
+`BAP-00` through `BAP-04` are implemented. The unpublished 0.1.0 package retains zero production
+dependencies, no application callback, and no supervision tree. The normative v1 tables and
+bounds, raw-number preflight, bounded ordered JSON decoder with recursive duplicate rejection,
+strict base64url decoder, Draft 2020-12 structural schemas, architecture mutation gates, public
+compatibility CI, exact-package consumer proof, CycloneDX output, and trusted-main provenance
+verification are closed. BAP-03 adds standard RFC 7515 JWS signing, deterministic grant/proof
+producers, bounded raw decode, standalone raw-grant verification, combined raw-envelope
+verification, value-bearing redacted facts, public-only independently verified vectors, and
+portable resource bounds. BAP-04 adds canonical consumption rows and range verification, signed
+boundary anchors and historical-key transitions, authenticated rollover, and atomic raw archived
+export verification. Consult [`docs/ROADMAP.md`](docs/ROADMAP.md),
+[`ADR 0003`](docs/adr/0003-standard-jws-and-verified-grant-results.md), and
+[`ADR 0004`](docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md).
+Commercial release readiness and BAP-05 remain open.
 
 ## Critical rules
 
 1. **Verification is not authority.** A successful pure verification result proves only that
    caller-supplied bytes satisfy caller-supplied trusted inputs and expected context. It never
    selects trusted keys, reserves replay, checks live revocation, grants execution, or overrides a
-   host policy. Public verified results are `GrantFacts` and `EnvelopeFacts`, both with
-   `authorization: :not_evaluated`; there is no `allowed?`, `authorized?`, `decision`, or receipt.
-   They are value-bearing and redacted, never execution credentials.
+   host policy. Public verified results are `GrantFacts`, `EnvelopeFacts`, `ChainFacts`,
+   `AnchorFacts`, `KeyTransitionFacts`, and `AnchoredExportFacts`. Only `GrantFacts`,
+   `EnvelopeFacts`, and `AnchoredExportFacts` carry `authorization: :not_evaluated`; the diagnostic
+   chain, anchor, and transition facts carry only `trust: :not_evaluated`. There is no `allowed?`,
+   `authorized?`, `decision`, or receipt. Facts are value-bearing and redacted, never execution
+   credentials.
 2. **Pure and deterministic.** Runtime code has no database, filesystem, network, environment,
    process dictionary, clock, random-number generator, supervisor, or application callback.
    Time, expected audience, already-trusted public keys, request context, and limits are explicit

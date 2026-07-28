@@ -63,11 +63,13 @@ All notable changes to `bounded_authority_protocol` are documented here.
   relinked, same-ID/equal-time, signed cross-chain, signed reverse-time, and signed invalid-genesis
   evidence. The project-independent Node verifiers prove an exact two-way nine-key census split
   into exact per-verifier sets observed at their public-key import boundaries,
-  28 decoded-byte and structural tamper cases, and five signed semantic-edge cases; the isolated
-  mutation gate proves 29 source-level invariants go red. Published fixture verdicts are
-  exact-checked rather than treated as commentary.
-- Add the maximum-count worst-of-20 chain/archive resource gate, ADR 0004, normative documentation,
-  and packed external-consumer coverage.
+  51 named decoded-byte, structural, boundary, coverage, chronology, and limit cases, two direct
+  valid chain cases, and five signed semantic-edge cases; the isolated mutation gate proves 29
+  source-level invariants go red. Published fixture verdicts and complete redacted
+  chain/anchor/transition/export facts are exact-checked rather than treated as commentary.
+- Add the maximum-count, maximum-width worst-of-20 chain/archive resource gate, with every sample
+  isolated in a fresh monitored process, plus ADR 0004, normative documentation, and packed
+  external-consumer coverage.
 - Make Ed25519 public-key/signature and SHA-256 digest widths immutable bounds so tightening cannot
   produce or admit a structurally nonconforming cryptographic value.
 - Centralize strict StringOrURI validation across grant/proof and BAP-04 identifiers so malformed
