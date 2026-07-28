@@ -47,8 +47,8 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
     %{
       name: "object-version",
       path: "lib/bounded_authority_protocol/v1/anchored_export_codec.ex",
-      from: "true <- archived.version == expected.object_version,",
-      to: "true <- is_binary(archived.version),",
+      from: "observed == expected do",
+      to: "is_binary(observed) do",
       command: ["mix", "test", "test/bounded_authority_protocol/v1/anchored_export_test.exs"]
     },
     %{
@@ -132,6 +132,20 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
       command: ["mix", "test", "test/bounded_authority_protocol/v1/key_transition_test.exs"]
     },
     %{
+      name: "transition-current-window",
+      path: "lib/bounded_authority_protocol/v1/key_transition_codec.ex",
+      from: "true <- inside_window?(parsed.effective_at, current_key),",
+      to: "true <- is_integer(parsed.effective_at),",
+      command: ["mix", "test", "test/bounded_authority_protocol/v1/key_transition_test.exs"]
+    },
+    %{
+      name: "transition-next-window",
+      path: "lib/bounded_authority_protocol/v1/key_transition_codec.ex",
+      from: "true <- inside_window?(parsed.effective_at, next_key),",
+      to: "true <- is_integer(parsed.effective_at),",
+      command: ["mix", "test", "test/bounded_authority_protocol/v1/key_transition_test.exs"]
+    },
+    %{
       name: "anchor-genesis-zero-hash",
       path: "lib/bounded_authority_protocol/v1/boundary_anchor_codec.ex",
       from: "(anchor.sequence != 0 or FixedBytes.equal?(anchor.chain_hash, @zero_hash))",
@@ -187,19 +201,22 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
     %{
       name: "manifest-removal-direction",
       path: "conformance/chain_archive_independent.mjs",
-      from:
-        ~S|canonical(declared) === canonical(actual), "manifest public-key fingerprint set mismatch"|,
-      to:
-        ~S|declared.every((value) => actual.includes(value)), "manifest public-key fingerprint set mismatch"|,
+      from: ~S|canonical(declared) === canonical(verifierUnion),|,
+      to: ~S|declared.every((value) => verifierUnion.includes(value)),|,
       command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
     },
     %{
       name: "manifest-addition-direction",
       path: "conformance/chain_archive_independent.mjs",
-      from:
-        ~S|canonical(declared) === canonical(actual), "manifest public-key fingerprint set mismatch"|,
-      to:
-        ~S|actual.every((value) => declared.includes(value)), "manifest public-key fingerprint set mismatch"|,
+      from: ~S|canonical(declared) === canonical(verifierUnion),|,
+      to: ~S|verifierUnion.every((value) => declared.includes(value)),|,
+      command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
+    },
+    %{
+      name: "crypto-import-census",
+      path: "conformance/chain_archive_independent.mjs",
+      from: ~S|importedPublicKeyFingerprints.add(fingerprint(raw).toString("base64url"));|,
+      to: ~S|fingerprint(raw);|,
       command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
     }
   ]

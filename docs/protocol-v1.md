@@ -367,4 +367,6 @@ The stored-object version is exact out-of-band expected context. Commitment prei
 opaque and private. A self-consistent chain does not certify that no row was deleted: validly
 signed shortened or relinked artifacts fail only when compared with the original caller
 boundaries. Successful facts state the performed cryptographic checks and always retain
-`trust: :not_evaluated` and, where present, `authorization: :not_evaluated`.
+`trust: :not_evaluated`. Only `AnchoredExportFacts` additionally carries
+`authorization: :not_evaluated`; chain, anchor, and transition facts make no authorization field
+part of their exact public shape.

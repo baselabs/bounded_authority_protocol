@@ -22,14 +22,18 @@ decoder-and-corpus checks.
 
 ## Key census integrity
 
-The manifest's canonical public-key fingerprint set equals—not merely contains—the set observed at
-the independent verifier's public-key import boundary across every tracked vector. Every fixture
-key occupies a schema-declared key-bearing field, and the boundary computes RFC 7638 OKP
-thumbprints instead of trusting claimed fingerprints.
+The manifest partitions its canonical public-key fingerprints into exact sorted sets for each
+independent verifier. Each set equals—not merely contains—the keys observed at that verifier's
+standard-library public-key import boundary, and the exact union equals the canonical manifest set
+across every tracked vector. Repository-wide discovery remains a supplemental private-material
+and unlisted-key gate; it cannot satisfy import reach. Every fixture key occupies a
+schema-declared key-bearing field, and the import boundary computes RFC 7638 OKP thumbprints
+instead of trusting claimed fingerprints.
 
 The gate fails in both directions: when a listed fingerprint is removed while its key remains
-reachable, and when an unreferenced fingerprint is added. Manifest membership is never a substitute
-for signature, holder, or issuer verification.
+reachable, when a reached key is assigned to the wrong verifier, and when an unreferenced
+fingerprint is added. Manifest membership is never a substitute for signature, holder, or issuer
+verification.
 
 ## Independent implementation rule
 
