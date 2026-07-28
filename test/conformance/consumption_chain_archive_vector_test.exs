@@ -30,7 +30,7 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
 
     assert output =~
              "bap04 independent verification: ok archives=3 boundary_adversaries=2 " <>
-               "chain_cases=2 public_key_fingerprints=9 tamper_cases=51 semantic_cases=5"
+               "chain_cases=2 public_key_fingerprints=11 tamper_cases=49 semantic_cases=7"
   end
 
   test "published verdict drift and valid opaque object-version mismatch fail independently" do
@@ -135,6 +135,39 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
                %ChainInput{rows: Enum.map(invalid_chain["rows"], &b64!/1)},
                expected_chain(invalid_chain["expected"])
              )
+
+    for name <- [
+          "signed_transition_before_start_archive",
+          "signed_transition_after_end_archive"
+        ] do
+      chronology = fixture[name]
+      [current, next] = historical_chain(chronology).keys
+      [transition] = chronology["transitions"]
+
+      assert {:ok, _facts} =
+               V1.verify_historical_anchor(
+                 chronology["start_anchor"]["compact"],
+                 current,
+                 expected_anchor(chronology["start_anchor"])
+               )
+
+      assert {:ok, _facts} =
+               V1.verify_key_transition(
+                 transition["compact"],
+                 current,
+                 next,
+                 expected_transition(transition)
+               )
+
+      assert {:ok, _facts} =
+               V1.verify_historical_anchor(
+                 chronology["end_anchor"]["compact"],
+                 next,
+                 expected_anchor(chronology["end_anchor"])
+               )
+
+      assert {:error, :invalid} = verify_archive(chronology)
+    end
   end
 
   test "public fixture drives genesis, continuation, and every raw archive verifier path" do
@@ -231,9 +264,9 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
   end
 
   test "fixture contains no retained private key, seed, PEM, or DER material" do
-    fixture = fixture!()
-    keys = collect_keys(fixture)
-    source = File.read!(@fixture)
+    fixtures = [fixture!(), json!(@semantic_fixture)]
+    keys = Enum.flat_map(fixtures, &collect_keys/1)
+    source = File.read!(@fixture) <> File.read!(@semantic_fixture)
 
     refute "d" in keys
     refute "sk" in keys
@@ -241,7 +274,7 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
     refute Enum.any?(keys, &String.contains?(&1, "seed"))
     refute source =~ "PRIVATE KEY"
     refute source =~ "BEGIN PRIVATE"
-    assert fixture["provenance"]["private_material_tracked"] == false
+    assert Enum.all?(fixtures, &(&1["provenance"]["private_material_tracked"] == false))
   end
 
   test "manifest removal and unreachable addition each fail the independent census" do
