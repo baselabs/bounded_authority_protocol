@@ -10,7 +10,9 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
     {output, 0} = run_node([])
 
     assert output =~ "bap03 independent verification: ok"
-    assert output =~ "vectors=1 public_key_fingerprints=3 tamper_cases=7"
+
+    assert output =~
+             "vectors=1 public_key_fingerprints=4 tamper_cases=7 duplicate_cases=1 uri_cases=18"
   end
 
   test "fixture contains no private key or seed field" do
@@ -29,6 +31,7 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
     assert manifest["canonical_public_key_fingerprints"] == [
              "0qPOlfSr_giHdRaDK18shLtG5DoQL1a2nrHVDeWruJI",
              "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk",
+             "b5dejonEMNbWuAUspTppNgiUa6QUXdzk40kdsDcWK6g",
              "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
            ]
 
@@ -65,6 +68,26 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
     with_temp_json(manifest, fn path ->
       {output, 1} = run_node(["--manifest", path])
       assert output =~ "manifest discovery roots mismatch"
+    end)
+  end
+
+  test "alternate hex public-key representation cannot escape the census" do
+    holder = json!(@fixture)["public_keys"]["holder"]["raw_base64url"]
+    <<first, rest::binary>> = Base.url_decode64!(holder, padding: false)
+    raw = <<Bitwise.bxor(first, 1), rest::binary>>
+
+    with_temp_json(%{"verification_key" => Base.encode16(raw, case: :lower)}, fn path ->
+      {output, 1} = run_node(["--scan", path])
+      assert output =~ "declared/observed public-key set mismatch"
+    end)
+  end
+
+  test "private key material under an alternate sk label fails closed" do
+    holder = json!(@fixture)["public_keys"]["holder"]["raw_base64url"]
+
+    with_temp_json(%{"sk" => holder}, fn path ->
+      {output, 1} = run_node(["--scan", path])
+      assert output =~ "private key material"
     end)
   end
 

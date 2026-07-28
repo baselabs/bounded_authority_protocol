@@ -14,6 +14,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "SECURITY.md",
                     "docs/adr/0001-public-protocol-verifier-boundary.md",
                     "docs/adr/0002-normative-v1-parsing-profile.md",
+                    "docs/adr/0003-standard-jws-and-verified-grant-results.md",
                     "docs/protocol-v1.md",
                     "docs/design/conformance-contract.md",
                     "docs/design/protocol-charter.md",
@@ -23,12 +24,36 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "lib/bounded_authority_protocol/v1.ex",
                     "lib/bounded_authority_protocol/v1/base64url.ex",
                     "lib/bounded_authority_protocol/v1/bounds.ex",
+                    "lib/bounded_authority_protocol/v1/compact_jws.ex",
+                    "lib/bounded_authority_protocol/v1/credentials.ex",
+                    "lib/bounded_authority_protocol/v1/decoded_grant.ex",
+                    "lib/bounded_authority_protocol/v1/decoded_proof.ex",
+                    "lib/bounded_authority_protocol/v1/envelope_facts.ex",
+                    "lib/bounded_authority_protocol/v1/expected_grant.ex",
+                    "lib/bounded_authority_protocol/v1/expected_request.ex",
+                    "lib/bounded_authority_protocol/v1/grant.ex",
+                    "lib/bounded_authority_protocol/v1/grant_facts.ex",
+                    "lib/bounded_authority_protocol/v1/jcs.ex",
                     "lib/bounded_authority_protocol/v1/json.ex",
+                    "lib/bounded_authority_protocol/v1/jwk.ex",
                     "lib/bounded_authority_protocol/v1/key_locator.ex",
+                    "lib/bounded_authority_protocol/v1/operation.ex",
+                    "lib/bounded_authority_protocol/v1/proof.ex",
+                    "lib/bounded_authority_protocol/v1/request_digest.ex",
+                    "lib/bounded_authority_protocol/v1/runtime.ex",
+                    "lib/bounded_authority_protocol/v1/selector.ex",
+                    "lib/bounded_authority_protocol/v1/signing_input.ex",
+                    "lib/bounded_authority_protocol/v1/trusted_issuer.ex",
+                    "lib/bounded_authority_protocol/v1/uri.ex",
                     "lib/bounded_authority_protocol/v1/violation.ex",
                     "mix.exs",
+                    "priv/conformance/v1/schemas/grant-payload.schema.json",
                     "priv/conformance/v1/schemas/grant-header.schema.json",
                     "priv/conformance/v1/schemas/json-value.schema.json",
+                    "priv/conformance/v1/schemas/proof-header.schema.json",
+                    "priv/conformance/v1/schemas/proof-payload.schema.json",
+                    "priv/conformance/v1/schemas/public-okp-jwk.schema.json",
+                    "priv/conformance/v1/schemas/selector.schema.json",
                     "usage-rules.md"
                   ])
 
@@ -49,7 +74,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       check_metadata!(package_root)
       compile_package!(package_root)
       check_architecture!(package_root)
-      compile_consumer!(consumer_root, package_root)
+      compile_consumer!(consumer_root, package_root, source_root)
 
       IO.puts("package archive boundary passed")
     after
@@ -144,8 +169,16 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     end
   end
 
-  defp compile_consumer!(consumer_root, package_root) do
+  defp compile_consumer!(consumer_root, package_root, source_root) do
     File.mkdir_p!(Path.join(consumer_root, "lib"))
+
+    fixture =
+      source_root
+      |> Path.join("priv/conformance/v1/vectors/grant-holder-proof.json")
+      |> File.read!()
+      |> :json.decode()
+
+    context = fixture["expected_context"]
 
     File.write!(
       Path.join(consumer_root, "mix.exs"),
@@ -171,6 +204,9 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       """
       defmodule BoundedAuthorityProtocolConsumer do
         @moduledoc false
+
+        @grant #{inspect(fixture["grant"]["compact"])}
+        @proof #{inspect(fixture["proof"]["compact"])}
 
         def package_contract? do
           header =
@@ -207,6 +243,81 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
             _failure -> false
           end
         end
+
+        def bap03_contract? do
+          alias BoundedAuthorityProtocol.V1
+          alias BoundedAuthorityProtocol.V1.Bounds
+          alias BoundedAuthorityProtocol.V1.Credentials
+          alias BoundedAuthorityProtocol.V1.ExpectedGrant
+          alias BoundedAuthorityProtocol.V1.ExpectedRequest
+          alias BoundedAuthorityProtocol.V1.TrustedIssuer
+
+          bounds = Bounds.maximum()
+
+          trusted = %TrustedIssuer{
+            key_id: #{inspect(context["trusted_issuer"]["key_id"])},
+            public_key:
+              Base.url_decode64!(
+                #{inspect(context["trusted_issuer"]["public_key_base64url"])},
+                padding: false
+              )
+          }
+
+          expected_grant = %ExpectedGrant{
+            issuer: #{inspect(context["issuer"])},
+            audience: #{inspect(context["audience"])},
+            evaluation_time: #{inspect(context["evaluation_time"])},
+            clock_skew: #{inspect(context["clock_skew"])},
+            bounds: bounds
+          }
+
+          arguments =
+            {:object,
+             [
+               {"record",
+                {:object,
+                 [
+                   {"tier", {:string, "gold"}},
+                   {"region", {:string, "us-east"}}
+                 ]}},
+               {"limit", {:integer, 10}}
+             ]}
+
+          expected_request = %ExpectedRequest{
+            trusted_issuer: trusted,
+            issuer: #{inspect(context["issuer"])},
+            audience: #{inspect(context["audience"])},
+            method: #{inspect(context["method"])},
+            target_uri: #{inspect(context["target_uri"])},
+            invocation_id: #{inspect(context["invocation_id"])},
+            operation: #{inspect(context["operation"])},
+            cast_arguments: arguments,
+            evaluation_time: #{inspect(context["evaluation_time"])},
+            clock_skew: #{inspect(context["clock_skew"])},
+            proof_max_age: #{inspect(context["proof_max_age"])},
+            nonce: {:required, #{inspect(context["nonce"]["required"])}},
+            bounds: bounds
+          }
+
+          credentials = %Credentials{grant: @grant, proof: @proof}
+
+          with {:ok, decoded_grant} <- V1.decode_grant(@grant, bounds),
+               true <- decoded_grant.verification == :not_evaluated,
+               {:ok, decoded_proof} <- V1.decode_proof(@proof, bounds),
+               true <- decoded_proof.verification == :not_evaluated,
+               {:ok, grant_facts} <- V1.verify_grant(@grant, trusted, expected_grant),
+               true <- grant_facts.authorization == :not_evaluated,
+               {:ok, envelope_facts} <- V1.check_envelope(credentials, expected_request),
+               true <- envelope_facts.authorization == :not_evaluated,
+               {:ok, _digest} <- V1.request_digest("read_record", arguments, bounds),
+               {:error, :invalid} <- V1.decode_grant(@proof, bounds),
+               {:error, :invalid} <-
+                 V1.check_envelope(%{credentials | proof: @grant}, expected_request) do
+            true
+          else
+            _failure -> false
+          end
+        end
       end
       """
 
@@ -228,7 +339,8 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
         "--no-start",
         "-e",
         "unless BoundedAuthorityProtocolConsumer.package_contract?() and " <>
-          "BoundedAuthorityProtocolConsumer.decoder_contract?(), do: System.halt(1)"
+          "BoundedAuthorityProtocolConsumer.decoder_contract?() and " <>
+          "BoundedAuthorityProtocolConsumer.bap03_contract?(), do: System.halt(1)"
       ],
       consumer_root,
       environment

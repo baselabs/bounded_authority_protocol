@@ -90,5 +90,8 @@ defmodule BoundedAuthorityProtocol.V1.JcsTest do
     assert {:error, :invalid} = Jcs.encode(%{}, %{})
     assert {:error, :invalid} = Jcs.encode({:object, [{"x", :null}, {"x", :null}]}, %{})
     assert {:error, :invalid} = Jcs.encode({:array, []}, %{jcs_bytes: 0})
+    assert {:error, :invalid} = Jcs.encode({:object, [{:not_binary, :null}]}, %{})
+    assert {:error, :invalid} = Jcs.encode({:array, List.duplicate(:null, 257)}, %{})
+    assert {:ok, "1"} = Jcs.encode({:float, 1.0}, %{})
   end
 end

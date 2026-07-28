@@ -96,7 +96,25 @@ compatibility.
   the authority-alignment landing. The aggregate remains a named degraded review, not a
   zero-finding cross-vendor review.
 
+## BAP-03 closeout evidence
+
+- The implementation landing carrying this receipt adds deterministic standard compact-JWS grant
+  and RFC 9449 proof production, bounded raw decode, standalone grant verification, and combined
+  raw-envelope verification without trust selection, state, signing, or operational authority.
+- Post-review `mix quality` passed 116 tests with 0 failures and 100.00% coverage, plus format,
+  warnings-as-errors compilation, exact source/BEAM architecture accounting, Credo, Dialyzer,
+  documentation, advisory, retired-package, license, CycloneDX, exact archive, and fresh
+  unpacked-consumer gates. The package has zero production dependencies, no application callback,
+  and no supervision tree; `:crypto` is its only runtime OTP application.
+- The independent Node verifier passed one vector, four exact public-key fingerprints, seven
+  meaningful-byte tamper cases, one duplicate-member case, and eighteen URI cases. The portable
+  worst-of-20 resource gate passed decode, verification, envelope, and maximum-invalid-input
+  timing, reduction, and heap-growth bounds.
+- The single bounded final review admitted five findings: signing-input revalidation, callback-gate
+  accounting, scalar JWT audience support, StringOrURI enforcement, and proof-check ordering. All
+  five were fixed in one pass; affected tests, architecture, independent verification, and the
+  complete quality gate then passed. No further review recursion was run.
+
 ## Next action
 
-BAP-02 is complete. BAP-03's approved authority and red conformance contract are frozen by Task 1;
-runtime implementation, purity/package proof, and closeout remain open.
+BAP-03 is complete. BAP-04 chain and historical-key verification is next.

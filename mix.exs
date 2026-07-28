@@ -32,6 +32,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       preferred_envs: [
         architecture: :test,
         audit: :test,
+        "bap03.performance": :test,
         "license.check": :test,
         "package.check": :test,
         quality: :test,
@@ -39,6 +40,10 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "sbom.generate": :test
       ]
     ]
+  end
+
+  def application do
+    [extra_applications: [:crypto]]
   end
 
   defp deps do
@@ -68,6 +73,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "usage-rules.md",
         "docs/adr/0001-public-protocol-verifier-boundary.md",
         "docs/adr/0002-normative-v1-parsing-profile.md",
+        "docs/adr/0003-standard-jws-and-verified-grant-results.md",
         "docs/protocol-v1.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
@@ -97,6 +103,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/protocol-v1.md",
         "docs/adr/0001-public-protocol-verifier-boundary.md",
         "docs/adr/0002-normative-v1-parsing-profile.md",
+        "docs/adr/0003-standard-jws-and-verified-grant-results.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
         "docs/design/threat-model.md"
@@ -118,6 +125,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "license.check",
         "sbom.check"
       ],
+      "bap03.performance": [
+        "run --no-start scripts/check_bap03_performance.exs"
+      ],
       "license.check": [
         "cmd elixir scripts/check_dependency_licenses.exs artifacts/tooling.cdx.json"
       ],
@@ -136,6 +146,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "compile --warnings-as-errors",
         "architecture",
         "credo --strict",
+        "bap03.performance",
         "test --cover",
         "dialyzer",
         "docs --warnings-as-errors",
