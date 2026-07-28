@@ -15,6 +15,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/adr/0001-public-protocol-verifier-boundary.md",
                     "docs/adr/0002-normative-v1-parsing-profile.md",
                     "docs/adr/0003-standard-jws-and-verified-grant-results.md",
+                    "docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md",
                     "docs/protocol-v1.md",
                     "docs/design/conformance-contract.md",
                     "docs/design/protocol-charter.md",
@@ -22,34 +23,64 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "hex_metadata.config",
                     "lib/bounded_authority_protocol.ex",
                     "lib/bounded_authority_protocol/v1.ex",
+                    "lib/bounded_authority_protocol/v1/anchor_facts.ex",
+                    "lib/bounded_authority_protocol/v1/anchored_export_codec.ex",
+                    "lib/bounded_authority_protocol/v1/anchored_export_facts.ex",
+                    "lib/bounded_authority_protocol/v1/anchored_export_input.ex",
+                    "lib/bounded_authority_protocol/v1/archived_object.ex",
                     "lib/bounded_authority_protocol/v1/base64url.ex",
+                    "lib/bounded_authority_protocol/v1/boundary_anchor.ex",
+                    "lib/bounded_authority_protocol/v1/boundary_anchor_codec.ex",
                     "lib/bounded_authority_protocol/v1/bounds.ex",
+                    "lib/bounded_authority_protocol/v1/chain_facts.ex",
+                    "lib/bounded_authority_protocol/v1/chain_input.ex",
                     "lib/bounded_authority_protocol/v1/compact_jws.ex",
+                    "lib/bounded_authority_protocol/v1/consumption_chain.ex",
+                    "lib/bounded_authority_protocol/v1/consumption_entry.ex",
                     "lib/bounded_authority_protocol/v1/credentials.ex",
                     "lib/bounded_authority_protocol/v1/decoded_grant.ex",
                     "lib/bounded_authority_protocol/v1/decoded_proof.ex",
+                    "lib/bounded_authority_protocol/v1/encoded_anchored_export.ex",
+                    "lib/bounded_authority_protocol/v1/encoded_consumption_entry.ex",
                     "lib/bounded_authority_protocol/v1/envelope_facts.ex",
+                    "lib/bounded_authority_protocol/v1/expected_anchor.ex",
+                    "lib/bounded_authority_protocol/v1/expected_anchored_export.ex",
+                    "lib/bounded_authority_protocol/v1/expected_chain.ex",
+                    "lib/bounded_authority_protocol/v1/expected_export.ex",
                     "lib/bounded_authority_protocol/v1/expected_grant.ex",
+                    "lib/bounded_authority_protocol/v1/expected_key_transition.ex",
                     "lib/bounded_authority_protocol/v1/expected_request.ex",
+                    "lib/bounded_authority_protocol/v1/fixed_bytes.ex",
                     "lib/bounded_authority_protocol/v1/grant.ex",
                     "lib/bounded_authority_protocol/v1/grant_facts.ex",
+                    "lib/bounded_authority_protocol/v1/historical_key_chain.ex",
+                    "lib/bounded_authority_protocol/v1/historical_public_key.ex",
                     "lib/bounded_authority_protocol/v1/jcs.ex",
                     "lib/bounded_authority_protocol/v1/json.ex",
                     "lib/bounded_authority_protocol/v1/jwk.ex",
                     "lib/bounded_authority_protocol/v1/key_locator.ex",
+                    "lib/bounded_authority_protocol/v1/key_transition.ex",
+                    "lib/bounded_authority_protocol/v1/key_transition_codec.ex",
+                    "lib/bounded_authority_protocol/v1/key_transition_facts.ex",
                     "lib/bounded_authority_protocol/v1/operation.ex",
                     "lib/bounded_authority_protocol/v1/proof.ex",
                     "lib/bounded_authority_protocol/v1/request_digest.ex",
                     "lib/bounded_authority_protocol/v1/runtime.ex",
                     "lib/bounded_authority_protocol/v1/selector.ex",
                     "lib/bounded_authority_protocol/v1/signing_input.ex",
+                    "lib/bounded_authority_protocol/v1/string_or_uri.ex",
                     "lib/bounded_authority_protocol/v1/trusted_issuer.ex",
                     "lib/bounded_authority_protocol/v1/uri.ex",
                     "lib/bounded_authority_protocol/v1/violation.ex",
                     "mix.exs",
                     "priv/conformance/v1/schemas/grant-payload.schema.json",
                     "priv/conformance/v1/schemas/grant-header.schema.json",
+                    "priv/conformance/v1/schemas/anchored-export-header.schema.json",
+                    "priv/conformance/v1/schemas/boundary-anchor-header.schema.json",
+                    "priv/conformance/v1/schemas/boundary-anchor-payload.schema.json",
+                    "priv/conformance/v1/schemas/consumption-row.schema.json",
                     "priv/conformance/v1/schemas/json-value.schema.json",
+                    "priv/conformance/v1/schemas/key-transition-payload.schema.json",
                     "priv/conformance/v1/schemas/proof-header.schema.json",
                     "priv/conformance/v1/schemas/proof-payload.schema.json",
                     "priv/conformance/v1/schemas/public-okp-jwk.schema.json",
@@ -180,6 +211,20 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
 
     context = fixture["expected_context"]
 
+    chain_fixture =
+      source_root
+      |> Path.join("priv/conformance/v1/vectors/consumption-chain-archive.json")
+      |> File.read!()
+      |> :json.decode()
+
+    chain_case =
+      Enum.find(
+        chain_fixture["archives"],
+        &(&1["name"] == "one-step-rollover")
+      )
+
+    genesis_chain = chain_fixture["chains"]["genesis"]
+
     File.write!(
       Path.join(consumer_root, "mix.exs"),
       """
@@ -207,6 +252,8 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
 
         @grant #{inspect(fixture["grant"]["compact"])}
         @proof #{inspect(fixture["proof"]["compact"])}
+        @chain_case #{inspect(chain_case, limit: :infinity, printable_limit: :infinity)}
+        @genesis_chain #{inspect(genesis_chain, limit: :infinity, printable_limit: :infinity)}
 
         def package_contract? do
           header =
@@ -318,6 +365,155 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
             _failure -> false
           end
         end
+
+        def bap04_contract? do
+          alias BoundedAuthorityProtocol.V1
+          alias BoundedAuthorityProtocol.V1.AnchoredExportInput
+          alias BoundedAuthorityProtocol.V1.ArchivedObject
+          alias BoundedAuthorityProtocol.V1.ChainInput
+          alias BoundedAuthorityProtocol.V1.ConsumptionEntry
+          alias BoundedAuthorityProtocol.V1.ExpectedExport
+
+          rows = Enum.map(@genesis_chain["rows"], &b64!/1)
+          expected_chain = expected_chain(@chain_case["chain"])
+          start_anchor = expected_anchor(@chain_case["start_anchor"])
+          end_anchor = expected_anchor(@chain_case["end_anchor"])
+          transitions = Enum.map(@chain_case["transitions"], &expected_transition/1)
+          expected = expected_archive(@chain_case)
+          key_chain = historical_chain(@chain_case)
+
+          input = %AnchoredExportInput{
+            rows: rows,
+            start_anchor: @chain_case["start_anchor"]["compact"],
+            transitions: Enum.map(@chain_case["transitions"], & &1["compact"]),
+            end_anchor: @chain_case["end_anchor"]["compact"]
+          }
+
+          expected_export = %ExpectedExport{
+            chain: expected_chain,
+            start_anchor: start_anchor,
+            transitions: transitions,
+            end_anchor: end_anchor,
+            bounds: %{}
+          }
+
+          {:ok, {:object, first_members}} = V1.Json.decode(hd(rows), %{})
+          first = Map.new(first_members)
+
+          entry = %ConsumptionEntry{
+            chain_id: elem(first["chain_id"], 1),
+            sequence: elem(first["sequence"], 1),
+            previous_hash: first["previous"] |> elem(1) |> b64!(),
+            commitment: first["commitment"] |> elem(1) |> b64!()
+          }
+
+          archived = %ArchivedObject{
+            chunks: [b64!(@chain_case["archive_base64url"])],
+            version: @chain_case["object_version"]
+          }
+
+          with {:ok, encoded_row} <- V1.encode_consumption_entry(entry, %{}),
+               true <- encoded_row.bytes == hd(rows),
+               {:error, :invalid} <-
+                 V1.encode_consumption_entry(%{entry | previous_hash: <<1::256>>}, %{}),
+               {:ok, chain_facts} <-
+                 V1.check_chain(%ChainInput{rows: rows}, expected_chain),
+               true <- chain_facts.trust == :not_evaluated,
+               {:ok, anchor_facts} <-
+                 V1.verify_historical_anchor(
+                   @chain_case["start_anchor"]["compact"],
+                   hd(key_chain.keys),
+                   start_anchor
+                 ),
+               true <- anchor_facts.trust == :not_evaluated,
+               {:ok, encoded_archive} <- V1.encode_anchored_export(input, expected_export),
+               true <- encoded_archive.digest == b64!(@chain_case["archive_digest"]),
+               {:error, :invalid} <-
+                 V1.encode_anchored_export(%{input | transitions: []}, expected_export),
+               {:ok, archive_facts} <-
+                 V1.verify_anchored_export(archived, key_chain, expected),
+               true <- archive_facts.authorization == :not_evaluated,
+               true <-
+                 inspect(archive_facts) ==
+                   "#BoundedAuthorityProtocol.V1.AnchoredExportFacts<redacted>",
+               {:error, :invalid} <-
+                 V1.verify_anchored_export(
+                   archived,
+                   key_chain,
+                   %{expected | digest: <<0::256>>}
+                 ) do
+            true
+          else
+            _failure -> false
+          end
+        end
+
+        defp expected_chain(value) do
+          struct!(BoundedAuthorityProtocol.V1.ExpectedChain,
+            chain_id: value["chain_id"],
+            first_sequence: value["first_sequence"],
+            last_sequence: value["last_sequence"],
+            row_count: value["row_count"],
+            previous_hash: b64!(value["previous_hash"]),
+            last_hash: b64!(value["last_hash"]),
+            bounds: %{}
+          )
+        end
+
+        defp expected_anchor(value) do
+          struct!(BoundedAuthorityProtocol.V1.ExpectedAnchor,
+            anchor_id: value["anchor_id"],
+            anchored_at: value["anchored_at"],
+            chain_id: value["chain_id"],
+            sequence: value["sequence"],
+            chain_hash: b64!(value["chain_hash"]),
+            key_id: value["key_id"],
+            key_fingerprint: b64!(value["key_fingerprint"]),
+            bounds: %{}
+          )
+        end
+
+        defp expected_transition(value) do
+          struct!(BoundedAuthorityProtocol.V1.ExpectedKeyTransition,
+            transition_id: value["transition_id"],
+            chain_id: value["chain_id"],
+            effective_at: value["effective_at"],
+            current_key_id: value["current_key_id"],
+            current_key_fingerprint: b64!(value["current_key_fingerprint"]),
+            next_key_id: value["next_key_id"],
+            next_key_fingerprint: b64!(value["next_key_fingerprint"]),
+            bounds: %{}
+          )
+        end
+
+        defp expected_archive(value) do
+          struct!(BoundedAuthorityProtocol.V1.ExpectedAnchoredExport,
+            chain: expected_chain(value["chain"]),
+            start_anchor: expected_anchor(value["start_anchor"]),
+            transitions: Enum.map(value["transitions"], &expected_transition/1),
+            end_anchor: expected_anchor(value["end_anchor"]),
+            digest: b64!(value["archive_digest"]),
+            object_version: value["object_version"],
+            bounds: %{}
+          )
+        end
+
+        defp historical_chain(value) do
+          keys =
+            Enum.map(value["historical_keys"], fn key ->
+              struct!(BoundedAuthorityProtocol.V1.HistoricalPublicKey,
+                key_id: key["key_id"],
+                public_key: b64!(key["public_key"]),
+                valid_from: key["valid_from"],
+                valid_before:
+                  if(key["valid_before"] == :null, do: :unbounded, else: key["valid_before"])
+              )
+            end)
+
+          struct!(BoundedAuthorityProtocol.V1.HistoricalKeyChain, keys: keys)
+        end
+
+        defp b64!(value), do: Base.url_decode64!(value, padding: false)
       end
       """
 
@@ -340,7 +536,8 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
         "-e",
         "unless BoundedAuthorityProtocolConsumer.package_contract?() and " <>
           "BoundedAuthorityProtocolConsumer.decoder_contract?() and " <>
-          "BoundedAuthorityProtocolConsumer.bap03_contract?(), do: System.halt(1)"
+          "BoundedAuthorityProtocolConsumer.bap03_contract?() and " <>
+          "BoundedAuthorityProtocolConsumer.bap04_contract?(), do: System.halt(1)"
       ],
       consumer_root,
       environment

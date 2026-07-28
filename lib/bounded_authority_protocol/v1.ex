@@ -41,6 +41,21 @@ defmodule BoundedAuthorityProtocol.V1 do
   @doc "Builds the deterministic standard-JWS holder-proof signing input."
   defdelegate proof_signing_input(proof, limits), to: Runtime
 
+  @doc "Encodes one exact canonical consumption-chain row."
+  defdelegate encode_consumption_entry(entry, limits), to: Runtime
+
+  @doc "Checks a raw nonempty consumption-chain range against mandatory caller boundaries."
+  defdelegate check_chain(input, expected), to: Runtime
+
+  @doc "Builds the deterministic standard-JWS boundary-anchor signing input."
+  defdelegate boundary_anchor_signing_input(anchor, limits), to: Runtime
+
+  @doc "Builds the deterministic standard-JWS historical-key-transition signing input."
+  defdelegate key_transition_signing_input(transition, limits), to: Runtime
+
+  @doc "Frames an exact deterministic anchored export after semantic validation."
+  defdelegate encode_anchored_export(input, expected), to: Runtime
+
   @doc "Assembles a validated signing input and raw Ed25519 signature."
   def assemble_compact(signing_input, signature),
     do: Runtime.assemble_compact(signing_input, signature, %{})
@@ -53,6 +68,15 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   @doc "Verifies one raw compact grant against caller-supplied trust and expected context."
   defdelegate verify_grant(compact, trusted_issuer, expected_grant), to: Runtime
+
+  @doc "Verifies one raw compact boundary anchor against one exact historical public key."
+  defdelegate verify_historical_anchor(compact, key, expected_anchor), to: Runtime
+
+  @doc "Verifies one raw compact authenticated historical-key transition."
+  defdelegate verify_key_transition(compact, current_key, next_key, expected), to: Runtime
+
+  @doc "Atomically verifies one raw anchored export against caller boundaries and key history."
+  defdelegate verify_anchored_export(archived, key_chain, expected), to: Runtime
 
   @doc "Verifies a raw grant-and-proof envelope against server-derived expected context."
   defdelegate check_envelope(credentials, expected_request), to: Runtime

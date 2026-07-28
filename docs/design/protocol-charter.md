@@ -73,6 +73,12 @@ as an execution credential.
 
 ## Evidence verification
 
-BAP-04 chain/archive functions will verify canonical row bytes, sequence, previous-link hashes,
-anchors, public-key rollover, archive coverage, and truncation/omission evidence. They will not
-read storage, append rows, create anchors, submit witnesses, certify deletion, or decide retention.
+BAP-04 chain/archive functions verify canonical row bytes, sequence, previous-link hashes,
+caller-supplied range boundaries, signed boundary anchors, authenticated historical-key rollover,
+complete archive framing/digest/EOF, and exact out-of-band object version. Historical keys and
+expected context are caller supplied; the package performs no lookup or current-key fallback.
+
+Chain consistency does not certify deletion absence. A separately valid shortened or relinked
+archive fails only against the original expected boundaries. The package does not read storage,
+append rows, hold or select keys, create or submit anchors, submit witnesses, remove archives,
+certify retention, or decide operational authority.

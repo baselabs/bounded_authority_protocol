@@ -43,6 +43,15 @@ BAP-03's focused vectors and independent verifier are public repository acceptan
 Hex package continues to ship the protocol schemas and Elixir runtime only. BAP-05 owns the
 portable corpus/verifier surface, and BAP-06 owns immutable candidate-archive proof.
 
+BAP-04's public-only chain/archive corpus includes genesis, continuation, same-key boundaries,
+one-step rollover, multi-step rollover, same-ID/equal-time rollover, and separately valid
+shortened, relinked-omission, signed cross-chain, signed reverse-time, and signed
+invalid-genesis artifacts. Its independent Node verifier imports no project code and recomputes
+strict base64url, JCS, RFC 7638 fingerprints, standard JWS/Ed25519, row-domain hashes, binary
+framing and digest, historical intervals, complete EOF, caller boundaries, and result verdicts.
+Decoded-byte commitment/link/anchor/transition/signature/key/frame/prefix drift and transition
+chronology/path mutations must exit nonzero at their intended verification stage.
+
 ## Public verifier API constraints
 
 Conforming APIs:
@@ -57,10 +66,19 @@ Conforming APIs:
 - perform no I/O, trust discovery, private-key work, clock read, randomness, replay/state check, or
   effect;
 - reject unknown extensions and ambiguous encodings and expose the protocol major in all results.
+- require raw canonical rows and raw archived-object chunks, mandatory caller boundaries, exact
+  out-of-band object version, exact historical public keys, and authenticated ordered rollover;
+- never infer archive completeness from a self-consistent chain or treat current key status as
+  evidence for a historical signature.
 
 `GrantFacts` and `EnvelopeFacts` are value-bearing/redacted, contain only their exact documented
 fields, have fixed redacted inspection and no generic encoder, and carry
 `authorization: :not_evaluated`.
+
+`ChainFacts`, `AnchorFacts`, `KeyTransitionFacts`, and `AnchoredExportFacts` follow the same closed
+redacted rule. They contain only bounded identifiers, times, counts, hashes/fingerprints, and
+performed-verification labels; no row, commitment, compact JWS, signature, public-key container,
+archive bytes, or object version is returned.
 
 ## Nonconforming claims
 

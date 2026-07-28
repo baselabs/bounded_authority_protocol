@@ -1,0 +1,359 @@
+defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest do
+  use ExUnit.Case, async: true
+
+  alias BoundedAuthorityProtocol.V1
+  alias BoundedAuthorityProtocol.V1.AnchoredExportFacts
+  alias BoundedAuthorityProtocol.V1.ArchivedObject
+  alias BoundedAuthorityProtocol.V1.ChainFacts
+  alias BoundedAuthorityProtocol.V1.ChainInput
+  alias BoundedAuthorityProtocol.V1.ExpectedAnchor
+  alias BoundedAuthorityProtocol.V1.ExpectedAnchoredExport
+  alias BoundedAuthorityProtocol.V1.ExpectedChain
+  alias BoundedAuthorityProtocol.V1.ExpectedKeyTransition
+  alias BoundedAuthorityProtocol.V1.HistoricalKeyChain
+  alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
+
+  @root Path.expand("../..", __DIR__)
+  @script Path.join(@root, "conformance/chain_archive_independent.mjs")
+  @fixture Path.join(
+             @root,
+             "priv/conformance/v1/vectors/consumption-chain-archive.json"
+           )
+  @manifest Path.join(@root, "priv/conformance/v1/vectors/manifest.json")
+  @semantic_fixture Path.join(
+                      @root,
+                      "priv/conformance/v1/vectors/chain-semantic-edge.json"
+                    )
+
+  test "independent Node verifier recomputes archives, rollover, census, and tamper verdicts" do
+    assert {output, 0} = run_node(@fixture, @manifest)
+
+    assert output =~
+             "bap04 independent verification: ok archives=3 boundary_adversaries=2 " <>
+               "public_key_fingerprints=9 tamper_cases=27 semantic_cases=5"
+  end
+
+  test "signed semantic-edge fixture proves inclusive rollover and fail-closed genesis and chain identity" do
+    fixture = json!(@semantic_fixture)
+    valid = fixture["valid_same_id_equal_time_archive"]
+
+    assert {:ok,
+            %AnchoredExportFacts{
+              end_anchored_at: 7000,
+              transition_count: 1
+            }} = verify_archive(valid)
+
+    cross = fixture["signed_cross_chain_archive"]
+    [current, next] = historical_chain(cross).keys
+    [transition] = cross["transitions"]
+
+    assert {:ok, _facts} =
+             V1.verify_key_transition(
+               transition["compact"],
+               current,
+               next,
+               expected_transition(transition)
+             )
+
+    assert {:error, :invalid} = verify_archive(cross)
+
+    reverse = fixture["signed_reverse_time_archive"]
+    [reverse_current, reverse_next] = historical_chain(reverse).keys
+    [reverse_transition] = reverse["transitions"]
+
+    assert {:ok, _facts} =
+             V1.verify_historical_anchor(
+               reverse["start_anchor"]["compact"],
+               reverse_current,
+               expected_anchor(reverse["start_anchor"])
+             )
+
+    assert {:ok, _facts} =
+             V1.verify_key_transition(
+               reverse_transition["compact"],
+               reverse_current,
+               reverse_next,
+               expected_transition(reverse_transition)
+             )
+
+    assert {:ok, _facts} =
+             V1.verify_historical_anchor(
+               reverse["end_anchor"]["compact"],
+               reverse_next,
+               expected_anchor(reverse["end_anchor"])
+             )
+
+    assert {:error, :invalid} = verify_archive(reverse)
+
+    invalid_anchor = fixture["signed_invalid_genesis_anchor"]
+    key = historical_key(invalid_anchor["historical_key"])
+
+    assert {:error, :invalid} =
+             V1.verify_historical_anchor(
+               invalid_anchor["anchor"]["compact"],
+               key,
+               expected_anchor(invalid_anchor["anchor"])
+             )
+
+    invalid_chain = fixture["invalid_genesis_chain"]
+
+    assert {:error, :invalid} =
+             V1.check_chain(
+               %ChainInput{rows: Enum.map(invalid_chain["rows"], &b64!/1)},
+               expected_chain(invalid_chain["expected"])
+             )
+  end
+
+  test "public fixture drives genesis, continuation, and every raw archive verifier path" do
+    fixture = fixture!()
+
+    for name <- ["genesis", "continuation"] do
+      chain = fixture["chains"][name]
+
+      assert {:ok, %ChainFacts{trust: :not_evaluated}} =
+               V1.check_chain(
+                 %ChainInput{rows: Enum.map(chain["rows"], &b64!/1)},
+                 expected_chain(chain["expected"])
+               )
+    end
+
+    for archive <- fixture["archives"] ++ fixture["boundary_adversaries"] do
+      keys = historical_chain(archive).keys
+
+      assert match?(
+               {:ok, _facts},
+               V1.verify_historical_anchor(
+                 archive["start_anchor"]["compact"],
+                 hd(keys),
+                 expected_anchor(archive["start_anchor"])
+               )
+             ),
+             "#{archive["name"]} start anchor"
+
+      archive["transitions"]
+      |> Enum.zip(Enum.zip(keys, tl(keys)))
+      |> Enum.each(fn {transition, {current, next}} ->
+        assert match?(
+                 {:ok, _facts},
+                 V1.verify_key_transition(
+                   transition["compact"],
+                   current,
+                   next,
+                   expected_transition(transition)
+                 )
+               ),
+               "#{archive["name"]} #{transition["transition_id"]}"
+      end)
+
+      assert match?(
+               {:ok, _facts},
+               V1.verify_historical_anchor(
+                 archive["end_anchor"]["compact"],
+                 List.last(keys),
+                 expected_anchor(archive["end_anchor"])
+               )
+             ),
+             "#{archive["name"]} end anchor"
+
+      result = verify_archive(archive)
+
+      assert match?(
+               {:ok,
+                %AnchoredExportFacts{
+                  verification: :anchored_export,
+                  trust: :not_evaluated,
+                  authorization: :not_evaluated
+                }},
+               result
+             ),
+             archive["name"]
+
+      {:ok, facts} = result
+
+      assert inspect(facts) == "#BoundedAuthorityProtocol.V1.AnchoredExportFacts<redacted>"
+    end
+  end
+
+  test "separately signed shortened and relinked artifacts fail full caller boundaries" do
+    fixture = fixture!()
+    full_chain = expected_chain(fixture["chains"]["genesis"]["expected"])
+
+    for archive <- fixture["boundary_adversaries"] do
+      expected = expected_archive(archive)
+
+      assert {:error, :invalid} =
+               V1.verify_anchored_export(
+                 archived(archive),
+                 historical_chain(archive),
+                 %{expected | chain: full_chain}
+               )
+    end
+  end
+
+  test "fixture contains no retained private key, seed, PEM, or DER material" do
+    fixture = fixture!()
+    keys = collect_keys(fixture)
+    source = File.read!(@fixture)
+
+    refute "d" in keys
+    refute "sk" in keys
+    refute Enum.any?(keys, &String.contains?(&1, "private_key"))
+    refute Enum.any?(keys, &String.contains?(&1, "seed"))
+    refute source =~ "PRIVATE KEY"
+    refute source =~ "BEGIN PRIVATE"
+    assert fixture["provenance"]["private_material_tracked"] == false
+  end
+
+  test "manifest removal and unreachable addition each fail the independent census" do
+    manifest = json!(@manifest)
+
+    removed =
+      update_in(manifest, ["canonical_public_key_fingerprints"], fn [_first | rest] -> rest end)
+
+    with_temp_json(removed, fn path ->
+      assert {output, 1} = run_node(@fixture, path)
+      assert output =~ "manifest public-key fingerprint set mismatch"
+    end)
+
+    added =
+      update_in(
+        manifest,
+        ["canonical_public_key_fingerprints"],
+        &Enum.sort(&1 ++ [String.duplicate("A", 43)])
+      )
+
+    with_temp_json(added, fn path ->
+      assert {output, 1} = run_node(@fixture, path)
+      assert output =~ "manifest public-key fingerprint set mismatch"
+    end)
+  end
+
+  test "independent verifier imports no project implementation" do
+    source = File.read!(@script)
+
+    refute source =~ "BoundedAuthorityProtocol"
+    refute source =~ ~r/from\s+["'][^"']*lib\//
+    refute source =~ ~r/import\s+["'][^"']*mix/
+    assert source =~ ~s(from "node:crypto")
+  end
+
+  defp verify_archive(archive) do
+    V1.verify_anchored_export(
+      archived(archive),
+      historical_chain(archive),
+      expected_archive(archive)
+    )
+  end
+
+  defp archived(archive) do
+    %ArchivedObject{
+      chunks: split_archive(b64!(archive["archive_base64url"]), []),
+      version: archive["object_version"]
+    }
+  end
+
+  defp split_archive(<<>>, chunks), do: Enum.reverse(chunks)
+
+  defp split_archive(bytes, chunks) do
+    width = min(17, byte_size(bytes))
+    <<chunk::binary-size(width), rest::binary>> = bytes
+    split_archive(rest, [chunk | chunks])
+  end
+
+  defp expected_archive(archive) do
+    %ExpectedAnchoredExport{
+      chain: expected_chain(archive["chain"]),
+      start_anchor: expected_anchor(archive["start_anchor"]),
+      transitions: Enum.map(archive["transitions"], &expected_transition/1),
+      end_anchor: expected_anchor(archive["end_anchor"]),
+      digest: b64!(archive["archive_digest"]),
+      object_version: archive["object_version"],
+      bounds: %{}
+    }
+  end
+
+  defp expected_chain(value) do
+    %ExpectedChain{
+      chain_id: value["chain_id"],
+      first_sequence: value["first_sequence"],
+      last_sequence: value["last_sequence"],
+      row_count: value["row_count"],
+      previous_hash: b64!(value["previous_hash"]),
+      last_hash: b64!(value["last_hash"]),
+      bounds: %{}
+    }
+  end
+
+  defp expected_anchor(value) do
+    %ExpectedAnchor{
+      anchor_id: value["anchor_id"],
+      anchored_at: value["anchored_at"],
+      chain_id: value["chain_id"],
+      sequence: value["sequence"],
+      chain_hash: b64!(value["chain_hash"]),
+      key_id: value["key_id"],
+      key_fingerprint: b64!(value["key_fingerprint"]),
+      bounds: %{}
+    }
+  end
+
+  defp expected_transition(value) do
+    %ExpectedKeyTransition{
+      transition_id: value["transition_id"],
+      chain_id: value["chain_id"],
+      effective_at: value["effective_at"],
+      current_key_id: value["current_key_id"],
+      current_key_fingerprint: b64!(value["current_key_fingerprint"]),
+      next_key_id: value["next_key_id"],
+      next_key_fingerprint: b64!(value["next_key_fingerprint"]),
+      bounds: %{}
+    }
+  end
+
+  defp historical_chain(archive) do
+    %HistoricalKeyChain{
+      keys: Enum.map(archive["historical_keys"], &historical_key/1)
+    }
+  end
+
+  defp historical_key(value) do
+    %HistoricalPublicKey{
+      key_id: value["key_id"],
+      public_key: b64!(value["public_key"]),
+      valid_from: value["valid_from"],
+      valid_before:
+        if(value["valid_before"] == :null, do: :unbounded, else: value["valid_before"])
+    }
+  end
+
+  defp run_node(fixture, manifest) do
+    System.cmd("node", [@script, fixture, manifest], stderr_to_stdout: true)
+  end
+
+  defp with_temp_json(value, function) do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "bap04-vector-#{System.unique_integer([:positive, :monotonic])}.json"
+      )
+
+    File.write!(path, :json.encode(value))
+
+    try do
+      function.(path)
+    after
+      File.rm(path)
+    end
+  end
+
+  defp fixture!, do: json!(@fixture)
+  defp json!(path), do: path |> File.read!() |> :json.decode()
+  defp b64!(value), do: Base.url_decode64!(value, padding: false)
+
+  defp collect_keys(value) when is_map(value) do
+    Enum.flat_map(value, fn {key, child} -> [key | collect_keys(child)] end)
+  end
+
+  defp collect_keys(value) when is_list(value), do: Enum.flat_map(value, &collect_keys/1)
+  defp collect_keys(_value), do: []
+end

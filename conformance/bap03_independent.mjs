@@ -501,7 +501,15 @@ function verifyTamperMatrix(fixture, issuerJwk, holderJwk, requestDigest) {
 async function verifyManifest(manifest, additionalScanPath) {
   assertEqual(manifest.format, "bounded-authority-protocol-v1-vector-manifest", "manifest format");
   const vectors = [...manifest.vectors].sort();
-  assertDeepEqual(vectors, ["grant-holder-proof.json"], "manifest vectors");
+  assertDeepEqual(
+    vectors,
+    [
+      "chain-semantic-edge.json",
+      "consumption-chain-archive.json",
+      "grant-holder-proof.json",
+    ],
+    "manifest vectors",
+  );
   assertDeepEqual(
     [...manifest.discovery_roots].sort(),
     [...requiredDiscoveryRoots].sort(),
@@ -515,6 +523,11 @@ async function verifyManifest(manifest, additionalScanPath) {
     await discoverPublicKeys(path, declared);
   }
   if (additionalScanPath !== null) await discoverPublicKeys(additionalScanPath, declared);
+
+  const chainArchiveFixture = await readJson(join(vectorsDir, "consumption-chain-archive.json"));
+  discoverJsonKeys(chainArchiveFixture, observedPublicKeyFingerprints);
+  const semanticEdgeFixture = await readJson(join(vectorsDir, "chain-semantic-edge.json"));
+  discoverJsonKeys(semanticEdgeFixture, observedPublicKeyFingerprints);
 
   const listed = [...manifest.canonical_public_key_fingerprints].sort();
   const actual = [...observedPublicKeyFingerprints].sort();

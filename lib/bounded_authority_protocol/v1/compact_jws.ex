@@ -89,7 +89,8 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
   end
 
   defp valid_kind_and_segments?(input) do
-    input.kind in [:grant, :proof] and is_binary(input.protected_segment) and
+    input.kind in [:grant, :proof, :boundary_anchor, :key_transition] and
+      is_binary(input.protected_segment) and
       is_binary(input.payload_segment) and is_binary(input.message) and
       byte_size(input.protected_segment) > 0 and byte_size(input.payload_segment) > 0
   end
@@ -135,6 +136,27 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
         else
           _invalid -> false
         end
+
+      _invalid ->
+        false
+    end
+  end
+
+  defp exact_signing_header?(kind, members, bounds)
+       when kind in [:boundary_anchor, :key_transition] and length(members) == 3 do
+    expected_type =
+      case kind do
+        :boundary_anchor -> "ba+chain-anchor"
+        :key_transition -> "ba+key-transition"
+      end
+
+    case Map.new(members) do
+      %{
+        "alg" => {:string, "EdDSA"},
+        "kid" => {:string, kid},
+        "typ" => {:string, ^expected_type}
+      } ->
+        byte_size(kid) > 0 and byte_size(kid) <= bounds.kid_bytes
 
       _invalid ->
         false

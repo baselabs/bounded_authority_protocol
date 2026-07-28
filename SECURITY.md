@@ -6,9 +6,11 @@ No released version exists yet. This file becomes version-specific with the firs
 
 The current unpublished 0.1.0 source implements bounded parsing, deterministic standard compact
 JWS grant and RFC 9449 holder-proof production, standalone raw-grant verification, and combined
-raw-envelope verification. Results are redacted facts with `authorization: :not_evaluated`; the
-package does not select trust, reserve replay, inspect live revocation state, or authorize an
-effect.
+raw-envelope verification. It also implements canonical consumption-chain, historical-anchor,
+authenticated rollover, and exact anchored-export verification against caller-supplied
+boundaries, digest, and out-of-band object version. Results are redacted facts with trust and
+authorization explicitly not evaluated; the package does not select trust, reserve replay,
+inspect live revocation state, certify deletion/retention, remove archives, or authorize an effect.
 
 Final BAP-03 package-bearing verification source
 `f322e08bba665374599b9f53c362966b6b59710a` passed

@@ -48,6 +48,19 @@ defmodule BoundedAuthorityProtocol.V1.RuntimeMalformedTest do
     assert {:error, :invalid} = V1.proof_signing_input(%{proof | invocation_id: "short"}, %{})
   end
 
+  test "chain, anchor, transition, and archive public boundaries fail fixed on malformed terms" do
+    assert {:error, :invalid} = V1.encode_consumption_entry(%{}, %{})
+    assert {:error, :invalid} = V1.encode_consumption_entry(:invalid, %{})
+    assert {:error, :invalid} = V1.check_chain(%{}, %{})
+    assert {:error, :invalid} = V1.check_chain(:invalid, :invalid)
+    assert {:error, :invalid} = V1.boundary_anchor_signing_input(%{}, %{})
+    assert {:error, :invalid} = V1.key_transition_signing_input(%{}, %{})
+    assert {:error, :invalid} = V1.encode_anchored_export(%{}, %{})
+    assert {:error, :invalid} = V1.verify_historical_anchor(nil, %{}, %{})
+    assert {:error, :invalid} = V1.verify_key_transition(nil, %{}, %{}, %{})
+    assert {:error, :invalid} = V1.verify_anchored_export(%{}, %{}, %{})
+  end
+
   test "bounded decoders reject malformed nested runtime shapes" do
     fixture = fixture!()
     grant = fixture["grant"]["compact"]

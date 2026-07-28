@@ -2,25 +2,43 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
   @moduledoc false
 
   alias BoundedAuthorityProtocol.V1.{
+    AnchoredExportCodec,
+    AnchoredExportInput,
+    ArchivedObject,
     Base64Url,
+    BoundaryAnchor,
+    BoundaryAnchorCodec,
     Bounds,
+    ChainInput,
     CompactJws,
+    ConsumptionChain,
+    ConsumptionEntry,
     Credentials,
     DecodedGrant,
     DecodedProof,
     EnvelopeFacts,
+    ExpectedAnchor,
+    ExpectedAnchoredExport,
+    ExpectedChain,
+    ExpectedExport,
     ExpectedGrant,
+    ExpectedKeyTransition,
     ExpectedRequest,
     Grant,
     GrantFacts,
+    HistoricalKeyChain,
+    HistoricalPublicKey,
     Jcs,
     Json,
     Jwk,
+    KeyTransition,
+    KeyTransitionCodec,
     Operation,
     Proof,
     RequestDigest,
     Selector,
     SigningInput,
+    StringOrUri,
     TrustedIssuer,
     Uri
   }
@@ -31,6 +49,74 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
   @proof_payload_keys ~w(ath ba_inv ba_op ba_req htm htu iat jti nonce v)
   @proof_payload_keys_without_nonce ~w(ath ba_inv ba_op ba_req htm htu iat jti v)
   @token_punctuation ~c"!#$%&'*+-.^_`|~"
+
+  def encode_consumption_entry(%ConsumptionEntry{} = entry, limits) do
+    fixed(fn -> ConsumptionChain.encode(entry, limits) end)
+  end
+
+  def encode_consumption_entry(_entry, _limits), do: {:error, :invalid}
+
+  def check_chain(%ChainInput{} = input, %ExpectedChain{} = expected) do
+    fixed(fn -> ConsumptionChain.check(input, expected) end)
+  end
+
+  def check_chain(_input, _expected), do: {:error, :invalid}
+
+  def boundary_anchor_signing_input(%BoundaryAnchor{} = anchor, limits) do
+    fixed(fn -> BoundaryAnchorCodec.signing_input(anchor, limits) end)
+  end
+
+  def boundary_anchor_signing_input(_anchor, _limits), do: {:error, :invalid}
+
+  def key_transition_signing_input(%KeyTransition{} = transition, limits) do
+    fixed(fn -> KeyTransitionCodec.signing_input(transition, limits) end)
+  end
+
+  def key_transition_signing_input(_transition, _limits), do: {:error, :invalid}
+
+  def verify_historical_anchor(
+        compact,
+        %HistoricalPublicKey{} = key,
+        %ExpectedAnchor{} = expected
+      )
+      when is_binary(compact) do
+    fixed(fn -> BoundaryAnchorCodec.verify(compact, key, expected) end)
+  end
+
+  def verify_historical_anchor(_compact, _key, _expected), do: {:error, :invalid}
+
+  def verify_key_transition(
+        compact,
+        %HistoricalPublicKey{} = current_key,
+        %HistoricalPublicKey{} = next_key,
+        %ExpectedKeyTransition{} = expected
+      )
+      when is_binary(compact) do
+    fixed(fn -> KeyTransitionCodec.verify(compact, current_key, next_key, expected) end)
+  end
+
+  def verify_key_transition(_compact, _current_key, _next_key, _expected),
+    do: {:error, :invalid}
+
+  def encode_anchored_export(
+        %AnchoredExportInput{} = input,
+        %ExpectedExport{} = expected
+      ) do
+    fixed(fn -> AnchoredExportCodec.encode(input, expected) end)
+  end
+
+  def encode_anchored_export(_input, _expected), do: {:error, :invalid}
+
+  def verify_anchored_export(
+        %ArchivedObject{} = archived,
+        %HistoricalKeyChain{} = key_chain,
+        %ExpectedAnchoredExport{} = expected
+      ) do
+    fixed(fn -> AnchoredExportCodec.verify(archived, key_chain, expected) end)
+  end
+
+  def verify_anchored_export(_archived, _key_chain, _expected),
+    do: {:error, :invalid}
 
   def grant_signing_input(%Grant{} = grant, limits) do
     fixed(fn ->
@@ -679,6 +765,20 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
     end
   end
 
+  defp validate_assembled_compact(:boundary_anchor, compact, bounds) do
+    case BoundaryAnchorCodec.parse(compact, bounds) do
+      {:ok, _parsed} -> :ok
+      {:error, :invalid} -> {:error, :invalid}
+    end
+  end
+
+  defp validate_assembled_compact(:key_transition, compact, bounds) do
+    case KeyTransitionCodec.parse(compact, bounds) do
+      {:ok, _parsed} -> :ok
+      {:error, :invalid} -> {:error, :invalid}
+    end
+  end
+
   defp decode_audiences({:string, audience}, bounds) do
     if valid_identifier?(audience, bounds),
       do: {:ok, [audience]},
@@ -787,11 +887,7 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
         String.valid?(value) and string_or_uri?(value)
 
   defp string_or_uri?(value) do
-    if String.contains?(value, ":") do
-      match?({:ok, %URI{}}, URI.new(value))
-    else
-      true
-    end
+    StringOrUri.valid?(value)
   end
 
   defp valid_operation?(value, bounds),
