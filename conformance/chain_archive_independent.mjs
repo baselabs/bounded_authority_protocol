@@ -1,5 +1,6 @@
 import {
   createHash,
+  createPrivateKey,
   createPublicKey,
   timingSafeEqual,
   verify as verifySignature,
@@ -129,7 +130,7 @@ function parseJsonNoDuplicates(text, context) {
 
   function parseObject() {
     const names = new Set();
-    const value = {};
+    const value = Object.create(null);
     index += 1;
     skipWhitespace();
     if (text[index] === "}") {
@@ -183,9 +184,6 @@ function parseJsonNoDuplicates(text, context) {
   return value;
 }
 
-const ED25519_PRIVATE_KEY_OID = Buffer.from("06032b6570", "hex");
-const NESTED_PRIVATE_KEY_OCTETS = Buffer.from("04220420", "hex");
-
 function decodedBinaryCandidates(value) {
   if (Array.isArray(value)) {
     if (
@@ -214,12 +212,31 @@ function decodedBinaryCandidates(value) {
 }
 
 function isEd25519PrivateDer(bytes) {
-  return (
-    bytes.length >= 48 &&
-    bytes[0] === 0x30 &&
-    bytes.indexOf(ED25519_PRIVATE_KEY_OID) >= 0 &&
-    bytes.indexOf(NESTED_PRIVATE_KEY_OCTETS) > bytes.indexOf(ED25519_PRIVATE_KEY_OID)
-  );
+  if (!isCompleteDerSequence(bytes)) return false;
+
+  try {
+    const key = createPrivateKey({key: bytes, format: "der", type: "pkcs8"});
+    return key.asymmetricKeyType === "ed25519";
+  } catch {
+    return false;
+  }
+}
+
+function isCompleteDerSequence(bytes) {
+  if (bytes.length < 2 || bytes[0] !== 0x30) return false;
+  const firstLength = bytes[1];
+  if ((firstLength & 0x80) === 0) return bytes.length === firstLength + 2;
+
+  const lengthBytes = firstLength & 0x7f;
+  if (lengthBytes === 0 || lengthBytes > 4 || bytes.length < 2 + lengthBytes) return false;
+  if (bytes[2] === 0) return false;
+
+  let contentLength = 0;
+  for (let index = 0; index < lengthBytes; index += 1) {
+    contentLength = contentLength * 256 + bytes[2 + index];
+  }
+  if (contentLength < 128) return false;
+  return bytes.length === 2 + lengthBytes + contentLength;
 }
 
 function assertNoPrivateMaterial(value, context) {
@@ -1317,7 +1334,7 @@ function discoverPublicKeys(path, manifestPath, fingerprints) {
   }
 }
 
-function verifyManifest(manifest, fixture, fixturePath) {
+function verifyManifest(manifest, fixture, fixturePath, additionalScanPath) {
   exactKeys(
     manifest,
     [
@@ -1364,6 +1381,9 @@ function verifyManifest(manifest, fixture, fixturePath) {
     );
     discoverPublicKeys(absolute, manifestPath, discovered);
   }
+  if (additionalScanPath !== null) {
+    discoverPublicKeys(resolve(additionalScanPath), manifestPath, discovered);
+  }
   collectFixtureFingerprints(fixture, discovered);
 
   const verifierSets = Object.values(manifest.verifier_public_key_fingerprints);
@@ -1400,9 +1420,14 @@ function verifyManifest(manifest, fixture, fixturePath) {
 
 function main() {
   const arguments_ = process.argv.slice(2);
-  assert(arguments_.length === 2, "usage: chain_archive_independent.mjs FIXTURE MANIFEST");
+  assert(
+    arguments_.length === 2 ||
+      (arguments_.length === 4 && arguments_[2] === "--scan"),
+    "usage: chain_archive_independent.mjs FIXTURE MANIFEST [--scan PATH]",
+  );
   const fixturePath = resolve(arguments_[0]);
   const manifestPath = resolve(arguments_[1]);
+  const additionalScanPath = arguments_.length === 4 ? arguments_[3] : null;
   const fixture = parseJsonNoDuplicates(readFileSync(fixturePath, "utf8"), `fixture ${fixturePath}`);
   const semanticFixture = parseJsonNoDuplicates(
     readFileSync(
@@ -1430,7 +1455,7 @@ function main() {
   for (const entry of fixture.archives) verifyArchive(entry);
   const semanticCases = verifySemanticEdges(semanticFixture);
   const tamperCases = runTamperMatrix(fixture);
-  const fingerprints = verifyManifest(manifest, fixture, fixturePath);
+  const fingerprints = verifyManifest(manifest, fixture, fixturePath, additionalScanPath);
   process.stdout.write(
       `bap04 independent verification: ok archives=${fixture.archives.length} ` +
       `boundary_adversaries=${fixture.boundary_adversaries.length} ` +
