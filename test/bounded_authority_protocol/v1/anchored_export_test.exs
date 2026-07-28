@@ -125,6 +125,37 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportTest do
                expected
              )
 
+    [first_key | remaining_keys] = context.key_chain.keys
+
+    assert {:error, :invalid} =
+             V1.verify_anchored_export(
+               archived,
+               %HistoricalKeyChain{keys: [%{first_key | key_id: "bad key"} | remaining_keys]},
+               expected
+             )
+
+    assert {:error, :invalid} =
+             V1.verify_anchored_export(
+               archived,
+               context.key_chain,
+               %{expected | chain: %{context.chain | chain_id: "x:%zz"}}
+             )
+
+    assert {:error, :invalid} =
+             V1.verify_anchored_export(
+               archived,
+               context.key_chain,
+               %{
+                 expected
+                 | transitions: [
+                     %{
+                       context.transition_expected
+                       | effective_at: 9_007_199_254_740_992
+                     }
+                   ]
+               }
+             )
+
     assert {:error, :invalid} =
              V1.verify_anchored_export(
                archived,
@@ -410,10 +441,13 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportTest do
                }
              )
 
+    {unrelated_public, _unrelated_private} = :crypto.generate_key(:eddsa, :ed25519)
+    {:ok, unrelated_fingerprint} = Jwk.public_key_thumbprint_raw(unrelated_public, %{})
+
     broken_transition = %{
       context.transition_expected
       | current_key_id: "archive-key-unrelated",
-        current_key_fingerprint: context.transition_expected.next_key_fingerprint
+        current_key_fingerprint: unrelated_fingerprint
     }
 
     assert {:error, :invalid} =

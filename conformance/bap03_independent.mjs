@@ -18,6 +18,8 @@ const argumentsByName = new Map();
 const missing = Symbol("missing");
 const numberLexemes = new WeakMap();
 const observedPublicKeyFingerprints = new Set();
+const ED25519_PRIVATE_KEY_OID = Buffer.from("06032b6570", "hex");
+const NESTED_PRIVATE_KEY_OCTETS = Buffer.from("04220420", "hex");
 const uriProfileCases = [
   ["https://example.com/", true],
   ["https://example.com/a/~", true],
@@ -685,6 +687,38 @@ function decodeRecognizedRawKey(value) {
   return null;
 }
 
+function privateDerCandidates(value) {
+  if (
+    Array.isArray(value) &&
+    value.length >= 48 &&
+    value.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255)
+  ) {
+    return [Buffer.from(value)];
+  }
+  if (typeof value !== "string") return [];
+
+  const candidates = [];
+  if (/^[0-9A-Fa-f]{96,}$/.test(value) && value.length % 2 === 0) {
+    candidates.push(Buffer.from(value, "hex"));
+  }
+  if (/^[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length >= 64 && value.length % 4 === 0) {
+    candidates.push(Buffer.from(value, "base64"));
+  }
+  if (/^[A-Za-z0-9_-]{64,}$/.test(value)) {
+    candidates.push(Buffer.from(value, "base64url"));
+  }
+  return candidates;
+}
+
+function isEd25519PrivateDer(bytes) {
+  return (
+    bytes.length >= 48 &&
+    bytes[0] === 0x30 &&
+    bytes.indexOf(ED25519_PRIVATE_KEY_OID) >= 0 &&
+    bytes.indexOf(NESTED_PRIVATE_KEY_OCTETS) > bytes.indexOf(ED25519_PRIVATE_KEY_OID)
+  );
+}
+
 function rawKeyThumbprint(publicKey) {
   assertEqual(publicKey.length, 32, "raw public-key length");
   return jwkThumbprint({
@@ -695,6 +729,16 @@ function rawKeyThumbprint(publicKey) {
 }
 
 function assertNoPrivateMaterial(value, label) {
+  if (typeof value === "string") {
+    assert(
+      !/-----BEGIN (?:ENCRYPTED |ED25519 )?PRIVATE KEY-----/.test(value),
+      `${label} private PEM material`,
+    );
+  }
+  for (const candidate of privateDerCandidates(value)) {
+    assert(!isEd25519PrivateDer(candidate), `${label} private Ed25519 DER material`);
+  }
+
   if (Array.isArray(value)) {
     for (const child of value) assertNoPrivateMaterial(child, label);
     return;

@@ -6,6 +6,7 @@ defmodule BoundedAuthorityProtocol.V1.ConsumptionChain do
   alias BoundedAuthorityProtocol.V1.ChainFacts
   alias BoundedAuthorityProtocol.V1.ChainInput
   alias BoundedAuthorityProtocol.V1.ConsumptionEntry
+  alias BoundedAuthorityProtocol.V1.ContextValidation
   alias BoundedAuthorityProtocol.V1.EncodedConsumptionEntry
   alias BoundedAuthorityProtocol.V1.ExpectedChain
   alias BoundedAuthorityProtocol.V1.FixedBytes
@@ -126,30 +127,8 @@ defmodule BoundedAuthorityProtocol.V1.ConsumptionChain do
     end
   end
 
-  defp validate_expected(expected, bounds) do
-    if valid_expected_range?(expected, bounds) and valid_expected_hashes?(expected, bounds) do
-      :ok
-    else
-      {:error, :invalid}
-    end
-  end
-
-  defp valid_expected_range?(expected, bounds),
-    do:
-      valid_identifier?(expected.chain_id, bounds) and
-        valid_sequence?(expected.first_sequence, bounds) and
-        valid_sequence?(expected.last_sequence, bounds) and
-        expected.first_sequence <= expected.last_sequence and
-        is_integer(expected.row_count) and expected.row_count > 0 and
-        expected.row_count <= bounds.chain_rows and
-        expected.row_count == expected.last_sequence - expected.first_sequence + 1
-
-  defp valid_expected_hashes?(expected, bounds),
-    do:
-      fixed_digest?(expected.previous_hash, bounds) and
-        fixed_digest?(expected.last_hash, bounds) and
-        (expected.first_sequence != 1 or
-           FixedBytes.equal?(expected.previous_hash, @zero_hash))
+  defp validate_expected(expected, bounds),
+    do: ContextValidation.expected_chain(expected, bounds)
 
   defp validate_rows([], _bounds, 0), do: {:error, :invalid}
   defp validate_rows([], _bounds, count), do: {:ok, count}

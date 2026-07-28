@@ -74,6 +74,12 @@ defmodule BoundedAuthorityProtocol.V1.BoundaryAnchorTest do
              V1.boundary_anchor_signing_input(%{anchor(public_key) | chain_hash: <<1::256>>}, %{})
 
     assert {:error, :invalid} =
+             V1.boundary_anchor_signing_input(
+               %{anchor(public_key) | sequence: -1, chain_hash: @zero_hash},
+               %{}
+             )
+
+    assert {:error, :invalid} =
              V1.verify_historical_anchor(
                compact,
                %HistoricalPublicKey{

@@ -4,6 +4,7 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionCodec do
   alias BoundedAuthorityProtocol.V1.Base64Url
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.CompactJws
+  alias BoundedAuthorityProtocol.V1.ContextValidation
   alias BoundedAuthorityProtocol.V1.ExpectedKeyTransition
   alias BoundedAuthorityProtocol.V1.FixedBytes
   alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
@@ -192,18 +193,8 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionCodec do
     end
   end
 
-  defp validate_expected(expected, bounds) do
-    validate_transition_fields(
-      expected.transition_id,
-      expected.chain_id,
-      expected.effective_at,
-      expected.current_key_id,
-      expected.current_key_fingerprint,
-      expected.next_key_id,
-      expected.next_key_fingerprint,
-      bounds
-    )
-  end
+  defp validate_expected(expected, bounds),
+    do: ContextValidation.expected_transition(expected, bounds)
 
   defp validate_transition_fields(
          transition_id,
@@ -226,26 +217,13 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionCodec do
     end
   end
 
-  defp validate_historical_key(key, bounds) do
-    if valid_key_id?(key.key_id, bounds) and is_binary(key.public_key) and
-         byte_size(key.public_key) == bounds.public_key_bytes and
-         valid_time?(key.valid_from, bounds) and
-         valid_before?(key.valid_before, key.valid_from, bounds) do
-      :ok
-    else
-      {:error, :invalid}
-    end
-  end
+  defp validate_historical_key(key, bounds),
+    do: ContextValidation.historical_key(key, bounds)
 
   defp inside_window?(time, key) do
     key.valid_from <= time and
       (key.valid_before == :unbounded or time < key.valid_before)
   end
-
-  defp valid_before?(:unbounded, _valid_from, _bounds), do: true
-
-  defp valid_before?(valid_before, valid_from, bounds),
-    do: valid_time?(valid_before, bounds) and valid_before > valid_from
 
   defp build_signing_input(protected, payload, bounds) do
     protected_segment = Base.url_encode64(protected, padding: false)
