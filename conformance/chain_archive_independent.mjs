@@ -181,6 +181,17 @@ function verifyAnchor(expected, key, context) {
     publicKey,
     context,
   );
+  return {
+    version: 1,
+    anchor_id: expected.anchor_id,
+    anchored_at: expected.anchored_at,
+    chain_id: expected.chain_id,
+    sequence: expected.sequence,
+    chain_hash: expected.chain_hash,
+    key_fingerprint: expected.key_fingerprint,
+    verification: "signature_and_window",
+    trust: "not_evaluated",
+  };
 }
 
 function verifyTransition(expected, current, next, context) {
@@ -225,6 +236,16 @@ function verifyTransition(expected, current, next, context) {
     currentRaw,
     context,
   );
+  return {
+    version: 1,
+    transition_id: expected.transition_id,
+    effective_at: expected.effective_at,
+    chain_id: expected.chain_id,
+    current_key_fingerprint: expected.current_key_fingerprint,
+    next_key_fingerprint: expected.next_key_fingerprint,
+    verification: "authenticated_transition",
+    trust: "not_evaluated",
+  };
 }
 
 function readFrame(bytes, cursor, maximum, context) {
@@ -358,7 +379,17 @@ function verifyChain(rows, expected) {
     sequence += 1;
   }
   equalBytes(previous, strictB64(expected.last_hash, 32), "chain head");
-  return previous;
+  return {
+    version: 1,
+    chain_id: expected.chain_id,
+    first_sequence: expected.first_sequence,
+    last_sequence: expected.last_sequence,
+    row_count: expected.row_count,
+    previous_hash: expected.previous_hash,
+    last_hash: expected.last_hash,
+    verification: "boundary_consistent",
+    trust: "not_evaluated",
+  };
 }
 
 function keyRecord(raw) {
@@ -422,18 +453,34 @@ function verifyArchive(
     new Set(keys.map((key) => key.fingerprint)).size === keys.length,
     `${rawCase.name}: key cycle`,
   );
-  verifyAnchor(rawCase.start_anchor, keys[0], `${rawCase.name} start`);
+  const startAnchorFacts = verifyAnchor(
+    rawCase.start_anchor,
+    keys[0],
+    `${rawCase.name} start`,
+  );
   let lastTime = rawCase.start_anchor.anchored_at;
+  const transitionFacts = [];
   rawCase.transitions.forEach((transition, index) => {
     assert(
       transition.chain_id === expectedChain.chain_id,
       `${rawCase.name}: transition chain identity`,
     );
-    verifyTransition(transition, keys[index], keys[index + 1], `${rawCase.name} transition ${index}`);
+    transitionFacts.push(
+      verifyTransition(
+        transition,
+        keys[index],
+        keys[index + 1],
+        `${rawCase.name} transition ${index}`,
+      ),
+    );
     assert(transition.effective_at > lastTime, `${rawCase.name}: increasing transition time`);
     lastTime = transition.effective_at;
   });
-  verifyAnchor(rawCase.end_anchor, keys[keys.length - 1], `${rawCase.name} end`);
+  const endAnchorFacts = verifyAnchor(
+    rawCase.end_anchor,
+    keys[keys.length - 1],
+    `${rawCase.name} end`,
+  );
   assert(rawCase.end_anchor.anchored_at >= lastTime, `${rawCase.name}: end chronology`);
   assert(
     rawCase.start_anchor.chain_id === expectedChain.chain_id &&
@@ -447,17 +494,37 @@ function verifyArchive(
       rawCase.end_anchor.chain_hash === expectedChain.last_hash,
     `${rawCase.name}: end boundary`,
   );
-  verifyChain(parsed.rows, expectedChain);
-  return {
+  const chainFacts = verifyChain(parsed.rows, expectedChain);
+  const anchoredExportFacts = {
+    version: 1,
     chain_id: expectedChain.chain_id,
     first_sequence: expectedChain.first_sequence,
     last_sequence: expectedChain.last_sequence,
     row_count: expectedChain.row_count,
+    previous_hash: expectedChain.previous_hash,
+    last_hash: expectedChain.last_hash,
+    digest: sha256(archive).toString("base64url"),
+    start_anchor_id: rawCase.start_anchor.anchor_id,
+    start_anchored_at: rawCase.start_anchor.anchored_at,
+    start_key_fingerprint: rawCase.start_anchor.key_fingerprint,
+    end_anchor_id: rawCase.end_anchor.anchor_id,
+    end_anchored_at: rawCase.end_anchor.anchored_at,
+    end_key_fingerprint: rawCase.end_anchor.key_fingerprint,
     transition_count: rawCase.transitions.length,
     verification: "anchored_export",
     trust: "not_evaluated",
     authorization: "not_evaluated",
   };
+  const facts = {
+    chain: chainFacts,
+    start_anchor: startAnchorFacts,
+    transitions: transitionFacts,
+    end_anchor: endAnchorFacts,
+    anchored_export: anchoredExportFacts,
+  };
+  assert(rawCase.facts !== undefined, `${rawCase.name}: published facts`);
+  assert(canonical(facts) === canonical(rawCase.facts), `${rawCase.name}: exact facts`);
+  return facts;
 }
 
 function clone(value) {
@@ -505,6 +572,18 @@ function mutateCompactPayload(compact, field) {
   return segments.join(".");
 }
 
+function mutateCompactProtected(compact, field, value) {
+  const segments = compact.split(".");
+  assert(segments.length === 3, "protected-header tamper compact shape");
+  const protectedHeader = parseCanonicalJson(
+    strictB64(segments[0]),
+    "protected-header tamper source",
+  );
+  protectedHeader[field] = value;
+  segments[0] = Buffer.from(canonical(protectedHeader), "utf8").toString("base64url");
+  return segments.join(".");
+}
+
 function mutateCompactSignature(compact) {
   const segments = compact.split(".");
   assert(segments.length === 3, "signature tamper compact shape");
@@ -539,9 +618,14 @@ function replaceCompact(rawCase, target, mutate, transitionIndex = 0) {
 function runTamperMatrix(fixture) {
   const one = fixture.archives.find((entry) => entry.name === "one-step-rollover");
   const multi = fixture.archives.find((entry) => entry.name === "multi-step-rollover");
+  const publishedInvalidCases = fixture.verdicts.invalid_cases;
+  const observedInvalidCases = new Set();
   let cases = 0;
   const invalid = (label, mutation, source = one, expectedMessage = undefined) => {
+    assert(publishedInvalidCases[label] === "invalid", `${label}: published invalid verdict`);
+    assert(!observedInvalidCases.has(label), `${label}: duplicate invalid case`);
     expectInvalid(label, mutation, source, expectedMessage);
+    observedInvalidCases.add(label);
     cases += 1;
   };
 
@@ -552,6 +636,11 @@ function runTamperMatrix(fixture) {
   invalid("prefix", (entry) => {
     const bytes = Buffer.from(strictB64(entry.archive_base64url));
     bytes[0] ^= 1;
+    replaceArchive(entry, bytes);
+  });
+  invalid("archive prefix version", (entry) => {
+    const bytes = Buffer.from(strictB64(entry.archive_base64url));
+    bytes[3] = "2".charCodeAt(0);
     replaceArchive(entry, bytes);
   });
   invalid("frame length", (entry) => {
@@ -576,6 +665,39 @@ function runTamperMatrix(fixture) {
     [parsed.rows[0], parsed.rows[1]] = [parsed.rows[1], parsed.rows[0]];
     replaceArchive(entry, encodeParsedArchive(parsed));
   });
+  invalid("removed first row", (entry) => {
+    const parsed = parseArchive(strictB64(entry.archive_base64url));
+    parsed.rows.shift();
+    replaceArchive(entry, encodeParsedArchive(parsed));
+  });
+  invalid("removed final row", (entry) => {
+    const parsed = parseArchive(strictB64(entry.archive_base64url));
+    parsed.rows.pop();
+    replaceArchive(entry, encodeParsedArchive(parsed));
+  });
+  invalid("removed middle row", (entry) => {
+    const parsed = parseArchive(strictB64(entry.archive_base64url));
+    parsed.rows.splice(1, 1);
+    replaceArchive(entry, encodeParsedArchive(parsed));
+  });
+  invalid("missing end anchor", (entry) => {
+    const parsed = parseArchive(strictB64(entry.archive_base64url));
+    const bytes = Buffer.concat([
+      ARCHIVE_PREFIX,
+      frame(parsed.headerBytes),
+      frame(parsed.start),
+      ...parsed.transitions.map(frame),
+      ...parsed.rows.map(frame),
+    ]);
+    replaceArchive(entry, bytes);
+  });
+  invalid("trailing byte exact EOF", (entry) => {
+    const bytes = Buffer.concat([
+      strictB64(entry.archive_base64url),
+      Buffer.from([0]),
+    ]);
+    replaceArchive(entry, bytes);
+  });
   invalid("start anchor payload bytes", (entry) => {
     replaceCompact(entry, "start", (compact) => mutateCompactPayload(compact, "chain_hash"));
   }, one, "expected payload");
@@ -596,10 +718,34 @@ function runTamperMatrix(fixture) {
   invalid("transition signature bytes", (entry) => {
     replaceCompact(entry, "transition", mutateCompactSignature);
   }, one, "Ed25519 signature");
+  invalid("swapped transition kid", (entry) => {
+    replaceCompact(entry, "transition", (compact) =>
+      mutateCompactProtected(compact, "kid", entry.transitions[0].next_key_id),
+    );
+  }, one, "kid");
+  invalid("swapped transition fingerprints", (entry) => {
+    const transition = entry.transitions[0];
+    [transition.current_key_fingerprint, transition.next_key_fingerprint] = [
+      transition.next_key_fingerprint,
+      transition.current_key_fingerprint,
+    ];
+  });
   invalid("public key", (entry) => {
     const raw = strictB64(entry.historical_keys[0].public_key, 32);
     raw[0] ^= 1;
     entry.historical_keys[0].public_key = raw.toString("base64url");
+  });
+  invalid("swapped historical public keys", (entry) => {
+    [entry.historical_keys[0].public_key, entry.historical_keys[1].public_key] = [
+      entry.historical_keys[1].public_key,
+      entry.historical_keys[0].public_key,
+    ];
+  });
+  invalid("swapped key records", (entry) => {
+    [entry.historical_keys[0], entry.historical_keys[1]] = [
+      entry.historical_keys[1],
+      entry.historical_keys[0],
+    ];
   });
   invalid("missing transition", (entry) => {
     entry.transitions = [];
@@ -637,32 +783,88 @@ function runTamperMatrix(fixture) {
   invalid("sequence-zero nonzero hash", (entry) => {
     entry.start_anchor.chain_hash = Buffer.alloc(32, 1).toString("base64url");
   });
+  invalid("expected first sequence", (entry) => {
+    entry.chain.first_sequence += 1;
+  });
+  invalid("expected last sequence", (entry) => {
+    entry.chain.last_sequence -= 1;
+  });
+  invalid("expected row count", (entry) => {
+    entry.chain.row_count -= 1;
+  });
+  invalid("expected predecessor", (entry) => {
+    entry.chain.previous_hash = Buffer.alloc(32, 1).toString("base64url");
+  });
+  invalid("expected head", (entry) => {
+    entry.chain.last_hash = Buffer.alloc(32).toString("base64url");
+  });
+  invalid("expected chain ID", (entry) => {
+    entry.chain.chain_id = `${entry.chain.chain_id}:drift`;
+  });
+  invalid("expected start anchor ID", (entry) => {
+    entry.start_anchor.anchor_id = `${entry.start_anchor.anchor_id}:drift`;
+  });
+  invalid("expected end anchor ID", (entry) => {
+    entry.end_anchor.anchor_id = `${entry.end_anchor.anchor_id}:drift`;
+  });
+  invalid("expected start anchor boundary", (entry) => {
+    entry.start_anchor.sequence += 1;
+  });
+  invalid("expected end anchor boundary", (entry) => {
+    entry.end_anchor.sequence -= 1;
+  });
+  invalid("transition before start", (entry) => {
+    entry.transitions[0].effective_at = entry.start_anchor.anchored_at - 1;
+  });
+  invalid("transition after end", (entry) => {
+    entry.transitions[0].effective_at = entry.end_anchor.anchored_at + 1;
+  });
+  invalid("transition maximum plus one", (entry) => {
+    const parsed = parseArchive(strictB64(entry.archive_base64url));
+    parsed.header.transition_count = 257;
+    parsed.headerBytes = Buffer.from(canonical(parsed.header), "utf8");
+    replaceArchive(entry, encodeParsedArchive(parsed));
+  }, one, "archive transition count");
   invalid("archive digest", (entry) => {
     entry.archive_digest = Buffer.alloc(32).toString("base64url");
   });
+  const objectVersionLabel = "object version mismatch";
+  assert(
+    publishedInvalidCases[objectVersionLabel] === "invalid",
+    `${objectVersionLabel}: published invalid verdict`,
+  );
   expectFailure(
-    "object version mismatch",
+    objectVersionLabel,
     () =>
       verifyArchive(
         one,
         undefined,
         `${one.object_version}-observed-drift`,
         one.object_version,
-      ),
+    ),
     "object version mismatch",
   );
+  observedInvalidCases.add(objectVersionLabel);
   cases += 1;
 
   for (const adversary of fixture.boundary_adversaries) {
+    const label = `${adversary.name} against full expectation`;
+    assert(publishedInvalidCases[label] === "invalid", `${label}: published invalid verdict`);
     verifyArchive(adversary);
     try {
       verifyArchive(adversary, fixture.chains.genesis.expected);
     } catch {
+      observedInvalidCases.add(label);
       cases += 1;
       continue;
     }
     fail(`boundary adversary accepted against full expectation: ${adversary.name}`);
   }
+  assert(
+    canonical([...observedInvalidCases].sort()) ===
+      canonical(Object.keys(publishedInvalidCases).sort()),
+    "published invalid-case set",
+  );
   return cases;
 }
 
@@ -753,6 +955,8 @@ function verifyPublishedVerdicts(verdicts) {
       "boundary_adversaries_against_full_chain_expectations",
       "boundary_adversaries_with_own_expectations",
       "canonical_cases",
+      "independent_valid_chains",
+      "invalid_cases",
     ],
     "fixture verdicts",
   );
@@ -765,6 +969,38 @@ function verifyPublishedVerdicts(verdicts) {
     verdicts.boundary_adversaries_against_full_chain_expectations === "invalid",
     "boundary full-expectation verdict",
   );
+  assert(
+    canonical(verdicts.independent_valid_chains) ===
+      canonical({ continuation: "valid", genesis: "valid" }),
+    "published valid-chain verdicts",
+  );
+  exactKeys(
+    verdicts.invalid_cases,
+    Object.keys(verdicts.invalid_cases),
+    "published invalid-case verdicts",
+  );
+  assert(
+    Object.keys(verdicts.invalid_cases).length > 0 &&
+      Object.values(verdicts.invalid_cases).every((verdict) => verdict === "invalid"),
+    "published invalid-case verdict values",
+  );
+}
+
+function verifyPublishedChains(chains, verdicts) {
+  exactKeys(chains, ["continuation", "genesis"], "published chains");
+  let cases = 0;
+  for (const name of ["continuation", "genesis"]) {
+    const chain = chains[name];
+    exactKeys(chain, ["expected", "facts", "row_hashes", "rows"], `${name} chain fixture`);
+    assert(verdicts.independent_valid_chains[name] === "valid", `${name}: chain verdict`);
+    const facts = verifyChain(
+      chain.rows.map((row) => strictB64(row)),
+      chain.expected,
+    );
+    assert(canonical(facts) === canonical(chain.facts), `${name}: exact chain facts`);
+    cases += 1;
+  }
+  return cases;
 }
 
 function collectFixtureFingerprints(value, accumulator = new Set()) {
@@ -968,6 +1204,7 @@ function main() {
   );
   assert(fixture.provenance.private_material_tracked === false, "fixture private material");
   verifyPublishedVerdicts(fixture.verdicts);
+  const chainCases = verifyPublishedChains(fixture.chains, fixture.verdicts);
   for (const entry of fixture.archives) verifyArchive(entry);
   const semanticCases = verifySemanticEdges(semanticFixture);
   const tamperCases = runTamperMatrix(fixture);
@@ -975,7 +1212,8 @@ function main() {
   process.stdout.write(
       `bap04 independent verification: ok archives=${fixture.archives.length} ` +
       `boundary_adversaries=${fixture.boundary_adversaries.length} ` +
-      `public_key_fingerprints=${fingerprints} tamper_cases=${tamperCases} ` +
+      `chain_cases=${chainCases} public_key_fingerprints=${fingerprints} ` +
+      `tamper_cases=${tamperCases} ` +
       `semantic_cases=${semanticCases}\n`,
   );
 }

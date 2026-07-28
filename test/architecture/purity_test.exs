@@ -452,6 +452,18 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     assert positions == Enum.sort(positions)
   end
 
+  test "performance samples use fresh monitored processes with bounded teardown" do
+    source =
+      File.read!(Path.join(@root, "scripts/check_chain_archive_performance.exs"))
+
+    assert source =~ "spawn_monitor(fn ->"
+    assert source =~ "send(parent, {reference, self(), sample})"
+    assert source =~ "{:DOWN, ^monitor, :process, ^pid, :normal} ->"
+    assert source =~ "send(pid, {reference, :acknowledged})"
+    assert source =~ "@sample_timeout_milliseconds"
+    assert source =~ "Process.exit(pid, :kill)"
+  end
+
   test "new protocol mechanics have exact compiled public exports" do
     root = copy_actual_project!()
 
