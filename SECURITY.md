@@ -10,12 +10,14 @@ raw-envelope verification. Results are redacted facts with `authorization: :not_
 package does not select trust, reserve replay, inspect live revocation state, or authorize an
 effect.
 
-Final BAP-02 verification source
-`893680f501d39371c7f1f1f630d8e8e92cd35cf8` passed
-[CI run 30242449363](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30242449363)
+Final BAP-03 package-bearing verification source
+`f322e08bba665374599b9f53c362966b6b59710a` passed
+[CI run 30331438234](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30331438234)
 and
-[supply-chain run 30242449390](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30242449390)
-at that exact revision.
+[supply-chain run 30331438252](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30331438252)
+at that exact revision. The unpublished archive SHA-256 is
+`2f09d66c68e3538aa1e0020710d7f2aaca07528ef60fcf571c5006212e3bf056`; its checksum,
+SLSA provenance, and CycloneDX SBOM attestation were independently verified.
 
 ## Reporting a vulnerability
 

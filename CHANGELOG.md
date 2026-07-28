@@ -45,6 +45,10 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Add public-only grant/holder-proof vectors, independent Node verification, exact public-key
   census, meaningful byte-tamper and duplicate-member cases, portable timing/allocation bounds,
   architecture census updates, and unpacked external-consumer API proof.
+- Close BAP-03 at package-bearing head `f322e08bba665374599b9f53c362966b6b59710a`
+  after the supported CI matrix, complete quality/package boundary, independent Node verification,
+  exact archive checksum, SLSA provenance, and CycloneDX SBOM attestation passed. The single final
+  review admitted five findings; all five were fixed in one pass without review recursion.
 
 ### Not yet available
 

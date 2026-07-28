@@ -21,8 +21,9 @@ grant operational authority by itself.
 
 ## Current state
 
-`BAP-00`, `BAP-01`, `BAP-02`, and the local BAP-03 implementation are complete. The unpublished
-0.1.0 package retains zero
+`BAP-00` through `BAP-03` are complete. BAP-03's package-bearing closeout head
+`f322e08bba665374599b9f53c362966b6b59710a` is pushed to public `main`; trusted-main CI,
+checksum, provenance, and SBOM verification are green. The unpublished 0.1.0 package retains zero
 production dependencies, no application callback, and no supervision tree. The normative v1
 tables and bounds, raw-number preflight, bounded ordered JSON decoder with recursive duplicate
 rejection, strict base64url decoder, protected-header-only `untrusted_key_locator/2`, Draft
@@ -33,6 +34,7 @@ standalone raw-grant verification, combined raw-envelope verification, value-bea
 facts, public-only independently verified vectors, and portable resource bounds. Consult
 [`docs/ROADMAP.md`](docs/ROADMAP.md) and
 [`ADR 0003`](docs/adr/0003-standard-jws-and-verified-grant-results.md).
+`BAP-04` chain and historical-key verification is the next roadmap row.
 
 ## Critical rules
 
