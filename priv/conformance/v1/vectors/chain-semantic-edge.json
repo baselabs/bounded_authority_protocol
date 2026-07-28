@@ -223,6 +223,73 @@
         "next_key_id": "archive-key-shared-id",
         "transition_id": "urn:baselabs:bap:v1:conformance:semantic-edge:transition"
       }
-    ]
+    ],
+    "facts": {
+      "chain": {
+        "version": 1,
+        "chain_id": "urn:baselabs:bap:v1:conformance:consumption-chain",
+        "first_sequence": 1,
+        "last_sequence": 4,
+        "row_count": 4,
+        "previous_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "last_hash": "-4ZNmfKiB-_wIJ9SwNBs40a77Nn8c9yAu9stIuOPeOE",
+        "verification": "boundary_consistent",
+        "trust": "not_evaluated"
+      },
+      "start_anchor": {
+        "version": 1,
+        "anchor_id": "urn:baselabs:bap:v1:conformance:semantic-edge:start",
+        "anchored_at": 6000,
+        "chain_id": "urn:baselabs:bap:v1:conformance:consumption-chain",
+        "sequence": 0,
+        "chain_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "key_fingerprint": "jNqoeV3u-yTgM-aDSbR90dRdNvOP0aD0J6_anyf0NRI",
+        "verification": "signature_and_window",
+        "trust": "not_evaluated"
+      },
+      "transitions": [
+        {
+          "version": 1,
+          "transition_id": "urn:baselabs:bap:v1:conformance:semantic-edge:transition",
+          "effective_at": 7000,
+          "chain_id": "urn:baselabs:bap:v1:conformance:consumption-chain",
+          "current_key_fingerprint": "jNqoeV3u-yTgM-aDSbR90dRdNvOP0aD0J6_anyf0NRI",
+          "next_key_fingerprint": "B_luRLoL5T-YfqSCot-qLaUVewraSBu-qaEWqXfMRHI",
+          "verification": "authenticated_transition",
+          "trust": "not_evaluated"
+        }
+      ],
+      "end_anchor": {
+        "version": 1,
+        "anchor_id": "urn:baselabs:bap:v1:conformance:semantic-edge:end",
+        "anchored_at": 7000,
+        "chain_id": "urn:baselabs:bap:v1:conformance:consumption-chain",
+        "sequence": 4,
+        "chain_hash": "-4ZNmfKiB-_wIJ9SwNBs40a77Nn8c9yAu9stIuOPeOE",
+        "key_fingerprint": "B_luRLoL5T-YfqSCot-qLaUVewraSBu-qaEWqXfMRHI",
+        "verification": "signature_and_window",
+        "trust": "not_evaluated"
+      },
+      "anchored_export": {
+        "version": 1,
+        "chain_id": "urn:baselabs:bap:v1:conformance:consumption-chain",
+        "first_sequence": 1,
+        "last_sequence": 4,
+        "row_count": 4,
+        "previous_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "last_hash": "-4ZNmfKiB-_wIJ9SwNBs40a77Nn8c9yAu9stIuOPeOE",
+        "digest": "ALafAkgRUhWl8CvWXDpdBQvB9M5XFw5uMYs3b8uNG78",
+        "start_anchor_id": "urn:baselabs:bap:v1:conformance:semantic-edge:start",
+        "start_anchored_at": 6000,
+        "start_key_fingerprint": "jNqoeV3u-yTgM-aDSbR90dRdNvOP0aD0J6_anyf0NRI",
+        "end_anchor_id": "urn:baselabs:bap:v1:conformance:semantic-edge:end",
+        "end_anchored_at": 7000,
+        "end_key_fingerprint": "B_luRLoL5T-YfqSCot-qLaUVewraSBu-qaEWqXfMRHI",
+        "transition_count": 1,
+        "verification": "anchored_export",
+        "trust": "not_evaluated",
+        "authorization": "not_evaluated"
+      }
+    }
   }
 }
