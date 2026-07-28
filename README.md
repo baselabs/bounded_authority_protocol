@@ -8,14 +8,13 @@ bounded proof-of-possession authority.
 The public/private boundary is complete under
 [`BAP-00`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). The source tree now
 contains the unpublished `:bounded_authority_protocol` 0.1.0 Mix package scaffold and its enforced
-release boundary. `BAP-01` is complete: its public CI matrix, complete quality gate, exact archive,
-checksum, SLSA provenance, and CycloneDX attestation passed from trusted `main`. `BAP-02` now
-freezes the v1 wire tables and limits and implements bounded ordered JSON, strict base64url, and
-the protected-header-only untrusted key locator; its local, compatibility-CI, packaged-consumer,
-checksum, provenance, and SBOM gates are complete. The raw-number preflight enforces source-byte
-and exact-decimal magnitude limits before OTP numeric conversion; independently validated Draft
-2020-12 schemas accompany, but do not replace, the byte-level decoder contract. Cryptographic
-verification begins in a later row. Nothing in this repository has been published to Hex.
+release boundary. `BAP-01` and `BAP-02` are complete. `BAP-03` implements deterministic standard
+compact-JWS grant and RFC 9449 holder-proof production, bounded decoding, standalone raw-grant
+verification, and combined raw-envelope verification. Its public-only vectors are independently
+verified and cover exact key census, meaningful byte tampering, duplicate members, holder
+binding, request digests, selectors, time boundaries, and URI normalization. Portable
+timing/allocation bounds and the unpacked external-consumer gate exercise the same public API.
+Nothing in this repository has been published to Hex.
 
 The scaffold has zero production dependencies, no application callback, and no supervision tree.
 Source AST, compiled BEAM imports, generated application metadata, dependency declarations, and
@@ -31,7 +30,15 @@ The v1 profile now provides:
 - raw numeric-lexeme and exact-decimal magnitude enforcement before numeric conversion;
 - `BoundedAuthorityProtocol.V1.Base64Url.decode/2`, providing strict canonical unpadded
   base64url decoding;
-- a protected-header-only `untrusted_key_locator/2` that returns `trust: :not_evaluated`.
+- a protected-header-only `untrusted_key_locator/2` that returns `trust: :not_evaluated`;
+- deterministic grant and proof signing-input production with external signature assembly;
+- exact public Ed25519 JWK encoding, decoding, and RFC 7638 thumbprints;
+- bounded HTTPS target-URI normalization and type-preserving request digests;
+- bounded grant/proof decoding with `verification: :not_evaluated`;
+- `verify_grant/3`, returning redacted, non-authorizing `GrantFacts`;
+- `check_envelope/2`, re-verifying the raw grant and binding the holder signature, request,
+  nonce, time, digest, operation, and selectors before returning redacted, non-authorizing
+  `EnvelopeFacts`.
 
 The two decoder functions live in named public submodules under the explicit
 `BoundedAuthorityProtocol.V1` namespace. There is no duplicate decoder façade and no implicit
@@ -42,12 +49,9 @@ raw-number, UTF-8 byte, depth, node-count, or canonical-encoding enforcement.
 
 Later rows will provide:
 
-- closed, versioned grant and RFC 9449 DPoP data types;
-- RFC 8785 JCS request digests and exact signing inputs;
-- compact EdDSA grant and holder-proof decoding and verification;
 - consumption-chain and archive verification;
-- normative fixtures, independent conformance vectors, and a verifier CLI;
-- fixed, value-free errors and explicit resource limits.
+- the portable conformance corpus and verifier CLI;
+- release-candidate and connected-release gates.
 
 All verification inputs are explicit: already-trusted public key, expected audience and instance,
 server-derived method, normalized URI, invocation ID, operation, cast arguments, evaluation time,
@@ -101,6 +105,7 @@ Useful focused gates are:
 ```bash
 mix architecture
 mix audit
+mix bap03.performance
 mix package.check
 mix sbom.generate
 ```

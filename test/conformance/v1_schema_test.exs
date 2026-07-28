@@ -101,6 +101,7 @@ defmodule BoundedAuthorityProtocol.Conformance.V1SchemaTest do
 
     assert :ok = JSONSchex.validate(grant_schema, grant)
     assert :ok = JSONSchex.validate(proof_schema, proof)
+    assert :ok = JSONSchex.validate(proof_schema, Map.put(proof, "htm", "report-v2"))
 
     for invalid <- [
           Map.delete(grant, "cnf"),
@@ -118,7 +119,7 @@ defmodule BoundedAuthorityProtocol.Conformance.V1SchemaTest do
           Map.delete(proof, "ath"),
           Map.put(proof, "v", 2),
           Map.put(proof, "extra", true),
-          Map.put(proof, "htm", "post"),
+          Map.put(proof, "htm", "POST /"),
           Map.put(proof, "htu", "http://api.example.test/invoke"),
           Map.put(proof, "ba_inv", String.upcase(proof["ba_inv"])),
           Map.put(proof, "ath", "not-a-digest"),

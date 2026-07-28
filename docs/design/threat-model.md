@@ -14,7 +14,9 @@
 - Over-limit input is rejected before attacker-amplified allocation or cryptography.
 - Product/private dependencies, state, I/O, clock, randomness, signing, or secrets cannot enter
   the public package unnoticed.
-- Errors and inspection remain fixed/redacted; tracked fixtures contain no private key or seed.
+- Errors remain fixed/value-free; `GrantFacts` and `EnvelopeFacts` inspection remains
+  fixed/redacted; tracked fixtures contain no private key or seed. Other public inputs, hints,
+  configuration, and explicitly unverified values retain ordinary Elixir inspection.
 - A missing or surplus manifest fingerprint cannot hide keyed test material.
 
 ## Primary adversaries

@@ -12,5 +12,7 @@
 7. Pin released major versions and run the conformance vectors before accepting a new release.
 8. Treat `untrusted_key_locator/2` output only as a case-sensitive lookup hint with
    `trust: :not_evaluated`; it does not parse claims, verify bytes, select trust, or authorize.
-9. Treat the current 0.1.0 package as unpublished. BAP-02 decoding is available, but
-   cryptographic verification and public release are not.
+9. Pass only raw compact credentials to verification boundaries. Decoded values and verified
+   facts are evidence outputs, never reusable credentials.
+10. Treat the current 0.1.0 package as unpublished. BAP-03 verification is implemented, but no
+    public release exists.
