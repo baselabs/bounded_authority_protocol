@@ -731,8 +731,6 @@
       "swapped transition fingerprints": "invalid",
       "swapped transition kid": "invalid",
       "trailing byte exact EOF": "invalid",
-      "transition after end": "invalid",
-      "transition before start": "invalid",
       "transition maximum plus one": "invalid",
       "transition outside current window": "invalid",
       "transition outside next window": "invalid",

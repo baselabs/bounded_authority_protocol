@@ -813,12 +813,6 @@ function runTamperMatrix(fixture) {
   invalid("expected end anchor boundary", (entry) => {
     entry.end_anchor.sequence -= 1;
   });
-  invalid("transition before start", (entry) => {
-    entry.transitions[0].effective_at = entry.start_anchor.anchored_at - 1;
-  });
-  invalid("transition after end", (entry) => {
-    entry.transitions[0].effective_at = entry.end_anchor.anchored_at + 1;
-  });
   invalid("transition maximum plus one", (entry) => {
     const parsed = parseArchive(strictB64(entry.archive_base64url));
     parsed.header.transition_count = 257;
@@ -879,6 +873,9 @@ function verifySemanticEdges(fixture) {
       "signed_reverse_time_archive",
       "signed_invalid_genesis_anchor",
       "invalid_genesis_chain",
+      "signed_transition_before_start_archive",
+      "signed_transition_after_end_archive",
+      "verdicts",
     ],
     "semantic edge fixture",
   );
@@ -887,6 +884,26 @@ function verifySemanticEdges(fixture) {
     "semantic edge format",
   );
   assert(fixture.provenance.private_material_tracked === false, "semantic edge private material");
+  exactKeys(
+    fixture.verdicts,
+    [
+      "invalid_genesis_chain",
+      "signed_cross_chain_archive",
+      "signed_invalid_genesis_anchor",
+      "signed_reverse_time_archive",
+      "signed_transition_after_end_archive",
+      "signed_transition_before_start_archive",
+      "valid_same_id_equal_time_archive",
+    ],
+    "semantic edge verdicts",
+  );
+  assert(
+    fixture.verdicts.valid_same_id_equal_time_archive === "valid" &&
+      Object.entries(fixture.verdicts)
+        .filter(([name]) => name !== "valid_same_id_equal_time_archive")
+        .every(([_name, verdict]) => verdict === "invalid"),
+    "semantic edge verdict values",
+  );
 
   verifyArchive(fixture.valid_same_id_equal_time_archive);
 
@@ -945,7 +962,33 @@ function verifySemanticEdges(fixture) {
     "chain genesis predecessor",
   );
 
-  return 5;
+  const chronologyCases = [
+    [
+      "signed transition before start",
+      fixture.signed_transition_before_start_archive,
+      "increasing transition time",
+    ],
+    [
+      "signed transition after end",
+      fixture.signed_transition_after_end_archive,
+      "end chronology",
+    ],
+  ];
+
+  for (const [label, chronology, expectedMessage] of chronologyCases) {
+    const chronologyKeys = chronology.historical_keys.map(keyRecord);
+    verifyAnchor(chronology.start_anchor, chronologyKeys[0], `${label} start`);
+    verifyTransition(
+      chronology.transitions[0],
+      chronologyKeys[0],
+      chronologyKeys[1],
+      `${label} transition`,
+    );
+    verifyAnchor(chronology.end_anchor, chronologyKeys[1], `${label} end`);
+    expectFailure(label, () => verifyArchive(chronology), expectedMessage);
+  }
+
+  return 7;
 }
 
 function verifyPublishedVerdicts(verdicts) {
