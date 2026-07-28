@@ -71,9 +71,182 @@ function equalBytes(left, right, context) {
 function parseCanonicalJson(bytes, context) {
   const text = bytes.toString("utf8");
   assert(Buffer.from(text, "utf8").equals(bytes), `${context}: UTF-8`);
-  const value = JSON.parse(text);
+  const value = parseJsonNoDuplicates(text, context);
   assert(canonical(value) === text, `${context}: canonical bytes`);
   return value;
+}
+
+function parseJsonNoDuplicates(text, context) {
+  let index = 0;
+
+  function skipWhitespace() {
+    while (index < text.length && /[\t\n\r ]/.test(text[index])) index += 1;
+  }
+
+  function parseString() {
+    assert(text[index] === '"', `${context}: string`);
+    const start = index;
+    index += 1;
+    while (index < text.length) {
+      if (text[index] === "\\") {
+        index += 2;
+        continue;
+      }
+      if (text[index] === '"') {
+        index += 1;
+        return JSON.parse(text.slice(start, index));
+      }
+      index += 1;
+    }
+    fail(`${context}: unterminated string`);
+  }
+
+  function parseValue() {
+    skipWhitespace();
+    if (text[index] === "{") return parseObject();
+    if (text[index] === "[") return parseArray();
+    if (text[index] === '"') return parseString();
+
+    for (const [literal, value] of [
+      ["true", true],
+      ["false", false],
+      ["null", null],
+    ]) {
+      if (text.startsWith(literal, index)) {
+        index += literal.length;
+        return value;
+      }
+    }
+
+    const match = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(text.slice(index));
+    assert(match !== null, `${context}: value`);
+    index += match[0].length;
+    assert(index === text.length || /[\t\n\r ,\]}]/.test(text[index]), `${context}: number`);
+    const value = Number(match[0]);
+    assert(Number.isFinite(value), `${context}: finite number`);
+    return value;
+  }
+
+  function parseObject() {
+    const names = new Set();
+    const value = {};
+    index += 1;
+    skipWhitespace();
+    if (text[index] === "}") {
+      index += 1;
+      return value;
+    }
+    while (index < text.length) {
+      skipWhitespace();
+      const name = parseString();
+      assert(!names.has(name), `${context}: duplicate JSON member ${name}`);
+      names.add(name);
+      skipWhitespace();
+      assert(text[index] === ":", `${context}: member separator`);
+      index += 1;
+      value[name] = parseValue();
+      skipWhitespace();
+      if (text[index] === "}") {
+        index += 1;
+        return value;
+      }
+      assert(text[index] === ",", `${context}: object separator`);
+      index += 1;
+    }
+    fail(`${context}: unterminated object`);
+  }
+
+  function parseArray() {
+    const value = [];
+    index += 1;
+    skipWhitespace();
+    if (text[index] === "]") {
+      index += 1;
+      return value;
+    }
+    while (index < text.length) {
+      value.push(parseValue());
+      skipWhitespace();
+      if (text[index] === "]") {
+        index += 1;
+        return value;
+      }
+      assert(text[index] === ",", `${context}: array separator`);
+      index += 1;
+    }
+    fail(`${context}: unterminated array`);
+  }
+
+  const value = parseValue();
+  skipWhitespace();
+  assert(index === text.length, `${context}: trailing bytes`);
+  return value;
+}
+
+const ED25519_PRIVATE_KEY_OID = Buffer.from("06032b6570", "hex");
+const NESTED_PRIVATE_KEY_OCTETS = Buffer.from("04220420", "hex");
+
+function decodedBinaryCandidates(value) {
+  if (Array.isArray(value)) {
+    if (
+      value.length >= 48 &&
+      value.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255)
+    ) {
+      return [Buffer.from(value)];
+    }
+    return [];
+  }
+
+  if (typeof value !== "string") return [];
+  const candidates = [];
+
+  if (/^[0-9A-Fa-f]{96,}$/.test(value) && value.length % 2 === 0) {
+    candidates.push(Buffer.from(value, "hex"));
+  }
+  if (/^[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length >= 64 && value.length % 4 === 0) {
+    candidates.push(Buffer.from(value, "base64"));
+  }
+  if (/^[A-Za-z0-9_-]{64,}$/.test(value)) {
+    candidates.push(Buffer.from(value, "base64url"));
+  }
+
+  return candidates;
+}
+
+function isEd25519PrivateDer(bytes) {
+  return (
+    bytes.length >= 48 &&
+    bytes[0] === 0x30 &&
+    bytes.indexOf(ED25519_PRIVATE_KEY_OID) >= 0 &&
+    bytes.indexOf(NESTED_PRIVATE_KEY_OCTETS) > bytes.indexOf(ED25519_PRIVATE_KEY_OID)
+  );
+}
+
+function assertNoPrivateMaterial(value, context) {
+  if (typeof value === "string") {
+    assert(!/-----BEGIN (?:ENCRYPTED |ED25519 )?PRIVATE KEY-----/.test(value), `${context}: private PEM material`);
+  }
+
+  for (const candidate of decodedBinaryCandidates(value)) {
+    assert(!isEd25519PrivateDer(candidate), `${context}: private Ed25519 DER material`);
+  }
+
+  if (Array.isArray(value)) {
+    for (const child of value) assertNoPrivateMaterial(child, context);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+
+  for (const [key, child] of Object.entries(value)) {
+    if (/(^|[_-])(d|sk)($|[_-])|private|secret|seed/i.test(key)) {
+      assert(
+        decodedBinaryCandidates(child).length === 0 &&
+          !(typeof child === "string" && child.length > 0),
+        `${context}: private key material`,
+      );
+    }
+    assertNoPrivateMaterial(child, context);
+  }
 }
 
 function fingerprint(publicKey) {
@@ -1136,7 +1309,9 @@ function discoverPublicKeys(path, manifestPath, fingerprints) {
   }
   const bytes = readFileSync(path);
   if (extname(path) === ".json") {
-    discoverJsonKeys(JSON.parse(bytes.toString("utf8")), fingerprints);
+    const value = parseJsonNoDuplicates(bytes.toString("utf8"), `census JSON ${path}`);
+    assertNoPrivateMaterial(value, `census JSON ${path}`);
+    discoverJsonKeys(value, fingerprints);
   } else {
     discoverTextKeys(bytes.toString("utf8"), fingerprints);
   }
@@ -1228,14 +1403,18 @@ function main() {
   assert(arguments_.length === 2, "usage: chain_archive_independent.mjs FIXTURE MANIFEST");
   const fixturePath = resolve(arguments_[0]);
   const manifestPath = resolve(arguments_[1]);
-  const fixture = JSON.parse(readFileSync(fixturePath, "utf8"));
-  const semanticFixture = JSON.parse(
+  const fixture = parseJsonNoDuplicates(readFileSync(fixturePath, "utf8"), `fixture ${fixturePath}`);
+  const semanticFixture = parseJsonNoDuplicates(
     readFileSync(
       join(repositoryRoot, "priv/conformance/v1/vectors/chain-semantic-edge.json"),
       "utf8",
     ),
+    "semantic fixture",
   );
-  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const manifest = parseJsonNoDuplicates(readFileSync(manifestPath, "utf8"), `manifest ${manifestPath}`);
+  assertNoPrivateMaterial(fixture, "fixture");
+  assertNoPrivateMaterial(semanticFixture, "semantic fixture");
+  assertNoPrivateMaterial(manifest, "manifest");
   exactKeys(
     fixture,
     ["format", "provenance", "public_keys", "chains", "archives", "boundary_adversaries", "verdicts"],

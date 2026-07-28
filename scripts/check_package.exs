@@ -37,6 +37,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "lib/bounded_authority_protocol/v1/compact_jws.ex",
                     "lib/bounded_authority_protocol/v1/consumption_chain.ex",
                     "lib/bounded_authority_protocol/v1/consumption_entry.ex",
+                    "lib/bounded_authority_protocol/v1/context_validation.ex",
                     "lib/bounded_authority_protocol/v1/credentials.ex",
                     "lib/bounded_authority_protocol/v1/decoded_grant.ex",
                     "lib/bounded_authority_protocol/v1/decoded_proof.ex",

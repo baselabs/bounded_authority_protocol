@@ -9,6 +9,7 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.ChainInput
   alias BoundedAuthorityProtocol.V1.ConsumptionChain
+  alias BoundedAuthorityProtocol.V1.ContextValidation
   alias BoundedAuthorityProtocol.V1.EncodedAnchoredExport
   alias BoundedAuthorityProtocol.V1.ExpectedAnchor
   alias BoundedAuthorityProtocol.V1.ExpectedAnchoredExport
@@ -89,6 +90,13 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
       ) do
     with {:ok, bounds} <- Bounds.coerce(expected.bounds),
          :ok <- validate_expected_anchored_export(expected, bounds),
+         :ok <-
+           validate_historical_key_shapes(
+             key_chain.keys,
+             proper_length(expected.transitions, 0) + 1,
+             bounds,
+             0
+           ),
          :ok <- validate_object_versions(archived.version, expected.object_version, bounds),
          {:ok, _chunk_count, _byte_count} <-
            validate_chunks(archived.chunks, bounds, 0, 0),
@@ -344,6 +352,9 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
          {:ok, ^bounds} <- Bounds.coerce(chain.bounds),
          {:ok, ^bounds} <- Bounds.coerce(start_anchor.bounds),
          {:ok, ^bounds} <- Bounds.coerce(end_anchor.bounds),
+         :ok <- ContextValidation.expected_chain(chain, bounds),
+         :ok <- ContextValidation.expected_anchor(start_anchor, bounds),
+         :ok <- ContextValidation.expected_anchor(end_anchor, bounds),
          {:ok, transition_count} <-
            validate_expected_transitions(expected.transitions, bounds, 0),
          true <- transition_count <= bounds.key_transitions,
@@ -390,13 +401,33 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
          count
        )
        when count < bounds.key_transitions do
-    case Bounds.coerce(transition.bounds) do
-      {:ok, ^bounds} -> validate_expected_transitions(rest, bounds, count + 1)
+    case {Bounds.coerce(transition.bounds),
+          ContextValidation.expected_transition(transition, bounds)} do
+      {{:ok, ^bounds}, :ok} -> validate_expected_transitions(rest, bounds, count + 1)
       _failure -> {:error, :invalid}
     end
   end
 
   defp validate_expected_transitions(_transitions, _bounds, _count),
+    do: {:error, :invalid}
+
+  defp validate_historical_key_shapes([], expected_count, _bounds, expected_count), do: :ok
+
+  defp validate_historical_key_shapes(
+         [%HistoricalPublicKey{} = key | rest],
+         expected_count,
+         bounds,
+         count
+       )
+       when count < expected_count do
+    if ContextValidation.historical_key(key, bounds) == :ok do
+      validate_historical_key_shapes(rest, expected_count, bounds, count + 1)
+    else
+      {:error, :invalid}
+    end
+  end
+
+  defp validate_historical_key_shapes(_keys, _expected_count, _bounds, _count),
     do: {:error, :invalid}
 
   defp transitions_match_chain?([], _chain_id), do: true

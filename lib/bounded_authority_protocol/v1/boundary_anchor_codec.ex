@@ -6,6 +6,7 @@ defmodule BoundedAuthorityProtocol.V1.BoundaryAnchorCodec do
   alias BoundedAuthorityProtocol.V1.BoundaryAnchor
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.CompactJws
+  alias BoundedAuthorityProtocol.V1.ContextValidation
   alias BoundedAuthorityProtocol.V1.ExpectedAnchor
   alias BoundedAuthorityProtocol.V1.FixedBytes
   alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
@@ -187,40 +188,16 @@ defmodule BoundedAuthorityProtocol.V1.BoundaryAnchorCodec do
         fixed_digest?(anchor.chain_hash, bounds) and fixed_digest?(fingerprint, bounds) and
         (anchor.sequence != 0 or FixedBytes.equal?(anchor.chain_hash, @zero_hash))
 
-  defp validate_expected(expected, bounds) do
-    anchor = %BoundaryAnchor{
-      anchor_id: expected.anchor_id,
-      anchored_at: expected.anchored_at,
-      chain_id: expected.chain_id,
-      sequence: expected.sequence,
-      chain_hash: expected.chain_hash,
-      key_id: expected.key_id,
-      public_key: <<0::256>>
-    }
+  defp validate_expected(expected, bounds),
+    do: ContextValidation.expected_anchor(expected, bounds)
 
-    validate_anchor_fields(anchor, expected.key_fingerprint, bounds)
-  end
-
-  defp validate_historical_key(key, bounds) do
-    if valid_key_id?(key.key_id, bounds) and is_binary(key.public_key) and
-         byte_size(key.public_key) == bounds.public_key_bytes and
-         valid_time?(key.valid_from, bounds) and
-         valid_before?(key.valid_before, key.valid_from, bounds) do
-      :ok
-    else
-      {:error, :invalid}
-    end
-  end
+  defp validate_historical_key(key, bounds),
+    do: ContextValidation.historical_key(key, bounds)
 
   defp inside_window?(time, key) do
     key.valid_from <= time and
       (key.valid_before == :unbounded or time < key.valid_before)
   end
-
-  defp valid_before?(:unbounded, _valid_from, _bounds), do: true
-
-  defp valid_before?(valid_before, valid_from, bounds),
-    do: valid_time?(valid_before, bounds) and valid_before > valid_from
 
   defp header_json(key_id) do
     {:object,

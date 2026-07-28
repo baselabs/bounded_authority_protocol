@@ -438,6 +438,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
 
     positions =
       for marker <- [
+            "validate_historical_key_shapes(",
             "validate_object_versions(archived.version, expected.object_version, bounds)",
             "validate_chunks(archived.chunks, bounds, 0, 0)",
             "digest <- hash_chunks(archived.chunks)",

@@ -134,6 +134,19 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
     end)
   end
 
+  test "self-identifying Ed25519 private DER fails under an unrelated label" do
+    private_der =
+      Base.encode64(
+        <<0x30, 0x2E, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x04, 0x22,
+          0x04, 0x20, 0::256>>
+      )
+
+    with_temp_json(%{"signing_material" => private_der}, fn path ->
+      {output, 1} = run_node(["--scan", path])
+      assert output =~ "private Ed25519 DER material"
+    end)
+  end
+
   test "one exact-byte drift makes the independent verifier exit nonzero" do
     fixture =
       update_in(

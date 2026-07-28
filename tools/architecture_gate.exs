@@ -28,10 +28,10 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:read_frame, 2} => %{variable_call: 3},
       {:read_transition_frames, 5} => %{variable_call: 2},
       {:validate_expected_anchored_export, 2} => %{variable_call: 3},
-      {:validate_expected_export, 2} => %{variable_call: 15},
+      {:validate_expected_export, 2} => %{variable_call: 18},
       {:validate_expected_key_path, 6} => %{variable_call: 3},
       {:validate_key_chain, 5} => %{variable_call: 4},
-      {:verify, 3} => %{variable_call: 19},
+      {:verify, 3} => %{variable_call: 20},
       {:verify_transitions, 7} => %{variable_call: 2}
     },
     "Elixir.BoundedAuthorityProtocol.V1.ArchivedObject.beam" => %{
@@ -227,6 +227,15 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
                                     module_info: 1,
                                     parse_row: 2
                                   ],
+                                  "Elixir.BoundedAuthorityProtocol.V1.ContextValidation.beam" => [
+                                    __info__: 1,
+                                    expected_anchor: 2,
+                                    expected_chain: 2,
+                                    expected_transition: 2,
+                                    historical_key: 2,
+                                    module_info: 0,
+                                    module_info: 1
+                                  ],
                                   "Elixir.BoundedAuthorityProtocol.V1.FixedBytes.beam" => [
                                     __info__: 1,
                                     equal?: 2,
@@ -408,7 +417,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   @approved_local_aliases ~w(AnchorFacts AnchoredExportCodec AnchoredExportFacts
     AnchoredExportInput ArchivedObject Base64Url BoundaryAnchor BoundaryAnchorCodec Bounds
-    ChainFacts ChainInput CompactJws ConsumptionChain ConsumptionEntry Container Credentials
+    ChainFacts ChainInput CompactJws ConsumptionChain ConsumptionEntry Container ContextValidation Credentials
     DecodedGrant DecodedProof EncodedAnchoredExport EncodedConsumptionEntry EnvelopeFacts
     ExpectedAnchor ExpectedAnchoredExport ExpectedChain ExpectedExport ExpectedGrant
     ExpectedKeyTransition ExpectedRequest FixedBytes Grant GrantFacts HistoricalKeyChain
@@ -1098,6 +1107,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules("lib/bounded_authority_protocol/v1/string_or_uri.ex"),
     do: ~w(String URI)
 
+  defp approved_source_modules("lib/bounded_authority_protocol/v1/context_validation.ex"),
+    do: ~w(String StringOrUri)
+
   defp approved_source_modules("lib/bounded_authority_protocol/v1/uri.ex"),
     do: ~w(Enum Integer List)
 
@@ -1143,6 +1155,13 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          function
        ),
        do: {module, function} in [{:binary, :split}, {"String", :valid?}, {"URI", :new}]
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/v1/context_validation.ex",
+         module,
+         function
+       ),
+       do: {module, function} in [{"String", :valid?}, {"StringOrUri", :valid?}]
 
   defp approved_source_call?(path, module, function)
        when path in @chain_codec_source_paths do

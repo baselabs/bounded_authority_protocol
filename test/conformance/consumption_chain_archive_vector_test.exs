@@ -64,6 +64,55 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
              )
   end
 
+  test "independent verifier rejects duplicate outer corpus and manifest members" do
+    fixture = File.read!(@fixture)
+
+    duplicated_fixture =
+      String.replace(
+        fixture,
+        ~s("format": "bounded-authority-protocol-v1-consumption-chain-archive"),
+        ~s("format": "shadow", "format": "bounded-authority-protocol-v1-consumption-chain-archive"),
+        global: false
+      )
+
+    with_temp_bytes(duplicated_fixture, fn path ->
+      assert {output, 1} = run_node(path, @manifest)
+      assert output =~ "duplicate JSON member format"
+    end)
+
+    manifest = File.read!(@manifest)
+
+    duplicated_manifest =
+      String.replace(
+        manifest,
+        ~s("format": "bounded-authority-protocol-v1-vector-manifest"),
+        ~s("format": "shadow", "format": "bounded-authority-protocol-v1-vector-manifest"),
+        global: false
+      )
+
+    with_temp_bytes(duplicated_manifest, fn path ->
+      assert {output, 1} = run_node(@fixture, path)
+      assert output =~ "duplicate JSON member format"
+    end)
+  end
+
+  test "independent verifier rejects self-identifying Ed25519 private DER under an unknown label" do
+    private_der =
+      Base.encode64(
+        <<0x30, 0x2E, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x04, 0x22,
+          0x04, 0x20, 0::256>>
+      )
+
+    fixture =
+      fixture!()
+      |> put_in(["provenance", "signing_material"], private_der)
+
+    with_temp_json(fixture, fn path ->
+      assert {output, 1} = run_node(path, @manifest)
+      assert output =~ "private Ed25519 DER material"
+    end)
+  end
+
   test "signed semantic-edge fixture proves inclusive rollover and fail-closed genesis and chain identity" do
     fixture = json!(@semantic_fixture)
     valid = fixture["valid_same_id_equal_time_archive"]
@@ -274,6 +323,7 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
     refute Enum.any?(keys, &String.contains?(&1, "seed"))
     refute source =~ "PRIVATE KEY"
     refute source =~ "BEGIN PRIVATE"
+    refute Enum.any?(fixtures, &contains_ed25519_private_der?/1)
     assert Enum.all?(fixtures, &(&1["provenance"]["private_material_tracked"] == false))
   end
 
@@ -469,13 +519,17 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
   end
 
   defp with_temp_json(value, function) do
+    with_temp_bytes(:json.encode(value), function)
+  end
+
+  defp with_temp_bytes(bytes, function) do
     path =
       Path.join(
         System.tmp_dir!(),
         "bap04-vector-#{System.unique_integer([:positive, :monotonic])}.json"
       )
 
-    File.write!(path, :json.encode(value))
+    File.write!(path, bytes)
 
     try do
       function.(path)
@@ -494,4 +548,78 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
 
   defp collect_keys(value) when is_list(value), do: Enum.flat_map(value, &collect_keys/1)
   defp collect_keys(_value), do: []
+
+  defp contains_ed25519_private_der?(value) when is_map(value),
+    do: Enum.any?(value, fn {_key, child} -> contains_ed25519_private_der?(child) end)
+
+  defp contains_ed25519_private_der?(value) when is_list(value) do
+    encoded =
+      if length(value) >= 48 and
+           Enum.all?(value, &(is_integer(&1) and &1 >= 0 and &1 <= 255)) do
+        [IO.iodata_to_binary(value)]
+      else
+        []
+      end
+
+    Enum.any?(encoded, &ed25519_private_der?/1) or
+      Enum.any?(value, &contains_ed25519_private_der?/1)
+  end
+
+  defp contains_ed25519_private_der?(value) when is_binary(value) do
+    candidates =
+      []
+      |> maybe_decode_hex(value)
+      |> maybe_decode_base64(value)
+      |> maybe_decode_base64url(value)
+
+    Enum.any?(candidates, &ed25519_private_der?/1)
+  end
+
+  defp contains_ed25519_private_der?(_value), do: false
+
+  defp maybe_decode_hex(candidates, value) do
+    if byte_size(value) >= 96 and rem(byte_size(value), 2) == 0 and
+         String.match?(value, ~r/\A[0-9A-Fa-f]+\z/) do
+      [Base.decode16!(value, case: :mixed) | candidates]
+    else
+      candidates
+    end
+  end
+
+  defp maybe_decode_base64(candidates, value) do
+    if byte_size(value) >= 64 and rem(byte_size(value), 4) == 0 and
+         String.match?(value, ~r/\A[A-Za-z0-9+\/]+={0,2}\z/) do
+      case Base.decode64(value) do
+        {:ok, decoded} -> [decoded | candidates]
+        :error -> candidates
+      end
+    else
+      candidates
+    end
+  end
+
+  defp maybe_decode_base64url(candidates, value) do
+    if byte_size(value) >= 64 and String.match?(value, ~r/\A[A-Za-z0-9_-]+\z/) do
+      case Base.url_decode64(value, padding: false) do
+        {:ok, decoded} -> [decoded | candidates]
+        :error -> candidates
+      end
+    else
+      candidates
+    end
+  end
+
+  defp ed25519_private_der?(bytes) do
+    oid = <<0x06, 0x03, 0x2B, 0x65, 0x70>>
+    nested_private_octets = <<0x04, 0x22, 0x04, 0x20>>
+
+    with true <- byte_size(bytes) >= 48,
+         <<0x30, _rest::binary>> <- bytes,
+         {oid_position, _} <- :binary.match(bytes, oid),
+         {octets_position, _} <- :binary.match(bytes, nested_private_octets) do
+      octets_position > oid_position
+    else
+      _failure -> false
+    end
+  end
 end
