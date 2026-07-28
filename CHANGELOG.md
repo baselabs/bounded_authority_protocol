@@ -64,12 +64,15 @@ All notable changes to `bounded_authority_protocol` are documented here.
   evidence. The project-independent Node verifiers prove an exact two-way eleven-key census split
   into exact per-verifier sets observed at their public-key import boundaries,
   49 named decoded-byte, structural, boundary, coverage, chronology, and limit cases, two direct
-  valid chain cases, and seven signed semantic-edge cases; the isolated mutation gate proves 29
+  valid chain cases, and seven signed semantic-edge cases; the isolated mutation gate proves 32
   source-level invariants go red. Published fixture verdicts and complete redacted
   chain/anchor/transition/export facts are exact-checked rather than treated as commentary.
 - Add the maximum-count, maximum-width worst-of-20 chain/archive resource gate, with every sample
   isolated in a fresh monitored process, plus ADR 0004, normative documentation, and packed
   external-consumer coverage.
+- Validate every nested expected field and historical-key shape before archive hashing or parsing;
+  reject duplicate outer conformance JSON members; and detect self-identifying Ed25519 PKCS#8 DER
+  regardless of its surrounding field name.
 - Make Ed25519 public-key/signature and SHA-256 digest widths immutable bounds so tightening cannot
   produce or admit a structurally nonconforming cryptographic value.
 - Centralize strict StringOrURI validation across grant/proof and BAP-04 identifiers so malformed

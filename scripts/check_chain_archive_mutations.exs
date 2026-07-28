@@ -150,10 +150,35 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
       path: "lib/bounded_authority_protocol/v1/boundary_anchor_codec.ex",
       from: "(anchor.sequence != 0 or FixedBytes.equal?(anchor.chain_hash, @zero_hash))",
       to: "is_binary(anchor.chain_hash)",
+      command: ["mix", "test", "test/bounded_authority_protocol/v1/boundary_anchor_test.exs"]
+    },
+    %{
+      name: "anchor-nonnegative-sequence",
+      path: "lib/bounded_authority_protocol/v1/boundary_anchor_codec.ex",
+      from: "is_integer(value) and value >= 0 and value <= bounds.integer_magnitude",
+      to: "is_integer(value) and value <= bounds.integer_magnitude",
+      command: ["mix", "test", "test/bounded_authority_protocol/v1/boundary_anchor_test.exs"]
+    },
+    %{
+      name: "expected-anchor-genesis-zero-hash",
+      path: "lib/bounded_authority_protocol/v1/context_validation.ex",
+      from: "(expected.sequence != 0 or FixedBytes.equal?(expected.chain_hash, @zero_hash))",
+      to: "is_binary(expected.chain_hash)",
       command: [
         "mix",
         "test",
-        "test/conformance/consumption_chain_archive_vector_test.exs"
+        "test/bounded_authority_protocol/v1/context_validation_test.exs"
+      ]
+    },
+    %{
+      name: "expected-anchor-nonnegative-sequence",
+      path: "lib/bounded_authority_protocol/v1/context_validation.ex",
+      from: "is_integer(value) and value >= 0 and value <= bounds.integer_magnitude",
+      to: "is_integer(value) and value <= bounds.integer_magnitude",
+      command: [
+        "mix",
+        "test",
+        "test/bounded_authority_protocol/v1/context_validation_test.exs"
       ]
     },
     %{
