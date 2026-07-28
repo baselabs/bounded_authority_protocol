@@ -10,9 +10,14 @@ defmodule BoundedAuthorityProtocol.Conformance.V1SchemaTest do
                   __DIR__
                 )
   @schema_names [
+    "anchored-export-header.schema.json",
+    "boundary-anchor-header.schema.json",
+    "boundary-anchor-payload.schema.json",
+    "consumption-row.schema.json",
     "grant-header.schema.json",
     "grant-payload.schema.json",
     "json-value.schema.json",
+    "key-transition-payload.schema.json",
     "proof-header.schema.json",
     "proof-payload.schema.json",
     "public-okp-jwk.schema.json",
@@ -158,6 +163,78 @@ defmodule BoundedAuthorityProtocol.Conformance.V1SchemaTest do
         ] do
       assert {:error, _errors} = JSONSchex.validate(schema, invalid)
     end
+  end
+
+  test "chain, anchor, transition, and archive schemas are closed exact structures" do
+    digest = String.duplicate("A", 43)
+
+    row = %{
+      "v" => 1,
+      "chain_id" => "urn:example:chain",
+      "sequence" => 1,
+      "previous" => digest,
+      "commitment" => digest
+    }
+
+    anchor_header = %{"alg" => "EdDSA", "typ" => "ba+chain-anchor", "kid" => "archive-key-a"}
+
+    anchor_payload = %{
+      "v" => 1,
+      "anchor_id" => "urn:example:anchor:start",
+      "anchored_at" => 1_999,
+      "chain_id" => "urn:example:chain",
+      "sequence" => 0,
+      "chain_hash" => digest,
+      "key_fingerprint" => digest
+    }
+
+    transition = %{
+      "v" => 1,
+      "transition_id" => "urn:example:transition:a-b",
+      "chain_id" => "urn:example:chain",
+      "effective_at" => 2_000,
+      "from_key_fingerprint" => digest,
+      "to_key_id" => "archive-key-b",
+      "to_key_fingerprint" => digest
+    }
+
+    archive_header = %{
+      "v" => 1,
+      "chain_id" => "urn:example:chain",
+      "first_sequence" => 1,
+      "last_sequence" => 1,
+      "row_count" => 1,
+      "transition_count" => 0,
+      "previous_hash" => digest,
+      "last_hash" => digest
+    }
+
+    pairs = [
+      {"consumption-row.schema.json", row, "v"},
+      {"boundary-anchor-header.schema.json", anchor_header, "kid"},
+      {"boundary-anchor-payload.schema.json", anchor_payload, "v"},
+      {"key-transition-payload.schema.json", transition, "v"},
+      {"anchored-export-header.schema.json", archive_header, "v"}
+    ]
+
+    for {name, valid, required_key} <- pairs do
+      schema = compiled!(name)
+      assert :ok = JSONSchex.validate(schema, valid)
+      assert {:error, _errors} = JSONSchex.validate(schema, Map.put(valid, "extra", true))
+      assert {:error, _errors} = JSONSchex.validate(schema, Map.delete(valid, required_key))
+    end
+
+    assert {:error, _errors} =
+             JSONSchex.validate(compiled!("boundary-anchor-payload.schema.json"), %{
+               anchor_payload
+               | "sequence" => -1
+             })
+
+    assert {:error, _errors} =
+             JSONSchex.validate(compiled!("anchored-export-header.schema.json"), %{
+               archive_header
+               | "row_count" => 65_537
+             })
   end
 
   test "JSON-value schema is structural while normative decoder owns byte limits" do

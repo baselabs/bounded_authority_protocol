@@ -410,6 +410,100 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
            end)
   end
 
+  test "fixed-byte comparison is pinned to constant-time crypto and is mutation-red" do
+    root = copy_actual_project!()
+    path = Path.join(root, "lib/bounded_authority_protocol/v1/fixed_bytes.ex")
+    original = File.read!(path)
+
+    mutated =
+      String.replace(
+        original,
+        ":crypto.hash_equals(left, right)",
+        "left == right",
+        global: false
+      )
+
+    assert mutated != original
+    File.write!(path, mutated)
+
+    assert Enum.any?(ArchitectureGate.check(root, compiled: false), fn violation ->
+             violation.category == :crypto_contract and
+               violation.detail =~ "exactly one :crypto.hash_equals/2"
+           end)
+  end
+
+  test "new protocol mechanics have exact compiled public exports" do
+    root = copy_actual_project!()
+
+    assert {_output, 0} =
+             System.cmd("mix", ["compile"],
+               cd: root,
+               env: [{"MIX_ENV", "prod"}],
+               stderr_to_stdout: true
+             )
+
+    refute Enum.any?(
+             ArchitectureGate.check_compiled(root),
+             &(&1.category == :public_surface)
+           )
+
+    path = Path.join(root, "lib/bounded_authority_protocol/v1/anchor_facts.ex")
+    original = File.read!(path)
+
+    mutated =
+      String.replace(
+        original,
+        "defstruct @enforce_keys",
+        "defstruct @enforce_keys\n\n  def unexpected_export, do: :forbidden",
+        global: false
+      )
+
+    assert mutated != original
+    File.write!(path, mutated)
+
+    assert {_output, 0} =
+             System.cmd("mix", ["compile", "--force"],
+               cd: root,
+               env: [{"MIX_ENV", "prod"}],
+               stderr_to_stdout: true
+             )
+
+    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+             violation.category == :public_surface and
+               violation.detail =~ "unexpected_export"
+           end)
+  end
+
+  test "chain facts expose no generic collection or string protocol and no raw evidence fields" do
+    modules = [
+      BoundedAuthorityProtocol.V1.AnchorFacts,
+      BoundedAuthorityProtocol.V1.AnchoredExportFacts,
+      BoundedAuthorityProtocol.V1.ChainFacts,
+      BoundedAuthorityProtocol.V1.KeyTransitionFacts
+    ]
+
+    forbidden_fields = [
+      :bytes,
+      :chunks,
+      :commitment,
+      :object_version,
+      :public_key,
+      :rows,
+      :signature
+    ]
+
+    for module <- modules do
+      value = module.__struct__()
+
+      assert Inspect.impl_for(value)
+      refute Enumerable.impl_for(value)
+      refute Collectable.impl_for(value)
+      refute String.Chars.impl_for(value)
+      refute function_exported?(module, :fetch, 2)
+      refute Enum.any?(forbidden_fields, &Map.has_key?(value, &1))
+    end
+  end
+
   test "the CI entrypoint goes red for a planted forbidden dependency and green after removal" do
     root = copy_actual_project!()
     script = Path.join(@root, "scripts/check_architecture.exs")

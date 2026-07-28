@@ -18,6 +18,10 @@
   fixed/redacted; tracked fixtures contain no private key or seed. Other public inputs, hints,
   configuration, and explicitly unverified values retain ordinary Elixir inspection.
 - A missing or surplus manifest fingerprint cannot hide keyed test material.
+- A truncated, reordered, relinked, cross-chain, wrong-generation, or trailing-byte archive cannot
+  satisfy exact caller boundaries and complete-object verification.
+- An unauthenticated, reordered, duplicated, cyclic, reverse-time, or out-of-window key transition
+  cannot advance the historical verification key.
 
 ## Primary adversaries
 
@@ -31,6 +35,8 @@
 - a fixture producer whose implementation agrees only with itself or whose manifest omits a key;
 - an input sender using duplicate fields, alternate base64url, private JWK members, HTTP or
   ambiguous URIs, malformed Ed25519 points/signatures, or maximum-plus-one structures.
+- an archive controller supplying a validly signed shorter history, relinked omission, stale object
+  generation, incomplete chunk stream, or forged historical-key path.
 
 ## Required controls
 
@@ -45,6 +51,9 @@
   tamper, duplicate/encoding, property/fuzz, timing/allocation, and source-isolated mutation-red
   gates;
 - architecture/package tests rejecting runtime, product, private, encoder, or inspection leaks.
+- mandatory caller chain/anchor/transition/digest/object-version context; exact archive EOF;
+  lower-inclusive/upper-exclusive historical windows; authenticated positional rollover; and
+  constant-time fixed-width hash/fingerprint comparisons.
 
 ## Adjacent controls outside this library
 
