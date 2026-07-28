@@ -42,6 +42,22 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
 
     assert manifest["canonical_public_key_fingerprints"] ==
              Enum.sort(Enum.uniq(manifest["canonical_public_key_fingerprints"]))
+
+    assert manifest["verifier_public_key_fingerprints"] == %{
+             "bap03_independent.mjs" => [
+               "0qPOlfSr_giHdRaDK18shLtG5DoQL1a2nrHVDeWruJI",
+               "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk",
+               "b5dejonEMNbWuAUspTppNgiUa6QUXdzk40kdsDcWK6g",
+               "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+             ],
+             "chain_archive_independent.mjs" => [
+               "B_luRLoL5T-YfqSCot-qLaUVewraSBu-qaEWqXfMRHI",
+               "TolqHySkTC69-Y7DUVNJP7JPn31VXHfk37ytoM0MZXM",
+               "gajR1zhnSjnHaH8LRAxglMF1t6aNiIRwljRrGC66UuI",
+               "jNqoeV3u-yTgM-aDSbR90dRdNvOP0aD0J6_anyf0NRI",
+               "ux6kGmd8C56UOZy4dXGjmqLHQO3PuOmQ5dg89lEO-Ag"
+             ]
+           }
   end
 
   test "removing a listed fingerprint fails while its keyed fixture remains reachable" do
@@ -73,6 +89,24 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
     with_temp_json(manifest, fn path ->
       {output, 1} = run_node(["--manifest", path])
       assert output =~ "manifest discovery roots mismatch"
+    end)
+  end
+
+  test "moving a reached key to the other verifier fails import-boundary ownership" do
+    manifest = json!(@manifest)
+    [moved | retained] = manifest["verifier_public_key_fingerprints"]["bap03_independent.mjs"]
+
+    manifest =
+      manifest
+      |> put_in(["verifier_public_key_fingerprints", "bap03_independent.mjs"], retained)
+      |> update_in(
+        ["verifier_public_key_fingerprints", "chain_archive_independent.mjs"],
+        &Enum.sort([moved | &1])
+      )
+
+    with_temp_json(manifest, fn path ->
+      {output, 1} = run_node(["--manifest", path])
+      assert output =~ "manifest verifier import set mismatch"
     end)
   end
 

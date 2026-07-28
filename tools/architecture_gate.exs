@@ -31,7 +31,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:validate_expected_export, 2} => %{variable_call: 15},
       {:validate_expected_key_path, 6} => %{variable_call: 3},
       {:validate_key_chain, 5} => %{variable_call: 4},
-      {:verify, 3} => %{variable_call: 20},
+      {:verify, 3} => %{variable_call: 19},
       {:verify_transitions, 7} => %{variable_call: 2}
     },
     "Elixir.BoundedAuthorityProtocol.V1.ArchivedObject.beam" => %{

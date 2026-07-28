@@ -10,8 +10,7 @@ defmodule BoundedAuthorityProtocol.V1.AnchorFacts do
     :chain_hash,
     :key_fingerprint,
     :verification,
-    :trust,
-    :authorization
+    :trust
   ]
   defstruct @enforce_keys
 
@@ -24,8 +23,7 @@ defmodule BoundedAuthorityProtocol.V1.AnchorFacts do
           chain_hash: binary(),
           key_fingerprint: binary(),
           verification: :signature_and_window,
-          trust: :not_evaluated,
-          authorization: :not_evaluated
+          trust: :not_evaluated
         }
 end
 

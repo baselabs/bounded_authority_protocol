@@ -10,8 +10,7 @@ defmodule BoundedAuthorityProtocol.V1.ChainFacts do
     :previous_hash,
     :last_hash,
     :verification,
-    :trust,
-    :authorization
+    :trust
   ]
   defstruct @enforce_keys
 
@@ -24,8 +23,7 @@ defmodule BoundedAuthorityProtocol.V1.ChainFacts do
           previous_hash: binary(),
           last_hash: binary(),
           verification: :boundary_consistent,
-          trust: :not_evaluated,
-          authorization: :not_evaluated
+          trust: :not_evaluated
         }
 end
 

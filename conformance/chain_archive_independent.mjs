@@ -12,6 +12,8 @@ const ARCHIVE_PREFIX = Buffer.from("BAP1-ARCHIVE\0EXPORT\0", "binary");
 const ROW_PREFIX = Buffer.from("BAP1-CHAIN\0", "binary");
 const SPKI_ED25519_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 const SAFE_INTEGER = Number.MAX_SAFE_INTEGER;
+const importedPublicKeyFingerprints = new Set();
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function fail(message) {
   throw new Error(message);
@@ -81,6 +83,7 @@ function fingerprint(publicKey) {
 
 function nodePublicKey(raw) {
   assert(raw.length === 32, "Ed25519 public-key width");
+  importedPublicKeyFingerprints.add(fingerprint(raw).toString("base64url"));
   return createPublicKey({
     key: Buffer.concat([SPKI_ED25519_PREFIX, raw]),
     format: "der",
@@ -375,14 +378,24 @@ function keyRecord(raw) {
   return raw;
 }
 
-function verifyArchive(rawCase, overrideChain = undefined) {
+function verifyArchive(
+  rawCase,
+  overrideChain = undefined,
+  observedVersion = rawCase.object_version,
+  expectedVersion = rawCase.object_version,
+) {
   const archive = strictB64(rawCase.archive_base64url);
   assert(archive.length === rawCase.archive_byte_count, `${rawCase.name}: byte count`);
   equalBytes(sha256(archive), strictB64(rawCase.archive_digest, 32), `${rawCase.name}: digest`);
   assert(
-    typeof rawCase.object_version === "string" && rawCase.object_version.length > 0,
-    `${rawCase.name}: object version`,
+    typeof observedVersion === "string" && observedVersion.length > 0,
+    `${rawCase.name}: observed object version`,
   );
+  assert(
+    typeof expectedVersion === "string" && expectedVersion.length > 0,
+    `${rawCase.name}: expected object version`,
+  );
+  assert(observedVersion === expectedVersion, `${rawCase.name}: object version mismatch`);
   const parsed = parseArchive(archive);
   const expectedChain = overrideChain ?? rawCase.chain;
   assert(canonical(parsed.header) === canonical({
@@ -612,6 +625,9 @@ function runTamperMatrix(fixture) {
   invalid("transition outside next window", (entry) => {
     entry.historical_keys[1].valid_from = entry.transitions[0].effective_at + 1;
   });
+  invalid("transition outside current window", (entry) => {
+    entry.historical_keys[0].valid_before = entry.transitions[0].effective_at;
+  });
   invalid("reverse-time boundary", (entry) => {
     entry.end_anchor.anchored_at = entry.start_anchor.anchored_at - 1;
   });
@@ -624,9 +640,18 @@ function runTamperMatrix(fixture) {
   invalid("archive digest", (entry) => {
     entry.archive_digest = Buffer.alloc(32).toString("base64url");
   });
-  invalid("object version", (entry) => {
-    entry.object_version = "";
-  });
+  expectFailure(
+    "object version mismatch",
+    () =>
+      verifyArchive(
+        one,
+        undefined,
+        `${one.object_version}-observed-drift`,
+        one.object_version,
+      ),
+    "object version mismatch",
+  );
+  cases += 1;
 
   for (const adversary of fixture.boundary_adversaries) {
     verifyArchive(adversary);
@@ -719,6 +744,27 @@ function verifySemanticEdges(fixture) {
   );
 
   return 5;
+}
+
+function verifyPublishedVerdicts(verdicts) {
+  exactKeys(
+    verdicts,
+    [
+      "boundary_adversaries_against_full_chain_expectations",
+      "boundary_adversaries_with_own_expectations",
+      "canonical_cases",
+    ],
+    "fixture verdicts",
+  );
+  assert(verdicts.canonical_cases === "valid", "canonical-case verdict");
+  assert(
+    verdicts.boundary_adversaries_with_own_expectations === "valid",
+    "boundary own-expectation verdict",
+  );
+  assert(
+    verdicts.boundary_adversaries_against_full_chain_expectations === "invalid",
+    "boundary full-expectation verdict",
+  );
 }
 
 function collectFixtureFingerprints(value, accumulator = new Set()) {
@@ -820,7 +866,13 @@ function discoverPublicKeys(path, manifestPath, fingerprints) {
 function verifyManifest(manifest, fixture, fixturePath) {
   exactKeys(
     manifest,
-    ["format", "vectors", "canonical_public_key_fingerprints", "discovery_roots"],
+    [
+      "format",
+      "vectors",
+      "canonical_public_key_fingerprints",
+      "verifier_public_key_fingerprints",
+      "discovery_roots",
+    ],
     "manifest",
   );
   assert(manifest.format === "bounded-authority-protocol-v1-vector-manifest", "manifest format");
@@ -833,6 +885,11 @@ function verifyManifest(manifest, fixture, fixturePath) {
       ]),
     "manifest vector set mismatch",
   );
+  exactKeys(
+    manifest.verifier_public_key_fingerprints,
+    ["bap03_independent.mjs", "chain_archive_independent.mjs"],
+    "manifest verifier fingerprints",
+  );
   assert(
     canonical(manifest.discovery_roots) ===
       canonical([
@@ -843,23 +900,48 @@ function verifyManifest(manifest, fixture, fixturePath) {
       ]),
     "manifest discovery roots mismatch",
   );
-  const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   const manifestPath = join(dirname(fixturePath), "manifest.json");
-  const reached = new Set();
+  const discovered = new Set();
   for (const relativeRoot of manifest.discovery_roots) {
-    const absolute = resolve(scriptRoot, relativeRoot);
+    const absolute = resolve(repositoryRoot, relativeRoot);
     assert(
-      absolute === scriptRoot || absolute.startsWith(`${scriptRoot}/`),
+      absolute === repositoryRoot || absolute.startsWith(`${repositoryRoot}/`),
       "manifest discovery root escape",
     );
-    discoverPublicKeys(absolute, manifestPath, reached);
+    discoverPublicKeys(absolute, manifestPath, discovered);
   }
-  collectFixtureFingerprints(fixture, reached);
-  const actual = [...reached].sort();
+  collectFixtureFingerprints(fixture, discovered);
+
+  const verifierSets = Object.values(manifest.verifier_public_key_fingerprints);
+  for (const verifierSet of verifierSets) {
+    assert(
+      canonical(verifierSet) === canonical([...new Set(verifierSet)].sort()),
+      "manifest verifier fingerprint set not sorted",
+    );
+  }
+
   const declared = [...manifest.canonical_public_key_fingerprints];
   assert(canonical(declared) === canonical([...new Set(declared)].sort()), "manifest set not sorted");
-  assert(canonical(declared) === canonical(actual), "manifest public-key fingerprint set mismatch");
-  return actual.length;
+  const verifierUnion = [...new Set(verifierSets.flat())].sort();
+  assert(
+    canonical(declared) === canonical(verifierUnion),
+    "manifest public-key fingerprint set mismatch",
+  );
+
+  const expectedImports =
+    manifest.verifier_public_key_fingerprints["chain_archive_independent.mjs"];
+  const actualImports = [...importedPublicKeyFingerprints].sort();
+  assert(
+    canonical(expectedImports) === canonical(actualImports),
+    "manifest verifier import set mismatch",
+  );
+
+  const discoveredFingerprints = [...discovered].sort();
+  assert(
+    canonical(declared) === canonical(discoveredFingerprints),
+    "manifest discovered public-key fingerprint set mismatch",
+  );
+  return declared.length;
 }
 
 function main() {
@@ -869,7 +951,10 @@ function main() {
   const manifestPath = resolve(arguments_[1]);
   const fixture = JSON.parse(readFileSync(fixturePath, "utf8"));
   const semanticFixture = JSON.parse(
-    readFileSync(join(dirname(fixturePath), "chain-semantic-edge.json"), "utf8"),
+    readFileSync(
+      join(repositoryRoot, "priv/conformance/v1/vectors/chain-semantic-edge.json"),
+      "utf8",
+    ),
   );
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   exactKeys(
@@ -882,6 +967,7 @@ function main() {
     "fixture format",
   );
   assert(fixture.provenance.private_material_tracked === false, "fixture private material");
+  verifyPublishedVerdicts(fixture.verdicts);
   for (const entry of fixture.archives) verifyArchive(entry);
   const semanticCases = verifySemanticEdges(semanticFixture);
   const tamperCases = runTamperMatrix(fixture);

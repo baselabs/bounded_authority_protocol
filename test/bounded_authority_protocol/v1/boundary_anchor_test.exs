@@ -42,8 +42,7 @@ defmodule BoundedAuthorityProtocol.V1.BoundaryAnchorTest do
     assert {:ok,
             %AnchorFacts{
               verification: :signature_and_window,
-              trust: :not_evaluated,
-              authorization: :not_evaluated
+              trust: :not_evaluated
             } = facts} = V1.verify_historical_anchor(compact, key, expected)
 
     assert inspect(facts) == "#BoundedAuthorityProtocol.V1.AnchorFacts<redacted>"

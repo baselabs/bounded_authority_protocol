@@ -61,9 +61,11 @@ All notable changes to `bounded_authority_protocol` are documented here.
   source/BEAM architecture accounting.
 - Add five Draft 2020-12 structural schemas and public-only same-key, rollover, shortened,
   relinked, same-ID/equal-time, signed cross-chain, signed reverse-time, and signed invalid-genesis
-  evidence. The project-independent Node verifier proves an exact two-way nine-key census,
-  27 decoded-byte and structural tamper cases, and five signed semantic-edge cases; the isolated
-  mutation gate proves 26 source-level invariants go red.
+  evidence. The project-independent Node verifiers prove an exact two-way nine-key census split
+  into exact per-verifier sets observed at their public-key import boundaries,
+  28 decoded-byte and structural tamper cases, and five signed semantic-edge cases; the isolated
+  mutation gate proves 29 source-level invariants go red. Published fixture verdicts are
+  exact-checked rather than treated as commentary.
 - Add the maximum-count worst-of-20 chain/archive resource gate, ADR 0004, normative documentation,
   and packed external-consumer coverage.
 - Make Ed25519 public-key/signature and SHA-256 digest widths immutable bounds so tightening cannot

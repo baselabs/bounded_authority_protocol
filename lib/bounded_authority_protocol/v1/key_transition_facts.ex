@@ -9,8 +9,7 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionFacts do
     :current_key_fingerprint,
     :next_key_fingerprint,
     :verification,
-    :trust,
-    :authorization
+    :trust
   ]
   defstruct @enforce_keys
 
@@ -22,8 +21,7 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionFacts do
           current_key_fingerprint: binary(),
           next_key_fingerprint: binary(),
           verification: :authenticated_transition,
-          trust: :not_evaluated,
-          authorization: :not_evaluated
+          trust: :not_evaluated
         }
 end
 

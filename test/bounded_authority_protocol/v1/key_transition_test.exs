@@ -33,8 +33,7 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionTest do
     assert {:ok,
             %KeyTransitionFacts{
               verification: :authenticated_transition,
-              trust: :not_evaluated,
-              authorization: :not_evaluated
+              trust: :not_evaluated
             } = facts} =
              V1.verify_key_transition(
                compact,
@@ -83,6 +82,14 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionTest do
              V1.verify_key_transition(
                compact,
                historical("archive-key-a", current_public, 1000, 2000),
+               historical("archive-key-b", next_public, 1500, :unbounded),
+               expected(current_fingerprint, next_fingerprint)
+             )
+
+    assert {:error, :invalid} =
+             V1.verify_key_transition(
+               compact,
+               historical("archive-key-a", current_public, 1000, 3000),
                historical("archive-key-b", next_public, 2001, :unbounded),
                expected(current_fingerprint, next_fingerprint)
              )

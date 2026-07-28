@@ -99,8 +99,7 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionCodec do
          current_key_fingerprint: current_fingerprint,
          next_key_fingerprint: next_fingerprint,
          verification: :authenticated_transition,
-         trust: :not_evaluated,
-         authorization: :not_evaluated
+         trust: :not_evaluated
        }}
     else
       _failure -> {:error, :invalid}

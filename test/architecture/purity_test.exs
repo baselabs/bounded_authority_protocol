@@ -432,6 +432,26 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
            end)
   end
 
+  test "archive version and digest reject before parsing and signature verification" do
+    source =
+      File.read!(Path.join(@root, "lib/bounded_authority_protocol/v1/anchored_export_codec.ex"))
+
+    positions =
+      for marker <- [
+            "validate_object_versions(archived.version, expected.object_version, bounds)",
+            "validate_chunks(archived.chunks, bounds, 0, 0)",
+            "digest <- hash_chunks(archived.chunks)",
+            "true <- FixedBytes.equal?(digest, expected.digest)",
+            "{:ok, parsed} <- parse_archive(archived.chunks, bounds)",
+            "verify_transitions("
+          ] do
+        {position, _length} = :binary.match(source, marker)
+        position
+      end
+
+    assert positions == Enum.sort(positions)
+  end
+
   test "new protocol mechanics have exact compiled public exports" do
     root = copy_actual_project!()
 
@@ -475,12 +495,20 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
   end
 
   test "chain facts expose no generic collection or string protocol and no raw evidence fields" do
-    modules = [
-      BoundedAuthorityProtocol.V1.AnchorFacts,
-      BoundedAuthorityProtocol.V1.AnchoredExportFacts,
-      BoundedAuthorityProtocol.V1.ChainFacts,
-      BoundedAuthorityProtocol.V1.KeyTransitionFacts
-    ]
+    modules = %{
+      BoundedAuthorityProtocol.V1.AnchorFacts =>
+        ~w(anchor_id anchored_at chain_hash chain_id key_fingerprint sequence trust verification version)a,
+      BoundedAuthorityProtocol.V1.AnchoredExportFacts =>
+        ~w(authorization chain_id digest end_anchor_id end_anchored_at end_key_fingerprint
+           first_sequence last_hash last_sequence previous_hash row_count start_anchor_id
+           start_anchored_at start_key_fingerprint transition_count trust verification version)a,
+      BoundedAuthorityProtocol.V1.ChainFacts =>
+        ~w(chain_id first_sequence last_hash last_sequence previous_hash row_count trust
+           verification version)a,
+      BoundedAuthorityProtocol.V1.KeyTransitionFacts =>
+        ~w(chain_id current_key_fingerprint effective_at next_key_fingerprint transition_id trust
+           verification version)a
+    }
 
     forbidden_fields = [
       :bytes,
@@ -492,9 +520,10 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       :signature
     ]
 
-    for module <- modules do
+    for {module, exact_fields} <- modules do
       value = module.__struct__()
 
+      assert Enum.sort(Map.keys(value) -- [:__struct__]) == Enum.sort(exact_fields)
       assert Inspect.impl_for(value)
       refute Enumerable.impl_for(value)
       refute Collectable.impl_for(value)

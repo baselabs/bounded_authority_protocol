@@ -30,7 +30,26 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
 
     assert output =~
              "bap04 independent verification: ok archives=3 boundary_adversaries=2 " <>
-               "public_key_fingerprints=9 tamper_cases=27 semantic_cases=5"
+               "public_key_fingerprints=9 tamper_cases=28 semantic_cases=5"
+  end
+
+  test "published verdict drift and valid opaque object-version mismatch fail independently" do
+    fixture = fixture!()
+    drifted = put_in(fixture, ["verdicts", "canonical_cases"], "invalid")
+
+    with_temp_json(drifted, fn path ->
+      assert {output, 1} = run_node(path, @manifest)
+      assert output =~ "canonical-case verdict"
+    end)
+
+    archive = hd(fixture["archives"])
+
+    assert {:error, :invalid} =
+             V1.verify_anchored_export(
+               %{archived(archive) | version: archive["object_version"] <> "-observed-drift"},
+               historical_chain(archive),
+               expected_archive(archive)
+             )
   end
 
   test "signed semantic-edge fixture proves inclusive rollover and fail-closed genesis and chain identity" do
@@ -228,6 +247,29 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
     end)
   end
 
+  test "moving a reached key to the other verifier fails import-boundary ownership" do
+    manifest = json!(@manifest)
+
+    [moved | retained] =
+      manifest["verifier_public_key_fingerprints"]["chain_archive_independent.mjs"]
+
+    manifest =
+      manifest
+      |> put_in(
+        ["verifier_public_key_fingerprints", "chain_archive_independent.mjs"],
+        retained
+      )
+      |> update_in(
+        ["verifier_public_key_fingerprints", "bap03_independent.mjs"],
+        &Enum.sort([moved | &1])
+      )
+
+    with_temp_json(manifest, fn path ->
+      assert {output, 1} = run_node(@fixture, path)
+      assert output =~ "manifest verifier import set mismatch"
+    end)
+  end
+
   test "independent verifier imports no project implementation" do
     source = File.read!(@script)
 
@@ -235,6 +277,7 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
     refute source =~ ~r/from\s+["'][^"']*lib\//
     refute source =~ ~r/import\s+["'][^"']*mix/
     assert source =~ ~s(from "node:crypto")
+    assert source =~ "importedPublicKeyFingerprints.add"
   end
 
   defp verify_archive(archive) do

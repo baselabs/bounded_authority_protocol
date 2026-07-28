@@ -65,8 +65,7 @@ defmodule BoundedAuthorityProtocol.V1.BoundaryAnchorCodec do
          chain_hash: parsed.chain_hash,
          key_fingerprint: fingerprint,
          verification: :signature_and_window,
-         trust: :not_evaluated,
-         authorization: :not_evaluated
+         trust: :not_evaluated
        }}
     else
       _failure -> {:error, :invalid}
