@@ -79,6 +79,10 @@ All notable changes to `bounded_authority_protocol` are documented here.
   percent escapes and non-URI bytes cannot enter any producer or verifier path.
 - Preserve exact package-boundary accounting across supported Elixir compiler versions and pin
   bitstring match sizes required by Elixir 1.20.
+- Close BAP-04 at package-bearing head `c4d7716de6499f29524e60638207b1c36e9484b3`
+  after the supported CI matrix, complete quality/package boundary, independent Node verification,
+  47/47 mutation battery, maximum-shape resource gate, exact archive checksum, SLSA provenance,
+  and CycloneDX SBOM attestation passed.
 
 ### Not yet available
 
