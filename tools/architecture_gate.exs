@@ -1467,6 +1467,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            ] ->
         [
           {Access, :get},
+          {Enum, :__in__},
           {Enum, :map},
           {Enum, :member?},
           {Enum, :sort},
