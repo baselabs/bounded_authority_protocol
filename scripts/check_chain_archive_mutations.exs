@@ -182,6 +182,17 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
       ]
     },
     %{
+      name: "distinct-transition-fingerprints",
+      path: "lib/bounded_authority_protocol/v1/context_validation.ex",
+      from: "if FixedBytes.equal?(current, next), do: {:error, :invalid}, else: :ok",
+      to: "if false, do: {:error, :invalid}, else: :ok",
+      command: [
+        "mix",
+        "test",
+        "test/bounded_authority_protocol/v1/context_validation_test.exs"
+      ]
+    },
+    %{
       name: "historical-lower-edge",
       path: "lib/bounded_authority_protocol/v1/boundary_anchor_codec.ex",
       from: "key.valid_from <= time and",

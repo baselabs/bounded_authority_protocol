@@ -39,24 +39,36 @@ defmodule BoundedAuthorityProtocol.V1.ContextValidation do
 
   @spec expected_transition(ExpectedKeyTransition.t(), Bounds.t()) :: :ok | {:error, :invalid}
   def expected_transition(%ExpectedKeyTransition{} = expected, bounds) do
-    if valid_identifier?(expected.transition_id, bounds) and
-         valid_identifier?(expected.chain_id, bounds) and
-         valid_time?(expected.effective_at, bounds) and
-         valid_key_id?(expected.current_key_id, bounds) and
-         fixed_digest?(expected.current_key_fingerprint, bounds) and
-         valid_key_id?(expected.next_key_id, bounds) and
-         fixed_digest?(expected.next_key_fingerprint, bounds) and
-         not FixedBytes.equal?(
-           expected.current_key_fingerprint,
-           expected.next_key_fingerprint
-         ) do
+    with true <-
+           valid_identifier?(expected.transition_id, bounds) and
+             valid_identifier?(expected.chain_id, bounds) and
+             valid_time?(expected.effective_at, bounds) and
+             valid_key_id?(expected.current_key_id, bounds) and
+             valid_key_id?(expected.next_key_id, bounds),
+         :ok <-
+           distinct_fingerprints(
+             expected.current_key_fingerprint,
+             expected.next_key_fingerprint,
+             bounds
+           ) do
       :ok
+    else
+      _failure -> {:error, :invalid}
+    end
+  end
+
+  def expected_transition(_expected, _bounds), do: {:error, :invalid}
+
+  @spec distinct_fingerprints(binary(), binary(), Bounds.t()) :: :ok | {:error, :invalid}
+  def distinct_fingerprints(current, next, %Bounds{} = bounds) do
+    if fixed_digest?(current, bounds) and fixed_digest?(next, bounds) do
+      if FixedBytes.equal?(current, next), do: {:error, :invalid}, else: :ok
     else
       {:error, :invalid}
     end
   end
 
-  def expected_transition(_expected, _bounds), do: {:error, :invalid}
+  def distinct_fingerprints(_current, _next, _bounds), do: {:error, :invalid}
 
   @spec historical_key(HistoricalPublicKey.t(), Bounds.t()) :: :ok | {:error, :invalid}
   def historical_key(%HistoricalPublicKey{} = key, bounds) do

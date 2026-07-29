@@ -64,6 +64,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:encode, 2} => %{variable_call: 4},
       {:parse_row, 2} => %{variable_call: 10}
     },
+    "Elixir.BoundedAuthorityProtocol.V1.ContextValidation.beam" => %{
+      {:expected_transition, 2} => %{variable_call: 2}
+    },
     "Elixir.BoundedAuthorityProtocol.V1.EncodedAnchoredExport.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
     },
@@ -108,9 +111,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     },
     "Elixir.BoundedAuthorityProtocol.V1.KeyTransitionCodec.beam" => %{
       {:parse, 2} => %{variable_call: 27},
-      {:signing_input, 2} => %{variable_call: 7},
+      {:signing_input, 2} => %{variable_call: 6},
       {:validate_transition_input, 2} => %{variable_call: 5},
-      {:verify, 4} => %{variable_call: 22}
+      {:verify, 4} => %{variable_call: 21}
     },
     "Elixir.BoundedAuthorityProtocol.V1.KeyTransitionFacts.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
@@ -229,6 +232,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
                                   ],
                                   "Elixir.BoundedAuthorityProtocol.V1.ContextValidation.beam" => [
                                     __info__: 1,
+                                    distinct_fingerprints: 3,
                                     expected_anchor: 2,
                                     expected_chain: 2,
                                     expected_transition: 2,
@@ -1671,6 +1675,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            "Elixir.BoundedAuthorityProtocol.V1.BoundaryAnchorCodec.beam",
            "Elixir.BoundedAuthorityProtocol.V1.CompactJws.beam",
            "Elixir.BoundedAuthorityProtocol.V1.ConsumptionChain.beam",
+           "Elixir.BoundedAuthorityProtocol.V1.ContextValidation.beam",
            "Elixir.BoundedAuthorityProtocol.V1.Jcs.beam",
            "Elixir.BoundedAuthorityProtocol.V1.Json.beam",
            "Elixir.BoundedAuthorityProtocol.V1.Jwk.beam",
