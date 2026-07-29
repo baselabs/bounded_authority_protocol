@@ -571,9 +571,6 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
     end
   end
 
-  defp validate_key_chain([], _expected_count, _bounds, _seen, _count),
-    do: {:error, :invalid}
-
   defp validate_key_chain(
          [%HistoricalPublicKey{} = key | rest],
          expected_count,
@@ -597,9 +594,6 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
       _failure -> {:error, :invalid}
     end
   end
-
-  defp validate_key_chain(_keys, _expected_count, _bounds, _seen, _count),
-    do: {:error, :invalid}
 
   defp validate_key_chain_tail([], expected_count, _bounds, _seen, expected_count), do: :ok
 

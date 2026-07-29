@@ -57,6 +57,7 @@ defmodule BoundedAuthorityProtocol.V1.ContextValidationTest do
     assert :ok = ContextValidation.expected_anchor(anchor, bounds)
     assert :ok = ContextValidation.expected_transition(transition, bounds)
     assert :ok = ContextValidation.historical_key(key, bounds)
+    assert :ok = ContextValidation.distinct_fingerprints(fingerprint, <<1::256>>, bounds)
 
     assert {:error, :invalid} =
              ContextValidation.expected_anchor(%{anchor | sequence: -1}, bounds)
@@ -71,6 +72,20 @@ defmodule BoundedAuthorityProtocol.V1.ContextValidationTest do
              )
 
     assert {:error, :invalid} =
+             ContextValidation.distinct_fingerprints(fingerprint, fingerprint, bounds)
+
+    assert {:error, :invalid} =
+             ContextValidation.distinct_fingerprints(fingerprint, <<1>>, bounds)
+
+    assert {:error, :invalid} =
+             ContextValidation.distinct_fingerprints(fingerprint, <<1::256>>, %{})
+
+    assert {:error, :invalid} =
              ContextValidation.historical_key(%{key | valid_before: 0}, bounds)
+
+    assert {:error, :invalid} = ContextValidation.expected_chain(%{}, bounds)
+    assert {:error, :invalid} = ContextValidation.expected_anchor(%{}, bounds)
+    assert {:error, :invalid} = ContextValidation.expected_transition(%{}, bounds)
+    assert {:error, :invalid} = ContextValidation.historical_key(%{}, bounds)
   end
 end

@@ -28,7 +28,6 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionCodec do
            Jwk.public_key_thumbprint_raw(transition.current_public_key, bounds),
          {:ok, next_fingerprint} <-
            Jwk.public_key_thumbprint_raw(transition.next_public_key, bounds),
-         false <- FixedBytes.equal?(current_fingerprint, next_fingerprint),
          {:ok, protected} <- Jcs.encode(header_json(transition.current_key_id), bounds),
          {:ok, payload} <-
            Jcs.encode(
@@ -64,7 +63,6 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionCodec do
          {:ok, current_fingerprint} <-
            Jwk.public_key_thumbprint_raw(current_key.public_key, bounds),
          {:ok, next_fingerprint} <- Jwk.public_key_thumbprint_raw(next_key.public_key, bounds),
-         false <- FixedBytes.equal?(current_fingerprint, next_fingerprint),
          true <- parsed.current_key_id == current_key.key_id,
          true <- parsed.current_key_id == expected.current_key_id,
          true <- parsed.next_key_id == next_key.key_id,
@@ -208,10 +206,8 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionCodec do
        ) do
     if valid_identifier?(transition_id, bounds) and valid_identifier?(chain_id, bounds) and
          valid_time?(effective_at, bounds) and valid_key_id?(current_key_id, bounds) and
-         fixed_digest?(current_fingerprint, bounds) and valid_key_id?(next_key_id, bounds) and
-         fixed_digest?(next_fingerprint, bounds) and
-         not FixedBytes.equal?(current_fingerprint, next_fingerprint) do
-      :ok
+         valid_key_id?(next_key_id, bounds) do
+      ContextValidation.distinct_fingerprints(current_fingerprint, next_fingerprint, bounds)
     else
       {:error, :invalid}
     end
@@ -277,9 +273,6 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionCodec do
       {:error, :invalid}
     end
   end
-
-  defp fixed_digest?(value, bounds),
-    do: is_binary(value) and byte_size(value) == bounds.digest_bytes
 
   defp valid_time?(value, bounds),
     do:
