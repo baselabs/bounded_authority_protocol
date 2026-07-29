@@ -316,7 +316,7 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
 
   defp read_exact({current, rest}, count, accumulator)
        when is_binary(current) and byte_size(current) >= count do
-    <<part::binary-size(count), remaining::binary>> = current
+    <<part::binary-size(^count), remaining::binary>> = current
     {:ok, :erlang.iolist_to_binary(reverse([part | accumulator])), {remaining, rest}}
   end
 
