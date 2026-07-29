@@ -77,6 +77,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
   produce or admit a structurally nonconforming cryptographic value.
 - Centralize strict StringOrURI validation across grant/proof and BAP-04 identifiers so malformed
   percent escapes and non-URI bytes cannot enter any producer or verifier path.
+- Preserve exact package-boundary accounting across supported Elixir compiler versions and pin
+  bitstring match sizes required by Elixir 1.20.
 
 ### Not yet available
 
