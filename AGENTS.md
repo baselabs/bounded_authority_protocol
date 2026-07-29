@@ -21,7 +21,7 @@ grant operational authority by itself.
 
 ## Current state
 
-`BAP-00` through `BAP-04` are implemented. The unpublished 0.1.0 package retains zero production
+`BAP-00` through `BAP-04` are closed. The unpublished 0.1.0 package retains zero production
 dependencies, no application callback, and no supervision tree. The normative v1 tables and
 bounds, raw-number preflight, bounded ordered JSON decoder with recursive duplicate rejection,
 strict base64url decoder, Draft 2020-12 structural schemas, architecture mutation gates, public
@@ -31,7 +31,8 @@ producers, bounded raw decode, standalone raw-grant verification, combined raw-e
 verification, value-bearing redacted facts, public-only independently verified vectors, and
 portable resource bounds. BAP-04 adds canonical consumption rows and range verification, signed
 boundary anchors and historical-key transitions, authenticated rollover, and atomic raw archived
-export verification. Consult [`docs/ROADMAP.md`](docs/ROADMAP.md),
+export verification. Its package-bearing closeout head is
+`c4d7716de6499f29524e60638207b1c36e9484b3`. Consult [`docs/ROADMAP.md`](docs/ROADMAP.md),
 [`ADR 0003`](docs/adr/0003-standard-jws-and-verified-grant-results.md), and
 [`ADR 0004`](docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md).
 Commercial release readiness and BAP-05 remain open.

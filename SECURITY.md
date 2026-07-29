@@ -13,13 +13,13 @@ authorization, where the result carries it, explicitly not evaluated; the packag
 trust, reserve replay, inspect live revocation state, certify deletion/retention, remove archives,
 or authorize an effect.
 
-Final BAP-03 package-bearing verification source
-`f322e08bba665374599b9f53c362966b6b59710a` passed
-[CI run 30331438234](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30331438234)
+Final BAP-04 package-bearing verification source
+`c4d7716de6499f29524e60638207b1c36e9484b3` passed
+[CI run 30414161666](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30414161666)
 and
-[supply-chain run 30331438252](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30331438252)
+[supply-chain run 30414161690](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30414161690)
 at that exact revision. The unpublished archive SHA-256 is
-`2f09d66c68e3538aa1e0020710d7f2aaca07528ef60fcf571c5006212e3bf056`; its checksum,
+`b947777a512e0e917eb42aa85fc9525087f1e555c0eba1944832431a8978a169`; its checksum,
 SLSA provenance, and CycloneDX SBOM attestation were independently verified.
 
 ## Reporting a vulnerability
