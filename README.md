@@ -8,18 +8,18 @@ bounded proof-of-possession authority.
 The public/private boundary is complete under
 [`BAP-00`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). The source tree now
 contains the unpublished `:bounded_authority_protocol` 0.1.0 Mix package scaffold and its enforced
-release boundary. `BAP-01` through `BAP-03` are complete. BAP-03's package-bearing closeout head
-`f322e08bba665374599b9f53c362966b6b59710a` passed the supported CI matrix and exact unpublished
-package, checksum, provenance, and SBOM gates. It implements deterministic standard compact-JWS
-grant and RFC 9449 holder-proof production, bounded decoding, standalone raw-grant verification,
-and combined raw-envelope verification. Its public-only vectors are independently verified and
-cover exact key census, meaningful byte tampering, duplicate members, holder binding, request
-digests, selectors, time boundaries, and URI normalization. Portable timing/allocation bounds and
-the unpacked external-consumer gate exercise the same public API. BAP-04 now implements canonical
+release boundary. `BAP-01` through `BAP-04` are complete. BAP-04's package-bearing closeout head
+`c4d7716de6499f29524e60638207b1c36e9484b3` passed the supported CI matrix and exact unpublished
+package, checksum, provenance, and SBOM gates. The package implements deterministic standard
+compact-JWS grant and RFC 9449 holder-proof production, bounded decoding, standalone raw-grant
+verification, and combined raw-envelope verification. Its public-only vectors are independently
+verified and cover exact key census, meaningful byte tampering, duplicate members, holder binding,
+request digests, selectors, time boundaries, and URI normalization. Portable timing/allocation
+bounds and the unpacked external-consumer gate exercise the same public API. BAP-04 adds canonical
 consumption chains, signed boundary anchors, authenticated historical-key rollover, deterministic
 anchored archives, and atomic raw-archive verification against mandatory caller boundaries,
-digest, and object version. Its public-only corpus is independently verified. Nothing in this
-repository has been published to Hex.
+digest, and object version. Its public-only corpus and resource limits are independently verified.
+Nothing in this repository has been published to Hex.
 
 The scaffold has zero production dependencies, no application callback, and no supervision tree.
 Source AST, compiled BEAM imports, generated application metadata, dependency declarations, and

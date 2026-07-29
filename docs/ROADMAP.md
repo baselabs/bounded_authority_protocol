@@ -128,8 +128,41 @@ compatibility.
   five were fixed in one pass; affected tests, architecture, independent verification, and the
   complete quality gate then passed. No further review recursion was run.
 
+## BAP-04 closeout evidence
+
+- Package-bearing closeout head `c4d7716de6499f29524e60638207b1c36e9484b3` is pushed to public
+  `main`. [CI run 30414161666](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30414161666)
+  passed workflow syntax, the complete quality/package boundary, and all supported pairs:
+  Elixir 1.18.4/OTP 27.3.4.14, Elixir 1.19.5/OTP 28.5.0.3, and Elixir
+  1.20.2/OTP 29.0.3.
+- [Supply-chain run 30414161690](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30414161690)
+  built artifact `8709707133`. Its exact unpublished archive has SHA-256
+  `b947777a512e0e917eb42aa85fc9525087f1e555c0eba1944832431a8978a169`; the downloaded
+  `SHA256SUMS` check passed. Separate SLSA provenance and CycloneDX SBOM attestations verified for
+  that digest, constrained to this repository, the trusted supply-chain workflow,
+  `refs/heads/main`, source digest `c4d7716de6499f29524e60638207b1c36e9484b3`, and
+  GitHub-hosted runners.
+- Implementation head `b48656c6942c0fe359032781c6a5d5161d9d3d82`, followed only by
+  supported-compiler compatibility corrections through the package-bearing head, delivers
+  canonical consumption rows and range verification, signed boundary anchors, authenticated
+  historical-key rollover, deterministic anchored-export framing, and atomic raw-archive
+  verification against mandatory caller boundaries, complete digest, exact EOF, every row, and
+  the out-of-band object version.
+- Post-review `mix quality` passed twice with 159 tests, 0 failures, and 100.00% coverage, plus
+  format, warnings-as-errors compilation, exact source/BEAM architecture accounting, Credo,
+  Dialyzer, documentation, advisory, retired-package, license, CycloneDX, exact archive, and
+  fresh unpacked-consumer gates. The isolated mutation battery passed 47/47. The independent Node
+  verifiers proved three archive cases, two direct chain cases, two boundary adversaries, eleven
+  exact imported public-key fingerprints, 49 tamper cases, and seven semantic-edge cases.
+- The maximum-shape resource gate exercised 65,536 rows, 256 key transitions, 65,796 chunks, and a
+  45,188,751-byte archive across isolated worst-of-20 samples. The admitted review findings were
+  fixed in bounded deltas; the final permitted delta review was clean, and the plan-integrity
+  reconciliation confirmed all 39 implementation claims. Its eight then-open closeout receipts
+  are the gates recorded above. The final cross-vendor pass was degraded, not reported as a zero:
+  GLM returned no findings after running compile, 159 tests, Credo, and Dialyzer; Claude fable and
+  pinned Opus were unavailable because their usage limits were exhausted. No further product
+  review recursion was run.
+
 ## Next action
 
-BAP-03 is complete. BAP-04 chain and historical-key verification is implemented and in closeout;
-its final full gates, independent delta review, public `main` delivery, CI matrix, and
-supply-chain receipts remain pending. BAP-05 does not start until those BAP-04 closure gates pass.
+BAP-04 is complete. BAP-05 portable conformance is next and remains unstarted.
