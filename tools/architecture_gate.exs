@@ -1470,6 +1470,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Enum, :map},
           {Enum, :member?},
           {Enum, :sort},
+          {Function, :identity},
           {Map, :new},
           {Range, :new},
           {String, :contains?},
