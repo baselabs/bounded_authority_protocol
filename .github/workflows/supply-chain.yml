@@ -42,12 +42,12 @@ jobs:
         run: sha256sum bounded_authority_protocol-0.1.0.tar > SHA256SUMS
 
       - name: Attest build provenance
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4
         with:
           subject-path: artifacts/bounded_authority_protocol-0.1.0.tar
 
       - name: Attest release SBOM
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4
         with:
           subject-path: artifacts/bounded_authority_protocol-0.1.0.tar
           sbom-path: artifacts/release.cdx.json
