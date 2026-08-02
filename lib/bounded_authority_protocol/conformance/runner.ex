@@ -39,6 +39,50 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     "request_digest"
   ]
 
+  # Compile-time map from the JSON string form of each bounds key to its atom, so case
+  # input overrides (string keys) convert to the atom keys Bounds.new expects without any
+  # runtime atom creation (the architecture gate forbids String.to_existing_atom).
+  @bounds_keys %{
+    "compact_bytes" => :compact_bytes,
+    "encoded_segment_bytes" => :encoded_segment_bytes,
+    "decoded_segment_bytes" => :decoded_segment_bytes,
+    "json_bytes" => :json_bytes,
+    "depth" => :depth,
+    "object_members" => :object_members,
+    "array_items" => :array_items,
+    "total_nodes" => :total_nodes,
+    "string_bytes" => :string_bytes,
+    "key_bytes" => :key_bytes,
+    "number_lexeme_bytes" => :number_lexeme_bytes,
+    "integer_magnitude" => :integer_magnitude,
+    "float_magnitude" => :float_magnitude,
+    "kid_bytes" => :kid_bytes,
+    "jcs_bytes" => :jcs_bytes,
+    "uri_bytes" => :uri_bytes,
+    "identifier_bytes" => :identifier_bytes,
+    "nonce_bytes" => :nonce_bytes,
+    "method_bytes" => :method_bytes,
+    "operation_bytes" => :operation_bytes,
+    "audiences" => :audiences,
+    "operations" => :operations,
+    "selectors" => :selectors,
+    "path_segments" => :path_segments,
+    "one_of_values" => :one_of_values,
+    "public_key_bytes" => :public_key_bytes,
+    "signature_bytes" => :signature_bytes,
+    "digest_bytes" => :digest_bytes,
+    "clock_skew" => :clock_skew,
+    "proof_max_age" => :proof_max_age,
+    "chain_row_bytes" => :chain_row_bytes,
+    "chain_rows" => :chain_rows,
+    "anchor_bytes" => :anchor_bytes,
+    "archive_header_bytes" => :archive_header_bytes,
+    "archive_chunks" => :archive_chunks,
+    "archive_bytes" => :archive_bytes,
+    "object_version_bytes" => :object_version_bytes,
+    "key_transitions" => :key_transitions
+  }
+
   @doc "Executes every loaded case against the frozen facade."
   @spec run(Corpus.t()) :: [{binary(), [%{case_id: binary(), agree: boolean()}]}]
   def run(%Corpus{cases: cases, raws: raws}) do
@@ -78,8 +122,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
 
   # --- dispatch table ------------------------------------------------------
 
-  defp dispatch("json.decode", input, _raws) do
-    with {:ok, bytes} <- input_bytes(input) do
+  defp dispatch("json.decode", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws) do
       case Json.decode(bytes, Bounds.maximum()) do
         {:ok, value} -> {:ok, {:json, value}}
         error -> error
@@ -87,8 +131,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("base64url.decode", input, _raws) do
-    with {:ok, bytes} <- input_bytes(input) do
+  defp dispatch("base64url.decode", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws) do
       case Base64Url.decode(bytes, Bounds.maximum()) do
         {:ok, decoded} -> {:ok, %{decoded: decoded}}
         error -> error
@@ -96,8 +140,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("uri.normalize", input, _raws) do
-    with {:ok, bytes} <- input_bytes(input) do
+  defp dispatch("uri.normalize", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws) do
       case Uri.normalize(bytes, Bounds.maximum()) do
         {:ok, normalized} -> {:ok, %{normalized: normalized}}
         error -> error
@@ -105,8 +149,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jcs.encode", input, _raws) do
-    with {:ok, bytes} <- input_bytes(input),
+  defp dispatch("jcs.encode", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws),
          {:ok, value} <- Json.decode(bytes, Bounds.maximum()) do
       case Jcs.encode(value, Bounds.maximum()) do
         {:ok, encoded} -> {:ok, %{encoded: encoded}}
@@ -124,8 +168,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jwk.decode_public", input, _raws) do
-    with {:ok, bytes} <- input_bytes(input) do
+  defp dispatch("jwk.decode_public", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws) do
       case Jwk.decode_public(bytes, Bounds.maximum()) do
         {:ok, public_key} -> {:ok, %{public_key: public_key}}
         error -> error
@@ -133,8 +177,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jwk.thumbprint_preimage", input, _raws) do
-    with {:ok, bytes} <- input_bytes(input) do
+  defp dispatch("jwk.thumbprint_preimage", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws) do
       case Jwk.thumbprint_preimage(bytes, Bounds.maximum()) do
         {:ok, preimage} -> {:ok, %{preimage: preimage}}
         error -> error
@@ -142,8 +186,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jwk.thumbprint", input, _raws) do
-    with {:ok, bytes} <- input_bytes(input) do
+  defp dispatch("jwk.thumbprint", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws) do
       case Jwk.thumbprint(bytes, Bounds.maximum()) do
         {:ok, thumbprint} -> {:ok, %{thumbprint: thumbprint}}
         error -> error
@@ -151,8 +195,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jwk.thumbprint_raw", input, _raws) do
-    with {:ok, bytes} <- input_bytes(input) do
+  defp dispatch("jwk.thumbprint_raw", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws) do
       case Jwk.thumbprint_raw(bytes, Bounds.maximum()) do
         {:ok, raw} -> {:ok, %{thumbprint_raw: raw}}
         error -> error
@@ -170,11 +214,15 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   end
 
   defp dispatch("bounds.new", input, _raws) do
-    overrides = Map.get(input, "overrides", %{})
+    case normalize_bounds_overrides(Map.get(input, "overrides", %{})) do
+      {:ok, overrides} ->
+        case Bounds.new(overrides) do
+          {:ok, bounds} -> {:ok, %{bounds: bounds}}
+          error -> error
+        end
 
-    case Bounds.new(overrides) do
-      {:ok, bounds} -> {:ok, %{bounds: bounds}}
-      error -> error
+      :error ->
+        {:error, :invalid}
     end
   end
 
@@ -193,14 +241,33 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     {:error, :invalid}
   end
 
+  # JSON case input carries override keys as strings; Bounds.new expects the atom
+  # keys of the @maximum map. Convert each known key via the compile-time @bounds_keys
+  # map; Bounds.new independently rejects any value that fails its tightening rules.
+  defp normalize_bounds_overrides(overrides) do
+    Enum.reduce_while(overrides, {:ok, %{}}, fn {key, value}, {:ok, acc} ->
+      case Map.fetch(@bounds_keys, key) do
+        {:ok, atom_key} -> {:cont, {:ok, Map.put(acc, atom_key, value)}}
+        :error -> {:halt, :error}
+      end
+    end)
+  end
+
   # --- input extraction ----------------------------------------------------
 
-  defp input_bytes(input) do
+  defp input_bytes(input, raws) do
     cond do
       is_binary(input["text"]) -> {:ok, input["text"]}
       is_binary(input["base64url"]) -> Base.url_decode64(input["base64url"], padding: false)
-      is_binary(input["raw_file"]) -> {:error, :raw_required}
+      is_binary(input["raw_file"]) -> raw_bytes(input["raw_file"], raws)
       true -> {:error, :invalid}
+    end
+  end
+
+  defp raw_bytes(raw_path, raws) do
+    case Map.get(raws, raw_path) do
+      {bytes, _hash} -> {:ok, bytes}
+      nil -> {:error, :invalid}
     end
   end
 

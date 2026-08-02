@@ -1127,7 +1127,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     do: ~w(Access Bitwise Enum List Map MapSet String)
 
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/runner.ex"),
-    do: ~w(Bitwise Enum Map String)
+    do: ~w(Enum Map String)
 
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/report.ex"),
     do: ~w(Enum)
@@ -1297,10 +1297,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
        ),
        do:
          {module, function} in [
-           {:binary, :at},
-           {"Bitwise", :bxor},
            {"Enum", :all?},
            {"Enum", :map},
+           {"Enum", :reduce_while},
            {"Map", :delete},
            {"Map", :get},
            {"Map", :new},
@@ -1672,12 +1671,11 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
       "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam" ->
         [
-          {:binary, :at},
           {:maps, :remove},
           {Access, :get},
-          {Bitwise, :bxor},
           {Enum, :all?},
           {Enum, :map},
+          {Enum, :reduce_while},
           {Map, :delete},
           {Map, :get},
           {Map, :new},
