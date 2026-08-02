@@ -83,6 +83,11 @@ All notable changes to `bounded_authority_protocol` are documented here.
   after the supported CI matrix, complete quality/package boundary, independent Node verification,
   47/47 mutation battery, maximum-shape resource gate, exact archive checksum, SLSA provenance,
   and CycloneDX SBOM attestation passed.
+- Author roadmap rows BAP-08 (capability-authorization extension proposal for the MCP
+  `modelcontextprotocol/ext-auth` extensions repository plus an AP2 mandate-mapping note;
+  depends on BAP-04 only) and BAP-09 (thin TypeScript and Python verifier SDKs consuming only
+  the published spec and vectors; depends on BAP-05). Each row's own ADR lands when its work
+  starts; neither changes any wire format, limit, or verification rule.
 
 ### Not yet available
 
