@@ -1267,8 +1267,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
        ),
        do:
          {module, function} in [
-           {:binary, :at},
-           {:erlang, :binary_to_integer},
            {"Bitwise", :bxor},
            {"Enum", :all?},
            {"Enum", :flat_map},
@@ -1642,7 +1640,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
       "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam" ->
         [
-          {:binary, :at},
           {:maps, :keys},
           {:maps, :remove},
           {:maps, :to_list},
