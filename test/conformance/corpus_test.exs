@@ -11,8 +11,6 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
 
   use ExUnit.Case, async: true
 
-  import Bitwise
-
   alias BoundedAuthorityProtocol.Conformance.Corpus
   alias BoundedAuthorityProtocol.Conformance.Report
   alias BoundedAuthorityProtocol.Conformance.Runner
@@ -417,31 +415,19 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   end
 
   test "an index declaring more than 256 files is rejected by the normative decoder" do
-    files = for i <- 1..257, do: file_entry("cases/x#{i}.json", "AAAA", 1)
+    # Build the files array as a raw JSON string (257 entries) so the JCS encoder's own
+    # array bound does not reject it at construction — the corpus LOADER's Json.decode
+    # must be the thing that trips on the 256-item array_items ceiling.
+    entries =
+      Enum.map_join(1..257, ",", fn i ->
+        ~s({"path":"cases/x#{i}.json","sha256_base64url":"AAAA","cases":1})
+      end)
 
     index =
-      jcs(
-        {:object,
-         [
-           {"format", {:string, "bounded-authority-protocol-v1-conformance-corpus-index"}},
-           {"public_key_fingerprints", {:array, []}},
-           {"files", {:array, files}},
-           {"total_cases", {:integer, 257}},
-           {"applicability", {:object, []}}
-         ]}
-      )
+      ~s({"format":"bounded-authority-protocol-v1-conformance-corpus-index","public_key_fingerprints":[],"files":[#{entries}],"total_cases":257,"applicability":{}})
 
     assert {:error, :invalid} = Corpus.load(%{"index.json" => index})
   end
-
-  defp file_entry(path, hash, cases),
-    do:
-      {:object,
-       [
-         {"path", {:string, path}},
-         {"sha256_base64url", {:string, hash}},
-         {"cases", {:integer, cases}}
-       ]}
 
   defp index_for_one_case(case_bytes) do
     build_index(%{"cases/json/oversize.json" => case_bytes}) |> to_object() |> jcs()
@@ -450,19 +436,20 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   # --- per-file SHA-256 (V3) -----------------------------------------------
 
   test "a tampered case byte (hash mismatch) is rejected at corpus load" do
+    # Isolate the hash check (V3): keep the case file valid JSON (decodeable), but make its
+    # declared SHA-256 in the index wrong. A midpoint byte-flip on JCS bytes can land in a
+    # structural byte and break JSON validity, so rejection would fire at decode, not the hash.
+    # Here the case bytes stay byte-identical and decodeable; only the index hash is stale.
     corpus = synthetic_corpus() |> full_corpus_map([])
+    index = corpus["index.json"]
 
-    tampered =
-      update_in(corpus["cases/json/trivial.json"], fn bytes ->
-        # flip one byte in the middle
-        size = byte_size(bytes)
-        half = div(size, 2)
-        <<head::binary-size(^half), byte, rest::binary>> = bytes
-        head <> <<bxor(byte, 0x01)>> <> rest
-      end)
+    # Rewrite the index with a wrong hash for the trivial case file (keep everything else valid).
+    # The index is JCS JSON; replace the real case-file hash with a different valid-shape hash.
+    real_hash = sha256_b64(corpus["cases/json/trivial.json"])
+    wrong_hash = sha256_b64(<<"different bytes">>)
+    tampered_index = String.replace(index, real_hash, wrong_hash, global: false)
 
-    # The index hash no longer matches the tampered file.
-    map_with_stale_index = %{tampered | "index.json" => corpus["index.json"]}
+    map_with_stale_index = %{corpus | "index.json" => tampered_index}
     assert {:error, :invalid} = Corpus.load(map_with_stale_index)
   end
 
@@ -651,6 +638,99 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     bytes = jcs(to_object(tampered_index))
     map = Map.put(corpus_with_raw, "index.json", bytes)
     assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "a VALID .raw-bearing corpus loads and the runner feeds sidecar bytes to the facade" do
+    # A .raw sidecar carrying raw JSON bytes 'false' — fed to json.decode (verdict: invalid because
+    # 'false' alone is valid JSON, but we declare invalid to isolate the load+dispatch path; the
+    # point of this test is that the corpus LOADS with a .raw file present and the runner reads it).
+    raw_bytes = "{\"raw\":1}"
+
+    case_obj =
+      {:object,
+       [
+         {"id", {:string, "json-decode-raw-valid-001"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "valid"}},
+         {"input",
+          {:object,
+           [
+             {"raw_file", {:string, "cases/json/payload.raw"}},
+             {"sha256_base64url", {:string, sha256_b64(raw_bytes)}}
+           ]}},
+         {"expected",
+          {:object,
+           [
+             {"verdict", {:string, "valid"}},
+             {"value", {:object, [{"raw", {:integer, 1}}]}}
+           ]}}
+       ]}
+
+    cases_map = Map.put(synthetic_corpus(), "cases/json/payload-case.json", jcs_case([case_obj]))
+    corpus_with_raw = Map.put(cases_map, "cases/json/payload.raw", raw_bytes)
+    map = full_corpus_map(corpus_with_raw, [])
+
+    # F1 regression: the corpus loads despite the .raw entry in index["files"].
+    assert {:ok, corpus} = Corpus.load(map)
+
+    # F2 regression: the runner reads the sidecar bytes and feeds them to json.decode.
+    results = Runner.run(corpus)
+    all_results = Enum.flat_map(results, &elem(&1, 1))
+    raw_result = Enum.find(all_results, &(&1.case_id == "json-decode-raw-valid-001"))
+    assert raw_result.agree == true
+  end
+
+  test "a bounds.new case with string-keyed overrides converts and agrees (F3 regression)" do
+    # tighten compact_bytes to its exact maximum = valid (Bounds.new accepts it).
+    case_obj =
+      {:object,
+       [
+         {"id", {:string, "bounds-new-valid-001"}},
+         {"surface", {:string, "bounds.new"}},
+         {"class", {:string, "exact_bound"}},
+         {"bound_profile",
+          {:object, [{"tightened", {:object, [{"compact_bytes", {:integer, 65_536}}]}}]}},
+         {"input",
+          {:object,
+           [
+             {"overrides", {:object, [{"compact_bytes", {:integer, 65_536}}]}}
+           ]}},
+         {"expected", {:object, [{"verdict", {:string, "valid"}}]}}
+       ]}
+
+    cases_map = Map.put(synthetic_corpus(), "cases/bounds/new.json", jcs_case([case_obj]))
+    map = full_corpus_map(cases_map, [])
+    assert {:ok, corpus} = Corpus.load(map)
+
+    results = Runner.run(corpus)
+    all_results = Enum.flat_map(results, &elem(&1, 1))
+    bounds_result = Enum.find(all_results, &(&1.case_id == "bounds-new-valid-001"))
+    assert bounds_result.agree == true
+  end
+
+  test "a bounds.new case with an unknown override key fails (F3 negative)" do
+    case_obj =
+      {:object,
+       [
+         {"id", {:string, "bounds-new-invalid-001"}},
+         {"surface", {:string, "bounds.new"}},
+         {"class", {:string, "invalid_limit"}},
+         {"input",
+          {:object,
+           [
+             {"overrides", {:object, [{"not_a_bounds_key", {:integer, 1}}]}}
+           ]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}}
+       ]}
+
+    cases_map = Map.put(synthetic_corpus(), "cases/bounds/invalid.json", jcs_case([case_obj]))
+    map = full_corpus_map(cases_map, [])
+    assert {:ok, corpus} = Corpus.load(map)
+
+    results = Runner.run(corpus)
+    all_results = Enum.flat_map(results, &elem(&1, 1))
+    bounds_result = Enum.find(all_results, &(&1.case_id == "bounds-new-invalid-001"))
+    assert bounds_result.agree == true
   end
 
   # --- runner agreement -----------------------------------------------------
