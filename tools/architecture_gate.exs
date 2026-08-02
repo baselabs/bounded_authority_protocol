@@ -422,11 +422,11 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   @approved_local_aliases ~w(AnchorFacts AnchoredExportCodec AnchoredExportFacts
     AnchoredExportInput ArchivedObject Base64Url BoundaryAnchor BoundaryAnchorCodec Bounds
     ChainFacts ChainInput CompactJws ConsumptionChain ConsumptionEntry Container ContextValidation Credentials
-    DecodedGrant DecodedProof EncodedAnchoredExport EncodedConsumptionEntry EnvelopeFacts
+    Corpus DecodedGrant DecodedProof EncodedAnchoredExport EncodedConsumptionEntry EnvelopeFacts
     ExpectedAnchor ExpectedAnchoredExport ExpectedChain ExpectedExport ExpectedGrant
     ExpectedKeyTransition ExpectedRequest FixedBytes Grant GrantFacts HistoricalKeyChain
     HistoricalPublicKey Jcs Json JsonValue Jwk KeyLocator KeyTransition KeyTransitionCodec
-    KeyTransitionFacts Operation Proof RequestDigest Root Runtime Selector SigningInput
+    KeyTransitionFacts Operation Proof Report RequestDigest Root Runner Runtime Selector SigningInput
     TrustedIssuer Uri Violation)
   @approved_struct_fields ~w(array_items compact_bytes count decoded_segment_bytes depth
     encoded_segment_bytes float_magnitude integer_magnitude json_bytes key_bytes kid_bytes kind
@@ -445,7 +445,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     byte_count keys valid_from valid_before verification trust authorization start_anchor_id
     start_anchored_at start_key_fingerprint end_anchor_id end_anchored_at end_key_fingerprint
     transition_count object_version version chain header start_anchor_parsed end_anchor_parsed
-    transition_parsed)a
+    transition_parsed index index_bytes cases raws case_ids id surface class input expected
+    bound_profile tamper verdict agree agreed disagreed agreement exit_status total kid)a
 
   def check(root, opts \\ []) do
     root = Path.expand(root)
@@ -1122,6 +1123,15 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules(path) when path in @chain_codec_source_paths,
     do: ~w(Access Enum Map String StringOrUri URI)
 
+  defp approved_source_modules("lib/bounded_authority_protocol/conformance/corpus.ex"),
+    do: ~w(Access Bitwise Enum List Map MapSet String)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/conformance/runner.ex"),
+    do: ~w(Bitwise Enum Map String)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/conformance/report.ex"),
+    do: ~w(Enum)
+
   defp approved_source_modules(_path), do: []
 
   defp approved_source_call?(
@@ -1249,6 +1259,64 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_call?(path, "Inspect.Algebra", :string)
        when path in @fact_source_paths,
        do: true
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/conformance/corpus.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {:binary, :at},
+           {:erlang, :binary_to_integer},
+           {"Bitwise", :bxor},
+           {"Enum", :all?},
+           {"Enum", :flat_map},
+           {"Enum", :map},
+           {"Enum", :reduce},
+           {"Enum", :reduce_while},
+           {"Enum", :reject},
+           {"Enum", :sort_by},
+           {"List", :keyfind},
+           {"Map", :delete},
+           {"Map", :fetch!},
+           {"Map", :get},
+           {"Map", :keys},
+           {"Map", :new},
+           {"Map", :update},
+           {"MapSet", :equal?},
+           {"MapSet", :new},
+           {"MapSet", :size},
+           {"String", :ends_with?}
+         ] or function == :get
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/conformance/runner.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {:binary, :at},
+           {"Bitwise", :bxor},
+           {"Enum", :all?},
+           {"Enum", :map},
+           {"Map", :delete},
+           {"Map", :get},
+           {"Map", :new},
+           {"String", :ends_with?}
+         ] or function == :get
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/conformance/report.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {"Enum", :count},
+           {"Enum", :flat_map}
+         ]
 
   defp approved_source_call?(_path, _module, _function), do: false
 
@@ -1436,7 +1504,10 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          "Elixir.BoundedAuthorityProtocol.V1.Proof.beam",
          "Elixir.BoundedAuthorityProtocol.V1.SigningInput.beam",
          "Elixir.BoundedAuthorityProtocol.V1.TrustedIssuer.beam",
-         "Elixir.BoundedAuthorityProtocol.V1.Violation.beam"
+         "Elixir.BoundedAuthorityProtocol.V1.Violation.beam",
+         "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
+         "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",
+         "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam"
        ],
        do: nil,
        else: :dynamic_dispatch
@@ -1570,6 +1641,55 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {:lists, :member}
         ]
 
+      "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam" ->
+        [
+          {:binary, :at},
+          {:maps, :keys},
+          {:maps, :remove},
+          {:maps, :to_list},
+          {Access, :get},
+          {Bitwise, :bxor},
+          {Enum, :all?},
+          {Enum, :flat_map},
+          {Enum, :map},
+          {Enum, :reduce},
+          {Enum, :reduce_while},
+          {Enum, :reject},
+          {Enum, :sort_by},
+          {List, :keyfind},
+          {Map, :delete},
+          {Map, :fetch!},
+          {Map, :get},
+          {Map, :keys},
+          {Map, :new},
+          {Map, :to_list},
+          {Map, :update},
+          {MapSet, :equal?},
+          {MapSet, :new},
+          {MapSet, :size},
+          {String, :ends_with?}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam" ->
+        [
+          {:binary, :at},
+          {:maps, :remove},
+          {Access, :get},
+          {Bitwise, :bxor},
+          {Enum, :all?},
+          {Enum, :map},
+          {Map, :delete},
+          {Map, :get},
+          {Map, :new},
+          {String, :ends_with?}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam" ->
+        [
+          {Enum, :count},
+          {Enum, :flat_map}
+        ]
+
       inspect_beam when is_binary(inspect_beam) ->
         if String.starts_with?(
              inspect_beam,
@@ -1685,7 +1805,10 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            "Elixir.BoundedAuthorityProtocol.V1.RequestDigest.beam",
            "Elixir.BoundedAuthorityProtocol.V1.Runtime.beam",
            "Elixir.BoundedAuthorityProtocol.V1.Selector.beam",
-           "Elixir.BoundedAuthorityProtocol.V1.Uri.beam"
+           "Elixir.BoundedAuthorityProtocol.V1.Uri.beam",
+           "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
+           "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",
+           "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam"
          ],
          do: [],
          else: [violation(:dynamic_dispatch, path, "compiled variable function invocation")]
