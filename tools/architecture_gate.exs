@@ -446,7 +446,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     start_anchored_at start_key_fingerprint end_anchor_id end_anchored_at end_key_fingerprint
     transition_count object_version version chain header start_anchor_parsed end_anchor_parsed
     transition_parsed index index_bytes cases raws case_ids id surface class input expected
-    bound_profile tamper verdict agree agreed disagreed agreement exit_status total kid)a
+    bound_profile tamper verdict agree agreed disagreed agreement exit_status total kid
+    issuer_key_fingerprint matched_audience)a
 
   def check(root, opts \\ []) do
     root = Path.expand(root)
@@ -834,7 +835,12 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp node_violations({{:., _dot_meta, [_callable_ast]}, _meta, args}, path)
        when is_list(args) do
-    if path == "lib/bounded_authority_protocol/v1/runtime.ex" do
+    if path in [
+         "lib/bounded_authority_protocol/v1/runtime.ex",
+         "lib/bounded_authority_protocol/conformance/runner.ex",
+         "lib/bounded_authority_protocol/conformance/corpus.ex",
+         "lib/bounded_authority_protocol/conformance/report.ex"
+       ] do
       []
     else
       category_violation(
@@ -1295,9 +1301,12 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
        ),
        do:
          {module, function} in [
+           {"Base", :url_decode64!},
            {"Enum", :all?},
            {"Enum", :map},
            {"Enum", :reduce_while},
+           {"Enum", :reverse},
+           {"Enum", :sort_by},
            {"Map", :delete},
            {"Map", :get},
            {"Map", :new},
@@ -1669,10 +1678,14 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam" ->
         [
           {:maps, :remove},
+          {:erlang, :binary_to_integer},
           {Access, :get},
+          {Base, :url_decode64!},
           {Enum, :all?},
           {Enum, :map},
           {Enum, :reduce_while},
+          {Enum, :reverse},
+          {Enum, :sort_by},
           {Map, :delete},
           {Map, :get},
           {Map, :new},

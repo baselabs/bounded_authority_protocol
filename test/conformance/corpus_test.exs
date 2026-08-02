@@ -595,6 +595,76 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert {:error, :invalid} = Corpus.load(map)
   end
 
+  test "a tamper case using the base64url input form with matching derived bytes loads" do
+    # base input: base64url("hello") = "aGVsbG8". Tamper byte index 0 xor 0x01 -> "bGVsbG8" region.
+    base_b64 = Base.url_encode64(<<"hello">>, padding: false)
+    base_bin = Base.url_decode64!(base_b64, padding: false)
+    # flip byte 0 of the decoded bytes
+    <<first, rest::binary>> = base_bin
+    tampered_bin = <<Bitwise.bxor(first, 0x01)>> <> rest
+    tampered_b64 = Base.url_encode64(tampered_bin, padding: false)
+
+    case_obj =
+      {:object,
+       [
+         {"id", {:string, "json-decode-tamper-b64-001"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", {:object, [{"base64url", {:string, tampered_b64}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, "json-decode-tamper-b64-001"}},
+             {"target", {:string, "input.base64url"}},
+             {"byte_index", {:integer, 0}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "first decoded byte"}}
+           ]}}
+       ]}
+
+    # The base_case references itself; the derived bytes (base with byte 0 flipped) must equal
+    # the verbatim artifact. Here both the input and the derivation reference the same base bytes,
+    # so the self-check passes when base_case input == the base64url of "hello".
+    # Build a corpus where the base input is the untampered base64url and the case is the tampered.
+    base_case_obj =
+      {:object,
+       [
+         {"id", {:string, "json-decode-tamper-b64-base"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "valid"}},
+         {"input", {:object, [{"base64url", {:string, base_b64}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}}
+       ]}
+
+    # Rewrite the tamper case to reference the base case.
+    tamper_case =
+      {:object,
+       [
+         {"id", {:string, "json-decode-tamper-b64-001"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", {:object, [{"base64url", {:string, tampered_b64}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, "json-decode-tamper-b64-base"}},
+             {"target", {:string, "input.base64url"}},
+             {"byte_index", {:integer, 0}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "first decoded byte"}}
+           ]}}
+       ]}
+
+    cases_map =
+      synthetic_corpus()
+      |> Map.put("cases/json/tamper-b64.json", jcs_case([base_case_obj, tamper_case]))
+
+    map = full_corpus_map(cases_map, [])
+    assert {:ok, _corpus} = Corpus.load(map)
+  end
+
   defp jcs_case(cases) do
     jcs(
       {:object,
@@ -786,6 +856,54 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert report.exit_status == 1
   end
 
+  # --- shipped corpus: official-side agreement gate (Task 2 deliverable) ---
+
+  @shipped_corpus "priv/conformance/v1/corpus"
+
+  test "the shipped corpus loads and the official side agrees on every case (exit 0)" do
+    map = shipped_corpus_map()
+    assert {:ok, corpus} = Corpus.load(map)
+    results = Runner.run(corpus)
+    report = Report.build(corpus, results)
+    assert report.agreement == true
+    assert report.exit_status == 0
+    assert report.disagreed == 0
+    assert report.total > 0
+  end
+
+  test "the shipped corpus report is deterministic JCS bytes binding the index SHA-256" do
+    map = shipped_corpus_map()
+    {:ok, corpus} = Corpus.load(map)
+    results = Runner.run(corpus)
+    {:ok, bytes_a} = Report.to_bytes(corpus, results)
+    {:ok, bytes_b} = Report.to_bytes(corpus, results)
+    assert bytes_a == bytes_b
+    # The report carries the index SHA-256.
+    assert is_binary(corpus.index_bytes)
+
+    expected_identity =
+      Base.url_encode64(:crypto.hash(:sha256, corpus.index_bytes), padding: false)
+
+    assert bytes_a =~ expected_identity
+  end
+
+  test "every shipped corpus JSON file is normative-decoder-loadable and under the byte ceiling" do
+    for path <- Path.wildcard(Path.join(@shipped_corpus, "**/*.json")) do
+      bytes = File.read!(path)
+      assert byte_size(bytes) <= 65_536, "#{path}: over the 65,536-byte ceiling"
+      assert {:ok, _} = Json.decode(bytes, Bounds.maximum())
+    end
+  end
+
+  defp shipped_corpus_map do
+    Path.wildcard(Path.join(@shipped_corpus, "**/*"))
+    |> Enum.filter(&File.regular?/1)
+    |> Enum.map(fn path ->
+      {Path.relative_to(path, @shipped_corpus), File.read!(path)}
+    end)
+    |> Map.new()
+  end
+
   # --- private-material sweep (closes census window until Task 4) ----------
 
   test "no corpus JSON file under priv/conformance/v1/corpus carries a private key or seed" do
@@ -807,6 +925,319 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
                "#{path}: forbidden seed field"
       end)
     end
+  end
+
+  # --- coverage: Corpus loader defensive/error arms ---
+
+  test "load_raw_entry halts when an indexed .raw file is absent from the map (L148)" do
+    # An index that declares a .raw file, but the corpus map does not carry that path, trips
+    # load_raw_entry's `{:halt, {:error, :invalid}}` arm during the files reduce.
+    raw_bytes = :crypto.strong_rand_bytes(64)
+
+    case_obj =
+      {:object,
+       [
+         {"id", {:string, "raw-absent-001"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "valid"}},
+         {"input",
+          {:object,
+           [
+             {"raw_file", {:string, "cases/json/absent.raw"}},
+             {"sha256_base64url", {:string, sha256_b64(raw_bytes)}}
+           ]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}}
+       ]}
+
+    cases_map = Map.put(synthetic_corpus(), "cases/json/absent-case.json", jcs_case([case_obj]))
+    # Index references the .raw, but the map omits it.
+    index = build_index(Map.put(cases_map, "cases/json/absent.raw", raw_bytes))
+    bytes = jcs(to_object(index))
+    # NOTE: deliberately do NOT add absent.raw to the map.
+    map = Map.put(cases_map, "index.json", bytes)
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "count_surface_class skips a case with non-binary surface/class (L296)" do
+    # A case whose surface/class are not binaries is skipped by count_surface_class (else -> acc),
+    # so it does NOT increment the observed applicability. The declared applicability therefore
+    # matches the valid synthetic cases only (the malformed one is invisible to the census). This
+    # proves the skip: if it were counted, the observed surface would be an unknown integer key and
+    # the surface-set check would reject the corpus.
+    malformed_case =
+      {:object,
+       [
+         {"id", {:string, "bad-surface-001"}},
+         {"surface", {:integer, 1}},
+         {"class", {:integer, 2}},
+         {"input", {:object, [{"text", {:string, "1"}}]}},
+         {"expected", {:object, [{"verdict", {:string, "valid"}}]}}
+       ]}
+
+    cases_map =
+      Map.put(synthetic_corpus(), "cases/json/bad-surface.json", jcs_case([malformed_case]))
+
+    # Declared applicability = the valid synthetic cases only (malformed case is skipped, so it
+    # contributes nothing to the observed census).
+    declared = applicability_from_cases(synthetic_corpus())
+    map = full_corpus_map(cases_map, applicability: declared)
+    assert {:ok, _corpus} = Corpus.load(map)
+  end
+
+  test "tamper_source_bytes :error arm (L389) via a base case with malformed base64url" do
+    # tamper_source_bytes decodes the BASE case's input; a malformed base64url in the base hits
+    # `:error -> :error` (L389). The tamper case references this base, so verify_tampers runs
+    # tamper_source_bytes(base) -> :error -> the with short-circuits -> load fails closed.
+    base_bad_b64 =
+      {:object,
+       [
+         {"id", {:string, "tamper-source-bad-base"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "valid"}},
+         {"input", {:object, [{"base64url", {:string, "!!!not-base64!!!"}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}}
+       ]}
+
+    tamper_ref =
+      {:object,
+       [
+         {"id", {:string, "tamper-source-bad"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", {:object, [{"text", {:string, "x"}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, "tamper-source-bad-base"}},
+             {"target", {:string, "input.text"}},
+             {"byte_index", {:integer, 0}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "first byte"}}
+           ]}}
+       ]}
+
+    cases_map =
+      Map.merge(synthetic_corpus(), %{
+        "cases/json/tamper-source-bad.json" => jcs_case([base_bad_b64, tamper_ref])
+      })
+
+    map = full_corpus_map(cases_map, [])
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "tamper_derived_bytes :error and true arms (L389/L392) via a tamper case with no byte key" do
+    # A tamper case whose input has neither text nor base64url hits the `true -> :error` arm of
+    # tamper_derived_bytes; the base64url `:error -> :error` arm is hit by a malformed b64 input.
+    # Both are reached during corpus load's verify_raw_bindings/tamper derivation pass.
+    tamper_no_key =
+      {:object,
+       [
+         {"id", {:string, "tamper-no-key-001"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", {:object, [{"other", {:string, "x"}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, "tamper-no-key-001"}},
+             {"target", {:string, "input.text"}},
+             {"byte_index", {:integer, 0}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "first byte"}}
+           ]}}
+       ]}
+
+    cases_map =
+      Map.put(synthetic_corpus(), "cases/json/tamper-no-key.json", jcs_case([tamper_no_key]))
+
+    map = full_corpus_map(cases_map, [])
+    # A tamper case whose derived bytes cannot be computed fails corpus load (fail-closed).
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "tamper_verbatim_bytes :error and true arms (L405/L408) via a tamper case whose verbatim input is malformed" do
+    # tamper_verbatim_matches? runs tamper_source_bytes(base) THEN tamper_verbatim_bytes(case).
+    # The verbatim :error/true arms (L405/L408) are only reached when the BASE has valid bytes
+    # (so source succeeds) but the tamper CASE's own input is malformed. Build a valid base case
+    # plus a tamper case whose input has a malformed base64url (-> :error) and a no-key variant.
+    base_case =
+      {:object,
+       [
+         {"id", {:string, "tamper-verbatim-base"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "valid"}},
+         {"input", {:object, [{"text", {:string, "{\"a\":1}"}}]}},
+         {"expected",
+          {:object,
+           [{"verdict", {:string, "valid"}}, {"value", {:object, [{"a", {:integer, 1}}]}}]}}
+       ]}
+
+    tamper_bad_b64 =
+      {:object,
+       [
+         {"id", {:string, "tamper-verbatim-bad-b64"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", {:object, [{"base64url", {:string, "!!!not-base64!!!"}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, "tamper-verbatim-base"}},
+             {"target", {:string, "input.text"}},
+             {"byte_index", {:integer, 0}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "first byte"}}
+           ]}}
+       ]}
+
+    cases_map =
+      Map.merge(synthetic_corpus(), %{
+        "cases/json/tamper-verbatim.json" => jcs_case([base_case, tamper_bad_b64])
+      })
+
+    map = full_corpus_map(cases_map, [])
+    # base source bytes succeed; verbatim bytes fail to decode -> mismatch -> load fails closed.
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "tamper_verbatim_bytes true arm (L408) via a tamper case whose verbatim input has no byte key" do
+    # The `true -> :error` arm fires when the tamper case input has neither text nor base64url.
+    base_case =
+      {:object,
+       [
+         {"id", {:string, "tamper-verbatim-nokey-base"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "valid"}},
+         {"input", {:object, [{"text", {:string, "{\"a\":1}"}}]}},
+         {"expected",
+          {:object,
+           [{"verdict", {:string, "valid"}}, {"value", {:object, [{"a", {:integer, 1}}]}}]}}
+       ]}
+
+    tamper_no_key =
+      {:object,
+       [
+         {"id", {:string, "tamper-verbatim-nokey"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", {:object, [{"other", {:string, "x"}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, "tamper-verbatim-nokey-base"}},
+             {"target", {:string, "input.text"}},
+             {"byte_index", {:integer, 0}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "first byte"}}
+           ]}}
+       ]}
+
+    cases_map =
+      Map.merge(synthetic_corpus(), %{
+        "cases/json/tamper-verbatim-nokey.json" => jcs_case([base_case, tamper_no_key])
+      })
+
+    map = full_corpus_map(cases_map, [])
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "check_raw_binding error passthrough (L430) when a prior raw binding already errored" do
+    # verify_raw_bindings reduces cases; if the first raw-bearing case's binding errors, the
+    # accumulator carries the error and check_raw_binding/3's `error -> error` arm fires for
+    # subsequent cases. Build two raw-bearing cases: the first with a wrong hash, the second valid.
+    raw_bytes = :crypto.strong_rand_bytes(64)
+    other_raw = :crypto.strong_rand_bytes(64)
+
+    first_case =
+      {:object,
+       [
+         {"id", {:string, "raw-passthrough-001"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "valid"}},
+         {"input",
+          {:object,
+           [
+             {"raw_file", {:string, "cases/json/a.raw"}},
+             # WRONG hash for a.raw -> verify_raw_entry errors -> accumulator becomes {:error,_}
+             {"sha256_base64url", {:string, sha256_b64(<<"wrong">>)}}
+           ]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}}
+       ]}
+
+    second_case =
+      {:object,
+       [
+         {"id", {:string, "raw-passthrough-002"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "valid"}},
+         {"input",
+          {:object,
+           [
+             {"raw_file", {:string, "cases/json/b.raw"}},
+             {"sha256_base64url", {:string, sha256_b64(other_raw)}}
+           ]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}}
+       ]}
+
+    base =
+      Map.merge(synthetic_corpus(), %{
+        "cases/json/passthrough-cases.json" => jcs_case([first_case, second_case]),
+        "cases/json/a.raw" => raw_bytes,
+        "cases/json/b.raw" => other_raw
+      })
+
+    map = full_corpus_map(base, [])
+    # The first case's hash mismatches -> binding errors; the reduce short-circuits the
+    # accumulator, exercising check_raw_binding/3's error passthrough.
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "verify_raw_entry missing-path arm (L439) when a raw_file is not in the loaded raws" do
+    # A case references a raw_file whose path was never registered in raws (e.g., a .raw that
+    # the index did not declare, or a typo). verify_raw_entry's `_ -> {:error, :invalid}` fires.
+    case_obj =
+      {:object,
+       [
+         {"id", {:string, "raw-missing-path-001"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "valid"}},
+         {"input",
+          {:object,
+           [
+             {"raw_file", {:string, "cases/json/never-registered.raw"}},
+             {"sha256_base64url", {:string, sha256_b64(:crypto.strong_rand_bytes(64))}}
+           ]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}}
+       ]}
+
+    cases_map =
+      Map.put(synthetic_corpus(), "cases/json/missing-raw-case.json", jcs_case([case_obj]))
+
+    map = full_corpus_map(cases_map, [])
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "member/2 nil arm (L459) via a case file object missing the queried key" do
+    # member/2 returns nil when List.keyfind finds nothing (key absent from the object). The
+    # case-file decoder calls member(members, "format") and member(members, "cases"); a case
+    # file whose decoded object lacks the "cases" key reaches member's `nil -> nil` arm and the
+    # subsequent pattern match fails -> file load errors -> corpus load fails closed.
+    malformed_file =
+      jcs({:object,
+       [
+         {"format", {:string, "bounded-authority-protocol-v1-conformance-cases"}},
+         {"provenance", {:object, [{"private_material_tracked", {:boolean, false}}]}}
+         # NOTE: "cases" key intentionally absent -> member(members, "cases") -> nil -> L459
+       ]})
+
+    cases_map = Map.put(synthetic_corpus(), "cases/json/no-cases-key.json", malformed_file)
+    # The index declares this file with case_count 0; the file lacks "cases", so member hits nil.
+    map = full_corpus_map(cases_map, [])
+    assert {:error, :invalid} = Corpus.load(map)
   end
 
   defp collect_keys(value, acc \\ []) do

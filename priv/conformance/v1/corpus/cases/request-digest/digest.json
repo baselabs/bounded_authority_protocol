@@ -1,0 +1,1 @@
+{"cases":[{"class":"valid","expected":{"digest":"uv20PiC8tRQoOy9-eRlBFPQngtiDXkw_SCbbgzxjC2g","verdict":"valid"},"id":"request-digest-valid","input":{"cast_arguments":{"limit":10,"record":{"id":"rec-1"}},"operation":"read"},"surface":"request_digest"}],"format":"bounded-authority-protocol-v1-conformance-cases","provenance":{"private_material_tracked":false}}
