@@ -221,16 +221,29 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
 
     declared_total =
       Enum.reduce_while(files, {:ok, 0}, fn %{"path" => path, "cases" => count}, {:ok, acc} ->
-        case Map.get(per_file_sums, path) do
-          nil -> {:halt, {:error, :invalid}}
-          ^count -> {:cont, {:ok, acc + count}}
-          _ -> {:halt, {:error, :invalid}}
+        case {observed_file_count(per_file_sums, path), String.ends_with?(path, ".raw"), count} do
+          {observed, false, _} when observed != :absent and observed == count ->
+            {:cont, {:ok, acc + count}}
+
+          # .raw sidecars carry no cases; their declared count must be 0.
+          {:absent, true, 0} ->
+            {:cont, {:ok, acc}}
+
+          _ ->
+            {:halt, {:error, :invalid}}
         end
       end)
 
     case declared_total do
       {:ok, ^total} -> :ok
       _ -> {:error, :invalid}
+    end
+  end
+
+  defp observed_file_count(per_file_sums, path) do
+    case Map.fetch(per_file_sums, path) do
+      {:ok, count} -> count
+      :error -> :absent
     end
   end
 
@@ -344,15 +357,24 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   defp tamper_verbatim_matches?(case_obj, base, index, xor) do
     with {:ok, base_bytes} <- tamper_source_bytes(base),
          {:ok, verbatim_bytes} <- tamper_verbatim_bytes(case_obj) do
-      size = byte_size(base_bytes)
+      derived = derive_tampered_bytes(base_bytes, index, xor)
+      derived == verbatim_bytes
+    else
+      _ -> false
+    end
+  end
 
-      if index >= 0 and index < size and byte_size(verbatim_bytes) == size do
-        derived = :binary.at(base_bytes, index)
-        expected = Bitwise.bxor(derived, xor)
-        :binary.at(verbatim_bytes, index) == expected
-      else
-        false
-      end
+  # Re-derive the FULL tampered bytes from the base case: the base with the single
+  # documented byte flipped by xor. The verbatim artifact must byte-equal this
+  # (design Q25) — not just match at the one index.
+  defp derive_tampered_bytes(base_bytes, index, xor) do
+    size = byte_size(base_bytes)
+
+    if index >= 0 and index < size do
+      <<pre::binary-size(^index), byte, post::binary>> = base_bytes
+      pre <> <<Bitwise.bxor(byte, xor)>> <> post
+    else
+      :error
     end
   end
 
