@@ -84,16 +84,27 @@ ACCEPTED; (iii) the vector is REJECTED by both the official facade and the indep
 What cannot be mechanically enforced (value-free errors) is a construction discipline, not an
 observed reason.
 
-Load-bearing corollaries. `invalid_algorithm` is `alg:"none"` + an empty signature + an unchanged
-payload (an alg:none-honoring JWS verifier skips signature verification and accepts; a correct
-verifier rejects at the fixed-header pin) — NOT a naive `alg` swap (rejected by signature mismatch
-regardless of alg-checking) nor `alg:"HS256"` + a 32-byte HMAC signature (rejected by the fixed
-64-byte Ed25519 signature-width guard, not the alg check). A class that cannot be constructed to
-satisfy skip-would-accept by mutating an existing valid case — i.e. it needs a validly-wrong
-signature — is an ESCALATION candidate kept `n_a` with a falsifiable reason, never a
-silently-weaker vector. The standing escalation candidate is `check_envelope/invalid_selector`: the
-binding short-circuits at `operation` then `ba_req` (which signs `[operation, cast_arguments]`)
-before the selector match, so no unsigned mutation reaches the selector check for the right reason.
+Load-bearing corollaries. `invalid_algorithm` is `alg:"none"` + an unchanged payload + the
+original signature KEPT — NOT a naive `alg` swap (rejected by signature mismatch regardless of
+alg-checking), nor `alg:"HS256"` + a 32-byte HMAC signature (rejected by the fixed 64-byte Ed25519
+signature-width guard, not the alg check), nor `alg:"none"` + an EMPTY signature (the empty segment
+is rejected by the compact structural scan BEFORE the algorithm pin runs, so it would test the
+scan, not the pin — a cross-vendor finding). Keeping the original signature lets the compact pass
+the structural scan so the algorithm pin is the rejecter. On the pure DECODE surfaces
+(`decode_grant`/`decode_proof`), which perform no signature verification, the algorithm pin is the
+SOLE rejecter of an `alg:"none"` header — removing it accepts the vector, so skip-would-accept holds
+cleanly (the `alg-header-reject` mutation proves it). On the VERIFY surfaces the algorithm pin fires
+first, but the signature check ALSO rejects `alg:"none"` (changing the header invalidates the
+signature over the original header), so the vector is double-protected: it confirms the verifier
+rejects algorithm confusion, but a single mutation removing only the algorithm pin is masked by the
+signature check. This double-protection is inherent — a validly-signed `alg:"none"` token does not
+exist (the algorithm has no signature to be valid under) — and is disclosed here rather than left
+implied. A class that cannot be constructed to satisfy skip-would-accept by mutating an existing
+valid case — i.e. it needs a validly-wrong signature — is an ESCALATION candidate kept `n_a` with a
+falsifiable reason, never a silently-weaker vector. The standing escalation candidate is
+`check_envelope/invalid_selector`: the binding short-circuits at `operation` then `ba_req` (which
+signs `[operation, cast_arguments]`) before the selector match, so no unsigned mutation reaches the
+selector check for the right reason.
 
 **Known residual — selector binding is unexercised (escalation, re-signing-blocked).** The single
 valid `check_envelope` case carries an `all` selector (matches any root), so the POSITIVE selector

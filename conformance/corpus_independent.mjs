@@ -1107,6 +1107,11 @@ function byteList(input, key, context) {
 function tamperB64(encoded, context) {
   const decoded = decodeB64Loose(encoded, context);
   if (decoded === null) fail(`${context}: invalid base64url`);
+  // Canonical/strict check: the loose decode silently drops non-alphabet bytes and tolerates
+  // non-canonical pad bits, whereas the official Elixir loader's Base.url_decode64(padding: false)
+  // rejects both. Require an exact canonical roundtrip so the tamper audit is a genuine independent
+  // MIRROR of the strict loader on the rows[i]/chunks[i]/base64url targets (cross-vendor GLM note).
+  if (decoded.toString("base64url") !== encoded) fail(`${context}: non-canonical base64url`);
   return decoded;
 }
 

@@ -1005,10 +1005,14 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp conformance_cli_leak?(_module, _path), do: false
 
+  # The Cli carve-out AND its Cli.Main escript entry (which does System.halt + delegates to Cli).
+  # Cli.Main is NOT exempted here: nothing in lib legitimately references it (the escript entry
+  # point is wired via mix.exs config, which the gate does not scan), so exempting it would let a
+  # core module call Cli.Main.main/1 and reach System.halt through the pure core. In-conformance
+  # references are exempted by the caller's path check, not by module identity.
   defp cli_carveout_module?(module) do
-    module != @cli_main_module and
-      (module == "BoundedAuthorityProtocol.Conformance.Cli" or
-         String.starts_with?(module, "BoundedAuthorityProtocol.Conformance.Cli."))
+    module == "BoundedAuthorityProtocol.Conformance.Cli" or
+      String.starts_with?(module, "BoundedAuthorityProtocol.Conformance.Cli.")
   end
 
   defp alias_binding_name(target, options) when is_list(options) do
