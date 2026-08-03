@@ -144,8 +144,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=218 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=218. Mutated in the isolated copy only.
+      # corpus yields agreed=220 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=220. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -338,10 +338,10 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       command: ["mix", "test", "test/conformance/cli_test.exs:36"]
     },
     # --- check_envelope authority bindings (BAP-05 selector closeout) ----------
-    # Each of the three bindings below is the SOLE rejecter of one shipped invalid_claim case, so
-    # neutralizing it flips that case to accept, the Node runner still rejects, and the shipped
-    # corpus disagrees -> cli_test:36 goes red. Before these cases existed the whole corpus stayed
-    # green under all three mutations (the closeout lenses proved that blindness mechanically).
+    # Each binding below is the SOLE rejecter of one shipped invalid_claim case, so neutralizing it
+    # flips that case to accept, the Node runner still rejects, and the shipped corpus disagrees ->
+    # cli_test:36 goes red. Before these cases existed the whole corpus stayed green under every one
+    # of these mutations (the closeout lenses proved that blindness mechanically).
     %{
       # Holder binding (proof-of-possession): without it ANY holder's validly-signed proof is
       # accepted against a grant issued to a different holder. Isolated by
@@ -366,8 +366,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     },
     %{
       # Request-argument binding (`ba_req`): without it a proof is replayable with different cast
-      # arguments — argument substitution. This binding also subsumes the `ba_op` check, since the
-      # request digest is taken over [operation, cast_arguments]. Isolated by
+      # arguments — argument substitution. Isolated by
       # check-envelope-invalid-claim-request-arguments.
       name: "check-envelope-request-digest-binding-removal",
       path: "lib/bounded_authority_protocol/v1/runtime.ex",
@@ -375,6 +374,40 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       to:
         "         true <-\n           (if is_nil(proof.request_hash),\n              do: secure_equal?(proof.request_hash, request_hash),\n              else: true),\n",
       command: ["mix", "test", "test/conformance/cli_test.exs:36"]
+    },
+    %{
+      # Operation binding (`ba_op`): the request digest is computed over the SERVER-derived
+      # expected.operation, never over proof.ba_op, so this line is the ONLY constraint on the
+      # holder-signed ba_op claim — it is NOT subsumed by ba_req. Without it a dishonest producer
+      # signs ba_op "write" alongside a ba_req over "read" and the false claim rides into
+      # EnvelopeFacts.operation unchecked. Isolated by
+      # check-envelope-invalid-claim-operation-binding, whose proof is exactly that shape (the
+      # producer facade cannot build it, which is why this binding was unexercised until now).
+      name: "check-envelope-operation-binding-removal",
+      path: "lib/bounded_authority_protocol/v1/runtime.ex",
+      from: "         true <- secure_equal?(proof.operation, expected.operation),\n",
+      to:
+        "         true <-\n           (if is_nil(proof.operation),\n              do: secure_equal?(proof.operation, expected.operation),\n              else: true),\n",
+      command: ["mix", "test", "test/conformance/cli_test.exs:36"]
+    },
+    %{
+      # Node-side selector PATH validation. The official rejects an empty selector path at grant
+      # decode; without validSelectorPath the independent runner treats [] as "the root", matches
+      # check-envelope-invalid-selector-empty-path (whose value IS the whole cast_arguments), and
+      # accepts what the official refuses -> the runner reports a disagreement and exits 1. This is
+      # what makes the matcher's shape hardening falsifiable rather than defensive code no gate can
+      # prove: with the mutation applied the runner reports
+      # `agreed=219 disagreed=1 ... disagreements: check-envelope-invalid-selector-empty-path`.
+      # TARGET: this mutates the NODE runner, so it targets the Node runner test. cli_test:36 is
+      # structurally blind here — that test runs the official Elixir CLI against the corpus's
+      # expected verdicts and never executes corpus_independent.mjs (proven: this entry SURVIVED
+      # while pointed at cli_test:36, and is caught pointed here).
+      name: "check-envelope-node-selector-path-validation-removal",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "  if (!Array.isArray(path) || path.length < 1 || path.length > MAXIMA.path_segments) return false;\n",
+      to: "  if (!Array.isArray(path)) return false;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----
     %{
