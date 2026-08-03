@@ -144,8 +144,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=215 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=215. Mutated in the isolated copy only.
+      # corpus yields agreed=218 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=218. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -325,8 +325,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # ACCEPT check-envelope-invalid-selector (its grant carries an `equals ["record","id"] "rec-1"`
       # selector that the case's rec-2 cast_arguments fail). The Node runner still rejects it, so the
       # shipped-corpus CLI reports a disagreement and Cli.run returns nonzero -> cli_test:36 (exit 0
-      # on the shipped corpus) goes red. `_ = operation.selectors` keeps `operation` referenced so the
-      # mutated source still compiles under --warnings-as-errors. FAMILY: this is the SOLE selector
+      # on the shipped corpus) goes red. The `is_nil` guard keeps `operation` referenced so the
+      # mutated source still compiles under --warnings-as-errors (selectors are always a non-empty
+      # list after decode, so the bypass branch always fires). FAMILY: this is the SOLE selector
       # enforcement point on the check_envelope path (`grep Selector.match_all lib/` -> one hit).
       name: "check-envelope-selector-reject-removal",
       path: "lib/bounded_authority_protocol/v1/runtime.ex",
@@ -334,6 +335,45 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "         :ok <- Selector.match_all(operation.selectors, expected.cast_arguments, bounds),\n",
       to:
         "         :ok <-\n           (if is_nil(operation.selectors),\n              do: Selector.match_all(operation.selectors, expected.cast_arguments, bounds),\n              else: :ok),\n",
+      command: ["mix", "test", "test/conformance/cli_test.exs:36"]
+    },
+    # --- check_envelope authority bindings (BAP-05 selector closeout) ----------
+    # Each of the three bindings below is the SOLE rejecter of one shipped invalid_claim case, so
+    # neutralizing it flips that case to accept, the Node runner still rejects, and the shipped
+    # corpus disagrees -> cli_test:36 goes red. Before these cases existed the whole corpus stayed
+    # green under all three mutations (the closeout lenses proved that blindness mechanically).
+    %{
+      # Holder binding (proof-of-possession): without it ANY holder's validly-signed proof is
+      # accepted against a grant issued to a different holder. Isolated by
+      # check-envelope-invalid-claim-holder-binding.
+      name: "check-envelope-holder-binding-removal",
+      path: "lib/bounded_authority_protocol/v1/runtime.ex",
+      from: "    with true <- secure_equal?(proof.holder_thumbprint, grant.holder_thumbprint),\n",
+      to:
+        "    with true <-\n           (if is_nil(proof.holder_thumbprint),\n              do: secure_equal?(proof.holder_thumbprint, grant.holder_thumbprint),\n              else: true),\n",
+      command: ["mix", "test", "test/conformance/cli_test.exs:36"]
+    },
+    %{
+      # Grant binding (`ath`): without it a proof minted over one grant is replayable against a
+      # different grant held by the same holder — scope widening. Isolated by
+      # check-envelope-invalid-claim-grant-binding.
+      name: "check-envelope-ath-binding-removal",
+      path: "lib/bounded_authority_protocol/v1/runtime.ex",
+      from: "         true <- secure_equal?(proof.grant_hash, grant_hash),\n",
+      to:
+        "         true <-\n           (if is_nil(proof.grant_hash),\n              do: secure_equal?(proof.grant_hash, grant_hash),\n              else: true),\n",
+      command: ["mix", "test", "test/conformance/cli_test.exs:36"]
+    },
+    %{
+      # Request-argument binding (`ba_req`): without it a proof is replayable with different cast
+      # arguments — argument substitution. This binding also subsumes the `ba_op` check, since the
+      # request digest is taken over [operation, cast_arguments]. Isolated by
+      # check-envelope-invalid-claim-request-arguments.
+      name: "check-envelope-request-digest-binding-removal",
+      path: "lib/bounded_authority_protocol/v1/runtime.ex",
+      from: "         true <- secure_equal?(proof.request_hash, request_hash),\n",
+      to:
+        "         true <-\n           (if is_nil(proof.request_hash),\n              do: secure_equal?(proof.request_hash, request_hash),\n              else: true),\n",
       command: ["mix", "test", "test/conformance/cli_test.exs:36"]
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----

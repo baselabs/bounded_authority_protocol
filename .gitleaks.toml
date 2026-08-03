@@ -1,19 +1,30 @@
 # gitleaks config — extends the default ruleset.
 #
-# The v1 conformance corpus and vectors ship PUBLIC deterministic test material:
-# compact JWS grant/proof/anchor tokens signed by throwaway keypairs whose public
-# fingerprints the corpus census declares (index.json public_key_fingerprints).
-# They are JWT-shaped by design and carry no private material — the corpus loader
-# enforces provenance.private_material_tracked=false, and the cross-verifier census
-# scan mechanically rejects private-key patterns (bap03_independent.mjs
-# assertNoPrivateMaterial / discoverTextKeys). Allowlisting these paths silences
-# the JWT-rule false positive without weakening the scan anywhere else.
+# The v1 conformance corpus and vectors ship PUBLIC deterministic test material: compact JWS
+# grant/proof/anchor tokens and raw base64url public keys, generated from throwaway seeds. They
+# are JWT-shaped and high-entropy by design, so the default `jwt` and `generic-api-key` rules fire
+# on them (273 findings, all fixture data). Those two rules are allowlisted for those two paths
+# ONLY — every other default rule (cloud credentials, provider tokens, private-key blocks) still
+# applies there, and all rules apply everywhere else in the tree.
+#
+# This is a false-positive suppression, not a claim that the fixtures are unscanned. Two
+# independent checks cover private material in these trees: the corpus loader requires every case
+# file to declare `provenance.private_material_tracked: false` (schema-pinned via
+# priv/conformance/v1/schemas/conformance-case.schema.json), and the cross-verifier census scan
+# (conformance/bap03_independent.mjs assertNoPrivateMaterial / discoverTextKeys) rejects PEM
+# blocks, Ed25519 private DER, JWK `d` members, and labeled private-key/seed values in the files it
+# walks. Neither is exhaustive: the census walk skips any file named `manifest.json`, and an
+# UNLABELED raw seed matches no private-key pattern. Keeping the two entropy rules scoped rather
+# than clearing the paths outright is what keeps the remaining default rules on that residue.
+#
+# No repository gate consumes this file today — it configures the developer's local commit scan.
 
 [extend]
 useDefault = true
 
-[allowlist]
-description = "public conformance fixtures: deterministic test vectors, no private material"
+[[allowlists]]
+description = "public conformance fixtures: JWT-shaped tokens and high-entropy public keys, no private material"
+targetRules = ["jwt", "generic-api-key"]
 paths = [
   '''priv/conformance/v1/corpus/.*''',
   '''priv/conformance/v1/vectors/.*''',

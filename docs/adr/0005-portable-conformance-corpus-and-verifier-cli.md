@@ -101,12 +101,15 @@ signature check. This double-protection is inherent — a validly-signed `alg:"n
 exist (the algorithm has no signature to be valid under) — and is disclosed here rather than left
 implied. A class that cannot be constructed to satisfy skip-would-accept by mutating an existing
 valid case — i.e. it needs a validly-wrong signature — is an ESCALATION candidate kept `n_a` with a
-falsifiable reason, never a silently-weaker vector. The former standing example of this class,
-`check_envelope/invalid_selector`, is now CLOSED (see "Selector binding — closed" below): its
-binding short-circuits at `operation` then `ba_req` (which signs `[operation, cast_arguments]`)
-before the selector match, so no UNSIGNED mutation of the existing valid case reaches the selector
-check for the right reason — closing it required re-signing, which the BAP-05 selector remediation
-did.
+falsifiable reason, never a silently-weaker vector. Both standing examples of this class,
+`check_envelope/invalid_selector` and `check_envelope/invalid_claim`, are now CLOSED (see "Selector
+binding — closed" and "Authority bindings — closed" below). Their `n_a` reasons both ended in
+"re-signing, out of scope", and that constraint is exactly what the selector remediation lifted:
+**once re-signing became available, every reason resting on it expired, and leaving a sibling cell
+`n_a` on an expired reason is a self-contradiction the applicability gate cannot see** (it checks
+only that a reason string is present). An `n_a` reason naming a PROCESS constraint rather than an
+input-algebra impossibility must therefore be re-derived whenever that constraint changes — the
+lesson the closeout lenses surfaced by proving three bindings unexercised.
 
 **Selector binding — closed (BAP-05 selector remediation).** Formerly the single valid
 `check_envelope` case carried an `all` selector (matches any root), so the positive selector path
@@ -127,6 +130,28 @@ least one labeled field under the discovery roots. The new issuer key is carried
 cases' `trusted_issuer.public_key`; the new holder key lives only inside the proof compacts, so a
 companion `proof_signing_input` valid case (`proof-signing-input-valid-distinct-holder`) carries it
 as a labeled `holder_public_key` input, keeping the field-discovered set equal to the canonical 19.
+
+**Authority bindings — closed (BAP-05 selector closeout).** Closing the selector cell exposed the
+same vacuity in its siblings. `check_envelope` binds nine things (`docs/protocol-v1.md` § Public
+verification contract), but the corpus isolated only six: neutralizing the holder binding
+(`cnf.jkt`), the grant binding (`ath`), or the request-argument binding (`ba_req`) one at a time
+left the ENTIRE corpus green, so a verifier omitting any one of them scored a perfect run and would
+be certified conformant. The holder-binding case is the severe one — without it any holder's
+validly-signed proof is accepted against a grant issued to a different holder, a total
+proof-of-possession bypass on a corpus published as normative evidence for third-party verifiers.
+Now closed by three `invalid_claim` cases, each a one-defect variant of a shared valid base whose
+named binding is the SOLE rejecter (right-reason controls in the generator; three matching
+mutation-battery entries prove each goes red):
+`check-envelope-invalid-claim-holder-binding` (proof signed by a declared key that is not the
+grant's `cnf.jkt` holder), `-grant-binding` (a proof minted over grant A presented with grant B,
+same holder and same arguments, so only `ath` fails), and `-request-arguments` (the harness supplies
+`cast_arguments` the proof never signed; the grant carries `all`, so only `ba_req` fails).
+Applicability: `check_envelope/invalid_claim` is `3`. The remaining `ba_op` binding needs no case
+and is NOT a coverage hole: the request digest is taken over `[operation, cast_arguments]`, so any
+proof whose `ba_op` differs from the expected operation necessarily carries a `ba_req` computed over
+a different operation and is rejected by the `ba_req` binding — `ba_op` is defence in depth, not an
+independent authority check. No new keys: all three cases reuse the two keypairs the selector
+remediation declared, so the census stays at 8.
 
 The tamper verbatim-vs-derived audit binds a single-byte flip to a named `tamper.target`
 (`compact` / `grant` / `proof` / `rows[i]` / `chunks[i]`), so a meaningful-byte tamper can address
