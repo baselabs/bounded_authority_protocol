@@ -88,7 +88,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
   depends on BAP-04 only) and BAP-09 (thin TypeScript and Python verifier SDKs consuming only
   the published spec and vectors; depends on BAP-05). Each row's own ADR lands when its work
   starts; neither changes any wire format, limit, or verification rule.
-- Add the portable v1 conformance corpus (68 cases across 28 surfaces with a total
+- Add the portable v1 conformance corpus (180 cases across 28 surfaces with a total
   surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
   `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
 - Add the deterministic offline verifier CLI (escript `bounded_authority_conformance`,

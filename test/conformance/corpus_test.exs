@@ -816,6 +816,18 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert report.exit_status == 0
   end
 
+  test "a zero-case run is NOT agreement (exit 1) — the empty-corpus vacuous-green floor" do
+    corpus_map = synthetic_corpus() |> full_corpus_map([])
+    {:ok, corpus} = Corpus.load(corpus_map)
+    # A structurally-valid corpus that executed zero cases verifies nothing: agreement requires
+    # at least one executed case AND zero disagreements, so exit is 1, not 0.
+    report = Report.build(corpus, [])
+
+    assert report.total == 0
+    assert report.agreement == false
+    assert report.exit_status == 1
+  end
+
   test "Report emits deterministic bytes for identical corpus input" do
     corpus_map = synthetic_corpus() |> full_corpus_map([])
     {:ok, corpus} = Corpus.load(corpus_map)
