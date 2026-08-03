@@ -69,12 +69,14 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
     with {:ok, map} <- read_corpus_dir(corpus_dir),
          {:ok, corpus} <- Corpus.load(map),
          results <- Runner.run(corpus),
-         {:ok, bytes} <- Report.to_bytes(corpus, results) do
-      write_report(bytes, report_path)
+         {:ok, bytes} <- Report.to_bytes(corpus, results),
+         :ok <- write_report(bytes, report_path) do
       report = Report.build(corpus, results)
       report.exit_status
     else
-      # Any integrity or load failure, or a report-encoding failure, is exit 1 (closed).
+      # Any integrity or load failure, a report-encoding failure, OR a failed report write is
+      # exit 1 (closed). A swallowed --report write would exit 0 with no report on disk — a
+      # quiet failure of the evidence artifact in the tool built to eliminate quiet failure.
       _ -> 1
     end
   end

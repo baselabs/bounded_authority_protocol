@@ -77,6 +77,20 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     assert Cli.run(["--corpus", "/tmp/does-not-exist-#{System.unique_integer([:positive])}"]) == 1
   end
 
+  test "exit 1 when the --report write fails (unwritable path is not swallowed)" do
+    # The corpus agrees (would be exit 0), but the report cannot be written: File.write returns
+    # {:error, :enoent} for a path under a nonexistent parent dir. A swallowed write would exit 0
+    # with no report on disk; the fail-closed contract makes it exit 1.
+    unwritable =
+      Path.join(
+        "/tmp/bap-cli-missing-parent-#{System.unique_integer([:positive])}/sub",
+        "report.json"
+      )
+
+    assert Cli.run(["--corpus", @shipped_corpus, "--report", unwritable]) == 1
+    refute File.exists?(unwritable)
+  end
+
   test "exit 1 when a corpus file is unreadable (File.read error arm)" do
     # A corpus copy with one file chmod'd 0000 -> File.read fails -> exit 1 (closed). chmod is
     # the only reliable way to make File.read fail on an existing path inside a copy we own.
