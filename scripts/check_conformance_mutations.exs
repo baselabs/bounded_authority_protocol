@@ -129,8 +129,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=180 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=180. Mutated in the isolated copy only.
+      # corpus yields agreed=199 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=199. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -179,7 +179,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # load-bearing (the audit binds to the addressed artifact, not a fixed field).
       name: "tamper-target-binding",
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
-      from: "      t when t in [\"compact\", \"grant\", \"proof\"] -> string_target_bytes(input, t)",
+      from:
+        "      t when t in [\"compact\", \"grant\", \"proof\"] -> string_target_bytes(input, t)",
       to: "      t when t in [\"compact\", \"grant\", \"proof\"] -> text_target_bytes(input)",
       command: ["mix", "test", "test/conformance/corpus_test.exs:649"]
     },
@@ -195,6 +196,86 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "  // Tamper verbatim-vs-derived audit (mirrors the official loader; a mismatch aborts the run).\n  verifyTampers(cases);",
       to: "  // tamper audit disabled (mutation)",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:74"]
+    },
+    # --- Task 3: per-invariant-family rejection proofs ------------------------
+    %{
+      # decode_grant performs NO signature verification, so its alg pin is the ONLY check that
+      # rejects an alg:"none" header. Removing it lets grant-decode-invalid-algorithm-none decode
+      # to a valid projection -> it agrees as valid -> the runner disagrees with the corpus (which
+      # declares it invalid) -> the agreement test reds. Proves the algorithm pin is load-bearing.
+      name: "alg-header-reject",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "  assert(header.alg === \"EdDSA\" && header.typ === \"ba+cap\", \"decode_grant header values\");",
+      to: "  assert(header.typ === \"ba+cap\", \"decode_grant header values\");",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Disabling the proof Ed25519 verification lets a meaningful-byte signature tamper pass:
+      # check-envelope-tamper-proof-signature-byte then agrees as valid, disagreeing with the
+      # corpus. Proves the signature check catches a tampered signature byte.
+      name: "tamper-reject",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "  assert(verifyEd25519(holderPub, proofJws.message, proofJws.signature), \"check_envelope: proof signature\");",
+      to: "  assert(true, \"check_envelope: proof signature\");",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Disabling the method binding lets check-envelope-invalid-request-method (a mismatched
+      # expected.method) agree as valid -> disagreement. Proves the request method binding is
+      # verified (the gap this slice's vectors surfaced and the runner now closes).
+      name: "envelope-binding-reject",
+      path: "conformance/corpus_independent.mjs",
+      from: "  assert(proofPayload.htm === method, \"check_envelope: method\");",
+      to: "  assert(true, \"check_envelope: method\");",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Disabling the nonce binding (a distinct mechanism from the ===-equality bindings) lets
+      # check-envelope-invalid-nonce-required (expected {required: n} while the proof carries no
+      # nonce) verify -> it agrees as valid -> disagreement. Proves the nonce binding is verified.
+      name: "envelope-nonce-reject",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "    assert(proofPayload.nonce === expNonce.required, \"check_envelope: nonce mismatch\");",
+      to: "    assert(true, \"check_envelope: nonce mismatch\");",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Disabling the per-row previous-link check (comparing row.previous to itself always passes)
+      # lets check-chain-invalid-encoding-broken-link (a corrupted `previous`, last_hash re-derived
+      # to match) verify as a self-consistent chain -> it agrees as valid -> disagreement. Proves
+      # the hash-chain link verification is load-bearing.
+      name: "chain-link-reject",
+      path: "conformance/corpus_independent.mjs",
+      from: "equalBytes(strictB64(row.previous, 32), previous, ",
+      to: "equalBytes(strictB64(row.previous, 32), strictB64(row.previous, 32), ",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Disabling the object-version binding lets verify-anchored-export-invalid-claim-version (a
+      # mismatched expected.object_version) verify -> it agrees as valid -> disagreement. Proves the
+      # archive object-version binding is verified.
+      name: "archive-invalid-reject",
+      path: "conformance/corpus_independent.mjs",
+      from: "  assert(version === objectVersion, \"verify_anchored_export: object version\");",
+      to: "  assert(true, \"verify_anchored_export: object version\");",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # The Node tamper audit's extended-target resolution must bind "compact" to input.compact
+      # (not fall back to input.text). This mutation resolves the compact target via input.text —
+      # the real compact-target tamper cases (verify-grant/anchor/transition/proof signature-byte
+      # tampers) carry no input.text, so the audit throws at load and the runner exits nonzero,
+      # reddening the agreement test. Proves the independent Node extended-target resolution is
+      # load-bearing (Task 2 review finding B: the Node compact/grant/proof/rows/chunks paths).
+      name: "node-tamper-target-compact",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "      if (typeof input.compact === \"string\") return Buffer.from(input.compact, \"utf8\");",
+      to: "      if (typeof input.text === \"string\") return Buffer.from(input.text, \"utf8\");",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----
     %{
