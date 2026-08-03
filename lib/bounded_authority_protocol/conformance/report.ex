@@ -31,7 +31,11 @@ defmodule BoundedAuthorityProtocol.Conformance.Report do
     total = length(all)
     agreed = Enum.count(all, fn result -> result.agree end)
     disagreed = total - agreed
-    agreement = disagreed == 0
+    # A zero-case corpus verifies nothing: agreement requires at least one executed case AND
+    # zero disagreements. Without the `total > 0` floor an empty-but-valid corpus (total_cases:0,
+    # files:[], every applicability cell n_a) passes integrity and reports agreement -> exit 0,
+    # which is the vacuous-conformance-green failure the CLI's required --corpus exists to kill.
+    agreement = total > 0 and disagreed == 0
 
     %__MODULE__{
       agreement: agreement,
