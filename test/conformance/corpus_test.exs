@@ -799,6 +799,174 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert {:ok, _corpus} = Corpus.load(map)
   end
 
+  test "tamper target resolution rejects every malformed / unresolvable target" do
+    # Exercise each tamper_target_bytes error branch: a target the loader cannot resolve makes the
+    # verbatim-vs-derived audit mismatch, so the corpus fails to load. (The nil-target legacy path
+    # is exercised by the "loads" case below.)
+    base = fn id, input ->
+      {:object,
+       [
+         {"id", {:string, id}},
+         {"surface", {:string, "check_chain"}},
+         {"class", {:string, "valid"}},
+         {"input", input},
+         {"expected", {:object, [{"verdict", {:string, "valid"}}]}}
+       ]}
+    end
+
+    tamper = fn id, base_id, input, target ->
+      {:object,
+       [
+         {"id", {:string, id}},
+         {"surface", {:string, "check_chain"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", input},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, base_id}},
+             {"target", {:string, target}},
+             {"byte_index", {:integer, 0}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "error-branch coverage"}}
+           ]}}
+       ]}
+    end
+
+    rows = fn list -> {:object, [{"rows", {:array, Enum.map(list, &{:string, &1})}}]} end
+    valid_row = Base.url_encode64("row-bytes-abc", padding: false)
+
+    load = fn base_obj, tamper_obj ->
+      cases_map =
+        synthetic_corpus() |> Map.put("cases/chain/e.json", jcs_case([base_obj, tamper_obj]))
+
+      Corpus.load(full_corpus_map(cases_map, []))
+    end
+
+    no_target_tamper = fn id, base_id, input ->
+      {:object,
+       [
+         {"id", {:string, id}},
+         {"surface", {:string, "check_chain"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", input},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, base_id}},
+             {"byte_index", {:integer, 0}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "no target member -> legacy path"}}
+           ]}}
+       ]}
+    end
+
+    # nil target + input.base64url (legacy base64url arm) -> audits and loads
+    b64_input = fn s ->
+      {:object, [{"base64url", {:string, Base.url_encode64(s, padding: false)}}]}
+    end
+
+    <<first, brest::binary>> = "xyz"
+
+    assert {:ok, _} =
+             load.(
+               base.("b8", b64_input.("xyz")),
+               no_target_tamper.("t8", "b8", b64_input.(<<Bitwise.bxor(first, 1)>> <> brest))
+             )
+
+    # nil target + neither text nor base64url (legacy fall-through) -> reject
+    assert {:error, :invalid} =
+             load.(
+               base.("b9", {:object, [{"compact", {:string, "abc"}}]}),
+               no_target_tamper.("t9", "b9", {:object, [{"compact", {:string, "abd"}}]})
+             )
+
+    # unknown target (the case-do catch-all)
+    assert {:error, :invalid} =
+             load.(
+               base.("b1", rows.([valid_row])),
+               tamper.("t1", "b1", rows.([valid_row]), "not-a-target")
+             )
+
+    # base case with no "input" (the second tamper_target_bytes clause)
+    no_input_base =
+      {:object,
+       [
+         {"id", {:string, "b2"}},
+         {"surface", {:string, "check_chain"}},
+         {"class", {:string, "valid"}},
+         {"expected", {:object, [{"verdict", {:string, "valid"}}]}}
+       ]}
+
+    assert {:error, :invalid} =
+             load.(no_input_base, tamper.("t2", "b2", rows.([valid_row]), "rows[0]"))
+
+    # rows[i] where the input member is not a list
+    assert {:error, :invalid} =
+             load.(
+               base.("b3", {:object, [{"rows", {:string, "not-a-list"}}]}),
+               tamper.("t3", "b3", {:object, [{"rows", {:string, "not-a-list"}}]}, "rows[0]")
+             )
+
+    # rows[] with an empty index (parse_index_suffix rejects seen=false)
+    assert {:error, :invalid} =
+             load.(
+               base.("b4", rows.([valid_row])),
+               tamper.("t4", "b4", rows.([valid_row]), "rows[]")
+             )
+
+    # rows[9] out of range (list_at walks off the end)
+    assert {:error, :invalid} =
+             load.(
+               base.("b5", rows.([valid_row])),
+               tamper.("t5", "b5", rows.([valid_row]), "rows[9]")
+             )
+
+    # rows[0] whose element is not valid base64url (b64_decode :error)
+    assert {:error, :invalid} =
+             load.(
+               base.("b6", rows.(["!!!not-base64!!!"])),
+               tamper.("t6", "b6", rows.(["!!!not-base64!!!"]), "rows[0]")
+             )
+
+    # nil target (no "target" member) falls to the legacy text path and audits correctly -> loads
+    legacy_base =
+      {:object,
+       [
+         {"id", {:string, "b7"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "valid"}},
+         {"input", {:object, [{"text", {:string, "abc"}}]}},
+         {"expected", {:object, [{"verdict", {:string, "valid"}}]}}
+       ]}
+
+    legacy_tamper =
+      {:object,
+       [
+         {"id", {:string, "t7"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", {:object, [{"text", {:string, <<0x60, ?b, ?c>>}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, "b7"}},
+             {"byte_index", {:integer, 0}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "no target member -> legacy text path"}}
+           ]}}
+       ]}
+
+    cases_map =
+      synthetic_corpus()
+      |> Map.put("cases/json/legacy.json", jcs_case([legacy_base, legacy_tamper]))
+
+    assert {:ok, _} = Corpus.load(full_corpus_map(cases_map, []))
+  end
+
   test "a tamper case with a present-but-dangling base_case is rejected (not loaded unaudited)" do
     # A present tamper block whose base_case does not resolve must FAIL the load — the case cannot
     # be proven a genuine single-byte flip, so it is corruption, not a case to wave through. This
@@ -972,7 +1140,19 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   # --- runner agreement -----------------------------------------------------
 
   test "Runner runs a loaded corpus and Report builds an agreement result" do
-    corpus_map = synthetic_corpus() |> full_corpus_map([])
+    # Include a json.decode valid case whose decoded value is a STRING, so the Runner's value
+    # projection exercises the string arm of its tagged->plain comparison.
+    string_case =
+      {:object,
+       [
+         {"id", {:string, "json-decode-valid-string"}},
+         {"surface", {:string, "json.decode"}},
+         {"class", {:string, "valid"}},
+         {"input", {:object, [{"text", {:string, ~s("hi")}}]}},
+         {"expected", {:object, [{"verdict", {:string, "valid"}}, {"value", {:string, "hi"}}]}}
+       ]}
+
+    corpus_map = synthetic_corpus(extra_cases: [string_case]) |> full_corpus_map([])
     {:ok, corpus} = Corpus.load(corpus_map)
     results = Runner.run(corpus)
     report = Report.build(corpus, results)
