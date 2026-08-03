@@ -413,7 +413,6 @@ function jsonDecode(bytes, context) {
     assert(text[index] === '"', "json string");
     const start = index;
     index += 1;
-    let byteLen = 1; // opening quote
     while (index < text.length) {
       const ch = text.charCodeAt(index);
       if (ch === 0x5c) {
@@ -423,24 +422,21 @@ function jsonDecode(bytes, context) {
         if (esc === "u") {
           assert(index + 5 < text.length, "json unicode escape");
           index += 6;
-          byteLen += 6;
         } else {
           index += 2;
-          byteLen += 2;
         }
         continue;
       }
       if (ch === 0x22) {
-        // closing quote
+        // closing quote — the string byte bound applies to the DECODED value's UTF-8 bytes
+        // (excluding the quotes and un-escaped), matching V1.Json's string_bytes ceiling.
         index += 1;
-        byteLen += 1;
-        assert(byteLen <= 8192, "json string byte bound");
+        const parsed = parseJsonStringLiteral(text.slice(start, index), "json string literal");
+        assert(Buffer.byteLength(parsed, "utf8") <= 8192, "json string byte bound");
         countNode();
-        return parseJsonStringLiteral(text.slice(start, index), "json string literal");
+        return parsed;
       }
-      // enforce valid UTF-8 byte presence via code unit accumulation
       index += 1;
-      byteLen += 1;
     }
     throw Err("json unterminated string");
   }
@@ -502,6 +498,9 @@ function jsonDecode(bytes, context) {
     while (text.length) {
       skipWhitespace();
       const name = decodeString();
+      // Object-name byte ceiling (128) — distinct from the 8192 string-value ceiling decodeString
+      // enforces; the profile bounds object names at 128 bytes (bounds.ex key_bytes).
+      assert(Buffer.byteLength(name, "utf8") <= 128, "json object-name byte bound");
       assert(!names.has(name), `json duplicate member ${name}`);
       names.add(name);
       assert(names.size <= 64, "json member bound");

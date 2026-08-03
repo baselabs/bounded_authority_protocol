@@ -129,8 +129,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=199 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=199. Mutated in the isolated copy only.
+      # corpus yields agreed=212 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=212. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -275,6 +275,33 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "      if (typeof input.compact === \"string\") return Buffer.from(input.compact, \"utf8\");",
       to: "      if (typeof input.text === \"string\") return Buffer.from(input.text, \"utf8\");",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    # --- Task 4: json.decode structural-limit boundary rejection -------------
+    %{
+      # Loosening the object-name (key) byte ceiling in the Node decoder lets
+      # json-decode-key_bytes-maximum-plus-one (a 129-byte key) decode as valid -> it agrees valid,
+      # disagreeing with the corpus (which declares it invalid). Proves the key_bytes limit — added
+      # to the Node runner this slice — is load-bearing.
+      name: "json-decode-key-bytes-loosen",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "    assert(Buffer.byteLength(name, \"utf8\") <= 128, \"json object-name byte bound\");",
+      to:
+        "    assert(Buffer.byteLength(name, \"utf8\") <= 129, \"json object-name byte bound\");",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Loosening the string-value byte ceiling lets json-decode-string_bytes-maximum-plus-one (an
+      # 8193-byte string value) decode as valid -> disagreement. Proves the string_bytes limit — now
+      # measured on the DECODED value's UTF-8 bytes (not the quoted literal) this slice — is
+      # load-bearing at the boundary.
+      name: "json-decode-string-bytes-loosen",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "        assert(Buffer.byteLength(parsed, \"utf8\") <= 8192, \"json string byte bound\");",
+      to:
+        "        assert(Buffer.byteLength(parsed, \"utf8\") <= 8193, \"json string byte bound\");",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----
