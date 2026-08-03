@@ -41,6 +41,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         audit: :test,
         "bap03.performance": :test,
         "bap04.performance": :test,
+        "chain_archive.mutations": :test,
+        "conformance.mutations": :test,
         "conformance.verify": :test,
         "license.check": :test,
         "package.check": :test,
@@ -143,6 +145,12 @@ defmodule BoundedAuthorityProtocol.MixProject do
       "bap04.performance": [
         "run --no-start scripts/check_chain_archive_performance.exs"
       ],
+      "chain_archive.mutations": [
+        "run --no-start scripts/check_chain_archive_mutations.exs"
+      ],
+      "conformance.mutations": [
+        "run --no-start scripts/check_conformance_mutations.exs"
+      ],
       "conformance.verify": [
         "escript.build",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/v1/corpus"
@@ -171,7 +179,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "dialyzer",
         "docs --warnings-as-errors",
         "audit",
-        "package.check"
+        "package.check",
+        "chain_archive.mutations",
+        "conformance.mutations"
       ]
     ]
   end
