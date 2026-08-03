@@ -74,6 +74,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       maintainers: ["rjpalermo"],
       files: [
         "lib",
+        "priv/conformance/v1/corpus",
         "priv/conformance/v1/schemas",
         ".formatter.exs",
         "mix.exs",
@@ -87,6 +88,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0002-normative-v1-parsing-profile.md",
         "docs/adr/0003-standard-jws-and-verified-grant-results.md",
         "docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md",
+        "docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md",
         "docs/protocol-v1.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",

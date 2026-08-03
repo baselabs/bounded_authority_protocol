@@ -201,10 +201,13 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     bytes = File.read!(index_path)
 
     tampered =
-      String.replace(bytes, ~r/"total_cases":\s*(\d+)/, fn _full ->
-        [_, n] = Regex.run(~r/"total_cases":\s*(\d+)/, bytes)
-        ~s("total_cases": #{String.to_integer(n) - 1})
-      end, global: false)
+      String.replace(
+        bytes,
+        ~r/"total_cases":\s*(\d+)/,
+        fn _full ->
+          [_, n] = Regex.run(~r/"total_cases":\s*(\d+)/, bytes)
+          ~s("total_cases": #{String.to_integer(n) - 1})
+        end, global: false)
 
     File.write!(index_path, tampered)
   end
