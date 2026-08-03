@@ -71,6 +71,18 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
     assert output =~ "corpus_independent: error:"
   end
 
+  test "exit 1 when a tamper case's verbatim disagrees with the re-derived bytes (tamper audit)" do
+    # Corrupt an existing tamper case's verbatim so it no longer equals base-with-one-flip, and
+    # re-sync the index hash so the per-file SHA-256 check passes and the tamper audit is what
+    # reds. This is the independent (Node) second implementation of the Q25 verbatim-vs-derived
+    # check DISAGREEING on a known-bad input.
+    dir = corpus_copy([&corrupt_tamper_verbatim/1])
+    on_exit(fn -> File.rm_rf!(dir) end)
+
+    {output, 1} = run_node([dir])
+    assert output =~ "tamper verbatim != derived"
+  end
+
   test "independent runner imports no project code (node:* only)" do
     source = File.read!(@script)
 
@@ -114,7 +126,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
 
     bytes = File.read!(case_file)
     pos = div(byte_size(bytes), 2)
-    <<pre::binary-size(pos), byte, rest::binary>> = bytes
+    <<pre::binary-size(^pos), byte, rest::binary>> = bytes
     File.write!(case_file, <<pre::binary, Bitwise.bxor(byte, 0x01), rest::binary>>)
   end
 
@@ -125,6 +137,26 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
 
     File.rm!(case_file)
   end
+
+  # Flip a SECOND byte of the uri.normalize tamper case's verbatim ("ittps..." -> "iutps...") so
+  # it no longer equals the base with the single documented flip, then update the file's index
+  # hash so the tamper audit — not the SHA-256 gate — is the check that reds.
+  defp corrupt_tamper_verbatim(dir) do
+    case_path = Path.join(dir, "cases/uri/normalize.json")
+    index_path = Path.join(dir, "index.json")
+
+    original = File.read!(case_path)
+
+    corrupted =
+      String.replace(original, "ittps://example.com/a", "iutps://example.com/a", global: false)
+
+    File.write!(case_path, corrupted)
+
+    index = File.read!(index_path)
+    File.write!(index_path, String.replace(index, sha256_b64(original), sha256_b64(corrupted)))
+  end
+
+  defp sha256_b64(bytes), do: Base.url_encode64(:crypto.hash(:sha256, bytes), padding: false)
 
   defp decrement_index_count(dir) do
     index_path = Path.join(dir, "index.json")
