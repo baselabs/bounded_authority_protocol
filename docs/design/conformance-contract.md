@@ -44,8 +44,20 @@ A self-round-trip proves only internal consistency. Byte drift or a manifest cen
 nonzero.
 
 BAP-03's focused vectors and independent verifier are public repository acceptance evidence. The
-Hex package continues to ship the protocol schemas and Elixir runtime only. BAP-05 owns the
-portable corpus/verifier surface, and BAP-06 owns immutable candidate-archive proof.
+Hex package ships the protocol schemas, Elixir runtime, and the portable v1 conformance corpus
+(68 cases across 28 surfaces with a total surface × class applicability matrix, `.raw` sidecars
+for oversize wire inputs). BAP-05's corpus is normative: a second Node implementation
+(`conformance/corpus_independent.mjs`, node:* only) independently recomputes every corpus verdict
+from scratch and agrees. The corpus index declares its full public-key set
+(`public_key_fingerprints`); the independent runner's published-mode census is hard two-way
+(observed import-boundary keys == declared, both directions, always). The manifest partitions grow
+to three (bap03 + chain_archive + corpus = 17 = canonical set); the corpus partition equals the
+index list. The deterministic verifier CLI (escript `bounded_authority_conformance`,
+`--corpus DIR` required, exits 0/1/2) runs the pure core against any corpus directory; the report
+is deterministic JCS bytes binding the index SHA-256. The `n_a` applicability criterion is
+falsifiable: a cell is not-applicable only when the input algebra cannot express that class for
+that surface; required cells must be ≥1, `n_a` cells must be 0, both directions enforced.
+BAP-06 owns immutable candidate-archive proof.
 
 BAP-04's public-only chain/archive corpus includes genesis, continuation, same-key boundaries,
 one-step rollover, multi-step rollover, same-ID/equal-time rollover, and separately valid
