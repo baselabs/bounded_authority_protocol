@@ -196,27 +196,16 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   end
 
   defp drop_one_case_from_file(dir) do
-    # Remove the last case from a multi-case file by rewriting it with one fewer case.
-    # This intentionally breaks the count without removing a file (count mismatch class).
-    case_file =
-      Path.wildcard(Path.join(dir, "cases/**/*.json"))
-      |> Enum.find(fn f ->
-        f |> File.read!() |> String.contains?("\"cases\"")
-      end)
-
-    # Simpler reliable count-mismatch: shrink the index total_cases by editing index.json.
+    # Count-mismatch class: shrink the index total_cases by 1 without removing a file.
     index_path = Path.join(dir, "index.json")
     bytes = File.read!(index_path)
-    # Decrement the total_cases integer by 1 to force a count mismatch.
-    tampered =
-      String.replace(
-        bytes,
-        ~r/"total_cases":(\d+)/,
-        fn full ->
-          [_, n] = Regex.run(~r/"total_cases":(\d+)/, full)
-          " \"total_cases\":#{String.to_integer(n) - 1}"
-        end, global: false)
 
-    File.write!(index_path, String.trim(tampered))
+    tampered =
+      String.replace(bytes, ~r/"total_cases":\s*(\d+)/, fn _full ->
+        [_, n] = Regex.run(~r/"total_cases":\s*(\d+)/, bytes)
+        ~s("total_cases": #{String.to_integer(n) - 1})
+      end, global: false)
+
+    File.write!(index_path, tampered)
   end
 end
