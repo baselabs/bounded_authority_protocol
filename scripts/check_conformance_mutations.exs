@@ -129,14 +129,43 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=68 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=68. Mutated in the isolated copy only.
+      # corpus yields agreed=180 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=180. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
         "  if (expected.verdict === \"invalid\") return actual === INVALID;\n  if (expected.verdict === \"valid\") {",
       to:
         "  if (expected.verdict === \"invalid\") return false;\n  if (expected.verdict === \"valid\") return false;\n  if (expected.verdict === \"valid\") {",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    # --- runner reject-vs-error typing (InvalidError whitelist) ---------------
+    %{
+      # A runner BUG (a non-InvalidError throw) on an INVALID-only path must ABORT the run, never be
+      # laundered into agreement. The plant fires ONLY when Ed25519 verification FAILS — the
+      # verify-grant invalid_key case reaches it; every valid case passes the assert. A regression
+      # from the InvalidError whitelist back to a blanket `catch { actual = INVALID }` would SWALLOW
+      # the ReferenceError to INVALID (the case is invalid-expected) and stay GREEN — which is
+      # exactly the vacuity this entry catches (design C1; plan-review F2 invalid-only calibration).
+      name: "runner-reject-typing",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "  assert(verifyEd25519(pub, jws.message, jws.signature), \"verify_grant: Ed25519 signature\");",
+      to:
+        "  if (!verifyEd25519(pub, jws.message, jws.signature)) throw new ReferenceError(\"planted runner bug on invalid path\");",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    # --- two-boundary census: verification-import truth -----------------------
+    %{
+      # Deleting the real createPublicKey verification-import tracking makes the two-boundary census
+      # unable to prove the runner ACTUALLY imported the verification keys — the verification-import
+      # assertion reds (a valid verification key was never imported at node:crypto). Defeats finding
+      # 4b's discovery-only-census vacuity (a census that stays green even if nothing is imported).
+      name: "census-verification-import",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "  importedPublicKeyFingerprints.add(fp);\n  verificationImportedFingerprints.add(fp);",
+      to: "  importedPublicKeyFingerprints.add(fp);",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----
