@@ -332,6 +332,14 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "lib/bounded_authority_protocol/v1/key_transition_codec.ex"
   ]
 
+  # The CLI I/O carve-out: the ONLY lib paths permitted File/IO/Path/System. The allowance is
+  # exact per path + per function (C1 purity boundary). cli.ex does File.read/File.ls/File.write/
+  # File.dir?/IO.binwrite/Path; cli/main.ex does System.halt + delegates to Cli.
+  @cli_source_paths [
+    "lib/bounded_authority_protocol/conformance/cli.ex",
+    "lib/bounded_authority_protocol/conformance/cli/main.ex"
+  ]
+
   @erlang_module_categories %{
     diameter: :network,
     diameter_config: :network,
@@ -499,7 +507,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     with {:ok, source} <- File.read(path),
          {:ok, ast} <- Code.string_to_quoted(source, file: path),
          {:ok, dependencies} <- dependencies_from_ast(ast) do
-      application_violations(ast) ++ dependency_violations(dependencies)
+      application_violations(ast) ++
+        dependency_violations(dependencies) ++
+        ignore_modules_violations(ast)
     else
       {:error, reason} ->
         [
@@ -511,6 +521,67 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         ]
     end
   end
+
+  # C1 carve-out pin (plan-review F6): the test_coverage ignore_modules list must equal EXACTLY
+  # [BoundedAuthorityProtocol.Conformance.Cli.Main] — the escript entry whose only behavior is
+  # System.halt (untestable in-VM). A second entry or a missing entry is a violation: a second
+  # entry hides untested code, a missing entry fails the coverage threshold.
+  @cli_main_module "BoundedAuthorityProtocol.Conformance.Cli.Main"
+
+  defp ignore_modules_violations(ast) do
+    case ignore_modules_from_ast(ast) do
+      {:ok, [@cli_main_module]} ->
+        []
+
+      {:ok, other} ->
+        [
+          violation(
+            :ignore_modules_drift,
+            "mix.exs",
+            "test_coverage ignore_modules must equal exactly [#{@cli_main_module}], got: #{inspect(other)}"
+          )
+        ]
+
+      :error ->
+        [
+          violation(
+            :ignore_modules_drift,
+            "mix.exs",
+            "test_coverage ignore_modules is missing or unparseable"
+          )
+        ]
+    end
+  end
+
+  defp ignore_modules_from_ast(ast) do
+    {_ast, ignore} =
+      Macro.prewalk(ast, nil, fn
+        # In a keyword-list literal (`[test_coverage: [...]]`), keyword pairs are 2-tuples.
+        {:test_coverage, opts} = node, _acc when is_list(opts) ->
+          {node, Keyword.get(opts, :ignore_modules)}
+
+        node, acc ->
+          {node, acc}
+      end)
+
+    case ignore do
+      nil -> :error
+      value -> {:ok, ignore_module_names(value)}
+    end
+  end
+
+  defp ignore_module_names({:__aliases__, _, segments}) do
+    [Enum.join(segments, ".")]
+  end
+
+  defp ignore_module_names(list) when is_list(list) do
+    Enum.map(list, fn
+      {:__aliases__, _, segments} -> Enum.join(segments, ".")
+      name when is_atom(name) -> Atom.to_string(name)
+    end)
+  end
+
+  defp ignore_module_names(_), do: []
 
   defp dependencies_from_ast(ast) do
     {_ast, bodies} =
@@ -839,7 +910,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          "lib/bounded_authority_protocol/v1/runtime.ex",
          "lib/bounded_authority_protocol/conformance/runner.ex",
          "lib/bounded_authority_protocol/conformance/corpus.ex",
-         "lib/bounded_authority_protocol/conformance/report.ex"
+         "lib/bounded_authority_protocol/conformance/report.ex",
+         "lib/bounded_authority_protocol/conformance/cli.ex"
        ] do
       []
     else
@@ -1138,6 +1210,12 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/report.ex"),
     do: ~w(Enum)
 
+  defp approved_source_modules("lib/bounded_authority_protocol/conformance/cli.ex"),
+    do: ~w(File IO Path)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/conformance/cli/main.ex"),
+    do: ~w(Cli System)
+
   defp approved_source_modules(_path), do: []
 
   defp approved_source_call?(
@@ -1264,6 +1342,40 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp approved_source_call?(path, "Inspect.Algebra", :string)
        when path in @fact_source_paths,
+       do: true
+
+  # CLI I/O carve-out (C1): exact-path + exact-function allowances. cli.ex may use File.read/1,
+  # File.ls/1, File.write/2, File.dir?/1, IO.binwrite/2, and Path.join/2 (the only filesystem/io
+  # calls in the verification tool's loader/output path). No halt here.
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/conformance/cli.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {"File", :read},
+           {"File", :ls},
+           {"File", :write},
+           {"File", :dir?},
+           {"IO", :binwrite},
+           {"Path", :join}
+         ]
+
+  # cli/main.ex is the escript entry: System.halt/1 only (delegates to Cli.run, which is an
+  # approved_source_module above). No File/IO here — the two-line entry.
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/conformance/cli/main.ex",
+         "System",
+         :halt
+       ),
+       do: true
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/conformance/cli/main.ex",
+         "Cli",
+         :run
+       ),
        do: true
 
   defp approved_source_call?(
@@ -1698,6 +1810,25 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Enum, :flat_map}
         ]
 
+      # CLI I/O carve-out compiled imports (C1): the exact File/IO/Path functions cli.ex uses,
+      # plus String.Chars.to_string (string interpolation in the relative-path joiner).
+      "Elixir.BoundedAuthorityProtocol.Conformance.Cli.beam" ->
+        [
+          {File, :dir?},
+          {File, :ls},
+          {File, :read},
+          {File, :write},
+          {IO, :binwrite},
+          {Path, :join},
+          {String.Chars, :to_string}
+        ]
+
+      # cli/main.ex compiled imports: System.halt/1 only.
+      "Elixir.BoundedAuthorityProtocol.Conformance.Cli.Main.beam" ->
+        [
+          {System, :halt}
+        ]
+
       inspect_beam when is_binary(inspect_beam) ->
         if String.starts_with?(
              inspect_beam,
@@ -1816,7 +1947,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            "Elixir.BoundedAuthorityProtocol.V1.Uri.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",
-           "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam"
+           "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam",
+           "Elixir.BoundedAuthorityProtocol.Conformance.Cli.beam"
          ],
          do: [],
          else: [violation(:dynamic_dispatch, path, "compiled variable function invocation")]
