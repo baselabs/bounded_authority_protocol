@@ -120,6 +120,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0002-normative-v1-parsing-profile.md",
         "docs/adr/0003-standard-jws-and-verified-grant-results.md",
         "docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md",
+        "docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
         "docs/design/threat-model.md"
@@ -177,7 +178,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "credo --strict",
         "bap03.performance",
         "bap04.performance",
-        "test --cover",
+        "test --cover --seed 42",
         "dialyzer",
         "docs --warnings-as-errors",
         "audit",

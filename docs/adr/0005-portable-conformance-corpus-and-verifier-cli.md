@@ -59,6 +59,61 @@ cells (valid, boundary_near, exact_bound, maximum_plus_one where expressible) mu
 cells must be 0. Enforced in both directions by both the official loader and the independent
 runner, and pinned byte-exact in ExUnit.
 
+**n_a reason obligation (Q29).** Each `n_a` leaf carries a one-line falsifiable reason naming
+what the surface's input algebra cannot express: a leaf is either a positive integer count OR the
+object `{"n_a": "<reason>"}` (the bare string `"n_a"` is also accepted for backward shape
+compatibility, but the shipped corpus uses the object form everywhere so every not-applicable
+cell is reviewable). The reason is for human review, not machine logic — the loader and the
+independent runner treat `{"n_a": reason}` identically to the bare `"n_a"` string (zero executed
+cases). Flipping a required cell to `n_a` therefore requires writing a mechanical impossibility
+claim that review can falsify; the "author fixes the matrix too" variant of V2 is met with a
+falsifiable-reason obligation, not trust. The shape, the reasons, and the loader's acceptance of
+the object form are all pinned in ExUnit.
+
+### bounds.new constant-pinning (Q31) + two-key exception
+
+The `bounds.new` surface pins every immutable profile maximum as portable data. For every key of
+the maxima table (`lib/bounded_authority_protocol/v1/bounds.ex:91-130`), the corpus carries a
+tighten-to-exact-maximum case (`class: exact_bound`, verdict `valid`) and, except for the
+two-key exception below, a tighten-to-maximum-plus-one case (`class: maximum_plus_one`, verdict
+`invalid` — widening violates the tightening-only contract). The fixed-width keys
+(`public_key_bytes`, `signature_bytes`, `digest_bytes`) additionally carry change-rejection
+cases (`class: invalid_limit`) exercising both below- and above-max values. A second
+implementation with any mistyped maximum constant fails these cases; no oversized artifact is
+needed to pin any constant.
+
+**Two-key exception (mechanically forced).** `integer_magnitude` and `float_magnitude` ship the
+tighten-to-exact-maximum `valid` pin only — they cannot carry the tighten-to-maximum-plus-one
+member because the +1 literal (`9,007,199,254,740,992`) exceeds the decoder's own magnitude
+ceiling (`lib/bounded_authority_protocol/v1/json.ex:147`, `9,007,199,254,740,991`), so any
+corpus JSON file containing it is rejected by the corpus loader by construction. The `bounds.new`
+input is structured JSON, so the `.raw` sidecar escape (which applies only to byte-bearing
+fields) does not help. The magnitude ceiling itself is still portably pinned through `json.decode`
+`maximum_plus_one` cases whose input is a `.raw` sidecar carrying the raw JSON bytes
+`9007199254740992` → expected `verdict: "invalid"`. The exception and its mechanical reason are
+pinned in ExUnit (the two keys' `maximum_plus_one` absence is asserted).
+
+### Legacy-depth subsumption (V5) + the [:::] divergence
+
+The corpus subsumes the legacy code-embedded case sets as data: all 18 legacy URI byte-values
+from `conformance/bap03_independent.mjs:22-41` and the legacy duplicate-member case appear as
+corpus data. The 6 idempotent-valid legacy URIs port as `uri.normalize` `valid` cases (normalized
+output equals input); the 5 normalizable-but-non-idempotent legacy URIs (e.g. default-port,
+uppercase-host, percent-encoded-tilde, dot-segments) port as `valid` cases whose pinned normalized
+output differs from the input — faithfully subsuming the byte value AND pinning the normalization
+behavior; the 6 URIs rejected by both implementations port as `invalid_uri` cases.
+
+**`https://[:::]/` is omitted (implementation-divergent).** This one legacy URI diverges between
+the two implementations: `V1.Uri.normalize/2` rejects it (`:invalid`, treating `:::` as an
+invalid IPv6 literal), while the independent Node runner accepts it and normalizes it to
+`https://[:::]/`. Any declared verdict makes exactly one side disagree, breaking the hard
+"both sides agree (exit 0)" normativity constraint. It is therefore omitted from the corpus; the
+other 17 of 18 legacy byte-values are subsumed. The divergence is recorded here (rather than
+hidden) so it is visible and tracked; resolving it (harmonizing the IPv6-literal acceptance rule
+across both implementations) is a frozen-profile change owned by a separate task, not a
+conformance-corpus concern. The 17 port-able cases and the omission are pinned in ExUnit.
+
+
 ### Census evolution + index self-census
 
 The corpus index declares `public_key_fingerprints` — the full set of public keys carried by the
@@ -118,4 +173,10 @@ published set is sufficient for verification.
   verify-surface case with a new key requires updating the index + manifest partition + canonical
   set in the same commit.
 - The CLI carve-out is the package's only I/O surface; widening it (a second File/IO call outside
-  the exact allowance) turns the architecture gate red and the mutation battery red.
+the exact allowance) turns the architecture gate red and the mutation battery red.
+- Every `n_a` applicability cell carries a falsifiable reason (`{"n_a": "<reason>"}`); removing a
+  reason or weakening it to a bare `"n_a"` is a visible diff against the pinned reason set, and
+  the loader rejects any leaf that is neither an integer, the bare `"n_a"`, nor the exact
+  `{"n_a": <string>}` shape.
+- Adding a new maxima key requires landing both the `exact_bound` and (except for magnitude keys)
+  the `maximum_plus_one` `bounds.new` pins, or the Q31 pin goes red.

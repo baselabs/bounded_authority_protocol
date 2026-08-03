@@ -52,10 +52,13 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       command: ["mix", "architecture"]
     },
     %{
-      # A reference to the Cli carve-out alias from a NON-conformance module (v1.ex) turns the gate
-      # red: the bare `Cli` alias binding root is not in v1.ex's approved source modules, so the
-      # reverse-reachability rule (no module outside conformance/ references the carve-out) fires
-      # as `forbidden module Cli`. Proves the carve-out is unreachable from the protocol core.
+      # A reference to the Cli carve-out from a NON-conformance module (v1.ex) turns the gate red.
+      # The mechanism is the existing module-allowance discipline (not a named special rule): the
+      # planted `@conformance_cli Cli` references the bare `Cli` root, which is not in v1.ex's
+      # approved_source_modules nor the always-allowed list, so node_violations fires
+      # `forbidden module Cli` (:unapproved_runtime). The full `BoundedAuthorityProtocol.*` root
+      # is blanket-allowed, so the bare short alias is what makes the mutation bite. Proves the
+      # carve-out is unreachable from the protocol core.
       name: "cli-reachability",
       path: "lib/bounded_authority_protocol/v1.ex",
       from: "  alias BoundedAuthorityProtocol.V1.Base64Url",
