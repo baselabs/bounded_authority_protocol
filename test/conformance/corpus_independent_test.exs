@@ -137,7 +137,9 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
         fn full ->
           [_, n] = Regex.run(~r/"total_cases":\s*(\d+)/, full)
           ~s("total_cases": #{String.to_integer(n) - 1})
-        end, global: false)
+        end,
+        global: false
+      )
 
     File.write!(index_path, tampered)
   end

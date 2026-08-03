@@ -16,6 +16,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/adr/0002-normative-v1-parsing-profile.md",
                     "docs/adr/0003-standard-jws-and-verified-grant-results.md",
                     "docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md",
+                    "docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md",
                     "docs/protocol-v1.md",
                     "docs/design/conformance-contract.md",
                     "docs/design/protocol-charter.md",
@@ -93,6 +94,32 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "priv/conformance/v1/schemas/proof-payload.schema.json",
                     "priv/conformance/v1/schemas/public-okp-jwk.schema.json",
                     "priv/conformance/v1/schemas/selector.schema.json",
+                    "priv/conformance/v1/corpus/cases/anchored-export/encode.json",
+                    "priv/conformance/v1/corpus/cases/anchored-export/verify.json",
+                    "priv/conformance/v1/corpus/cases/assemble-compact/assemble.json",
+                    "priv/conformance/v1/corpus/cases/base64url/decode.json",
+                    "priv/conformance/v1/corpus/cases/boundary-anchor/verify.json",
+                    "priv/conformance/v1/corpus/cases/bounds/new.json",
+                    "priv/conformance/v1/corpus/cases/consumption-chain/check.json",
+                    "priv/conformance/v1/corpus/cases/consumption-chain/entry.json",
+                    "priv/conformance/v1/corpus/cases/envelope/check.json",
+                    "priv/conformance/v1/corpus/cases/grant-decode/decode.json",
+                    "priv/conformance/v1/corpus/cases/grant-verify/verify.json",
+                    "priv/conformance/v1/corpus/cases/jcs/encode.json",
+                    "priv/conformance/v1/corpus/cases/json/decode.json",
+                    "priv/conformance/v1/corpus/cases/json/magnitude-plus-one.raw",
+                    "priv/conformance/v1/corpus/cases/json/magnitude.json",
+                    "priv/conformance/v1/corpus/cases/jwk/jwk.json",
+                    "priv/conformance/v1/corpus/cases/key-locator/untrusted.json",
+                    "priv/conformance/v1/corpus/cases/key-transition/verify.json",
+                    "priv/conformance/v1/corpus/cases/proof-decode/decode.json",
+                    "priv/conformance/v1/corpus/cases/request-digest/digest.json",
+                    "priv/conformance/v1/corpus/cases/signing-input/anchor.json",
+                    "priv/conformance/v1/corpus/cases/signing-input/grant.json",
+                    "priv/conformance/v1/corpus/cases/signing-input/proof.json",
+                    "priv/conformance/v1/corpus/cases/signing-input/transition.json",
+                    "priv/conformance/v1/corpus/cases/uri/normalize.json",
+                    "priv/conformance/v1/corpus/index.json",
                     "usage-rules.md"
                   ])
 
@@ -550,6 +577,20 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       consumer_root,
       environment
     )
+
+    # BAP-05 published-set sufficiency: build the packaged escript and run it against the
+    # PACKAGED corpus (inside the unpacked archive), proving the published set alone verifies.
+    run!("mix", ["escript.build"], package_root, environment)
+
+    escript_path = Path.join(package_root, "bounded_authority_conformance")
+    packaged_corpus = Path.join(package_root, "priv/conformance/v1/corpus")
+
+    {output, 0} =
+      System.cmd(escript_path, ["--corpus", packaged_corpus], stderr_to_stdout: true)
+
+    unless output =~ ~s("agreement":true) do
+      fail!("packaged escript did not agree on the packaged corpus:\n#{output}")
+    end
   end
 
   defp check_decoder_contract_calls!(consumer_source) do

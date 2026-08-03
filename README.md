@@ -99,7 +99,32 @@ See the [normative v1 profile](docs/protocol-v1.md),
 [ADR 0001](docs/adr/0001-public-protocol-verifier-boundary.md) plus
 [ADR 0002](docs/adr/0002-normative-v1-parsing-profile.md) and
 [ADR 0003](docs/adr/0003-standard-jws-and-verified-grant-results.md), plus
-[ADR 0004](docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md).
+[ADR 0004](docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md), plus
+[ADR 0005](docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md).
+
+## Conformance
+
+The package ships a language-neutral v1 conformance corpus and a deterministic offline verifier
+CLI. The corpus (`priv/conformance/v1/corpus`) is the normative evidence: 68 cases across 28
+surfaces with a total surface × class applicability matrix, re-derived from the official
+implementation and independently re-verified by a second Node implementation
+(`conformance/corpus_independent.mjs`) that recomputes every verdict from scratch. A value that
+only round-trips the official implementation is not normative until the independent runner agrees.
+
+Build the verifier and run it against the shipped corpus:
+
+```bash
+mix escript.build
+./bounded_authority_conformance --corpus priv/conformance/v1/corpus
+```
+
+`--corpus DIR` is required (no default — a wrong-corpus run that exits 0 is a quiet
+misverification path in the tool built to eliminate quiet misverification). It exits `0` only on
+complete agreement, `1` on any integrity/verdict failure, `2` on usage error. From a consumer
+dependency, point `--corpus` at the packaged path under `deps/bounded_authority_protocol/`. The
+report is deterministic JCS bytes binding the corpus index SHA-256. See
+[`docs/design/conformance-contract.md`](docs/design/conformance-contract.md) and
+[ADR 0005](docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md).
 
 ## Development
 
@@ -122,6 +147,9 @@ mix architecture
 mix audit
 mix bap03.performance
 mix bap04.performance
+mix conformance.verify
+mix chain_archive.mutations
+mix conformance.mutations
 mix package.check
 mix sbom.generate
 ```

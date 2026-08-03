@@ -88,6 +88,26 @@ All notable changes to `bounded_authority_protocol` are documented here.
   depends on BAP-04 only) and BAP-09 (thin TypeScript and Python verifier SDKs consuming only
   the published spec and vectors; depends on BAP-05). Each row's own ADR lands when its work
   starts; neither changes any wire format, limit, or verification rule.
+- Add the portable v1 conformance corpus (68 cases across 28 surfaces with a total
+  surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
+  `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
+- Add the deterministic offline verifier CLI (escript `bounded_authority_conformance`,
+  `--corpus DIR` required, exits 0/1/2) with an exact-path purity carve-out (File/IO in `cli.ex`,
+  `System.halt` in `cli/main.ex` only) enforced by the architecture gate.
+- Add the independent Node second-implementation runner
+  (`conformance/corpus_independent.mjs`, node:* only) that recomputes every corpus verdict from
+  scratch — making the corpus normative. Evolve the public-key census to three partitions
+  (bap03 + chain_archive + corpus = 17 = canonical set); the corpus self-census is hard two-way.
+- Add stream_data property gates (JCS determinism/idempotence, base64url round-trip/pad rejection,
+  URI normalization idempotence, facade closure totality) and a deterministic-PRNG fuzz gate.
+- Add the source-isolated conformance mutation battery (10 entries proving the corpus integrity,
+  CLI carve-out, and runner-verdict gates actually catch their named failures); wire both mutation
+  batteries into `mix quality`. CI pins Node 20 for the quality job.
+- Close BAP-05 with ADR 0005 (corpus formats, sidecar rule, published-artifacts definition,
+  applicability matrix + n_a criterion, census evolution, CLI contract, carve-out shape,
+  gate set). The corpus ships in the published package; the fresh-consumer check runs the packaged
+  escript against the packaged corpus, proving published-set sufficiency.
+
 
 ### Not yet available
 
