@@ -1866,14 +1866,32 @@ function dispatchCheckEnvelope(input) {
   // ath must equal sha256(grant compact).
   const ath = sha256(Buffer.from(grantCompact, "ascii")).toString("base64url");
   assert(proofPayload.ath === ath, "check_envelope: ath");
+  // Method / URI / invocation / operation bindings: the proof's signed htm/htu/ba_inv/ba_op must
+  // equal the expected request context (the profile binds every one; runtime.ex:485-491).
+  const method = fetchBinary(expected, "method", "check_envelope");
+  assert(proofPayload.htm === method, "check_envelope: method");
+  const targetUri = fetchBinary(expected, "target_uri", "check_envelope");
+  assert(proofPayload.htu === targetUri, "check_envelope: target_uri");
+  const invocationId = fetchBinary(expected, "invocation_id", "check_envelope");
+  assert(proofPayload.ba_inv === invocationId, "check_envelope: invocation_id");
   // ba_req must equal the request digest of (operation, cast_arguments).
   const operation = fetchBinary(expected, "operation", "check_envelope");
+  assert(proofPayload.ba_op === operation, "check_envelope: operation");
   if (expected.cast_arguments === undefined) fail("check_envelope: cast_arguments");
   const baReq = requestDigest(operation, expected.cast_arguments);
   assert(proofPayload.ba_req === baReq, "check_envelope: ba_req");
   // Proof time window.
   assert(proofPayload.iat >= evaluationTime - proofMaxAge - clockSkew, "check_envelope: proof iat min");
   assert(proofPayload.iat <= evaluationTime + clockSkew, "check_envelope: proof iat max");
+  // Nonce binding: absent expected.nonce => proof carries none; {required: n} => proof.nonce === n.
+  const expNonce = expected.nonce;
+  if (expNonce === undefined || expNonce === null) {
+    assert(proofPayload.nonce === undefined, "check_envelope: nonce must be absent");
+  } else if (expNonce && typeof expNonce === "object" && typeof expNonce.required === "string") {
+    assert(proofPayload.nonce === expNonce.required, "check_envelope: nonce mismatch");
+  } else {
+    fail("check_envelope: expected nonce shape");
+  }
   // Holder thumbprint must match the grant cnf.jkt.
   assert(grantPayload.cnf && grantPayload.cnf.jkt === jwkThumbprint(holderJwk), "check_envelope: holder thumbprint");
   return {};

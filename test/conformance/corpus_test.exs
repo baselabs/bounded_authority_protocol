@@ -1080,8 +1080,66 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   test "the shipped corpus total_cases is pinned at the expanded count" do
     map = shipped_corpus_map()
     {:ok, corpus} = Corpus.load(map)
-    assert corpus.index["total_cases"] == 180
-    assert MapSet.size(corpus.case_ids) == 180
+    assert corpus.index["total_cases"] == 199
+    assert MapSet.size(corpus.case_ids) == 199
+  end
+
+  test "the crypto verifying surfaces carry the mandated invalid classes (vacuity closed)" do
+    # BAP-05 hardening: the review found the corpus was vacuous on the security-critical surfaces
+    # (zero algorithm-confusion cases, no meaningful-byte tampers on signed surfaces,
+    # verify_anchored_export with zero invalid cases). This pin asserts those cells are now
+    # populated so a regression that empties them turns red.
+    {:ok, corpus} = Corpus.load(shipped_corpus_map())
+    app = corpus.index["applicability"]
+
+    required? = fn surface, class ->
+      leaf = app[surface][class]
+      is_integer(leaf) and leaf >= 1
+    end
+
+    # algorithm confusion (alg:"none") on every surface that decodes/verifies a compact header
+    for surface <- [
+          "verify_grant",
+          "decode_grant",
+          "decode_proof",
+          "check_envelope",
+          "verify_historical_anchor",
+          "verify_key_transition"
+        ] do
+      assert required?.(surface, "invalid_algorithm"),
+             "#{surface}/invalid_algorithm must be populated (alg:none vector)"
+    end
+
+    # meaningful-byte signature/commitment/anchor tamper on every signed verifying surface
+    for surface <- [
+          "verify_grant",
+          "check_envelope",
+          "verify_historical_anchor",
+          "verify_key_transition",
+          "verify_anchored_export",
+          "check_chain"
+        ] do
+      assert required?.(surface, "tamper_meaningful_byte"),
+             "#{surface}/tamper_meaningful_byte must be populated"
+    end
+
+    # verify_anchored_export previously had ZERO invalid cases
+    assert required?.("verify_anchored_export", "invalid_claim")
+    assert required?.("verify_anchored_export", "invalid_encoding")
+    assert required?.("verify_anchored_export", "invalid_key")
+
+    # check_envelope request/time/nonce bindings (the profile requires them; the runner now checks)
+    for class <- ["invalid_request", "invalid_time", "invalid_nonce"] do
+      assert required?.("check_envelope", class),
+             "check_envelope/#{class} must be populated"
+    end
+
+    # invalid_selector STAYS n_a — an escalation candidate (unreachable by unsigned mutation) with a
+    # falsifiable reason, NOT a vacuous label.
+    assert match?(
+             %{"n_a" => reason} when is_binary(reason),
+             app["check_envelope"]["invalid_selector"]
+           )
   end
 
   test "every n_a applicability leaf carries a falsifiable reason (Q29 obligation)" do
@@ -1243,9 +1301,21 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
              "missing exact_bound pin for #{key_str}"
     end
 
-    # Every key EXCEPT integer_magnitude/float_magnitude carries a maximum_plus_one (invalid) pin.
+    # Every TIGHTENABLE key carries a maximum_plus_one (invalid) pin. Excluded:
+    # - integer_magnitude/float_magnitude: the max+1 literal exceeds the decoder magnitude ceiling.
+    # - digest_bytes/public_key_bytes/signature_bytes: fixed-width keys. A fixed-width key cannot be
+    #   tightened OR widened, so a max+1 value is a fixed-width CHANGE (invalid_limit), not a
+    #   tightening-contract violation (maximum_plus_one) — those are pinned as invalid_limit-*-above.
+    no_max_plus_one = [
+      :integer_magnitude,
+      :float_magnitude,
+      :digest_bytes,
+      :public_key_bytes,
+      :signature_bytes
+    ]
+
     for key <- Map.from_struct(Bounds.maximum()) |> Map.keys(),
-        key not in [:integer_magnitude, :float_magnitude] do
+        key not in no_max_plus_one do
       key_str = Atom.to_string(key)
 
       assert Enum.any?(
@@ -1255,15 +1325,16 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
              "missing maximum_plus_one pin for #{key_str}"
     end
 
-    # The two-key exception: integer_magnitude and float_magnitude have NO maximum_plus_one pin.
-    for key <- [:integer_magnitude, :float_magnitude] do
+    # The excepted keys carry NO maximum_plus_one pin (magnitude: exceeds the decoder ceiling;
+    # fixed-width: a max+1 is a fixed-width-change invalid_limit case, not a maximum_plus_one).
+    for key <- no_max_plus_one do
       key_str = Atom.to_string(key)
 
       refute Enum.any?(
                bounds_cases,
                &(&1["class"] == "maximum_plus_one" and &1["bound_profile"]["tightened"][key_str])
              ),
-             "#{key_str} must NOT carry a maximum_plus_one pin (the max+1 literal exceeds the decoder magnitude ceiling)"
+             "#{key_str} must NOT carry a maximum_plus_one pin"
     end
 
     # The magnitude ceiling itself is still portably pinned via the json.decode maximum_plus_one
