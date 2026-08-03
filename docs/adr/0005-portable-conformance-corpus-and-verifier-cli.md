@@ -146,12 +146,35 @@ mutation-battery entries prove each goes red):
 grant's `cnf.jkt` holder), `-grant-binding` (a proof minted over grant A presented with grant B,
 same holder and same arguments, so only `ath` fails), and `-request-arguments` (the harness supplies
 `cast_arguments` the proof never signed; the grant carries `all`, so only `ba_req` fails).
-Applicability: `check_envelope/invalid_claim` is `3`. The remaining `ba_op` binding needs no case
-and is NOT a coverage hole: the request digest is taken over `[operation, cast_arguments]`, so any
-proof whose `ba_op` differs from the expected operation necessarily carries a `ba_req` computed over
-a different operation and is rejected by the `ba_req` binding — `ba_op` is defence in depth, not an
-independent authority check. No new keys: all three cases reuse the two keypairs the selector
-remediation declared, so the census stays at 8.
+A fourth case, `-operation-binding`, closes the `ba_op` binding. It was first claimed to be
+subsumed by `ba_req` on the reasoning that the request digest covers `[operation,
+cast_arguments]`; the delta review falsified that. The digest the verifier compares against is
+computed from the SERVER-derived `expected.operation` (`runtime.ex:489-491`), never from
+`proof.ba_op`, and nothing else in `verify_proof_parsed` reads `proof.operation` — so the binding at
+`:488` is the only constraint on that holder-signed claim. Subsumption holds only for an HONEST
+producer that wrote the same operation into both fields, which is precisely the assumption a
+conformance corpus may not make: a dishonest holder signs `ba_op: "write"` alongside a `ba_req`
+computed over `"read"`, and with the binding removed the false claim is accepted and rides into
+`EnvelopeFacts.operation`. Bounded honestly, this is not an authorization bypass — grant scope
+lookup and selector matching both key on `expected.operation` — but it is a spec-mandated binding
+(`docs/protocol-v1.md` § Public verification contract) that the corpus could not see. The case
+carries a hand-built proof payload because the producer façade derives `ba_op` and `ba_req` from
+one field and therefore cannot express the defect; that inexpressibility is exactly why the binding
+went unexercised.
+
+Applicability: `check_envelope/invalid_claim` is `4`. No new keys — every case reuses the two
+keypairs the selector remediation declared, so the census stays at 8.
+
+**Independent-runner permissiveness.** A second `invalid_selector` case,
+`check-envelope-invalid-selector-empty-path`, carries a grant whose `equals` selector has an EMPTY
+path and a value equal to the whole `cast_arguments`. The official rejects it at grant decode
+(`valid_path?` requires a non-empty path); an independent matcher that treats `[]` as "the root"
+matches and accepts. The case exists so the Node matcher's shape and width validation is
+FALSIFIABLE: without it the hardening would be defensive code no gate could prove, and a regression
+loosening it would leave every gate green. Its mutation entry
+(`check-envelope-node-selector-path-validation-removal`) proves the red. Like the `ba_op` proof,
+this grant is hand-signed — the official producer refuses to build it, which is what a
+nonconforming issuer would have to do.
 
 The tamper verbatim-vs-derived audit binds a single-byte flip to a named `tamper.target`
 (`compact` / `grant` / `proof` / `rows[i]` / `chunks[i]`), so a meaningful-byte tamper can address
