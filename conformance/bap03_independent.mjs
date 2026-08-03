@@ -44,6 +44,7 @@ const requiredDiscoveryRoots = [
   "priv/conformance/v1/schemas",
   "conformance",
   "test",
+  "priv/conformance/v1/corpus",
 ];
 
 for (let index = 2; index < process.argv.length; index += 2) {
@@ -524,7 +525,7 @@ async function verifyManifest(manifest, additionalScanPath) {
   );
   exactKeys(
     manifest.verifier_public_key_fingerprints,
-    ["bap03_independent.mjs", "chain_archive_independent.mjs"],
+    ["bap03_independent.mjs", "chain_archive_independent.mjs", "corpus_independent.mjs"],
     "manifest verifier fingerprints",
   );
   assertDeepEqual(

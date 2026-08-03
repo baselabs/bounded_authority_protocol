@@ -7,15 +7,21 @@
   ],
   "canonical_public_key_fingerprints": [
     "0qPOlfSr_giHdRaDK18shLtG5DoQL1a2nrHVDeWruJI",
+    "3x4aFGRFbZvTCoSGCd1yA55MYDITwK0MFDlrUFvPoF4",
+    "7VjCxMImm16N6RYUjklULyDjbw2aGEOgNNtKBP9r-i0",
     "B_luRLoL5T-YfqSCot-qLaUVewraSBu-qaEWqXfMRHI",
     "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk",
     "TolqHySkTC69-Y7DUVNJP7JPn31VXHfk37ytoM0MZXM",
     "Tzmr9QXSXbXh_uKsem5dEblMnkflm_LuJShpYtOrQKk",
     "UyuHKlIU-ePRfsWpPkNSuW-OgWrwkOSwMv5Y6dgEDfA",
     "b5dejonEMNbWuAUspTppNgiUa6QUXdzk40kdsDcWK6g",
+    "d4ucEZwvJTfwxXCN4f2xmIE5ZBFoH5i5mlzeWZaB3yI",
+    "eGPJdenILo5TLcdbdZa046_Z-t9wGJl11N6_QJQrob8",
     "gajR1zhnSjnHaH8LRAxglMF1t6aNiIRwljRrGC66UuI",
+    "inGhtkoCo4fChHxdTEsAtMrCebtW84GM_7v2rPbowok",
     "jNqoeV3u-yTgM-aDSbR90dRdNvOP0aD0J6_anyf0NRI",
     "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k",
+    "o7gl0rdxSPU-qXbmNod4RAkV5pUjaB47JhPA43hwKP8",
     "ux6kGmd8C56UOZy4dXGjmqLHQO3PuOmQ5dg89lEO-Ag"
   ],
   "verifier_public_key_fingerprints": {
@@ -33,12 +39,21 @@
       "gajR1zhnSjnHaH8LRAxglMF1t6aNiIRwljRrGC66UuI",
       "jNqoeV3u-yTgM-aDSbR90dRdNvOP0aD0J6_anyf0NRI",
       "ux6kGmd8C56UOZy4dXGjmqLHQO3PuOmQ5dg89lEO-Ag"
+    ],
+    "corpus_independent.mjs": [
+      "3x4aFGRFbZvTCoSGCd1yA55MYDITwK0MFDlrUFvPoF4",
+      "7VjCxMImm16N6RYUjklULyDjbw2aGEOgNNtKBP9r-i0",
+      "d4ucEZwvJTfwxXCN4f2xmIE5ZBFoH5i5mlzeWZaB3yI",
+      "eGPJdenILo5TLcdbdZa046_Z-t9wGJl11N6_QJQrob8",
+      "inGhtkoCo4fChHxdTEsAtMrCebtW84GM_7v2rPbowok",
+      "o7gl0rdxSPU-qXbmNod4RAkV5pUjaB47JhPA43hwKP8"
     ]
   },
   "discovery_roots": [
     "priv/conformance/v1/vectors",
     "priv/conformance/v1/schemas",
     "conformance",
-    "test"
+    "test",
+    "priv/conformance/v1/corpus"
   ]
 }

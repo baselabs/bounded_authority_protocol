@@ -1358,7 +1358,7 @@ function verifyManifest(manifest, fixture, fixturePath, additionalScanPath) {
   );
   exactKeys(
     manifest.verifier_public_key_fingerprints,
-    ["bap03_independent.mjs", "chain_archive_independent.mjs"],
+    ["bap03_independent.mjs", "chain_archive_independent.mjs", "corpus_independent.mjs"],
     "manifest verifier fingerprints",
   );
   assert(
@@ -1368,6 +1368,7 @@ function verifyManifest(manifest, fixture, fixturePath, additionalScanPath) {
         "priv/conformance/v1/schemas",
         "conformance",
         "test",
+        "priv/conformance/v1/corpus",
       ]),
     "manifest discovery roots mismatch",
   );
