@@ -93,20 +93,25 @@ All notable changes to `bounded_authority_protocol` are documented here.
   and add a `selector-reject` mutation — so a verifier that ignores grant selectors now fails the
   corpus. Uses two new deterministic conformance keypairs (census 6→8); a companion
   `proof_signing_input` valid case carries the new holder key as a labeled field so the
-  cross-verifier census discovery scan finds it.
+  cross-verifier census discovery scan finds it (corpus 212→215).
 - Close the check_envelope authority-binding gap the same re-signing capability exposed: the
-  holder (`cnf.jkt`), grant (`ath`), and request-argument (`ba_req`) bindings had no corpus case
-  isolating them, so a verifier omitting any one of them still scored a perfect corpus run —
-  omitting the holder binding accepts any holder's proof against any grant. Add three
+  holder (`cnf.jkt`), grant (`ath`), request-argument (`ba_req`), and operation (`ba_op`) bindings
+  had no corpus case isolating them, so a verifier omitting any one of them still scored a perfect
+  corpus run — omitting the holder binding accepts any holder's proof against any grant. Add four
   `invalid_claim` cases (each a one-defect variant of a shared valid base, with the named binding
-  as the sole rejecter) and three matching mutation-battery entries. The `ba_op` binding needs no
-  separate case: the request digest is taken over `[operation, cast_arguments]`, so `ba_req`
-  subsumes it (corpus 212→218).
+  as the sole rejecter) and four matching mutation-battery entries. The `ba_op` case needs a
+  hand-built proof payload: the request digest is computed over the server-derived operation, never
+  over the proof's own `ba_op` claim, so only a dishonest producer — which the façade cannot be —
+  emits a proof whose two operation fields disagree (corpus 215→219).
+- Add an empty-path `invalid_selector` case so the independent runner's selector shape and width
+  validation is falsifiable: the official rejects an empty selector path at grant decode, and a
+  matcher treating `[]` as "the root" would accept what the official refuses (corpus 219→220).
 - Add `.gitleaks.toml`: the `jwt` and `generic-api-key` rules are allowlisted for the conformance
-  corpus and vector paths only, where every fixture is JWT-shaped high-entropy public test
-  material. All other default rules still apply there, so a real credential committed under those
-  paths is still caught.
-- Add the portable v1 conformance corpus (218 cases across 28 surfaces with a total
+  corpus and vector paths only, where all 279 findings are JWT-shaped high-entropy public test
+  material. Every other default rule still applies in those trees — a `ghp_…` token committed there
+  is still caught — and every rule applies everywhere else. Stated residual: a credential matching
+  ONLY those two rules, under those two machine-generated fixture directories, is not flagged.
+- Add the portable v1 conformance corpus (220 cases across 28 surfaces with a total
   surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
   `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
 - Harden the corpus against vacuous green: author the invalid vectors the crypto verifying

@@ -1679,9 +1679,12 @@ function taggedMember(owner, key, value) {
 // selectors apply CONJUNCTIVELY; `all` matches any root; `equals`/`one_of` require the path to
 // exist, traversing OBJECTS ONLY (never index arrays) and comparing by SEMANTIC IDENTITY. Shape
 // and width are enforced first (closed member set, non-empty bounded path of bounded string
-// segments, bounded one_of values) so a malformed selector REJECTS here exactly as the official
-// grant decoder and `valid_path?` reject it — an independent verifier that were more permissive
-// than the official would certify a grant the official refuses.
+// segments, bounded one_of values) so a malformed selector REJECTS here rather than being accepted
+// — an independent verifier more permissive than the official would certify a grant the official
+// refuses. Two legs of the official's validation are NOT mirrored here and are covered upstream
+// instead: per-segment `String.valid?` (JSON.parse yields well-formed strings, and
+// parseCanonicalJson re-encodes and requires byte equality) and JCS-encodability of selector values
+// within bounds (the same canonical-bytes check). Treat those as upstream-covered, not absent.
 //
 // Identity is the JCS of the tagged form — the same tagged projection ba_req uses (arrays
 // positional, objects unordered). One tag distinction the official draws is NOT recoverable here:
@@ -1907,9 +1910,15 @@ function dispatchCheckEnvelope(input) {
   assert(grantPublicKey.length === 32, "check_envelope: issuer key width");
   const grantJws = parseCompactJws(grantCompact, "check_envelope grant");
   const grantHeader = parseCanonicalJson(grantJws.protectedBytes, "check_envelope grant header");
+  exactKeys(grantHeader, ["alg", "kid", "typ"], "check_envelope grant header");
   assert(grantHeader.alg === "EdDSA" && grantHeader.typ === "ba+cap", "check_envelope grant header");
   assert(grantHeader.kid === grantKeyId, "check_envelope: grant kid");
   const grantPayload = parseCanonicalJson(grantJws.payloadBytes, "check_envelope grant payload");
+  exactKeys(
+    grantPayload,
+    ["aud", "cnf", "exp", "iat", "iss", "jti", "nbf", "operations", "v"],
+    "check_envelope grant payload",
+  );
   const issuer = fetchBinary(expected, "issuer", "check_envelope");
   const audience = fetchBinary(expected, "audience", "check_envelope");
   const evaluationTime = intField(expected, "evaluation_time", "check_envelope");
@@ -1926,8 +1935,16 @@ function dispatchCheckEnvelope(input) {
   // Verify the proof (holder signature over the request).
   const proofJws = parseCompactJws(proofCompact, "check_envelope proof");
   const proofHeader = parseCanonicalJson(proofJws.protectedBytes, "check_envelope proof header");
+  exactKeys(proofHeader, ["alg", "jwk", "typ"], "check_envelope proof header");
   assert(proofHeader.alg === "EdDSA" && proofHeader.typ === "dpop+jwt", "check_envelope proof header");
   const proofPayload = parseCanonicalJson(proofJws.payloadBytes, "check_envelope proof payload");
+  exactKeys(
+    proofPayload,
+    proofPayload.nonce === undefined
+      ? ["ath", "ba_inv", "ba_op", "ba_req", "htm", "htu", "iat", "jti", "v"]
+      : ["ath", "ba_inv", "ba_op", "ba_req", "htm", "htu", "iat", "jti", "nonce", "v"],
+    "check_envelope proof payload",
+  );
   const holderJwk = exactPublicJwk(proofHeader.jwk, "check_envelope proof jwk");
   const holderPub = nodePublicKey(holderJwk.raw, "check_envelope proof");
   assert(verifyEd25519(holderPub, proofJws.message, proofJws.signature), "check_envelope: proof signature");
@@ -1967,9 +1984,22 @@ function dispatchCheckEnvelope(input) {
   // carries must match the server-derived cast_arguments (runtime.ex:497-498). Without this the
   // independent verifier would ignore grant selectors — the exact gap the check_envelope selector
   // fixtures exercise, so a corpus with a non-trivial selector would else silently disagree.
+  // Guard family: the selector is not the only structure on this path the official closes. Its
+  // enclosing operation object is a closed map too (runtime.ex `closed_map(members, ["name",
+  // "selectors"])`), and the sibling decode_grant / verify_grant dispatchers in this file already
+  // apply exactKeys to the structures they read. Closing the selector alone would leave the
+  // asymmetry the selector hardening exists to remove.
   const grantOperations = grantPayload.operations;
-  assert(Array.isArray(grantOperations), "check_envelope: operations");
-  const namedOps = grantOperations.filter((o) => o && o.name === operation);
+  assert(
+    Array.isArray(grantOperations) &&
+      grantOperations.length >= 1 &&
+      grantOperations.length <= MAXIMA.operations,
+    "check_envelope: operations",
+  );
+  for (const op of grantOperations) {
+    exactKeys(op, ["name", "selectors"], "check_envelope grant operation");
+  }
+  const namedOps = grantOperations.filter((o) => o.name === operation);
   assert(namedOps.length === 1, "check_envelope: unique operation");
   const opSelectors = namedOps[0].selectors;
   assert(
