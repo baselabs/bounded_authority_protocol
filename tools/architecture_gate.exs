@@ -7,7 +7,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     ex_doc: {"~> 0.40.3", [:dev, :test]},
     jsonschex: {"~> 0.8.1", [:dev, :test]},
     mix_audit: {"~> 2.1", [:dev, :test]},
-    sbom: {"~> 0.10.0", [:dev, :test]}
+    sbom: {"~> 0.10.0", [:dev, :test]},
+    stream_data: {"~> 1.1", [:dev, :test]}
   }
 
   @compiled_dynamic_allowances %{
