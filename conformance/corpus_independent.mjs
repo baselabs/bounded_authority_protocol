@@ -946,7 +946,11 @@ function loadCorpus(corpusDir) {
     );
     const executed = observedMatrix[surface] ?? {};
     for (const [cls, declared] of Object.entries(classes)) {
-      if (declared === "n_a") {
+      // An applicability leaf may be a bare "n_a" string OR an object {"n_a": "<reason>"}. The
+      // object form carries a falsifiable reason (Q29 obligation) for human review; both are
+      // treated identically by the machine check (not-applicable: zero executed cases).
+      const isNotApplicable = declared === "n_a" || (declared && typeof declared === "object" && typeof declared.n_a === "string");
+      if (isNotApplicable) {
         assert((executed[cls] ?? 0) === 0, `applicability ${surface}/${cls}: n_a cell populated`);
       } else {
         assert(Number.isInteger(declared) && declared >= 1, `applicability ${surface}/${cls}: count`);

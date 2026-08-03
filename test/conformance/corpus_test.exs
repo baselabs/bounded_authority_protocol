@@ -895,6 +895,256 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     end
   end
 
+  # --- corpus-expansion pins (V5 subsumption, Q29 n_a reasons, Q31 bounds pinning) ---
+
+  # The total is pinned so a dropped class cannot retreat into code silently (V1/V2): removing
+  # any case changes the total and this pin goes red.
+  test "the shipped corpus total_cases is pinned at the expanded count" do
+    map = shipped_corpus_map()
+    {:ok, corpus} = Corpus.load(map)
+    assert corpus.index["total_cases"] == 180
+    assert MapSet.size(corpus.case_ids) == 180
+  end
+
+  test "every n_a applicability leaf carries a falsifiable reason (Q29 obligation)" do
+    # The n_a half of the matrix is derived, not authored: a cell may be n_a ONLY when the
+    # surface's input algebra cannot express the class. Each n_a leaf carries a one-line
+    # reason so flipping a required cell to n_a requires writing a falsifiable impossibility
+    # claim. This pin asserts the shape + that reasons are present (non-empty strings).
+    map = shipped_corpus_map()
+    {:ok, corpus} = Corpus.load(map)
+
+    n_a? = fn
+      "n_a" -> true
+      %{"n_a" => reason} when is_binary(reason) -> true
+      _ -> false
+    end
+
+    n_a_cells =
+      for {surface, leaves} <- corpus.index["applicability"],
+          {class, leaf} <- leaves,
+          n_a?.(leaf),
+          reduce: [] do
+        acc -> [{surface, class, leaf} | acc]
+      end
+
+    assert n_a_cells != [], "the corpus must carry n_a cells (else the matrix is vacuous)"
+
+    for {surface, class, leaf} <- n_a_cells do
+      %{"n_a" => reason} = leaf
+
+      assert is_binary(reason) and byte_size(reason) > 0,
+             "#{surface}/#{class}: n_a leaf must be {\"n_a\": <non-empty reason>}, got #{inspect(leaf)}"
+    end
+  end
+
+  test "the n_a leaf object shape is schema-valid and the loader treats it as not-applicable" do
+    # The index schema accepts {"n_a": "<reason>"} as a leaf (in addition to integer / bare "n_a"),
+    # and Corpus.load treats it identically to the bare "n_a" string (zero executed cases).
+    {:ok, meta} = Draft202012Schemas.fetch("https://json-schema.org/draft/2020-12/schema")
+    {:ok, compiled_meta} = JSONSchex.compile(meta)
+    schema = File.read!("priv/conformance/v1/schemas/corpus-index.schema.json") |> :json.decode()
+    {:ok, compiled} = JSONSchex.compile(schema)
+    assert :ok = JSONSchex.validate(compiled_meta, schema)
+
+    valid = minimal_valid_index_map()
+    # Rewrite one n_a leaf to the object form; the schema must still accept it.
+    valid =
+      put_in(valid, ["applicability", "json.decode", "invalid_algorithm"], %{"n_a" => "no field"})
+
+    assert :ok = JSONSchex.validate(compiled, valid)
+
+    # The loader treats the object n_a form as not-applicable (the synthetic corpus has zero
+    # json.decode/invalid_algorithm cases, so this cell must load).
+    cases_map = %{"cases/json/trivial.json" => trivial_case_bytes()}
+    applicability = applicability_from_cases(cases_map)
+
+    applicability =
+      put_in(applicability, ["json.decode", "invalid_algorithm"], %{"n_a" => "no field"})
+
+    index = build_index(cases_map, applicability: applicability)
+    bytes = jcs(to_object(index))
+    map = Map.put(cases_map, "index.json", bytes)
+    assert {:ok, _corpus} = Corpus.load(map)
+  end
+
+  test "the n_a reason object shape with a missing reason is rejected by the loader" do
+    # A malformed n_a object (e.g. empty or wrong key) is NOT a valid not-applicable marker —
+    # it falls through leaf_matches? to the catch-all -> {:error, :invalid}. This keeps the
+    # reason obligation machine-enforced: only the exact {"n_a": <string>} shape is honored.
+    cases_map = %{"cases/json/trivial.json" => trivial_case_bytes()}
+    applicability = applicability_from_cases(cases_map)
+
+    applicability =
+      put_in(applicability, ["json.decode", "invalid_algorithm"], %{"reason" => "nope"})
+
+    index = build_index(cases_map, applicability: applicability)
+    bytes = jcs(to_object(index))
+    map = Map.put(cases_map, "index.json", bytes)
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  # Legacy-depth subsumption (V5): the 18 legacy URI byte-values from
+  # conformance/bap03_independent.mjs:22-41 appear as corpus data. The 6 VALID (idempotent)
+  # + 5 normalizable-but-non-idempotent appear as valid uri.normalize cases; the 6 rejected
+  # by both implementations appear as invalid_uri. https://[:::]/ is implementation-divergent
+  # (Elixir rejects, Node accepts) and is omitted — recorded in ADR 0005. 17 of 18 ported.
+  test "the corpus subsumes the 17 port-able legacy URI byte-values (V5)" do
+    legacy_inputs = [
+      "https://example.com/",
+      "https://example.com/a/~",
+      "https://example.com:8443/a%2Fb",
+      "https://[2001:db8::1]/",
+      "https://[v1.a:b]/",
+      "https://192.0.2.1/",
+      "https://example.com:0443/",
+      "https://EXAMPLE.com/",
+      "https://example.com:443/",
+      "https://example.com/%7e",
+      "https://example.com/a/../b",
+      "https://example.com/?q=1",
+      "https://example.com:/",
+      "https://[v.a]/",
+      "https://01.2.3.4/",
+      "https://256.2.3.4/",
+      "http://example.com/"
+    ]
+
+    map = shipped_corpus_map()
+    {:ok, corpus} = Corpus.load(map)
+
+    uri_inputs =
+      corpus.cases
+      |> Enum.flat_map(&elem(&1, 1))
+      |> Enum.filter(&(&1["surface"] == "uri.normalize"))
+      |> Enum.map(& &1["input"]["text"])
+      |> MapSet.new()
+
+    for legacy <- legacy_inputs do
+      assert MapSet.member?(uri_inputs, legacy),
+             "legacy URI #{inspect(legacy)} not subsumed as corpus data"
+    end
+  end
+
+  test "the corpus subsumes the legacy duplicate-member case (V5)" do
+    map = shipped_corpus_map()
+    {:ok, corpus} = Corpus.load(map)
+
+    dup_inputs =
+      corpus.cases
+      |> Enum.flat_map(&elem(&1, 1))
+      |> Enum.filter(&(&1["surface"] == "json.decode" and &1["class"] == "invalid_duplicate"))
+      |> Enum.map(& &1["input"]["text"])
+      |> MapSet.new()
+
+    # The legacy bap03 duplicate-member target was a JWS header with a duplicated "alg" member.
+    assert MapSet.member?(dup_inputs, "{\"alg\":\"EdDSA\",\"alg\":\"none\"}")
+  end
+
+  # bounds.new constant-pinning (Q31): every maxima-table key has a tighten-to-exact-max (valid)
+  # pin; every key EXCEPT integer_magnitude/float_magnitude has a tighten-to-max-plus-one (invalid)
+  # pin. The two-key exception is mechanically forced (the max+1 literal exceeds the decoder's own
+  # magnitude ceiling and cannot appear in a corpus JSON file) — recorded in ADR 0005.
+  test "bounds.new pins every maxima key (exact_bound + maximum_plus_one), modulo the two-key exception" do
+    map = shipped_corpus_map()
+    {:ok, corpus} = Corpus.load(map)
+
+    bounds_cases =
+      corpus.cases
+      |> Enum.flat_map(&elem(&1, 1))
+      |> Enum.filter(&(&1["surface"] == "bounds.new"))
+
+    # Every key of Bounds.maximum/0 carries an exact_bound (valid) pin.
+    for key <- Map.from_struct(Bounds.maximum()) |> Map.keys() do
+      key_str = Atom.to_string(key)
+
+      assert Enum.any?(
+               bounds_cases,
+               &(&1["class"] == "exact_bound" and &1["bound_profile"]["tightened"][key_str])
+             ),
+             "missing exact_bound pin for #{key_str}"
+    end
+
+    # Every key EXCEPT integer_magnitude/float_magnitude carries a maximum_plus_one (invalid) pin.
+    for key <- Map.from_struct(Bounds.maximum()) |> Map.keys(),
+        key not in [:integer_magnitude, :float_magnitude] do
+      key_str = Atom.to_string(key)
+
+      assert Enum.any?(
+               bounds_cases,
+               &(&1["class"] == "maximum_plus_one" and &1["bound_profile"]["tightened"][key_str])
+             ),
+             "missing maximum_plus_one pin for #{key_str}"
+    end
+
+    # The two-key exception: integer_magnitude and float_magnitude have NO maximum_plus_one pin.
+    for key <- [:integer_magnitude, :float_magnitude] do
+      key_str = Atom.to_string(key)
+
+      refute Enum.any?(
+               bounds_cases,
+               &(&1["class"] == "maximum_plus_one" and &1["bound_profile"]["tightened"][key_str])
+             ),
+             "#{key_str} must NOT carry a maximum_plus_one pin (the max+1 literal exceeds the decoder magnitude ceiling)"
+    end
+
+    # The magnitude ceiling itself is still portably pinned via the json.decode maximum_plus_one
+    # .raw sidecar (9007199254740992 raw JSON bytes -> invalid).
+    assert Enum.any?(
+             corpus.cases |> Enum.flat_map(&elem(&1, 1)),
+             &(&1["surface"] == "json.decode" and &1["class"] == "maximum_plus_one")
+           )
+  end
+
+  test "bounds.new fixed-width keys carry change-rejection (invalid_limit) cases" do
+    map = shipped_corpus_map()
+    {:ok, corpus} = Corpus.load(map)
+
+    bounds_cases =
+      corpus.cases
+      |> Enum.flat_map(&elem(&1, 1))
+      |> Enum.filter(&(&1["surface"] == "bounds.new" and &1["class"] == "invalid_limit"))
+
+    for key <- [:digest_bytes, :public_key_bytes, :signature_bytes] do
+      key_str = Atom.to_string(key)
+
+      assert Enum.any?(bounds_cases, &(&1["input"]["overrides"][key_str] != nil)),
+             "missing fixed-width invalid_limit pin for #{key_str}"
+    end
+  end
+
+  # tamper_meaningful_byte (Q25): the class is exercised on the byte-bearing surfaces whose
+  # dispatch input IS input.text (JSON/text). The byte-bearing compact/segment/structured-input
+  # surfaces are n_a (the tamper loader reads input.text/base64url, which they do not expose).
+  test "tamper_meaningful_byte is exercised on text-input surfaces and n_a elsewhere" do
+    map = shipped_corpus_map()
+    {:ok, corpus} = Corpus.load(map)
+
+    tamper_surfaces =
+      corpus.cases
+      |> Enum.flat_map(&elem(&1, 1))
+      |> Enum.filter(&(&1["class"] == "tamper_meaningful_byte"))
+      |> Enum.map(& &1["surface"])
+      |> MapSet.new()
+
+    # The genuinely byte-bearing text-input surfaces carry tampers.
+    for surface <- [
+          "json.decode",
+          "jcs.encode",
+          "uri.normalize",
+          "jwk.decode_public",
+          "jwk.thumbprint_preimage",
+          "jwk.thumbprint",
+          "jwk.thumbprint_raw"
+        ] do
+      assert MapSet.member?(tamper_surfaces, surface),
+             "missing tamper_meaningful_byte case for #{surface}"
+    end
+
+    # base64url.decode is n_a (canonical segment closed under single-byte flip).
+    refute MapSet.member?(tamper_surfaces, "base64url.decode")
+  end
+
   defp shipped_corpus_map do
     Path.wildcard(Path.join(@shipped_corpus, "**/*"))
     |> Enum.filter(&File.regular?/1)

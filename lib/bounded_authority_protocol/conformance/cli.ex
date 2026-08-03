@@ -94,23 +94,21 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
     full = Path.join(dir, entry)
     rel = if prefix == "", do: entry, else: Path.join(prefix, entry)
 
-    cond do
-      File.dir?(full) ->
-        with {:ok, sub} <- File.ls(full),
-             {:ok, walked} <- walk(full, sub, rel),
-             {:ok, acc} <- walk(dir, rest, prefix) do
-          {:ok, Map.merge(walked, acc)}
-        else
-          {:error, _} -> {:error, :invalid}
-        end
-
-      true ->
-        with {:ok, bytes} <- File.read(full),
-             {:ok, acc} <- walk(dir, rest, prefix) do
-          {:ok, Map.put(acc, rel, bytes)}
-        else
-          {:error, _} -> {:error, :invalid}
-        end
+    if File.dir?(full) do
+      with {:ok, sub} <- File.ls(full),
+           {:ok, walked} <- walk(full, sub, rel),
+           {:ok, acc} <- walk(dir, rest, prefix) do
+        {:ok, Map.merge(walked, acc)}
+      else
+        {:error, _} -> {:error, :invalid}
+      end
+    else
+      with {:ok, bytes} <- File.read(full),
+           {:ok, acc} <- walk(dir, rest, prefix) do
+        {:ok, Map.put(acc, rel, bytes)}
+      else
+        {:error, _} -> {:error, :invalid}
+      end
     end
   end
 

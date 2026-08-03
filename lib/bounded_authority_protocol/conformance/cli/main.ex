@@ -7,6 +7,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli.Main do
 
   alias BoundedAuthorityProtocol.Conformance.Cli
 
+  @spec main([binary()]) :: no_return()
   def main(argv) do
     System.halt(Cli.run(argv))
   end
