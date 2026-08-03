@@ -604,29 +604,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     tampered_bin = <<Bitwise.bxor(first, 0x01)>> <> rest
     tampered_b64 = Base.url_encode64(tampered_bin, padding: false)
 
-    case_obj =
-      {:object,
-       [
-         {"id", {:string, "json-decode-tamper-b64-001"}},
-         {"surface", {:string, "json.decode"}},
-         {"class", {:string, "tamper_meaningful_byte"}},
-         {"input", {:object, [{"base64url", {:string, tampered_b64}}]}},
-         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
-         {"tamper",
-          {:object,
-           [
-             {"base_case", {:string, "json-decode-tamper-b64-001"}},
-             {"target", {:string, "input.base64url"}},
-             {"byte_index", {:integer, 0}},
-             {"xor", {:integer, 1}},
-             {"meaning", {:string, "first decoded byte"}}
-           ]}}
-       ]}
-
-    # The base_case references itself; the derived bytes (base with byte 0 flipped) must equal
-    # the verbatim artifact. Here both the input and the derivation reference the same base bytes,
-    # so the self-check passes when base_case input == the base64url of "hello".
-    # Build a corpus where the base input is the untampered base64url and the case is the tampered.
+    # The derived bytes (base with byte 0 flipped) must equal the tampered verbatim artifact, so
+    # the tamper case references a distinct base case whose input is the untampered base64url.
     base_case_obj =
       {:object,
        [
@@ -663,6 +642,193 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
 
     map = full_corpus_map(cases_map, [])
     assert {:ok, _corpus} = Corpus.load(map)
+  end
+
+  # --- tamper target resolution (Task 2: compact / grant / proof / rows[i] / chunks[i]) ------
+
+  test "a compact-target tamper re-derives against input.compact (not input.text) and loads" do
+    {grant_compact, _pub} = signed_grant_compact(holder_thumbprint())
+
+    # Flip the last byte of the compact JWS string (inside the signature segment).
+    idx = byte_size(grant_compact) - 1
+    <<pre::binary-size(^idx), last>> = grant_compact
+    tampered = pre <> <<Bitwise.bxor(last, 0x01)>>
+
+    base_case =
+      {:object,
+       [
+         {"id", {:string, "decode-grant-compact-base"}},
+         {"surface", {:string, "decode_grant"}},
+         {"class", {:string, "valid"}},
+         {"input", {:object, [{"compact", {:string, grant_compact}}]}},
+         {"expected",
+          {:object, [{"verdict", {:string, "valid"}}, {"key_id", {:string, "issuer-a"}}]}}
+       ]}
+
+    tamper_case =
+      {:object,
+       [
+         {"id", {:string, "decode-grant-compact-tamper"}},
+         {"surface", {:string, "decode_grant"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", {:object, [{"compact", {:string, tampered}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, "decode-grant-compact-base"}},
+             {"target", {:string, "compact"}},
+             {"byte_index", {:integer, idx}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "last byte of the signature segment"}}
+           ]}}
+       ]}
+
+    cases_map =
+      synthetic_corpus()
+      |> Map.put("cases/grant/compact-tamper.json", jcs_case([base_case, tamper_case]))
+
+    map = full_corpus_map(cases_map, [])
+    assert {:ok, _corpus} = Corpus.load(map)
+  end
+
+  test "a compact-target tamper whose byte_index disagrees with the verbatim flip is rejected" do
+    {grant_compact, _pub} = signed_grant_compact(holder_thumbprint())
+
+    idx = byte_size(grant_compact) - 1
+    <<pre::binary-size(^idx), last>> = grant_compact
+    tampered = pre <> <<Bitwise.bxor(last, 0x01)>>
+
+    base_case =
+      {:object,
+       [
+         {"id", {:string, "decode-grant-compact-base"}},
+         {"surface", {:string, "decode_grant"}},
+         {"class", {:string, "valid"}},
+         {"input", {:object, [{"compact", {:string, grant_compact}}]}},
+         {"expected",
+          {:object, [{"verdict", {:string, "valid"}}, {"key_id", {:string, "issuer-a"}}]}}
+       ]}
+
+    # byte_index points one byte before the actual flip: the re-derived bytes differ from verbatim.
+    tamper_case =
+      {:object,
+       [
+         {"id", {:string, "decode-grant-compact-tamper-wrong-index"}},
+         {"surface", {:string, "decode_grant"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", {:object, [{"compact", {:string, tampered}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, "decode-grant-compact-base"}},
+             {"target", {:string, "compact"}},
+             {"byte_index", {:integer, idx - 1}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "wrong index (does not match the verbatim flip)"}}
+           ]}}
+       ]}
+
+    cases_map =
+      synthetic_corpus()
+      |> Map.put("cases/grant/compact-tamper.json", jcs_case([base_case, tamper_case]))
+
+    map = full_corpus_map(cases_map, [])
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "a rows[i]-target tamper re-derives against the decoded i-th base64url row and loads" do
+    row0 = Base.url_encode64("row-zero-bytes", padding: false)
+    base_row1_bin = "row-one-bytes!!"
+    <<first, rest::binary>> = base_row1_bin
+    tampered_row1_bin = <<Bitwise.bxor(first, 0x01)>> <> rest
+
+    base_case =
+      {:object,
+       [
+         {"id", {:string, "check-chain-rows-base"}},
+         {"surface", {:string, "check_chain"}},
+         {"class", {:string, "valid"}},
+         {"input",
+          {:object,
+           [
+             {"rows",
+              {:array,
+               [
+                 {:string, row0},
+                 {:string, Base.url_encode64(base_row1_bin, padding: false)}
+               ]}}
+           ]}},
+         {"expected", {:object, [{"verdict", {:string, "valid"}}]}}
+       ]}
+
+    tamper_case =
+      {:object,
+       [
+         {"id", {:string, "check-chain-rows-tamper"}},
+         {"surface", {:string, "check_chain"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input",
+          {:object,
+           [
+             {"rows",
+              {:array,
+               [
+                 {:string, row0},
+                 {:string, Base.url_encode64(tampered_row1_bin, padding: false)}
+               ]}}
+           ]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, "check-chain-rows-base"}},
+             {"target", {:string, "rows[1]"}},
+             {"byte_index", {:integer, 0}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "first decoded byte of the second row"}}
+           ]}}
+       ]}
+
+    cases_map =
+      synthetic_corpus()
+      |> Map.put("cases/chain/rows-tamper.json", jcs_case([base_case, tamper_case]))
+
+    map = full_corpus_map(cases_map, [])
+    assert {:ok, _corpus} = Corpus.load(map)
+  end
+
+  test "a tamper case with a present-but-dangling base_case is rejected (not loaded unaudited)" do
+    # A present tamper block whose base_case does not resolve must FAIL the load — the case cannot
+    # be proven a genuine single-byte flip, so it is corruption, not a case to wave through. This
+    # matches the independent Node audit (which asserts the base is present) and closes the
+    # divergence where the Elixir loader would otherwise load such a case unaudited.
+    tamper_case =
+      {:object,
+       [
+         {"id", {:string, "decode-grant-dangling-tamper"}},
+         {"surface", {:string, "decode_grant"}},
+         {"class", {:string, "tamper_meaningful_byte"}},
+         {"input", {:object, [{"compact", {:string, "aaa.bbb.ccc"}}]}},
+         {"expected", {:object, [{"verdict", {:string, "invalid"}}]}},
+         {"tamper",
+          {:object,
+           [
+             {"base_case", {:string, "no-such-base-case"}},
+             {"target", {:string, "compact"}},
+             {"byte_index", {:integer, 0}},
+             {"xor", {:integer, 1}},
+             {"meaning", {:string, "dangling base_case reference"}}
+           ]}}
+       ]}
+
+    cases_map =
+      synthetic_corpus()
+      |> Map.put("cases/grant/dangling-tamper.json", jcs_case([tamper_case]))
+
+    map = full_corpus_map(cases_map, [])
+    assert {:error, :invalid} = Corpus.load(map)
   end
 
   defp jcs_case(cases) do

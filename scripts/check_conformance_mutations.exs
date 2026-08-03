@@ -168,6 +168,34 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       to: "  importedPublicKeyFingerprints.add(fp);",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
+    # --- Task 2: tamper target resolution (audit binds to the addressed bytes) -
+    %{
+      # The compact-target audit must resolve input.compact, NOT default to input.text. This
+      # mutation makes the "compact" target fall back to text resolution — the exact bug the
+      # `target` field exists to prevent — so a compact-target tamper case (which carries no
+      # input.text) fails to resolve, the verbatim-vs-derived audit mismatches, and the corpus
+      # fails to load. The positive compact-target test asserts {:ok, _}; under the mutation the
+      # load returns {:error, :invalid} and the test goes red. Proves target resolution is
+      # load-bearing (the audit binds to the addressed artifact, not a fixed field).
+      name: "tamper-target-binding",
+      path: "lib/bounded_authority_protocol/conformance/corpus.ex",
+      from: "      t when t in [\"compact\", \"grant\", \"proof\"] -> string_target_bytes(input, t)",
+      to: "      t when t in [\"compact\", \"grant\", \"proof\"] -> text_target_bytes(input)",
+      command: ["mix", "test", "test/conformance/corpus_test.exs:649"]
+    },
+    %{
+      # The independent Node runner's verbatim-vs-derived tamper audit must run at load. Removing
+      # the verifyTampers call lets a corpus whose tamper verbatim disagrees with the re-derived
+      # bytes load and "agree". Targeted test feeds a corrupted-verbatim corpus (its index hash
+      # re-synced so the SHA-256 gate passes and the tamper audit is what fires) and asserts exit 1;
+      # with the audit gone the runner exits 0 and the test goes red.
+      name: "node-tamper-audit-removal",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "  // Tamper verbatim-vs-derived audit (mirrors the official loader; a mismatch aborts the run).\n  verifyTampers(cases);",
+      to: "  // tamper audit disabled (mutation)",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:74"]
+    },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----
     %{
       # A real caught mutation used to prove the raise path: disabling case-id uniqueness lets a

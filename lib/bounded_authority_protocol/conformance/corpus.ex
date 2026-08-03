@@ -347,20 +347,26 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     end)
   end
 
-  defp check_one_tamper(case_obj, by_id) do
-    with %{"tamper" => tamper} <- case_obj,
-         %{"base_case" => base_id, "byte_index" => index, "xor" => xor}
+  defp check_one_tamper(%{"tamper" => tamper} = case_obj, by_id) do
+    with %{"base_case" => base_id, "byte_index" => index, "xor" => xor}
          when is_integer(index) and is_integer(xor) <- tamper,
          %{} = base <- Map.get(by_id, base_id) do
-      if tamper_verbatim_matches?(case_obj, base, index, xor), do: :ok, else: :invalid
+      target = Map.get(tamper, "target")
+      if tamper_verbatim_matches?(case_obj, base, target, index, xor), do: :ok, else: :invalid
     else
-      _ -> :ok
+      # A PRESENT tamper block that is malformed (non-integer byte_index/xor) or references a
+      # missing base_case is a corrupt corpus — reject, matching the independent Node audit
+      # (which asserts base present + integer byte_index/xor). Only a case with NO tamper block is
+      # a non-tamper case (the second clause) and passes this check untouched.
+      _ -> :invalid
     end
   end
 
-  defp tamper_verbatim_matches?(case_obj, base, index, xor) do
-    with {:ok, base_bytes} <- tamper_source_bytes(base),
-         {:ok, verbatim_bytes} <- tamper_verbatim_bytes(case_obj) do
+  defp check_one_tamper(_case_obj, _by_id), do: :ok
+
+  defp tamper_verbatim_matches?(case_obj, base, target, index, xor) do
+    with {:ok, base_bytes} <- tamper_target_bytes(base, target),
+         {:ok, verbatim_bytes} <- tamper_target_bytes(case_obj, target) do
       derived = derive_tampered_bytes(base_bytes, index, xor)
       derived == verbatim_bytes
     else
@@ -382,35 +388,76 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     end
   end
 
-  defp tamper_source_bytes(%{"input" => input}) do
-    cond do
-      is_binary(input["text"]) ->
-        {:ok, input["text"]}
-
-      is_binary(input["base64url"]) ->
-        case Base.url_decode64(input["base64url"], padding: false) do
-          {:ok, bytes} -> {:ok, bytes}
-          :error -> :error
-        end
-
-      true ->
-        :error
+  # Resolve the bytes a tamper's verbatim-vs-derived audit binds to, per the tamper `target`.
+  # Both the base case's source bytes and the tampered case's verbatim bytes resolve through the
+  # SAME target, so the audit re-derives base-with-one-flip and byte-compares against the stored
+  # verbatim on exactly the addressed artifact. The default/`"input.text"`/`"input.base64url"`
+  # paths preserve the original text/base64url resolution (back-compat); the extended targets
+  # address the byte-bearing verifying-surface inputs: the compact JWS string (`"compact"`), a
+  # named compact inside a check_envelope input (`"grant"`/`"proof"`), or the decoded i-th
+  # base64url row/chunk (`"rows[i]"`/`"chunks[i]"`) of a chain/archive input.
+  defp tamper_target_bytes(%{"input" => input}, target) do
+    case target do
+      nil -> legacy_target_bytes(input)
+      "input.text" -> text_target_bytes(input)
+      "input.base64url" -> b64_target_bytes(input, "base64url")
+      t when t in ["compact", "grant", "proof"] -> string_target_bytes(input, t)
+      "rows[" <> suffix -> indexed_target_bytes(input["rows"], suffix)
+      "chunks[" <> suffix -> indexed_target_bytes(input["chunks"], suffix)
+      _ -> :error
     end
   end
 
-  defp tamper_verbatim_bytes(%{"input" => input}) do
+  defp tamper_target_bytes(_case_obj, _target), do: :error
+
+  defp legacy_target_bytes(input) do
     cond do
-      is_binary(input["text"]) ->
-        {:ok, input["text"]}
+      is_binary(input["text"]) -> {:ok, input["text"]}
+      is_binary(input["base64url"]) -> b64_decode(input["base64url"])
+      true -> :error
+    end
+  end
 
-      is_binary(input["base64url"]) ->
-        case Base.url_decode64(input["base64url"], padding: false) do
-          {:ok, bytes} -> {:ok, bytes}
-          :error -> :error
-        end
+  defp text_target_bytes(input) do
+    if is_binary(input["text"]), do: {:ok, input["text"]}, else: :error
+  end
 
-      true ->
-        :error
+  defp string_target_bytes(input, key) do
+    if is_binary(input[key]), do: {:ok, input[key]}, else: :error
+  end
+
+  defp b64_target_bytes(input, key) do
+    if is_binary(input[key]), do: b64_decode(input[key]), else: :error
+  end
+
+  # Resolve `key[i]` to the decoded i-th base64url element of `list`. The index is parsed from the
+  # `i]` suffix with a pure digit fold (Regex/Integer/Enum.at are forbidden in this module by the
+  # architecture gate), and the element is fetched by recursive list walk.
+  defp indexed_target_bytes(list, suffix) when is_list(list) do
+    with {:ok, i} <- parse_index_suffix(suffix, 0, false),
+         {:ok, element} when is_binary(element) <- list_at(list, i) do
+      b64_decode(element)
+    else
+      _ -> :error
+    end
+  end
+
+  defp indexed_target_bytes(_list, _suffix), do: :error
+
+  defp parse_index_suffix(<<d, rest::binary>>, acc, _seen) when d >= ?0 and d <= ?9,
+    do: parse_index_suffix(rest, acc * 10 + (d - ?0), true)
+
+  defp parse_index_suffix("]", acc, true), do: {:ok, acc}
+  defp parse_index_suffix(_suffix, _acc, _seen), do: :error
+
+  defp list_at([element | _rest], 0), do: {:ok, element}
+  defp list_at([_element | rest], i) when i > 0, do: list_at(rest, i - 1)
+  defp list_at(_list, _i), do: :error
+
+  defp b64_decode(encoded) do
+    case Base.url_decode64(encoded, padding: false) do
+      {:ok, bytes} -> {:ok, bytes}
+      :error -> :error
     end
   end
 

@@ -1027,6 +1027,9 @@ function loadCorpus(corpusDir) {
     }
   }
 
+  // Tamper verbatim-vs-derived audit (mirrors the official loader; a mismatch aborts the run).
+  verifyTampers(cases);
+
   return { index, cases, raws, corpusDir };
 }
 
@@ -1093,6 +1096,79 @@ function byteList(input, key, context) {
     if (decoded === null) fail(`${context}: ${key}[${i}] invalid`);
     return decoded;
   });
+}
+
+// --- tamper verbatim-vs-derived audit (Q25) --------------------------------
+// The independent second implementation of Corpus.verify_tampers: re-derive base-with-one-flip
+// on the addressed target and require byte-equality with the tampered case's stored verbatim
+// artifact, so a tamper case that labels a flip it did not actually perform is rejected at load.
+// Target resolution mirrors corpus.ex tamper_target_bytes/2 (default/text/base64url +
+// compact/grant/proof/rows[i]/chunks[i]).
+
+function tamperB64(encoded, context) {
+  const decoded = decodeB64Loose(encoded, context);
+  if (decoded === null) fail(`${context}: invalid base64url`);
+  return decoded;
+}
+
+function tamperTargetBytes(caseObj, target, context) {
+  const input = caseObj.input || {};
+  switch (target) {
+    case undefined:
+      if (typeof input.text === "string") return Buffer.from(input.text, "utf8");
+      if (typeof input.base64url === "string") return tamperB64(input.base64url, context);
+      break;
+    case "input.text":
+      if (typeof input.text === "string") return Buffer.from(input.text, "utf8");
+      break;
+    case "input.base64url":
+      if (typeof input.base64url === "string") return tamperB64(input.base64url, context);
+      break;
+    case "compact":
+      if (typeof input.compact === "string") return Buffer.from(input.compact, "utf8");
+      break;
+    case "grant":
+      if (typeof input.grant === "string") return Buffer.from(input.grant, "utf8");
+      break;
+    case "proof":
+      if (typeof input.proof === "string") return Buffer.from(input.proof, "utf8");
+      break;
+    default: {
+      const m = /^(rows|chunks)\[(\d+)\]$/.exec(target);
+      if (m) {
+        const list = input[m[1]];
+        const i = Number(m[2]);
+        if (Array.isArray(list) && typeof list[i] === "string") return tamperB64(list[i], context);
+      }
+    }
+  }
+  return fail(`${context}: unresolved tamper target ${target}`);
+}
+
+function verifyTampers(cases) {
+  const byId = new Map();
+  for (const { caseObj } of cases) byId.set(caseObj.id, caseObj);
+  for (const { caseObj } of cases) {
+    const tamper = caseObj.tamper;
+    if (!tamper || typeof tamper !== "object") continue;
+    assert(typeof tamper.base_case === "string", `${caseObj.id}: tamper base_case`);
+    assert(
+      Number.isInteger(tamper.byte_index) && tamper.byte_index >= 0,
+      `${caseObj.id}: tamper byte_index`,
+    );
+    assert(Number.isInteger(tamper.xor), `${caseObj.id}: tamper xor`);
+    const base = byId.get(tamper.base_case);
+    assert(base !== undefined, `${caseObj.id}: tamper base_case ${tamper.base_case} present`);
+    const baseBytes = tamperTargetBytes(base, tamper.target, `${caseObj.id} tamper base`);
+    const verbatim = tamperTargetBytes(caseObj, tamper.target, `${caseObj.id} tamper verbatim`);
+    assert(tamper.byte_index < baseBytes.length, `${caseObj.id}: tamper byte_index in range`);
+    const derived = Buffer.from(baseBytes);
+    derived[tamper.byte_index] = derived[tamper.byte_index] ^ (tamper.xor & 0xff);
+    assert(
+      derived.equals(verbatim),
+      `${caseObj.id}: tamper verbatim != derived (target ${tamper.target})`,
+    );
+  }
 }
 
 // ===========================================================================
