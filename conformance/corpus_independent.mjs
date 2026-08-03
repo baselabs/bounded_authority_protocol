@@ -74,15 +74,41 @@ const FIXED_WIDTH_KEYS = new Set(["digest_bytes", "public_key_bytes", "signature
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const importedPublicKeyFingerprints = new Set();
+// Two-boundary census (design C2): `importedPublicKeyFingerprints` is the discovery-membership set
+// (every key the fixtures carry). `verificationImportedFingerprints` is the SEPARATE truth set —
+// only keys the runner actually fed to node:crypto createPublicKey on a verification surface. The
+// verification-import assertion (main) proves the runner genuinely imported the verification keys,
+// which the membership census alone cannot (finding 4b: a discovery-only census stays green even if
+// nothing is ever imported). Producer-only keys never reach createPublicKey and are naturally exempt.
+const verificationImportedFingerprints = new Set();
 
 // --- error + assertion discipline (mirrors chain_archive_independent.mjs) ----
 
+// A GENUINE protocol rejection (the runner's own validation saying "this input is invalid") is a
+// distinct type from a runner BUG (a TypeError/ReferenceError/RangeError, or an uncaught library
+// throw). Only InvalidError maps to the corpus INVALID verdict; every other throw aborts the run
+// nonzero. This is a whitelist, not an error-type blacklist: a blacklist both false-REDs (a genuine
+// invalid_encoding case whose bytes make JSON.parse throw SyntaxError would abort a legitimate
+// rejection) and false-GREENs (a plain Error from a runner bug is swallowed to agreement).
+class InvalidError extends Error {}
+
 function fail(message) {
-  throw new Error(message);
+  throw new InvalidError(message);
 }
 
 function assert(condition, message) {
   if (!condition) fail(message);
+}
+
+// Parse a scanned JSON string literal via JSON.parse, converting a SyntaxError on genuinely-invalid
+// bytes (a bad escape in an invalid_encoding case) into an InvalidError protocol rejection — never
+// an uncaught SyntaxError that would abort the run under the InvalidError whitelist.
+function parseJsonStringLiteral(literal, context) {
+  try {
+    return JSON.parse(literal);
+  } catch {
+    return fail(`${context}: invalid string literal`);
+  }
 }
 
 function exactKeys(value, keys, context) {
@@ -181,7 +207,7 @@ function parseJsonNoDuplicates(text, context) {
       }
       if (text[index] === '"') {
         index += 1;
-        return JSON.parse(text.slice(start, index));
+        return parseJsonStringLiteral(text.slice(start, index), `${context}: string literal`);
       }
       index += 1;
     }
@@ -311,24 +337,30 @@ function decodeCensusRawKey(value) {
   return null;
 }
 
-function discoverCaseKeys(value) {
+function collectCaseKeys(value, target) {
   if (Array.isArray(value)) {
-    for (const item of value) discoverCaseKeys(item);
+    for (const item of value) collectCaseKeys(item, target);
     return;
   }
   if (!value || typeof value !== "object") return;
   for (const [key, child] of Object.entries(value)) {
     if (isCensusKeyLabel(key)) {
       const raw = decodeCensusRawKey(child);
-      if (raw) importedPublicKeyFingerprints.add(fingerprint(raw).toString("base64url"));
+      if (raw) target.add(fingerprint(raw).toString("base64url"));
     }
-    discoverCaseKeys(child);
+    collectCaseKeys(child, target);
   }
+}
+
+function discoverCaseKeys(value) {
+  collectCaseKeys(value, importedPublicKeyFingerprints);
 }
 
 function nodePublicKey(raw, context) {
   assert(Buffer.isBuffer(raw) && raw.length === 32, `${context}: Ed25519 public-key width`);
-  importedPublicKeyFingerprints.add(fingerprint(raw).toString("base64url"));
+  const fp = fingerprint(raw).toString("base64url");
+  importedPublicKeyFingerprints.add(fp);
+  verificationImportedFingerprints.add(fp);
   return createPublicKey({
     key: Buffer.concat([SPKI_ED25519_PREFIX, raw]),
     format: "der",
@@ -367,7 +399,9 @@ function jsonDecode(bytes, context) {
   }
 
   function Err(message) {
-    return new Error(`${context}: ${message}`);
+    // A malformed-JSON rejection is a protocol INVALID, not a runner bug — InvalidError so the
+    // dispatch whitelist maps it to INVALID rather than aborting the run.
+    return new InvalidError(`${context}: ${message}`);
   }
 
   function countNode() {
@@ -402,7 +436,7 @@ function jsonDecode(bytes, context) {
         byteLen += 1;
         assert(byteLen <= 8192, "json string byte bound");
         countNode();
-        return JSON.parse(text.slice(start, index));
+        return parseJsonStringLiteral(text.slice(start, index), "json string literal");
       }
       // enforce valid UTF-8 byte presence via code unit accumulation
       index += 1;
@@ -1004,59 +1038,59 @@ function inputBytes(input, raws, context) {
   if (typeof input.text === "string") return Buffer.from(input.text, "utf8");
   if (typeof input.base64url === "string") {
     const decoded = decodeB64Loose(input.base64url, context);
-    if (decoded === null) throw new Error(`${context}: invalid base64url`);
+    if (decoded === null) fail(`${context}: invalid base64url`);
     return decoded;
   }
   if (typeof input.raw_file === "string") {
     const bytes = raws.get(input.raw_file);
-    if (!Buffer.isBuffer(bytes)) throw new Error(`${context}: missing raw_file`);
+    if (!Buffer.isBuffer(bytes)) fail(`${context}: missing raw_file`);
     return bytes;
   }
-  throw new Error(`${context}: no input bytes`);
+  fail(`${context}: no input bytes`);
 }
 
 function fetchBinary(input, key, context) {
   const value = input[key];
-  if (typeof value !== "string") throw new Error(`${context}: missing ${key}`);
+  if (typeof value !== "string") fail(`${context}: missing ${key}`);
   return value;
 }
 
 function b64Field(input, key, context) {
   const encoded = fetchBinary(input, key, context);
   const decoded = decodeB64Loose(encoded, context);
-  if (decoded === null) throw new Error(`${context}: invalid ${key}`);
+  if (decoded === null) fail(`${context}: invalid ${key}`);
   return decoded;
 }
 
 function intField(input, key, context) {
   const value = input[key];
-  if (!Number.isSafeInteger(value)) throw new Error(`${context}: integer ${key}`);
+  if (!Number.isSafeInteger(value)) fail(`${context}: integer ${key}`);
   return value;
 }
 
 function inputPublicKey(input, context) {
   const encoded = fetchBinary(input, "public_key", context);
   const decoded = decodeB64Loose(encoded, context);
-  if (decoded === null) throw new Error(`${context}: invalid public_key`);
+  if (decoded === null) fail(`${context}: invalid public_key`);
   return decoded;
 }
 
 function stringList(input, key, context) {
   const list = input[key];
-  if (!Array.isArray(list) || list.length === 0) throw new Error(`${context}: list ${key}`);
+  if (!Array.isArray(list) || list.length === 0) fail(`${context}: list ${key}`);
   for (const item of list) {
-    if (typeof item !== "string") throw new Error(`${context}: string item ${key}`);
+    if (typeof item !== "string") fail(`${context}: string item ${key}`);
   }
   return list;
 }
 
 function byteList(input, key, context) {
   const list = input[key];
-  if (!Array.isArray(list)) throw new Error(`${context}: list ${key}`);
+  if (!Array.isArray(list)) fail(`${context}: list ${key}`);
   return list.map((item, i) => {
-    if (typeof item !== "string") throw new Error(`${context}: ${key}[${i}]`);
+    if (typeof item !== "string") fail(`${context}: ${key}[${i}]`);
     const decoded = decodeB64Loose(item, context);
-    if (decoded === null) throw new Error(`${context}: ${key}[${i}] invalid`);
+    if (decoded === null) fail(`${context}: ${key}[${i}] invalid`);
     return decoded;
   });
 }
@@ -1088,8 +1122,8 @@ function compareField(key, expected, actual) {
   if (key === "value" || key === "decoded") {
     return canonical(expected) === canonical(actual);
   }
-  // bounds: presence only (the surface produced a valid bounds struct).
-  if (key === "bounds") return true;
+  // bounds: structural equality of the resolved tightened overrides (no longer presence-only).
+  if (key === "bounds") return canonical(expected) === canonical(actual);
   // String fields: byte-wise; expected may be a raw string.
   if (typeof expected === "string" && typeof actual === "string") {
     return expected === actual;
@@ -1181,8 +1215,8 @@ function dispatchBase64UrlDecode(input) {
     // Fallback: derive the segment from input bytes (text/base64url/raw).
     segment = inputBytes(input, new Map(), "base64url.decode").toString("utf8");
   }
-  if (segment.length === 0) throw new Error("base64url.decode: empty segment");
-  if (!isCanonicalBase64Url(segment)) throw new Error("base64url.decode: non-canonical");
+  if (segment.length === 0) fail("base64url.decode: empty segment");
+  if (!isCanonicalBase64Url(segment)) fail("base64url.decode: non-canonical");
   return { decoded: Buffer.from(segment, "base64url").toString("utf8") };
 }
 
@@ -1268,8 +1302,10 @@ function dispatchJwkPublicKeyThumbprintRaw(input) {
 
 function dispatchBoundsNew(input) {
   const overrides = input.overrides ?? {};
-  if (!boundsNew(overrides, "bounds.new")) throw new Error("bounds.new: invalid overrides");
-  return { bounds: {} };
+  if (!boundsNew(overrides, "bounds.new")) fail("bounds.new: invalid overrides");
+  // Return the RESOLVED tightened overrides so a valid case carrying `expected.bounds` is checked
+  // field-by-field (not presence-only). A case with no `expected.bounds` still agrees on verdict.
+  return { bounds: overrides };
 }
 
 // --- untrusted_key_locator --------------------------------------------------
@@ -1287,9 +1323,9 @@ function dispatchUntrustedKeyLocator(input) {
 // --- signing-input producers -----------------------------------------------
 
 function buildOperation(op, context) {
-  if (!op || typeof op.name !== "string") throw new Error(`${context}: operation name`);
+  if (!op || typeof op.name !== "string") fail(`${context}: operation name`);
   const selectors = op.selectors;
-  if (!Array.isArray(selectors)) throw new Error(`${context}: selectors`);
+  if (!Array.isArray(selectors)) fail(`${context}: selectors`);
   return { name: op.name, selectors: selectors.map((s) => buildSelector(s, context)) };
 }
 
@@ -1305,7 +1341,7 @@ function buildSelector(selector, context) {
   if (selector && selector.kind === "one_of" && Array.isArray(selector.path) && Array.isArray(selector.values)) {
     return { kind: "one_of", path: selector.path, values: selector.values };
   }
-  throw new Error(`${context}: selector shape`);
+  fail(`${context}: selector shape`);
 }
 
 function dispatchGrantSigningInput(input) {
@@ -1318,7 +1354,7 @@ function dispatchGrantSigningInput(input) {
   const expiresAt = intField(input, "expires_at", "grant_signing_input");
   const holderThumbprint = b64Field(input, "holder_thumbprint", "grant_signing_input");
   const operations = input.operations;
-  if (!Array.isArray(operations) || operations.length === 0) throw new Error("grant_signing_input: operations");
+  if (!Array.isArray(operations) || operations.length === 0) fail("grant_signing_input: operations");
   const builtOps = operations.map((o) => buildOperation(o, "grant_signing_input"));
 
   const header = { alg: "EdDSA", kid: keyId, typ: "ba+cap" };
@@ -1353,7 +1389,7 @@ function dispatchProofSigningInput(input) {
   const operation = fetchBinary(input, "operation", "proof_signing_input");
   const grantCompact = fetchBinary(input, "grant_compact", "proof_signing_input");
   const castArguments = input.cast_arguments;
-  if (castArguments === undefined) throw new Error("proof_signing_input: cast_arguments");
+  if (castArguments === undefined) fail("proof_signing_input: cast_arguments");
 
   // The facade normalizes+validates htu as an https URI before signing.
   normalizeHttpsUri(Buffer.from(targetUri, "utf8"), "proof_signing_input htu");
@@ -1452,7 +1488,7 @@ function dispatchAssembleCompact(input) {
   const signature = b64Field(input, "signature", "assemble_compact");
   // Kind must be a known signing-input kind (else the facade rejects).
   if (!["grant", "proof", "boundary_anchor", "key_transition"].includes(kind)) {
-    throw new Error("assemble_compact: unknown kind");
+    fail("assemble_compact: unknown kind");
   }
   assert(signature.length === 64, "assemble_compact: signature width");
   const compact = `${protectedSegment}.${payloadSegment}.${signature.toString("base64url")}`;
@@ -1568,7 +1604,7 @@ function requestDigest(operation, castArguments) {
 
 function dispatchRequestDigest(input) {
   const operation = fetchBinary(input, "operation", "request_digest");
-  if (input.cast_arguments === undefined) throw new Error("request_digest: cast_arguments");
+  if (input.cast_arguments === undefined) fail("request_digest: cast_arguments");
   return { digest: requestDigest(operation, input.cast_arguments) };
 }
 
@@ -1756,7 +1792,7 @@ function dispatchCheckEnvelope(input) {
   assert(proofPayload.ath === ath, "check_envelope: ath");
   // ba_req must equal the request digest of (operation, cast_arguments).
   const operation = fetchBinary(expected, "operation", "check_envelope");
-  if (expected.cast_arguments === undefined) throw new Error("check_envelope: cast_arguments");
+  if (expected.cast_arguments === undefined) fail("check_envelope: cast_arguments");
   const baReq = requestDigest(operation, expected.cast_arguments);
   assert(proofPayload.ba_req === baReq, "check_envelope: ba_req");
   // Proof time window.
@@ -1820,7 +1856,7 @@ function dispatchVerifyAnchoredExport(input) {
   const chunks = byteList(input, "chunks", "verify_anchored_export");
   const version = fetchBinary(input, "version", "verify_anchored_export");
   const keys = input.keys;
-  if (!Array.isArray(keys)) throw new Error("verify_anchored_export: keys");
+  if (!Array.isArray(keys)) fail("verify_anchored_export: keys");
   const expected = input.expected ?? {};
 
   const archive = Buffer.concat(chunks);
@@ -2007,7 +2043,11 @@ function main() {
     let actual;
     try {
       actual = dispatch(caseObj.surface, caseObj.input ?? {}, raws);
-    } catch {
+    } catch (error) {
+      // ONLY a genuine protocol rejection maps to INVALID. A runner bug (TypeError/ReferenceError/
+      // an uncaught library throw) re-throws and aborts the run nonzero — it must never be laundered
+      // into agreement on an invalid-expected case.
+      if (!(error instanceof InvalidError)) throw error;
       actual = INVALID;
     }
     if (agree(caseObj.expected, actual)) {
@@ -2016,6 +2056,36 @@ function main() {
       disagreed += 1;
       disagreements.push(caseObj.id);
     }
+  }
+
+  // Verification-import assertion (two-boundary census, design C2 / finding 4b): every key a VALID
+  // verification-surface case declares must have been genuinely imported at node:crypto
+  // createPublicKey during the run. This defeats a discovery-only census that stays green even if
+  // the runner imports nothing. Producer-only keys (raw-thumbprint signing-input surfaces) never
+  // reach createPublicKey and are correctly absent from the expected set — no false red.
+  const VERIFICATION_SURFACES = new Set([
+    "verify_grant",
+    "verify_historical_anchor",
+    "verify_key_transition",
+    "check_envelope",
+    "verify_anchored_export",
+  ]);
+  const expectedVerificationFingerprints = new Set();
+  for (const { caseObj } of cases) {
+    if (caseObj.class === "valid" && VERIFICATION_SURFACES.has(caseObj.surface)) {
+      collectCaseKeys(caseObj.input ?? {}, expectedVerificationFingerprints);
+    }
+  }
+  assert(
+    expectedVerificationFingerprints.size > 0,
+    "verification-import: no valid verification-surface keys discovered (corpus lost its verify cases)",
+  );
+  for (const fp of expectedVerificationFingerprints) {
+    assert(
+      verificationImportedFingerprints.has(fp),
+      `verification-import: key ${fp} is declared by a valid verification case but was never imported ` +
+        `at node:crypto createPublicKey (the runner did not actually verify it)`,
+    );
   }
 
   // Census (Option D semantics: hard two-way equality once the index declares a
