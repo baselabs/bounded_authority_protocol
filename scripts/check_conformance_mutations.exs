@@ -52,18 +52,33 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       command: ["mix", "architecture"]
     },
     %{
-      # A reference to the Cli carve-out from a NON-conformance module (v1.ex) turns the gate red.
-      # The mechanism is the existing module-allowance discipline (not a named special rule): the
-      # planted `@conformance_cli Cli` references the bare `Cli` root, which is not in v1.ex's
-      # approved_source_modules nor the always-allowed list, so node_violations fires
-      # `forbidden module Cli` (:unapproved_runtime). The full `BoundedAuthorityProtocol.*` root
-      # is blanket-allowed, so the bare short alias is what makes the mutation bite. Proves the
-      # carve-out is unreachable from the protocol core.
+      # A BARE-ALIAS reference to the Cli carve-out from a NON-conformance module (v1.ex) turns the
+      # gate red via the existing module-allowance discipline: the planted `Cli.run([])` (behind a
+      # function-scoped alias) references the bare `Cli` root, which is not approved for v1.ex, so
+      # node_violations fires `forbidden module/call Cli` (:unapproved_runtime). Planted as a USED
+      # call in a function body (compiles clean, no unused-attribute warning), so the ARCHITECTURE
+      # GATE — not the compiler — is what reds (plan-review F6). Proves the carve-out is unreachable
+      # from the protocol core.
       name: "cli-reachability",
       path: "lib/bounded_authority_protocol/v1.ex",
-      from: "  alias BoundedAuthorityProtocol.V1.Base64Url",
+      from: "  def untrusted_key_locator(compact, limits) when is_binary(compact) do\n",
       to:
-        "  alias BoundedAuthorityProtocol.Conformance.Cli\n  @conformance_cli Cli\n  alias BoundedAuthorityProtocol.V1.Base64Url",
+        "  def untrusted_key_locator(compact, limits) when is_binary(compact) do\n    alias BoundedAuthorityProtocol.Conformance.Cli\n    Cli.run([])\n",
+      command: ["mix", "architecture"]
+    },
+    %{
+      # A FULLY-QUALIFIED reference to the Cli carve-out from v1.ex turns the gate red via the
+      # reverse-reachability extension added this slice. `BoundedAuthorityProtocol.Conformance.Cli`
+      # carries the `BoundedAuthorityProtocol` root, which the blanket passthrough would otherwise
+      # allow; conformance_cli_leak? closes it for the fully-qualified form from outside conformance/.
+      # Planted as a USED call so the GATE (not the compiler) is what reds. Guard-family sibling of
+      # the bare-alias entry (the same carve-out reachable two ways); both node_violations
+      # passthroughs — the alias case and the MFA/mfa_category case — are swept.
+      name: "cli-reachability-fq",
+      path: "lib/bounded_authority_protocol/v1.ex",
+      from: "  def untrusted_key_locator(compact, limits) when is_binary(compact) do\n",
+      to:
+        "  def untrusted_key_locator(compact, limits) when is_binary(compact) do\n    BoundedAuthorityProtocol.Conformance.Cli.run([])\n",
       command: ["mix", "architecture"]
     },
     # --- V1 corpus integrity: counts + hashes --------------------------------
