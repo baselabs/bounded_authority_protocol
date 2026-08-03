@@ -1674,6 +1674,42 @@ function taggedMember(owner, key, value) {
   return toTagged(value);
 }
 
+// --- selector matching ------------------------------------------------------
+// Mirrors the official Selector.match_all (lib/.../v1/selector.ex; protocol-v1 § Selector algebra):
+// selectors apply CONJUNCTIVELY; `all` matches any root; `equals`/`one_of` require the path to
+// exist, traversing OBJECTS ONLY (never index arrays) and comparing by SEMANTIC IDENTITY. Identity
+// is the JCS of the tagged form — the same tagged projection ba_req uses — so it mirrors the
+// official's tagged comparison exactly (int/float tags preserved, arrays positional, objects
+// unordered). No selector grants business authorization; this is a bounded structural match only.
+function traverseObjectPath(value, path) {
+  let current = value;
+  for (const segment of path) {
+    if (current === null || typeof current !== "object" || Array.isArray(current)) return undefined;
+    if (!Object.prototype.hasOwnProperty.call(current, segment)) return undefined;
+    current = current[segment];
+  }
+  return { found: current };
+}
+
+function taggedIdentity(value) {
+  return canonical(toTagged(value));
+}
+
+function selectorMatches(selector, args) {
+  if (selector && selector.kind === "all") return true;
+  if (selector && selector.kind === "equals" && Array.isArray(selector.path)) {
+    const hit = traverseObjectPath(args, selector.path);
+    return hit !== undefined && taggedIdentity(hit.found) === taggedIdentity(selector.value);
+  }
+  if (selector && selector.kind === "one_of" && Array.isArray(selector.path) && Array.isArray(selector.values)) {
+    const hit = traverseObjectPath(args, selector.path);
+    if (hit === undefined) return false;
+    const target = taggedIdentity(hit.found);
+    return selector.values.some((v) => taggedIdentity(v) === target);
+  }
+  fail("check_envelope: selector shape");
+}
+
 // --- request_digest ---------------------------------------------------------
 
 function requestDigest(operation, castArguments) {
@@ -1898,6 +1934,17 @@ function dispatchCheckEnvelope(input) {
   }
   // Holder thumbprint must match the grant cnf.jkt.
   assert(grantPayload.cnf && grantPayload.cnf.jkt === jwkThumbprint(holderJwk), "check_envelope: holder thumbprint");
+  // Selector binding: the grant operation named ba_op must exist UNIQUELY, and EVERY selector it
+  // carries must match the server-derived cast_arguments (runtime.ex:497-498). Without this the
+  // independent verifier would ignore grant selectors — the exact gap the check_envelope selector
+  // fixtures exercise, so a corpus with a non-trivial selector would else silently disagree.
+  const grantOperations = grantPayload.operations;
+  assert(Array.isArray(grantOperations), "check_envelope: operations");
+  const namedOps = grantOperations.filter((o) => o && o.name === operation);
+  assert(namedOps.length === 1, "check_envelope: unique operation");
+  const opSelectors = namedOps[0].selectors;
+  assert(Array.isArray(opSelectors) && opSelectors.length >= 1, "check_envelope: selectors");
+  assert(opSelectors.every((s) => selectorMatches(s, expected.cast_arguments)), "check_envelope: selector");
   return {};
 }
 

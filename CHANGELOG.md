@@ -88,7 +88,13 @@ All notable changes to `bounded_authority_protocol` are documented here.
   depends on BAP-04 only) and BAP-09 (thin TypeScript and Python verifier SDKs consuming only
   the published spec and vectors; depends on BAP-05). Each row's own ADR lands when its work
   starts; neither changes any wire format, limit, or verification rule.
-- Add the portable v1 conformance corpus (212 cases across 28 surfaces with a total
+- Close the check_envelope selector-binding gap: add a non-trivial (`equals`) selector valid case
+  plus an `invalid_selector` case, teach the independent Node verifier to evaluate grant selectors,
+  and add a `selector-reject` mutation — so a verifier that ignores grant selectors now fails the
+  corpus. Uses two new deterministic conformance keypairs (census 6→8); a companion
+  `proof_signing_input` valid case carries the new holder key as a labeled field so the
+  cross-verifier census discovery scan finds it (corpus 212→215).
+- Add the portable v1 conformance corpus (215 cases across 28 surfaces with a total
   surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
   `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
 - Harden the corpus against vacuous green: author the invalid vectors the crypto verifying

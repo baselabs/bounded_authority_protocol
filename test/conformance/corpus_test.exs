@@ -1260,8 +1260,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   test "the shipped corpus total_cases is pinned at the expanded count" do
     map = shipped_corpus_map()
     {:ok, corpus} = Corpus.load(map)
-    assert corpus.index["total_cases"] == 212
-    assert MapSet.size(corpus.case_ids) == 212
+    assert corpus.index["total_cases"] == 215
+    assert MapSet.size(corpus.case_ids) == 215
   end
 
   test "the crypto verifying surfaces carry the mandated invalid classes (vacuity closed)" do
@@ -1314,12 +1314,10 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
              "check_envelope/#{class} must be populated"
     end
 
-    # invalid_selector STAYS n_a — an escalation candidate (unreachable by unsigned mutation) with a
-    # falsifiable reason, NOT a vacuous label.
-    assert match?(
-             %{"n_a" => reason} when is_binary(reason),
-             app["check_envelope"]["invalid_selector"]
-           )
+    # invalid_selector is now POPULATED (BAP-05 selector remediation): the former escalation
+    # candidate was closed by re-signing a non-trivial-selector grant + a selector-rejecting proof,
+    # so the cell carries a real count, not an n_a label.
+    assert required?.("check_envelope", "invalid_selector")
   end
 
   test "every n_a applicability leaf carries a falsifiable reason (Q29 obligation)" do
