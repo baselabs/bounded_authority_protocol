@@ -93,8 +93,20 @@ All notable changes to `bounded_authority_protocol` are documented here.
   and add a `selector-reject` mutation — so a verifier that ignores grant selectors now fails the
   corpus. Uses two new deterministic conformance keypairs (census 6→8); a companion
   `proof_signing_input` valid case carries the new holder key as a labeled field so the
-  cross-verifier census discovery scan finds it (corpus 212→215).
-- Add the portable v1 conformance corpus (215 cases across 28 surfaces with a total
+  cross-verifier census discovery scan finds it.
+- Close the check_envelope authority-binding gap the same re-signing capability exposed: the
+  holder (`cnf.jkt`), grant (`ath`), and request-argument (`ba_req`) bindings had no corpus case
+  isolating them, so a verifier omitting any one of them still scored a perfect corpus run —
+  omitting the holder binding accepts any holder's proof against any grant. Add three
+  `invalid_claim` cases (each a one-defect variant of a shared valid base, with the named binding
+  as the sole rejecter) and three matching mutation-battery entries. The `ba_op` binding needs no
+  separate case: the request digest is taken over `[operation, cast_arguments]`, so `ba_req`
+  subsumes it (corpus 212→218).
+- Add `.gitleaks.toml`: the `jwt` and `generic-api-key` rules are allowlisted for the conformance
+  corpus and vector paths only, where every fixture is JWT-shaped high-entropy public test
+  material. All other default rules still apply there, so a real credential committed under those
+  paths is still caught.
+- Add the portable v1 conformance corpus (218 cases across 28 surfaces with a total
   surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
   `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
 - Harden the corpus against vacuous green: author the invalid vectors the crypto verifying
@@ -112,11 +124,11 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Add the independent Node second-implementation runner
   (`conformance/corpus_independent.mjs`, node:* only) that recomputes every corpus verdict from
   scratch — making the corpus normative. Evolve the public-key census to three partitions
-  (bap03 + chain_archive + corpus = 17 = canonical set); the corpus self-census is hard two-way.
+  (bap03 + chain_archive + corpus = the canonical set); the corpus self-census is hard two-way.
 - Add stream_data property gates (JCS determinism/idempotence, base64url round-trip/pad rejection,
   URI normalization idempotence, facade closure totality) and a deterministic-PRNG fuzz gate.
-- Add the source-isolated conformance mutation battery (10 entries proving the corpus integrity,
-  CLI carve-out, and runner-verdict gates actually catch their named failures); wire both mutation
+- Add the source-isolated conformance mutation battery (proving the corpus integrity, CLI
+  carve-out, and runner-verdict gates actually catch their named failures); wire both mutation
   batteries into `mix quality`. CI pins Node 20 for the quality job.
 - Close BAP-05 with ADR 0005 (corpus formats, sidecar rule, published-artifacts definition,
   applicability matrix + n_a criterion, census evolution, CLI contract, carve-out shape,

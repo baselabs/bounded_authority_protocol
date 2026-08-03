@@ -1260,8 +1260,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   test "the shipped corpus total_cases is pinned at the expanded count" do
     map = shipped_corpus_map()
     {:ok, corpus} = Corpus.load(map)
-    assert corpus.index["total_cases"] == 215
-    assert MapSet.size(corpus.case_ids) == 215
+    assert corpus.index["total_cases"] == 218
+    assert MapSet.size(corpus.case_ids) == 218
   end
 
   test "the crypto verifying surfaces carry the mandated invalid classes (vacuity closed)" do
@@ -1318,6 +1318,13 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     # candidate was closed by re-signing a non-trivial-selector grant + a selector-rejecting proof,
     # so the cell carries a real count, not an n_a label.
     assert required?.("check_envelope", "invalid_selector")
+
+    # invalid_claim is now POPULATED (BAP-05 selector closeout). Its n_a reason had ended in
+    # "re-signing, out of scope" — the same constraint the selector remediation lifted — while the
+    # holder (cnf.jkt), grant (ath), and request-argument (ba_req) bindings it covers had no case
+    # isolating them: neutralizing any one of the three left the whole corpus green. The cell now
+    # carries three one-defect cases, one per binding, each proven red by its own mutation entry.
+    assert required?.("check_envelope", "invalid_claim")
   end
 
   test "every n_a applicability leaf carries a falsifiable reason (Q29 obligation)" do
