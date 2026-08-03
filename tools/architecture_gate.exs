@@ -333,14 +333,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "lib/bounded_authority_protocol/v1/key_transition_codec.ex"
   ]
 
-  # The CLI I/O carve-out: the ONLY lib paths permitted File/IO/Path/System. The allowance is
-  # exact per path + per function (C1 purity boundary). cli.ex does File.read/File.ls/File.write/
-  # File.dir?/IO.binwrite/Path; cli/main.ex does System.halt + delegates to Cli.
-  @cli_source_paths [
-    "lib/bounded_authority_protocol/conformance/cli.ex",
-    "lib/bounded_authority_protocol/conformance/cli/main.ex"
-  ]
-
   @erlang_module_categories %{
     diameter: :network,
     diameter_config: :network,
@@ -528,6 +520,13 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   # System.halt (untestable in-VM). A second entry or a missing entry is a violation: a second
   # entry hides untested code, a missing entry fails the coverage threshold.
   @cli_main_module "BoundedAuthorityProtocol.Conformance.Cli.Main"
+
+  # The CLI I/O carve-out module. A fully-qualified reference to it (or a submodule) from OUTSIDE
+  # the conformance directory leaks the impure CLI into the pure core; the bare-alias form is
+  # already caught by the module-allowance discipline, but the fully-qualified form otherwise passes
+  # through the blanket `root == "BoundedAuthorityProtocol"` allow. Only Cli.Main (the escript entry,
+  # itself inside conformance/) and in-conformance/ references are exempt.
+  @conformance_dir "lib/bounded_authority_protocol/conformance/"
 
   defp ignore_modules_violations(ast) do
     case ignore_modules_from_ast(ast) do
@@ -831,6 +830,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
     category =
       cond do
+        conformance_cli_leak?(name, path) -> :unapproved_runtime
         root == "BoundedAuthorityProtocol" -> nil
         root == :dynamic -> :dynamic_module
         root in @approved_local_aliases -> nil
@@ -896,12 +896,21 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
        when is_atom(function) do
     module = module_name(module_ast)
 
-    if approved_source_call?(path, module, function) do
-      []
-    else
-      module
-      |> mfa_category(function)
-      |> category_violation(path, "forbidden call #{format_call(module_ast, function)}")
+    cond do
+      approved_source_call?(path, module, function) ->
+        []
+
+      conformance_cli_leak?(module, path) ->
+        category_violation(
+          :unapproved_runtime,
+          path,
+          "forbidden call #{format_call(module_ast, function)}"
+        )
+
+      true ->
+        module
+        |> mfa_category(function)
+        |> category_violation(path, "forbidden call #{format_call(module_ast, function)}")
     end
   end
 
@@ -983,6 +992,23 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       segment when is_atom(segment) -> Atom.to_string(segment)
       segment -> Macro.to_string(segment)
     end)
+  end
+
+  # A fully-qualified BoundedAuthorityProtocol.Conformance.Cli(.Sub) reference from OUTSIDE the
+  # conformance directory. Cli.Main (the escript entry) and any reference from within conformance/
+  # are exempt. The bare-alias form is caught separately by the module-allowance discipline; this
+  # closes the fully-qualified form that would otherwise pass the blanket BoundedAuthorityProtocol.*
+  # allow.
+  defp conformance_cli_leak?(module, path) when is_binary(module) do
+    cli_carveout_module?(module) and not String.starts_with?(path, @conformance_dir)
+  end
+
+  defp conformance_cli_leak?(_module, _path), do: false
+
+  defp cli_carveout_module?(module) do
+    module != @cli_main_module and
+      (module == "BoundedAuthorityProtocol.Conformance.Cli" or
+         String.starts_with?(module, "BoundedAuthorityProtocol.Conformance.Cli."))
   end
 
   defp alias_binding_name(target, options) when is_list(options) do
@@ -1633,9 +1659,29 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   end
 
   defp compiled_import_category(module, function, path) do
-    if approved_compiled_import?(Path.basename(path), module, function),
-      do: nil,
-      else: compiled_mfa_category(module, function)
+    module_string = module |> Atom.to_string() |> String.replace_prefix("Elixir.", "")
+
+    cond do
+      # Symmetric with the source-AST conformance_cli_leak? check (parallel construction paths must
+      # enforce the same invariant): a compiled import of the Cli carve-out from a NON-conformance
+      # beam leaks the CLI into the pure core. Catches a macro/codegen-emitted reference the source
+      # scan cannot see. Cli.Main and in-conformance beams are exempt (as in the source path).
+      cli_carveout_module?(module_string) and not conformance_beam?(path) ->
+        :unapproved_runtime
+
+      approved_compiled_import?(Path.basename(path), module, function) ->
+        nil
+
+      true ->
+        compiled_mfa_category(module, function)
+    end
+  end
+
+  defp conformance_beam?(path) do
+    String.starts_with?(
+      Path.basename(path),
+      "Elixir.BoundedAuthorityProtocol.Conformance."
+    )
   end
 
   defp approved_compiled_import?(beam, module, function) do
