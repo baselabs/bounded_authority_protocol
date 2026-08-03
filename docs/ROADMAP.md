@@ -167,11 +167,11 @@ compatibility.
 
 ## Next action
 
-BAP-04 and BAP-05 are complete. BAP-05 shipped the portable v1 conformance corpus (215 cases
+BAP-04 and BAP-05 are complete. BAP-05 shipped the portable v1 conformance corpus (218 cases
 across 28 surfaces, total applicability matrix), the deterministic verifier CLI (escript,
 `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent Node
 second-implementation runner (node:* only — the corpus is normative), a three-partition
 public-key census (hard two-way), stream_data property + deterministic-PRNG fuzz gates, and a
-10-entry source-isolated mutation battery wired into `mix quality` (ADR 0005). The corpus ships
+source-isolated mutation battery wired into `mix quality` (ADR 0005). The corpus ships
 in the published package and the fresh-consumer check runs the packaged escript against the
 packaged corpus. BAP-06 (release-candidate contract) is next.

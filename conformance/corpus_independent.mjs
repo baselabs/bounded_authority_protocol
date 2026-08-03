@@ -1677,10 +1677,29 @@ function taggedMember(owner, key, value) {
 // --- selector matching ------------------------------------------------------
 // Mirrors the official Selector.match_all (lib/.../v1/selector.ex; protocol-v1 § Selector algebra):
 // selectors apply CONJUNCTIVELY; `all` matches any root; `equals`/`one_of` require the path to
-// exist, traversing OBJECTS ONLY (never index arrays) and comparing by SEMANTIC IDENTITY. Identity
-// is the JCS of the tagged form — the same tagged projection ba_req uses — so it mirrors the
-// official's tagged comparison exactly (int/float tags preserved, arrays positional, objects
-// unordered). No selector grants business authorization; this is a bounded structural match only.
+// exist, traversing OBJECTS ONLY (never index arrays) and comparing by SEMANTIC IDENTITY. Shape
+// and width are enforced first (closed member set, non-empty bounded path of bounded string
+// segments, bounded one_of values) so a malformed selector REJECTS here exactly as the official
+// grant decoder and `valid_path?` reject it — an independent verifier that were more permissive
+// than the official would certify a grant the official refuses.
+//
+// Identity is the JCS of the tagged form — the same tagged projection ba_req uses (arrays
+// positional, objects unordered). One tag distinction the official draws is NOT recoverable here:
+// the official carries {:integer, 10} and {:float, 10.0} separately, while JSON.parse collapses
+// `10` and `10.0` to the same JS number, so this runner tags by Number.isInteger. Selector values
+// in the corpus are therefore strings (design note D1); an integral-float selector value would
+// disagree with the official and must not be authored without closing this gap first.
+// No selector grants business authorization; this is a bounded structural match only.
+function validSelectorPath(path) {
+  if (!Array.isArray(path) || path.length < 1 || path.length > MAXIMA.path_segments) return false;
+  return path.every(
+    (segment) =>
+      typeof segment === "string" &&
+      Buffer.byteLength(segment, "utf8") >= 1 &&
+      Buffer.byteLength(segment, "utf8") <= MAXIMA.key_bytes,
+  );
+}
+
 function traverseObjectPath(value, path) {
   let current = value;
   for (const segment of path) {
@@ -1696,16 +1715,26 @@ function taggedIdentity(value) {
 }
 
 function selectorMatches(selector, args) {
-  if (selector && selector.kind === "all") return true;
-  if (selector && selector.kind === "equals" && Array.isArray(selector.path)) {
+  if (!selector || typeof selector !== "object" || Array.isArray(selector)) {
+    fail("check_envelope: selector shape");
+  }
+  const members = Object.keys(selector).sort().join(",");
+  if (selector.kind === "all" && members === "kind") return true;
+  if (selector.kind === "equals" && members === "kind,path,value") {
+    if (!validSelectorPath(selector.path)) fail("check_envelope: selector path");
     const hit = traverseObjectPath(args, selector.path);
     return hit !== undefined && taggedIdentity(hit.found) === taggedIdentity(selector.value);
   }
-  if (selector && selector.kind === "one_of" && Array.isArray(selector.path) && Array.isArray(selector.values)) {
+  if (selector.kind === "one_of" && members === "kind,path,values") {
+    if (!validSelectorPath(selector.path)) fail("check_envelope: selector path");
+    const values = selector.values;
+    if (!Array.isArray(values) || values.length < 1 || values.length > MAXIMA.one_of_values) {
+      fail("check_envelope: selector values");
+    }
     const hit = traverseObjectPath(args, selector.path);
     if (hit === undefined) return false;
     const target = taggedIdentity(hit.found);
-    return selector.values.some((v) => taggedIdentity(v) === target);
+    return values.some((v) => taggedIdentity(v) === target);
   }
   fail("check_envelope: selector shape");
 }
@@ -1943,7 +1972,12 @@ function dispatchCheckEnvelope(input) {
   const namedOps = grantOperations.filter((o) => o && o.name === operation);
   assert(namedOps.length === 1, "check_envelope: unique operation");
   const opSelectors = namedOps[0].selectors;
-  assert(Array.isArray(opSelectors) && opSelectors.length >= 1, "check_envelope: selectors");
+  assert(
+    Array.isArray(opSelectors) &&
+      opSelectors.length >= 1 &&
+      opSelectors.length <= MAXIMA.selectors,
+    "check_envelope: selectors",
+  );
   assert(opSelectors.every((s) => selectorMatches(s, expected.cast_arguments)), "check_envelope: selector");
   return {};
 }
