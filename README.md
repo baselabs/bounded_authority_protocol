@@ -105,7 +105,7 @@ See the [normative v1 profile](docs/protocol-v1.md),
 ## Conformance
 
 The package ships a language-neutral v1 conformance corpus and a deterministic offline verifier
-CLI. The corpus (`priv/conformance/v1/corpus`) is the normative evidence: 180 cases across 28
+CLI. The corpus (`priv/conformance/v1/corpus`) is the normative evidence: 212 cases across 28
 surfaces with a total surface × class applicability matrix, re-derived from the official
 implementation and independently re-verified by a second Node implementation
 (`conformance/corpus_independent.mjs`) that recomputes every verdict from scratch. A value that

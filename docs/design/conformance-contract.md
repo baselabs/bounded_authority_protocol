@@ -45,7 +45,7 @@ nonzero.
 
 BAP-03's focused vectors and independent verifier are public repository acceptance evidence. The
 Hex package ships the protocol schemas, Elixir runtime, and the portable v1 conformance corpus
-(180 cases across 28 surfaces with a total surface × class applicability matrix, `.raw` sidecars
+(212 cases across 28 surfaces with a total surface × class applicability matrix, `.raw` sidecars
 for oversize wire inputs). BAP-05's corpus is normative: a second Node implementation
 (`conformance/corpus_independent.mjs`, node:* only) independently recomputes every corpus verdict
 from scratch and agrees. The corpus index declares its full public-key set
@@ -56,8 +56,13 @@ index list. The deterministic verifier CLI (escript `bounded_authority_conforman
 `--corpus DIR` required, exits 0/1/2) runs the pure core against any corpus directory; the report
 is deterministic JCS bytes binding the index SHA-256. The `n_a` applicability criterion is
 falsifiable: a cell is not-applicable only when the input algebra cannot express that class for
-that surface; required cells must be ≥1, `n_a` cells must be 0, both directions enforced.
-BAP-06 owns immutable candidate-archive proof.
+that surface; required cells must be ≥1, `n_a` cells must be 0, both directions enforced. Every
+invalid vector on the cryptographic verifying surfaces (algorithm-confusion, meaningful-byte
+tamper, key/claim/time/request/nonce binding, archive and chain integrity) is a one-defect
+skip-would-accept construction — it differs from a passing valid case in exactly the dimension its
+class names, so a verifier that skips that check would accept it — confirmed rejected by BOTH
+implementations before it is normative (a wrong invalid vector silently certifies nonconforming
+verifiers, so it is worse than a missing one). BAP-06 owns immutable candidate-archive proof.
 
 BAP-04's public-only chain/archive corpus includes genesis, continuation, same-key boundaries,
 one-step rollover, multi-step rollover, same-ID/equal-time rollover, and separately valid

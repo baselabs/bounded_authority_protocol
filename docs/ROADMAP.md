@@ -167,7 +167,7 @@ compatibility.
 
 ## Next action
 
-BAP-04 and BAP-05 are complete. BAP-05 shipped the portable v1 conformance corpus (180 cases
+BAP-04 and BAP-05 are complete. BAP-05 shipped the portable v1 conformance corpus (212 cases
 across 28 surfaces, total applicability matrix), the deterministic verifier CLI (escript,
 `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent Node
 second-implementation runner (node:* only — the corpus is normative), a three-partition

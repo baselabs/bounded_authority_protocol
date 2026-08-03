@@ -70,17 +70,51 @@ claim that review can falsify; the "author fixes the matrix too" variant of V2 i
 falsifiable-reason obligation, not trust. The shape, the reasons, and the loader's acceptance of
 the object form are all pinned in ExUnit.
 
+### Skip-would-accept construction discipline (BAP-05 hardening, C7)
+
+The profile is deliberately VALUE-FREE: every implementation returns exactly `{:error, :invalid}`
+with no reason, so no runner can observe *why* a case rejected, and the `class` label is author
+metadata a gate cannot machine-verify against the reason. Per-class assurance for the invalid
+vectors therefore rests on CONSTRUCTION, stated as a hard authoring invariant: **each invalid
+vector differs from a passing valid case in EXACTLY the one dimension its class names, constructed
+so that an implementation which SKIPS the check the class names would ACCEPT it.** Only then does
+"rejected" ⟺ "the named check ran". Enforcement is threefold and honest about its limit: (i)
+one-defect construction, reviewable per case; (ii) the valid base is a corpus case that is
+ACCEPTED; (iii) the vector is REJECTED by both the official facade and the independent Node runner.
+What cannot be mechanically enforced (value-free errors) is a construction discipline, not an
+observed reason.
+
+Load-bearing corollaries. `invalid_algorithm` is `alg:"none"` + an empty signature + an unchanged
+payload (an alg:none-honoring JWS verifier skips signature verification and accepts; a correct
+verifier rejects at the fixed-header pin) — NOT a naive `alg` swap (rejected by signature mismatch
+regardless of alg-checking) nor `alg:"HS256"` + a 32-byte HMAC signature (rejected by the fixed
+64-byte Ed25519 signature-width guard, not the alg check). A class that cannot be constructed to
+satisfy skip-would-accept by mutating an existing valid case — i.e. it needs a validly-wrong
+signature — is an ESCALATION candidate kept `n_a` with a falsifiable reason, never a
+silently-weaker vector. The standing escalation candidate is `check_envelope/invalid_selector`: the
+binding short-circuits at `operation` then `ba_req` (which signs `[operation, cast_arguments]`)
+before the selector match, so no unsigned mutation reaches the selector check for the right reason.
+
+The tamper verbatim-vs-derived audit binds a single-byte flip to a named `tamper.target`
+(`compact` / `grant` / `proof` / `rows[i]` / `chunks[i]`), so a meaningful-byte tamper can address
+the signature / key / commitment / row / anchor bytes of the cryptographic surfaces; both the
+official loader and the independent Node runner re-derive base-with-one-flip and require byte
+equality, so a tamper case that labels a flip it did not perform is rejected at load.
+
 ### bounds.new constant-pinning (Q31) + two-key exception
 
 The `bounds.new` surface pins every immutable profile maximum as portable data. For every key of
 the maxima table (`lib/bounded_authority_protocol/v1/bounds.ex:91-130`), the corpus carries a
 tighten-to-exact-maximum case (`class: exact_bound`, verdict `valid`) and, except for the
-two-key exception below, a tighten-to-maximum-plus-one case (`class: maximum_plus_one`, verdict
+exclusions below, a tighten-to-maximum-plus-one case (`class: maximum_plus_one`, verdict
 `invalid` — widening violates the tightening-only contract). The fixed-width keys
-(`public_key_bytes`, `signature_bytes`, `digest_bytes`) additionally carry change-rejection
-cases (`class: invalid_limit`) exercising both below- and above-max values. A second
-implementation with any mistyped maximum constant fails these cases; no oversized artifact is
-needed to pin any constant.
+(`public_key_bytes`, `signature_bytes`, `digest_bytes`) instead carry change-rejection cases
+(`class: invalid_limit`) exercising both below- and above-max values: a fixed-width key cannot be
+tightened OR widened, so its max+1 value is a fixed-width CHANGE (`invalid_limit`), not a
+tightening-contract violation (`maximum_plus_one`). They therefore carry NO `maximum_plus_one`
+case — the `-above` `invalid_limit` case is the max+1 pin — and the `maximum_plus_one` totality
+pin excludes them alongside the magnitude keys. A second implementation with any mistyped maximum
+constant fails these cases; no oversized artifact is needed to pin any constant.
 
 **Two-key exception (mechanically forced).** `integer_magnitude` and `float_magnitude` ship the
 tighten-to-exact-maximum `valid` pin only — they cannot carry the tighten-to-maximum-plus-one
@@ -123,6 +157,15 @@ must equal the index's declared set exactly, both directions, always — no soft
 green is the V4 hole this design exists to kill). The vector manifest grows to three partitions
 (bap03 + chain_archive + corpus); the three-partition union equals the canonical set (17 keys),
 and the corpus partition equals the index list.
+
+The census is TWO-BOUNDARY (BAP-05 hardening): the discovery census above is the
+partition-membership set (every key the fixtures carry); a SECOND assertion proves the runner
+genuinely imported the verification keys — the set of keys fed to `createPublicKey` on a
+verification surface (verify_grant / check_envelope / verify_historical_anchor /
+verify_key_transition / verify_anchored_export + chain checks) must equal the verification keys the
+corpus declares for those surfaces. Producer-only keys (raw-thumbprint signing-input surfaces that
+never import a key) are exempt. This closes the hole a discovery-only census leaves open — it stays
+green even if the runner never actually imports anything.
 
 ### CLI contract
 
