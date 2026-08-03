@@ -144,8 +144,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=212 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=212. Mutated in the isolated copy only.
+      # corpus yields agreed=215 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=215. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -318,6 +318,23 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       to:
         "        assert(Buffer.byteLength(parsed, \"utf8\") <= 8193, \"json string byte bound\");",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    # --- check_envelope selector binding (BAP-05 selector remediation) --------
+    %{
+      # Neutralizing the check_envelope selector match (runtime.ex:498) makes the OFFICIAL verifier
+      # ACCEPT check-envelope-invalid-selector (its grant carries an `equals ["record","id"] "rec-1"`
+      # selector that the case's rec-2 cast_arguments fail). The Node runner still rejects it, so the
+      # shipped-corpus CLI reports a disagreement and Cli.run returns nonzero -> cli_test:36 (exit 0
+      # on the shipped corpus) goes red. `_ = operation.selectors` keeps `operation` referenced so the
+      # mutated source still compiles under --warnings-as-errors. FAMILY: this is the SOLE selector
+      # enforcement point on the check_envelope path (`grep Selector.match_all lib/` -> one hit).
+      name: "check-envelope-selector-reject-removal",
+      path: "lib/bounded_authority_protocol/v1/runtime.ex",
+      from:
+        "         :ok <- Selector.match_all(operation.selectors, expected.cast_arguments, bounds),\n",
+      to:
+        "         :ok <-\n           (if is_nil(operation.selectors),\n              do: Selector.match_all(operation.selectors, expected.cast_arguments, bounds),\n              else: :ok),\n",
+      command: ["mix", "test", "test/conformance/cli_test.exs:36"]
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----
     %{

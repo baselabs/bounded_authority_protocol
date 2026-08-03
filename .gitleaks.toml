@@ -1,0 +1,20 @@
+# gitleaks config — extends the default ruleset.
+#
+# The v1 conformance corpus and vectors ship PUBLIC deterministic test material:
+# compact JWS grant/proof/anchor tokens signed by throwaway keypairs whose public
+# fingerprints the corpus census declares (index.json public_key_fingerprints).
+# They are JWT-shaped by design and carry no private material — the corpus loader
+# enforces provenance.private_material_tracked=false, and the cross-verifier census
+# scan mechanically rejects private-key patterns (bap03_independent.mjs
+# assertNoPrivateMaterial / discoverTextKeys). Allowlisting these paths silences
+# the JWT-rule false positive without weakening the scan anywhere else.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "public conformance fixtures: deterministic test vectors, no private material"
+paths = [
+  '''priv/conformance/v1/corpus/.*''',
+  '''priv/conformance/v1/vectors/.*''',
+]
