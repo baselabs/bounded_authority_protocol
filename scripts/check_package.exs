@@ -22,6 +22,8 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/design/threat-model.md",
                     "hex_metadata.config",
                     "lib/bounded_authority_protocol.ex",
+                    "lib/bounded_authority_protocol/conformance/cli.ex",
+                    "lib/bounded_authority_protocol/conformance/cli/main.ex",
                     "lib/bounded_authority_protocol/conformance/corpus.ex",
                     "lib/bounded_authority_protocol/conformance/report.ex",
                     "lib/bounded_authority_protocol/conformance/runner.ex",
