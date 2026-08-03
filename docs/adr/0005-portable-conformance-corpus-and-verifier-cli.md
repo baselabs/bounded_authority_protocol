@@ -95,6 +95,16 @@ silently-weaker vector. The standing escalation candidate is `check_envelope/inv
 binding short-circuits at `operation` then `ba_req` (which signs `[operation, cast_arguments]`)
 before the selector match, so no unsigned mutation reaches the selector check for the right reason.
 
+**Known residual — selector binding is unexercised (escalation, re-signing-blocked).** The single
+valid `check_envelope` case carries an `all` selector (matches any root), so the POSITIVE selector
+path is vacuous even when a verifier evaluates it correctly, and there is no `invalid_selector`
+case (kept `n_a` above). Consequence: a verifier that ignores grant selectors entirely still passes
+the whole corpus. Both are constraint-forced by the no-re-signing rule — a non-trivial-selector
+valid case and a selector-rejecting invalid case each need a re-signed grant. This residual is
+recorded here (like the `[:::]` divergence) rather than left implied; closing it is an escalation
+candidate: it requires a re-signed non-trivial-selector fixture, owned by a separate task, not by a
+mutation of the existing valid case.
+
 The tamper verbatim-vs-derived audit binds a single-byte flip to a named `tamper.target`
 (`compact` / `grant` / `proof` / `rows[i]` / `chunks[i]`), so a meaningful-byte tamper can address
 the signature / key / commitment / row / anchor bytes of the cryptographic surfaces; both the
