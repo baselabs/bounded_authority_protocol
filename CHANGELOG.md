@@ -88,9 +88,18 @@ All notable changes to `bounded_authority_protocol` are documented here.
   depends on BAP-04 only) and BAP-09 (thin TypeScript and Python verifier SDKs consuming only
   the published spec and vectors; depends on BAP-05). Each row's own ADR lands when its work
   starts; neither changes any wire format, limit, or verification rule.
-- Add the portable v1 conformance corpus (180 cases across 28 surfaces with a total
+- Add the portable v1 conformance corpus (212 cases across 28 surfaces with a total
   surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
   `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
+- Harden the corpus against vacuous green: author the invalid vectors the crypto verifying
+  surfaces were missing — algorithm-confusion (`alg:"none"`), meaningful-byte signature/commitment/
+  anchor tampers (via a target-addressed tamper loader that binds a single-byte flip to the
+  compact / grant / proof / row / chunk bytes), and archive/chain/envelope binding failures — plus
+  exact-bound and maximum-plus-one pairs for every `json.decode` structural limit. Each new invalid
+  vector is a one-defect construction confirmed rejected by BOTH the official facade and the
+  independent Node runner; every remaining not-applicable applicability cell carries a falsifiable
+  inexpressibility reason. The independent Node runner gained the request-binding (method / URI /
+  invocation / operation / nonce) and object-name-byte checks the new vectors surfaced.
 - Add the deterministic offline verifier CLI (escript `bounded_authority_conformance`,
   `--corpus DIR` required, exits 0/1/2) with an exact-path purity carve-out (File/IO in `cli.ex`,
   `System.halt` in `cli/main.ex` only) enforced by the architecture gate.
