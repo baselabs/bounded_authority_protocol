@@ -13,13 +13,20 @@ defmodule BoundedAuthorityProtocol.MixProject do
       package: package(),
       docs: docs(),
       aliases: aliases(),
+      escript: [
+        main_module: BoundedAuthorityProtocol.Conformance.Cli.Main,
+        name: "bounded_authority_conformance"
+      ],
       name: "Bounded Authority Protocol",
       description:
         "Deterministic protocol verification for cryptographically bounded " <>
           "proof-of-possession authority.",
       source_url: @source_url,
       homepage_url: @source_url,
-      test_coverage: [summary: [threshold: 100]],
+      test_coverage: [
+        summary: [threshold: 100],
+        ignore_modules: [BoundedAuthorityProtocol.Conformance.Cli.Main]
+      ],
       dialyzer: [
         plt_core_path: "_build/plts",
         plt_local_path: "_build/plts"
@@ -34,6 +41,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         audit: :test,
         "bap03.performance": :test,
         "bap04.performance": :test,
+        "conformance.verify": :test,
         "license.check": :test,
         "package.check": :test,
         quality: :test,
@@ -133,6 +141,10 @@ defmodule BoundedAuthorityProtocol.MixProject do
       ],
       "bap04.performance": [
         "run --no-start scripts/check_chain_archive_performance.exs"
+      ],
+      "conformance.verify": [
+        "escript.build",
+        "cmd ./bounded_authority_conformance --corpus priv/conformance/v1/corpus"
       ],
       "license.check": [
         "cmd elixir scripts/check_dependency_licenses.exs artifacts/tooling.cdx.json"
