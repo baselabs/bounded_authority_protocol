@@ -325,6 +325,10 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     case declared_leaf do
       n when is_integer(n) and n >= 1 -> observed_count == n
       "n_a" -> observed_count == 0
+      # An applicability leaf may carry a falsifiable reason: {"n_a": "<reason>"}. The reason
+      # is for human review (Q29 obligation), not machine logic — treated identically to the
+      # bare "n_a" string (not-applicable: zero executed cases).
+      %{"n_a" => _reason} -> observed_count == 0
       _ -> false
     end
   end
