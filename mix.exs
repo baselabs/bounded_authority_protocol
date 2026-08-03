@@ -184,7 +184,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "audit",
         "package.check",
         "chain_archive.mutations",
-        "conformance.mutations"
+        "conformance.mutations",
+        "conformance.verify"
       ]
     ]
   end
