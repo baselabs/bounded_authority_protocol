@@ -101,20 +101,32 @@ signature check. This double-protection is inherent — a validly-signed `alg:"n
 exist (the algorithm has no signature to be valid under) — and is disclosed here rather than left
 implied. A class that cannot be constructed to satisfy skip-would-accept by mutating an existing
 valid case — i.e. it needs a validly-wrong signature — is an ESCALATION candidate kept `n_a` with a
-falsifiable reason, never a silently-weaker vector. The standing escalation candidate is
-`check_envelope/invalid_selector`: the binding short-circuits at `operation` then `ba_req` (which
-signs `[operation, cast_arguments]`) before the selector match, so no unsigned mutation reaches the
-selector check for the right reason.
+falsifiable reason, never a silently-weaker vector. The former standing example of this class,
+`check_envelope/invalid_selector`, is now CLOSED (see "Selector binding — closed" below): its
+binding short-circuits at `operation` then `ba_req` (which signs `[operation, cast_arguments]`)
+before the selector match, so no UNSIGNED mutation of the existing valid case reaches the selector
+check for the right reason — closing it required re-signing, which the BAP-05 selector remediation
+did.
 
-**Known residual — selector binding is unexercised (escalation, re-signing-blocked).** The single
-valid `check_envelope` case carries an `all` selector (matches any root), so the POSITIVE selector
-path is vacuous even when a verifier evaluates it correctly, and there is no `invalid_selector`
-case (kept `n_a` above). Consequence: a verifier that ignores grant selectors entirely still passes
-the whole corpus. Both are constraint-forced by the no-re-signing rule — a non-trivial-selector
-valid case and a selector-rejecting invalid case each need a re-signed grant. This residual is
-recorded here (like the `[:::]` divergence) rather than left implied; closing it is an escalation
-candidate: it requires a re-signed non-trivial-selector fixture, owned by a separate task, not by a
-mutation of the existing valid case.
+**Selector binding — closed (BAP-05 selector remediation).** Formerly the single valid
+`check_envelope` case carried an `all` selector (matches any root), so the positive selector path
+was vacuous and there was no `invalid_selector` case — a verifier that ignored grant selectors still
+passed the whole corpus. Now closed: a valid case with a non-trivial `equals ["record","id"]`
+selector plus an `invalid_selector` case (a validly-signed grant carrying that selector, with a
+proof over `cast_arguments` that satisfy `ba_req` but FAIL the selector — reaching the selector
+check at `runtime.ex`'s `Selector.match_all` for the right reason, proven by a right-reason control
+and a `selector-reject` mutation) exercise both directions. The independent Node verifier now
+evaluates grant selectors on the `check_envelope` path (unique operation by `ba_op`, then a
+conjunctive `match_all` over `cast_arguments`), so both implementations reject the `invalid_selector`
+case. Applicability: `check_envelope/valid` is `2`, `invalid_selector` is `1`. Re-signing required
+two new deterministic conformance keypairs (the original corpus keys' private seeds are unrecoverable
+— generation was throwaway), growing the corpus key census 6→8; see "Census evolution" below.
+The cross-verifier discovery scan (bap03 + chain_archive `discoverPublicKeys`) finds keys in
+labeled JSON fields only — it never decodes compact JWS — so every canonical key must appear in at
+least one labeled field under the discovery roots. The new issuer key is carried by the selector
+cases' `trusted_issuer.public_key`; the new holder key lives only inside the proof compacts, so a
+companion `proof_signing_input` valid case (`proof-signing-input-valid-distinct-holder`) carries it
+as a labeled `holder_public_key` input, keeping the field-discovered set equal to the canonical 19.
 
 The tamper verbatim-vs-derived audit binds a single-byte flip to a named `tamper.target`
 (`compact` / `grant` / `proof` / `rows[i]` / `chunks[i]`), so a meaningful-byte tamper can address
@@ -172,12 +184,14 @@ conformance-corpus concern. The 17 port-able cases and the omission are pinned i
 ### Census evolution + index self-census
 
 The corpus index declares `public_key_fingerprints` — the full set of public keys carried by the
-corpus case data (4 valid verify-surface keys + 2 invalid_key-case keys = 6). An independent
+corpus case data (4 valid verify-surface keys + 2 invalid_key-case keys = 6, plus the 2
+selector-remediation keys = 8; the selector fixtures re-sign with a new issuer + holder keypair
+because the original corpus keys' private seeds are unrecoverable). An independent
 runner's published-mode census is HARD two-way: the keys observed at its crypto import boundary
 must equal the index's declared set exactly, both directions, always — no softness (a vacuous
 green is the V4 hole this design exists to kill). The vector manifest grows to three partitions
-(bap03 + chain_archive + corpus); the three-partition union equals the canonical set (17 keys),
-and the corpus partition equals the index list.
+(bap03 + chain_archive + corpus); the three-partition union equals the canonical set (19 keys),
+and the corpus partition (8) equals the index list.
 
 The census is TWO-BOUNDARY (BAP-05 hardening): the discovery census above is the
 partition-membership set (every key the fixtures carry); a SECOND assertion proves the runner

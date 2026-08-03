@@ -12,7 +12,7 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
     assert output =~ "bap03 independent verification: ok"
 
     assert output =~
-             "vectors=3 public_key_fingerprints=17 tamper_cases=7 duplicate_cases=1 uri_cases=18"
+             "vectors=3 public_key_fingerprints=19 tamper_cases=7 duplicate_cases=1 uri_cases=18"
   end
 
   test "fixture contains no private key or seed field" do
@@ -30,11 +30,13 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
 
     assert manifest["canonical_public_key_fingerprints"] == [
              "0qPOlfSr_giHdRaDK18shLtG5DoQL1a2nrHVDeWruJI",
+             "3iR-H6Xx_3rpt7eNMUVNazSZkUclb_cekBJZZL4mlUs",
              "3x4aFGRFbZvTCoSGCd1yA55MYDITwK0MFDlrUFvPoF4",
              "7VjCxMImm16N6RYUjklULyDjbw2aGEOgNNtKBP9r-i0",
              "B_luRLoL5T-YfqSCot-qLaUVewraSBu-qaEWqXfMRHI",
              "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk",
              "TolqHySkTC69-Y7DUVNJP7JPn31VXHfk37ytoM0MZXM",
+             "TrI1g9her5mzNtdwThUyqwwGfZVLKd3MMoWkRY-Fn8c",
              "Tzmr9QXSXbXh_uKsem5dEblMnkflm_LuJShpYtOrQKk",
              "UyuHKlIU-ePRfsWpPkNSuW-OgWrwkOSwMv5Y6dgEDfA",
              "b5dejonEMNbWuAUspTppNgiUa6QUXdzk40kdsDcWK6g",
@@ -68,8 +70,10 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
                "ux6kGmd8C56UOZy4dXGjmqLHQO3PuOmQ5dg89lEO-Ag"
              ],
              "corpus_independent.mjs" => [
+               "3iR-H6Xx_3rpt7eNMUVNazSZkUclb_cekBJZZL4mlUs",
                "3x4aFGRFbZvTCoSGCd1yA55MYDITwK0MFDlrUFvPoF4",
                "7VjCxMImm16N6RYUjklULyDjbw2aGEOgNNtKBP9r-i0",
+               "TrI1g9her5mzNtdwThUyqwwGfZVLKd3MMoWkRY-Fn8c",
                "d4ucEZwvJTfwxXCN4f2xmIE5ZBFoH5i5mlzeWZaB3yI",
                "eGPJdenILo5TLcdbdZa046_Z-t9wGJl11N6_QJQrob8",
                "inGhtkoCo4fChHxdTEsAtMrCebtW84GM_7v2rPbowok",

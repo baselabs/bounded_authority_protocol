@@ -17,15 +17,15 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
   test "independent runner agrees on every shipped corpus case (repo mode)" do
     {output, 0} = run_node([@corpus, "--manifest", @manifest])
 
-    assert output =~ "corpus_independent: agreed=212 disagreed=0 total=212"
-    assert output =~ "census_keys=6 declared=6 partition=wired"
+    assert output =~ "corpus_independent: agreed=215 disagreed=0 total=215"
+    assert output =~ "census_keys=8 declared=8 partition=wired"
   end
 
   test "independent runner agrees in published mode (no --manifest; index self-census)" do
     {output, 0} = run_node([@corpus])
 
-    assert output =~ "corpus_independent: agreed=212 disagreed=0 total=212"
-    assert output =~ "census_keys=6 declared=6"
+    assert output =~ "corpus_independent: agreed=215 disagreed=0 total=215"
+    assert output =~ "census_keys=8 declared=8"
   end
 
   test "published-set sufficiency: a tree containing ONLY the published corpus agrees" do
@@ -43,7 +43,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
 
     {output, 0} = run_node([dir])
 
-    assert output =~ "corpus_independent: agreed=212 disagreed=0 total=212"
+    assert output =~ "corpus_independent: agreed=215 disagreed=0 total=215"
   end
 
   test "exit 1 on a byte-flipped case file (integrity failure)" do
