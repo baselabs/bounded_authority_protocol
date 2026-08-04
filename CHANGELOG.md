@@ -106,12 +106,24 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Add an empty-path `invalid_selector` case so the independent runner's selector shape and width
   validation is falsifiable: the official rejects an empty selector path at grant decode, and a
   matcher treating `[]` as "the root" would accept what the official refuses (corpus 219→220).
+- Close the independent runner's remaining permissiveness against the official decoder, so it can
+  no longer certify a grant the reference implementation refuses. Six divergences, each now carried
+  by a corpus case and a mutation entry: an extra member inside the closed `cnf` map; a
+  non-printable byte in an operation name (the official requires printable ASCII); a structurally
+  invalid selector on a NON-matching operation, and duplicate operation names (the official
+  validates every operation and enforces global name uniqueness, not just the requested one); a
+  lone surrogate in a selector path (the official requires valid UTF-8); and a `__proto__` member
+  in a selector value, which the tagged projection silently dropped to the prototype setter so that
+  two structurally different values compared equal — a collapse that reached the request digest as
+  well as selector matching. Selector values are now also held to the protocol JSON bounds. The
+  same operation validation is applied on `verify_grant`, which reaches the same official decode
+  path (corpus 220→231; `check_envelope/invalid_encoding` 6, `verify_grant/invalid_encoding` 5).
 - Add `.gitleaks.toml`: the `jwt` and `generic-api-key` rules are allowlisted for the conformance
   corpus and vector paths only, where all 283 findings are JWT-shaped high-entropy public test
   material (109 `jwt`, 174 `generic-api-key`, the latter almost entirely key fingerprints). Every other default rule still applies in those trees — a `ghp_…` token committed there
   is still caught — and every rule applies everywhere else. Stated residual: a credential matching
   ONLY those two rules, under those two machine-generated fixture directories, is not flagged.
-- Add the portable v1 conformance corpus (220 cases across 28 surfaces with a total
+- Add the portable v1 conformance corpus (231 cases across 28 surfaces with a total
   surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
   `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
 - Harden the corpus against vacuous green: author the invalid vectors the crypto verifying

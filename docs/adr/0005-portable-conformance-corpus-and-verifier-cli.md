@@ -177,6 +177,26 @@ loosening it would leave every gate green. Its mutation entry
 this grant is hand-signed — the official producer refuses to build it, which is what a
 nonconforming issuer would have to do.
 
+**Independent-runner permissiveness — closed (BAP-05 selector closeout).** The runner exists to
+disagree with the official; a runner that is more PERMISSIVE than the official is the one failure
+that cannot surface as a disagreement on a valid corpus, because it only accepts things the corpus
+does not contain. Six such divergences were found by the closeout lenses and the cross-vendor peers
+and are now closed, each with a corpus case AND a mutation entry (removing the guard makes the
+runner accept what the official refuses, so the corpus disagrees): the closed `cnf` map; the
+printable-ASCII operation-name rule; validation of EVERY operation's selectors rather than only the
+requested one; global operation-name uniqueness; UTF-8 validity of selector path segments (a lone
+surrogate passes a byte-length check); and prototype safety in the tagged projection, where a
+`__proto__` member was absorbed by the prototype setter so two different values canonicalized
+identically — a collapse that reached `ba_req` as well as selector identity. Selector values are
+also held to the protocol JSON bounds (`Jcs.encode(value, bounds)` in the official). The operation
+validation is shared with `verify_grant`, which reaches the same official decode path.
+
+The general lesson, recorded because it generalizes past this surface: for a differential checker,
+"both implementations agree on the corpus" only constrains the runner where the corpus has cases.
+Permissiveness is invisible to agreement by construction, so it must be closed by reading the
+reference implementation's validators and mirroring them, then PROVING each mirror with a case that
+goes red when the mirror is removed.
+
 The tamper verbatim-vs-derived audit binds a single-byte flip to a named `tamper.target`
 (`compact` / `grant` / `proof` / `rows[i]` / `chunks[i]`), so a meaningful-byte tamper can address
 the signature / key / commitment / row / anchor bytes of the cryptographic surfaces; both the
