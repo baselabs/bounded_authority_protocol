@@ -89,9 +89,13 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0003-standard-jws-and-verified-grant-results.md",
         "docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md",
         "docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md",
+        "docs/adr/0006-standards-evolution-suite-identity-and-delegation-posture.md",
         "docs/protocol-v1.md",
+        "docs/errata.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
+        "docs/design/registries.md",
+        "docs/design/standards-track.md",
         "docs/design/threat-model.md"
       ],
       licenses: ["Apache-2.0"],
@@ -121,8 +125,12 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0003-standard-jws-and-verified-grant-results.md",
         "docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md",
         "docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md",
+        "docs/adr/0006-standards-evolution-suite-identity-and-delegation-posture.md",
+        "docs/errata.md",
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
+        "docs/design/registries.md",
+        "docs/design/standards-track.md",
         "docs/design/threat-model.md"
       ]
     ]

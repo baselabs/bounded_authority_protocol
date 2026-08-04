@@ -117,13 +117,31 @@ All notable changes to `bounded_authority_protocol` are documented here.
   two structurally different values compared equal — a collapse that reached the request digest as
   well as selector matching. Selector values are now also held to the protocol JSON bounds. The
   same operation validation is applied on `verify_grant`, which reaches the same official decode
-  path (corpus 220→233; `check_envelope/invalid_encoding` 6, `verify_grant/invalid_encoding` 5).
+  path (corpus 220→236; `check_envelope/invalid_encoding` 6, `verify_grant/invalid_encoding` 5).
 - Add `.gitleaks.toml`: the `jwt` and `generic-api-key` rules are allowlisted for the conformance
   corpus and vector paths only, where all 283 findings are JWT-shaped high-entropy public test
-  material (109 `jwt`, 174 `generic-api-key`, the latter almost entirely key fingerprints). Every other default rule still applies in those trees — a `ghp_…` token committed there
-  is still caught — and every rule applies everywhere else. Stated residual: a credential matching
-  ONLY those two rules, under those two machine-generated fixture directories, is not flagged.
-- Add the portable v1 conformance corpus (233 cases across 28 surfaces with a total
+  material (109 `jwt`, 174 `generic-api-key`, the latter entirely key fingerprints). Every other
+  default rule still applies in those trees — a `ghp_…` token committed there is still caught —
+  and every rule applies everywhere else. Stated residual: a credential matching ONLY those two
+  rules, under those two machine-generated fixture directories, is not flagged.
+- Close three further runner/official divergences the final cross-vendor pass found in selector
+  value validation, each now carried by a corpus case and a mutation entry: the magnitude bound
+  (the official caps |value| at 9007199254740991 and rejects 2^53; the runner checked only
+  finiteness), and a one-byte floor on object member keys that the official does not impose — the
+  runner rejected `{"":1}`, which `Json.decode` and `Jcs.encode` both accept, making it STRICTER
+  than the reference. Corpus 233→236 (a valid empty-object-key case pins the strictness fix).
+- Adopt the standards track charter (ADR 0006, `docs/design/standards-track.md`,
+  `docs/design/registries.md`, `docs/errata.md`): evolution above the permanently closed wire
+  format via parallel contract-majors with published deprecation windows; the current profile
+  named as cryptographic suite `BAP1-Ed25519-SHA256` with an ML-DSA succession path and
+  cross-suite countersignature design for long-retention evidence; RFC 2119 requirement
+  identifiers with corpus traceability and IANA registration templates as release-gating roadmap
+  rows; delegation-with-attenuation decided (chained grants, `ba_dlg`/`ba_obo`/`ba+cap-delegated`
+  reserved, the conjunctive selector algebra as the attenuation language, no caveat DSL);
+  revocation and principal-binding deployment guidance homed; governance (change classes, errata
+  registry with the no-verdict-flip invariant, comment-window triggers) published. No wire byte,
+  bound, or verdict changes; new roadmap rows gate first publication on the unretrofittable items.
+- Add the portable v1 conformance corpus (236 cases across 28 surfaces with a total
   surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
   `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
 - Harden the corpus against vacuous green: author the invalid vectors the crypto verifying
