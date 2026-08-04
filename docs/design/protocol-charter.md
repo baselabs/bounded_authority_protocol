@@ -6,6 +6,19 @@ Define and deterministically verify the exact bytes for one issuer-bounded, hold
 invocation. The package returns cryptographic/contextual facts; operational authorization and live
 state remain outside it.
 
+## Standards posture
+
+The protocol is on a standards track governed by the
+[standards track charter](standards-track.md) and
+[ADR 0006](../adr/0006-standards-evolution-suite-identity-and-delegation-posture.md): the closed
+wire profile is permanent and evolution happens above it through parallel contract-majors; the
+current profile is the named suite `BAP1-Ed25519-SHA256` with a specified post-quantum succession
+and cross-suite evidence-attestation path; names for delegation (`ba_dlg`,
+`ba+cap-delegated`), principal binding (`ba_obo`), and status checking are reserved in the
+[registries](registries.md) with their designs decided; governance, errata, and deprecation
+policy are published. Nothing in that posture changes a byte, bound, or verdict of this charter's
+verification chain.
+
 ## Verification chain
 
 1. The caller supplies raw credentials and expected issuer/request context to the private runtime.

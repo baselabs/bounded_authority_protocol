@@ -8,6 +8,20 @@ This document freezes the byte-level profile. A conforming implementation reject
 member, value, encoding, or extension with exactly `{:error, :invalid}`. Successful decode or
 verification is not a trust-selection or authorization decision.
 
+## Suite identity and evolution
+
+This profile constitutes the cryptographic suite `BAP1-Ed25519-SHA256` (see the
+[registries](design/registries.md)): EdDSA over Ed25519, SHA-256 digests, RFC 8785 canonical
+bytes, and the `BAP1-*` domain separators, with the fixed widths listed in the bounds table. Every
+artifact self-declares this identity through its `v` claim, `typ` header, `alg` value, and domain
+separators. Evolution happens above this profile, never inside it: successor contract-majors carry
+their own complete closed profiles and suites, a proof's contract-major equals its grant's, and
+the closed-rejection rule above is exactly what makes parallel majors safe — an artifact of any
+other major or suite fails closed here. The evolution contract, deprecation policy, reserved
+names, and delegation posture are governed by the
+[standards track charter](design/standards-track.md) and [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md);
+none of them alters a byte, bound, or verdict of this profile.
+
 ## Normative sources
 
 - [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259): JSON grammar, UTF-8, interoperable integer
