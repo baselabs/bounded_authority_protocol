@@ -144,8 +144,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=247 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=247. Mutated in the isolated copy only.
+      # corpus yields agreed=259 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=259. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -470,8 +470,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # Without this the runner accepts a grant whose selector value exceeds object_members.
       name: "node-selector-value-json-bounds-removal",
       path: "conformance/corpus_independent.mjs",
-      from: "function withinJsonBounds(value, depth = 1) {\n",
-      to: "function withinJsonBounds(value, depth = 1) {\n  return true;\n",
+      from: "function withinJsonBounds(value, level = 0) {\n",
+      to: "function withinJsonBounds(value, level = 0) {\n  return true;\n",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
     %{
@@ -490,8 +490,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # runner accepts a grant carrying 2^53, which the official rejects at decode.
       name: "node-selector-value-magnitude-removal",
       path: "conformance/corpus_independent.mjs",
-      from: "    return Number.isFinite(value) && Math.abs(value) <= MAXIMA.integer_magnitude;\n",
-      to: "    return Number.isFinite(value);\n",
+      from:
+        "      Number.isFinite(value) &&\n      Math.abs(value) <= MAXIMA.integer_magnitude\n    );",
+      to: "      Number.isFinite(value)\n    );",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
     %{
@@ -592,6 +593,87 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "    if length(all_ids) == MapSet.size(MapSet.new(all_ids)) and Enum.all?(all_ids, &is_binary/1),",
       to: "    if true,",
       command: ["mix", "test", "test/conformance/corpus_test.exs:555"]
+    },
+    # --- runner permissiveness residuals: the four closed permissive gaps + the guard family -----
+    %{
+      # withinJsonBounds per-node-type depth: reverting the SCALAR depth to `level < depth` (the old
+      # uniform-gate strictness) rejects request-digest-exact-bound-value-depth's deep integer scalar
+      # in the typed projection -> the valid 15-deep case decodes INVALID -> disagreement. Proves the
+      # scalar<=depth / container<depth distinction is load-bearing (not the old uniform gate).
+      name: "runner-withinjsonbounds-scalar-depth",
+      path: "conformance/corpus_independent.mjs",
+      from: "level <= MAXIMA.depth &&\n      Number.isFinite(value) &&",
+      to: "level < MAXIMA.depth &&\n      Number.isFinite(value) &&",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # isInteger magnitude: dropping the |value| <= integer_magnitude bound lets a proof with
+      # iat = 2^53 decode valid -> decode-proof-maximum-plus-one-iat-magnitude disagrees (official
+      # rejects at Json.decode magnitude). Proves the magnitude bound on integer claims is real.
+      name: "runner-isinteger-magnitude",
+      path: "conformance/corpus_independent.mjs",
+      from: "Number.isInteger(value) &&\n    Math.abs(value) <= MAXIMA.integer_magnitude",
+      to: "Number.isInteger(value)",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # requestDigest total_nodes: removing the typed-projection node bound lets a value-carried
+      # cast_arguments exceeding 4096 typed nodes produce a digest -> request-digest-maximum-plus-one-
+      # total-nodes disagrees (official request_digest rejects). The typed projection triples nodes,
+      # so this is expressible while the raw stays under the loader's own node ceiling.
+      name: "runner-requestdigest-total-nodes",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "if (countJsonNodes(projected) > MAXIMA.total_nodes) fail(\"request_digest: total_nodes\");",
+      to: "// total_nodes check removed (mutation)",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # requestDigest jcs_bytes: removing the canonical byte bound lets a typed projection exceeding
+      # jcs_bytes (65536) produce a digest -> request-digest-maximum-plus-one-jcs-bytes disagrees.
+      name: "runner-requestdigest-jcs-bytes",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "if (Buffer.byteLength(jcs, \"utf8\") > MAXIMA.jcs_bytes) fail(\"request_digest: jcs_bytes\");",
+      to: "// jcs_bytes check removed (mutation)",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # requestDigest operation validation: neutering valid_operation? lets a 129-byte operation
+      # produce a digest -> request-digest-maximum-plus-one-operation disagrees (official rejects an
+      # over-length / non-printable operation before hashing).
+      name: "runner-requestdigest-operation",
+      path: "conformance/corpus_independent.mjs",
+      from: "assert(validOperationName(operation), \"request_digest: operation\");",
+      to: "assert(true, \"request_digest: operation\");",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # parseCanonicalJson whole-payload depth: neutering the container-depth gate lets a grant whose
+      # payload nests past depth 32 decode -> decode-grant-maximum-plus-one-payload-depth disagrees
+      # (official rejects the deep payload at Json.decode). Closes the whole-payload depth
+      # permissiveness the runner previously left open (parseCanonicalJson had no depth bound).
+      name: "runner-parsecanonical-payload-depth",
+      path: "conformance/corpus_independent.mjs",
+      from: "assert(containerDepth(value) <= MAXIMA.depth, `${context}: depth`);",
+      to: "assert(true, `${context}: depth`);",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # jsonDecode per-node-type depth — the guard-family sibling of withinJsonBounds and the ACTUAL
+      # C4 content. The official Json.decode bounds only CONTAINERS (start_container level <= depth),
+      # never scalars, so a 32-deep scalar-inner nest is valid. Re-introducing a per-SCALAR depth
+      # check in decodeValue (the pre-fix bug) rejects that scalar at depth 33 -> ONLY
+      # json-decode-exact-bound-depth-scalar-inner disagrees (the pre-existing empty-inner exact-bound
+      # case never reaches a scalar at the boundary, so it does NOT catch this — which is exactly why
+      # the scalar-inner case was added). The too-STRICT direction that silently fails a conforming
+      # verifier. (The container-entry offset is separately guarded by the empty-inner differential.)
+      name: "runner-jsondecode-scalar-depth",
+      path: "conformance/corpus_independent.mjs",
+      from: "    skipWhitespace();\n    assert(index < text.length, \"json value\");",
+      to:
+        "    assert(depth <= 32, \"json depth bound\");\n    skipWhitespace();\n    assert(index < text.length, \"json value\");",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     }
   ]
 
