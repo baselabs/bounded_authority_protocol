@@ -1665,9 +1665,59 @@ function toTagged(value) {
   }
   if (Array.isArray(value)) return ["array", value.map((v, i) => taggedMember(value, i, v))];
   assert(value && typeof value === "object", "tagged JSON value");
-  const obj = {};
+  // NULL-PROTOTYPE, not `{}`: on a plain object `obj["__proto__"] = v` invokes the prototype
+  // setter instead of creating an own property, so the member VANISHES from Object.keys and two
+  // structurally different objects canonicalize identically. That collapse reaches both the
+  // selector identity comparison and the ba_req request digest, either of which would then agree
+  // with the official on inputs the official distinguishes.
+  const obj = Object.create(null);
   for (const [k, v] of Object.entries(value)) obj[k] = taggedMember(value, k, v);
   return ["object", obj];
+}
+
+// The official requires every protocol string to be valid UTF-8 (`String.valid?`). A JSON
+// `\uD800` escape survives JSON.parse as a lone surrogate and can survive parseCanonicalJson's
+// round-trip (JSON.stringify re-emits the same escape), so byte-length checks alone do not cover
+// it — the official rejects such a string and this runner must too.
+function wellFormedString(value) {
+  if (typeof value !== "string") return false;
+  return typeof value.isWellFormed === "function"
+    ? value.isWellFormed()
+    : !/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(value);
+}
+
+// Mirrors the official `valid_operation?`: 1..operation_bytes AND printable ASCII only.
+function validOperationName(name) {
+  return (
+    wellFormedString(name) &&
+    Buffer.byteLength(name, "utf8") >= 1 &&
+    Buffer.byteLength(name, "utf8") <= MAXIMA.operation_bytes &&
+    /^[\x20-\x7E]*$/.test(name)
+  );
+}
+
+// Mirrors the official `Jcs.encode(value, bounds)` gate applied to every selector value: the
+// protocol JSON bounds, not merely canonical-encodability.
+function withinJsonBounds(value, depth = 1) {
+  if (depth > MAXIMA.depth) return false;
+  if (value === null || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "string") {
+    return wellFormedString(value) && Buffer.byteLength(value, "utf8") <= MAXIMA.string_bytes;
+  }
+  if (Array.isArray(value)) {
+    return value.length <= MAXIMA.array_items && value.every((v) => withinJsonBounds(v, depth + 1));
+  }
+  if (!value || typeof value !== "object") return false;
+  const keys = Object.keys(value);
+  if (keys.length > MAXIMA.object_members) return false;
+  return keys.every(
+    (k) =>
+      wellFormedString(k) &&
+      Buffer.byteLength(k, "utf8") >= 1 &&
+      Buffer.byteLength(k, "utf8") <= MAXIMA.key_bytes &&
+      withinJsonBounds(value[k], depth + 1),
+  );
 }
 
 function taggedMember(owner, key, value) {
@@ -1697,7 +1747,7 @@ function validSelectorPath(path) {
   if (!Array.isArray(path) || path.length < 1 || path.length > MAXIMA.path_segments) return false;
   return path.every(
     (segment) =>
-      typeof segment === "string" &&
+      wellFormedString(segment) &&
       Buffer.byteLength(segment, "utf8") >= 1 &&
       Buffer.byteLength(segment, "utf8") <= MAXIMA.key_bytes,
   );
@@ -1717,6 +1767,60 @@ function taggedIdentity(value) {
   return canonical(toTagged(value));
 }
 
+// Full mirror of the official `operations/2` -> `operation/2` (runtime.ex): a bounded non-empty
+// array; each element a closed {name, selectors} map; each name printable-ASCII within
+// operation_bytes; each selectors list a bounded non-empty array of STRUCTURALLY valid selectors;
+// and operation names globally unique (runtime.ex `unique?`). Shared by check_envelope and
+// verify_grant, which both reach the same official decode path.
+function validateGrantOperations(operations, context) {
+  assert(
+    Array.isArray(operations) &&
+      operations.length >= 1 &&
+      operations.length <= MAXIMA.operations,
+    `${context}: operations`,
+  );
+  const names = [];
+  for (const op of operations) {
+    exactKeys(op, ["name", "selectors"], `${context} grant operation`);
+    assert(validOperationName(op.name), `${context}: operation name`);
+    assert(
+      Array.isArray(op.selectors) &&
+        op.selectors.length >= 1 &&
+        op.selectors.length <= MAXIMA.selectors,
+      `${context}: operation selectors`,
+    );
+    for (const selector of op.selectors) validSelectorShape(selector, context);
+    names.push(op.name);
+  }
+  assert(new Set(names).size === names.length, `${context}: duplicate operation name`);
+}
+
+// Structural half of the selector contract, independent of whether it MATCHES anything. Split out
+// so every operation's selectors can be validated while only the requested operation's are
+// evaluated against cast_arguments.
+function validSelectorShape(selector, context) {
+  if (!selector || typeof selector !== "object" || Array.isArray(selector)) {
+    fail(`${context}: selector shape`);
+  }
+  const members = Object.keys(selector).sort().join(",");
+  if (selector.kind === "all" && members === "kind") return;
+  if (selector.kind === "equals" && members === "kind,path,value") {
+    if (!validSelectorPath(selector.path)) fail(`${context}: selector path`);
+    if (!withinJsonBounds(selector.value)) fail(`${context}: selector value bounds`);
+    return;
+  }
+  if (selector.kind === "one_of" && members === "kind,path,values") {
+    if (!validSelectorPath(selector.path)) fail(`${context}: selector path`);
+    const values = selector.values;
+    if (!Array.isArray(values) || values.length < 1 || values.length > MAXIMA.one_of_values) {
+      fail(`${context}: selector values`);
+    }
+    if (!values.every((v) => withinJsonBounds(v))) fail(`${context}: selector value bounds`);
+    return;
+  }
+  fail(`${context}: selector shape`);
+}
+
 function selectorMatches(selector, args) {
   if (!selector || typeof selector !== "object" || Array.isArray(selector)) {
     fail("check_envelope: selector shape");
@@ -1725,6 +1829,7 @@ function selectorMatches(selector, args) {
   if (selector.kind === "all" && members === "kind") return true;
   if (selector.kind === "equals" && members === "kind,path,value") {
     if (!validSelectorPath(selector.path)) fail("check_envelope: selector path");
+    if (!withinJsonBounds(selector.value)) fail("check_envelope: selector value bounds");
     const hit = traverseObjectPath(args, selector.path);
     return hit !== undefined && taggedIdentity(hit.found) === taggedIdentity(selector.value);
   }
@@ -1734,6 +1839,7 @@ function selectorMatches(selector, args) {
     if (!Array.isArray(values) || values.length < 1 || values.length > MAXIMA.one_of_values) {
       fail("check_envelope: selector values");
     }
+    if (!values.every((v) => withinJsonBounds(v))) fail("check_envelope: selector value bounds");
     const hit = traverseObjectPath(args, selector.path);
     if (hit === undefined) return false;
     const target = taggedIdentity(hit.found);
@@ -1805,6 +1911,7 @@ function dispatchVerifyGrant(input) {
     "verify_grant payload",
   );
   exactKeys(payload.cnf, ["jkt"], "verify_grant grant cnf");
+  validateGrantOperations(payload.operations, "verify_grant");
   assert(payload.v === 1, "verify_grant: version");
   assert(payload.iss === issuer, "verify_grant: issuer");
   assert(Array.isArray(payload.aud) && payload.aud.includes(audience), "verify_grant: audience");
@@ -1995,43 +2102,18 @@ function dispatchCheckEnvelope(input) {
   // carries must match the server-derived cast_arguments (runtime.ex:497-498). Without this the
   // independent verifier would ignore grant selectors — the exact gap the check_envelope selector
   // fixtures exercise, so a corpus with a non-trivial selector would else silently disagree.
-  // Guard family: the selector is not the only structure on this path the official closes. Every
-  // operation object is a closed map (runtime.ex `closed_map(members, ["name", "selectors"])`) and
-  // the official validates the CONTENTS of every operation, not just the one named by ba_op
-  // (`operations/2` maps `operation/2` over all of them), so both are enforced below for every
-  // element. `cnf`, the grant header/payload and the proof header/payload are closed above.
-  const grantOperations = grantPayload.operations;
-  assert(
-    Array.isArray(grantOperations) &&
-      grantOperations.length >= 1 &&
-      grantOperations.length <= MAXIMA.operations,
-    "check_envelope: operations",
-  );
-  for (const op of grantOperations) {
-    exactKeys(op, ["name", "selectors"], "check_envelope grant operation");
-    assert(
-      typeof op.name === "string" &&
-        Buffer.byteLength(op.name, "utf8") >= 1 &&
-        Buffer.byteLength(op.name, "utf8") <= MAXIMA.operation_bytes,
-      "check_envelope: operation name",
-    );
-    assert(
-      Array.isArray(op.selectors) &&
-        op.selectors.length >= 1 &&
-        op.selectors.length <= MAXIMA.selectors,
-      "check_envelope: operation selectors",
-    );
-  }
-  const namedOps = grantOperations.filter((o) => o.name === operation);
+  // Guard family: the selector is not the only structure on this path the official closes.
+  // validateGrantOperations mirrors `operations/2` -> `operation/2` in full — every operation
+  // object closed, every name and every selector STRUCTURE validated (not just the one named by
+  // ba_op), and global name uniqueness — because a runner that validates only the requested
+  // operation certifies grants the official decoder refuses outright.
+  validateGrantOperations(grantPayload.operations, "check_envelope");
+  const namedOps = grantPayload.operations.filter((o) => o.name === operation);
   assert(namedOps.length === 1, "check_envelope: unique operation");
-  const opSelectors = namedOps[0].selectors;
   assert(
-    Array.isArray(opSelectors) &&
-      opSelectors.length >= 1 &&
-      opSelectors.length <= MAXIMA.selectors,
-    "check_envelope: selectors",
+    namedOps[0].selectors.every((s) => selectorMatches(s, expected.cast_arguments)),
+    "check_envelope: selector",
   );
-  assert(opSelectors.every((s) => selectorMatches(s, expected.cast_arguments)), "check_envelope: selector");
   return {};
 }
 

@@ -144,8 +144,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=220 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=220. Mutated in the isolated copy only.
+      # corpus yields agreed=231 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=231. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -407,6 +407,62 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "  if (!Array.isArray(path) || path.length < 1 || path.length > MAXIMA.path_segments) return false;\n",
       to: "  if (!Array.isArray(path)) return false;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    # --- independent-runner permissiveness (BAP-05 selector closeout, round 4) -
+    # Each entry deletes one guard that keeps the Node runner from being MORE PERMISSIVE than the
+    # official. Removing any of them makes the runner accept a grant the official refuses, so the
+    # corpus disagrees and the runner test goes red. These target the Node runner test, never
+    # cli_test:36, which runs the official CLI and cannot observe a .mjs change.
+    %{
+      # `cnf` is a closed map in the official; without this the runner accepts an extra member.
+      name: "node-check-envelope-cnf-closed-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  exactKeys(grantPayload.cnf, [\"jkt\"], \"check_envelope grant cnf\");\n",
+      to: "\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Operation names are printable ASCII in the official (valid_operation?).
+      name: "node-operation-name-charset-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "    /^[\\x20-\\x7E]*$/.test(name)\n",
+      to: "    true\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # The official enforces global operation-name uniqueness (unique?).
+      name: "node-duplicate-operation-name-removal",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "  assert(new Set(names).size === names.length, `${context}: duplicate operation name`);\n",
+      to: "  void names;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # The official validates EVERY operation's selectors, not just the requested one.
+      name: "node-nonmatching-operation-selector-validation-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "    for (const selector of op.selectors) validSelectorShape(selector, context);\n",
+      to: "\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Protocol strings must be valid UTF-8 (String.valid?); a byte-length check accepts a lone
+      # surrogate the official rejects.
+      name: "node-selector-path-utf8-validity-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "      wellFormedString(segment) &&\n",
+      to: "      typeof segment === \"string\" &&\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # On a plain {} the tagged projection loses a `__proto__` member to the prototype setter, so
+      # two distinct values canonicalize identically and the selector wrongly matches.
+      name: "node-tagged-projection-prototype-safety-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  const obj = Object.create(null);\n",
+      to: "  const obj = {};\n",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----
