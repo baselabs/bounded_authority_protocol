@@ -213,14 +213,30 @@ differential evidence — the reviewer built hand-signed grants/proofs and compa
 `decode_grant`/`decode_proof` against the runner — which is the standard the field mirror is now held
 to, since agreement on the corpus alone cannot catch a permissiveness the corpus does not exercise.
 
-One bound is deliberately NOT mirrored at these surfaces, stated rather than hidden: the aggregate
-`total_nodes`/`depth` budget the official applies across the WHOLE payload. An input that violates
-it necessarily exceeds `string_bytes` once encoded, so it cannot appear inline in a case file, and
-`check_envelope`/`verify_grant`/`decode_*` accept no `.raw` sidecar — so this boundary is exercised
-at the `json.decode` surface (which does take a sidecar) rather than duplicated here. An earlier
-attempt to add a whole-payload bounds pass to the runner was reverted because it duplicated the
-per-field/per-selector string checks and thereby made an existing mutation vacuous — the granular
-validators are the faithful and independently provable mirror.
+The aggregate `total_nodes`/`depth` budget the official applies across the WHOLE payload was
+originally NOT mirrored at these surfaces and disclosed as inexpressible ("an input that violates it
+necessarily exceeds `string_bytes` once encoded"). That disclosure was PARTLY WRONG and is corrected
+here (2026-08-04, the runner-permissiveness-residuals slice, after a cross-vendor design review):
+
+- **Whole-payload DEPTH is now enforced and tested.** A depth-violating payload is deep-but-narrow
+  (~60 bytes), NOT `string_bytes`-exceeding, so it IS inline-expressible. `parseCanonicalJson` now
+  rejects a payload whose container nesting exceeds `depth`. This is a depth-ONLY pass — unlike the
+  earlier whole-payload *bounds* pass that was reverted for duplicating the per-field/per-selector
+  string checks (and making a mutation vacuous), a depth-only gate duplicates none of them, so the
+  granular validators stay independently provable. The sibling `jsonDecode` decoder carried the same
+  per-node-type depth error (it rejected a 32-deep scalar-inner nest the official accepts) and is
+  fixed in the same slice; a `json.decode` scalar-inner exact-bound case pins the strict boundary.
+- **Value-carried `cast_arguments` `total_nodes` + `jcs_bytes` are now enforced and tested** at the
+  `request_digest`/`check_envelope` surface. The `request_digest` typed projection roughly triples
+  node count, so a cast_arguments under the loader's own node ceiling still exceeds `total_nodes` once
+  projected, and the tag overhead can push a raw-under-limit value over `jcs_bytes` — both reachable
+  inline as request_digest cases (the second rides its own single-case file just under `json_bytes`).
+- **What genuinely remains inexpressible inline, correctly disclosed and enforced without a red case:**
+  the whole-payload `total_nodes` budget for COMPACT-carried grant/proof payloads (the compact rides
+  in a `string_bytes`-capped case field, so a >4096-node payload cannot fit), and the `object_members`
+  MAX+1 at `request_digest` (a 65-member cast_arguments cannot appear in a case file the loader's own
+  `Json.decode` bounds at `object_members`=64). The runner enforces both (whole-payload / typed-
+  projection checks); neither carries a corpus red case, and each is a falsifiable structural limit.
 
 The general lesson, recorded because it generalizes past this surface: for a differential checker,
 "both implementations agree on the corpus" only constrains the runner where the corpus has cases.
