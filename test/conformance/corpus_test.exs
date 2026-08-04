@@ -1260,8 +1260,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   test "the shipped corpus total_cases is pinned at the expanded count" do
     map = shipped_corpus_map()
     {:ok, corpus} = Corpus.load(map)
-    assert corpus.index["total_cases"] == 247
-    assert MapSet.size(corpus.case_ids) == 247
+    assert corpus.index["total_cases"] == 259
+    assert MapSet.size(corpus.case_ids) == 259
   end
 
   test "the crypto verifying surfaces carry the mandated invalid classes (vacuity closed)" do

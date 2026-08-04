@@ -297,11 +297,28 @@ function parseJsonNoDuplicates(text, context) {
   return value;
 }
 
+// Whole-payload container-nesting depth, mirroring the official `Json.decode` depth gate that every
+// payload/header passes through (json.ex start_container `level <= depth`; depth 32). Counts EMPTY
+// containers (the official rejects a 33-deep empty nest too). `parseCanonicalJson` does not otherwise
+// bound the whole payload — the field validators cover per-field bounds — so this closes the
+// whole-payload depth permissiveness: a deep grant/proof payload the official rejects at decode.
+function containerDepth(value) {
+  if (value === null || typeof value !== "object") return 0;
+  let deepest = 0;
+  if (Array.isArray(value)) {
+    for (const item of value) deepest = Math.max(deepest, containerDepth(item));
+  } else {
+    for (const key of Object.keys(value)) deepest = Math.max(deepest, containerDepth(value[key]));
+  }
+  return 1 + deepest;
+}
+
 function parseCanonicalJson(bytes, context) {
   const text = bytes.toString("utf8");
   assert(Buffer.from(text, "utf8").equals(bytes), `${context}: UTF-8`);
   const value = parseJsonNoDuplicates(text, context);
   assert(canonical(value) === text, `${context}: canonical bytes`);
+  assert(containerDepth(value) <= MAXIMA.depth, `${context}: depth`);
   return value;
 }
 
@@ -461,12 +478,16 @@ function jsonDecode(bytes, context) {
   }
 
   function decodeValue(depth) {
-    assert(depth <= 32, "json depth bound");
+    // Depth is checked at CONTAINER entry (decodeObject/decodeArray), NOT here: the official
+    // Json.decode bounds only containers (json.ex start_container `level <= depth`); a scalar carries
+    // no level check, so a 32-deep scalar-inner nest is valid. decodeValue forwards the current
+    // container level unincremented; the container it opens asserts its own level and recurses at
+    // depth + 1. (A uniform `depth <= 32` here — root at 1 — wrongly rejected the deepest scalar.)
     skipWhitespace();
     assert(index < text.length, "json value");
     const ch = text[index];
-    if (ch === "{") return decodeObject(depth + 1);
-    if (ch === "[") return decodeArray(depth + 1);
+    if (ch === "{") return decodeObject(depth);
+    if (ch === "[") return decodeArray(depth);
     if (ch === '"') return decodeString();
     if (text.startsWith("true", index)) {
       index += 4;
@@ -487,6 +508,7 @@ function jsonDecode(bytes, context) {
   }
 
   function decodeObject(depth) {
+    assert(depth <= 32, "json depth bound");
     const names = new Set();
     const value = Object.create(null);
     index += 1;
@@ -508,7 +530,7 @@ function jsonDecode(bytes, context) {
       skipWhitespace();
       assert(text[index] === ":", "json member separator");
       index += 1;
-      value[name] = decodeValue(depth);
+      value[name] = decodeValue(depth + 1);
       skipWhitespace();
       if (text[index] === "}") {
         index += 1;
@@ -521,6 +543,7 @@ function jsonDecode(bytes, context) {
   }
 
   function decodeArray(depth) {
+    assert(depth <= 32, "json depth bound");
     const value = [];
     index += 1;
     countNode();
@@ -530,7 +553,7 @@ function jsonDecode(bytes, context) {
       return value;
     }
     while (text.length) {
-      value.push(decodeValue(depth));
+      value.push(decodeValue(depth + 1));
       assert(value.length <= 256, "json array bound");
       skipWhitespace();
       if (text[index] === "]") {
@@ -1736,7 +1759,14 @@ function validOperationName(name) {
 // canonical-bytes equality already rejects `1000.0` (canonical re-emits `1000`), so a claim value
 // that IS a JS number here came from an integer lexeme. isInteger keeps the intent explicit.
 function isInteger(value) {
-  return typeof value === "number" && Number.isInteger(value);
+  // The official carries the protocol integer magnitude bound on every integer claim (Json.decode
+  // magnitude at decode: json.ex:147/214+). parseCanonicalJson does not magnitude-check, so this is
+  // the runner's only gate: iat = 2^53 is accepted by Number.isInteger but rejected by the official.
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    Math.abs(value) <= MAXIMA.integer_magnitude
+  );
 }
 
 // valid_key_id?: 1..kid_bytes, ASCII [A-Za-z0-9-._~].
@@ -1869,37 +1899,68 @@ function validateProofPayloadFields(payload, context) {
   }
 }
 
-// Mirrors the official `Jcs.encode(value, bounds)` gate applied to every selector value: the
-// protocol JSON bounds (depth, members, items, magnitude, string validity), not merely
-// canonical-encodability. The one bound NOT enforced here is the aggregate total_nodes/depth
-// budget the official applies across the WHOLE payload: an input violating it is inherently larger
-// than string_bytes, so it cannot appear inline in a case file, and check_envelope/verify_grant/
-// decode take no `.raw` sidecar — that boundary is exercised at the json.decode surface instead.
-function withinJsonBounds(value, depth = 1) {
-  if (depth > MAXIMA.depth) return false;
-  if (value === null || typeof value === "boolean") return true;
+// Mirrors the official `Jcs.encode(value, bounds)` PER-NODE gate (jcs.ex): protocol JSON bounds
+// (depth, members, items, magnitude, string validity), not merely canonical-encodability. Depth is
+// per-node-type EXACTLY as the official: a SCALAR is valid at `level <= depth`, a CONTAINER at
+// `level < depth`, root value at `level 0` (jcs.ex:28/33/40/49/58 vs 65/77). A uniform
+// `depth > MAXIMA.depth` gate (root at 1) wrongly rejected a scalar at the deepest legal level.
+// This checks the PER-NODE bounds only; the AGGREGATE bounds the official Jcs.encode also applies —
+// total_nodes and jcs_bytes — are NOT enforced here. For selector values (compact-carried, capped
+// by string_bytes) both aggregates are inline-inexpressible (the disclosed gap). For the
+// request_digest/check_envelope typed projection (value-carried cast_arguments) total_nodes AND
+// jcs_bytes ARE expressible and are enforced at the `requestDigest` call site (countJsonNodes + the
+// canonical byte length), not here.
+function withinJsonBounds(value, level = 0) {
+  if (value === null || typeof value === "boolean") return level <= MAXIMA.depth;
   if (typeof value === "number") {
-    // Mirror the official magnitude bound exactly: |value| capped at 9007199254740991; 2^53
-    // itself is rejected (probed against V1.Jcs.encode directly).
-    return Number.isFinite(value) && Math.abs(value) <= MAXIMA.integer_magnitude;
+    // Magnitude bound: |value| capped at integer_magnitude; 2^53 itself rejected (probed vs
+    // V1.Jcs.encode). Scalar depth: level <= depth.
+    return (
+      level <= MAXIMA.depth &&
+      Number.isFinite(value) &&
+      Math.abs(value) <= MAXIMA.integer_magnitude
+    );
   }
   if (typeof value === "string") {
-    return wellFormedString(value) && Buffer.byteLength(value, "utf8") <= MAXIMA.string_bytes;
+    return (
+      level <= MAXIMA.depth &&
+      wellFormedString(value) &&
+      Buffer.byteLength(value, "utf8") <= MAXIMA.string_bytes
+    );
   }
   if (Array.isArray(value)) {
-    return value.length <= MAXIMA.array_items && value.every((v) => withinJsonBounds(v, depth + 1));
+    // Container depth: level < depth (a container at level == depth would place its children beyond).
+    return (
+      level < MAXIMA.depth &&
+      value.length <= MAXIMA.array_items &&
+      value.every((v) => withinJsonBounds(v, level + 1))
+    );
   }
   if (!value || typeof value !== "object") return false;
   const keys = Object.keys(value);
-  if (keys.length > MAXIMA.object_members) return false;
+  if (!(level < MAXIMA.depth) || keys.length > MAXIMA.object_members) return false;
   // Object member keys have NO one-byte floor: the official accepts {"":1} (probed against both
   // V1.Json.decode and V1.Jcs.encode). Only selector PATH segments carry the 1-byte minimum.
   return keys.every(
     (k) =>
       wellFormedString(k) &&
       Buffer.byteLength(k, "utf8") <= MAXIMA.key_bytes &&
-      withinJsonBounds(value[k], depth + 1),
+      withinJsonBounds(value[k], level + 1),
   );
+}
+
+// Node count mirroring the official `next_node!` (jcs.ex:105): one node per value (scalar OR
+// container); object keys are not nodes. Used to enforce total_nodes on the request_digest typed
+// projection, where a value-carried cast_arguments can exceed 4096 nodes inline.
+function countJsonNodes(value) {
+  if (value === null || typeof value !== "object") return 1;
+  let count = 1;
+  if (Array.isArray(value)) {
+    for (const item of value) count += countJsonNodes(item);
+  } else {
+    for (const key of Object.keys(value)) count += countJsonNodes(value[key]);
+  }
+  return count;
 }
 
 function taggedMember(owner, key, value) {
@@ -2044,7 +2105,22 @@ function selectorMatches(selector, args) {
 // --- request_digest ---------------------------------------------------------
 
 function requestDigest(operation, castArguments) {
-  const jcs = canonical([operation, toTagged(castArguments)]);
+  // Full mirror of the official `RequestDigest.digest` (request_digest.ex): valid_operation? AND a
+  // bounded `Jcs.encode({:array,[{:string,op}, typed(args)]}, bounds)`. The runner previously
+  // computed an UNBOUNDED canonical digest, certifying a request the official rejects. The bounds
+  // apply to the TYPED projection (not the raw args): `typed` deepens/triples the tree, so the
+  // depth boundary is ~15 (not 32) and total_nodes is reachable inline.
+  assert(validOperationName(operation), "request_digest: operation");
+  const projected = [operation, toTagged(castArguments)];
+  // Per-node bounds (depth per-node-type / members / items / string / magnitude / key).
+  if (!withinJsonBounds(projected)) fail("request_digest: cast_arguments bounds");
+  // total_nodes: the projection can exceed 4096 nodes for a value-carried cast_arguments.
+  if (countJsonNodes(projected) > MAXIMA.total_nodes) fail("request_digest: total_nodes");
+  const jcs = canonical(projected);
+  // jcs_bytes: the outermost fragment is the largest, so its byte length bounds every fragment
+  // (mirrors the official per-fragment `bounded`). Typed tag overhead can push a raw-under-limit
+  // arg over jcs_bytes.
+  if (Buffer.byteLength(jcs, "utf8") > MAXIMA.jcs_bytes) fail("request_digest: jcs_bytes");
   const preimage = Buffer.concat([REQUEST_PREFIX, Buffer.from(jcs, "utf8")]);
   return sha256(preimage).toString("base64url");
 }

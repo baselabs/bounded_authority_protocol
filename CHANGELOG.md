@@ -187,6 +187,18 @@ All notable changes to `bounded_authority_protocol` are documented here.
   applicability matrix + n_a criterion, census evolution, CLI contract, carve-out shape,
   gate set). The corpus ships in the published package; the fresh-consumer check runs the packaged
   escript against the packaged corpus, proving published-set sufficiency.
+- Close the remaining independent-runner permissiveness residuals surfaced by a cross-vendor design
+  review (corpus grows 247 → 259 cases). The Node runner now mirrors the official on: the integer
+  magnitude bound for every integer claim (a proof `iat` of 2^53 is rejected); the full
+  `request_digest` gate on `cast_arguments` — operation validity, per-node bounds, `total_nodes`, and
+  `jcs_bytes` on the type-tagged projection, not an unbounded digest; and whole-payload container
+  depth on grant/proof payloads (a payload nested past depth 32 is rejected at parse). Fix the sibling
+  `jsonDecode` per-node-type depth error (it rejected a 32-deep scalar-inner nest the official
+  accepts — the too-strict direction that fails a conforming verifier). Twelve exact-bound /
+  maximum-plus-one cases and seven source mutations pin each, each verdict confirmed against the
+  official facade. ADR 0005 corrected: whole-payload depth and value-carried `cast_arguments`
+  node/byte bounds are inline-expressible and now tested; only compact-carried whole-payload
+  `total_nodes` and an inline 65-member `object_members` remain enforced-without-a-red-case.
 
 
 ### Not yet available
