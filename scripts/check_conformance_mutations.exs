@@ -144,8 +144,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=233 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=233. Mutated in the isolated copy only.
+      # corpus yields agreed=236 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=236. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -483,6 +483,27 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "  if (selector.kind === \"all\") return;\n",
       to: "  if (selector.kind === \"all\" && members === \"kind\") return;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Selector-value magnitude. The official caps |value| at 9007199254740991; without this the
+      # runner accepts a grant carrying 2^53, which the official rejects at decode.
+      name: "node-selector-value-magnitude-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "    return Number.isFinite(value) && Math.abs(value) <= MAXIMA.integer_magnitude;\n",
+      to: "    return Number.isFinite(value);\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Object member keys have NO one-byte floor in the official ({"":1} is accepted, probed
+      # directly). Re-adding a floor makes the runner STRICTER than the official and flips the
+      # valid empty-object-key fixture to invalid.
+      name: "node-selector-value-empty-key-floor-reintroduction",
+      path: "conformance/corpus_independent.mjs",
+      from:
+        "      wellFormedString(k) &&\n      Buffer.byteLength(k, \"utf8\") <= MAXIMA.key_bytes &&\n",
+      to:
+        "      wellFormedString(k) &&\n      Buffer.byteLength(k, \"utf8\") >= 1 &&\n      Buffer.byteLength(k, \"utf8\") <= MAXIMA.key_bytes &&\n",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----
