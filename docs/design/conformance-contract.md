@@ -45,7 +45,7 @@ nonzero.
 
 BAP-03's focused vectors and independent verifier are public repository acceptance evidence. The
 Hex package ships the protocol schemas, Elixir runtime, and the portable v1 conformance corpus
-(236 cases across 28 surfaces with a total surface × class applicability matrix, `.raw` sidecars
+(245 cases across 28 surfaces with a total surface × class applicability matrix, `.raw` sidecars
 for oversize wire inputs). BAP-05's corpus is normative: a second Node implementation
 (`conformance/corpus_independent.mjs`, node:* only) independently recomputes every corpus verdict
 from scratch and agrees. The corpus index declares its full public-key set

@@ -1583,6 +1583,17 @@ function dispatchDecodeGrant(input) {
   const header = parseCanonicalJson(jws.protectedBytes, "decode_grant header");
   exactKeys(header, ["alg", "kid", "typ"], "decode_grant header");
   assert(header.alg === "EdDSA" && header.typ === "ba+cap", "decode_grant header values");
+  assert(validKeyId(header.kid), "decode_grant: kid");
+  // decode is a full-payload validation surface (no expected context), so the runner mirrors the
+  // whole of decode_grant_fields here rather than only reading a field back.
+  const payload = parseCanonicalJson(jws.payloadBytes, "decode_grant payload");
+  exactKeys(
+    payload,
+    ["aud", "cnf", "exp", "iat", "iss", "jti", "nbf", "operations", "v"],
+    "decode_grant payload",
+  );
+  exactKeys(payload.cnf, ["jkt"], "decode_grant grant cnf");
+  validateGrantPayloadFields(payload, "decode_grant grant");
   return { key_id: header.kid };
 }
 
@@ -1590,8 +1601,23 @@ function dispatchDecodeProof(input) {
   const compact = fetchBinary(input, "compact", "decode_proof");
   const jws = parseCompactJws(compact, "decode_proof");
   const header = parseCanonicalJson(jws.protectedBytes, "decode_proof header");
+  exactKeys(header, ["alg", "jwk", "typ"], "decode_proof header");
   assert(header.alg === "EdDSA" && header.typ === "dpop+jwt", "decode_proof header values");
+  exactPublicJwk(header.jwk, "decode_proof jwk");
   const payload = parseCanonicalJson(jws.payloadBytes, "decode_proof payload");
+  exactKeys(
+    payload,
+    payload.nonce === undefined
+      ? ["ath", "ba_inv", "ba_op", "ba_req", "htm", "htu", "iat", "jti", "v"]
+      : ["ath", "ba_inv", "ba_op", "ba_req", "htm", "htu", "iat", "jti", "nonce", "v"],
+    "decode_proof payload",
+  );
+  validateProofPayloadFields(payload, "decode_proof proof");
+  // The official requires htu to already be a normalized HTTPS URI (Uri.normalize(htu) === htu).
+  // check_envelope reaches this via equality to the expected target_uri; decode has no expected,
+  // so the normalization is validated directly here.
+  const normalized = normalizeHttpsUri(Buffer.from(payload.htu, "utf8"), "decode_proof htu");
+  assert(normalized === payload.htu, "decode_proof: htu normalized");
   return { proof_id: payload.jti };
 }
 
@@ -1696,8 +1722,114 @@ function validOperationName(name) {
   );
 }
 
+// --- shared payload-field validators ----------------------------------------
+// The runner previously validated only the grant/proof fields the expected-context comparison
+// happened to touch, leaving it MORE PERMISSIVE than the official decoder on every other field.
+// These mirror `decode_grant_fields`/`decode_proof_fields` (runtime.ex) field for field, applied
+// wherever the runner reads a grant or proof payload (check_envelope, verify_grant, decode_grant,
+// decode_proof). Each is probed against the official facade before it lands (see the
+// runner-permissiveness corpus cases + mutation entries).
+
+// The official carries a strict {:integer, _} tag; a JSON integral-float (`1000.0`) would decode as
+// {:float, _} and fail that match. This runner reaches the value through parseCanonicalJson, whose
+// canonical-bytes equality already rejects `1000.0` (canonical re-emits `1000`), so a claim value
+// that IS a JS number here came from an integer lexeme. isInteger keeps the intent explicit.
+function isInteger(value) {
+  return typeof value === "number" && Number.isInteger(value);
+}
+
+// valid_key_id?: 1..kid_bytes, ASCII [A-Za-z0-9-._~].
+function validKeyId(value) {
+  return (
+    typeof value === "string" &&
+    Buffer.byteLength(value, "utf8") >= 1 &&
+    Buffer.byteLength(value, "utf8") <= MAXIMA.kid_bytes &&
+    /^[A-Za-z0-9\-._~]*$/.test(value)
+  );
+}
+
+// valid_method?: 1..method_bytes, ASCII [A-Za-z0-9] + RFC 7230 token punctuation !#$%&'*+-.^_`|~.
+function validMethod(value) {
+  return (
+    typeof value === "string" &&
+    Buffer.byteLength(value, "utf8") >= 1 &&
+    Buffer.byteLength(value, "utf8") <= MAXIMA.method_bytes &&
+    /^[A-Za-z0-9!#$%&'*+\-.^_`|~]*$/.test(value)
+  );
+}
+
+// valid_uuid?: exact 8-4-4-4-12 lower-hex shape, version nibble 1..5, variant nibble 8/9/a/b.
+function validUuid(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value);
+}
+
+// StringOrUri.valid?: either no ':' (a bare string), or a valid scheme + RFC 3986-ish URI bytes.
+function stringOrUri(value) {
+  if (typeof value !== "string" || !wellFormedString(value)) return false;
+  const colon = value.indexOf(":");
+  if (colon === -1) return true;
+  const scheme = value.slice(0, colon);
+  if (!/^[A-Za-z][A-Za-z0-9+\-.]*$/.test(scheme)) return false;
+  // uri_bytes?: unreserved + reserved punctuation, or a %HH escape.
+  return /^(?:%[0-9A-Fa-f]{2}|[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=])*$/.test(value);
+}
+
+// valid_identifier?: 1..identifier_bytes, valid UTF-8, StringOrUri.
+function validIdentifier(value) {
+  return (
+    typeof value === "string" &&
+    Buffer.byteLength(value, "utf8") >= 1 &&
+    Buffer.byteLength(value, "utf8") <= MAXIMA.identifier_bytes &&
+    stringOrUri(value)
+  );
+}
+
+// coherent_times?: all three integers, iat < exp and nbf < exp (iat<=nbf is NOT required).
+function coherentTimes(iat, nbf, exp) {
+  return isInteger(iat) && isInteger(nbf) && isInteger(exp) && iat < exp && nbf < exp;
+}
+
+// decode_audiences: a bare string is a single audience; an array is a bounded non-empty list of
+// distinct valid identifiers. Returns the audience list or null (reject).
+function decodeAudiences(aud) {
+  if (typeof aud === "string") return validIdentifier(aud) ? [aud] : null;
+  if (!Array.isArray(aud) || aud.length < 1 || aud.length > MAXIMA.audiences) return null;
+  if (!aud.every((a) => typeof a === "string" && validIdentifier(a))) return null;
+  if (new Set(aud).size !== aud.length) return null;
+  return aud;
+}
+
+// Full mirror of `decode_grant_fields` beyond the already-closed header/cnf/operations checks.
+// The payload's exact member set is closed by the caller; this validates each member's VALUE.
+function validateGrantPayloadFields(payload, context) {
+  assert(payload.v === 1 && isInteger(payload.v), `${context}: grant version`);
+  assert(validIdentifier(payload.iss), `${context}: grant issuer`);
+  assert(validIdentifier(payload.jti), `${context}: grant id`);
+  assert(decodeAudiences(payload.aud) !== null, `${context}: grant audiences`);
+  assert(coherentTimes(payload.iat, payload.nbf, payload.exp), `${context}: grant times`);
+  const jkt = strictB64(payload.cnf.jkt, MAXIMA.digest_bytes);
+  assert(jkt.length === MAXIMA.digest_bytes, `${context}: grant cnf jkt width`);
+  validateGrantOperations(payload.operations, context);
+}
+
+// Full mirror of `decode_proof_fields` value validation (the member set is closed by the caller).
+function validateProofPayloadFields(payload, context) {
+  assert(payload.v === 1 && isInteger(payload.v), `${context}: proof version`);
+  assert(validIdentifier(payload.jti), `${context}: proof id`);
+  assert(validMethod(payload.htm), `${context}: proof method`);
+  assert(validUuid(payload.ba_inv), `${context}: proof invocation`);
+  assert(validOperationName(payload.ba_op), `${context}: proof operation`);
+  assert(isInteger(payload.iat), `${context}: proof iat`);
+  assert(strictB64(payload.ath, MAXIMA.digest_bytes).length === MAXIMA.digest_bytes, `${context}: proof ath width`);
+  assert(strictB64(payload.ba_req, MAXIMA.digest_bytes).length === MAXIMA.digest_bytes, `${context}: proof ba_req width`);
+}
+
 // Mirrors the official `Jcs.encode(value, bounds)` gate applied to every selector value: the
-// protocol JSON bounds, not merely canonical-encodability.
+// protocol JSON bounds (depth, members, items, magnitude, string validity), not merely
+// canonical-encodability. The one bound NOT enforced here is the aggregate total_nodes/depth
+// budget the official applies across the WHOLE payload: an input violating it is inherently larger
+// than string_bytes, so it cannot appear inline in a case file, and check_envelope/verify_grant/
+// decode take no `.raw` sidecar — that boundary is exercised at the json.decode surface instead.
 function withinJsonBounds(value, depth = 1) {
   if (depth > MAXIMA.depth) return false;
   if (value === null || typeof value === "boolean") return true;
@@ -1927,7 +2059,7 @@ function dispatchVerifyGrant(input) {
     "verify_grant payload",
   );
   exactKeys(payload.cnf, ["jkt"], "verify_grant grant cnf");
-  validateGrantOperations(payload.operations, "verify_grant");
+  validateGrantPayloadFields(payload, "verify_grant grant");
   assert(payload.v === 1, "verify_grant: version");
   assert(payload.iss === issuer, "verify_grant: issuer");
   assert(Array.isArray(payload.aud) && payload.aud.includes(audience), "verify_grant: audience");
@@ -2076,6 +2208,7 @@ function dispatchCheckEnvelope(input) {
       : ["ath", "ba_inv", "ba_op", "ba_req", "htm", "htu", "iat", "jti", "nonce", "v"],
     "check_envelope proof payload",
   );
+  validateProofPayloadFields(proofPayload, "check_envelope proof");
   const holderJwk = exactPublicJwk(proofHeader.jwk, "check_envelope proof jwk");
   const holderPub = nodePublicKey(holderJwk.raw, "check_envelope proof");
   assert(verifyEd25519(holderPub, proofJws.message, proofJws.signature), "check_envelope: proof signature");
@@ -2114,16 +2247,12 @@ function dispatchCheckEnvelope(input) {
   // here too — same nesting depth as the operation object below, same permissiveness class.
   exactKeys(grantPayload.cnf, ["jkt"], "check_envelope grant cnf");
   assert(grantPayload.cnf.jkt === jwkThumbprint(holderJwk), "check_envelope: holder thumbprint");
-  // Selector binding: the grant operation named ba_op must exist UNIQUELY, and EVERY selector it
-  // carries must match the server-derived cast_arguments (runtime.ex:497-498). Without this the
-  // independent verifier would ignore grant selectors — the exact gap the check_envelope selector
-  // fixtures exercise, so a corpus with a non-trivial selector would else silently disagree.
-  // Guard family: the selector is not the only structure on this path the official closes.
-  // validateGrantOperations mirrors `operations/2` -> `operation/2` in full — every operation
-  // object closed, every name and every selector STRUCTURE validated (not just the one named by
-  // ba_op), and global name uniqueness — because a runner that validates only the requested
-  // operation certifies grants the official decoder refuses outright.
-  validateGrantOperations(grantPayload.operations, "check_envelope");
+  // Grant payload field validation (version / issuer / jti / audiences / times / jkt width) and the
+  // full operations mirror (`operations/2` -> `operation/2`: every operation object closed, every
+  // name and every selector STRUCTURE validated, global name uniqueness) are done by
+  // validateGrantPayloadFields above; a runner that validated only the requested operation, or
+  // skipped the payload field checks, would certify grants the official decoder refuses outright.
+  validateGrantPayloadFields(grantPayload, "check_envelope grant");
   const namedOps = grantPayload.operations.filter((o) => o.name === operation);
   assert(namedOps.length === 1, "check_envelope: unique operation");
   assert(

@@ -117,13 +117,25 @@ All notable changes to `bounded_authority_protocol` are documented here.
   two structurally different values compared equal — a collapse that reached the request digest as
   well as selector matching. Selector values are now also held to the protocol JSON bounds. The
   same operation validation is applied on `verify_grant`, which reaches the same official decode
-  path (corpus 220→236; `check_envelope/invalid_encoding` 6, `verify_grant/invalid_encoding` 5).
+  path (corpus 220→245; `check_envelope/invalid_encoding` 6, `verify_grant/invalid_encoding` 5).
 - Add `.gitleaks.toml`: the `jwt` and `generic-api-key` rules are allowlisted for the conformance
   corpus and vector paths only, where all 283 findings are JWT-shaped high-entropy public test
   material (109 `jwt`, 174 `generic-api-key`, the latter entirely key fingerprints). Every other
   default rule still applies in those trees — a `ghp_…` token committed there is still caught —
   and every rule applies everywhere else. Stated residual: a credential matching ONLY those two
   rules, under those two machine-generated fixture directories, is not flagged.
+- Complete the payload-field decode mirror, closing the last of the runner's permissiveness
+  against the official decoder. The runner previously validated only the grant/proof fields the
+  expected-context comparison happened to touch; it now mirrors decode_grant_fields /
+  decode_proof_fields field for field — issuer/grant-id/audience StringOrURI validity and length,
+  audience count bound and uniqueness, coherent times (iat<exp, nbf<exp), method token charset,
+  invocation UUID shape, and htu normalization — wherever it reads a grant or proof payload
+  (check_envelope, verify_grant, decode_grant, decode_proof). Nine cases on the DECODE surfaces
+  (no expected context to mask the validator, so each is the sole reject reason) with six mutation
+  entries prove them; corpus 236→245. One bound stays out of scope by construction: the aggregate
+  total_nodes/depth budget the official applies across the whole payload cannot appear inline (such
+  an input exceeds string_bytes) and these surfaces take no `.raw` sidecar, so it is exercised at
+  the json.decode surface instead.
 - Close three further runner/official divergences the final cross-vendor pass found in selector
   value validation, each now carried by a corpus case and a mutation entry: the magnitude bound
   (the official caps |value| at 9007199254740991 and rejects 2^53; the runner checked only
@@ -141,7 +153,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
   revocation and principal-binding deployment guidance homed; governance (change classes, errata
   registry with the no-verdict-flip invariant, comment-window triggers) published. No wire byte,
   bound, or verdict changes; new roadmap rows gate first publication on the unretrofittable items.
-- Add the portable v1 conformance corpus (236 cases across 28 surfaces with a total
+- Add the portable v1 conformance corpus (245 cases across 28 surfaces with a total
   surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
   `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
 - Harden the corpus against vacuous green: author the invalid vectors the crypto verifying

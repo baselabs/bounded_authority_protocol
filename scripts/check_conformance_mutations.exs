@@ -144,8 +144,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=236 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=236. Mutated in the isolated copy only.
+      # corpus yields agreed=245 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=245. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -504,6 +504,60 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "      wellFormedString(k) &&\n      Buffer.byteLength(k, \"utf8\") <= MAXIMA.key_bytes &&\n",
       to:
         "      wellFormedString(k) &&\n      Buffer.byteLength(k, \"utf8\") >= 1 &&\n      Buffer.byteLength(k, \"utf8\") <= MAXIMA.key_bytes &&\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    # --- payload field-validation mirror (decode surfaces) --------------------
+    # Each validator mirrors a decode_grant_fields/decode_proof_fields check the runner did not
+    # have. The cases live on decode_grant/decode_proof (no expected context to mask the
+    # validator), so neutralizing one makes the runner accept a grant/proof the official
+    # decoder rejects -> corpus disagreement -> the Node runner test goes red.
+    %{
+      # valid_identifier?: 1..identifier_bytes + StringOrUri; catches empty jti and non-URI iss.
+      name: "node-decode-valid-identifier-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "function validIdentifier(value) {\n",
+      to: "function validIdentifier(value) {\n  return true;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # valid_method?: token charset; catches a method with a space.
+      name: "node-decode-valid-method-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "function validMethod(value) {\n",
+      to: "function validMethod(value) {\n  return true;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # valid_uuid?: exact UUID shape; catches a non-UUID ba_inv.
+      name: "node-decode-valid-uuid-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "function validUuid(value) {\n",
+      to: "function validUuid(value) {\n  return true;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # coherent_times?: iat<exp and nbf<exp; catches iat >= exp.
+      name: "node-decode-coherent-times-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "function coherentTimes(iat, nbf, exp) {\n",
+      to: "function coherentTimes(iat, nbf, exp) {\n  return true;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # decode_audiences: count bound + per-element validity + uniqueness; catches over-max and duplicate aud.
+      name: "node-decode-audiences-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "function decodeAudiences(aud) {\n",
+      to: "function decodeAudiences(aud) {\n  return true;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # decode_proof requires htu already normalized (Uri.normalize(htu) === htu); check_envelope
+      # reaches this via equality to the expected target_uri, but decode has no expected.
+      name: "node-decode-proof-htu-normalization-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  assert(normalized === payload.htu, \"decode_proof: htu normalized\");\n",
+      to: "  void normalized;\n",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----
