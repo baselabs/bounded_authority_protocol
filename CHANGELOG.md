@@ -117,7 +117,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
   two structurally different values compared equal — a collapse that reached the request digest as
   well as selector matching. Selector values are now also held to the protocol JSON bounds. The
   same operation validation is applied on `verify_grant`, which reaches the same official decode
-  path (corpus 220→245; `check_envelope/invalid_encoding` 6, `verify_grant/invalid_encoding` 5).
+  path (corpus 220→247; `check_envelope/invalid_encoding` 6, `verify_grant/invalid_encoding` 5).
 - Add `.gitleaks.toml`: the `jwt` and `generic-api-key` rules are allowlisted for the conformance
   corpus and vector paths only, where all 283 findings are JWT-shaped high-entropy public test
   material (109 `jwt`, 174 `generic-api-key`, the latter entirely key fingerprints). Every other
@@ -132,10 +132,16 @@ All notable changes to `bounded_authority_protocol` are documented here.
   invocation UUID shape, and htu normalization — wherever it reads a grant or proof payload
   (check_envelope, verify_grant, decode_grant, decode_proof). Nine cases on the DECODE surfaces
   (no expected context to mask the validator, so each is the sole reject reason) with six mutation
-  entries prove them; corpus 236→245. One bound stays out of scope by construction: the aggregate
+  entries prove them; corpus 236→247. One bound stays out of scope by construction: the aggregate
   total_nodes/depth budget the official applies across the whole payload cannot appear inline (such
   an input exceeds string_bytes) and these surfaces take no `.raw` sidecar, so it is exercised at
-  the json.decode surface instead.
+  the json.decode surface instead. Two further field checks the first mirror pass missed,
+  found by the closeout review: the StringOrURI structural gate (the official validates
+  iss/jti/aud through URI.new, so it rejects a non-numeric port, an unterminated IPv6
+  literal, or a double `@`; the byte-only mirror accepted them — now matched to URI.new
+  across a 56-input boundary set, using node:net for IPv6 literals so the mirror is neither
+  looser nor stricter), and the optional proof nonce (present must be a 1..nonce_bytes
+  well-formed string). Each with a decode case and mutation entry; corpus 236→247.
 - Close three further runner/official divergences the final cross-vendor pass found in selector
   value validation, each now carried by a corpus case and a mutation entry: the magnitude bound
   (the official caps |value| at 9007199254740991 and rejects 2^53; the runner checked only
@@ -153,7 +159,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
   revocation and principal-binding deployment guidance homed; governance (change classes, errata
   registry with the no-verdict-flip invariant, comment-window triggers) published. No wire byte,
   bound, or verdict changes; new roadmap rows gate first publication on the unretrofittable items.
-- Add the portable v1 conformance corpus (245 cases across 28 surfaces with a total
+- Add the portable v1 conformance corpus (247 cases across 28 surfaces with a total
   surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
   `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
 - Harden the corpus against vacuous green: author the invalid vectors the crypto verifying

@@ -19,6 +19,7 @@ import {
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isIP } from "node:net";
 
 const ARCHIVE_PREFIX = Buffer.from("BAP1-ARCHIVE\0EXPORT\0", "binary");
 const ROW_PREFIX = Buffer.from("BAP1-CHAIN\0", "binary");
@@ -1763,7 +1764,13 @@ function validUuid(value) {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value);
 }
 
-// StringOrUri.valid?: either no ':' (a bare string), or a valid scheme + RFC 3986-ish URI bytes.
+// StringOrUri.valid?: either no ':' (a bare string is a StringOrURI), or a valid scheme, RFC 3986
+// URI bytes, AND — when the value carries a `//` authority — a structurally valid authority. The
+// official's valid_uri? gates on `URI.new(value)` in addition to the byte check; the earlier
+// byte-only mirror accepted `http://a:b` (non-numeric port), `http://[bad` (unterminated IPv6), and
+// `foo://h@o@st` (double `@`), all of which URI.new rejects. Boundary probed exhaustively against
+// V1.StringOrUri: no-colon → always valid; opaque (no `//`) like `urn:x` / `mailto:x@y` / `a:b` →
+// valid; a `//` authority is validated below.
 function stringOrUri(value) {
   if (typeof value !== "string" || !wellFormedString(value)) return false;
   const colon = value.indexOf(":");
@@ -1771,7 +1778,33 @@ function stringOrUri(value) {
   const scheme = value.slice(0, colon);
   if (!/^[A-Za-z][A-Za-z0-9+\-.]*$/.test(scheme)) return false;
   // uri_bytes?: unreserved + reserved punctuation, or a %HH escape.
-  return /^(?:%[0-9A-Fa-f]{2}|[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=])*$/.test(value);
+  if (!/^(?:%[0-9A-Fa-f]{2}|[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=])*$/.test(value)) return false;
+  const rest = value.slice(colon + 1);
+  if (!rest.startsWith("//")) return true; // opaque / path-rootless: no authority to validate.
+  return validUriAuthority(rest.slice(2).split(/[/?#]/, 1)[0]);
+}
+
+// RFC 3986 authority validation matching URI.new for the cases the profile can produce: at most one
+// `@` (userinfo before it must not reappear in the host), a terminated `[IPv6]` literal, and — for
+// a non-bracketed host — at most one `:` whose suffix is an all-digits-or-empty port. Empty host
+// and empty port are both accepted, matching URI.new (`http://:80`, `http://host:`).
+function validUriAuthority(authority) {
+  const at = authority.indexOf("@");
+  const hostport = at === -1 ? authority : authority.slice(at + 1);
+  if (hostport.includes("@")) return false; // a second `@` lands in the host — invalid.
+  if (hostport.startsWith("[")) {
+    const close = hostport.indexOf("]");
+    if (close === -1) return false; // unterminated IPv6 literal.
+    // URI.new (Erlang :uri_string) accepts only a valid IPv6 literal in brackets — NOT IPvFuture
+    // (`[v1.x]`) and not an arbitrary token (`[not:ip:here]`). node:net's isIP is the same test.
+    if (isIP(hostport.slice(1, close)) !== 6) return false;
+    const suffix = hostport.slice(close + 1);
+    return suffix === "" || /^:\d*$/.test(suffix);
+  }
+  if (hostport.includes("[") || hostport.includes("]")) return false; // stray bracket in host.
+  if ((hostport.match(/:/g) ?? []).length > 1) return false; // host/port ambiguity.
+  const sep = hostport.lastIndexOf(":");
+  return sep === -1 || /^\d*$/.test(hostport.slice(sep + 1));
 }
 
 // valid_identifier?: 1..identifier_bytes, valid UTF-8, StringOrUri.
@@ -1822,6 +1855,18 @@ function validateProofPayloadFields(payload, context) {
   assert(isInteger(payload.iat), `${context}: proof iat`);
   assert(strictB64(payload.ath, MAXIMA.digest_bytes).length === MAXIMA.digest_bytes, `${context}: proof ath width`);
   assert(strictB64(payload.ba_req, MAXIMA.digest_bytes).length === MAXIMA.digest_bytes, `${context}: proof ba_req width`);
+  // Optional nonce: absent is fine; present must be a well-formed string of 1..nonce_bytes
+  // (official `optional_nonce` -> `valid_nonce?`). exactKeys already admits the key; without this
+  // the runner accepted an empty / numeric / boolean / over-long nonce the official rejects.
+  if (payload.nonce !== undefined) {
+    assert(
+      typeof payload.nonce === "string" &&
+        wellFormedString(payload.nonce) &&
+        Buffer.byteLength(payload.nonce, "utf8") >= 1 &&
+        Buffer.byteLength(payload.nonce, "utf8") <= MAXIMA.nonce_bytes,
+      `${context}: proof nonce`,
+    );
+  }
 }
 
 // Mirrors the official `Jcs.encode(value, bounds)` gate applied to every selector value: the
