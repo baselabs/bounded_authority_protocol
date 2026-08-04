@@ -144,8 +144,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=245 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=245. Mutated in the isolated copy only.
+      # corpus yields agreed=247 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=247. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -558,6 +558,25 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "  assert(normalized === payload.htu, \"decode_proof: htu normalized\");\n",
       to: "  void normalized;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # StringOrURI structure: the official gates iss/jti/aud on URI.new (numeric port, terminated
+      # IPv6, single @) beyond the byte check. Without validUriAuthority the runner accepts
+      # http://a:b (non-numeric port) which the official rejects.
+      name: "node-decode-string-or-uri-authority-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  return validUriAuthority(rest.slice(2).split(/[/?#]/, 1)[0]);\n",
+      to: "  return true;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Optional proof nonce: present must be a well-formed string of 1..nonce_bytes
+      # (official optional_nonce -> valid_nonce?). Without this the runner accepts an empty nonce.
+      name: "node-decode-proof-nonce-validation-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  if (payload.nonce !== undefined) {\n",
+      to: "  if (false) {\n",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----

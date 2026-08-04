@@ -203,6 +203,16 @@ first by the expected-context equality (a wrong `htm` never equals the expected 
 masks the validator and makes such a case vacuous — a trap this closeout hit and corrected by
 moving the cases to the decode surfaces.
 
+Two field checks the first mirror pass missed were found by the closeout review and closed: the
+StringOrURI structural gate (the official validates `iss`/`jti`/`aud` through `URI.new`, not only the
+byte set, so it rejects a non-numeric port, an unterminated IPv6 literal, or a double `@` — the
+byte-only mirror accepted them; the mirror now matches `URI.new` across a 56-input boundary set and
+uses `node:net` for IPv6 literals so it is neither looser nor stricter), and the optional proof
+`nonce` (present must be a 1..`nonce_bytes` well-formed string). Both were reported with byte-identical
+differential evidence — the reviewer built hand-signed grants/proofs and compared the official
+`decode_grant`/`decode_proof` against the runner — which is the standard the field mirror is now held
+to, since agreement on the corpus alone cannot catch a permissiveness the corpus does not exercise.
+
 One bound is deliberately NOT mirrored at these surfaces, stated rather than hidden: the aggregate
 `total_nodes`/`depth` budget the official applies across the WHOLE payload. An input that violates
 it necessarily exceeds `string_bytes` once encoded, so it cannot appear inline in a case file, and
