@@ -191,11 +191,33 @@ identically — a collapse that reached `ba_req` as well as selector identity. S
 also held to the protocol JSON bounds (`Jcs.encode(value, bounds)` in the official). The operation
 validation is shared with `verify_grant`, which reaches the same official decode path.
 
+The payload-field mirror completes the same closure at the decode surfaces. The runner had
+validated only the grant/proof fields the expected-context comparison happened to touch; it now
+mirrors `decode_grant_fields`/`decode_proof_fields` field for field — StringOrURI validity and
+length for issuer/grant-id/audience, the audience count bound and uniqueness, `coherent_times?`,
+the method token charset, the invocation-UUID shape, and `htu` normalization — wherever it reads a
+grant or proof payload. These cases live on `decode_grant`/`decode_proof` deliberately: those
+surfaces carry NO expected context, so a malformed field is rejected SOLELY by its validator, which
+is why each case is non-vacuous. On `check_envelope` the same malformed field would be rejected
+first by the expected-context equality (a wrong `htm` never equals the expected method), which
+masks the validator and makes such a case vacuous — a trap this closeout hit and corrected by
+moving the cases to the decode surfaces.
+
+One bound is deliberately NOT mirrored at these surfaces, stated rather than hidden: the aggregate
+`total_nodes`/`depth` budget the official applies across the WHOLE payload. An input that violates
+it necessarily exceeds `string_bytes` once encoded, so it cannot appear inline in a case file, and
+`check_envelope`/`verify_grant`/`decode_*` accept no `.raw` sidecar — so this boundary is exercised
+at the `json.decode` surface (which does take a sidecar) rather than duplicated here. An earlier
+attempt to add a whole-payload bounds pass to the runner was reverted because it duplicated the
+per-field/per-selector string checks and thereby made an existing mutation vacuous — the granular
+validators are the faithful and independently provable mirror.
+
 The general lesson, recorded because it generalizes past this surface: for a differential checker,
 "both implementations agree on the corpus" only constrains the runner where the corpus has cases.
 Permissiveness is invisible to agreement by construction, so it must be closed by reading the
 reference implementation's validators and mirroring them, then PROVING each mirror with a case that
-goes red when the mirror is removed.
+goes red when the mirror is removed — and the case must be placed where NO other check masks the
+one it targets.
 
 The tamper verbatim-vs-derived audit binds a single-byte flip to a named `tamper.target`
 (`compact` / `grant` / `proof` / `rows[i]` / `chunks[i]`), so a meaningful-byte tamper can address
