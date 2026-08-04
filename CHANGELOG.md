@@ -107,8 +107,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
   validation is falsifiable: the official rejects an empty selector path at grant decode, and a
   matcher treating `[]` as "the root" would accept what the official refuses (corpus 219→220).
 - Add `.gitleaks.toml`: the `jwt` and `generic-api-key` rules are allowlisted for the conformance
-  corpus and vector paths only, where all 279 findings are JWT-shaped high-entropy public test
-  material. Every other default rule still applies in those trees — a `ghp_…` token committed there
+  corpus and vector paths only, where all 283 findings are JWT-shaped high-entropy public test
+  material (109 `jwt`, 174 `generic-api-key`, the latter almost entirely key fingerprints). Every other default rule still applies in those trees — a `ghp_…` token committed there
   is still caught — and every rule applies everywhere else. Stated residual: a credential matching
   ONLY those two rules, under those two machine-generated fixture directories, is not flagged.
 - Add the portable v1 conformance corpus (220 cases across 28 surfaces with a total

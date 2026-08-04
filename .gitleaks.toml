@@ -3,9 +3,12 @@
 # The v1 conformance corpus and vectors ship PUBLIC deterministic test material: compact JWS
 # grant/proof/anchor tokens and raw base64url public keys, hashes, and fingerprints, all generated
 # from throwaway seeds. They are JWT-shaped and high-entropy by design, so two default rules fire
-# on them — 279 findings, every one fixture data: `jwt` (105) on the compact tokens and
-# `generic-api-key` (174) on the 32-byte base64url values. Those two rules are allowlisted for
-# those two paths. Every other default rule still applies in these trees, and every rule applies
+# on them — 283 findings, every one fixture data: `jwt` (109) on the compact tokens and
+# `generic-api-key` (174) on the 32-byte base64url values, which are dominated by SHA-256 key
+# FINGERPRINTS (`key_fingerprint` 82, `current_/next_key_fingerprint` 24 each,
+# `from_/to_key_fingerprint` 16 each, `start_/end_key_fingerprint` 6 each) rather than by public
+# keys. Those two rules are allowlisted for those two paths. Re-measure both totals whenever
+# fixtures are added — each new corpus case carrying a grant + proof adds 2 `jwt` hits. Every other default rule still applies in these trees, and every rule applies
 # everywhere else in the repository.
 #
 # RESIDUAL, measured and stated rather than claimed away: a credential committed under
@@ -37,7 +40,7 @@
 useDefault = true
 
 [[allowlists]]
-description = "conformance fixtures: JWT-shaped tokens and 32-byte base64url public key material"
+description = "conformance fixtures: JWT-shaped tokens plus 32-byte base64url fingerprints, digests and public keys"
 targetRules = ["jwt", "generic-api-key"]
 paths = [
   '''priv/conformance/v1/corpus/.*''',
