@@ -1701,7 +1701,11 @@ function validOperationName(name) {
 function withinJsonBounds(value, depth = 1) {
   if (depth > MAXIMA.depth) return false;
   if (value === null || typeof value === "boolean") return true;
-  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "number") {
+    // Mirror the official magnitude bound exactly: |value| capped at 9007199254740991; 2^53
+    // itself is rejected (probed against V1.Jcs.encode directly).
+    return Number.isFinite(value) && Math.abs(value) <= MAXIMA.integer_magnitude;
+  }
   if (typeof value === "string") {
     return wellFormedString(value) && Buffer.byteLength(value, "utf8") <= MAXIMA.string_bytes;
   }
@@ -1711,10 +1715,11 @@ function withinJsonBounds(value, depth = 1) {
   if (!value || typeof value !== "object") return false;
   const keys = Object.keys(value);
   if (keys.length > MAXIMA.object_members) return false;
+  // Object member keys have NO one-byte floor: the official accepts {"":1} (probed against both
+  // V1.Json.decode and V1.Jcs.encode). Only selector PATH segments carry the 1-byte minimum.
   return keys.every(
     (k) =>
       wellFormedString(k) &&
-      Buffer.byteLength(k, "utf8") >= 1 &&
       Buffer.byteLength(k, "utf8") <= MAXIMA.key_bytes &&
       withinJsonBounds(value[k], depth + 1),
   );
