@@ -1797,6 +1797,14 @@ function dispatchVerifyGrant(input) {
   assert(header.alg === "EdDSA" && header.typ === "ba+cap", "verify_grant header values");
   assert(header.kid === keyId, "verify_grant: kid");
   const payload = parseCanonicalJson(jws.payloadBytes, "verify_grant payload");
+  // Closed like the official (runtime.ex `closed_map(payload_members, @grant_payload_keys)`), and
+  // `cnf` with it — this dispatcher reads payload.cnf.jkt below.
+  exactKeys(
+    payload,
+    ["aud", "cnf", "exp", "iat", "iss", "jti", "nbf", "operations", "v"],
+    "verify_grant payload",
+  );
+  exactKeys(payload.cnf, ["jkt"], "verify_grant grant cnf");
   assert(payload.v === 1, "verify_grant: version");
   assert(payload.iss === issuer, "verify_grant: issuer");
   assert(Array.isArray(payload.aud) && payload.aud.includes(audience), "verify_grant: audience");
@@ -1978,17 +1986,20 @@ function dispatchCheckEnvelope(input) {
   } else {
     fail("check_envelope: expected nonce shape");
   }
-  // Holder thumbprint must match the grant cnf.jkt.
-  assert(grantPayload.cnf && grantPayload.cnf.jkt === jwkThumbprint(holderJwk), "check_envelope: holder thumbprint");
+  // Holder thumbprint must match the grant cnf.jkt. `cnf` is a closed map in the official
+  // (runtime.ex `closed_map(confirmation_members, ["jkt"])`), so an extra member there must reject
+  // here too — same nesting depth as the operation object below, same permissiveness class.
+  exactKeys(grantPayload.cnf, ["jkt"], "check_envelope grant cnf");
+  assert(grantPayload.cnf.jkt === jwkThumbprint(holderJwk), "check_envelope: holder thumbprint");
   // Selector binding: the grant operation named ba_op must exist UNIQUELY, and EVERY selector it
   // carries must match the server-derived cast_arguments (runtime.ex:497-498). Without this the
   // independent verifier would ignore grant selectors — the exact gap the check_envelope selector
   // fixtures exercise, so a corpus with a non-trivial selector would else silently disagree.
-  // Guard family: the selector is not the only structure on this path the official closes. Its
-  // enclosing operation object is a closed map too (runtime.ex `closed_map(members, ["name",
-  // "selectors"])`), and the sibling decode_grant / verify_grant dispatchers in this file already
-  // apply exactKeys to the structures they read. Closing the selector alone would leave the
-  // asymmetry the selector hardening exists to remove.
+  // Guard family: the selector is not the only structure on this path the official closes. Every
+  // operation object is a closed map (runtime.ex `closed_map(members, ["name", "selectors"])`) and
+  // the official validates the CONTENTS of every operation, not just the one named by ba_op
+  // (`operations/2` maps `operation/2` over all of them), so both are enforced below for every
+  // element. `cnf`, the grant header/payload and the proof header/payload are closed above.
   const grantOperations = grantPayload.operations;
   assert(
     Array.isArray(grantOperations) &&
@@ -1998,6 +2009,18 @@ function dispatchCheckEnvelope(input) {
   );
   for (const op of grantOperations) {
     exactKeys(op, ["name", "selectors"], "check_envelope grant operation");
+    assert(
+      typeof op.name === "string" &&
+        Buffer.byteLength(op.name, "utf8") >= 1 &&
+        Buffer.byteLength(op.name, "utf8") <= MAXIMA.operation_bytes,
+      "check_envelope: operation name",
+    );
+    assert(
+      Array.isArray(op.selectors) &&
+        op.selectors.length >= 1 &&
+        op.selectors.length <= MAXIMA.selectors,
+      "check_envelope: operation selectors",
+    );
   }
   const namedOps = grantOperations.filter((o) => o.name === operation);
   assert(namedOps.length === 1, "check_envelope: unique operation");

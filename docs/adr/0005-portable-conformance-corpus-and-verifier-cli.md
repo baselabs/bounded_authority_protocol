@@ -121,7 +121,8 @@ check at `runtime.ex`'s `Selector.match_all` for the right reason, proven by a r
 and a `selector-reject` mutation) exercise both directions. The independent Node verifier now
 evaluates grant selectors on the `check_envelope` path (unique operation by `ba_op`, then a
 conjunctive `match_all` over `cast_arguments`), so both implementations reject the `invalid_selector`
-case. Applicability: `check_envelope/valid` is `2`, `invalid_selector` is `1`. Re-signing required
+case. Applicability: `check_envelope/valid` is `2`, `invalid_selector` is `2` (the second is the
+empty-path case recorded below). Re-signing required
 two new deterministic conformance keypairs (the original corpus keys' private seeds are unrecoverable
 — generation was throwaway), growing the corpus key census 6→8; see "Census evolution" below.
 The cross-verifier discovery scan (bap03 + chain_archive `discoverPublicKeys`) finds keys in
