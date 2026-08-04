@@ -117,13 +117,13 @@ All notable changes to `bounded_authority_protocol` are documented here.
   two structurally different values compared equal — a collapse that reached the request digest as
   well as selector matching. Selector values are now also held to the protocol JSON bounds. The
   same operation validation is applied on `verify_grant`, which reaches the same official decode
-  path (corpus 220→231; `check_envelope/invalid_encoding` 6, `verify_grant/invalid_encoding` 5).
+  path (corpus 220→233; `check_envelope/invalid_encoding` 6, `verify_grant/invalid_encoding` 5).
 - Add `.gitleaks.toml`: the `jwt` and `generic-api-key` rules are allowlisted for the conformance
   corpus and vector paths only, where all 283 findings are JWT-shaped high-entropy public test
   material (109 `jwt`, 174 `generic-api-key`, the latter almost entirely key fingerprints). Every other default rule still applies in those trees — a `ghp_…` token committed there
   is still caught — and every rule applies everywhere else. Stated residual: a credential matching
   ONLY those two rules, under those two machine-generated fixture directories, is not flagged.
-- Add the portable v1 conformance corpus (231 cases across 28 surfaces with a total
+- Add the portable v1 conformance corpus (233 cases across 28 surfaces with a total
   surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
   `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
 - Harden the corpus against vacuous green: author the invalid vectors the crypto verifying

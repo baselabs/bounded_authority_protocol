@@ -1731,10 +1731,10 @@ function taggedMember(owner, key, value) {
 // and width are enforced first (closed member set, non-empty bounded path of bounded string
 // segments, bounded one_of values) so a malformed selector REJECTS here rather than being accepted
 // — an independent verifier more permissive than the official would certify a grant the official
-// refuses. Two legs of the official's validation are NOT mirrored here and are covered upstream
-// instead: per-segment `String.valid?` (JSON.parse yields well-formed strings, and
-// parseCanonicalJson re-encodes and requires byte equality) and JCS-encodability of selector values
-// within bounds (the same canonical-bytes check). Treat those as upstream-covered, not absent.
+// refuses. Per-segment UTF-8 validity and the selector-value JSON bounds ARE mirrored here
+// (wellFormedString / withinJsonBounds). An earlier revision of this comment claimed both were
+// "covered upstream" by parseCanonicalJson's round-trip; that was wrong — a lone surrogate
+// survives the round-trip because JSON.stringify re-emits the same escape.
 //
 // Identity is the JCS of the tagged form — the same tagged projection ba_req uses (arrays
 // positional, objects unordered). One tag distinction the official draws is NOT recoverable here:
@@ -1795,6 +1795,9 @@ function validateGrantOperations(operations, context) {
   assert(new Set(names).size === names.length, `${context}: duplicate operation name`);
 }
 
+// The official resolves selector members with closed_map_one_of over exactly these three sets.
+const SELECTOR_MEMBER_SETS = new Set(["kind", "kind,path,value", "kind,path,values"]);
+
 // Structural half of the selector contract, independent of whether it MATCHES anything. Split out
 // so every operation's selectors can be validated while only the requested operation's are
 // evaluated against cast_arguments.
@@ -1803,7 +1806,13 @@ function validSelectorShape(selector, context) {
     fail(`${context}: selector shape`);
   }
   const members = Object.keys(selector).sort().join(",");
-  if (selector.kind === "all" && members === "kind") return;
+  if (!SELECTOR_MEMBER_SETS.has(members)) fail(`${context}: selector shape`);
+  // `all` FIRST and on ANY of the three closed member sets: the official's `selector/2` matches
+  // `{:ok, %{"kind" => {:string, "all"}}}` before the other clauses, and that is an OPEN map
+  // pattern, so a selector carrying kind:"all" alongside path/value decodes as :all rather than
+  // being rejected. Requiring members === "kind" here made this runner STRICTER than the official
+  // — the one divergence direction that fails a conforming implementation.
+  if (selector.kind === "all") return;
   if (selector.kind === "equals" && members === "kind,path,value") {
     if (!validSelectorPath(selector.path)) fail(`${context}: selector path`);
     if (!withinJsonBounds(selector.value)) fail(`${context}: selector value bounds`);
@@ -1826,7 +1835,9 @@ function selectorMatches(selector, args) {
     fail("check_envelope: selector shape");
   }
   const members = Object.keys(selector).sort().join(",");
-  if (selector.kind === "all" && members === "kind") return true;
+  if (!SELECTOR_MEMBER_SETS.has(members)) fail("check_envelope: selector shape");
+  // Same open-pattern rule as validSelectorShape above: kind:"all" wins on any closed member set.
+  if (selector.kind === "all") return true;
   if (selector.kind === "equals" && members === "kind,path,value") {
     if (!validSelectorPath(selector.path)) fail("check_envelope: selector path");
     if (!withinJsonBounds(selector.value)) fail("check_envelope: selector value bounds");

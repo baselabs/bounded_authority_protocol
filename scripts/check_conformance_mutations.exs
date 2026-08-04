@@ -144,8 +144,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Disabling verdict agreement in the independent Node runner (agree() returns false for every
       # case) turns every shipped case into a disagreement. Targeted test asserts the shipped
-      # corpus yields agreed=231 disagreed=0; with agreement disabled it yields agreed=0
-      # disagreed=231. Mutated in the isolated copy only.
+      # corpus yields agreed=233 disagreed=0; with agreement disabled it yields agreed=0
+      # disagreed=233. Mutated in the isolated copy only.
       name: "runner-verdict-agreement-removal",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -463,6 +463,26 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "  const obj = Object.create(null);\n",
       to: "  const obj = {};\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # Selector values must satisfy the protocol JSON bounds (official: Jcs.encode(value, bounds)).
+      # Without this the runner accepts a grant whose selector value exceeds object_members.
+      name: "node-selector-value-json-bounds-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "function withinJsonBounds(value, depth = 1) {\n",
+      to: "function withinJsonBounds(value, depth = 1) {\n  return true;\n",
+      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+    },
+    %{
+      # The official matches `all` on an OPEN pattern, so kind:"all" decodes as :all on ANY of the
+      # three closed member sets. Requiring members === "kind" makes the runner STRICTER than the
+      # official — it would reject a conforming grant. The valid fixture
+      # check-envelope-valid-selector-all-with-extra-members flips to invalid under this mutation.
+      name: "node-selector-all-open-pattern-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  if (selector.kind === \"all\") return;\n",
+      to: "  if (selector.kind === \"all\" && members === \"kind\") return;\n",
       command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----
