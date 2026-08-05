@@ -17,7 +17,7 @@ Naming scheme: `BAP<contract-major>-<signature>-<digest>`.
 | Suite | Status | Definition |
 |---|---|---|
 | `BAP1-Ed25519-SHA256` | active | EdDSA/Ed25519, SHA-256, RFC 8785 JCS, `BAP1-*` domain separators, fixed 32-byte keys / 64-byte signatures — the complete current [normative profile](../protocol-v1.md) |
-| ML-DSA (FIPS 204) successor | anticipated | Named on definition per the scheme; hybrid Ed25519+ML-DSA composite evaluated at that time; see charter § Cryptographic suite identity |
+| ML-DSA (FIPS 204) successor | anticipated | Named on definition per the scheme (`BAP<contract-major>-ML-DSA-<digest>`); the anticipated parameter sets are ML-DSA-44 (NIST category 2), ML-DSA-65 (category 3), ML-DSA-87 (category 5); hybrid Ed25519+ML-DSA composite evaluated at that time; see [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) and charter § Cryptographic suite identity |
 
 ## Claim names
 
@@ -28,6 +28,7 @@ Naming scheme: `BAP<contract-major>-<signature>-<digest>`.
 | `ba_req` | active | Request digest (`BAP1-REQUEST\0` domain) over `[operation, typed(cast_arguments)]` |
 | `ba_dlg` | reserved | Parent-grant hash binding a delegated (attenuated) grant to its parent — charter § Delegation with attenuation |
 | `ba_obo` | reserved | Issuer-asserted on-behalf-of principal identifier (StringOrURI) — charter § Principal binding |
+| `ba_sut` | reserved | Suite-attestation payload binding (chain identity, sequence range, archive content digest, original suite, attestation time, typed suite-parameterized key) — [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
 
 Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti`, `cnf`, `ath`,
 `htm`, `htu`, `nonce`) carry their RFC 7519 / RFC 7638 / RFC 9449 registered meanings.
@@ -41,6 +42,7 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 | `ba+chain-anchor` | active | Signed consumption-chain boundary anchor |
 | `ba+key-transition` | active | Authenticated historical-key transition |
 | `ba+cap-delegated` | reserved | Delegated attenuated grant — charter § Delegation with attenuation |
+| `ba+suite-attestation` | reserved | Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
 
 ## Selector kinds
 
