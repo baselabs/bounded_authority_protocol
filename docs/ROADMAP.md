@@ -170,6 +170,44 @@ compatibility.
   pinned Opus were unavailable because their usage limits were exhausted. No further product
   review recursion was run.
 
+## BAP-05 closeout evidence
+
+- Package-bearing closeout head `ce20a8b12e7b715f5373a72763e46adff7b3e30f` is pushed to public
+  `main`. [CI run 30918991087](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30918991087)
+  passed workflow syntax, the complete quality/package boundary, and all supported pairs:
+  Elixir 1.18.4/OTP 27.3.4.14, Elixir 1.19.5/OTP 28.5.0.3, and Elixir
+  1.20.2/OTP 29.0.3.
+- [Supply-chain run 30918990587](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30918990587)
+  built artifact `8896780979`. Its exact unpublished archive has SHA-256
+  `dd0a17eada43f1f60c8f2f23f92575dd4f995a02d93043b1ac097bb954f936df`; the downloaded
+  `SHA256SUMS` check passed. `gh attestation verify` accepted separate SLSA provenance and
+  CycloneDX 1.6 SBOM attestations for that digest, constrained to this repository, the trusted
+  supply-chain workflow (`refs/heads/main`), source digest `ce20a8b12e7b715f5373a72763e46adff7b3e30f`,
+  and GitHub-hosted runners.
+- Implementation head `53c4590` (followed by supported-compiler compatibility corrections and an
+  extended runner-hardening arc through the package-bearing head) delivers the portable v1
+  conformance corpus (259 cases across 28 surfaces with a total applicability matrix), the
+  deterministic verifier CLI (escript, `--corpus` required, exits 0/1/2, exact-path purity
+  carve-out), the independent Node second-implementation runner (node:* only — the corpus is
+  normative), a three-partition public-key census (hard two-way), stream_data property and
+  deterministic-PRNG fuzz gates, and a source-isolated mutation battery wired into `mix quality`
+  ([ADR 0005](adr/0005-portable-conformance-corpus-and-verifier-cli.md)). The corpus ships in the
+  published package and the fresh-consumer check runs the packaged escript against the packaged
+  corpus.
+- The corpus and runner were hardened across multiple bounded deltas after their first closeout
+  pass: the `check_envelope` selector-binding vacuity and its `ba_op`/CNF/operation-name
+  companions were closed, and every independent-runner permissiveness residual against the official
+  decoder was mirrored (StringOrURI structure, optional proof nonce, payload-field decode,
+  selector-value magnitude, JSON bounds, request-digest typed projection). The committed corpus
+  count (259) is reconciled in `README.md`, this roadmap, and
+  [`docs/design/conformance-contract.md`](design/conformance-contract.md).
+- Local `mix quality` passes with 295 tests and 13 properties (0 failures), plus format,
+  warnings-as-errors compilation, exact architecture accounting, Credo, Dialyzer, documentation,
+  advisory, retired-package, license, CycloneDX, exact archive, fresh unpacked-consumer,
+  chain-archive mutation (47/47), conformance mutation (55/55), and conformance-verify gates. The
+  conformance runner reports `agreed=259, agreement=true, disagreed=0`. The package retains zero
+  production dependencies, no application callback, and no supervision tree.
+
 ## Next action
 
 BAP-04 and BAP-05 are complete. BAP-05 shipped the portable v1 conformance corpus (259 cases
