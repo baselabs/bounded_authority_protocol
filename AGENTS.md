@@ -21,7 +21,7 @@ grant operational authority by itself.
 
 ## Current state
 
-`BAP-00` through `BAP-04` are closed. The unpublished 0.1.0 package retains zero production
+`BAP-00` through `BAP-05` and `BAP-10` are closed. The unpublished 0.1.0 package retains zero production
 dependencies, no application callback, and no supervision tree. The normative v1 tables and
 bounds, raw-number preflight, bounded ordered JSON decoder with recursive duplicate rejection,
 strict base64url decoder, Draft 2020-12 structural schemas, architecture mutation gates, public

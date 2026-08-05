@@ -243,31 +243,6 @@ base64url(SHA-256("BAP1-REQUEST\0" || JCS([operation, typed(cast_arguments)])))
 The prefix is exact ASCII including its final zero byte (`REQ1-SIGNING-digest-prefix`). `typed/1`
 projects the tagged JSON algebra to the following closed JSON form before JCS:
 
-## Signing and digest inputs
-
-Grant and proof compact values use the exact RFC 7515 signing input:
-
-```text
-ASCII(base64url(protected) || "." || base64url(payload))
-```
-
-No bytes precede or follow it. Verification uses the exact received segments; correctly signed
-closed JSON objects may use any member order. Producers emit one deterministic JCS representation.
-
-The verifier validates the fixed 32-byte public-key and 64-byte signature encodings, completes
-all bounded parsing and contextual checks, and then delegates Ed25519 verification to the
-supported OTP `:crypto` backend. A backend rejection or exception returns exactly
-`{:error, :invalid}`.
-
-The request digest is:
-
-```text
-base64url(SHA-256("BAP1-REQUEST\0" || JCS([operation, typed(cast_arguments)])))
-```
-
-The prefix is exact ASCII including its final zero byte. `typed/1` projects the tagged JSON algebra
-to the following closed JSON form before JCS:
-
 | tagged value | projected JSON |
 |---|---|
 | `:null` | `["null"]` |
