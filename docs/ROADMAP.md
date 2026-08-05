@@ -270,7 +270,7 @@ compatibility.
   mix.lock` is empty. Local `mix quality` passes with 295 tests and 13 properties (0 failures), the
   conformance runner reports `agreed=259, agreement=true, disagreed=0`, and the new
   `release.candidate` gate passes (candidate archive SHA-256
-  `7caeb8704a148e7214d7818dc75b8a03c37618c1b03334b317e8a0f833c192dd` at the local closeout head). The
+  `c8897054f528e3a81853ed5fcb1fe062ccd14622b41b8e9fbda55bd1057d98f0` at the local closeout head). The
   CI-attested SHA-256 + supply-chain run + `gh attestation verify` constraints are the post-push
   receipt (mirroring BAP-10's pattern); they record at the exact closeout head once pushed.
 
