@@ -323,19 +323,22 @@ compatibility.
     mirroring `ath`); the `ba+cap-delegated` typ with its parent-holder key carried in the
     protected-header `jwk` (the current grant carries `cnf.jkt` as a thumbprint digest only, so
     the successor-major delegated grant carries the signing key the way today's `dpop+jwt` proof
-    does); the four-part attenuation relation (operations subset by name, **multiset containment**
-    of parent selector tuples in the child list, validity-window containment, audience
-    containment); the depth-bounded chain-verification algorithm; and a soundness + decidability
-    proof against `Selector.match_all/3`'s conjunctive `Enum.all?` (selector.ex:23).
+    does); the four-part attenuation relation (operations subset by name, **set containment on
+    distinct selector tuples** of parent selectors in the child list, validity-window containment,
+    audience containment); the depth-bounded chain-verification algorithm; and a soundness +
+    decidability proof against `Selector.match_all/3`'s conjunctive `Enum.all?` (selector.ex:23).
   - The design-adversarial pass (7 challenges, all admitted) forced two blocking-class design
     changes: (a) the per-link signature binding was unrealizable as drafted — `cnf.jkt` is a
     thumbprint, not a key, so the successor-major `ba+cap-delegated` grant carries its issuer key
     in a header `jwk`; (b) the selector-attenuation rule was a verbatim-PREFIX requirement, which
     would reject valid reordered narrowings (the matcher's conjunction is order-independent) —
-    corrected to multiset containment. Five further challenges folded: a raw-vs-base64url type
-    incoherence in the `ba_dlg` comparison; the depth bound restated as REQUIRED-and-finite; a
-    separate breadth/fan-out bound (depth caps depth, not fan-out); and an honest acceptance-set
-    completeness picture for the narrowing rule.
+    corrected to set containment on distinct tuples. Cross-vendor review (codex peer) then forced
+    two further fixes: a raw-vs-base64url type incoherence in the `ba_dlg` comparison; and the
+    leaf-binding step restated to run the full leaf verification (audience/operation/selectors/
+    time/ath) via a successor-major delegated-leaf parse path (today's `check_envelope` cannot
+    parse `ba+cap-delegated`). Five design-adversarial challenges folded: the depth bound
+    restated as REQUIRED-and-finite; a separate breadth/fan-out bound (depth caps depth, not
+    fan-out); and an honest acceptance-set completeness picture for the narrowing rule.
   - [registries.md](design/registries.md) `ba_dlg` and `ba+cap-delegated` rows forward-ref
     ADR 0010 (status stays `reserved` — no new reservation; the names were reserved in ADR 0006
     §4). [standards-track.md](design/standards-track.md) § Delegation and
@@ -363,7 +366,7 @@ a content-covering countersignature primitive, ML-DSA successor family named, re
 change. BAP-14 carried the delegation-with-attenuation design to a full successor-contract
 specification ([ADR 0010](adr/0010-delegation-with-attenuation.md)): the `ba_dlg` parent-grant-hash
 claim, the `ba+cap-delegated` typ with header-`jwk` parent-holder key binding, the four-part
-attenuation relation (multiset-containment selector narrowing proven decidable against the existing
+attenuation relation (set-containment-on-distinct-tuples selector narrowing proven decidable against the existing
 selector algebra), and the depth-bounded chain-verification algorithm — design-only, zero wire
 change, names stay reserved-and-rejected.
 
