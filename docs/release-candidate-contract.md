@@ -20,9 +20,13 @@ The locked API is the set of modules and functions a consumer depends on. It is 
 mechanically and enumerated here for human readers + SemVer review.
 
 **Mechanical enforcement:** `tools/architecture_gate.exs` `@compiled_export_allowances` pins the
-exact compiled exports per `.beam`. Any export addition, removal, or arity change to a
-`BoundedAuthorityProtocol.V1` façade turns `mix architecture` red. The gate is the authoritative
-full-arity lock; the enumeration below lists primary arities.
+exact compiled exports per `.beam` for the dominant contract modules (the `V1` facade, `V1.Runtime`,
+the codecs, the public structs) — any export addition, removal, or arity change to those turns
+`mix architecture` red. The named decoder/bounds submodules (`V1.Json`, `V1.Base64Url`, `V1.Bounds`)
+are enforced under `@compiled_dynamic_allowances` (dynamic-call-count): removal/rename/arity change
+of their existing functions surfaces via the dynamic-call check plus the unpacked-consumer gate.
+The `V1.beam` facade pin is the authoritative full-arity lock for the dominant surface; the
+enumeration below lists primary arities.
 
 **`BoundedAuthorityProtocol.V1`** facade (`lib/bounded_authority_protocol/v1.ex`):
 

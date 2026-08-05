@@ -1,12 +1,17 @@
 # Release-candidate reproducibility gate (BAP-06).
 #
-# Builds the unpublished candidate archive TWICE from independently-prepared build
-# environments — purging `_build` and `deps` between the two builds so the second
-# build re-resolves and repackages from scratch — and asserts the two archives are
-# byte-identical (SHA-256 equal). This DETECTS output-byte drift between two
-# independently-built archives; it does not assert "the build is reproducible" from
-# a shared-cache self-comparison (the original overclaim defeated by the design's
-# adversarial pass, Challenge 3).
+# Builds the unpublished candidate archive TWICE, each in a fresh COPY of the source
+# tree under a temp dir, and asserts the two archives are byte-identical (SHA-256
+# equal). This DETECTS output-byte drift between two independently-built archives;
+# it does not assert "the build is reproducible" from a shared-cache self-comparison
+# (the original overclaim defeated by the design's adversarial pass, Challenge 3).
+#
+# Isolation strategy: each copy gets its own `deps.get` + `hex.build`, so the two
+# builds share no compiled artifacts and no fetched deps — the cache isolation that
+# makes the gate meaningful. The developer's `_build`/`deps` are NEVER mutated (the
+# earlier purge-in-place approach was redesigned after the closeout correctness lens
+# found it left the tree degraded and depended on a best-effort restore that could
+# fail silently); building in copies sidesteps both.
 #
 # Honest scope (verified via the red-capable proof at authoring): `mix hex.build`
 # packages SOURCE files (the `files:` list — lib/, priv/, docs, metadata), not
@@ -14,17 +19,15 @@
 # gate's value is REGRESSION DETECTION — it catches the moment a future change
 # introduces a non-deterministic packaged input (a generated file embedding a build
 # path or timestamp, a dep that writes into a packaged dir, a metadata field that
-# varies per build). The cache purge between builds ensures the second build
-# re-resolves deps and re-assembles the archive rather than reusing mix's assembled
-# state, so any non-determinism in the assembly path surfaces. Hex normalizes tar
-# mtimes to epoch, so mtime non-determinism is already neutralized; the gate catches
-# the rest. A tamper that changes a packaged source file between the two builds is
-# confirmed to make the gate exit non-zero (the red-capable proof).
+# varies per build). The fresh-copy + fresh-deps.get ensures the second build
+# re-resolves and re-assembles rather than reusing any prior state. Hex normalizes
+# tar mtimes to epoch, so mtime non-determinism is neutralized. A tamper that changes
+# a packaged source file between the two builds is confirmed to make the gate exit
+# non-zero (the red-capable proof).
 #
-# The gate mutates the project tree (`mix deps.clean --all`, `rm -rf _build`) and
-# restores it (`mix deps.get`) before exiting, so a green run leaves a working tree.
-# A red run (byte drift) exits non-zero AFTER restoring the tree, so the developer's
-# environment is never left broken by the gate.
+# The gate does NOT mutate the project tree; a green or red run leaves the
+# developer's environment exactly as it was (the copies live under a temp dir that
+# is removed in the `after` block).
 #
 # Wired into `mix quality` via the `release.candidate` alias (mix.exs). The SHA-256
 # printed on success is the candidate-evidence yardstick (same yardstick the
@@ -36,40 +39,43 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
 
   def run! do
     source_root = File.cwd!()
+    assert_mix_lock_present!(source_root)
 
     tmp = unique_tmp_root!()
-    build1 = Path.join(tmp, "build1.tar")
-    build2 = Path.join(tmp, "build2.tar")
 
     try do
-      assert_mix_lock_present!(source_root)
+      # Isolation strategy (reconciled closeout F1+F2): build in two fresh COPIES of the
+      # source tree, so the developer's _build/deps are never mutated and no restore is
+      # needed. Each copy gets its own deps.get + hex.build, so the two builds share no
+      # compiled artifacts and no fetched deps — the cache isolation that makes the gate
+      # meaningful. The earlier purge-in-place approach (deps.clean + rm -rf _build)
+      # left the dev's tree degraded (no _build, including dialyzer PLTs) and depended on
+      # a best-effort restore that could fail silently; copying avoids both.
+      copy1 = Path.join(tmp, "copy1")
+      copy2 = Path.join(tmp, "copy2")
+      build1 = Path.join(tmp, "build1.tar")
+      build2 = Path.join(tmp, "build2.tar")
 
-      run!("mix", ["hex.build", "--output", build1], source_root)
-      assert_regular_nonempty!(build1)
+      copy_source_tree!(source_root, copy1)
+      copy_source_tree!(source_root, copy2)
+
+      build_in!(copy1, build1)
+      build_in!(copy2, build2)
+
       digest1 = sha256_file(build1)
-
-      # Cache isolation: purge compiled artifacts and fetched deps so build #2
-      # recompiles every source and re-resolves every dependency from scratch.
-      run!("mix", ["deps.clean", "--all"], source_root)
-      File.rm_rf!(Path.join(source_root, "_build"))
-
-      run!("mix", ["hex.build", "--output", build2], source_root)
-      assert_regular_nonempty!(build2)
       digest2 = sha256_file(build2)
 
       unless digest1 == digest2 do
         fail!(
           "candidate archive is not reproducible across independent builds: " <>
-            "build1=#{digest1} build2=#{digest2} (cache was purged between builds; " <>
-            "a non-deterministic input produced different bytes)"
+            "build1=#{digest1} build2=#{digest2} (two fresh source-tree copies, no shared " <>
+            "cache; a non-deterministic input produced different bytes)"
         )
       end
 
       IO.puts("release candidate reproducibility gate passed (two independent builds agree)")
       IO.puts("candidate archive SHA-256: #{digest1}")
     after
-      # Restore the tree so the gate never leaves the developer's environment broken.
-      restore_deps!(source_root)
       File.rm_rf!(tmp)
     end
   end
@@ -80,23 +86,36 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
     end
   end
 
-  defp restore_deps!(source_root) do
-    # Re-fetch deps destroyed by deps.clean --all. Best-effort: if this fails the
-    # developer can run `mix deps.get` manually, but a silent broken tree is worse
-    # than a loud restore error.
-    case System.cmd("mix", ["deps.get"],
-           cd: source_root,
-           stderr_to_stdout: true,
-           into: IO.stream(:stdio, :line)
-         ) do
-      {_output, 0} ->
-        :ok
+  # Copy the source tree into dest, excluding build artifacts, fetched deps, editor/tool
+  # state, and generated output. What remains is exactly the source a reproducible build
+  # starts from: lib, priv, docs, scripts, tools, mix.exs, mix.lock, and the metadata/docs.
+  @copy_excludes ~w(_build deps .git .forge .zcode artifacts cover doc graphify-out
+                    bounded_authority_conformance conformance compliance erl_crash.dump)
 
-      {_output, status} ->
-        IO.puts(
-          "warning: mix deps.get exited #{status} during restore — run `mix deps.get` manually"
-        )
-    end
+  defp copy_source_tree!(source, dest) do
+    File.mkdir_p!(dest)
+
+    source
+    |> File.ls!()
+    |> Enum.reject(&(&1 in @copy_excludes))
+    |> Enum.each(fn entry ->
+      src = Path.join(source, entry)
+      dst = Path.join(dest, entry)
+
+      case File.lstat(src) do
+        {:regular, _} -> File.cp!(src, dst)
+        {:symlink, _} -> File.ln_s!(File.read_link!(src), dst)
+        _ -> File.cp_r!(src, dst)
+      end
+    end)
+  end
+
+  defp build_in!(copy_root, output) do
+    # Fetch deps into the copy, then build the archive there. The copy has no _build
+    # and no deps, so this is a from-scratch resolve + assemble.
+    run!("mix", ["deps.get"], copy_root)
+    run!("mix", ["hex.build", "--output", output], copy_root)
+    assert_regular_nonempty!(output)
   end
 
   defp unique_tmp_root! do
