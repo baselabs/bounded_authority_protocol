@@ -310,9 +310,42 @@ compatibility.
     `.forge/critical-surfaces` (declaration; the commit hook is not installed in this repo, so the
     manifest governs via declaration + honor-system `track: T2`).
 
+## BAP-14 closeout evidence
+
+- The slice carries the already-decided delegation shape (ADR 0006 §5) to a full successor-
+  contract specification. It is a **design-only slice: zero wire byte, bound, or verdict change**
+  (`git diff 9affafd..HEAD -- lib/ test/ priv/conformance/ mix.lock` empty). Local `mix quality`
+  passes with 295 tests and 13 properties (0 failure); the conformance runner reports
+  `agreed=259, agreement=true, disagreed=0` (unchanged — the reserved names `ba_dlg` and
+  `ba+cap-delegated` are rejected by the current closed profile).
+  - [ADR 0010](adr/0010-delegation-with-attenuation.md) specifies the mechanism: the `ba_dlg`
+    parent-grant-hash claim (compared raw-to-raw via the `CompactJws.hash/2` raw-digest variant,
+    mirroring `ath`); the `ba+cap-delegated` typ with its parent-holder key carried in the
+    protected-header `jwk` (the current grant carries `cnf.jkt` as a thumbprint digest only, so
+    the successor-major delegated grant carries the signing key the way today's `dpop+jwt` proof
+    does); the four-part attenuation relation (operations subset by name, **multiset containment**
+    of parent selector tuples in the child list, validity-window containment, audience
+    containment); the depth-bounded chain-verification algorithm; and a soundness + decidability
+    proof against `Selector.match_all/3`'s conjunctive `Enum.all?` (selector.ex:23).
+  - The design-adversarial pass (7 challenges, all admitted) forced two blocking-class design
+    changes: (a) the per-link signature binding was unrealizable as drafted — `cnf.jkt` is a
+    thumbprint, not a key, so the successor-major `ba+cap-delegated` grant carries its issuer key
+    in a header `jwk`; (b) the selector-attenuation rule was a verbatim-PREFIX requirement, which
+    would reject valid reordered narrowings (the matcher's conjunction is order-independent) —
+    corrected to multiset containment. Five further challenges folded: a raw-vs-base64url type
+    incoherence in the `ba_dlg` comparison; the depth bound restated as REQUIRED-and-finite; a
+    separate breadth/fan-out bound (depth caps depth, not fan-out); and an honest acceptance-set
+    completeness picture for the narrowing rule.
+  - [registries.md](design/registries.md) `ba_dlg` and `ba+cap-delegated` rows forward-ref
+    ADR 0010 (status stays `reserved` — no new reservation; the names were reserved in ADR 0006
+    §4). [standards-track.md](design/standards-track.md) § Delegation and
+    [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) §5
+    forward-ref ADR 0010. [protocol-v1.md](protocol-v1.md) names ADR 0010 in its deferral
+    sentence (prose only; no value, bound, or table change).
+
 ## Next action
 
-BAP-04, BAP-05, BAP-10, BAP-06, and BAP-11 are complete. BAP-05 shipped the portable v1 conformance
+BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, and BAP-14 are complete. BAP-05 shipped the portable v1 conformance
 corpus (259 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI
 (escript, `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent
 Node second-implementation runner (node:* only — the corpus is normative), a three-partition
@@ -327,12 +360,18 @@ and the candidate-facing docs. BAP-11 carried the cryptographic-suite succession
 evidence-longevity design to ADR quality ([ADR 0009](adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md)):
 a content-covering countersignature primitive, ML-DSA successor family named, reserved
 `ba+suite-attestation`/`ba_sut`, suite identity woven through the profile — design-only, zero wire
-change.
+change. BAP-14 carried the delegation-with-attenuation design to a full successor-contract
+specification ([ADR 0010](adr/0010-delegation-with-attenuation.md)): the `ba_dlg` parent-grant-hash
+claim, the `ba+cap-delegated` typ with header-`jwk` parent-holder key binding, the four-part
+attenuation relation (multiset-containment selector narrowing proven decidable against the existing
+selector algebra), and the depth-bounded chain-verification algorithm — design-only, zero wire
+change, names stay reserved-and-rejected.
 
 The standards track charter (ADR 0006, [standards-track.md](design/standards-track.md)) gates that
 cannot be retrofitted after third parties implement the profile are now closed: BAP-10 (normative
-contract), BAP-06 (release candidate), and BAP-11 (suite identity + evidence longevity) all landed.
-**BAP-07 (connected verification and first public release) is unblocked on the public-protocol
-side** — its remaining dependency is private BA-14 (the private runtime's connected gates). BAP-12
-(IANA templates) and BAP-13 (published governance) ride the BAP-08 external submission path; BAP-14
-carries the already-decided delegation design to a full successor-contract specification.
+contract), BAP-06 (release candidate), BAP-11 (suite identity + evidence longevity), and BAP-14
+(delegation-with-attenuation specification) all landed — every one of ADR 0006 §context's
+"capture-now-or-never" designs. **BAP-07 (connected verification and first public release) is
+unblocked on the public-protocol side** — its remaining dependency is private BA-14 (the private
+runtime's connected gates). BAP-12 (IANA templates) and BAP-13 (published governance) ride the
+BAP-08 external submission path.
