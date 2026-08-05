@@ -246,10 +246,38 @@ compatibility.
   requirement map (docs-build registration, not a wire/code change). Registries reconciliation found
   no drift (`docs/design/registries.md` unchanged).
 
+## BAP-06 closeout evidence
+
+- The slice spans `7f4cdd1` (Task 1, the reproducibility gate) through this closeout block. It
+  delivers the 0.1.0 release-candidate contract: the locked public API surface, the reproducibility
+  gate, and the candidate-facing docs.
+  - [ADR 0008](adr/0008-release-candidate-contract.md) records the API-lock + reproducibility-gate
+    decision: the locked surface is enforced mechanically by the existing
+    `@compiled_export_allowances` pin in `tools/architecture_gate.exs` (lines 188-207 pin every
+    `V1` façade export, including the corrected `verify_key_transition/4` arity and the five producer
+    functions), enumerated for readers in [the release-candidate contract](release-candidate-contract.md);
+    the pre-1.0 SemVer convention (0.x.y may break, the lock identifies the intended 1.0.0 surface);
+    and the cache-isolated two-build reproducibility gate.
+  - `scripts/check_release_candidate.exs` builds the candidate archive twice with `_build`/`deps`
+    purged between builds and asserts byte-identical SHA-256, scoped honestly as "two independent
+    builds agree" (regression detection, not a shared-cache self-comparison — the design-adversarial
+    Challenge 3 overclaim, defeated). The red-capable proof at authoring confirmed a source-byte
+    difference between builds makes the gate exit non-zero. Wired into `mix quality` via the
+    `release.candidate` alias.
+  - [release-candidate-contract.md](release-candidate-contract.md) is the candidate-facing doc (API
+    lock + SemVer posture + verification recipe, explicitly NOT an authority shape — AGENTS rule 1).
+- **No wire byte, bound, or verdict change.** `git diff 46a7eb1..HEAD -- lib/ test/ priv/conformance/
+  mix.lock` is empty. Local `mix quality` passes with 295 tests and 13 properties (0 failures), the
+  conformance runner reports `agreed=259, agreement=true, disagreed=0`, and the new
+  `release.candidate` gate passes (candidate archive SHA-256
+  `7caeb8704a148e7214d7818dc75b8a03c37618c1b03334b317e8a0f833c192dd` at the local closeout head). The
+  CI-attested SHA-256 + supply-chain run + `gh attestation verify` constraints are the post-push
+  receipt (mirroring BAP-10's pattern); they record at the exact closeout head once pushed.
+
 ## Next action
 
-BAP-04, BAP-05, and BAP-10 are complete. BAP-05 shipped the portable v1 conformance corpus (259
-cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI (escript,
+BAP-04, BAP-05, BAP-10, and BAP-06 are complete. BAP-05 shipped the portable v1 conformance corpus
+(259 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI (escript,
 `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent Node
 second-implementation runner (node:* only — the corpus is normative), a three-partition
 public-key census (hard two-way), stream_data property + deterministic-PRNG fuzz gates, and a
@@ -257,11 +285,14 @@ source-isolated mutation battery wired into `mix quality` (ADR 0005). The corpus
 in the published package and the fresh-consumer check runs the packaged escript against the
 packaged corpus. BAP-10 shipped the RFC 2119/8174 normative rewrite of the profile and evolution
 contract, the major-namespaced requirement-identifier scheme (ADR 0007), and the MUST-to-cell
-traceability map.
+traceability map. BAP-06 froze the 0.1.0 release candidate: the locked public API surface
+([ADR 0008](adr/0008-release-candidate-contract.md)), the `release.candidate` reproducibility gate,
+and the candidate-facing docs.
 
 The standards track charter (ADR 0006, [standards-track.md](design/standards-track.md)) now
 governs what ships before first publication: BAP-11 (suite identity + evidence longevity design)
-gates BAP-07 alongside BAP-06, because neither can be retrofitted after third parties implement the
-profile. BAP-12 (IANA templates) and BAP-13 (published governance) ride the BAP-08 external
-submission path; BAP-14 carries the already-decided delegation design to a full successor-contract
-specification. BAP-06 (release-candidate contract) and BAP-11 are next.
+is the last remaining gate before BAP-07 (first public release), because its cryptographic-suite
+identity and cross-suite evidence-longevity design cannot be retrofitted after third parties
+implement the profile. BAP-12 (IANA templates) and BAP-13 (published governance) ride the BAP-08
+external submission path; BAP-14 carries the already-decided delegation design to a full
+successor-contract specification. BAP-11 is next.
