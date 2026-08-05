@@ -16,13 +16,21 @@ This document is the standing authority for standards-track decisions. The
 [conformance contract](conformance-contract.md) defines how conformance is proven. This charter
 defines how all three survive time.
 
+Normative keywords in this charter (MUST, MUST NOT, MAY) carry the meanings defined in BCP 14
+[RFC2119] [RFC8174] when, and only when, they appear in all capitals, as carried by the
+[normative profile](../protocol-v1.md). Evolution-contract requirements use the stable identifier
+scheme of [ADR 0007](../adr/0007-normative-requirement-identifiers.md) under the `REQ1-EVO-*`
+prefix and are traced to conformance cells in the requirement map
+(`docs/design/bap-10-requirement-map.md`).
+
 ## The evolution contract
 
 The wire profile is closed: a conforming verifier rejects every unlisted member, value, encoding,
-or extension. That posture is permanent. It is what structurally kills the `alg:"none"`,
-`crit`-confusion, and permissive-compatibility class that destroyed the security reputation of
-prior token formats, and no evolution need weakens it. Evolution therefore happens **above** the
-wire format, through parallel contract-majors, never through in-place extension of an open format.
+or extension. That posture is permanent (`REQ1-EVO-closed-format-permanent`). It is what
+structurally kills the `alg:"none"`, `crit`-confusion, and permissive-compatibility class that
+destroyed the security reputation of prior token formats, and no evolution need weakens it.
+Evolution therefore happens **above** the wire format, through parallel contract-majors, never
+through in-place extension of an open format (`REQ1-EVO-evolution-above-wire`).
 
 ### Self-declaration and negotiation
 
@@ -34,26 +42,29 @@ major of any artifact from its bytes alone. Negotiation is therefore discovery, 
   shape is defined at first external submission; its name is reserved in the
   [registries](registries.md)).
 - An issuer chooses the emission major per audience capability. A holder presents artifacts of one
-  major end-to-end: a proof's contract-major MUST equal its grant's contract-major. Mixed-major
-  envelopes are invalid by construction.
+  major end-to-end: a proof's contract-major MUST equal its grant's contract-major
+  (`REQ1-EVO-proof-major-equals-grant`). Mixed-major envelopes are invalid by construction
+  (`REQ1-EVO-mixed-major-invalid`).
 - Acceptance of an older major never weakens a newer one: each accepted major is verified under its
   own complete closed profile. There is no cross-major fallback, no downgrade path, and no
-  best-effort parsing.
+  best-effort parsing (`REQ1-EVO-no-downgrade`).
 
 ### Parallel-version support and deprecation
 
 Successor contract-majors overlap rather than flag-day:
 
 - A contract-major enters deprecation only after its successor has a published normative profile, a
-  published conformance corpus, and at least two independent implementations passing that corpus.
-- The deprecation window is published at announcement and is never shorter than twelve months.
-  During the window, conforming verifier deployments support both majors in parallel.
+  published conformance corpus, and at least two independent implementations passing that corpus
+  (`REQ1-EVO-deprecation-prerequisites`).
+- The deprecation window is published at announcement and is never shorter than twelve months
+  (`REQ1-EVO-deprecation-window-minimum`). During the window, conforming verifier deployments
+  support both majors in parallel (`REQ1-EVO-parallel-support-during-window`).
 - Sunset of a major is a deployment decision after the published window, never a silent library
-  change.
+  change (`REQ1-EVO-sunset-is-deployment-decision`).
 - Errata never change verification behavior. An erratum may clarify prose, correct non-normative
-  text, or add conformance cases; **no erratum may flip a corpus verdict**. Any change that would
-  alter an accept/reject outcome is by definition a contract-major change. The errata registry
-  lives at [docs/errata.md](../errata.md).
+  text, or add conformance cases; **no erratum may flip a corpus verdict**
+  (`REQ1-EVO-no-verdict-flip`). Any change that would alter an accept/reject outcome is by
+  definition a contract-major change. The errata registry lives at [docs/errata.md](../errata.md).
 
 ### Registries
 
