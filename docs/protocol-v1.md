@@ -110,6 +110,7 @@ rejecting non-zero unused pad bits and alternate encodings (`REQ1-B64-canonical`
 
 ## Protected headers
 
+The protected headers bind the suite `BAP1-Ed25519-SHA256` via their `alg` and `typ` values.
 Member order is insignificant and the member sets are exact:
 
 | Compact value | Members |
@@ -255,6 +256,8 @@ projects the tagged JSON algebra to the following closed JSON form before JCS:
 JCS orders projected object members. The explicit scalar tags preserve the protocol's semantic
 distinction between an integer and an integral float even though RFC 8785 emits both numeric
 payloads with the same JSON number bytes. `cast_arguments` may be any tagged JSON value.
+The `BAP1-*` domain separators below are the suite-identity markers of `BAP1-Ed25519-SHA256`
+(a successor suite binds its own `BAP<contract-major>-*` separators under its own major).
 `BAP1-CHAIN\0` and `BAP1-ARCHIVE\0` remain reserved for BAP-04. The retired
 `BAP1-GRANT\0` and `BAP1-PROOF\0` strings are invalid signing prefixes
 (`REQ1-SIGNING-retired-prefixes`).
@@ -386,8 +389,10 @@ containers, or nonces, and neither is accepted as credentials. `GrantFacts` carr
 | object-store version bytes | 512 |
 
 Callers MAY tighten resource ceilings with a positive integer (`REQ1-BOUNDS-tighten-only`). The
-32-byte public-key and digest widths and 64-byte signature width are protocol constants and MUST
-remain exact (`REQ1-BOUNDS-fixed-widths`). Unknown, non-integer, zero, negative, widening, or
+32-byte public-key and digest widths and 64-byte signature width are the immutable cryptographic
+constants of the suite `BAP1-Ed25519-SHA256` — they are protocol constants, MUST remain exact
+(`REQ1-BOUNDS-fixed-widths`), and cannot be tightened or widened (a successor suite carries its own
+widths under its own contract-major). Unknown, non-integer, zero, negative, widening, or
 fixed-width-changing limits are invalid (`REQ1-BOUNDS-reject-list`). Raw and encoded sizes precede
 decoding; decoded-size projection precedes allocation; structure and scalar limits apply while
 decoding/emitting; all precede cryptography (`REQ1-BOUNDS-ordering`).
