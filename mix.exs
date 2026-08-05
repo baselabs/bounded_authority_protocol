@@ -96,7 +96,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
         "docs/design/registries.md",
-        "docs/design/bap-10-requirement-map.md",
+        "docs/design/requirement-map.md",
         "docs/design/standards-track.md",
         "docs/design/threat-model.md"
       ],
@@ -133,7 +133,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/design/conformance-contract.md",
         "docs/design/protocol-charter.md",
         "docs/design/registries.md",
-        "docs/design/bap-10-requirement-map.md",
+        "docs/design/requirement-map.md",
         "docs/design/standards-track.md",
         "docs/design/threat-model.md"
       ]
