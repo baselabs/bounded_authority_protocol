@@ -221,7 +221,7 @@ compatibility.
     [ADR 0007](adr/0007-normative-requirement-identifiers.md)) across 13 surfaces.
   - `docs/design/standards-track.md` evolution-contract sections carry **10 `REQ1-EVO-*` ids** and a
     BCP 14 reference note.
-  - `docs/design/bap-10-requirement-map.md` (the [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md)
+  - `docs/design/requirement-map.md` (the [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md)
     §3 acceptance artifact) maps all 86 requirement ids to conformance cells: 45 distinct populated
     `(surface, class)` cells (all mechanically verified to resolve to integer≥1 values in
     `index.json`), and 9 `gap` rows each carrying a falsifiable input-algebra reason (the
