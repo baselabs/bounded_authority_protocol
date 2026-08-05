@@ -282,25 +282,57 @@ compatibility.
   builds on darwin — the gate compares two builds WITHIN one run on one platform, not cross-platform;
   the CI-attested SHA is the ubuntu receipt, mirroring BAP-05/BAP-10's pattern.)
 
+## BAP-11 closeout evidence
+
+- The slice spans `87fade7` (Task 1, the critical-surfaces manifest addition) through this closeout
+  block. It is a **design-only slice: zero wire byte, bound, or verdict change**
+  (`git diff 06b8821..HEAD -- lib/ test/ priv/conformance/ mix.lock` empty). Local `mix quality`
+  passes with 295 tests and 13 properties (0 failures); the conformance runner reports
+  `agreed=259, agreement=true, disagreed=0` (unchanged — the reserved names are rejected by the
+  current closed profile).
+  - [ADR 0009](adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) carries
+    the cryptographic-suite succession and cross-suite evidence-longevity mechanism to ADR quality.
+    The headline decision: the cross-suite primitive is a **content-covering countersignature**
+    (`ba+suite-attestation` typ, `ba_sut` claim) — a current-suite key signs the archive's CONTENT
+    DIGEST (the SHA-256 over every raw byte that [ADR 0004](adr/0004-consumption-chain-rollover-and-anchored-export-verification.md)
+    already computes), so trust freshness comes from the current key's content signature, NOT from
+    the original signature surviving cryptanalysis. The design-adversarial pass (Challenge 1, blocking)
+    defeated the original draft — a `ba+suite-transition` chaining key/suite identity — because it
+    solves key succession, not algorithm break (under break the original anchors/transitions are
+    forgeable). ML-DSA-44/65/87 + NIST categories 2/3/5 are named as the anticipated successor family
+    (no byte sizes); the hybrid composite is flagged on the wire-freeze barrier.
+  - [registries.md](design/registries.md) reserves the `ba+suite-attestation` typ + `ba_sut` claim
+    and tightens the ML-DSA successor row. [protocol-v1.md](protocol-v1.md) weaves the suite identity
+    (`BAP1-Ed25519-SHA256`) explicitly at each binding surface (protected headers, domain separators,
+    fixed widths) — prose re-statement, no value change. [standards-track.md](design/standards-track.md)
+    § Evidence longevity forward-refs ADR 0009 and tightens "countersignature chain" → "content-covering
+    countersignature" to match the revised primitive. `docs/protocol-v1.md` is added to
+    `.forge/critical-surfaces` (declaration; the commit hook is not installed in this repo, so the
+    manifest governs via declaration + honor-system `track: T2`).
+
 ## Next action
 
-BAP-04, BAP-05, BAP-10, and BAP-06 are complete. BAP-05 shipped the portable v1 conformance corpus
-(259 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI (escript,
-`--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent Node
-second-implementation runner (node:* only — the corpus is normative), a three-partition
+BAP-04, BAP-05, BAP-10, BAP-06, and BAP-11 are complete. BAP-05 shipped the portable v1 conformance
+corpus (259 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI
+(escript, `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent
+Node second-implementation runner (node:* only — the corpus is normative), a three-partition
 public-key census (hard two-way), stream_data property + deterministic-PRNG fuzz gates, and a
-source-isolated mutation battery wired into `mix quality` (ADR 0005). The corpus ships
-in the published package and the fresh-consumer check runs the packaged escript against the
-packaged corpus. BAP-10 shipped the RFC 2119/8174 normative rewrite of the profile and evolution
-contract, the major-namespaced requirement-identifier scheme (ADR 0007), and the MUST-to-cell
-traceability map. BAP-06 froze the 0.1.0 release candidate: the locked public API surface
+source-isolated mutation battery wired into `mix quality` (ADR 0005). The corpus ships in the
+published package and the fresh-consumer check runs the packaged escript against the packaged
+corpus. BAP-10 shipped the RFC 2119/8174 normative rewrite of the profile and evolution contract,
+the major-namespaced requirement-identifier scheme (ADR 0007), and the MUST-to-cell traceability
+map. BAP-06 froze the 0.1.0 release candidate: the locked public API surface
 ([ADR 0008](adr/0008-release-candidate-contract.md)), the `release.candidate` reproducibility gate,
-and the candidate-facing docs.
+and the candidate-facing docs. BAP-11 carried the cryptographic-suite succession and cross-suite
+evidence-longevity design to ADR quality ([ADR 0009](adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md)):
+a content-covering countersignature primitive, ML-DSA successor family named, reserved
+`ba+suite-attestation`/`ba_sut`, suite identity woven through the profile — design-only, zero wire
+change.
 
-The standards track charter (ADR 0006, [standards-track.md](design/standards-track.md)) now
-governs what ships before first publication: BAP-11 (suite identity + evidence longevity design)
-is the last remaining gate before BAP-07 (first public release), because its cryptographic-suite
-identity and cross-suite evidence-longevity design cannot be retrofitted after third parties
-implement the profile. BAP-12 (IANA templates) and BAP-13 (published governance) ride the BAP-08
-external submission path; BAP-14 carries the already-decided delegation design to a full
-successor-contract specification. BAP-11 is next.
+The standards track charter (ADR 0006, [standards-track.md](design/standards-track.md)) gates that
+cannot be retrofitted after third parties implement the profile are now closed: BAP-10 (normative
+contract), BAP-06 (release candidate), and BAP-11 (suite identity + evidence longevity) all landed.
+**BAP-07 (connected verification and first public release) is unblocked on the public-protocol
+side** — its remaining dependency is private BA-14 (the private runtime's connected gates). BAP-12
+(IANA templates) and BAP-13 (published governance) ride the BAP-08 external submission path; BAP-14
+carries the already-decided delegation design to a full successor-contract specification.
