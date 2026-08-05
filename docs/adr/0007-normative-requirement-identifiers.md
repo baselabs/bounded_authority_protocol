@@ -60,8 +60,8 @@ REQ<contract-major>-<SURFACE>-<short-tag>
 
 Properties:
 
-- **Major-namespaced** — resolves the parallel-majors ambiguity. `REQ1-GRANT-alg-eddsa` (major 1,
-  EdDSA) and `REQ2-GRANT-alg-ml-dsa` (a hypothetical successor major) cannot collide.
+- **Major-namespaced** — resolves the parallel-majors ambiguity. `REQ1-HEADER-alg-eddsa` (major 1,
+  EdDSA) and `REQ2-HEADER-alg-ml-dsa` (a hypothetical successor major) cannot collide.
 - **Stable across editorial rewording within a major** — an id's meaning only changes at a
   contract-major boundary, which is exactly when a new `REQ2-*` range is authored under a new
   normative profile.
