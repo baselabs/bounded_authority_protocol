@@ -8,6 +8,19 @@ This document freezes the byte-level profile. A conforming implementation reject
 member, value, encoding, or extension with exactly `{:error, :invalid}`. Successful decode or
 verification is not a trust-selection or authorization decision.
 
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT",
+"RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as
+described in BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all capitals, as shown
+here. Lowercase forms carry their normal English meaning and impose no requirement.
+
+The closed-rejection rule in the previous paragraph is the profile's central invariant
+(`REQ1-CORE-reject-unlisted`): it is the principle each per-section closed-set requirement
+operationalizes. It is stated once here as the rationale; each per-surface closed-set statement below
+is its own MUST (`REQ1-HEADER-closed-set`, `REQ1-CLAIM-closed-set`, ...) and maps to the conformance
+cells of the surface it governs. See [ADR 0007](adr/0007-normative-requirement-identifiers.md) for the
+requirement-identifier scheme. The MUST-to-cell traceability map is published in
+`docs/design/bap-10-requirement-map.md`.
+
 ## Suite identity and evolution
 
 This profile constitutes the cryptographic suite `BAP1-Ed25519-SHA256` (see the
@@ -24,6 +37,9 @@ none of them alters a byte, bound, or verdict of this profile.
 
 ## Normative sources
 
+- [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) and
+  [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174) (BCP 14): interpretation of the conformance key
+  words (MUST, MUST NOT, SHOULD, SHOULD NOT, MAY, ...) used in this document.
 - [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259): JSON grammar, UTF-8, interoperable integer
   range, and parser resource limits.
 - [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785): I-JSON, duplicate-name prohibition, no
