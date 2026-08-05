@@ -35,7 +35,8 @@ export verification. Its package-bearing closeout head is
 `c4d7716de6499f29524e60638207b1c36e9484b3`. Consult [`docs/ROADMAP.md`](docs/ROADMAP.md),
 [`ADR 0003`](docs/adr/0003-standard-jws-and-verified-grant-results.md), and
 [`ADR 0004`](docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md).
-Commercial release readiness and BAP-05 remain open.
+Commercial release readiness remains open; BAP-05 is closed (see the BAP-05 closeout-evidence
+block in [`docs/ROADMAP.md`](docs/ROADMAP.md)).
 
 ## Critical rules
 
