@@ -160,7 +160,10 @@ already-decided shape rather than opening a design debate after external adoptio
   signature and subset relation under the same closed rules; the holder proof binds the leaf grant.
 
 The names this design needs (`ba_dlg`, a delegated-capability `typ`) are reserved in the
-registries now.
+registries now. The full mechanism — the `ba_dlg` claim schema, the `ba+cap-delegated` typ with
+its parent-holder key binding, the depth-bounded chain-verification algorithm, and the attenuation
+subset rules proven decidable against the existing selector algebra — is specified in
+[ADR 0010](../adr/0010-delegation-with-attenuation.md).
 
 ## Revocation and freshness
 

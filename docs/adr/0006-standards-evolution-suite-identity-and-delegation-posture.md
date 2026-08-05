@@ -56,7 +56,8 @@ a successor contract-major, and those arrive with their design already specified
    chained attenuated grants: each link a signed grant issued by the parent's holder, bound by
    parent-grant hash (`ba_dlg`), attenuation-only and mechanically checkable (operations subset,
    conjunctive selector narrowing, window/audience containment), no caveat DSL — the closed
-   selector algebra is the attenuation language. The current major remains single-holder.
+   selector algebra is the attenuation language. The current major remains single-holder. The
+   mechanism is carried to ADR quality in [ADR 0010](0010-delegation-with-attenuation.md).
 
 6. **Revocation and principal binding get designed homes.** Deployment-level revocation guidance
    (validity windows + nonce challenges as baseline, a reserved status-check profile for long-lived

@@ -34,7 +34,8 @@ parallel majors safe — an artifact of any other major or suite fails closed he
 (`REQ1-CORE-cross-major-reject`). The evolution contract, deprecation policy, reserved
 names, and delegation posture are governed by the
 [standards track charter](design/standards-track.md) and [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md);
-none of them alters a byte, bound, or verdict of this profile.
+[ADR 0010](adr/0010-delegation-with-attenuation.md) carries the delegation mechanism to spec
+quality. None of them alters a byte, bound, or verdict of this profile.
 
 ## Normative sources
 

@@ -26,7 +26,7 @@ Naming scheme: `BAP<contract-major>-<signature>-<digest>`.
 | `ba_inv` | active | Invocation UUID bound into the holder proof |
 | `ba_op` | active | Operation name bound into the holder proof |
 | `ba_req` | active | Request digest (`BAP1-REQUEST\0` domain) over `[operation, typed(cast_arguments)]` |
-| `ba_dlg` | reserved | Parent-grant hash binding a delegated (attenuated) grant to its parent — charter § Delegation with attenuation |
+| `ba_dlg` | reserved | Parent-grant hash binding a delegated (attenuated) grant to its parent — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md) |
 | `ba_obo` | reserved | Issuer-asserted on-behalf-of principal identifier (StringOrURI) — charter § Principal binding |
 | `ba_sut` | reserved | Suite-attestation payload binding (chain identity, sequence range, archive content digest, original suite, attestation time, typed suite-parameterized key) — [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
 
@@ -41,7 +41,7 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 | `dpop+jwt` | active | Holder proof (RFC 9449) |
 | `ba+chain-anchor` | active | Signed consumption-chain boundary anchor |
 | `ba+key-transition` | active | Authenticated historical-key transition |
-| `ba+cap-delegated` | reserved | Delegated attenuated grant — charter § Delegation with attenuation |
+| `ba+cap-delegated` | reserved | Delegated attenuated grant — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md) |
 | `ba+suite-attestation` | reserved | Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
 
 ## Selector kinds
