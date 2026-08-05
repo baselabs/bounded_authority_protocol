@@ -6,6 +6,12 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- _Nothing yet._
+
+## [0.1.0] — release candidate
+
+### Added
+
 - Initialize the public Apache-2.0 repository and cold-start architecture authority.
 - Define the deterministic verifier boundary, public/private dependency direction, protocol
   charter, threat model, conformance contract, ADR, and implementation roadmap.
@@ -199,9 +205,16 @@ All notable changes to `bounded_authority_protocol` are documented here.
   official facade. ADR 0005 corrected: whole-payload depth and value-carried `cast_arguments`
   node/byte bounds are inline-expressible and now tested; only compact-carried whole-payload
   `total_nodes` and an inline 65-member `object_members` remain enforced-without-a-red-case.
+- Close BAP-06: lock the 0.1.0 release-candidate public API surface (enumerated in the
+  [release-candidate contract](release-candidate-contract.md) and enforced by the
+  `@compiled_export_allowances` architecture-gate pin; [ADR 0008](adr/0008-release-candidate-contract.md)),
+  add the `release.candidate` reproducibility gate (two cache-isolated builds, byte-equal SHA-256,
+  wired into `mix quality`), and author the candidate-facing docs (release-candidate-contract.md,
+  SECURITY.md, CHANGELOG `[0.1.0]`, README). Zero wire byte, bound, or verdict change. Not yet
+  published — BAP-07 publishes the exact candidate after the connected gates pass.
 
 
 ### Not yet available
 
-- The portable verifier CLI and a public Hex release remain planned. The current package is
-  unpublished.
+- A public Hex release remains planned (BAP-07). The current package is an unpublished release
+  candidate; the portable verifier CLI shipped in BAP-05.
