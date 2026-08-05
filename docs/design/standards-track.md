@@ -21,7 +21,7 @@ Normative keywords in this charter (MUST, MUST NOT, MAY) carry the meanings defi
 [normative profile](../protocol-v1.md). Evolution-contract requirements use the stable identifier
 scheme of [ADR 0007](../adr/0007-normative-requirement-identifiers.md) under the `REQ1-EVO-*`
 prefix and are traced to conformance cells in the requirement map
-(`docs/design/bap-10-requirement-map.md`).
+[requirement map](bap-10-requirement-map.md).
 
 ## The evolution contract
 

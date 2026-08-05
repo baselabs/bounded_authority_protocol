@@ -94,7 +94,7 @@ acceptance bar (every MUST maps to a populated conformance cell).
 ## Consequences
 
 - The v1 profile's requirement ids all carry the `REQ1-` prefix. The conformance mapping
-  (`docs/design/bap-10-requirement-map.md`, BAP-10) references ids in this form.
+  [conformance mapping](../design/bap-10-requirement-map.md) references ids in this form.
 - A successor contract-major (BAP-14 and beyond) authors a `REQ2-*` range under its own normative
   profile; the two ranges coexist during the deprecation overlap without collision. This is the same
   posture the suite and domain-separator conventions already take.
