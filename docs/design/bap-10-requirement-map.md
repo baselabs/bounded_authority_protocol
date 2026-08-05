@@ -54,7 +54,7 @@ qualifier makes a stale mapping a detectable drift rather than a silent false cl
 
 | REQ-id | Requirement | Surface(s) | Cell class(es) | Cell-type | Evidence / reason |
 |---|---|---|---|---|---|
-| REQ1-B64-alphabet / no-padding / length / canonical | Segments use only the base64url alphabet, no padding/whitespace, length mod 4 ≠ 1, canonical re-encode reproduces input | base64url.decode | invalid_encoding | populated | base64url.decode.invalid_encoding=2 (covers alphabet, padding, length, pad-bit, alternate-encoding rejections) |
+| REQ1-B64-alphabet; REQ1-B64-no-padding; REQ1-B64-length; REQ1-B64-canonical | Segments use only the base64url alphabet, no padding/whitespace, length mod 4 ≠ 1, canonical re-encode reproduces input | base64url.decode | invalid_encoding | populated | base64url.decode.invalid_encoding=2 (covers alphabet, padding, length, pad-bit, alternate-encoding rejections — a family proof: the two cases each reject one malformed input, collectively exercising the alphabet/padding/length/canonical rules) |
 
 ## HEADER — protected headers (`decode_grant`, `decode_proof`, `verify_grant`, jwk surfaces)
 
@@ -115,7 +115,7 @@ qualifier makes a stale mapping a detectable drift rather than a silent false cl
 | REQ1-VERIFY-grant-exact; REQ1-VERIFY-grant-times; REQ1-VERIFY-no-iat-nbf-order | Grant verification requires exact key-id/signature/issuer/audience; time invariants; does not require `iat <= nbf` | verify_grant | invalid_key, invalid_claim, invalid_time | populated | verify_grant.invalid_key=1, invalid_claim=1, invalid_time=1 |
 | REQ1-VERIFY-time-bounds | Skew ≤ 60s, proof max age ≤ 300s | verify_grant, check_envelope | invalid_time | populated | verify_grant.invalid_time=1; check_envelope.invalid_time=1 |
 | REQ1-VERIFY-nonce-mode | Nonce absent in `:not_required`, present-once-and-equal in required mode | check_envelope | invalid_nonce | populated | check_envelope.invalid_nonce=1 |
-| REQ1-VERIFY-envelope-binding | Combined verification re-verifies raw grant; binds ath/method/URI/invocation/op/ba_req/time/nonce/selectors | check_envelope | invalid_request, invalid_nonce, invalid_selector, invalid_time, invalid_uri | populated | check_envelope.invalid_request=3, invalid_nonce=1, invalid_selector=3, invalid_time=1 |
+| REQ1-VERIFY-envelope-binding | Combined verification re-verifies raw grant; binds ath/method/URI/invocation/op/ba_req/time/nonce/selectors | check_envelope | invalid_request, invalid_nonce, invalid_selector, invalid_time | populated | check_envelope.invalid_request=3 (URI/method/invocation/op binding — a URI mismatch is a request-binding failure, exercised here, not via a separate invalid_uri cell), invalid_nonce=1, invalid_selector=3, invalid_time=1 |
 | REQ1-VERIFY-facts-redacted; REQ1-VERIFY-facts-not-credentials; REQ1-VERIFY-grant-not-authorized | Facts value-bearing, redacted, no generic encoder, not accepted as credentials, `authorization: :not_evaluated` | verify_grant, check_envelope | valid | populated | verify_grant.valid=1, check_envelope.valid=4 (facts carry `authorization: :not_evaluated`, no credential fields) |
 
 ## BOUNDS — hard maxima (`bounds.new`)
@@ -197,7 +197,7 @@ input-algebra reason, never silently overstated as `populated`.
 
 ## Coverage summary
 
-- **82 requirement ids** total: 72 `REQ1-*` (protocol-v1.md) + 10 `REQ1-EVO-*` (standards-track.md).
+- **86 requirement ids** total: 76 `REQ1-*` (protocol-v1.md) + 10 `REQ1-EVO-*` (standards-track.md).
 - **MUST/MUST NOT requirements mapped to populated cells:** all protocol-v1.md `REQ1-*` map to ≥1
   populated conformance cell. One profile-level invariant (`REQ1-CORE-reject-unlisted`) is recorded as
   a `gap` with its input-algebra reason (it is the rationale for the per-surface closed-set MUSTs, each
