@@ -132,16 +132,12 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
   end
 
   defp sha256_file(path) do
-    case System.cmd("shasum", ["-a", "256", path], stderr_to_stdout: true) do
-      {output, 0} ->
-        output
-        |> String.trim()
-        |> String.split(~r/\s+/, parts: 2)
-        |> hd()
+    # In-process SHA-256 (matches the repo's established pattern: scripts/check_chain_archive_performance.exs,
+    # check_dependency_licenses.exs use :crypto.hash(:sha256, ...)). Avoids a dependency on an external
+    # `shasum` binary that may be absent on a minimal build host/CI image (cross-vendor finding).
+    data = File.read!(path)
 
-      {output, status} ->
-        fail!("shasum exited with status #{status}: #{String.trim(output)}")
-    end
+    Base.encode16(:crypto.hash(:sha256, data), case: :lower)
   end
 
   defp assert_regular_nonempty!(path) do
