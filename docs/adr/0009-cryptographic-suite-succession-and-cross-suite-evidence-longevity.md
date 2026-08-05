@@ -55,7 +55,8 @@ A hybrid Ed25519 + ML-DSA composite posture is FLAGGED for evaluation when the s
 defined. It is NOT specified here: a composite changes frozen wire bytes, which is a contract-major
 change, and the composite's value is a migration-window optimization (a single archive remains
 directly verifiable during the overlap without re-attestation), not the only path to evidence
-longevity (the content-countersignature below solves algorithm break on its own). The deferral is on
+longevity (the content-countersignature below solves signature-family break on its own; digest-
+primitive break requires the successor suite to bind a fresh digest, named in § 3). The deferral is on
 the wire-freeze barrier, not "speculative design."
 
 ### 3. The content-covering countersignature mechanism (the core)
@@ -92,24 +93,48 @@ The reserved claim name `ba_sut` (suite-attestation) carries the payload binding
    depend on the original suite's signatures** — it covers the content.
 2. **Original-suite verification as historical record (the algorithm-break class):** the archive MAY
    still verify under its original suite's rules (anchors, transitions, row hashes) when those
-   signatures are still trusted, preserving the issuance provenance. Under cryptanalytic break of the
-   original suite, step 1 alone suffices for trust: the archive's content digest D (SHA-256 over the
-   FULL archive bytes, including the signed anchors/transitions/rows per ADR 0004's `hash_chunks`)
-   COVERS the original signatures — they are bytes within the hashed content — so a current key's
-   signature over D re-attests the complete archive byte-for-byte, and an Ed25519-break attacker
-   cannot alter any archive byte without changing D nor forge the current-key countersignature. The
-   original signatures become historical record, not the trust root. (Note: no original-suite
+   signatures are still trusted, preserving the issuance provenance. Under **signature-family break**
+   of the original suite (e.g. Ed25519 broken, SHA-256 still trusted), step 1 alone suffices for
+   trust: the archive's content digest D (SHA-256 over the FULL archive bytes, including the signed
+   anchors/transitions/rows per ADR 0004's `hash_chunks`) COVERS the original signatures — they are
+   bytes within the hashed content — so a current key's signature over D re-attests the complete
+   archive byte-for-byte, and an Ed25519-break attacker cannot alter any archive byte without
+   changing D nor forge the current-key countersignature. The original signatures become historical
+   record, not the trust root. (Under **digest-primitive break** — SHA-256 itself compromised — step 1
+   does NOT suffice, because D is the broken digest; see the failure-class enumeration below for the
+   hash-agility gap and the successor-major fresh-digest requirement.) (Note: no original-suite
    signature signs D itself — the anchors sign the chain hash, the transitions sign key succession —
    so the relationship is "D covers the signatures," not "the signatures cover D.")
 
 ### Failure classes the mechanism closes (including algorithm break — Challenge 2)
 
-- **Algorithm break of the original suite (the load-bearing class):** an attacker forges every
-  original-suite signature (anchors that bind the chain hash, transitions, row commitments). CLOSED
-  by the content-covering countersignature — trust rests on the current key's signature over the
-  content digest, re-derived and compared in constant time, NOT on the original signatures.
-- **Content-digest mismatch:** a countersignature over digest D presented with an archive whose
-  re-derived digest is D'. CLOSED by the constant-time digest comparison (ADR 0004's mechanism).
+"Algorithm break" splits into two sub-classes with different closures, because the content digest
+D the countersignature binds IS the original suite's SHA-256 (`anchored_export_codec.ex:706`) — a
+named member of `BAP1-Ed25519-SHA256`. The mechanism as specified (countersigning the existing
+digest D) closes signature-family break fully; digest-primitive break requires the successor suite
+to bind a FRESH successor-suite digest, named honestly below rather than overclaimed.
+
+- **Signature-family break of the original suite (the load-bearing class — e.g. Ed25519 broken):**
+  an attacker forges every original-suite signature (anchors that bind the chain hash, transitions,
+  row commitments). CLOSED by the content-covering countersignature — trust rests on the current
+  key's signature over the content digest, re-derived and compared in constant time, NOT on the
+  original signatures. (SHA-256 is presumed unbroken in this sub-class; the break is the signature
+  primitive.)
+- **Digest-primitive break (NOT closed by re-signing the existing digest — hash-agility gap):** if
+  the reason for suite succession is SHA-256's compromise (second-preimage/collision resistance
+  lost), an attacker presents a colliding archive with the same digest D and inherits the legitimate
+  current-key countersignature — the constant-time digest comparison passes on forged content. The
+  mechanism as specified does NOT close this sub-class, because it binds D (the original suite's
+  digest). A successor major that anticipates digest break MUST bind a FRESH successor-suite digest
+  of the raw archive bytes (hash-agile: the countersignature signs `H_succ(raw_archive_bytes)`, not
+  the inherited D, and binds the digest algorithm in the payload). This is a successor-major
+  mechanism detail; this ADR names the gap honestly rather than claiming the whole "algorithm break"
+  class is closed. (NIST's collision-resistance guidance for signature applications applies: the
+  digest bound by a countersignature must be one the verifier still trusts.)
+- **Content-digest mismatch (signature-family-break regime, SHA-256 trusted):** a countersignature
+  over digest D presented with an archive whose re-derived digest is D'. CLOSED by the constant-time
+  digest comparison (ADR 0004's mechanism) — under the signature-family-break regime where SHA-256
+  remains collision-resistant.
 - **Compromise of the attesting current-suite key:** a rogue `K_cur` can countersign arbitrary
   archives (including ones carrying forged original-suite signatures). This is the trust-root risk
   the caller manages by supplying the trusted current key — it is a key-custody/trust-decision, not
