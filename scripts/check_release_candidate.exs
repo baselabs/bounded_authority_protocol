@@ -99,14 +99,11 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
     |> File.ls!()
     |> Enum.reject(&(&1 in @copy_excludes))
     |> Enum.each(fn entry ->
-      src = Path.join(source, entry)
-      dst = Path.join(dest, entry)
-
-      case File.lstat(src) do
-        {:regular, _} -> File.cp!(src, dst)
-        {:symlink, _} -> File.ln_s!(File.read_link!(src), dst)
-        _ -> File.cp_r!(src, dst)
-      end
+      # File.cp_r!/2 handles regular files, directories, and symlinks correctly
+      # (it preserves symlinks rather than following them). The earlier case-on-
+      # File.lstat form was dead code: File.lstat returns {:ok, %File.Stat{}},
+      # not {:regular, _}/{:symlink, _}, so every branch fell through here anyway.
+      File.cp_r!(Path.join(source, entry), Path.join(dest, entry))
     end)
   end
 
