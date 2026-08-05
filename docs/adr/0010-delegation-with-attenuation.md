@@ -99,21 +99,24 @@ algebra comparison — no selector interpretation, no caveat DSL.
 child may drop operations; it may not add, rename, or duplicate them. For each operation name in
 BOTH, the selector relation (3.2) must hold.
 
-**3.2 Conjunctive selector narrowing — multiset containment (the load-bearing rule).** For each
-operation `name` present in both child and parent, every selector tuple in
+**3.2 Conjunctive selector narrowing — set containment (the load-bearing rule).** For each
+operation `name` present in both child and parent, every DISTINCT selector tuple in
 `parent.selectors(name)` appears IDENTICALLY (same kind, same path, same value(s)) AT LEAST ONCE
 in `child.selectors(name)`, plus zero or more additional conjunctive selectors, in any order.
 
-This is multiset containment of closed selector tuples, NOT a verbatim-PREFIX requirement. Order
-independence is forced by the matcher: `match_all/3` applies `Enum.all?(selectors, &matches?/3)`
-(`selector.ex:23`), which is blind to list order, so a parent tuple may appear anywhere in the
-child list. (A draft of this design required the parent tuples to appear as a verbatim PREFIX of
-the child list. That was rejected in the BAP-14 design-adversarial review: it would reject a
-reordered-but-strictly-narrower child even though `Enum.all?` is order-independent, making the
-rule stricter than the semantic attenuation it encodes. Multiset containment is sound and
-complete without that brittleness.) The relation is a MULTISET (counted, not deduplicated)
-because the algebra permits repeated selectors and a child could legitimately carry two identical
-conjuncts.
+This is SET containment of the distinct closed-selector tuples, NOT a verbatim-PREFIX
+requirement and NOT a counted-multiset requirement. Order independence is forced by the matcher:
+`match_all/3` applies `Enum.all?(selectors, &matches?/3)` (`selector.ex:23`), which is blind to
+list order. Multiplicity is IGNORED because the conjunction is idempotent — `Enum.all?([S, S])`
+accepts exactly the same arguments as `Enum.all?([S])` (the matcher's own behavior: a duplicate
+conjunct adds no restriction), so `Accept([S, S]) = Accept([S])`. (An earlier draft used
+counted-MULTISET containment "because the algebra permits repeated selectors." That was rejected
+in cross-vendor review: it would reject an equality-preserving delegation `parent [S, S] → child
+[S]` even though `Accept([S]) = Accept([S, S])` — i.e. a non-widening the rule should accept. Set
+containment on the distinct tuples is the right relation for THIS algebra, where duplicates carry
+no acceptance semantics. An even earlier draft required a verbatim PREFIX; that was rejected in
+the design-adversarial review as order-sensitive. Set containment is sound and complete without
+either brittleness.)
 
 **Soundness** against `match_all/3` (`selector.ex:19-28`):
 
@@ -133,11 +136,13 @@ property each valid grant's selector list satisfies on its own, the second depen
 `Enum.all?` conjunct carries the conclusion.) Every argument set the child accepts, the parent
 accepts: `Accept(S_child) ⊆ Accept(S_parent)`. Attenuation holds.
 
-**Decidability.** The relation is multiset membership on closed selector tuples — compare each
-parent tuple (kind/path/value(s)) for an identical occurrence in the child list, never invoke
-`matches?/3`. Nothing is interpreted; everything is compared ([standards-track.md](../design/standards-track.md)
-§ Delegation). This is the closed-algebra discipline that makes attenuation mechanically checkable
-without a caveat interpreter.
+**Decidability.** The relation is set membership on distinct closed-selector tuples — for each
+distinct parent tuple (kind/path/value(s)), check for an identical occurrence in the child list;
+never invoke `matches?/3`. Nothing is interpreted; everything is compared ([standards-track.md](../design/standards-track.md)
+§ Delegation). This is the closed-algebra discipline that makes attenuation mechanically
+checkable without a caveat interpreter. (Multiplicity is ignored at the comparison step because
+it is ignored by the matcher — idempotence of conjunction — so deduplicating each list before the
+membership check changes no verdict.)
 
 **Acceptance-set completeness (why this is not a capability loss).** In-place value refinement on
 a shared path is expressible as a conjunctive ADD, because the conjunction intersects. A parent
@@ -145,7 +150,8 @@ a shared path is expressible as a conjunctive ADD, because the conjunction inter
 ADDING `{:one_of, path, [a,b]}` — the conjunction of {a,b,c} and {a,b} accepts exactly {a,b}. A
 parent `{:equals, path, v}` can only be narrowed to the empty set (add a contradictory
 `{:equals, path, v'}`), which is correct — `equals` is a singleton. `:all` is narrowed by adding
-any selector. So at the level of ACCEPTED ARGUMENT SETS, multiset containment is sound AND
+any selector. So at the level of ACCEPTED ARGUMENT SETS, set containment (on distinct tuples)
+is sound AND
 expressively complete for every narrowing a general selector-implication rule could express,
 without paying for an implication decision procedure (which would require re-implementing the
 matcher — i.e. interpretation, forbidden by ADR 0006 §5). This completeness is stated at the
@@ -164,8 +170,8 @@ child may narrow who it is for; it cannot widen.
 **Not attenuated (recorded honestly).** `grant_id`, `jti`, `iat`, `iss`, `holder_thumbprint`,
 `key_id` are per-link identities, not inherited — each link has its own. The cryptographic binding
 between child and parent is `thumbprint_raw(G_i.header.jwk) == G_{i-1}.cnf.jkt` (§2), NOT an
-`iss`-principal match. Selectors are never rewritten or re-typed — only contained (as a multiset)
-plus extra conjuncts appended.
+`iss`-principal match. Selectors are never rewritten or re-typed — only contained (as a set of
+distinct tuples) plus extra conjuncts appended.
 
 ### 4. Chain-verification algorithm
 
@@ -201,22 +207,31 @@ caller supplies `G_0`'s trusted issuer (as today) and the ordered chain bytes `[
    earlier grant's hash without a SHA-256 second-preimage collision), and a child's `ba_dlg`
    cannot point forward (it binds the PARENT, which precedes it in the walk). The depth bound is
    the operational bound; hash-chain acyclicity is the structural property.
-6. **Leaf binding.** The leaf `G_n` is verified by today's FULL combined verification
-   (`check_envelope`, UNCHANGED) — not merely `proof.ath`. That is: `proof.ath` = raw hash of
-   `G_n` (`runtime.ex:482-484`); the leaf's audience set contains `expected.audience`
-   (`runtime.ex:466`); the proof's operation is in the leaf's operation set and the leaf's
-   selectors match the arguments (`runtime.ex:497-498`); and the time/window checks run against
-   the leaf (`runtime.ex:468-469`). All four are restated because attenuation (§3) is a
-   link-by-link PARENT→CHILD relation — it guarantees `G_n` is no wider than `G_0`, NOT that
-   `G_n` satisfies the caller's `expected` context. In particular, §3.4 audience containment
-   gives `G_n.audiences ⊆ G_0.audiences`, which combined with step 1's
+6. **Leaf binding.** The leaf `G_n` + its holder proof are verified by a successor-major
+   delegated-leaf verification that runs the SAME checks today's combined verification runs over
+   a single grant — not merely `proof.ath`, and NOT today's `check_envelope` byte-for-byte. The
+   leaf checks are: `proof.ath` = raw hash of `G_n` (`runtime.ex:482-484`); the leaf's audience
+   set contains `expected.audience` (`runtime.ex:466`); the proof's operation is in the leaf's
+   operation set and the leaf's selectors match the arguments (`runtime.ex:497-498`); and the
+   time/window checks run against the leaf (`runtime.ex:468-469`). These four checks are restated
+   because attenuation (§3) is a link-by-link PARENT→CHILD relation — it guarantees `G_n` is no
+   wider than `G_0`, NOT that `G_n` satisfies the caller's `expected` context. In particular,
+   §3.4 audience containment gives `G_n.audiences ⊆ G_0.audiences`, which combined with step 1's
    `expected.audience ∈ G_0.audiences` does NOT entail `expected.audience ∈ G_n.audiences` — a
    leaf may have narrowed to a subset excluding `expected.audience` (e.g. leaf audience {B},
-   root audience {A,B}, request for A). An implementation that checked attenuation link-by-link
-   but skipped the leaf's own audience/operation/time checks would accept such a request. Running
-   today's full `check_envelope` over the leaf closes the gap: the leaf grant is re-verified
-   against `expected` exactly as a single grant is today. Combined verification runs over the
-   leaf; the chain proof is the ordered attenuated grants root→leaf plus the leaf's holder proof.
+   root audience {A,B}, request for A); the leaf's own audience check closes that gap.
+
+   It is NOT today's `check_envelope` unchanged: today's grant parse rejects `ba+cap-delegated`
+   at the closed typ check (`runtime.ex:280`, `typ = "ba+cap"` only), the closed header-key set
+   (`runtime.ex:240`, `@grant_header_keys ~w(alg kid typ)` — no `jwk`), and the closed payload-
+   key set (`runtime.ex:241`, `@grant_payload_keys` — no `ba_dlg`). A `ba+cap-delegated` leaf
+   carrying `jwk` + `ba_dlg` therefore cannot be parsed by today's `check_envelope`. The
+   successor major defines a delegated-leaf parse path that admits exactly `typ = ba+cap-
+   delegated`, header `{alg, kid, typ, jwk}`, and the `ba_dlg` payload claim (closed-set, reject
+   extras — the same closed posture, widened only for these reserved names), and THEN runs the
+   four leaf checks above. The check SEMANTICS (audience/operation/selectors/time/ath) are
+   reused from today; the PARSE path is a successor-major addition. The chain proof is the
+   ordered attenuated grants root→leaf plus the leaf's holder proof.
 
 This algorithm is SPECIFIED, not implemented. It is what the successor major implements; the
 current major has none of it. The successor major owns the concrete `bounds.delegation_depth`
@@ -227,8 +242,22 @@ value, the chain input-size bound, and the `ba+cap-delegated` header shape.
 - **Verbatim-PREFIX selector containment** (a draft of §3.2). Rejected (design-adversarial
   Challenge 3): `match_all/3`'s `Enum.all?` (`selector.ex:23`) is order-independent, so a prefix
   rule would reject a reordered-but-strictly-narrower child, making the rule stricter than the
-  semantic attenuation it encodes and making the "completeness" claim false. Multiset containment
-  is sound and complete without the position sensitivity.
+  semantic attenuation it encodes and making the "completeness" claim false.
+- **Counted-MULTISET selector containment** (a draft of §3.2, after the PREFIX rejection).
+  Rejected (cross-vendor review): the matcher's conjunction is idempotent — `Enum.all?([S, S])`
+  accepts exactly the arguments `Enum.all?([S])` does — so a counted-multiset rule would reject
+  an equality-preserving delegation `parent [S, S] → child [S]` (the child's single `S` cannot
+  "account for" the parent's two), even though `Accept([S]) = Accept([S, S])` and the delegation
+  widens nothing. Set containment on the DISTINCT tuples is the right relation for an algebra
+  where duplicates carry no acceptance semantics.
+- **Today's `check_envelope` UNCHANGED for the delegated leaf** (a draft of §4 step 6). Rejected
+  (cross-vendor review, blocking): today's grant parse rejects `ba+cap-delegated` at the closed
+  typ check (`runtime.ex:280`), the closed header-key set (`runtime.ex:240`, no `jwk`), and the
+  closed payload-key set (`runtime.ex:241`, no `ba_dlg`). A delegated leaf carrying `jwk` +
+  `ba_dlg` cannot be parsed by today's `check_envelope`, so "UNCHANGED" was unrealizable. The
+  successor major defines a delegated-leaf parse path (closed-set, widened only for the reserved
+  names) that THEN runs the same audience/operation/selectors/time/ath checks today's combined
+  verification runs.
 - **Verify the link signature "under `cnf.jkt`" without a header key** (a draft of §2). Rejected
   (design-adversarial Challenge 2, blocking): `cnf.jkt` is a 32-byte thumbprint digest
   (`runtime.ex:296-298`), not a public key; `Grant.t()` carries no holder key or principal.
@@ -243,7 +272,7 @@ value, the chain input-size bound, and the `ba+cap-delegated` header shape.
   product-shaping decision lands as a numbered public ADR" rule.
 - **General selector implication.** Rejected (§3.2): not mechanically checkable without
   re-implementing the matcher (= interpretation, forbidden by ADR 0006 §5), and buys no
-  accepted-set expressiveness over multiset containment.
+  accepted-set expressiveness over set containment on distinct tuples.
 
 ## Consequences
 
