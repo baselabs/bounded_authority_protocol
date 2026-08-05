@@ -19,6 +19,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md",
                     "docs/adr/0006-standards-evolution-suite-identity-and-delegation-posture.md",
                     "docs/adr/0007-normative-requirement-identifiers.md",
+                    "docs/adr/0008-release-candidate-contract.md",
                     "docs/protocol-v1.md",
                     "docs/errata.md",
                     "docs/design/conformance-contract.md",
