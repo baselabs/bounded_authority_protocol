@@ -21,6 +21,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/adr/0007-normative-requirement-identifiers.md",
                     "docs/adr/0008-release-candidate-contract.md",
                     "docs/protocol-v1.md",
+                    "docs/release-candidate-contract.md",
                     "docs/errata.md",
                     "docs/design/conformance-contract.md",
                     "docs/design/protocol-charter.md",
