@@ -47,6 +47,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "license.check": :test,
         "package.check": :test,
         quality: :test,
+        "release.candidate": :test,
         "sbom.check": :test,
         "sbom.generate": :test
       ]
@@ -174,6 +175,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "cmd elixir scripts/check_dependency_licenses.exs artifacts/tooling.cdx.json"
       ],
       "package.check": ["run --no-start scripts/check_package.exs"],
+      "release.candidate": ["run --no-start scripts/check_release_candidate.exs"],
       "sbom.generate": [
         &prepare_artifacts/1,
         "cmd mix sbom.cyclonedx --only prod --exclude-system-dependencies --classification library --schema 1.6 --format json --output artifacts/release.cdx.json --force",
@@ -195,6 +197,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs --warnings-as-errors",
         "audit",
         "package.check",
+        "release.candidate",
         "chain_archive.mutations",
         "conformance.mutations",
         "conformance.verify"
