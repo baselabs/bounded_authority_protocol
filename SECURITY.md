@@ -2,7 +2,10 @@
 
 ## Supported versions
 
-No released version exists yet. This file becomes version-specific with the first public release.
+The unpublished `0.1.0` package is a **release candidate** — no version is published to Hex. The
+public API surface is locked ([release-candidate contract](docs/release-candidate-contract.md));
+BAP-07 (connected verification and first public release) publishes the exact candidate after the
+private-runtime connected gates pass. This file becomes version-specific with that first release.
 
 The current unpublished 0.1.0 source implements bounded parsing, deterministic standard compact
 JWS grant and RFC 9449 holder-proof production, standalone raw-grant verification, and combined
