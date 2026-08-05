@@ -269,10 +269,18 @@ compatibility.
 - **No wire byte, bound, or verdict change.** `git diff 46a7eb1..HEAD -- lib/ test/ priv/conformance/
   mix.lock` is empty. Local `mix quality` passes with 295 tests and 13 properties (0 failures), the
   conformance runner reports `agreed=259, agreement=true, disagreed=0`, and the new
-  `release.candidate` gate passes (candidate archive SHA-256
-  `c8897054f528e3a81853ed5fcb1fe062ccd14622b41b8e9fbda55bd1057d98f0` at the local closeout head). The
-  CI-attested SHA-256 + supply-chain run + `gh attestation verify` constraints are the post-push
-  receipt (mirroring BAP-10's pattern); they record at the exact closeout head once pushed.
+  `release.candidate` gate passes.
+- **Remote verification (post-push receipt):** [CI run 31029289860](https://github.com/baselabs/bounded_authority_protocol/actions/runs/31029289860)
+  passed the complete quality/package boundary (incl. the new `release.candidate` gate) and all
+  supported Elixir/OTP pairs. [Supply-chain run 31029289864](https://github.com/baselabs/bounded_authority_protocol/actions/runs/31029289864)
+  built artifact `bounded-authority-protocol-4c64be36ada1c167214471847d4061ea5ff63c56`. The CI-attested
+  candidate archive SHA-256 (ubuntu-built) is
+  `abe962eb7fddefdc1906d5bb6baea38518ca017e0b6dab957497293ee12cf515`; the downloaded `SHA256SUMS`
+  check passed, and `gh attestation verify` accepted the build-provenance attestation for that digest
+  constrained to this repository, the trusted supply-chain workflow, `refs/heads/main`, source digest
+  `4c64be3`, and GitHub-hosted runners. (The local `release.candidate` gate's SHA differs because it
+  builds on darwin — the gate compares two builds WITHIN one run on one platform, not cross-platform;
+  the CI-attested SHA is the ubuntu receipt, mirroring BAP-05/BAP-10's pattern.)
 
 ## Next action
 
