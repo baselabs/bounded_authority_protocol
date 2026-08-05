@@ -21,6 +21,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/adr/0007-normative-requirement-identifiers.md",
                     "docs/adr/0008-release-candidate-contract.md",
                     "docs/adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md",
+                    "docs/adr/0010-delegation-with-attenuation.md",
                     "docs/protocol-v1.md",
                     "docs/release-candidate-contract.md",
                     "docs/errata.md",
