@@ -93,9 +93,14 @@ The reserved claim name `ba_sut` (suite-attestation) carries the payload binding
 2. **Original-suite verification as historical record (the algorithm-break class):** the archive MAY
    still verify under its original suite's rules (anchors, transitions, row hashes) when those
    signatures are still trusted, preserving the issuance provenance. Under cryptanalytic break of the
-   original suite, step 1 alone suffices for trust: the content countersignature covers what the
-   original signatures covered (the content digest), signed by a current key. The original signatures
-   become historical record, not the trust root.
+   original suite, step 1 alone suffices for trust: the archive's content digest D (SHA-256 over the
+   FULL archive bytes, including the signed anchors/transitions/rows per ADR 0004's `hash_chunks`)
+   COVERS the original signatures — they are bytes within the hashed content — so a current key's
+   signature over D re-attests the complete archive byte-for-byte, and an Ed25519-break attacker
+   cannot alter any archive byte without changing D nor forge the current-key countersignature. The
+   original signatures become historical record, not the trust root. (Note: no original-suite
+   signature signs D itself — the anchors sign the chain hash, the transitions sign key succession —
+   so the relationship is "D covers the signatures," not "the signatures cover D.")
 
 ### Failure classes the mechanism closes (including algorithm break — Challenge 2)
 
@@ -105,9 +110,26 @@ The reserved claim name `ba_sut` (suite-attestation) carries the payload binding
   content digest, re-derived and compared in constant time, NOT on the original signatures.
 - **Content-digest mismatch:** a countersignature over digest D presented with an archive whose
   re-derived digest is D'. CLOSED by the constant-time digest comparison (ADR 0004's mechanism).
-- **Suite-downgrade / suite-mismatch / window gaps:** the caller supplies the trusted current suite +
-  key; the attestation's original-suite field must match the archive's declared suite; ADR 0004's
-  window rules apply to the attesting key's validity.
+- **Compromise of the attesting current-suite key:** a rogue `K_cur` can countersign arbitrary
+  archives (including ones carrying forged original-suite signatures). This is the trust-root risk
+  the caller manages by supplying the trusted current key — it is a key-custody/trust-decision, not
+  a verifier bypass (the verifier only accepts keys the caller declared trusted). The mitigation is
+  operational (the caller's trusted-key set), exactly as ADR 0004's caller supplies the trusted
+  current key for the historical-key chain.
+- **Suite-downgrade:** the caller supplies the trusted current suite, so a downgrade (a weaker suite
+  claimed as "current" to bypass a stronger suite's deprecation) is a caller trust-decision, not a
+  verifier bypass.
+- **Suite-mismatch:** the attestation's `original_suite` field must match the archive's original
+  suite. ADR 0004's archive carries no explicit suite field (the suite is implicit in the `BAP1-*`
+  prefix/alg/fixed widths); a successor major derives the archive's original suite from those
+  markers (the prefix byte `BAP1-ARCHIVE\0`, the anchor `alg`/`typ`, the fixed widths) and the
+  verifier requires the attestation's `original_suite` to equal the derived value. The successor
+  major's ADR specifies the exact derivation.
+- **Attesting-key validity window:** only the generic `valid_from <= attestation_time < valid_before`
+  check transfers from ADR 0004 (a single key's interval), NOT ADR 0004's positional anti-cycling /
+  no-fingerprint-cycle rules — those govern an ordered transition CHAIN, and the attestation is
+  deliberately NOT a chain link. The attesting key's interval is checked against the attestation
+  time; ordering across multiple attestations is the successor major's concern.
 
 ## Alternatives considered
 
@@ -127,9 +149,13 @@ The reserved claim name `ba_sut` (suite-attestation) carries the payload binding
 
 - A successor major implementing evidence longevity implements the `ba+suite-attestation` typ as a
   content-covering countersignature, NOT a key/suite-identity chain. The reserved `ba+suite-attestation`
-  typ and `ba_sut` claim are REJECTED by the current major's closed profile (the unchanged conformance
-  corpus proves this; the rejection evidence is the code's closed typ set `{ba+cap, dpop+jwt,
-  ba+chain-anchor, ba+key-transition}` and closed claim set, neither of which admits the reserved names).
+  typ and `ba_sut` claim are REJECTED by the current major's closed profile — the rejection evidence
+  is the CODE's closed typ set `{ba+cap, dpop+jwt, ba+chain-anchor, ba+key-transition}`
+  (`compact_jws.ex:117,149-150`, `runtime.ex:280`, `boundary_anchor_codec.ex:92`,
+  `key_transition_codec.ex:124`) and closed claim set, neither of which admits the reserved names.
+  (The unchanged conformance corpus at `agreed=259` is CONSISTENT with this — it exercises the closed
+  code sets — but is not itself the rejection proof for names that live in docs only, since the corpus
+  verifies code behavior, not docs reservations.)
 - Activation is a successor-contract-major decision. The current major's wire profile, bounds, and
   verdicts are unchanged.
 - The hybrid Ed25519 + ML-DSA composite is a successor-suite-ADR concern (wire-freeze barrier), not
