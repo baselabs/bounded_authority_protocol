@@ -99,17 +99,20 @@ commitment is that the migration is a suite succession, not a redesign.
 BAP-04 anchored exports and historical-key rollover exist so evidence verifies years later.
 Long-retention evidence under a frozen signature algorithm means the evidence's trustworthiness
 would expire before its retention period — a design problem, not a hypothetical. The committed
-design direction, specified now and activated in a successor contract-major:
+design direction, specified now and activated in a successor contract-major (carried to ADR
+quality in [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md)):
 
-- **Cross-suite countersignature generalizes historical-key rollover to historical-suite
-  rollover.** A boundary anchor of a current suite countersigns an archive whose rows and anchors
-  were produced under an earlier suite, attesting "verified complete under suite A at time T".
+- **Cross-suite content-covering countersignature.** A boundary anchor of a current suite
+  countersigns an archive whose rows and anchors were produced under an earlier suite, attesting
+  "verified complete under suite A at time T" by signing the archive's CONTENT DIGEST (not merely
+  chaining key/suite identity — a content-covering signature is required so trust survives the
+  original suite's cryptanalytic break, since the original signatures are forgeable under break).
 - Verification of aged evidence then has two parts: the archive verifies under its original suite's
-  complete rules, and an authenticated countersignature chain connects it to a currently trusted
-  suite. Trust freshness comes from the newest countersignature, not from the original signature
-  surviving cryptanalysis.
-- The anchor chain already models authenticated succession (ordered key transitions with
-  lower-inclusive/upper-exclusive windows); suite succession reuses that mechanism rather than
+  complete rules, and an authenticated content-covering countersignature from a currently trusted
+  suite re-attests the archive's content. Trust freshness comes from the newest countersignature,
+  not from the original signature surviving cryptanalysis.
+- The archive's existing SHA-256 content digest (BAP-04, computed over every raw byte) is the
+  binding target; suite succession reuses the anchored-export digest mechanism rather than
   inventing a parallel one.
 
 ## Conformance language
