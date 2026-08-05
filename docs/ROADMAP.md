@@ -210,9 +210,11 @@ compatibility.
 
 ## BAP-10 closeout evidence
 
-- Implementation head `57fb3a2` (BAP-10 Task 5; the closeout-evidence block itself lands at the next
-  head) delivers the RFC 2119/8174 normative rewrite of the profile and evolution contract, the
-  stable requirement-identifier scheme, and the MUST-to-conformance-cell traceability map:
+- The slice spans `a495808` (ADR 0007) through `1ad8e44` (closeout fix); the full deliverable set is
+  collectively present from `57fb3a2` (Task 5, the requirement map), with the closeout-evidence block
+  itself landing at `ee873a7` and a structural closeout fix at `1ad8e44`. The slice delivers the
+  RFC 2119/8174 normative rewrite of the profile and evolution contract, the stable requirement-
+  identifier scheme, and the MUST-to-conformance-cell traceability map:
   - `docs/protocol-v1.md` carries the BCP 14 boilerplate (verbatim RFC 8174 §2 NEW sentence, all 11
     keywords incl. NOT RECOMMENDED, the "when, and only when, they appear in all capitals" clause)
     and **72 stable requirement identifiers** (`REQ1-<SURFACE>-<tag>`, per

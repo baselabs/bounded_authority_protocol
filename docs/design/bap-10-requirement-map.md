@@ -63,20 +63,20 @@ qualifier makes a stale mapping a detectable drift rather than a silent false cl
 | REQ1-HEADER-closed-set | Member sets are exact; `crit`, `b64`, embedded grant keys, unknown alg, unlisted member are invalid | decode_grant, decode_proof | invalid_encoding, invalid_algorithm | populated | decode_grant.invalid_encoding=7, invalid_algorithm=1; decode_proof.invalid_encoding=6, invalid_algorithm=1 |
 | REQ1-HEADER-kid-bytes | Grant `kid` is 1–128 byte ASCII letters/digits/`-`.`_``~` | decode_grant | exact_bound, maximum_plus_one | populated | decode_grant.exact_bound=1, maximum_plus_one=1 (kid width bounds) |
 | REQ1-HEADER-kid-not-selector | `kid` is an untrusted hint, not a trust selector | untrusted_key_locator | valid | populated | untrusted_key_locator.valid=1 (returns `trust: :not_evaluated`) |
-| REQ1-HEADER-proof-jwk / no-private-jwk | Proof JWK is exactly `{crv,kty,x}`; private `d` and extra members invalid | jwk.decode_public | invalid_encoding, tamper_meaningful_byte | populated | jwk.decode_public.invalid_encoding=1, tamper_meaningful_byte=1 |
-| REQ1-HEADER-thumbprint / digest-width / issuer-fingerprint | Thumbprint = unpadded b64url SHA-256 of the canonical preimage; 32-byte digest; issuer fingerprint over raw 32-byte key, kid excluded | jwk.thumbprint, jwk.thumbprint_raw, jwk.public_key_thumbprint_raw | invalid_encoding, invalid_key, tamper_meaningful_byte, valid | populated | jwk.thumbprint.invalid_encoding=1, tamper_meaningful_byte=1; jwk.public_key_thumbprint_raw.invalid_key=1; valid cells present |
+| REQ1-HEADER-proof-jwk; REQ1-HEADER-no-private-jwk | Proof JWK is exactly `{crv,kty,x}`; private `d` and extra members invalid | jwk.decode_public | invalid_encoding, tamper_meaningful_byte | populated | jwk.decode_public.invalid_encoding=1, tamper_meaningful_byte=1 |
+| REQ1-HEADER-thumbprint; REQ1-HEADER-digest-width; REQ1-HEADER-issuer-fingerprint | Thumbprint = unpadded b64url SHA-256 of the canonical preimage; 32-byte digest; issuer fingerprint over raw 32-byte key, kid excluded | jwk.thumbprint, jwk.thumbprint_raw, jwk.public_key_thumbprint_raw | invalid_encoding, invalid_key, tamper_meaningful_byte, valid | populated | jwk.thumbprint.invalid_encoding=1, tamper_meaningful_byte=1; jwk.public_key_thumbprint_raw.invalid_key=1; valid cells present |
 
 ## CLAIM — grant/proof claims (`verify_grant`, `check_envelope`)
 
 | REQ-id | Requirement | Surface(s) | Cell class(es) | Cell-type | Evidence / reason |
 |---|---|---|---|---|---|
-| REQ1-CLAIM-closed-set / no-extra | All claim objects closed; no other claim accepted | verify_grant, check_envelope | invalid_claim, invalid_encoding | populated | verify_grant.invalid_claim=1, invalid_encoding=5; check_envelope.invalid_claim=4 |
+| REQ1-CLAIM-closed-set; REQ1-CLAIM-no-extra | All claim objects closed; no other claim accepted | verify_grant, check_envelope | invalid_claim, invalid_encoding | populated | verify_grant.invalid_claim=1, invalid_encoding=5; check_envelope.invalid_claim=4 |
 | REQ1-CLAIM-case-sensitive | Names and string values case-sensitive | verify_grant | invalid_claim | populated | verify_grant.invalid_claim=1 |
-| REQ1-CLAIM-v / proof-v | Grant/proof `v` MUST be exactly integer 1 | verify_grant | invalid_claim | populated | verify_grant.invalid_claim=1 |
+| REQ1-CLAIM-v; REQ1-CLAIM-proof-v | Grant/proof `v` MUST be exactly integer 1 | verify_grant | invalid_claim | populated | verify_grant.invalid_claim=1 |
 | REQ1-CLAIM-operation-shape | Operation = `{name, selectors}`; unique 1–128 byte names; 1–64 selector array | verify_grant | invalid_claim, invalid_selector | populated | verify_grant.invalid_selector=2 |
 | REQ1-CLAIM-proof-required | Every proof row required except `nonce` | check_envelope | invalid_claim, invalid_request | populated | check_envelope.invalid_claim=4, invalid_request=3 |
 | REQ1-CLAIM-ath | `ath` = SHA-256 over ASCII bytes of complete received grant compact value | check_envelope | invalid_request | populated | check_envelope.invalid_request=3 (request-binding mismatch) |
-| REQ1-CLAIM-htm-bytes / htm-no-case-normalize | `htm` is 1–32 byte RFC 9110 token; compared byte-for-byte, never case-normalized | check_envelope | invalid_request | populated | check_envelope.invalid_request=3 |
+| REQ1-CLAIM-htm-bytes; REQ1-CLAIM-htm-no-case-normalize | `htm` is 1–32 byte RFC 9110 token; compared byte-for-byte, never case-normalized | check_envelope | invalid_request | populated | check_envelope.invalid_request=3 |
 
 ## SELECTOR — selector algebra (`verify_grant`, `check_envelope`)
 
@@ -86,20 +86,20 @@ qualifier makes a stale mapping a detectable drift rather than a silent false cl
 | REQ1-SELECTOR-path-shape | Path 1–32 member names, 1–128 bytes, objects only | verify_grant | invalid_selector | populated | verify_grant.invalid_selector=2 |
 | REQ1-SELECTOR-one-of-size | `one_of` ≤ 256 values | verify_grant | invalid_selector | populated | verify_grant.invalid_selector=2 |
 | REQ1-SELECTOR-path-required | `equals`/`one_of` require the path to exist | verify_grant | invalid_selector | populated | verify_grant.invalid_selector=2 |
-| REQ1-SELECTOR-semantic-identity / no-tag-collapse | Tagged scalar distinctions preserved; arrays positional; objects unordered; int/float not collapsed | verify_grant | invalid_selector | populated | verify_grant.invalid_selector=2 |
+| REQ1-SELECTOR-semantic-identity; REQ1-SELECTOR-no-tag-collapse | Tagged scalar distinctions preserved; arrays positional; objects unordered; int/float not collapsed | verify_grant | invalid_selector | populated | verify_grant.invalid_selector=2 |
 | REQ1-SELECTOR-not-authorization | No selector grants business authorization | verify_grant | valid | populated | verify_grant.valid=1 (facts carry `authorization: :not_evaluated`) |
 
 ## URI — URI normalization (`uri.normalize`, `proof_signing_input`)
 
 | REQ-id | Requirement | Surface(s) | Cell class(es) | Cell-type | Evidence / reason |
 |---|---|---|---|---|---|
-| REQ1-URI-reject-list / pre-normalized / no-network | HTTPS-only, hierarchical, bounded ASCII; rejects HTTP/other-scheme/authority-less/malformed; expected+proof URIs already normal; no DNS/IDNA/network | uri.normalize | invalid_uri, invalid_encoding, tamper_meaningful_byte | populated | uri.normalize.invalid_uri=7, invalid_encoding=1, tamper_meaningful_byte=1; valid=14 |
+| REQ1-URI-reject-list; REQ1-URI-pre-normalized; REQ1-URI-no-network | HTTPS-only, hierarchical, bounded ASCII; rejects HTTP/other-scheme/authority-less/malformed; expected+proof URIs already normal; no DNS/IDNA/network | uri.normalize | invalid_uri, invalid_encoding, tamper_meaningful_byte | populated | uri.normalize.invalid_uri=7, invalid_encoding=1, tamper_meaningful_byte=1; valid=14 |
 
 ## SIGNING — signing and digest inputs (`grant_signing_input`, `proof_signing_input`, `request_digest`)
 
 | REQ-id | Requirement | Surface(s) | Cell class(es) | Cell-type | Evidence / reason |
 |---|---|---|---|---|---|
-| REQ1-SIGNING-exact-input / any-order / deterministic-produce | Exact RFC 7515 signing input, no bytes before/after; received segments; producers emit one deterministic JCS | grant_signing_input, proof_signing_input | valid | populated | grant_signing_input.valid=1; proof_signing_input.valid=2 |
+| REQ1-SIGNING-exact-input; REQ1-SIGNING-any-order; REQ1-SIGNING-deterministic-produce | Exact RFC 7515 signing input, no bytes before/after; received segments; producers emit one deterministic JCS | grant_signing_input, proof_signing_input | valid | populated | grant_signing_input.valid=1; proof_signing_input.valid=2 |
 | REQ1-SIGNING-backend-reject | Backend rejection/exception returns exactly `{:error, :invalid}` | verify_grant, check_envelope | tamper_meaningful_byte | populated | verify_grant.tamper_meaningful_byte=1; check_envelope.tamper_meaningful_byte=1 |
 | REQ1-SIGNING-digest-prefix | Request-digest prefix `BAP1-REQUEST\0` exact ASCII incl. final zero byte | request_digest | valid | populated | request_digest.valid=1 |
 | REQ1-SIGNING-retired-prefixes | Retired `BAP1-GRANT\0`/`BAP1-PROOF\0` strings are invalid signing prefixes | verify_grant | invalid_encoding | populated | verify_grant.invalid_encoding=5 |
@@ -112,11 +112,11 @@ qualifier makes a stale mapping a detectable drift rather than a silent false cl
 | REQ1-VERIFY-revalidate | Each public entry revalidates every field | verify_grant | invalid_claim, invalid_time, invalid_key | populated | verify_grant.invalid_claim=1, invalid_time=1, invalid_key=1 |
 | REQ1-VERIFY-no-signer-callback | `assemble_compact/2` accepts only SigningInput + 64-byte signature, never a key/signer/callback | assemble_compact | valid | populated | assemble_compact.valid=1 (no key/signer input path exists) |
 | REQ1-VERIFY-decode-not-evaluated | Decode results carry `verification: :not_evaluated` | decode_grant, decode_proof | valid | populated | decode_grant.valid=1, decode_proof.valid=1 |
-| REQ1-VERIFY-grant-exact / grant-times / no-iat-nbf-order | Grant verification requires exact key-id/signature/issuer/audience; time invariants; does not require `iat <= nbf` | verify_grant | invalid_key, invalid_claim, invalid_time | populated | verify_grant.invalid_key=1, invalid_claim=1, invalid_time=1 |
+| REQ1-VERIFY-grant-exact; REQ1-VERIFY-grant-times; REQ1-VERIFY-no-iat-nbf-order | Grant verification requires exact key-id/signature/issuer/audience; time invariants; does not require `iat <= nbf` | verify_grant | invalid_key, invalid_claim, invalid_time | populated | verify_grant.invalid_key=1, invalid_claim=1, invalid_time=1 |
 | REQ1-VERIFY-time-bounds | Skew ≤ 60s, proof max age ≤ 300s | verify_grant, check_envelope | invalid_time | populated | verify_grant.invalid_time=1; check_envelope.invalid_time=1 |
 | REQ1-VERIFY-nonce-mode | Nonce absent in `:not_required`, present-once-and-equal in required mode | check_envelope | invalid_nonce | populated | check_envelope.invalid_nonce=1 |
 | REQ1-VERIFY-envelope-binding | Combined verification re-verifies raw grant; binds ath/method/URI/invocation/op/ba_req/time/nonce/selectors | check_envelope | invalid_request, invalid_nonce, invalid_selector, invalid_time, invalid_uri | populated | check_envelope.invalid_request=3, invalid_nonce=1, invalid_selector=3, invalid_time=1 |
-| REQ1-VERIFY-facts-redacted / facts-not-credentials / grant-not-authorized | Facts value-bearing, redacted, no generic encoder, not accepted as credentials, `authorization: :not_evaluated` | verify_grant, check_envelope | valid | populated | verify_grant.valid=1, check_envelope.valid=4 (facts carry `authorization: :not_evaluated`, no credential fields) |
+| REQ1-VERIFY-facts-redacted; REQ1-VERIFY-facts-not-credentials; REQ1-VERIFY-grant-not-authorized | Facts value-bearing, redacted, no generic encoder, not accepted as credentials, `authorization: :not_evaluated` | verify_grant, check_envelope | valid | populated | verify_grant.valid=1, check_envelope.valid=4 (facts carry `authorization: :not_evaluated`, no credential fields) |
 
 ## BOUNDS — hard maxima (`bounds.new`)
 
@@ -131,8 +131,8 @@ qualifier makes a stale mapping a detectable drift rather than a silent false cl
 
 | REQ-id | Requirement | Surface(s) | Cell class(es) | Cell-type | Evidence / reason |
 |---|---|---|---|---|---|
-| REQ1-LOCATOR-three-segments / opaque-payload | Bounds complete compact input, exactly 3 segments, validates only grant header; payload/signature opaque | untrusted_key_locator | invalid_encoding, valid | populated | untrusted_key_locator.invalid_encoding=1, valid=1 |
-| REQ1-LOCATOR-not-authority / no-value-leak | Does not select key/decode claims/verify/trust/authorize; failures return `{:error, :invalid}` without input values | untrusted_key_locator | valid | populated | untrusted_key_locator.valid=1 (returns `trust: :not_evaluated`) |
+| REQ1-LOCATOR-three-segments; REQ1-LOCATOR-opaque-payload | Bounds complete compact input, exactly 3 segments, validates only grant header; payload/signature opaque | untrusted_key_locator | invalid_encoding, valid | populated | untrusted_key_locator.invalid_encoding=1, valid=1 |
+| REQ1-LOCATOR-not-authority; REQ1-LOCATOR-no-value-leak | Does not select key/decode claims/verify/trust/authorize; failures return `{:error, :invalid}` without input values | untrusted_key_locator | valid | populated | untrusted_key_locator.valid=1 (returns `trust: :not_evaluated`) |
 
 ## CHAIN / EXPORT — consumption chain and anchored export (`check_chain`, `verify_*`, `encode_*`)
 
@@ -140,9 +140,9 @@ qualifier makes a stale mapping a detectable drift rather than a silent false cl
 |---|---|---|---|---|---|
 | REQ1-CHAIN-raw-rows-bounds | Chain verification accepts raw canonical row bytes and mandatory caller boundaries | check_chain | valid, invalid_encoding, invalid_claim | populated | check_chain.valid=1, invalid_encoding=2, invalid_claim=3 |
 | REQ1-CHAIN-no-deletion-cert | A self-consistent chain does not certify no row deleted; shortened/relinked artifacts fail only vs original boundaries | check_chain | tamper_meaningful_byte | populated | check_chain.tamper_meaningful_byte=1 |
-| REQ1-CHAIN-facts-not-evaluated / facts-shape | Successful facts state performed checks, retain `trust: :not_evaluated`; chain/anchor/transition facts make no authorization field | check_chain, verify_historical_anchor, verify_key_transition | valid | populated | check_chain.valid=1; verify_historical_anchor.valid=1; verify_key_transition.valid=1 |
-| REQ1-EXPORT-input-shape / complete-scan | Export accepts only `%ArchivedObject{}` + ordered historical key chain + complete expected context; scans/hashes complete archive, exact EOF, authenticates both boundaries + every transition, checks every row | verify_anchored_export | valid, invalid_encoding, invalid_claim, invalid_key, invalid_time, tamper_meaningful_byte | populated | verify_anchored_export.valid=1, invalid_encoding=1, invalid_claim=1, invalid_key=1, invalid_time=1, tamper_meaningful_byte=1 |
-| REQ1-EXPORT-version-exact / preimage-private | Stored-object version is exact out-of-band context; commitment preimages opaque/private | verify_anchored_export | invalid_claim | populated | verify_anchored_export.invalid_claim=1 |
+| REQ1-CHAIN-facts-not-evaluated; REQ1-CHAIN-facts-shape | Successful facts state performed checks, retain `trust: :not_evaluated`; chain/anchor/transition facts make no authorization field | check_chain, verify_historical_anchor, verify_key_transition | valid | populated | check_chain.valid=1; verify_historical_anchor.valid=1; verify_key_transition.valid=1 |
+| REQ1-EXPORT-input-shape; REQ1-EXPORT-complete-scan | Export accepts only `%ArchivedObject{}` + ordered historical key chain + complete expected context; scans/hashes complete archive, exact EOF, authenticates both boundaries + every transition, checks every row | verify_anchored_export | valid, invalid_encoding, invalid_claim, invalid_key, invalid_time, tamper_meaningful_byte | populated | verify_anchored_export.valid=1, invalid_encoding=1, invalid_claim=1, invalid_key=1, invalid_time=1, tamper_meaningful_byte=1 |
+| REQ1-EXPORT-version-exact; REQ1-EXPORT-preimage-private | Stored-object version is exact out-of-band context; commitment preimages opaque/private | verify_anchored_export | invalid_claim | populated | verify_anchored_export.invalid_claim=1 |
 
 ## EVO — evolution contract (`standards-track.md`)
 
@@ -156,16 +156,44 @@ qualifier + re-walk obligation (§ Maintenance) makes that the successor slice's
 
 | REQ-id | Requirement | Cell-type | Falsifiable reason (input-algebra impossibility) |
 |---|---|---|---|
-| REQ1-EVO-closed-format-permanent | Closed-rejection posture permanent | `gap` | The corpus exercises the closed profile's rejections (verify_grant invalid_algorithm etc.), proving the posture *as implemented*; the "permanent" governance commitment is not a runtime check — no corpus case can express "this posture never changes across all future time." |
+| REQ1-EVO-closed-format-permanent | Closed-rejection posture permanent | `gap` | Input-algebra impossibility: "the closed-rejection posture is permanent across all future time" is a cross-release governance commitment; a v1 corpus case is a fixed `(compact bytes, bounds)→verdict` pair that cannot express a property over future releases. The posture *as implemented in v1* is exercised by the per-surface closed-set cells (verify_grant invalid_algorithm, etc.); the "permanent" commitment is the governance invariant over those cells. |
 | REQ1-EVO-evolution-above-wire | Evolution via parallel majors, never in-place extension | `gap` | The v1 corpus contains only v1 artifacts; the input algebra cannot express an in-place extension to reject because the closed profile already rejects every unlisted member. The requirement is proven structurally by REQ1-CORE-reject-unlisted + the per-surface closed-set cells. |
 | REQ1-EVO-proof-major-equals-grant | Proof major MUST equal grant major | `populated` | See REQ1-CORE-proof-major-equals-grant — `check_envelope.invalid_request=3` proves mixed-major rejection. (Mirrors REQ1-CORE row; listed under EVO because the charter states it as an evolution-contract invariant.) |
 | REQ1-EVO-mixed-major-invalid | Mixed-major envelopes invalid by construction | `populated` | check_envelope.invalid_request=3 (same cell family). |
-| REQ1-EVO-no-downgrade | No cross-major fallback/downgrade/best-effort parsing | `gap` | The v1 verifier has a single code path (no fallback logic exists to exercise); the corpus proves the closed rejection of any other major via verify_grant invalid_algorithm. "No fallback path" is the absence of a code path, not a runtime behavior a corpus case can trigger. |
-| REQ1-EVO-deprecation-prerequisites | Deprecation requires successor profile + corpus + 2 independent passing implementations | `gap` | Governance/process prerequisite, not a runtime check. No successor major exists; the input algebra cannot express "a successor has shipped and two implementations pass it." |
-| REQ1-EVO-deprecation-window-minimum | Deprecation window never shorter than 12 months | `gap` | A wall-clock-duration policy, not a runtime check. No corpus case can express a 12-month minimum. |
-| REQ1-EVO-parallel-support-during-window | Conforming deployments support both majors during the window | `gap` | Deployment posture, not a runtime check. No successor major exists to support in parallel. |
-| REQ1-EVO-sunset-is-deployment-decision | Sunset is a deployment decision after the window, never a silent library change | `gap` | Governance invariant about library behavior across releases, not a v1 runtime check. |
-| REQ1-EVO-no-verdict-flip | No erratum may flip a corpus verdict | `gap` | A governance invariant over the errata process, not a runtime check. The corpus proves verdicts are stable *within* v1 (the mutation battery); "no future erratum flips a verdict" cannot be expressed as a v1 input. |
+| REQ1-EVO-no-downgrade | No cross-major fallback/downgrade/best-effort parsing | `gap` | Input-algebra impossibility: "no fallback/downgrade path exists" is the absence of a code path, and a v1 corpus case is a single `(artifact, bounds)→verdict` pair that cannot express the non-existence of an alternative resolution path. The closed rejection any other major hits is exercised by `verify_grant.invalid_algorithm=1` (the mechanism no-downgrade relies on); the "no fallback path" governance invariant is over the codebase's structure, not a v1 input. |
+| REQ1-EVO-deprecation-prerequisites | Deprecation requires successor profile + corpus + 2 independent passing implementations | `gap` | Input-algebra impossibility: the v1 corpus input algebra is `(compact bytes, bounds)` and has no axis for "a successor contract-major exists, with a published corpus and two independent passing implementations." That is an industry-adoption state, not a v1 input→verdict pair, so no v1 corpus case can express it. |
+| REQ1-EVO-deprecation-window-minimum | Deprecation window never shorter than 12 months | `gap` | Input-algebra impossibility: the v1 corpus input algebra has no temporal/policy axis; a 12-month minimum duration cannot be expressed as a v1 `(compact bytes, bounds)` input (the v1 verifier has no wall-clock input to test a duration against). |
+| REQ1-EVO-parallel-support-during-window | Conforming deployments support both majors during the window | `gap` | Input-algebra impossibility: a v1 corpus case is a single `(artifact, bounds)→verdict` pair against the v1 closed profile; "a deployment accepts both v1 and a successor major in parallel" is a multi-artifact, multi-major deployment state with no successor major in scope to express. |
+| REQ1-EVO-sunset-is-deployment-decision | Sunset is a deployment decision after the window, never a silent library change | `gap` | Input-algebra impossibility: "sunset is a deployment decision, never a silent library change" is a cross-release governance property over the library's version history; a v1 corpus case is a fixed `(compact bytes, bounds)→verdict` pair that cannot express a property spanning releases. |
+| REQ1-EVO-no-verdict-flip | No erratum may flip a corpus verdict | `gap` | Input-algebra impossibility: "no future erratum flips a corpus verdict" is a governance invariant over the errata process across releases; a v1 corpus case is a fixed `(compact bytes, bounds)→verdict` pair that cannot express a property over future errata. Verdict stability *within v1* is exercised by the mutation battery (bap05 gate, 55 mutations); the no-verdict-flip invariant is over the errata process, not a v1 input. |
+
+## What a populated cell does and does not prove (reading guide)
+
+A `populated` mapping row certifies that the named conformance cell **exercises** the requirement's
+subject — not always that a single corpus case is a end-to-end proof of the full requirement. Three
+honest distinctions a standards reader should apply:
+
+1. **Direct proof** — the cell's defect is exactly the requirement's violation (e.g. `REQ1-CLAIM-v`
+   ← `verify_grant.invalid_claim=1`, where the case mutates the `v` claim). The cell directly proves
+   the requirement.
+2. **Adjacency proof** — the cell exercises the requirement's *family* but not its exact trigger
+   (e.g. `REQ1-CORE-cross-major-reject` ← `verify_grant.invalid_algorithm=1`: the v1 corpus contains
+   only `v:1` artifacts, so no case exercises a *literal* successor major; the `alg:none`/wrong-alg
+   cell proves the closed-profile rejection that any other major/suite hits, which is the mechanism
+   cross-major rejection relies on). The cell proves the property the requirement *depends on*, and
+   a literal successor-major case arrives with a successor-major corpus.
+3. **Family proof** — a closed-set requirement (e.g. `REQ1-HEADER-closed-set`) is proven by the union
+   of that surface's rejection cells (`invalid_algorithm`, `invalid_encoding`, `invalid_claim`, ...),
+   each of which rejects one class of unlisted member. No single cell is "the" closed-set proof; the
+   union is.
+
+Rows in this map name the cell(s) that exercise the requirement; where the proof is adjacency or
+family rather than direct, the requirement's full coverage is the union of the named cells plus the
+profile's closed-rejection invariant (`REQ1-CORE-reject-unlisted`). A row whose cell exercises only
+an adjacent property is still a valid `populated` row — the cell exists and exercises the surface —
+but it is not a claim that a single corpus case is an end-to-end proof. Gaps (rows where no cell
+exercises the requirement on any surface, even by adjacency) are recorded as `gap` with their
+input-algebra reason, never silently overstated as `populated`.
 
 ## Coverage summary
 
