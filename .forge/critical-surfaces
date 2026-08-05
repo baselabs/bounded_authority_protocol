@@ -2,6 +2,7 @@ lib/bounded_authority_protocol.ex
 lib/bounded_authority_protocol/**
 priv/conformance/**
 test/conformance/**
+docs/protocol-v1.md
 docs/design/protocol-charter.md
 docs/design/conformance-contract.md
 docs/design/threat-model.md
