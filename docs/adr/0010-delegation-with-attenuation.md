@@ -50,7 +50,7 @@ Verification re-derives the parent's hash and compares it to the child's `ba_dlg
 is RAW-to-RAW: the verifier base64url-decodes `ba_dlg` to 32 raw bytes and compares against the
 raw SHA-256 of the parent's compact bytes (computed by the raw-digest variant,
 `CompactJws.hash/2` at `compact_jws.ex:61-66`), in constant time. This mirrors how today's `ath`
-check compares raw-to-raw (`runtime.ex:482-484`: the proof decodes `ath` from base64url to raw at
+check compares raw-to-raw (`runtime.ex:483-484`: the proof decodes `ath` from base64url to raw at
 `runtime.ex:342-343`, re-derives the raw grant hash, and `secure_equal?`s them). The base64url
 *encoding* of the claim value is the wire shape; the *comparison* is over raw bytes, never
 raw-vs-encoded. (A draft of this design compared a decoded raw `ba_dlg` against `CompactJws.ath/2`,
@@ -160,7 +160,8 @@ acceptance-set level only.
 **3.3 Validity-window containment.** `parent.not_before <= child.not_before` and
 `child.expires_at <= parent.expires_at` (integer NumericDate comparison). The child window is a
 sub-interval of the parent's; within each grant the existing coherence invariants hold
-(`iat < exp`, `nbf < exp`, [protocol-v1.md](../protocol-v1.md) § Verification).
+(`iat < exp`, `nbf < exp`, [protocol-v1.md](../protocol-v1.md) § Public verification contract
+— the "coherent signed times `iat < exp` and `nbf < exp`" sentence).
 
 **3.4 Audience containment.** The child's audience set is a subset of the parent's (set
 membership on 1–64 StringOrURI each, [protocol-v1.md](../protocol-v1.md) § Claims — the `aud`
@@ -187,7 +188,7 @@ caller supplies `G_0`'s trusted issuer (as today) and the ordered chain bytes `[
      (§2). Closed-set match on the header; reject extras.
    - `ba_dlg(G_i)` is a base64url claim; decode to 32 raw bytes; re-derive the parent's raw hash
      via `CompactJws.hash(G_{i-1})` (the RAW variant); compare raw-to-raw with `secure_equal?`
-     (mirrors `runtime.ex:482-484`).
+     (mirrors `runtime.ex:483-484`).
    - Bind the signer: `Jwk.thumbprint_raw(G_i.header.jwk) == G_{i-1}.cnf.jkt`, then
      `ed25519_verify(G_i.sig, G_i.signing_input, G_i.header.jwk.public_key)` (§2).
    - `attenuate(G_i, G_{i-1})` holds (§3, all four sub-relations).
@@ -210,7 +211,7 @@ caller supplies `G_0`'s trusted issuer (as today) and the ordered chain bytes `[
 6. **Leaf binding.** The leaf `G_n` + its holder proof are verified by a successor-major
    delegated-leaf verification that runs the SAME checks today's combined verification runs over
    a single grant — not merely `proof.ath`, and NOT today's `check_envelope` byte-for-byte. The
-   leaf checks are: `proof.ath` = raw hash of `G_n` (`runtime.ex:482-484`); the leaf's audience
+   leaf checks are: `proof.ath` = raw hash of `G_n` (`runtime.ex:483-484`); the leaf's audience
    set contains `expected.audience` (`runtime.ex:466`); the proof's operation is in the leaf's
    operation set and the leaf's selectors match the arguments (`runtime.ex:497-498`); and the
    time/window checks run against the leaf (`runtime.ex:468-469`). These four checks are restated
