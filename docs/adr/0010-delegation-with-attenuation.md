@@ -201,9 +201,22 @@ caller supplies `G_0`'s trusted issuer (as today) and the ordered chain bytes `[
    earlier grant's hash without a SHA-256 second-preimage collision), and a child's `ba_dlg`
    cannot point forward (it binds the PARENT, which precedes it in the walk). The depth bound is
    the operational bound; hash-chain acyclicity is the structural property.
-6. **Leaf binding.** The leaf `G_n` is bound by the holder proof exactly as today: `proof.ath` =
-   raw hash of `G_n` (`runtime.ex:482-484`, UNCHANGED). Combined verification runs over the leaf;
-   the chain proof is the ordered attenuated grants root→leaf plus the leaf's holder proof.
+6. **Leaf binding.** The leaf `G_n` is verified by today's FULL combined verification
+   (`check_envelope`, UNCHANGED) — not merely `proof.ath`. That is: `proof.ath` = raw hash of
+   `G_n` (`runtime.ex:482-484`); the leaf's audience set contains `expected.audience`
+   (`runtime.ex:466`); the proof's operation is in the leaf's operation set and the leaf's
+   selectors match the arguments (`runtime.ex:497-498`); and the time/window checks run against
+   the leaf (`runtime.ex:468-469`). All four are restated because attenuation (§3) is a
+   link-by-link PARENT→CHILD relation — it guarantees `G_n` is no wider than `G_0`, NOT that
+   `G_n` satisfies the caller's `expected` context. In particular, §3.4 audience containment
+   gives `G_n.audiences ⊆ G_0.audiences`, which combined with step 1's
+   `expected.audience ∈ G_0.audiences` does NOT entail `expected.audience ∈ G_n.audiences` — a
+   leaf may have narrowed to a subset excluding `expected.audience` (e.g. leaf audience {B},
+   root audience {A,B}, request for A). An implementation that checked attenuation link-by-link
+   but skipped the leaf's own audience/operation/time checks would accept such a request. Running
+   today's full `check_envelope` over the leaf closes the gap: the leaf grant is re-verified
+   against `expected` exactly as a single grant is today. Combined verification runs over the
+   leaf; the chain proof is the ordered attenuated grants root→leaf plus the leaf's holder proof.
 
 This algorithm is SPECIFIED, not implemented. It is what the successor major implements; the
 current major has none of it. The successor major owns the concrete `bounds.delegation_depth`
