@@ -208,21 +208,58 @@ compatibility.
   conformance runner reports `agreed=259, agreement=true, disagreed=0`. The package retains zero
   production dependencies, no application callback, and no supervision tree.
 
+## BAP-10 closeout evidence
+
+- Implementation head `57fb3a2` (BAP-10 Task 5; the closeout-evidence block itself lands at the next
+  head) delivers the RFC 2119/8174 normative rewrite of the profile and evolution contract, the
+  stable requirement-identifier scheme, and the MUST-to-conformance-cell traceability map:
+  - `docs/protocol-v1.md` carries the BCP 14 boilerplate (verbatim RFC 8174 §2 NEW sentence, all 11
+    keywords incl. NOT RECOMMENDED, the "when, and only when, they appear in all capitals" clause)
+    and **72 stable requirement identifiers** (`REQ1-<SURFACE>-<tag>`, per
+    [ADR 0007](adr/0007-normative-requirement-identifiers.md)) across 12 surfaces.
+  - `docs/design/standards-track.md` evolution-contract sections carry **10 `REQ1-EVO-*` ids** and a
+    BCP 14 reference note.
+  - `docs/design/bap-10-requirement-map.md` (the [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md)
+    §3 acceptance artifact) maps all 82 requirement ids to conformance cells: 45 distinct populated
+    `(surface, class)` cells (all mechanically verified to resolve to integer≥1 values in
+    `index.json`), and 9 `gap` rows each carrying a falsifiable input-algebra reason (the
+    [ADR 0005](adr/0005-portable-conformance-corpus-and-verifier-cli.md) n_a criterion applied as the
+    gap gate). The closed-rejection profile invariant (`REQ1-CORE-reject-unlisted`) is the one
+    profile-level gap — proven by the union of the per-surface closed-set cells it rationalizes.
+  - [ADR 0007](adr/0007-normative-requirement-identifiers.md) records the requirement-ID format
+    decision: `REQ<contract-major>-<SURFACE>-<tag>`, major-namespaced to mirror the existing suite
+    scheme (`BAP<contract-major>-<sig>-<digest>`) and resolve the parallel-majors ambiguity. Refines
+    ADR 0006 §3 (does not supersede the RFC 2119/8174 + stable-id + MUST-to-cell bar).
+- The slice was driven under forge T2: a fresh-context design-adversarial pass raised 9 challenges,
+  all admitted and folded in (the ADR-0007 escalation is the resolution of the "no ADR owed"
+  rubber-stamp the pass defeated; the major-namespacing resolves the parallel-majors ambiguity; the
+  three-state mapping schema and gap gate resolve the n/a-cell conflation and unfalsifiable-gap
+  escape; the mapping covers standards-track.md's evolution-contract MUSTs). A fresh-context
+  plan-review raised 3 findings, 2 fixed in-plan (boilerplate content-fidelity verification,
+  surface-name translation); 1 (AGENTS.md BAP-05 staleness) routed to a separate T0 commit.
+- **No wire byte, bound, or verdict change.** `git diff 4080b9f..HEAD -- lib/ test/ priv/ mix.lock`
+  is empty. Local `mix quality` passes with 295 tests and 13 properties (0 failures) and the
+  conformance runner reports `agreed=259, agreement=true, disagreed=0` — unchanged from the BAP-05
+  baseline. `mix.exs` is touched only for the ExDoc `extras` registration of ADR 0007 and the
+  requirement map (docs-build registration, not a wire/code change). Registries reconciliation found
+  no drift (`docs/design/registries.md` unchanged).
+
 ## Next action
 
-BAP-04 and BAP-05 are complete. BAP-05 shipped the portable v1 conformance corpus (259 cases
-across 28 surfaces, total applicability matrix), the deterministic verifier CLI (escript,
+BAP-04, BAP-05, and BAP-10 are complete. BAP-05 shipped the portable v1 conformance corpus (259
+cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI (escript,
 `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent Node
 second-implementation runner (node:* only — the corpus is normative), a three-partition
 public-key census (hard two-way), stream_data property + deterministic-PRNG fuzz gates, and a
 source-isolated mutation battery wired into `mix quality` (ADR 0005). The corpus ships
 in the published package and the fresh-consumer check runs the packaged escript against the
-packaged corpus.
+packaged corpus. BAP-10 shipped the RFC 2119/8174 normative rewrite of the profile and evolution
+contract, the major-namespaced requirement-identifier scheme (ADR 0007), and the MUST-to-cell
+traceability map.
 
 The standards track charter (ADR 0006, [standards-track.md](design/standards-track.md)) now
-governs what ships before first publication: BAP-10 (evolution contract + RFC 2119 requirement
-identifiers with corpus traceability) and BAP-11 (suite identity + evidence longevity design) gate
-BAP-07 alongside BAP-06, because neither can be retrofitted after third parties implement the
+governs what ships before first publication: BAP-11 (suite identity + evidence longevity design)
+gates BAP-07 alongside BAP-06, because neither can be retrofitted after third parties implement the
 profile. BAP-12 (IANA templates) and BAP-13 (published governance) ride the BAP-08 external
 submission path; BAP-14 carries the already-decided delegation design to a full successor-contract
-specification. BAP-06 (release-candidate contract) and BAP-10 are next, in either order.
+specification. BAP-06 (release-candidate contract) and BAP-11 are next.
