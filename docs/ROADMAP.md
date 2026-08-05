@@ -218,7 +218,7 @@ compatibility.
   - `docs/protocol-v1.md` carries the BCP 14 boilerplate (verbatim RFC 8174 §2 NEW sentence, all 11
     keywords incl. NOT RECOMMENDED, the "when, and only when, they appear in all capitals" clause)
     and **76 stable requirement identifiers** (`REQ1-<SURFACE>-<tag>`, per
-    [ADR 0007](adr/0007-normative-requirement-identifiers.md)) across 12 surfaces.
+    [ADR 0007](adr/0007-normative-requirement-identifiers.md)) across 13 surfaces.
   - `docs/design/standards-track.md` evolution-contract sections carry **10 `REQ1-EVO-*` ids** and a
     BCP 14 reference note.
   - `docs/design/bap-10-requirement-map.md` (the [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md)

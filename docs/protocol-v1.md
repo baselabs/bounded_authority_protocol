@@ -150,7 +150,8 @@ All claim objects are closed (`REQ1-CLAIM-closed-set`). Names and string values 
 | `operations` | nonempty array of at most 64 operation objects |
 
 An operation is exactly `{name: string, selectors: selector_array}`. Names are unique within the
-grant and contain 1–128 printable ASCII bytes. The ordered selector array has 1–64 members.
+grant and contain 1–128 printable ASCII bytes. The ordered selector array has 1–64 members
+(`REQ1-CLAIM-operation-shape`).
 
 | Proof claim | Type |
 |---|---|
@@ -171,9 +172,7 @@ value (`REQ1-CLAIM-ath`). The method accepts ASCII letters, digits, the punctuat
 byte-for-byte and is never case-normalized (`REQ1-CLAIM-htm-no-case-normalize`).
 
 The grant `v` claim MUST be exactly the integer `1` (`REQ1-CLAIM-v`). The proof `v` claim MUST be
-exactly the integer `1` (`REQ1-CLAIM-proof-v`). An operation is exactly
-`{name: string, selectors: selector_array}`; names are unique within the grant and contain 1–128
-printable ASCII bytes; the ordered selector array has 1–64 members (`REQ1-CLAIM-operation-shape`).
+exactly the integer `1` (`REQ1-CLAIM-proof-v`).
 
 ## Selector algebra
 
