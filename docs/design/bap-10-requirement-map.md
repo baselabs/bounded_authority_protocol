@@ -54,7 +54,7 @@ qualifier makes a stale mapping a detectable drift rather than a silent false cl
 
 | REQ-id | Requirement | Surface(s) | Cell class(es) | Cell-type | Evidence / reason |
 |---|---|---|---|---|---|
-| REQ1-B64-alphabet; REQ1-B64-no-padding; REQ1-B64-length; REQ1-B64-canonical | Segments use only the base64url alphabet, no padding/whitespace, length mod 4 ≠ 1, canonical re-encode reproduces input | base64url.decode | invalid_encoding | populated | base64url.decode.invalid_encoding=2 (covers alphabet, padding, length, pad-bit, alternate-encoding rejections — a family proof: the two cases each reject one malformed input, collectively exercising the alphabet/padding/length/canonical rules) |
+| REQ1-B64-alphabet; REQ1-B64-no-padding; REQ1-B64-length; REQ1-B64-canonical | Segments use only the base64url alphabet, no padding/whitespace, length mod 4 ≠ 1, canonical re-encode reproduces input | base64url.decode | invalid_encoding | populated | base64url.decode.invalid_encoding=2 — **partial coverage**: the two cases exercise padding rejection (`AAA=`) and alphabet rejection (`a+b`); they do NOT exercise length-mod-4-equals-1, whitespace, non-zero pad bits, or alternate canonical encodings. Full coverage of every B64 trigger is a corpus-growth obligation (BAP-10 cannot add cases — verdict change). |
 
 ## HEADER — protected headers (`decode_grant`, `decode_proof`, `verify_grant`, jwk surfaces)
 
@@ -115,7 +115,7 @@ qualifier makes a stale mapping a detectable drift rather than a silent false cl
 | REQ1-VERIFY-grant-exact; REQ1-VERIFY-grant-times; REQ1-VERIFY-no-iat-nbf-order | Grant verification requires exact key-id/signature/issuer/audience; time invariants; does not require `iat <= nbf` | verify_grant | invalid_key, invalid_claim, invalid_time | populated | verify_grant.invalid_key=1, invalid_claim=1, invalid_time=1 |
 | REQ1-VERIFY-time-bounds | Skew ≤ 60s, proof max age ≤ 300s | verify_grant, check_envelope | invalid_time | populated | verify_grant.invalid_time=1; check_envelope.invalid_time=1 |
 | REQ1-VERIFY-nonce-mode | Nonce absent in `:not_required`, present-once-and-equal in required mode | check_envelope | invalid_nonce | populated | check_envelope.invalid_nonce=1 |
-| REQ1-VERIFY-envelope-binding | Combined verification re-verifies raw grant; binds ath/method/URI/invocation/op/ba_req/time/nonce/selectors | check_envelope | invalid_request, invalid_nonce, invalid_selector, invalid_time | populated | check_envelope.invalid_request=3 (URI/method/invocation/op binding — a URI mismatch is a request-binding failure, exercised here, not via a separate invalid_uri cell), invalid_nonce=1, invalid_selector=3, invalid_time=1 |
+| REQ1-VERIFY-envelope-binding | Combined verification re-verifies raw grant; binds holder thumbprint/ath/method/URI/invocation/op/ba_req/time/nonce/selectors | check_envelope | invalid_claim, invalid_request, invalid_nonce, invalid_selector, invalid_time | populated | check_envelope.invalid_claim=4 (holder-thumbprint/ath/ba_req/ba_op binding — the holder-proof bindings are exercised under invalid_claim), invalid_request=3 (URI/method/invocation/op binding), invalid_nonce=1, invalid_selector=3, invalid_time=1 |
 | REQ1-VERIFY-facts-redacted; REQ1-VERIFY-facts-not-credentials; REQ1-VERIFY-grant-not-authorized | Facts value-bearing, redacted, no generic encoder, not accepted as credentials, `authorization: :not_evaluated` | verify_grant, check_envelope | valid | populated | verify_grant.valid=1, check_envelope.valid=4 (facts carry `authorization: :not_evaluated`, no credential fields) |
 
 ## BOUNDS — hard maxima (`bounds.new`)
@@ -169,31 +169,36 @@ qualifier + re-walk obligation (§ Maintenance) makes that the successor slice's
 
 ## What a populated cell does and does not prove (reading guide)
 
-A `populated` mapping row certifies that the named conformance cell **exercises** the requirement's
-subject — not always that a single corpus case is a end-to-end proof of the full requirement. Three
-honest distinctions a standards reader should apply:
+A `populated` mapping row certifies that the named conformance cell **directly exercises** the
+requirement's named trigger — i.e., the cell's defect IS the requirement's violation (or, for a
+closed-set requirement, one class of it). This section exists because several requirements are
+exercised only *partially* by the current v1 corpus, and the map must not overstate that as full
+proof. Three categories a standards reader must distinguish:
 
 1. **Direct proof** — the cell's defect is exactly the requirement's violation (e.g. `REQ1-CLAIM-v`
    ← `verify_grant.invalid_claim=1`, where the case mutates the `v` claim). The cell directly proves
-   the requirement.
-2. **Adjacency proof** — the cell exercises the requirement's *family* but not its exact trigger
-   (e.g. `REQ1-CORE-cross-major-reject` ← `verify_grant.invalid_algorithm=1`: the v1 corpus contains
-   only `v:1` artifacts, so no case exercises a *literal* successor major; the `alg:none`/wrong-alg
-   cell proves the closed-profile rejection that any other major/suite hits, which is the mechanism
-   cross-major rejection relies on). The cell proves the property the requirement *depends on*, and
-   a literal successor-major case arrives with a successor-major corpus.
+   the requirement. A `populated` row certifies this where it can.
+2. **Partial coverage** — the cell exercises ONE dimension of a multi-dimension requirement, but not
+   every trigger the requirement names (e.g. `REQ1-B64-*` ← `base64url.decode.invalid_encoding=2`:
+   the two cases exercise padding and alphabet rejection, but NOT length-mod-4-equals-1, whitespace,
+   non-zero pad bits, or alternate canonical encodings — so the four B64 requirements are only
+   *partially* proven by the current corpus). Where a requirement is only partially covered, the row
+   is `populated` (the cell exists and rejects the inputs it names) but the partial coverage is
+   disclosed in the evidence column; full coverage of every named trigger is a corpus-growth
+   obligation, not a BAP-10 deliverable (BAP-10 cannot add corpus cases — that is a verdict change).
 3. **Family proof** — a closed-set requirement (e.g. `REQ1-HEADER-closed-set`) is proven by the union
    of that surface's rejection cells (`invalid_algorithm`, `invalid_encoding`, `invalid_claim`, ...),
    each of which rejects one class of unlisted member. No single cell is "the" closed-set proof; the
    union is.
 
-Rows in this map name the cell(s) that exercise the requirement; where the proof is adjacency or
-family rather than direct, the requirement's full coverage is the union of the named cells plus the
-profile's closed-rejection invariant (`REQ1-CORE-reject-unlisted`). A row whose cell exercises only
-an adjacent property is still a valid `populated` row — the cell exists and exercises the surface —
-but it is not a claim that a single corpus case is an end-to-end proof. Gaps (rows where no cell
-exercises the requirement on any surface, even by adjacency) are recorded as `gap` with their
-input-algebra reason, never silently overstated as `populated`.
+**This reading guide does NOT lower the `populated` bar.** A row is `populated` only when a real
+corpus cell exists and rejects a real input exercising the requirement's subject; it is `gap` when
+no cell exercises the requirement on any surface. The category-2 disclosure ("partial coverage") is
+honesty about the *breadth* of the existing corpus's coverage of a multi-trigger requirement, not an
+acceptance of non-proving evidence — the named cells DO prove what they exercise, and what they do
+not exercise is disclosed so a successor-corpus slice can close it. Gaps (rows where no cell
+exercises the requirement on any surface) are recorded as `gap` with their input-algebra reason,
+never silently overstated as `populated`.
 
 ## Coverage summary
 
