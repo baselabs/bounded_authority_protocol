@@ -38,7 +38,10 @@ a successor contract-major, and those arrive with their design already specified
    family. Evidence longevity is solved by cross-suite countersignature: boundary anchors of a
    current suite countersign archives of an earlier suite, generalizing the existing
    historical-key rollover to historical-suite rollover; trust freshness comes from the newest
-   countersignature. Specified now; activation is a successor-suite concern.
+   countersignature. Specified now (the mechanism — a content-covering countersignature binding the
+   archive's content digest, not a key/suite-identity chain — is carried to ADR quality in
+   [ADR 0009](0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md));
+   activation is a successor-suite concern.
 
 3. **Requirement-to-corpus traceability.** Before BAP-06, the normative profile is rewritten with
    RFC 2119/8174 keywords and stable requirement identifiers, with the acceptance bar that every
