@@ -29,10 +29,16 @@ The locked public API is the set of modules and functions a consumer depends on,
 existing mechanical lock and enumerated for human readers + SemVer review:
 
 **Mechanical lock (already exists, uncited until BAP-06):** `tools/architecture_gate.exs:184-287`
-`@compiled_export_allowances` pins the exact compiled exports per `.beam`. For
-`Elixir.BoundedAuthorityProtocol.V1.beam` (lines 188-207), the pinned exports include every locked
-function below at its exact arity. Any export addition, removal, or arity change to a `V1` façade
-turns `mix architecture` red. **This pin IS the lock; the doc enumeration below is for readers.**
+`@compiled_export_allowances` pins the exact compiled exports per `.beam` for the dominant contract
+modules — `Elixir.BoundedAuthorityProtocol.V1.beam` (the facade, lines 188-207), `V1.Runtime.beam`,
+the codecs, and the public structs. For those modules, any export addition, removal, or arity change
+turns `mix architecture` red (full-export-set enforcement at `:1581-1596`). The named decoder/bounds
+submodules (`V1.Json`, `V1.Base64Url`, `V1.Bounds`) are enforced under `@compiled_dynamic_allowances`
+(dynamic-call-count enforcement at `:1894-1910`): removal/rename/arity change of their existing
+locked functions surfaces via the dynamic-call check plus the unpacked-consumer gate, though a
+brand-new additive export on those specific submodules is not caught by the full-set check. **The
+`V1.beam` facade pin IS the lock for the dominant contract surface; the doc enumeration below is for
+readers, and the submodule gap is noted honestly rather than overclaimed.**
 
 **Doc enumeration (for human readers + SemVer review), the locked surface:**
 
