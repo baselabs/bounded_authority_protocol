@@ -19,7 +19,7 @@ operationalizes. It is stated once here as the rationale; each per-surface close
 is its own MUST (`REQ1-HEADER-closed-set`, `REQ1-CLAIM-closed-set`, ...) and maps to the conformance
 cells of the surface it governs. See [ADR 0007](adr/0007-normative-requirement-identifiers.md) for the
 requirement-identifier scheme. The MUST-to-cell traceability map is published in
-`docs/design/bap-10-requirement-map.md`.
+[the requirement map](design/bap-10-requirement-map.md).
 
 ## Suite identity and evolution
 
