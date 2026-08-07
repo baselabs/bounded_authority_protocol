@@ -94,14 +94,17 @@ the verifier recovers the holder key from the proof header (§ 3.2).
 
 A holder proves possession per invocation with a compact-JWS proof of `typ: dpop+jwt` (header
 `{alg: "EdDSA", typ: "dpop+jwt", jwk: <public OKP JWK>}`, per [RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449)
-as profiled by v1). The proof payload binds the invocation: `htm`/`htu` (the MCP HTTP method +
-normalized target URI), `ba_inv` (a lowercase RFC 4122 UUID identifying the invocation), `ba_op`
-(the operation name, matching a grant operation's `name`), `ba_req` (a SHA-256 request digest over
-`[operation, typed(cast_arguments)]` under the `BAP1-REQUEST\0` domain), and `ath` (SHA-256 over the
-grant's compact bytes, binding proof → grant exactly as RFC 9449 binds a DPoP proof to its access
-token) — v1 profile § Claims (the Proof claim table + the `ath` row). The verifier checks the proof
-signature, that `ath` re-derives from the presented grant, and that the proof's `ba_op`/`ba_req`/
-`ba_inv` match the invocation.
+as profiled by v1). The proof payload's invocation-binding claims are: `htm`/`htu` (the MCP HTTP
+method + normalized target URI), `ba_inv` (a lowercase RFC 4122 UUID identifying the invocation),
+`ba_op` (the operation name, matching a grant operation's `name`), `ba_req` (a SHA-256 request
+digest over `[operation, typed(cast_arguments)]` under the `BAP1-REQUEST\0` domain), and `ath`
+(SHA-256 over the grant's compact bytes, binding proof → grant exactly as RFC 9449 binds a DPoP proof
+to its access token). The complete required proof claim set also includes `v` (exactly `1`), `jti`,
+`iat`, and the optional `nonce` (a server-issued replay-binding challenge) — see v1 profile § Claims
+(the Proof claim table + the `ath` row). The verifier checks the proof signature, that `ath`
+re-derives from the presented grant, and that the proof's `ba_op`/`ba_req`/`ba_inv` match the
+invocation; nonce-mode replay binding is the server's responsibility (the verifier is pure and
+stateless — see § 6).
 
 ### 3.3 The conjunctive selector algebra
 

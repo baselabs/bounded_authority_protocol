@@ -54,8 +54,9 @@ accept contributed implementations," so the reference implementation is a negoti
    authorization credentials — Verifiable Digital Credentials: Checkout Mandate, Payment Mandate)
    that this protocol's grant/proof model structurally corresponds to. The mandate-mapping note
    (`docs/extensions/ap2-mandate-mapping.md`) cites the AP2 v0.2 spec as its mapping target and
-   makes **no runtime compatibility claim** — the correspondences are structural, and AP2 is
-   A2A/UCP-native, not MCP-native (the host-protocol question is recorded in the note).
+   makes **no runtime compatibility claim** — the correspondences are structural, and AP2
+   self-describes as an extension for A2A, MCP, and UCP (the host-protocol question — at which layer
+   an adopter composes AP2 with BAP — is recorded in the note).
 
 4. **The extension documents, and does not change, the v1 protocol.** `git diff -- lib/ test/
    priv/conformance/ mix.lock` is empty at closeout; the conformance corpus is unchanged at
