@@ -76,12 +76,12 @@ authoritative one" for deprecation ([standards-track.md](design/standards-track.
 
 ## Security policy
 
-[SECURITY.md](SECURITY.md) governs vulnerability intake; a vulnerability whose fix would change a
+[SECURITY.md](../SECURITY.md) governs vulnerability intake; a vulnerability whose fix would change a
 verdict is handled as a contract-major security release with an accelerated overlap window, never as
 a silent verdict change.
 ([standards-track.md](design/standards-track.md):212-214, the charter § Governance security-policy
-bullet, verbatim.) SECURITY.md cross-references this section (rather than restating the rule) so the
-verdict-change rule lives in one place.
+bullet, verbatim.) [SECURITY.md](../SECURITY.md) cross-references this section (rather than
+restating the rule) so the verdict-change rule lives in one place.
 
 ## Errata registry posture
 
