@@ -346,9 +346,46 @@ compatibility.
     forward-ref ADR 0010. [protocol-v1.md](protocol-v1.md) names ADR 0010 in its deferral
     sentence (prose only; no value, bound, or table change).
 
+## BAP-13 closeout evidence
+
+- The slice publishes the already-decided governance policy (ADR 0006 §7 + charter § Governance) as
+  a standalone normative project document. It is a **design-only slice: zero wire byte, bound, or
+  verdict change** (`git diff 2435e3e..HEAD -- lib/ test/ priv/conformance/ mix.lock` empty). Local
+  `mix quality` passes with 295 tests and 13 properties (0 failure); the conformance runner reports
+  `agreed=259, agreement=true, disagreed=0` (unchanged — governance is not a verifier behavior).
+  - [governance.md](governance.md) is a **companion republication** of the charter § Governance
+    policy, carried verbatim with four labeled departures (deictic resolution, intro rationale, the
+    § Errata channel cross-source composite of charter § Governance + the evolution-contract
+    no-verdict-flip gloss, and the § Deprecation policy facts-vs-identifiers split — the window
+    NUMBERS are carried as policy facts while the authoritative prose and conformance-traced
+    `REQ1-EVO-*` identifiers stay cross-referenced to the evolution contract). The charter §
+    Governance stays authoritative (its preamble names itself the standing authority and enumerates
+    governance); governance.md names the charter as its source.
+  - [ADR 0011](adr/0011-published-governance.md) records the publication decision: the
+    companion-republication shape + charter-authoritative discipline, the controlled-dual-copy
+    principle for the general policy sections + the post-publication sync mechanism (fidelity check
+    re-run on charter § Governance edits), the `SECURITY.md` critical-surfaces retroactive-gap close
+    (latent since BAP-06), and the `docs/governance.md` manifest exclusion (a governance doc is not
+    a T2 surface).
+  - The charter § Governance gains an in-place forward-ref to governance.md (stays authoritative —
+    NOT stubbed; the § Governance ↔ § Venue strategy "see below" deictic stays intact).
+    [SECURITY.md](../SECURITY.md) reporting gains a one-line LINK to governance.md § Security policy
+    (not a restated rule). [README.md](../README.md) gains a governance pointer (consistency with
+    the existing docs-graph links). The [errata registry](errata.md) header retargets to
+    governance.md as the published policy home; the registry body is unchanged (live, zero entries).
+  - The design-adversarial pass ran twice (fresh-context): the first raised 9 challenges and forced
+    a blocking reframe — the original "stub the charter + relocate single-source" plan contradicted
+    the charter's standing-authority claim with no precedent (BAP-11/BAP-14 edited charter sections
+    in place + added ADRs alongside; neither stubbed a section nor created a standalone policy doc).
+    The second pass (on the reconciled design) confirmed the reframe resolved the blocking cluster
+    on authority-chain grounds and forced six further fixes: the false "verbatim" labels (§ Errata
+    is a composite), the § Change control dual-copy principle + sync mechanism, the CHANGELOG entry,
+    the deprecation-window-numbers publication, the manifest `docs/governance.md` exclusion, and the
+    README consistency rationale. All admitted; all folded.
+
 ## Next action
 
-BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, and BAP-14 are complete. BAP-05 shipped the portable v1 conformance
+BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, and BAP-14 are complete. BAP-05 shipped the portable v1 conformance
 corpus (259 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI
 (escript, `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent
 Node second-implementation runner (node:* only — the corpus is normative), a three-partition
@@ -374,7 +411,10 @@ The standards track charter (ADR 0006, [standards-track.md](design/standards-tra
 cannot be retrofitted after third parties implement the profile are now closed: BAP-10 (normative
 contract), BAP-06 (release candidate), BAP-11 (suite identity + evidence longevity), and BAP-14
 (delegation-with-attenuation specification) all landed — every one of ADR 0006 §context's
-"capture-now-or-never" designs. **BAP-07 (connected verification and first public release) is
-unblocked on the public-protocol side** — its remaining dependency is private BA-14 (the private
-runtime's connected gates). BAP-12 (IANA templates) and BAP-13 (published governance) ride the
-BAP-08 external submission path.
+"capture-now-or-never" designs. BAP-13 (published governance) is now complete: the governance
+policy is published as a standalone normative document
+([governance.md](governance.md), [ADR 0011](adr/0011-published-governance.md)), a companion
+republication of the charter § Governance. **BAP-07 (connected verification and first public
+release) is unblocked on the public-protocol side** — its remaining dependency is private BA-14 (the
+private runtime's connected gates). BAP-12 (IANA templates) rides the BAP-08 external submission
+path.
