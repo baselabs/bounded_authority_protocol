@@ -414,7 +414,8 @@ compatibility.
     (`ap2-mandate-mapping.md`). "AP2" = the [Agent Payments Protocol](https://ap2-protocol.org/)
     (Google-originated, FIDO-donated); the note maps AP2 VDC mandates (Checkout Mandate, Payment
     Mandate) ↔ BAP grant/proof as structural correspondences, explicitly not claiming runtime
-    compatibility, and records the host-protocol question (AP2 is A2A/UCP-native, not MCP-native).
+    compatibility, and records the host-protocol question (AP2 self-describes as an extension for
+    A2A, MCP, and UCP).
   - [ADR 0013](adr/0013-capability-authorization-extension.md) records the decisions: the
     experimental-track target; the owned-domain identifier (the project owns `bounded-authority.io`);
     the partial-conformance framing; and the official-submission gates (reference implementation in

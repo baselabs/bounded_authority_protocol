@@ -21,9 +21,10 @@ objects. Two mandate kinds:
 
 VDCs chain from an **Open** state (capturing user constraints) to a **Closed** state (capturing
 finalized authorization); a closed Checkout Mandate plus a closed Payment Mandate together form the
-non-repudiable proof of user authorization for a specific transaction. AP2 is described on its public
-site as "an extension for [Agent2Agent (A2A)](https://a2aproject.dev/) and [UCP](https://www.universalcommerce.org/)"
-— it is **not MCP-native**.
+non-repudiable proof of user authorization for a specific transaction. AP2 self-describes as "an
+extension for [Agent2Agent (A2A)](https://a2a-protocol.org/) and MCP" (Core Principles) and "an
+extension for the open-source Agent2Agent (A2A) protocol and Universal Commerce Protocol" (overview)
+— so it targets **A2A, MCP, and UCP** as host protocols.
 
 ## The structural correspondence
 
@@ -43,17 +44,17 @@ execution-time read of those schemas, not asserted here.
 
 ## The host-protocol question (open)
 
-AP2 is **A2A/UCP-native**, not MCP-native. The Bounded Authority Protocol's charter venue strategy
-names the MCP `ext-auth` repository as its first venue. So a real design question for the
-capability-authorization extension's target is: does the mandate correspondence operate at the
-**MCP** layer (BAP grants presented at MCP tool/resource invocations — the charter-named venue) or
-the **A2A** layer (BAP grants presented at A2A agent-to-agent delegations — where AP2 actually
-lives)?
+AP2 targets A2A, MCP, and UCP as host protocols, so the capability-authorization extension's
+mandate correspondence is relevant at multiple layers. The Bounded Authority Protocol's charter
+venue strategy names the MCP `ext-auth` repository as its first venue — and MCP is one of AP2's
+named hosts — so an MCP-layer correspondence (BAP grants presented at MCP tool/resource invocations,
+AP2 mandates securing the payment/checkout step an MCP tool triggers) is directly in scope. The
+A2A and UCP layers are additional correspondences (BAP grants carried in A2A agent delegations; AP2
+mandates composed with UCP checkout flows), not mutually exclusive with the MCP one.
 
-This note maps both correspondences and records that AP2's native host is A2A, while not prejudging
-the eventual venue. The two are not mutually exclusive: a BAP capability grant could bind an MCP
-tool invocation *and* be carried in an A2A delegation that AP2 secures. Resolving the primary target
-is a content decision for the extension's eventual submission, shaped by where adoption is real.
+Resolving the primary target is a content decision for the extension's eventual submission, shaped
+by where adoption is real; this note maps the correspondences without prejudging the venue split.
+The structural mapping below holds at whichever host layer an adopter composes AP2 with BAP.
 
 ## Honesty line
 
