@@ -132,5 +132,10 @@ extension requires — none of which this draft performs:
 5. On acceptance, a PR adding the `.mdx` to `modelcontextprotocol/ext-auth`.
 
 Until these gates close, this draft targets the **experimental-extension** track
-([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Experimental Extensions), which
-is the sanctioned incubation path and does not require the reference-SDK implementation.
+([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Experimental Extensions) — the
+sanctioned incubation path, which does not require the reference-SDK implementation. That track is
+reachable *before* SEP submission, but it is still not unilaterally standable-up by this project:
+[SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Experimental Extensions requires
+an MCP maintainer to create the `experimental-ext-*` repository and a Working Group or Interest Group
+association. The actionable next step is therefore engaging the MCP `ext-auth` working group, not
+provisioning a repository from this project.
