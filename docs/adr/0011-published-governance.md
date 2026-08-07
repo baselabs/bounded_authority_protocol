@@ -51,15 +51,25 @@ mechanism): ADR 0006 §7 stays the decision; this ADR records the publication ex
    check (diff governance.md's general sections against the charter § Governance) is re-run on
    every charter § Governance edit. This obligation rides with the charter section, recorded here.
 
-3. **`SECURITY.md` is added to `.forge/critical-surfaces`; `docs/governance.md` is NOT.** SECURITY.md
-   carries the vulnerability-reporting flow and the verdict-change-handling cross-ref — a
-   security-policy gap fails quietly, which is the manifest's purpose. SECURITY.md was authored
-   across BAP-04 (supply-chain verification) and BAP-06 (the release-candidate contract it
-   describes) but was never added to the manifest; this is a retroactive gap close, latent since
-   BAP-06. `docs/governance.md` is NOT added: `.forge/critical-surfaces` is uniformly
-   code/wire/charter/conformance surfaces, and a governance doc is not a T2 surface (the project
-   defines T2 as wire formats, cryptography, verification, canonicalization, and conformance — none
-   of which governance prose is). Adding governance.md would mislabel a non-T2 surface.
+3. **`SECURITY.md`, `docs/governance.md`, and `docs/design/standards-track.md` are added to
+   `.forge/critical-surfaces`.** The manifest is not the strict-T2 code/wire set — AGENTS.md defines
+   T2 as wire, cryptography, verification, canonicalization, and conformance, yet the manifest
+   already carries `usage-rules.md`, `docs/design/threat-model.md`, and `docs/adr/**`, none of which
+   is a wire/crypto surface. Its operative criterion is *shipped public-contract or normative docs
+   whose silent drift is dangerous*; the `track: T2` trailer is the honor-system flag on any change
+   touching a member, wire surface or not (every BAP-13 doc commit carries it). Under that criterion:
+   SECURITY.md (vulnerability-reporting flow + verdict-change cross-ref; authored across BAP-04 and
+   BAP-06 but never added — a retroactive gap close, latent since BAP-06); `docs/governance.md`
+   (a published normative document carrying a controlled dual-copy of the charter § Governance whose
+   *only* failure mode is silent drift — exactly what the manifest guards, and what decision 2's
+   post-publication sync mechanism has no installed gate to catch); and `docs/design/standards-track.md`
+   (the standing authority and the source of the published policy — editing it is what must trigger
+   the sync mechanism, so leaving it unflagged is the load-bearing gap). An earlier draft excluded
+   governance.md on strict-T2 grounds and did not add standards-track.md; that reasoning was
+   inconsistent with the manifest's own membership and is corrected here. A residual
+   manifest-completeness gap remains — `docs/design/registries.md`, `docs/design/requirement-map.md`,
+   and `docs/release-candidate-contract.md` are shipped normative docs still absent — and is flagged
+   for a dedicated manifest audit rather than resolved in this publish-verbatim slice.
 
 4. **The SECURITY.md verdict-change cross-reference is a one-line LINK, not a restated rule.** The
    verdict-change rule lives in ONE place (governance.md § Security policy, as the verbatim
@@ -77,13 +87,16 @@ mechanism): ADR 0006 §7 stays the decision; this ADR records the publication ex
 - **Restate the verdict-change rule in SECURITY.md.** Rejected (design-adversarial): a second copy
   of a single-place rule is the drift hazard the design's no-dual-copy discipline exists to prevent;
   asymmetric with the deprecation cross-ref. SECURITY.md carries a one-line link.
-- **Add `docs/governance.md` to `.forge/critical-surfaces`.** Rejected (design-adversarial): a
-  governance doc is not a T2 surface (T2 = wire/crypto/verification/canonicalization/conformance);
-  the manifest has no standalone-policy-doc precedent. SECURITY.md qualifies on its own
-  (public-contract security policy, retroactive gap).
+- **Exclude `docs/governance.md` from `.forge/critical-surfaces` on strict-T2 grounds.** Rejected:
+  the manifest is not the strict-T2 set — it already carries `usage-rules.md` and
+  `docs/design/threat-model.md`, neither a wire/crypto surface — so "not a wire surface" does not
+  exclude. A published normative doc with a controlled dual-copy whose only failure mode is silent
+  drift is exactly what the manifest exists to flag; excluding it while including SECURITY.md applies
+  two different criteria to reach opposite results. The same criterion adds the standing-authority
+  charter `docs/design/standards-track.md`, whose absence is the load-bearing gap in the drift story.
 - **Record the publication decision as a charter amendment rather than a new ADR.** Rejected: the
   charter's own change-control rule ("every product-shaping decision lands as a numbered public ADR",
-  [standards-track.md](../design/standards-track.md):202-204) applies, and ADR 0006 spans many
+  [standards-track.md](../design/standards-track.md):204-206) applies, and ADR 0006 spans many
   surfaces; amending it for one execution decision loses traceability.
 
 ## Consequences
@@ -94,8 +107,11 @@ mechanism): ADR 0006 §7 stays the decision; this ADR records the publication ex
 - The charter § Governance remains the authoritative source; governance.md is its faithful
   companion republication. The post-publication sync mechanism (fidelity check re-run on charter §
   Governance edits) governs drift, recorded here.
-- `SECURITY.md` joins `.forge/critical-surfaces` (retroactive gap close since BAP-06); future
-  SECURITY.md edits carry `track: T2` under the manifest's honor-system regime (the commit hook is
-  not installed in this repo).
+- `SECURITY.md`, `docs/governance.md`, and `docs/design/standards-track.md` join
+  `.forge/critical-surfaces` (SECURITY.md a retroactive gap close since BAP-06; standards-track.md a
+  pre-existing gap for the standing authority); future edits to any of them carry `track: T2` under
+  the manifest's honor-system regime (the commit hook is not installed in this repo). A
+  manifest-completeness audit for the remaining shipped normative docs (`registries.md`,
+  `requirement-map.md`, `release-candidate-contract.md`) is flagged as follow-up.
 - No wire byte, bound, or verdict change. `git diff -- lib/ test/ priv/conformance/ mix.lock` is
   empty at closeout; the conformance corpus is unchanged at `agreed=259`.

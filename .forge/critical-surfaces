@@ -3,8 +3,10 @@ lib/bounded_authority_protocol/**
 priv/conformance/**
 test/conformance/**
 docs/protocol-v1.md
+docs/governance.md
 docs/design/protocol-charter.md
 docs/design/conformance-contract.md
+docs/design/standards-track.md
 docs/design/threat-model.md
 usage-rules.md
 docs/adr/**
