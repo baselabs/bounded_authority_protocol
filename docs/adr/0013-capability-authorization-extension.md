@@ -58,13 +58,17 @@ accept contributed implementations," so the reference implementation is a negoti
    self-describes as an extension for A2A, MCP, and UCP (the host-protocol question — at which layer
    an adopter composes AP2 with BAP — is recorded in the note).
 
-4. **The extension documents, and does not change, the v1 protocol.** `git diff -- lib/ test/
-   priv/conformance/ mix.lock` is empty at closeout; the conformance corpus is unchanged at
-   `agreed=259`. The extension restates the v1 grant/proof/selector/header surfaces in MCP vocabulary,
-   citing the v1 profile per claim; it introduces nothing normative outside
-   [`protocol-v1.md`](../protocol-v1.md). The fidelity check (every restated value cites its v1
-   source) is a manual closeout discipline, not an automated gate — the extension documents do not
-   ship in the Hex package (Decision 6), so ExDoc does not run against them.
+4. **The extension documents, and does not change, the v1 *mechanism*; its MCP-spec surfaces are
+   new normative requirements defined per SEP-2133.** `git diff -- lib/ test/ priv/conformance/
+   mix.lock` is empty at closeout; the conformance corpus is unchanged at `agreed=259`. The
+   capability-authorization *mechanism* (grant, proof, selector algebra, verification) restates the
+   v1 surfaces in MCP vocabulary, citing the v1 profile per claim, and introduces nothing normative
+   outside [`protocol-v1.md`](../protocol-v1.md). The extension's negotiation, transport-binding, and
+   graceful-degradation surfaces are normative requirements this extension defines for MCP per
+   [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) — not restatements of v1. The
+   fidelity check (every restated mechanism value cites its v1 source) is a manual closeout
+   discipline, not an automated gate — the extension documents do not ship in the Hex package
+   (Decision 6), so ExDoc does not run against them.
 
 5. **Official submission is gated on external dependencies, recorded as preconditions (not BAP-08
    closeout gates):** (a) a reference implementation in an official MCP SDK, negotiated with the
