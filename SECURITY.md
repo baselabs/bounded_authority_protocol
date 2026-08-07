@@ -35,6 +35,10 @@ A report should identify the affected version or commit, the violated protocol p
 minimal value-free reproduction, and the expected security outcome. BaseLabs will acknowledge,
 triage, remediate, and coordinate disclosure through the private advisory.
 
+For vulnerabilities whose fix would change a verification verdict, see the
+[governance policy § Security policy](docs/governance.md#security-policy) (a contract-major
+security release with an accelerated overlap window, never a silent verdict change).
+
 ## Supply-chain verification
 
 Every trusted-main CI build creates an unpublished Hex archive, SHA-256 checksum, release and

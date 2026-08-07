@@ -213,6 +213,9 @@ credibility step and the policy is what makes single-maintainer tolerable to ado
   change a verdict is handled as a contract-major security release with an accelerated overlap
   window, never as a silent verdict change.
 
+The governance policy is also published as a standalone normative project document at
+[docs/governance.md](../governance.md); this charter section remains its authoritative source.
+
 ## Venue strategy
 
 - **First:** the MCP `ext-auth` extensions repository (roadmap row BAP-08) — fast, targeted, and
