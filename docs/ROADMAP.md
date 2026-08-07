@@ -398,9 +398,51 @@ compatibility.
     + § Governance amended; [governance.md](governance.md) and the requirement map re-synced.
     Gap-traced deployment policy — zero wire, bound, or verdict change.
 
+## BAP-08 closeout evidence
+
+- The slice drafts a **pre-submission capability-authorization extension package** for the MCP
+  experimental-extension track ([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) §
+  Experimental Extensions), documenting the already-normative v1 protocol. It is a **design-only
+  slice: zero wire byte, bound, or verdict change** (`git diff b73e1fc..HEAD -- lib/ test/
+  priv/conformance/ mix.lock` empty). Local `mix quality` passes with 295 tests and 13 properties
+  (0 failure); the conformance runner reports `agreed=259, agreement=true, disagreed=0` (unchanged).
+  - The deliverables live under `docs/extensions/`: a draft extension `.mdx`
+    (`capability-authorization.mdx`) carrying the full codified bar (BCP 14 / RFC 2119 / RFC 8174
+    conformance language + the `io.boundedauthority/capability-authorization` identifier in the body
+    — beyond what the grandfathered ext-auth exemplars carry); a draft Extensions-Track SEP
+    (`mcp-sep-capability-authorization.md`); and an AP2 mandate-mapping note
+    (`ap2-mandate-mapping.md`). "AP2" = the [Agent Payments Protocol](https://ap2-protocol.org/)
+    (Google-originated, FIDO-donated); the note maps AP2 VDC mandates (Checkout Mandate, Payment
+    Mandate) ↔ BAP grant/proof as structural correspondences, explicitly not claiming runtime
+    compatibility, and records the host-protocol question (AP2 is A2A/UCP-native, not MCP-native).
+  - [ADR 0013](adr/0013-capability-authorization-extension.md) records the decisions: the
+    experimental-track target; the owned-domain identifier (the project owns `bounded-authority.io`);
+    the partial-conformance framing; and the official-submission gates (reference implementation in
+    an official MCP SDK negotiated with the `modelcontextprotocol` SDK maintainers, working group +
+    sponsor, Extensions-Track SEP acceptance, IANA registration of the `ba_*`/`ba+*` names via
+    BAP-12). **No new repository is required for BAP-08.**
+  - The extension documents are repo-tracked under `docs/extensions/`, excluded from the Hex package
+    census (pre-submission drafts, not consumer-facing), and covered by the repository's Apache-2.0
+    license. ADR 0013 ships in the package census (the 0001-0013 ADR set).
+- **Partial conformance, stated honestly.** The ROADMAP BAP-08 acceptance bar says "conforms to the
+  ext-auth repository's submission requirements." [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions)
+  makes one of those requirements — a reference implementation in an official SDK prior to review —
+  a hard MUST that gates the OFFICIAL track, which this repository has no path to. So BAP-08 closes
+  on **partial conformance**: every in-repo-reachable SEP-2133 requirement is met (RFC 2119
+  language, owned-domain identifier, settings + fallback, Security Considerations, Apache-2.0
+  content, BCP-14 boilerplate), and the remaining gates are recorded as official-submission
+  preconditions in ADR 0013, not BAP-08 closeout gates. The draft targets the experimental track
+  (the sanctioned pre-SEP incubation path, which has no reference-SDK requirement).
+- The design-adversarial pass (8 challenges, 1 blocking) forced a premise reframe: the original
+  design silently redefined "conforms to submission requirements" to the achievable subset (a
+  frame-capture the review caught). Three challenges were resolved with user input: "AP2" was
+  undefined (it is the Agent Payments Protocol); the `io.boundedauthority` identifier domain had to
+  be owned (it is — `bounded-authority.io`); and the SDK-repository question (no new repo is
+  required; the official-SDK path runs through the MCP SDK maintainers).
+
 ## Next action
 
-BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, and BAP-14 are complete. BAP-05 shipped the portable v1 conformance
+BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, and BAP-14 are complete. BAP-05 shipped the portable v1 conformance
 corpus (259 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI
 (escript, `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent
 Node second-implementation runner (node:* only — the corpus is normative), a three-partition
@@ -426,10 +468,13 @@ The standards track charter (ADR 0006, [standards-track.md](design/standards-tra
 cannot be retrofitted after third parties implement the profile are now closed: BAP-10 (normative
 contract), BAP-06 (release candidate), BAP-11 (suite identity + evidence longevity), and BAP-14
 (delegation-with-attenuation specification) all landed — every one of ADR 0006 §context's
-"capture-now-or-never" designs. BAP-13 (published governance) is now complete: the governance
-policy is published as a standalone normative document
-([governance.md](governance.md), [ADR 0011](adr/0011-published-governance.md)), a companion
-republication of the charter § Governance. **BAP-07 (connected verification and first public
-release) is unblocked on the public-protocol side** — its remaining dependency is private BA-14 (the
-private runtime's connected gates). BAP-12 (IANA templates) rides the BAP-08 external submission
-path.
+"capture-now-or-never" designs. BAP-13 (published governance) is complete: the governance policy is
+published as a standalone normative document ([governance.md](governance.md),
+[ADR 0011](adr/0011-published-governance.md)), a companion republication of the charter § Governance.
+BAP-08 (capability-authorization extension proposal) is drafted as a pre-submission package for the
+MCP experimental-extension track (`docs/extensions/`, [ADR 0013](adr/0013-capability-authorization-extension.md))
+— partial conformance to the official-submission bar, with the reference-SDK / working-group / SEP-
+acceptance gates recorded as external preconditions. **BAP-07 (connected verification and first
+public release) is unblocked on the public-protocol side** — its remaining dependency is private
+BA-14 (the private runtime's connected gates). BAP-12 (IANA templates) rides the BAP-08 external
+submission path, gated on the same official-submission preconditions.

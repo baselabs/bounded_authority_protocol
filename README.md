@@ -106,7 +106,8 @@ See the [normative v1 profile](docs/protocol-v1.md),
 [ADR 0004](docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md), plus
 [ADR 0005](docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md). See
 [docs/governance.md](docs/governance.md) for the change-control, errata, deprecation, and
-security-release policy.
+security-release policy. Pre-submission MCP extension drafts (capability-authorization, targeted at
+the MCP experimental track) live under `docs/extensions/`.
 
 ## Conformance
 
