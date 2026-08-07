@@ -364,9 +364,12 @@ compatibility.
   - [ADR 0011](adr/0011-published-governance.md) records the publication decision: the
     companion-republication shape + charter-authoritative discipline, the controlled-dual-copy
     principle for the general policy sections + the post-publication sync mechanism (fidelity check
-    re-run on charter § Governance edits), the `SECURITY.md` critical-surfaces retroactive-gap close
-    (latent since BAP-06), and the `docs/governance.md` manifest exclusion (a governance doc is not
-    a T2 surface).
+    re-run on charter § Governance edits), and the `SECURITY.md` + `docs/governance.md` +
+    `docs/design/standards-track.md` critical-surfaces additions (SECURITY.md a retroactive-gap close
+    latent since BAP-06; the manifest tracks shipped public-contract docs whose silent drift is
+    dangerous — not the strict-T2 wire set — so the published governance doc and its standing-authority
+    source both belong; a completeness audit of the remaining shipped normative docs is flagged as
+    follow-up).
   - The charter § Governance gains an in-place forward-ref to governance.md (stays authoritative —
     NOT stubbed; the § Governance ↔ § Venue strategy "see below" deictic stays intact).
     [SECURITY.md](../SECURITY.md) reporting gains a one-line LINK to governance.md § Security policy
@@ -380,8 +383,20 @@ compatibility.
     The second pass (on the reconciled design) confirmed the reframe resolved the blocking cluster
     on authority-chain grounds and forced six further fixes: the false "verbatim" labels (§ Errata
     is a composite), the § Change control dual-copy principle + sync mechanism, the CHANGELOG entry,
-    the deprecation-window-numbers publication, the manifest `docs/governance.md` exclusion, and the
-    README consistency rationale. All admitted; all folded.
+    the deprecation-window-numbers publication, the manifest `docs/governance.md` membership
+    decision, and the README consistency rationale. All admitted; all folded. (Post-closeout review
+    corrected the manifest decision from exclusion to inclusion — the exclusion rationale was
+    inconsistent with the manifest's own non-wire members; see ADR 0011 § Decision 3 — and added the
+    standing-authority charter alongside.)
+  - **Post-BAP-13-review governance refinement.** The review found the charter's deprecation and
+    security policy self-contradictory: `REQ1-EVO-deprecation-window-minimum`'s absolute twelve-month
+    floor plus `REQ1-EVO-parallel-support-during-window` forced up to a year of accepting a
+    vulnerable major, against the § Governance security bullet's "accelerated overlap window."
+    [ADR 0012](adr/0012-security-release-accelerated-deprecation-window.md) resolves it — the floor is
+    scoped to planned deprecations and a security contract-major is exempt (its accelerated window is
+    still published, severity-proportional, and deployment-sunset). Charter § The evolution contract
+    + § Governance amended; [governance.md](governance.md) and the requirement map re-synced.
+    Gap-traced deployment policy — zero wire, bound, or verdict change.
 
 ## Next action
 

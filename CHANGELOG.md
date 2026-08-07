@@ -12,8 +12,16 @@ All notable changes to `bounded_authority_protocol` are documented here.
   — a companion republication of the charter § Governance, which remains the authoritative source.
   [SECURITY.md](SECURITY.md) cross-references the verdict-change rule; the
   [errata registry](docs/errata.md) header retargets to governance.md as the published policy home;
-  `SECURITY.md` joins `.forge/critical-surfaces` (retroactive gap close since BAP-06). Zero wire
-  byte, bound, or verdict change.
+  `SECURITY.md`, `docs/governance.md`, and `docs/design/standards-track.md` join
+  `.forge/critical-surfaces` (SECURITY.md a retroactive gap close since BAP-06). Zero wire byte,
+  bound, or verdict change.
+- Resolve a contradiction in the deprecation/security policy: the twelve-month deprecation-window
+  minimum (`REQ1-EVO-deprecation-window-minimum`) is scoped to planned deprecations, and a security
+  contract-major (one remediating a verdict-changing vulnerability) is exempt — its accelerated
+  overlap window is published at announcement, proportional to severity, and a deployment-decided
+  sunset, never a silent change ([ADR 0012](docs/adr/0012-security-release-accelerated-deprecation-window.md);
+  charter § The evolution contract + § Governance; [governance.md](docs/governance.md) re-synced).
+  Deployment-policy refinement only — zero wire byte, bound, or verdict change.
 
 ## [0.1.0] — release candidate
 

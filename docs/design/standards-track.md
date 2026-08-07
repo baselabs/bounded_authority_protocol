@@ -57,8 +57,10 @@ Successor contract-majors overlap rather than flag-day:
   published conformance corpus, and at least two independent implementations passing that corpus
   (`REQ1-EVO-deprecation-prerequisites`).
 - The deprecation window is published at announcement and is never shorter than twelve months
-  (`REQ1-EVO-deprecation-window-minimum`). During the window, conforming verifier deployments
-  support both majors in parallel (`REQ1-EVO-parallel-support-during-window`).
+  (`REQ1-EVO-deprecation-window-minimum`), except for a security contract-major, whose accelerated
+  overlap window is governed by the security-policy rule under § Governance. During the window,
+  conforming verifier deployments support both majors in parallel
+  (`REQ1-EVO-parallel-support-during-window`).
 - Sunset of a major is a deployment decision after the published window, never a silent library
   change (`REQ1-EVO-sunset-is-deployment-decision`).
 - Errata never change verification behavior. An erratum may clarify prose, correct non-normative
@@ -211,7 +213,9 @@ credibility step and the policy is what makes single-maintainer tolerable to ado
   authoritative one.
 - **Security policy.** SECURITY.md governs vulnerability intake; a vulnerability whose fix would
   change a verdict is handled as a contract-major security release with an accelerated overlap
-  window, never as a silent verdict change.
+  window — published at announcement and set proportional to the vulnerability's severity, exempt
+  from the twelve-month deprecation minimum above (§ The evolution contract), yet still a published,
+  deployment-decided sunset, not a flag-day — never as a silent verdict change.
 
 The governance policy is also published as a standalone normative project document at
 [docs/governance.md](../governance.md); this charter section remains its authoritative source.
