@@ -104,7 +104,9 @@ See the [normative v1 profile](docs/protocol-v1.md),
 [ADR 0002](docs/adr/0002-normative-v1-parsing-profile.md) and
 [ADR 0003](docs/adr/0003-standard-jws-and-verified-grant-results.md), plus
 [ADR 0004](docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md), plus
-[ADR 0005](docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md).
+[ADR 0005](docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md). See
+[docs/governance.md](docs/governance.md) for the change-control, errata, deprecation, and
+security-release policy.
 
 ## Conformance
 
