@@ -12,7 +12,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
   [ADR 0013](docs/adr/0013-capability-authorization-extension.md)), documenting the already-normative
   v1 protocol. Identifier `io.bounded-authority/capability-authorization`. Partial conformance to the
   MCP official-submission bar (SEP-2133); official submission is gated on external preconditions
-  (a reference implementation in an official MCP SDK, a working group + sponsor, SEP acceptance, and
+  (a reference implementation in an official MCP SDK, a working group + Extension Maintainers +
+  sponsor, SEP acceptance, and
   IANA registration of the `ba_*`/`ba+*` names via BAP-12). The extension documents are repo-tracked,
   excluded from the Hex package census (pre-submission drafts). Zero wire byte, bound, or verdict
   change.
