@@ -36,8 +36,8 @@ minimal value-free reproduction, and the expected security outcome. BaseLabs wil
 triage, remediate, and coordinate disclosure through the private advisory.
 
 For vulnerabilities whose fix would change a verification verdict, see the
-[governance policy § Security policy](docs/governance.md#security-policy) (a contract-major
-security release with an accelerated overlap window, never a silent verdict change).
+[governance policy § Security policy](docs/governance.md#security-policy) for the verdict-change
+handling rule.
 
 ## Supply-chain verification
 
