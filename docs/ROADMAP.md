@@ -408,7 +408,7 @@ compatibility.
   (0 failure); the conformance runner reports `agreed=259, agreement=true, disagreed=0` (unchanged).
   - The deliverables live under `docs/extensions/`: a draft extension `.mdx`
     (`capability-authorization.mdx`) carrying the full codified bar (BCP 14 / RFC 2119 / RFC 8174
-    conformance language + the `io.boundedauthority/capability-authorization` identifier in the body
+    conformance language + the `io.bounded-authority/capability-authorization` identifier in the body
     — beyond what the grandfathered ext-auth exemplars carry); a draft Extensions-Track SEP
     (`mcp-sep-capability-authorization.md`); and an AP2 mandate-mapping note
     (`ap2-mandate-mapping.md`). "AP2" = the [Agent Payments Protocol](https://ap2-protocol.org/)
@@ -437,7 +437,7 @@ compatibility.
 - The design-adversarial pass (8 challenges, 1 blocking) forced a premise reframe: the original
   design silently redefined "conforms to submission requirements" to the achievable subset (a
   frame-capture the review caught). Three challenges were resolved with user input: "AP2" was
-  undefined (it is the Agent Payments Protocol); the `io.boundedauthority` identifier domain had to
+  undefined (it is the Agent Payments Protocol); the `io.bounded-authority` identifier domain had to
   be owned (it is — `bounded-authority.io`); and the SDK-repository question (no new repo is
   required; the official-SDK path runs through the MCP SDK maintainers).
 
