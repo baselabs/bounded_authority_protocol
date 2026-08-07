@@ -6,6 +6,16 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- Draft the capability-authorization extension as a pre-submission package for the MCP
+  experimental-extension track (`docs/extensions/` — a draft `.mdx`, a draft
+  Extensions-Track SEP, and an Agent Payments Protocol (AP2) mandate-mapping note;
+  [ADR 0013](docs/adr/0013-capability-authorization-extension.md)), documenting the already-normative
+  v1 protocol. Identifier `io.boundedauthority/capability-authorization`. Partial conformance to the
+  MCP official-submission bar (SEP-2133); official submission is gated on external preconditions
+  (a reference implementation in an official MCP SDK, a working group + sponsor, SEP acceptance, and
+  IANA registration of the `ba_*`/`ba+*` names via BAP-12). The extension documents are repo-tracked,
+  excluded from the Hex package census (pre-submission drafts). Zero wire byte, bound, or verdict
+  change.
 - Publish the governance policy (change classes, change-control triggers, errata no-verdict-flip
   prohibition, deprecation windows, security-release handling) as a standalone normative project
   document ([docs/governance.md](docs/governance.md); [ADR 0011](docs/adr/0011-published-governance.md))
