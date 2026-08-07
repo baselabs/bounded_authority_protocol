@@ -72,11 +72,13 @@ requirements this extension introduces for MCP.
 - **Extension identifier:** `io.boundedauthority/capability-authorization` (the
   `io.boundedauthority` prefix is a reversed-DNS name the extension author controls).
 - **Capability negotiation:** via `capabilities.extensions["io.boundedauthority/capability-authorization"]`
-  with a settings object identifying the accepted suite and contract-major
-  ([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Negotiation).
-- **Graceful degradation:** revert to core MCP authorization (OAuth scopes) when a peer does not
-  support the extension ([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Graceful
-  Degradation); a server MAY reject for a tool/resource that requires capability-auth.
+  ([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Negotiation); this draft does
+  not yet fix a settings schema (advertised empty), and the deployment's accepted suites and
+  contract-majors are published via the reserved verifier discovery document, not this settings
+  object.
+- **Graceful degradation:** revert to the MCP core authorization framework (OAuth 2.1) when a peer
+  does not support the extension ([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) §
+  Graceful Degradation); a server MAY reject for a tool/resource that requires capability-auth.
 
 ## Rationale
 
