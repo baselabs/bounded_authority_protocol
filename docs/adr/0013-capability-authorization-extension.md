@@ -34,9 +34,12 @@ accept contributed implementations," so the reference implementation is a negoti
    recorded alternatives.** The official track's reference-SDK requirement is unreachable from this
    repository (an "official SDK" is an MCP-org SDK; this project's BAP-09 verifier SDKs verify *this*
    protocol, they are not implementations *in* an MCP SDK). The experimental track is the sanctioned
-   pre-SEP incubation path with no reference-SDK requirement. BAP-08 delivers a conforming
-   pre-submission draft package for that track; official submission is gated on the external
-   dependencies in Decision 5.
+   pre-SEP incubation path with no reference-SDK requirement — though reaching it still requires an
+   MCP maintainer to create the `experimental-ext-*` repository and a Working Group / Interest Group
+   association ([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Experimental
+   Extensions), i.e. an engagement with the MCP `ext-auth` working group, not a repository this
+   project provisions. BAP-08 delivers a conforming pre-submission draft package for that track;
+   official submission is gated on the external dependencies in Decision 5.
 
 2. **The extension identifier is `io.bounded-authority/capability-authorization`.** The
    `io.modelcontextprotocol` prefix is reserved for official extensions
