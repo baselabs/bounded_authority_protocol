@@ -27,7 +27,11 @@ Protocol. An issuer grants a holder a cryptographically bounded capability over 
 operations and their arguments; the holder proves possession per invocation; a verifier checks the
 capability against the invocation under a closed, fail-closed profile. The mechanism is the
 already-normative [Bounded Authority Protocol v1 profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/protocol-v1.md);
-this SEP documents it for the MCP venue and introduces nothing normative outside that profile. The
+this SEP documents it for the MCP venue. The capability-authorization *mechanism* (grant, proof,
+selector algebra, verification) introduces nothing normative outside that profile; the extension's
+negotiation, transport-binding, and graceful-degradation surfaces are normative requirements this
+extension defines for MCP per [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions), not
+restatements of the v1 profile. The
 extension composes with — does not replace — the OAuth-scope authorization the existing `ext-auth`
 extensions assume.
 
@@ -40,8 +44,11 @@ cryptographically bind *which arguments* an operation may be invoked with, nor b
 invocation to a specific holder proof. For agent-driven invocations — where an autonomous agent
 calls tools on a user's behalf, and the consequences of an over-broad capability are real — a
 finer-grained, cryptographically bound capability model closes a gap that scopes leave open: the
-*object-level* authority ("this agent may call `transfer_funds` only for account A, only up to
-amount N, only until time T") is provable per-invocation, not merely asserted by a scope string.
+*object-level* authority ("this agent may call `transfer_funds` only for account A, only until
+time T") is provable per-invocation, not merely asserted by a scope string. (The v1 selector
+algebra expresses exact-value and enumerated-set argument bounds — `equals`/`one_of` — plus
+operation, time, and audience bounds; it does not express inequality/range bounds like "up to
+amount N," which remain a server-side policy check.)
 
 The Bounded Authority Protocol already specifies this mechanism — bounded proof-of-possession grants
 with a conjunctive selector algebra over invocation arguments, holder proofs that bind the request
@@ -58,7 +65,9 @@ The extension-document restatement is
 language (BCP 14 / RFC 2119 / RFC 8174) required by
 [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Official Extensions. Conformance
 to this extension REQUIRES conformance to the v1 profile's grant, proof, selector, header, and
-verification surfaces; the extension introduces no additional normative requirements.
+verification surfaces; the extension's negotiation/transport/fallback surfaces (defined per
+[SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions)) are the additional normative
+requirements this extension introduces for MCP.
 
 - **Extension identifier:** `io.boundedauthority/capability-authorization` (the
   `io.boundedauthority` prefix is a reversed-DNS name the extension author controls).
