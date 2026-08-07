@@ -10,7 +10,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
   experimental-extension track (`docs/extensions/` — a draft `.mdx`, a draft
   Extensions-Track SEP, and an Agent Payments Protocol (AP2) mandate-mapping note;
   [ADR 0013](docs/adr/0013-capability-authorization-extension.md)), documenting the already-normative
-  v1 protocol. Identifier `io.boundedauthority/capability-authorization`. Partial conformance to the
+  v1 protocol. Identifier `io.bounded-authority/capability-authorization`. Partial conformance to the
   MCP official-submission bar (SEP-2133); official submission is gated on external preconditions
   (a reference implementation in an official MCP SDK, a working group + sponsor, SEP acceptance, and
   IANA registration of the `ba_*`/`ba+*` names via BAP-12). The extension documents are repo-tracked,
