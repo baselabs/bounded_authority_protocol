@@ -29,9 +29,10 @@ capability against the invocation under a closed, fail-closed profile. The mecha
 already-normative [Bounded Authority Protocol v1 profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/protocol-v1.md);
 this SEP documents it for the MCP venue. The capability-authorization *mechanism* (grant, proof,
 selector algebra, verification) introduces nothing normative outside that profile; the extension's
-negotiation, transport-binding, and graceful-degradation surfaces are normative requirements this
-extension defines for MCP per [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions), not
-restatements of the v1 profile. The
+negotiation and graceful-degradation surfaces are normative requirements this extension defines for
+MCP per [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions), and its transport binding
+is scoped to streamable-HTTP for this draft with the per-message binding left open — none a
+restatement of the v1 profile. The
 extension composes with — does not replace — the OAuth-scope authorization the existing `ext-auth`
 extensions assume.
 
@@ -65,9 +66,10 @@ The extension-document restatement is
 language (BCP 14 / RFC 2119 / RFC 8174) required by
 [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Official Extensions. Conformance
 to this extension REQUIRES conformance to the v1 profile's grant, proof, selector, header, and
-verification surfaces; the extension's negotiation/transport/fallback surfaces (defined per
+verification surfaces; the extension's negotiation and fallback surfaces (defined per
 [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions)) are the additional normative
-requirements this extension introduces for MCP.
+requirements this extension introduces for MCP, and its transport binding is scoped to
+streamable-HTTP with the per-message binding still open (see the `.mdx` § 4.2).
 
 - **Extension identifier:** `io.bounded-authority/capability-authorization` (the
   `io.bounded-authority` prefix is a reversed-DNS name the extension author controls).
@@ -112,7 +114,7 @@ the algorithm-confusion and permissive-parsing classes.
 extension SEP "MUST have at least one reference implementation in an official SDK prior to review."
 This draft is **pre-submission**: no reference implementation in an official MCP SDK exists yet.
 [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § SDK Implementation states that
-"SDK maintainers are under no obligation to implement any extension or accept contributed
+"Maintainers are under no obligation to implement any extension or accept contributed
 implementations," so the reference implementation is a negotiation with the
 `modelcontextprotocol` SDK maintainers (e.g. the TypeScript or Python MCP SDKs), not a repository the
 extension author provisions. This SEP is not filed until that reference implementation exists;
@@ -124,7 +126,8 @@ Per [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions), official a
 extension requires — none of which this draft performs:
 
 1. A reference implementation in an official MCP SDK (negotiated with the SDK maintainers).
-2. A Working Group + sponsor identified in this SEP's Preamble.
+2. A Working Group and Extension Maintainers identified in this SEP's Preamble
+   ([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Creation), plus a sponsor.
 3. Extensions-Track SEP review and acceptance by the MCP Core Maintainers.
 4. IANA registration of the `ba_*` / `ba+*` names (coordinated with the Bounded Authority Protocol's
    BAP-12 roadmap row; the names are currently reserved under the `ba_` / `ba+` collision-avoidance

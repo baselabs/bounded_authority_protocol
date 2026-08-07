@@ -22,9 +22,9 @@ Standards Track), verified live during BAP-08. It defines **three tracks** with 
 (2) *experimental* — an `experimental-ext-` repo under the MCP org, associated with a working group,
 the sanctioned **incubation path before SEP submission** (no reference-SDK requirement); (3)
 *official* — the full bar: Extensions-Track SEP accepted by Core Maintainers, "MUST have at least
-one reference implementation in an official SDK prior to review," working group + sponsor, `.mdx`
-lands in `ext-auth`. [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § SDK
-Implementation adds that "SDK maintainers are under no obligation to implement any extension or
+one reference implementation in an official SDK prior to review," working group + Extension
+Maintainers + sponsor, `.mdx` lands in `ext-auth`. [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § SDK
+Implementation adds that "Maintainers are under no obligation to implement any extension or
 accept contributed implementations," so the reference implementation is a negotiation with the
 `modelcontextprotocol` SDK maintainers, not a repository this project provisions.
 
@@ -66,16 +66,18 @@ accept contributed implementations," so the reference implementation is a negoti
    mix.lock` is empty at closeout; the conformance corpus is unchanged at `agreed=259`. The
    capability-authorization *mechanism* (grant, proof, selector algebra, verification) restates the
    v1 surfaces in MCP vocabulary, citing the v1 profile per claim, and introduces nothing normative
-   outside [`protocol-v1.md`](../protocol-v1.md). The extension's negotiation, transport-binding, and
-   graceful-degradation surfaces are normative requirements this extension defines for MCP per
-   [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) — not restatements of v1. The
+   outside [`protocol-v1.md`](../protocol-v1.md). The extension's negotiation and graceful-degradation
+   surfaces are normative requirements this extension defines for MCP per
+   [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions); its transport binding is scoped
+   to streamable-HTTP for this draft with the per-message binding left open (see the `.mdx` § 4.2) —
+   not restatements of v1. The
    fidelity check (every restated mechanism value cites its v1 source) is a manual closeout
    discipline, not an automated gate — the extension documents do not ship in the Hex package
    (Decision 6), so ExDoc does not run against them.
 
 5. **Official submission is gated on external dependencies, recorded as preconditions (not BAP-08
    closeout gates):** (a) a reference implementation in an official MCP SDK, negotiated with the
-   `modelcontextprotocol` SDK maintainers; (b) a working group + sponsor; (c) Extensions-Track SEP
+   `modelcontextprotocol` SDK maintainers; (b) a working group + Extension Maintainers + sponsor; (c) Extensions-Track SEP
    acceptance by the MCP Core Maintainers; (d) IANA registration of the `ba_*` / `ba+*` names,
    coordinated with the Bounded Authority Protocol's BAP-12 roadmap row (the names are currently
    reserved under the `ba_` / `ba+` collision-avoidance prefix, unregistered — the extension `.mdx`
