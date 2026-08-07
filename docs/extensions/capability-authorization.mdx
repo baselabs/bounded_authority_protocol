@@ -34,9 +34,10 @@ compose; see § 5). The mechanism this extension documents is the already-normat
 [Bounded Authority Protocol v1 profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/protocol-v1.md);
 this document restates that mechanism in MCP vocabulary. The capability-authorization *mechanism*
 (grant, proof, selector algebra, verification) introduces nothing normative outside the v1 profile;
-the extension's negotiation, transport-binding, and graceful-degradation surfaces (§ 4) are
-normative requirements this extension defines for MCP per
-[SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions), not restatements of v1.
+the extension's negotiation and graceful-degradation surfaces (§ 4) are normative requirements this
+extension defines for MCP per [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions), and
+its transport binding (§ 4.2) is scoped to the streamable-HTTP transport for this draft with the
+per-message binding left open — none of these a restatement of v1.
 
 The Bounded Authority Protocol is a pure, deterministic verification library — **verification is not
 authority** (§ 6). A successful verification proves only that caller-supplied bytes satisfy
@@ -167,8 +168,9 @@ message-binding detail to be specified.
 
 ### 4.3 Graceful degradation
 
-If one party supports this extension but the other does not, the supporting party MUST revert to
-core MCP protocol behavior (the core authorization framework defined in the MCP specification), as
+If one party supports this extension but the other does not, the supporting party MUST either revert
+to core MCP protocol behavior (the core authorization framework defined in the MCP specification) or
+— for a mandatory extension — reject the request with an appropriate error, as
 [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Graceful Degradation requires.
 (MCP core defines an OAuth 2.1-based authorization framework in its specification; the `ext-auth`
 extensions, and any capability-authorization layered above it, are optional additions on top of that
