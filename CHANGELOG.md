@@ -6,7 +6,14 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
-- _Nothing yet._
+- Publish the governance policy (change classes, change-control triggers, errata no-verdict-flip
+  prohibition, deprecation windows, security-release handling) as a standalone normative project
+  document ([docs/governance.md](docs/governance.md); [ADR 0011](docs/adr/0011-published-governance.md))
+  — a companion republication of the charter § Governance, which remains the authoritative source.
+  [SECURITY.md](SECURITY.md) cross-references the verdict-change rule; the
+  [errata registry](docs/errata.md) header retargets to governance.md as the published policy home;
+  `SECURITY.md` joins `.forge/critical-surfaces` (retroactive gap close since BAP-06). Zero wire
+  byte, bound, or verdict change.
 
 ## [0.1.0] — release candidate
 
