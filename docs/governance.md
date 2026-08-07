@@ -48,7 +48,7 @@ charter's "see below" is resolved to an explicit link to the charter § Venue st
 
 ## Errata channel
 
-The numbered errata registry is [docs/errata.md](errata.md); each entry names affected versions and
+[docs/errata.md](errata.md) is the numbered errata registry; each entry names affected versions and
 its corpus impact, and the no-verdict-flip invariant is checked at review
 ([standards-track.md](design/standards-track.md):207-209, the charter § Governance errata bullet,
 verbatim). **No erratum may flip a corpus verdict** — any change that would alter an accept/reject
