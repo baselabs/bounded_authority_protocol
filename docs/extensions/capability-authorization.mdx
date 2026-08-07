@@ -77,11 +77,17 @@ conjunctive selector algebra over the invocation arguments (§ Selector algebra)
 Every value below is restated from the v1 profile; the v1 profile is the normative source and this
 section cites it per claim. The claim, `typ`, selector-kind, and suite names (`ba+cap`, `dpop+jwt`,
 `ba_inv`, `ba_op`, `ba_req`, `ath`, `cnf`, `BAP1-Ed25519-SHA256`, `all`/`equals`/`one_of`) are
-defined in the [Bounded Authority Protocol registries](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/registries.md).
-**Name registration status:** these names are currently unregistered; they are reserved under the
-`ba_` / `ba+` collision-avoidance prefix and are to be filed with IANA (JWT Claims registry +
-media-type suffix values) at first external submission, coordinated via the Bounded Authority
-Protocol's BAP-12 roadmap row.
+cataloged in the [Bounded Authority Protocol registries](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/registries.md).
+**Name registration status:** only the Bounded Authority Protocol's own names are unregistered — the
+`ba_inv`, `ba_op`, and `ba_req` claims and the `ba+cap` media-type suffix, reserved under the
+`ba_` / `ba+` collision-avoidance prefix, to be filed with IANA (the `ba_*` claims in the JWT Claims
+registry and `ba+cap` as a media-type structured suffix) at first external submission, coordinated
+via the Bounded Authority Protocol's BAP-12 roadmap row. The `dpop+jwt` proof type
+([RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449)), the `ath` and `cnf` claims
+([RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449) / [RFC 7638](https://datatracker.ietf.org/doc/html/rfc7638)),
+and the other standard JWT claims the profile reuses carry their already-registered meanings; the
+selector kinds and the `BAP1-Ed25519-SHA256` suite name are protocol-internal identifiers, not IANA
+registrations.
 
 ### 3.1 The `ba+cap` capability grant
 
@@ -126,13 +132,15 @@ closed rules.
 ### 4.1 Capability negotiation
 
 Per [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Negotiation, clients and
-servers advertise support for this extension in the `initialize` request/response. The per-extension
-settings object is an *example* of the deployment's accepted cryptographic suite and contract-major;
-its exact shape is not fixed by this draft (the Bounded Authority Protocol reserves a "verifier
-discovery document" for the deployment-published set of accepted contract-majors and suites, with
-its exact name and shape fixed at first external submission — see the
+servers advertise support for this extension in the `initialize` request/response. This draft does
+**not** yet fix a settings schema: it advertises an empty settings object, which per
+[SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Negotiation indicates no
+settings. Publishing the deployment's accepted cryptographic suites and contract-majors is deferred
+to the reserved "verifier discovery document" (the Bounded Authority Protocol reserves this name for
+the deployment-published set of accepted contract-majors and suites, with its exact name and shape
+fixed at first external submission — see the
 [registries](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/registries.md)
-§ reserved names). An empty settings object indicates no settings:
+§ reserved names), not to this settings object:
 
 ```json
 {
@@ -162,9 +170,11 @@ message-binding detail to be specified.
 If one party supports this extension but the other does not, the supporting party MUST revert to
 core MCP protocol behavior (the core authorization framework defined in the MCP specification), as
 [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Graceful Degradation requires.
-(The OAuth-scope-based authorization in the `ext-auth` extensions is itself an optional extension,
-not the core behavior; a deployment that layers this extension on top of an `ext-auth` extension
-reverts to whichever authorization posture it had before adding capability-auth.) A server that
+(MCP core defines an OAuth 2.1-based authorization framework in its specification; the `ext-auth`
+extensions, and any capability-authorization layered above it, are optional additions on top of that
+core. Reverting means the supporting party stops applying capability-authorization and falls back to
+the authorization posture it applied before adding it — MCP core's OAuth 2.1 framework, plus whatever
+`ext-auth` extensions the deployment uses.) A server that
 REQUIRES capability-authorization for a specific tool/resource MAY reject connections from clients
 that do not support the extension, as [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions)
 § Graceful Degradation permits for mandatory extensions.
