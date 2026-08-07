@@ -21,10 +21,10 @@ objects. Two mandate kinds:
 
 VDCs chain from an **Open** state (capturing user constraints) to a **Closed** state (capturing
 finalized authorization); a closed Checkout Mandate plus a closed Payment Mandate together form the
-non-repudiable proof of user authorization for a specific transaction. AP2 self-describes as "an
-extension for [Agent2Agent (A2A)](https://a2a-protocol.org/) and MCP" (Core Principles) and "an
-extension for the open-source Agent2Agent (A2A) protocol and Universal Commerce Protocol" (overview)
-— so it targets **A2A, MCP, and UCP** as host protocols.
+non-repudiable proof of user authorization for a specific transaction. Its overview describes AP2 as
+"an extension for emerging agent-to-agent (A2A), model-context protocols (MCP), and Universal
+Commerce Protocol (UCP)" (AP2 v0.2 `docs/overview.md`) — so it targets **A2A, MCP, and UCP** as host
+protocols.
 
 ## The structural correspondence
 
@@ -41,6 +41,16 @@ holder proves possession of per transaction*. The table maps the credential-mode
 The exact AP2 VDC wire format and field-level structure is defined in the AP2 v0.2 specification
 under its `docs/` and `schemas/` directories; the field-level mandate↔grant mapping is an
 execution-time read of those schemas, not asserted here.
+
+**Selector-expressiveness gap (Payment Mandate).** AP2's Payment Mandate carries range constraints —
+an **Amount Range**, a **Budget** total, and an **Execution Date** range (AP2 v0.2
+`docs/ap2/payment_mandate.md`). These are exactly the inequality/range bounds the Bounded Authority
+Protocol's selector algebra does **not** express: its `equals`/`one_of` kinds bind exact-value and
+enumerated-set arguments only (see [`capability-authorization.mdx`](./capability-authorization.mdx)
+§ 5). So the Payment Mandate correspondence is partial — AP2's set-membership constraints (Allowed
+Payee / Allowed Payment Instrument / Allowed PISP) map to `one_of` selectors, but its amount,
+budget, and date-range constraints have no selector representation and would remain a deployment-side
+policy check, not a bound the grant itself carries.
 
 ## The host-protocol question (open)
 
