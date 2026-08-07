@@ -14,7 +14,7 @@ with the official `ext-auth` track as a gated follow-on.
 
 - **SEP:** (to be numbered on submission)
 - **Title:** Capability-Authorization Extension
-- **Extension identifier:** `io.boundedauthority/capability-authorization`
+- **Extension identifier:** `io.bounded-authority/capability-authorization`
 - **Author(s):** Russ Palermo, BaseLabs
 - **Sponsor:** None (seeking sponsor)
 - **Working Group:** (to be identified — `ext-auth` authorization working group)
@@ -69,9 +69,9 @@ verification surfaces; the extension's negotiation/transport/fallback surfaces (
 [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions)) are the additional normative
 requirements this extension introduces for MCP.
 
-- **Extension identifier:** `io.boundedauthority/capability-authorization` (the
-  `io.boundedauthority` prefix is a reversed-DNS name the extension author controls).
-- **Capability negotiation:** via `capabilities.extensions["io.boundedauthority/capability-authorization"]`
+- **Extension identifier:** `io.bounded-authority/capability-authorization` (the
+  `io.bounded-authority` prefix is a reversed-DNS name the extension author controls).
+- **Capability negotiation:** via `capabilities.extensions["io.bounded-authority/capability-authorization"]`
   ([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Negotiation); this draft does
   not yet fix a settings schema (advertised empty), and the deployment's accepted suites and
   contract-majors are published via the reserved verifier discovery document, not this settings

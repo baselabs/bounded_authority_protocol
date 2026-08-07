@@ -38,7 +38,7 @@ accept contributed implementations," so the reference implementation is a negoti
    pre-submission draft package for that track; official submission is gated on the external
    dependencies in Decision 5.
 
-2. **The extension identifier is `io.boundedauthority/capability-authorization`.** The
+2. **The extension identifier is `io.bounded-authority/capability-authorization`.** The
    `io.modelcontextprotocol` prefix is reserved for official extensions
    ([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Official Extensions); this is
    a third-party proposal, so it uses the author's own reversed-DNS prefix. The project owns the
