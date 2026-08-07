@@ -34,7 +34,7 @@ holder proves possession of per transaction*. The table maps the credential-mode
 | AP2 v0.2 concept | Bounded Authority Protocol correspondence | Relationship |
 |---|---|---|
 | AP2 Checkout Mandate (signed authorization for the negotiated items/purchase details) | BAP `ba+cap` grant (issuer-signed capability over operations + selectors) | structural: both are issuer-signed authorization credentials binding *what* is authorized |
-| AP2 Payment Mandate (signed authorization against a payment instrument, bound to a finalized checkout) | BAP grant with selector narrowing binding the payment scope + a `ba_req` request binding | structural: both additionally bind the *scope/target* of the authorization |
+| AP2 Payment Mandate (signed authorization against a payment instrument, bound to a finalized checkout) | BAP grant with selector narrowing binding the payment scope + a `ba_req` request binding | structural but **partial** — both bind the *scope/target*, but AP2's amount/budget/date-range constraints have no selector representation (see the selector-expressiveness gap below) |
 | AP2 closed-mandate proof (agent presents the closed VDC chain) | BAP `dpop+jwt` holder proof (binds the grant via `ath` + the request via `ba_req` + the invocation via `ba_inv`/`ba_op`) | structural: both prove holder possession of the authorization and bind it to the specific invocation |
 | AP2 VDC credential model (signed, tamper-evident, chain Open→Closed) | BAP compact-JWS grant + DPoP proof (RFC 7515 / RFC 9449) | structural at the credential-model level |
 
@@ -64,7 +64,7 @@ mandates composed with UCP checkout flows), not mutually exclusive with the MCP 
 
 Resolving the primary target is a content decision for the extension's eventual submission, shaped
 by where adoption is real; this note maps the correspondences without prejudging the venue split.
-The structural mapping below holds at whichever host layer an adopter composes AP2 with BAP.
+The structural mapping above holds at whichever host layer an adopter composes AP2 with BAP.
 
 ## Honesty line
 
@@ -74,7 +74,7 @@ v1 mechanism to AP2's VDC mandate model. This note does **not** claim:
 - that an AP2-conforming agent can consume a BAP grant + proof (unverified);
 - that AP2's VDC format is identical to or interoperable with BAP's compact-JWS grant (the exact VDC
   wire format is an execution-time read);
-- that the host-protocol question (MCP vs A2A) is resolved.
+- that the host-protocol question (which host layer among A2A, MCP, and UCP is primary) is resolved.
 
 This is the same no-round-trip-claims discipline the Bounded Authority Protocol applies to its
 independent conformance verifier: a structural correspondence is a hypothesis about credential-model
