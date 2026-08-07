@@ -8,3 +8,4 @@ docs/design/conformance-contract.md
 docs/design/threat-model.md
 usage-rules.md
 docs/adr/**
+SECURITY.md
