@@ -74,7 +74,9 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          # Active LTS (Node 20 reached end-of-life 2026-04). The independent Node second-
+          # implementation runner in `mix quality` runs on this toolchain.
+          node-version: "22"
 
       - name: Install dependencies
         run: mix deps.get
