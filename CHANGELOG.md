@@ -6,6 +6,16 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- Ship cross-language verifier SDKs (TypeScript `@bounded-authority/verifier` + Python
+  `bounded-authority-verifier`) under `sdks/` — typed reimplementations of the frozen v1 profile from
+  the spec + corpus alone, with no code-level derivation from the Elixir reference
+  ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)). Each passes all 259 conformance vectors
+  (recomputed from scratch), asserts the corpus `index.json` SHA at startup, and proves every
+  permissiveness closure red-capable via a per-language mutation-gate. They are verifiers, not
+  authority runtimes (no key selection, replay reservation, or execution grant). NOT in the Hex
+  package `files:` (they are not Elixir). The `sdks-conformance` CI job
+  ([`.github/workflows/sdks.yml`](.github/workflows/sdks.yml)) gates every `sdks/**` /
+  `priv/conformance/**` change. Zero wire byte, bound, or verdict change to the Elixir package.
 - Draft the capability-authorization extension as a pre-submission package for the MCP
   experimental-extension track (`docs/extensions/` — a draft `.mdx`, a draft
   Extensions-Track SEP, and an Agent Payments Protocol (AP2) mandate-mapping note;
