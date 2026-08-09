@@ -47,6 +47,7 @@ from bounded_authority_verifier.json_alg import (
     JFloat,
     JInt,
     JObject,
+    JString,
     json_decode,
 )
 from bounded_authority_verifier.selector import (
@@ -198,4 +199,89 @@ def test_jcs_astral_codepoint_emits_4_byte_utf8():
     out = jcs_encode(v)
     # The string value between the quotes is the raw 4-byte UTF-8 of U+10000: F0 90 80 80.
     assert out == b'"' + bytes([0xF0, 0x90, 0x80, 0x80]) + b'"'
+
+
+# === BAP-09 cross-vendor remediation — fail-closed + reference-parity closures (defect-injected) ===
+# Each closure below was verified divergent against the RUNNING Elixir reference, fixed to match the
+# reference verdict, then proven red-capable by mechanically removing/breaking the fix and watching
+# the named test go RED. The reference verdict is the contract (AGENTS rule 7); RFC 8785 is cited
+# only where the reference agrees with it.
+
+def test_lone_high_surrogate_at_eof_is_invalid_not_indexerror():
+    """Claude opus cross-vendor finding: a lone high-surrogate \\uXXXX escape at end-of-buffer
+    (b'\"\\\\uD800') must fail closed as InvalidError, not raise IndexError on src[ctx.pos+1].
+    The TS sibling is safe (out-of-range Uint8Array access yields undefined); Python raises.
+    Defect: revert json_alg.py to `if src[ctx.pos] != 0x5C ...` (no _byte_at guard) → IndexError.
+    """
+    with pytest.raises(InvalidError):
+        json_decode(b'"\\uD800')
+    with pytest.raises(InvalidError):
+        json_decode(b'"\\uD800\\')
+    # Control: a lone high surrogate WITH a closing quote already failed closed; still does.
+    with pytest.raises(InvalidError):
+        json_decode(b'"\\uD800"')
+    # Control: a valid surrogate pair still succeeds (decodes to U+103FF).
+    assert json_decode(b'"\\uD800\\uDFFF"') == JString(v=bytes([0xF0, 0x90, 0x8F, 0xBF]))
+
+
+def test_malformed_utf8_member_name_is_invalid():
+    """Cross-vendor #14: an object member name with invalid UTF-8 bytes (e.g. 0xff) must fail closed
+    as InvalidError, not raise UnicodeDecodeError past the closed-error whitelist. The reference
+    returns {:error,:invalid} (json.ex rescues). Defect: revert to bare `name_bytes.decode('utf-8')`
+    → UnicodeDecodeError.
+    """
+    with pytest.raises(InvalidError):
+        json_decode(b'{"\xff":1}')
+    # Control: a valid name still decodes.
+    assert json_decode(b'{"a":1}') == JObject(v={"a": JInt(v=1)})
+
+
+def test_float_magnitude_checked_on_raw_lexeme_not_lossy_conversion():
+    """Cross-vendor #7: a float lexeme whose value exceeds the maximum but rounds to it under
+    float() (9007199254740991.0001 → 9007199254740991.0) MUST be rejected. The reference checks the
+    raw lexeme by decimal arithmetic (json.ex magnitude_within?). Defect: revert to the post-
+    conversion `abs(n) > MAX_FLOAT` check → this lexeme is accepted (lossy).
+    """
+    with pytest.raises(InvalidError):
+        json_decode(b"9007199254740991.0001")
+    # Controls: exactly MAX is valid (int); MAX+1 as int is rejected on the raw lexeme too.
+    assert json_decode(b"9007199254740991") == JInt(v=9007199254740991)
+    with pytest.raises(InvalidError):
+        json_decode(b"9007199254740992")
+    # A float strictly under MAX is valid.
+    assert isinstance(json_decode(b"9007199254740990.5"), JFloat)
+
+
+def test_malformed_ipv6_literal_rejected():
+    """Cross-vendor #6: a structurally-invalid IPv6 literal (e.g. [:::]) must be rejected, not
+    normalized. The reference (uri.ex valid_ipv6_literal?) validates group count + compression
+    rules; the prior implementation only checked the character class. Defect: revert _ipv6_kind to
+    the regex-only branch → [:::] normalizes to Ok.
+    """
+    from bounded_authority_verifier.error import Err
+    from bounded_authority_verifier.uri import uri_normalize
+
+    assert isinstance(uri_normalize(b"https://[:::]/"), Err)
+    assert isinstance(uri_normalize(b"https://[1:2:3:4:5:6:7:8:9]/"), Err)
+    assert isinstance(uri_normalize(b"https://[1::2::3]/"), Err)
+    assert isinstance(uri_normalize(b"https://[gggg]/"), Err)
+    # Controls: valid IPv6 literals still normalize.
+    assert uri_normalize(b"https://[::1]/").is_ok
+    assert uri_normalize(b"https://[2001:db8::1]/").is_ok
+    assert uri_normalize(b"https://[1:2:3:4:5:6:7:8]/").is_ok
+    assert uri_normalize(b"https://[::ffff:192.0.2.1]/").is_ok
+
+
+def test_jcs_del_emits_raw_byte_matching_reference():
+    """Cross-vendor #8: JCS serialization of DEL (U+007F) MUST emit the raw byte 0x7f, matching the
+    Elixir reference (jcs.ex has no DEL case → the general codepoint branch passes it raw). RFC 8785
+    §3.2.2.3 mandates \\u007f, but the reference bytes are the contract (AGENTS rule 7) — diverging
+    would produce different signed inputs and request digests. Defect: revert to the `\\u007f`
+    branch → this test's byte comparison fails.
+    """
+    from bounded_authority_verifier.jcs import jcs_encode
+
+    v = JString(v=b"x\x7fy")
+    assert list(jcs_encode(v)) == [34, 120, 127, 121, 34]  # "x<raw DEL>y"
+
 
