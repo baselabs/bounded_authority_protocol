@@ -975,18 +975,34 @@ def _encode_consumption_entry_body(entry: ConsumptionEntry, bounds: Bounds | Non
         fail("encode_consumption_entry: chain_id bytes")
     if not _is_string_or_uri(entry.chain_id):
         fail("encode_consumption_entry: chain_id string-or-uri")
-    members: dict[str, Tagged] = {
-        "chain_id": JString(chain_id_bytes),
-        "commitment": JString(str_utf8(utf8_str(base64url_encode(entry.commitment)))),
-        "previous": JString(str_utf8(utf8_str(base64url_encode(entry.previous_hash)))),
-        "sequence": JInt(entry.sequence),
-        "v": JInt(VERSION),
-    }
-    row_bytes = jcs_encode(JObject(members), b)
+    # Genesis invariant (consumption_chain.ex:123 validate_entry): sequence 1 requires the all-zero
+    # predecessor. The verifier re-checks this; the producer rejects pre-signing.
+    if entry.sequence == 1 and not _bytes_equal(entry.previous_hash, DEFAULT_HASH):
+        fail("encode_consumption_entry: genesis predecessor")
+    row_bytes = _canonical_row_bytes_from_id(chain_id_bytes, entry.sequence, entry.previous_hash, entry.commitment, b)
     if len(row_bytes) > bounds_resolve(b, "chain_row_bytes"):
         fail("encode_consumption_entry: chain_row_bytes")
     hash_ = sha256(ROW_PREFIX, row_bytes)
     return EncodedConsumptionEntry(bytes_=row_bytes, hash_=hash_)
+
+
+def _canonical_row_bytes_from_id(
+    chain_id_bytes: bytes, sequence: int, previous_hash: bytes, commitment: bytes, b: Bounds
+) -> bytes:
+    """The canonical row bytes shared by the producer and the verifier (so the verifier's re-encode
+    produces EXACTLY the bytes the producer emits and the chain hash is computed over)."""
+    members: dict[str, Tagged] = {
+        "chain_id": JString(chain_id_bytes),
+        "commitment": JString(str_utf8(utf8_str(base64url_encode(commitment)))),
+        "previous": JString(str_utf8(utf8_str(base64url_encode(previous_hash)))),
+        "sequence": JInt(sequence),
+        "v": JInt(VERSION),
+    }
+    return jcs_encode(JObject(members), b)
+
+
+def _canonical_row_bytes(chain_id: str, sequence: int, previous_hash: bytes, commitment: bytes) -> bytes:
+    return _canonical_row_bytes_from_id(str_utf8(chain_id), sequence, previous_hash, commitment, MAXIMUM_BOUNDS)
 
 
 # 8. check_chain (ADR 0004 § Consumption rows; REQ1-CHAIN-raw-rows-bounds).
@@ -1032,10 +1048,21 @@ def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
         seq_v = row.v["sequence"]
         if not isinstance(seq_v, JInt) or seq_v.v != sequence:
             fail(f"check_chain row {i}: sequence")
+        # valid_sequence?: sequence must be strictly positive (> 0). The encode_consumption_entry
+        # producer already rejects sequence < 1, but the raw row stream is untrusted input here, so
+        # reject sequence 0 at verify time too (mirrors consumption_chain.ex:163 valid_sequence?).
+        if seq_v.v < 1:
+            fail(f"check_chain row {i}: sequence positive")
         prev_raw = _require_b64url_n(row.v.get("previous"), "previous", 32)
         if not _bytes_equal(prev_raw, previous):
             fail(f"check_chain row {i}: previous link")
-        _require_b64url_n(row.v.get("commitment"), "commitment", 32)
+        commitment_raw = _require_b64url_n(row.v.get("commitment"), "commitment", 32)
+        # Canonical re-encode: the input row bytes MUST byte-equal the canonical re-encoded form
+        # (mirrors consumption_chain.ex:96 parse_row `encode(entry).bytes == ^bytes`). This rejects
+        # whitespace drift and member-order drift that would otherwise hash to a different chain link.
+        re_encoded = _canonical_row_bytes(chain.chain_id, seq_v.v, prev_raw, commitment_raw)
+        if not _bytes_equal(re_encoded, row_bytes):
+            fail(f"check_chain row {i}: canonical")
         previous = sha256(ROW_PREFIX, row_bytes)
         sequence += 1
     if not _bytes_equal(previous, expected.last_hash):
@@ -1292,6 +1319,11 @@ def _boundary_anchor_signing_input_body(anchor: BoundaryAnchorProducer, bounds: 
         fail("anchor_signing_input: non-negative sequence")
     require(len(anchor.chain_hash) == 32, "anchor_signing_input: chain_hash width")
     require(len(anchor.public_key) == 32, "anchor_signing_input: public_key width")
+    # Genesis invariant (boundary_anchor_codec.ex:185-189 valid_anchor_binding?): sequence 0 is the
+    # chain root and requires the all-zero chain_hash. The verifier re-checks this; the producer
+    # rejects pre-signing so a mis-bound genesis anchor cannot be minted.
+    if anchor.sequence == 0 and not _bytes_equal(anchor.chain_hash, DEFAULT_HASH):
+        fail("anchor_signing_input: genesis chain_hash")
     header: dict[str, Tagged] = {
         "alg": JString(str_utf8(ALG)),
         "kid": JString(key_id_bytes),
@@ -1369,6 +1401,10 @@ def encode_anchored_export(input_: AnchoredExportInput, expected: ExpectedExport
 
 
 def _encode_anchored_export_body(input_: AnchoredExportInput, expected: ExpectedExport) -> EncodedAnchoredExport:
+    # Validate inputs BEFORE framing (mirrors anchored_export_codec.ex:33-57 encode →
+    # validate_expected_export + parse_expected_transitions + validate_expected_key_path). The parser
+    # would reject the bytes a too-large input would produce; the producer rejects earlier.
+    _validate_export_inputs(input_, expected)
     header_bytes = _build_archive_header(input_, expected.chain)
     parts = [ARCHIVE_PREFIX, _frame(header_bytes), _frame(input_.start_anchor)]
     parts.extend(_frame(t) for t in input_.transitions)
@@ -1378,6 +1414,41 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     if len(archive) > bounds_resolve(MAXIMUM_BOUNDS, "archive_bytes"):
         fail("encode_anchored_export: archive_bytes")
     return EncodedAnchoredExport(archive=archive, digest=sha256(archive))
+
+
+def _validate_export_inputs(input_: AnchoredExportInput, expected: ExpectedExport) -> None:
+    """Encode-time input validation (mirrors anchored_export_codec.ex validate_expected_export +
+    validate_chunks): the transition count, chain range coherence, anchor bindings, and the key-path
+    invariants must hold before framing. The parser enforces all of this at verify time; the producer
+    must not mint bytes its own consumer would reject."""
+    chain = expected.chain
+    # Transition count bound (anchored_export_codec.ex:360 transition_count <= bounds.key_transitions).
+    if len(input_.transitions) > bounds_resolve(MAXIMUM_BOUNDS, "key_transitions"):
+        fail("encode_anchored_export: transition_count bound")
+    if len(expected.transitions) != len(input_.transitions):
+        fail("encode_anchored_export: transition count")
+    # Anchor bindings (anchored_export_codec.ex:364-371): start spans first_sequence-1 with the
+    # chain's previous_hash; end spans last_sequence with the chain's last_hash.
+    if expected.start_anchor.sequence != chain.first_sequence - 1:
+        fail("encode_anchored_export: start sequence")
+    if not _bytes_equal(expected.start_anchor.chain_hash, chain.previous_hash):
+        fail("encode_anchored_export: start chain_hash")
+    if expected.end_anchor.sequence != chain.last_sequence:
+        fail("encode_anchored_export: end sequence")
+    if not _bytes_equal(expected.end_anchor.chain_hash, chain.last_hash):
+        fail("encode_anchored_export: end chain_hash")
+    # All transitions + both anchors carry the chain_id (anchored_export_codec.ex:361-363).
+    for i, t in enumerate(expected.transitions):
+        if t.chain_id != chain.chain_id:
+            fail(f"encode_anchored_export: transition {i} chain_id")
+    if expected.start_anchor.chain_id != chain.chain_id:
+        fail("encode_anchored_export: start chain_id")
+    if expected.end_anchor.chain_id != chain.chain_id:
+        fail("encode_anchored_export: end chain_id")
+    # Key-path invariants (validate_expected_key_path): the no-transition path requires start==end key
+    # identity with a chronologically-non-decreasing end anchor; the transition path requires strictly
+    # increasing effective_at with no fingerprint cycle. Mirrored by _validate_key_path.
+    _validate_key_path(expected.start_anchor, expected.transitions, expected.end_anchor)
 
 
 def _build_archive_header(input_: AnchoredExportInput, chain: ExpectedChain) -> bytes:
@@ -1533,6 +1604,10 @@ def verify_anchored_export(archived: ArchivedObject, key_chain: HistoricalKeyCha
 
 
 def _verify_anchored_export_body(archived: ArchivedObject, key_chain: HistoricalKeyChain, expected: ExpectedExport) -> AnchoredExportFacts:
+    # Validate the chunk list BEFORE concatenation (mirrors anchored_export_codec.ex:101-102,333-342
+    # validate_chunks): each chunk nonempty, count < archive_chunks, total ≤ archive_bytes. Hashing
+    # happens after the shape is validated.
+    _validate_chunks(archived.chunks)
     archive = b"".join(archived.chunks)
     if len(archive) <= len(ARCHIVE_PREFIX):
         fail("verify_anchored_export: archive too short")
@@ -1559,16 +1634,33 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     if not _bytes_equal(parsed.header_bytes, expected_header_bytes):
         fail("verify_anchored_export: header")
     # Verify start + end anchors + each transition against the ordered historical key chain.
-    if len(key_chain.keys) < 2:
-        fail("verify_anchored_export: key chain")
+    # A key chain of N keys spans N-1 transitions (keys[0]→[1], ..., keys[N-2]→[N-1]); a 1-key,
+    # 0-transition archive is the no-rollover case the reference accepts (validate_historical_key_shapes
+    # requires keys == transitions+1, with no minimum). The exact-count check below is the gate.
     _verify_anchor_compact(parsed.start, key_chain.keys[0], expected.start_anchor, "verify_anchored_export start")
     _verify_anchor_compact(parsed.end, key_chain.keys[-1], expected.end_anchor, "verify_anchored_export end")
     if len(parsed.transitions) != len(expected.transitions):
         fail("verify_anchored_export: transition count")
     if len(key_chain.keys) != len(parsed.transitions) + 1:
         fail("verify_anchored_export: key chain length")
+    # Key-path invariants (anchored_export_codec.ex:506-572 validate_expected_key_path): the expected
+    # transition list must form a strictly-increasing effective_at sequence with no fingerprint cycle,
+    # and the end anchor must close the path with a chronologically-non-decreasing anchored_at.
+    _validate_key_path(expected.start_anchor, expected.transitions, expected.end_anchor)
     for i, tr in enumerate(parsed.transitions):
         _verify_transition_compact(tr, key_chain.keys[i], key_chain.keys[i + 1], expected.transitions[i], f"verify_anchored_export transition {i}")
+    # Chronology over the ACTUAL anchored times (anchored_export_codec.ex:138-154 verify_transitions
+    # + chronological_end?): each transition's effective_at must be strictly greater than the previous
+    # anchor/transition time, and the end anchor's anchored_at must be >= the last transition's
+    # effective_at (>= the start anchor's anchored_at for the no-transition case — covered by
+    # _validate_key_path's chronological_end on the start anchor).
+    transition_time = expected.start_anchor.anchored_at
+    for i, t in enumerate(expected.transitions):
+        if not (t.effective_at > transition_time):
+            fail(f"verify_anchored_export transition {i}: chronology")
+        transition_time = t.effective_at
+    if not (expected.end_anchor.anchored_at >= transition_time):
+        fail("verify_anchored_export: end chronology")
     # Re-check every row (REQ1-EXPORT-complete-scan; mirrors check_chain).
     previous = expected.chain.previous_hash
     sequence = expected.chain.first_sequence
@@ -1588,10 +1680,15 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
         seq_v = row.v["sequence"]
         if not isinstance(seq_v, JInt) or seq_v.v != sequence:
             fail(f"verify_anchored_export row {i}: sequence")
+        if seq_v.v < 1:
+            fail(f"verify_anchored_export row {i}: sequence positive")
         prev_raw = _require_b64url_n(row.v.get("previous"), "previous", 32)
         if not _bytes_equal(prev_raw, previous):
             fail(f"verify_anchored_export row {i}: previous link")
-        _require_b64url_n(row.v.get("commitment"), "commitment", 32)
+        commitment_raw = _require_b64url_n(row.v.get("commitment"), "commitment", 32)
+        re_encoded = _canonical_row_bytes(expected.chain.chain_id, seq_v.v, prev_raw, commitment_raw)
+        if not _bytes_equal(re_encoded, row_bytes):
+            fail(f"verify_anchored_export row {i}: canonical")
         previous = sha256(ROW_PREFIX, row_bytes)
         sequence += 1
     if not _bytes_equal(previous, expected.chain.last_hash):
@@ -1779,3 +1876,61 @@ def _read_frame(data: bytes, cursor: int, maximum: int, ctx: str) -> tuple[bytes
     if end > len(data):
         fail(f"{ctx}: complete frame")
     return data[start:end], end
+
+
+def _validate_key_path(
+    start: ExpectedAnchor, transitions: Sequence[ExpectedKeyTransition], end: ExpectedAnchor
+) -> None:
+    """Validate the expected key-transition path (anchored_export_codec.ex:506-572
+    validate_expected_key_path). The no-transition path requires the start and end anchors to share
+    key id + fingerprint with a chronologically-non-decreasing end anchored_at. The transition path
+    requires: each transition's current key matches the running key; effective_at is strictly
+    increasing; no next fingerprint has appeared before (cycle rejection); the end anchor closes on
+    the last transition's next key with a chronologically-non-decreasing anchored_at."""
+    if len(transitions) == 0:
+        if start.key_id != end.key_id or not _bytes_equal(start.key_fingerprint, end.key_fingerprint):
+            fail("key path: start==end key")
+        if not (end.anchored_at >= start.anchored_at):
+            fail("key path: end chronological")
+        return
+    current_key_id = start.key_id
+    current_fp = start.key_fingerprint
+    previous_time = start.anchored_at
+    # seen is seeded with the start anchor's fingerprint (anchored_export_codec.ex:523).
+    seen: list[bytes] = [start.key_fingerprint]
+    for i, t in enumerate(transitions):
+        if t.current_key_id != current_key_id or not _bytes_equal(t.current_key_fingerprint, current_fp):
+            fail(f"key path: transition {i} current key")
+        # strictly_after?(effective_at, previous_time) — strictly increasing.
+        if not (t.effective_at > previous_time):
+            fail(f"key path: transition {i} chronology")
+        # No cycle: next_key_fingerprint must not be in seen.
+        if any(_bytes_equal(t.next_key_fingerprint, s) for s in seen):
+            fail(f"key path: transition {i} cycle")
+        current_key_id = t.next_key_id
+        current_fp = t.next_key_fingerprint
+        previous_time = t.effective_at
+        seen.append(t.next_key_fingerprint)
+    # The end anchor must close on the last transition's next key.
+    if end.key_id != current_key_id or not _bytes_equal(end.key_fingerprint, current_fp):
+        fail("key path: end key")
+    # chronological_end?(end.anchored_at, previous_time) — >= the last transition's effective_at.
+    if not (end.anchored_at >= previous_time):
+        fail("key path: end chronological")
+
+
+def _validate_chunks(chunks: Sequence[bytes]) -> None:
+    """Validate the chunk list BEFORE concatenation (anchored_export_codec.ex:333-342
+    validate_chunks): at least one chunk, each chunk nonempty, count < archive_chunks, running total
+    ≤ archive_bytes."""
+    if len(chunks) == 0:
+        fail("archive: no chunks")
+    if len(chunks) >= bounds_resolve(MAXIMUM_BOUNDS, "archive_chunks"):
+        fail("archive: chunk count")
+    total = 0
+    for i, c in enumerate(chunks):
+        if len(c) == 0:
+            fail(f"archive: empty chunk {i}")
+        total += len(c)
+        if total > bounds_resolve(MAXIMUM_BOUNDS, "archive_bytes"):
+            fail("archive: chunk bytes")
