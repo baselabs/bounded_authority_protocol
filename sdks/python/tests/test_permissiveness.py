@@ -635,10 +635,14 @@ def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
     # Control: the canonical row verifies.
     assert check_chain(good_chain, good_chain).is_ok
     # Defect A: a row with leading whitespace (valid JSON but NOT canonical) must reject.
+    # Recompute last_hash from the padded row's ACTUAL hash so the hash-chain check passes and ONLY
+    # the canonical re-encode check is the load-bearing gate (otherwise the hash mismatch rejects
+    # first, masking a regression to the canonical check specifically).
     padded = b" " + canonical
+    padded_last_hash = sha256(ROW_PREFIX, padded)
     padded_chain = ChainInput(
         rows=(padded,), chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1,
-        previous_hash=Z32, last_hash=last_hash,
+        previous_hash=Z32, last_hash=padded_last_hash,
     )
     assert not check_chain(padded_chain, padded_chain).is_ok, "noncanonical (whitespace) row must reject"
     # Defect B: a sequence-0 row (hand-rolled canonical bytes) must reject.
@@ -754,6 +758,11 @@ def test_verify_anchored_export_rejects_non_monotonic_rollover():
     # signed with its own effective_at, so _verify_transition_compact passes; only chronology rejects.
     non_mono = _build_archive([a, b, c], effective_ats=[1500, 1400], end_anchored_at=2000)
     assert not verify_anchored_export(ArchivedObject(chunks=(non_mono["archive"],), version="v1"), non_mono["key_chain"], non_mono["expected"]).is_ok, "non-monotonic effective_at must reject"
+    # Strict-`>` boundary: EQUAL consecutive effective_at must also reject (strictly_after? is `>`,
+    # not `>=`; anchored_export_codec.ex:722). Each compact is individually valid; only the strict
+    # chronology check rejects.
+    equal_at = _build_archive([a, b, c], effective_ats=[1500, 1500], end_anchored_at=2000)
+    assert not verify_anchored_export(ArchivedObject(chunks=(equal_at["archive"],), version="v1"), equal_at["key_chain"], equal_at["expected"]).is_ok, "equal consecutive effective_at must reject (strict >)"
 
 
 def test_verify_anchored_export_rejects_fingerprint_cycle():
