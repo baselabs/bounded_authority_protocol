@@ -44,35 +44,79 @@ _SHORT_ESCAPES: dict[int, bytes] = {
 
 def jcs_encode(value: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> bytes:
     out = bytearray()
-    _emit(value, out, bounds)
+    _emit(value, out, bounds, 0, 0)
     if len(out) > bounds_resolve(bounds, "jcs_bytes"):
         fail("jcs: jcs_bytes bound")
     return bytes(out)
 
 
-def _emit(value: Tagged, out: bytearray, bounds: Bounds) -> None:
+def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int) -> int:  # noqa: RET503
+    """Emit one tagged value as RFC 8785 bytes, enforcing every per-node resource bound DURING
+    encode (mirrors jcs.ex:27-101 encode_value). Returns the updated node count.
+
+    Per-node invariants (the reference enforces these at encode, not just on the final byte total):
+      scalars (null/bool/int/float/string): level <= depth (NOT <); int/float magnitude;
+        string byte_size <= string_bytes; one node each.
+      array: level < depth (children sit at level+1); length <= array_items; one node for the
+        container, then each child.
+      object: level < depth; length <= object_members; each key byte_size <= key_bytes; one node for
+        the container, then each child.
+      total_nodes: incremented at every node, checked <= bounds.total_nodes.
+    """
+    depth = bounds_resolve(bounds, "depth")
     if isinstance(value, JNull):
+        if level > depth:
+            fail("jcs: depth bound")
         out += b"null"
-    elif isinstance(value, JBool):
+        return _next_node(nodes, bounds)
+    if isinstance(value, JBool):
+        if level > depth:
+            fail("jcs: depth bound")
         out += b"true" if value.v else b"false"
-    elif isinstance(value, JInt):
+        return _next_node(nodes, bounds)
+    if isinstance(value, JInt):
+        mag = bounds_resolve(bounds, "integer_magnitude")
+        if level > depth or abs(value.v) > mag:
+            fail("jcs: integer bound")
         out += str_utf8(_format_int(value.v))
-    elif isinstance(value, JFloat):
+        return _next_node(nodes, bounds)
+    if isinstance(value, JFloat):
+        mag = bounds_resolve(bounds, "float_magnitude")
+        if level > depth or abs(value.v) > mag:
+            fail("jcs: float bound")
         out += str_utf8(_format_float(value.v))
-    elif isinstance(value, JString):
+        return _next_node(nodes, bounds)
+    if isinstance(value, JString):
+        # The decoder already validated UTF-8 + string_bytes; re-check here so a programmatically-
+        # built over-bound value (not from the decoder) is rejected at encode, matching jcs.ex:57-59.
+        if level > depth or len(value.v) > bounds_resolve(bounds, "string_bytes"):
+            fail("jcs: string bound")
         _escape_string(value.v, out)
-    elif isinstance(value, JArray):
+        return _next_node(nodes, bounds)
+    if isinstance(value, JArray):
+        if level >= depth or len(value.v) > bounds_resolve(bounds, "array_items"):
+            fail("jcs: array bound")
+        nodes = _next_node(nodes, bounds)
         out.append(0x5B)  # [
         first = True
         for item in value.v:
             if not first:
                 out.append(0x2C)  # ,
             first = False
-            _emit(item, out, bounds)
+            nodes = _emit(item, out, bounds, level + 1, nodes)
         out.append(0x5D)  # ]
-    elif isinstance(value, JObject):
+        return nodes
+    if isinstance(value, JObject):
+        if level >= depth or len(value.v) > bounds_resolve(bounds, "object_members"):
+            fail("jcs: object bound")
+        key_bytes = bounds_resolve(bounds, "key_bytes")
+        nodes = _next_node(nodes, bounds)
         # RFC 8785 §3.2.3: object names sorted by unsigned UTF-16 code unit sequence.
         names = sorted(value.v.keys(), key=_utf16_key)
+        for name in names:
+            name_b = str_utf8(name)
+            if len(name_b) > key_bytes:
+                fail("jcs: key_bytes bound")
         out.append(0x7B)  # {
         first = True
         for name in names:
@@ -81,10 +125,17 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds) -> None:
             first = False
             _escape_string(str_utf8(name), out)
             out.append(0x3A)  # :
-            _emit(value.v[name], out, bounds)
+            nodes = _emit(value.v[name], out, bounds, level + 1, nodes)
         out.append(0x7D)  # }
-    else:  # pragma: no cover — the algebra is closed
-        fail("jcs: unknown tag")
+        return nodes
+    fail("jcs: unknown tag")  # pragma: no cover — the algebra is closed
+
+
+def _next_node(nodes: int, bounds: Bounds) -> int:
+    nxt = nodes + 1
+    if nxt > bounds_resolve(bounds, "total_nodes"):
+        fail("jcs: total_nodes bound")
+    return nxt
 
 
 def _format_int(n: int) -> str:
