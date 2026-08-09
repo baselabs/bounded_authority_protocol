@@ -15,7 +15,7 @@ the Elixir JCS.
 
 from __future__ import annotations
 
-from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve
+from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .error import fail
 from .json_alg import (
     JArray,
@@ -26,6 +26,7 @@ from .json_alg import (
     JObject,
     JString,
     Tagged,
+    is_valid_utf8,
     str_utf8,
     utf8_str,
 )
@@ -43,9 +44,12 @@ _SHORT_ESCAPES: dict[int, bytes] = {
 
 
 def jcs_encode(value: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> bytes:
+    # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits past
+    # MAXIMA, bypassing bounds_new). Mirrors the reference's Bounds.coerce.
+    b = coerce_bounds(bounds)
     out = bytearray()
-    _emit(value, out, bounds, 0, 0)
-    if len(out) > bounds_resolve(bounds, "jcs_bytes"):
+    _emit(value, out, b, 0, 0)
+    if len(out) > bounds_resolve(b, "jcs_bytes"):
         fail("jcs: jcs_bytes bound")
     return bytes(out)
 
@@ -75,8 +79,11 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int)
         out += b"true" if value.v else b"false"
         return _next_node(nodes, bounds)
     if isinstance(value, JInt):
+        # Cross-vendor F3: the reference guard is `when is_integer(value)` (jcs.ex:38); a non-integer
+        # int-tag value (1.5) or a bool (isinstance(True, int) is True in Python) must fail closed, not
+        # canonicalize to "1.5"/"True". Python bool is an int subclass — exclude it explicitly.
         mag = bounds_resolve(bounds, "integer_magnitude")
-        if level > depth or abs(value.v) > mag:
+        if isinstance(value.v, bool) or not isinstance(value.v, int) or level > depth or abs(value.v) > mag:
             fail("jcs: integer bound")
         out += str_utf8(_format_int(value.v))
         return _next_node(nodes, bounds)
@@ -89,7 +96,10 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int)
     if isinstance(value, JString):
         # The decoder already validated UTF-8 + string_bytes; re-check here so a programmatically-
         # built over-bound value (not from the decoder) is rejected at encode, matching jcs.ex:57-59.
-        if level > depth or len(value.v) > bounds_resolve(bounds, "string_bytes"):
+        # Cross-vendor (JCS UTF-8): the reference guard `String.valid?(value)` (jcs.ex:58) rejects
+        # invalid UTF-8. A programmatically-built JString with invalid bytes would otherwise reach
+        # _escape_string -> utf8_str and raise UnicodeDecodeError past the closed-Result contract.
+        if level > depth or len(value.v) > bounds_resolve(bounds, "string_bytes") or not is_valid_utf8(value.v):
             fail("jcs: string bound")
         _escape_string(value.v, out)
         return _next_node(nodes, bounds)
@@ -248,11 +258,12 @@ def _escape_string(src_bytes: bytes, out: bytearray) -> None:
         elif cp == 0x22 or cp == 0x5C:
             out += _SHORT_ESCAPES[cp]
         elif cp == 0x7F:
-            # DEL: RFC 8785 §3.2.2.3 mandates \u007f, BUT the Elixir reference (the contract per
-            # AGENTS rule 7 — canonical bytes are the contract) emits RAW 0x7f here (jcs.ex:147 has
-            # no DEL case, so the general codepoint branch passes it through raw). Matching the
-            # reference bytes is required for identical signed inputs and request digests; the SDK
-            # MUST NOT diverge to the RFC's escaped form. Verified: Jcs.encode("x<DEL>y") -> raw 0x7f.
+            # DEL (0x7F): RFC 8785 serializes strings per ECMAScript JSON.stringify, which escapes
+            # only U+0000–U+001F plus quote (0x22) and backslash (0x5c) — so raw DEL is RFC-COMPLIANT,
+            # NOT an RFC deviation. The Elixir reference (the contract per AGENTS rule 7) emits RAW
+            # 0x7f here (jcs.ex:147 has no DEL case, so the general codepoint branch passes it through
+            # raw), and the SDK matches those bytes for identical signed inputs and request digests.
+            # Verified: Jcs.encode("x<DEL>y") -> raw 0x7f.
             out.append(0x7F)
         else:
             _append_utf8_bytes(cp, out)

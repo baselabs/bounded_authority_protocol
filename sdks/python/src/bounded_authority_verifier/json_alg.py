@@ -515,6 +515,20 @@ def utf8_str(b: bytes) -> str:
     return b.decode("utf-8")
 
 
+def is_valid_utf8(b: bytes) -> bool:
+    """Return True iff ``b`` is valid UTF-8 (no throw).
+
+    Cross-vendor (JCS UTF-8): the reference's ``String.valid?`` (jcs.ex:58) rejects invalid UTF-8 at
+    encode. ``utf8_str`` raises ``UnicodeDecodeError`` on invalid bytes, escaping the closed-Result
+    contract; this non-throwing gate lets ``jcs_encode`` fail closed instead.
+    """
+    try:
+        b.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
 def str_utf8(s: str) -> bytes:
     """Encode a str to UTF-8 bytes."""
     return s.encode("utf-8")

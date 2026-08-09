@@ -12,7 +12,7 @@ non-authorizing.
 from __future__ import annotations
 
 from .base64url import base64url_decode, base64url_encode
-from .bounds import MAXIMA, MAXIMUM_BOUNDS, Bounds, bounds_maximum, bounds_new
+from .bounds import MAXIMA, MAXIMUM_BOUNDS, Bounds, bounds_maximum, bounds_new, coerce_bounds
 from .compact import SigningInput, assemble_compact
 from .digest import REQUEST_PREFIX, typed_project
 from .ed25519 import sha256
@@ -131,7 +131,7 @@ __all__ = [
     "jwk_encode_public", "jwk_decode_public", "thumbprint", "thumbprint_raw",
     "thumbprint_preimage", "public_key_thumbprint_raw", "jwk_from_public_key",
     "OkpPublic", "uri_normalize",
-    "bounds_new", "bounds_maximum", "MAXIMUM_BOUNDS", "MAXIMA", "Bounds", "jcs_encode",
+    "bounds_new", "bounds_maximum", "coerce_bounds", "MAXIMUM_BOUNDS", "MAXIMA", "Bounds", "jcs_encode",
     "base64url_decode", "base64url_encode", "parse_selector", "selector_matches",
     "semantic_identity", "typed_project", "REQUEST_PREFIX", "ROW_PREFIX", "ARCHIVE_PREFIX",
     "sha256", "json_decode", "str_utf8", "utf8_str",
