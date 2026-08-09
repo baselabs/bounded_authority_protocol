@@ -40,8 +40,14 @@ Closures (design § Invariant conformance — Python-specific):
 
 from __future__ import annotations
 
-import pytest
+import base64
+import struct
 
+import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from bounded_authority_verifier.ed25519 import reset_census, sha256
 from bounded_authority_verifier.error import InvalidError
 from bounded_authority_verifier.json_alg import (
     JArray,
@@ -51,10 +57,34 @@ from bounded_authority_verifier.json_alg import (
     JString,
     json_decode,
 )
+from bounded_authority_verifier.jwk import public_key_thumbprint_raw
 from bounded_authority_verifier.selector import (
     parse_selector,
     selector_matches,
     semantic_identity,
+)
+from bounded_authority_verifier.v1 import (
+    ARCHIVE_PREFIX,
+    ROW_PREFIX,
+    AnchoredExportInput,
+    ArchivedObject,
+    BoundaryAnchorProducer,
+    ChainInput,
+    ConsumptionEntry,
+    ExpectedAnchor,
+    ExpectedChain,
+    ExpectedExport,
+    ExpectedKeyTransition,
+    HistoricalKeyChain,
+    HistoricalPublicKey,
+    KeyTransitionProducer,
+    assemble_compact,
+    boundary_anchor_signing_input,
+    check_chain,
+    encode_anchored_export,
+    encode_consumption_entry,
+    key_transition_signing_input,
+    verify_anchored_export,
 )
 
 dec = json_decode
@@ -388,4 +418,351 @@ def test_check_envelope_rejects_fractional_and_zero_temporal_context():
     assert not call(evaluation_time=150, clock_skew=10.5, proof_max_age=300).is_ok
     assert not call(evaluation_time=150, clock_skew=0, proof_max_age=0).is_ok
     assert not call(evaluation_time=150, clock_skew=0, proof_max_age=300).is_ok
+
+
+# === BAP-09 #2/#3/#15/#16/#17/#18 cross-vendor remediation — chain/archive verify + encode paths ===
+# Each closure was verified divergent against the RUNNING Elixir reference (the verification agents
+# confirmed precise behaviors), fixed to match the reference verdict, then proven red-capable by
+# mechanically reverting the named fix and watching the test go RED. The reference bytes are the
+# contract (AGENTS rule 7).
+#
+# The SDK is verify-only (public keys; AGENTS rule 6), so to build red-capable deny cases for the
+# archive path we mint throwaway Ed25519 keys via `cryptography`, sign anchors/transitions through the
+# SDK's own producers, assemble archives via encode_anchored_export, and then mutate one variable per
+# finding. The producer/encode tests (#16, #17) need no signatures.
+
+
+def _fresh_key() -> tuple[bytes, Ed25519PrivateKey]:
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    return pub, priv
+
+
+def _b64url(b: bytes) -> str:
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode("ascii")
+
+
+def _signed_anchor_compact(anchor: BoundaryAnchorProducer, priv: Ed25519PrivateKey) -> bytes:
+    si = boundary_anchor_signing_input(anchor)
+    assert si.is_ok, "anchor signing input failed"
+    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
+    sig = priv.sign(message)
+    return assemble_compact(si.value, sig)
+
+
+Z32 = bytes(32)
+
+
+def _build_archive(
+    keys: list[tuple[bytes, Ed25519PrivateKey]],
+    effective_ats: list[int] | None = None,
+    end_anchored_at: int | None = None,
+):
+    """A self-contained archive builder. Produces signed anchors + transitions, encodes the row via
+    encode_consumption_entry, and assembles the archive. By default effective_at increases strictly;
+    pass effective_ats to override (used by the #2 non-monotone test). The builder does NOT validate
+    the path, so a malformed path can be assembled and offered to verify_anchored_export to prove the
+    chronology/cycle gate fires."""
+    chain_id = "urn:example:chain"
+    zero_prev = Z32
+    row_entry = ConsumptionEntry(chain_id=chain_id, sequence=1, previous_hash=zero_prev, commitment=bytes([7] * 32))
+    encoded = encode_consumption_entry(row_entry)
+    assert encoded.is_ok, "row encode failed"
+    row_bytes = encoded.value.bytes_
+    last_hash = sha256(ROW_PREFIX, row_bytes)
+    start_pub, start_priv = keys[0]
+    start_compact = _signed_anchor_compact(
+        BoundaryAnchorProducer(
+            anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id=chain_id, sequence=0,
+            chain_hash=zero_prev, key_id="k0", public_key=start_pub,
+        ),
+        start_priv,
+    )
+    transitions: list[bytes] = []
+    expected_transitions: list[ExpectedKeyTransition] = []
+    for i in range(len(keys) - 1):
+        cur_pub, cur_priv = keys[i]
+        nxt_pub, _ = keys[i + 1]
+        from_fp = public_key_thumbprint_raw(cur_pub)
+        to_fp = public_key_thumbprint_raw(nxt_pub)
+        effective_at = effective_ats[i] if effective_ats is not None else 1500 + 500 * i
+        tp = KeyTransitionProducer(
+            transition_id=f"urn:example:transition:{i}", chain_id=chain_id, effective_at=effective_at,
+            current_key_id=f"k{i}", current_public_key=cur_pub,
+            next_key_id=f"k{i + 1}", next_public_key=nxt_pub,
+        )
+        si = key_transition_signing_input(tp)
+        assert si.is_ok, "transition signing input failed"
+        message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
+        sig = cur_priv.sign(message)
+        transitions.append(assemble_compact(si.value, sig))
+        expected_transitions.append(ExpectedKeyTransition(
+            transition_id=f"urn:example:transition:{i}", chain_id=chain_id, effective_at=effective_at,
+            current_key_id=f"k{i}", current_key_fingerprint=from_fp,
+            next_key_id=f"k{i + 1}", next_key_fingerprint=to_fp,
+        ))
+    end_pub, end_priv = keys[-1]
+    last_effective_at = expected_transitions[-1].effective_at if expected_transitions else 1000
+    end_at = end_anchored_at if end_anchored_at is not None else max(last_effective_at + 1, 1000 + 500 * len(keys))
+    end_compact = _signed_anchor_compact(
+        BoundaryAnchorProducer(
+            anchor_id="urn:example:anchor:end", anchored_at=end_at, chain_id=chain_id, sequence=1,
+            chain_hash=last_hash, key_id=f"k{len(keys) - 1}", public_key=end_pub,
+        ),
+        end_priv,
+    )
+    chain = ExpectedChain(
+        chain_id=chain_id, first_sequence=1, last_sequence=1, row_count=1,
+        previous_hash=zero_prev, last_hash=last_hash,
+    )
+    input_ = AnchoredExportInput(
+        rows=(row_bytes,), start_anchor=start_compact, end_anchor=end_compact,
+        transitions=tuple(transitions), chain_id=chain_id, first_sequence=1, last_sequence=1, row_count=1,
+        previous_hash=zero_prev, last_hash=last_hash,
+    )
+    start_anchor = ExpectedAnchor(
+        anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id=chain_id, sequence=0,
+        chain_hash=zero_prev, key_id="k0", key_fingerprint=public_key_thumbprint_raw(start_pub),
+    )
+    end_anchor = ExpectedAnchor(
+        anchor_id="urn:example:anchor:end", anchored_at=end_at, chain_id=chain_id, sequence=1,
+        chain_hash=last_hash, key_id=f"k{len(keys) - 1}", key_fingerprint=public_key_thumbprint_raw(end_pub),
+    )
+    # encode_anchored_export validates inputs (incl. the key path) — for the malformed-path archives
+    # (#2 non-monotone / cycle), bypass encode-time validation by hand-assembling the frames.
+    if effective_ats is None:
+        enc = encode_anchored_export(input_, ExpectedExport(
+            chain=chain, digest=bytes(32), start_anchor=start_anchor, end_anchor=end_anchor,
+            transitions=tuple(expected_transitions), object_version="v1",
+        ))
+        assert enc.is_ok, "archive encode failed"
+        archive = enc.value.archive
+        digest = enc.value.digest
+    else:
+        archive = _hand_frame_archive(input_)
+        digest = sha256(archive)
+    expected = ExpectedExport(
+        chain=chain, digest=digest, start_anchor=start_anchor, end_anchor=end_anchor,
+        transitions=tuple(expected_transitions), object_version="v1",
+    )
+    key_chain = HistoricalKeyChain(
+        keys=tuple(HistoricalPublicKey(key_id=f"k{i}", public_key=pub, valid_from=0, valid_before=None) for i, (pub, _) in enumerate(keys))
+    )
+    return {
+        "archive": archive, "digest": digest, "expected": expected, "key_chain": key_chain,
+        "input": input_, "chain": chain, "start_anchor": start_anchor, "end_anchor": end_anchor,
+        "expected_transitions": expected_transitions,
+    }
+
+
+def _hand_frame_archive(input_: AnchoredExportInput) -> bytes:
+    """Hand-assemble the archive byte stream (mirrors encode_anchored_export's framing) WITHOUT the
+    encode-time key-path validation — used to build malformed-path archives for the #2 tests."""
+    from bounded_authority_verifier.jcs import jcs_encode
+
+    members = {
+        "chain_id": JString(v=input_.chain_id.encode("utf-8")),
+        "first_sequence": JInt(v=input_.first_sequence),
+        "last_hash": JString(v=_b64url(input_.last_hash).encode("ascii")),
+        "last_sequence": JInt(v=input_.last_sequence),
+        "previous_hash": JString(v=_b64url(input_.previous_hash).encode("ascii")),
+        "row_count": JInt(v=input_.row_count),
+        "transition_count": JInt(v=len(input_.transitions)),
+        "v": JInt(v=1),
+    }
+    header_bytes = jcs_encode(JObject(v=members))
+
+    def frame(b: bytes) -> bytes:
+        return struct.pack(">I", len(b)) + b
+
+    parts = [ARCHIVE_PREFIX, frame(header_bytes), frame(input_.start_anchor)]
+    parts.extend(frame(t) for t in input_.transitions)
+    parts.extend(frame(r) for r in input_.rows)
+    parts.append(frame(input_.end_anchor))
+    return b"".join(parts)
+
+
+def test_encode_consumption_entry_rejects_genesis_row_with_nonzero_previous_hash():
+    """Cross-vendor #16: encode_consumption_entry MUST reject a sequence-1 row whose previous_hash is
+    not the all-zero hash (consumption_chain.ex:123 validate_entry genesis invariant). Defect: revert
+    the genesis check → Ok."""
+    nonzero = bytes([9] * 32)
+    r = encode_consumption_entry(ConsumptionEntry(
+        chain_id="urn:example:chain", sequence=1, previous_hash=nonzero, commitment=bytes(32),
+    ))
+    assert not r.is_ok, "sequence-1 with non-zero previous_hash must reject"
+    ok = encode_consumption_entry(ConsumptionEntry(
+        chain_id="urn:example:chain", sequence=1, previous_hash=Z32, commitment=bytes(32),
+    ))
+    assert ok.is_ok
+
+
+def test_boundary_anchor_signing_input_rejects_genesis_anchor_with_nonzero_chain_hash():
+    """Cross-vendor #16: boundary_anchor_signing_input MUST reject a sequence-0 (genesis) anchor whose
+    chain_hash is not the all-zero hash (boundary_anchor_codec.ex:185-189 valid_anchor_binding?).
+    Defect: revert the genesis check → Ok."""
+    pub, _ = _fresh_key()
+    nonzero = bytes([9] * 32)
+    r = boundary_anchor_signing_input(BoundaryAnchorProducer(
+        anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain",
+        sequence=0, chain_hash=nonzero, key_id="k0", public_key=pub,
+    ))
+    assert not r.is_ok, "sequence-0 with non-zero chain_hash must reject"
+    ok = boundary_anchor_signing_input(BoundaryAnchorProducer(
+        anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain",
+        sequence=0, chain_hash=Z32, key_id="k0", public_key=pub,
+    ))
+    assert ok.is_ok
+
+
+def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
+    """Cross-vendor #15: check_chain MUST re-encode each row canonically and require byte-equality
+    (consumption_chain.ex:96 parse_row), and reject sequence 0 (consumption_chain.ex:163 value > 0).
+    Defect A: revert the canonical check → a whitespace-padded row passes. Defect B: revert the
+    sequence-positive check → a sequence-0 row passes."""
+    from bounded_authority_verifier.jcs import jcs_encode
+
+    enc = encode_consumption_entry(ConsumptionEntry(
+        chain_id="urn:example:chain", sequence=1, previous_hash=Z32, commitment=bytes([7] * 32),
+    ))
+    assert enc.is_ok
+    canonical = enc.value.bytes_
+    last_hash = enc.value.hash_
+    good_chain = ChainInput(
+        rows=(canonical,), chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1,
+        previous_hash=Z32, last_hash=last_hash,
+    )
+    # Control: the canonical row verifies.
+    assert check_chain(good_chain, good_chain).is_ok
+    # Defect A: a row with leading whitespace (valid JSON but NOT canonical) must reject.
+    padded = b" " + canonical
+    padded_chain = ChainInput(
+        rows=(padded,), chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1,
+        previous_hash=Z32, last_hash=last_hash,
+    )
+    assert not check_chain(padded_chain, padded_chain).is_ok, "noncanonical (whitespace) row must reject"
+    # Defect B: a sequence-0 row (hand-rolled canonical bytes) must reject.
+    seq_zero = jcs_encode(JObject(v={
+        "chain_id": JString(v=b"urn:example:chain"),
+        "commitment": JString(v=_b64url(bytes([7] * 32)).encode("ascii")),
+        "previous": JString(v=_b64url(Z32).encode("ascii")),
+        "sequence": JInt(v=0),
+        "v": JInt(v=1),
+    }))
+    seq_zero_chain = ChainInput(
+        rows=(seq_zero,), chain_id="urn:example:chain", first_sequence=0, last_sequence=0, row_count=1,
+        previous_hash=Z32, last_hash=sha256(ROW_PREFIX, seq_zero),
+    )
+    assert not check_chain(seq_zero_chain, seq_zero_chain).is_ok, "sequence-0 row must reject"
+
+
+def test_encode_anchored_export_rejects_transition_count_over_bound():
+    """Cross-vendor #17: encode_anchored_export MUST validate inputs before framing — at minimum the
+    transition count <= key_transitions bound (256). The SDK previously accepted 257 transitions.
+    Defect: revert the bound check → encode returns Ok."""
+    pub, priv = _fresh_key()
+    row_entry = ConsumptionEntry(chain_id="urn:example:chain", sequence=1, previous_hash=Z32, commitment=bytes(32))
+    encoded = encode_consumption_entry(row_entry)
+    assert encoded.is_ok
+    row_bytes = encoded.value.bytes_
+    last_hash = encoded.value.hash_
+    start_compact = _signed_anchor_compact(BoundaryAnchorProducer(
+        anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain",
+        sequence=0, chain_hash=Z32, key_id="k0", public_key=pub,
+    ), priv)
+    end_compact = _signed_anchor_compact(BoundaryAnchorProducer(
+        anchor_id="urn:example:anchor:end", anchored_at=2000, chain_id="urn:example:chain",
+        sequence=1, chain_hash=last_hash, key_id="k0", public_key=pub,
+    ), priv)
+    fp = public_key_thumbprint_raw(pub)
+    chain = ExpectedChain(chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1, previous_hash=Z32, last_hash=last_hash)
+    r = encode_anchored_export(
+        AnchoredExportInput(
+            rows=(row_bytes,), start_anchor=start_compact, end_anchor=end_compact,
+            transitions=tuple(b"x" for _ in range(257)), chain_id="urn:example:chain",
+            first_sequence=1, last_sequence=1, row_count=1, previous_hash=Z32, last_hash=last_hash,
+        ),
+        ExpectedExport(
+            chain=chain, digest=bytes(32),
+            start_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain", sequence=0, chain_hash=Z32, key_id="k0", key_fingerprint=fp),
+            end_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:end", anchored_at=2000, chain_id="urn:example:chain", sequence=1, chain_hash=last_hash, key_id="k0", key_fingerprint=fp),
+            transitions=(), object_version="v1",
+        ),
+    )
+    assert not r.is_ok, "257 transitions must reject (over the key_transitions=256 bound)"
+
+
+def test_encode_anchored_export_rejects_misbound_start_anchor():
+    """Cross-vendor #17 (anchor binding): encode_anchored_export MUST reject when the start anchor's
+    sequence != chain.first_sequence - 1 (anchored_export_codec.ex:364). Defect: revert the binding
+    check → encode returns Ok with a mis-bound anchor."""
+    pub, priv = _fresh_key()
+    built = _build_archive([(pub, priv)])
+    bad_expected = ExpectedExport(
+        chain=built["chain"], digest=built["digest"],
+        start_anchor=ExpectedAnchor(**{**built["start_anchor"].__dict__, "sequence": 5}),
+        end_anchor=built["end_anchor"], transitions=built["expected"].transitions, object_version="v1",
+    )
+    r = encode_anchored_export(built["input"], bad_expected)
+    assert not r.is_ok, "start anchor sequence != first_sequence-1 must reject"
+
+
+def test_verify_anchored_export_accepts_valid_one_key_zero_transition_archive():
+    """Cross-vendor #3: a valid 1-key / 0-transition archive MUST verify
+    (anchored_export_codec.ex:94-99 validate_historical_key_shapes accepts keys == transitions+1 with
+    NO minimum). The SDK previously gated on keys.length < 2 and falsely rejected it. Defect: revert
+    to the `< 2` gate → this valid archive returns Err."""
+    reset_census()
+    built = _build_archive([_fresh_key()])
+    r = verify_anchored_export(
+        ArchivedObject(chunks=(built["archive"],), version="v1"),
+        built["key_chain"], built["expected"],
+    )
+    assert r.is_ok, "a valid 1-key/0-transition archive must verify"
+    assert r.value.transition_count == 0
+
+
+def test_verify_anchored_export_rejects_bad_chunk_lists():
+    """Cross-vendor #18: verify_anchored_export MUST validate the chunk list BEFORE concatenation
+    (anchored_export_codec.ex:333-342 validate_chunks): reject empty chunks, reject chunk count >=
+    archive_chunks, reject total > archive_bytes. Defect: revert _validate_chunks → these pass."""
+    reset_census()
+    built = _build_archive([_fresh_key()])
+    # Empty chunk in the list.
+    with_empty = ArchivedObject(chunks=(built["archive"], b""), version="v1")
+    assert not verify_anchored_export(with_empty, built["key_chain"], built["expected"]).is_ok, "empty chunk must reject"
+    # Too many chunks (>= archive_chunks bound 65796).
+    too_many = ArchivedObject(chunks=tuple(b"\x01" for _ in range(65796)), version="v1")
+    assert not verify_anchored_export(too_many, built["key_chain"], built["expected"]).is_ok, "chunk count over bound must reject"
+    # Control: a single-chunk split of the valid archive still verifies.
+    assert verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], built["expected"]).is_ok
+
+
+def test_verify_anchored_export_rejects_non_monotonic_rollover():
+    """Cross-vendor #2: verify_anchored_export MUST enforce rollover chronology (effective_at strictly
+    increasing) and reject fingerprint cycles (anchored_export_codec.ex:516-572). The signed
+    transitions are built with the actual non-monotonic effective_at sequence (each compact
+    individually valid), so the chronology check is the load-bearing gate. Defect: revert
+    _validate_key_path + the chronology loop → this archive wrongly verifies."""
+    reset_census()
+    a = _fresh_key()
+    b = _fresh_key()
+    c = _fresh_key()
+    valid = _build_archive([a, b, c])
+    assert verify_anchored_export(ArchivedObject(chunks=(valid["archive"],), version="v1"), valid["key_chain"], valid["expected"]).is_ok, "control: valid 3-key archive verifies"
+    # transition[1].effective_at (1400) < transition[0].effective_at (1500): each compact is validly
+    # signed with its own effective_at, so _verify_transition_compact passes; only chronology rejects.
+    non_mono = _build_archive([a, b, c], effective_ats=[1500, 1400], end_anchored_at=2000)
+    assert not verify_anchored_export(ArchivedObject(chunks=(non_mono["archive"],), version="v1"), non_mono["key_chain"], non_mono["expected"]).is_ok, "non-monotonic effective_at must reject"
+
+
+def test_verify_anchored_export_rejects_fingerprint_cycle():
+    """Cross-vendor #2 (cycle): a key-path where a fingerprint repeats (A→B→A) must reject. Built with
+    a REAL repeated key (positions 0 and 2 reuse key A) so each transition (A→B, B→A) is individually
+    valid, and the cycle check is the load-bearing gate. Defect: revert _validate_key_path → verifies."""
+    reset_census()
+    a = _fresh_key()
+    b = _fresh_key()
+    cyclic = _build_archive([a, b, a], effective_ats=[1500, 2000], end_anchored_at=3000)
+    assert not verify_anchored_export(ArchivedObject(chunks=(cyclic["archive"],), version="v1"), cyclic["key_chain"], cyclic["expected"]).is_ok, "fingerprint cycle A→B→A must reject"
 
