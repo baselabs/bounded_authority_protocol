@@ -526,7 +526,7 @@ def _validate_grant_payload(p: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
         if not (1 <= len(sels.v) <= bounds_resolve(bounds, "selectors")):
             fail("grant: selectors count")
         for s in sels.v:
-            parse_selector(s)
+            parse_selector(s, bounds)
 
 
 def _extract_audience(v: Tagged | None, bounds: Bounds = MAXIMUM_BOUNDS) -> list[str]:
@@ -952,7 +952,7 @@ def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: E
     if sels_v is None or not isinstance(sels_v, JArray):
         fail("check_envelope: selectors")
     for s in sels_v.v:
-        sel = parse_selector(s)
+        sel = parse_selector(s, b)
         if not selector_matches(sel, expected.cast_arguments):
             fail("check_envelope: selector")
     from .facts import EnvelopeFacts

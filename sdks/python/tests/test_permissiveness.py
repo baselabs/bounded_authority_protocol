@@ -867,6 +867,32 @@ def test_decode_grant_honors_caller_bounds():
     assert not decode_grant(g["compact"], bounds_new({"kid_bytes": 5})).is_ok, "kid_bytes=5 must reject a 13-byte kid"
 
 
+def test_decode_grant_threads_caller_bounds_into_selector_decode():
+    """#10 delta-review F1: decode_grant MUST thread caller bounds into parse_selector (the reference's
+    selector/2 enforces one_of_values, path_segments, selector value node bounds). A grant with a
+    one_of selector of 2 values is accepted at MAX, rejected under one_of_values=1. Defect: revert
+    the parse_selector(s) call to default bounds → the tightened call returns Ok."""
+    issuer_pub, issuer_priv = _fresh_key()
+    holder_pub, _ = _fresh_key()
+    holder_fp = public_key_thumbprint_raw(holder_pub)
+    grant = GrantProducer(
+        key_id="k1", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        holder_thumbprint=_b64url(holder_fp),
+        operations=(OperationInput(name="read", selectors=(
+            {"kind": "one_of", "path": ("x",), "values": (JInt(v=1), JInt(v=2))},
+        ),),),
+    )
+    si = grant_signing_input(grant)
+    assert si.is_ok, "grant signing input failed"
+    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
+    compact = assemble_compact(si.value, issuer_priv.sign(message))
+    # Control: at MAX, a one_of with 2 values is accepted.
+    assert decode_grant(compact).is_ok, "one_of with 2 values must be accepted at MAX"
+    # Tightened: one_of_values=1 → the 2-value selector must be rejected (parse_selector threads bounds).
+    assert not decode_grant(compact, bounds_new({"one_of_values": 1})).is_ok, "one_of_values=1 must reject a 2-value selector"
+
+
 def test_verify_grant_honors_caller_bounds():
     """#10/#11: verify_grant MUST thread ExpectedGrant.bounds into _require_kid (valid_key_id?). The
     grant is validly signed, so the only load-bearing gate under the tightening is the kid bound.
