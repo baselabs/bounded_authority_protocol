@@ -139,7 +139,7 @@ In addition to the Elixir package, the repository ships typed **verifier** SDK r
 the frozen v1 profile, authored from the spec + corpus alone with no code-level derivation from the
 Elixir reference ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)):
 
-- **TypeScript** — `sdks/typescript/` ([`@bounded-authority/verifier`][ts-pkg] on npm; Node `>= 20`,
+- **TypeScript** — `sdks/typescript/` ([`@bounded-authority/verifier`][ts-pkg] on npm; Node `>= 22`,
   zero runtime dependencies; Ed25519 via `node:crypto`).
 - **Python** — `sdks/python/` ([`bounded-authority-verifier`][py-pkg] on PyPI; Python `>= 3.10`,
   single runtime dependency `cryptography`).

@@ -31,8 +31,17 @@ concurrency:
 
 jobs:
   sdks-conformance:
-    name: Cross-language SDK conformance
+    name: Cross-language SDK conformance (Node ${{ matrix.node }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      # The SDK targets Node >= 22 (the active LTS line; Node 20 reached end-of-life 2026-04).
+      # Verify against both the active LTS (22) and the current release line (24) so a runtime
+      # regression on either is caught. The Python steps re-run per Node version — they do not
+      # depend on Node (<1s of waste) and keeping a single self-contained job is clearer than a
+      # two-job split for this surface size.
+      matrix:
+        node: ["22", "24"]
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -40,7 +49,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: "20"
+          node-version: ${{ matrix.node }}
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
