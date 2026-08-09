@@ -12,7 +12,7 @@ from __future__ import annotations
 from .base64url import base64url_encode
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve
 from .ed25519 import sha256
-from .error import fail, invalid_error
+from .error import InvalidError, Ok, Result, err, fail, invalid_error
 from .jcs import jcs_encode
 from .json_alg import JArray, JBool, JFloat, JInt, JNull, JObject, JString, Tagged, str_utf8
 
@@ -114,7 +114,13 @@ def _count_tagged_nodes(v: Tagged) -> int:
     return 1
 
 
-def request_digest_b64url(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> str:
-    """base64url-encoded form (for comparison against proof.ba_req which is base64url)."""
-    raw = request_digest(operation, cast_arguments, bounds)
-    return base64url_encode(raw).decode("ascii")
+def request_digest_b64url(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[str]:
+    """base64url-encoded form (for comparison against proof.ba_req which is base64url).
+
+    Returns Ok<str> | Err (cross-vendor #21 + the bounds-ignored note: bounds threaded into the digest).
+    """
+    try:
+        raw = request_digest(operation, cast_arguments, bounds)
+        return Ok(base64url_encode(raw).decode("ascii"))
+    except InvalidError:
+        return err()

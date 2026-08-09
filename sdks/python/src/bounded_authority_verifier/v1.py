@@ -971,9 +971,10 @@ def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: E
     )
 
 
-# 6. request_digest (the façade; returns the raw 32-byte digest).
-def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds | None = None) -> bytes:
-    return compute_request_digest(operation, cast_arguments, bounds if bounds is not None else MAXIMUM_BOUNDS)
+# 6. request_digest (the façade; returns Ok<raw 32-byte digest> | Err — cross-vendor #21: mirror
+# the Elixir {:ok, binary} | {:error, :invalid} and the other 15 façade functions).
+def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds | None = None) -> Result[bytes]:
+    return _trying(lambda: compute_request_digest(operation, cast_arguments, bounds if bounds is not None else MAXIMUM_BOUNDS))
 
 
 # 7. encode_consumption_entry (ADR 0004 § Consumption rows). Returns canonical row bytes + hash.

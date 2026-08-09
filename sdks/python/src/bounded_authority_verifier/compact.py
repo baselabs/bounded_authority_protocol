@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve
-from .error import fail, require
+from .error import InvalidError, Ok, Result, err, fail, require
 
 _DOT = 0x2E
 
@@ -72,19 +72,24 @@ class SigningInput:
 _KINDS = ("grant", "proof", "boundary_anchor", "key_transition")
 
 
-def assemble_compact(signing_input: SigningInput, signature: bytes) -> bytes:
-    """``assemble_compact``: SigningInput + 64-byte signature → compact.
+def assemble_compact(signing_input: SigningInput, signature: bytes) -> Result[bytes]:
+    """``assemble_compact``: SigningInput + 64-byte signature → Ok<compact> | Err.
 
-    REQ1-VERIFY-no-signer-callback: takes a signature, never a key.
+    REQ1-VERIFY-no-signer-callback: takes a signature, never a key. Cross-vendor #21: returns
+    Result, mirroring the Elixir ``{:ok, binary} | {:error, :invalid}`` and the other 15 façade
+    functions.
     """
-    if signing_input.kind not in _KINDS:
-        fail("assemble_compact: kind closed set")
-    require(len(signature) == 64, "assemble_compact: signature width 64")
-    sig_b64 = base64url_encode(signature)
-    return (
-        signing_input.protected_segment
-        + bytes([_DOT])
-        + signing_input.payload_segment
-        + bytes([_DOT])
-        + sig_b64
-    )
+    try:
+        if signing_input.kind not in _KINDS:
+            fail("assemble_compact: kind closed set")
+        require(len(signature) == 64, "assemble_compact: signature width 64")
+        sig_b64 = base64url_encode(signature)
+        return Ok(
+            signing_input.protected_segment
+            + bytes([_DOT])
+            + signing_input.payload_segment
+            + bytes([_DOT])
+            + sig_b64
+        )
+    except InvalidError:
+        return err()
