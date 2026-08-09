@@ -93,9 +93,13 @@ are not protocol compatibility targets.
 
 ```text
 bounded_authority          -> bounded_authority_protocol
-retired_private_consumer               -> beamline + bounded_authority + ash + ash_ai
+private_consumer                -> bounded_authority + application transport libraries
 bounded_authority_protocol -> no private or product package
 ```
+
+`private_consumer` is the product consumer (`retired_private_consumer` is deprecated). It routes an operational
+decision through the private runtime, not a direct public-verifier result — see
+[consumer-seams-application-report-path.md](docs/design/consumer-seams-application-report-path.md).
 
 See the [normative v1 profile](docs/protocol-v1.md),
 [protocol charter](docs/design/protocol-charter.md), [threat model](docs/design/threat-model.md),
