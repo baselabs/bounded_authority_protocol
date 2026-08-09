@@ -1091,8 +1091,9 @@ def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
     from .facts import ChainFacts
 
     return ChainFacts(
-        chain_id=chain.chain_id, first_sequence=chain.first_sequence,
+        version=VERSION, chain_id=chain.chain_id, first_sequence=chain.first_sequence,
         last_sequence=chain.last_sequence, row_count=chain.row_count,
+        previous_hash=chain.previous_hash, last_hash=previous,
     )
 
 
@@ -1559,8 +1560,8 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
     from .facts import AnchorFacts
 
     return AnchorFacts(
-        anchor_id=anchor_id, anchored_at=anchored_at, chain_id=chain_id, sequence=sequence,
-        chain_hash=chain_hash, key_id=expected.key_id, key_fingerprint=key_fp_raw,
+        version=VERSION, anchor_id=anchor_id, anchored_at=anchored_at, chain_id=chain_id,
+        sequence=sequence, chain_hash=chain_hash, key_fingerprint=key_fp_raw,
     )
 
 
@@ -1621,9 +1622,8 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
     from .facts import KeyTransitionFacts
 
     return KeyTransitionFacts(
-        transition_id=transition_id, chain_id=chain_id, effective_at=effective_at,
-        from_key_id=expected.current_key_id, from_key_fingerprint=from_fp_raw,
-        to_key_id=expected.next_key_id, to_key_fingerprint=to_fp_raw,
+        version=VERSION, transition_id=transition_id, chain_id=chain_id, effective_at=effective_at,
+        current_key_fingerprint=from_fp_raw, next_key_fingerprint=to_fp_raw,
     )
 
 
@@ -1731,10 +1731,15 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     from .facts import AnchoredExportFacts
 
     return AnchoredExportFacts(
-        object_version=archived.version, chain_id=expected.chain.chain_id,
+        version=VERSION, object_version=archived.version, chain_id=expected.chain.chain_id,
         first_sequence=expected.chain.first_sequence, last_sequence=expected.chain.last_sequence,
-        row_count=expected.chain.row_count, transition_count=len(expected.transitions),
-        digest=digest,
+        row_count=expected.chain.row_count, previous_hash=expected.chain.previous_hash,
+        last_hash=previous, digest=digest,
+        start_anchor_id=expected.start_anchor.anchor_id, start_anchored_at=expected.start_anchor.anchored_at,
+        start_key_fingerprint=expected.start_anchor.key_fingerprint,
+        end_anchor_id=expected.end_anchor.anchor_id, end_anchored_at=expected.end_anchor.anchored_at,
+        end_key_fingerprint=expected.end_anchor.key_fingerprint,
+        transition_count=len(expected.transitions),
     )
 
 

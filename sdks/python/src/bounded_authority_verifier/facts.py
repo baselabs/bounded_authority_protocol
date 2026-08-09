@@ -57,54 +57,83 @@ class EnvelopeFacts:
 
 @dataclass(frozen=True)
 class ChainFacts:
-    """ChainFacts (ADR 0004:84-87; REQ1-CHAIN-facts-shape): value-bearing, trust=not_evaluated."""
+    """ChainFacts (ADR 0004:84-87; REQ1-CHAIN-facts-shape): value-bearing, trust=not_evaluated.
 
+    Field set mirrors the Elixir reference ChainFacts (chain_facts.ex) exactly.
+    """
+
+    version: int
     chain_id: str
     first_sequence: int
     last_sequence: int
     row_count: int
+    previous_hash: bytes
+    last_hash: bytes
+    verification: str = "boundary_consistent"
     trust: str = "not_evaluated"
 
 
 @dataclass(frozen=True)
 class AnchorFacts:
-    """AnchorFacts (protocol-v1.md § Historical anchor verify): trust=not_evaluated."""
+    """AnchorFacts (protocol-v1.md § Historical anchor verify): trust=not_evaluated.
 
+    Field set mirrors the Elixir reference AnchorFacts (anchor_facts.ex) exactly. The reference
+    carries NO key_id (only the key_fingerprint).
+    """
+
+    version: int
     anchor_id: str
     anchored_at: int
     chain_id: str
     sequence: int
     chain_hash: bytes
-    key_id: str
     key_fingerprint: bytes
+    verification: str = "signature_and_window"
     trust: str = "not_evaluated"
 
 
 @dataclass(frozen=True)
 class KeyTransitionFacts:
-    """KeyTransitionFacts (ADR 0004:44-55): trust=not_evaluated."""
+    """KeyTransitionFacts (ADR 0004:44-55): trust=not_evaluated.
 
+    Field set mirrors the Elixir reference KeyTransitionFacts (key_transition_facts.ex) exactly. The
+    reference carries fingerprints only (current_/next_key_fingerprint), no key ids.
+    """
+
+    version: int
     transition_id: str
     chain_id: str
     effective_at: int
-    from_key_id: str
-    from_key_fingerprint: bytes
-    to_key_id: str
-    to_key_fingerprint: bytes
+    current_key_fingerprint: bytes
+    next_key_fingerprint: bytes
+    verification: str = "authenticated_transition"
     trust: str = "not_evaluated"
 
 
 @dataclass(frozen=True)
 class AnchoredExportFacts:
-    """AnchoredExportFacts (protocol-v1.md:437-440): the ONLY facts type with an authorization field."""
+    """AnchoredExportFacts (protocol-v1.md:437-440): the ONLY facts type with an authorization field.
 
-    object_version: str
+    Field set mirrors the Elixir reference AnchoredExportFacts (anchored_export_facts.ex) exactly.
+    """
+
+    version: int
     chain_id: str
     first_sequence: int
     last_sequence: int
     row_count: int
-    transition_count: int
+    previous_hash: bytes
+    last_hash: bytes
     digest: bytes
+    start_anchor_id: str
+    start_anchored_at: int
+    start_key_fingerprint: bytes
+    end_anchor_id: str
+    end_anchored_at: int
+    end_key_fingerprint: bytes
+    transition_count: int
+    object_version: str
+    verification: str = "anchored_export"
     trust: str = "not_evaluated"
     authorization: str = "not_evaluated"
 
