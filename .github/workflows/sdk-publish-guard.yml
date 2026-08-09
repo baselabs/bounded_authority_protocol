@@ -1,0 +1,70 @@
+name: SDK publish guard
+
+# Non-bypassable backstop for ADR 0015 Decision 5: no SDK publishes from the
+# monorepo. The local hook (scripts/hooks/pre-commit) gives fast contributor
+# feedback; this CI job is the hard gate on main and on pull requests. Both use
+# the SAME pattern source — scripts/check_sdk_publish_infra.sh — so the two
+# cannot drift apart. That script is the authority on which strings are blocked;
+# this file intentionally does NOT repeat them (an earlier draft listed them in
+# this comment and the checker then matched its own comment text).
+#
+# This workflow IS a scanned surface (it lives under .github/workflows/), but it
+# invokes the checker by path and runs no publish command in any step, so it
+# does not self-match.
+#
+# Honesty limit: this catches publish infrastructure COMMITTED. It cannot catch a
+# literal ad-hoc publish run against a working tree. This is the non-bypassable
+# layer for committed infrastructure.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-publish-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: No SDK publish infrastructure in monorepo
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run SDK publish guard over workflows and SDK manifests
+        env:
+          CHECKER: scripts/check_sdk_publish_infra.sh
+        run: |
+          set -eu
+          fail=0
+          # Build the file list once, into a temp, then read from it. (A here-doc
+          # carrying a $(find ...) command substitution triggers shellcheck SC2094
+          # and is needlessly subtle; a temp file is unambiguous.)
+          tmp="$(mktemp)"
+          {
+            find .github/workflows -type f \( -name '*.yml' -o -name '*.yaml' \)
+            find sdks -type f \( -name 'package.json' -o -name 'pyproject.toml' -o -name 'setup.py' -o -name 'setup.cfg' \)
+          } | sort -u > "$tmp"
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            # cat-into-pipe (not `< "$path"`): the latter reads and "writes" the
+            # same path in one line and trips shellcheck SC2094 (a CI hard-fail).
+            if ! cat "$path" | "./$CHECKER" "$path"; then
+              fail=1
+            fi
+          done < "$tmp"
+          rm -f "$tmp"
+          if [ "$fail" -ne 0 ]; then
+            echo
+            echo "SDK publish infrastructure is committed to the monorepo, which ADR 0015 forbids." >&2
+            echo "SDKs graduate to per-SDK repos on first publication; see docs/adr/0015-sdk-graduation-and-publish-topology.md." >&2
+            exit 1
+          fi
+          echo "No SDK publish infrastructure found."
