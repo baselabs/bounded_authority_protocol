@@ -666,10 +666,38 @@ def untrusted_key_locator(compact: bytes, bounds: Bounds | None = None) -> Resul
 
 
 def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLocator:
-    seg = parse_compact(compact, bounds if bounds is not None else MAXIMUM_BOUNDS)
-    kid = _parse_grant_header(seg)
+    # Cross-vendor #13: the reference (v1.ex:21-34) decodes ONLY the protected segment — payload and
+    # signature are NOT decoded, interpreted, or independently size-checked. parse_compact decodes
+    # all three, so a compact with a valid protected grant header but non-canonical payload/signature
+    # bytes was wrongly rejected. Mirror the reference: split into exactly 3 segments, decode protected
+    # only, validate the grant header + kid. (An invalid payload/signature does not affect the kid.)
+    b = bounds if bounds is not None else MAXIMUM_BOUNDS
     from .facts import KeyLocator
 
+    if len(compact) > bounds_resolve(b, "compact_bytes"):
+        fail("key_locator: compact bound")
+    # Exactly 3 segments on '.' (a 2- or 4-segment input fails the closed shape).
+    parts = compact.split(b".")
+    if len(parts) != 3:
+        fail("key_locator: three segments")
+    protected_text = parts[0]
+    if len(protected_text) == 0 or len(parts[1]) == 0 or len(parts[2]) == 0:
+        fail("key_locator: empty segment")
+    if len(protected_text) > bounds_resolve(b, "encoded_segment_bytes"):
+        fail("key_locator: protected bound")
+    protected_bytes = base64url_decode(protected_text, bounds_resolve(b, "decoded_segment_bytes"))
+    h = json_decode(protected_bytes)
+    h = _require_object_exact(h, ["alg", "typ", "kid"], "grant header")
+    _require_string_lit(h, "alg", ALG, "grant header alg")
+    _require_string_lit(h, "typ", GRANT_TYP, "grant header typ")
+    kid_v = h.v.get("kid")
+    if not isinstance(kid_v, JString):
+        fail("header: kid string")
+    if not (1 <= len(kid_v.v) <= bounds_resolve(b, "kid_bytes")):
+        fail("header: kid bytes")
+    kid = utf8_str(kid_v.v)
+    if _KID_CHARSET.match(kid) is None:
+        fail("header: kid charset")
     return KeyLocator(key_id=kid)
 
 
@@ -728,8 +756,14 @@ def verify_grant(compact: bytes, trusted: TrustedIssuer, expected: ExpectedGrant
 
 
 def _verify_grant_body(compact: bytes, trusted: TrustedIssuer, expected: ExpectedGrant) -> GrantFacts:
+    if trusted is None:
+        fail("verify_grant: trusted issuer required")
     require(len(trusted.public_key) == 32, "verify_grant: issuer key width")
-    if expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(MAXIMUM_BOUNDS, "clock_skew"):
+    # Cross-vendor #19: the reference requires is_integer(evaluation_time) and is_integer(clock_skew)
+    # (>= 0) — runtime.ex:522-523. Range-only `< 0` checks accept fractional times.
+    if not isinstance(expected.evaluation_time, int):
+        fail("verify_grant: integer evaluation time")
+    if not isinstance(expected.clock_skew, int) or expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(MAXIMUM_BOUNDS, "clock_skew"):
         fail("verify_grant: skew")
     seg = parse_compact(compact, expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     kid = _parse_grant_header(seg)
@@ -779,10 +813,19 @@ def check_envelope(grant_compact: bytes, proof_compact: bytes, expected: Expecte
 
 def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: ExpectedRequest) -> EnvelopeFacts:
     t = expected.trusted_issuer
+    # Cross-vendor #22: a None trusted_issuer must fail closed, not raise AttributeError on the
+    # .public_key deref below. The reference returns {:error,:invalid} for all malformed input.
+    if t is None:
+        fail("check_envelope: trusted issuer required")
     require(len(t.public_key) == 32, "check_envelope: issuer key width")
-    if expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(MAXIMUM_BOUNDS, "clock_skew"):
+    # Cross-vendor #19: the reference requires is_integer(evaluation_time), is_integer(clock_skew)
+    # (>= 0), and proof_max_age > 0 (strictly positive) — runtime.ex:522-523,550-551. Range-only
+    # `< 0` checks accept fractional times and proof_max_age=0. The signed-time boundary is exact.
+    if not isinstance(expected.evaluation_time, int):
+        fail("check_envelope: integer evaluation time")
+    if not isinstance(expected.clock_skew, int) or expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(MAXIMUM_BOUNDS, "clock_skew"):
         fail("check_envelope: skew")
-    if expected.proof_max_age < 0 or expected.proof_max_age > bounds_resolve(MAXIMUM_BOUNDS, "proof_max_age"):
+    if not isinstance(expected.proof_max_age, int) or expected.proof_max_age <= 0 or expected.proof_max_age > bounds_resolve(MAXIMUM_BOUNDS, "proof_max_age"):
         fail("check_envelope: proof_max_age")
     # --- verify grant (issuer signature + context) ---
     gseg = parse_compact(grant_compact, MAXIMUM_BOUNDS)
@@ -802,6 +845,11 @@ def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: E
     giat = _require_int(gp.v.get("iat"), "iat")
     gnbf = _require_int(gp.v.get("nbf"), "nbf")
     gexp = _require_int(gp.v.get("exp"), "exp")
+    # Cross-vendor #4: check_envelope must enforce grant-time coherence (iat<exp, nbf<exp), mirroring
+    # the reference's coherent_times? (runtime.ex:872-875) which fires at parse time. verify_grant
+    # already checks this; check_envelope had its own inline path that omitted it.
+    if not (giat < gexp) or not (gnbf < gexp):
+        fail("check_envelope: grant times coherent")
     if not (giat <= expected.evaluation_time + expected.clock_skew):
         fail("check_envelope: grant iat")
     if not (gnbf <= expected.evaluation_time + expected.clock_skew):
