@@ -6,6 +6,15 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- Record the SDK graduation and publish-topology decision: cross-language verifier SDKs are
+  authored under `sdks/` (per [ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)) but each
+  graduates to its own per-SDK repository (`bounded_authority_protocol_<lang>`) on first
+  publication; the decision boundary is publication irreversibility, not SDK count
+  ([ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md)). Zero wire byte, bound, or
+  verdict change.
+- Add ROADMAP rows BAP-15 (Rust verifier SDK) and BAP-16 (Go verifier SDK) — typed reimplementations
+  of the frozen v1 profile from spec + corpus alone, authored under `sdks/` and graduating per
+  [ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md). Post-1.0 rows; no code shipped.
 - Ship cross-language verifier SDKs (TypeScript `@bounded-authority/verifier` + Python
   `bounded-authority-verifier`) under `sdks/` — typed reimplementations of the frozen v1 profile from
   the spec + corpus alone, with no code-level derivation from the Elixir reference
