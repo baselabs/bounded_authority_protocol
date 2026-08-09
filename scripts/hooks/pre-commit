@@ -1,0 +1,54 @@
+#!/bin/sh
+# pre-commit — guard against SDK publish infrastructure landing in the monorepo.
+#
+# Installed by: sh scripts/install-hooks.sh   (symlinks this into .git/hooks/)
+# Bypass:       git commit --no-verify        (documented deliberate-admin escape)
+# Authority:    ADR 0015 (SDK graduation and publish topology), Decision 5.
+# Patterns:     scripts/check_sdk_publish_infra.sh (single source of truth; the CI
+#               job in .github/workflows/sdk-publish-guard.yml uses the same script).
+#
+# What it does: for each staged file that is a workflow or an SDK manifest, run the
+# shared checker against the STAGED blob (git show :<path>) — not the working tree,
+# so an un-staged revert does not fool the gate. Fail the commit on the first hit.
+#
+# Honesty limit: this catches publish infrastructure STAGED. It cannot catch a
+# literal 'npm publish' run against a working tree. CI on main is the hard,
+# non-bypassable backstop for committed infrastructure; this hook is honor-system
+# fast feedback for contributors.
+
+set -u
+
+# Resolve the repo root from the git toplevel so the checker path is stable whether
+# the hook runs via .git/hooks/pre-commit (symlink) or directly.
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  printf 'pre-commit: not inside a git work tree; skipping SDK publish guard\n' >&2
+  exit 0
+}
+checker="$repo_root/scripts/check_sdk_publish_infra.sh"
+
+if [ ! -x "$checker" ]; then
+  printf 'pre-commit: %s missing or not executable; cannot enforce SDK publish guard\n' "$checker" >&2
+  exit 1
+fi
+
+status=0
+# Stage the file list into a temp, then iterate. Avoids the here-doc-with-$()
+# pattern (shellcheck SC2094) and — critically — avoids a pipeline, which would
+# run the loop in a subshell and silently drop any failure (the "gate present
+# but vacuous" failure the forge skill warns about for hook surfaces).
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+git diff --cached --name-only --diff-filter=ACM --no-renames > "$tmp"
+while IFS= read -r path; do
+  [ -n "$path" ] || continue
+  blob="$(git show ":$path" 2>/dev/null)" || {
+    printf 'pre-commit: could not read staged blob for %s\n' "$path" >&2
+    status=1
+    continue
+  }
+  if ! printf '%s' "$blob" | "$checker" "$path"; then
+    status=1
+  fi
+done < "$tmp"
+
+exit "$status"
