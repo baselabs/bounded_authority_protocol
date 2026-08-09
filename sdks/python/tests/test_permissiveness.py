@@ -310,6 +310,9 @@ def test_malformed_ipv6_literal_rejected():
     assert isinstance(uri_normalize(b"https://[1:2:3:4:5:6:7:8:9]/"), Err)
     assert isinstance(uri_normalize(b"https://[1::2::3]/"), Err)
     assert isinstance(uri_normalize(b"https://[gggg]/"), Err)
+    # Cross-vendor re-review Finding 1: a non-tail IPv4-style group must reject (the reference's
+    # ipv6_groups_length checks non-last groups as hex-only). The prior fix accepted this.
+    assert isinstance(uri_normalize(b"https://[1.2.3.4:5::6]/"), Err), "non-tail IPv4 group must reject"
     # Controls: valid IPv6 literals still normalize.
     assert uri_normalize(b"https://[::1]/").is_ok
     assert uri_normalize(b"https://[2001:db8::1]/").is_ok

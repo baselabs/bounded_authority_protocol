@@ -222,10 +222,13 @@ def _ipv6_side_length(side: bytes) -> int | None:
         return 0
     groups = side.split(b":")
     total = 0
-    for group in groups:
+    for i, group in enumerate(groups):
+        is_last = i == len(groups) - 1
         if b"." in group:
-            # IPv4 tail counts as 2 groups (reference ipv6_groups_length).
-            if not _is_canonical_ipv4(group):
+            # An IPv4-style group is valid ONLY in the tail position (reference ipv6_groups_length
+            # checks non-last groups as hex-only via valid_hex_group?). A non-tail IPv4 group is a
+            # malformed literal the reference rejects.
+            if not is_last or not _is_canonical_ipv4(group):
                 return None
             total += 2
         else:

@@ -690,7 +690,9 @@ def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLoc
     if len(protected_text) > bounds_resolve(b, "encoded_segment_bytes"):
         fail("key_locator: protected bound")
     protected_bytes = base64url_decode(protected_text, bounds_resolve(b, "decoded_segment_bytes"))
-    h = json_decode(protected_bytes)
+    # Cross-vendor re-review Finding 3: thread the caller-resolved bounds into the JSON decode
+    # (reference v1.ex:27 Json.decode(header_bytes, bounds) — depth/total_nodes limits honor bounds).
+    h = json_decode(protected_bytes, b)
     h = _require_object_exact(h, ["alg", "typ", "kid"], "grant header")
     _require_string_lit(h, "alg", ALG, "grant header alg")
     _require_string_lit(h, "typ", GRANT_TYP, "grant header typ")
@@ -1970,7 +1972,10 @@ def _validate_chunks(chunks: Sequence[bytes], bounds: Bounds = MAXIMUM_BOUNDS) -
     ≤ archive_bytes."""
     if len(chunks) == 0:
         fail("archive: no chunks")
-    if len(chunks) >= bounds_resolve(bounds, "archive_chunks"):
+    # Cross-vendor re-review Finding 2: the reference's validate_chunks guard is
+    # `count < archive_chunks` on the recursive clause (start 0), accepting up to archive_chunks
+    # INCLUSIVE. Use `>` not `>=`.
+    if len(chunks) > bounds_resolve(bounds, "archive_chunks"):
         fail("archive: chunk count")
     total = 0
     for i, c in enumerate(chunks):
