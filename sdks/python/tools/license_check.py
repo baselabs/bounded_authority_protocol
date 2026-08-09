@@ -16,7 +16,10 @@ import sys
 from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib  # Python 3.11+ stdlib
+except ModuleNotFoundError:  # pragma: no cover — the 3.10 fallback
+    import tomli as tomllib  # type: ignore[no-redef]
 
 
 def _runtime_deps() -> list[str]:
