@@ -444,7 +444,7 @@ compatibility.
 ## BAP-09 closeout evidence
 
 - Cross-language verifier SDKs ship under `sdks/` — a TypeScript SDK
-  (`sdks/typescript/`, `@bounded-authority/verifier`, Node `>= 20`, zero runtime
+  (`sdks/typescript/`, `@bounded-authority/verifier`, Node `>= 22`, zero runtime
   dependencies, Ed25519 via `node:crypto`) and a Python SDK
   (`sdks/python/`, `bounded-authority-verifier`, Python `>= 3.10`, single runtime
   dependency `cryptography`). Both are typed reimplementations of the frozen v1
@@ -462,10 +462,10 @@ compatibility.
   vs Python plain-dict + `dict[key]`-only — the mechanism differs per language),
   raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction.
   The per-language permissiveness suite grew through the cross-vendor
-  remediation to **31 gates (TS) / 38 gates (Python)**, each mechanically broken,
+  remediation to **37 gates (TS) / 45 gates (Python)**, each mechanically broken,
   confirmed RED, and reverted at authoring — the original 8-item authoring
-  battery (5 closures + census + purity lint + license check) is now the floor,
-  not the ceiling.
+  battery (5 closures + census + purity lint + license check) is the floor the
+  suite grew from, not the current count.
 - The SDKs are **verifiers**, not authority runtimes: every function returns
   `Result[T] = Ok|Err` (the `{:ok, value} | {:error, :invalid}` mirror), including
   the façade producers `assembleCompact`/`assemble_compact` and
@@ -481,8 +481,14 @@ compatibility.
   `sdks/**` / `priv/conformance/**` change and is **supply-chain-pinned**
   (cross-vendor #23): SHA-pinned GitHub Actions, exact `pnpm@10.33.0`, and exact
   `cryptography==50.0.0 ruff==0.16.2 mypy==2.3.0 pytest==9.1.1` — no floating
-  toolchain. The Elixir package is untouched — zero wire byte, bound, or verdict
-  change.
+  toolchain. It ran green on the Node 22 + 24 matrix
+  ([run 31321016268](https://github.com/baselabs/bounded_authority_protocol/actions/runs/31321016268),
+  `d9df0bf`); the Elixir matrix
+  ([run 31321016314](https://github.com/baselabs/bounded_authority_protocol/actions/runs/31321016314))
+  and supply-chain job
+  ([run 31321016270](https://github.com/baselabs/bounded_authority_protocol/actions/runs/31321016270))
+  are likewise green. The Elixir package is untouched — zero wire byte, bound, or
+  verdict change.
 - **Cross-vendor decorrelation remediation (T2 closeout).** Because the SDKs are
   a HIGH-stakes surface (verification/crypto), the bounded closeout ran the
   cross-vendor lens over the full landed range with the two other model families
