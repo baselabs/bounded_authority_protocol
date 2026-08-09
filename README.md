@@ -133,6 +133,25 @@ report is deterministic JCS bytes binding the corpus index SHA-256. See
 [`docs/design/conformance-contract.md`](docs/design/conformance-contract.md) and
 [ADR 0005](docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md).
 
+## Cross-language verifier SDKs
+
+In addition to the Elixir package, the repository ships typed **verifier** SDK reimplementations of
+the frozen v1 profile, authored from the spec + corpus alone with no code-level derivation from the
+Elixir reference ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)):
+
+- **TypeScript** — [`sdks/typescript/`](sdks/typescript/) (`@bounded-authority/verifier` on npm; Node
+  `>= 20`, zero runtime dependencies; Ed25519 via `node:crypto`).
+- **Python** — [`sdks/python/`](sdks/python/) (`bounded-authority-verifier` on PyPI; Python `>= 3.10`,
+  single runtime dependency `cryptography`).
+
+Each SDK passes all **259** published conformance vectors (recomputed from scratch, not cached),
+asserts the corpus `index.json` SHA-256 at startup, and proves every parser-layer permissiveness
+closure **red-capable** via a per-language mutation-gate. They are **verifiers**, not authority
+runtimes: a successful result proves only that caller-supplied bytes satisfy caller-supplied trusted
+inputs — it never selects keys, reserves replay, or grants execution. The `sdks-conformance` CI job
+([`.github/workflows/sdks.yml`](.github/workflows/sdks.yml)) runs on every change to `sdks/**` or
+`priv/conformance/**`. See each SDK's `README.md` for install + quickstart.
+
 ## Development
 
 The supported CI matrix is Elixir 1.18/OTP 27, Elixir 1.19/OTP 28, and Elixir 1.20/OTP 29.
