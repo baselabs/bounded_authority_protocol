@@ -77,20 +77,23 @@ block in [`docs/ROADMAP.md`](docs/ROADMAP.md)).
 
 - Public protocol: [`baselabs/bounded_authority_protocol`](https://github.com/baselabs/bounded_authority_protocol)
 - Private runtime consumer: `baselabs/bounded_authority` (private)
-- First product consumer: `baselabs/beamline` package `integrations/beamline_ash` (private)
+- Product consumer: `baselabs/navyler_cdc` (private; the successor product — `beamline_ash` is
+  deprecated and not a current consumer)
 - QorPay: unchanged and not a dependency
 
 ```text
 bounded_authority          -> bounded_authority_protocol + ecto_sql + postgrex + runtime deps
-beamline_ash               -> beamline + bounded_authority + ash + ash_ai
+navyler_cdc                -> bounded_authority + CDC transport libraries (capstan, replicant)
 bounded_authority_protocol -> pure protocol/crypto dependencies only
-beamline                   -> no authority dependency
 qorpay                     -> no authority dependency
 ```
 
-`beamline_ash` obtains an operational decision from the private runtime. It does not treat a
+`navyler_cdc` obtains an operational decision from the private runtime. It does not treat a
 direct public-verifier result as execution authority or call this package directly. The private
 runtime accepts raw credentials at its public boundary, not a caller-provided `EnvelopeFacts`.
+(`beamline_ash` was the first product consumer historically; it is deprecated in favor of
+`navyler_cdc`. See `docs/design/consumer-seams-cdc-report-path.md` for the navyler_cdc CDC report
+seam.)
 
 ## Workflow
 

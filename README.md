@@ -93,9 +93,13 @@ are not protocol compatibility targets.
 
 ```text
 bounded_authority          -> bounded_authority_protocol
-beamline_ash               -> beamline + bounded_authority + ash + ash_ai
+navyler_cdc                -> bounded_authority + CDC transport libraries
 bounded_authority_protocol -> no private or product package
 ```
+
+`navyler_cdc` is the product consumer (`beamline_ash` is deprecated). It routes an operational
+decision through the private runtime, not a direct public-verifier result — see
+[consumer-seams-cdc-report-path.md](docs/design/consumer-seams-cdc-report-path.md).
 
 See the [normative v1 profile](docs/protocol-v1.md),
 [protocol charter](docs/design/protocol-charter.md), [threat model](docs/design/threat-model.md),
