@@ -1,0 +1,83 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bounded-authority-verifier"
+version = "0.1.0"
+description = "Provider-neutral, deterministic verifier SDK for bounded proof-of-possession authority — a typed Python reimplementation of the BAP v1 verification profile."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [{ name = "BaseLabs" }]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security :: Cryptography",
+  "Typing :: Typed",
+]
+dependencies = [
+  "cryptography>=44.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/baselabs/bounded_authority_protocol"
+Repository = "https://github.com/baselabs/bounded_authority_protocol"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bounded_authority_verifier"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests", "conformance"]
+
+[tool.ruff.lint]
+# Ruff rule set: a strict-but-conservative selection. The mypy gate (below) carries the type
+# invariant; ruff carries the lint/style + import hygiene surface.
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes (unused, undefined, redefinition)
+  "I",    # isort
+  "B",    # bugbear
+  "UP",   # pyupgrade
+  "SIM",  # simplify
+  "C4",   # comprehensions
+  "PIE",
+  "RET",
+  "ARG",  # unused arguments
+]
+ignore = [
+  "E501",   # line length handled by formatter; the gate is mypy + correctness, not column count
+  "B008",   # function call in default argument (used for dataclass defaults)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ARG"]
+"conformance/**/*.py" = ["ARG"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unreachable = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_any_generics = true
+packages = ["bounded_authority_verifier"]
+
+# No per-module mypy overrides: the cryptography package ships its own types (no stubs needed),
+# and hashlib/urllib/base64 are in typeshed. cryptography>=50 includes inline type hints.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
