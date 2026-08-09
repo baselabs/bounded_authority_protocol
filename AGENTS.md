@@ -77,20 +77,23 @@ block in [`docs/ROADMAP.md`](docs/ROADMAP.md)).
 
 - Public protocol: [`baselabs/bounded_authority_protocol`](https://github.com/baselabs/bounded_authority_protocol)
 - Private runtime consumer: `baselabs/bounded_authority` (private)
-- First product consumer: `baselabs/beamline` package `integrations/retired_private_consumer` (private)
+- Product consumer: `baselabs/private_consumer` (private; the successor product — `retired_private_consumer` is
+  deprecated and not a current consumer)
 - QorPay: unchanged and not a dependency
 
 ```text
 bounded_authority          -> bounded_authority_protocol + ecto_sql + postgrex + runtime deps
-retired_private_consumer               -> beamline + bounded_authority + ash + ash_ai
+private_consumer                -> bounded_authority + application transport libraries (transport component, transport component)
 bounded_authority_protocol -> pure protocol/crypto dependencies only
-beamline                   -> no authority dependency
 qorpay                     -> no authority dependency
 ```
 
-`retired_private_consumer` obtains an operational decision from the private runtime. It does not treat a
+`private_consumer` obtains an operational decision from the private runtime. It does not treat a
 direct public-verifier result as execution authority or call this package directly. The private
 runtime accepts raw credentials at its public boundary, not a caller-provided `EnvelopeFacts`.
+(`retired_private_consumer` was the first product consumer historically; it is deprecated in favor of
+`private_consumer`. See `docs/design/consumer-seams-application-report-path.md` for the private_consumer application report
+seam.)
 
 ## Workflow
 
