@@ -774,6 +774,22 @@ def test_verify_anchored_export_accepts_valid_one_key_zero_transition_archive():
     assert r.value.transition_count == 0
 
 
+def test_verify_anchored_export_rejects_zero_key_chain_fail_closed():
+    """Cross-vendor re-review F2: a zero-key key chain MUST fail closed (Err), not raise
+    IndexError on key_chain.keys[0]. The length check (keys == transitions+1) must fire BEFORE the
+    keys[0] deref. Defect: revert the length-check-before-deref ordering → IndexError propagates."""
+    from bounded_authority_verifier.v1 import HistoricalKeyChain
+
+    reset_census()
+    built = _build_archive([_fresh_key()])
+    empty_chain = HistoricalKeyChain(keys=())
+    r = verify_anchored_export(
+        ArchivedObject(chunks=(built["archive"],), version="v1"),
+        empty_chain, built["expected"],
+    )
+    assert not r.is_ok, "zero-key chain must reject (keys != transitions+1), fail closed"
+
+
 def test_verify_anchored_export_rejects_bad_chunk_lists():
     """Cross-vendor #18: verify_anchored_export MUST validate the chunk list BEFORE concatenation
     (anchored_export_codec.ex:333-342 validate_chunks): reject empty chunks, reject chunk count >=
@@ -1023,3 +1039,30 @@ def test_assemble_compact_and_request_digest_return_result_contract():
     # request_digest: invalid (empty operation) -> Err.
     rd_bad = request_digest("", JInt(v=1))
     assert not rd_bad.is_ok, "empty operation must return Err"
+
+
+def test_check_envelope_rejects_bool_temporal_context():
+    """Cross-vendor re-review F4: Python's isinstance(True, int) is True, so a bool-typed
+    evaluation_time/clock_skew/proof_max_age passed the isinstance(x, int) check. The reference
+    requires is_integer; booleans are not integers. Defect: revert _is_int to isinstance(x, int) ->
+    bool values pass the guard."""
+    from bounded_authority_verifier.v1 import ExpectedRequest, TrustedIssuer, check_envelope
+
+    junk = b"aaa.bbb.ccc"
+    issuer = TrustedIssuer(key_id=b"k", public_key=b"\x00" * 32)
+    base = {
+        "issuer": "x", "audience": "x", "method": "GET", "target_uri": "https://x.example/",
+        "invocation_id": "550e8400-e29b-41d4-a716-446655440000", "operation": "read",
+        "cast_arguments": {"t": "null", "v": None}, "nonce": ("not_required",),
+    }
+
+    def call(**overrides):
+        return check_envelope(junk, junk, ExpectedRequest(trusted_issuer=issuer, **{**base, **overrides}))
+
+    # bool evaluation_time -> reject (isinstance(True, int) is True in Python, but bool is not int).
+    assert not call(evaluation_time=True, clock_skew=0, proof_max_age=300).is_ok
+    assert not call(evaluation_time=False, clock_skew=0, proof_max_age=300).is_ok
+    # bool clock_skew -> reject.
+    assert not call(evaluation_time=150, clock_skew=True, proof_max_age=300).is_ok
+    # bool proof_max_age -> reject.
+    assert not call(evaluation_time=150, clock_skew=0, proof_max_age=True).is_ok
