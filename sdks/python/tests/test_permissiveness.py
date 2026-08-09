@@ -47,13 +47,14 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from bounded_authority_verifier.bounds import bounds_new
+from bounded_authority_verifier.bounds import Bounds, bounds_new
 from bounded_authority_verifier.ed25519 import reset_census, sha256
 from bounded_authority_verifier.error import InvalidError
 from bounded_authority_verifier.json_alg import (
     JArray,
     JFloat,
     JInt,
+    JNull,
     JObject,
     JString,
     Tagged,
@@ -99,6 +100,7 @@ from bounded_authority_verifier.v1 import (
     key_transition_signing_input,
     proof_signing_input,
     request_digest,
+    untrusted_key_locator,
     verify_anchored_export,
     verify_grant,
 )
@@ -799,8 +801,13 @@ def test_verify_anchored_export_rejects_bad_chunk_lists():
     # Empty chunk in the list.
     with_empty = ArchivedObject(chunks=(built["archive"], b""), version="v1")
     assert not verify_anchored_export(with_empty, built["key_chain"], built["expected"]).is_ok, "empty chunk must reject"
-    # Too many chunks (>= archive_chunks bound 65796).
-    too_many = ArchivedObject(chunks=tuple(b"\x01" for _ in range(65796)), version="v1")
+    # Too many chunks: archive_chunks bound is 65796 and the reference accepts UP TO 65796 inclusive
+    # (validate_chunks guard `count < archive_chunks` on the recursive clause, start 0). The count
+    # guard itself fires only at 65797 (> archive_chunks). At exactly 65796 one-byte chunks the count
+    # guard PASSES (65796 > 65796 is false), so a rejection there is the digest check, not the count
+    # guard — vacuous w.r.t. the closure it claims to prove. Feed 65797 so the count guard is the
+    # falsifier.
+    too_many = ArchivedObject(chunks=tuple(b"\x01" for _ in range(65797)), version="v1")
     assert not verify_anchored_export(too_many, built["key_chain"], built["expected"]).is_ok, "chunk count over bound must reject"
     # Control: a single-chunk split of the valid archive still verifies.
     assert verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], built["expected"]).is_ok
@@ -1066,3 +1073,111 @@ def test_check_envelope_rejects_bool_temporal_context():
     assert not call(evaluation_time=150, clock_skew=True, proof_max_age=300).is_ok
     # bool proof_max_age -> reject.
     assert not call(evaluation_time=150, clock_skew=0, proof_max_age=True).is_ok
+
+
+def test_forged_widening_bounds_rejected_at_entry_points():
+    """Cross-vendor F2: a hand-crafted Bounds with a widening override bypasses bounds_new; resolve()
+    trusts it. Every entry point must re-validate (mirrors reference Bounds.coerce). Defect: revert
+    coerce_bounds -> a forged widening is honored."""
+    reset_census()
+    g = _signed_grant()
+    forged = Bounds({"compact_bytes": 1000000})  # > MAXIMA.compact_bytes (65536)
+    assert forged.resolve("compact_bytes") == 1000000, "control: forged override honored by resolve()"
+    eg = ExpectedGrant(
+        issuer="https://issuer.example.test", audience="https://resource.example.test",
+        evaluation_time=1500, clock_skew=60, bounds=forged,
+    )
+    assert not verify_grant(g["compact"], g["issuer"], eg).is_ok, "forged widening bounds must reject"
+
+
+def test_jcs_encode_rejects_non_integer_int_tag():
+    """Cross-vendor F3: a non-integer int-tag value (1.5) or a bool must fail closed at jcs_encode
+    (reference guard `when is_integer(value)`, jcs.ex:38). Defect: remove the isinstance check ->
+    JInt(1.5) emits b'1.5', JInt(True) emits b'True'."""
+    from bounded_authority_verifier.jcs import jcs_encode
+
+    assert jcs_encode(JInt(2)) == b"2", "control: integer int-tag encodes"
+    with pytest.raises(InvalidError):
+        jcs_encode(JInt(1.5))  # type: ignore[arg-type]
+    with pytest.raises(InvalidError):
+        jcs_encode(JInt(True))  # type: ignore[arg-type]
+
+
+def test_jcs_encode_rejects_invalid_utf8_string():
+    """Cross-vendor (JCS UTF-8): a programmatically-built JString with invalid UTF-8 must fail closed
+    (reference String.valid?, jcs.ex:58), not raise UnicodeDecodeError past the Result contract.
+    Defect: remove the is_valid_utf8 gate -> invalid bytes reach utf8_str -> UnicodeDecodeError."""
+    from bounded_authority_verifier.jcs import jcs_encode
+
+    with pytest.raises(InvalidError):
+        jcs_encode(JString(b"\x80\x81"))
+
+
+def test_untrusted_key_locator_accepts_empty_payload_signature_segments():
+    """Cross-vendor (key-locator empty segments): the reference (v1.ex:24) accepts empty
+    payload/signature segments — it decodes ONLY the protected segment. Defect: re-add the empty-
+    segment rejection -> RED."""
+    reset_census()
+    g = _signed_grant()
+    protected_seg = g["compact"].split(b".")[0]
+    empty_ps = protected_seg + b".."
+    r = untrusted_key_locator(empty_ps)
+    assert r.is_ok, "empty payload+signature segments must be accepted (reference decodes protected only)"
+    assert r.value.key_id == g["issuer"].key_id
+
+
+def test_verify_anchored_export_rejects_nested_bounds_mismatch():
+    """Cross-vendor (nested bounds pinning): the reference pins every nested bounds == top-level
+    (anchored_export_codec.ex:352-354). A tightened top + nested default-MAX must reject. Defect:
+    remove _require_bounds_equal -> a tightened top silently overrides nested."""
+    reset_census()
+    built = _build_archive([_fresh_key()])
+    tightened = ExpectedExport(
+        chain=built["expected"].chain, start_anchor=built["expected"].start_anchor,
+        end_anchor=built["expected"].end_anchor, transitions=built["expected"].transitions,
+        digest=built["expected"].digest, object_version=built["expected"].object_version,
+        bounds=bounds_new({"identifier_bytes": 4}),
+    )
+    assert not verify_anchored_export(built["archive"], built["key_chain"], tightened).is_ok, \
+        "nested bounds absent under a tightened top must reject (reference pin)"
+
+
+def test_check_chain_rejects_genesis_previous_hash_mismatch():
+    """Cross-vendor F4: genesis chain must not return an unchecked chain.previous_hash as a verified
+    fact. The SDK now validates chain.previous_hash == expected.previous_hash in BOTH cases. Defect:
+    revert the equality check + return chain.previous_hash -> a forged genesis input flows through."""
+    reset_census()
+    zero = bytes(32)
+    chain_id = "ba://chain-f4"
+    commitment = sha256(b"commitment-f4")
+    row0 = encode_consumption_entry(ConsumptionEntry(chain_id=chain_id, sequence=1, previous_hash=zero, commitment=commitment))
+    assert row0.is_ok
+    last_hash = sha256(ROW_PREFIX, row0.value.bytes_)
+    chain = ChainInput(rows=(row0.value.bytes_,), chain_id=chain_id, first_sequence=1, last_sequence=1,
+                       row_count=1, previous_hash=zero, last_hash=last_hash)
+    expected = ExpectedChain(chain_id=chain_id, first_sequence=1, last_sequence=1, row_count=1,
+                             previous_hash=zero, last_hash=last_hash)
+    assert check_chain(chain, expected).is_ok, "control: genesis chain with matching previous_hash verifies"
+    forged = ChainInput(rows=chain.rows, chain_id=chain_id, first_sequence=1, last_sequence=1,
+                        row_count=1, previous_hash=sha256(b"forged"), last_hash=last_hash)
+    assert not check_chain(forged, expected).is_ok, \
+        "genesis chain.previous_hash != expected.previous_hash must reject (F4)"
+
+
+def test_malformed_trusted_issuer_fails_closed():
+    """Cross-vendor (fail-closed shallow): a malformed trusted issuer (missing public_key/key_id) must
+    fail closed as Err, not raise AttributeError past the Result contract. Defect: revert the shape
+    check -> AttributeError."""
+    reset_census()
+    g = _signed_grant()
+    eg = ExpectedGrant(issuer="https://issuer.example.test", audience="https://resource.example.test",
+                       evaluation_time=1500, clock_skew=60)
+    # A TrustedIssuer missing public_key/key_id: must return Err, not raise.
+    bad = TrustedIssuer.__new__(TrustedIssuer)  # bypass __init__ -> no attributes
+    assert not verify_grant(g["compact"], bad, eg).is_ok, "malformed trusted issuer must fail closed"
+    er = ExpectedRequest(trusted_issuer=bad, issuer="https://issuer.example.test",
+                         audience="https://resource.example.test", method="POST",
+                         target_uri="https://resource.example.test/invoke", invocation_id="i",
+                         operation="read", cast_arguments=JNull(),  # type: ignore[arg-type]
+                         evaluation_time=1500, clock_skew=60, proof_max_age=300, nonce=NonceNotRequired())
+    assert not check_envelope(g["compact"], g["compact"], er).is_ok, "malformed trusted issuer must fail closed (check_envelope)"

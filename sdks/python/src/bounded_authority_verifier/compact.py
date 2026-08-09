@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .base64url import base64url_decode, base64url_encode
-from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve
+from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .error import InvalidError, Ok, Result, err, fail, require
 
 _DOT = 0x2E
@@ -29,12 +29,15 @@ class CompactSegments:
 def parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegments:
     """Parse + bound a compact input into 3 segments. Validates the segment count, bounds, canonical
     base64url of each segment, and decodes protected + payload (signature kept raw after decode)."""
-    if len(data) > bounds_resolve(bounds, "compact_bytes"):
+    # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits past
+    # MAXIMA, bypassing bounds_new). Mirrors the reference's Bounds.coerce on every entry point.
+    b = coerce_bounds(bounds)
+    if len(data) > bounds_resolve(b, "compact_bytes"):
         fail("compact: byte bound")
     if len(data) == 0:
         fail("compact: empty")
     # Split into exactly 3 segments on '.'.
-    dots = [i for i, b in enumerate(data) if b == _DOT]
+    dots = [i for i, byte in enumerate(data) if byte == _DOT]
     if len(dots) != 2:
         fail("compact: three segments")
     d0 = dots[0]
@@ -44,12 +47,12 @@ def parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegmen
     protected_text = data[:d0]
     payload_text = data[d0 + 1:d1]
     signature_text = data[d1 + 1:]
-    if len(protected_text) > bounds_resolve(bounds, "encoded_segment_bytes"):
+    if len(protected_text) > bounds_resolve(b, "encoded_segment_bytes"):
         fail("compact: protected segment bound")
-    if len(payload_text) > bounds_resolve(bounds, "encoded_segment_bytes"):
+    if len(payload_text) > bounds_resolve(b, "encoded_segment_bytes"):
         fail("compact: payload segment bound")
-    protected_bytes = base64url_decode(protected_text, bounds_resolve(bounds, "decoded_segment_bytes"))
-    payload_bytes = base64url_decode(payload_text, bounds_resolve(bounds, "decoded_segment_bytes"))
+    protected_bytes = base64url_decode(protected_text, bounds_resolve(b, "decoded_segment_bytes"))
+    payload_bytes = base64url_decode(payload_text, bounds_resolve(b, "decoded_segment_bytes"))
     signature = base64url_decode(signature_text)
     signing_input = protected_text + bytes([_DOT]) + payload_text
     return CompactSegments(

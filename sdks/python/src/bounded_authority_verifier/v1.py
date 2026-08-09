@@ -17,7 +17,14 @@ from dataclasses import dataclass, field
 from typing import TypeVar, cast
 
 from .base64url import base64url_decode, base64url_encode
-from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_new, bounds_resolve  # noqa: F401
+from .bounds import (  # noqa: F401
+    MAXIMA,
+    MAXIMUM_BOUNDS,
+    Bounds,
+    bounds_new,
+    bounds_resolve,
+    coerce_bounds,
+)
 from .compact import CompactSegments, SigningInput, assemble_compact, parse_compact  # noqa: F401
 from .digest import request_digest as compute_request_digest
 from .ed25519 import ed25519_verify, import_public_key, sha256
@@ -682,7 +689,8 @@ def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLoc
     # all three, so a compact with a valid protected grant header but non-canonical payload/signature
     # bytes was wrongly rejected. Mirror the reference: split into exactly 3 segments, decode protected
     # only, validate the grant header + kid. (An invalid payload/signature does not affect the kid.)
-    b = bounds if bounds is not None else MAXIMUM_BOUNDS
+    # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits).
+    b = coerce_bounds(bounds if bounds is not None else MAXIMUM_BOUNDS)
     from .facts import KeyLocator
 
     if len(compact) > bounds_resolve(b, "compact_bytes"):
@@ -692,8 +700,13 @@ def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLoc
     if len(parts) != 3:
         fail("key_locator: three segments")
     protected_text = parts[0]
-    if len(protected_text) == 0 or len(parts[1]) == 0 or len(parts[2]) == 0:
-        fail("key_locator: empty segment")
+    # Cross-vendor (key-locator empty segments): the reference (v1.ex:24) only requires exactly 3
+    # segments and decodes the PROTECTED segment alone — payload and signature are bound to _ and
+    # never decoded or size-checked, so empty payload/signature segments are ACCEPTED. Only an empty
+    # PROTECTED segment is invalid (it must base64url-decode to a header). Do NOT reject empty
+    # payload/signature.
+    if len(protected_text) == 0:
+        fail("key_locator: empty protected segment")
     if len(protected_text) > bounds_resolve(b, "encoded_segment_bytes"):
         fail("key_locator: protected bound")
     protected_bytes = base64url_decode(protected_text, bounds_resolve(b, "decoded_segment_bytes"))
@@ -771,9 +784,15 @@ def verify_grant(compact: bytes, trusted: TrustedIssuer, expected: ExpectedGrant
 
 
 def _verify_grant_body(compact: bytes, trusted: TrustedIssuer, expected: ExpectedGrant) -> GrantFacts:
+    # Cross-vendor #22 (fail-closed shallow): the reference pattern-matches %TrustedIssuer{} and
+    # returns {:error, :invalid} for any malformed context struct. A None OR a struct missing
+    # public_key/key_id must fail closed — not raise AttributeError past the Result contract.
     if trusted is None:
         fail("verify_grant: trusted issuer required")
-    require(len(trusted.public_key) == 32, "verify_grant: issuer key width")
+    if not isinstance(getattr(trusted, "public_key", None), bytes) or len(trusted.public_key) != 32:
+        fail("verify_grant: issuer key width")
+    if not isinstance(getattr(trusted, "key_id", None), str):
+        fail("verify_grant: issuer key id")
     # Cross-vendor #19: the reference requires is_integer(evaluation_time) and is_integer(clock_skew)
     # (>= 0) — runtime.ex:522-523. Range-only `< 0` checks accept fractional times.
     if not _is_int(expected.evaluation_time):
@@ -781,7 +800,7 @@ def _verify_grant_body(compact: bytes, trusted: TrustedIssuer, expected: Expecte
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (runtime.ex:186) and
     # threads it into validate_expected_grant (clock_skew <= bounds.clock_skew) + every bound-sensitive
     # check below. A caller tightening via expected.bounds now actually takes effect.
-    b = expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS
+    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     if not _is_int(expected.clock_skew) or expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(b, "clock_skew"):
         fail("verify_grant: skew")
     seg = parse_compact(compact, b)
@@ -832,11 +851,15 @@ def check_envelope(grant_compact: bytes, proof_compact: bytes, expected: Expecte
 
 def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: ExpectedRequest) -> EnvelopeFacts:
     t = expected.trusted_issuer
-    # Cross-vendor #22: a None trusted_issuer must fail closed, not raise AttributeError on the
-    # .public_key deref below. The reference returns {:error,:invalid} for all malformed input.
+    # Cross-vendor #22 (fail-closed shallow): a None or malformed trusted_issuer must fail closed,
+    # not raise AttributeError on the .public_key deref below. The reference returns {:error,:invalid}
+    # for all malformed input.
     if t is None:
         fail("check_envelope: trusted issuer required")
-    require(len(t.public_key) == 32, "check_envelope: issuer key width")
+    if not isinstance(getattr(t, "public_key", None), bytes) or len(t.public_key) != 32:
+        fail("check_envelope: issuer key width")
+    if not isinstance(getattr(t, "key_id", None), str):
+        fail("check_envelope: issuer key id")
     # Cross-vendor #19: the reference requires is_integer(evaluation_time), is_integer(clock_skew)
     # (>= 0), and proof_max_age > 0 (strictly positive) — runtime.ex:522-523,550-551. Range-only
     # `< 0` checks accept fractional times and proof_max_age=0. The signed-time boundary is exact.
@@ -846,7 +869,7 @@ def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: E
     # threads it into validate_expected_request (clock_skew, proof_max_age) + parse_grant + parse_proof
     # + every bound-sensitive claim check below. A caller tightening via expected.bounds now takes
     # effect across both the grant and the proof.
-    b = expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS
+    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     if not _is_int(expected.clock_skew) or expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(b, "clock_skew"):
         fail("check_envelope: skew")
     if not _is_int(expected.proof_max_age) or expected.proof_max_age <= 0 or expected.proof_max_age > bounds_resolve(b, "proof_max_age"):
@@ -1041,7 +1064,7 @@ def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (consumption_chain.ex
     # check_chain) and threads it into the row-count bound + every parse_row (chain_row_bytes). A
     # caller tightening via expected.bounds now takes effect.
-    b = expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS
+    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     if expected.chain_id != chain.chain_id:
         fail("check_chain: chain_id")
     if expected.first_sequence != chain.first_sequence:
@@ -1057,12 +1080,14 @@ def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
     if chain.last_sequence != chain.first_sequence + chain.row_count - 1:
         fail("check_chain: range")
     # Genesis: firstSequence === 1 requires the all-zero predecessor.
-    if chain.first_sequence == 1:
-        if not _bytes_equal(expected.previous_hash, DEFAULT_HASH):
-            fail("check_chain: genesis predecessor")
-    else:
-        if not _bytes_equal(expected.previous_hash, chain.previous_hash):
-            fail("check_chain: previous_hash")
+    if chain.first_sequence == 1 and not _bytes_equal(expected.previous_hash, DEFAULT_HASH):
+        fail("check_chain: genesis predecessor")
+    # Cross-vendor F4: the reference's check_chain takes ChainInput{rows} + ExpectedChain and uses
+    # expected.previous_hash as BOTH the validation seed and the returned fact; the SDK's ChainInput
+    # also carries a previous_hash that must equal the expected value in BOTH cases (genesis + non-
+    # genesis), so chain.previous_hash is never an unverified echo flowing into the returned facts.
+    if not _bytes_equal(expected.previous_hash, chain.previous_hash):
+        fail("check_chain: previous_hash")
     previous = expected.previous_hash
     sequence = chain.first_sequence
     for i, row_bytes in enumerate(chain.rows):
@@ -1100,10 +1125,13 @@ def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
         fail("check_chain: head")
     from .facts import ChainFacts
 
+    # Cross-vendor F4: return the VERIFIED expected.previous_hash (the reference's contract), not the
+    # caller's chain.previous_hash input. Python bytes are immutable so no aliasing hazard, but the
+    # value must be the verified one.
     return ChainFacts(
         version=VERSION, chain_id=chain.chain_id, first_sequence=chain.first_sequence,
         last_sequence=chain.last_sequence, row_count=chain.row_count,
-        previous_hash=chain.previous_hash, last_hash=previous,
+        previous_hash=expected.previous_hash, last_hash=previous,
     )
 
 
@@ -1438,7 +1466,7 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     # would reject the bytes a too-large input would produce; the producer rejects earlier.
     # BAP-09 #10/#11: resolve expected.bounds once and thread it through the encode-time bounds
     # checks so a caller tightening via expected.bounds takes effect (matches verify_anchored_export).
-    b = expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS
+    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     _validate_export_inputs(input_, expected, b)
     header_bytes = _build_archive_header(input_, expected.chain, b)
     parts = [ARCHIVE_PREFIX, _frame(header_bytes), _frame(input_.start_anchor)]
@@ -1528,7 +1556,7 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
     require(len(key.public_key) == 32, "verify_historical_anchor: key width")
     # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check, as
     # the reference does (boundary_anchor_codec.ex parses the compact + payload under bounds).
-    b = expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS
+    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     seg = parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != key.key_id:
@@ -1585,7 +1613,7 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
     if _bytes_equal(old_key.public_key, new_key.public_key):
         fail("verify_key_transition: distinct keys")
     # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check.
-    b = expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS
+    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     seg = parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != old_key.key_id:
@@ -1648,7 +1676,16 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # archive_bytes), parse_archive (frame reads), and every row check. The inner anchors/transitions
     # carry their own bounds (used by their own compact parsers). A caller tightening via
     # expected.bounds now takes effect.
-    b = expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS
+    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    # Cross-vendor (nested bounds pinning): the reference (anchored_export_codec.ex:352-354, :404-406)
+    # pins every nested bounds to the top-level resolved bounds via `{:ok, ^bounds} <- Bounds.coerce(x.bounds)`.
+    # The SDK previously preferred the outer bounds and silently discarded the nested value; pin them
+    # explicitly so a mismatch fails closed, matching the reference.
+    _require_bounds_equal(expected.chain.bounds, b, "verify_anchored_export: chain bounds")
+    _require_bounds_equal(expected.start_anchor.bounds, b, "verify_anchored_export: start anchor bounds")
+    _require_bounds_equal(expected.end_anchor.bounds, b, "verify_anchored_export: end anchor bounds")
+    for ti, texp in enumerate(expected.transitions):
+        _require_bounds_equal(texp.bounds, b, f"verify_anchored_export: transition {ti} bounds")
     # Validate the chunk list BEFORE concatenation (mirrors anchored_export_codec.ex:101-102,333-342
     # validate_chunks): each chunk nonempty, count < archive_chunks, total ≤ archive_bytes. Hashing
     # happens after the shape is validated.
@@ -2000,3 +2037,22 @@ def _validate_chunks(chunks: Sequence[bytes], bounds: Bounds = MAXIMUM_BOUNDS) -
         total += len(c)
         if total > bounds_resolve(bounds, "archive_bytes"):
             fail("archive: chunk bytes")
+
+
+def _require_bounds_equal(nested: Bounds | None, top: Bounds, ctx: str) -> None:
+    """Pin a nested expected.bounds to the top-level resolved bounds (cross-vendor nested-bounds).
+
+    The reference (anchored_export_codec.ex:352-354) pins nested bounds via
+    ``{:ok, ^bounds} <- Bounds.coerce(x.bounds)``. When a nested bounds is present it must coerce
+    cleanly AND resolve to the same value as ``top`` for every limit. An absent nested bounds is valid
+    only when the top is also maximum (no tightening); a tightened top requires every nested struct to
+    carry the same tightening.
+    """
+    if nested is None:
+        if top.overrides:
+            fail(f"{ctx}: nested bounds absent under tightened top")
+        return
+    coerced = coerce_bounds(nested)
+    for key in MAXIMA:
+        if bounds_resolve(coerced, key) != bounds_resolve(top, key):
+            fail(f"{ctx}: nested bounds mismatch")

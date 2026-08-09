@@ -461,17 +461,46 @@ compatibility.
   per-language): duplicate-reject, null-prototype/dunder (TS `Object.create(null)`
   vs Python plain-dict + `dict[key]`-only — the mechanism differs per language),
   raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction.
-  Each SDK's 8-item defect-injection battery (5 closures + census + purity lint +
-  license check) was mechanically broken, confirmed RED, and reverted at authoring.
+  The per-language permissiveness suite grew through the cross-vendor
+  remediation to **31 gates (TS) / 38 gates (Python)**, each mechanically broken,
+  confirmed RED, and reverted at authoring — the original 8-item authoring
+  battery (5 closures + census + purity lint + license check) is now the floor,
+  not the ceiling.
 - The SDKs are **verifiers**, not authority runtimes: every function returns
-  `Result[T] = Ok|Err` (the `{:ok, value} | {:error, :invalid}` mirror); no
-  `authorized`/`decision` surface; facts are value-bearing, redacted, and
-  non-authorizing. The library path is purity-gated (TS ESLint rule; Python AST
-  ban on I/O/clock/RNG/network) and dependency-license-gated (Apache-2.0/BSD/MIT/ISC
-  allowlist). The `sdks-conformance` CI job
+  `Result[T] = Ok|Err` (the `{:ok, value} | {:error, :invalid}` mirror), including
+  the façade producers `assembleCompact`/`assemble_compact` and
+  `requestDigest`/`request_digest`, which return `Ok<Uint8Array>`/`Ok[bytes]` or
+  `Err` (cross-vendor #21) rather than throwing; no `authorized`/`decision`
+  surface; facts are value-bearing, redacted, and non-authorizing, with the facts
+  schemas (`GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`,
+  `KeyTransitionFacts`, `AnchoredExportFacts`) aligned field-for-field to the
+  Elixir reference (cross-vendor #20). The library path is purity-gated (TS ESLint
+  rule; Python AST ban on I/O/clock/RNG/network) and dependency-license-gated
+  (Apache-2.0/BSD/MIT/ISC allowlist). The `sdks-conformance` CI job
   ([`.github/workflows/sdks.yml`](../.github/workflows/sdks.yml)) runs on every
-  `sdks/**` / `priv/conformance/**` change. The Elixir package is untouched —
-  zero wire byte, bound, or verdict change.
+  `sdks/**` / `priv/conformance/**` change and is **supply-chain-pinned**
+  (cross-vendor #23): SHA-pinned GitHub Actions, exact `pnpm@10.33.0`, and exact
+  `cryptography==50.0.0 ruff==0.16.2 mypy==2.3.0 pytest==9.1.1` — no floating
+  toolchain. The Elixir package is untouched — zero wire byte, bound, or verdict
+  change.
+- **Cross-vendor decorrelation remediation (T2 closeout).** Because the SDKs are
+  a HIGH-stakes surface (verification/crypto), the bounded closeout ran the
+  cross-vendor lens over the full landed range with the two other model families
+  as peers (ADR-0003). The peers surfaced **25 confirmed divergences** from the
+  Elixir reference (bounds-threading into nested verify and selector decode;
+  JCS per-node encode bounds; float-magnitude exact-decimal; JCS DEL raw-0x7f to
+  match the reference, not the RFC 8785 `\u007f` escape — AGENTS rule 7, reference
+  bytes are the contract; canonical + sequence-zero consumption rows; genesis-row
+  producer validation; transition/row-count and chunk-list bound parity;
+  rollover chronology and fingerprint-cycle rejection; key-locator protected-only
+  decode; temporal integer/strict-positive guards; null `trustedIssuer`
+  fail-closed; nested-export bounds threading; zero-key fail-closed; immutable
+  `ChainFacts.previousHash`; Python bool-is-not-int). All 25 were fixed in both
+  SDKs and re-verified against the reference oracle (`agreed=259, disagreed=0`);
+  2 candidate findings were honestly **falsified by running the reference** (the
+  boundary-anchor attacks are already rejected; `kind:"all"` accepts extra
+  members, matching the reference). The GLM peer's documented JCS-DEL note is the
+  intended reference-wins decision, not a defect.
 
 ## Next action
 

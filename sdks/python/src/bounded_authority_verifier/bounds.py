@@ -132,3 +132,29 @@ def bounds_new(tightening: Mapping[str, int] | None = None) -> Bounds:
                 fail(f"bounds.new: widening limit {key}")
         overrides[key] = value
     return Bounds(overrides)
+
+
+def coerce_bounds(b: Bounds) -> Bounds:
+    """Re-validate a Bounds object (mirrors the reference's Bounds.coerce/1).
+
+    ``Bounds`` is a class with a public ``overrides`` mapping, so a caller can hand-craft a
+    ``Bounds`` that bypasses ``bounds_new`` — including a WIDENING override (compact_bytes > MAXIMA).
+    ``resolve`` trusts the override directly; without this gate the verify/decode paths would honor
+    the forged widening (cross-vendor F2). ``coerce_bounds`` re-runs the ``bounds_new`` validation over
+    the override map so every entry point that resolves caller-supplied bounds fails closed on a
+    forgery.
+    """
+    from .error import fail
+
+    for key, value in b.overrides.items():
+        if not isinstance(value, int) or isinstance(value, bool):
+            fail(f"bounds.coerce: non-integer limit {key}")
+        if key in FIXED_WIDTH_KEYS:
+            if value != MAXIMA[key]:
+                fail(f"bounds.coerce: fixed-width key {key} must equal maximum")
+        else:
+            if value <= 0:
+                fail(f"bounds.coerce: non-positive limit {key}")
+            if value > MAXIMA[key]:
+                fail(f"bounds.coerce: widening limit {key}")
+    return b
