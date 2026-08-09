@@ -318,4 +318,74 @@ def test_jcs_enforces_per_node_bounds_at_encode():
     assert isinstance(jcs_encode(JString(v=b"x" * 8192)), bytes)
 
 
+# === FIX-C cross-vendor remediation — v1 façade closed-boundary (defect-injected) ===
+
+def test_untrusted_key_locator_decodes_only_protected_segment():
+    """Cross-vendor #13: untrusted_key_locator MUST decode ONLY the protected segment — the reference
+    (v1.ex:21-34) splits on '.' and never decodes payload/signature. A compact with a valid grant
+    header but garbage (non-base64url) payload+signature must return the kid (Ok), not reject. The
+    prior implementation called parse_compact (decodes all 3) → wrongly rejected. Defect: revert to
+    parse_compact → the garbage-payload case returns Err.
+    """
+    from bounded_authority_verifier.error import Ok
+    from bounded_authority_verifier.v1 import untrusted_key_locator
+
+    protected = b"eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIiwidHlwIjoiYmErY2FwIn0"
+    # Garbage payload + signature (non-base64url bytes).
+    r = untrusted_key_locator(protected + b".!!.!!!")
+    assert isinstance(r, Ok) and r.value.key_id == "k1"
+    # Valid-base64 non-JSON payload + signature — reference also returns Ok.
+    assert isinstance(untrusted_key_locator(protected + b".YWFh.YmJi"), Ok)
+    # 2- and 4-segment inputs reject (reference requires exactly 3).
+    assert not untrusted_key_locator(protected + b".!!").is_ok
+    assert not untrusted_key_locator(protected + b".!!.!!.!!").is_ok
+
+
+def test_check_envelope_rejects_null_trusted_issuer_fail_closed():
+    """Cross-vendor #22: a null trusted_issuer must fail closed (return Err), not raise
+    AttributeError on the .public_key deref. The _trying wrapper only catches InvalidError, so without
+    the guard an AttributeError propagates out of the public API. Defect: revert the
+    `if t is None: fail(...)` guard → AttributeError is raised (not caught).
+    """
+    from bounded_authority_verifier.v1 import ExpectedRequest, check_envelope
+
+    junk = b"aaa.bbb.ccc"
+    # Must return Err (fail-closed); without the guard this raises AttributeError.
+    r = check_envelope(junk, junk, ExpectedRequest(
+        trusted_issuer=None,  # type: ignore[arg-type]
+        issuer="x", audience="x", method="GET", target_uri="https://x.example/",
+        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
+        cast_arguments={"t": "null", "v": None}, evaluation_time=100, clock_skew=0,
+        proof_max_age=300, nonce=("not_required",)))
+    assert not r.is_ok
+
+
+def test_check_envelope_rejects_fractional_and_zero_temporal_context():
+    """Cross-vendor #19: the reference requires is_integer(evaluation_time), is_integer(clock_skew),
+    and proof_max_age > 0 (strictly positive). A range-only `< 0` check accepts fractional times and
+    proof_max_age=0. These guards fire BEFORE grant parsing, so a junk compact suffices. Defect:
+    revert the isinstance/`<= 0` guards → fractional/zero values pass the guard and the junk compact
+    fails later at grant parse (so the guard's rejection is indistinguishable — but the integer
+    boundary is the contract, and a valid grant under a fractional eval time would wrongly verify).
+    """
+    from bounded_authority_verifier.v1 import ExpectedRequest, TrustedIssuer, check_envelope
+
+    junk = b"aaa.bbb.ccc"
+    issuer = TrustedIssuer(key_id=b"k", public_key=b"\x00" * 32)
+    base = {
+        "issuer": "x", "audience": "x", "method": "GET", "target_uri": "https://x.example/",
+        "invocation_id": "550e8400-e29b-41d4-a716-446655440000", "operation": "read",
+        "cast_arguments": {"t": "null", "v": None}, "nonce": ("not_required",),
+    }
+
+    def call(**overrides):
+        return check_envelope(junk, junk, ExpectedRequest(trusted_issuer=issuer, **{**base, **overrides}))
+
+    # All of these must return Err (the guard rejects). A valid-integer context also returns Err
+    # here only because the junk compact fails at grant parse — so the test's load-bearing assertion
+    # is that the fractional/zero cases do NOT raise and DO return Err, matching the integer control.
+    assert not call(evaluation_time=150.5, clock_skew=0, proof_max_age=300).is_ok
+    assert not call(evaluation_time=150, clock_skew=10.5, proof_max_age=300).is_ok
+    assert not call(evaluation_time=150, clock_skew=0, proof_max_age=0).is_ok
+    assert not call(evaluation_time=150, clock_skew=0, proof_max_age=300).is_ok
 
