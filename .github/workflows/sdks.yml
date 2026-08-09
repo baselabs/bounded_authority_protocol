@@ -1,0 +1,108 @@
+name: SDK conformance
+
+# Cross-language verifier SDK gate (ADR 0014 D8). Runs on push/PR touching sdks/** or
+# priv/conformance/**, plus manual dispatch and a daily schedule (catches upstream crypto-runtime
+# drift). NOT part of the Elixir `mix quality` battery — the SDK suites run in their own job to
+# avoid runner starvation during the quality gate.
+
+on:
+  pull_request:
+    paths:
+      - "sdks/**"
+      - "priv/conformance/**"
+      - ".github/workflows/sdks.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "sdks/**"
+      - "priv/conformance/**"
+      - ".github/workflows/sdks.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sdks-conformance:
+    name: Cross-language SDK conformance
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10
+
+      # --- TypeScript SDK gate ---
+      - name: TS — install
+        run: pnpm install --frozen-lockfile
+        working-directory: sdks/typescript
+
+      - name: TS — typecheck
+        run: pnpm typecheck
+        working-directory: sdks/typescript
+
+      - name: TS — lint (purity rule)
+        run: pnpm lint
+        working-directory: sdks/typescript
+
+      - name: TS — license check
+        run: pnpm license-check
+        working-directory: sdks/typescript
+
+      - name: TS — unit + permissiveness tests
+        run: pnpm test && pnpm test:permissiveness
+        working-directory: sdks/typescript
+
+      - name: TS — conformance (259 + census)
+        run: pnpm conformance
+        working-directory: sdks/typescript
+
+      # --- Python SDK gate ---
+      - name: Python — install
+        run: |
+          python -m pip install --upgrade pip
+          pip install cryptography ruff mypy pytest
+          pip install -e . --no-deps
+        working-directory: sdks/python
+
+      - name: Python — typecheck (mypy --strict)
+        run: mypy src/
+        working-directory: sdks/python
+
+      - name: Python — lint
+        run: ruff check src/ tests/ tools/
+        working-directory: sdks/python
+
+      - name: Python — purity check
+        run: python tools/purity_check.py
+        working-directory: sdks/python
+
+      - name: Python — license check
+        run: python tools/license_check.py
+        working-directory: sdks/python
+
+      - name: Python — unit + permissiveness tests
+        run: python -m pytest tests/ -q
+        working-directory: sdks/python
+
+      - name: Python — conformance (259 + census)
+        run: python tests/conformance/run.py
+        working-directory: sdks/python
