@@ -192,11 +192,47 @@ def _remove_dot_segments(path: bytes) -> bytes:
 
 
 def _ipv6_kind(literal: bytes) -> int | str | None:
-    if re.match(rb"^[0-9A-Fa-f:.]+$", literal) is not None:
+    if re.match(rb"^[0-9A-Fa-f:.]+$", literal) is not None and _valid_ipv6_literal(literal):
         return 6
     if re.match(rb"^v[0-9A-Fa-f]+\.[A-Za-z0-9._~!$&'()*+,;=:\-]+$", literal) is not None:
         return "future"
     return None
+
+
+# Structural IPv6 validation mirroring the reference (uri.ex:181-226 valid_ipv6_literal? /
+# ipv6_side_length / ipv6_groups_length). Rejects malformed literals like ":::", "1:2:3:4:5:6:7:8:9"
+# (too many groups), and a "::" that does not actually compress (< 8 groups required). The prior
+# implementation only checked the character class, so structurally-invalid literals normalized.
+def _valid_ipv6_literal(literal: bytes) -> bool:
+    parts = literal.split(b"::")
+    if len(parts) == 1:
+        return _ipv6_side_length(parts[0]) == 8
+    if len(parts) == 2:
+        left = _ipv6_side_length(parts[0])
+        right = _ipv6_side_length(parts[1])
+        if left is None or right is None:
+            return False
+        return left + right < 8
+    return False  # multiple "::" compressions
+
+
+def _ipv6_side_length(side: bytes) -> int | None:
+    """Count groups on one side of "::". Returns None if any group is malformed."""
+    if side == b"":
+        return 0
+    groups = side.split(b":")
+    total = 0
+    for group in groups:
+        if b"." in group:
+            # IPv4 tail counts as 2 groups (reference ipv6_groups_length).
+            if not _is_canonical_ipv4(group):
+                return None
+            total += 2
+        else:
+            if not (1 <= len(group) <= 4) or not re.match(rb"^[0-9A-Fa-f]+$", group):
+                return None
+            total += 1
+    return total
 
 
 def _is_invalid(e: BaseException) -> bool:
