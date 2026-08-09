@@ -697,22 +697,36 @@ def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
 def test_encode_anchored_export_rejects_transition_count_over_bound():
     """Cross-vendor #17: encode_anchored_export MUST validate inputs before framing — at minimum the
     transition count <= key_transitions bound (256). The SDK previously accepted 257 transitions.
-    Defect: revert the bound check → encode returns Ok."""
-    pub, priv = _fresh_key()
+    Defect: revert the bound check -> encode returns Ok.
+
+    FIX-D delta-review FINDING 2: supply 257 matching ExpectedKeyTransition entries over a 258-key
+    chain so the count-mismatch check passes and the key_transitions=256 BOUND check is the
+    load-bearing gate (otherwise transitions=() makes count-mismatch fire first). The 258-key path is
+    chronology-clean (distinct keys, strictly-increasing effective_at, no fingerprint cycle)."""
+    keys = [_fresh_key() for _ in range(258)]
     row_entry = ConsumptionEntry(chain_id="urn:example:chain", sequence=1, previous_hash=Z32, commitment=bytes(32))
     encoded = encode_consumption_entry(row_entry)
     assert encoded.is_ok
     row_bytes = encoded.value.bytes_
     last_hash = encoded.value.hash_
+    start_pub, start_priv = keys[0]
+    end_pub, end_priv = keys[257]
     start_compact = _signed_anchor_compact(BoundaryAnchorProducer(
         anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain",
-        sequence=0, chain_hash=Z32, key_id="k0", public_key=pub,
-    ), priv)
+        sequence=0, chain_hash=Z32, key_id="k0", public_key=start_pub,
+    ), start_priv)
     end_compact = _signed_anchor_compact(BoundaryAnchorProducer(
-        anchor_id="urn:example:anchor:end", anchored_at=2000, chain_id="urn:example:chain",
-        sequence=1, chain_hash=last_hash, key_id="k0", public_key=pub,
-    ), priv)
-    fp = public_key_thumbprint_raw(pub)
+        anchor_id="urn:example:anchor:end", anchored_at=100000, chain_id="urn:example:chain",
+        sequence=1, chain_hash=last_hash, key_id="k257", public_key=end_pub,
+    ), end_priv)
+    expected_transitions = tuple(
+        ExpectedKeyTransition(
+            transition_id=f"urn:example:t:{i}", chain_id="urn:example:chain", effective_at=2000 + i,
+            current_key_id=f"k{i}", current_key_fingerprint=public_key_thumbprint_raw(keys[i][0]),
+            next_key_id=f"k{i + 1}", next_key_fingerprint=public_key_thumbprint_raw(keys[i + 1][0]),
+        )
+        for i in range(257)
+    )
     chain = ExpectedChain(chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1, previous_hash=Z32, last_hash=last_hash)
     r = encode_anchored_export(
         AnchoredExportInput(
@@ -722,9 +736,9 @@ def test_encode_anchored_export_rejects_transition_count_over_bound():
         ),
         ExpectedExport(
             chain=chain, digest=bytes(32),
-            start_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain", sequence=0, chain_hash=Z32, key_id="k0", key_fingerprint=fp),
-            end_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:end", anchored_at=2000, chain_id="urn:example:chain", sequence=1, chain_hash=last_hash, key_id="k0", key_fingerprint=fp),
-            transitions=(), object_version="v1",
+            start_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain", sequence=0, chain_hash=Z32, key_id="k0", key_fingerprint=public_key_thumbprint_raw(start_pub)),
+            end_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:end", anchored_at=100000, chain_id="urn:example:chain", sequence=1, chain_hash=last_hash, key_id="k257", key_fingerprint=public_key_thumbprint_raw(end_pub)),
+            transitions=expected_transitions, object_version="v1",
         ),
     )
     assert not r.is_ok, "257 transitions must reject (over the key_transitions=256 bound)"
