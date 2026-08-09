@@ -44,6 +44,7 @@ import pytest
 
 from bounded_authority_verifier.error import InvalidError
 from bounded_authority_verifier.json_alg import (
+    JArray,
     JFloat,
     JInt,
     JObject,
@@ -283,5 +284,38 @@ def test_jcs_del_emits_raw_byte_matching_reference():
 
     v = JString(v=b"x\x7fy")
     assert list(jcs_encode(v)) == [34, 120, 127, 121, 34]  # "x<raw DEL>y"
+
+
+def test_jcs_enforces_per_node_bounds_at_encode():
+    """Cross-vendor #9: the JCS encoder MUST enforce per-node resource bounds DURING encode (mirrors
+    jcs.ex:27-101 encode_value), not only the final jcs_bytes total. A 257-item array (array_items
+    bound 256), a depth-33 nested array (depth bound 32), and an 8193-byte string (string_bytes bound
+    8192) must all reject — the reference rejects each. Defect: revert _emit to the boundless
+    recurse (no level/nodes/length checks) → all three encode successfully.
+    """
+    from bounded_authority_verifier.jcs import jcs_encode
+
+    # 257-item array (over array_items=256).
+    with pytest.raises(InvalidError):
+        jcs_encode(JArray(v=tuple(JInt(i) for i in range(257))))
+    # Control: 256 items is the boundary and encodes.
+    assert isinstance(jcs_encode(JArray(v=tuple(JInt(i) for i in range(256)))), bytes)
+    # depth-33 nested array (over depth=32).
+    deep = JInt(0)
+    for _ in range(33):
+        deep = JArray(v=(deep,))
+    with pytest.raises(InvalidError):
+        jcs_encode(deep)
+    # Control: depth-32 encodes.
+    deep32 = JInt(0)
+    for _ in range(32):
+        deep32 = JArray(v=(deep32,))
+    assert isinstance(jcs_encode(deep32), bytes)
+    # oversized string (over string_bytes=8192).
+    with pytest.raises(InvalidError):
+        jcs_encode(JString(v=b"x" * 8193))
+    # Control: exactly 8192 bytes encodes.
+    assert isinstance(jcs_encode(JString(v=b"x" * 8192)), bytes)
+
 
 
