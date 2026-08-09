@@ -66,6 +66,13 @@ VERSION = 1
 # BAP1-CHAIN\0 prefix for consumption-row hashing (ADR 0004 § Consumption rows).
 ROW_PREFIX = b"BAP1-CHAIN\x00"
 
+
+def _is_int(value: object) -> bool:
+    """isinstance(int) that EXCLUDES bool (cross-vendor re-review F4: in Python isinstance(True, int)
+    is True, so a bool-typed evaluation_time/clock_skew/proof_max_age would pass an isinstance(x, int)
+    check. The reference requires is_integer — booleans are not integers.)"""
+    return isinstance(value, int) and not isinstance(value, bool)
+
 # BAP1-ARCHIVE\0EXPORT\0 prefix (ADR 0004 § Anchored export; the 20-byte magic, NOT framed).
 ARCHIVE_PREFIX = b"BAP1-ARCHIVE\x00EXPORT\x00"
 
@@ -769,13 +776,13 @@ def _verify_grant_body(compact: bytes, trusted: TrustedIssuer, expected: Expecte
     require(len(trusted.public_key) == 32, "verify_grant: issuer key width")
     # Cross-vendor #19: the reference requires is_integer(evaluation_time) and is_integer(clock_skew)
     # (>= 0) — runtime.ex:522-523. Range-only `< 0` checks accept fractional times.
-    if not isinstance(expected.evaluation_time, int):
+    if not _is_int(expected.evaluation_time):
         fail("verify_grant: integer evaluation time")
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (runtime.ex:186) and
     # threads it into validate_expected_grant (clock_skew <= bounds.clock_skew) + every bound-sensitive
     # check below. A caller tightening via expected.bounds now actually takes effect.
     b = expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS
-    if not isinstance(expected.clock_skew, int) or expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(b, "clock_skew"):
+    if not _is_int(expected.clock_skew) or expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(b, "clock_skew"):
         fail("verify_grant: skew")
     seg = parse_compact(compact, b)
     kid = _parse_grant_header(seg, b)
@@ -833,16 +840,16 @@ def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: E
     # Cross-vendor #19: the reference requires is_integer(evaluation_time), is_integer(clock_skew)
     # (>= 0), and proof_max_age > 0 (strictly positive) — runtime.ex:522-523,550-551. Range-only
     # `< 0` checks accept fractional times and proof_max_age=0. The signed-time boundary is exact.
-    if not isinstance(expected.evaluation_time, int):
+    if not _is_int(expected.evaluation_time):
         fail("check_envelope: integer evaluation time")
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (runtime.ex:204) and
     # threads it into validate_expected_request (clock_skew, proof_max_age) + parse_grant + parse_proof
     # + every bound-sensitive claim check below. A caller tightening via expected.bounds now takes
     # effect across both the grant and the proof.
     b = expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS
-    if not isinstance(expected.clock_skew, int) or expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(b, "clock_skew"):
+    if not _is_int(expected.clock_skew) or expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(b, "clock_skew"):
         fail("check_envelope: skew")
-    if not isinstance(expected.proof_max_age, int) or expected.proof_max_age <= 0 or expected.proof_max_age > bounds_resolve(b, "proof_max_age"):
+    if not _is_int(expected.proof_max_age) or expected.proof_max_age <= 0 or expected.proof_max_age > bounds_resolve(b, "proof_max_age"):
         fail("check_envelope: proof_max_age")
     # --- verify grant (issuer signature + context) ---
     gseg = parse_compact(grant_compact, b)
@@ -1672,21 +1679,25 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     if not _bytes_equal(parsed.header_bytes, expected_header_bytes):
         fail("verify_anchored_export: header")
     # Verify start + end anchors + each transition against the ordered historical key chain.
-    # A key chain of N keys spans N-1 transitions (keys[0]→[1], ..., keys[N-2]→[N-1]); a 1-key,
+    # A key chain of N keys spans N-1 transitions (keys[0]->[1], ..., keys[N-2]->[N-1]); a 1-key,
     # 0-transition archive is the no-rollover case the reference accepts (validate_historical_key_shapes
     # requires keys == transitions+1, with no minimum). The exact-count check below is the gate.
-    _verify_anchor_compact(parsed.start, key_chain.keys[0], expected.start_anchor, "verify_anchored_export start")
-    _verify_anchor_compact(parsed.end, key_chain.keys[-1], expected.end_anchor, "verify_anchored_export end")
+    # Cross-vendor re-review F2: validate the key-chain length BEFORE dereferencing keys[0]/keys[-1]
+    # so a zero-key chain fails closed (Err) instead of raising IndexError.
     if len(parsed.transitions) != len(expected.transitions):
         fail("verify_anchored_export: transition count")
     if len(key_chain.keys) != len(parsed.transitions) + 1:
         fail("verify_anchored_export: key chain length")
+    # Cross-vendor re-review F1: pass the export-level resolved bounds b so a top-level tightening
+    # takes effect in the nested anchor/transition verification (not just the nested struct's bounds).
+    _verify_anchor_compact(parsed.start, key_chain.keys[0], expected.start_anchor, "verify_anchored_export start", b)
+    _verify_anchor_compact(parsed.end, key_chain.keys[-1], expected.end_anchor, "verify_anchored_export end", b)
     # Key-path invariants (anchored_export_codec.ex:506-572 validate_expected_key_path): the expected
     # transition list must form a strictly-increasing effective_at sequence with no fingerprint cycle,
     # and the end anchor must close the path with a chronologically-non-decreasing anchored_at.
     _validate_key_path(expected.start_anchor, expected.transitions, expected.end_anchor)
     for i, tr in enumerate(parsed.transitions):
-        _verify_transition_compact(tr, key_chain.keys[i], key_chain.keys[i + 1], expected.transitions[i], f"verify_anchored_export transition {i}")
+        _verify_transition_compact(tr, key_chain.keys[i], key_chain.keys[i + 1], expected.transitions[i], f"verify_anchored_export transition {i}", b)
     # Chronology over the ACTUAL anchored times (anchored_export_codec.ex:138-154 verify_transitions
     # + chronological_end?): each transition's effective_at must be strictly greater than the previous
     # anchor/transition time, and the end anchor's anchored_at must be >= the last transition's
@@ -1758,10 +1769,12 @@ class ExpectedExport:
     bounds: Bounds | None = None
 
 
-def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: ExpectedAnchor, ctx: str) -> None:
+def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: ExpectedAnchor, ctx: str, bounds: Bounds | None = None) -> None:
     require(len(key.public_key) == 32, f"{ctx}: key width")
-    # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check.
-    b = expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS
+    # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check. When
+    # an enclosing export passes its own resolved bounds (cross-vendor re-review F1), prefer it over
+    # the nested anchor's bounds so the top-level tightening takes effect.
+    b = bounds if bounds is not None else (expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     seg = parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != key.key_id:
@@ -1802,12 +1815,14 @@ def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: E
         fail(f"{ctx}: signature")
 
 
-def _verify_transition_compact(compact: bytes, current_key: HistoricalPublicKey, next_key: HistoricalPublicKey, expected: ExpectedKeyTransition, ctx: str) -> None:
+def _verify_transition_compact(compact: bytes, current_key: HistoricalPublicKey, next_key: HistoricalPublicKey, expected: ExpectedKeyTransition, ctx: str, bounds: Bounds | None = None) -> None:
     require(len(current_key.public_key) == 32 and len(next_key.public_key) == 32, f"{ctx}: key width")
     if _bytes_equal(current_key.public_key, next_key.public_key):
         fail(f"{ctx}: distinct keys")
-    # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check.
-    b = expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS
+    # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check. When
+    # an enclosing export passes its own resolved bounds (cross-vendor re-review F1), prefer it over
+    # the nested transition's bounds so the top-level tightening takes effect.
+    b = bounds if bounds is not None else (expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     seg = parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != current_key.key_id:
