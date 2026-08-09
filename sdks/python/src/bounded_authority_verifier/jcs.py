@@ -92,16 +92,76 @@ def _format_int(n: int) -> str:
 
 
 def _format_float(n: float) -> str:
-    # RFC 8785 §3.2.2: shortest representation. Python's repr(float) produces the shortest
-    # round-tripping decimal (matching ECMAScript's binary64 shortest algorithm).
+    # RFC 8785 §3.2.2: the ECMAScript Number.prototype.toString serialization (shortest
+    # round-tripping decimal, fixed-vs-exponent thresholds, lowercase unpadded exponent). Python's
+    # repr() gives the shortest digits BUT diverges on formatting (repr(1.0)=="1.0", repr(1e-7)==
+    # "1e-07", repr(1e16)=="1e+16"). We port the Elixir reference's ecmascript_number/1 algorithm
+    # (jcs.ex:151-204): take repr's shortest digits, then re-format to the ECMAScript fixed/scientific
+    # thresholds. Without this, a Python verifier computes a different request digest (ba_req) than an
+    # Elixir/TS signer for ANY float-valued cast_argument — a cross-implementation divergence the
+    # corpus cannot express (its digest cases use integer-only arguments).
     if n != n or n in (float("inf"), float("-inf")):  # NaN / inf
         fail("jcs: non-finite float")
-    return repr(n)
-    # Normalize Python's float repr to ECMAScript Number.prototype.toString form:
-    #  - Python writes 'e' for exponents (matches ECMAScript lowercase e).
-    #  - Python writes 'inf'/'nan' (already rejected above).
-    #  - repr(1.0) == '1.0' (a float carries the trailing .0 — the TAG carries the distinction,
-    #    the serialization is the binary64 text). This matches the Elixir/TS JCS for float values.
+    if n == 0.0:
+        # Covers +0.0 and -0.0 (RFC 8785: -0 === 0, emits "0"; the sign is dropped).
+        return "0"
+    sign = "-" if n < 0.0 else ""
+    magnitude = -n if n < 0.0 else n
+    # repr gives the shortest round-tripping decimal (matches :erlang.float_to_binary [:short]).
+    raw = repr(magnitude)
+    mantissa, exponent = _split_exponent(raw)
+    digits, decimal_index = _decimal_digits(mantissa, exponent)
+    digits = _trim_trailing_zeroes(digits)
+    scientific_exponent = decimal_index - 1
+    if scientific_exponent < -6 or scientific_exponent >= 21:
+        body = _scientific(digits, scientific_exponent)
+    else:
+        body = _fixed(digits, decimal_index)
+    return sign + body
+
+
+def _split_exponent(raw: str) -> tuple[str, int]:
+    # repr may use 'e' (1e-07) or 'E'; split off the exponent.
+    if "e" in raw:
+        m, e = raw.split("e", 1)
+        return m, int(e)
+    if "E" in raw:
+        m, e = raw.split("E", 1)
+        return m, int(e)
+    return raw, 0
+
+
+def _decimal_digits(mantissa: str, exponent: int) -> tuple[str, int]:
+    # Combine integer + fraction parts; decimal_index = len(integer_part) + exponent.
+    if "." in mantissa:
+        integer, fraction = mantissa.split(".", 1)
+    else:
+        integer, fraction = mantissa, ""
+    return integer + fraction, len(integer) + exponent
+
+
+def _trim_trailing_zeroes(digits: str) -> str:
+    if len(digits) == 0:
+        return digits
+    while len(digits) > 1 and digits[-1] == "0":
+        digits = digits[:-1]
+    return digits
+
+
+def _scientific(digits: str, exponent: int) -> str:
+    first = digits[0]
+    rest = digits[1:]
+    mantissa = first if rest == "" else f"{first}.{rest}"
+    sign = "+" if exponent >= 0 else ""
+    return f"{mantissa}e{sign}{exponent}"
+
+
+def _fixed(digits: str, decimal_index: int) -> str:
+    if decimal_index <= 0:
+        return "0." + "0" * (-decimal_index) + digits
+    if decimal_index >= len(digits):
+        return digits + "0" * (decimal_index - len(digits))
+    return digits[:decimal_index] + "." + digits[decimal_index:]
 
 
 def _escape_string(src_bytes: bytes, out: bytearray) -> None:
@@ -155,8 +215,16 @@ def _append_utf8_bytes(cp: int, out: bytearray) -> None:
     elif cp < 0x800:
         out.append(0xC0 | (cp >> 6))
         out.append(0x80 | (cp & 0x3F))
-    else:
+    elif cp < 0x10000:
         out.append(0xE0 | (cp >> 12))
+        out.append(0x80 | ((cp >> 6) & 0x3F))
+        out.append(0x80 | (cp & 0x3F))
+    else:
+        # Astral code points (cp >= 0x10000) — 4-byte UTF-8 (RFC 8785 keeps astral chars as their
+        # UTF-8 bytes, not \u escapes). The prior 3-byte-cap branch here produced a malformed
+        # sequence for astral chars; this is the 4-byte form.
+        out.append(0xF0 | (cp >> 18))
+        out.append(0x80 | ((cp >> 12) & 0x3F))
         out.append(0x80 | ((cp >> 6) & 0x3F))
         out.append(0x80 | (cp & 0x3F))
 

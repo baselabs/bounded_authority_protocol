@@ -9,6 +9,7 @@ immutable cryptographic constants of suite BAP1-Ed25519-SHA256 — they MUST equ
 from __future__ import annotations
 
 from collections.abc import Mapping
+from types import MappingProxyType
 
 # The 38-row Hard maxima table (protocol-v1.md:352-390). Derived from the spec, NOT from lib/*.ex.
 MAXIMA: Mapping[str, int] = {
@@ -62,19 +63,27 @@ FIXED_WIDTH_KEYS: frozenset[str] = frozenset({"digest_bytes", "public_key_bytes"
 class Bounds:
     """The immutable maximum + an optional per-key tightening override.
 
-    ``maximum`` is always the full MAXIMA table; ``overrides`` carries caller tightenings. The
-    profile maxima is the ceiling for every key; an override may only lower a non-fixed key (or
-    set a fixed-width key to exactly its maximum, a no-op).
+    ``maximum`` is always the full MAXIMA table; ``overrides`` carries caller tightenings as a
+    READ-ONLY view (``MappingProxyType``) so a caller cannot mutate a shared ``Bounds`` to widen the
+    profile maximum globally. The profile maxima is the ceiling for every key; an override may only
+    lower a non-fixed key (or set a fixed-width key to exactly its maximum, a no-op).
     """
 
-    __slots__ = ("overrides",)
+    __slots__ = ("_overrides",)
 
     def __init__(self, overrides: Mapping[str, int] | None = None) -> None:
-        self.overrides: dict[str, int] = dict(overrides) if overrides else {}
+        # Wrap in a read-only MappingProxyType so the overrides cannot be mutated post-construction
+        # (a caller doing ``bounds_maximum().overrides["depth"] = 999`` raises TypeError, not widens).
+        self._overrides: Mapping[str, int] = MappingProxyType(dict(overrides)) if overrides else MappingProxyType({})
+
+    @property
+    def overrides(self) -> Mapping[str, int]:
+        """The read-only override map (a MappingProxyType — mutation raises TypeError)."""
+        return self._overrides
 
     def resolve(self, key: str) -> int:
         """Resolve a bound: the override if present, else the maximum."""
-        return self.overrides.get(key, MAXIMA[key])
+        return self._overrides.get(key, MAXIMA[key])
 
 
 MAXIMUM_BOUNDS = Bounds()

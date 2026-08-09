@@ -172,6 +172,8 @@ def _parse_bool(ctx: _Ctx) -> Tagged:
 def _expect_lit(ctx: _Ctx, lit: bytes) -> None:
     src = ctx.src
     pos = ctx.pos
+    if pos + len(lit) > len(src):
+        fail(f"json: expected {lit!r}")  # truncated literal — bounds-check before indexing
     for i, b in enumerate(lit):
         if src[pos + i] != b:
             fail(f"json: expected {lit!r}")
@@ -182,6 +184,14 @@ def _parse_string(ctx: _Ctx) -> JString:
     _node(ctx)
     start = ctx.pos
     raw = _scan_string(ctx, start)
+    # RFC 8259 §2.5 / REQ1-JSON-no-normalization: a JSON string's bytes MUST be valid UTF-8. The
+    # scanner copies raw bytes (multi-byte sequences pass through); validate here so an invalid byte
+    # (e.g. a lone 0xff) rejects as InvalidError rather than escaping later as a UnicodeDecodeError
+    # (which would bypass the closed-error whitelist) or producing a wrong JCS digest.
+    try:
+        raw.decode("utf-8")
+    except UnicodeDecodeError:
+        fail("json: string not valid UTF-8")
     if len(raw) > bounds_resolve(ctx.bounds, "string_bytes"):
         fail("json: string_bytes bound")
     return JString(raw)

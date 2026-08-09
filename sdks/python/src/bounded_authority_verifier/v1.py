@@ -1177,6 +1177,8 @@ def _proof_signing_input_body(proof: ProofProducer, bounds: Bounds | None) -> Si
     if _OPERATION_PRINTABLE.match(proof.operation) is None:
         fail("proof_signing_input: operation charset")
     if proof.nonce is not None:
+        if not _is_well_formed(proof.nonce):
+            fail("proof_signing_input: nonce well-formed")
         nb = str_utf8(proof.nonce)
         if not (1 <= len(nb) <= bounds_resolve(b, "nonce_bytes")):
             fail("proof_signing_input: nonce bytes")
