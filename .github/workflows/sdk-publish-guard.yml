@@ -54,9 +54,13 @@ jobs:
           } | sort -u > "$tmp"
           while IFS= read -r path; do
             [ -n "$path" ] || continue
-            # cat-into-pipe (not `< "$path"`): the latter reads and "writes" the
-            # same path in one line and trips shellcheck SC2094 (a CI hard-fail).
-            if ! cat "$path" | "./$CHECKER" "$path"; then
+            # Read the file into a variable, then pipe it. A direct `< "$path"`
+            # redirect trips shellcheck SC2094 (read+write same path in one
+            # pipeline); `cat "$path" |` trips SC2002 (useless cat). Both are
+            # CI hard-fails under actionlint. The variable form avoids both and
+            # matches the hook's staged-blob pattern.
+            content="$(cat "$path")"
+            if ! printf '%s' "$content" | "./$CHECKER" "$path"; then
               fail=1
             fi
           done < "$tmp"
