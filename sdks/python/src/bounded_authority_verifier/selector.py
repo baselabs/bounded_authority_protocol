@@ -59,6 +59,11 @@ def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Selector:
     # carrying kind:"all" decodes as :all on ANY of the three closed member sets (kind / kind,path,value
     # / kind,path,values). Requiring members === "kind" alone made this runner STRICTER than the
     # official — the one divergence direction that fails a conforming implementation.
+    # The reference accepts kind:"all" on ANY of the three closed member sets (kind / kind,path,value
+    # / kind,path,values) — verified by the corpus case check-envelope-valid-selector-all-with-extra-
+    # members, which the Elixir reference accepts (conformance reports agreed=259 including it). The
+    # reference's closed_map_one_of matches kind:"all" against all three alternatives. Requiring
+    # exactly one member would be STRICTER than the reference and fail that valid case.
     if kind == "all":
         return SelAll()
     if kind == "equals":
