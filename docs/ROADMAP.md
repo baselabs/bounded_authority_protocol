@@ -441,9 +441,43 @@ compatibility.
   be owned (it is — `bounded-authority.io`); and the SDK-repository question (no new repo is
   required; the official-SDK path runs through the MCP SDK maintainers).
 
+## BAP-09 closeout evidence
+
+- Cross-language verifier SDKs ship under `sdks/` — a TypeScript SDK
+  (`sdks/typescript/`, `@bounded-authority/verifier`, Node `>= 20`, zero runtime
+  dependencies, Ed25519 via `node:crypto`) and a Python SDK
+  (`sdks/python/`, `bounded-authority-verifier`, Python `>= 3.10`, single runtime
+  dependency `cryptography`). Both are typed reimplementations of the frozen v1
+  profile authored from the spec + corpus alone with no code-level derivation from
+  the Elixir reference ([ADR 0014](adr/0014-cross-language-verifier-sdks.md)).
+- Each SDK passes all **259** published conformance vectors, recomputed from
+  scratch (not cached verdicts), and asserts the corpus `index.json` SHA-256
+  (`c3b0bcf7665c217ea45843a9c49c2769a61c21c4998d8b85249cf6cb757084dd`) at startup
+  — a mismatched vendored corpus fails closed rather than drifting silently. The
+  two-boundary key census is asserted per-runner (discovery == verify-import ==
+  index `public_key_fingerprints`, 8 keys both directions).
+- Every parser-layer permissiveness closure is proven **red-capable** by a
+  per-language mutation-gate (the ADR 0005:240-246 discipline applied
+  per-language): duplicate-reject, null-prototype/dunder (TS `Object.create(null)`
+  vs Python plain-dict + `dict[key]`-only — the mechanism differs per language),
+  raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction.
+  Each SDK's 8-item defect-injection battery (5 closures + census + purity lint +
+  license check) was mechanically broken, confirmed RED, and reverted at authoring.
+- The SDKs are **verifiers**, not authority runtimes: every function returns
+  `Result[T] = Ok|Err` (the `{:ok, value} | {:error, :invalid}` mirror); no
+  `authorized`/`decision` surface; facts are value-bearing, redacted, and
+  non-authorizing. The library path is purity-gated (TS ESLint rule; Python AST
+  ban on I/O/clock/RNG/network) and dependency-license-gated (Apache-2.0/BSD/MIT/ISC
+  allowlist). The `sdks-conformance` CI job
+  ([`.github/workflows/sdks.yml`](../.github/workflows/sdks.yml)) runs on every
+  `sdks/**` / `priv/conformance/**` change. The Elixir package is untouched —
+  zero wire byte, bound, or verdict change.
+
 ## Next action
 
-BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, and BAP-14 are complete. BAP-05 shipped the portable v1 conformance
+BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, and BAP-14 are complete. BAP-09 shipped the cross-language verifier SDKs
+(TypeScript `@bounded-authority/verifier` + Python `bounded-authority-verifier` under `sdks/`, each
+passing all 259 conformance vectors + per-language permissiveness mutation-gates; ADR 0014). BAP-05 shipped the portable v1 conformance
 corpus (259 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI
 (escript, `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent
 Node second-implementation runner (node:* only — the corpus is normative), a three-partition
