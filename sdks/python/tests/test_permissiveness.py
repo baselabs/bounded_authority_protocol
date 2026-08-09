@@ -86,6 +86,7 @@ from bounded_authority_verifier.v1 import (
     NonceNotRequired,
     OperationInput,
     ProofProducer,
+    SigningInput,
     TrustedIssuer,
     assemble_compact,
     boundary_anchor_signing_input,
@@ -97,6 +98,7 @@ from bounded_authority_verifier.v1 import (
     grant_signing_input,
     key_transition_signing_input,
     proof_signing_input,
+    request_digest,
     verify_anchored_export,
     verify_grant,
 )
@@ -455,6 +457,13 @@ def _fresh_key() -> tuple[bytes, Ed25519PrivateKey]:
     return pub, priv
 
 
+def _must_assemble(si: SigningInput, sig: bytes) -> bytes:
+    """Unwrap assemble_compact's Result in test helpers (failure is a test-setup bug)."""
+    c = assemble_compact(si, sig)
+    assert c.is_ok, "assemble_compact failed in test helper"
+    return c.value
+
+
 def _b64url(b: bytes) -> str:
     return base64.urlsafe_b64encode(b).rstrip(b"=").decode("ascii")
 
@@ -464,7 +473,7 @@ def _signed_anchor_compact(anchor: BoundaryAnchorProducer, priv: Ed25519PrivateK
     assert si.is_ok, "anchor signing input failed"
     message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
     sig = priv.sign(message)
-    return assemble_compact(si.value, sig)
+    return _must_assemble(si.value, sig)
 
 
 Z32 = bytes(32)
@@ -512,7 +521,7 @@ def _build_archive(
         assert si.is_ok, "transition signing input failed"
         message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
         sig = cur_priv.sign(message)
-        transitions.append(assemble_compact(si.value, sig))
+        transitions.append(_must_assemble(si.value, sig))
         expected_transitions.append(ExpectedKeyTransition(
             transition_id=f"urn:example:transition:{i}", chain_id=chain_id, effective_at=effective_at,
             current_key_id=f"k{i}", current_key_fingerprint=from_fp,
@@ -837,7 +846,7 @@ def _signed_grant(kid: str = "issuer-123456"):
     message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
     sig = issuer_priv.sign(message)
     return {
-        "compact": assemble_compact(si.value, sig),
+        "compact": _must_assemble(si.value, sig),
         "issuer": TrustedIssuer(key_id=kid, public_key=issuer_pub),
         "issuer_pub": issuer_pub, "issuer_priv": issuer_priv,
         "holder_pub": holder_pub, "holder_fp": holder_fp,
@@ -856,7 +865,7 @@ def _signed_proof(grant_compact: bytes, holder_pub: bytes, holder_priv: Ed25519P
     assert si.is_ok, "proof signing input failed"
     message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
     sig = holder_priv.sign(message)
-    return assemble_compact(si.value, sig)
+    return _must_assemble(si.value, sig)
 
 
 def test_decode_grant_honors_caller_bounds():
@@ -889,7 +898,7 @@ def test_decode_grant_threads_caller_bounds_into_selector_decode():
     si = grant_signing_input(grant)
     assert si.is_ok, "grant signing input failed"
     message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
-    compact = assemble_compact(si.value, issuer_priv.sign(message))
+    compact = _must_assemble(si.value, issuer_priv.sign(message))
     # Control: at MAX, a one_of with 2 values is accepted.
     assert decode_grant(compact).is_ok, "one_of with 2 values must be accepted at MAX"
     # Tightened: one_of_values=1 → the 2-value selector must be rejected (parse_selector threads bounds).
@@ -933,7 +942,7 @@ def test_check_envelope_honors_caller_bounds():
     gsi = grant_signing_input(grant)
     assert gsi.is_ok
     gmsg = f"{gsi.value.protected_segment.decode('ascii')}.{gsi.value.payload_segment.decode('ascii')}".encode("ascii")
-    grant_compact = assemble_compact(gsi.value, issuer_priv.sign(gmsg))
+    grant_compact = _must_assemble(gsi.value, issuer_priv.sign(gmsg))
     proof_compact = _signed_proof(grant_compact, holder_pub, holder_priv)
     base = ExpectedRequest(
         trusted_issuer=TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
@@ -970,3 +979,33 @@ def test_expected_structs_bounds_absent_defaults_to_max():
     assert verify_grant(g["compact"], g["issuer"], eg).is_ok
     assert decode_grant(g["compact"]).is_ok
 
+
+
+def test_assemble_compact_and_request_digest_return_result_contract():
+    """Cross-vendor #21: assemble_compact + request_digest return Ok/Err (the Result contract),
+    not raw values + throw. Invalid inputs return Err; valid inputs return Ok. Mirrors the Elixir
+    {:ok,_}|{:error,:invalid} and the other 15 facade functions."""
+    # assemble_compact: bad kind -> Err (not raise).
+    bad = assemble_compact(
+        SigningInput(kind="bogus", protected_segment=b"a", payload_segment=b"b"),  # type: ignore[arg-type]
+        b"\x00" * 64,
+    )
+    assert not bad.is_ok, "bad kind must return Err"
+    # assemble_compact: short signature -> Err.
+    short = assemble_compact(
+        SigningInput(kind="grant", protected_segment=b"a", payload_segment=b"b"),
+        b"\x00" * 32,
+    )
+    assert not short.is_ok, "short signature must return Err"
+    # assemble_compact: valid -> Ok.
+    valid = assemble_compact(
+        SigningInput(kind="grant", protected_segment=b"a", payload_segment=b"b"),
+        b"\x00" * 64,
+    )
+    assert valid.is_ok and isinstance(valid.value, bytes)
+    # request_digest: valid -> Ok (raw 32 bytes).
+    rd = request_digest("read", JInt(v=1))
+    assert rd.is_ok and len(rd.value) == 32
+    # request_digest: invalid (empty operation) -> Err.
+    rd_bad = request_digest("", JInt(v=1))
+    assert not rd_bad.is_ok, "empty operation must return Err"

@@ -335,7 +335,7 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
             ),
             b64_field(inp, "signature", "assemble_compact"),
         ))
-        return INVALID if r is INVALID else {"compact": utf8_str(r)}
+        return INVALID if (r is INVALID or not r.is_ok) else {"compact": utf8_str(r.value)}
     if surface == "decode_grant":
         compact = str_utf8(fetch_binary(inp, "compact", "decode_grant"))
         r = _run_thunk(lambda: v1.decode_grant(compact))
@@ -381,7 +381,7 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         operation = fetch_binary(inp, "operation", "request_digest")
         cast_args = _js_to_tagged(inp["cast_arguments"])
         r = _run_thunk(lambda: v1.request_digest(operation, cast_args))
-        return INVALID if r is INVALID else {"digest": _b64e(r)}
+        return INVALID if (r is INVALID or not r.is_ok) else {"digest": _b64e(r.value)}
     if surface == "verify_grant":
         r = _run_thunk(lambda: v1.verify_grant(
             str_utf8(fetch_binary(inp, "compact", "verify_grant")),
