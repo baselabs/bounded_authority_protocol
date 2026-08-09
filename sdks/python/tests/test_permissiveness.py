@@ -98,7 +98,8 @@ def test_dunder_member_preserved_as_data():
     assert "ok" in v.v
     class_member = v.v["__class__"]
     assert isinstance(class_member, JObject)  # the data value, NOT <class 'dict'>
-    assert class_member.v["evil"].v == 1 if isinstance(class_member.v.get("evil"), JInt) else True
+    evil = class_member.v["evil"]
+    assert isinstance(evil, JInt) and evil.v == 1
 
 
 def test_dunder_does_not_collapse_identity():
@@ -156,3 +157,45 @@ def test_equals_selector_distinguishes_int_from_float():
     sel_float = parse_selector(dec(b'{"kind":"equals","path":["n"],"value":1.0}'))
     assert selector_matches(sel_int, args) is True
     assert selector_matches(sel_float, args) is False  # float 1.0 != integer 1
+
+
+# 6. JCS float canonicalization (RFC 8785 §3.2.2 / ECMAScript Number.prototype.toString). The host
+# defect: Python repr(1.0)=="1.0" but ECMAScript emits "1"; repr(1e-7)=="1e-07" but ECMAScript emits
+# "1e-7". A wrong float serialization makes a Python verifier compute a different request digest
+# (ba_req) than an Elixir/TS signer for any float-valued cast_argument — a cross-implementation
+# divergence the corpus cannot express (its digest cases are integer-only). These cases pin the
+# ECMAScript serialization; removing the _format_float normalization → they go RED.
+@pytest.mark.parametrize(
+    "lexeme,expected",
+    [
+        (b"1.0", b'{"x":1}'),
+        (b"10.0", b'{"x":10}'),
+        (b"100.0", b'{"x":100}'),
+        (b"0.0", b'{"x":0}'),
+        (b"1e-7", b'{"x":1e-7}'),
+        (b"1.5", b'{"x":1.5}'),
+        (b"0.0001", b'{"x":0.0001}'),
+        (b"1e-6", b'{"x":0.000001}'),
+        (b"9e15", b'{"x":9000000000000000}'),
+        (b"123.456", b'{"x":123.456}'),
+    ],
+)
+def test_jcs_float_canonicalization_matches_ecmascript(lexeme, expected):
+    from bounded_authority_verifier.jcs import jcs_encode
+
+    v = dec(b'{"x":' + lexeme + b"}")
+    assert jcs_encode(v) == expected
+
+
+def test_jcs_astral_codepoint_emits_4_byte_utf8():
+    """RFC 8785: astral code points (cp >= 0x10000) emit as 4-byte UTF-8, not a malformed 3-byte
+    sequence. The defect: a 3-byte-cap _append_utf8_bytes produces F0 80 80 ... for astral chars.
+    """
+    from bounded_authority_verifier.jcs import jcs_encode
+
+    # U+10000 (𐀀) encoded as a JSON \uXXXX surrogate pair.
+    v = dec(b'"\\ud800\\udc00"')
+    out = jcs_encode(v)
+    # The string value between the quotes is the raw 4-byte UTF-8 of U+10000: F0 90 80 80.
+    assert out == b'"' + bytes([0xF0, 0x90, 0x80, 0x80]) + b'"'
+

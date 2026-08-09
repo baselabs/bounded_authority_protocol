@@ -14,9 +14,31 @@ from __future__ import annotations
 
 import sys
 from importlib.metadata import PackageNotFoundError, distribution
+from pathlib import Path
 
-# The runtime dependencies declared in pyproject.toml.
-RUNTIME_DEPS = ["cryptography"]
+import tomllib
+
+
+def _runtime_deps() -> list[str]:
+    """Read the runtime dependencies from pyproject.toml [project] dependencies.
+
+    Parses the actual manifest (NOT a hardcoded list) so adding a non-allowlisted dep to
+    pyproject.toml makes this gate fail — the defect-injection battery item 8 claim.
+    """
+    pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+    with open(pyproject, "rb") as f:
+        data = tomllib.load(f)
+    deps = data.get("project", {}).get("dependencies", [])
+    # Normalize "cryptography>=44.0.0" → "cryptography" (strip version specifiers).
+    names: list[str] = []
+    for d in deps:
+        # PEP 508: the name is the canonical package name up to the first version comparator,
+        # extras marker, or semicolon. Match the leading name run ([A-Za-z0-9._-]+).
+        import re
+
+        m = re.match(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)", d)
+        names.append(m.group(1) if m else d.strip())
+    return names
 
 # The allowlist of SPDX-compatible licenses (AGENTS rule 10). ``cryptography`` is Apache-2.0 OR BSD-3-Clause.
 ALLOWED_LICENSES = {
@@ -60,7 +82,11 @@ def _license_terms(dist_name: str) -> list[str]:
 
 def main() -> int:
     violations: list[str] = []
-    for dep in RUNTIME_DEPS:
+    runtime_deps = _runtime_deps()
+    if not runtime_deps:
+        print("license: no runtime dependencies declared in pyproject.toml", file=sys.stderr)
+        return 1
+    for dep in runtime_deps:
         licenses = [t for t in _license_terms(dep) if t]
         if not licenses:
             violations.append(f"{dep}: no license metadata found")
