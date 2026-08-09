@@ -47,6 +47,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from bounded_authority_verifier.bounds import bounds_new
 from bounded_authority_verifier.ed25519 import reset_census, sha256
 from bounded_authority_verifier.error import InvalidError
 from bounded_authority_verifier.json_alg import (
@@ -55,6 +56,7 @@ from bounded_authority_verifier.json_alg import (
     JInt,
     JObject,
     JString,
+    Tagged,
     json_decode,
 )
 from bounded_authority_verifier.jwk import public_key_thumbprint_raw
@@ -74,17 +76,29 @@ from bounded_authority_verifier.v1 import (
     ExpectedAnchor,
     ExpectedChain,
     ExpectedExport,
+    ExpectedGrant,
     ExpectedKeyTransition,
+    ExpectedRequest,
+    GrantProducer,
     HistoricalKeyChain,
     HistoricalPublicKey,
     KeyTransitionProducer,
+    NonceNotRequired,
+    OperationInput,
+    ProofProducer,
+    TrustedIssuer,
     assemble_compact,
     boundary_anchor_signing_input,
     check_chain,
+    check_envelope,
+    decode_grant,
     encode_anchored_export,
     encode_consumption_entry,
+    grant_signing_input,
     key_transition_signing_input,
+    proof_signing_input,
     verify_anchored_export,
+    verify_grant,
 )
 
 dec = json_decode
@@ -621,6 +635,14 @@ def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
     Defect A: revert the canonical check → a whitespace-padded row passes. Defect B: revert the
     sequence-positive check → a sequence-0 row passes."""
     from bounded_authority_verifier.jcs import jcs_encode
+    from bounded_authority_verifier.v1 import ExpectedChain
+
+    def expected_of(chain: ChainInput) -> ExpectedChain:
+        return ExpectedChain(
+            chain_id=chain.chain_id, first_sequence=chain.first_sequence,
+            last_sequence=chain.last_sequence, row_count=chain.row_count,
+            previous_hash=chain.previous_hash, last_hash=chain.last_hash,
+        )
 
     enc = encode_consumption_entry(ConsumptionEntry(
         chain_id="urn:example:chain", sequence=1, previous_hash=Z32, commitment=bytes([7] * 32),
@@ -633,7 +655,7 @@ def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
         previous_hash=Z32, last_hash=last_hash,
     )
     # Control: the canonical row verifies.
-    assert check_chain(good_chain, good_chain).is_ok
+    assert check_chain(good_chain, expected_of(good_chain)).is_ok
     # Defect A: a row with leading whitespace (valid JSON but NOT canonical) must reject.
     # Recompute last_hash from the padded row's ACTUAL hash so the hash-chain check passes and ONLY
     # the canonical re-encode check is the load-bearing gate (otherwise the hash mismatch rejects
@@ -644,7 +666,7 @@ def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
         rows=(padded,), chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1,
         previous_hash=Z32, last_hash=padded_last_hash,
     )
-    assert not check_chain(padded_chain, padded_chain).is_ok, "noncanonical (whitespace) row must reject"
+    assert not check_chain(padded_chain, expected_of(padded_chain)).is_ok, "noncanonical (whitespace) row must reject"
     # Defect B: a sequence-0 row (hand-rolled canonical bytes) must reject.
     seq_zero = jcs_encode(JObject(v={
         "chain_id": JString(v=b"urn:example:chain"),
@@ -657,7 +679,7 @@ def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
         rows=(seq_zero,), chain_id="urn:example:chain", first_sequence=0, last_sequence=0, row_count=1,
         previous_hash=Z32, last_hash=sha256(ROW_PREFIX, seq_zero),
     )
-    assert not check_chain(seq_zero_chain, seq_zero_chain).is_ok, "sequence-0 row must reject"
+    assert not check_chain(seq_zero_chain, expected_of(seq_zero_chain)).is_ok, "sequence-0 row must reject"
 
 
 def test_encode_anchored_export_rejects_transition_count_over_bound():
@@ -774,4 +796,148 @@ def test_verify_anchored_export_rejects_fingerprint_cycle():
     b = _fresh_key()
     cyclic = _build_archive([a, b, a], effective_ats=[1500, 2000], end_anchored_at=3000)
     assert not verify_anchored_export(ArchivedObject(chunks=(cyclic["archive"],), version="v1"), cyclic["key_chain"], cyclic["expected"]).is_ok, "fingerprint cycle A→B→A must reject"
+
+
+# === BAP-09 #10/#11 cross-vendor remediation — caller-supplied bounds threaded through verify/decode ===
+# The reference resolves Bounds.coerce(expected.bounds) once per entry point and threads the result
+# into EVERY bound-sensitive check (runtime.ex:186,204; consumption_chain.ex check_chain;
+# anchored_export_codec.ex:84-185): valid_key_id?(kid, bounds.kid_bytes), Json.decode(bytes, bounds),
+# valid_identifier?(iss/grant_id, bounds), decode_audiences(aud, bounds), operations(ops, bounds),
+# validate_chunks / parse_archive frame reads, etc. The SDK previously passed bounds ONLY to
+# parse_compact and hardcoded MAXIMUM_BOUNDS in every subsequent validator, so a caller tightening had
+# no effect. Each test below proves a tightening now rejects at the named gate. Defect: revert the
+# threading (any helper back to MAXIMUM_BOUNDS, or the bounds param removed) → the named deny goes
+# GREEN (Err→Ok regression), proving the test is red-capable.
+#
+# The falsifiable case: a grant whose kid is 13 bytes ("issuer-123456") is valid at MAX (kid_bytes
+# 128), but MUST be rejected under bounds_new({"kid_bytes": 5}) via valid_key_id? (the reference's
+# decode_grant(grant, %{kid_bytes: 5}) rejects it). Each test drives one entry point.
+
+# A typed JSON-null cast-arguments value (the Tagged null variant carries no `v`).
+_NULL_ARGS: Tagged = json_decode(b"null")
+
+
+def _signed_grant(kid: str = "issuer-123456"):
+    """Build a real Ed25519-signed grant with a chosen kid (13 bytes by default). Returns the compact
+    + the issuer key material needed for verify_grant / check_envelope."""
+    issuer_pub, issuer_priv = _fresh_key()
+    holder_pub, _ = _fresh_key()
+    holder_fp = public_key_thumbprint_raw(holder_pub)
+    grant = GrantProducer(
+        key_id=kid, issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        holder_thumbprint=_b64url(holder_fp),
+        operations=(OperationInput(name="read", selectors=("all",)),),
+    )
+    si = grant_signing_input(grant)
+    assert si.is_ok, "grant signing input failed"
+    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
+    sig = issuer_priv.sign(message)
+    return {
+        "compact": assemble_compact(si.value, sig),
+        "issuer": TrustedIssuer(key_id=kid, public_key=issuer_pub),
+        "issuer_pub": issuer_pub, "issuer_priv": issuer_priv,
+        "holder_pub": holder_pub, "holder_fp": holder_fp,
+    }
+
+
+def _signed_proof(grant_compact: bytes, holder_pub: bytes, holder_priv: Ed25519PrivateKey) -> bytes:
+    """Build a valid proof binding to the grant (holder signs). Drives the check_envelope path."""
+    proof = ProofProducer(
+        holder_public_key=holder_pub,
+        proof_id="urn:example:proof:1", method="POST", target_uri="https://resource.example.test/invoke",
+        issued_at=1400, invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
+        grant_compact=grant_compact, cast_arguments=_NULL_ARGS,
+    )
+    si = proof_signing_input(proof)
+    assert si.is_ok, "proof signing input failed"
+    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
+    sig = holder_priv.sign(message)
+    return assemble_compact(si.value, sig)
+
+
+def test_decode_grant_honors_caller_bounds():
+    """#10/#11: decode_grant MUST thread caller-supplied bounds into _require_kid (valid_key_id?). A
+    grant with a 13-byte kid is accepted at MAX, rejected under kid_bytes=5. Defect: revert
+    _require_kid to MAXIMUM_BOUNDS → the tightened call returns Ok."""
+    g = _signed_grant()
+    # Control: no bounds (MAX) → the 13-byte kid is accepted.
+    assert decode_grant(g["compact"]).is_ok, "13-byte kid must be accepted at MAX"
+    # Tightened: kid_bytes=5 → the 13-byte kid must be rejected (the reference's valid_key_id? gate).
+    assert not decode_grant(g["compact"], bounds_new({"kid_bytes": 5})).is_ok, "kid_bytes=5 must reject a 13-byte kid"
+
+
+def test_verify_grant_honors_caller_bounds():
+    """#10/#11: verify_grant MUST thread ExpectedGrant.bounds into _require_kid (valid_key_id?). The
+    grant is validly signed, so the only load-bearing gate under the tightening is the kid bound.
+    Defect: revert verify_grant's bounds threading → the tightened call returns Ok."""
+    reset_census()
+    g = _signed_grant()
+    expected_max = ExpectedGrant(
+        issuer="https://issuer.example.test", audience="https://resource.example.test",
+        evaluation_time=1500, clock_skew=60,
+    )
+    # Control: no bounds (MAX) → verifies.
+    assert verify_grant(g["compact"], g["issuer"], expected_max).is_ok, "13-byte kid must verify at MAX"
+    # Tightened: kid_bytes=5 → rejected via the kid gate (signature would otherwise verify).
+    expected_tight = ExpectedGrant(
+        issuer="https://issuer.example.test", audience="https://resource.example.test",
+        evaluation_time=1500, clock_skew=60, bounds=bounds_new({"kid_bytes": 5}),
+    )
+    assert not verify_grant(g["compact"], g["issuer"], expected_tight).is_ok, "kid_bytes=5 must reject a 13-byte kid"
+
+
+def test_check_envelope_honors_caller_bounds():
+    """#10/#11: check_envelope MUST thread ExpectedRequest.bounds into the grant header parse. The
+    grant + proof are both validly signed; the only load-bearing gate under the tightening is the
+    grant kid bound. Defect: revert check_envelope's bounds threading → the tightened call returns Ok."""
+    reset_census()
+    issuer_pub, issuer_priv = _fresh_key()
+    holder_pub, holder_priv = _fresh_key()
+    holder_fp = public_key_thumbprint_raw(holder_pub)
+    grant = GrantProducer(
+        key_id="issuer-123456", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        holder_thumbprint=_b64url(holder_fp),
+        operations=(OperationInput(name="read", selectors=("all",)),),
+    )
+    gsi = grant_signing_input(grant)
+    assert gsi.is_ok
+    gmsg = f"{gsi.value.protected_segment.decode('ascii')}.{gsi.value.payload_segment.decode('ascii')}".encode("ascii")
+    grant_compact = assemble_compact(gsi.value, issuer_priv.sign(gmsg))
+    proof_compact = _signed_proof(grant_compact, holder_pub, holder_priv)
+    base = ExpectedRequest(
+        trusted_issuer=TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
+        issuer="https://issuer.example.test", audience="https://resource.example.test",
+        method="POST", target_uri="https://resource.example.test/invoke",
+        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
+        cast_arguments=_NULL_ARGS, evaluation_time=1500, clock_skew=60, proof_max_age=300,
+        nonce=NonceNotRequired(),
+    )
+    # Control: no bounds (MAX) → envelope verifies.
+    assert check_envelope(grant_compact, proof_compact, base).is_ok, "13-byte kid must verify at MAX"
+    # Tightened: kid_bytes=5 → rejected via the grant kid gate.
+    tight = ExpectedRequest(
+        trusted_issuer=TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
+        issuer="https://issuer.example.test", audience="https://resource.example.test",
+        method="POST", target_uri="https://resource.example.test/invoke",
+        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
+        cast_arguments=_NULL_ARGS, evaluation_time=1500, clock_skew=60, proof_max_age=300,
+        nonce=NonceNotRequired(), bounds=bounds_new({"kid_bytes": 5}),
+    )
+    assert not check_envelope(grant_compact, proof_compact, tight).is_ok, "kid_bytes=5 must reject a 13-byte kid"
+
+
+def test_expected_structs_bounds_absent_defaults_to_max():
+    """#11 control: bounds absent on every Expected* MUST default to MAX (the conformance runner
+    constructs Expected* without bounds; a missing default would break 259/259). The 13-byte kid grant
+    verifies at MAX via every entry point that takes an Expected*."""
+    reset_census()
+    g = _signed_grant()
+    eg = ExpectedGrant(
+        issuer="https://issuer.example.test", audience="https://resource.example.test",
+        evaluation_time=1500, clock_skew=60,
+    )
+    assert verify_grant(g["compact"], g["issuer"], eg).is_ok
+    assert decode_grant(g["compact"]).is_ok
 
