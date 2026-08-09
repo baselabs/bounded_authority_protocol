@@ -25,6 +25,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/adr/0011-published-governance.md",
                     "docs/adr/0012-security-release-accelerated-deprecation-window.md",
                     "docs/adr/0013-capability-authorization-extension.md",
+                    "docs/adr/0014-cross-language-verifier-sdks.md",
                     "docs/protocol-v1.md",
                     "docs/release-candidate-contract.md",
                     "docs/errata.md",

@@ -139,10 +139,13 @@ In addition to the Elixir package, the repository ships typed **verifier** SDK r
 the frozen v1 profile, authored from the spec + corpus alone with no code-level derivation from the
 Elixir reference ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)):
 
-- **TypeScript** — [`sdks/typescript/`](sdks/typescript/) (`@bounded-authority/verifier` on npm; Node
-  `>= 20`, zero runtime dependencies; Ed25519 via `node:crypto`).
-- **Python** — [`sdks/python/`](sdks/python/) (`bounded-authority-verifier` on PyPI; Python `>= 3.10`,
+- **TypeScript** — `sdks/typescript/` ([`@bounded-authority/verifier`][ts-pkg] on npm; Node `>= 20`,
+  zero runtime dependencies; Ed25519 via `node:crypto`).
+- **Python** — `sdks/python/` ([`bounded-authority-verifier`][py-pkg] on PyPI; Python `>= 3.10`,
   single runtime dependency `cryptography`).
+
+[ts-pkg]: https://www.npmjs.com/package/@bounded-authority/verifier
+[py-pkg]: https://pypi.org/project/bounded-authority-verifier/
 
 Each SDK passes all **259** published conformance vectors (recomputed from scratch, not cached),
 asserts the corpus `index.json` SHA-256 at startup, and proves every parser-layer permissiveness
