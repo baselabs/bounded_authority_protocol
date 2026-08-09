@@ -10,7 +10,7 @@ int/float distinction (REQ1-SELECTOR-semantic-identity depends on it).
 from __future__ import annotations
 
 from .base64url import base64url_encode
-from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve
+from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .ed25519 import sha256
 from .error import InvalidError, Ok, Result, err, fail, invalid_error
 from .jcs import jcs_encode
@@ -50,23 +50,25 @@ def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXI
 
     ``operation`` is validated printable ASCII 1..128.
     """
+    # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits).
+    b = coerce_bounds(bounds)
     op_bytes = str_utf8(operation)
-    if not (1 <= len(op_bytes) <= bounds_resolve(bounds, "operation_bytes")):
+    if not (1 <= len(op_bytes) <= bounds_resolve(b, "operation_bytes")):
         fail("request_digest: operation bound")
-    for b in op_bytes:
-        if b < 0x20 or b > 0x7E:
+    for byte in op_bytes:
+        if byte < 0x20 or byte > 0x7E:
             fail("request_digest: operation printable ASCII")
     # The projection: [operation_string, typed(cast_arguments)].
     projected = typed_project(cast_arguments)
     array: Tagged = JArray((JString(op_bytes), projected))
     # Per-node bounds on the TYPED projection (not the raw args): `typed` deepens/triples the tree, so
     # the depth boundary is ~15 (not 32) and total_nodes is reachable inline.
-    if not _within_tagged_bounds(array, 0, bounds):
+    if not _within_tagged_bounds(array, 0, b):
         fail("request_digest: cast_arguments bounds")
-    if _count_tagged_nodes(array) > bounds_resolve(bounds, "total_nodes"):
+    if _count_tagged_nodes(array) > bounds_resolve(b, "total_nodes"):
         fail("request_digest: total_nodes")
-    jcs = jcs_encode(array, bounds)
-    if len(jcs) > bounds_resolve(bounds, "jcs_bytes"):
+    jcs = jcs_encode(array, b)
+    if len(jcs) > bounds_resolve(b, "jcs_bytes"):
         fail("request_digest: jcs_bytes")
     return sha256(REQUEST_PREFIX, jcs)
 
