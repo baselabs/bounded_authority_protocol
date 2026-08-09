@@ -235,8 +235,11 @@ def _scan_string(ctx: _Ctx, start: int) -> bytes:
             elif e == 0x75:  # \uXXXX — 4 hex digits; handle surrogate pairs.
                 hi = _parse_hex4(ctx)
                 if 0xD800 <= hi <= 0xDBFF:
-                    # High surrogate; require \uXXXX low surrogate.
-                    if src[ctx.pos] != 0x5C or src[ctx.pos + 1] != 0x75:
+                    # High surrogate; require \uXXXX low surrogate. Bounds-guard the continuation
+                    # check — a lone high-surrogate escape at end-of-buffer (b'"\uD800') must fail
+                    # closed as InvalidError, not raise IndexError on src[ctx.pos+1]. The TS sibling
+                    # is safe (out-of-range Uint8Array access yields undefined); Python raises.
+                    if _byte_at(src, ctx.pos) != 0x5C or _byte_at(src, ctx.pos + 1) != 0x75:
                         fail("json: unpaired high surrogate")
                     ctx.pos += 2
                     lo = _parse_hex4(ctx)
@@ -348,18 +351,73 @@ def _parse_number(ctx: _Ctx) -> Tagged:
     ctx.pos = lexeme_end
     text = lexeme.decode("ascii")
     if is_float:
+        # REQ1-JSON-raw-lexeme: check the magnitude of the RAW lexeme by decimal arithmetic BEFORE
+        # float() conversion. A lexeme like "9007199254740991.0001" rounds to the max binary64 value
+        # under float(), so a post-conversion abs(n) > MAX check accepts it — defeating the exact
+        # bound. The reference (json.ex magnitude_within?) compares the lexeme's significant digits
+        # against the maximum's digit string. Mirror that here.
+        if not _lexeme_magnitude_within(text, MAX_FLOAT):
+            fail("json: float magnitude bound")
         n = float(text)
         # Python floats are always finite here (a non-finite lexeme like "1e400" overflows to inf,
         # which we reject — float_magnitude is the finite bound).
         if _is_inf(n):
             fail("json: float not finite")
-        if abs(n) > MAX_FLOAT:
-            fail("json: float magnitude bound")
         return JFloat(n)
-    n_int = int(text)
-    if abs(n_int) > MAX_INT:
+    if not _lexeme_magnitude_within(text, MAX_INT):
         fail("json: integer magnitude bound")
+    n_int = int(text)
     return JInt(n_int)
+
+
+def _lexeme_magnitude_within(text: str, maximum: int) -> bool:
+    """Exact decimal magnitude check of a number lexeme against `maximum`, mirroring the reference
+    (json.ex:298-349 magnitude_within? / compare_boundary). Returns True if |value| <= maximum.
+
+    Compares the lexeme's significant digits by their effective integer position — NOT the float
+    value (which loses precision). Handles sign, fraction, and exponent exactly.
+    """
+    # Strip a leading sign.
+    unsigned = text[1:] if text[:1] in ("-", "+") else text
+    # Split into integer digits, fraction digits, exponent (sign already validated by the scanner).
+    e_pos = -1
+    for marker in ("e", "E"):
+        idx = unsigned.find(marker)
+        if idx != -1:
+            e_pos = idx
+            break
+    if e_pos != -1:
+        mantissa = unsigned[:e_pos]
+        exponent = int(unsigned[e_pos + 1:])
+    else:
+        mantissa = unsigned
+        exponent = 0
+    if "." in mantissa:
+        integer_digits, fraction_digits = mantissa.split(".", 1)
+    else:
+        integer_digits, fraction_digits = mantissa, ""
+    digits = (integer_digits + fraction_digits).lstrip("0")
+    if digits == "":
+        return True  # value is zero
+    maximum_digits = str(maximum)
+    # Effective integer-position of the last significant digit (reference's integer_length).
+    integer_length = len(digits) + exponent - len(fraction_digits)
+    if integer_length < len(maximum_digits):
+        return True
+    if integer_length > len(maximum_digits):
+        return False
+    # Same digit-count boundary: compare the leading integer_part (padded/truncated to maximum's
+    # length) then require the leftover fractional_part to be all-zero if equal (compare_boundary).
+    maximum_length = len(maximum_digits)
+    if len(digits) >= maximum_length:
+        integer_part = digits[:maximum_length]
+        fractional_part = digits[maximum_length:]
+    else:
+        integer_part = digits + "0" * (maximum_length - len(digits))
+        fractional_part = ""
+    return integer_part < maximum_digits or (
+        integer_part == maximum_digits and (fractional_part == "" or set(fractional_part) <= {"0"})
+    )
 
 
 def _is_inf(x: float) -> bool:
@@ -384,7 +442,13 @@ def _parse_object(ctx: _Ctx, child_level: int) -> JObject:
         name_bytes = _scan_string(ctx, ctx.pos)
         if len(name_bytes) > bounds_resolve(ctx.bounds, "key_bytes"):
             fail("json: key_bytes bound")
-        name_str = name_bytes.decode("utf-8")
+        # A member name's bytes MUST be valid UTF-8 (RFC 8259 §2.5 / REQ1-JSON-no-normalization).
+        # Validate before decode so a lone 0xff in a name fails closed as InvalidError rather than
+        # raising UnicodeDecodeError past the closed-error whitelist (matches _parse_string above).
+        try:
+            name_str = name_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            fail("json: member name not valid UTF-8")
         # REQ1-JSON-no-duplicate: reject before dict insertion.
         if name_str in members:
             fail("json: duplicate member")

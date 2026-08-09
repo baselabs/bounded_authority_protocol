@@ -196,8 +196,13 @@ def _escape_string(src_bytes: bytes, out: bytearray) -> None:
                 _append_u(cp, out)
         elif cp == 0x22 or cp == 0x5C:
             out += _SHORT_ESCAPES[cp]
-        elif cp == 0x7F:  # DEL — RFC 8785 §3.2.2.3 mandates \u007f
-            _append_u(0x7F, out)
+        elif cp == 0x7F:
+            # DEL: RFC 8785 §3.2.2.3 mandates \u007f, BUT the Elixir reference (the contract per
+            # AGENTS rule 7 — canonical bytes are the contract) emits RAW 0x7f here (jcs.ex:147 has
+            # no DEL case, so the general codepoint branch passes it through raw). Matching the
+            # reference bytes is required for identical signed inputs and request digests; the SDK
+            # MUST NOT diverge to the RFC's escaped form. Verified: Jcs.encode("x<DEL>y") -> raw 0x7f.
+            out.append(0x7F)
         else:
             _append_utf8_bytes(cp, out)
         i += 1
