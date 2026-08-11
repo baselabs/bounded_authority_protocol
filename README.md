@@ -148,17 +148,21 @@ report is deterministic JCS bytes binding the corpus index SHA-256. See
 
 ## Cross-language verifier SDKs
 
-In addition to the Elixir package, the repository ships typed **verifier** SDK reimplementations of
-the frozen v1 profile, authored from the spec + corpus alone with no code-level derivation from the
+In addition to the Elixir package, the repository authors typed **verifier** SDK reimplementations of
+the frozen v1 profile, built from the spec + corpus alone with no code-level derivation from the
 Elixir reference ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)):
 
-- **TypeScript** — `sdks/typescript/` ([`@bounded-authority/verifier`][ts-pkg] on npm; Node `>= 22`,
-  zero runtime dependencies; Ed25519 via `node:crypto`).
-- **Python** — `sdks/python/` ([`bounded-authority-verifier`][py-pkg] on PyPI; Python `>= 3.10`,
-  single runtime dependency `cryptography`).
+- **TypeScript** — `sdks/typescript/` (`@bounded-authority/verifier`, to be published on npm; Node
+  `>= 22`, zero runtime dependencies; Ed25519 via `node:crypto`).
+- **Python** — `sdks/python/` (`bounded-authority-verifier`, to be published on PyPI; Python
+  `>= 3.10`, single runtime dependency `cryptography`).
 
-[ts-pkg]: https://www.npmjs.com/package/@bounded-authority/verifier
-[py-pkg]: https://pypi.org/project/bounded-authority-verifier/
+**Neither SDK is published to a registry yet.** They are authored in this monorepo but, per the SDK
+graduation model ([ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md)), each publishes
+from its own per-SDK repository (`bounded_authority_protocol_<lang>`) on first publication — never
+from here. A local pre-commit hook and the `sdk-publish-guard` CI job reject registry-publish
+infrastructure committed to this repo; see `CONTRIBUTING.md`. The npm/PyPI package names are reserved
+identifiers recorded for the graduated publish, not live registry links.
 
 Each SDK passes all **259** published conformance vectors (recomputed from scratch, not cached),
 asserts the corpus `index.json` SHA-256 at startup, and proves every parser-layer permissiveness
@@ -166,7 +170,7 @@ closure **red-capable** via a per-language mutation-gate. They are **verifiers**
 runtimes: a successful result proves only that caller-supplied bytes satisfy caller-supplied trusted
 inputs — it never selects keys, reserves replay, or grants execution. The `sdks-conformance` CI job
 ([`.github/workflows/sdks.yml`](.github/workflows/sdks.yml)) runs on every change to `sdks/**` or
-`priv/conformance/**`. See each SDK's `README.md` for install + quickstart.
+`priv/conformance/**`. See each SDK's `README.md` for build + test details.
 
 ## Development
 
