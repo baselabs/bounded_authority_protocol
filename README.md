@@ -10,6 +10,8 @@ bounded proof-of-possession authority.
 > or [`overview.md`](https://github.com/baselabs/bounded_authority/blob/master/docs/strategy/overview.md).
 > Engineering detail: [`product-identity.md`](https://github.com/baselabs/bounded_authority/blob/master/docs/strategy/product-identity.md).
 
+**Looking for a specific doc?** [`doc-map.md`](https://github.com/baselabs/bounded_authority/blob/master/docs/doc-map.md) is the cross-repo document tracker — every doc across all four repos, organized by reader intent.
+
 ## Status
 
 The unpublished `0.1.0` package is a **release candidate**: the public API surface is locked
