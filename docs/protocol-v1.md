@@ -94,6 +94,31 @@ unsigned UTF-16 object-name sorting at every depth, preserved array order, and e
 binary64 number text, including `-0` as `0`, fixed/exponent thresholds, lowercase `e`, and a
 positive exponent `+` (`REQ1-JSON-jcs-exact`).
 
+### JCS string and number serialization
+
+String escaping follows RFC 8785 §3.2.2.2 exactly. A code point in the ASCII control range
+`U+0000..U+001F` is serialized as `\b`, `\t`, `\n`, `\f`, `\r` for `U+0008/0009/000A/000C/000D`
+respectively, and as lowercase `\u00XX` for every other control code point. Every other code point is
+serialized **as is** (its UTF-8 encoding) unless it is `U+005C` (`\\`) or `U+0022` (`\"`). In particular
+`U+007F` (DELETE) is outside the control range and is not `\` or `"`, so it is emitted as the raw byte
+`0x7f` — this is RFC-conformant, not a deviation. Lone surrogates are rejected (invalid Unicode).
+
+Number serialization follows RFC 8785 §3.2.2.3, which delegates to the ECMAScript `Number::toString`
+operation (ECMA-262 §7.1.12.1, unchanged in current editions as TC39 §6.1.6.1.20). A finite `{:float, n}`
+is serialized as the shortest decimal text that round-trips to `n` under binary64, formatted as fixed or
+scientific notation by the decimal exponent `e` of the leading digit:
+
+- `e < -6` → scientific: one digit, `.`, fraction, `e`, sign, exponent (lowercase `e`; the exponent
+  sign is mandatory `+` or `-`).
+- `e >= 21` → scientific (same shape).
+- otherwise → fixed (no exponent).
+
+`{:float, 0.0}` and `{:float, -0.0}` both serialize as `"0"` (the sign of zero is dropped). Worked
+examples: `1.5` → `"1.5"`; `1e-6` → `"0.000001"` (e = −6, fixed); `1e-7` → `"1e-7"` (e = −7,
+scientific); `1e20` → `"100000000000000000000"` (e = 20, fixed); `1e21` → `"1e+21"` (e = 21,
+scientific); `333333333.3333333` → `"333333333.3333333"` (shortest round-trip digit selection).
+`{:integer, n}` serializes as its plain decimal text with no exponent. Non-finite floats are rejected.
+
 ## Structural schemas
 
 Draft 2020-12 schemas under `priv/conformance/v1/schemas/` are structural companion artifacts.

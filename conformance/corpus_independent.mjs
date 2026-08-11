@@ -653,8 +653,9 @@ function removeDotSegments(path) {
 function ipv6Kind(literal) {
   // Returns 6 = valid IPv6, "future" = IPvFuture, null = invalid.
   if (/^[0-9A-Fa-f:.]+$/.test(literal)) {
-    // crude hex-colon validation; rely on node:net for authority.
-    return 6;
+    // Structural IPv6 validation via node:net — rejects multiple "::" ellisions, wrong hextet
+    // count, and other malformations the crude hex/colon charset check silently accepted.
+    return isIP(literal, 6) === 6 ? 6 : null;
   }
   if (/^v[0-9A-Fa-f]+\.[A-Za-z0-9._~!$&'()*+,;=:-]+$/.test(literal)) return "future";
   return null;
@@ -1533,6 +1534,9 @@ function dispatchBoundaryAnchorSigningInput(input) {
   const keyId = fetchBinary(input, "key_id", "boundary_anchor_signing_input");
   const publicKey = b64Field(input, "public_key", "boundary_anchor_signing_input");
   assert(publicKey.length === 32, "boundary_anchor_signing_input: public key width");
+  // Genesis binding (mirrors ContextValidation.valid_anchor_binding? + anchored_export_codec.ex):
+  // a sequence-0 anchor is the chain genesis and must bind the all-zero chain_hash.
+  assert(sequence !== 0 || chainHash.equals(DEFAULT_HASH), "boundary_anchor_signing_input: genesis hash");
 
   const header = { alg: "EdDSA", kid: keyId, typ: "ba+chain-anchor" };
   const payload = {
@@ -1653,6 +1657,9 @@ function dispatchEncodeConsumptionEntry(input) {
   const previousHash = b64Field(input, "previous_hash", "encode_consumption_entry");
   const commitment = b64Field(input, "commitment", "encode_consumption_entry");
   assert(sequence >= 1, "encode_consumption_entry: positive sequence");
+  // Genesis binding (mirrors ConsumptionChain.validate_entry/1): the first row (sequence 1) is the
+  // chain genesis and must bind the all-zero previous_hash.
+  assert(sequence !== 1 || previousHash.equals(DEFAULT_HASH), "encode_consumption_entry: genesis predecessor");
 
   const row = {
     chain_id: chainId,
@@ -2418,6 +2425,15 @@ function dispatchEncodeAnchoredExport(input) {
     last_hash: b64Field(chain, "last_hash", "encode_anchored_export chain").toString("base64url"),
   };
   const headerBytes = Buffer.from(canonical(header), "utf8");
+  // Expected-export anchor bindings (mirrors anchored_export_codec.ex validate_expected_export/2):
+  // the start anchor sits at first_sequence-1 over the chain's previous_hash, the end anchor at
+  // last_sequence over last_hash. encode_anchored_export rejects a mismatch before framing.
+  const startExp = buildExpectedAnchorRaw(expected.start_anchor ?? {}, "encode_anchored_export start");
+  const endExp = buildExpectedAnchorRaw(expected.end_anchor ?? {}, "encode_anchored_export end");
+  assert(startExp.sequence === header.first_sequence - 1, "encode_anchored_export: start sequence binding");
+  assert(endExp.sequence === header.last_sequence, "encode_anchored_export: end sequence binding");
+  equalBytes(startExp.chain_hash, b64Field(chain, "previous_hash", "encode_anchored_export chain"), "encode_anchored_export: start hash binding");
+  equalBytes(endExp.chain_hash, b64Field(chain, "last_hash", "encode_anchored_export chain"), "encode_anchored_export: end hash binding");
   const archive = Buffer.concat([
     ARCHIVE_PREFIX,
     frame(headerBytes),
@@ -2434,6 +2450,12 @@ function dispatchEncodeAnchoredExport(input) {
 
 function dispatchVerifyAnchoredExport(input) {
   const chunks = byteList(input, "chunks", "verify_anchored_export");
+  // Per-chunk emptiness + count bound (mirrors anchored_export_codec.ex validate_chunks/4): every
+  // chunk must be non-empty and the chunk count must not exceed archive_chunks.
+  assert(chunks.length > 0 && chunks.length <= MAXIMA.archive_chunks, "verify_anchored_export: chunk count");
+  for (let i = 0; i < chunks.length; i += 1) {
+    assert(Buffer.isBuffer(chunks[i]) && chunks[i].length > 0, "verify_anchored_export: empty chunk");
+  }
   const version = fetchBinary(input, "version", "verify_anchored_export");
   const keys = input.keys;
   if (!Array.isArray(keys)) fail("verify_anchored_export: keys");
