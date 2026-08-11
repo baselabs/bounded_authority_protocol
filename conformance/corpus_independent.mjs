@@ -1685,6 +1685,7 @@ function dispatchCheckChain(input) {
   const lastHash = b64Field(input, "last_hash", "check_chain");
 
   assert(rowCount === rows.length && rowCount > 0, "check_chain: row count");
+  assert(firstSequence > 0, "check_chain: positive first sequence");
   assert(lastSequence === firstSequence + rowCount - 1, "check_chain: range");
   assert(
     firstSequence !== 1 || previousHash.equals(DEFAULT_HASH),
@@ -1700,7 +1701,11 @@ function dispatchCheckChain(input) {
     assert(row.sequence === sequence, `check_chain row ${i}: sequence`);
     equalBytes(strictB64(row.previous, 32), previous, `check_chain row ${i}: previous`);
     strictB64(row.commitment, 32);
-    previous = sha256(ROW_PREFIX, rowBytes);
+    // Hash the CANONICAL re-encode, not the raw row bytes — mirrors ConsumptionChain.parse_row/1,
+    // which returns `encoded.hash` over the JCS re-encode (raw == canonical for accepted rows; the
+    // canonical-reencode reject case stays skip-would-accept because disabling the canonical check
+    // leaves the canonical hash — and thus the chain links — intact).
+    previous = sha256(ROW_PREFIX, Buffer.from(canonical(row), "utf8"));
     sequence += 1;
   }
   equalBytes(previous, lastHash, "check_chain: head");
