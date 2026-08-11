@@ -12,6 +12,14 @@ All notable changes to `bounded_authority_protocol` are documented here.
   publication; the decision boundary is publication irreversibility, not SDK count
   ([ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md)). Zero wire byte, bound, or
   verdict change.
+- Ship the ADR 0015 enforcement layer: a tracked pre-commit hook
+  (`scripts/hooks/pre-commit`, single pattern source `scripts/check_sdk_publish_infra.sh`, installed
+  via `scripts/install-hooks.sh`) and the `sdk-publish-guard` CI job
+  ([`.github/workflows/sdk-publish-guard.yml`](.github/workflows/sdk-publish-guard.yml)) that together
+  reject SDK registry-publish infrastructure committed to the monorepo. Honesty limit: catches
+  committed publish infrastructure, not a literal ad-hoc publish run against a working tree; CI on
+  main is the non-bypassable backstop, the local hook is honor-system. Bypass:
+  `git commit --no-verify`.
 - Add ROADMAP rows BAP-15 (Rust verifier SDK) and BAP-16 (Go verifier SDK) — typed reimplementations
   of the frozen v1 profile from spec + corpus alone, authored under `sdks/` and graduating per
   [ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md). Post-1.0 rows; no code shipped.

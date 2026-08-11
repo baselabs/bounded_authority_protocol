@@ -21,7 +21,7 @@ compatibility.
 | BAP-04 | **Chain and historical-key verification** — Consumption-chain, anchor, archive, and historical public-key verification, slug:bap-04 | Rollover, truncation, reorder, omission, archive-coverage, and tamper vectors pass independently | BAP-03 | [ADR 0004](adr/0004-consumption-chain-rollover-and-anchored-export-verification.md) and the [normative v1 profile](protocol-v1.md) |
 | BAP-05 | **Portable conformance** — Language-neutral conformance corpus, verifier CLI, and property, fuzz, and mutation gates, slug:bap-05 | A second implementation consumes only published artifacts and agrees on every valid and invalid vector | BAP-04 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
 | BAP-06 | **Release-candidate contract** — Stable public API, guides, security policy, documentation, immutable release-candidate archive, and automation, slug:bap-06 | SemVer/API review; docs; reproducible candidate archive; unpacked consumer; checksum/SBOM/provenance gates; not yet published | BAP-05 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
-| BAP-07 | **Connected verification and release** — Connected verification and first public release, slug:bap-07 | Exact candidate passes private-runtime PG16/17/18 and BeamlineAsh connected gates; full public quality/conformance; fresh correctness, security, gate-integrity, and cross-vendor reviews; publish that exact archive with zero open findings | BAP-06, BAP-10, BAP-11, private BA-14 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md), [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md), and the [conformance contract](design/conformance-contract.md) |
+| BAP-07 | **Connected verification and release** — Connected verification and first public release, slug:bap-07 | Exact candidate passes private-runtime PG16/17/18 and navyler_cdc connected gates; full public quality/conformance; fresh correctness, security, gate-integrity, and cross-vendor reviews; publish that exact archive with zero open findings | BAP-06, BAP-10, BAP-11, private BA-14 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md), [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md), and the [conformance contract](design/conformance-contract.md) |
 | BAP-08 | **Capability-authorization extension proposal** — Draft capability-authorization extension for the MCP `modelcontextprotocol/ext-auth` extensions repository plus an AP2 mandate-mapping note, documenting the already-normative v1 protocol (no wire-format, limit, or verification-rule change), slug:bap-08 | Extension document conforms to the ext-auth repository's submission requirements (closed on **partial** conformance — every in-repo-reachable requirement met; full official-track conformance gated on external preconditions [reference SDK, WG + Extension Maintainers + sponsor, SEP acceptance, IANA registration]; see [ADR 0013](adr/0013-capability-authorization-extension.md) and the BAP-08 closeout evidence below); every referenced mechanism cites the [normative v1 profile](protocol-v1.md) (nothing normative is introduced outside it); the AP2 note maps mandate↔grant correspondences without claiming compatibility not yet verified; its own ADR lands before any external submission | BAP-04 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) |
 | BAP-09 | **Cross-language verifier SDKs** — Thin TypeScript and Python verifier SDKs consuming only the published spec, vectors, and conformance corpus (client libraries of the extension; independent second implementations by design), slug:bap-09 | Each SDK passes every valid and invalid published vector; spec + vectors are the only inputs (no code-level derivation from the Elixir implementation); its own ADR at authoring covers packaging and support surface | BAP-05 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
 | BAP-10 | **Evolution contract and normative conformance language** — RFC 2119/8174 rewrite of the normative profile with stable requirement identifiers, plus the evolution-contract sections (self-declaration, parallel-major support, deprecation windows) and registry reconciliation, slug:bap-10 | Every MUST maps to at least one conformance applicability cell (surface × class) or a named falsifiable gap, with the mapping published; no wire byte, bound, or verdict changes; [standards-track.md](design/standards-track.md) and [registries.md](design/registries.md) reconciled against the rewritten profile | BAP-05 | [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) and the [standards track charter](design/standards-track.md) |
@@ -548,5 +548,26 @@ MCP experimental-extension track (`docs/extensions/`, [ADR 0013](adr/0013-capabi
 — partial conformance to the official-submission bar, with the reference-SDK / working-group / SEP-
 acceptance gates recorded as external preconditions. **BAP-07 (connected verification and first
 public release) is unblocked on the public-protocol side** — its remaining dependency is private
-BA-14 (the private runtime's connected gates). BAP-12 (IANA templates) rides the BAP-08 external
-submission path, gated on the same official-submission preconditions.
+BA-14 (the private runtime's connected gates); the Hex-publication half is deferred by maintainer
+decision (internal consumption uses the `v0.1.0` git tag, not a registry pin). BAP-12 (IANA templates)
+rides the BAP-08 external submission path, gated on the same official-submission preconditions.
+
+**SDK graduation and publish topology ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)).**
+Cross-language verifier SDKs are authored under `sdks/` (ADR 0014) but each graduates to its own
+per-SDK repository (`bounded_authority_protocol_<lang>`) on first publication — the boundary is
+publication irreversibility, not SDK count. No SDK publishes from this monorepo: a local pre-commit
+hook (`scripts/hooks/pre-commit`, installed via `scripts/install-hooks.sh`) and the CI
+`sdk-publish-guard` job ([`.github/workflows/sdk-publish-guard.yml`](../.github/workflows/sdk-publish-guard.yml))
+reject registry-publish infrastructure (publish commands, publish actions, npm publish lifecycle
+keys) committed here. The `v0.1.0` git tag (at `c65d3be`) is the internal-reference pin; no Hex
+release has been published. See `CONTRIBUTING.md` for the install + bypass (`git commit --no-verify`).
+
+**BAP-15 (Rust) and BAP-16 (Go) SDK rows are authored, post-1.0.** A spec/corpus review surfaced
+that BAP-15 is **not executable as the roadmap acceptance criteria currently specify**: three gaps
+where neither `protocol-v1.md` nor the corpus pins behavior the TS/Python SDKs reached by reading
+the Elixir reference during cross-vendor remediation — ECMAScript float formatting (JCS §3.2.2.3,
+zero float-valued corpus cases), DEL (`U+007F`) raw-emit vs RFC 8785 `\u007f`, and the cross-vendor
+findings catalog (~25 falsifiers carried only in `sdks/typescript/test/permissiveness.ts`). Closing
+those gaps — float-valued corpus cases, a spec-side DEL ruling, and promoting the byte-level
+cross-vendor findings into the corpus — is the prerequisite slice before BAP-15 can be built
+honestly under the ADR 0014 "no code-level derivation from the Elixir reference" bar.
