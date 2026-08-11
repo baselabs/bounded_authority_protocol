@@ -325,11 +325,12 @@ def test_malformed_ipv6_literal_rejected():
 
 
 def test_jcs_del_emits_raw_byte_matching_reference():
-    """Cross-vendor #8: JCS serialization of DEL (U+007F) MUST emit the raw byte 0x7f, matching the
-    Elixir reference (jcs.ex has no DEL case → the general codepoint branch passes it raw). RFC 8785
-    §3.2.2.3 mandates \\u007f, but the reference bytes are the contract (AGENTS rule 7) — diverging
-    would produce different signed inputs and request digests. Defect: revert to the `\\u007f`
-    branch → this test's byte comparison fails.
+    """Cross-vendor #8: JCS serialization of DEL (U+007F) MUST emit the raw byte 0x7f. This is
+    RFC-CONFORMANT, not a deviation: RFC 8785 §3.2.2.2 escapes only U+0000–U+001F plus quote (0x22)
+    and backslash (0x5c); DEL (0x7f) is outside that range, so it is serialized "as is" (raw). The
+    reference (jcs.ex:142-148: the < 0x20 branch skips DEL, the general codepoint clause emits it
+    raw) and the SDK source comment (jcs.py:261-266) already state this correctly. Defect: revert to
+    the `\\u007f` branch → this test's byte comparison fails.
     """
     from bounded_authority_verifier.jcs import jcs_encode
 
@@ -1005,7 +1006,7 @@ def test_check_envelope_honors_caller_bounds():
 
 def test_expected_structs_bounds_absent_defaults_to_max():
     """#11 control: bounds absent on every Expected* MUST default to MAX (the conformance runner
-    constructs Expected* without bounds; a missing default would break 259/259). The 13-byte kid grant
+    constructs Expected* without bounds; a missing default would break 280/280). The 13-byte kid grant
     verifies at MAX via every entry point that takes an Expected*."""
     reset_census()
     g = _signed_grant()

@@ -45,7 +45,7 @@ nonzero.
 
 BAP-03's focused vectors and independent verifier are public repository acceptance evidence. The
 Hex package ships the protocol schemas, Elixir runtime, and the portable v1 conformance corpus
-(259 cases across 28 surfaces with a total surface × class applicability matrix, `.raw` sidecars
+(280 cases across 28 surfaces with a total surface × class applicability matrix, `.raw` sidecars
 for oversize wire inputs). BAP-05's corpus is normative: a second Node implementation
 (`conformance/corpus_independent.mjs`, node:* only) independently recomputes every corpus verdict
 from scratch and agrees. The corpus index declares its full public-key set
@@ -110,3 +110,44 @@ host policy, or business-effect safety. Those require private-runtime and operat
 Successful decode is `verification: :not_evaluated`. Successful verification is non-authorizing
 facts. The only production invalid result is `{:error, :invalid}`; offline tooling may classify
 failures only if those classes cannot widen the runtime surface.
+
+## Cross-vendor findings → corpus/spec mapping
+
+The cross-language SDKs (BAP-09) were hardened by a multi-vendor review that surfaced byte-level
+divergences from the Elixir reference. To keep the ADR 0014 D5 bar — a new SDK is authored from
+`docs/protocol-v1.md` + ADRs + the corpus **alone**, with no code-level derivation from the Elixir
+reference or a sibling SDK — each behavior the review pinned is reachable from the spec or carried as
+a corpus case. The table maps every byte-level finding to its pinning artifact; `(d)`-class host
+closures stay as per-SDK mutation-gates (the corpus cannot express them).
+
+| Finding | Surface | Class | Spec / ADR pin | Where pinned |
+|---|---|---|---|---|
+| astral codepoint → 4-byte UTF-8 raw | `jcs.encode` | valid | RFC 8785 §3.2.2.2 | `jcs-encode-astral-raw` |
+| DEL `U+007F` raw-emit (not `\u007f`) | `jcs.encode` | valid | RFC 8785 §3.2.2.2 + `protocol-v1.md` JCS subsection | `jcs-encode-del-raw` |
+| ECMAScript float thresholds (`e<-6`,`e>=21`) | `jcs.encode` | valid | RFC 8785 §3.2.2.3 + ECMA §7.1.12.1 / TC39 §6.1.6.1.20 | `jcs-encode-float-*` (5 cases, both sides) |
+| float `cast_arguments` digest | `request_digest` | valid | REQ1-DIGEST-typed-projection | `request-digest-float-cast-arguments` |
+| malformed UTF-8 member name | `json.decode` | invalid_encoding | REQ1-JSON-no-normalization | `json-decode-malformed-utf8-member-name` |
+| float magnitude over bound | `json.decode` | invalid_encoding | REQ1-JSON-raw-lexeme | `json-decode-float-magnitude` |
+| malformed IPv6 literals | `uri.normalize` | invalid_uri | REQ1-URI-reject-list | `uri-normalize-ipv6-*` (3 cases) |
+| locator decodes protected only | `untrusted_key_locator` | valid | REQ1-LOCATOR-opaque-payload | `untrusted-key-locator-empty-payload-signature` |
+| canonical re-encode of raw rows | `check_chain` | invalid_encoding | REQ1-CHAIN-raw-rows | `check-chain-canonical-reencode` |
+| rejects sequence 0 | `check_chain` | invalid_claim | ADR 0004 | `check-chain-sequence-zero-row` |
+| genesis previous_hash binding | `check_chain` | invalid_claim | REQ1-CHAIN-raw-rows | `check-chain-genesis-previous-hash-forge` |
+| seq-1 + nonzero previous | `encode_consumption_entry` | invalid_encoding | ADR 0004 (genesis row) | `encode-consumption-entry-invalid-seq1-nonzero-previous` |
+| seq-0 + nonzero chain_hash | `boundary_anchor_signing_input` | invalid_key | ADR 0004 (genesis anchor) | `boundary-anchor-signing-input-invalid-seq0-nonzero-chain-hash` |
+| start-anchor binding (`seq == first_sequence-1`) | `encode_anchored_export` | invalid_encoding | ADR 0004 | `encode-anchored-export-invalid-start-anchor-binding` |
+| empty chunk | `verify_anchored_export` | invalid_encoding | REQ1-EXPORT-complete-scan | `verify-anchored-export-invalid-empty-chunk` |
+| non-monotone `effective_at` | `verify_anchored_export` | invalid_time | ADR 0004 "strictly increase" | follow-up (signed) |
+| fingerprint cycle A→B→A | `verify_anchored_export` | invalid_key | ADR 0004 "cannot cycle" | follow-up (signed) |
+| one-key / zero-transition valid | `verify_anchored_export` | valid | ADR 0004 (no min key count) | follow-up (signed) |
+| per-node encode bounds | `jcs.encode` | (d) | bounds threading (host closure) | per-SDK mutation-gate (ADR 0014 D6/D7) |
+| transition-count bound (257) | `encode_anchored_export` | n_a | REQ1-BOUNDS at `bounds.new` | `index.json` `n_a` reason (representation-blocked) |
+| chunk-count bound (65797) | `verify_anchored_export` | n_a | `bounds.new` `archive_chunks` | `index.json` `n_a` reason (representation-blocked) |
+
+The two `maximum_plus_one` `n_a` reasons name the consuming-surface representation constraint: the
+over-bound structured array (65797 chunks or 257 transitions) exceeds the loader's case-file
+`json_bytes` ceiling (65536) and the `.raw` sidecar is single-blob only, so the input cannot be
+carried as a corpus case; the bound itself stays pinned at `bounds.new` and is proven red-capable by
+the source-isolated mutation battery. The upper JCS float threshold (`>= 21`) is unreachable from the
+bounded algebra (the largest representable float has decimal exponent ≈ 15.95), so no corpus case
+pins it — the spec subsection documents both thresholds and the reference implements both.

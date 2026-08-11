@@ -6,6 +6,26 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- Close the BAP-15 prerequisite spec/corpus gaps (no-key half). `docs/protocol-v1.md` gains a
+  normative **JCS string and number serialization** subsection transcribing RFC 8785 §3.2.2.2–3
+  (control-range escapes, raw DEL `U+007F`, ECMAScript `Number::toString` float thresholds
+  `e < -6` / `e >= 21`, `-0`→`0`, shortest-round-trip digits — both ECMA §7.1.12.1 and TC39
+  §6.1.6.1.20 cited). The conformance corpus grows **259 → 280 cases**: 5 JCS float cases pinning
+  both threshold sides, a raw-DEL bare-string case, an astral-codepoint (U+10000) raw-emit case, a
+  float `cast_arguments` request-digest case, malformed-UTF-8-member-name and float-magnitude
+  `json.decode` rejects, three malformed-IPv6 `uri.normalize` rejects, a key-locator
+  protected-only (empty-segment) valid case, three `check_chain` rejects (canonical re-encode,
+  sequence-zero, genesis previous-hash forge), and the byte-level cross-vendor findings for
+  `encode_consumption_entry` (seq-1 nonzero previous), `boundary_anchor_signing_input` (seq-0
+  nonzero chain_hash), `encode_anchored_export` (start-anchor binding), and `verify_anchored_export`
+  (empty chunk). The two `encode_/verify_anchored_export.maximum_plus_one` `n_a` reasons are
+  corrected to name all three bounds (`archive_bytes` + `archive_chunks` + `historical_key_transitions`)
+  and the loader representation constraint. The independent Node runner is strengthened to mirror the
+  reference's IPv6-structure, consumption-entry/anchor genesis-binding, anchored-export start-anchor
+  binding, and chunk-emptiness invariants those cases exposed; every new case is dual-verified
+  (`agreed=280 disagreed=0`). SDK `CERTIFIED_INDEX_SHA` constants (Python hex + TypeScript base64url)
+  rebind to the new `index.json`. The signed anchored-export cases (`#2` non-monotone chronology,
+  `#2` fingerprint cycle, `#3` one-key valid — three seeded Ed25519 keys) remain as a follow-up.
 - Record the SDK graduation and publish-topology decision: cross-language verifier SDKs are
   authored under `sdks/` (per [ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)) but each
   graduates to its own per-SDK repository (`bounded_authority_protocol_<lang>`) on first
@@ -26,7 +46,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Ship cross-language verifier SDKs (TypeScript `@bounded-authority/verifier` + Python
   `bounded-authority-verifier`) under `sdks/` — typed reimplementations of the frozen v1 profile from
   the spec + corpus alone, with no code-level derivation from the Elixir reference
-  ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)). Each passes all 259 conformance vectors
+  ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)). Each passes all 280 conformance vectors
   (recomputed from scratch), asserts the corpus `index.json` SHA at startup, and proves every
   permissiveness closure red-capable via a per-language mutation-gate. They are verifiers, not
   authority runtimes (no key selection, replay reservation, or execution grant). NOT in the Hex
