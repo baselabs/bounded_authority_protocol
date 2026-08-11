@@ -3,6 +3,13 @@
 Public Apache-2.0 protocol, deterministic verifier, and conformance suite for cryptographically
 bounded proof-of-possession authority.
 
+> **Where this fits:** this is the open format/verifier (the standard) in BaseLabs's commercial
+> agent-authority platform. For the one-page product picture (what it is, the market, the play),
+> see
+> [`bounded_authority` → `docs/strategy/overview.html`](https://github.com/baselabs/bounded_authority/blob/master/docs/strategy/overview.html)
+> or [`overview.md`](https://github.com/baselabs/bounded_authority/blob/master/docs/strategy/overview.md).
+> Engineering detail: [`product-identity.md`](https://github.com/baselabs/bounded_authority/blob/master/docs/strategy/product-identity.md).
+
 ## Status
 
 The unpublished `0.1.0` package is a **release candidate**: the public API surface is locked
