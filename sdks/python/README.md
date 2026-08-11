@@ -25,14 +25,14 @@ SHA-256, base64url, and JSON canonicalization are hand-rolled from the RFCs.
 ## Conformance
 
 This SDK is certified against the published corpus (`priv/conformance/v1/corpus/`) and passes every
-one of its **280** valid + invalid vectors, recomputed from scratch — not cached verdicts. The
+one of its **279** valid + invalid vectors, recomputed from scratch — not cached verdicts. The
 conformance runner asserts the corpus `index.json` SHA-256 at startup
 (`c3b0bcf7665c217ea45843a9c49c2769a61c21c4998d8b85249cf6cb757084dd`), so a consumer who vendors a
 mismatched corpus snapshot gets a hard failure rather than a silent drift ([ADR 0014 D4][adr14]).
 
 ```bash
 uv pip install -e .
-python tests/conformance/run.py   # 280/280 + two-boundary key census
+python tests/conformance/run.py   # 279/279 + two-boundary key census
 ```
 
 Permissiveness is invisible to corpus agreement by construction, so each parser-layer closure is
@@ -140,7 +140,7 @@ mypy src/                         # --strict, warnings-as-errors
 python tools/purity_check.py      # AST purity gate (no I/O/clock/RNG/network in src/)
 python tools/license_check.py     # dependency-license gate
 python -m pytest tests/           # permissiveness mutation-gate + conformance wrapper
-python tests/conformance/run.py   # 280/280 + two-boundary key census
+python tests/conformance/run.py   # 279/279 + two-boundary key census
 ```
 
 ## License

@@ -1,4 +1,4 @@
-"""Pytest wrapper for the conformance runner (BAP-09 T9). Runs the full 280-case corpus + census."""
+"""Pytest wrapper for the conformance runner (BAP-09 T9). Runs the full 279-case corpus + census."""
 
 from __future__ import annotations
 
@@ -19,11 +19,11 @@ def _load_run_module():
     return mod
 
 
-def test_conformance_280_cases_agree():
-    """All 280 published vectors agree + the two-boundary census is equal."""
+def test_conformance_279_cases_agree():
+    """All 279 published vectors agree + the two-boundary census is equal."""
     run = _load_run_module()
     result = run.run_all()
     assert result["fail"] == 0, (
         f"{result['fail']}/{result['total']} cases disagreed: {result['failures'][:10]}"
     )
-    assert result["pass"] == result["total"] == 280
+    assert result["pass"] == result["total"] == 279

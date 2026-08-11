@@ -125,7 +125,7 @@ the MCP experimental track) live under `docs/extensions/`.
 ## Conformance
 
 The package ships a language-neutral v1 conformance corpus and a deterministic offline verifier
-CLI. The corpus (`priv/conformance/v1/corpus`) is the normative evidence: 280 cases across 28
+CLI. The corpus (`priv/conformance/v1/corpus`) is the normative evidence: 279 cases across 28
 surfaces with a total surface × class applicability matrix, re-derived from the official
 implementation and independently re-verified by a second Node implementation
 (`conformance/corpus_independent.mjs`) that recomputes every verdict from scratch. A value that
@@ -164,7 +164,7 @@ from here. A local pre-commit hook and the `sdk-publish-guard` CI job reject reg
 infrastructure committed to this repo; see `CONTRIBUTING.md`. The npm/PyPI package names are reserved
 identifiers recorded for the graduated publish, not live registry links.
 
-Each SDK passes all **280** published conformance vectors (recomputed from scratch, not cached),
+Each SDK passes all **279** published conformance vectors (recomputed from scratch, not cached),
 asserts the corpus `index.json` SHA-256 at startup, and proves every parser-layer permissiveness
 closure **red-capable** via a per-language mutation-gate. They are **verifiers**, not authority
 runtimes: a successful result proves only that caller-supplied bytes satisfy caller-supplied trusted
