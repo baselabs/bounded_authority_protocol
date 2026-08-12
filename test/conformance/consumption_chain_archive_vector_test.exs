@@ -30,7 +30,7 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
 
     assert output =~
              "bap04 independent verification: ok archives=3 boundary_adversaries=2 " <>
-               "chain_cases=2 public_key_fingerprints=19 tamper_cases=49 semantic_cases=7"
+               "chain_cases=2 public_key_fingerprints=22 tamper_cases=49 semantic_cases=7"
   end
 
   test "published verdict drift and valid opaque object-version mismatch fail independently" do

@@ -33,9 +33,21 @@ All notable changes to `bounded_authority_protocol` are documented here.
   `CERTIFIED_INDEX_SHA` constants (Python hex + TypeScript base64url) rebind to the new `index.json`.
   The encode_anchored_export binding case's authoring key is seed-generated and never enters the
   import-boundary census (encode frames signatures, never verifies them), so
-  `public_key_fingerprints` stays 8 and the manifest three-partition is unchanged. The signed
-  anchored-export cases (`#2` non-monotone chronology, `#2` fingerprint cycle, `#3` one-key valid —
-  three seeded Ed25519 keys, fingerprints 8→11) remain as a follow-up.
+  `public_key_fingerprints` stays 8 and the manifest three-partition is unchanged.
+- Close the BAP-15 prerequisite corpus gap (signed half). The conformance corpus grows
+  **280 → 283 cases** with three signed `verify_anchored_export` cases exercising ADR 0004's
+  authenticated key-transition path: `#2` non-monotone chronology (two transitions with non-monotone
+  `effective_at` → `invalid_time`), `#2` fingerprint cycle (B→C→B → `invalid_key`), and `#3`
+  one-key/zero-transition valid (the equal start/end-time same-key case). Three new seeded Ed25519
+  keys join `public_key_fingerprints` (**8→11**) since the export verifier imports them; their seeds
+  never enter the corpus. The independent Node runner is strengthened to mirror the reference's
+  cross-transition invariants (`validate_expected_key_path`): strictly-increasing transition times,
+  fingerprint no-cycle, and the end-anchor chronologically at-or-after the last transition — gates
+  the per-element compact checks cannot express. Every new invalid case is a one-defect
+  **skip-would-accept** construction (a monotone / no-cycle variant accepts); every new case is
+  dual-verified (`agreed=283 disagreed=0`). SDK `CERTIFIED_INDEX_SHA` constants (Python hex +
+  TypeScript base64url) rebind to the new `index.json`; the vector manifest's canonical fingerprint
+  set grows 19→22 and the corpus partition 8→11.
 - Record the SDK graduation and publish-topology decision: cross-language verifier SDKs are
   authored under `sdks/` (per [ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)) but each
   graduates to its own per-SDK repository (`bounded_authority_protocol_<lang>`) on first
@@ -56,7 +68,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Ship cross-language verifier SDKs (TypeScript `@bounded-authority/verifier` + Python
   `bounded-authority-verifier`) under `sdks/` — typed reimplementations of the frozen v1 profile from
   the spec + corpus alone, with no code-level derivation from the Elixir reference
-  ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)). Each passes all 280 conformance vectors
+  ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)). Each passes all 283 conformance vectors
   (recomputed from scratch), asserts the corpus `index.json` SHA at startup, and proves every
   permissiveness closure red-capable via a per-language mutation-gate. They are verifiers, not
   authority runtimes (no key selection, replay reservation, or execution grant). NOT in the Hex

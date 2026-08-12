@@ -3,7 +3,7 @@
 
 Loads the published corpus from ``priv/conformance/v1/corpus/``, recomputes EVERY verdict from
 scratch by calling the SDK façade (``bounded_authority_verifier.v1``), and asserts agreement on all
-280 cases. Asserts the ``index.json`` SHA-256 at startup (ADR 0014 D4: the SDK binds to the exact
+283 cases. Asserts the ``index.json`` SHA-256 at startup (ADR 0014 D4: the SDK binds to the exact
 corpus it was certified against). Runs the two-boundary key census (discovery == verify-import ==
 index ``public_key_fingerprints``).
 
@@ -57,7 +57,7 @@ from bounded_authority_verifier.uri import uri_normalize  # noqa: E402
 
 CORPUS_DIR = _REPO_ROOT / "priv" / "conformance" / "v1" / "corpus"
 # The certified index.json SHA-256 (ADR 0014 D4). A mismatched vendored corpus fails closed.
-CERTIFIED_INDEX_SHA = "f3054cbb37c4d40b148d98a118b3ae9ac862e00b0076f7f25c0f6c7b2ff675f2"
+CERTIFIED_INDEX_SHA = "a5ac7361c508d2bb55c6ca3045a5cc06ec4a3f64f65904214108c6f10c704dcc"
 
 INVALID = object()  # sentinel: any genuine protocol rejection maps to this
 

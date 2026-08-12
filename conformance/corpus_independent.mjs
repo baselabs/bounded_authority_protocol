@@ -2495,6 +2495,11 @@ function dispatchVerifyAnchoredExport(input) {
   verifyAnchorCompact(parsed.end.toString("ascii"), builtKeys[builtKeys.length - 1], endExpected, "verify_anchored_export end");
   const expectedTransitions = expected.transitions ?? [];
   assert(parsed.transitions.length === expectedTransitions.length, "verify_anchored_export: transition count");
+  // The ordered key list must be exactly transitions + 1 long (mirror
+  // anchored_export_codec.ex validate_key_chain + validate_historical_key_shapes). Without this a
+  // surplus key would let the end anchor bind to a key never reached via the transition path, and a
+  // 0-transition case would not require start/end key identity.
+  assert(builtKeys.length === expectedTransitions.length + 1, "verify_anchored_export: keys != transitions + 1");
   for (let i = 0; i < expectedTransitions.length; i += 1) {
     verifyTransitionCompact(
       parsed.transitions[i].toString("ascii"),
@@ -2504,6 +2509,61 @@ function dispatchVerifyAnchoredExport(input) {
       `verify_anchored_export transition ${i}`,
     );
   }
+  // Cross-transition invariants (mirror anchored_export_codec.ex validate_expected_key_path):
+  // transition times strictly increase (start.anchored_at < t[0].effective_at < ... < t[n-1]),
+  // no fingerprint cycle (each next fingerprint not in {start_fp} ∪ prior next_fps), and the end
+  // anchor is chronologically at-or-after the last transition (or start.anchored_at, if none). The
+  // positional key path is bound above over a key list now pinned to transitions + 1
+  // (start=builtKeys[0], end=builtKeys[last], transitions chain builtKeys[i]->builtKeys[i+1]);
+  // these are the cross-transition gates the per-element verify*Compact checks cannot express.
+  // per-element verify*Compact checks cannot express.
+  {
+    let previousTime = startExpected.anchored_at;
+    const seen = [builtKeys[0].fingerprint];
+    for (let i = 0; i < expectedTransitions.length; i += 1) {
+      const effAt = expectedTransitions[i].effective_at;
+      assert(effAt > previousTime, `verify_anchored_export: transition ${i} not strictly after predecessor`);
+      const nextFp = builtKeys[i + 1].fingerprint;
+      assert(!seen.some((s) => s === nextFp), `verify_anchored_export: transition ${i} fingerprint cycle`);
+      seen.push(nextFp);
+      previousTime = effAt;
+    }
+    assert(
+      endExpected.anchored_at >= previousTime,
+      "verify_anchored_export: end not chronologically after last transition",
+    );
+  }
+  // Independently verify every archived row (ADR 0004: "and then independently checks every row";
+  // REQ1-EXPORT-complete-scan). Mirrors dispatchCheckChain's row loop over the archive's framed
+  // rows against the caller's expected chain boundaries — the per-row commitment/sequence/
+  // previous-hash chain the overall archive digest cannot express.
+  const rowChainId = fetchBinary(chain, "chain_id", "verify_anchored_export chain");
+  const rowPreviousHash = b64Field(chain, "previous_hash", "verify_anchored_export chain");
+  const rowLastHash = b64Field(chain, "last_hash", "verify_anchored_export chain");
+  assert(parsed.rows.length === chain.row_count, "verify_anchored_export: row count");
+  assert(chain.first_sequence > 0, "verify_anchored_export: positive first sequence");
+  assert(
+    chain.last_sequence === chain.first_sequence + chain.row_count - 1,
+    "verify_anchored_export: sequence range",
+  );
+  assert(
+    chain.first_sequence !== 1 || rowPreviousHash.equals(DEFAULT_HASH),
+    "verify_anchored_export: genesis predecessor",
+  );
+  let rowPrevious = rowPreviousHash;
+  let rowSequence = chain.first_sequence;
+  for (let i = 0; i < parsed.rows.length; i += 1) {
+    const row = parseCanonicalJson(parsed.rows[i], `verify_anchored_export row ${i}`);
+    exactKeys(row, ["v", "chain_id", "sequence", "previous", "commitment"], `verify_anchored_export row ${i}`);
+    assert(row.v === 1, `verify_anchored_export row ${i}: version`);
+    assert(row.chain_id === rowChainId, `verify_anchored_export row ${i}: chain_id`);
+    assert(row.sequence === rowSequence, `verify_anchored_export row ${i}: sequence`);
+    equalBytes(strictB64(row.previous, 32), rowPrevious, `verify_anchored_export row ${i}: previous`);
+    strictB64(row.commitment, 32);
+    rowPrevious = sha256(ROW_PREFIX, Buffer.from(canonical(row), "utf8"));
+    rowSequence += 1;
+  }
+  equalBytes(rowLastHash, rowPrevious, "verify_anchored_export: last_hash");
   return {};
 }
 
