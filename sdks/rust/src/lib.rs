@@ -16,7 +16,9 @@
 pub mod base64url;
 pub mod bounds;
 pub mod error;
+pub mod json;
 
 pub use base64url::{base64url_decode, base64url_encode};
 pub use bounds::Bounds;
 pub use error::{Invalid, Result};
+pub use json::{json_decode, JsonValue};
