@@ -21,6 +21,7 @@
 //!   decoding; all precede cryptography.
 
 use crate::error::{Invalid, Result};
+use crate::json::JsonValue;
 
 /// The immutable profile maxima plus tightening overrides.
 ///
@@ -176,23 +177,36 @@ impl Bounds {
     /// Validates caller-supplied overrides against tightening-only rules and
     /// returns a [`Bounds`] with the tightened values applied.
     ///
-    /// `overrides` is the raw bytes of a flat JSON object mapping bound names
-    /// to positive integers — e.g. `{"compact_bytes":1000,"string_bytes":4096}`.
-    /// `None` or `Some(b"{}")` returns [`Bounds::maximum`] unchanged.
+    /// `overrides` is a decoded [`JsonValue::Object`] mapping bound names to
+    /// positive integers — e.g. the decoded form of `{"compact_bytes":1000,
+    /// "string_bytes":4096}`. `None` or an empty object returns
+    /// [`Bounds::maximum`] unchanged.
     ///
-    /// REWIRE NOTE: this signature currently takes `Option<&[u8]>` raw bytes and
-    /// parses the flat overrides shape locally to keep Task 1 self-contained.
-    /// Task 3 rewires it to `Option<&JsonValue>` once the full tagged decoder
-    /// lands; the validation semantics (tighten-only, reject-list, fixed-width)
-    /// are unchanged.
-    pub fn new(overrides: Option<&[u8]>) -> Result<Self> {
-        let bytes = match overrides {
-            None => return Ok(Self::maximum()),
-            Some(b) => b,
-        };
+    /// Each value MUST be [`JsonValue::Int`] with `n > 0`. A non-object root,
+    /// a non-integer value, a non-positive value, an unknown key, a widening
+    /// value, or a fixed-width-changing value is `Invalid`
+    /// (`REQ1-BOUNDS-tighten-only`, `REQ1-BOUNDS-reject-list`,
+    /// `REQ1-BOUNDS-fixed-widths`). The caller decodes the overrides JSON
+    /// (through [`crate::json::json_decode`], which itself rejects duplicate
+    /// keys), so the members arrive in source order and collision-free.
+    pub fn new(overrides: Option<&JsonValue>) -> Result<Self> {
         let mut bounds = Self::maximum();
-        for (key, value) in parse_overrides(bytes)? {
-            bounds.apply_override(&key, value)?;
+        let members = match overrides {
+            None => return Ok(bounds),
+            Some(JsonValue::Object(m)) => m,
+            // A non-object overrides root (array / scalar / null) is invalid.
+            Some(_) => return Err(Invalid),
+        };
+        for (key, value) in members {
+            let n = match value {
+                JsonValue::Int(n) => *n,
+                // A float / bool / null / structured value is not a positive integer.
+                _ => return Err(Invalid),
+            };
+            if n <= 0 {
+                return Err(Invalid);
+            }
+            bounds.apply_override(key, n as u64)?;
         }
         Ok(bounds)
     }
@@ -456,162 +470,16 @@ fn fixed(width: u64, value: u64) -> Result<()> {
     }
 }
 
-// ----------------------------------------------------------------------------
-// Focused overrides parser (flat `{string: integer}` shape)
-//
-// This is NOT the full tagged JSON decoder (Task 3); it decodes only the flat
-// overrides map: a JSON object whose values are non-negative integer lexemes.
-// Non-integer values (`.`, `e`, `E`), leading `-`, leading zeros, escapes in
-// keys, and any structural deviation are rejected as Invalid. Task 3 rewires
-// `Bounds::new` to consume `JsonValue` directly and this parser is removed.
-// ----------------------------------------------------------------------------
-
-/// Parses a flat JSON object `{string: integer}` into an ordered key-value list.
-/// Rejects duplicate keys (fail-closed; the full decoder in Task 3 also rejects).
-fn parse_overrides(input: &[u8]) -> Result<Vec<(String, u64)>> {
-    let mut p = OverrideParser { input, pos: 0 };
-    p.skip_ws();
-    p.expect_byte(b'{')?;
-    p.skip_ws();
-
-    let mut out: Vec<(String, u64)> = Vec::new();
-    if p.peek() == Some(b'}') {
-        p.advance();
-        p.skip_ws();
-        p.expect_end()?;
-        return Ok(out);
-    }
-
-    loop {
-        p.skip_ws();
-        let key = p.parse_string()?;
-        // Reject duplicate keys (fail-closed).
-        if out.iter().any(|(k, _)| k == &key) {
-            return Err(Invalid);
-        }
-        p.skip_ws();
-        p.expect_byte(b':')?;
-        p.skip_ws();
-        let value = p.parse_u64()?;
-        out.push((key, value));
-        p.skip_ws();
-        match p.peek() {
-            Some(b',') => p.advance(),
-            Some(b'}') => {
-                p.advance();
-                break;
-            }
-            _ => return Err(Invalid),
-        }
-    }
-
-    p.skip_ws();
-    p.expect_end()?;
-    Ok(out)
-}
-
-/// A minimal byte-cursor parser for the flat overrides shape.
-struct OverrideParser<'a> {
-    input: &'a [u8],
-    pos: usize,
-}
-
-impl<'a> OverrideParser<'a> {
-    fn peek(&self) -> Option<u8> {
-        self.input.get(self.pos).copied()
-    }
-
-    fn advance(&mut self) {
-        self.pos += 1;
-    }
-
-    fn skip_ws(&mut self) {
-        while matches!(self.peek(), Some(b' ' | b'\t' | b'\n' | b'\r')) {
-            self.advance();
-        }
-    }
-
-    fn expect_byte(&mut self, byte: u8) -> Result<()> {
-        if self.peek() == Some(byte) {
-            self.advance();
-            Ok(())
-        } else {
-            Err(Invalid)
-        }
-    }
-
-    fn expect_end(&self) -> Result<()> {
-        if self.pos == self.input.len() {
-            Ok(())
-        } else {
-            Err(Invalid)
-        }
-    }
-
-    /// Parses a JSON string key (no escape support — override keys are plain
-    /// ASCII identifiers; any `\` or control byte is rejected).
-    fn parse_string(&mut self) -> Result<String> {
-        self.expect_byte(b'"')?;
-        let start = self.pos;
-        loop {
-            match self.peek() {
-                None => return Err(Invalid),
-                Some(b'"') => break,
-                Some(b'\\') => return Err(Invalid),
-                Some(b) if b < 0x20 => return Err(Invalid),
-                Some(_) => self.advance(),
-            }
-        }
-        let content = &self.input[start..self.pos];
-        self.advance(); // closing quote
-        std::str::from_utf8(content)
-            .map(|s| s.to_string())
-            .map_err(|_| Invalid)
-    }
-
-    /// Parses a non-negative integer lexeme. Rejects floats (`.`, `e`, `E`),
-    /// leading `-`, leading zeros (`0` followed by more digits), and overflow.
-    /// A bare `0` is returned as `Ok(0)` — `tighten()` rejects it as zero.
-    fn parse_u64(&mut self) -> Result<u64> {
-        let first = self.peek().ok_or(Invalid)?;
-        if !first.is_ascii_digit() {
-            return Err(Invalid);
-        }
-        if first == b'0' {
-            self.advance();
-            return match self.peek() {
-                None | Some(b',') | Some(b'}') | Some(b' ') | Some(b'\t') | Some(b'\n')
-                | Some(b'\r') => Ok(0),
-                Some(b'.') | Some(b'e') | Some(b'E') => Err(Invalid), // float
-                Some(_) => Err(Invalid),                              // leading zero
-            };
-        }
-        // first digit is 1–9
-        let mut value: u64 = u64::from(first - b'0');
-        self.advance();
-        while let Some(b) = self.peek() {
-            if b.is_ascii_digit() {
-                value = value
-                    .checked_mul(10)
-                    .ok_or(Invalid)?
-                    .checked_add(u64::from(b - b'0'))
-                    .ok_or(Invalid)?;
-                self.advance();
-            } else {
-                break;
-            }
-        }
-        // Reject float indicators that follow the integer digits.
-        if matches!(self.peek(), Some(b'.') | Some(b'e') | Some(b'E')) {
-            return Err(Invalid);
-        }
-        Ok(value)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::json::{json_decode, JsonValue};
+
+    /// Decode an overrides object bytes through the real tagged decoder so the
+    /// rewired `Bounds::new(Option<&JsonValue>)` is exercised end-to-end.
+    fn ov(bytes: &[u8]) -> JsonValue {
+        json_decode(bytes, &Bounds::maximum()).expect("overrides decode")
+    }
 
     // ------------------------------------------------------------------
     // maximum() — every value must match docs/protocol-v1.md § Hard maxima
@@ -676,7 +544,7 @@ mod tests {
 
     #[test]
     fn new_empty_object_returns_maximum() {
-        let b = Bounds::new(Some(b"{}")).expect("empty overrides");
+        let b = Bounds::new(Some(&ov(b"{}"))).expect("empty overrides");
         let m = Bounds::maximum();
         assert_eq!(b.compact_bytes(), m.compact_bytes());
         assert_eq!(b.archive_bytes(), m.archive_bytes());
@@ -688,7 +556,7 @@ mod tests {
 
     #[test]
     fn new_accepts_single_tightening() {
-        let b = Bounds::new(Some(br#"{"compact_bytes":1000}"#)).expect("tighten");
+        let b = Bounds::new(Some(&ov(br#"{"compact_bytes":1000}"#))).expect("tighten");
         assert_eq!(b.compact_bytes(), 1000);
         // Non-overridden fields remain at maximum.
         assert_eq!(b.string_bytes(), 8192);
@@ -696,7 +564,7 @@ mod tests {
 
     #[test]
     fn new_accepts_multiple_tightening() {
-        let b = Bounds::new(Some(br#"{"compact_bytes":1000,"string_bytes":4096}"#))
+        let b = Bounds::new(Some(&ov(br#"{"compact_bytes":1000,"string_bytes":4096}"#)))
             .expect("multi-tighten");
         assert_eq!(b.compact_bytes(), 1000);
         assert_eq!(b.string_bytes(), 4096);
@@ -706,7 +574,7 @@ mod tests {
     #[test]
     fn new_accepts_override_at_exact_maximum() {
         // exact_bound: setting a field to exactly its maximum is accepted.
-        let b = Bounds::new(Some(br#"{"compact_bytes":65536}"#)).expect("exact max");
+        let b = Bounds::new(Some(&ov(br#"{"compact_bytes":65536}"#))).expect("exact max");
         assert_eq!(b.compact_bytes(), 65536);
     }
 
@@ -717,49 +585,59 @@ mod tests {
     #[test]
     fn new_rejects_widening_compact_bytes() {
         // maximum_plus_one: 65537 > 65536 → widening → Invalid.
-        let result = Bounds::new(Some(br#"{"compact_bytes":65537}"#));
+        let result = Bounds::new(Some(&ov(br#"{"compact_bytes":65537}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
     #[test]
     fn new_rejects_unknown_key() {
-        let result = Bounds::new(Some(br#"{"unknown_key":100}"#));
+        let result = Bounds::new(Some(&ov(br#"{"unknown_key":100}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
     #[test]
     fn new_rejects_zero_value() {
-        let result = Bounds::new(Some(br#"{"compact_bytes":0}"#));
+        let result = Bounds::new(Some(&ov(br#"{"compact_bytes":0}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
     #[test]
     fn new_rejects_negative_value() {
-        let result = Bounds::new(Some(br#"{"compact_bytes":-1}"#));
+        let result = Bounds::new(Some(&ov(br#"{"compact_bytes":-1}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
     #[test]
     fn new_rejects_non_integer_float() {
-        let result = Bounds::new(Some(br#"{"compact_bytes":1.5}"#));
+        let result = Bounds::new(Some(&ov(br#"{"compact_bytes":1.5}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
     #[test]
     fn new_rejects_non_integer_exponent() {
-        let result = Bounds::new(Some(br#"{"compact_bytes":1e2}"#));
+        let result = Bounds::new(Some(&ov(br#"{"compact_bytes":1e2}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
     #[test]
-    fn new_rejects_malformed_json() {
-        let result = Bounds::new(Some(b"not json"));
-        assert_eq!(result, Err(Invalid));
+    fn new_rejects_malformed_overrides_json() {
+        // After the T3 rewire, Bounds::new consumes an already-decoded
+        // JsonValue; malformed overrides JSON is therefore rejected by the
+        // tagged decoder itself (the end-to-end caller behavior is unchanged).
+        let result = json_decode(b"not json", &Bounds::maximum());
+        assert_eq!(result.map(|v| Bounds::new(Some(&v))), Err(Invalid));
     }
 
     #[test]
-    fn new_rejects_trailing_bytes() {
-        let result = Bounds::new(Some(b"{}  garbage"));
+    fn new_rejects_trailing_bytes_in_overrides_json() {
+        let result = json_decode(b"{}  garbage", &Bounds::maximum());
+        assert_eq!(result.map(|v| Bounds::new(Some(&v))), Err(Invalid));
+    }
+
+    #[test]
+    fn new_rejects_non_object_overrides_root() {
+        // A non-object overrides root (array / scalar) is invalid per the contract.
+        let result = Bounds::new(Some(&ov(b"[]")));
         assert_eq!(result, Err(Invalid));
     }
 
@@ -769,43 +647,43 @@ mod tests {
 
     #[test]
     fn new_accepts_exact_fixed_width_digest() {
-        let result = Bounds::new(Some(br#"{"digest_bytes":32}"#));
+        let result = Bounds::new(Some(&ov(br#"{"digest_bytes":32}"#)));
         assert!(result.is_ok());
     }
 
     #[test]
     fn new_rejects_fixed_width_digest_below() {
-        let result = Bounds::new(Some(br#"{"digest_bytes":31}"#));
+        let result = Bounds::new(Some(&ov(br#"{"digest_bytes":31}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
     #[test]
     fn new_rejects_fixed_width_digest_above() {
-        let result = Bounds::new(Some(br#"{"digest_bytes":33}"#));
+        let result = Bounds::new(Some(&ov(br#"{"digest_bytes":33}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
     #[test]
     fn new_rejects_fixed_width_public_key_below() {
-        let result = Bounds::new(Some(br#"{"public_key_bytes":31}"#));
+        let result = Bounds::new(Some(&ov(br#"{"public_key_bytes":31}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
     #[test]
     fn new_rejects_fixed_width_public_key_above() {
-        let result = Bounds::new(Some(br#"{"public_key_bytes":33}"#));
+        let result = Bounds::new(Some(&ov(br#"{"public_key_bytes":33}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
     #[test]
     fn new_rejects_fixed_width_signature_below() {
-        let result = Bounds::new(Some(br#"{"signature_bytes":63}"#));
+        let result = Bounds::new(Some(&ov(br#"{"signature_bytes":63}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
     #[test]
     fn new_rejects_fixed_width_signature_above() {
-        let result = Bounds::new(Some(br#"{"signature_bytes":65}"#));
+        let result = Bounds::new(Some(&ov(br#"{"signature_bytes":65}"#)));
         assert_eq!(result, Err(Invalid));
     }
 
@@ -833,10 +711,15 @@ mod tests {
                 .as_str()
                 .unwrap_or_else(|| panic!("case {id} missing expected.verdict"));
             let overrides = &case["input"]["overrides"];
+            // Re-serialize the corpus overrides object to bytes, then decode
+            // through the real tagged decoder so the rewired
+            // `Bounds::new(Option<&JsonValue>)` path is exercised end-to-end.
             let overrides_bytes = serde_json::to_vec(overrides)
                 .unwrap_or_else(|e| panic!("serialize overrides for {id}: {e}"));
-
-            let result = Bounds::new(Some(&overrides_bytes));
+            let result = match json_decode(&overrides_bytes, &Bounds::maximum()) {
+                Ok(value) => Bounds::new(Some(&value)),
+                Err(Invalid) => Err(Invalid),
+            };
             let actual_ok = result.is_ok();
             let expected_ok = expected_verdict == "valid";
 
@@ -848,6 +731,7 @@ mod tests {
             }
         }
 
+        eprintln!("agreed={agreed} disagreed={disagreed}");
         assert_eq!(agreed, 79, "agreed count (total cases should be 79)");
         assert_eq!(disagreed, 0, "disagreed count");
     }
@@ -855,7 +739,7 @@ mod tests {
     #[test]
     fn corpus_valid_tightened_carries_exact_overrides() {
         // Mirrors bounds-new-valid-tightened: two overrides, rest at maximum.
-        let b = Bounds::new(Some(br#"{"compact_bytes":1000,"string_bytes":4096}"#))
+        let b = Bounds::new(Some(&ov(br#"{"compact_bytes":1000,"string_bytes":4096}"#)))
             .expect("tightened overrides accepted");
         assert_eq!(b.compact_bytes(), 1000);
         assert_eq!(b.string_bytes(), 4096);
