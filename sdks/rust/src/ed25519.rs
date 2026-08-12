@@ -22,13 +22,9 @@
 //! diagnostic detail that the protocol forbids leaking, so it is mapped to the
 //! single closed error shape and discarded.
 
-// `verify` is `pub(crate)` but, until the v1 façade wires it (Task 10–13),
-// nothing in the non-test crate calls it. `pub(crate)` does NOT suppress the
-// dead-code lint the way `pub` does (the compiler sees the whole crate and
-// knows nothing calls it), so the module-level allow keeps the lint clean.
-// Remove this once the façade makes the call chain reachable. Mirrors the
-// `digest` module's precedent.
-#![allow(dead_code)]
+// `verify` is `pub(crate)` and is wired by the v1 façade: `verify_grant` and
+// `check_envelope` (Task 12) call it for the grant and holder-proof Ed25519
+// signatures. The crate-level `#![forbid(unsafe_code)]` is unaffected.
 
 use crate::error::{Invalid, Result};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};

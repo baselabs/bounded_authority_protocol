@@ -30,14 +30,17 @@ use crate::base64url::{base64url_decode, base64url_encode};
 use crate::bounds::Bounds;
 use crate::compact;
 use crate::digest;
+use crate::ed25519;
 use crate::error::{Invalid, Result};
-use crate::facts::{ChainFacts, NotEvaluated};
+use crate::facts::{ChainFacts, EnvelopeFacts, GrantFacts, NotEvaluated};
 use crate::jcs::jcs_encode;
 use crate::json::{json_decode, JsonValue};
 use crate::jwk::{jwk_decode_public, public_key_thumbprint_raw, thumbprint_raw};
+use crate::selector;
 use crate::types::{
-    BoundaryAnchor, ChainInput, ConsumptionEntry, ExpectedChain, GrantDecoded, GrantInput,
-    KeyLocator, KeyTransition, ProducedSigningInput, ProofDecoded, ProofInput,
+    BoundaryAnchor, ChainInput, ConsumptionEntry, Credentials, ExpectedChain, ExpectedGrant,
+    ExpectedRequest, GrantDecoded, GrantInput, KeyLocator, KeyTransition, NonceMode,
+    ProducedSigningInput, ProofDecoded, ProofInput, TrustedIssuer,
 };
 use crate::uri::uri_normalize;
 
@@ -120,26 +123,17 @@ pub fn untrusted_key_locator(compact: &[u8], bounds: &Bounds) -> Result<KeyLocat
 /// (`REQ1-CLAIM-closed-set`). All three compact segments MUST be non-empty
 /// canonical base64url (via [`compact::parse_compact`]).
 pub fn decode_grant(compact: &[u8], bounds: &Bounds) -> Result<GrantDecoded> {
-    if compact.len() as u64 > bounds.compact_bytes() {
-        return Err(Invalid);
-    }
-    let (protected_seg, payload_seg, _signature_seg) = compact::parse_compact(compact)?;
-    let header_bytes = decode_segment(protected_seg, bounds)?;
-    let payload_bytes = decode_segment(payload_seg, bounds)?;
-    let header = json_decode(&header_bytes, bounds)?;
-    let payload = json_decode(&payload_bytes, bounds)?;
-    let key_id = validate_grant_header(&header, bounds)?;
-    let decoded = validate_grant_payload(&payload, bounds)?;
+    let g = decode_grant_parts(compact, bounds)?;
     Ok(GrantDecoded {
-        key_id,
-        version: decoded.version,
-        issuer: decoded.issuer,
-        grant_id: decoded.grant_id,
-        audiences: decoded.audiences,
-        holder_thumbprint: decoded.holder_thumbprint,
-        issued_at: decoded.issued_at,
-        not_before: decoded.not_before,
-        expires_at: decoded.expires_at,
+        key_id: g.key_id,
+        version: g.payload.version,
+        issuer: g.payload.issuer,
+        grant_id: g.payload.grant_id,
+        audiences: g.payload.audiences,
+        holder_thumbprint: g.payload.holder_thumbprint,
+        issued_at: g.payload.issued_at,
+        not_before: g.payload.not_before,
+        expires_at: g.payload.expires_at,
         verification: NotEvaluated,
     })
 }
@@ -159,32 +153,300 @@ pub fn decode_grant(compact: &[u8], bounds: &Bounds) -> Result<GrantDecoded> {
 /// (every claim required except `nonce`; `REQ1-CLAIM-proof-required`,
 /// `REQ1-CLAIM-no-extra`).
 pub fn decode_proof(compact: &[u8], bounds: &Bounds) -> Result<ProofDecoded> {
-    if compact.len() as u64 > bounds.compact_bytes() {
-        return Err(Invalid);
-    }
-    let (protected_seg, payload_seg, _signature_seg) = compact::parse_compact(compact)?;
-    let header_bytes = decode_segment(protected_seg, bounds)?;
-    let payload_bytes = decode_segment(payload_seg, bounds)?;
-    let header = json_decode(&header_bytes, bounds)?;
-    let payload = json_decode(&payload_bytes, bounds)?;
-    // validate_proof_header returns the decoded holder [u8;32] public key.
-    let holder_public_key = validate_proof_header(&header, bounds)?;
-    let holder_thumbprint = thumbprint_raw(&holder_public_key);
-    let decoded = validate_proof_payload(&payload, bounds)?;
+    let p = decode_proof_parts(compact, bounds)?;
+    let holder_thumbprint = thumbprint_raw(&p.holder_public_key);
     Ok(ProofDecoded {
         // The proof header carries a JWK, not a kid; the field is empty.
         key_id: String::new(),
-        proof_id: decoded.proof_id,
-        method: decoded.method,
-        target_uri: decoded.target_uri,
-        invocation_id: decoded.invocation_id,
-        operation: decoded.operation,
-        grant_hash: decoded.grant_hash,
-        request_hash: decoded.request_hash,
-        issued_at: decoded.issued_at,
+        proof_id: p.payload.proof_id,
+        method: p.payload.method,
+        target_uri: p.payload.target_uri,
+        invocation_id: p.payload.invocation_id,
+        operation: p.payload.operation,
+        grant_hash: p.payload.grant_hash,
+        request_hash: p.payload.request_hash,
+        issued_at: p.payload.issued_at,
         holder_thumbprint,
-        nonce: decoded.nonce,
+        nonce: p.payload.nonce,
         verification: NotEvaluated,
+    })
+}
+
+// ============================================================================
+// verify_grant — Façade C (Task 12): grant verification (the authz surface)
+// ============================================================================
+//
+// This is the **silent-forgery surface**: a permissive verify silently accepts
+// FORGED CREDENTIALS. Every binding — exact key id, exact issuer/audience, the
+// Ed25519 signature over the exact 2-segment signing input, coherent signed
+// times, and the three skew invariants — collapses to exactly [`Invalid`] on
+// any mismatch (`REQ1-VERIFY-return-shape`) with no value leak. The result is
+// [`GrantFacts`] carrying `authorization: NotEvaluated` — verification is not
+// authority (`REQ1-VERIFY-grant-not-authorized`).
+
+/// Verify a grant compact against a trusted issuer and caller expectation.
+///
+/// Decodes the compact (reusing [`decode_grant_parts`]), then enforces
+/// `REQ1-VERIFY-grant-exact` (exact key id, issuer, audience), verifies the
+/// Ed25519 signature over the exact RFC 7515 two-segment signing input
+/// (`REQ1-SIGNING-exact-input`, `REQ1-SIGNING-backend-reject`), and checks the
+/// signed-time coherence (`REQ1-VERIFY-grant-times`: `iat < exp` and
+/// `nbf < exp`; `iat <= nbf` is NOT required) plus the three skew invariants
+/// (`REQ1-VERIFY-time-bounds`):
+///
+/// ```text
+/// iat <= evaluation_time + skew
+/// nbf <= evaluation_time + skew
+/// exp >  evaluation_time - skew
+/// ```
+///
+/// Returns [`GrantFacts`] carrying the raw 32-byte issuer-key fingerprint, the
+/// decoded `cnf.jkt` holder thumbprint, the matched audience, the grant times,
+/// and `authorization: NotEvaluated`. The issuer-key fingerprint is
+/// `public_key_thumbprint_raw(issuer.public_key)` (`REQ1-HEADER-issuer-
+/// fingerprint`); it is a digest of the caller's trusted key, never a raw key.
+pub fn verify_grant(
+    compact: &[u8],
+    issuer: &TrustedIssuer,
+    expected: &ExpectedGrant,
+) -> Result<GrantFacts> {
+    let g = decode_grant_parts(compact, &expected.bounds)?;
+
+    // REQ1-VERIFY-grant-exact: exact key ID, issuer, audience.
+    if g.key_id != issuer.key_id {
+        return Err(Invalid);
+    }
+    if g.payload.issuer != expected.issuer {
+        return Err(Invalid);
+    }
+    if !audience_matches(&g.payload.audiences, &expected.audience) {
+        return Err(Invalid);
+    }
+
+    // Signature over the exact 2-segment signing input
+    // (ASCII(base64url(protected) || "." || base64url(payload))).
+    let sig_raw = base64url_decode(g.signature_seg)?;
+    if sig_raw.len() != 64 {
+        return Err(Invalid); // REQ1-BOUNDS-fixed-widths (signature = 64 bytes)
+    }
+    let mut signature = [0u8; 64];
+    signature.copy_from_slice(&sig_raw);
+    let signing_input = signing_input_bytes(g.protected_seg, g.payload_seg);
+    ed25519::verify(&issuer.public_key, &signing_input, &signature)?;
+
+    // REQ1-VERIFY-grant-times: iat < exp and nbf < exp are already enforced by
+    // validate_grant_payload. iat <= nbf is NOT required
+    // (REQ1-VERIFY-no-iat-nbf-order). The skew invariants use checked
+    // arithmetic; an overflow saturates so the bound cannot be mis-evaluated.
+    let eval = expected.evaluation_time;
+    let skew = expected.skew as i64;
+    let upper = eval.checked_add(skew).unwrap_or(i64::MAX);
+    if g.payload.issued_at > upper || g.payload.not_before > upper {
+        return Err(Invalid);
+    }
+    let lower = eval.checked_sub(skew).unwrap_or(i64::MIN);
+    if g.payload.expires_at <= lower {
+        return Err(Invalid);
+    }
+
+    let issuer_key_fingerprint = public_key_thumbprint_raw(&issuer.public_key);
+    Ok(GrantFacts {
+        version: g.payload.version,
+        issuer: g.payload.issuer,
+        grant_id: g.payload.grant_id,
+        issuer_key_fingerprint,
+        holder_thumbprint: g.payload.holder_thumbprint,
+        matched_audience: expected.audience.clone(),
+        iat: g.payload.issued_at,
+        nbf: g.payload.not_before,
+        exp: g.payload.expires_at,
+        authorization: NotEvaluated,
+    })
+}
+
+// ============================================================================
+// check_envelope — Façade C (Task 12): combined envelope verification
+// ============================================================================
+//
+// The **highest-stakes silent-forgery surface**: a permissive check_envelope
+// silently accepts a proof bound to a DIFFERENT grant, a different holder, a
+// different request, or a replayed/stale proof. Combined verification
+// re-verifies the raw grant; verifies the holder signature + RFC 7638
+// thumbprint binding (the proof's holder key MUST be the grant's `cnf.jkt`);
+// and binds `ath` (SHA-256 over the EXACT RECEIVED grant compact), method, URI,
+// invocation, operation, `ba_req`, proof time window, nonce mode, and every
+// selector (`REQ1-VERIFY-envelope-binding`). Every mismatch → `Err(Invalid)`.
+
+/// Verify a holder proof bound to a grant against a caller's expected request.
+///
+/// Re-verifies the raw grant (via [`verify_grant`]); decodes the proof and
+/// verifies the holder Ed25519 signature; binds the proof header JWK RFC 7638
+/// thumbprint to the grant's `cnf.jkt` (holder binding); and enforces every
+/// request binding (`REQ1-VERIFY-envelope-binding`): `ath` over the received
+/// grant compact (`REQ1-CLAIM-ath`), `ba_req`, `htm` method, `htu` URI,
+/// `ba_inv` invocation, `ba_op` operation (which MUST name a grant operation),
+/// the proof time window (`REQ1-VERIFY-time-bounds`), the nonce mode
+/// (`REQ1-VERIFY-nonce-mode`), and every selector of the matched grant
+/// operation via [`selector::evaluate`].
+///
+/// Returns [`EnvelopeFacts`] embedding the re-verified [`GrantFacts`] plus the
+/// proof identity, the normalized URI, the raw grant/request hashes, the proof
+/// issuance time, and `authorization: NotEvaluated`.
+pub fn check_envelope(
+    credentials: &Credentials,
+    expected: &ExpectedRequest,
+) -> Result<EnvelopeFacts> {
+    let bounds = &expected.bounds;
+
+    // Re-verify the raw grant: construct an ExpectedGrant from the request's
+    // issuer/audience/timing/bounds and verify_grant the received compact.
+    let expected_grant = ExpectedGrant {
+        issuer: expected.issuer.clone(),
+        audience: expected.audience.clone(),
+        evaluation_time: expected.evaluation_time,
+        skew: expected.skew,
+        bounds: expected.bounds,
+    };
+    let grant_facts = verify_grant(
+        &credentials.grant,
+        &expected.trusted_issuer,
+        &expected_grant,
+    )?;
+
+    // Decode the grant a second time to surface the operations array for
+    // selector evaluation (GrantFacts is redacted and carries no operations).
+    // The grant bytes were already authenticated by verify_grant; decode is
+    // deterministic, so this yields the authentic operations of the verified
+    // grant.
+    let grant_parts = decode_grant_parts(&credentials.grant, bounds)?;
+    let operations = extract_operations(&grant_parts.payload_json)?;
+
+    // Decode the proof (header + payload + holder key + segments).
+    let proof = decode_proof_parts(&credentials.proof, bounds)?;
+
+    // Holder thumbprint binding: the proof header JWK RFC 7638 thumbprint MUST
+    // equal the grant's cnf.jkt (REQ1-VERIFY-envelope-binding). This binds the
+    // proof's holder key to the grant's confirmation.
+    let holder_thumb = thumbprint_raw(&proof.holder_public_key);
+    if holder_thumb != grant_facts.holder_thumbprint {
+        return Err(Invalid);
+    }
+
+    // Holder signature verify over the proof's 2-segment signing input.
+    let proof_sig_raw = base64url_decode(proof.signature_seg)?;
+    if proof_sig_raw.len() != 64 {
+        return Err(Invalid); // REQ1-BOUNDS-fixed-widths (signature = 64 bytes)
+    }
+    let mut proof_signature = [0u8; 64];
+    proof_signature.copy_from_slice(&proof_sig_raw);
+    let proof_signing_input = signing_input_bytes(proof.protected_seg, proof.payload_seg);
+    ed25519::verify(
+        &proof.holder_public_key,
+        &proof_signing_input,
+        &proof_signature,
+    )?;
+
+    // ath binding (REQ1-CLAIM-ath): SHA-256 over the ASCII bytes of the EXACT
+    // RECEIVED grant compact. Computing ath over a re-serialized compact would
+    // let a modified compact pass — this is the parse!=verify protection.
+    let mut ath_hasher = Sha256::new();
+    ath_hasher.update(&credentials.grant);
+    let mut recomputed_ath = [0u8; 32];
+    recomputed_ath.copy_from_slice(&ath_hasher.finalize());
+    if proof.payload.grant_hash != recomputed_ath {
+        return Err(Invalid);
+    }
+
+    // ba_req binding: request_digest(operation, cast_arguments) MUST equal the
+    // proof's ba_req.
+    let ba_req_b64u =
+        digest::request_digest(&expected.operation, &expected.cast_arguments, bounds)?;
+    let ba_req_raw = base64url_decode(&ba_req_b64u)?;
+    if ba_req_raw.len() != 32 {
+        return Err(Invalid);
+    }
+    let mut recomputed_ba_req = [0u8; 32];
+    recomputed_ba_req.copy_from_slice(&ba_req_raw);
+    if proof.payload.request_hash != recomputed_ba_req {
+        return Err(Invalid);
+    }
+
+    // method binding (byte-for-byte, case-sensitive).
+    if proof.payload.method != expected.method {
+        return Err(Invalid);
+    }
+
+    // URI binding: the expected URI MUST be pre-normalized (REQ1-URI-pre-
+    // normalized) and the proof htu MUST equal it.
+    let normalized_uri = uri_normalize(&expected.target_uri, bounds)?;
+    if normalized_uri != expected.target_uri {
+        return Err(Invalid);
+    }
+    if proof.payload.target_uri != normalized_uri {
+        return Err(Invalid);
+    }
+
+    // invocation binding (lowercase UUID string compare).
+    if proof.payload.invocation_id != expected.invocation_id {
+        return Err(Invalid);
+    }
+
+    // operation binding: proof ba_op MUST equal the expected operation, AND the
+    // grant MUST carry an operation of that name whose selectors are then
+    // evaluated against the cast arguments.
+    if proof.payload.operation != expected.operation {
+        return Err(Invalid);
+    }
+    let matched_op = operations
+        .iter()
+        .find(|(name, _)| name == &expected.operation)
+        .ok_or(Invalid)?;
+    // REQ1-VERIFY-envelope-binding: EVERY selector of the matched operation
+    // MUST evaluate Ok(true) against the cast arguments.
+    for selector_value in &matched_op.1 {
+        if !selector::evaluate(selector_value, &expected.cast_arguments, bounds)? {
+            return Err(Invalid);
+        }
+    }
+
+    // Proof time window (REQ1-VERIFY-time-bounds):
+    //   evaluation_time - proof_max_age - skew <= iat <= evaluation_time + skew
+    let eval = expected.evaluation_time;
+    let skew = expected.skew as i64;
+    let proof_max_age = expected.proof_max_age as i64;
+    let lower = eval
+        .checked_sub(proof_max_age)
+        .unwrap_or(i64::MIN)
+        .checked_sub(skew)
+        .unwrap_or(i64::MIN);
+    let upper = eval.checked_add(skew).unwrap_or(i64::MAX);
+    if proof.payload.issued_at < lower || proof.payload.issued_at > upper {
+        return Err(Invalid);
+    }
+
+    // Nonce mode (REQ1-VERIFY-nonce-mode).
+    match &expected.nonce_mode {
+        NonceMode::NotRequired => {
+            if proof.payload.nonce.is_some() {
+                return Err(Invalid);
+            }
+        }
+        NonceMode::Required(expected_nonce) => match &proof.payload.nonce {
+            Some(n) if n == expected_nonce => {}
+            _ => return Err(Invalid),
+        },
+    }
+
+    Ok(EnvelopeFacts {
+        grant: grant_facts,
+        proof_id: proof.payload.proof_id,
+        invocation_id: proof.payload.invocation_id,
+        operation: proof.payload.operation,
+        normalized_uri,
+        grant_hash: recomputed_ath,
+        request_hash: recomputed_ba_req,
+        proof_iat: proof.payload.issued_at,
+        authorization: NotEvaluated,
     })
 }
 
@@ -811,6 +1073,142 @@ fn decode_segment(segment: &[u8], bounds: &Bounds) -> Result<Vec<u8>> {
     Ok(decoded)
 }
 
+/// The fully-decoded grant compact: the three raw segments (borrowed from the
+/// input compact), the validated `kid`, the validated [`GrantPayload`], and the
+/// parsed payload [`JsonValue`] (retained so [`check_envelope`] can extract the
+/// operations array the redacted [`GrantFacts`] does not carry).
+struct DecodedGrant<'a> {
+    protected_seg: &'a [u8],
+    payload_seg: &'a [u8],
+    signature_seg: &'a [u8],
+    key_id: String,
+    payload: GrantPayload,
+    payload_json: JsonValue,
+}
+
+/// Shared grant decode used by [`decode_grant`] (signature-not-verified view)
+/// and [`verify_grant`] (which adds the signature, identity, and time checks).
+/// Splits, bounds, decodes, and structurally validates the protected header +
+/// payload claims. The signature segment is NOT width-checked here (decode is
+/// signature-width-agnostic); [`verify_grant`] enforces the 64-byte width.
+fn decode_grant_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedGrant<'a>> {
+    if compact.len() as u64 > bounds.compact_bytes() {
+        return Err(Invalid);
+    }
+    let (protected_seg, payload_seg, signature_seg) = compact::parse_compact(compact)?;
+    let header_bytes = decode_segment(protected_seg, bounds)?;
+    let payload_bytes = decode_segment(payload_seg, bounds)?;
+    let header = json_decode(&header_bytes, bounds)?;
+    let payload_json = json_decode(&payload_bytes, bounds)?;
+    let key_id = validate_grant_header(&header, bounds)?;
+    let payload = validate_grant_payload(&payload_json, bounds)?;
+    Ok(DecodedGrant {
+        protected_seg,
+        payload_seg,
+        signature_seg,
+        key_id,
+        payload,
+        payload_json,
+    })
+}
+
+/// The fully-decoded proof compact: the three raw segments (borrowed), the
+/// decoded 32-byte holder public key, and the validated [`ProofPayload`].
+struct DecodedProof<'a> {
+    protected_seg: &'a [u8],
+    payload_seg: &'a [u8],
+    signature_seg: &'a [u8],
+    holder_public_key: [u8; 32],
+    payload: ProofPayload,
+}
+
+/// Shared proof decode used by [`decode_proof`] and [`check_envelope`]. Splits,
+/// bounds, decodes, and structurally validates the proof header (returning the
+/// holder public key) and payload claims. The signature segment is NOT
+/// width-checked here; [`check_envelope`] enforces the 64-byte width.
+fn decode_proof_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedProof<'a>> {
+    if compact.len() as u64 > bounds.compact_bytes() {
+        return Err(Invalid);
+    }
+    let (protected_seg, payload_seg, signature_seg) = compact::parse_compact(compact)?;
+    let header_bytes = decode_segment(protected_seg, bounds)?;
+    let payload_bytes = decode_segment(payload_seg, bounds)?;
+    let header = json_decode(&header_bytes, bounds)?;
+    let payload_json = json_decode(&payload_bytes, bounds)?;
+    let holder_public_key = validate_proof_header(&header, bounds)?;
+    let payload = validate_proof_payload(&payload_json, bounds)?;
+    Ok(DecodedProof {
+        protected_seg,
+        payload_seg,
+        signature_seg,
+        holder_public_key,
+        payload,
+    })
+}
+
+/// Assembles the RFC 7515 two-segment signing input
+/// (`protected_segment || "." || payload_segment`) — the exact bytes the
+/// Ed25519 signature covers (`REQ1-SIGNING-exact-input`).
+fn signing_input_bytes(protected_seg: &[u8], payload_seg: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(protected_seg.len() + 1 + payload_seg.len());
+    out.extend_from_slice(protected_seg);
+    out.push(b'.');
+    out.extend_from_slice(payload_seg);
+    out
+}
+
+/// Audience match: `expected` MUST be one of the grant's decoded audiences.
+/// `take_audiences` normalizes a single-string `aud` to a one-element Vec, so
+/// this handles both the string and array `aud` shapes uniformly.
+fn audience_matches(grant_audiences: &[String], expected: &str) -> bool {
+    grant_audiences.iter().any(|a| a == expected)
+}
+
+/// Extracts the grant `operations` array as `(name, selectors)` pairs for
+/// selector evaluation. The payload is already structurally validated by
+/// [`validate_operations`]; this re-walks the array to surface each operation's
+/// selector objects (cloned, so they outlive the borrowed payload).
+fn extract_operations(payload: &JsonValue) -> Result<Vec<(String, Vec<JsonValue>)>> {
+    let members = match payload {
+        JsonValue::Object(m) => m,
+        _ => return Err(Invalid),
+    };
+    let ops_value = members
+        .iter()
+        .find(|(k, _)| k == "operations")
+        .map(|(_, v)| v)
+        .ok_or(Invalid)?;
+    let ops = match ops_value {
+        JsonValue::Array(a) => a,
+        _ => return Err(Invalid),
+    };
+    let mut out = Vec::with_capacity(ops.len());
+    for op in ops {
+        let omembers = match op {
+            JsonValue::Object(m) => m,
+            _ => return Err(Invalid),
+        };
+        let name = omembers
+            .iter()
+            .find(|(k, _)| k == "name")
+            .and_then(|(_, v)| match v {
+                JsonValue::String(s) => Some(s),
+                _ => None,
+            })
+            .ok_or(Invalid)?;
+        let selectors = omembers
+            .iter()
+            .find(|(k, _)| k == "selectors")
+            .and_then(|(_, v)| match v {
+                JsonValue::Array(a) => Some(a),
+                _ => None,
+            })
+            .ok_or(Invalid)?;
+        out.push((name.clone(), selectors.clone()));
+    }
+    Ok(out)
+}
+
 /// JCS-encodes each object, base64url-encodes the result, and assembles the
 /// two-segment RFC 7515 signing input (`REQ1-SIGNING-exact-input`).
 fn build_produced(
@@ -1279,8 +1677,43 @@ fn validate_operations(value: Option<&JsonValue>, bounds: &Bounds) -> Result<()>
         if sel_items.is_empty() || sel_items.len() as u64 > bounds.selectors() {
             return Err(Invalid);
         }
+        // Each selector MUST carry a known `kind` (REQ1-SELECTOR-closed-set).
+        // This is the structural check exercised at grant-verify time (corpus
+        // `verify-grant-invalid-selector-operation-selector-content`: a
+        // `kind:"bogus"` selector is rejected here, before the signature check).
+        // Path/value shape and the equals/one_of exact-member sets are enforced
+        // at envelope time by selector::evaluate; JSON-decoder bounds catch
+        // oversized selector values and lone-surrogate path bytes (corpus
+        // `verify-grant-invalid-selector-path-lone-surrogate`,
+        // `-selector-value-object-members`, `-selector-value-magnitude`).
+        for sel in sel_items {
+            validate_selector_kind(sel)?;
+        }
     }
     Ok(())
+}
+
+/// Structural selector check at decode time: the selector MUST be a JSON object
+/// whose `kind` member is exactly one of the closed set {all, equals, one_of}
+/// (`REQ1-SELECTOR-closed-set`). Catches an unknown `kind` (corpus
+/// `kind:"bogus"`) before signature verification. Per-kind member/path/value
+/// validation runs in `selector::evaluate` at envelope time (which needs the
+/// cast arguments a grant-verify does not have).
+fn validate_selector_kind(selector: &JsonValue) -> Result<()> {
+    let members = match selector {
+        JsonValue::Object(m) => m,
+        _ => return Err(Invalid),
+    };
+    let mut kind = None;
+    for (k, v) in members {
+        if k == "kind" {
+            kind = Some(v);
+        }
+    }
+    match kind {
+        Some(JsonValue::String(s)) if matches!(s.as_str(), "all" | "equals" | "one_of") => Ok(()),
+        _ => Err(Invalid),
+    }
 }
 
 /// Extracts an `htm` method token (1–32 bytes of the RFC 9110 token alphabet).
@@ -2423,5 +2856,410 @@ mod tests {
         }
         assert_eq!(agreed, 10, "agreed (check corpus == 10)");
         assert_eq!(disagreed, 0, "disagreed");
+    }
+
+    // ==========================================================================
+    // Façade C — grant + envelope verification (Task 12)
+    //
+    // The FORGED-CREDENTIAL surface: a permissive verify silently accepts
+    // forged credentials. The red-capable battery below asserts each binding's
+    // reject; the corpus tests assert byte-level agreement with the falsifier.
+    // ==========================================================================
+
+    /// Builds the `verify-grant-valid` corpus fixture (a real Ed25519-signed
+    /// grant compact + its trusted issuer + expectation).
+    fn valid_grant_verify_fixture() -> (Vec<u8>, TrustedIssuer, ExpectedGrant) {
+        let cases = load_cases("grant-verify/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-grant-valid"))
+            .expect("valid grant-verify case");
+        let input = &case["input"];
+        let compact = input["compact"].as_str().unwrap().as_bytes().to_vec();
+        let issuer = TrustedIssuer {
+            key_id: input["key_id"].as_str().unwrap().to_string(),
+            public_key: b64url_to_32(&input["public_key"]).expect("32 bytes"),
+        };
+        let expected = ExpectedGrant {
+            issuer: input["issuer"].as_str().unwrap().to_string(),
+            audience: input["audience"].as_str().unwrap().to_string(),
+            evaluation_time: input["evaluation_time"].as_i64().unwrap(),
+            skew: input["clock_skew"].as_u64().unwrap(),
+            bounds: max(),
+        };
+        (compact, issuer, expected)
+    }
+
+    /// Builds the `check-envelope-valid` corpus fixture (real signed grant +
+    /// proof compacts + the matching ExpectedRequest, NonceMode::NotRequired).
+    fn valid_envelope_fixture() -> (Credentials, ExpectedRequest) {
+        envelope_fixture_for("check-envelope-valid")
+    }
+
+    /// Loads one envelope corpus case into (Credentials, ExpectedRequest).
+    fn envelope_fixture_for(id: &str) -> (Credentials, ExpectedRequest) {
+        let cases = load_cases("envelope/check.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some(id))
+            .unwrap_or_else(|| panic!("envelope case {id}"));
+        let input = &case["input"];
+        let exp = &input["expected"];
+        let trusted = TrustedIssuer {
+            key_id: exp["trusted_issuer"]["key_id"]
+                .as_str()
+                .unwrap()
+                .to_string(),
+            public_key: b64url_to_32(&exp["trusted_issuer"]["public_key"]).unwrap_or([0u8; 32]),
+        };
+        let nonce_mode = match exp.get("nonce") {
+            None => NonceMode::NotRequired,
+            Some(n) => NonceMode::Required(
+                n["required"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("case {id} nonce.required"))
+                    .to_string(),
+            ),
+        };
+        let expected = ExpectedRequest {
+            issuer: exp["issuer"].as_str().unwrap().to_string(),
+            audience: exp["audience"].as_str().unwrap().to_string(),
+            evaluation_time: exp["evaluation_time"].as_i64().unwrap(),
+            skew: exp["clock_skew"].as_u64().unwrap(),
+            bounds: max(),
+            method: exp["method"].as_str().unwrap().to_string(),
+            target_uri: exp["target_uri"].as_str().unwrap().to_string(),
+            invocation_id: exp["invocation_id"].as_str().unwrap().to_string(),
+            operation: exp["operation"].as_str().unwrap().to_string(),
+            cast_arguments: serde_to_json(&exp["cast_arguments"]),
+            proof_max_age: exp["proof_max_age"].as_u64().unwrap(),
+            nonce_mode,
+            trusted_issuer: trusted,
+        };
+        let credentials = Credentials {
+            grant: input["grant"].as_str().unwrap().as_bytes().to_vec(),
+            proof: input["proof"].as_str().unwrap().as_bytes().to_vec(),
+        };
+        (credentials, expected)
+    }
+
+    // ==========================================================================
+    // RED-CAPABLE BATTERY — each test names the red state it catches.
+    // ==========================================================================
+
+    // --- Signature tamper: a decodable-but-wrong 64-byte signature -> Invalid.
+    // Uses the corpus's properly-tampered signature case (a single signature
+    // byte flipped then re-canonicalized, so the segment still decodes to 64
+    // bytes — this isolates the Ed25519 verify, not the b64 decoder).
+    // RED-capable: if ed25519::verify returned Ok(()) unconditionally, the
+    // tampered signature would pass (forged credential accepted).
+    #[test]
+    fn red_grant_signature_tamper_rejected() {
+        let cases = load_cases("grant-verify/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-grant-tamper-signature-byte"))
+            .expect("tamper case");
+        let input = &case["input"];
+        let issuer = TrustedIssuer {
+            key_id: input["key_id"].as_str().unwrap().to_string(),
+            public_key: b64url_to_32(&input["public_key"]).expect("32 bytes"),
+        };
+        let expected = ExpectedGrant {
+            issuer: input["issuer"].as_str().unwrap().to_string(),
+            audience: input["audience"].as_str().unwrap().to_string(),
+            evaluation_time: input["evaluation_time"].as_i64().unwrap(),
+            skew: input["clock_skew"].as_u64().unwrap(),
+            bounds: max(),
+        };
+        let compact = input["compact"].as_str().unwrap().as_bytes();
+        assert_eq!(verify_grant(compact, &issuer, &expected), Err(Invalid));
+    }
+
+    // --- Key confusion: verifying the grant with the WRONG issuer key -> Invalid.
+    // RED-capable: if the key arg were ignored (verify always against the
+    // grant's own embedded key), the wrong key would pass.
+    #[test]
+    fn red_grant_wrong_issuer_key_rejected() {
+        let (compact, mut issuer, expected) = valid_grant_verify_fixture();
+        issuer.public_key[0] ^= 0x01; // a different 32-byte key
+        assert_eq!(verify_grant(&compact, &issuer, &expected), Err(Invalid));
+    }
+
+    // --- Key-ID mismatch: header.kid != issuer.key_id -> Invalid.
+    #[test]
+    fn red_grant_kid_mismatch_rejected() {
+        let (compact, mut issuer, expected) = valid_grant_verify_fixture();
+        issuer.key_id = "different-kid".to_string();
+        assert_eq!(verify_grant(&compact, &issuer, &expected), Err(Invalid));
+    }
+
+    // --- Issuer mismatch: claim.iss != expected.issuer -> Invalid.
+    #[test]
+    fn red_grant_issuer_mismatch_rejected() {
+        let (compact, issuer, mut expected) = valid_grant_verify_fixture();
+        expected.issuer = "https://wrong-issuer.test".to_string();
+        assert_eq!(verify_grant(&compact, &issuer, &expected), Err(Invalid));
+    }
+
+    // --- Audience mismatch: expected audience not in grant aud -> Invalid.
+    #[test]
+    fn red_grant_audience_mismatch_rejected() {
+        let (compact, issuer, mut expected) = valid_grant_verify_fixture();
+        expected.audience = "https://wrong-audience.test".to_string();
+        assert_eq!(verify_grant(&compact, &issuer, &expected), Err(Invalid));
+    }
+
+    // --- Time window: an expired grant (exp <= eval - skew) -> Invalid.
+    // RED-capable: skip the exp skew check -> red. (corpus invalid-expired:
+    // eval=3000, exp=2000, skew=60 -> 2000 > 2940 is false.)
+    #[test]
+    fn red_grant_expired_rejected() {
+        let (compact, issuer, mut expected) = valid_grant_verify_fixture();
+        expected.evaluation_time = 3000; // iat=1000,nbf=1000,exp=2000,skew=60
+        assert_eq!(verify_grant(&compact, &issuer, &expected), Err(Invalid));
+    }
+
+    // --- iat-future: iat > eval + skew -> Invalid.
+    #[test]
+    fn red_grant_iat_future_rejected() {
+        let (compact, issuer, mut expected) = valid_grant_verify_fixture();
+        // iat=1000, skew=60 -> eval=939 makes eval+skew=999 < iat(1000).
+        expected.evaluation_time = 939;
+        assert_eq!(verify_grant(&compact, &issuer, &expected), Err(Invalid));
+    }
+
+    // ==========================================================================
+    // Envelope red battery
+    // ==========================================================================
+
+    // --- Proof signature tamper: flip one proof-signature byte -> Invalid.
+    // RED-capable: bypass the holder ed25519::verify -> a forged proof passes.
+    #[test]
+    fn red_envelope_proof_signature_tamper_rejected() {
+        let (mut creds, expected) = valid_envelope_fixture();
+        *creds.proof.last_mut().unwrap() ^= 0x01;
+        assert_eq!(check_envelope(&creds, &expected), Err(Invalid));
+    }
+
+    // --- Holder thumbprint binding: proof JWK thumbprint != grant cnf.jkt ->
+    // Invalid. (corpus invalid-claim-holder-binding.)
+    #[test]
+    fn red_envelope_holder_binding_rejected() {
+        let (creds, expected) = envelope_fixture_for("check-envelope-invalid-claim-holder-binding");
+        assert_eq!(check_envelope(&creds, &expected), Err(Invalid));
+    }
+
+    // --- ath binding (parse!=verify): proof.ath != SHA-256(RECEIVED grant) ->
+    // Invalid. (corpus invalid-claim-grant-binding: a proof built over a
+    // DIFFERENT grant compact.)
+    // RED-capable: compute ath over re-serialized JSON instead of received
+    // bytes -> a modified compact wrongly passes.
+    #[test]
+    fn red_envelope_ath_over_received_bytes_rejected() {
+        let (creds, expected) = envelope_fixture_for("check-envelope-invalid-claim-grant-binding");
+        assert_eq!(check_envelope(&creds, &expected), Err(Invalid));
+    }
+
+    // --- ba_req binding: proof.ba_req != request_digest(op, args) -> Invalid.
+    // (corpus invalid-claim-request-arguments.)
+    #[test]
+    fn red_envelope_ba_req_rejected() {
+        let (creds, expected) =
+            envelope_fixture_for("check-envelope-invalid-claim-request-arguments");
+        assert_eq!(check_envelope(&creds, &expected), Err(Invalid));
+    }
+
+    // --- Selector non-match: an equals selector returning Ok(false) -> Invalid.
+    // RED-capable: skip selector evaluation -> a non-matching selector passes.
+    // (corpus invalid-selector: selector value "rec-1", args id "rec-2".)
+    #[test]
+    fn red_envelope_selector_non_match_rejected() {
+        let (creds, expected) = envelope_fixture_for("check-envelope-invalid-selector");
+        assert_eq!(check_envelope(&creds, &expected), Err(Invalid));
+    }
+
+    // --- method / uri / invocation / operation mismatch -> each Invalid.
+    #[test]
+    fn red_envelope_request_bindings_rejected() {
+        let (creds, expected) = valid_envelope_fixture();
+
+        // method
+        {
+            let mut e = expected.clone();
+            e.method = "GET".to_string();
+            assert_eq!(check_envelope(&creds, &e), Err(Invalid), "method mismatch");
+        }
+        // uri
+        {
+            let mut e = expected.clone();
+            e.target_uri = "https://resource.example.test/different".to_string();
+            assert_eq!(check_envelope(&creds, &e), Err(Invalid), "uri mismatch");
+        }
+        // invocation
+        {
+            let mut e = expected.clone();
+            e.invocation_id = "00000000-0000-0000-0000-000000000001".to_string();
+            assert_eq!(
+                check_envelope(&creds, &e),
+                Err(Invalid),
+                "invocation mismatch"
+            );
+        }
+        // operation (not present in the grant)
+        {
+            let mut e = expected.clone();
+            e.operation = "nonexistent-op".to_string();
+            assert_eq!(
+                check_envelope(&creds, &e),
+                Err(Invalid),
+                "operation mismatch"
+            );
+        }
+    }
+
+    // --- Nonce mode: NotRequired rejects a proof that carries a nonce.
+    // (Mirror of corpus invalid-nonce-required, which is the Required direction:
+    // a Required proof missing its nonce.)
+    #[test]
+    fn red_envelope_nonce_mode_rejected() {
+        // corpus invalid-nonce-required: Required("server-nonce-x") but proof
+        // carries no nonce -> Invalid.
+        let (creds, expected) = envelope_fixture_for("check-envelope-invalid-nonce-required");
+        assert_eq!(check_envelope(&creds, &expected), Err(Invalid));
+    }
+
+    // --- Proof time window: a stale proof (iat < eval - proof_max_age - skew)
+    // -> Invalid. Constructed by pushing evaluation_time forward against the
+    // valid fixture's proof iat (1100).
+    #[test]
+    fn red_envelope_proof_time_window_rejected() {
+        let (creds, mut expected) = valid_envelope_fixture();
+        // valid: proof iat=1100, eval=1200, proof_max_age=300, skew=60 ->
+        // window [840,1260]. Push eval to 2000 -> lower = 2000-300-60 = 1640 >
+        // 1100 -> stale -> Invalid.
+        expected.evaluation_time = 2000;
+        assert_eq!(check_envelope(&creds, &expected), Err(Invalid));
+    }
+
+    // ==========================================================================
+    // Corpus: grant-verify/verify.json (13 cases) + envelope/check.json (26)
+    // ==========================================================================
+
+    #[test]
+    fn corpus_verify_grant_all_13_cases() {
+        let cases = load_cases("grant-verify/verify.json");
+        assert_eq!(cases.len(), 13, "grant-verify corpus has 13 cases");
+        let mut agreed = 0usize;
+        let mut disagreed = 0usize;
+        for case in &cases {
+            let id = case["id"].as_str().unwrap_or("<no id>");
+            let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+            let input = &case["input"];
+            let issuer = TrustedIssuer {
+                key_id: input["key_id"].as_str().unwrap().to_string(),
+                public_key: b64url_to_32(&input["public_key"]).unwrap_or([0u8; 32]),
+            };
+            let expected = ExpectedGrant {
+                issuer: input["issuer"].as_str().unwrap().to_string(),
+                audience: input["audience"].as_str().unwrap().to_string(),
+                evaluation_time: input["evaluation_time"].as_i64().unwrap(),
+                skew: input["clock_skew"].as_u64().unwrap(),
+                bounds: max(),
+            };
+            let compact = input["compact"].as_str().unwrap().as_bytes();
+            let result = verify_grant(compact, &issuer, &expected);
+            let agree = match (expected_verdict, &result) {
+                ("valid", Ok(facts)) => {
+                    facts.grant_id == case["expected"]["grant_id"].as_str().unwrap()
+                        && facts.issuer == case["expected"]["issuer"].as_str().unwrap()
+                        && facts.authorization == NotEvaluated
+                        && facts.version == 1
+                }
+                ("invalid", Err(Invalid)) => true,
+                _ => false,
+            };
+            if agree {
+                agreed += 1;
+            } else {
+                disagreed += 1;
+                eprintln!("DISAGREE: id={id} expected={expected_verdict}");
+            }
+        }
+        assert_eq!(agreed, 13, "agreed (grant-verify corpus == 13)");
+        assert_eq!(disagreed, 0, "disagreed");
+    }
+
+    #[test]
+    fn corpus_check_envelope_all_26_cases() {
+        let cases = load_cases("envelope/check.json");
+        assert_eq!(cases.len(), 26, "envelope corpus has 26 cases");
+        let mut agreed = 0usize;
+        let mut disagreed = 0usize;
+        for case in &cases {
+            let id = case["id"].as_str().unwrap_or("<no id>");
+            let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+            let (creds, expected) = envelope_fixture_for(id);
+            let result = check_envelope(&creds, &expected);
+            let agree = match (expected_verdict, &result) {
+                ("valid", Ok(facts)) => {
+                    facts.authorization == NotEvaluated
+                        && facts.grant.authorization == NotEvaluated
+                        && facts.grant.version == 1
+                }
+                ("invalid", Err(Invalid)) => true,
+                _ => false,
+            };
+            if agree {
+                agreed += 1;
+            } else {
+                disagreed += 1;
+                eprintln!("DISAGREE: id={id} expected={expected_verdict}");
+            }
+        }
+        assert_eq!(agreed, 26, "agreed (envelope corpus == 26)");
+        assert_eq!(disagreed, 0, "disagreed");
+    }
+
+    // ==========================================================================
+    // GrantFacts shape: verify_grant on the valid case populates every field.
+    // ==========================================================================
+
+    #[test]
+    fn verify_grant_valid_populates_facts() {
+        let (compact, issuer, expected) = valid_grant_verify_fixture();
+        let facts = verify_grant(&compact, &issuer, &expected).expect("valid");
+        assert_eq!(facts.version, 1);
+        assert_eq!(facts.issuer, expected.issuer);
+        assert_eq!(facts.matched_audience, expected.audience);
+        assert_eq!(facts.authorization, NotEvaluated);
+        // issuer_key_fingerprint is the raw 32-byte thumbprint of the trusted key.
+        assert_eq!(
+            facts.issuer_key_fingerprint,
+            public_key_thumbprint_raw(&issuer.public_key)
+        );
+    }
+
+    // ==========================================================================
+    // EnvelopeFacts shape: check_envelope on the valid case embeds the grant
+    // facts and populates the envelope-only fields.
+    // ==========================================================================
+
+    #[test]
+    fn check_envelope_valid_populates_facts() {
+        let (creds, expected) = valid_envelope_fixture();
+        let facts = check_envelope(&creds, &expected).expect("valid");
+        assert_eq!(facts.authorization, NotEvaluated);
+        assert_eq!(facts.grant.authorization, NotEvaluated);
+        assert_eq!(facts.operation, expected.operation);
+        assert_eq!(facts.invocation_id, expected.invocation_id);
+        assert_eq!(facts.normalized_uri, expected.target_uri);
+        // grant_hash == SHA-256(received grant compact).
+        let mut h = Sha256::new();
+        h.update(&creds.grant);
+        let mut want = [0u8; 32];
+        want.copy_from_slice(&h.finalize());
+        assert_eq!(facts.grant_hash, want);
+        assert_eq!(facts.grant.matched_audience, expected.audience);
     }
 }
