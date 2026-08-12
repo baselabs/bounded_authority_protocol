@@ -137,9 +137,9 @@ closures stay as per-SDK mutation-gates (the corpus cannot express them).
 | seq-0 + nonzero chain_hash | `boundary_anchor_signing_input` | invalid_key | ADR 0004 (genesis anchor) | `boundary-anchor-signing-input-invalid-seq0-nonzero-chain-hash` |
 | start-anchor binding (`seq == first_sequence-1`) | `encode_anchored_export` | invalid_encoding | ADR 0004 | `encode-anchored-export-invalid-start-anchor-binding` |
 | empty chunk | `verify_anchored_export` | invalid_encoding | REQ1-EXPORT-complete-scan | `verify-anchored-export-invalid-empty-chunk` |
-| non-monotone `effective_at` | `verify_anchored_export` | invalid_time | ADR 0004 "strictly increase" | follow-up (signed) |
-| fingerprint cycle A→B→A | `verify_anchored_export` | invalid_key | ADR 0004 "cannot cycle" | follow-up (signed) |
-| one-key / zero-transition valid | `verify_anchored_export` | valid | ADR 0004 (no min key count) | follow-up (signed) |
+| non-monotone `effective_at` | `verify_anchored_export` | invalid_time | ADR 0004 "strictly increase" | `verify-anchored-export-invalid-non-monotone-transitions` |
+| fingerprint cycle A→B→A | `verify_anchored_export` | invalid_key | ADR 0004 "cannot cycle" | `verify-anchored-export-invalid-fingerprint-cycle` |
+| one-key / zero-transition valid | `verify_anchored_export` | valid | ADR 0004 (no min key count) | `verify-anchored-export-valid-one-key` |
 | per-node encode bounds | `jcs.encode` | (d) | bounds threading (host closure) | per-SDK mutation-gate (ADR 0014 D6/D7) |
 | transition-count bound (257) | `encode_anchored_export` | n_a | REQ1-BOUNDS at `bounds.new` | `index.json` `n_a` reason (representation-blocked) |
 | chunk-count bound (65797) | `verify_anchored_export` | n_a | `bounds.new` `archive_chunks` | `index.json` `n_a` reason (representation-blocked) |
