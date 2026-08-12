@@ -19,6 +19,7 @@ pub mod error;
 pub mod jcs;
 pub mod json;
 pub mod jwk;
+pub mod uri;
 
 // `digest` is an internal mechanic behind the v1 façade (protocol-v1.md §lines
 // 329–330): its typed projection is not a stable public primitive. The module
@@ -38,3 +39,4 @@ pub use jwk::{
     jwk_decode_public, jwk_encode_public, public_key_thumbprint_raw, thumbprint,
     thumbprint_preimage, thumbprint_raw,
 };
+pub use uri::uri_normalize;
