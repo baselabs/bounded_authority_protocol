@@ -510,9 +510,67 @@ compatibility.
   members, matching the reference). The GLM peer's documented JCS-DEL note is the
   intended reference-wins decision, not a defect.
 
+## BAP-15 closeout evidence
+
+- The slice spans the corpus prerequisite `696384c` through the closeout-fix head
+  `b9815fc`. It ships the typed Rust verifier SDK reimplementing the frozen v1
+  profile from `docs/protocol-v1.md` + ADRs + the corpus **alone** (ADR 0014 D5:
+  no code-level derivation from the Elixir reference — the closeout grep confirms
+  no Elixir/sibling-SDK module path appears in `sdks/rust/src/`).
+- **Library (T1–T14):** the 15-function façade + the versioned primitives
+  (`json`/`jcs`/`jwk`/`uri`/`base64url`/`bounds`), `#![forbid(unsafe_code)]`, the
+  283-vector conformance runner (vendored corpus, startup SHA-256 assertion, two-
+  boundary key census — `agreed=283 disagreed=0`), all green.
+- **Envelope (T15–T17):** the named permissiveness battery (`tests/permissiveness.rs`,
+  10 closures through the public boundary, each red-capable), the `(d)`-class
+  per-node encode-bounds closure IN `jcs_encode` (depth/nodes/output + magnitude/
+  string/members/items/key/duplicate-key — see the cross-vendor fix below), the
+  purity + license gate scripts (each red-capable, license `<3`-floor), the
+  separate `rust-conformance` CI job on MSRV 1.81 (`--locked`), the ADR 0015
+  publish-guard extension (`Cargo.toml` + `cargo publish`/`crate-ci/cargo-release`),
+  `sdks/rust/README.md` + `docs/deployment/rust-sdk.md` (AWS Lambda
+  `provided.al2023`; PostgreSQL `plrust` — ed25519-dalek verification is NOT
+  plrust-trusted-mode-compatible as built, D-RISK-1).
+- **Cross-vendor (codex + claude — MANDATORY zcode T2, ADR-0007; zcode's peers are
+  the two non-GLM families; NO alongside-GLM, ADR-0006):** the codex peer returned
+  rc=0; the claude fable peer hit its 1200s ceiling and the instrument's resilience
+  re-dispatched claude-opus-4-8 (rc=0). The review surfaced REAL divergences from
+  the Elixir reference in the T1–T14 verify path that the 283-corpus does not pin
+  (conformance is necessary-but-not-sufficient): (1) `jcs_encode` closure #6 was
+  incomplete — the reference `jcs.ex` `encode_value` also enforces int/float
+  magnitude, string/count/key bounds, and duplicate-key rejection per-node; (2)
+  `verify_grant`/`check_envelope` did not enforce the skew/proof_max_age ceilings
+  the reference (`runtime.ex:523-524,550-551`) enforces — a misconfigured caller
+  silently widened the time window; (3) `encode_anchored_export`/`verify_anchored_
+  export` panicked on `first_sequence = i64::MIN` (`- 1` overflow — a fail-closed
+  violation); (4) `license_check.sh` failed open on `<3` parsed rows; (5) CI ran
+  without a tracked `Cargo.lock`/`--locked`. ALL FIVE fixed (commit `b9815fc`),
+  each verified against the reference; the skew ceiling is red-capable-proven by
+  mutation; lib 332 + conformance 283 + permissiveness 10 green under `--locked`.
+  Two codex findings were CONTESTED with reference evidence: the "small-order key
+  forgery" (the reference uses OpenSSL non-strict `:crypto.verify` = matches
+  dalek's default `verify`; and public keys are caller-supplied trusted inputs, so
+  it is unreachable under the verifier's threat model) and the "producer emits
+  verifier-invalid credentials" cluster (the reference producers also just build;
+  producers are deterministic signing-input composers, not validators).
+  Residual should-fixs documented (not blocking): archive-verify memory
+  amplification (~3× the caller-bounded archive peak — an efficiency
+  characteristic, capped by `archive_bytes`), and the by-design decode/envelope
+  selector-validation split. The always-on lenses (spec-conformance/correctness/
+  security/gate-integrity) were GLM-orchestrator self-review on this single-model
+  host — honestly NOT decorrelated; the cross-vendor pass was the decorrelation.
+- **No wire byte, bound, or verdict change to the Elixir package** (Rust-only SDK +
+  its tooling/docs). `mix quality` was green at the pre-fix head `a4176e1` (295
+  tests + 13 properties, 55/55 mutation gate, conformance agreed=283, release.
+  candidate clean); the closeout fix cluster (`b9815fc`) is Rust-only and does not
+  touch `lib/`, so the Elixir/repo gate is unaffected. Local Rust gate at `b9815fc`:
+  `cargo test --locked` lib 332 + conformance agreed=283 + permissiveness 10;
+  `cargo clippy --locked --all-targets -- -D warnings`; `sh tools/purity_check.sh`;
+  `sh tools/license_check.sh` (15 runtime deps).
+
 ## Next action
 
-BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, and BAP-14 are complete. BAP-09 shipped the cross-language verifier SDKs
+BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, and BAP-15 are complete. BAP-09 shipped the cross-language verifier SDKs
 (TypeScript `@bounded-authority/verifier` + Python `bounded-authority-verifier` under `sdks/`, each
 passing all 283 conformance vectors + per-language permissiveness mutation-gates; ADR 0014). BAP-05 shipped the portable v1 conformance
 corpus (283 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI
@@ -586,5 +644,8 @@ three seeded Ed25519 keys, fingerprints 8→11) have since landed, growing the c
 `public_key_fingerprints` to 11; the independent Node runner was strengthened to mirror the
 reference's cross-transition chronology (strictly-increasing `effective_at`), fingerprint-no-cycle,
 and end-anchor-chronology invariants those cases exposed. BAP-15's corpus acceptance is now met
-under the ADR 0014 "no code-level derivation from the Elixir reference" bar; the Rust SDK
-implementation itself is the remaining BAP-15 row.
+under the ADR 0014 "no code-level derivation from the Elixir reference" bar. BAP-15 (the Rust SDK
+implementation + its CI/gate/docs envelope + cross-vendor closeout) is now COMPLETE — see the
+BAP-15 closeout evidence above; the cross-vendor pass closed five real T1–T14 divergences from the
+reference (jcs closure #6 completion, timing ceilings, an archive-encode panic, the license gate's
+fail-open, and un-locked CI). BAP-16 (the Go verifier SDK) remains authored, not started.
