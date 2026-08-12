@@ -15,8 +15,12 @@ against the same published corpus.
   non-stdlib deps by default).
 - **[`python/`](python/)** — `bounded-authority-verifier` (PyPI). Python >= 3.10, `cryptography` for
   Ed25519.
+- **[`rust/`](rust/)** — `bounded-authority-protocol` (crates.io). Rust MSRV 1.81, `ed25519-dalek`
+  (serial backend) + `sha2` + `ryu-js`. See its [README](rust/README.md) and the
+  [deployment guide](../docs/deployment/rust-sdk.md) (AWS Lambda `provided.al2023` + PostgreSQL `plrust`
+  posture).
 
-Both are **pure verification libraries** (no I/O, clock, RNG, or network in the verify path). They return
+All three are **pure verification libraries** (no I/O, clock, RNG, or network in the verify path). They return
 value-bearing redacted facts or `Invalid` — never an authorization decision. See
 [ADR 0014](../docs/adr/0014-cross-language-verifier-sdks.md) for the packaging, support-surface, and
 derivation-hygiene decisions.
@@ -32,6 +36,9 @@ pnpm --filter @bounded-authority/verifier conformance
 
 # Python
 uv run --project sdks/python conformance
+
+# Rust
+cargo test --test conformance --manifest-path sdks/rust/Cargo.toml
 ```
 
 Beyond the frozen corpus, each SDK ships a **per-language permissiveness mutation-gate** — for every

@@ -33,11 +33,13 @@ fi
 
 # Classify by path to decide which pattern set applies. A file that is neither a
 # workflow nor an SDK manifest is not a scanned surface — exit 0 immediately.
-is_workflow=0
 is_sdk_manifest=0
 case "$path" in
-  .github/workflows/*.yml | .github/workflows/*.yaml) is_workflow=1 ;;
-  sdks/*/package.json | sdks/*/pyproject.toml | sdks/*/setup.py | sdks/*/setup.cfg)
+  # Workflows match so they DON'T hit the `*) exit 0` fall-through: every scanned
+  # surface runs the publish-command check below; only manifests add the
+  # publish-lifecycle-key check. No flag is needed for the workflow branch.
+  .github/workflows/*.yml | .github/workflows/*.yaml) ;;
+  sdks/*/package.json | sdks/*/pyproject.toml | sdks/*/setup.py | sdks/*/setup.cfg | sdks/*/Cargo.toml)
     is_sdk_manifest=1 ;;
   *) exit 0 ;;
 esac
@@ -65,10 +67,14 @@ twine upload
 hatch publish
 flit publish
 uv publish
+cargo publish
+cargo release publish
+cargo-release publish
 mix hex.publish
 pypa/gh-action-pypi-publish
 JS-DevTools/npm-publish
-JS-DevTools/action-publish'
+JS-DevTools/action-publish
+crate-ci/cargo-release'
 
 # npm publish lifecycle hooks + publishConfig — publish infrastructure specific to
 # SDK manifests. Checked on manifests only (meaningless in a workflow).

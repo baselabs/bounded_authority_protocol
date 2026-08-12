@@ -156,12 +156,16 @@ Elixir reference ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)):
   `>= 22`, zero runtime dependencies; Ed25519 via `node:crypto`).
 - **Python** — `sdks/python/` (`bounded-authority-verifier`, to be published on PyPI; Python
   `>= 3.10`, single runtime dependency `cryptography`).
+- **Rust** — `sdks/rust/` (`bounded-authority-protocol`, to be published on crates.io; Rust MSRV 1.81;
+  `ed25519-dalek` serial backend + `sha2` + `ryu-js`). See its `README` (`sdks/rust/README.md`) and the
+  deployment guide (`docs/deployment/rust-sdk.md`) for the AWS Lambda (`provided.al2023`) and PostgreSQL
+  (`plrust`) posture.
 
-**Neither SDK is published to a registry yet.** They are authored in this monorepo but, per the SDK
+**None of the SDKs is published to a registry yet.** They are authored in this monorepo but, per the SDK
 graduation model ([ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md)), each publishes
 from its own per-SDK repository (`bounded_authority_protocol_<lang>`) on first publication — never
 from here. A local pre-commit hook and the `sdk-publish-guard` CI job reject registry-publish
-infrastructure committed to this repo; see `CONTRIBUTING.md`. The npm/PyPI package names are reserved
+infrastructure committed to this repo; see `CONTRIBUTING.md`. The npm/PyPI/crates.io package names are reserved
 identifiers recorded for the graduated publish, not live registry links.
 
 Each SDK passes all **283** published conformance vectors (recomputed from scratch, not cached),

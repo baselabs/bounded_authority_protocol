@@ -119,3 +119,42 @@ jobs:
       - name: Python — conformance (283 + census)
         run: python tests/conformance/run.py
         working-directory: sdks/python
+
+  # Rust is Node-independent; per ADR 0015 D4 it runs as its OWN job on the same
+  # sdks/** + priv/conformance/** trigger (not folded into the Node matrix). The
+  # MSRV (1.81) is pinned by sdks/rust/rust-toolchain.toml; this job installs
+  # that exact toolchain so the MSRV floor is the CI-tested floor.
+  rust-conformance:
+    name: Cross-language SDK conformance (Rust MSRV 1.81)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust (MSRV 1.81 + rustfmt + clippy)
+        run: |
+          rustup toolchain install 1.81 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup default 1.81
+
+      - name: fmt
+        run: cargo fmt --check
+        working-directory: sdks/rust
+
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+        working-directory: sdks/rust
+
+      # `cargo test` runs every test target: the lib unit suite, the
+      # permissiveness mutation-gate battery, and the conformance runner that
+      # asserts agreed=283 disagreed=0 + the two-boundary key census.
+      - name: unit + permissiveness + conformance (283 + census)
+        run: cargo test
+        working-directory: sdks/rust
+
+      - name: purity check
+        run: sh tools/purity_check.sh
+        working-directory: sdks/rust
+
+      - name: license check
+        run: sh tools/license_check.sh
+        working-directory: sdks/rust

@@ -6,6 +6,29 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- Close the **BAP-15 Rust verifier SDK** (Tasks 15–17 + closeout; the library Tasks 1–14 were already
+  landed and verified green). `sdks/rust/tests/permissiveness.rs` is the named per-language permissiveness
+  battery exercising all six ADR 0014 D6 closures through the public crate boundary (duplicate-reject,
+  source-order preservation, raw-lexeme ceiling, single-value, int/float tag distinction, base64url
+  pad-bits), each documented with its red-capable mutation. Closure #6 — the `(d)`-class per-node encode
+  bounds — is now enforced IN `jcs_encode`'s recursion (depth + total_nodes + a per-node `jcs_bytes`
+  early bail), so a hand-built value passed directly to the public primitive cannot force unbounded
+  recursion, traversal, or intermediate allocation. This narrows `jcs_encode`'s accept set
+  (verdict-preserving on every corpus case — all corpus inputs are decode-bounded within the same
+  ceilings; verified lib 331/331, conformance 283/283); the depth and total_nodes guards are proven
+  red-capable by live mutation. `sdks/rust/tools/purity_check.sh` + `license_check.sh` enforce the
+  lib-path purity invariant (no I/O/clock/RNG/network/env in `src/`; `#![forbid(unsafe_code)]` is the
+  compile-time `unsafe` half) and the runtime dependency-license allowlist (15 runtime deps, all
+  permissive; dev-deps excluded as non-consumer-facing) — both shellcheck-clean and red-capable. The
+  `rust-conformance` CI job (`.github/workflows/sdks.yml`) runs fmt + clippy + the full `cargo test`
+  (unit + permissiveness + 283-vector conformance + census) + purity + license on the MSRV 1.81
+  toolchain. The publish guard now scans `sdks/*/Cargo.toml` and blocks `cargo publish` /
+  `cargo release publish` / `cargo-release publish` / `crate-ci/cargo-release` (ADR 0015). New docs:
+  [`sdks/rust/README.md`](sdks/rust/README.md) and the deployment guide
+  (`docs/deployment/rust-sdk.md`) (AWS Lambda `provided.al2023`; PostgreSQL
+  `plrust` — ed25519-dalek-based verification is NOT plrust-trusted-mode-compatible as built). The three
+  signed anchored-export rows in [`docs/design/conformance-contract.md`](docs/design/conformance-contract.md)
+  are updated to their landed case ids. Zero wire byte, bound, or verdict change to the Elixir package.
 - Close the BAP-15 prerequisite spec/corpus gaps (no-key half). `docs/protocol-v1.md` gains a
   normative **JCS string and number serialization** subsection transcribing RFC 8785 §3.2.2.2–3
   (control-range escapes, raw DEL `U+007F`, ECMAScript `Number::toString` float thresholds
