@@ -36,9 +36,12 @@
 //!   UTF-8 byte ordering, NOT code-point ordering). Arrays preserve source
 //!   order; values are recursively encoded.
 //! - **Bounds** (`REQ1-BOUNDS-ordering`): the JCS output byte ceiling
-//!   (`jcs_bytes`, 65536) is enforced here. The per-node / per-depth
-//!   during-recursion encode budget is the `(d)`-class closure owned by the
-//!   permissiveness battery (T15); this primitive enforces the final ceiling.
+//!   (`jcs_bytes`, 65536) AND the per-node/per-depth structural ceilings
+//!   (`total_nodes`, `depth`) are enforced DURING recursion, so a hand-built
+//!   (not decode-bounded) value passed directly to this public primitive cannot
+//!   force unbounded recursion, traversal, or intermediate allocation — the
+//!   `(d)`-class per-node encode-bounds closure (ADR 0014 D6/D7; the corpus
+//!   cannot express it, so the permissiveness battery proves it red-capable).
 
 use crate::bounds::Bounds;
 use crate::error::{Invalid, Result};
@@ -48,21 +51,44 @@ use crate::json::JsonValue;
 ///
 /// Returns the exact canonical byte sequence (object members UTF-16-sorted at
 /// every depth, strings escaped per §3.2.2.2, numbers formatted per §3.2.2.3),
-/// or `Err(Invalid)` if any float is non-finite or the encoded output exceeds
-/// `bounds.jcs_bytes()`.
+/// or `Err(Invalid)` if any float is non-finite, the encoded output exceeds
+/// `bounds.jcs_bytes()`, or `value` itself violates a structural ceiling
+/// (`total_nodes`, `depth`) enforced per-node during recursion. The structural
+/// ceilings mirror [`crate::json::json_decode`]; a value that came through the
+/// decoder is already within them, but `jcs_encode` is a public primitive
+/// reachable by a direct caller with a hand-built value, so the ceilings are
+/// re-enforced here (the `(d)`-class closure, ADR 0014 D6/D7).
 pub fn jcs_encode(value: &JsonValue, bounds: &Bounds) -> Result<Vec<u8>> {
     let mut out: Vec<u8> = Vec::new();
-    encode_value(value, &mut out)?;
+    let mut nodes: u64 = 0;
+    encode_value(value, 1, bounds, &mut out, &mut nodes)?;
+    // Authoritative final ceiling on the complete output. The per-node early
+    // bail inside encode_value already fires at this threshold; this is the
+    // contract-level check on the finished encoding.
     if out.len() as u64 > bounds.jcs_bytes() {
         return Err(Invalid);
     }
     Ok(out)
 }
 
-/// Recursive encoder. The depth here mirrors the (already-bounded) shape of
-/// `value`; the structural ceilings were enforced at decode time. Only the
-/// non-finite-float guard and the final `jcs_bytes` ceiling live in this path.
-fn encode_value(v: &JsonValue, out: &mut Vec<u8>) -> Result<()> {
+/// Recursive encoder. Threads the per-node budgets (`depth`, `total_nodes`,
+/// and the `jcs_bytes` output ceiling) through the recursion so a hand-built
+/// value cannot force unbounded recursion, traversal, or intermediate
+/// allocation. `depth` is the container nesting level (root container = 1),
+/// mirroring [`crate::json::json_decode`]'s accounting. The non-finite-float
+/// guard is unchanged.
+fn encode_value(
+    v: &JsonValue,
+    depth: u64,
+    bounds: &Bounds,
+    out: &mut Vec<u8>,
+    nodes: &mut u64,
+) -> Result<()> {
+    // (d)-class per-node encode bounds — total_nodes counts every value.
+    *nodes += 1;
+    if *nodes > bounds.total_nodes() {
+        return Err(Invalid);
+    }
     match v {
         JsonValue::Null => out.extend_from_slice(b"null"),
         JsonValue::Bool(true) => out.extend_from_slice(b"true"),
@@ -71,16 +97,22 @@ fn encode_value(v: &JsonValue, out: &mut Vec<u8>) -> Result<()> {
         JsonValue::Float(f) => encode_float(*f, out)?,
         JsonValue::String(s) => encode_string(s, out),
         JsonValue::Array(items) => {
+            if depth > bounds.depth() {
+                return Err(Invalid);
+            }
             out.push(b'[');
             for (i, item) in items.iter().enumerate() {
                 if i > 0 {
                     out.push(b',');
                 }
-                encode_value(item, out)?;
+                encode_value(item, depth + 1, bounds, out, nodes)?;
             }
             out.push(b']');
         }
         JsonValue::Object(members) => {
+            if depth > bounds.depth() {
+                return Err(Invalid);
+            }
             // RFC 8785 §3.2.3: sort members by unsigned UTF-16 code-unit
             // comparison of names. Members are duplicate-free by construction
             // (the decoder rejects duplicates at any depth), so the sort has no
@@ -94,10 +126,16 @@ fn encode_value(v: &JsonValue, out: &mut Vec<u8>) -> Result<()> {
                 }
                 encode_string(&members[idx].0, out);
                 out.push(b':');
-                encode_value(&members[idx].1, out)?;
+                encode_value(&members[idx].1, depth + 1, bounds, out, nodes)?;
             }
             out.push(b'}');
         }
+    }
+    // Per-node output-budget early bail: stop the moment the encoding crosses
+    // jcs_bytes, so an over-budget value cannot force materialization of its
+    // full encoding before the final check rejects it.
+    if out.len() as u64 > bounds.jcs_bytes() {
+        return Err(Invalid);
     }
     Ok(())
 }
