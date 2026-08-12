@@ -48,7 +48,7 @@ const REQUEST_DIGEST_PREFIX: &[u8] = b"BAP1-REQUEST\0";
 /// bound (depth / total-nodes / object-members / array-items / string /
 /// object-name ceilings), the structure contains a non-finite float, or the JCS
 /// encoding exceeds `bounds.jcs_bytes()`.
-pub(crate) fn request_digest(
+pub fn request_digest(
     operation: &str,
     cast_arguments: &JsonValue,
     bounds: &Bounds,
