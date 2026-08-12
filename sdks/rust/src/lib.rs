@@ -47,8 +47,9 @@ pub(crate) mod selector;
 // composer is the contract; the module stays internal).
 pub use compact::assemble_compact;
 pub use v1::{
-    boundary_anchor_signing_input, decode_grant, decode_proof, grant_signing_input,
-    key_transition_signing_input, proof_signing_input, untrusted_key_locator,
+    boundary_anchor_signing_input, check_chain, decode_grant, decode_proof,
+    encode_consumption_entry, grant_signing_input, key_transition_signing_input,
+    proof_signing_input, untrusted_key_locator,
 };
 
 pub use base64url::{base64url_decode, base64url_encode};
