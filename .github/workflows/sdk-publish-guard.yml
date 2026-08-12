@@ -50,7 +50,7 @@ jobs:
           tmp="$(mktemp)"
           {
             find .github/workflows -type f \( -name '*.yml' -o -name '*.yaml' \)
-            find sdks -type f \( -name 'package.json' -o -name 'pyproject.toml' -o -name 'setup.py' -o -name 'setup.cfg' \)
+            find sdks -type f \( -name 'package.json' -o -name 'pyproject.toml' -o -name 'setup.py' -o -name 'setup.cfg' -o -name 'Cargo.toml' \)
           } | sort -u > "$tmp"
           while IFS= read -r path; do
             [ -n "$path" ] || continue
