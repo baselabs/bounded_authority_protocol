@@ -210,7 +210,7 @@ never silently overstated as `populated`.
 - **Evolution-contract `REQ1-EVO-*` gaps:** 8 of 10 are `gap` (governance/process invariants the v1
   corpus cannot express); 2 are `populated` (mirror CORE rows on `check_envelope`). Every gap carries
   a falsifiable input-algebra reason per the gap gate.
-- **Corpus revision:** `bounded-authority-protocol-v1-conformance-corpus-index` (280 cases, 28 surfaces,
+- **Corpus revision:** `bounded-authority-protocol-v1-conformance-corpus-index` (283 cases, 28 surfaces,
   16 classes).
 
 ## Maintenance

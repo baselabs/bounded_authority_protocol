@@ -12,7 +12,7 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
     assert output =~ "bap03 independent verification: ok"
 
     assert output =~
-             "vectors=3 public_key_fingerprints=19 tamper_cases=7 duplicate_cases=1 uri_cases=18"
+             "vectors=3 public_key_fingerprints=22 tamper_cases=7 duplicate_cases=1 uri_cases=18"
   end
 
   test "fixture contains no private key or seed field" do
@@ -33,12 +33,15 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
              "3iR-H6Xx_3rpt7eNMUVNazSZkUclb_cekBJZZL4mlUs",
              "3x4aFGRFbZvTCoSGCd1yA55MYDITwK0MFDlrUFvPoF4",
              "7VjCxMImm16N6RYUjklULyDjbw2aGEOgNNtKBP9r-i0",
+             "AanG80rCLeLkdCixmSERao2zGEztrrDp3wXKQTih3zU",
              "B_luRLoL5T-YfqSCot-qLaUVewraSBu-qaEWqXfMRHI",
              "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk",
+             "ScKffw4c2B2cUtQT_S3-m7GBOP1Simu2sVs1xsIMVYY",
              "TolqHySkTC69-Y7DUVNJP7JPn31VXHfk37ytoM0MZXM",
              "TrI1g9her5mzNtdwThUyqwwGfZVLKd3MMoWkRY-Fn8c",
              "Tzmr9QXSXbXh_uKsem5dEblMnkflm_LuJShpYtOrQKk",
              "UyuHKlIU-ePRfsWpPkNSuW-OgWrwkOSwMv5Y6dgEDfA",
+             "ZtUKp6TBMsNOke11XkcQGVGNJ08NNbGfz5muhXmNbaU",
              "b5dejonEMNbWuAUspTppNgiUa6QUXdzk40kdsDcWK6g",
              "d4ucEZwvJTfwxXCN4f2xmIE5ZBFoH5i5mlzeWZaB3yI",
              "eGPJdenILo5TLcdbdZa046_Z-t9wGJl11N6_QJQrob8",
@@ -73,7 +76,10 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
                "3iR-H6Xx_3rpt7eNMUVNazSZkUclb_cekBJZZL4mlUs",
                "3x4aFGRFbZvTCoSGCd1yA55MYDITwK0MFDlrUFvPoF4",
                "7VjCxMImm16N6RYUjklULyDjbw2aGEOgNNtKBP9r-i0",
+               "AanG80rCLeLkdCixmSERao2zGEztrrDp3wXKQTih3zU",
+               "ScKffw4c2B2cUtQT_S3-m7GBOP1Simu2sVs1xsIMVYY",
                "TrI1g9her5mzNtdwThUyqwwGfZVLKd3MMoWkRY-Fn8c",
+               "ZtUKp6TBMsNOke11XkcQGVGNJ08NNbGfz5muhXmNbaU",
                "d4ucEZwvJTfwxXCN4f2xmIE5ZBFoH5i5mlzeWZaB3yI",
                "eGPJdenILo5TLcdbdZa046_Z-t9wGJl11N6_QJQrob8",
                "inGhtkoCo4fChHxdTEsAtMrCebtW84GM_7v2rPbowok",
