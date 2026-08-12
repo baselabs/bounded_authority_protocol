@@ -32,15 +32,20 @@ use crate::compact;
 use crate::digest;
 use crate::ed25519;
 use crate::error::{Invalid, Result};
-use crate::facts::{ChainFacts, EnvelopeFacts, GrantFacts, NotEvaluated};
+use crate::facts::{
+    AnchorFacts, AnchoredExportFacts, ChainFacts, EnvelopeFacts, GrantFacts, KeyTransitionFacts,
+    NotEvaluated,
+};
 use crate::jcs::jcs_encode;
 use crate::json::{json_decode, JsonValue};
 use crate::jwk::{jwk_decode_public, public_key_thumbprint_raw, thumbprint_raw};
 use crate::selector;
 use crate::types::{
-    BoundaryAnchor, ChainInput, ConsumptionEntry, Credentials, ExpectedChain, ExpectedGrant,
-    ExpectedRequest, GrantDecoded, GrantInput, KeyLocator, KeyTransition, NonceMode,
-    ProducedSigningInput, ProofDecoded, ProofInput, TrustedIssuer,
+    AnchoredExportEncoded, AnchoredExportInput, ArchivedObject, BoundaryAnchor, ChainInput,
+    ConsumptionEntry, Credentials, ExpectedAnchor, ExpectedAnchoredExport, ExpectedChain,
+    ExpectedExport, ExpectedGrant, ExpectedKeyTransition, ExpectedRequest, GrantDecoded,
+    GrantInput, HistoricalKeyChain, HistoricalPublicKey, KeyLocator, KeyTransition, NonceMode,
+    ProducedSigningInput, ProofDecoded, ProofInput, TrustedIssuer, ValidityUpperBound,
 };
 use crate::uri::uri_normalize;
 
@@ -67,6 +72,11 @@ const KTY_OKP: &str = "OKP";
 /// hash). The final zero byte is load-bearing (ADR 0004 § Consumption rows:
 /// `SHA-256("BAP1-CHAIN\0" || canonical_row_bytes)`).
 const CHAIN_DIGEST_PREFIX: &[u8] = b"BAP1-CHAIN\0";
+
+/// The 20-byte archive magic prefix (ADR 0004 § Anchored export): the exact
+/// ASCII bytes `BAP1-ARCHIVE\0EXPORT\0` (12 + NUL + 6 + NUL = 20). Confirmed
+/// byte-exact against the corpus `anchored-export/verify.json` `chunks[0]`.
+const ARCHIVE_MAGIC: &[u8] = b"BAP1-ARCHIVE\0EXPORT\0";
 
 // ============================================================================
 // untrusted_key_locator
@@ -1033,6 +1043,957 @@ fn take_b64url_32(value: Option<&JsonValue>) -> Result<[u8; 32]> {
     let mut arr = [0u8; 32];
     arr.copy_from_slice(&raw);
     Ok(arr)
+}
+
+// ============================================================================
+// Façade D — anchored export verify/encode (Task 13)
+// ============================================================================
+//
+// This is the **silent-relink surface**: a permissive export verify silently
+// certifies a RELINKED or SHORTENED archive, and a permissive rollover silently
+// accepts a key path with no authenticated transition. Every binding — the
+// exact archive bytes (magic + frames + EOF), the constant-time SHA-256 digest,
+// the out-of-band object-store version, the closed header, the authenticated
+// start/end anchors, the positional key-transition path, the chronology
+// (strictly increasing effective times, no fingerprint cycle, anchor ordering),
+// the surplus-key invariant (`keys.len() == transitions.len() + 1`), and the
+// re-checked row-domain hash chain — collapses to exactly [`Invalid`] on any
+// mismatch. [`AnchoredExportFacts`] is the ONLY chain-family fact that carries
+// BOTH `trust: NotEvaluated` and `authorization: NotEvaluated`
+// (`REQ1-CHAIN-facts-shape`): an anchored export binds the retrieved object
+// generation, but even a fully authenticated export is not an execution
+// decision.
+
+/// Verify a signed historical boundary anchor against a trusted key and caller
+/// expectation.
+///
+/// Parses the 3-segment compact (reusing the anchor decode helper), enforces
+/// the closed protected header `{alg:"EdDSA", kid, typ:"ba+chain-anchor"}` and
+/// the closed payload set, then requires: the header `kid` equals both
+/// `key.key_id` and `expected.key_id`; the RFC 7638 fingerprint derived from
+/// `key.public_key` equals the signed `key_fingerprint` and the expected
+/// fingerprint; the signed values equal `expected`; sequence zero requires the
+/// all-zero `chain_hash`; `key.valid_from <= anchored_at < valid_before` (open
+/// upper under [`ValidityUpperBound::Unbounded`]); and the Ed25519 signature
+/// over the exact 2-segment signing input verifies under `key.public_key`.
+///
+/// Returns [`AnchorFacts`] carrying `trust: NotEvaluated`.
+pub fn verify_historical_anchor(
+    compact: &[u8],
+    key: &HistoricalPublicKey,
+    expected: &ExpectedAnchor,
+) -> Result<AnchorFacts> {
+    let bounds = Bounds::maximum();
+    let a = decode_anchor_parts(compact, &bounds)?;
+
+    // Key ID: header.kid == key.key_id == expected.key_id.
+    if a.key_id != key.key_id || a.key_id != expected.key_id {
+        return Err(Invalid);
+    }
+
+    // Derived fingerprint == signed key_fingerprint == expected.key_fingerprint.
+    let derived = public_key_thumbprint_raw(&key.public_key);
+    if a.payload.key_fingerprint != derived || a.payload.key_fingerprint != expected.key_fingerprint
+    {
+        return Err(Invalid);
+    }
+
+    // Signed values == expected.
+    if a.payload.anchor_id != expected.anchor_id
+        || a.payload.anchored_at != expected.anchored_at
+        || a.payload.chain_id != expected.chain_id
+        || a.payload.sequence != expected.sequence
+        || a.payload.chain_hash != expected.chain_hash
+    {
+        return Err(Invalid);
+    }
+
+    // Sequence-zero binding: sequence 0 requires the all-zero chain hash
+    // (ADR 0004 § Boundary anchors).
+    if a.payload.sequence == 0 && a.payload.chain_hash.iter().any(|&b| b != 0) {
+        return Err(Invalid);
+    }
+
+    // Validity interval: valid_from <= anchored_at < valid_before.
+    if !in_interval(a.payload.anchored_at, key.valid_from, &key.valid_before) {
+        return Err(Invalid);
+    }
+
+    // Ed25519 signature over the exact 2-segment signing input.
+    let mut signature = [0u8; 64];
+    decode_signature64(a.signature_seg, &mut signature)?;
+    let signing_input = signing_input_bytes(a.protected_seg, a.payload_seg);
+    ed25519::verify(&key.public_key, &signing_input, &signature)?;
+
+    Ok(AnchorFacts {
+        anchor_id: a.payload.anchor_id,
+        anchored_at: a.payload.anchored_at,
+        chain_id: a.payload.chain_id,
+        sequence: a.payload.sequence,
+        chain_hash: a.payload.chain_hash,
+        key_fingerprint: derived,
+        key_id: a.key_id,
+        trust: NotEvaluated,
+    })
+}
+
+/// Verify a signed historical key transition: the current key signs the rollover
+/// to the next key.
+///
+/// Enforces the closed protected header `{alg:"EdDSA", kid:current_key_id,
+/// typ:"ba+key-transition"}` and the closed payload set, then requires: the
+/// header `kid` equals `current.key_id` and `expected.current_key_id`; the
+/// derived current/next fingerprints equal the signed `from_key_fingerprint`/
+/// `to_key_fingerprint` and the expected fingerprints; the signed `to_key_id`,
+/// `chain_id`, `effective_at`, and `transition_id` equal `expected`; the current
+/// and next fingerprints DIFFER (their key IDs may be equal); `effective_at`
+/// lies in BOTH historical intervals; and the current key's Ed25519 signature
+/// over the 2-segment signing input verifies.
+///
+/// Returns [`KeyTransitionFacts`] carrying `trust: NotEvaluated`.
+pub fn verify_key_transition(
+    compact: &[u8],
+    current: &HistoricalPublicKey,
+    next: &HistoricalPublicKey,
+    expected: &ExpectedKeyTransition,
+) -> Result<KeyTransitionFacts> {
+    let bounds = Bounds::maximum();
+    let t = decode_transition_parts(compact, &bounds)?;
+
+    // header.kid == current.key_id == expected.current_key_id.
+    if t.key_id != current.key_id || t.key_id != expected.current_key_id {
+        return Err(Invalid);
+    }
+
+    let current_derived = public_key_thumbprint_raw(&current.public_key);
+    let next_derived = public_key_thumbprint_raw(&next.public_key);
+
+    // from_fingerprint == derived(current) == expected.current_key_fingerprint.
+    if t.payload.from_fingerprint != current_derived
+        || t.payload.from_fingerprint != expected.current_key_fingerprint
+    {
+        return Err(Invalid);
+    }
+    // to_fingerprint == derived(next) == expected.next_key_fingerprint.
+    if t.payload.to_fingerprint != next_derived
+        || t.payload.to_fingerprint != expected.next_key_fingerprint
+    {
+        return Err(Invalid);
+    }
+    // Signed to_key_id / chain_id / effective_at / transition_id == expected.
+    if t.payload.to_key_id != expected.next_key_id
+        || t.payload.chain_id != expected.chain_id
+        || t.payload.effective_at != expected.effective_at
+        || t.payload.transition_id != expected.transition_id
+    {
+        return Err(Invalid);
+    }
+
+    // Current and next fingerprints MUST differ (public keys differ); their
+    // key IDs MAY be equal.
+    if current_derived == next_derived {
+        return Err(Invalid);
+    }
+
+    // Effective time in BOTH historical intervals.
+    if !in_interval(
+        t.payload.effective_at,
+        current.valid_from,
+        &current.valid_before,
+    ) {
+        return Err(Invalid);
+    }
+    if !in_interval(t.payload.effective_at, next.valid_from, &next.valid_before) {
+        return Err(Invalid);
+    }
+
+    // The current key signs the transition.
+    let mut signature = [0u8; 64];
+    decode_signature64(t.signature_seg, &mut signature)?;
+    let signing_input = signing_input_bytes(t.protected_seg, t.payload_seg);
+    ed25519::verify(&current.public_key, &signing_input, &signature)?;
+
+    Ok(KeyTransitionFacts {
+        transition_id: t.payload.transition_id,
+        chain_id: t.payload.chain_id,
+        effective_at: t.payload.effective_at,
+        current_key_fingerprint: current_derived,
+        current_key_id: t.key_id,
+        next_key_fingerprint: next_derived,
+        next_key_id: t.payload.to_key_id,
+        trust: NotEvaluated,
+    })
+}
+
+/// Encode an anchored export archive (the producer).
+///
+/// Builds the exact binary concatenation (ADR 0004 § Anchored export):
+/// `ARCHIVE_MAGIC || frame(canonical_header) || frame(start_anchor) ||
+/// frame(each transition) || frame(each row) || frame(end_anchor)`, where each
+/// frame is `UINT32_BE(nonzero_length) || bytes`. The closed canonical header
+/// binds `chain_id, first_sequence, last_hash, last_sequence, previous_hash,
+/// row_count, transition_count, v:1` (member names derived first-hand from the
+/// corpus header frame).
+///
+/// Enforces `input.rows.len() == expected.chain.row_count`,
+/// `input.transitions.len() == expected.transitions.len()`, the bounds, and the
+/// **start-anchor binding** (`start_anchor.sequence == first_sequence - 1`,
+/// caught by the corpus `encode-anchored-export-invalid-start-anchor-binding`
+/// case). Computes `byte_count` and the SHA-256 `digest` over the full byte
+/// stream. The result is the public archive a caller stores; it is not a
+/// credential.
+pub fn encode_anchored_export(
+    input: &AnchoredExportInput,
+    expected: &ExpectedExport,
+) -> Result<AnchoredExportEncoded> {
+    let bounds = Bounds::maximum();
+
+    // Consistency between the artifacts and the caller's expected boundaries.
+    if input.rows.len() as i64 != expected.chain.row_count {
+        return Err(Invalid);
+    }
+    if input.transitions.len() != expected.transitions.len() {
+        return Err(Invalid);
+    }
+    if input.transitions.len() as u64 > bounds.key_transitions() {
+        return Err(Invalid);
+    }
+    if input.rows.is_empty() || input.rows.len() as u64 > bounds.chain_rows() {
+        return Err(Invalid);
+    }
+    if input.start_anchor.len() as u64 > bounds.anchor_bytes()
+        || input.end_anchor.len() as u64 > bounds.anchor_bytes()
+    {
+        return Err(Invalid);
+    }
+
+    // Start-anchor binding: start_anchor.sequence == first_sequence - 1.
+    let start_parts = decode_anchor_parts(&input.start_anchor, &bounds)?;
+    if start_parts.payload.sequence != expected.chain.first_sequence - 1 {
+        return Err(Invalid);
+    }
+
+    // Canonical header JCS object (member names + order derived first-hand from
+    // the corpus header frame: chain_id, first_sequence, last_hash,
+    // last_sequence, previous_hash, row_count, transition_count, v).
+    let transition_count = input.transitions.len() as i64;
+    let previous_hash_str = b64url_to_string(&base64url_encode(&expected.chain.previous_hash))?;
+    let last_hash_str = b64url_to_string(&base64url_encode(&expected.chain.head_hash))?;
+    let header_value = JsonValue::Object(vec![
+        (
+            "chain_id".to_string(),
+            JsonValue::String(expected.chain.chain_id.clone()),
+        ),
+        (
+            "first_sequence".to_string(),
+            JsonValue::Int(expected.chain.first_sequence),
+        ),
+        ("last_hash".to_string(), JsonValue::String(last_hash_str)),
+        (
+            "last_sequence".to_string(),
+            JsonValue::Int(expected.chain.last_sequence),
+        ),
+        (
+            "previous_hash".to_string(),
+            JsonValue::String(previous_hash_str),
+        ),
+        (
+            "row_count".to_string(),
+            JsonValue::Int(expected.chain.row_count),
+        ),
+        (
+            "transition_count".to_string(),
+            JsonValue::Int(transition_count),
+        ),
+        ("v".to_string(), JsonValue::Int(1)),
+    ]);
+    let header_bytes = jcs_encode(&header_value, &bounds)?;
+    if header_bytes.len() as u64 > bounds.archive_header_bytes() {
+        return Err(Invalid);
+    }
+
+    // Assemble the archive: magic + frames + EOF. Each frame's content MUST be
+    // non-empty (UINT32_BE(nonzero_length)).
+    let mut bytes = Vec::with_capacity(
+        ARCHIVE_MAGIC.len()
+            + header_bytes.len()
+            + input.start_anchor.len()
+            + input.end_anchor.len(),
+    );
+    bytes.extend_from_slice(ARCHIVE_MAGIC);
+    frame_into(&header_bytes, &mut bytes);
+    if input.start_anchor.is_empty() {
+        return Err(Invalid);
+    }
+    frame_into(&input.start_anchor, &mut bytes);
+    for t in &input.transitions {
+        if t.is_empty() {
+            return Err(Invalid);
+        }
+        frame_into(t, &mut bytes);
+    }
+    for r in &input.rows {
+        if r.is_empty() {
+            return Err(Invalid);
+        }
+        frame_into(r, &mut bytes);
+    }
+    if input.end_anchor.is_empty() {
+        return Err(Invalid);
+    }
+    frame_into(&input.end_anchor, &mut bytes);
+
+    let byte_count = bytes.len() as u64;
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    let mut digest = [0u8; 32];
+    digest.copy_from_slice(&hasher.finalize());
+
+    Ok(AnchoredExportEncoded {
+        bytes,
+        byte_count,
+        digest,
+    })
+}
+
+/// Verify a retrieved archived object against an ordered historical key chain
+/// and caller-expected anchored-export boundaries.
+///
+/// `obj.chunks` is the bounded nonempty proper flat chunk list (each raw
+/// binary, base64url-decoded by the caller); `obj.version` is the observed
+/// object-store version. Verification: bounds the chunk count + total bytes +
+/// per-chunk non-emptiness; materializes the stream; checks the exact 20-byte
+/// magic; hashes every raw byte and compares the SHA-256 to `expected.digest`
+/// in CONSTANT TIME; requires exact `obj.version == expected.object_version`;
+/// scans frames incrementally (header, start anchor, transitions, rows, end
+/// anchor) requiring exact EOF; decodes + validates the closed header against
+/// the caller's chain boundaries; enforces the **surplus-key invariant**
+/// `keys.len() == transitions.len() + 1`; authenticates the start anchor with
+/// `keys[0]`, each transition positionally (`keys[i]` signs, `keys[i+1]` is
+/// next), and the end anchor with the last key; checks chronology (strictly
+/// increasing effective times, no fingerprint cycle, anchor ordering); and
+/// re-checks every row via [`check_chain`].
+///
+/// Returns [`AnchoredExportFacts`] carrying `trust: NotEvaluated` AND
+/// `authorization: NotEvaluated`.
+pub fn verify_anchored_export(
+    obj: &ArchivedObject,
+    keys: &HistoricalKeyChain,
+    expected: &ExpectedAnchoredExport,
+) -> Result<AnchoredExportFacts> {
+    let bounds = Bounds::maximum();
+    let chunks = &obj.chunks;
+
+    // Bounded nonempty proper flat chunk list; each chunk non-empty.
+    if chunks.is_empty() || chunks.len() as u64 > bounds.archive_chunks() {
+        return Err(Invalid);
+    }
+    let mut total: u64 = 0;
+    for c in chunks {
+        if c.is_empty() {
+            return Err(Invalid);
+        }
+        total = total.checked_add(c.len() as u64).ok_or(Invalid)?;
+    }
+    if total > bounds.archive_bytes() {
+        return Err(Invalid);
+    }
+    if total < ARCHIVE_MAGIC.len() as u64 {
+        return Err(Invalid);
+    }
+    if obj.version.len() as u64 > bounds.object_version_bytes() {
+        return Err(Invalid);
+    }
+
+    // Materialize the byte stream.
+    let mut buf = Vec::with_capacity(total as usize);
+    for c in chunks {
+        buf.extend_from_slice(c);
+    }
+
+    // Exact magic prefix.
+    if &buf[..ARCHIVE_MAGIC.len()] != ARCHIVE_MAGIC {
+        return Err(Invalid);
+    }
+
+    // Hash every raw byte; constant-time digest compare.
+    let mut hasher = Sha256::new();
+    hasher.update(&buf);
+    let mut computed = [0u8; 32];
+    computed.copy_from_slice(&hasher.finalize());
+    if !constant_time_eq(&computed, &expected.digest) {
+        return Err(Invalid);
+    }
+
+    // Out-of-band object-store version exact equality.
+    if obj.version != expected.object_version {
+        return Err(Invalid);
+    }
+
+    // Incremental frame scan.
+    let mut cursor = ARCHIVE_MAGIC.len();
+    let header_frame = read_frame(&buf, &mut cursor)?;
+    let start_anchor_compact = read_frame(&buf, &mut cursor)?;
+    let header = decode_archive_header(header_frame, &bounds)?;
+
+    // Header's closed claims == caller's chain boundaries + transition count.
+    if header.chain_id != expected.chain.chain_id
+        || header.first_sequence != expected.chain.first_sequence
+        || header.last_sequence != expected.chain.last_sequence
+        || header.row_count != expected.chain.row_count
+        || header.previous_hash != expected.chain.previous_hash
+        || header.last_hash != expected.chain.head_hash
+        || header.transition_count != expected.transitions.len() as i64
+    {
+        return Err(Invalid);
+    }
+
+    // Read transition_count + row_count frames (counts come from the header).
+    let mut transition_compacts: Vec<&[u8]> = Vec::with_capacity(header.transition_count as usize);
+    for _ in 0..header.transition_count {
+        transition_compacts.push(read_frame(&buf, &mut cursor)?);
+    }
+    let mut rows: Vec<Vec<u8>> = Vec::with_capacity(header.row_count as usize);
+    for _ in 0..header.row_count {
+        rows.push(read_frame(&buf, &mut cursor)?.to_vec());
+    }
+    let end_anchor_compact = read_frame(&buf, &mut cursor)?;
+    // Exact EOF — nothing follows the end-anchor frame.
+    if cursor != buf.len() {
+        return Err(Invalid);
+    }
+
+    // F1 surplus-key invariant: keys.len() == transitions.len() + 1. WITHOUT
+    // this check a 0-transition archive carrying two distinct keys (start
+    // signed by keys[0], end by keys[1]) would be accepted — both anchors
+    // verify individually, but no transition authenticates the rollover.
+    if keys.keys.len() as i64 != header.transition_count + 1 {
+        return Err(Invalid);
+    }
+
+    // Authenticate the start anchor with keys[0]; bind it to the chain start.
+    let start_facts =
+        verify_historical_anchor(start_anchor_compact, &keys.keys[0], &expected.start_anchor)?;
+    if start_facts.chain_hash != expected.chain.previous_hash {
+        return Err(Invalid);
+    }
+    if start_facts.sequence != expected.chain.first_sequence - 1 {
+        return Err(Invalid);
+    }
+
+    // Authenticate each transition positionally: keys[i] signs, keys[i+1] next.
+    let mut effective_times: Vec<i64> = Vec::with_capacity(transition_compacts.len());
+    for (i, tcompact) in transition_compacts.iter().enumerate() {
+        let exp_t = expected.transitions.get(i).ok_or(Invalid)?;
+        let t_facts = verify_key_transition(tcompact, &keys.keys[i], &keys.keys[i + 1], exp_t)?;
+        effective_times.push(t_facts.effective_at);
+    }
+
+    // Authenticate the end anchor with the last key; bind it to the chain head.
+    let end_facts = verify_historical_anchor(
+        end_anchor_compact,
+        &keys.keys[header.transition_count as usize],
+        &expected.end_anchor,
+    )?;
+    if end_facts.chain_hash != expected.chain.head_hash {
+        return Err(Invalid);
+    }
+    if end_facts.sequence != expected.chain.last_sequence {
+        return Err(Invalid);
+    }
+
+    // Chronology + rollover (strictly increasing effective times, no fingerprint
+    // cycle, anchor ordering).
+    check_export_chronology(
+        start_facts.anchored_at,
+        end_facts.anchored_at,
+        &effective_times,
+        &keys.keys,
+    )?;
+
+    // Re-check every row (canonical re-encode, predecessor links, genesis,
+    // sequence, count, head — reused from Façade B).
+    let chain_input = ChainInput { rows };
+    check_chain(&chain_input, &expected.chain)?;
+
+    Ok(AnchoredExportFacts {
+        chain_id: header.chain_id,
+        first_sequence: header.first_sequence,
+        last_sequence: header.last_sequence,
+        row_count: header.row_count,
+        transition_count: header.transition_count,
+        previous_hash: header.previous_hash,
+        head_hash: header.last_hash,
+        digest: computed,
+        object_version: expected.object_version.clone(),
+        trust: NotEvaluated,
+        authorization: NotEvaluated,
+    })
+}
+
+// ----------------------------------------------------------------------------
+// Façade D helpers — anchor/transition decode, archive framing, chronology
+// ----------------------------------------------------------------------------
+
+/// The fully-decoded boundary-anchor compact (segments borrowed from input).
+struct DecodedAnchor<'a> {
+    protected_seg: &'a [u8],
+    payload_seg: &'a [u8],
+    signature_seg: &'a [u8],
+    key_id: String,
+    payload: AnchorPayload,
+}
+
+/// Decoded closed anchor payload fields.
+struct AnchorPayload {
+    anchor_id: String,
+    anchored_at: i64,
+    chain_hash: [u8; 32],
+    chain_id: String,
+    key_fingerprint: [u8; 32],
+    sequence: i64,
+}
+
+/// Splits, bounds, decodes, and structurally validates a boundary-anchor
+/// compact. Shared by [`verify_historical_anchor`] and the encode path's
+/// start-anchor binding check. The signature segment is NOT width-checked
+/// here; the verifier enforces the 64-byte width.
+fn decode_anchor_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedAnchor<'a>> {
+    if compact.len() as u64 > bounds.anchor_bytes() {
+        return Err(Invalid);
+    }
+    let (protected_seg, payload_seg, signature_seg) = compact::parse_compact(compact)?;
+    let header_bytes = decode_segment(protected_seg, bounds)?;
+    let payload_bytes = decode_segment(payload_seg, bounds)?;
+    let header = json_decode(&header_bytes, bounds)?;
+    let payload_json = json_decode(&payload_bytes, bounds)?;
+    let key_id = validate_anchor_header(&header, bounds)?;
+    let payload = validate_anchor_payload(&payload_json, bounds)?;
+    Ok(DecodedAnchor {
+        protected_seg,
+        payload_seg,
+        signature_seg,
+        key_id,
+        payload,
+    })
+}
+
+/// Validates the anchor protected header is exactly
+/// `{alg:"EdDSA", typ:"ba+chain-anchor", kid:<valid kid>}`. Returns the kid.
+fn validate_anchor_header(header: &JsonValue, bounds: &Bounds) -> Result<String> {
+    let members = match header {
+        JsonValue::Object(m) => m,
+        _ => return Err(Invalid),
+    };
+    let mut alg = None;
+    let mut typ = None;
+    let mut kid = None;
+    for (name, val) in members {
+        match name.as_str() {
+            "alg" => alg = Some(val),
+            "typ" => typ = Some(val),
+            "kid" => kid = Some(val),
+            _ => return Err(Invalid), // closed set
+        }
+    }
+    match alg {
+        Some(JsonValue::String(s)) if s == ALG_EDDSA => {}
+        _ => return Err(Invalid),
+    }
+    match typ {
+        Some(JsonValue::String(s)) if s == TYP_CHAIN_ANCHOR => {}
+        _ => return Err(Invalid),
+    }
+    let kid_str = match kid {
+        Some(JsonValue::String(s)) => s,
+        _ => return Err(Invalid),
+    };
+    validate_kid(kid_str, bounds)?;
+    Ok(kid_str.clone())
+}
+
+/// Validates the anchor payload against the closed set (member names derived
+/// first-hand from the corpus anchor `payload_segment`): exactly
+/// `{anchor_id, anchored_at, chain_hash, chain_id, key_fingerprint, sequence,
+/// v:1}`, no extra members. `chain_hash`/`key_fingerprint` are canonical
+/// base64url of exactly 32 bytes.
+fn validate_anchor_payload(payload: &JsonValue, bounds: &Bounds) -> Result<AnchorPayload> {
+    let members = match payload {
+        JsonValue::Object(m) => m,
+        _ => return Err(Invalid),
+    };
+    let mut anchor_id = None;
+    let mut anchored_at = None;
+    let mut chain_hash = None;
+    let mut chain_id = None;
+    let mut key_fingerprint = None;
+    let mut sequence = None;
+    let mut version = None;
+    for (name, val) in members {
+        match name.as_str() {
+            "anchor_id" => anchor_id = Some(val),
+            "anchored_at" => anchored_at = Some(val),
+            "chain_hash" => chain_hash = Some(val),
+            "chain_id" => chain_id = Some(val),
+            "key_fingerprint" => key_fingerprint = Some(val),
+            "sequence" => sequence = Some(val),
+            "v" => version = Some(val),
+            _ => return Err(Invalid), // closed set
+        }
+    }
+    match version {
+        Some(JsonValue::Int(1)) => {}
+        _ => return Err(Invalid),
+    }
+    let anchor_id = take_string_or_uri(anchor_id, bounds)?;
+    let chain_id = take_string_or_uri(chain_id, bounds)?;
+    let anchored_at = take_integral_date(anchored_at)?;
+    let sequence = take_integral_date(sequence)?;
+    if sequence < 0 {
+        return Err(Invalid);
+    }
+    let chain_hash = take_digest_b64u(chain_hash, bounds)?;
+    let key_fingerprint = take_digest_b64u(key_fingerprint, bounds)?;
+    Ok(AnchorPayload {
+        anchor_id,
+        anchored_at,
+        chain_hash,
+        chain_id,
+        key_fingerprint,
+        sequence,
+    })
+}
+
+/// The fully-decoded key-transition compact (segments borrowed from input).
+struct DecodedTransition<'a> {
+    protected_seg: &'a [u8],
+    payload_seg: &'a [u8],
+    signature_seg: &'a [u8],
+    key_id: String,
+    payload: TransitionPayload,
+}
+
+/// Decoded closed transition payload fields.
+struct TransitionPayload {
+    chain_id: String,
+    effective_at: i64,
+    from_fingerprint: [u8; 32],
+    to_fingerprint: [u8; 32],
+    to_key_id: String,
+    transition_id: String,
+}
+
+/// Splits, bounds, decodes, and structurally validates a key-transition compact.
+fn decode_transition_parts<'a>(
+    compact: &'a [u8],
+    bounds: &Bounds,
+) -> Result<DecodedTransition<'a>> {
+    if compact.len() as u64 > bounds.anchor_bytes() {
+        return Err(Invalid);
+    }
+    let (protected_seg, payload_seg, signature_seg) = compact::parse_compact(compact)?;
+    let header_bytes = decode_segment(protected_seg, bounds)?;
+    let payload_bytes = decode_segment(payload_seg, bounds)?;
+    let header = json_decode(&header_bytes, bounds)?;
+    let payload_json = json_decode(&payload_bytes, bounds)?;
+    let key_id = validate_transition_header(&header, bounds)?;
+    let payload = validate_transition_payload(&payload_json, bounds)?;
+    Ok(DecodedTransition {
+        protected_seg,
+        payload_seg,
+        signature_seg,
+        key_id,
+        payload,
+    })
+}
+
+/// Validates the transition protected header is exactly
+/// `{alg:"EdDSA", typ:"ba+key-transition", kid:<valid kid>}`. Returns the kid.
+fn validate_transition_header(header: &JsonValue, bounds: &Bounds) -> Result<String> {
+    let members = match header {
+        JsonValue::Object(m) => m,
+        _ => return Err(Invalid),
+    };
+    let mut alg = None;
+    let mut typ = None;
+    let mut kid = None;
+    for (name, val) in members {
+        match name.as_str() {
+            "alg" => alg = Some(val),
+            "typ" => typ = Some(val),
+            "kid" => kid = Some(val),
+            _ => return Err(Invalid), // closed set
+        }
+    }
+    match alg {
+        Some(JsonValue::String(s)) if s == ALG_EDDSA => {}
+        _ => return Err(Invalid),
+    }
+    match typ {
+        Some(JsonValue::String(s)) if s == TYP_KEY_TRANSITION => {}
+        _ => return Err(Invalid),
+    }
+    let kid_str = match kid {
+        Some(JsonValue::String(s)) => s,
+        _ => return Err(Invalid),
+    };
+    validate_kid(kid_str, bounds)?;
+    Ok(kid_str.clone())
+}
+
+/// Validates the transition payload against the closed set (member names
+/// derived first-hand from the corpus transition `payload_segment`): exactly
+/// `{chain_id, effective_at, from_key_fingerprint, to_key_fingerprint,
+/// to_key_id, transition_id, v:1}`.
+fn validate_transition_payload(payload: &JsonValue, bounds: &Bounds) -> Result<TransitionPayload> {
+    let members = match payload {
+        JsonValue::Object(m) => m,
+        _ => return Err(Invalid),
+    };
+    let mut chain_id = None;
+    let mut effective_at = None;
+    let mut from_key_fingerprint = None;
+    let mut to_key_fingerprint = None;
+    let mut to_key_id = None;
+    let mut transition_id = None;
+    let mut version = None;
+    for (name, val) in members {
+        match name.as_str() {
+            "chain_id" => chain_id = Some(val),
+            "effective_at" => effective_at = Some(val),
+            "from_key_fingerprint" => from_key_fingerprint = Some(val),
+            "to_key_fingerprint" => to_key_fingerprint = Some(val),
+            "to_key_id" => to_key_id = Some(val),
+            "transition_id" => transition_id = Some(val),
+            "v" => version = Some(val),
+            _ => return Err(Invalid), // closed set
+        }
+    }
+    match version {
+        Some(JsonValue::Int(1)) => {}
+        _ => return Err(Invalid),
+    }
+    let chain_id = take_string_or_uri(chain_id, bounds)?;
+    let transition_id = take_string_or_uri(transition_id, bounds)?;
+    let to_key_id = match to_key_id {
+        Some(JsonValue::String(s)) => {
+            validate_kid(s, bounds)?;
+            s.clone()
+        }
+        _ => return Err(Invalid),
+    };
+    let effective_at = take_integral_date(effective_at)?;
+    let from_fingerprint = take_digest_b64u(from_key_fingerprint, bounds)?;
+    let to_fingerprint = take_digest_b64u(to_key_fingerprint, bounds)?;
+    Ok(TransitionPayload {
+        chain_id,
+        effective_at,
+        from_fingerprint,
+        to_fingerprint,
+        to_key_id,
+        transition_id,
+    })
+}
+
+/// The closed anchored-export archive header.
+struct ArchiveHeader {
+    chain_id: String,
+    first_sequence: i64,
+    last_sequence: i64,
+    row_count: i64,
+    transition_count: i64,
+    previous_hash: [u8; 32],
+    last_hash: [u8; 32],
+}
+
+/// Decodes + structurally validates the closed archive header (member names
+/// derived first-hand from the corpus header frame): exactly
+/// `{chain_id, first_sequence, last_hash, last_sequence, previous_hash,
+/// row_count, transition_count, v:1}`. Enforces the canonical re-encode check
+/// (the header bytes MUST be the exact JCS encoding) and bounds the counts.
+fn decode_archive_header(bytes: &[u8], bounds: &Bounds) -> Result<ArchiveHeader> {
+    if bytes.len() as u64 > bounds.archive_header_bytes() {
+        return Err(Invalid);
+    }
+    let value = json_decode(bytes, bounds)?;
+    let members = match &value {
+        JsonValue::Object(m) => m,
+        _ => return Err(Invalid),
+    };
+    let mut chain_id = None;
+    let mut first_sequence = None;
+    let mut last_hash = None;
+    let mut last_sequence = None;
+    let mut previous_hash = None;
+    let mut row_count = None;
+    let mut transition_count = None;
+    let mut version = None;
+    for (name, val) in members {
+        match name.as_str() {
+            "chain_id" => chain_id = Some(val),
+            "first_sequence" => first_sequence = Some(val),
+            "last_hash" => last_hash = Some(val),
+            "last_sequence" => last_sequence = Some(val),
+            "previous_hash" => previous_hash = Some(val),
+            "row_count" => row_count = Some(val),
+            "transition_count" => transition_count = Some(val),
+            "v" => version = Some(val),
+            _ => return Err(Invalid), // closed set
+        }
+    }
+    match version {
+        Some(JsonValue::Int(1)) => {}
+        _ => return Err(Invalid),
+    }
+    let chain_id = take_string_or_uri(chain_id, bounds)?;
+    let first_sequence = take_integral_date(first_sequence)?;
+    let last_sequence = take_integral_date(last_sequence)?;
+    let row_count = take_integral_date(row_count)?;
+    let transition_count = take_integral_date(transition_count)?;
+    if row_count < 0 || transition_count < 0 {
+        return Err(Invalid);
+    }
+    if first_sequence < 1 || last_sequence < first_sequence {
+        return Err(Invalid);
+    }
+    if row_count as u64 > bounds.chain_rows() {
+        return Err(Invalid);
+    }
+    if transition_count as u64 > bounds.key_transitions() {
+        return Err(Invalid);
+    }
+    let previous_hash = take_digest_b64u(previous_hash, bounds)?;
+    let last_hash = take_digest_b64u(last_hash, bounds)?;
+    // Canonical re-encode check (the header is the canonical_header).
+    let reencoded = jcs_encode(&value, bounds)?;
+    if reencoded.as_slice() != bytes {
+        return Err(Invalid);
+    }
+    Ok(ArchiveHeader {
+        chain_id,
+        first_sequence,
+        last_sequence,
+        row_count,
+        transition_count,
+        previous_hash,
+        last_hash,
+    })
+}
+
+/// Appends one archive frame `UINT32_BE(len) || bytes` (caller guarantees
+/// non-empty content; the framing of empty content is rejected at the call
+/// sites). `len` fits in `u32` for every protocol element (anchor/transition ≤
+/// 8,192 bytes; row ≤ 4,096 bytes; header ≤ 8,192 bytes).
+fn frame_into(content: &[u8], out: &mut Vec<u8>) {
+    out.extend_from_slice(&(content.len() as u32).to_be_bytes());
+    out.extend_from_slice(content);
+}
+
+/// Reads one archive frame at `*cursor`: a UINT32_BE nonzero length prefix
+/// followed by exactly that many bytes. Returns a borrowed slice of the frame
+/// payload and advances `*cursor` past it.
+fn read_frame<'a>(buf: &'a [u8], cursor: &mut usize) -> Result<&'a [u8]> {
+    let prefix_end = cursor.checked_add(4).ok_or(Invalid)?;
+    if prefix_end > buf.len() {
+        return Err(Invalid);
+    }
+    let mut len_bytes = [0u8; 4];
+    len_bytes.copy_from_slice(&buf[*cursor..prefix_end]);
+    let len = u32::from_be_bytes(len_bytes) as usize;
+    *cursor = prefix_end;
+    if len == 0 {
+        return Err(Invalid); // REQ: nonzero_length
+    }
+    let end = cursor.checked_add(len).ok_or(Invalid)?;
+    if end > buf.len() {
+        return Err(Invalid);
+    }
+    let frame = &buf[*cursor..end];
+    *cursor = end;
+    Ok(frame)
+}
+
+/// Decodes a compact signature segment into a fixed 64-byte array.
+fn decode_signature64(signature_seg: &[u8], out: &mut [u8; 64]) -> Result<()> {
+    let sig_raw = base64url_decode(signature_seg)?;
+    if sig_raw.len() != 64 {
+        return Err(Invalid); // REQ1-BOUNDS-fixed-widths (signature = 64 bytes)
+    }
+    out.copy_from_slice(&sig_raw);
+    Ok(())
+}
+
+/// Half-open interval membership: `valid_from <= t < upper` (`Unbounded` is the
+/// only open upper interval).
+fn in_interval(t: i64, valid_from: i64, upper: &ValidityUpperBound) -> bool {
+    if t < valid_from {
+        return false;
+    }
+    match upper {
+        ValidityUpperBound::Bounded(v) => t < *v,
+        ValidityUpperBound::Unbounded => true,
+    }
+}
+
+/// Chronology + rollover checks for an anchored export (ADR 0004 §49-55):
+/// fingerprints cannot cycle (all key fingerprints distinct); transition
+/// effective times strictly increase; the start anchor precedes every
+/// transition; the end anchor is at or after the last transition. Equal
+/// start/end times are permitted only for the no-transition same-key case
+/// (implied: no transitions + `start <= end`).
+fn check_export_chronology(
+    start_at: i64,
+    end_at: i64,
+    effective_times: &[i64],
+    keys: &[HistoricalPublicKey],
+) -> Result<()> {
+    // Fingerprints cannot cycle: no key fingerprint may recur.
+    let mut seen: Vec<[u8; 32]> = Vec::with_capacity(keys.len());
+    for k in keys {
+        let fp = public_key_thumbprint_raw(&k.public_key);
+        if seen.iter().any(|s| *s == fp) {
+            return Err(Invalid);
+        }
+        seen.push(fp);
+    }
+
+    if effective_times.is_empty() {
+        // No-transition same-key case: start <= end.
+        if start_at > end_at {
+            return Err(Invalid);
+        }
+    } else {
+        // Strictly increasing effective times.
+        for i in 1..effective_times.len() {
+            if effective_times[i - 1] >= effective_times[i] {
+                return Err(Invalid);
+            }
+        }
+        // Start anchor precedes every transition.
+        if start_at >= effective_times[0] {
+            return Err(Invalid);
+        }
+        // End anchor at or after the last transition.
+        if end_at < effective_times[effective_times.len() - 1] {
+            return Err(Invalid);
+        }
+    }
+    Ok(())
+}
+
+/// Constant-time byte equality for two equal-width digests. The length check
+/// leaks length only (both sides are fixed 32-byte SHA-256 digests, so the
+/// length is a protocol constant, not secret); the byte loop runs in constant
+/// time for equal-length inputs with no early exit.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut acc = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        acc |= x ^ y;
+    }
+    acc == 0
 }
 
 // ============================================================================
@@ -3261,5 +4222,798 @@ mod tests {
         want.copy_from_slice(&h.finalize());
         assert_eq!(facts.grant_hash, want);
         assert_eq!(facts.grant.matched_audience, expected.audience);
+    }
+
+    // ==========================================================================
+    // Façade D — anchored export verify/encode (Task 13)
+    //
+    // The SILENT-RELINK surface: a permissive export verify silently certifies a
+    // relinked/shortened archive; a permissive rollover silently accepts an
+    // unauthenticated key path. The corpus tests pin byte-level agreement with
+    // the falsifier; the F1 defect-injection proves the surplus-key invariant
+    // is red-capable.
+    // ==========================================================================
+
+    /// Builds a HistoricalPublicKey from a corpus key object. The corpus always
+    /// carries an integral `valid_before`; a missing upper bound maps to
+    /// `Unbounded` (the only open upper interval).
+    fn historical_key_from(v: &serde_json::Value) -> HistoricalPublicKey {
+        let valid_before = match v["valid_before"].as_i64() {
+            Some(n) => ValidityUpperBound::Bounded(n),
+            None => ValidityUpperBound::Unbounded,
+        };
+        HistoricalPublicKey {
+            key_id: v["key_id"].as_str().unwrap().to_string(),
+            public_key: b64url_to_32(&v["public_key"]).expect("32-byte public key"),
+            valid_from: v["valid_from"].as_i64().unwrap(),
+            valid_before,
+        }
+    }
+
+    /// Builds an ExpectedAnchor from a corpus expected-anchor object.
+    fn expected_anchor_from(v: &serde_json::Value) -> ExpectedAnchor {
+        ExpectedAnchor {
+            anchor_id: v["anchor_id"].as_str().unwrap().to_string(),
+            anchored_at: v["anchored_at"].as_i64().unwrap(),
+            chain_hash: b64url_to_32(&v["chain_hash"]).expect("32-byte chain_hash"),
+            chain_id: v["chain_id"].as_str().unwrap().to_string(),
+            key_fingerprint: b64url_to_32(&v["key_fingerprint"]).expect("32-byte fp"),
+            key_id: v["key_id"].as_str().unwrap().to_string(),
+            sequence: v["sequence"].as_i64().unwrap(),
+        }
+    }
+
+    /// Builds an ExpectedKeyTransition from a corpus expected-transition object.
+    fn expected_transition_from(v: &serde_json::Value) -> ExpectedKeyTransition {
+        ExpectedKeyTransition {
+            chain_id: v["chain_id"].as_str().unwrap().to_string(),
+            current_key_fingerprint: b64url_to_32(&v["current_key_fingerprint"]).expect("32"),
+            current_key_id: v["current_key_id"].as_str().unwrap().to_string(),
+            effective_at: v["effective_at"].as_i64().unwrap(),
+            next_key_fingerprint: b64url_to_32(&v["next_key_fingerprint"]).expect("32"),
+            next_key_id: v["next_key_id"].as_str().unwrap().to_string(),
+            transition_id: v["transition_id"].as_str().unwrap().to_string(),
+        }
+    }
+
+    /// Builds an ExpectedChain from a corpus chain object (corpus `last_hash`
+    /// maps to `head_hash`).
+    fn expected_chain_from(v: &serde_json::Value) -> ExpectedChain {
+        ExpectedChain {
+            chain_id: v["chain_id"].as_str().unwrap().to_string(),
+            first_sequence: v["first_sequence"].as_i64().unwrap(),
+            last_sequence: v["last_sequence"].as_i64().unwrap(),
+            row_count: v["row_count"].as_i64().unwrap(),
+            previous_hash: b64url_to_32(&v["previous_hash"]).expect("32"),
+            head_hash: b64url_to_32(&v["last_hash"]).expect("32"),
+        }
+    }
+
+    /// Builds an ExpectedAnchoredExport from the corpus expected object.
+    fn expected_anchored_export_from(exp: &serde_json::Value) -> ExpectedAnchoredExport {
+        ExpectedAnchoredExport {
+            chain: expected_chain_from(&exp["chain"]),
+            digest: b64url_to_32(&exp["digest"]).expect("32-byte digest"),
+            start_anchor: expected_anchor_from(&exp["start_anchor"]),
+            end_anchor: expected_anchor_from(&exp["end_anchor"]),
+            transitions: exp["transitions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(expected_transition_from)
+                .collect(),
+            object_version: exp["object_version"].as_str().unwrap().to_string(),
+        }
+    }
+
+    // ==========================================================================
+    // RED-CAPABLE battery — anchor / transition / export bindings.
+    // ==========================================================================
+
+    // --- Anchor signature tamper (corpus tamper case): a flipped signature
+    // byte -> Invalid. RED-capable: skip the ed25519::verify call and the
+    // tampered anchor would pass.
+    #[test]
+    fn red_historical_anchor_tamper_rejected() {
+        let cases = load_cases("boundary-anchor/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-historical-anchor-tamper-signature-byte"))
+            .expect("tamper case");
+        let input = &case["input"];
+        let compact = input["compact"].as_str().unwrap().as_bytes();
+        let key = historical_key_from(&input["key"]);
+        let expected = expected_anchor_from(&input["expected"]);
+        assert_eq!(
+            verify_historical_anchor(compact, &key, &expected),
+            Err(Invalid)
+        );
+    }
+
+    // --- Anchor wrong key (corpus invalid_key): derived fingerprint != signed.
+    #[test]
+    fn red_historical_anchor_wrong_key_rejected() {
+        let cases = load_cases("boundary-anchor/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-historical-anchor-invalid-bad-key"))
+            .expect("bad-key case");
+        let input = &case["input"];
+        let key = historical_key_from(&input["key"]);
+        let expected = expected_anchor_from(&input["expected"]);
+        assert_eq!(
+            verify_historical_anchor(
+                input["compact"].as_str().unwrap().as_bytes(),
+                &key,
+                &expected
+            ),
+            Err(Invalid)
+        );
+    }
+
+    // --- Anchor alg=none (corpus invalid_algorithm): closed-set header reject.
+    #[test]
+    fn red_historical_anchor_alg_none_rejected() {
+        let cases = load_cases("boundary-anchor/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-historical-anchor-invalid-algorithm-none"))
+            .expect("alg case");
+        let input = &case["input"];
+        let key = historical_key_from(&input["key"]);
+        let expected = expected_anchor_from(&input["expected"]);
+        assert_eq!(
+            verify_historical_anchor(
+                input["compact"].as_str().unwrap().as_bytes(),
+                &key,
+                &expected
+            ),
+            Err(Invalid)
+        );
+    }
+
+    // --- Anchor validity window (corpus invalid_time): anchored_at >=
+    // valid_before -> Invalid.
+    #[test]
+    fn red_historical_anchor_time_window_rejected() {
+        let cases = load_cases("boundary-anchor/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-historical-anchor-invalid-time-window"))
+            .expect("time case");
+        let input = &case["input"];
+        let key = historical_key_from(&input["key"]);
+        let expected = expected_anchor_from(&input["expected"]);
+        assert_eq!(
+            verify_historical_anchor(
+                input["compact"].as_str().unwrap().as_bytes(),
+                &key,
+                &expected
+            ),
+            Err(Invalid)
+        );
+    }
+
+    // --- Transition signature tamper + bad current key + alg none + time.
+    #[test]
+    fn red_key_transition_battery_rejected() {
+        for (case_id, label) in [
+            ("verify-key-transition-tamper-signature-byte", "tamper"),
+            (
+                "verify-key-transition-invalid-bad-current-key",
+                "bad-current-key",
+            ),
+            ("verify-key-transition-invalid-algorithm-none", "alg-none"),
+            ("verify-key-transition-invalid-time-window", "time-window"),
+        ] {
+            let cases = load_cases("key-transition/verify.json");
+            let case = cases
+                .iter()
+                .find(|c| c["id"].as_str() == Some(case_id))
+                .unwrap_or_else(|| panic!("case {case_id}"));
+            let input = &case["input"];
+            let compact = input["compact"].as_str().unwrap().as_bytes();
+            let current = historical_key_from(&input["current_key"]);
+            let next = historical_key_from(&input["next_key"]);
+            let expected = expected_transition_from(&input["expected"]);
+            assert_eq!(
+                verify_key_transition(compact, &current, &next, &expected),
+                Err(Invalid),
+                "{label}"
+            );
+        }
+    }
+
+    // --- Encode byte-exact: the valid encode's byte_count + digest match the
+    // corpus byte-exact. RED-capable: a wrong magic or wrong frame order yields
+    // a different digest.
+    #[test]
+    fn red_encode_anchored_export_byte_exact() {
+        let cases = load_cases("anchored-export/encode.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("encode-anchored-export-valid"))
+            .unwrap();
+        let input = &case["input"];
+        let anchored_input = AnchoredExportInput {
+            start_anchor: input["start_anchor"].as_str().unwrap().as_bytes().to_vec(),
+            end_anchor: input["end_anchor"].as_str().unwrap().as_bytes().to_vec(),
+            transitions: input["transitions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|t| t.as_str().unwrap().as_bytes().to_vec())
+                .collect(),
+            rows: input["rows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|r| {
+                    crate::base64url_decode(r.as_str().unwrap().as_bytes()).expect("row decodes")
+                })
+                .collect(),
+        };
+        let expected = ExpectedExport {
+            chain: expected_chain_from(&input["expected"]["chain"]),
+            digest: b64url_to_32(&input["expected"]["digest"]).expect("32"),
+            start_anchor: expected_anchor_from(&input["expected"]["start_anchor"]),
+            end_anchor: expected_anchor_from(&input["expected"]["end_anchor"]),
+            transitions: input["expected"]["transitions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(expected_transition_from)
+                .collect(),
+            object_version: input["expected"]["object_version"]
+                .as_str()
+                .unwrap()
+                .to_string(),
+        };
+        let encoded = encode_anchored_export(&anchored_input, &expected).expect("encodes");
+        let exp = &case["expected"];
+        assert_eq!(
+            encoded.byte_count,
+            exp["byte_count"].as_i64().unwrap() as u64
+        );
+        assert_eq!(
+            crate::base64url_encode(&encoded.digest).as_slice(),
+            exp["digest"].as_str().unwrap().as_bytes()
+        );
+        // The first 20 bytes are exactly the archive magic.
+        assert_eq!(&encoded.bytes[..ARCHIVE_MAGIC.len()], ARCHIVE_MAGIC);
+    }
+
+    // --- Encode start-anchor binding (corpus invalid case): start sequence !=
+    // first_sequence - 1 -> Invalid.
+    #[test]
+    fn red_encode_start_anchor_binding_rejected() {
+        let cases = load_cases("anchored-export/encode.json");
+        let case = cases
+            .iter()
+            .find(|c| {
+                c["id"].as_str() == Some("encode-anchored-export-invalid-start-anchor-binding")
+            })
+            .unwrap();
+        let input = &case["input"];
+        let anchored_input = AnchoredExportInput {
+            start_anchor: input["start_anchor"].as_str().unwrap().as_bytes().to_vec(),
+            end_anchor: input["end_anchor"].as_str().unwrap().as_bytes().to_vec(),
+            transitions: vec![],
+            rows: input["rows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|r| {
+                    crate::base64url_decode(r.as_str().unwrap().as_bytes()).expect("row decodes")
+                })
+                .collect(),
+        };
+        let expected = ExpectedExport {
+            chain: expected_chain_from(&input["expected"]["chain"]),
+            digest: b64url_to_32(&input["expected"]["digest"]).expect("32"),
+            start_anchor: expected_anchor_from(&input["expected"]["start_anchor"]),
+            end_anchor: expected_anchor_from(&input["expected"]["end_anchor"]),
+            transitions: vec![],
+            object_version: input["expected"]["object_version"]
+                .as_str()
+                .unwrap()
+                .to_string(),
+        };
+        assert_eq!(
+            encode_anchored_export(&anchored_input, &expected),
+            Err(Invalid)
+        );
+    }
+
+    // --- Export digest mismatch (corpus invalid-encoding-digest): a wrong
+    // expected digest -> constant-time compare fails -> Invalid.
+    #[test]
+    fn red_export_digest_mismatch_rejected() {
+        let cases = load_cases("anchored-export/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-anchored-export-invalid-encoding-digest"))
+            .unwrap();
+        let input = &case["input"];
+        let chunks: Vec<Vec<u8>> = input["chunks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| crate::base64url_decode(c.as_str().unwrap().as_bytes()).unwrap_or_default())
+            .collect();
+        let obj = ArchivedObject {
+            chunks,
+            version: input["version"].as_str().unwrap().to_string(),
+        };
+        let keys = HistoricalKeyChain {
+            keys: input["keys"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(historical_key_from)
+                .collect(),
+        };
+        let expected = expected_anchored_export_from(&input["expected"]);
+        assert_eq!(verify_anchored_export(&obj, &keys, &expected), Err(Invalid));
+    }
+
+    // --- Export version mismatch (corpus invalid-claim-version).
+    #[test]
+    fn red_export_version_mismatch_rejected() {
+        let cases = load_cases("anchored-export/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-anchored-export-invalid-claim-version"))
+            .unwrap();
+        let input = &case["input"];
+        let chunks: Vec<Vec<u8>> = input["chunks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| crate::base64url_decode(c.as_str().unwrap().as_bytes()).unwrap_or_default())
+            .collect();
+        let obj = ArchivedObject {
+            chunks,
+            version: input["version"].as_str().unwrap().to_string(),
+        };
+        let keys = HistoricalKeyChain {
+            keys: input["keys"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(historical_key_from)
+                .collect(),
+        };
+        let expected = expected_anchored_export_from(&input["expected"]);
+        assert_eq!(verify_anchored_export(&obj, &keys, &expected), Err(Invalid));
+    }
+
+    // --- The 3 signed cases from the 696384c gating prerequisite: non-monotone
+    // effective_at -> Invalid; fingerprint cycle -> Invalid; one-key/zero-
+    // transition -> Ok. These MUST pass.
+    #[test]
+    fn signed_prerequisite_non_monotone_rejected() {
+        let cases = load_cases("anchored-export/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| {
+                c["id"].as_str() == Some("verify-anchored-export-invalid-non-monotone-transitions")
+            })
+            .unwrap();
+        let input = &case["input"];
+        let chunks: Vec<Vec<u8>> = input["chunks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| crate::base64url_decode(c.as_str().unwrap().as_bytes()).unwrap_or_default())
+            .collect();
+        let obj = ArchivedObject {
+            chunks,
+            version: input["version"].as_str().unwrap().to_string(),
+        };
+        let keys = HistoricalKeyChain {
+            keys: input["keys"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(historical_key_from)
+                .collect(),
+        };
+        let expected = expected_anchored_export_from(&input["expected"]);
+        assert_eq!(verify_anchored_export(&obj, &keys, &expected), Err(Invalid));
+    }
+
+    #[test]
+    fn signed_prerequisite_fingerprint_cycle_rejected() {
+        let cases = load_cases("anchored-export/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-anchored-export-invalid-fingerprint-cycle"))
+            .unwrap();
+        let input = &case["input"];
+        let chunks: Vec<Vec<u8>> = input["chunks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| crate::base64url_decode(c.as_str().unwrap().as_bytes()).unwrap_or_default())
+            .collect();
+        let obj = ArchivedObject {
+            chunks,
+            version: input["version"].as_str().unwrap().to_string(),
+        };
+        let keys = HistoricalKeyChain {
+            keys: input["keys"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(historical_key_from)
+                .collect(),
+        };
+        let expected = expected_anchored_export_from(&input["expected"]);
+        assert_eq!(verify_anchored_export(&obj, &keys, &expected), Err(Invalid));
+    }
+
+    #[test]
+    fn signed_prerequisite_one_key_zero_transition_valid() {
+        let cases = load_cases("anchored-export/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-anchored-export-valid-one-key"))
+            .unwrap();
+        let input = &case["input"];
+        let chunks: Vec<Vec<u8>> = input["chunks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| crate::base64url_decode(c.as_str().unwrap().as_bytes()).unwrap_or_default())
+            .collect();
+        let obj = ArchivedObject {
+            chunks,
+            version: input["version"].as_str().unwrap().to_string(),
+        };
+        let keys = HistoricalKeyChain {
+            keys: input["keys"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(historical_key_from)
+                .collect(),
+        };
+        let expected = expected_anchored_export_from(&input["expected"]);
+        let facts = verify_anchored_export(&obj, &keys, &expected).expect("one-key valid");
+        assert_eq!(facts.transition_count, 0);
+        assert_eq!(facts.trust, NotEvaluated);
+        assert_eq!(facts.authorization, NotEvaluated);
+    }
+
+    // --- F1 surplus-key invariant (MANDATORY defect injection). NO corpus case
+    // constructs this: a 0-transition archive (one signing key) presented with
+    // a 2-key chain. The F1 check (keys.len() == transitions.len() + 1) is the
+    // ONLY thing that catches it: without F1, the surplus key is silently
+    // ignored (start+end both verify against keys[0], no transitions to
+    // authenticate, the two distinct fingerprints pass the cycle check) and the
+    // archive is WRONGLY accepted as Ok.
+    //
+    // RED-capable proof (executed separately): mechanically remove the F1 check
+    // -> this test returns Ok (RED). Restore -> Invalid (GREEN).
+    #[test]
+    fn red_f1_surplus_key_invariant_zero_transition() {
+        let cases = load_cases("anchored-export/verify.json");
+        let one_key = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-anchored-export-valid-one-key"))
+            .unwrap();
+        let input = &one_key["input"];
+        let exp = &input["expected"];
+        let chunks: Vec<Vec<u8>> = input["chunks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| crate::base64url_decode(c.as_str().unwrap().as_bytes()).unwrap_or_default())
+            .collect();
+        let obj = ArchivedObject {
+            chunks,
+            version: input["version"].as_str().unwrap().to_string(),
+        };
+        let archive_c = historical_key_from(&input["keys"][0]);
+        // A second DISTINCT key (archive-d, from the non-monotone case) as the
+        // surplus entry the no-transition archive never authenticates.
+        let nm = cases
+            .iter()
+            .find(|c| {
+                c["id"].as_str() == Some("verify-anchored-export-invalid-non-monotone-transitions")
+            })
+            .unwrap();
+        let archive_d = historical_key_from(&nm["input"]["keys"][1]);
+        assert_ne!(
+            archive_c.public_key, archive_d.public_key,
+            "precondition: surplus key must be distinct"
+        );
+        let keys = HistoricalKeyChain {
+            keys: vec![archive_c, archive_d],
+        };
+        let expected = expected_anchored_export_from(exp);
+        assert_eq!(
+            verify_anchored_export(&obj, &keys, &expected),
+            Err(Invalid),
+            "F1: a 0-transition archive with 2 keys MUST be Invalid"
+        );
+    }
+
+    // --- constant_time_eq sanity: equal-length digest compare is byte-exact
+    // and rejects a single-byte difference (the tamper-digest defense).
+    #[test]
+    fn constant_time_eq_rejects_single_byte_difference() {
+        let a = [0u8; 32];
+        let mut b = [0u8; 32];
+        assert!(constant_time_eq(&a, &b));
+        b[17] ^= 0x01;
+        assert!(!constant_time_eq(&a, &b));
+        assert!(!constant_time_eq(&a, &[0u8; 31]));
+    }
+
+    // ==========================================================================
+    // Corpus: boundary-anchor/verify.json (5 cases)
+    // ==========================================================================
+
+    #[test]
+    fn corpus_verify_historical_anchor_all_5_cases() {
+        let cases = load_cases("boundary-anchor/verify.json");
+        assert_eq!(cases.len(), 5, "boundary-anchor corpus has 5 cases");
+        let mut agreed = 0usize;
+        let mut disagreed = 0usize;
+        for case in &cases {
+            let id = case["id"].as_str().unwrap_or("<no id>");
+            let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+            let input = &case["input"];
+            let compact = input["compact"].as_str().unwrap().as_bytes();
+            let key = historical_key_from(&input["key"]);
+            let expected = expected_anchor_from(&input["expected"]);
+            let result = verify_historical_anchor(compact, &key, &expected);
+            let agree = match (expected_verdict, &result) {
+                ("valid", Ok(facts)) => {
+                    facts.anchor_id == expected.anchor_id
+                        && facts.sequence == expected.sequence
+                        && facts.chain_hash == expected.chain_hash
+                        && facts.key_fingerprint == expected.key_fingerprint
+                        && facts.trust == NotEvaluated
+                }
+                ("invalid", Err(Invalid)) => true,
+                _ => false,
+            };
+            if agree {
+                agreed += 1;
+            } else {
+                disagreed += 1;
+                eprintln!("DISAGREE: id={id} expected={expected_verdict}");
+            }
+        }
+        assert_eq!(agreed, 5, "agreed (boundary-anchor corpus == 5)");
+        assert_eq!(disagreed, 0, "disagreed");
+    }
+
+    // ==========================================================================
+    // Corpus: key-transition/verify.json (5 cases)
+    // ==========================================================================
+
+    #[test]
+    fn corpus_verify_key_transition_all_5_cases() {
+        let cases = load_cases("key-transition/verify.json");
+        assert_eq!(cases.len(), 5, "key-transition corpus has 5 cases");
+        let mut agreed = 0usize;
+        let mut disagreed = 0usize;
+        for case in &cases {
+            let id = case["id"].as_str().unwrap_or("<no id>");
+            let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+            let input = &case["input"];
+            let compact = input["compact"].as_str().unwrap().as_bytes();
+            let current = historical_key_from(&input["current_key"]);
+            let next = historical_key_from(&input["next_key"]);
+            let expected = expected_transition_from(&input["expected"]);
+            let result = verify_key_transition(compact, &current, &next, &expected);
+            let agree = match (expected_verdict, &result) {
+                ("valid", Ok(facts)) => {
+                    facts.transition_id == expected.transition_id
+                        && facts.current_key_fingerprint == expected.current_key_fingerprint
+                        && facts.next_key_fingerprint == expected.next_key_fingerprint
+                        && facts.trust == NotEvaluated
+                }
+                ("invalid", Err(Invalid)) => true,
+                _ => false,
+            };
+            if agree {
+                agreed += 1;
+            } else {
+                disagreed += 1;
+                eprintln!("DISAGREE: id={id} expected={expected_verdict}");
+            }
+        }
+        assert_eq!(agreed, 5, "agreed (key-transition corpus == 5)");
+        assert_eq!(disagreed, 0, "disagreed");
+    }
+
+    // ==========================================================================
+    // Corpus: anchored-export/encode.json (2 cases)
+    // ==========================================================================
+
+    #[test]
+    fn corpus_encode_anchored_export_all_2_cases() {
+        let cases = load_cases("anchored-export/encode.json");
+        assert_eq!(cases.len(), 2, "anchored-export encode corpus has 2 cases");
+        let mut agreed = 0usize;
+        let mut disagreed = 0usize;
+        for case in &cases {
+            let id = case["id"].as_str().unwrap_or("<no id>");
+            let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+            let input = &case["input"];
+            let anchored_input = AnchoredExportInput {
+                start_anchor: input["start_anchor"].as_str().unwrap().as_bytes().to_vec(),
+                end_anchor: input["end_anchor"].as_str().unwrap().as_bytes().to_vec(),
+                transitions: input["transitions"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|t| t.as_str().unwrap().as_bytes().to_vec())
+                    .collect(),
+                rows: input["rows"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|r| {
+                        crate::base64url_decode(r.as_str().unwrap().as_bytes())
+                            .expect("row decodes")
+                    })
+                    .collect(),
+            };
+            let expected = ExpectedExport {
+                chain: expected_chain_from(&input["expected"]["chain"]),
+                digest: b64url_to_32(&input["expected"]["digest"]).unwrap_or([0u8; 32]),
+                start_anchor: expected_anchor_from(&input["expected"]["start_anchor"]),
+                end_anchor: expected_anchor_from(&input["expected"]["end_anchor"]),
+                transitions: input["expected"]["transitions"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(expected_transition_from)
+                    .collect(),
+                object_version: input["expected"]["object_version"]
+                    .as_str()
+                    .unwrap()
+                    .to_string(),
+            };
+            let result = encode_anchored_export(&anchored_input, &expected);
+            let agree = match (expected_verdict, &result) {
+                ("valid", Ok(encoded)) => {
+                    let exp = &case["expected"];
+                    encoded.byte_count == exp["byte_count"].as_i64().unwrap() as u64
+                        && crate::base64url_encode(&encoded.digest).as_slice()
+                            == exp["digest"].as_str().unwrap().as_bytes()
+                }
+                ("invalid", Err(Invalid)) => true,
+                _ => false,
+            };
+            if agree {
+                agreed += 1;
+            } else {
+                disagreed += 1;
+                eprintln!("DISAGREE: id={id} expected={expected_verdict}");
+            }
+        }
+        assert_eq!(agreed, 2, "agreed (anchored-export encode corpus == 2)");
+        assert_eq!(disagreed, 0, "disagreed");
+    }
+
+    // ==========================================================================
+    // Corpus: anchored-export/verify.json (10 cases)
+    // ==========================================================================
+
+    #[test]
+    fn corpus_verify_anchored_export_all_10_cases() {
+        let cases = load_cases("anchored-export/verify.json");
+        assert_eq!(
+            cases.len(),
+            10,
+            "anchored-export verify corpus has 10 cases"
+        );
+        let mut agreed = 0usize;
+        let mut disagreed = 0usize;
+        for case in &cases {
+            let id = case["id"].as_str().unwrap_or("<no id>");
+            let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+            let input = &case["input"];
+            let chunks: Vec<Vec<u8>> = input["chunks"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|c| {
+                    crate::base64url_decode(c.as_str().unwrap().as_bytes()).unwrap_or_default()
+                })
+                .collect();
+            let obj = ArchivedObject {
+                chunks,
+                version: input["version"].as_str().unwrap().to_string(),
+            };
+            let keys = HistoricalKeyChain {
+                keys: input["keys"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(historical_key_from)
+                    .collect(),
+            };
+            let expected = expected_anchored_export_from(&input["expected"]);
+            let result = verify_anchored_export(&obj, &keys, &expected);
+            let agree = match (expected_verdict, &result) {
+                ("valid", Ok(facts)) => {
+                    facts.trust == NotEvaluated
+                        && facts.authorization == NotEvaluated
+                        && facts.chain_id
+                            == input["expected"]["chain"]["chain_id"].as_str().unwrap()
+                        && facts.row_count
+                            == input["expected"]["chain"]["row_count"].as_i64().unwrap()
+                }
+                ("invalid", Err(Invalid)) => true,
+                _ => false,
+            };
+            if agree {
+                agreed += 1;
+            } else {
+                disagreed += 1;
+                eprintln!(
+                    "DISAGREE: id={id} expected={expected_verdict} ok={}",
+                    result.is_ok()
+                );
+            }
+        }
+        assert_eq!(agreed, 10, "agreed (anchored-export verify corpus == 10)");
+        assert_eq!(disagreed, 0, "disagreed");
+    }
+
+    // ==========================================================================
+    // AnchoredExportFacts shape: the valid 2-key case populates every field and
+    // carries BOTH trust + authorization markers.
+    // ==========================================================================
+
+    #[test]
+    fn verify_anchored_export_valid_populates_facts() {
+        let cases = load_cases("anchored-export/verify.json");
+        let case = cases
+            .iter()
+            .find(|c| c["id"].as_str() == Some("verify-anchored-export-valid"))
+            .unwrap();
+        let input = &case["input"];
+        let chunks: Vec<Vec<u8>> = input["chunks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| crate::base64url_decode(c.as_str().unwrap().as_bytes()).unwrap_or_default())
+            .collect();
+        let obj = ArchivedObject {
+            chunks,
+            version: input["version"].as_str().unwrap().to_string(),
+        };
+        let keys = HistoricalKeyChain {
+            keys: input["keys"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(historical_key_from)
+                .collect(),
+        };
+        let expected = expected_anchored_export_from(&input["expected"]);
+        let facts = verify_anchored_export(&obj, &keys, &expected).expect("valid");
+        assert_eq!(facts.trust, NotEvaluated);
+        assert_eq!(facts.authorization, NotEvaluated);
+        assert_eq!(facts.transition_count, 1);
+        assert_eq!(facts.row_count, 1);
+        assert_eq!(facts.object_version, "v1");
+        // digest == SHA-256 over the complete archive byte stream.
+        let mut recomputed = [0u8; 32];
+        let mut h = Sha256::new();
+        for c in &obj.chunks {
+            h.update(c);
+        }
+        recomputed.copy_from_slice(&h.finalize());
+        assert_eq!(facts.digest, recomputed);
     }
 }
