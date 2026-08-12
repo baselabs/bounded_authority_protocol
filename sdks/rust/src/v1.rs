@@ -31,13 +31,13 @@ use crate::bounds::Bounds;
 use crate::compact;
 use crate::digest;
 use crate::error::{Invalid, Result};
-use crate::facts::NotEvaluated;
+use crate::facts::{ChainFacts, NotEvaluated};
 use crate::jcs::jcs_encode;
 use crate::json::{json_decode, JsonValue};
 use crate::jwk::{jwk_decode_public, public_key_thumbprint_raw, thumbprint_raw};
 use crate::types::{
-    BoundaryAnchor, GrantDecoded, GrantInput, KeyLocator, KeyTransition, ProducedSigningInput,
-    ProofDecoded, ProofInput,
+    BoundaryAnchor, ChainInput, ConsumptionEntry, ExpectedChain, GrantDecoded, GrantInput,
+    KeyLocator, KeyTransition, ProducedSigningInput, ProofDecoded, ProofInput,
 };
 use crate::uri::uri_normalize;
 
@@ -54,6 +54,16 @@ const TYP_CHAIN_ANCHOR: &str = "ba+chain-anchor";
 const TYP_KEY_TRANSITION: &str = "ba+key-transition";
 const CRV_ED25519: &str = "Ed25519";
 const KTY_OKP: &str = "OKP";
+
+/// The ASCII domain-separation prefix for the consumption row-domain hash,
+/// including its FINAL NUL byte — the same `REQ1-SIGNING-digest-prefix` pattern
+/// as `BAP1-REQUEST\0` (T5's request digest).
+///
+/// `"BAP1-CHAIN\0"` = `[B, A, P, 1, -, C, H, A, I, N, 0x00]` (10 ASCII + 1 NUL
+/// = 11 bytes — confirmed byte-exact against the corpus entry.json row-domain
+/// hash). The final zero byte is load-bearing (ADR 0004 § Consumption rows:
+/// `SHA-256("BAP1-CHAIN\0" || canonical_row_bytes)`).
+const CHAIN_DIGEST_PREFIX: &[u8] = b"BAP1-CHAIN\0";
 
 // ============================================================================
 // untrusted_key_locator
@@ -480,6 +490,287 @@ pub fn key_transition_signing_input(
     ]);
 
     build_produced(&header, &payload, bounds)
+}
+
+// ============================================================================
+// Façade B — consumption entry + chain verification (Task 11)
+// ============================================================================
+//
+// This is a **silent-relink surface**: a permissive chain check silently
+// certifies a relinked, shortened, or omitted archive. Every invariant —
+// canonical re-encode, genesis binding, predecessor links, and the caller
+// head/predecessor/sequence/count boundaries — collapses to exactly
+// [`Invalid`](crate::Invalid) on any mismatch (`REQ1-VERIFY-return-shape`).
+// [`ChainFacts`] carries `trust: NotEvaluated` and makes no `authorization`
+// field part of its shape (`REQ1-CHAIN-facts-shape`,
+// `REQ1-CHAIN-facts-not-evaluated`). A self-consistent chain does NOT certify
+// completeness (`REQ1-CHAIN-no-deletion-cert`): a validly shortened or relinked
+// range fails only against the ORIGINAL caller boundaries.
+
+/// Encode one canonical consumption row and compute its row-domain hash.
+///
+/// Builds the closed JCS row object
+/// `{"chain_id","commitment","previous","sequence","v":1}` (ADR 0004 §
+/// Consumption rows), enforces `sequence >= 1` and the genesis binding
+/// (`sequence == 1` requires the all-zero predecessor), bounds the canonical
+/// bytes by `bounds.chain_row_bytes()`, and returns
+/// `(canonical_bytes, SHA-256("BAP1-CHAIN\0" || canonical_bytes))`.
+///
+/// The corpus `entry.json` `input.previous_hash` (a base64url string) maps to
+/// the row member `previous`; the producer adds `v: 1`. The corpus pins `bytes`
+/// (the canonical ASCII) and `hash` (the base64url row-domain hash) byte-exact.
+pub fn encode_consumption_entry(
+    entry: &ConsumptionEntry,
+    bounds: &Bounds,
+) -> Result<(Vec<u8>, [u8; 32])> {
+    // sequence MUST be a positive integer (corpus invalid-zero-sequence).
+    if entry.sequence < 1 {
+        return Err(Invalid);
+    }
+    // Genesis binding: sequence 1 requires the all-zero predecessor (corpus
+    // invalid-seq1-nonzero-previous). A sequence > 1 MAY carry any predecessor —
+    // the encoder does not know the prior row's hash; the verifier binds it.
+    if entry.sequence == 1 && entry.previous_hash.iter().any(|&b| b != 0) {
+        return Err(Invalid);
+    }
+
+    let previous_str = b64url_to_string(&base64url_encode(&entry.previous_hash))?;
+    let commitment_str = b64url_to_string(&base64url_encode(&entry.commitment))?;
+    // Member names + order derived first-hand from ADR 0004 § Consumption rows
+    // + the corpus entry.json expected.bytes: chain_id, commitment, previous,
+    // sequence, v (already in JCS / UTF-16-sorted order).
+    let row = JsonValue::Object(vec![
+        (
+            "chain_id".to_string(),
+            JsonValue::String(entry.chain_id.clone()),
+        ),
+        ("commitment".to_string(), JsonValue::String(commitment_str)),
+        ("previous".to_string(), JsonValue::String(previous_str)),
+        ("sequence".to_string(), JsonValue::Int(entry.sequence)),
+        ("v".to_string(), JsonValue::Int(1)),
+    ]);
+
+    let canonical = jcs_encode(&row, bounds)?;
+    // REQ1-CHAIN-raw-rows-bounds: the canonical row is bounded by chain_row_bytes.
+    if canonical.len() as u64 > bounds.chain_row_bytes() {
+        return Err(Invalid);
+    }
+    let hash = row_domain_hash(&canonical);
+    Ok((canonical, hash))
+}
+
+/// Verify a bounded range of raw canonical consumption rows against the
+/// caller's expected chain boundaries.
+///
+/// `input.rows` is the nonempty proper list of raw canonical row binaries (each
+/// already base64url-decoded by the caller); `expected` carries the caller's
+/// intended chain identity, sequence span, row count, predecessor, and head
+/// (`REQ1-CHAIN-no-deletion-cert`). Verification requires: the closed row shape
+/// `{chain_id, commitment, previous, sequence, v:1}`, exact canonical bytes (a
+/// re-`jcs_encode` of each decoded row must equal the received bytes), chain
+/// identity, consecutive sequence, the genesis/caller predecessor, predecessor
+/// links, row count, last sequence, and the caller head. Every failure is
+/// `Err(Invalid)` with no value leak.
+///
+/// The row-count (≤ 65,536) and per-row-byte (≤ 4,096) ceilings are the
+/// immutable profile maxima from [`Bounds::maximum`]
+/// (`REQ1-CHAIN-raw-rows-bounds`); they are not caller-tightenable through this
+/// façade entry (the entry takes no `Bounds` argument).
+pub fn check_chain(input: &ChainInput, expected: &ExpectedChain) -> Result<ChainFacts> {
+    let bounds = Bounds::maximum();
+    let rows = &input.rows;
+
+    // REQ1-CHAIN-raw-rows-bounds: nonempty + ≤ chain_rows; each row ≤ chain_row_bytes.
+    if rows.is_empty() || rows.len() as u64 > bounds.chain_rows() {
+        return Err(Invalid);
+    }
+    for row in rows {
+        if row.len() as u64 > bounds.chain_row_bytes() {
+            return Err(Invalid);
+        }
+    }
+
+    // Parse + canonical-reencode-check + row-domain-hash every row.
+    let mut parsed: Vec<ParsedRow> = Vec::with_capacity(rows.len());
+    for row in rows {
+        parsed.push(parse_row(row, &bounds)?);
+    }
+
+    // Chain identity: every row's chain_id == expected.chain_id (the rows
+    // therefore also agree amongst themselves). Corpus: cross-graft.
+    for p in &parsed {
+        if p.chain_id != expected.chain_id {
+            return Err(Invalid);
+        }
+    }
+
+    // Consecutive sequence: row i sequence == expected.first_sequence + i.
+    for (i, p) in parsed.iter().enumerate() {
+        let want = expected
+            .first_sequence
+            .checked_add(i as i64)
+            .ok_or(Invalid)?;
+        if p.sequence != want {
+            return Err(Invalid);
+        }
+    }
+
+    // Genesis binding. first_sequence < 1 is invalid (sequences begin at 1);
+    // first_sequence == 1 requires the first row's previous to be the all-zero
+    // hash; first_sequence > 1 requires it to equal the caller's predecessor.
+    // Corpus: sequence-zero-row + genesis-previous-hash-forge.
+    let first = &parsed[0];
+    if expected.first_sequence < 1 {
+        return Err(Invalid);
+    }
+    if expected.first_sequence == 1 {
+        if first.previous.iter().any(|&b| b != 0) {
+            return Err(Invalid);
+        }
+    } else if first.previous != expected.previous_hash {
+        return Err(Invalid);
+    }
+
+    // Predecessor links: row i's previous (32 bytes) == row_domain_hash(row i-1).
+    // Corpus: invalid-encoding-broken-link.
+    for i in 1..parsed.len() {
+        if parsed[i].previous != parsed[i - 1].hash {
+            return Err(Invalid);
+        }
+    }
+
+    // Row count. Corpus: invalid-claim-count.
+    if parsed.len() as i64 != expected.row_count {
+        return Err(Invalid);
+    }
+
+    // Last sequence + caller head. Corpus: invalid-claim-sequence,
+    // invalid-bad-last-hash, tamper-commitment-byte.
+    let last = parsed.last().expect("nonempty");
+    if last.sequence != expected.last_sequence {
+        return Err(Invalid);
+    }
+    if last.hash != expected.head_hash {
+        return Err(Invalid);
+    }
+
+    Ok(ChainFacts {
+        chain_id: expected.chain_id.clone(),
+        row_count: parsed.len() as i64,
+        first_sequence: expected.first_sequence,
+        last_sequence: expected.last_sequence,
+        previous_hash: expected.previous_hash,
+        head_hash: expected.head_hash,
+        trust: NotEvaluated,
+    })
+}
+
+// ----------------------------------------------------------------------------
+// Chain helpers
+// ----------------------------------------------------------------------------
+
+/// One parsed + canonical-reencoded + hashed consumption row.
+struct ParsedRow {
+    chain_id: String,
+    /// Decoded 32-byte `previous` field (for the genesis + predecessor checks).
+    previous: [u8; 32],
+    sequence: i64,
+    /// `SHA-256("BAP1-CHAIN\0" || canonical_row_bytes)`.
+    hash: [u8; 32],
+}
+
+/// Computes `SHA-256("BAP1-CHAIN\0" || canonical_row_bytes)` as a raw 32-byte
+/// digest — the row-domain hash (ADR 0004 § Consumption rows).
+fn row_domain_hash(canonical_row: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(CHAIN_DIGEST_PREFIX);
+    hasher.update(canonical_row);
+    let out = hasher.finalize();
+    let mut arr = [0u8; 32];
+    arr.copy_from_slice(&out);
+    arr
+}
+
+/// Decodes + structurally validates one closed consumption row, enforces the
+/// canonical re-encode check, and returns the parsed fields plus the row-domain
+/// hash.
+///
+/// Closed row shape: exactly `{chain_id: string, commitment: base64url-32,
+/// previous: base64url-32, sequence: int, v: 1}` — no extra members.
+/// `commitment` is validated to decode to exactly 32 bytes but otherwise stays
+/// opaque (it is neither stored nor compared). The canonical re-encode check
+/// rejects any row whose received bytes are not the exact JCS encoding of the
+/// decoded value (corpus `check-chain-canonical-reencode`).
+fn parse_row(row: &[u8], bounds: &Bounds) -> Result<ParsedRow> {
+    let value = json_decode(row, bounds)?;
+    let members = match &value {
+        JsonValue::Object(m) => m,
+        _ => return Err(Invalid),
+    };
+    let mut chain_id = None;
+    let mut commitment = None;
+    let mut previous = None;
+    let mut sequence = None;
+    let mut version = None;
+    for (name, val) in members {
+        match name.as_str() {
+            "chain_id" => chain_id = Some(val),
+            "commitment" => commitment = Some(val),
+            "previous" => previous = Some(val),
+            "sequence" => sequence = Some(val),
+            "v" => version = Some(val),
+            _ => return Err(Invalid), // closed set
+        }
+    }
+    match version {
+        Some(JsonValue::Int(1)) => {}
+        _ => return Err(Invalid),
+    }
+    let chain_id = match chain_id {
+        Some(JsonValue::String(s)) => s.clone(),
+        _ => return Err(Invalid),
+    };
+    let sequence = match sequence {
+        Some(JsonValue::Int(n)) => *n,
+        _ => return Err(Invalid),
+    };
+    // commitment + previous MUST be canonical base64url of exactly 32 bytes
+    // (ADR 0004: "<base64url-32>"). base64url_decode enforces the canonical
+    // encoding, so a non-canonical lexeme is rejected here.
+    let _commitment = take_b64url_32(commitment)?;
+    let previous = take_b64url_32(previous)?;
+
+    // Canonical re-encode check: re-jcs the decoded value and require byte-exact
+    // equality with the received row bytes. A whitespace or member-order variant
+    // that decodes identically MUST fail closed (canonical bytes are the hash
+    // preimage contract).
+    let reencoded = jcs_encode(&value, bounds)?;
+    if reencoded.as_slice() != row {
+        return Err(Invalid);
+    }
+
+    let hash = row_domain_hash(row);
+    Ok(ParsedRow {
+        chain_id,
+        previous,
+        sequence,
+        hash,
+    })
+}
+
+/// Extracts a base64url string member that decodes to exactly 32 bytes.
+fn take_b64url_32(value: Option<&JsonValue>) -> Result<[u8; 32]> {
+    let s = match value {
+        Some(JsonValue::String(s)) => s,
+        _ => return Err(Invalid),
+    };
+    let raw = base64url_decode(s.as_bytes())?;
+    if raw.len() != 32 {
+        return Err(Invalid);
+    }
+    let mut arr = [0u8; 32];
+    arr.copy_from_slice(&raw);
+    Ok(arr)
 }
 
 // ============================================================================
@@ -1855,5 +2146,282 @@ mod tests {
         assert_eq!(decoded.issuer, grant.issuer);
         assert_eq!(decoded.grant_id, grant.grant_id);
         assert_eq!(decoded.version, 1);
+    }
+
+    // ==========================================================================
+    // Façade B — consumption entry + chain verification (Task 11)
+    // ==========================================================================
+
+    /// Encodes a canonical row directly via jcs_encode — a test helper for
+    /// building rows with arbitrary previous/sequence (including rows the
+    /// encoder itself would reject, e.g. a forged genesis row).
+    fn encode_row_canonical(
+        chain_id: &str,
+        commitment: &[u8; 32],
+        previous: &[u8; 32],
+        sequence: i64,
+    ) -> Vec<u8> {
+        let row = JsonValue::Object(vec![
+            (
+                "chain_id".to_string(),
+                JsonValue::String(chain_id.to_string()),
+            ),
+            (
+                "commitment".to_string(),
+                JsonValue::String(String::from_utf8(crate::base64url_encode(commitment)).unwrap()),
+            ),
+            (
+                "previous".to_string(),
+                JsonValue::String(String::from_utf8(crate::base64url_encode(previous)).unwrap()),
+            ),
+            ("sequence".to_string(), JsonValue::Int(sequence)),
+            ("v".to_string(), JsonValue::Int(1)),
+        ]);
+        jcs_encode(&row, &max()).expect("encodes")
+    }
+
+    // --- Encoder row-domain hash: the "BAP1-CHAIN\0" prefix is load-bearing ---
+    // RED if the prefix omitted the final NUL byte (or used the wrong prefix):
+    // the corpus-pinned hash would mismatch.
+    #[test]
+    fn red_encoder_hash_prefix_nul_is_load_bearing() {
+        let entry = ConsumptionEntry {
+            chain_id: "urn:example:chain".to_string(),
+            commitment: [1u8; 32],
+            previous_hash: [0u8; 32],
+            sequence: 1,
+        };
+        let (canonical, hash) = encode_consumption_entry(&entry, &max()).expect("encodes");
+        // The produced hash equals SHA-256("BAP1-CHAIN\0" || canonical).
+        let mut h = Sha256::new();
+        h.update(CHAIN_DIGEST_PREFIX);
+        h.update(&canonical);
+        let mut want = [0u8; 32];
+        want.copy_from_slice(&h.finalize());
+        assert_eq!(
+            hash, want,
+            "hash MUST be SHA-256(\"BAP1-CHAIN\\0\" || canonical)"
+        );
+        // Dropping the NUL byte from the prefix MUST change the digest — the
+        // zero byte is load-bearing (this is the red state).
+        let mut h2 = Sha256::new();
+        h2.update(b"BAP1-CHAIN"); // NO NUL byte
+        h2.update(&canonical);
+        let mut wrong = [0u8; 32];
+        wrong.copy_from_slice(&h2.finalize());
+        assert_ne!(
+            hash, wrong,
+            "dropping the NUL byte MUST change the row-domain hash"
+        );
+        // The prefix is exactly 11 bytes (10 ASCII "BAP1-CHAIN" + 1 NUL).
+        assert_eq!(CHAIN_DIGEST_PREFIX, b"BAP1-CHAIN\0");
+        assert_eq!(CHAIN_DIGEST_PREFIX.len(), 11);
+        assert_eq!(CHAIN_DIGEST_PREFIX.last(), Some(&0u8));
+    }
+
+    // --- Encoder genesis binding ---
+    // RED if the encoder accepted sequence 0 or a sequence-1 nonzero previous.
+    #[test]
+    fn red_encoder_rejects_zero_sequence_and_forged_genesis() {
+        let zero_seq = ConsumptionEntry {
+            chain_id: "urn:example:chain".to_string(),
+            commitment: [1u8; 32],
+            previous_hash: [0u8; 32],
+            sequence: 0,
+        };
+        assert_eq!(encode_consumption_entry(&zero_seq, &max()), Err(Invalid));
+
+        let forged_genesis = ConsumptionEntry {
+            chain_id: "urn:example:chain".to_string(),
+            commitment: [1u8; 32],
+            previous_hash: [9u8; 32], // nonzero previous at sequence 1
+            sequence: 1,
+        };
+        assert_eq!(
+            encode_consumption_entry(&forged_genesis, &max()),
+            Err(Invalid)
+        );
+    }
+
+    // --- Chain canonical re-encode check ---
+    // RED if the canonical re-encode check were removed: a row whose received
+    // bytes are valid JSON but NOT canonical (here, a space after `{`) would be
+    // accepted, silently certifying a non-canonical hash preimage.
+    #[test]
+    fn red_check_chain_canonical_reencode() {
+        let (row, hash) = encode_consumption_entry(
+            &ConsumptionEntry {
+                chain_id: "urn:example:chain".to_string(),
+                commitment: [1u8; 32],
+                previous_hash: [0u8; 32],
+                sequence: 1,
+            },
+            &max(),
+        )
+        .expect("encodes");
+        // Inject a space after `{`: valid JSON (json_decode skips whitespace),
+        // but NOT canonical -> re-encode differs -> the canonical check fires.
+        let mut non_canonical = row.clone();
+        non_canonical.insert(1, b' ');
+        let input = ChainInput {
+            rows: vec![non_canonical],
+        };
+        let expected = ExpectedChain {
+            chain_id: "urn:example:chain".to_string(),
+            first_sequence: 1,
+            last_sequence: 1,
+            row_count: 1,
+            previous_hash: [0u8; 32],
+            head_hash: hash, // honest head; the canonical check fires first
+        };
+        assert_eq!(check_chain(&input, &expected), Err(Invalid));
+    }
+
+    // --- Chain genesis binding ---
+    // RED if the genesis binding were removed: a sequence-1 row with a nonzero
+    // previous would be accepted as a forged genesis.
+    #[test]
+    fn red_check_chain_genesis_binding() {
+        let forged = encode_row_canonical("urn:example:chain", &[1u8; 32], &[2u8; 32], 1);
+        let input = ChainInput { rows: vec![forged] };
+        let expected = ExpectedChain {
+            chain_id: "urn:example:chain".to_string(),
+            first_sequence: 1,
+            last_sequence: 1,
+            row_count: 1,
+            previous_hash: [0u8; 32],
+            head_hash: [0u8; 32],
+        };
+        assert_eq!(check_chain(&input, &expected), Err(Invalid));
+    }
+
+    // --- Chain predecessor link ---
+    // RED if the predecessor-link check were removed: a row whose previous does
+    // not equal the prior row's hash would be accepted as a valid link.
+    #[test]
+    fn red_check_chain_predecessor_link() {
+        let (row0, hash0) = encode_consumption_entry(
+            &ConsumptionEntry {
+                chain_id: "urn:example:chain".to_string(),
+                commitment: [1u8; 32],
+                previous_hash: [0u8; 32],
+                sequence: 1,
+            },
+            &max(),
+        )
+        .expect("encodes");
+        // row1 claims a previous that is NOT hash0.
+        let row1 = encode_row_canonical("urn:example:chain", &[3u8; 32], &[9u8; 32], 2);
+        let input = ChainInput {
+            rows: vec![row0, row1],
+        };
+        let expected = ExpectedChain {
+            chain_id: "urn:example:chain".to_string(),
+            first_sequence: 1,
+            last_sequence: 2,
+            row_count: 2,
+            previous_hash: [0u8; 32],
+            head_hash: hash0, // the link check fires before the head check
+        };
+        assert_ne!(
+            [9u8; 32], hash0,
+            "test precondition: link is genuinely broken"
+        );
+        assert_eq!(check_chain(&input, &expected), Err(Invalid));
+    }
+
+    // ==========================================================================
+    // Corpus: consumption-chain/entry.json (3 cases)
+    // ==========================================================================
+
+    #[test]
+    fn corpus_encode_consumption_entry_all_3_cases() {
+        let cases = load_cases("consumption-chain/entry.json");
+        assert_eq!(cases.len(), 3, "entry corpus has 3 cases");
+        let mut agreed = 0usize;
+        let mut disagreed = 0usize;
+        for case in &cases {
+            let id = case["id"].as_str().unwrap_or("<no id>");
+            let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+            let input = &case["input"];
+            let entry = ConsumptionEntry {
+                chain_id: input["chain_id"].as_str().unwrap_or("").to_string(),
+                commitment: b64url_to_32(&input["commitment"]).unwrap_or([0u8; 32]),
+                previous_hash: b64url_to_32(&input["previous_hash"]).unwrap_or([0u8; 32]),
+                sequence: input["sequence"].as_i64().unwrap_or(0),
+            };
+            let result = encode_consumption_entry(&entry, &max());
+            let agree = match (expected_verdict, &result) {
+                ("valid", Ok((bytes, hash))) => {
+                    let exp = &case["expected"];
+                    bytes.as_slice() == exp["bytes"].as_str().unwrap().as_bytes()
+                        && crate::base64url_encode(hash).as_slice()
+                            == exp["hash"].as_str().unwrap().as_bytes()
+                }
+                ("invalid", Err(Invalid)) => true,
+                _ => false,
+            };
+            if agree {
+                agreed += 1;
+            } else {
+                disagreed += 1;
+                eprintln!("DISAGREE: id={id} expected={expected_verdict}");
+            }
+        }
+        assert_eq!(agreed, 3, "agreed (entry corpus == 3)");
+        assert_eq!(disagreed, 0, "disagreed");
+    }
+
+    // ==========================================================================
+    // Corpus: consumption-chain/check.json (10 cases)
+    // ==========================================================================
+
+    #[test]
+    fn corpus_check_chain_all_10_cases() {
+        let cases = load_cases("consumption-chain/check.json");
+        assert_eq!(cases.len(), 10, "check corpus has 10 cases");
+        let mut agreed = 0usize;
+        let mut disagreed = 0usize;
+        for case in &cases {
+            let id = case["id"].as_str().unwrap_or("<no id>");
+            let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+            let input = &case["input"];
+            let rows: Vec<Vec<u8>> = input["rows"]
+                .as_array()
+                .expect("rows array")
+                .iter()
+                .map(|r| {
+                    crate::base64url_decode(r.as_str().expect("b64 row").as_bytes())
+                        .expect("row decodes")
+                })
+                .collect();
+            let chain_input = ChainInput { rows };
+            let expected = ExpectedChain {
+                chain_id: input["chain_id"].as_str().unwrap_or("").to_string(),
+                first_sequence: input["first_sequence"].as_i64().unwrap_or(0),
+                last_sequence: input["last_sequence"].as_i64().unwrap_or(0),
+                row_count: input["row_count"].as_i64().unwrap_or(0),
+                previous_hash: b64url_to_32(&input["previous_hash"]).unwrap_or([0u8; 32]),
+                head_hash: b64url_to_32(&input["last_hash"]).unwrap_or([0u8; 32]),
+            };
+            let result = check_chain(&chain_input, &expected);
+            let agree = match (expected_verdict, &result) {
+                ("valid", Ok(facts)) => {
+                    facts.chain_id == input["chain_id"].as_str().unwrap()
+                        && facts.row_count == input["row_count"].as_i64().unwrap()
+                        && facts.trust == NotEvaluated
+                }
+                ("invalid", Err(Invalid)) => true,
+                _ => false,
+            };
+            if agree {
+                agreed += 1;
+            } else {
+                disagreed += 1;
+                eprintln!("DISAGREE: id={id} expected={expected_verdict}");
+            }
+        }
+        assert_eq!(agreed, 10, "agreed (check corpus == 10)");
+        assert_eq!(disagreed, 0, "disagreed");
     }
 }
