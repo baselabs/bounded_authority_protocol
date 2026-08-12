@@ -20,14 +20,10 @@
 //! (lines 246–261) and RFC 7515 §7.1 — NOT from any sibling-SDK or Elixir
 //! source (ADR 0014 D5).
 
-// `assemble_compact` is `pub` (so the Task 10 façade can `pub use` re-export
-// it) but lives in a `pub(crate)` module, so it is effectively `pub(crate)`
-// and, until the façade wires it, nothing in the non-test crate calls it.
-// `parse_compact` is `pub(crate)` for the same reason. The module-level
-// dead-code allow keeps the lint clean (mirrors the `digest` module). Remove
-// once the façade makes the call chain reachable.
-#![allow(dead_code)]
-
+// `assemble_compact` is `pub` (re-exported at the crate root by the Façade A
+// `pub use compact::assemble_compact;` in lib.rs) and `parse_compact` is
+// `pub(crate)` (called by v1::decode_grant / decode_proof). Both are now
+// reachable from the crate root through the Façade A call chain.
 use crate::base64url::{base64url_decode, base64url_encode};
 use crate::error::{Invalid, Result};
 use crate::types::SigningInput;

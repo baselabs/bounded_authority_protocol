@@ -22,6 +22,7 @@ pub mod json;
 pub mod jwk;
 pub mod types;
 pub mod uri;
+pub mod v1;
 
 // `compact`, `digest`, `ed25519`, and `selector` are internal mechanics behind
 // the v1 façade (protocol-v1.md §lines 329–330 names only `jcs`/`jwk`/`uri`/
@@ -32,13 +33,23 @@ pub mod uri;
 // can call them; they are intentionally NOT re-exported at the crate root and
 // do not widen the 0.1.0 public surface. `assemble_compact` is `pub fn` so the
 // Task 10 façade can `pub use` re-export it, but the module itself stays
-// internal. Until the façade wires them, nothing in the non-test crate calls
-// any of these, so the dead-code allow inside each module keeps the lint clean
-// (removed once the façade makes the call chain reachable).
+// internal. `compact` and `digest` are now wired by the Façade A call chain
+// (locator/decode/assemble + proof_signing_input respectively); `ed25519` and
+// `selector` remain unwired until T12, so only those two retain the dead-code
+// allow.
 pub(crate) mod compact;
 pub(crate) mod digest;
 pub(crate) mod ed25519;
 pub(crate) mod selector;
+
+// Façade A re-exports (Task 10): the public v1 entry points reachable at the
+// crate root. `assemble_compact` is re-exported from the `compact` module (the
+// composer is the contract; the module stays internal).
+pub use compact::assemble_compact;
+pub use v1::{
+    boundary_anchor_signing_input, decode_grant, decode_proof, grant_signing_input,
+    key_transition_signing_input, proof_signing_input, untrusted_key_locator,
+};
 
 pub use base64url::{base64url_decode, base64url_encode};
 pub use bounds::Bounds;
