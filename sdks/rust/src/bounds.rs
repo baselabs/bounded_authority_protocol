@@ -32,10 +32,13 @@ use crate::json::JsonValue;
 /// validating constructors — callers cannot bypass tighten-only / fixed-width
 /// enforcement by assembling a struct literal.
 ///
-/// Derives [`Debug`] and [`PartialEq`] (not `Serialize`/`Display`): a `Bounds`
-/// is public configuration of integer ceilings, not a credential — printing
-/// or comparing it leaks no authority-bearing material.
-#[derive(Debug, PartialEq)]
+/// Derives [`Debug`], [`Clone`], [`Copy`], [`PartialEq`], and [`Eq`] (not
+/// `Serialize`/`Display`): a `Bounds` is public configuration of integer
+/// ceilings (every field is a `u64`), not a credential — printing, copying, or
+/// comparing it leaks no authority-bearing material. `Clone`/`Copy`/`Eq` are
+/// required so the input structs that embed a `Bounds` (e.g. `ExpectedGrant`,
+/// `ExpectedRequest`) can derive `Clone`/`Eq` themselves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Bounds {
     compact_bytes: u64,
     encoded_segment_bytes: u64,

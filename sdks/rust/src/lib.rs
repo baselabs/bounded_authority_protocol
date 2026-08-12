@@ -16,6 +16,7 @@
 pub mod base64url;
 pub mod bounds;
 pub mod error;
+pub mod facts;
 pub mod jcs;
 pub mod json;
 pub mod jwk;
