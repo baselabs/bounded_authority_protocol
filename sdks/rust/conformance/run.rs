@@ -23,8 +23,8 @@
 //!
 //! Derivation hygiene (ADR 0014 §D5): the runner is derived from ADR 0014,
 //! `docs/protocol-v1.md`, and the existing in-crate harnesses only. It does NOT
-//! read `lib/*.ex` or any sibling SDK. The corpus is the falsifier; the SHA
-//! binding + census are the mechanisms.
+//! read the reference Elixir implementation or any sibling SDK. The corpus is
+//! the falsifier; the SHA binding + census are the mechanisms.
 
 #![forbid(unsafe_code)]
 
@@ -40,8 +40,8 @@ use bounded_authority_protocol::{Bounds, Invalid, JsonValue};
 use sha2::{Digest, Sha256};
 
 // ============================================================================
-// ADR 0014 §D4 — the certified corpus index SHA-256 (verified by `sha256sum`
-// against priv/conformance/v1/corpus/index.json, then byte-copied here).
+// ADR 0014 §D4 — the certified corpus index SHA-256 (verified by hashing the
+// source corpus index.json, then byte-copied into the SDK's vendored snapshot).
 // ============================================================================
 
 const CERTIFIED_INDEX_SHA: &str =
