@@ -141,14 +141,16 @@ jobs:
         working-directory: sdks/rust
 
       - name: clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --locked --all-targets -- -D warnings
         working-directory: sdks/rust
 
-      # `cargo test` runs every test target: the lib unit suite, the
-      # permissiveness mutation-gate battery, and the conformance runner that
-      # asserts agreed=283 disagreed=0 + the two-boundary key census.
+      # `cargo test --locked` runs every test target against the committed
+      # Cargo.lock: the lib unit suite, the permissiveness mutation-gate
+      # battery, and the conformance runner that asserts agreed=283 disagreed=0
+      # + the two-boundary key census. `--locked` makes the exact resolved
+      # dependency versions a reviewed repo change, not a per-run resolution.
       - name: unit + permissiveness + conformance (283 + census)
-        run: cargo test
+        run: cargo test --locked
         working-directory: sdks/rust
 
       - name: purity check

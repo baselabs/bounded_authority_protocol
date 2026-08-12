@@ -122,6 +122,18 @@ def main():
         rows.append((name, version, expr, ok))
 
     print(f"license_check: {len(rows)} runtime dependencies audited")
+    # Fail-closed floor (gate-integrity): if cargo tree's output drifted to
+    # fewer than the 3 direct runtime deps (ed25519-dalek, sha2, ryu-js), the
+    # parser audited nothing meaningful — refuse the "OK" path on empty or
+    # degraded input rather than reporting success over zero dependencies.
+    if len(rows) < 3:
+        print(
+            f"license_check: FAIL — only {len(rows)} runtime dep(s) parsed "
+            f"(expected >= 3: ed25519-dalek, sha2, ryu-js). cargo tree output "
+            f"drift or an empty success suspected.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     bad = [r for r in rows if not r[3]]
     for name, version, expr, ok in sorted(rows):
         flag = "OK " if ok else "FAIL"

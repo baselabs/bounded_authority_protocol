@@ -71,12 +71,16 @@ pub fn jcs_encode(value: &JsonValue, bounds: &Bounds) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-/// Recursive encoder. Threads the per-node budgets (`depth`, `total_nodes`,
-/// and the `jcs_bytes` output ceiling) through the recursion so a hand-built
-/// value cannot force unbounded recursion, traversal, or intermediate
-/// allocation. `depth` is the container nesting level (root container = 1),
-/// mirroring [`crate::json::json_decode`]'s accounting. The non-finite-float
-/// guard is unchanged.
+/// Recursive encoder. Threads the full per-node budget set through the
+/// recursion so a hand-built (not decode-bounded) value cannot force unbounded
+/// recursion/traversal/allocation AND cannot smuggle an out-of-profile scalar
+/// or duplicate member past the encoder: `total_nodes`, container `depth`,
+/// `integer_magnitude`/`float_magnitude`, `string_bytes`, `array_items`,
+/// `object_members`, `key_bytes`, duplicate-key rejection, non-finite-float
+/// rejection, and the `jcs_bytes` output ceiling (the `(d)`-class closure,
+/// ADR 0014 D6/D7; mirrors the reference `jcs.ex` `encode_value` guard set).
+/// `depth` is the container nesting level (root container = 1), mirroring
+/// [`crate::json::json_decode`]'s accounting.
 fn encode_value(
     v: &JsonValue,
     depth: u64,
@@ -93,11 +97,40 @@ fn encode_value(
         JsonValue::Null => out.extend_from_slice(b"null"),
         JsonValue::Bool(true) => out.extend_from_slice(b"true"),
         JsonValue::Bool(false) => out.extend_from_slice(b"false"),
-        JsonValue::Int(n) => encode_int(*n, out),
-        JsonValue::Float(f) => encode_float(*f, out)?,
-        JsonValue::String(s) => encode_string(s, out),
+        JsonValue::Int(n) => {
+            // Magnitude bound (reference jcs.ex:40-41): a hand-built integer
+            // outside ±integer_magnitude is rejected at encode, matching the
+            // decoder. The decoded path never carries such a value.
+            let mag = bounds.integer_magnitude() as i64;
+            if *n < -mag || *n > mag {
+                return Err(Invalid);
+            }
+            encode_int(*n, out);
+        }
+        JsonValue::Float(f) => {
+            // Finite + magnitude (reference jcs.ex:49-50): non-finite (the F2
+            // tripwire) OR over-magnitude floats are rejected before formatting.
+            let mag = bounds.float_magnitude() as f64;
+            if !f.is_finite() || f.abs() > mag {
+                return Err(Invalid);
+            }
+            encode_float(*f, out)?;
+        }
+        JsonValue::String(s) => {
+            // byte_size bound (reference jcs.ex:58). A Rust `String` is valid
+            // UTF-8 by construction, so the reference's String.valid? check is
+            // structurally guaranteed here.
+            if s.len() as u64 > bounds.string_bytes() {
+                return Err(Invalid);
+            }
+            encode_string(s, out);
+        }
         JsonValue::Array(items) => {
             if depth > bounds.depth() {
+                return Err(Invalid);
+            }
+            // item-count bound (reference jcs.ex:65 length_bounded?).
+            if items.len() as u64 > bounds.array_items() {
                 return Err(Invalid);
             }
             out.push(b'[');
@@ -113,10 +146,24 @@ fn encode_value(
             if depth > bounds.depth() {
                 return Err(Invalid);
             }
+            // member-count bound (reference jcs.ex:77).
+            if members.len() as u64 > bounds.object_members() {
+                return Err(Invalid);
+            }
+            // Per-member key-width bound (reference jcs.ex:83) AND duplicate-key
+            // rejection (reference jcs.ex:92): a hand-built Object can carry
+            // duplicate names (the Vec carrier allows it); the reference rejects
+            // any object whose member-name set is smaller than its length.
+            let mut seen = std::collections::HashSet::with_capacity(members.len());
+            for (k, _) in members {
+                if k.len() as u64 > bounds.key_bytes() || !seen.insert(k.as_str()) {
+                    return Err(Invalid);
+                }
+            }
             // RFC 8785 §3.2.3: sort members by unsigned UTF-16 code-unit
-            // comparison of names. Members are duplicate-free by construction
-            // (the decoder rejects duplicates at any depth), so the sort has no
-            // ties and stability is irrelevant — `sort_unstable_by` is correct.
+            // comparison of names. The duplicate check above proves the names
+            // are distinct, so the sort has no ties and stability is irrelevant
+            // — `sort_unstable_by` is correct.
             let mut order: Vec<usize> = (0..members.len()).collect();
             order.sort_unstable_by(|&a, &b| utf16_compare(&members[a].0, &members[b].0));
             out.push(b'{');
@@ -339,17 +386,18 @@ mod tests {
     }
 
     #[test]
-    fn float_1e20_serializes_fixed() {
-        // e = 20 -> still fixed (the upper threshold boundary on the fixed side).
-        let out = enc(&f64_(1e20));
-        assert_eq!(out, b"100000000000000000000");
-    }
-
-    #[test]
-    fn float_1e21_serializes_scientific_with_mandatory_sign() {
-        // e = 21 -> scientific, mandatory '+' exponent sign.
-        let out = enc(&f64_(1e21));
-        assert_eq!(out, b"1e+21");
+    fn float_over_magnitude_is_rejected_at_encode() {
+        // 1e20 and 1e21 exceed the float magnitude bound (±2^53−1 ≈ 9.0e15), so
+        // jcs_encode rejects them — the magnitude half of the (d)-class
+        // per-node closure (reference jcs.ex:49-50). NOTE: these values were
+        // previously used to exercise ryu-js's e≥21 scientific threshold, but
+        // that threshold is UNREACHABLE from within-magnitude floats (the
+        // largest representable float has decimal exponent ≈ 15.95 — see
+        // docs/design/conformance-contract.md), so the decoder cannot produce
+        // them and the corpus pins no case for it. The lower (e<−6) threshold
+        // stays pinned by `float_1e_neg7_serializes_scientific`.
+        assert_eq!(jcs_encode(&f64_(1e20), &max()), Err(Invalid));
+        assert_eq!(jcs_encode(&f64_(1e21), &max()), Err(Invalid));
     }
 
     #[test]
@@ -456,11 +504,19 @@ mod tests {
         assert_eq!(enc(&JsonValue::Int(42)), b"42");
         assert_eq!(enc(&JsonValue::Int(-1)), b"-1");
         assert_eq!(enc(&JsonValue::Int(0)), b"0");
-        // i64::MIN formats without panic and without an exponent.
+        // The exact magnitude bound (±2^53−1 = 9007199254740991) encodes.
         assert_eq!(
-            enc(&JsonValue::Int(i64::MIN)),
-            i64::MIN.to_string().as_bytes()
+            enc(&JsonValue::Int(9_007_199_254_740_991)),
+            b"9007199254740991"
         );
+        assert_eq!(
+            enc(&JsonValue::Int(-9_007_199_254_740_991)),
+            b"-9007199254740991"
+        );
+        // i64::MIN is far over the magnitude bound, so jcs_encode rejects it
+        // (the encode_int formatter itself is panic-free for all i64, but it is
+        // only reached for in-magnitude values).
+        assert_eq!(jcs_encode(&JsonValue::Int(i64::MIN), &max()), Err(Invalid));
     }
 
     #[test]
