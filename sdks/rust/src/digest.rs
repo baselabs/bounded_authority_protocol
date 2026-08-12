@@ -24,13 +24,9 @@
 //! internal mechanic behind the v1 façade; this module is `pub(crate)` and
 //! [`request_digest`] is re-exported through the façade at Task 12.
 
-// `request_digest` is `pub(crate)` but, until the v1 façade wires it (Task
-// 10–12), nothing in the non-test crate calls it. `pub(crate)` does NOT suppress
-// the dead-code lint the way `pub` does (the compiler can see the whole crate
-// and knows nothing calls it), so the module-level allow keeps the lint clean.
-// Remove this once the façade makes the call chain reachable.
-#![allow(dead_code)]
-
+// `request_digest` is `pub(crate)` and is now wired by v1::proof_signing_input
+// (Façade A); `typed` / `tag1` / `tag2` / `validate_bounds` are all reachable
+// through that call chain. check_envelope (T12) will add a second caller.
 use crate::base64url::base64url_encode;
 use crate::bounds::Bounds;
 use crate::error::{Invalid, Result};

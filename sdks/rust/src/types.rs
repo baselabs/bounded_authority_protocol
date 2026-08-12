@@ -620,6 +620,105 @@ pub struct AnchoredExportEncoded {
     pub digest: [u8; 32],
 }
 
+// ============================================================================
+// Signing-input producers (Façade A — Task 10)
+// ============================================================================
+
+/// The deterministic JCS producer result: the two canonical base64url segments
+/// plus the exact two-segment RFC 7515 signing input.
+///
+/// `REQ1-SIGNING-exact-input`: the message that was signed is
+/// `ASCII(base64url(protected) || "." || base64url(payload))` — no bytes precede
+/// or follow. [`crate::compact::assemble_compact`] appends the `.` + signature
+/// segment separately. The corpus pins all three byte-exact
+/// (`REQ1-SIGNING-deterministic-produce`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProducedSigningInput {
+    /// `base64url(JCS(protected_header))` — canonical ASCII.
+    pub protected_segment: Vec<u8>,
+    /// `base64url(JCS(payload))` — canonical ASCII.
+    pub payload_segment: Vec<u8>,
+    /// `protected_segment ++ b"." ++ payload_segment` — the exact signed
+    /// message (two-segment RFC 7515 signing input).
+    pub message: Vec<u8>,
+}
+
+/// One operation of a grant the producer frames into a grant payload.
+///
+/// An operation is exactly `{name: string, selectors: selector_array}`
+/// (`docs/protocol-v1.md` § Claims). `selectors` is stored as the tagged
+/// [`JsonValue`] selector objects (each `{kind, ...}`) the corpus supplies;
+/// the producer emits them verbatim inside the payload's `operations` array.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GrantOperation {
+    /// The operation name (1–128 printable ASCII bytes, unique within the
+    /// grant).
+    pub name: String,
+    /// The ordered selector array (1–64 selector objects).
+    pub selectors: Vec<JsonValue>,
+}
+
+/// The structured grant fields the grant producer frames into a signing input.
+///
+/// Sourced from `signing-input/grant.json` `input`. Field names map to the
+/// grant claim names: `issuer`→`iss`, `grant_id`→`jti`, `key_id`→header `kid`,
+/// `holder_thumbprint`→`cnf.jkt`, `expires_at`→`exp`, `issued_at`→`iat`,
+/// `not_before`→`nbf`, `audiences`→`aud`, `operations`→`operations`.
+/// `holder_thumbprint` is the raw 32-byte SHA-256 (the producer base64url-
+/// encodes it for the `jkt` string).
+#[derive(Debug, Clone, PartialEq)]
+pub struct GrantInput {
+    /// Expected `iss` claim.
+    pub issuer: String,
+    /// Expected `jti` claim (grant identifier).
+    pub grant_id: String,
+    /// The protected-header `kid`.
+    pub key_id: String,
+    /// Raw 32-byte holder thumbprint (`cnf.jkt` source).
+    pub holder_thumbprint: [u8; 32],
+    /// Grant `iat` (integral NumericDate).
+    pub issued_at: i64,
+    /// Grant `nbf` (integral NumericDate).
+    pub not_before: i64,
+    /// Grant `exp` (integral NumericDate).
+    pub expires_at: i64,
+    /// The `aud` array (always emitted as an array; non-empty, ≤64, unique).
+    pub audiences: Vec<String>,
+    /// The `operations` array (non-empty, ≤64).
+    pub operations: Vec<GrantOperation>,
+}
+
+/// The structured proof fields the proof producer frames into a signing input.
+///
+/// Sourced from `signing-input/proof.json` `input`. The producer derives:
+/// `ath = base64url(SHA-256(grant_compact ASCII))` (`REQ1-CLAIM-ath`),
+/// `ba_req = request_digest(operation, cast_arguments, bounds)`,
+/// `htu = uri_normalize(target_uri, bounds)`, and the header `jwk` from
+/// `holder_public_key`. `cast_arguments` is the tagged [`JsonValue`] the
+/// request-digest projection consumes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProofInput {
+    /// Expected `jti` claim (proof identifier).
+    pub proof_id: String,
+    /// Expected `htm` claim (case-sensitive RFC 9110 method token).
+    pub method: String,
+    /// The target URI; the producer normalizes it into the `htu` claim.
+    pub target_uri: String,
+    /// Expected `ba_inv` claim (lowercase RFC 4122 invocation UUID).
+    pub invocation_id: String,
+    /// Expected `ba_op` claim (operation name).
+    pub operation: String,
+    /// Tagged JSON cast arguments — the `ba_req` digest preimage (NOT emitted
+    /// in the payload; only its digest is).
+    pub cast_arguments: JsonValue,
+    /// The received grant compact bytes — the `ath` hash preimage.
+    pub grant_compact: Vec<u8>,
+    /// Raw 32-byte holder Ed25519 public key (the header `jwk.x` source).
+    pub holder_public_key: [u8; 32],
+    /// Proof `iat` (integral NumericDate).
+    pub issued_at: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -999,5 +1098,51 @@ mod tests {
         let _ = expected_export.clone();
         let _ = expected_verify.clone();
         let _ = encoded.clone();
+    }
+
+    #[test]
+    fn produced_signing_input_and_producer_inputs_construct() {
+        let produced = ProducedSigningInput {
+            protected_segment: b"prot".to_vec(),
+            payload_segment: b"pay".to_vec(),
+            message: b"prot.pay".to_vec(),
+        };
+        assert_eq!(&produced.message, b"prot.pay");
+        let _ = produced.clone();
+
+        let grant_op = GrantOperation {
+            name: "read".to_string(),
+            selectors: vec![JsonValue::Object(vec![(
+                "kind".to_string(),
+                JsonValue::String("all".to_string()),
+            )])],
+        };
+        let grant_in = GrantInput {
+            issuer: "https://issuer.example.test".to_string(),
+            grant_id: "urn:example:grant:1".to_string(),
+            key_id: "issuer".to_string(),
+            holder_thumbprint: zero32(),
+            issued_at: 1000,
+            not_before: 1000,
+            expires_at: 2000,
+            audiences: vec!["https://resource.example.test".to_string()],
+            operations: vec![grant_op.clone()],
+        };
+        let _ = grant_in.clone();
+        assert_eq!(grant_in.operations.len(), 1);
+
+        let proof_in = ProofInput {
+            proof_id: "urn:example:proof:1".to_string(),
+            method: "POST".to_string(),
+            target_uri: "https://resource.example.test/invoke".to_string(),
+            invocation_id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
+            operation: "read".to_string(),
+            cast_arguments: JsonValue::Null,
+            grant_compact: b"g".to_vec(),
+            holder_public_key: zero32(),
+            issued_at: 1100,
+        };
+        let _ = proof_in.clone();
+        assert_eq!(proof_in.method, "POST");
     }
 }
