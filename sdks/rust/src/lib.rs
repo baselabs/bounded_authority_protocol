@@ -33,23 +33,22 @@ pub mod v1;
 // can call them; they are intentionally NOT re-exported at the crate root and
 // do not widen the 0.1.0 public surface. `assemble_compact` is `pub fn` so the
 // Task 10 façade can `pub use` re-export it, but the module itself stays
-// internal. `compact` and `digest` are now wired by the Façade A call chain
-// (locator/decode/assemble + proof_signing_input respectively); `ed25519` and
-// `selector` remain unwired until T12, so only those two retain the dead-code
-// allow.
+// internal. All four are now wired by the v1 façade call chain
+// (compact/digest by Façade A; ed25519/selector by Façade C — Task 12 — so the
+// dead-code allows on those two modules are removed in this landing).
 pub(crate) mod compact;
 pub(crate) mod digest;
 pub(crate) mod ed25519;
 pub(crate) mod selector;
 
-// Façade A re-exports (Task 10): the public v1 entry points reachable at the
-// crate root. `assemble_compact` is re-exported from the `compact` module (the
-// composer is the contract; the module stays internal).
+// Façade A/B/C re-exports (Tasks 10–12): the public v1 entry points reachable
+// at the crate root. `assemble_compact` is re-exported from the `compact`
+// module (the composer is the contract; the module stays internal).
 pub use compact::assemble_compact;
 pub use v1::{
-    boundary_anchor_signing_input, check_chain, decode_grant, decode_proof,
+    boundary_anchor_signing_input, check_chain, check_envelope, decode_grant, decode_proof,
     encode_consumption_entry, grant_signing_input, key_transition_signing_input,
-    proof_signing_input, untrusted_key_locator,
+    proof_signing_input, untrusted_key_locator, verify_grant,
 };
 
 pub use base64url::{base64url_decode, base64url_encode};

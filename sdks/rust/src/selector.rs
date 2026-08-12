@@ -28,12 +28,10 @@
 //! Derived first-hand from `docs/protocol-v1.md` § Selector algebra — NOT from
 //! any sibling-SDK or Elixir source (ADR 0014 D5).
 
-// `evaluate` / `semantic_identity` are `pub(crate)` but, until the v1 façade
-// wires them (Task 10–12), nothing in the non-test crate calls them.
-// `pub(crate)` does NOT suppress dead-code the way `pub` does, so the
-// module-level allow keeps the lint clean. Remove once the façade makes the
-// call chain reachable. Mirrors the `digest` module's precedent.
-#![allow(dead_code)]
+// `evaluate` / `semantic_identity` are `pub(crate)` and are wired by the v1
+// façade: `evaluate` is called by `check_envelope` (Task 12) for every selector
+// in the matched grant operation, and `semantic_identity` is reachable through
+// that call chain. The crate-level `#![forbid(unsafe_code)]` is unaffected.
 
 use crate::bounds::Bounds;
 use crate::error::{Invalid, Result};
@@ -62,11 +60,20 @@ pub(crate) fn evaluate(
     let kind = member_str(members, "kind")?;
     match kind {
         "all" => {
-            // Exactly {kind:"all"}: no extra members.
-            if members.len() != 1 {
-                return Err(Invalid);
-            }
-            // Matches any JSON root.
+            // `all` matches any JSON root. The conformance corpus
+            // (`check-envelope-valid-selector-all-with-extra-members`, jti
+            // `urn:example:grant:fat-all`) establishes that an `all` selector
+            // carrying inert extra members (e.g. a stray `path`/`value`) still
+            // matches. The canonical closed form is `{kind:"all"}`
+            // (REQ1-SELECTOR-closed-set; selector.schema.json), but extra members
+            // on `all` are not authorization-relevant — `all` returns true
+            // regardless of any other members — so they are tolerated rather
+            // than rejected. (Schemas are explicitly NOT byte-level oracles —
+            // protocol-v1.md line 126 — the corpus is.) Only the `kind` itself
+            // is examined here; `equals`/`one_of` below remain strict about
+            // their exact member sets, which is security-relevant (an extra
+            // `value`/`values` would be ambiguous) and uncontradicted by the
+            // corpus.
             Ok(true)
         }
         "equals" => eval_equals(members, cast_arguments, bounds),
@@ -408,9 +415,18 @@ mod tests {
     }
 
     #[test]
-    fn all_with_extra_member_is_invalid() {
-        let selector = j(br#"{"kind":"all","extra":1}"#);
-        assert_eq!(evaluate(&selector, &JsonValue::Null, &max()), Err(Invalid));
+    fn all_tolerates_inert_extra_members() {
+        // Corpus-driven (`check-envelope-valid-selector-all-with-extra-members`):
+        // an `all` selector with inert extra members still matches any root.
+        // `all` returns true regardless of the extra members, so tolerating them
+        // is not authorization-relevant. Both a bare and a "fat" `all` match.
+        let bare = j(br#"{"kind":"all"}"#);
+        let fat = j(br#"{"kind":"all","path":["record"],"value":"zz"}"#);
+        assert_eq!(evaluate(&bare, &JsonValue::Null, &max()), Ok(true));
+        assert_eq!(
+            evaluate(&fat, &j(br#"{"limit":10,"record":{"id":"rec-1"}}"#), &max()),
+            Ok(true)
+        );
     }
 
     #[test]
