@@ -29,8 +29,8 @@ compatibility.
 | BAP-12 | **IANA registration templates** — Registration templates for the `ba_*` JWT claims and `ba+*` media-type values, ready to file at first external submission, slug:bap-12 | Templates conform to the target registries' submission formats; claims/values match [registries.md](design/registries.md) exactly, including reserved entries marked as such; filing itself is coordinated with the BAP-08 submission | BAP-08 | [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) |
 | BAP-13 | **Published governance** — Change-control, errata, deprecation, and security-release policy published as normative project documents, slug:bap-13 | Change classes, comment-window and change-control-group triggers, the errata verdict-flip prohibition, and the deprecation windows are published verbatim from the charter; SECURITY.md cross-references them; the errata registry is live | BAP-05 | [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) and the [standards track charter](design/standards-track.md) |
 | BAP-14 | **Delegation-with-attenuation contract design** — The chained attenuated-grant design (parent-hash binding via reserved `ba_dlg`, attenuation-only subset rules over the existing conjunctive selector algebra, no caveat DSL) carried to a full successor-contract specification, slug:bap-14 | Complete claim schema, chain-verification algorithm with depth bounds, and subset-decision rules specified; attenuation proven decidable against the existing selector algebra; explicitly no change to the current contract-major's bytes or verdicts; its ADR supersedes nothing and activates nothing | BAP-10 | [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) and the [standards track charter](design/standards-track.md) |
-| BAP-15 | **Rust verifier SDK** — A typed Rust verifier SDK reimplementing the frozen v1 profile from spec + corpus alone (no code-level derivation from the Elixir reference), authored under `sdks/rust/` and graduating to a per-SDK repository on first publication ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)), slug:bap-15-rust-sdk | Passes all 279 conformance vectors from a vendored corpus snapshot with startup SHA-256 assertion; per-language permissiveness mutation-gate (duplicate-reject, null-prototype-equivalent, raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction) each proven red-capable; purity lint (no I/O/clock/RNG/network in the library path); dependency-license gate; a deployment guide covering AWS Lambda (`provided.al2023`) and PostgreSQL `plrust` binding; NOT in the Hex `files:` list | BAP-05, BAP-09 | [ADR 0014](adr/0014-cross-language-verifier-sdks.md) and [ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md) |
-| BAP-16 | **Go verifier SDK** — A typed Go verifier SDK reimplementing the frozen v1 profile from spec + corpus alone (stdlib `crypto/ed25519` + `crypto/sha256`, zero crypto dependencies), authored under `sdks/go/` and graduating to a per-SDK repository on first publication ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)), slug:bap-16-go-sdk | Passes all 279 conformance vectors from a vendored corpus snapshot with startup SHA-256 assertion; per-language permissiveness mutation-gate (duplicate-reject, raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction) each proven red-capable; purity vet (no I/O/clock/RNG/network in the library path); dependency-license gate; NOT in the Hex `files:` list | BAP-05, BAP-09 | [ADR 0014](adr/0014-cross-language-verifier-sdks.md) and [ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md) |
+| BAP-15 | **Rust verifier SDK** — A typed Rust verifier SDK reimplementing the frozen v1 profile from spec + corpus alone (no code-level derivation from the Elixir reference), authored under `sdks/rust/` and graduating to a per-SDK repository on first publication ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)), slug:bap-15-rust-sdk | Passes all 280 conformance vectors from a vendored corpus snapshot with startup SHA-256 assertion; per-language permissiveness mutation-gate (duplicate-reject, null-prototype-equivalent, raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction) each proven red-capable; purity lint (no I/O/clock/RNG/network in the library path); dependency-license gate; a deployment guide covering AWS Lambda (`provided.al2023`) and PostgreSQL `plrust` binding; NOT in the Hex `files:` list | BAP-05, BAP-09 | [ADR 0014](adr/0014-cross-language-verifier-sdks.md) and [ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md) |
+| BAP-16 | **Go verifier SDK** — A typed Go verifier SDK reimplementing the frozen v1 profile from spec + corpus alone (stdlib `crypto/ed25519` + `crypto/sha256`, zero crypto dependencies), authored under `sdks/go/` and graduating to a per-SDK repository on first publication ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)), slug:bap-16-go-sdk | Passes all 280 conformance vectors from a vendored corpus snapshot with startup SHA-256 assertion; per-language permissiveness mutation-gate (duplicate-reject, raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction) each proven red-capable; purity vet (no I/O/clock/RNG/network in the library path); dependency-license gate; NOT in the Hex `files:` list | BAP-05, BAP-09 | [ADR 0014](adr/0014-cross-language-verifier-sdks.md) and [ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md) |
 
 ## BAP-00 closeout evidence
 
@@ -188,7 +188,7 @@ compatibility.
   and GitHub-hosted runners.
 - Implementation head `53c4590` (followed by supported-compiler compatibility corrections and an
   extended runner-hardening arc through the package-bearing head) delivers the portable v1
-  conformance corpus (279 cases across 28 surfaces with a total applicability matrix), the
+  conformance corpus (280 cases across 28 surfaces with a total applicability matrix), the
   deterministic verifier CLI (escript, `--corpus` required, exits 0/1/2, exact-path purity
   carve-out), the independent Node second-implementation runner (node:* only — the corpus is
   normative), a three-partition public-key census (hard two-way), stream_data property and
@@ -201,13 +201,13 @@ compatibility.
   companions were closed, and every independent-runner permissiveness residual against the official
   decoder was mirrored (StringOrURI structure, optional proof nonce, payload-field decode,
   selector-value magnitude, JSON bounds, request-digest typed projection). The committed corpus
-  count (279) is reconciled in `README.md`, this roadmap, and
+  count (280) is reconciled in `README.md`, this roadmap, and
   [`docs/design/conformance-contract.md`](design/conformance-contract.md).
 - Local `mix quality` passes with 295 tests and 13 properties (0 failures), plus format,
   warnings-as-errors compilation, exact architecture accounting, Credo, Dialyzer, documentation,
   advisory, retired-package, license, CycloneDX, exact archive, fresh unpacked-consumer,
   chain-archive mutation (47/47), conformance mutation (55/55), and conformance-verify gates. The
-  conformance runner reports `agreed=279, agreement=true, disagreed=0`. The package retains zero
+  conformance runner reports `agreed=280, agreement=true, disagreed=0`. The package retains zero
   production dependencies, no application callback, and no supervision tree.
 
 ## BAP-10 closeout evidence
@@ -452,9 +452,9 @@ compatibility.
   dependency `cryptography`). Both are typed reimplementations of the frozen v1
   profile authored from the spec + corpus alone with no code-level derivation from
   the Elixir reference ([ADR 0014](adr/0014-cross-language-verifier-sdks.md)).
-- Each SDK passes all **259** published conformance vectors, recomputed from
+- Each SDK passes all **280** published conformance vectors, recomputed from
   scratch (not cached verdicts), and asserts the corpus `index.json` SHA-256
-  (`c3b0bcf7665c217ea45843a9c49c2769a61c21c4998d8b85249cf6cb757084dd`) at startup
+  (`f3054cbb37c4d40b148d98a118b3ae9ac862e00b0076f7f25c0f6c7b2ff675f2`) at startup
   — a mismatched vendored corpus fails closed rather than drifting silently. The
   two-boundary key census is asserted per-runner (discovery == verify-import ==
   index `public_key_fingerprints`, 8 keys both directions).
@@ -504,7 +504,7 @@ compatibility.
   decode; temporal integer/strict-positive guards; null `trustedIssuer`
   fail-closed; nested-export bounds threading; zero-key fail-closed; immutable
   `ChainFacts.previousHash`; Python bool-is-not-int). All 25 were fixed in both
-  SDKs and re-verified against the reference oracle (`agreed=259, disagreed=0`);
+  SDKs and re-verified against the reference oracle (`agreed=280, disagreed=0`);
   2 candidate findings were honestly **falsified by running the reference** (the
   boundary-anchor attacks are already rejected; `kind:"all"` accepts extra
   members, matching the reference). The GLM peer's documented JCS-DEL note is the
@@ -514,8 +514,8 @@ compatibility.
 
 BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, and BAP-14 are complete. BAP-09 shipped the cross-language verifier SDKs
 (TypeScript `@bounded-authority/verifier` + Python `bounded-authority-verifier` under `sdks/`, each
-passing all 279 conformance vectors + per-language permissiveness mutation-gates; ADR 0014). BAP-05 shipped the portable v1 conformance
-corpus (279 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI
+passing all 280 conformance vectors + per-language permissiveness mutation-gates; ADR 0014). BAP-05 shipped the portable v1 conformance
+corpus (280 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI
 (escript, `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent
 Node second-implementation runner (node:* only — the corpus is normative), a three-partition
 public-key census (hard two-way), stream_data property + deterministic-PRNG fuzz gates, and a
@@ -569,16 +569,18 @@ formatting (JCS §3.2.2.3, zero float-valued corpus cases), DEL (`U+007F`) raw-e
 `\u007f`, and the byte-level cross-vendor findings (~25 falsifiers carried only in
 `sdks/typescript/test/permissiveness.ts`). The no-key gap-closing slice landed: `protocol-v1.md`
 now transcribes the JCS string/number serialization rules (float thresholds, `-0`→`0`, raw DEL per
-RFC 8785 §3.2.2.2), the corpus grows **259 → 279 cases** pinning both float-threshold sides, the
+RFC 8785 §3.2.2.2), the corpus grows **259 → 280 cases** pinning both float-threshold sides, the
 astral-codepoint raw emit, malformed UTF-8/IPv6/float-magnitude rejects, the key-locator
-protected-only decode, the consumption-chain/anchor genesis bindings, and the anchored-export
-empty-chunk reject, plus the corrected `n_a` reasons — and the independent Node runner was
+protected-only decode, the consumption-chain/anchor genesis bindings, the anchored-export
+empty-chunk reject, and the anchored-export start-anchor sequence binding (a signed start anchor
+with a bogus sequence), plus the corrected `n_a` reasons — and the independent Node runner was
 strengthened to mirror the reference's IPv6-structure (node:net `isIP`), genesis-binding,
-`check_chain` positive-`first_sequence` + canonical-rehash, and chunk-emptiness invariants those
-cases exposed. Every new invalid case is a one-defect skip-would-accept construction (proven by
-defect-injecting its target check in the runner); every new case is dual-verified
-(`agreed=279 disagreed=0`). The signed anchored-export cases (`#2` non-monotone chronology,
-`#2` fingerprint cycle, `#3` one-key valid — three seeded Ed25519 keys) **and the
-`encode_anchored_export` start-anchor-binding case** (which needs new signed anchors with
-isolate-able sequences) remain as a tight follow-up slice before BAP-15's acceptance is fully met
-under the ADR 0014 "no code-level derivation from the Elixir reference" bar.
+`check_chain` positive-`first_sequence` + canonical-rehash, anchored-export bindings, and
+chunk-emptiness invariants those cases exposed. Every new invalid case is a one-defect
+skip-would-accept construction (proven by defect-injecting its target check in the runner); every
+new case is dual-verified (`agreed=280 disagreed=0`). The encode_anchored_export binding case's
+authoring key is seed-generated and stays out of the import-boundary census (encode frames
+signatures, never verifies), so `public_key_fingerprints` remains 8. The signed anchored-export
+cases (`#2` non-monotone chronology, `#2` fingerprint cycle, `#3` one-key valid — three seeded
+Ed25519 keys, fingerprints 8→11) remain as a tight follow-up slice before BAP-15's acceptance is
+fully met under the ADR 0014 "no code-level derivation from the Elixir reference" bar.

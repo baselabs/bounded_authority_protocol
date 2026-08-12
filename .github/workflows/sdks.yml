@@ -80,7 +80,7 @@ jobs:
         run: pnpm test && pnpm test:permissiveness
         working-directory: sdks/typescript
 
-      - name: TS — conformance (279 + census)
+      - name: TS — conformance (280 + census)
         run: pnpm conformance
         working-directory: sdks/typescript
 
@@ -116,6 +116,6 @@ jobs:
         run: python -m pytest tests/ -q
         working-directory: sdks/python
 
-      - name: Python — conformance (279 + census)
+      - name: Python — conformance (280 + census)
         run: python tests/conformance/run.py
         working-directory: sdks/python

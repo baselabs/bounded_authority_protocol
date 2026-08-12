@@ -23,7 +23,7 @@ derivation-hygiene decisions.
 
 ## Conformance
 
-Each SDK passes every one of the 279 published conformance vectors (valid + invalid), recomputing each
+Each SDK passes every one of the 280 published conformance vectors (valid + invalid), recomputing each
 verdict from scratch using only its language's primitives. The conformance is independently verifiable:
 
 ```bash

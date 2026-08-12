@@ -1006,7 +1006,7 @@ def test_check_envelope_honors_caller_bounds():
 
 def test_expected_structs_bounds_absent_defaults_to_max():
     """#11 control: bounds absent on every Expected* MUST default to MAX (the conformance runner
-    constructs Expected* without bounds; a missing default would break 279/279). The 13-byte kid grant
+    constructs Expected* without bounds; a missing default would break 280/280). The 13-byte kid grant
     verifies at MAX via every entry point that takes an Expected*."""
     reset_census()
     g = _signed_grant()
