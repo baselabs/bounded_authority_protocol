@@ -17,3 +17,16 @@ ryu-js = "1.0"
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# The BAP-15 T14 conformance runner: the acceptance gate that vendors the 283-
+# case corpus, dispatches all 28 surfaces through the public façade, SHA-binds
+# the vendored index.json, and runs the two-boundary key census. It is an
+# integration test living outside `src/` (so it can exercise ONLY the public
+# crate surface), declared as an explicit `[[test]]` target so
+# `cargo test --test conformance` runs it. serde/serde_json (dev-deps) read the
+# corpus JSON into `serde_json::Value`; the runner constructs the `src/` input
+# structs field-by-field (the F3 construction seam) — there is NO serde derive
+# on any `src/` struct.
+[[test]]
+name = "conformance"
+path = "conformance/run.rs"

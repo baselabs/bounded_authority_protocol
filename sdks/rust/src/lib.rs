@@ -29,13 +29,20 @@ pub mod v1;
 // `base64url`/`bounds`/`json` as public primitives, and notes that request-
 // digest, selector, and compact-JWS composition mechanics "remain internal
 // implementation behind the supported façade; their modules are not additional
-// stable façade contracts"). They are `pub(crate)` so the façade (Task 10–13)
-// can call them; they are intentionally NOT re-exported at the crate root and
-// do not widen the 0.1.0 public surface. `assemble_compact` is `pub fn` so the
-// Task 10 façade can `pub use` re-export it, but the module itself stays
-// internal. All four are now wired by the v1 façade call chain
-// (compact/digest by Façade A; ed25519/selector by Façade C — Task 12 — so the
-// dead-code allows on those two modules are removed in this landing).
+// stable façade contracts"). The MODULES are `pub(crate)` so the façade can
+// call them; they are intentionally NOT re-exported as module contracts and do
+// not widen the 0.1.0 public module surface. `assemble_compact` is `pub fn` so
+// the Task 10 façade can `pub use` re-export it, but the module itself stays
+// internal. All four are wired by the v1 façade call chain.
+//
+// One distinction the line-329 note draws: request-digest, selector, and
+// compact-JWS MODULES are not additional stable façade contracts, BUT
+// `request_digest/3` IS named in the 17-function public verification contract
+// (protocol-v1.md line 304). So the `digest` MODULE stays `pub(crate)` while
+// its `request_digest` FUNCTION is re-exported at the crate root as a public
+// façade entry point (the conformance runner — Task 14 — dispatches the 9-case
+// `request_digest` corpus through this public re-export). `selector` and
+// `compact` have no equivalently-named façade function and stay fully internal.
 pub(crate) mod compact;
 pub(crate) mod digest;
 pub(crate) mod ed25519;
@@ -44,7 +51,11 @@ pub(crate) mod selector;
 // Façade A/B/C/D re-exports (Tasks 10–13): the public v1 entry points reachable
 // at the crate root. `assemble_compact` is re-exported from the `compact`
 // module (the composer is the contract; the module stays internal).
+// `request_digest` is re-exported from the internal `digest` MODULE (the
+// function is public — protocol-v1.md line 304 — even though the module is
+// not a stable façade contract — line 329).
 pub use compact::assemble_compact;
+pub use digest::request_digest;
 pub use v1::{
     boundary_anchor_signing_input, check_chain, check_envelope, decode_grant, decode_proof,
     encode_anchored_export, encode_consumption_entry, grant_signing_input,
