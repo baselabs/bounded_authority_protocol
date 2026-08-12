@@ -220,6 +220,16 @@ pub fn verify_grant(
     issuer: &TrustedIssuer,
     expected: &ExpectedGrant,
 ) -> Result<GrantFacts> {
+    // REQ1-VERIFY-time-bounds: the caller's skew MUST NOT exceed the profile
+    // ceiling (reference runtime.ex:523-524 validates clock_skew <= bounds.
+    // clock_skew). A value above the ceiling silently widens the time window
+    // (future iat/nbf, expired exp accepted); reject it before any time
+    // arithmetic. The `bounds.clock_skew()` ceiling itself is a tightening-
+    // only maximum (60) set via `Bounds::new`.
+    if expected.skew > expected.bounds.clock_skew() {
+        return Err(Invalid);
+    }
+
     let g = decode_grant_parts(compact, &expected.bounds)?;
 
     // REQ1-VERIFY-grant-exact: exact key ID, issuer, audience.
@@ -307,6 +317,14 @@ pub fn check_envelope(
     expected: &ExpectedRequest,
 ) -> Result<EnvelopeFacts> {
     let bounds = &expected.bounds;
+
+    // REQ1-VERIFY-time-bounds: proof_max_age MUST NOT exceed the profile ceiling
+    // (reference runtime.ex:550-551 validates proof_max_age <= bounds.
+    // proof_max_age). The skew ceiling is enforced by the verify_grant call
+    // below (which carries expected.skew through ExpectedGrant).
+    if expected.proof_max_age > bounds.proof_max_age() {
+        return Err(Invalid);
+    }
 
     // Re-verify the raw grant: construct an ExpectedGrant from the request's
     // issuer/audience/timing/bounds and verify_grant the received compact.
@@ -1268,8 +1286,15 @@ pub fn encode_anchored_export(
     }
 
     // Start-anchor binding: start_anchor.sequence == first_sequence - 1.
+    // checked_sub: a caller-supplied first_sequence of i64::MIN would underflow
+    // a bare `- 1` (debug panic / release wrap); fail closed to Invalid instead.
     let start_parts = decode_anchor_parts(&input.start_anchor, &bounds)?;
-    if start_parts.payload.sequence != expected.chain.first_sequence - 1 {
+    let expected_start_seq = expected
+        .chain
+        .first_sequence
+        .checked_sub(1)
+        .ok_or(Invalid)?;
+    if start_parts.payload.sequence != expected_start_seq {
         return Err(Invalid);
     }
 
@@ -1477,7 +1502,12 @@ pub fn verify_anchored_export(
     if start_facts.chain_hash != expected.chain.previous_hash {
         return Err(Invalid);
     }
-    if start_facts.sequence != expected.chain.first_sequence - 1 {
+    let expected_start_seq = expected
+        .chain
+        .first_sequence
+        .checked_sub(1)
+        .ok_or(Invalid)?;
+    if start_facts.sequence != expected_start_seq {
         return Err(Invalid);
     }
 
@@ -3849,6 +3879,36 @@ mod tests {
             bounds: max(),
         };
         (compact, issuer, expected)
+    }
+
+    /// REQ1-VERIFY-time-bounds ceiling: a caller-supplied skew above the profile
+    /// maximum MUST be rejected before the time arithmetic, else the window
+    /// silently widens (future iat/nbf, expired exp accepted). Reference
+    /// runtime.ex:523-524 enforces clock_skew <= bounds.clock_skew. Removing the
+    /// ceiling check makes this test go RED (the otherwise-valid grant accepts).
+    #[test]
+    fn red_grant_skew_over_ceiling_rejected() {
+        let (compact, issuer, mut expected) = valid_grant_verify_fixture();
+        expected.skew = expected.bounds.clock_skew() + 1; // 61 > 60
+        assert_eq!(
+            verify_grant(&compact, &issuer, &expected),
+            Err(Invalid),
+            "skew above the bounds.clock_skew ceiling must be rejected"
+        );
+    }
+
+    /// REQ1-VERIFY-time-bounds ceiling for the proof window: proof_max_age above
+    /// the profile maximum MUST be rejected, else stale proofs are admitted.
+    /// Reference runtime.ex:550-551. Removing the check makes this test go RED.
+    #[test]
+    fn red_envelope_proof_max_age_over_ceiling_rejected() {
+        let (credentials, mut expected) = valid_envelope_fixture();
+        expected.proof_max_age = expected.bounds.proof_max_age() + 1; // 301 > 300
+        assert_eq!(
+            check_envelope(&credentials, &expected),
+            Err(Invalid),
+            "proof_max_age above the bounds.proof_max_age ceiling must be rejected"
+        );
     }
 
     /// Builds the `check-envelope-valid` corpus fixture (real signed grant +

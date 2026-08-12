@@ -252,6 +252,31 @@ fn closure_6_output_over_jcs_bytes_rejected() {
     );
 }
 
+#[test]
+fn closure_6_over_magnitude_and_duplicate_members_rejected() {
+    // The scalar/members half of closure #6 (mirrors reference jcs.ex encode_value
+    // guards that the closeout cross-vendor review found the Rust encoder was
+    // missing). A hand-built integer above ±2^53−1, and a hand-built Object with
+    // a duplicate member name, are both rejected at encode — a permissive encoder
+    // would accept them. The decoded path cannot produce either (the decoder
+    // magnitude-checks and dup-rejects), so these are only reachable via a
+    // direct caller of the public `jcs_encode` primitive.
+    assert_eq!(
+        jcs_encode(&JsonValue::Int(i64::MAX), &max()),
+        Err(bounded_authority_protocol::Invalid),
+        "over-magnitude integer rejected"
+    );
+    let dup = JsonValue::Object(vec![
+        ("a".to_string(), JsonValue::Int(1)),
+        ("a".to_string(), JsonValue::Int(2)),
+    ]);
+    assert_eq!(
+        jcs_encode(&dup, &max()),
+        Err(bounded_authority_protocol::Invalid),
+        "duplicate object member rejected"
+    );
+}
+
 // =============================================================================
 // base64url pad-bits closure — REQ1-B64-canonical (corpus-blind)
 // =============================================================================

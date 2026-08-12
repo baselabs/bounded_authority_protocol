@@ -1,0 +1,5 @@
+# Rust build artifacts (regenerable). Cargo.lock IS tracked on purpose — this
+# project's CI runs `cargo --locked` so the exact resolved dependency versions
+# are under repository control (the Rust analogue of the pinned TS/Python
+# toolchains), not resolved fresh per run.
+/target
