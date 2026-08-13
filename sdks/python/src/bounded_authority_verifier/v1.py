@@ -1390,8 +1390,11 @@ def assemble_compact(input_: SigningInput, signature: bytes) -> Result[bytes]:
         seg = parse_compact(compact, b)
         payload = json_decode(seg.payload_bytes, b)
         if input_.kind == "grant":
-            _parse_grant_header(seg, b)
-            _validate_grant_payload(payload, b)
+            # Full grant re-parse (decode_grant validates iss/jti/aud/times/cnf, which the structural
+            # _validate_grant_payload does not) — mirrors reference validate_assembled_compact → parse_grant.
+            r = decode_grant(compact, b)
+            if not r.is_ok:
+                fail("assemble_compact: grant re-parse")
         elif input_.kind == "proof":
             _parse_proof_header(seg, b)
             _validate_proof_payload(payload, b)
@@ -1524,15 +1527,14 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     parts.extend(_frame(t) for t in input_.transitions)
     parts.extend(_frame(r) for r in input_.rows)
     parts.append(_frame(input_.end_anchor))
-    archive = b"".join(parts)
-    # Aggregate chunk-count bound (anchored_export_codec.ex:69 validate_chunks enforces archive_chunks
-    # DURING encode, not only archive_bytes). Frame count = prefix + header + start + transitions +
-    # rows + end. A producer must not mint an archive its own consumer rejects.
-    frame_count = 4 + len(input_.transitions) + len(input_.rows)
-    if frame_count > bounds_resolve(b, "archive_chunks"):
+    # Validate the chunk list BEFORE materializing the joined archive (mirrors reference
+    # validate_chunks on the chunk list, anchored_export_codec.ex:69 — not a concatenated binary,
+    # so an over-bound input rejects before the allocation).
+    if len(parts) > bounds_resolve(b, "archive_chunks"):
         fail("encode_anchored_export: archive_chunks")
-    if len(archive) > bounds_resolve(b, "archive_bytes"):
+    if sum(len(p) for p in parts) > bounds_resolve(b, "archive_bytes"):
         fail("encode_anchored_export: archive_bytes")
+    archive = b"".join(parts)
     return EncodedAnchoredExport(archive=archive, digest=sha256(archive))
 
 
