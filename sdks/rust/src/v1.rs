@@ -45,7 +45,8 @@ use crate::types::{
     ConsumptionEntry, Credentials, ExpectedAnchor, ExpectedAnchoredExport, ExpectedChain,
     ExpectedExport, ExpectedGrant, ExpectedKeyTransition, ExpectedRequest, GrantDecoded,
     GrantInput, HistoricalKeyChain, HistoricalPublicKey, KeyLocator, KeyTransition, NonceMode,
-    ProducedSigningInput, ProofDecoded, ProofInput, TrustedIssuer, ValidityUpperBound,
+    ProducedSigningInput, ProofDecoded, ProofInput, SigningInput, SigningKind, TrustedIssuer,
+    ValidityUpperBound,
 };
 use crate::uri::uri_normalize;
 
@@ -318,11 +319,12 @@ pub fn check_envelope(
 ) -> Result<EnvelopeFacts> {
     let bounds = &expected.bounds;
 
-    // REQ1-VERIFY-time-bounds: proof_max_age MUST NOT exceed the profile ceiling
-    // (reference runtime.ex:550-551 validates proof_max_age <= bounds.
-    // proof_max_age). The skew ceiling is enforced by the verify_grant call
-    // below (which carries expected.skew through ExpectedGrant).
-    if expected.proof_max_age > bounds.proof_max_age() {
+    // REQ1-VERIFY-time-bounds: proof_max_age MUST be positive AND MUST NOT exceed
+    // the profile ceiling (reference runtime.ex:550-551: proof_max_age > 0 and
+    // <= bounds.proof_max_age). A zero proof_max_age would admit any proof within
+    // the skew window (no max-age floor). The skew ceiling is enforced by the
+    // verify_grant call below (which carries expected.skew through ExpectedGrant).
+    if expected.proof_max_age < 1 || expected.proof_max_age > bounds.proof_max_age() {
         return Err(Invalid);
     }
 
@@ -479,6 +481,42 @@ pub fn check_envelope(
 }
 
 // ============================================================================
+// assemble_compact — public façade wrapper (compose + per-kind validation)
+// ============================================================================
+
+/// Assemble the 3-segment compact serialization from a signing input + raw
+/// signature, then validate the composed compact parses as its kind.
+///
+/// Wraps [`compact::compose_compact`] (composition + segment well-formedness)
+/// with the per-kind CONTENT validation the reference's
+/// `validate_assembled_compact` performs (runtime.ex:151 — it re-parses the
+/// composed output as a grant/proof/anchor/transition). The public contract is
+/// `/2` (no caller bounds — protocol-v1.md:299), so the per-kind parse runs
+/// against the profile maximum bounds. A caller passing segments that compose
+/// to a structurally-invalid credential — wrong segment count, non-canonical
+/// base64url, or a header/payload that does not parse as the declared kind's
+/// closed header/claim set — is rejected.
+pub fn assemble_compact(input: &SigningInput, signature: &[u8; 64]) -> Result<Vec<u8>> {
+    let compact = compact::compose_compact(input, signature)?;
+    let bounds = Bounds::maximum();
+    match input.kind {
+        SigningKind::Grant => {
+            decode_grant_parts(&compact, &bounds)?;
+        }
+        SigningKind::Proof => {
+            decode_proof_parts(&compact, &bounds)?;
+        }
+        SigningKind::ChainAnchor => {
+            decode_anchor_parts(&compact, &bounds)?;
+        }
+        SigningKind::KeyTransition => {
+            decode_transition_parts(&compact, &bounds)?;
+        }
+    }
+    Ok(compact)
+}
+
+// ============================================================================
 // grant_signing_input
 // ============================================================================
 
@@ -497,7 +535,7 @@ pub fn grant_signing_input(grant: &GrantInput, bounds: &Bounds) -> Result<Produc
     if grant.audiences.is_empty() || grant.audiences.len() as u64 > bounds.audiences() {
         return Err(Invalid);
     }
-    let mut seen_aud = std::collections::HashSet::new();
+    let mut seen_aud = std::collections::BTreeSet::new();
     for aud in &grant.audiences {
         validate_identifier(aud, bounds)?;
         if !seen_aud.insert(aud.clone()) {
@@ -507,7 +545,7 @@ pub fn grant_signing_input(grant: &GrantInput, bounds: &Bounds) -> Result<Produc
     if grant.operations.is_empty() || grant.operations.len() as u64 > bounds.operations() {
         return Err(Invalid);
     }
-    let mut seen_op = std::collections::HashSet::new();
+    let mut seen_op = std::collections::BTreeSet::new();
     for op in &grant.operations {
         validate_operation_name(&op.name, bounds)?;
         if !seen_op.insert(op.name.clone()) {
@@ -589,12 +627,14 @@ pub fn proof_signing_input(proof: &ProofInput, bounds: &Bounds) -> Result<Produc
     }
 
     // ath = base64url(SHA-256(grant_compact ASCII bytes)) — REQ1-CLAIM-ath.
-    // Bound grant_compact by compact_bytes BEFORE hashing (reference compact_jws
-    // .ex:18 scan gates SHA-256 on the byte-length ceiling), so an oversized
-    // caller-supplied grant compact cannot force unbounded hashing work.
+    // Gate SHA-256 on the FULL scan the reference runs (compact_jws.ex:16-27):
+    // total <= compact_bytes AND a well-formed 3-segment canonical compact, so
+    // an empty / non-JWS / oversized caller-supplied grant compact is rejected
+    // before any hashing work (not just length-bounded).
     if proof.grant_compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
     }
+    compact::parse_compact(&proof.grant_compact)?;
     let mut ath_hasher = Sha256::new();
     ath_hasher.update(&proof.grant_compact);
     let ath = b64url_to_string(&base64url_encode(&ath_hasher.finalize()))?;
@@ -2558,8 +2598,10 @@ fn take_string_or_uri(value: Option<&JsonValue>, bounds: &Bounds) -> Result<Stri
 }
 
 /// Validates a StringOrURI / identifier scalar: non-empty, ≤ identifier_bytes,
-/// no control/whitespace/DEL/non-ASCII; if it contains `:`, the scheme and
-/// (when `//` follows) authority port grammar are checked.
+/// no control/whitespace/DEL/non-ASCII; if it contains `:`, the scheme, the
+/// suffix's `%HH` percent-escapes, and (when `//` follows) the authority port
+/// grammar are checked (reference string_or_uri.ex:38-48 — only URI-permitted
+/// bytes and well-formed `%HH` escapes).
 fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
     if s.is_empty() || s.len() as u64 > bounds.identifier_bytes() {
         return Err(Invalid);
@@ -2575,6 +2617,7 @@ fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
             let scheme = &s[..colon];
             validate_scheme(scheme)?;
             let rest = &s[colon + 1..];
+            validate_percent_escapes(rest)?;
             if let Some(after) = rest.strip_prefix("//") {
                 let auth_end = after.find('/').unwrap_or(after.len());
                 validate_authority_port(&after[..auth_end])?;
@@ -2582,6 +2625,28 @@ fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
             Ok(())
         }
     }
+}
+
+/// Every `%` in `s` MUST be followed by two hex digits (a well-formed `%HH`
+/// percent-escape); a bare `%` or `%G` is invalid (reference string_or_uri.ex).
+fn validate_percent_escapes(s: &str) -> Result<()> {
+    let b = s.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' {
+            if i + 2 >= b.len() || !is_hex(b[i + 1]) || !is_hex(b[i + 2]) {
+                return Err(Invalid);
+            }
+            i += 3;
+        } else {
+            i += 1;
+        }
+    }
+    Ok(())
+}
+
+fn is_hex(b: u8) -> bool {
+    b.is_ascii_digit() || (0x41..=0x46).contains(&b) || (0x61..=0x66).contains(&b)
 }
 
 /// RFC 3986 scheme: `ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )`.
@@ -2627,7 +2692,7 @@ fn take_audiences(value: Option<&JsonValue>, bounds: &Bounds) -> Result<Vec<Stri
                 return Err(Invalid);
             }
             let mut audiences = Vec::with_capacity(items.len());
-            let mut seen = std::collections::HashSet::new();
+            let mut seen = std::collections::BTreeSet::new();
             for item in items {
                 let s = match item {
                     JsonValue::String(s) => s,
@@ -2699,7 +2764,7 @@ fn validate_operations(value: Option<&JsonValue>, bounds: &Bounds) -> Result<()>
     if items.is_empty() || items.len() as u64 > bounds.operations() {
         return Err(Invalid);
     }
-    let mut seen_names = std::collections::HashSet::new();
+    let mut seen_names = std::collections::BTreeSet::new();
     for op in items {
         let members = match op {
             JsonValue::Object(m) => m,
@@ -3636,6 +3701,23 @@ mod tests {
         assert_eq!(decoded.version, 1);
     }
 
+    /// assemble_compact validates the composed compact parses as its kind
+    /// (reference validate_assembled_compact, runtime.ex:151). Segments that are
+    /// canonical base64url but decode to non-grant content (here "a"."b") are
+    /// rejected, not composed into a malformed credential. RED-capable: routing
+    /// the public fn straight to compose_compact (dropping the per-kind parse)
+    /// makes this accept.
+    #[test]
+    fn assemble_compact_rejects_non_grant_content() {
+        let sig = [0xaa; 64];
+        let bad = crate::types::SigningInput {
+            kind: crate::types::SigningKind::Grant,
+            protected_segment: b"YQ".to_vec(), // decodes to "a" — not a grant header
+            payload_segment: b"Yg".to_vec(),   // decodes to "b"
+        };
+        assert_eq!(crate::assemble_compact(&bad, &sig), Err(Invalid));
+    }
+
     // ==========================================================================
     // Façade B — consumption entry + chain verification (Task 11)
     // ==========================================================================
@@ -3748,8 +3830,19 @@ mod tests {
             encode_consumption_entry(&mk("chain\nid"), &max()),
             Err(Invalid)
         );
-        // Sanity: a valid StringOrURI still encodes.
+        // A `:`-bearing identifier with a malformed %HH escape is rejected
+        // (reference string_or_uri.ex:38-48 — well-formed %HH required).
+        assert_eq!(
+            encode_consumption_entry(&mk("urn:exa%GGmple"), &max()),
+            Err(Invalid)
+        );
+        assert_eq!(
+            encode_consumption_entry(&mk("urn:trunc%"), &max()),
+            Err(Invalid)
+        );
+        // Sanity: valid StringOrURIs (opaque + a well-formed %HH) still encode.
         assert!(encode_consumption_entry(&mk("urn:example:chain"), &max()).is_ok());
+        assert!(encode_consumption_entry(&mk("urn:exa%41mple"), &max()).is_ok());
     }
 
     // --- Chain canonical re-encode check ---
@@ -3993,6 +4086,21 @@ mod tests {
             check_envelope(&credentials, &expected),
             Err(Invalid),
             "proof_max_age above the bounds.proof_max_age ceiling must be rejected"
+        );
+    }
+
+    /// REQ1-VERIFY-time-bounds: proof_max_age MUST be positive (reference
+    /// runtime.ex:550 `proof_max_age > 0`). A zero value would admit any proof
+    /// within the skew window (no max-age floor). Removing the `< 1` guard makes
+    /// this test go RED.
+    #[test]
+    fn red_envelope_proof_max_age_zero_rejected() {
+        let (credentials, mut expected) = valid_envelope_fixture();
+        expected.proof_max_age = 0;
+        assert_eq!(
+            check_envelope(&credentials, &expected),
+            Err(Invalid),
+            "proof_max_age == 0 must be rejected (required positive)"
         );
     }
 

@@ -24,8 +24,12 @@ src_dir=$(cd "$(dirname "$0")/.." && pwd)/src
 
 # Safe-but-impure APIs that #![forbid(unsafe_code)] does not catch.
 # `rand::` / `rand_core::` are path-qualified to avoid the doc-comment mention
-# of `rand_core` (features) in src/ed25519.rs.
-patterns='std::fs|std::net|std::process|std::env|std::io|std::time::SystemTime|std::time::Instant|getrandom|rand::|rand_core::'
+# of `rand_core` (features) in src/ed25519.rs. `std::collections::HashSet` /
+# `HashMap` are path-qualified too: their default `RandomState::new()` reads OS
+# entropy (hashmap_random_keys), a randomness boundary this pure library forbids
+# (use `BTreeSet`/`BTreeMap`, deterministic). Path-qualification avoids matching
+# the bare words in comments that document the choice.
+patterns='std::fs|std::net|std::process|std::env|std::io|std::time::SystemTime|std::time::Instant|getrandom|rand::|rand_core::|std::collections::HashSet|std::collections::HashMap'
 
 status=0
 # find -print0 / read -d '' is not POSIX; src/ is flat, so a plain glob suffices

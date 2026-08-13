@@ -28,25 +28,20 @@ use crate::base64url::{base64url_decode, base64url_encode};
 use crate::error::{Invalid, Result};
 use crate::types::SigningInput;
 
-/// Assemble the 3-segment compact serialization from a signing input + raw
-/// signature.
+/// Compose the 3-segment compact serialization from a signing input + raw
+/// signature — the internal composer. The public [`crate::assemble_compact`]
+/// (re-exported from the v1 façade) wraps this with per-kind content validation
+/// (the reference `validate_assembled_compact`, runtime.ex:151).
 ///
 /// Returns
 /// `protected_segment || "." || payload_segment || "." || base64url(signature)`.
 ///
-/// The protected / payload segments are passed through VERBATIM (byte-for-byte;
-/// no re-encode) and appear in the composed compact exactly as supplied. The
-/// composed compact is then validated for segment well-formedness via
-/// [`parse_compact`] (three non-empty canonical unpadded base64url segments —
-/// matching the reference `validate_assembled_compact`, runtime.ex:151); the
-/// public contract is `/2` (no caller bounds, protocol-v1.md:299), so a caller
-/// passing empty / non-base64url / extra-segment bytes is rejected rather than
-/// composed into a malformed compact. `kind` is metadata for the façade's
-/// protected-header `typ` check and does not affect the composed bytes.
-///
-/// Returns `Err(Invalid)` when the assembled compact is not three canonical
-/// base64url segments; `Ok` otherwise (`REQ1-VERIFY-return-shape`).
-pub fn assemble_compact(input: &SigningInput, signature: &[u8; 64]) -> Result<Vec<u8>> {
+/// The protected / payload segments are passed through VERBATIM (byte-for-byte)
+/// and the composed compact is validated for segment well-formedness via
+/// [`parse_compact`] (three non-empty canonical unpadded base64url segments).
+/// Returns `Err(Invalid)` when the composed bytes are not three canonical
+/// base64url segments.
+pub(crate) fn compose_compact(input: &SigningInput, signature: &[u8; 64]) -> Result<Vec<u8>> {
     // base64url of 64 bytes is always 86 chars (64 = 16 groups of 3 + ... ; 64
     // is not a multiple of 3, so the trailing group of 1 byte -> 2 chars;
     // 64/3 = 21 full groups (63 bytes) -> 84 chars + 1 trailing group of 1
@@ -58,13 +53,9 @@ pub fn assemble_compact(input: &SigningInput, signature: &[u8; 64]) -> Result<Ve
     out.extend_from_slice(&input.payload_segment);
     out.push(b'.');
     out.extend_from_slice(&base64url_encode(signature));
-    // Validate the assembled compact is well-formed: exactly three non-empty
-    // canonical unpadded base64url segments (reference runtime.ex:151
-    // validate_assembled_compact re-parses the composed output). The public
-    // contract is /2 (no caller bounds — protocol-v1.md:299), so this enforces
-    // segment well-formedness, not a caller-supplied size ceiling. Catches a
-    // caller passing empty / non-base64url / extra-segment protected or payload
-    // bytes (the signature segment is always canonical by construction).
+    // Segment well-formedness: three non-empty canonical unpadded base64url
+    // segments. Per-kind CONTENT validation (closed header/claim set) is the
+    // public façade wrapper's job (v1::assemble_compact).
     parse_compact(&out)?;
     Ok(out)
 }
@@ -151,7 +142,7 @@ mod tests {
             protected_segment: SEG_ABC.to_vec(),
             payload_segment: SEG_DEF.to_vec(),
         };
-        let compact = assemble_compact(&input, &sig_raw).expect("assemble");
+        let compact = compose_compact(&input, &sig_raw).expect("assemble");
         // Third segment is base64url_encode of the raw 64 bytes (canonical, so
         // it round-trips to the input b64u).
         let mut expected = Vec::new();
@@ -176,13 +167,13 @@ mod tests {
             protected_segment: b"YW+J".to_vec(), // `+` is standard base64, NOT base64url
             payload_segment: SEG_DEF.to_vec(),
         };
-        assert_eq!(assemble_compact(&bad, &sig_raw), Err(Invalid));
+        assert_eq!(compose_compact(&bad, &sig_raw), Err(Invalid));
         let empty = SigningInput {
             kind: SigningKind::Grant,
             protected_segment: Vec::new(),
             payload_segment: SEG_DEF.to_vec(),
         };
-        assert_eq!(assemble_compact(&empty, &sig_raw), Err(Invalid));
+        assert_eq!(compose_compact(&empty, &sig_raw), Err(Invalid));
     }
 
     #[test]
@@ -201,8 +192,8 @@ mod tests {
             protected_segment: SEG_ABC.to_vec(),
             payload_segment: SEG_DEF.to_vec(),
         };
-        let ca = assemble_compact(&input, &sig_a).expect("assemble a");
-        let cb = assemble_compact(&input, &sig_b).expect("assemble b");
+        let ca = compose_compact(&input, &sig_a).expect("assemble a");
+        let cb = compose_compact(&input, &sig_b).expect("assemble b");
         assert_ne!(ca, cb, "tampered signature must change the compact");
         // The first two segments are identical; only the third differs.
         assert_eq!(&ca[..ca.len() - 86], &cb[..cb.len() - 86]);
@@ -329,7 +320,7 @@ mod tests {
                         protected_segment: protected.to_vec(),
                         payload_segment: payload.to_vec(),
                     };
-                    let compact = assemble_compact(&input, &sig).expect("valid case assembles");
+                    let compact = compose_compact(&input, &sig).expect("valid case assembles");
                     let expected_compact = case["expected"]["compact"]
                         .as_str()
                         .unwrap_or_else(|| panic!("valid case {id} missing expected.compact"));

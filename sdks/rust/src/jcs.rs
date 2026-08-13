@@ -154,7 +154,11 @@ fn encode_value(
             // rejection (reference jcs.ex:92): a hand-built Object can carry
             // duplicate names (the Vec carrier allows it); the reference rejects
             // any object whose member-name set is smaller than its length.
-            let mut seen = std::collections::HashSet::with_capacity(members.len());
+            // BTreeSet (not HashSet): HashSet's RandomState reads OS entropy to
+            // seed its hasher — a randomness boundary the lib path forbids and
+            // the reference (Elixir MapSet) does not have. BTreeSet is
+            // deterministic, same insert-returns-bool semantics.
+            let mut seen = std::collections::BTreeSet::new();
             for (k, _) in members {
                 if k.len() as u64 > bounds.key_bytes() || !seen.insert(k.as_str()) {
                     return Err(Invalid);
