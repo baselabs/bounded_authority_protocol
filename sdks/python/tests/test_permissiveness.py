@@ -90,6 +90,7 @@ from bounded_authority_verifier.v1 import (
     SigningInput,
     TrustedIssuer,
     assemble_compact,
+    assemble_segments,
     boundary_anchor_signing_input,
     check_chain,
     check_envelope,
@@ -461,9 +462,11 @@ def _fresh_key() -> tuple[bytes, Ed25519PrivateKey]:
 
 
 def _must_assemble(si: SigningInput, sig: bytes) -> bytes:
-    """Unwrap assemble_compact's Result in test helpers (failure is a test-setup bug)."""
-    c = assemble_compact(si, sig)
-    assert c.is_ok, "assemble_compact failed in test helper"
+    """Unwrap the low-level assembler's Result in test helpers (failure is a test-setup bug). Uses
+    assemble_segments (not the validating façade) so permissiveness cases can build compacts freely
+    and then prove the VERIFY path (or the façade) rejects them."""
+    c = assemble_segments(si, sig)
+    assert c.is_ok, "assemble_segments failed in test helper"
     return c.value
 
 
@@ -1019,24 +1022,25 @@ def test_expected_structs_bounds_absent_defaults_to_max():
 
 
 
-def test_assemble_compact_and_request_digest_return_result_contract():
-    """Cross-vendor #21: assemble_compact + request_digest return Ok/Err (the Result contract),
-    not raw values + throw. Invalid inputs return Err; valid inputs return Ok. Mirrors the Elixir
-    {:ok,_}|{:error,:invalid} and the other 15 facade functions."""
-    # assemble_compact: bad kind -> Err (not raise).
-    bad = assemble_compact(
+def test_assemble_segments_and_request_digest_return_result_contract():
+    """The low-level assembler (assemble_segments) + request_digest return Ok/Err (the Result
+    contract), not raw values + throw. Invalid inputs return Err; a minimal well-shaped input
+    returns Ok. Mirrors the Elixir {:ok,_}|{:error,:invalid}. The PUBLIC assemble_compact façade
+    adds per-kind content validation (tested separately)."""
+    # assemble_segments: bad kind -> Err (not raise).
+    bad = assemble_segments(
         SigningInput(kind="bogus", protected_segment=b"a", payload_segment=b"b"),  # type: ignore[arg-type]
         b"\x00" * 64,
     )
     assert not bad.is_ok, "bad kind must return Err"
-    # assemble_compact: short signature -> Err.
-    short = assemble_compact(
+    # assemble_segments: short signature -> Err.
+    short = assemble_segments(
         SigningInput(kind="grant", protected_segment=b"a", payload_segment=b"b"),
         b"\x00" * 32,
     )
     assert not short.is_ok, "short signature must return Err"
-    # assemble_compact: valid -> Ok.
-    valid = assemble_compact(
+    # assemble_segments: minimal well-shaped input -> Ok (content is NOT validated here).
+    valid = assemble_segments(
         SigningInput(kind="grant", protected_segment=b"a", payload_segment=b"b"),
         b"\x00" * 64,
     )
@@ -1182,3 +1186,66 @@ def test_malformed_trusted_issuer_fails_closed():
                          operation="read", cast_arguments=JNull(),  # type: ignore[arg-type]
                          evaluation_time=1500, clock_skew=60, proof_max_age=300, nonce=NonceNotRequired())
     assert not check_envelope(g["compact"], g["compact"], er).is_ok, "malformed trusted issuer must fail closed (check_envelope)"
+
+
+# === BAP-09 derisk: cross-vendor reference-divergence tripwires (TS/Python derisk, pre-BAP-07) ===
+
+# The corpus grant/proof protected headers (typ=ba+cap / typ=dpop+jwt) — used by the #11 façade tests.
+_DERISK_GRANT_PROTECTED = b"eyJhbGciOiJFZERTQSIsImtpZCI6Imlzc3VlciIsInR5cCI6ImJhK2NhcCJ9"
+_DERISK_PROOF_PROTECTED = (
+    b"eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Ilcxczd5RTlmR0RNQmJtZHBx"
+    b"WVZ3UTFoRENYdHpPZVBVRDNmSWYxdDdGRGsifSwidHlwIjoiZHBvcCtqd3QifQ"
+)
+
+
+def test_proof_signing_input_rejects_malformed_grant_compact():
+    """#9: proof_signing_input MUST scan the grant compact (shape+size, not canonicity) before hashing
+    it into ath (compact_jws.ex:16-27 scan gates ath/hash). A 2-segment grant compact is not a valid
+    compact JWS; the producer must reject it rather than embed sha256(garbage) in the proof."""
+    pub = _fresh_key()[0]
+    proof = ProofProducer(
+        holder_public_key=pub,
+        proof_id="urn:example:proof:1", method="POST", target_uri="https://resource.example.test/invoke",
+        issued_at=1400, invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
+        grant_compact=b"aaa.bbb",  # one dot — not a 3-segment compact
+        cast_arguments=JNull(),
+    )
+    r = proof_signing_input(proof)
+    assert not r.is_ok, "malformed (2-segment) grant compact must be rejected"
+
+
+def test_encode_anchored_export_rejects_when_archive_chunks_exceeded():
+    """#4: encode_anchored_export MUST enforce archive_chunks (frame count) during encode
+    (anchored_export_codec.ex:69 validate_chunks), not only archive_bytes. A 2-key archive frames
+    into 6 chunks (prefix+header+start+transition+row+end); tightening archive_chunks to 5 rejects
+    even though archive_bytes is still ample."""
+    built = _build_archive([_fresh_key(), _fresh_key()])  # 1 transition + 1 row → 6 frames
+    r = encode_anchored_export(
+        built["input"],
+        ExpectedExport(
+            chain=built["chain"], digest=built["digest"],
+            start_anchor=built["start_anchor"], end_anchor=built["end_anchor"],
+            transitions=built["expected"].transitions, object_version="v1",
+            bounds=bounds_new({"archive_chunks": 5}),
+        ),
+    )
+    assert not r.is_ok, "6 frames > archive_chunks=5 must reject"
+
+
+def test_assemble_compact_facade_rejects_invalid_signing_input():
+    """#11: the public assemble_compact façade MUST validate the signing input (kind↔typ, segment
+    bounds, base64url payload) and re-parse the composed compact per kind (runtime.ex:151
+    validate_assembled_compact). It must NOT assemble a mislabeled or malformed compact."""
+    sig = b"\x00" * 64
+    # kind/typ mismatch: grant kind but a proof (dpop+jwt) protected header.
+    r = assemble_compact(SigningInput(kind="grant", protected_segment=_DERISK_PROOF_PROTECTED, payload_segment=b"e30"), sig)
+    assert not r.is_ok, "kind/typ mismatch must reject"
+    # oversized protected segment (> encoded_segment_bytes=32768).
+    r = assemble_compact(SigningInput(kind="grant", protected_segment=b"A" * 32769, payload_segment=b"e30"), sig)
+    assert not r.is_ok, "oversized protected segment must reject"
+    # non-base64url payload segment.
+    r = assemble_compact(SigningInput(kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=b"not-valid!@#"), sig)
+    assert not r.is_ok, "non-base64url payload must reject"
+    # structurally-invalid grant payload (empty object) — the per-kind re-parse rejects it.
+    r = assemble_compact(SigningInput(kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=b"e30"), sig)
+    assert not r.is_ok, "malformed grant payload must reject (re-parse)"
