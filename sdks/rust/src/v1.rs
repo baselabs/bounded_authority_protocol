@@ -589,6 +589,12 @@ pub fn proof_signing_input(proof: &ProofInput, bounds: &Bounds) -> Result<Produc
     }
 
     // ath = base64url(SHA-256(grant_compact ASCII bytes)) — REQ1-CLAIM-ath.
+    // Bound grant_compact by compact_bytes BEFORE hashing (reference compact_jws
+    // .ex:18 scan gates SHA-256 on the byte-length ceiling), so an oversized
+    // caller-supplied grant compact cannot force unbounded hashing work.
+    if proof.grant_compact.len() as u64 > bounds.compact_bytes() {
+        return Err(Invalid);
+    }
     let mut ath_hasher = Sha256::new();
     ath_hasher.update(&proof.grant_compact);
     let ath = b64url_to_string(&base64url_encode(&ath_hasher.finalize()))?;
@@ -817,6 +823,10 @@ pub fn encode_consumption_entry(
     if entry.sequence < 1 {
         return Err(Invalid);
     }
+    // chain_id is a StringOrURI identifier, not an arbitrary string (reference
+    // consumption_chain.ex:169-172 valid_identifier?): non-empty, ≤ identifier
+    // _bytes, no control/DEL/non-ASCII, valid scheme if `:`-bearing.
+    validate_identifier(&entry.chain_id, bounds)?;
     // Genesis binding: sequence 1 requires the all-zero predecessor (corpus
     // invalid-seq1-nonzero-previous). A sequence > 1 MAY carry any predecessor —
     // the encoder does not know the prior row's hash; the verifier binds it.
@@ -886,9 +896,13 @@ pub fn check_chain(input: &ChainInput, expected: &ExpectedChain) -> Result<Chain
         parsed.push(parse_row(row, &bounds)?);
     }
 
-    // Chain identity: every row's chain_id == expected.chain_id (the rows
-    // therefore also agree amongst themselves). Corpus: cross-graft.
+    // Chain identity: validate the identifier shape (reference consumption_chain
+    // .ex:169-172 + context_validation.ex:155-159 valid_identifier?), then every
+    // row's chain_id == expected.chain_id (the rows therefore also agree amongst
+    // themselves). Corpus: cross-graft.
+    validate_identifier(&expected.chain_id, &bounds)?;
     for p in &parsed {
+        validate_identifier(&p.chain_id, &bounds)?;
         if p.chain_id != expected.chain_id {
             return Err(Invalid);
         }
@@ -905,19 +919,22 @@ pub fn check_chain(input: &ChainInput, expected: &ExpectedChain) -> Result<Chain
         }
     }
 
-    // Genesis binding. first_sequence < 1 is invalid (sequences begin at 1);
-    // first_sequence == 1 requires the first row's previous to be the all-zero
-    // hash; first_sequence > 1 requires it to equal the caller's predecessor.
-    // Corpus: sequence-zero-row + genesis-previous-hash-forge.
+    // Genesis binding. first_sequence < 1 is invalid (sequences begin at 1).
+    // The first row's previous is ALWAYS bound to expected.previous_hash
+    // (reference consumption_chain.ex:113, seeded at :47-54), and when
+    // first_sequence == 1 expected.previous_hash MUST be the all-zero hash
+    // (reference context_validation.ex:106-107 — a fresh chain has no
+    // predecessor, so a caller-inconsistent predecessor is rejected, not
+    // attested unchecked into ChainFacts). Corpus: sequence-zero-row +
+    // genesis-previous-hash-forge.
     let first = &parsed[0];
     if expected.first_sequence < 1 {
         return Err(Invalid);
     }
-    if expected.first_sequence == 1 {
-        if first.previous.iter().any(|&b| b != 0) {
-            return Err(Invalid);
-        }
-    } else if first.previous != expected.previous_hash {
+    if expected.first_sequence == 1 && expected.previous_hash.iter().any(|&b| b != 0) {
+        return Err(Invalid);
+    }
+    if first.previous != expected.previous_hash {
         return Err(Invalid);
     }
 
@@ -1199,7 +1216,13 @@ pub fn verify_key_transition(
         return Err(Invalid);
     }
     // Signed to_key_id / chain_id / effective_at / transition_id == expected.
-    if t.payload.to_key_id != expected.next_key_id
+    // to_key_id is bound to BOTH the positional next key's identifier AND the
+    // caller's expected id (reference key_transition_codec.ex:68-69) — the
+    // current-key side at line ~11 binds header.kid to current.key_id; the
+    // next side must bind to_key_id to next.key_id too, or the positional key
+    // chain could advance under a mismatched identifier.
+    if t.payload.to_key_id != next.key_id
+        || t.payload.to_key_id != expected.next_key_id
         || t.payload.chain_id != expected.chain_id
         || t.payload.effective_at != expected.effective_at
         || t.payload.transition_id != expected.transition_id
@@ -1337,6 +1360,40 @@ pub fn encode_anchored_export(
         return Err(Invalid);
     }
 
+    // Aggregate ceilings at encode (reference anchored_export_codec.ex:69 ->
+    // validate_chunks :337-340): chunk count <= archive_chunks and total bytes
+    // <= archive_bytes, checked BEFORE assembling so an over-budget input cannot
+    // force a full-archive allocation. Chunk count = header + start + transitions
+    // + rows + end; total = magic + sum(4-byte length prefix + content) per frame.
+    let frame_count = 1u64
+        .checked_add(1)
+        .and_then(|n| n.checked_add(input.transitions.len() as u64))
+        .and_then(|n| n.checked_add(input.rows.len() as u64))
+        .and_then(|n| n.checked_add(1))
+        .ok_or(Invalid)?;
+    if frame_count > bounds.archive_chunks() {
+        return Err(Invalid);
+    }
+    let mut total_bytes = ARCHIVE_MAGIC.len() as u64;
+    total_bytes = total_bytes
+        .checked_add(4 + header_bytes.len() as u64)
+        .ok_or(Invalid)?;
+    total_bytes = total_bytes
+        .checked_add(4 + input.start_anchor.len() as u64)
+        .ok_or(Invalid)?;
+    for t in &input.transitions {
+        total_bytes = total_bytes.checked_add(4 + t.len() as u64).ok_or(Invalid)?;
+    }
+    for r in &input.rows {
+        total_bytes = total_bytes.checked_add(4 + r.len() as u64).ok_or(Invalid)?;
+    }
+    total_bytes = total_bytes
+        .checked_add(4 + input.end_anchor.len() as u64)
+        .ok_or(Invalid)?;
+    if total_bytes > bounds.archive_bytes() {
+        return Err(Invalid);
+    }
+
     // Assemble the archive: magic + frames + EOF. Each frame's content MUST be
     // non-empty (UINT32_BE(nonzero_length)).
     let mut bytes = Vec::with_capacity(
@@ -1430,7 +1487,28 @@ pub fn verify_anchored_export(
         return Err(Invalid);
     }
 
-    // Materialize the byte stream.
+    // Stream the digest over the chunks WITHOUT materializing the whole archive
+    // first (reference hash_chunks, anchored_export_codec.ex:705-714 —
+    // incremental SHA-256 over each chunk, no concat). A huge inauthentic
+    // archive fails this compare before the buf is allocated, so the materialize
+    // step below runs only for digest-matching (caller-legitimate) archives.
+    let mut hasher = Sha256::new();
+    for c in chunks {
+        hasher.update(c);
+    }
+    let mut computed = [0u8; 32];
+    computed.copy_from_slice(&hasher.finalize());
+    if !constant_time_eq(&computed, &expected.digest) {
+        return Err(Invalid);
+    }
+
+    // Out-of-band object-store version exact equality (after the digest, before
+    // the byte stream is materialized).
+    if obj.version != expected.object_version {
+        return Err(Invalid);
+    }
+
+    // Materialize the byte stream for the magic check + incremental frame scan.
     let mut buf = Vec::with_capacity(total as usize);
     for c in chunks {
         buf.extend_from_slice(c);
@@ -1438,20 +1516,6 @@ pub fn verify_anchored_export(
 
     // Exact magic prefix.
     if &buf[..ARCHIVE_MAGIC.len()] != ARCHIVE_MAGIC {
-        return Err(Invalid);
-    }
-
-    // Hash every raw byte; constant-time digest compare.
-    let mut hasher = Sha256::new();
-    hasher.update(&buf);
-    let mut computed = [0u8; 32];
-    computed.copy_from_slice(&hasher.finalize());
-    if !constant_time_eq(&computed, &expected.digest) {
-        return Err(Invalid);
-    }
-
-    // Out-of-band object-store version exact equality.
-    if obj.version != expected.object_version {
         return Err(Invalid);
     }
 
@@ -3665,6 +3729,27 @@ mod tests {
             encode_consumption_entry(&forged_genesis, &max()),
             Err(Invalid)
         );
+    }
+
+    #[test]
+    fn red_encode_rejects_malformed_chain_id() {
+        // chain_id is a StringOrURI identifier, not an arbitrary string
+        // (reference consumption_chain.ex:169-172 valid_identifier?). An empty
+        // chain_id and one carrying a control byte are rejected at encode.
+        // RED-capable: removing the validate_identifier call makes these accept.
+        let mk = |chain_id: &str| ConsumptionEntry {
+            chain_id: chain_id.to_string(),
+            commitment: [1u8; 32],
+            previous_hash: [0u8; 32],
+            sequence: 1,
+        };
+        assert_eq!(encode_consumption_entry(&mk(""), &max()), Err(Invalid));
+        assert_eq!(
+            encode_consumption_entry(&mk("chain\nid"), &max()),
+            Err(Invalid)
+        );
+        // Sanity: a valid StringOrURI still encodes.
+        assert!(encode_consumption_entry(&mk("urn:example:chain"), &max()).is_ok());
     }
 
     // --- Chain canonical re-encode check ---
