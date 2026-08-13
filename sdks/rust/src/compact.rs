@@ -34,16 +34,18 @@ use crate::types::SigningInput;
 /// Returns
 /// `protected_segment || "." || payload_segment || "." || base64url(signature)`.
 ///
-/// The protected / payload segments are passed through VERBATIM (no re-encode,
-/// no re-validation): they are the producer's canonical base64url output and
-/// appear byte-for-byte in the composed compact. The 64-byte raw signature is
-/// base64url-encoded. `kind` is metadata for the Task 10 façade's protected-
-/// header `typ` check and does not affect the composed bytes.
+/// The protected / payload segments are passed through VERBATIM (byte-for-byte;
+/// no re-encode) and appear in the composed compact exactly as supplied. The
+/// composed compact is then validated for segment well-formedness via
+/// [`parse_compact`] (three non-empty canonical unpadded base64url segments —
+/// matching the reference `validate_assembled_compact`, runtime.ex:151); the
+/// public contract is `/2` (no caller bounds, protocol-v1.md:299), so a caller
+/// passing empty / non-base64url / extra-segment bytes is rejected rather than
+/// composed into a malformed compact. `kind` is metadata for the façade's
+/// protected-header `typ` check and does not affect the composed bytes.
 ///
-/// Total over the fixed inputs (the segment widths are bounded elsewhere by
-/// `bounds.encoded_segment_bytes()` at the façade); this function never fails
-/// and returns [`Result`] only for contract uniformity
-/// (`REQ1-VERIFY-return-shape`: every public function returns `Ok`/`Invalid`).
+/// Returns `Err(Invalid)` when the assembled compact is not three canonical
+/// base64url segments; `Ok` otherwise (`REQ1-VERIFY-return-shape`).
 pub fn assemble_compact(input: &SigningInput, signature: &[u8; 64]) -> Result<Vec<u8>> {
     // base64url of 64 bytes is always 86 chars (64 = 16 groups of 3 + ... ; 64
     // is not a multiple of 3, so the trailing group of 1 byte -> 2 chars;
@@ -56,6 +58,14 @@ pub fn assemble_compact(input: &SigningInput, signature: &[u8; 64]) -> Result<Ve
     out.extend_from_slice(&input.payload_segment);
     out.push(b'.');
     out.extend_from_slice(&base64url_encode(signature));
+    // Validate the assembled compact is well-formed: exactly three non-empty
+    // canonical unpadded base64url segments (reference runtime.ex:151
+    // validate_assembled_compact re-parses the composed output). The public
+    // contract is /2 (no caller bounds — protocol-v1.md:299), so this enforces
+    // segment well-formedness, not a caller-supplied size ceiling. Catches a
+    // caller passing empty / non-base64url / extra-segment protected or payload
+    // bytes (the signature segment is always canonical by construction).
+    parse_compact(&out)?;
     Ok(out)
 }
 
@@ -151,6 +161,28 @@ mod tests {
         expected.push(b'.');
         expected.extend_from_slice(&base64url_encode(&sig_raw));
         assert_eq!(compact, expected);
+    }
+
+    #[test]
+    fn assemble_rejects_non_canonical_or_empty_segment() {
+        // validate_assembled_compact (reference runtime.ex:151): the composed
+        // compact must be three canonical base64url segments. A caller-supplied
+        // protected segment carrying standard-alphabet `+` (NOT base64url) or an
+        // empty segment is rejected, not composed into a malformed compact.
+        // RED-capable: removing the `parse_compact(&out)?` call makes these accept.
+        let sig_raw = [0u8; 64];
+        let bad = SigningInput {
+            kind: SigningKind::Grant,
+            protected_segment: b"YW+J".to_vec(), // `+` is standard base64, NOT base64url
+            payload_segment: SEG_DEF.to_vec(),
+        };
+        assert_eq!(assemble_compact(&bad, &sig_raw), Err(Invalid));
+        let empty = SigningInput {
+            kind: SigningKind::Grant,
+            protected_segment: Vec::new(),
+            payload_segment: SEG_DEF.to_vec(),
+        };
+        assert_eq!(assemble_compact(&empty, &sig_raw), Err(Invalid));
     }
 
     #[test]

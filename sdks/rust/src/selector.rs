@@ -209,6 +209,14 @@ fn traverse<'a>(root: &'a JsonValue, path: &[String]) -> Result<&'a JsonValue> {
 /// is NOT `Int(1)`, and `String("1")` is NOT `Int(1)`. Removing the tag guard
 /// (e.g. casting both numbers to `f64`) collapses this distinction and yields
 /// wrong authorization.
+///
+/// Returns `false` for a duplicate-bearing object: a decoded `Object` is always
+/// duplicate-free, but a hand-built one (a direct caller's `cast_arguments`)
+/// may not be, and find-first-match equality on a dup-bearing object is unsound.
+fn unique_keys(members: &[(String, JsonValue)]) -> bool {
+    let mut seen = std::collections::HashSet::with_capacity(members.len());
+    members.iter().all(|(k, _)| seen.insert(k.as_str()))
+}
 pub(crate) fn semantic_identity(a: &JsonValue, b: &JsonValue) -> bool {
     match (a, b) {
         (JsonValue::Null, JsonValue::Null) => true,
@@ -223,9 +231,16 @@ pub(crate) fn semantic_identity(a: &JsonValue, b: &JsonValue) -> bool {
             x.len() == y.len() && x.iter().zip(y).all(|(xi, yi)| semantic_identity(xi, yi))
         }
         (JsonValue::Object(x), JsonValue::Object(y)) => {
-            // Unordered key/value sets; dup-free by construction. Same key set
-            // (length equality + every x-key present in y) and each value
-            // recursively identical.
+            // Unordered key/value sets. Both MUST be duplicate-free (reference
+            // selector.ex:51 unique_object?): a hand-built Object CAN carry
+            // duplicate names (the Vec carrier allows it), and find-first-match
+            // equality on a dup-bearing object is unsound — {a:1,a:1} would
+            // otherwise equal {a:1,b:2}. Reject any dup-bearing object outright.
+            if !unique_keys(x) || !unique_keys(y) {
+                return false;
+            }
+            // Same key set (length equality + every x-key present in y) and each
+            // value recursively identical.
             x.len() == y.len()
                 && x.iter().all(|(kx, vx)| {
                     y.iter()
@@ -657,5 +672,37 @@ mod tests {
             &JsonValue::Bool(false)
         ));
         assert!(!semantic_identity(&JsonValue::Null, &JsonValue::Int(0)));
+    }
+
+    #[test]
+    fn dup_bearing_objects_are_not_semantically_equal() {
+        // The bypass the unique_keys check defeats (reference selector.ex:51
+        // unique_object?): WITHOUT it, find-first-match equality makes
+        // {a:1,a:1} (dup, len 2) wrongly equal {a:1,b:2} (len 2) — both x-keys
+        // ("a","a") find a match in y. unique_keys rejects the dup-bearing
+        // object outright (RED-capable: removing the unique_keys guard makes
+        // the first assertion fail).
+        let dup_x = JsonValue::Object(vec![
+            ("a".to_string(), JsonValue::Int(1)),
+            ("a".to_string(), JsonValue::Int(1)),
+        ]);
+        let y = JsonValue::Object(vec![
+            ("a".to_string(), JsonValue::Int(1)),
+            ("b".to_string(), JsonValue::Int(2)),
+        ]);
+        assert!(
+            !semantic_identity(&dup_x, &y),
+            "dup-bearing object must not equal a distinct object"
+        );
+        assert!(
+            !semantic_identity(&dup_x, &dup_x),
+            "a dup-bearing object is not a valid value"
+        );
+        // Sanity: two identical dup-free objects ARE equal.
+        let ok = JsonValue::Object(vec![
+            ("a".to_string(), JsonValue::Int(1)),
+            ("b".to_string(), JsonValue::Int(2)),
+        ]);
+        assert!(semantic_identity(&ok, &y));
     }
 }
