@@ -2617,10 +2617,13 @@ fn validate_proof_payload(payload: &JsonValue, bounds: &Bounds) -> Result<ProofP
 
 /// Extracts a non-empty StringOrURI (≤ `identifier_bytes`).
 ///
-/// Per RFC 7519: a value containing `:` is treated as a URI and its structure
-/// is validated; otherwise it is an opaque string. Rejects control/whitespace/
-/// DEL/non-ASCII bytes anywhere, an empty value, and a malformed scheme or
-/// non-numeric authority port. `None` (claim absent) → `Invalid`.
+/// Per RFC 7519 + the reference `string_or_uri.ex`: a colon-free value is a
+/// PLAIN string (any valid UTF-8 is accepted); a colon-bearing value is a URI
+/// whose scheme is valid, every byte is alnum / URI-punctuation / a well-formed
+/// `%HH` escape, and (for a `://` authority) the port is all-digit. Rejects an
+/// empty value, a bad scheme, a non-URI byte (e.g. `{`), a malformed `%HH`, or a
+/// non-numeric authority port. `None` (claim absent) → `Invalid`. (A Rust `&str`
+/// is always valid UTF-8, so `String.valid?` is automatic.)
 fn take_string_or_uri(value: Option<&JsonValue>, bounds: &Bounds) -> Result<String> {
     let s = match value {
         Some(JsonValue::String(s)) => s,
