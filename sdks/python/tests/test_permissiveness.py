@@ -1249,3 +1249,20 @@ def test_assemble_compact_facade_rejects_invalid_signing_input():
     # structurally-invalid grant payload (empty object) — the per-kind re-parse rejects it.
     r = assemble_compact(SigningInput(kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=b"e30"), sig)
     assert not r.is_ok, "malformed grant payload must reject (re-parse)"
+
+
+def test_assemble_compact_facade_rejects_numeric_iss():
+    """#11 (codex): the grant re-parse must validate FIELD values, not just the closed key-set. A
+    payload with every required key + a numeric iss passes the structural validator but must be
+    rejected by the full decode_grant re-parse."""
+    json_payload = (
+        b'{"v":1,"iss":123,"jti":"urn:example:g:1","aud":["https://resource.example.test"],'
+        b'"iat":1000,"nbf":1000,"exp":2000,"cnf":{"jkt":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},'
+        b'"operations":[{"name":"read","selectors":[{"kind":"all"}]}]}'
+    )
+    payload_segment = base64.urlsafe_b64encode(json_payload).rstrip(b"=")
+    r = assemble_compact(
+        SigningInput(kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=payload_segment),
+        b"\x00" * 64,
+    )
+    assert not r.is_ok, "numeric iss must reject (field re-parse)"
