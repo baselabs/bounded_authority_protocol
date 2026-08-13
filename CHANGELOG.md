@@ -6,6 +6,18 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- **BAP-09 SDK conformance hardening (TypeScript + Python).** The TS + Python verifier SDKs now
+  enforce two checks the Elixir reference has and the SDKs were missing: (1) a decoded
+  **signature-width gate** in `parseCompact`/`parse_compact` (`len(signature) == signature_bytes`,
+  mirroring `runtime.ex:237`/`:259` — `scanCompact`/`scan_compact` intentionally stays shape-only,
+  mirroring `CompactJws.scan`); (2) **canonical-form equality** for boundary-anchor + key-transition
+  compacts — the protected header AND payload segments must equal the exact JCS re-encoding
+  (mirroring `boundary_anchor_codec.ex:95-96,118-119` + `key_transition_codec.ex:127-128,151-152`),
+  so a non-canonical encoding (e.g. reordered members) is rejected. New red-capable tests cover the
+  anchor + transition canonical paths (header + payload) and the signature-width gate. Verified: TS
+  92 unit + conformance 283/283; Python 62 unit + conformance 283/283. (The Rust/Go SDKs — BAP-15/16
+  — may carry the same gaps; a separate check is owed.)
+
 - **BAP-17 — offline-eligible grant claims (reserve + specify).** Reserve the `ba_offline`
   grant-payload claim name in the [registries](docs/design/registries.md) (issuer-set offline
   floor limits: maximum value with explicit currency, maximum offline use count, offline-window
