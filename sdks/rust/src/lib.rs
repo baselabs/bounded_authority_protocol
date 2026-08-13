@@ -49,13 +49,13 @@ pub(crate) mod ed25519;
 pub(crate) mod selector;
 
 // Façade A/B/C/D re-exports (Tasks 10–13): the public v1 entry points reachable
-// at the crate root. `assemble_compact` is re-exported from the `compact`
-// module (the composer is the contract; the module stays internal).
-// `request_digest` is re-exported from the internal `digest` MODULE (the
-// function is public — protocol-v1.md line 304 — even though the module is
+// at the crate root. `assemble_compact` is re-exported from the `v1` façade
+// (compose + per-kind content validation); the pure composer lives internal to
+// `compact`. `request_digest` is re-exported from the internal `digest` MODULE
+// (the function is public — protocol-v1.md line 304 — even though the module is
 // not a stable façade contract — line 329).
-pub use compact::assemble_compact;
 pub use digest::request_digest;
+pub use v1::assemble_compact;
 pub use v1::{
     boundary_anchor_signing_input, check_chain, check_envelope, decode_grant, decode_proof,
     encode_anchored_export, encode_consumption_entry, grant_signing_input,
