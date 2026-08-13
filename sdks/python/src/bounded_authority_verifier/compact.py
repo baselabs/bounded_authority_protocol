@@ -65,6 +65,36 @@ def parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegmen
     )
 
 
+def scan_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
+    """Faithful port of the reference ``CompactJws.scan`` (compact_jws.ex:16-27): the shape+size gate
+    that ``ath``/``hash`` run BEFORE hashing a compact. Validates structure + bounds only — NOT
+    base64url canonicity (canonicity is the full verify path's job via parse_compact). The producer
+    ath (proof signing input) and the verify grant-hash both gate on this so a non-compact grant
+    (wrong segment count, oversized, dotted signature) is rejected rather than hashed. Mirrors the
+    Rust scan_compact gate added in the BAP-15 closeout.
+    """
+    b = coerce_bounds(bounds)
+    if len(data) > bounds_resolve(b, "compact_bytes"):
+        fail("compact: byte bound")
+    if len(data) == 0:
+        fail("compact: empty")
+    dots = [i for i, byte in enumerate(data) if byte == _DOT]
+    if len(dots) != 2:
+        fail("compact: three segments")
+    d0 = dots[0]
+    d1 = dots[1]
+    if d0 == 0 or d1 == d0 + 1 or d1 == len(data) - 1:
+        fail("compact: empty segment")
+    seg_bytes = bounds_resolve(b, "encoded_segment_bytes")
+    if d0 > seg_bytes:
+        fail("compact: protected segment bound")
+    if d1 - d0 - 1 > seg_bytes:
+        fail("compact: payload segment bound")
+    if len(data) - d1 - 1 > seg_bytes:
+        fail("compact: signature segment bound")
+    # signature dot-free: exactly 2 dots guarantees no dot inside the signature segment.
+
+
 @dataclass(frozen=True)
 class SigningInput:
     kind: str  # "grant" | "proof" | "boundary_anchor" | "key_transition"
@@ -75,17 +105,21 @@ class SigningInput:
 _KINDS = ("grant", "proof", "boundary_anchor", "key_transition")
 
 
-def assemble_compact(signing_input: SigningInput, signature: bytes) -> Result[bytes]:
-    """``assemble_compact``: SigningInput + 64-byte signature → Ok<compact> | Err.
+def assemble_segments(signing_input: SigningInput, signature: bytes) -> Result[bytes]:
+    """``assemble_segments``: the LOW-LEVEL compact assembler (mirrors CompactJws.assemble's byte
+    assembly, compact_jws.ex:41-43). Validates only the kind closed-set + 64-byte signature width,
+    then concatenates protected.payload.base64url(signature). It does NOT validate the signing-input
+    header/payload content — that is the v1.py ``assemble_compact`` FAÇADE's job (re-parse per kind,
+    runtime.ex:151 validate_assembled_compact). Test helpers and conformance use this to build
+    compacts freely; the public contract is the façade (assemble_compact in v1.py).
 
-    REQ1-VERIFY-no-signer-callback: takes a signature, never a key. Cross-vendor #21: returns
-    Result, mirroring the Elixir ``{:ok, binary} | {:error, :invalid}`` and the other 15 façade
-    functions.
+    REQ1-VERIFY-no-signer-callback: takes a signature, never a key. Returns Result, mirroring the
+    Elixir ``{:ok, binary} | {:error, :invalid}``.
     """
     try:
         if signing_input.kind not in _KINDS:
-            fail("assemble_compact: kind closed set")
-        require(len(signature) == 64, "assemble_compact: signature width 64")
+            fail("assemble_segments: kind closed set")
+        require(len(signature) == 64, "assemble_segments: signature width 64")
         sig_b64 = base64url_encode(signature)
         return Ok(
             signing_input.protected_segment
