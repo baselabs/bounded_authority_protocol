@@ -544,21 +544,29 @@ compatibility.
   silently widened the time window; (3) `encode_anchored_export`/`verify_anchored_
   export` panicked on `first_sequence = i64::MIN` (`- 1` overflow — a fail-closed
   violation); (4) `license_check.sh` failed open on `<3` parsed rows; (5) CI ran
-  without a tracked `Cargo.lock`/`--locked`. ALL FIVE fixed (commit `b9815fc`),
-  each verified against the reference; the skew ceiling is red-capable-proven by
-  mutation; lib 332 + conformance 283 + permissiveness 10 green under `--locked`.
+  without a tracked `Cargo.lock`/`--locked`. ALL FIVE fixed (commit `b9815fc`).
+  A second reconciliation pass closed the eight further reference-divergences the
+  first pass had surfaced but the closeout had wrongly parked in a risk block
+  (commit `185b547` — AGENTS.md forbids risk-block parking; each was verified
+  against the reference, none deferred): genesis `previous_hash` consistency,
+  `to_key_id` binding to `next.key_id`, archive encode aggregate (`archive_bytes`
+  + `archive_chunks`) bounds, archive-verify streaming digest (the memory
+  amplification — a huge inauthentic archive now fails the digest compare before
+  the buffer is allocated), producer `ath` `compact_bytes` bound, `chain_id`
+  StringOrURI validation, selector duplicate-object rejection (`unique_object?`),
+  and `assemble_compact` output validation. Three red-capable tests added
+  (selector dup, assemble validation, chain_id). No confirmed-real finding is
+  parked; lib 335 + conformance 283 + permissiveness 10 green under `--locked`.
   Two codex findings were CONTESTED with reference evidence: the "small-order key
   forgery" (the reference uses OpenSSL non-strict `:crypto.verify` = matches
   dalek's default `verify`; and public keys are caller-supplied trusted inputs, so
   it is unreachable under the verifier's threat model) and the "producer emits
   verifier-invalid credentials" cluster (the reference producers also just build;
-  producers are deterministic signing-input composers, not validators).
-  Residual should-fixs documented (not blocking): archive-verify memory
-  amplification (~3× the caller-bounded archive peak — an efficiency
-  characteristic, capped by `archive_bytes`), and the by-design decode/envelope
-  selector-validation split. The always-on lenses (spec-conformance/correctness/
-  security/gate-integrity) were GLM-orchestrator self-review on this single-model
-  host — honestly NOT decorrelated; the cross-vendor pass was the decorrelation.
+  producers are deterministic signing-input composers, not validators). The
+  decode/envelope selector-validation split is the reference's own design (verified),
+  not a defect. The always-on lenses (spec-conformance/correctness/security/
+  gate-integrity) were GLM-orchestrator self-review on this single-model host —
+  honestly NOT decorrelated; the cross-vendor pass was the decorrelation.
 - **No wire byte, bound, or verdict change to the Elixir package** (Rust-only SDK +
   its tooling/docs). `mix quality` was green at the pre-fix head `a4176e1` (295
   tests + 13 properties, 55/55 mutation gate, conformance agreed=283, release.
@@ -646,6 +654,7 @@ reference's cross-transition chronology (strictly-increasing `effective_at`), fi
 and end-anchor-chronology invariants those cases exposed. BAP-15's corpus acceptance is now met
 under the ADR 0014 "no code-level derivation from the Elixir reference" bar. BAP-15 (the Rust SDK
 implementation + its CI/gate/docs envelope + cross-vendor closeout) is now COMPLETE — see the
-BAP-15 closeout evidence above; the cross-vendor pass closed five real T1–T14 divergences from the
+BAP-15 closeout evidence above; the cross-vendor pass closed thirteen real T1–T14 divergences from the
 reference (jcs closure #6 completion, timing ceilings, an archive-encode panic, the license gate's
-fail-open, and un-locked CI). BAP-16 (the Go verifier SDK) remains authored, not started.
+fail-open, un-locked CI, genesis/transition/archive/selector/compact/chain-id/ath gaps). BAP-16 (the Go
+verifier SDK) remains authored, not started.
