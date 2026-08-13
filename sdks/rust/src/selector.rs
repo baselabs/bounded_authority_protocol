@@ -214,8 +214,9 @@ fn traverse<'a>(root: &'a JsonValue, path: &[String]) -> Result<&'a JsonValue> {
 /// duplicate-free, but a hand-built one (a direct caller's `cast_arguments`)
 /// may not be, and find-first-match equality on a dup-bearing object is unsound.
 fn unique_keys(members: &[(String, JsonValue)]) -> bool {
-    // BTreeSet (not HashSet): HashSet's RandomState reads OS entropy (a
-    // randomness boundary the lib path forbids; the reference's MapSet has none).
+    // BTreeSet (deterministic): a std hash-set's RandomState reads OS entropy
+    // (a randomness boundary the lib path forbids; the reference's MapSet has
+    // none). BTreeSet has none, with the same insert-returns-bool semantics.
     let mut seen = std::collections::BTreeSet::new();
     members.iter().all(|(k, _)| seen.insert(k.as_str()))
 }

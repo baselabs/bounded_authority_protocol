@@ -481,6 +481,41 @@ pub fn check_envelope(
 }
 
 // ============================================================================
+// scan_compact — faithful port of the reference CompactJws.scan (ath hash gate)
+// ============================================================================
+
+/// Faithful port of the reference `CompactJws.scan` (compact_jws.ex:16-27 +
+/// `take_segment` :68-75): the compact MUST be ≤ `compact_bytes` and split into
+/// exactly three non-empty segments (split on `.`), the protected and payload
+/// each ≤ `encoded_segment_bytes`, and the signature non-empty, ≤
+/// `encoded_segment_bytes`, and dot-free. Unlike [`compact::parse_compact`],
+/// this does NOT require the segments be canonical base64url — the reference's
+/// scan gates hashing (`ath`/`hash`), not verification, so a non-canonical
+/// segment like `a!a` passes.
+fn scan_compact(compact: &[u8], bounds: &Bounds) -> Result<()> {
+    if compact.len() as u64 > bounds.compact_bytes() {
+        return Err(Invalid);
+    }
+    let dot1 = compact.iter().position(|&b| b == b'.').ok_or(Invalid)?;
+    if dot1 == 0 || dot1 as u64 > bounds.encoded_segment_bytes() {
+        return Err(Invalid);
+    }
+    let after1 = &compact[dot1 + 1..];
+    let dot2 = after1.iter().position(|&b| b == b'.').ok_or(Invalid)?;
+    if dot2 == 0 || dot2 as u64 > bounds.encoded_segment_bytes() {
+        return Err(Invalid);
+    }
+    let signature = &after1[dot2 + 1..];
+    if signature.is_empty() || signature.len() as u64 > bounds.encoded_segment_bytes() {
+        return Err(Invalid);
+    }
+    if signature.contains(&b'.') {
+        return Err(Invalid);
+    }
+    Ok(())
+}
+
+// ============================================================================
 // assemble_compact — public façade wrapper (compose + per-kind validation)
 // ============================================================================
 
@@ -627,14 +662,12 @@ pub fn proof_signing_input(proof: &ProofInput, bounds: &Bounds) -> Result<Produc
     }
 
     // ath = base64url(SHA-256(grant_compact ASCII bytes)) — REQ1-CLAIM-ath.
-    // Gate SHA-256 on the FULL scan the reference runs (compact_jws.ex:16-27):
-    // total <= compact_bytes AND a well-formed 3-segment canonical compact, so
-    // an empty / non-JWS / oversized caller-supplied grant compact is rejected
-    // before any hashing work (not just length-bounded).
-    if proof.grant_compact.len() as u64 > bounds.compact_bytes() {
-        return Err(Invalid);
-    }
-    compact::parse_compact(&proof.grant_compact)?;
+    // Gate SHA-256 on the reference `CompactJws.scan` (compact_jws.ex:16-27):
+    // total <= compact_bytes AND three non-empty segments each <=
+    // encoded_segment_bytes (signature dot-free). The scan does NOT require
+    // base64url canonicity — it gates hashing, not verification — so a
+    // non-canonical segment (e.g. `a!a`) passes, matching the reference.
+    scan_compact(proof.grant_compact.as_slice(), bounds)?;
     let mut ath_hasher = Sha256::new();
     ath_hasher.update(&proof.grant_compact);
     let ath = b64url_to_string(&base64url_encode(&ath_hasher.finalize()))?;
@@ -2597,49 +2630,77 @@ fn take_string_or_uri(value: Option<&JsonValue>, bounds: &Bounds) -> Result<Stri
     Ok(s.clone())
 }
 
-/// Validates a StringOrURI / identifier scalar: non-empty, ≤ identifier_bytes,
-/// no control/whitespace/DEL/non-ASCII; if it contains `:`, the scheme, the
-/// suffix's `%HH` percent-escapes, and (when `//` follows) the authority port
-/// grammar are checked (reference string_or_uri.ex:38-48 — only URI-permitted
-/// bytes and well-formed `%HH` escapes).
+/// Validates a StringOrURI / identifier scalar — a faithful port of the
+/// reference `string_or_uri.ex`. A colon-free value is a PLAIN string (any valid
+/// UTF-8 — `String.valid?`, automatic for a Rust `&str`); a colon-bearing value
+/// is a URI whose scheme is valid and whose every byte is alphanumeric, a URI
+/// punctuation byte (`-._~:/?#[]@!$&'()*+,;=`), or part of a well-formed `%HH`
+/// escape. There is NO global control/non-ASCII restriction on the plain branch
+/// (a prior byte loop over-rejected UTF-8 like "café" that the reference
+/// accepts); the URI branch's `uri_bytes` is what rejects non-URI bytes like `{`
+/// (`urn:{a}`). (The reference additionally requires `URI.new/1` to parse
+/// structurally with a scheme; for identifier-shaped inputs that is subsumed by
+/// `validate_scheme` + `validate_uri_bytes`, the load-bearing checks.)
 fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
     if s.is_empty() || s.len() as u64 > bounds.identifier_bytes() {
         return Err(Invalid);
     }
-    for b in s.bytes() {
-        if b <= 0x20 || b == 0x7f || b >= 0x80 {
-            return Err(Invalid);
-        }
-    }
     match s.find(':') {
-        None => Ok(()), // opaque string
+        None => Ok(()), // plain string — any valid UTF-8 (a Rust &str guarantees it)
         Some(colon) => {
-            let scheme = &s[..colon];
-            validate_scheme(scheme)?;
-            let rest = &s[colon + 1..];
-            validate_percent_escapes(rest)?;
-            if let Some(after) = rest.strip_prefix("//") {
-                let auth_end = after.find('/').unwrap_or(after.len());
-                validate_authority_port(&after[..auth_end])?;
-            }
+            validate_scheme(&s[..colon])?;
+            validate_uri_bytes(s.as_bytes())?;
+            // Structural authority/port check (the reference delegates to URI.new;
+            // the corpus case `http://a:b` exercises it — a `:` after the host,
+            // outside an IP-literal bracket, MUST introduce an all-digit port).
+            // uri_bytes already permits `:`/`/`, so this is the structural gate
+            // that rejects malformed authorities.
+            validate_authority_port(s)?;
             Ok(())
         }
     }
 }
 
-/// Every `%` in `s` MUST be followed by two hex digits (a well-formed `%HH`
-/// percent-escape); a bare `%` or `%G` is invalid (reference string_or_uri.ex).
-fn validate_percent_escapes(s: &str) -> Result<()> {
-    let b = s.as_bytes();
+/// Reference `URI.new` authority/port structure: when the URI has an authority
+/// (`://authority`), a `:` in the authority outside an IP-literal bracket (`[…]`)
+/// MUST introduce an all-digit port. Rejects e.g. `http://a:b` (port "b"). The
+/// reference enforces this via `URI.new`; this is the faithful structural gate.
+fn validate_authority_port(value: &str) -> Result<()> {
+    let after_scheme_host = match value.find("://") {
+        Some(i) => &value[i + 3..],
+        None => return Ok(()), // no authority (e.g. `urn:…`) — nothing to port-check
+    };
+    let auth_end = after_scheme_host
+        .find(['/', '?', '#'])
+        .unwrap_or(after_scheme_host.len());
+    let authority = &after_scheme_host[..auth_end];
+    if authority.starts_with('[') {
+        return Ok(()); // IP literal — colons inside […] are not a port.
+    }
+    if let Some(c) = authority.rfind(':') {
+        let port = &authority[c + 1..];
+        if port.is_empty() || !port.bytes().all(|b| b.is_ascii_digit()) {
+            return Err(Invalid);
+        }
+    }
+    Ok(())
+}
+
+/// Reference `string_or_uri.ex` `uri_bytes?/1`: every byte is alphanumeric, one
+/// of the URI punctuation bytes `-._~:/?#[]@!$&'()*+,;=`, or part of a
+/// well-formed `%HH` percent-escape. Rejects `{`, whitespace, control, non-ASCII,
+/// and a bare `%` / `%G` (`urn:{a}`, `urn:trunc%`).
+fn validate_uri_bytes(bytes: &[u8]) -> Result<()> {
+    const URI_PUNCT: &[u8] = b"-._~:/?#[]@!$&'()*+,;=";
     let mut i = 0;
-    while i < b.len() {
-        if b[i] == b'%' {
-            if i + 2 >= b.len() || !is_hex(b[i + 1]) || !is_hex(b[i + 2]) {
-                return Err(Invalid);
-            }
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b.is_ascii_alphanumeric() || URI_PUNCT.contains(&b) {
+            i += 1;
+        } else if b == b'%' && i + 2 < bytes.len() && is_hex(bytes[i + 1]) && is_hex(bytes[i + 2]) {
             i += 3;
         } else {
-            i += 1;
+            return Err(Invalid);
         }
     }
     Ok(())
@@ -2657,21 +2718,6 @@ fn validate_scheme(scheme: &str) -> Result<()> {
     }
     for &b in bytes {
         if !(b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.')) {
-            return Err(Invalid);
-        }
-    }
-    Ok(())
-}
-
-/// Checks the authority port grammar: a `:` after the host (outside an IP
-/// literal bracket) MUST introduce an all-digit, non-empty port.
-fn validate_authority_port(authority: &str) -> Result<()> {
-    if authority.starts_with('[') {
-        return Ok(()); // IP literal — colons inside brackets are not a port.
-    }
-    if let Some(c) = authority.find(':') {
-        let port = &authority[c + 1..];
-        if port.is_empty() || !port.bytes().all(|b| b.is_ascii_digit()) {
             return Err(Invalid);
         }
     }
@@ -3814,24 +3860,38 @@ mod tests {
     }
 
     #[test]
-    fn red_encode_rejects_malformed_chain_id() {
-        // chain_id is a StringOrURI identifier, not an arbitrary string
-        // (reference consumption_chain.ex:169-172 valid_identifier?). An empty
-        // chain_id and one carrying a control byte are rejected at encode.
-        // RED-capable: removing the validate_identifier call makes these accept.
+    fn red_encode_chain_id_string_or_uri() {
+        // chain_id is a StringOrURI identifier, faithfully ported from
+        // string_or_uri.ex (consumption_chain.ex:169-172 valid_identifier?). A
+        // colon-free value is a PLAIN string — any valid UTF-8 (incl. "café" and
+        // a newline) is accepted; a colon-bearing value is a URI whose scheme is
+        // valid and whose every byte is alnum / URI-punctuation / %HH. The
+        // URI-branch rejections are RED-capable (removing validate_identifier /
+        // validate_uri_bytes makes them accept).
         let mk = |chain_id: &str| ConsumptionEntry {
             chain_id: chain_id.to_string(),
             commitment: [1u8; 32],
             previous_hash: [0u8; 32],
             sequence: 1,
         };
+        // Plain branch: any UTF-8 (length-bounded) is accepted.
+        assert!(encode_consumption_entry(&mk("café"), &max()).is_ok());
+        assert!(encode_consumption_entry(&mk("chain\nid"), &max()).is_ok());
+        // Empty rejected (length).
         assert_eq!(encode_consumption_entry(&mk(""), &max()), Err(Invalid));
+        // URI branch: bad scheme / byte / %HH / authority-port rejected.
         assert_eq!(
-            encode_consumption_entry(&mk("chain\nid"), &max()),
+            encode_consumption_entry(&mk("1bad:u"), &max()),
             Err(Invalid)
         );
-        // A `:`-bearing identifier with a malformed %HH escape is rejected
-        // (reference string_or_uri.ex:38-48 — well-formed %HH required).
+        assert_eq!(
+            encode_consumption_entry(&mk("urn:{a}"), &max()),
+            Err(Invalid)
+        );
+        assert_eq!(
+            encode_consumption_entry(&mk("http://a:b"), &max()),
+            Err(Invalid)
+        );
         assert_eq!(
             encode_consumption_entry(&mk("urn:exa%GGmple"), &max()),
             Err(Invalid)
@@ -3840,9 +3900,25 @@ mod tests {
             encode_consumption_entry(&mk("urn:trunc%"), &max()),
             Err(Invalid)
         );
-        // Sanity: valid StringOrURIs (opaque + a well-formed %HH) still encode.
+        // Valid URIs (opaque-suffix + well-formed %HH) accepted.
         assert!(encode_consumption_entry(&mk("urn:example:chain"), &max()).is_ok());
         assert!(encode_consumption_entry(&mk("urn:exa%41mple"), &max()).is_ok());
+    }
+
+    /// scan_compact faithfully ports the reference `CompactJws.scan`: it gates
+    /// hashing on shape + size, NOT base64url canonicity. A non-canonical
+    /// segment (e.g. `a!a`) passes the scan (the reference accepts it for ath);
+    /// an over-canonical check (the prior parse_compact) would wrongly reject it.
+    #[test]
+    fn scan_compact_accepts_non_canonical_segment() {
+        // `a!a.YQ.YQ` — three non-empty dot-free size-bounded segments; `a!a` is
+        // NOT canonical base64url but the reference scan does not require it.
+        assert!(scan_compact(b"a!a.YQ.YQ", &max()).is_ok());
+        // Shape/size rejections still fire.
+        assert_eq!(scan_compact(b"", &max()), Err(Invalid)); // no dots
+        assert_eq!(scan_compact(b"a.b", &max()), Err(Invalid)); // one dot
+        assert_eq!(scan_compact(b".b.c", &max()), Err(Invalid)); // empty protected
+        assert_eq!(scan_compact(b"a.b.c.d", &max()), Err(Invalid)); // signature has '.'
     }
 
     // --- Chain canonical re-encode check ---
