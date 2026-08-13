@@ -182,6 +182,16 @@ guidance with normative force at submission time:
   defined once at submission; name reserved in the registries) prevents each deployment from
   improvising its own. The library still never performs I/O; the deployment requirement sits at
   the layer that already owns key resolution and replay state.
+- **Offline-eligible floor limits.** For endpoints that must answer during a connectivity window
+  (kiosk / EV-charging / vending fleets), an issuer MAY price an offline risk acceptance into a
+  grant via floor-limit claims (the reserved `ba_offline`): maximum value with explicit currency,
+  maximum offline use count, and an offline-window expiry. The endpoint honors these at its own
+  risk within the window; the runtime (in the private `bounded_authority`) reconciles deferred
+  consumption and surfaces over-consumption as a first-class event. The closed claim shape, the
+  non-authorizing facts contract, the `ba_dlg` attenuation composition, and the successor-major
+  activation are specified in [ADR 0016](../adr/0016-offline-eligible-grant-claims.md); the
+  requirements are [R-BAP-1..6](offline-authorization-requirements.md). The closed v1 profile
+  rejects the reserved name today; activation arrives with a successor contract-major.
 
 ## Principal binding
 

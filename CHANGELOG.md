@@ -6,6 +6,23 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- **BAP-17 — offline-eligible grant claims (reserve + specify).** Reserve the `ba_offline`
+  grant-payload claim name in the [registries](docs/design/registries.md) (issuer-set offline
+  floor limits: maximum value with explicit currency, maximum offline use count, offline-window
+  expiry — a closed nested object; absence means online-only, per
+  [R-BAP-1](docs/design/offline-authorization-requirements.md)). [ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)
+  carries the activating-major mechanism to spec quality: the closed `{cnt, cur, max, win}` object,
+  the non-authorizing facts contract (an `offline_eligible` flag + `win` only — magnitudes are read
+  from the decoded grant, not redacted facts), malformed⇒`:invalid` (online-only is the *absent*
+  default), a wire-layer `max × cnt` ceiling (the cross-language SDKs compute exposure in fixed-width
+  integers), the `ba_dlg` attenuation composition, and the freshness scoping. **Activation is a
+  successor contract-major** — the closed v1 profile rejects `ba_offline` today (the `v0.1.0`-amend
+  alternative was considered and is the heavier path: the published governance change-class rule, the
+  three corpus-SHA-pinning SDKs, and intra-major fragmentation). This is a design-only slice: zero
+  `lib/`/`docs/protocol-v1.md`/`priv/conformance/` wire-behavior change (mirror BAP-11/BAP-14); an
+  R-BAP-2 legacy-rejection tripwire is added under `test/`. The offline runtime arc (private
+  `bounded_authority` BA-20..23) is successor-major-gated by this reservation.
+
 - Close the **BAP-15 Rust verifier SDK** (Tasks 15–17 + closeout; the library Tasks 1–14 were already
   landed and verified green). `sdks/rust/tests/permissiveness.rs` is the named per-language permissiveness
   battery exercising all six ADR 0014 D6 closures through the public crate boundary (duplicate-reject,
