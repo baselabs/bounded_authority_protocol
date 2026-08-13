@@ -1266,3 +1266,83 @@ def test_assemble_compact_facade_rejects_numeric_iss():
         b"\x00" * 64,
     )
     assert not r.is_ok, "numeric iss must reject (field re-parse)"
+
+
+def test_assemble_compact_facade_rejects_noncanonical_anchor():
+    """Canonical-form (boundary_anchor_codec.ex:95-96,118-119): the protected AND payload segments of
+    an anchor compact must be the exact JCS encoding. The façade (and verify) now enforce this on
+    both segments — without the check the façade accepts the non-canonical compact."""
+    import json as _json
+
+    def _reorder(segment_text: bytes) -> bytes:
+        # segment_text is base64url TEXT; decode, reverse the JSON member order (values unchanged),
+        # re-encode — non-canonical bytes, same valid fields.
+        pad = b"=" * (-len(segment_text) % 4)
+        obj = _json.loads(base64.urlsafe_b64decode(segment_text + pad).decode("utf-8"))
+        keys = list(reversed(list(obj.keys())))
+        body = "{" + ",".join(_json.dumps(k) + ":" + _json.dumps(obj[k]) for k in keys) + "}"
+        return base64.urlsafe_b64encode(body.encode("utf-8")).rstrip(b"=")
+
+    pub = _fresh_key()[0]
+    si = boundary_anchor_signing_input(BoundaryAnchorProducer(
+        anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain",
+        sequence=0, chain_hash=Z32, key_id="archive-a", public_key=pub,
+    ))
+    assert si.is_ok, "anchor signing input failed"
+    canon_header, canon_payload = si.value.protected_segment, si.value.payload_segment
+    sig = b"\x00" * 64
+    # Non-canonical protected header, canonical payload → reject (header canonical check).
+    r = assemble_compact(
+        SigningInput(kind="boundary_anchor", protected_segment=_reorder(canon_header), payload_segment=canon_payload), sig)
+    assert not r.is_ok, "non-canonical anchor header must reject"
+    # Canonical header, non-canonical payload → reject (payload canonical check).
+    r = assemble_compact(
+        SigningInput(kind="boundary_anchor", protected_segment=canon_header, payload_segment=_reorder(canon_payload)), sig)
+    assert not r.is_ok, "non-canonical anchor payload must reject"
+
+
+def test_assemble_compact_facade_rejects_noncanonical_transition():
+    """Canonical-form (key_transition_codec.ex:127-128,151-152): the protected AND payload segments
+    of a transition compact must be the exact JCS encoding. Symmetric to the anchor test above —
+    proves the transition canonical checks fire (without them the façade accepts the non-canonical
+    compact)."""
+    import json as _json
+
+    def _reorder(segment_text: bytes) -> bytes:
+        pad = b"=" * (-len(segment_text) % 4)
+        obj = _json.loads(base64.urlsafe_b64decode(segment_text + pad).decode("utf-8"))
+        keys = list(reversed(list(obj.keys())))
+        body = "{" + ",".join(_json.dumps(k) + ":" + _json.dumps(obj[k]) for k in keys) + "}"
+        return base64.urlsafe_b64encode(body.encode("utf-8")).rstrip(b"=")
+
+    cur_pub = _fresh_key()[0]
+    nxt_pub = _fresh_key()[0]
+    si = key_transition_signing_input(KeyTransitionProducer(
+        transition_id="urn:example:transition:a-b", chain_id="urn:example:chain", effective_at=1500,
+        current_key_id="anchor-a", current_public_key=cur_pub,
+        next_key_id="anchor-b", next_public_key=nxt_pub,
+    ))
+    assert si.is_ok, "transition signing input failed"
+    canon_header, canon_payload = si.value.protected_segment, si.value.payload_segment
+    sig = b"\x00" * 64
+    # Non-canonical protected header, canonical payload → reject (header canonical check).
+    r = assemble_compact(
+        SigningInput(kind="key_transition", protected_segment=_reorder(canon_header), payload_segment=canon_payload), sig)
+    assert not r.is_ok, "non-canonical transition header must reject"
+    # Canonical header, non-canonical payload → reject (payload canonical check).
+    r = assemble_compact(
+        SigningInput(kind="key_transition", protected_segment=canon_header, payload_segment=_reorder(canon_payload)), sig)
+    assert not r.is_ok, "non-canonical transition payload must reject"
+
+
+def test_decode_grant_rejects_wrong_signature_width():
+    """Reference parse_grant (runtime.ex:237) requires byte_size(signature) == signature_bytes (64).
+    The SDK decode path (parse_compact) now enforces this; a grant compact with a 32-byte signature
+    rejects where it previously decoded to Ok."""
+    g = _signed_grant()
+    parts = g["compact"].split(b".")
+    bad = parts[0] + b"." + parts[1] + b"." + base64.urlsafe_b64encode(b"\x00" * 32).rstrip(b"=")
+    r = decode_grant(bad)
+    assert not r.is_ok, "wrong-width signature must reject"
+
+

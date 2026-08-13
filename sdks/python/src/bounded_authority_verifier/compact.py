@@ -54,6 +54,12 @@ def parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegmen
     protected_bytes = base64url_decode(protected_text, bounds_resolve(b, "decoded_segment_bytes"))
     payload_bytes = base64url_decode(payload_text, bounds_resolve(b, "decoded_segment_bytes"))
     signature = base64url_decode(signature_text)
+    # Decoded signature-width gate (runtime.ex:237 parse_grant, :259 parse_proof,
+    # boundary_anchor_codec.ex:88, key_transition_codec.ex:120 all enforce byte_size(signature) ==
+    # signature_bytes). scan_compact (the ath/hash gate) intentionally does NOT — it mirrors
+    # CompactJws.scan (shape+size only); the decoded-width check belongs to the decode path.
+    if len(signature) != bounds_resolve(b, "signature_bytes"):
+        fail("compact: signature width")
     signing_input = protected_text + bytes([_DOT]) + payload_text
     return CompactSegments(
         protected_segment=protected_text,

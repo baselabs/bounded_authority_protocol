@@ -342,7 +342,11 @@ def _parse_anchor_header(seg: CompactSegments, bounds: Bounds) -> str:
     h = _require_object_exact(h, ["alg", "typ", "kid"], "anchor header")
     _require_string_lit(h, "alg", ALG, "anchor header alg")
     _require_string_lit(h, "typ", ANCHOR_TYP, "anchor header typ")
-    return _require_kid(h, bounds)
+    kid = _require_kid(h, bounds)
+    # Canonical form: the protected segment must be the exact JCS encoding (boundary_anchor_codec.ex:95-96).
+    if not _bytes_equal(jcs_encode(h, bounds), seg.protected_bytes):
+        fail("anchor header: canonical")
+    return kid
 
 
 def _parse_transition_header(seg: CompactSegments, bounds: Bounds) -> str:
@@ -350,7 +354,11 @@ def _parse_transition_header(seg: CompactSegments, bounds: Bounds) -> str:
     h = _require_object_exact(h, ["alg", "typ", "kid"], "transition header")
     _require_string_lit(h, "alg", ALG, "transition header alg")
     _require_string_lit(h, "typ", TRANSITION_TYP, "transition header typ")
-    return _require_kid(h, bounds)
+    kid = _require_kid(h, bounds)
+    # Canonical form: the protected segment must be the exact JCS encoding (key_transition_codec.ex:127-128).
+    if not _bytes_equal(jcs_encode(h, bounds), seg.protected_bytes):
+        fail("transition header: canonical")
+    return kid
 
 
 def _require_kid(h: JObject, bounds: Bounds) -> str:
@@ -613,7 +621,7 @@ def _validate_proof_payload(p: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
             fail("proof: nonce bytes")
 
 
-def _validate_anchor_payload(p: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
+def _validate_anchor_payload(p: Tagged, payload_bytes: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
     p = _require_object_exact(
         p,
         ["anchor_id", "anchored_at", "chain_hash", "chain_id", "key_fingerprint", "sequence", "v"],
@@ -628,9 +636,12 @@ def _validate_anchor_payload(p: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> None
     _require_int(p.v.get("sequence"), "sequence")
     _require_b64url_n(p.v.get("chain_hash"), "chain_hash", 32)
     _require_b64url_n(p.v.get("key_fingerprint"), "key_fingerprint", 32)
+    # Canonical form: the payload segment must be the exact JCS encoding (boundary_anchor_codec.ex:118-119).
+    if not _bytes_equal(jcs_encode(p, bounds), payload_bytes):
+        fail("anchor payload: canonical")
 
 
-def _validate_transition_payload(p: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
+def _validate_transition_payload(p: Tagged, payload_bytes: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
     p = _require_object_exact(
         p,
         [
@@ -655,6 +666,9 @@ def _validate_transition_payload(p: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> 
         fail("transition: to_key_id bytes")
     if _KID_CHARSET.match(s) is None:
         fail("transition: to_key_id charset")
+    # Canonical form: the payload segment must be the exact JCS encoding (key_transition_codec.ex:151-152).
+    if not _bytes_equal(jcs_encode(p, bounds), payload_bytes):
+        fail("transition payload: canonical")
 
 
 def _in_window(time: int, key: HistoricalPublicKey) -> bool:
@@ -1400,10 +1414,10 @@ def assemble_compact(input_: SigningInput, signature: bytes) -> Result[bytes]:
             _validate_proof_payload(payload, b)
         elif input_.kind == "boundary_anchor":
             _parse_anchor_header(seg, b)
-            _validate_anchor_payload(payload, b)
+            _validate_anchor_payload(payload, seg.payload_bytes, b)
         elif input_.kind == "key_transition":
             _parse_transition_header(seg, b)
-            _validate_transition_payload(payload, b)
+            _validate_transition_payload(payload, seg.payload_bytes, b)
         else:
             fail("assemble_compact: kind")
         return compact
@@ -1623,7 +1637,7 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
     if expected.key_id != key.key_id:
         fail("verify_historical_anchor: expected key id")
     p = json_decode(seg.payload_bytes, b)
-    _validate_anchor_payload(p, b)
+    _validate_anchor_payload(p, seg.payload_bytes, b)
     if not isinstance(p, JObject):
         fail("verify_historical_anchor: payload object")
     anchor_id = _require_string_or_uri(p.v.get("anchor_id"), "anchor_id", b)
@@ -1682,7 +1696,7 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
     if expected.next_key_id != new_key.key_id:
         fail("verify_key_transition: next key id")
     p = json_decode(seg.payload_bytes, b)
-    _validate_transition_payload(p, b)
+    _validate_transition_payload(p, seg.payload_bytes, b)
     if not isinstance(p, JObject):
         fail("verify_key_transition: payload object")
     transition_id = _require_string_or_uri(p.v.get("transition_id"), "transition_id", b)
@@ -1882,7 +1896,7 @@ def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: E
     if expected.key_id != key.key_id:
         fail(f"{ctx}: expected key id")
     p = json_decode(seg.payload_bytes, b)
-    _validate_anchor_payload(p, b)
+    _validate_anchor_payload(p, seg.payload_bytes, b)
     if not isinstance(p, JObject):
         fail(f"{ctx}: payload object")
     anchor_id = _require_string_or_uri(p.v.get("anchor_id"), "anchor_id", b)
@@ -1932,7 +1946,7 @@ def _verify_transition_compact(compact: bytes, current_key: HistoricalPublicKey,
     if expected.next_key_id != next_key.key_id:
         fail(f"{ctx}: next key id")
     p = json_decode(seg.payload_bytes, b)
-    _validate_transition_payload(p, b)
+    _validate_transition_payload(p, seg.payload_bytes, b)
     if not isinstance(p, JObject):
         fail(f"{ctx}: payload object")
     transition_id = _require_string_or_uri(p.v.get("transition_id"), "transition_id", b)
