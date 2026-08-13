@@ -25,7 +25,13 @@ from .bounds import (  # noqa: F401
     bounds_resolve,
     coerce_bounds,
 )
-from .compact import CompactSegments, SigningInput, assemble_compact, parse_compact  # noqa: F401
+from .compact import (  # noqa: F401
+    CompactSegments,
+    SigningInput,
+    assemble_segments,
+    parse_compact,
+    scan_compact,
+)
 from .digest import request_digest as compute_request_digest
 from .ed25519 import ed25519_verify, import_public_key, sha256
 from .error import InvalidError, Ok, Result, err, fail, invalid_error, require
@@ -917,7 +923,10 @@ def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: E
         fail("check_envelope: proof signature")
     if not isinstance(pp, JObject):
         fail("check_envelope: proof payload")
-    # ath = SHA-256(ASCII grant compact).
+    # ath = SHA-256(ASCII grant compact), gated by scan (shape+size, not canonicity) — mirrors
+    # CompactJws.hash (compact_jws.ex:60-66 scan then hash). The grant was already parsed above, so
+    # this scan is redundant for verify but matches the reference's hash gate exactly.
+    scan_compact(grant_compact, b)
     ath_raw = sha256(grant_compact)
     ath_b64 = utf8_str(base64url_encode(ath_raw))
     pp_ath = pp.v["ath"]
@@ -1323,6 +1332,10 @@ def _proof_signing_input_body(proof: ProofProducer, bounds: Bounds | None) -> Si
         "jwk": _jwk_to_tagged(jwk),
         "typ": JString(str_utf8(PROOF_TYP)),
     }
+    # Producer ath: gate the grant compact by scan (shape+size, NOT base64url canonicity) before
+    # hashing it into `ath` — mirrors CompactJws.ath (compact_jws.ex:53-58 scan then hash). A
+    # caller-supplied non-compact grant must not be embedded as sha256(garbage) in the proof.
+    scan_compact(proof.grant_compact, b)
     ath_raw = sha256(proof.grant_compact)
     ba_req_raw = compute_request_digest(proof.operation, proof.cast_arguments, b)
     payload_members: dict[str, Tagged] = {
@@ -1354,7 +1367,45 @@ def _jwk_to_tagged(jwk: OkpPublic) -> Tagged:
     return JObject(members)
 
 
-# 11. assemble_compact (REQ1-VERIFY-no-signer-callback). Re-exported from compact.
+# 11. assemble_compact (REQ1-VERIFY-no-signer-callback; public /2 contract, protocol-v1.md:299,319).
+# Mirrors runtime.ex:147-155 assemble_compact: assemble via the low-level assembler, then
+# validate_assembled_compact (runtime.ex:754-780) re-parses the composed compact per kind. The
+# signing-input gates (kind↔typ, segment bounds, base64url payload, compact_bytes) come from
+# CompactJws.assemble's valid_signing_input? (compact_jws.ex:36,80-101). The public contract carries
+# no caller bounds, so the profile maximum (MAXIMUM_BOUNDS) is used. A mislabeled kind (typ ≠ kind),
+# oversized segment, non-base64url payload, or malformed payload content fails closed — the producer
+# must not mint bytes its own consumer (verify) would reject.
+def assemble_compact(input_: SigningInput, signature: bytes) -> Result[bytes]:
+    def body() -> bytes:
+        b = MAXIMUM_BOUNDS
+        assembled = assemble_segments(input_, signature)
+        if not isinstance(assembled, Ok):
+            fail("assemble_compact: signing input")
+        compact = assembled.value
+        if len(compact) > bounds_resolve(b, "compact_bytes"):
+            fail("assemble_compact: compact_bytes")
+        # Re-parse the composed compact per kind (validate_assembled_compact). parse_compact enforces
+        # the segment bounds + base64url decode; _parse_xxx_header enforces kind↔typ;
+        # _validate_xxx_payload enforces the full payload structure.
+        seg = parse_compact(compact, b)
+        payload = json_decode(seg.payload_bytes, b)
+        if input_.kind == "grant":
+            _parse_grant_header(seg, b)
+            _validate_grant_payload(payload, b)
+        elif input_.kind == "proof":
+            _parse_proof_header(seg, b)
+            _validate_proof_payload(payload, b)
+        elif input_.kind == "boundary_anchor":
+            _parse_anchor_header(seg, b)
+            _validate_anchor_payload(payload, b)
+        elif input_.kind == "key_transition":
+            _parse_transition_header(seg, b)
+            _validate_transition_payload(payload, b)
+        else:
+            fail("assemble_compact: kind")
+        return compact
+
+    return _trying(body)
 
 
 # 12. boundary_anchor_signing_input (ADR 0004 § Boundary anchors).
@@ -1474,6 +1525,12 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     parts.extend(_frame(r) for r in input_.rows)
     parts.append(_frame(input_.end_anchor))
     archive = b"".join(parts)
+    # Aggregate chunk-count bound (anchored_export_codec.ex:69 validate_chunks enforces archive_chunks
+    # DURING encode, not only archive_bytes). Frame count = prefix + header + start + transitions +
+    # rows + end. A producer must not mint an archive its own consumer rejects.
+    frame_count = 4 + len(input_.transitions) + len(input_.rows)
+    if frame_count > bounds_resolve(b, "archive_chunks"):
+        fail("encode_anchored_export: archive_chunks")
     if len(archive) > bounds_resolve(b, "archive_bytes"):
         fail("encode_anchored_export: archive_bytes")
     return EncodedAnchoredExport(archive=archive, digest=sha256(archive))
@@ -1690,16 +1747,20 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # validate_chunks): each chunk nonempty, count < archive_chunks, total ≤ archive_bytes. Hashing
     # happens after the shape is validated.
     _validate_chunks(archived.chunks, b)
-    archive = b"".join(archived.chunks)
-    if len(archive) <= len(ARCHIVE_PREFIX):
-        fail("verify_anchored_export: archive too short")
-    if len(archive) > bounds_resolve(b, "archive_bytes"):
-        fail("verify_anchored_export: byte bound")
-    digest = sha256(archive)
+    # Stream the digest over the chunks WITHOUT materializing the whole archive first (reference
+    # hash_chunks, anchored_export_codec.ex:705-714 — incremental SHA-256 per chunk, no concat). An
+    # inauthentic/oversized archive is rejected at the digest compare before the parse materializes
+    # the bytes (BAP-15 Rust precedent, v1.rs:30-40). archive_bytes is already enforced by
+    # _validate_chunks (running total), so no post-materialization byte bound is needed.
+    digest = sha256(*archived.chunks)
     if not _bytes_equal(digest, expected.digest):
         fail("verify_anchored_export: digest")
     if archived.version != expected.object_version:
         fail("verify_anchored_export: object version")
+    # Materialize for parsing ONLY after the digest matches (caller-legitimate, bounded archive).
+    archive = b"".join(archived.chunks)
+    if len(archive) <= len(ARCHIVE_PREFIX):
+        fail("verify_anchored_export: archive too short")
     parsed = _parse_archive(archive, b)
     # Header canonical equality.
     header_members: dict[str, Tagged] = {
