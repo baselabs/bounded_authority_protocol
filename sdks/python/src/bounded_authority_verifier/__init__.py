@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMA, MAXIMUM_BOUNDS, Bounds, bounds_maximum, bounds_new, coerce_bounds
-from .compact import SigningInput, assemble_segments
+from .compact import SigningInput
 from .digest import REQUEST_PREFIX, typed_project
 from .ed25519 import sha256
 from .error import Err, InvalidError, Ok, Result, err, fail, ok, require
@@ -115,7 +115,6 @@ __all__ = [
     "grant_signing_input",
     "proof_signing_input",
     "assemble_compact",
-    "assemble_segments",
     "boundary_anchor_signing_input",
     "key_transition_signing_input",
     "encode_anchored_export",
