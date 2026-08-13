@@ -320,7 +320,11 @@ mod tests {
                         protected_segment: protected.to_vec(),
                         payload_segment: payload.to_vec(),
                     };
-                    let compact = compose_compact(&input, &sig).expect("valid case assembles");
+                    // Exercise the PUBLIC crate::assemble_compact (compose +
+                    // per-kind content validation), not the internal composer —
+                    // so the conformance corpus covers the spec surface.
+                    let compact =
+                        crate::assemble_compact(&input, &sig).expect("valid case assembles");
                     let expected_compact = case["expected"]["compact"]
                         .as_str()
                         .unwrap_or_else(|| panic!("valid case {id} missing expected.compact"));
