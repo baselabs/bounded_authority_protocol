@@ -80,6 +80,21 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
           replace_json(compact, 0, &Map.put(&1, "crit", ["alg"])),
           replace_json(compact, 1, &Map.put(&1, "v", 2)),
           replace_json(compact, 1, &Map.put(&1, "extra", true)),
+          # R-BAP-2 / BAP-17: a reserved-but-inactive grant claim (`ba_offline`, the offline
+          # floor-limit object) is rejected by the closed v1 payload set exactly like any other
+          # unlisted member — a verifier that predates the claim denies a grant carrying it.
+          # This is the reference-implementation tripwire against silently admitting the reserved
+          # name; activation is a successor contract-major (ADR 0016).
+          replace_json(
+            compact,
+            1,
+            &Map.put(&1, "ba_offline", %{
+              "cnt" => 3,
+              "cur" => "USD",
+              "max" => 5000,
+              "win" => 1_700_000_000
+            })
+          ),
           replace_json(compact, 1, &Map.put(&1, "aud", [])),
           replace_json(compact, 1, &Map.put(&1, "aud", 1)),
           replace_json(compact, 1, &Map.put(&1, "iss", "bad: space")),
