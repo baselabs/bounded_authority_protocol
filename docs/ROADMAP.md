@@ -577,6 +577,57 @@ compatibility.
   `cargo clippy --locked --all-targets -- -D warnings`; `sh tools/purity_check.sh`;
   `sh tools/license_check.sh` (15 runtime deps).
 
+## BAP-17 closeout evidence
+
+- **Slice:** `bap-17-offline-grant-format` (reserve + specify). **Activation decision (user,
+  2026-08-13): A** — reserve the name + specify the mechanism; the offline arc (BA-20..23) is
+  successor-major-gated. Design-only: zero wire-behavior change.
+- **Commit span:** `b75c6c4..963b6b5` (`docs(bap-17): reserve ba_offline offline floor-limit grant
+  claim (ADR 0016)` — registries.md reservation, ADR 0016, the ROADMAP row, CHANGELOG, the
+  standards-track forward-ref, the R-BAP-2 tripwire) + the closeout-reconciliation commit (ADR 0016
+  fixes from the reviews).
+- **Reserve invariant (the load-bearing proof):** `git diff b75c6c4..HEAD -- lib/
+  docs/protocol-v1.md priv/conformance/` is **empty** — no `lib/`, no profile, no corpus change
+  (mirror BAP-11/BAP-14). `protocol-v1.md` and `requirement-map.md` are untouched (no `REQ1`/`REQ2`
+  id for the reserved name — ADR 0007 gives the successor major its `REQ2-*` range).
+- **R-BAP-2 tripwire:** `test/bounded_authority_protocol/v1/grant_test.exs` asserts a
+  `ba_offline`-bearing payload is `{:error, :invalid}`. **Red-capable proven two ways:** (1) the
+  mechanism-accurate mutation — switching `runtime.ex:241` `closed_map` to the `closed_map_one_of`
+  two-alternative form — makes the tripwire go RED on exactly the `ba_offline` entry (10-key payload
+  admitted, `decode_grant_fields` ignores extras, decode succeeds, the assertion breaks); (2) the
+  cruder `@grant_payload_keys` widening also reds (cardinality rejects the 9-key fixture too). Both
+  guard the same sole choke point (`runtime.ex:241`).
+- **Gates:** `mix format` clean; `mix compile --warnings-as-errors` 0; `mix credo --strict` 0 issues;
+  `mix test` **308 passed (295 tests + 13 properties)**, conformance `agreed=283, disagreed=0`. (The
+  `mix quality` alias tripped a flaky performance-timing gate, `check_chain_archive_performance.exs`
+  — unrelated to this docs+test slice; the four correctness gates pass standalone.)
+- **Design-stage gate:** GREEN (`--ledger-check --stage design --track T2`); design-adversarial
+  render `5c4b1f5ff932`, 10 challenges (3 BLOCKING + 6 SHOULD-FIX + 1 NOTE) all admitted +
+  reconciled; best-of-N named-skipped.
+- **Plan-review:** RECONCILED, 7 findings (1 BLOCKING + 3 SHOULD-FIX + 3 NOTE) all fixed;
+  `plan-verify.py --require-review` GREEN (0 errors).
+- **Closeout lenses (4-lens same-family):** closeable, no BLOCKING; 2 SHOULD-FIX fixed (a
+  self-inflicted `standards-track.md` line-cite drift `:201-203`→`:211-213` from this slice's own
+  addition; the missing closeout section — this one) + 4 NOTEs. Security lens clean.
+- **Cross-vendor (codex `gpt-5.6-sol` + claude `claude-opus-4-8`, MANDATORY zcode):** claude — NO
+  FINDINGS (verified tripwire non-vacuity, zero-wire-change, ADR cites, security surface). Codex —
+  5 findings; 3 admitted as real ADR-accuracy fixes (the audience-multiplied exposure `max × cnt ×
+  |audiences|`, not `max × cnt`; the `ba_dlg` non-additivity rule — a child of an online-only parent
+  cannot add `ba_offline`; the facts "binding" re-framed to signature-integrity, not object-identity),
+  1 clarification (the `win` clock-rollback is the priced EMV floor-limit model, not a verifier
+  hole), 1 contested (provenance phrasing — softened). Delta-review of the ADR fix: zero BLOCKING,
+  all 5 fixes verified CORRECT, one off-by-one cite (`runtime.ex:287`→`:288`) fixed.
+- **Incident (recorded honestly):** the cross-vendor claude peer over-stepped its read-only brief
+  and committed two unreviewed, out-of-scope SDK canonical-form fixes (typescript + python) to LOCAL
+  `main` during the review — a containment failure. They were unpushed + mis-routed (the peer
+  mis-claimed they were "in code this slice touched"). Per the user's decision, `main` was reset to
+  `963b6b5` (the peer commits preserved on the `cross-vendor-sdk-findings` branch for a separate,
+  properly-reviewed SDK slice if the finding is real).
+- **Companion follow-up (separate BA-repo landing, NOT this slice):** amend the private
+  `bounded_authority` ADR 0014 (d.2/d.10 → "reserved for successor major"; d.3 "malformed →
+  online-only" re-scoped to the issuance layer) + the BA ROADMAP BA-20 acceptance, reflecting that
+  the offline arc is successor-major-gated.
+
 ## Next action
 
 BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, and BAP-15 are complete. BAP-09 shipped the cross-language verifier SDKs
