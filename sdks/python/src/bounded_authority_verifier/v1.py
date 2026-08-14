@@ -1777,13 +1777,17 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
     if anchor_id != expected.anchor_id:
         fail("verify_historical_anchor: anchor_id")
     anchored_at = _require_int(p.v.get("anchored_at"), "anchored_at")
-    if anchored_at != expected.anchored_at:
+    if anchored_at != _expected_time(
+        expected.anchored_at, "verify_historical_anchor: anchored_at type"
+    ):
         fail("verify_historical_anchor: anchored_at")
     chain_id = _require_string_or_uri(p.v.get("chain_id"), "chain_id", b)
     if chain_id != expected.chain_id:
         fail("verify_historical_anchor: chain_id")
     sequence = _require_int(p.v.get("sequence"), "sequence")
-    if sequence != expected.sequence:
+    if sequence != _expected_time(
+        expected.sequence, "verify_historical_anchor: sequence type"
+    ):
         fail("verify_historical_anchor: sequence")
     chain_hash = _require_b64url_n(p.v.get("chain_hash"), "chain_hash", 32)
     if not _bytes_equal(chain_hash, expected.chain_hash):
@@ -1859,7 +1863,9 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
     if chain_id != expected.chain_id:
         fail("verify_key_transition: chain_id")
     effective_at = _require_int(p.v.get("effective_at"), "effective_at")
-    if effective_at != expected.effective_at:
+    if effective_at != _expected_time(
+        expected.effective_at, "verify_key_transition: effective_at type"
+    ):
         fail("verify_key_transition: effective_at")
     from_fp_raw = _require_b64url_n(p.v.get("from_key_fingerprint"), "from_key_fingerprint", 32)
     if not _bytes_equal(from_fp_raw, expected.current_key_fingerprint):
@@ -1927,6 +1933,10 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # pins every nested bounds to the top-level resolved bounds via `{:ok, ^bounds} <- Bounds.coerce(x.bounds)`.
     # The SDK previously preferred the outer bounds and silently discarded the nested value; pin them
     # explicitly so a mismatch fails closed, matching the reference.
+    # The count ceiling BEFORE any per-element walk (the Rust round-3 fix —
+    # cross-vendor: the pin walks ran unbounded caller input first).
+    if len(expected.transitions) > bounds_resolve(b, "key_transitions"):
+        fail("verify_anchored_export: transition count bound")
     _require_bounds_equal(expected.chain.bounds, b, "verify_anchored_export: chain bounds")
     _require_bounds_equal(expected.start_anchor.bounds, b, "verify_anchored_export: start anchor bounds")
     _require_bounds_equal(expected.end_anchor.bounds, b, "verify_anchored_export: end anchor bounds")
@@ -2087,13 +2097,17 @@ def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: E
     if anchor_id != expected.anchor_id:
         fail(f"{ctx}: anchor_id")
     anchored_at = _require_int(p.v.get("anchored_at"), "anchored_at")
-    if anchored_at != expected.anchored_at:
+    if anchored_at != _expected_time(
+        expected.anchored_at, "verify_historical_anchor: anchored_at type"
+    ):
         fail(f"{ctx}: anchored_at")
     chain_id = _require_string_or_uri(p.v.get("chain_id"), "chain_id", b)
     if chain_id != expected.chain_id:
         fail(f"{ctx}: chain_id")
     sequence = _require_int(p.v.get("sequence"), "sequence")
-    if sequence != expected.sequence:
+    if sequence != _expected_time(
+        expected.sequence, "verify_historical_anchor: sequence type"
+    ):
         fail(f"{ctx}: sequence")
     chain_hash = _require_b64url_n(p.v.get("chain_hash"), "chain_hash", 32)
     if not _bytes_equal(chain_hash, expected.chain_hash):
@@ -2153,7 +2167,9 @@ def _verify_transition_compact(compact: bytes, current_key: HistoricalPublicKey,
     if chain_id != expected.chain_id:
         fail(f"{ctx}: chain_id")
     effective_at = _require_int(p.v.get("effective_at"), "effective_at")
-    if effective_at != expected.effective_at:
+    if effective_at != _expected_time(
+        expected.effective_at, "verify_key_transition: effective_at type"
+    ):
         fail(f"{ctx}: effective_at")
     from_fp_raw = _require_b64url_n(p.v.get("from_key_fingerprint"), "from_key_fingerprint", 32)
     if not _bytes_equal(from_fp_raw, expected.current_key_fingerprint):

@@ -1872,11 +1872,18 @@ def test_archive_verify_key_validity_guards():
     # Control: the corpus archive verifies Ok.
     assert verify_anchored_export(obj, keys_ok, exp).is_ok
     # Fractional valid_from on the first key -> fail closed at the archive path.
+    # Shape-coupling guard: the tampered chains below rebuild keys_ok in full,
+    # replacing exactly one entry — a corpus reshape changes the count here and
+    # trips this assert, not a silent vacuity (the closing cross-vendor note).
+    assert len(keys_ok.keys) == len(exp.transitions) + 1
     bad0 = HistoricalPublicKey(key_id=keys_ok.keys[0].key_id, public_key=keys_ok.keys[0].public_key, valid_from=0.5, valid_before=keys_ok.keys[0].valid_before)  # type: ignore[arg-type]
-    assert not verify_anchored_export(obj, HistoricalKeyChain(keys=[bad0, keys_ok.keys[1]]), exp).is_ok
+    chain0 = [bad0 if i == 0 else k for i, k in enumerate(keys_ok.keys)]
+    assert not verify_anchored_export(obj, HistoricalKeyChain(keys=chain0), exp).is_ok
     # Huge bounded valid_before (2^62) on the last key -> fail closed.
-    bad1 = HistoricalPublicKey(key_id=keys_ok.keys[1].key_id, public_key=keys_ok.keys[1].public_key, valid_from=keys_ok.keys[1].valid_from, valid_before=4611686018427387904)
-    assert not verify_anchored_export(obj, HistoricalKeyChain(keys=[keys_ok.keys[0], bad1]), exp).is_ok
+    last = keys_ok.keys[-1]
+    bad1 = HistoricalPublicKey(key_id=last.key_id, public_key=last.public_key, valid_from=last.valid_from, valid_before=4611686018427387904)
+    chain1 = [bad1 if i == len(keys_ok.keys) - 1 else k for i, k in enumerate(keys_ok.keys)]
+    assert not verify_anchored_export(obj, HistoricalKeyChain(keys=chain1), exp).is_ok
 
 
 def test_bounds_inverted_window_rejects():
@@ -1910,3 +1917,42 @@ def test_bounds_inverted_window_rejects():
     assert verify_historical_anchor(compact, ok, expected).is_ok
     bad = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=1000, valid_before=1000)
     assert not verify_historical_anchor(compact, bad, expected).is_ok
+
+
+def test_expected_anchor_non_integral_rejects():
+    """The codex closing probe: float/bool EXPECTED fields equate to decoded ints
+    (1000.0 == 1000, False == 0) — type-strict expected ints fail closed."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+    from bounded_authority_verifier.jwk import public_key_thumbprint_raw
+    from bounded_authority_verifier.v1 import HistoricalPublicKey, verify_historical_anchor
+
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key().public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
+    si = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="anchor-t", anchored_at=1000, chain_id="chain-x",
+            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=pub,
+        )
+    )
+    assert si.is_ok
+    msg = si.value.protected_segment + b"." + si.value.payload_segment
+    sig = priv.sign(msg)
+    compact = si.value.protected_segment + b"." + si.value.payload_segment + b"." + _b64e(sig)
+    ok = ExpectedAnchor(
+        anchor_id="anchor-t", anchored_at=1000, chain_id="chain-x",
+        sequence=0, chain_hash=_Z32P, key_id="anchor-a",
+        key_fingerprint=public_key_thumbprint_raw(pub), bounds=None,
+    )
+    key = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=0, valid_before=None)
+    assert verify_historical_anchor(compact, key, ok).is_ok
+    for bad_kwargs in [{"anchored_at": 1000.0}, {"sequence": False}]:
+        bad = replace_ok(ok, **bad_kwargs)
+        assert not verify_historical_anchor(compact, key, bad).is_ok, bad_kwargs
+
+
+def replace_ok(ok, **kw):
+    from dataclasses import replace as _r
+
+    return _r(ok, **kw)

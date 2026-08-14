@@ -2034,7 +2034,7 @@ struct AnchorPayload {
 /// + 118-119) — enforced inside the validators below.
 fn decode_anchor_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedAnchor<'a>> {
     // The whole-input compact_bytes ceiling FIRST (the reference's scan gates it
-    // before the codec's anchor_bytes clause — compact_jws.ex:34-43; cross-vendor
+    // before the codec's anchor_bytes clause — compact_jws.ex:16-18; cross-vendor
     // round 4: a tightened compact_bytes below anchor_bytes was bypassed).
     if compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
@@ -2193,7 +2193,7 @@ fn decode_transition_parts<'a>(
     bounds: &Bounds,
 ) -> Result<DecodedTransition<'a>> {
     // The whole-input compact_bytes ceiling FIRST (the reference's scan gates it
-    // before the codec's anchor_bytes clause — compact_jws.ex:34-43; cross-vendor
+    // before the codec's anchor_bytes clause — compact_jws.ex:16-18; cross-vendor
     // round 4: a tightened compact_bytes below anchor_bytes was bypassed).
     if compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
