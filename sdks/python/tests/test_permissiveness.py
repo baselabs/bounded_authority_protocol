@@ -1807,3 +1807,73 @@ def test_bounds_magnitude_non_integral_rejects():
     for bad_from, bad_before in [(True, None), (0.5, None), (0, 2000.5), (False, None)]:
         key = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=bad_from, valid_before=bad_before)  # type: ignore[arg-type]
         assert not verify_historical_anchor(compact, key, expected).is_ok, (bad_from, bad_before)
+
+
+def b64_32_ea(v, k):
+    import base64
+
+    t = v[k]
+    return base64.urlsafe_b64decode(t + "=" * (-len(t) % 4))
+
+
+def test_archive_verify_key_validity_guards():
+    """Cross-vendor round 7: the ARCHIVE verify path guards key-window validity
+    (integral + magnitude). Built on the corpus' REAL signed anchored export —
+    the keys are caller-supplied, so only they are tampered."""
+    import json as _json
+    from pathlib import Path
+
+    corpus = Path(__file__).resolve().parents[3] / "priv" / "conformance" / "v1" / "corpus" / "cases" / "anchored-export" / "verify.json"
+    cases = _json.loads(corpus.read_text())["cases"]
+    c = next(x for x in cases if x["class"] == "valid")
+    inp = c["input"]
+    chunks = [
+        __import__("base64").urlsafe_b64decode(ch + "=" * (-len(ch) % 4))
+        for ch in inp["chunks"]
+    ]
+    obj = ArchivedObject(chunks=chunks, version=inp["version"])
+
+    def mk_key(v):
+        import base64
+
+        raw = base64.urlsafe_b64decode(v["public_key"] + "=" * (-len(v["public_key"]) % 4))
+        return HistoricalPublicKey(
+            key_id=v["key_id"], public_key=raw,
+            valid_from=v["valid_from"], valid_before=v.get("valid_before"),
+        )
+
+    keys_ok = HistoricalKeyChain(keys=[mk_key(k) for k in inp["keys"]])
+    e = inp["expected"]
+    ec = e["chain"]
+    exp = ExpectedExport(
+        chain=ExpectedChain(
+            chain_id=ec["chain_id"], first_sequence=ec["first_sequence"],
+            last_sequence=ec["last_sequence"], row_count=ec["row_count"],
+            previous_hash=b64_32_ea(ec, "previous_hash"), last_hash=b64_32_ea(ec, "last_hash"), bounds=None),
+        digest=b64_32_ea(e, "digest"),
+        start_anchor=ExpectedAnchor(anchor_id=e["start_anchor"]["anchor_id"], anchored_at=e["start_anchor"]["anchored_at"],
+            chain_id=e["start_anchor"]["chain_id"], sequence=e["start_anchor"]["sequence"],
+            chain_hash=b64_32_ea(e["start_anchor"], "chain_hash"), key_id=e["start_anchor"]["key_id"],
+            key_fingerprint=b64_32_ea(e["start_anchor"], "key_fingerprint"), bounds=None),
+        end_anchor=ExpectedAnchor(anchor_id=e["end_anchor"]["anchor_id"], anchored_at=e["end_anchor"]["anchored_at"],
+            chain_id=e["end_anchor"]["chain_id"], sequence=e["end_anchor"]["sequence"],
+            chain_hash=b64_32_ea(e["end_anchor"], "chain_hash"), key_id=e["end_anchor"]["key_id"],
+            key_fingerprint=b64_32_ea(e["end_anchor"], "key_fingerprint"), bounds=None),
+        transitions=[],
+        object_version=e["object_version"], bounds=None)
+    # transitions: reuse the same builder if present
+    for t in e.get("transitions", []):
+        exp.transitions.append(ExpectedKeyTransition(
+            chain_id=t["chain_id"], current_key_id=t["current_key_id"],
+            current_key_fingerprint=b64_32_ea(t, "current_key_fingerprint"),
+            effective_at=t["effective_at"], next_key_id=t["next_key_id"],
+            next_key_fingerprint=b64_32_ea(t, "next_key_fingerprint"),
+            transition_id=t["transition_id"], bounds=None))
+    # Control: the corpus archive verifies Ok.
+    assert verify_anchored_export(obj, keys_ok, exp).is_ok
+    # Fractional valid_from on the first key -> fail closed at the archive path.
+    bad0 = HistoricalPublicKey(key_id=keys_ok.keys[0].key_id, public_key=keys_ok.keys[0].public_key, valid_from=0.5, valid_before=keys_ok.keys[0].valid_before)  # type: ignore[arg-type]
+    assert not verify_anchored_export(obj, HistoricalKeyChain(keys=[bad0, keys_ok.keys[1]]), exp).is_ok
+    # Huge bounded valid_before (2^62) on the last key -> fail closed.
+    bad1 = HistoricalPublicKey(key_id=keys_ok.keys[1].key_id, public_key=keys_ok.keys[1].public_key, valid_from=keys_ok.keys[1].valid_from, valid_before=4611686018427387904)
+    assert not verify_anchored_export(obj, HistoricalKeyChain(keys=[keys_ok.keys[0], bad1]), exp).is_ok
