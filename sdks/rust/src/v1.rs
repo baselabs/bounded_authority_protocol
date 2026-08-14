@@ -1381,18 +1381,83 @@ pub fn encode_anchored_export(
         return Err(Invalid);
     }
 
-    // Start-anchor binding: start_anchor.sequence == first_sequence - 1.
+    // Expected-side consistency (reference validate_expected_export,
+    // anchored_export_codec.ex:344-375): every transition and both anchors
+    // belong to the expected chain; the anchors bind the chain's sequence span
+    // and hash boundaries.
     // checked_sub: a caller-supplied first_sequence of i64::MIN would underflow
     // a bare `- 1` (debug panic / release wrap); fail closed to Invalid instead.
-    let start_parts = decode_anchor_parts(&input.start_anchor, &bounds)?;
     let expected_start_seq = expected
         .chain
         .first_sequence
         .checked_sub(1)
         .ok_or(Invalid)?;
-    if start_parts.payload.sequence != expected_start_seq {
+    if expected.start_anchor.chain_id != expected.chain.chain_id
+        || expected.end_anchor.chain_id != expected.chain.chain_id
+    {
         return Err(Invalid);
     }
+    for t in &expected.transitions {
+        if t.chain_id != expected.chain.chain_id {
+            return Err(Invalid);
+        }
+    }
+    if expected.start_anchor.sequence != expected_start_seq
+        || expected.start_anchor.chain_hash != expected.chain.previous_hash
+        || expected.end_anchor.sequence != expected.chain.last_sequence
+        || expected.end_anchor.chain_hash != expected.chain.head_hash
+    {
+        return Err(Invalid);
+    }
+
+    // Row chain re-check (reference ConsumptionChain.check,
+    // anchored_export_codec.ex:37-39): the rows must verify against the
+    // expected boundaries before they are archived.
+    check_chain(
+        &ChainInput {
+            rows: input.rows.clone(),
+        },
+        &expected.chain,
+    )?;
+
+    // Start-anchor binding: parse through the width+canonical-gated decoder,
+    // then match ALL signed fields against the expected anchor (reference
+    // anchor_matches?, anchored_export_codec.ex:485-492).
+    let start_parts = decode_anchor_parts(&input.start_anchor, &bounds)?;
+    if !anchor_matches(
+        &start_parts.payload,
+        &start_parts.key_id,
+        &expected.start_anchor,
+    ) {
+        return Err(Invalid);
+    }
+
+    // End anchor: the same gated parse + full match.
+    let end_parts = decode_anchor_parts(&input.end_anchor, &bounds)?;
+    if !anchor_matches(&end_parts.payload, &end_parts.key_id, &expected.end_anchor) {
+        return Err(Invalid);
+    }
+
+    // Transitions: gated parse + full match, positionally (reference
+    // parse_expected_transitions + transition_matches?,
+    // anchored_export_codec.ex:443-504).
+    for (compact, exp) in input.transitions.iter().zip(&expected.transitions) {
+        let t = decode_transition_parts(compact, &bounds)?;
+        if !transition_matches(&t.payload, &t.key_id, exp) {
+            return Err(Invalid);
+        }
+    }
+
+    // Key-path walk (reference validate_expected_key_path,
+    // anchored_export_codec.ex:506-572): the running key starts at the start
+    // anchor's, every transition carries it and advances strictly in time
+    // without cycling fingerprints, and the end anchor binds the final key with
+    // NON-STRICT chronology (chronological_end?, .ex:723: >=).
+    key_path_ok(
+        &expected.start_anchor,
+        &expected.transitions,
+        &expected.end_anchor,
+    )?;
 
     // Canonical header JCS object (member names + order derived first-hand from
     // the corpus header frame: chain_id, first_sequence, last_hash,
@@ -1509,6 +1574,81 @@ pub fn encode_anchored_export(
         byte_count,
         digest,
     })
+}
+
+/// Full signed-field match of a parsed anchor against its expected values
+/// (reference `anchor_matches?`, anchored_export_codec.ex:485-492 — all seven
+/// fields).
+fn anchor_matches(payload: &AnchorPayload, key_id: &str, expected: &ExpectedAnchor) -> bool {
+    payload.anchor_id == expected.anchor_id
+        && payload.anchored_at == expected.anchored_at
+        && payload.chain_id == expected.chain_id
+        && payload.sequence == expected.sequence
+        && key_id == expected.key_id
+        && payload.chain_hash == expected.chain_hash
+        && payload.key_fingerprint == expected.key_fingerprint
+}
+
+/// Full signed-field match of a parsed transition against its expected values
+/// (reference `transition_matches?`, anchored_export_codec.ex:493-504 — all
+/// seven fields: both key ids, both fingerprints, chain, time, identity).
+fn transition_matches(
+    payload: &TransitionPayload,
+    current_kid: &str,
+    exp: &ExpectedKeyTransition,
+) -> bool {
+    payload.transition_id == exp.transition_id
+        && payload.chain_id == exp.chain_id
+        && payload.effective_at == exp.effective_at
+        && current_kid == exp.current_key_id
+        && payload.from_fingerprint == exp.current_key_fingerprint
+        && payload.to_key_id == exp.next_key_id
+        && payload.to_fingerprint == exp.next_key_fingerprint
+}
+
+/// The key-path walk over the EXPECTED set (reference
+/// `validate_expected_key_path`, anchored_export_codec.ex:506-572): the running
+/// `(key_id, fingerprint)` starts at the start anchor's; each transition must
+/// carry it as its current key, be STRICTLY after the previous time, and name a
+/// next fingerprint not already seen (cycle guard — the running current is
+/// always in `seen`, so a self-loop rejects here, which is also what enforces
+/// the reference's distinct-fingerprints rule by composition); the end anchor
+/// must bind the final running key and carry `anchored_at >=` the running time
+/// (NON-STRICT — `chronological_end?`, .ex:723; the zero-transition case
+/// compares against the start anchor's time the same way, .ex:506-513).
+fn key_path_ok(
+    start: &ExpectedAnchor,
+    transitions: &[ExpectedKeyTransition],
+    end: &ExpectedAnchor,
+) -> Result<()> {
+    let mut current_key_id = &start.key_id;
+    let mut current_fingerprint = start.key_fingerprint;
+    let mut previous_time = start.anchored_at;
+    // Seed the seen-list with the start fingerprint (the reference seeds
+    // `[start_anchor.key_fingerprint]`, .ex:523).
+    let mut seen: Vec<[u8; 32]> = vec![start.key_fingerprint];
+    for t in transitions {
+        if t.current_key_id != *current_key_id || t.current_key_fingerprint != current_fingerprint {
+            return Err(Invalid);
+        }
+        if t.effective_at <= previous_time {
+            return Err(Invalid);
+        }
+        if seen.contains(&t.next_key_fingerprint) {
+            return Err(Invalid);
+        }
+        current_key_id = &t.next_key_id;
+        current_fingerprint = t.next_key_fingerprint;
+        previous_time = t.effective_at;
+        seen.push(t.next_key_fingerprint);
+    }
+    if current_key_id != &end.key_id || current_fingerprint != end.key_fingerprint {
+        return Err(Invalid);
+    }
+    if end.anchored_at < previous_time {
+        return Err(Invalid);
+    }
+    Ok(())
 }
 
 /// Verify a retrieved archived object against an ordered historical key chain
@@ -1889,7 +2029,11 @@ fn decode_transition_parts<'a>(
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
     // REQ1-BOUNDS-fixed-widths: the decoded signature is exactly 64 bytes
-    // (key_transition_codec.ex:120).
+    // (key_transition_codec.ex:120). Verdict-inert placement parity: no PUBLIC
+    // input can reach this gate with a wrong-width signature (assemble_compact
+    // is [u8; 64]-type-locked; verify_key_transition's decode_signature64
+    // rejects first; the encode path never parses transitions) — kept for
+    // structural faithfulness to the reference; see the battery header.
     let sig_raw = base64url_decode(signature_seg)?;
     if sig_raw.len() != 64 {
         return Err(Invalid);
