@@ -1349,13 +1349,21 @@ pub fn verify_key_transition(
 /// row_count, transition_count, v:1` (member names derived first-hand from the
 /// corpus header frame).
 ///
-/// Enforces `input.rows.len() == expected.chain.row_count`,
-/// `input.transitions.len() == expected.transitions.len()`, the bounds, and the
-/// **start-anchor binding** (`start_anchor.sequence == first_sequence - 1`,
-/// caught by the corpus `encode-anchored-export-invalid-start-anchor-binding`
-/// case). Computes `byte_count` and the SHA-256 `digest` over the full byte
-/// stream. The result is the public archive a caller stores; it is not a
-/// credential.
+/// Mirrors the reference producer's FULL validation contract
+/// (`anchored_export_codec.ex` encode): expected-side consistency (the chain_id
+/// binding of both anchors and every transition; the start/end sequence + hash
+/// bindings to the chain — the start binding caught by the corpus
+/// `encode-anchored-export-invalid-start-anchor-binding` case), a full
+/// [`check_chain`] re-check of the rows, gated parses + 7-field matches for
+/// BOTH anchors and every transition (the decoded signature width and the
+/// canonical-form byte-equality of each segment enforced by the shared decode
+/// path), and the key-path walk (running key from the start anchor,
+/// strictly-after transition times, a fingerprint no-cycle seen-list, the end
+/// anchor binding the final key with NON-STRICT `>=` chronology). Aggregate
+/// ceilings are checked before the archive allocation. Computes `byte_count`
+/// and the SHA-256 `digest` over the full byte stream; encode never verifies
+/// Ed25519 signatures (a producer, not an authority). The result is the public
+/// archive a caller stores; it is not a credential.
 pub fn encode_anchored_export(
     input: &AnchoredExportInput,
     expected: &ExpectedExport,
