@@ -1722,9 +1722,12 @@ struct AnchorPayload {
 }
 
 /// Splits, bounds, decodes, and structurally validates a boundary-anchor
-/// compact. Shared by [`verify_historical_anchor`] and the encode path's
-/// start-anchor binding check. The signature segment is NOT width-checked
-/// here; the verifier enforces the 64-byte width.
+/// compact. Shared by [`verify_historical_anchor`], [`assemble_compact`], and
+/// the encode path's start-anchor binding check. The decoded signature segment
+/// MUST be exactly 64 bytes (REQ1-BOUNDS-fixed-widths, mirroring
+/// boundary_anchor_codec.ex:88), and the protected/payload segments must equal
+/// their exact JCS re-encoding (canonical form, boundary_anchor_codec.ex:95-96
+/// + 118-119) — enforced inside the validators below.
 fn decode_anchor_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedAnchor<'a>> {
     if compact.len() as u64 > bounds.anchor_bytes() {
         return Err(Invalid);
@@ -1732,10 +1735,16 @@ fn decode_anchor_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<Decoded
     let (protected_seg, payload_seg, signature_seg) = compact::parse_compact(compact)?;
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
+    // REQ1-BOUNDS-fixed-widths: the decoded signature is exactly 64 bytes
+    // (boundary_anchor_codec.ex:88).
+    let sig_raw = base64url_decode(signature_seg)?;
+    if sig_raw.len() != 64 {
+        return Err(Invalid);
+    }
     let header = json_decode(&header_bytes, bounds)?;
     let payload_json = json_decode(&payload_bytes, bounds)?;
-    let key_id = validate_anchor_header(&header, bounds)?;
-    let payload = validate_anchor_payload(&payload_json, bounds)?;
+    let key_id = validate_anchor_header(&header, &header_bytes, bounds)?;
+    let payload = validate_anchor_payload(&payload_json, &payload_bytes, bounds)?;
     Ok(DecodedAnchor {
         protected_seg,
         payload_seg,
@@ -1747,7 +1756,13 @@ fn decode_anchor_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<Decoded
 
 /// Validates the anchor protected header is exactly
 /// `{alg:"EdDSA", typ:"ba+chain-anchor", kid:<valid kid>}`. Returns the kid.
-fn validate_anchor_header(header: &JsonValue, bounds: &Bounds) -> Result<String> {
+/// Canonical form: the protected segment bytes must equal the exact JCS
+/// re-encoding of the header (boundary_anchor_codec.ex:95-96).
+fn validate_anchor_header(
+    header: &JsonValue,
+    header_bytes: &[u8],
+    bounds: &Bounds,
+) -> Result<String> {
     let members = match header {
         JsonValue::Object(m) => m,
         _ => return Err(Invalid),
@@ -1776,6 +1791,9 @@ fn validate_anchor_header(header: &JsonValue, bounds: &Bounds) -> Result<String>
         _ => return Err(Invalid),
     };
     validate_kid(kid_str, bounds)?;
+    if jcs_encode(header, bounds)?.as_slice() != header_bytes {
+        return Err(Invalid); // canonical form
+    }
     Ok(kid_str.clone())
 }
 
@@ -1783,8 +1801,14 @@ fn validate_anchor_header(header: &JsonValue, bounds: &Bounds) -> Result<String>
 /// first-hand from the corpus anchor `payload_segment`): exactly
 /// `{anchor_id, anchored_at, chain_hash, chain_id, key_fingerprint, sequence,
 /// v:1}`, no extra members. `chain_hash`/`key_fingerprint` are canonical
-/// base64url of exactly 32 bytes.
-fn validate_anchor_payload(payload: &JsonValue, bounds: &Bounds) -> Result<AnchorPayload> {
+/// base64url of exactly 32 bytes. Canonical form: the payload segment bytes
+/// must equal the exact JCS re-encoding of the payload
+/// (boundary_anchor_codec.ex:118-119).
+fn validate_anchor_payload(
+    payload: &JsonValue,
+    payload_bytes: &[u8],
+    bounds: &Bounds,
+) -> Result<AnchorPayload> {
     let members = match payload {
         JsonValue::Object(m) => m,
         _ => return Err(Invalid),
@@ -1821,6 +1845,9 @@ fn validate_anchor_payload(payload: &JsonValue, bounds: &Bounds) -> Result<Ancho
     }
     let chain_hash = take_digest_b64u(chain_hash, bounds)?;
     let key_fingerprint = take_digest_b64u(key_fingerprint, bounds)?;
+    if jcs_encode(payload, bounds)?.as_slice() != payload_bytes {
+        return Err(Invalid); // canonical form
+    }
     Ok(AnchorPayload {
         anchor_id,
         anchored_at,
@@ -1861,10 +1888,16 @@ fn decode_transition_parts<'a>(
     let (protected_seg, payload_seg, signature_seg) = compact::parse_compact(compact)?;
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
+    // REQ1-BOUNDS-fixed-widths: the decoded signature is exactly 64 bytes
+    // (key_transition_codec.ex:120).
+    let sig_raw = base64url_decode(signature_seg)?;
+    if sig_raw.len() != 64 {
+        return Err(Invalid);
+    }
     let header = json_decode(&header_bytes, bounds)?;
     let payload_json = json_decode(&payload_bytes, bounds)?;
-    let key_id = validate_transition_header(&header, bounds)?;
-    let payload = validate_transition_payload(&payload_json, bounds)?;
+    let key_id = validate_transition_header(&header, &header_bytes, bounds)?;
+    let payload = validate_transition_payload(&payload_json, &payload_bytes, bounds)?;
     Ok(DecodedTransition {
         protected_seg,
         payload_seg,
@@ -1876,7 +1909,13 @@ fn decode_transition_parts<'a>(
 
 /// Validates the transition protected header is exactly
 /// `{alg:"EdDSA", typ:"ba+key-transition", kid:<valid kid>}`. Returns the kid.
-fn validate_transition_header(header: &JsonValue, bounds: &Bounds) -> Result<String> {
+/// Canonical form: the protected segment bytes must equal the exact JCS
+/// re-encoding of the header (key_transition_codec.ex:127-128).
+fn validate_transition_header(
+    header: &JsonValue,
+    header_bytes: &[u8],
+    bounds: &Bounds,
+) -> Result<String> {
     let members = match header {
         JsonValue::Object(m) => m,
         _ => return Err(Invalid),
@@ -1905,14 +1944,23 @@ fn validate_transition_header(header: &JsonValue, bounds: &Bounds) -> Result<Str
         _ => return Err(Invalid),
     };
     validate_kid(kid_str, bounds)?;
+    if jcs_encode(header, bounds)?.as_slice() != header_bytes {
+        return Err(Invalid); // canonical form
+    }
     Ok(kid_str.clone())
 }
 
 /// Validates the transition payload against the closed set (member names
 /// derived first-hand from the corpus transition `payload_segment`): exactly
 /// `{chain_id, effective_at, from_key_fingerprint, to_key_fingerprint,
-/// to_key_id, transition_id, v:1}`.
-fn validate_transition_payload(payload: &JsonValue, bounds: &Bounds) -> Result<TransitionPayload> {
+/// to_key_id, transition_id, v:1}`. Canonical form: the payload segment bytes
+/// must equal the exact JCS re-encoding of the payload
+/// (key_transition_codec.ex:151-152).
+fn validate_transition_payload(
+    payload: &JsonValue,
+    payload_bytes: &[u8],
+    bounds: &Bounds,
+) -> Result<TransitionPayload> {
     let members = match payload {
         JsonValue::Object(m) => m,
         _ => return Err(Invalid),
@@ -1952,6 +2000,9 @@ fn validate_transition_payload(payload: &JsonValue, bounds: &Bounds) -> Result<T
     let effective_at = take_integral_date(effective_at)?;
     let from_fingerprint = take_digest_b64u(from_key_fingerprint, bounds)?;
     let to_fingerprint = take_digest_b64u(to_key_fingerprint, bounds)?;
+    if jcs_encode(payload, bounds)?.as_slice() != payload_bytes {
+        return Err(Invalid); // canonical form
+    }
     Ok(TransitionPayload {
         chain_id,
         effective_at,
@@ -2217,8 +2268,8 @@ struct DecodedGrant<'a> {
 /// Shared grant decode used by [`decode_grant`] (signature-not-verified view)
 /// and [`verify_grant`] (which adds the signature, identity, and time checks).
 /// Splits, bounds, decodes, and structurally validates the protected header +
-/// payload claims. The signature segment is NOT width-checked here (decode is
-/// signature-width-agnostic); [`verify_grant`] enforces the 64-byte width.
+/// payload claims. The decoded signature segment MUST be exactly 64 bytes
+/// (REQ1-BOUNDS-fixed-widths, mirroring runtime.ex:237 parse_grant).
 fn decode_grant_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedGrant<'a>> {
     if compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
@@ -2226,6 +2277,12 @@ fn decode_grant_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedG
     let (protected_seg, payload_seg, signature_seg) = compact::parse_compact(compact)?;
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
+    // REQ1-BOUNDS-fixed-widths: the decoded signature is exactly 64 bytes
+    // (runtime.ex:237).
+    let sig_raw = base64url_decode(signature_seg)?;
+    if sig_raw.len() != 64 {
+        return Err(Invalid);
+    }
     let header = json_decode(&header_bytes, bounds)?;
     let payload_json = json_decode(&payload_bytes, bounds)?;
     let key_id = validate_grant_header(&header, bounds)?;
@@ -2252,8 +2309,9 @@ struct DecodedProof<'a> {
 
 /// Shared proof decode used by [`decode_proof`] and [`check_envelope`]. Splits,
 /// bounds, decodes, and structurally validates the proof header (returning the
-/// holder public key) and payload claims. The signature segment is NOT
-/// width-checked here; [`check_envelope`] enforces the 64-byte width.
+/// holder public key) and payload claims. The decoded signature segment MUST be
+/// exactly 64 bytes (REQ1-BOUNDS-fixed-widths, mirroring runtime.ex:259
+/// parse_proof).
 fn decode_proof_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedProof<'a>> {
     if compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
@@ -2261,6 +2319,12 @@ fn decode_proof_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedP
     let (protected_seg, payload_seg, signature_seg) = compact::parse_compact(compact)?;
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
+    // REQ1-BOUNDS-fixed-widths: the decoded signature is exactly 64 bytes
+    // (runtime.ex:259).
+    let sig_raw = base64url_decode(signature_seg)?;
+    if sig_raw.len() != 64 {
+        return Err(Invalid);
+    }
     let header = json_decode(&header_bytes, bounds)?;
     let payload_json = json_decode(&payload_bytes, bounds)?;
     let holder_public_key = validate_proof_header(&header, bounds)?;
