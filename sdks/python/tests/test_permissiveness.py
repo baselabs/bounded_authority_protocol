@@ -1548,3 +1548,18 @@ def test_encode_parity_transition_width_rejects():
         replace(input_, transitions=[_swap_segment(input_.transitions[0], 2, _b64e(_SIG32))]),
         expected,
     )
+
+
+def test_encode_parity_tightened_outer_bounds_row_rejects():
+    """Correctness-lens F1: the encode row re-check must run under the caller's OUTER
+    bounds (the reference threads %{expected.chain | bounds: bounds}); a tightened outer
+    with the chain's nested bounds absent is the reference's nested-bounds pin rejecting
+    (anchored_export_codec.ex:352-354). A 157-byte row under chain_row_bytes=156 -> Err."""
+    from dataclasses import replace as _replace
+
+    from bounded_authority_verifier.bounds import bounds_new
+
+    input_, expected = _conformant_export()
+    tight = bounds_new({"chain_row_bytes": 156})
+    r = encode_anchored_export(input_, _replace(expected, bounds=tight))
+    assert not r.is_ok, "tightened outer bounds must take effect at the encode row walk"

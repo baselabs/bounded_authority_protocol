@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, TypeVar, cast
 
 from .base64url import base64url_decode, base64url_encode
@@ -1538,6 +1538,11 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     _validate_export_inputs(input_, expected, b)
     # Row chain re-check (anchored_export_codec.ex:37-39 — ConsumptionChain.check):
     # the rows must verify against the expected boundaries before they are archived.
+    # The row walk runs under the caller's OUTER bounds (the reference threads
+    # %{expected.chain | bounds: bounds}); the chain's nested bounds, when present,
+    # must coerce-equal the outer (anchored_export_codec.ex:352-354). Correctness-lens
+    # F1: resolving only the chain's own bounds let a tightened outer wrong-ACCEPT.
+    _require_bounds_equal(expected.chain.bounds, b, "encode_anchored_export: chain bounds")
     _require_ok(
         check_chain(
             ChainInput(
@@ -1549,7 +1554,7 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
                 previous_hash=expected.chain.previous_hash,
                 last_hash=expected.chain.last_hash,
             ),
-            expected.chain,
+            replace(expected.chain, bounds=b),
         ),
         "encode_anchored_export: rows chain",
     )
