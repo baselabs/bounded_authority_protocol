@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from .base64url import base64url_decode, base64url_encode
 from .bounds import (  # noqa: F401
@@ -1536,6 +1536,31 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     # checks so a caller tightening via expected.bounds takes effect (matches verify_anchored_export).
     b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     _validate_export_inputs(input_, expected, b)
+    # Row chain re-check (anchored_export_codec.ex:37-39 — ConsumptionChain.check):
+    # the rows must verify against the expected boundaries before they are archived.
+    _require_ok(
+        check_chain(
+            ChainInput(
+                rows=tuple(input_.rows),
+                chain_id=expected.chain.chain_id,
+                first_sequence=expected.chain.first_sequence,
+                last_sequence=expected.chain.last_sequence,
+                row_count=expected.chain.row_count,
+                previous_hash=expected.chain.previous_hash,
+                last_hash=expected.chain.last_hash,
+            ),
+            expected.chain,
+        ),
+        "encode_anchored_export: rows chain",
+    )
+    # Gated parses + full signed-field matches (anchored_export_codec.ex:40-52): the
+    # start anchor, the end anchor, and every transition go through the width+canonical
+    # gated decode and match their expected values field-by-field.
+    _parse_and_match_anchor(input_.start_anchor, expected.start_anchor, "start", b)
+    _parse_and_match_anchor(input_.end_anchor, expected.end_anchor, "end", b)
+    # strict: the count equality is already enforced above; strict zip is defense-in-depth.
+    for i, (compact, exp) in enumerate(zip(input_.transitions, expected.transitions, strict=True)):
+        _parse_and_match_transition(compact, exp, i, b)
     header_bytes = _build_archive_header(input_, expected.chain, b)
     parts = [ARCHIVE_PREFIX, _frame(header_bytes), _frame(input_.start_anchor)]
     parts.extend(_frame(t) for t in input_.transitions)
@@ -1550,6 +1575,67 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
         fail("encode_anchored_export: archive_bytes")
     archive = b"".join(parts)
     return EncodedAnchoredExport(archive=archive, digest=sha256(archive))
+
+
+def _require_ok(result: Result[Any], ctx: str) -> Any:
+    """Unwrap a Result or fail closed (encode-path helper)."""
+    if not result.is_ok:
+        fail(ctx)
+    return result.value  # type: ignore[union-attr]  # is_ok implies Ok
+
+
+def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str, b: Bounds) -> None:
+    """Gated parse + full 7-field match of an anchor compact against its expected
+    values (reference BoundaryAnchorCodec.parse + anchor_matches?,
+    anchored_export_codec.ex:40-42/:485-492). Encode never verifies a signature
+    (a producer, not an authority) — it mirrors the reference's structural gates
+    (width, canonical form) and the signed-field match."""
+    seg = parse_compact(compact, b)
+    kid = _parse_anchor_header(seg, b)
+    if kid != expected.key_id:
+        fail(f"encode_anchored_export: {which} anchor kid")
+    p = json_decode(seg.payload_bytes, b)
+    _validate_anchor_payload(p, seg.payload_bytes, b)
+    if not isinstance(p, JObject):
+        fail(f"encode_anchored_export: {which} anchor payload")
+    if _require_string_or_uri(p.v.get("anchor_id"), "anchor_id", b) != expected.anchor_id:
+        fail(f"encode_anchored_export: {which} anchor_id")
+    if _require_int(p.v.get("anchored_at"), "anchored_at") != expected.anchored_at:
+        fail(f"encode_anchored_export: {which} anchored_at")
+    if _require_string_or_uri(p.v.get("chain_id"), "chain_id", b) != expected.chain_id:
+        fail(f"encode_anchored_export: {which} chain_id")
+    if _require_int(p.v.get("sequence"), "sequence") != expected.sequence:
+        fail(f"encode_anchored_export: {which} sequence")
+    if not _bytes_equal(_require_b64url_n(p.v.get("chain_hash"), "chain_hash", 32), expected.chain_hash):
+        fail(f"encode_anchored_export: {which} chain_hash")
+    if not _bytes_equal(_require_b64url_n(p.v.get("key_fingerprint"), "key_fingerprint", 32), expected.key_fingerprint):
+        fail(f"encode_anchored_export: {which} key_fingerprint")
+
+
+def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition, i: int, b: Bounds) -> None:
+    """Gated parse + full 7-field match of a transition compact (reference
+    KeyTransitionCodec.parse + transition_matches?, anchored_export_codec.ex:443-504)."""
+    seg = parse_compact(compact, b)
+    kid = _parse_transition_header(seg, b)
+    if kid != expected.current_key_id:
+        fail(f"encode_anchored_export: transition {i} kid")
+    p = json_decode(seg.payload_bytes, b)
+    _validate_transition_payload(p, seg.payload_bytes, b)
+    if not isinstance(p, JObject):
+        fail(f"encode_anchored_export: transition {i} payload")
+    if _require_string_or_uri(p.v.get("transition_id"), "transition_id", b) != expected.transition_id:
+        fail(f"encode_anchored_export: transition {i} transition_id")
+    if _require_string_or_uri(p.v.get("chain_id"), "chain_id", b) != expected.chain_id:
+        fail(f"encode_anchored_export: transition {i} chain_id")
+    if _require_int(p.v.get("effective_at"), "effective_at") != expected.effective_at:
+        fail(f"encode_anchored_export: transition {i} effective_at")
+    if not _bytes_equal(_require_b64url_n(p.v.get("from_key_fingerprint"), "from_key_fingerprint", 32), expected.current_key_fingerprint):
+        fail(f"encode_anchored_export: transition {i} from_key_fingerprint")
+    if not _bytes_equal(_require_b64url_n(p.v.get("to_key_fingerprint"), "to_key_fingerprint", 32), expected.next_key_fingerprint):
+        fail(f"encode_anchored_export: transition {i} to_key_fingerprint")
+    to_key_id = p.v.get("to_key_id")
+    if not isinstance(to_key_id, JString) or utf8_str(to_key_id.v) != expected.next_key_id:
+        fail(f"encode_anchored_export: transition {i} to_key_id")
 
 
 def _validate_export_inputs(input_: AnchoredExportInput, expected: ExpectedExport, b: Bounds) -> None:
