@@ -604,9 +604,11 @@ verified against the Elixir reference oracle (20/20 — the receipt is a re-runn
 .forge artifact under reviews/results/rust-encode-path-parity/oracle-probe/). The TS/Python sibling permissiveness
 closed in the immediately-following commit (same contract, 15 legs each at closeout,
 proven red-capable — the five pin legs each isolated under their named mutation, the
-threading leg joint-by-construction per the settled diff-review record); the SDK-wide maximum-bounds encode posture
-remains a NAMED delta (caller-tightened `expected.bounds` = a public-API change, its own
-reviewed slice). The Go SDK (BAP-16) picks the whole contract up at authoring.
+threading leg joint-by-construction per the settled diff-review record). **The SDK-wide
+maximum-bounds delta is CLOSED** (`b4ca616`): five `Option<Bounds>` fields, the nested pins
+with identity semantics, threading at encode/verify/standalone, the chunk-count magic pin,
+12 mutation-proven legs (permissiveness 51), a 7/7 Elixir oracle receipt — executed under
+the user's 2026-08-14 zero-residuals directive. The Go SDK (BAP-16) picks the whole contract up at authoring.
 
 ## BAP-17 closeout evidence
 
