@@ -24,8 +24,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
   (their expected-side + key-path validations were already present — the deltas were the parses,
   the matches, and the row re-check; the start anchor was framed raw too, plan-review F1).
   15 legs per SDK at closeout (control + 8 tampers + the six pin/threading legs the
-  delta- and diff-reviews forced, each re-isolated under its named mutation), each
-  proven red-capable; TS 107 unit + conformance 283/283; Python 77 + conformance 283/283.
+  delta- and diff-reviews forced; the five pin legs each isolated under their named
+  mutation, the threading leg joint-by-construction per the settled diff-review record),
+  each proven red-capable; TS 107 unit + conformance 283/283; Python 77 + conformance 283/283.
   mypy/ruff/purity/license clean. With this, all three shipped SDKs enforce the reference
   producer's full contract; the Go SDK (BAP-16) picks it up at authoring.
 
@@ -36,12 +37,16 @@ All notable changes to `bounded_authority_protocol` are documented here.
   + 7-field matches for BOTH anchors and every transition (the width/canonical gates now
   reached at encode), and the key-path walk (running key, strictly-after transition times,
   seen-list cycle guard, end anchor binding the final key with NON-STRICT `>=` chronology).
-  15 new red-capable battery legs (permissiveness 19 → 34), each mutation-proven; every leg
-  verified against the Elixir reference oracle (16/16 — conformant control Ok, every tamper
-  `{:error,:invalid}`). Honest residuals, both NAMED: the TypeScript/Python SDKs carry the same
-  producer permissiveness (closed by the sibling commit landing immediately after); the
-  Rust SDK is a documented maximum-bounds posture at encode (the reference + siblings thread
-  caller-tightened `expected.bounds` — carrying that is a public-API change, its own slice).
+  19 red-capable battery legs at closeout (permissiveness 19 → 38), each mutation-proven; every leg
+  verified against the Elixir reference oracle (20/20 fixtures — the 15 + control + the four
+  closeout-lens additions; the receipt is a local re-runnable .forge artifact). Honest
+  residuals, both NAMED: the TypeScript/Python SDKs carried the same producer permissiveness
+  (CLOSED by the sibling entries above); the Rust SDK is a documented maximum-bounds posture
+  at encode (the reference + siblings thread caller-tightened `expected.bounds` — carrying
+  that is a public-API change, its own slice; the sibling identity fix also WIDENS TS/Python
+  VERIFY-path acceptance for identity-override configurations, matching the reference; the
+  Rust chunk-count parity fix is a latent verdict-tightening flip unreachable at the frozen
+  maximum bounds — its pin is owed by the future caller-bounds slice).
 
 - **Rust SDK conformance hardening (BAP-15).** The Rust verifier SDK now enforces the same two
   checks the Elixir reference has (closing the "separate check owed" note above, mirroring
@@ -56,8 +61,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
   `key_transition_codec.ex:127-128,151-152`), so a non-canonical (member-reordered) segment is
   rejected across `assemble_compact`, `verify_historical_anchor`, `verify_key_transition`,
   `encode_anchored_export`, and `verify_anchored_export`. Nine red-capable battery legs
-  (4 canonical + 2 decode-width + 1 export-encode width + 2 canonical-exclusion pins), each
-  mutation-proven. Verified: cargo 338 unit + conformance 283/283 + permissiveness 19;
+  (4 canonical + 2 decode-width + 1 export-encode width + 2 canonical-exclusion pins + the
+  four closeout-lens legs), each mutation-proven. Verified: cargo 338 unit + conformance 283/283 + permissiveness 38;
   clippy/fmt clean. Honest residuals, all
   routed: the encode path validates less than the reference producer — it frames the END
   anchor AND every TRANSITION raw without parsing them (the reference parses both anchors +
