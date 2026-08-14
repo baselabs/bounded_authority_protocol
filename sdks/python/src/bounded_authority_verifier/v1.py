@@ -2058,6 +2058,15 @@ def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: E
     # an enclosing export passes its own resolved bounds (cross-vendor re-review F1), prefer it over
     # the nested anchor's bounds so the top-level tightening takes effect.
     b = bounds if bounds is not None else (expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    # Key-window endpoints: integral + magnitude-bounded (the standalone path's
+    # gates — cross-vendor round 7: the archive path skipped them).
+    _vf = _expected_time(key.valid_from, f"{ctx}: valid_from type")
+    _vb = _expected_time(key.valid_before, f"{ctx}: valid_before type") if key.valid_before is not None else None
+    _mag = bounds_resolve(b, "integer_magnitude")
+    if abs(_vf) > _mag:
+        fail(f"{ctx}: valid_from magnitude")
+    if _vb is not None and abs(_vb) > _mag:
+        fail(f"{ctx}: valid_before magnitude")
     seg = parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != key.key_id:
@@ -2106,6 +2115,17 @@ def _verify_transition_compact(compact: bytes, current_key: HistoricalPublicKey,
     # an enclosing export passes its own resolved bounds (cross-vendor re-review F1), prefer it over
     # the nested transition's bounds so the top-level tightening takes effect.
     b = bounds if bounds is not None else (expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    # Key-window endpoints: integral + magnitude-bounded for BOTH keys (the
+    # standalone path's gates — cross-vendor round 7).
+    _ovf = _expected_time(current_key.valid_from, f"{ctx}: valid_from type")
+    _nvf = _expected_time(next_key.valid_from, f"{ctx}: valid_from type")
+    _ovb = _expected_time(current_key.valid_before, f"{ctx}: valid_before type") if current_key.valid_before is not None else None
+    _nvb = _expected_time(next_key.valid_before, f"{ctx}: valid_before type") if next_key.valid_before is not None else None
+    _mag = bounds_resolve(b, "integer_magnitude")
+    if abs(_ovf) > _mag or abs(_nvf) > _mag:
+        fail(f"{ctx}: valid_from magnitude")
+    if (_ovb is not None and abs(_ovb) > _mag) or (_nvb is not None and abs(_nvb) > _mag):
+        fail(f"{ctx}: valid_before magnitude")
     seg = parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != current_key.key_id:
