@@ -1193,6 +1193,17 @@ pub fn verify_historical_anchor(
     expected: &ExpectedAnchor,
 ) -> Result<AnchorFacts> {
     let bounds = resolve_bounds(expected.bounds.as_ref());
+    // Key-window endpoints are magnitude-bounded under the resolved bounds
+    // (context_validation.ex valid_time? — cross-vendor round 4: interval
+    // membership alone accepted out-of-magnitude endpoints).
+    if key.valid_from.unsigned_abs() > bounds.integer_magnitude() {
+        return Err(Invalid);
+    }
+    if let ValidityUpperBound::Bounded(v) = key.valid_before {
+        if v.unsigned_abs() > bounds.integer_magnitude() {
+            return Err(Invalid);
+        }
+    }
     let a = decode_anchor_parts(compact, &bounds)?;
 
     // Key ID: header.kid == key.key_id == expected.key_id.
@@ -1267,6 +1278,23 @@ pub fn verify_key_transition(
     expected: &ExpectedKeyTransition,
 ) -> Result<KeyTransitionFacts> {
     let bounds = resolve_bounds(expected.bounds.as_ref());
+    // Key-window endpoints magnitude-bounded (same as the anchor path).
+    if current.valid_from.unsigned_abs() > bounds.integer_magnitude() {
+        return Err(Invalid);
+    }
+    if let ValidityUpperBound::Bounded(v) = current.valid_before {
+        if v.unsigned_abs() > bounds.integer_magnitude() {
+            return Err(Invalid);
+        }
+    }
+    if next.valid_from.unsigned_abs() > bounds.integer_magnitude() {
+        return Err(Invalid);
+    }
+    if let ValidityUpperBound::Bounded(v) = next.valid_before {
+        if v.unsigned_abs() > bounds.integer_magnitude() {
+            return Err(Invalid);
+        }
+    }
     let t = decode_transition_parts(compact, &bounds)?;
 
     // header.kid == current.key_id == expected.current_key_id.
@@ -1994,6 +2022,12 @@ struct AnchorPayload {
 /// their exact JCS re-encoding (canonical form, boundary_anchor_codec.ex:95-96
 /// + 118-119) — enforced inside the validators below.
 fn decode_anchor_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedAnchor<'a>> {
+    // The whole-input compact_bytes ceiling FIRST (the reference's scan gates it
+    // before the codec's anchor_bytes clause — compact_jws.ex:34-43; cross-vendor
+    // round 4: a tightened compact_bytes below anchor_bytes was bypassed).
+    if compact.len() as u64 > bounds.compact_bytes() {
+        return Err(Invalid);
+    }
     if compact.len() as u64 > bounds.anchor_bytes() {
         return Err(Invalid);
     }
@@ -2147,6 +2181,12 @@ fn decode_transition_parts<'a>(
     compact: &'a [u8],
     bounds: &Bounds,
 ) -> Result<DecodedTransition<'a>> {
+    // The whole-input compact_bytes ceiling FIRST (the reference's scan gates it
+    // before the codec's anchor_bytes clause — compact_jws.ex:34-43; cross-vendor
+    // round 4: a tightened compact_bytes below anchor_bytes was bypassed).
+    if compact.len() as u64 > bounds.compact_bytes() {
+        return Err(Invalid);
+    }
     if compact.len() as u64 > bounds.anchor_bytes() {
         return Err(Invalid);
     }
