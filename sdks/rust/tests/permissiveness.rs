@@ -340,9 +340,10 @@ fn base64url_non_canonical_pad_bits_rejected() {
 //     width-checked at all. RED-capable mutation: delete the width clause in
 //     `decode_grant_parts` / `decode_proof_parts` / `decode_anchor_parts` → the
 //     corresponding test goes RED. (The transition width clause in
-//     `decode_transition_parts` is verdict-inert placement parity — every public
-//     path already rejected wrong-width transitions — and carries no test leg;
-//     see the BAP-15 evidence amendment.)
+//     `decode_transition_parts` was verdict-inert placement parity at
+//     bap-18; the encode-parity slice made it publicly reachable (encode
+//     parses caller transitions) and it carries its own leg:
+//     `encode_transition_signature_width_rejected`.)
 
 use bounded_authority_protocol::types::{
     AnchoredExportInput, BoundaryAnchor, ExpectedAnchor, ExpectedChain, ExpectedExport, GrantInput,
@@ -1016,6 +1017,175 @@ fn encode_expected_end_sequence_binding_rejected() {
     assert!(
         encode_anchored_export(&f.input, &f.expected).is_err(),
         "end.sequence != chain.last_sequence must reject"
+    );
+}
+
+// Leg 3b — expected-side: an ANCHOR's chain_id drifts from the chain's
+// (two-sided on the end anchor: the 7-field match passes; ONLY the expected-side
+// anchors'-chain_id clause fires — the SOLE Rust enforcement of this binding:
+// the verify path binds only the header chain_id, never the anchor payload's).
+// Mutation: drop the anchors' chain_id clause. (Security-lens F2a; gate-integrity R4.)
+#[test]
+fn encode_expected_anchor_chain_id_binding_rejected() {
+    let mut f = conformant_export();
+    let head = f.expected.chain.head_hash;
+    let produced = boundary_anchor_signing_input(
+        &BoundaryAnchor {
+            anchor_id: "anchor-end".to_string(),
+            anchored_at: 1600,
+            chain_hash: head,
+            chain_id: "chain-OTHER".to_string(),
+            key_id: "anchor-b".to_string(),
+            public_key: KEY_B,
+            sequence: 1,
+        },
+        &max(),
+    )
+    .expect("re-signed end anchor (chain drift)");
+    f.input.end_anchor = compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    );
+    f.expected.end_anchor.chain_id = "chain-OTHER".to_string();
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "anchor chain_id drift from the chain must reject"
+    );
+}
+
+// Leg 3c — expected-side: end.chain_hash != chain.head_hash (two-sided on the
+// anchor; the match passes; only the end-hash binding fires). Mutation: drop
+// the end-hash clause. (Security-lens F2b; gate-integrity R3.)
+#[test]
+fn encode_expected_end_hash_binding_rejected() {
+    let mut f = conformant_export();
+    let wrong = [9u8; 32];
+    let produced = boundary_anchor_signing_input(
+        &BoundaryAnchor {
+            anchor_id: "anchor-end".to_string(),
+            anchored_at: 1600,
+            chain_hash: wrong,
+            chain_id: "chain-x".to_string(),
+            key_id: "anchor-b".to_string(),
+            public_key: KEY_B,
+            sequence: 1,
+        },
+        &max(),
+    )
+    .expect("re-signed end anchor (hash drift)");
+    f.input.end_anchor = compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    );
+    f.expected.end_anchor.chain_hash = wrong;
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "end.chain_hash != chain.head_hash must reject"
+    );
+}
+
+// Leg 16 — key-path end chronology: end.anchored_at BELOW the running time
+// (two-sided; the match passes; only the chronology clause fires). Mutation:
+// drop the end-chronology clause. (Gate-integrity BLOCKING — the clause was
+// mutation-invisible: plan-review F4 was resolved by rewording, not a leg.)
+#[test]
+fn encode_key_path_end_before_last_time_rejected() {
+    let mut f = conformant_export();
+    let head = f.expected.chain.head_hash;
+    let produced = boundary_anchor_signing_input(
+        &BoundaryAnchor {
+            anchor_id: "anchor-end".to_string(),
+            anchored_at: 1400,
+            chain_hash: head,
+            chain_id: "chain-x".to_string(),
+            key_id: "anchor-b".to_string(),
+            public_key: KEY_B,
+            sequence: 1,
+        },
+        &max(),
+    )
+    .expect("re-signed end anchor (early)");
+    f.input.end_anchor = compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    );
+    f.expected.end_anchor.anchored_at = 1400;
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "end anchor before the last transition time must reject"
+    );
+}
+
+// Leg 17 — the NON-STRICT pin: end.anchored_at == the running time MUST be
+// ACCEPTED (chronological_end? is >=, .ex:723). Mutation: flip the clause
+// strict (<) — this leg goes RED. (The equality half of the same BLOCKING.)
+#[test]
+fn encode_key_path_end_time_equality_accepted() {
+    let (row, head_hash) = encode_consumption_entry(
+        &ConsumptionEntry {
+            chain_id: "chain-x".to_string(),
+            commitment: [5u8; 32],
+            previous_hash: Z32,
+            sequence: 1,
+        },
+        &max(),
+    )
+    .expect("genesis row encodes");
+    let t = {
+        let produced = key_transition_signing_input(
+            &KeyTransition {
+                chain_id: "chain-x".to_string(),
+                current_key_id: "anchor-a".to_string(),
+                current_public_key: KEY_A,
+                effective_at: 1600,
+                next_key_id: "anchor-b".to_string(),
+                next_public_key: KEY_B,
+                transition_id: "transition-1".to_string(),
+            },
+            &max(),
+        )
+        .expect("transition at 1600");
+        compact_with_signature(
+            &produced.protected_segment,
+            &produced.payload_segment,
+            &[0u8; 64],
+        )
+    };
+    let expected = ExpectedExport {
+        chain: ExpectedChain {
+            chain_id: "chain-x".to_string(),
+            first_sequence: 1,
+            last_sequence: 1,
+            row_count: 1,
+            previous_hash: Z32,
+            head_hash,
+        },
+        digest: Z32,
+        start_anchor: expected_start_anchor(Z32),
+        end_anchor: expected_end_anchor(head_hash, "anchor-b", KEY_B, 1600),
+        transitions: vec![ExpectedKeyTransition {
+            chain_id: "chain-x".to_string(),
+            current_key_fingerprint: public_key_thumbprint_raw(&KEY_A),
+            current_key_id: "anchor-a".to_string(),
+            effective_at: 1600,
+            next_key_fingerprint: public_key_thumbprint_raw(&KEY_B),
+            next_key_id: "anchor-b".to_string(),
+            transition_id: "transition-1".to_string(),
+        }],
+        object_version: "v1".to_string(),
+    };
+    let input = AnchoredExportInput {
+        start_anchor: build_start_anchor(Z32),
+        end_anchor: build_end_anchor(head_hash, "anchor-b", KEY_B, 1600),
+        transitions: vec![t],
+        rows: vec![row],
+    };
+    assert!(
+        encode_anchored_export(&input, &expected).is_ok(),
+        "end.anchored_at == the running time MUST encode (NON-STRICT >=)"
     );
 }
 
