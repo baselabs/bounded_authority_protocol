@@ -619,68 +619,29 @@ fn signature_width_proof_decode_rejected() {
 
 #[test]
 fn signature_width_export_encode_start_anchor_rejected() {
-    // The encode path parses the START anchor (v1.rs decode_anchor_parts) and
-    // never width-checks its signature segment elsewhere — this is the anchor
-    // width gate's one public flip (the plan-review F1 leg).
-    let produced =
-        boundary_anchor_signing_input(&anchor_fixture(), &max()).expect("anchor signing input ok");
-    let expected = ExpectedExport {
-        chain: ExpectedChain {
-            chain_id: "chain-x".to_string(),
-            first_sequence: 1, // start_anchor.sequence + 1 (the :1390 binding)
-            last_sequence: 1,
-            row_count: 1,
-            previous_hash: Z32,
-            head_hash: [1u8; 32],
-        },
-        digest: Z32,
-        start_anchor: ExpectedAnchor {
-            anchor_id: "anchor-start".to_string(),
-            anchored_at: 1000,
-            chain_hash: Z32,
-            chain_id: "chain-x".to_string(),
-            key_fingerprint: Z32,
-            key_id: "anchor-a".to_string(),
-            sequence: 0,
-        },
-        end_anchor: ExpectedAnchor {
-            anchor_id: "anchor-end".to_string(),
-            anchored_at: 1100,
-            chain_hash: [1u8; 32],
-            chain_id: "chain-x".to_string(),
-            key_fingerprint: Z32,
-            key_id: "anchor-a".to_string(),
-            sequence: 1,
-        },
-        transitions: vec![],
-        object_version: "v1".to_string(),
-    };
-    // Control: a 64-byte-signature start anchor encodes Ok (rows/end frame raw).
-    let ok_input = AnchoredExportInput {
-        start_anchor: compact_with_signature(
-            &produced.protected_segment,
-            &produced.payload_segment,
-            &[0u8; 64],
-        ),
-        end_anchor: b"end-anchor-bytes".to_vec(),
-        transitions: vec![],
-        rows: vec![b"row-0".to_vec()],
-    };
+    // The encode path parses the START anchor (decode_anchor_parts) and never
+    // width-checks its signature segment elsewhere — this is the anchor width
+    // gate's one public flip (the plan-review F1 leg of bap-18). Rebuilt on the
+    // conformant fixture (the closeout cross-vendor blocking finding: the old
+    // garbage-end-anchor control locked in malformed-archive acceptance).
+    let f = conformant_export();
+    let segs: Vec<&[u8]> = f.input.start_anchor.split(|&b| b == b'.').collect();
+    // Control: the conformant fixture encodes Ok.
     assert!(
-        encode_anchored_export(&ok_input, &expected).is_ok(),
-        "64-byte-signature start anchor must encode"
+        encode_anchored_export(&f.input, &f.expected).is_ok(),
+        "conformant export must encode"
     );
     // A 32-byte-signature start anchor must reject at the parse.
-    let bad_input = AnchoredExportInput {
-        start_anchor: compact_with_signature(
-            &produced.protected_segment,
-            &produced.payload_segment,
-            &[0u8; 32],
-        ),
-        ..ok_input
-    };
+    let mut rebuilt = Vec::new();
+    rebuilt.extend_from_slice(segs[0]);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(segs[1]);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(&base64url_encode(&[0u8; 32]));
+    let mut input = f.input.clone();
+    input.start_anchor = rebuilt;
     assert!(
-        encode_anchored_export(&bad_input, &expected).is_err(),
+        encode_anchored_export(&input, &f.expected).is_err(),
         "wrong-width start-anchor signature must reject at encode"
     );
 }
@@ -764,5 +725,632 @@ fn canonical_exclusion_proof_reorder_still_decodes() {
     assert!(
         r.is_ok(),
         "non-canonical proof must still decode (reference has no canonical gate)"
+    );
+}
+
+// =============================================================================
+// Encode-path validation parity — the reference producer's full contract
+// (anchored_export_codec.ex encode: expected-side consistency, row chain
+// re-check, gated parses + 7-field matches, key-path walk). One red-capable
+// leg per NEW clause/call-site; each names its red mutation. Match legs (5,6,9)
+// tamper ONE side only; expected↔chain and key-path legs (1,2,3,12,13,14,15)
+// tamper BOTH sides to the same off-value so the targeted clause is the sole
+// rejector. Non-canonical legs (7,10) hand-assemble (assemble_compact re-parses
+// and would reject the reorder).
+// =============================================================================
+
+use bounded_authority_protocol::jwk::public_key_thumbprint_raw;
+use bounded_authority_protocol::types::{ChainInput, ConsumptionEntry, ExpectedKeyTransition};
+use bounded_authority_protocol::{check_chain, encode_consumption_entry};
+
+const KEY_A: [u8; 32] = [7u8; 32];
+const KEY_B: [u8; 32] = [8u8; 32];
+
+/// A fully conformant export: 1 genesis row, start anchor (seq 0, key A), one
+/// transition (A→B), end anchor (seq 1, key B). Every value ties to `expected`.
+struct ConformantExport {
+    input: AnchoredExportInput,
+    expected: ExpectedExport,
+}
+
+fn build_start_anchor(chain_hash: [u8; 32]) -> Vec<u8> {
+    let produced = boundary_anchor_signing_input(
+        &BoundaryAnchor {
+            anchor_id: "anchor-start".to_string(),
+            anchored_at: 1000,
+            chain_hash,
+            chain_id: "chain-x".to_string(),
+            key_id: "anchor-a".to_string(),
+            public_key: KEY_A,
+            sequence: 0,
+        },
+        &max(),
+    )
+    .expect("start anchor signing input ok");
+    compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    )
+}
+
+fn build_end_anchor(
+    chain_hash: [u8; 32],
+    key_id: &str,
+    public_key: [u8; 32],
+    anchored_at: i64,
+) -> Vec<u8> {
+    let produced = boundary_anchor_signing_input(
+        &BoundaryAnchor {
+            anchor_id: "anchor-end".to_string(),
+            anchored_at,
+            chain_hash,
+            chain_id: "chain-x".to_string(),
+            key_id: key_id.to_string(),
+            public_key,
+            sequence: 1,
+        },
+        &max(),
+    )
+    .expect("end anchor signing input ok");
+    compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    )
+}
+
+fn build_transition(effective_at: i64) -> Vec<u8> {
+    let produced = key_transition_signing_input(
+        &KeyTransition {
+            chain_id: "chain-x".to_string(),
+            current_key_id: "anchor-a".to_string(),
+            current_public_key: KEY_A,
+            effective_at,
+            next_key_id: "anchor-b".to_string(),
+            next_public_key: KEY_B,
+            transition_id: "transition-1".to_string(),
+        },
+        &max(),
+    )
+    .expect("transition signing input ok");
+    compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    )
+}
+
+fn expected_start_anchor(chain_hash: [u8; 32]) -> ExpectedAnchor {
+    ExpectedAnchor {
+        anchor_id: "anchor-start".to_string(),
+        anchored_at: 1000,
+        chain_hash,
+        chain_id: "chain-x".to_string(),
+        key_fingerprint: public_key_thumbprint_raw(&KEY_A),
+        key_id: "anchor-a".to_string(),
+        sequence: 0,
+    }
+}
+
+fn expected_end_anchor(
+    chain_hash: [u8; 32],
+    key_id: &str,
+    public_key: [u8; 32],
+    anchored_at: i64,
+) -> ExpectedAnchor {
+    ExpectedAnchor {
+        anchor_id: "anchor-end".to_string(),
+        anchored_at,
+        chain_hash,
+        chain_id: "chain-x".to_string(),
+        key_fingerprint: public_key_thumbprint_raw(&public_key),
+        key_id: key_id.to_string(),
+        sequence: 1,
+    }
+}
+
+fn conformant_export() -> ConformantExport {
+    // One genesis row: sequence 1, all-zero previous, its hash is the chain head.
+    let (row, head_hash) = encode_consumption_entry(
+        &ConsumptionEntry {
+            chain_id: "chain-x".to_string(),
+            commitment: [5u8; 32],
+            previous_hash: Z32,
+            sequence: 1,
+        },
+        &max(),
+    )
+    .expect("genesis row encodes");
+    let rows = vec![row];
+    let expected_chain = ExpectedChain {
+        chain_id: "chain-x".to_string(),
+        first_sequence: 1,
+        last_sequence: 1,
+        row_count: 1,
+        previous_hash: Z32,
+        head_hash,
+    };
+    let transitions = vec![build_transition(1500)];
+    let expected = ExpectedExport {
+        chain: expected_chain.clone(),
+        digest: Z32,
+        start_anchor: expected_start_anchor(Z32),
+        end_anchor: expected_end_anchor(head_hash, "anchor-b", KEY_B, 1600),
+        transitions: vec![ExpectedKeyTransition {
+            chain_id: "chain-x".to_string(),
+            current_key_fingerprint: public_key_thumbprint_raw(&KEY_A),
+            current_key_id: "anchor-a".to_string(),
+            effective_at: 1500,
+            next_key_fingerprint: public_key_thumbprint_raw(&KEY_B),
+            next_key_id: "anchor-b".to_string(),
+            transition_id: "transition-1".to_string(),
+        }],
+        object_version: "v1".to_string(),
+    };
+    let input = AnchoredExportInput {
+        start_anchor: build_start_anchor(Z32),
+        end_anchor: build_end_anchor(head_hash, "anchor-b", KEY_B, 1600),
+        transitions,
+        rows,
+    };
+    // Self-check: the row set passes check_chain under the expected boundaries.
+    assert!(
+        check_chain(
+            &ChainInput {
+                rows: input.rows.clone()
+            },
+            &expected_chain
+        )
+        .is_ok(),
+        "fixture: rows must pass check_chain"
+    );
+    ConformantExport { input, expected }
+}
+
+// Leg 1 — expected-side: a transition's chain_id drifts from the chain's.
+// Mutation: drop the transitions-chain_id clause of the expected-side check.
+#[test]
+fn encode_expected_chain_id_drift_rejected() {
+    let mut f = conformant_export();
+    f.expected.transitions[0].chain_id = "chain-OTHER".to_string();
+    // Two-sided: the signed transition carries the same drifted chain_id.
+    let produced = key_transition_signing_input(
+        &KeyTransition {
+            chain_id: "chain-OTHER".to_string(),
+            current_key_id: "anchor-a".to_string(),
+            current_public_key: KEY_A,
+            effective_at: 1500,
+            next_key_id: "anchor-b".to_string(),
+            next_public_key: KEY_B,
+            transition_id: "transition-1".to_string(),
+        },
+        &max(),
+    )
+    .expect("drifted transition encodes");
+    f.input.transitions[0] = compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    );
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "transition chain_id drift must reject at encode"
+    );
+}
+
+// Leg 2 — expected-side: start.chain_hash != chain.previous_hash. Two-sided:
+// expected.start_anchor carries the same (mismatching) hash the match would
+// accept; only the expected-side binding catches it.
+#[test]
+fn encode_expected_start_hash_binding_rejected() {
+    let mut f = conformant_export();
+    let wrong = [9u8; 32];
+    // Two-sided ANCHOR tamper: the signed start anchor AND expected carry the
+    // wrong hash (the match passes); chain.previous_hash stays all-zero so the
+    // genesis/check_chain clauses stay satisfied — only the binding fires.
+    // Hand-modified payload (the producer rightly refuses a sequence-0 anchor
+    // with a non-zero chain hash; the DECODER carries no such rule — the
+    // encode-side binding under test is what rejects it, mirroring how the
+    // reference's validate_expected_export sees it before any parse).
+    let segs: Vec<&[u8]> = f.input.start_anchor.split(|&b| b == b'.').collect();
+    let payload_json =
+        json_decode(&base64url_decode(segs[1]).expect("payload"), &max()).expect("payload parses");
+    let members = match &payload_json {
+        JsonValue::Object(m) => m.clone(),
+        _ => panic!("object"),
+    };
+    let get = |k: &str| members.iter().find(|(n, _)| n == k).expect(k).1.clone();
+    let wrong_str = String::from_utf8(base64url_encode(&wrong)).unwrap();
+    let modified = JsonValue::Object(vec![
+        ("anchor_id".to_string(), get("anchor_id")),
+        ("anchored_at".to_string(), get("anchored_at")),
+        ("chain_hash".to_string(), JsonValue::String(wrong_str)),
+        ("chain_id".to_string(), get("chain_id")),
+        ("key_fingerprint".to_string(), get("key_fingerprint")),
+        ("sequence".to_string(), get("sequence")),
+        ("v".to_string(), JsonValue::Int(1)),
+    ]);
+    let modified_payload = jcs_encode(&modified, &max()).expect("canonical re-encode");
+    let mut rebuilt = Vec::new();
+    rebuilt.extend_from_slice(segs[0]);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(&base64url_encode(&modified_payload));
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(segs[2]);
+    f.input.start_anchor = rebuilt;
+    f.expected.start_anchor.chain_hash = wrong;
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "start.chain_hash != chain.previous_hash must reject"
+    );
+}
+
+// Leg 3 — expected-side: end.sequence != chain.last_sequence (two-sided).
+#[test]
+fn encode_expected_end_sequence_binding_rejected() {
+    let mut f = conformant_export();
+    let head = f.expected.chain.head_hash;
+    // Two-sided ANCHOR tamper: the signed end anchor AND expected carry
+    // sequence 7; chain.last_sequence stays 1 (row-conformant) so check_chain
+    // stays satisfied — only the binding fires.
+    let produced = boundary_anchor_signing_input(
+        &BoundaryAnchor {
+            anchor_id: "anchor-end".to_string(),
+            anchored_at: 1600,
+            chain_hash: head,
+            chain_id: "chain-x".to_string(),
+            key_id: "anchor-b".to_string(),
+            public_key: KEY_B,
+            sequence: 7,
+        },
+        &max(),
+    )
+    .expect("re-signed end anchor (seq 7)");
+    f.input.end_anchor = compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    );
+    f.expected.end_anchor.sequence = 7;
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "end.sequence != chain.last_sequence must reject"
+    );
+}
+
+// Leg 4 — rows failing the chain re-check. Mutation: drop the check_chain call.
+#[test]
+fn encode_rows_chain_recheck_rejected() {
+    let mut f = conformant_export();
+    f.input.rows[0][0] ^= 0x01; // tamper a meaningful byte of the canonical row
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "a row failing check_chain must reject at encode"
+    );
+}
+
+// Leg 5 — the START-anchor 7-field match call-site: the signed anchor_id
+// contradicts expected (two-sided to the same off-value).
+#[test]
+fn encode_start_anchor_full_match_rejected() {
+    let mut f = conformant_export();
+    // ONE-SIDED: only the signed anchor_id drifts; expected stays conformant so
+    // the 3a MATCH is the sole rejecting clause.
+    let produced = boundary_anchor_signing_input(
+        &BoundaryAnchor {
+            anchor_id: "anchor-WRONG".to_string(),
+            anchored_at: 1000,
+            chain_hash: Z32,
+            chain_id: "chain-x".to_string(),
+            key_id: "anchor-a".to_string(),
+            public_key: KEY_A,
+            sequence: 0,
+        },
+        &max(),
+    )
+    .expect("re-signed start anchor");
+    f.input.start_anchor = compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    );
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "start-anchor field mismatch must reject"
+    );
+}
+
+// Leg 6 — the END-anchor match call-site: signed chain_id drifts (two-sided).
+#[test]
+fn encode_end_anchor_full_match_rejected() {
+    let mut f = conformant_export();
+    let head = f.expected.chain.head_hash;
+    // ONE-SIDED: only the SIGNED anchor_id drifts (chain_id stays conformant so
+    // the expected-side clause is not the rejector).
+    let produced = boundary_anchor_signing_input(
+        &BoundaryAnchor {
+            anchor_id: "anchor-WRONG".to_string(),
+            anchored_at: 1600,
+            chain_hash: head,
+            chain_id: "chain-x".to_string(),
+            key_id: "anchor-b".to_string(),
+            public_key: KEY_B,
+            sequence: 1,
+        },
+        &max(),
+    )
+    .expect("re-signed end anchor");
+    f.input.end_anchor = compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    );
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "end-anchor field mismatch must reject"
+    );
+}
+
+// Leg 7 — the END-anchor gated parse: member-reordered (non-canonical) payload.
+// Hand-assembled (assemble_compact would reject the reorder). Mutation: drop the
+// 3b decode_anchor_parts call (legs 7+8 flip together — one call-site).
+#[test]
+fn encode_end_anchor_canonical_form_rejected() {
+    let f = conformant_export();
+    let segs: Vec<&[u8]> = f.input.end_anchor.split(|&b| b == b'.').collect();
+    let payload = segs[1];
+    let non_canonical = reversed_segment(payload);
+    let mut rebuilt = Vec::new();
+    rebuilt.extend_from_slice(segs[0]);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(&non_canonical);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(segs[2]);
+    let mut input = f.input.clone();
+    input.end_anchor = rebuilt;
+    assert!(
+        encode_anchored_export(&input, &f.expected).is_err(),
+        "non-canonical end anchor must reject at encode"
+    );
+}
+
+// Leg 8 — the END-anchor gated parse: wrong-width signature. Same call-site as 7.
+#[test]
+fn encode_end_anchor_signature_width_rejected() {
+    let f = conformant_export();
+    let segs: Vec<&[u8]> = f.input.end_anchor.split(|&b| b == b'.').collect();
+    let mut rebuilt = Vec::new();
+    rebuilt.extend_from_slice(segs[0]);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(segs[1]);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(&base64url_encode(&[0u8; 32]));
+    let mut input = f.input.clone();
+    input.end_anchor = rebuilt;
+    assert!(
+        encode_anchored_export(&input, &f.expected).is_err(),
+        "wrong-width end-anchor signature must reject at encode"
+    );
+}
+
+// Leg 9 — the transition match call-site: signed effective_at drifts (two-sided).
+#[test]
+fn encode_transition_full_match_rejected() {
+    let mut f = conformant_export();
+    // ONE-SIDED: only the signed effective_at drifts; expected stays at 1500 so
+    // the 3c MATCH is the sole rejecting clause (a two-sided tamper passes the
+    // match and the walk — 1501 > 1000, 1600 >= 1501 — and encodes Ok).
+    let produced = key_transition_signing_input(
+        &KeyTransition {
+            chain_id: "chain-x".to_string(),
+            current_key_id: "anchor-a".to_string(),
+            current_public_key: KEY_A,
+            effective_at: 1501,
+            next_key_id: "anchor-b".to_string(),
+            next_public_key: KEY_B,
+            transition_id: "transition-1".to_string(),
+        },
+        &max(),
+    )
+    .expect("re-signed transition");
+    f.input.transitions[0] = compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    );
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "transition field mismatch must reject at encode"
+    );
+}
+
+// Leg 10 — the transition gated parse: non-canonical payload (hand-assembled).
+// Mutation: drop the 3c decode_transition_parts call (legs 10+11 together).
+#[test]
+fn encode_transition_canonical_form_rejected() {
+    let f = conformant_export();
+    let segs: Vec<&[u8]> = f.input.transitions[0].split(|&b| b == b'.').collect();
+    let non_canonical = reversed_segment(segs[1]);
+    let mut rebuilt = Vec::new();
+    rebuilt.extend_from_slice(segs[0]);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(&non_canonical);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(segs[2]);
+    let mut input = f.input.clone();
+    input.transitions[0] = rebuilt;
+    assert!(
+        encode_anchored_export(&input, &f.expected).is_err(),
+        "non-canonical transition must reject at encode"
+    );
+}
+
+// Leg 11 — the transition gated parse: wrong-width signature. Same call-site as 10.
+#[test]
+fn encode_transition_signature_width_rejected() {
+    let f = conformant_export();
+    let segs: Vec<&[u8]> = f.input.transitions[0].split(|&b| b == b'.').collect();
+    let mut rebuilt = Vec::new();
+    rebuilt.extend_from_slice(segs[0]);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(segs[1]);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(&base64url_encode(&[0u8; 32]));
+    let mut input = f.input.clone();
+    input.transitions[0] = rebuilt;
+    assert!(
+        encode_anchored_export(&input, &f.expected).is_err(),
+        "wrong-width transition signature must reject at encode"
+    );
+}
+
+// Leg 12 — key-path no-cycle: a SELF-LOOP transition (next fingerprint ==
+// current) — caught by the seen-list (current is always already in seen); also
+// covers the distinct-fingerprints semantic check by composition (design C4a).
+// Hand-built (the producer refuses current==next public keys): take the valid
+// transition, set to_key_fingerprint := from_fingerprint, re-encode canonically.
+// Mutation: drop the seen-list check.
+#[test]
+fn encode_key_path_self_loop_rejected() {
+    let f = conformant_export();
+    let segs: Vec<&[u8]> = f.input.transitions[0].split(|&b| b == b'.').collect();
+    let payload_json =
+        json_decode(&base64url_decode(segs[1]).expect("payload"), &max()).expect("payload parses");
+    let members = match &payload_json {
+        JsonValue::Object(m) => m.clone(),
+        _ => panic!("object"),
+    };
+    let get = |k: &str| members.iter().find(|(n, _)| n == k).expect(k).1.clone();
+    let from_fp = get("from_key_fingerprint");
+    let looped = JsonValue::Object(vec![
+        ("chain_id".to_string(), get("chain_id")),
+        ("effective_at".to_string(), get("effective_at")),
+        ("from_key_fingerprint".to_string(), from_fp.clone()),
+        ("to_key_fingerprint".to_string(), from_fp),
+        (
+            "to_key_id".to_string(),
+            JsonValue::String("anchor-a".to_string()),
+        ),
+        ("transition_id".to_string(), get("transition_id")),
+        ("v".to_string(), JsonValue::Int(1)),
+    ]);
+    let looped_payload = jcs_encode(&looped, &max()).expect("canonical re-encode");
+    let mut rebuilt = Vec::new();
+    rebuilt.extend_from_slice(segs[0]);
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(&base64url_encode(&looped_payload));
+    rebuilt.push(b'.');
+    rebuilt.extend_from_slice(segs[2]);
+    let mut input = f.input.clone();
+    input.transitions[0] = rebuilt;
+    // Two-sided: expected mirrors the self-loop exactly, and the END anchor
+    // moves to KEY_A — after a self-loop the running key IS A, so the walk ends
+    // consistently WITHOUT the cycle guard; the seen-list is the sole rejector
+    // (left on KEY_B, the end-binding clause would backstop under the mutation).
+    let mut expected = f.expected.clone();
+    expected.transitions[0].next_key_fingerprint = public_key_thumbprint_raw(&KEY_A);
+    expected.transitions[0].next_key_id = "anchor-a".to_string();
+    expected.end_anchor = expected_end_anchor(expected.chain.head_hash, "anchor-a", KEY_A, 1600);
+    input.end_anchor = build_end_anchor(expected.chain.head_hash, "anchor-a", KEY_A, 1600);
+    assert!(
+        encode_anchored_export(&input, &expected).is_err(),
+        "self-loop transition must reject at the key-path walk"
+    );
+}
+
+// Leg 13 — key-path: transition 1's current key != the start anchor's key
+// (KEY_C signs, expected mirrors — the match passes; only the walk rejects).
+// Mutation: drop the current-key clause.
+#[test]
+fn encode_key_path_wrong_current_key_rejected() {
+    let mut f = conformant_export();
+    let produced = key_transition_signing_input(
+        &KeyTransition {
+            chain_id: "chain-x".to_string(),
+            current_key_id: "anchor-c".to_string(),
+            current_public_key: [3u8; 32],
+            effective_at: 1500,
+            next_key_id: "anchor-b".to_string(),
+            next_public_key: KEY_B,
+            transition_id: "transition-1".to_string(),
+        },
+        &max(),
+    )
+    .expect("re-signed transition (current KEY_C)");
+    f.input.transitions[0] = compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    );
+    f.expected.transitions[0].current_key_id = "anchor-c".to_string();
+    f.expected.transitions[0].current_key_fingerprint = public_key_thumbprint_raw(&[3u8; 32]);
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "wrong current key at transition 1 must reject"
+    );
+}
+
+// Leg 14 — key-path: the end anchor's key != the final running key (KEY_B).
+// Re-signed end anchor + mirrored expected; only the end-binding rejects.
+// Mutation: drop the end-binding clause.
+#[test]
+fn encode_key_path_end_key_mismatch_rejected() {
+    let mut f = conformant_export();
+    let head = f.expected.chain.head_hash;
+    let produced = boundary_anchor_signing_input(
+        &BoundaryAnchor {
+            anchor_id: "anchor-end".to_string(),
+            anchored_at: 1600,
+            chain_hash: head,
+            chain_id: "chain-x".to_string(),
+            key_id: "anchor-c".to_string(),
+            public_key: [3u8; 32],
+            sequence: 1,
+        },
+        &max(),
+    )
+    .expect("re-signed end anchor (KEY_C)");
+    f.input.end_anchor = compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    );
+    f.expected.end_anchor.key_id = "anchor-c".to_string();
+    f.expected.end_anchor.key_fingerprint = public_key_thumbprint_raw(&[3u8; 32]);
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "end anchor on a non-final key must reject"
+    );
+}
+
+// Leg 15 — key-path chronology: the transition effective_at (999) is NOT
+// strictly after the start anchor's anchored_at (1000); expected mirrors.
+// Mutation: drop the strictly-after clause.
+#[test]
+fn encode_key_path_non_chronology_rejected() {
+    let mut f = conformant_export();
+    let produced = key_transition_signing_input(
+        &KeyTransition {
+            chain_id: "chain-x".to_string(),
+            current_key_id: "anchor-a".to_string(),
+            current_public_key: KEY_A,
+            effective_at: 999,
+            next_key_id: "anchor-b".to_string(),
+            next_public_key: KEY_B,
+            transition_id: "transition-1".to_string(),
+        },
+        &max(),
+    )
+    .expect("re-signed transition (early)");
+    f.input.transitions[0] = compact_with_signature(
+        &produced.protected_segment,
+        &produced.payload_segment,
+        &[0u8; 64],
+    );
+    f.expected.transitions[0].effective_at = 999;
+    assert!(
+        encode_anchored_export(&f.input, &f.expected).is_err(),
+        "non-chronological transition must reject"
     );
 }
