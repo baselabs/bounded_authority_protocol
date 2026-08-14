@@ -12,7 +12,7 @@ into a grant, EMV-style: explicit floor limits the endpoint honors at its own ri
 offline window, with deferred consumption reconciled later. The requirements are settled on
 both sides: the protocol-side
 [offline requirements](../design/offline-authorization-requirements.md) (R-BAP-1..6) and the
-private runtime's [ADR 0014](../../bounded_authority/docs/adr/0014-offline-authorization-surface.md)
+private runtime's ADR 0014 of the private `bounded_authority` runtime (offline authorization surface)
 + R-BA-1..7 (the offline DECISION is endpoint-side; the runtime's role is issuance +
 reconciliation + distinguishability + freshness).
 
@@ -127,7 +127,7 @@ drop-the-field-and-continue-online parser — that is exactly the permissive-com
 the closed profile exists to kill (`standards-track.md:28-33`).
 
 "Online-only" is the ABSENT default (R-BAP-1): a grant with no `ba_offline` member is online-only.
-It is NOT a malformation recovery. **[ADR 0014](../../bounded_authority/docs/adr/0014-offline-authorization-surface.md)
+It is NOT a malformation recovery. **ADR 0014 of the private `bounded_authority` runtime (offline authorization surface)
 d.3's "malformed floor fields → online-only" is an issuance/runtime-layer semantic — the runtime's
 nullable Grant columns decode a malformed floor as online-only at ISSUANCE — NOT a codec semantic.**
 The BA-repo ADR 0014 amendment (the companion follow-up) re-scopes d.3 to the issuance layer; the
@@ -183,7 +183,7 @@ states the offline window, and `max_offline_exposure` is computable from the gra
 the planned `[ba-offline-freshness-format]` row is absorbable into the window.
 
 The OTHER two R-BA-7 options are NOT grant payload and are NOT absorbed here: a device-cached
-revocation list and a runtime-minted short-TTL freshness token ([ADR 0014](../../bounded_authority/docs/adr/0014-offline-authorization-surface.md)
+revocation list and a runtime-minted short-TTL freshness token (ADR 0014 of the private `bounded_authority` runtime (offline authorization surface)
 d.7) are signed artifacts the endpoint verifies offline "using only the public package and pinned
 trust anchors" (R-BA-1) — canonical wire formats consumable by the pure verifier, i.e. new
 public-package surfaces of the boundary-anchor / key-transition class. **If BA-23 picks either, a
@@ -246,7 +246,7 @@ compares an amount to `max`).
   ROADMAP:290-291 + 318-319).
 - The offline runtime arc (private `bounded_authority` BA-20..23) is **successor-major-gated**: BA-20
   (issuance of floor-limited grants) cannot ship against the current v1 codec. The companion BA-repo
-  amendment re-scopes [ADR 0014](../../bounded_authority/docs/adr/0014-offline-authorization-surface.md)
+  amendment re-scopes ADR 0014 of the private `bounded_authority` runtime (offline authorization surface)
   d.2/d.10 to "reserved for a successor major" and d.3 to the issuance layer.
 - The activating successor major owns: the concrete `max × cnt` ceiling, the `ba_dlg` attenuation
   extension (§6), its `REQ2-CLAIM-*` ids, the accept-direction conformance vectors, and the decision
