@@ -2163,3 +2163,125 @@ fn bounds_verify_identity_outer_absent_nested_accepts() {
     v.bounds = Some(tight(&[("chain_row_bytes", 4096)])); // == the maximum
     assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_ok());
 }
+
+// Cross-vendor round-4 legs — the compact_bytes ceiling in the decoders + the
+// key-window magnitude gates. Each names its red mutation.
+
+#[test]
+fn bounds_standalone_anchor_tightened_compact_bytes_rejects() {
+    // compact_bytes tightened BELOW the compact length (anchor_bytes left at the
+    // 8192 maximum so only the new ceiling can fire).
+    let case_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/conformance/corpus/cases/boundary-anchor/verify.json"
+    );
+    let raw = std::fs::read(case_path).expect("corpus readable");
+    let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
+    let valid_case = root["cases"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|c| c["class"].as_str() == Some("valid"))
+        .expect("valid");
+    let input = &valid_case["input"];
+    let compact = input["compact"]
+        .as_str()
+        .expect("compact")
+        .as_bytes()
+        .to_vec();
+    let k = &input["key"];
+    let key = HistoricalPublicKey {
+        key_id: k["key_id"].as_str().expect("kid").to_string(),
+        public_key: {
+            let mut pk = [0u8; 32];
+            pk.copy_from_slice(
+                &base64url_decode(k["public_key"].as_str().expect("pk").as_bytes()).expect("k"),
+            );
+            pk
+        },
+        valid_from: k["valid_from"].as_i64().expect("vf"),
+        valid_before: match k["valid_before"].as_i64() {
+            Some(vb) => ValidityUpperBound::Bounded(vb),
+            None => ValidityUpperBound::Unbounded,
+        },
+    };
+    let e = &input["expected"];
+    let b64_32 = |k: &str| -> [u8; 32] {
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&base64url_decode(e[k].as_str().unwrap().as_bytes()).expect("32"));
+        out
+    };
+    let expected = ExpectedAnchor {
+        anchor_id: e["anchor_id"].as_str().unwrap().to_string(),
+        anchored_at: e["anchored_at"].as_i64().unwrap(),
+        chain_hash: b64_32("chain_hash"),
+        chain_id: e["chain_id"].as_str().unwrap().to_string(),
+        key_fingerprint: b64_32("key_fingerprint"),
+        key_id: e["key_id"].as_str().unwrap().to_string(),
+        sequence: e["sequence"].as_i64().unwrap(),
+        bounds: Some(tight(&[("compact_bytes", 100)])),
+    };
+    // control: the same fixture with bounds None verifies Ok
+    let mut ctrl = expected.clone();
+    ctrl.bounds = None;
+    assert!(verify_historical_anchor(&compact, &key, &ctrl).is_ok());
+    assert!(verify_historical_anchor(&compact, &key, &expected).is_err());
+}
+
+#[test]
+fn bounds_standalone_anchor_key_window_magnitude_rejects() {
+    // An out-of-magnitude valid_from on the caller's key: the magnitude gate
+    // rejects before interval membership.
+    let case_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/conformance/corpus/cases/boundary-anchor/verify.json"
+    );
+    let raw = std::fs::read(case_path).expect("corpus readable");
+    let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
+    let valid_case = root["cases"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|c| c["class"].as_str() == Some("valid"))
+        .expect("valid");
+    let input = &valid_case["input"];
+    let compact = input["compact"]
+        .as_str()
+        .expect("compact")
+        .as_bytes()
+        .to_vec();
+    let k = &input["key"];
+    let mut key = HistoricalPublicKey {
+        key_id: k["key_id"].as_str().expect("kid").to_string(),
+        public_key: {
+            let mut pk = [0u8; 32];
+            pk.copy_from_slice(
+                &base64url_decode(k["public_key"].as_str().expect("pk").as_bytes()).expect("k"),
+            );
+            pk
+        },
+        valid_from: 0,
+        valid_before: ValidityUpperBound::Unbounded,
+    };
+    // Membership must still hold so ONLY the magnitude gate can fire: a huge
+    // BOUNDED valid_before (2^62) with valid_from 0 — anchored_at 1000 is inside
+    // [0, 2^62), but 2^62 > the integer_magnitude maximum (2^53-1).
+    key.valid_before = ValidityUpperBound::Bounded(4_611_686_018_427_387_904); // 2^62
+    let e = &input["expected"];
+    let b64_32 = |k: &str| -> [u8; 32] {
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&base64url_decode(e[k].as_str().unwrap().as_bytes()).expect("32"));
+        out
+    };
+    let expected = ExpectedAnchor {
+        anchor_id: e["anchor_id"].as_str().unwrap().to_string(),
+        anchored_at: e["anchored_at"].as_i64().unwrap(),
+        chain_hash: b64_32("chain_hash"),
+        chain_id: e["chain_id"].as_str().unwrap().to_string(),
+        key_fingerprint: b64_32("key_fingerprint"),
+        key_id: e["key_id"].as_str().unwrap().to_string(),
+        sequence: e["sequence"].as_i64().unwrap(),
+        bounds: None,
+    };
+    assert!(verify_historical_anchor(&compact, &key, &expected).is_err());
+}
