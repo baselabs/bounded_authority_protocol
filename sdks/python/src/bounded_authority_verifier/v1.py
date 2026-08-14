@@ -1586,6 +1586,14 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     return EncodedAnchoredExport(archive=archive, digest=sha256(archive))
 
 
+def _expected_time(v: object, ctx: str) -> int:
+    """Type-strict INTEGRAL time (cross-vendor: Python ``1 == True`` and floats
+    pass ``abs()`` comparisons; the reference's valid_time? demands an integer)."""
+    if not isinstance(v, int) or isinstance(v, bool):
+        fail(ctx)
+    return v
+
+
 def _expected_int(v: object, ctx: str) -> int:
     """Type-strict expected-side integer (cross-vendor round 2: Python ``1 == True``,
     so an untyped boolean expected field would equal a decoded 0/1 at the match)."""
@@ -1742,10 +1750,16 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
     # Key-window endpoints magnitude-bounded under the resolved bounds
     # (context_validation.ex valid_time? — the Rust round-4 parity fix; without
     # this the SDKs diverge on in-window times with out-of-magnitude windows).
+    _vf = _expected_time(key.valid_from, "verify_historical_anchor: valid_from type")
+    _vb = (
+        _expected_time(key.valid_before, "verify_historical_anchor: valid_before type")
+        if key.valid_before is not None
+        else None
+    )
     _mag = bounds_resolve(b, "integer_magnitude")
-    if abs(key.valid_from) > _mag:
+    if abs(_vf) > _mag:
         fail("verify_historical_anchor: valid_from magnitude")
-    if key.valid_before is not None and abs(key.valid_before) > _mag:
+    if _vb is not None and abs(_vb) > _mag:
         fail("verify_historical_anchor: valid_before magnitude")
     seg = parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
@@ -1805,12 +1819,22 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
     # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check.
     b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     # Key-window endpoints magnitude-bounded (both keys — the Rust parity).
+    _ovf = _expected_time(old_key.valid_from, "verify_key_transition: valid_from type")
+    _nvf = _expected_time(new_key.valid_from, "verify_key_transition: valid_from type")
+    _ovb = (
+        _expected_time(old_key.valid_before, "verify_key_transition: valid_before type")
+        if old_key.valid_before is not None
+        else None
+    )
+    _nvb = (
+        _expected_time(new_key.valid_before, "verify_key_transition: valid_before type")
+        if new_key.valid_before is not None
+        else None
+    )
     _mag = bounds_resolve(b, "integer_magnitude")
-    if abs(old_key.valid_from) > _mag or abs(new_key.valid_from) > _mag:
+    if abs(_ovf) > _mag or abs(_nvf) > _mag:
         fail("verify_key_transition: valid_from magnitude")
-    if (old_key.valid_before is not None and abs(old_key.valid_before) > _mag) or (
-        new_key.valid_before is not None and abs(new_key.valid_before) > _mag
-    ):
+    if (_ovb is not None and abs(_ovb) > _mag) or (_nvb is not None and abs(_nvb) > _mag):
         fail("verify_key_transition: valid_before magnitude")
     seg = parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
