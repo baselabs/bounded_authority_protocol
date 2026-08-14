@@ -18,6 +18,20 @@ All notable changes to `bounded_authority_protocol` are documented here.
   92 unit + conformance 283/283; Python 62 unit + conformance 283/283. (The Rust/Go SDKs — BAP-15/16
   — may carry the same gaps; a separate check is owed.)
 
+- **Rust SDK encode-path validation parity (BAP-15).** `encode_anchored_export` now enforces the
+  Elixir reference producer's FULL validation contract (`anchored_export_codec.ex` encode):
+  expected-side consistency (chain_id binding of both anchors + all transitions; the
+  start/end sequence + hash bindings), a full `check_chain` re-check of the rows, gated parses
+  + 7-field matches for BOTH anchors and every transition (the width/canonical gates now
+  reached at encode), and the key-path walk (running key, strictly-after transition times,
+  seen-list cycle guard, end anchor binding the final key with NON-STRICT `>=` chronology).
+  15 new red-capable battery legs (permissiveness 19 → 34), each mutation-proven; every leg
+  verified against the Elixir reference oracle (16/16 — conformant control Ok, every tamper
+  `{:error,:invalid}`). Honest residuals, both NAMED: the TypeScript/Python SDKs carry the same
+  producer permissiveness (closed by the sibling commit landing immediately after); the
+  Rust SDK is a documented maximum-bounds posture at encode (the reference + siblings thread
+  caller-tightened `expected.bounds` — carrying that is a public-API change, its own slice).
+
 - **Rust SDK conformance hardening (BAP-15).** The Rust verifier SDK now enforces the same two
   checks the Elixir reference has (closing the "separate check owed" note above, mirroring
   `18c6467`): (1) a decoded **signature-width gate** in all four `decode_*_parts` fns

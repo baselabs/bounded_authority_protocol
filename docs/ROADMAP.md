@@ -595,6 +595,16 @@ change. The Go SDK (BAP-16) picks both classes up at authoring. (This slice land
 as its owning row — the same provenance as `18c6467` under BAP-09 — rather than as a new row;
 the evidence amendment is this repo's docs-currency rule, not the sibling's pattern.)
 
+**2026-08-14 amendment #2 — Rust encode-path validation parity (`8de07dd`).** The routed
+residual of amendment #1 is CLOSED for Rust: `encode_anchored_export` now mirrors the
+reference producer's full contract (expected-side consistency, row chain re-check, gated
+parses + 7-field matches for both anchors and every transition, the key-path walk with
+NON-STRICT end-anchor chronology). 15 mutation-proven battery legs (permissiveness 34), each
+verified against the Elixir reference oracle (16/16). The TS/Python sibling permissiveness
+closes in the immediately-following commit; the SDK-wide maximum-bounds encode posture
+remains a NAMED delta (caller-tightened `expected.bounds` = a public-API change, its own
+reviewed slice). The Go SDK (BAP-16) picks the whole contract up at authoring.
+
 ## BAP-17 closeout evidence
 
 - **Slice:** `bap-17-offline-grant-format` (reserve + specify). **Activation decision (user,
