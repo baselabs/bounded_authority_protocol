@@ -583,10 +583,14 @@ signature-width gate at decode and no canonical-form byte-equality for anchor/tr
 segments. Both closed RED-first (7 battery legs, each mutation-proven; the plan-review BLOCKING
 finding surfaced a third public flip — `encode_anchored_export`'s start-anchor signature was
 never width-checked — which gained its own leg). Gates: `cargo test --locked` 338 unit +
-conformance agreed=283 + permissiveness 17; fmt/clippy clean. Honest residual, routed: the
-encode path frames the END anchor unparsed (the reference parses both anchors through the
-gating codec, `anchored_export_codec.ex:40/:42`) — a non-canonical or wrong-width end anchor is
-still accepted at Rust encode; fixing it flips a third verdict class and is its own reviewed
+conformance agreed=283 + permissiveness 17; fmt/clippy clean. Honest residuals, routed (closeout-lens-completed
+enumeration): the encode path validates less than the reference producer — the END anchor and
+every TRANSITION are framed raw, unparsed (the reference parses both anchors + all transitions
+through the width/canonical-gating codecs, `anchored_export_codec.ex:40-52`; a non-canonical or
+wrong-width end anchor or transition is still accepted at Rust encode, probe-proven in the
+closeout lenses and caught downstream by `verify_anchored_export`), the start-anchor binding is
+sequence-only (the reference matches all signed fields), and rows are not re-checked against
+the chain at encode. Closing these flips further verdict classes and is its own reviewed
 change. The Go SDK (BAP-16) picks both classes up at authoring. (This slice lands under BAP-15
 as its owning row — the same provenance as `18c6467` under BAP-09 — rather than as a new row;
 the evidence amendment is this repo's docs-currency rule, not the sibling's pattern.)
