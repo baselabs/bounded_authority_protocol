@@ -1823,8 +1823,7 @@ fn bounds_encode_absent_nested_under_tightened_outer_rejects() {
     // B1: the pin's absent branch — outer tightened, ALL nested None → reject
     // (the wrong-ACCEPT direction; the reference rejects at .ex:352-354).
     let mut f = conformant_export();
-    f.expected.bounds = Some(tight(&[("anchor_bytes", 8192)])); // real tightening < maximum? identity!
-                                                                // use a genuinely tightening value so the absent branch is the rejector
+    // use a genuinely tightening value so the absent branch is the rejector
     f.expected.bounds = Some(tight(&[("chain_row_bytes", 4000)]));
     assert!(encode_anchored_export(&f.input, &f.expected).is_err());
 }

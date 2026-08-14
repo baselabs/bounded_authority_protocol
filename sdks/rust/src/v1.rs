@@ -1371,6 +1371,12 @@ pub fn encode_anchored_export(
 ) -> Result<AnchoredExportEncoded> {
     let bounds = resolve_bounds(expected.bounds.as_ref());
 
+    // The count ceiling BEFORE any per-element walk (cross-vendor round 3: the
+    // pin loop walked unbounded caller input first — O(n) work past the ceiling).
+    if expected.transitions.len() as u64 > bounds.key_transitions() {
+        return Err(Invalid);
+    }
+
     // The nested-bounds pins (the reference applies them at encode AND verify —
     // validate_expected_export :352-354/:404-406 via :33 AND :387).
     require_bounds_equal(expected.chain.bounds.as_ref(), &bounds)?;
@@ -1748,6 +1754,11 @@ pub fn verify_anchored_export(
     expected: &ExpectedAnchoredExport,
 ) -> Result<AnchoredExportFacts> {
     let bounds = resolve_bounds(expected.bounds.as_ref());
+
+    // The count ceiling BEFORE any per-element walk (cross-vendor round 3).
+    if expected.transitions.len() as u64 > bounds.key_transitions() {
+        return Err(Invalid);
+    }
 
     // The nested-bounds pins at verify (validate_expected_anchored_export :387
     // -> validate_expected_export :352-354/:404-406).
