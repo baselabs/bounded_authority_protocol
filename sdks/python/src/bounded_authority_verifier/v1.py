@@ -1739,6 +1739,14 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
     # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check, as
     # the reference does (boundary_anchor_codec.ex parses the compact + payload under bounds).
     b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    # Key-window endpoints magnitude-bounded under the resolved bounds
+    # (context_validation.ex valid_time? — the Rust round-4 parity fix; without
+    # this the SDKs diverge on in-window times with out-of-magnitude windows).
+    _mag = bounds_resolve(b, "integer_magnitude")
+    if abs(key.valid_from) > _mag:
+        fail("verify_historical_anchor: valid_from magnitude")
+    if key.valid_before is not None and abs(key.valid_before) > _mag:
+        fail("verify_historical_anchor: valid_before magnitude")
     seg = parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != key.key_id:
@@ -1796,6 +1804,14 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
         fail("verify_key_transition: distinct keys")
     # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check.
     b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    # Key-window endpoints magnitude-bounded (both keys — the Rust parity).
+    _mag = bounds_resolve(b, "integer_magnitude")
+    if abs(old_key.valid_from) > _mag or abs(new_key.valid_from) > _mag:
+        fail("verify_key_transition: valid_from magnitude")
+    if (old_key.valid_before is not None and abs(old_key.valid_before) > _mag) or (
+        new_key.valid_before is not None and abs(new_key.valid_before) > _mag
+    ):
+        fail("verify_key_transition: valid_before magnitude")
     seg = parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != old_key.key_id:

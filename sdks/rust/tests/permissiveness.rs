@@ -2230,8 +2230,8 @@ fn bounds_standalone_anchor_tightened_compact_bytes_rejects() {
 
 #[test]
 fn bounds_standalone_anchor_key_window_magnitude_rejects() {
-    // An out-of-magnitude valid_from on the caller's key: the magnitude gate
-    // rejects before interval membership.
+    // The BOUNDED-VALID_BEFORE half: a huge bounded upper bound (2^62) —
+    // membership holds (anchored_at is inside), only the magnitude gate fires.
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/conformance/corpus/cases/boundary-anchor/verify.json"
@@ -2267,6 +2267,185 @@ fn bounds_standalone_anchor_key_window_magnitude_rejects() {
     // BOUNDED valid_before (2^62) with valid_from 0 — anchored_at 1000 is inside
     // [0, 2^62), but 2^62 > the integer_magnitude maximum (2^53-1).
     key.valid_before = ValidityUpperBound::Bounded(4_611_686_018_427_387_904); // 2^62
+    let e = &input["expected"];
+    let b64_32 = |k: &str| -> [u8; 32] {
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&base64url_decode(e[k].as_str().unwrap().as_bytes()).expect("32"));
+        out
+    };
+    let expected = ExpectedAnchor {
+        anchor_id: e["anchor_id"].as_str().unwrap().to_string(),
+        anchored_at: e["anchored_at"].as_i64().unwrap(),
+        chain_hash: b64_32("chain_hash"),
+        chain_id: e["chain_id"].as_str().unwrap().to_string(),
+        key_fingerprint: b64_32("key_fingerprint"),
+        key_id: e["key_id"].as_str().unwrap().to_string(),
+        sequence: e["sequence"].as_i64().unwrap(),
+        bounds: None,
+    };
+    assert!(verify_historical_anchor(&compact, &key, &expected).is_err());
+}
+
+// Round-5 legs (the claude peer): the transition-path round-4 gates + the
+// valid_from half of the anchor magnitude family.
+
+#[test]
+fn bounds_standalone_transition_tightened_compact_bytes_rejects() {
+    let case_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/conformance/corpus/cases/key-transition/verify.json"
+    );
+    let raw = std::fs::read(case_path).expect("corpus readable");
+    let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
+    let valid_case = root["cases"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|c| c["class"].as_str() == Some("valid"))
+        .expect("valid");
+    let input = &valid_case["input"];
+    let compact = input["compact"]
+        .as_str()
+        .expect("compact")
+        .as_bytes()
+        .to_vec();
+    let mk_key = |v: &serde_json::Value| -> HistoricalPublicKey {
+        let mut pk = [0u8; 32];
+        pk.copy_from_slice(
+            &base64url_decode(v["public_key"].as_str().expect("pk").as_bytes()).expect("k"),
+        );
+        HistoricalPublicKey {
+            key_id: v["key_id"].as_str().expect("kid").to_string(),
+            public_key: pk,
+            valid_from: v["valid_from"].as_i64().expect("vf"),
+            valid_before: match v["valid_before"].as_i64() {
+                Some(vb) => ValidityUpperBound::Bounded(vb),
+                None => ValidityUpperBound::Unbounded,
+            },
+        }
+    };
+    let current = mk_key(&input["current_key"]);
+    let next = mk_key(&input["next_key"]);
+    let e = &input["expected"];
+    let b64_32 = |k: &str| -> [u8; 32] {
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&base64url_decode(e[k].as_str().unwrap().as_bytes()).expect("32"));
+        out
+    };
+    let expected = ExpectedKeyTransition {
+        chain_id: e["chain_id"].as_str().unwrap().to_string(),
+        current_key_fingerprint: b64_32("current_key_fingerprint"),
+        current_key_id: e["current_key_id"].as_str().unwrap().to_string(),
+        effective_at: e["effective_at"].as_i64().unwrap(),
+        next_key_fingerprint: b64_32("next_key_fingerprint"),
+        next_key_id: e["next_key_id"].as_str().unwrap().to_string(),
+        transition_id: e["transition_id"].as_str().unwrap().to_string(),
+        bounds: Some(tight(&[("compact_bytes", 100)])),
+    };
+    // Control at maximum: Ok.
+    let mut ctrl = expected.clone();
+    ctrl.bounds = None;
+    assert!(verify_key_transition(&compact, &current, &next, &ctrl).is_ok());
+    assert!(verify_key_transition(&compact, &current, &next, &expected).is_err());
+}
+
+#[test]
+fn bounds_standalone_transition_key_window_magnitude_rejects() {
+    // The huge-BOUNDED-valid_before variant on the CURRENT key of the transition
+    // path (membership holds; only the magnitude gate fires).
+    let case_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/conformance/corpus/cases/key-transition/verify.json"
+    );
+    let raw = std::fs::read(case_path).expect("corpus readable");
+    let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
+    let valid_case = root["cases"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|c| c["class"].as_str() == Some("valid"))
+        .expect("valid");
+    let input = &valid_case["input"];
+    let compact = input["compact"]
+        .as_str()
+        .expect("compact")
+        .as_bytes()
+        .to_vec();
+    let mk_key = |v: &serde_json::Value| -> HistoricalPublicKey {
+        let mut pk = [0u8; 32];
+        pk.copy_from_slice(
+            &base64url_decode(v["public_key"].as_str().expect("pk").as_bytes()).expect("k"),
+        );
+        HistoricalPublicKey {
+            key_id: v["key_id"].as_str().expect("kid").to_string(),
+            public_key: pk,
+            valid_from: v["valid_from"].as_i64().expect("vf"),
+            valid_before: match v["valid_before"].as_i64() {
+                Some(vb) => ValidityUpperBound::Bounded(vb),
+                None => ValidityUpperBound::Unbounded,
+            },
+        }
+    };
+    let mut current = mk_key(&input["current_key"]);
+    current.valid_before = ValidityUpperBound::Bounded(4_611_686_018_427_387_904); // 2^62
+    let next = mk_key(&input["next_key"]);
+    let e = &input["expected"];
+    let b64_32 = |k: &str| -> [u8; 32] {
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&base64url_decode(e[k].as_str().unwrap().as_bytes()).expect("32"));
+        out
+    };
+    let expected = ExpectedKeyTransition {
+        chain_id: e["chain_id"].as_str().unwrap().to_string(),
+        current_key_fingerprint: b64_32("current_key_fingerprint"),
+        current_key_id: e["current_key_id"].as_str().unwrap().to_string(),
+        effective_at: e["effective_at"].as_i64().unwrap(),
+        next_key_fingerprint: b64_32("next_key_fingerprint"),
+        next_key_id: e["next_key_id"].as_str().unwrap().to_string(),
+        transition_id: e["transition_id"].as_str().unwrap().to_string(),
+        bounds: None,
+    };
+    assert!(verify_key_transition(&compact, &current, &next, &expected).is_err());
+}
+
+#[test]
+fn bounds_standalone_anchor_key_window_magnitude_valid_from_rejects() {
+    // The valid_from half, symmetric-sign: a NEGATIVE out-of-magnitude
+    // valid_from (i64::MIN + 1 — membership holds for any positive anchored_at
+    // only if... it does not; instead use valid_from = -(2^62) with anchored_at
+    // 1000: 1000 >= valid_from passes; unsigned_abs(2^62) > 2^53-1 fires).
+    let case_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/conformance/corpus/cases/boundary-anchor/verify.json"
+    );
+    let raw = std::fs::read(case_path).expect("corpus readable");
+    let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
+    let valid_case = root["cases"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|c| c["class"].as_str() == Some("valid"))
+        .expect("valid");
+    let input = &valid_case["input"];
+    let compact = input["compact"]
+        .as_str()
+        .expect("compact")
+        .as_bytes()
+        .to_vec();
+    let k = &input["key"];
+    let mut key = HistoricalPublicKey {
+        key_id: k["key_id"].as_str().expect("kid").to_string(),
+        public_key: {
+            let mut pk = [0u8; 32];
+            pk.copy_from_slice(
+                &base64url_decode(k["public_key"].as_str().expect("pk").as_bytes()).expect("k"),
+            );
+            pk
+        },
+        valid_from: 0,
+        valid_before: ValidityUpperBound::Unbounded,
+    };
+    key.valid_from = -(4_611_686_018_427_387_904i64); // -2^62: membership holds, magnitude fires
     let e = &input["expected"];
     let b64_32 = |k: &str| -> [u8; 32] {
         let mut out = [0u8; 32];
