@@ -43,7 +43,7 @@ including the pinning legs that guard the grant/proof canonical EXCLUSION the re
 imposes nowhere).
 
 ```bash
-cargo test --test permissiveness   # 9 closures, each red-capable
+cargo test --test permissiveness   # 19 tests: closures + conformance legs + exclusion pins, each red-capable
 ```
 
 ## The public façade
