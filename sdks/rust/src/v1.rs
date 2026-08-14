@@ -1420,7 +1420,16 @@ pub fn encode_anchored_export(
 
     // Row chain re-check (reference ConsumptionChain.check,
     // anchored_export_codec.ex:37-39): the rows must verify against the
-    // expected boundaries before they are archived.
+    // expected boundaries before they are archived. Per-row byte ceilings are
+    // enforced BEFORE the row set is cloned into ChainInput (which owns its
+    // rows) — cloning an oversized caller-controlled row first would amplify
+    // memory before the rejection (cross-vendor finding; the surrounding
+    // encode posture is reject-before-large-allocation).
+    for r in &input.rows {
+        if r.len() as u64 > bounds.chain_row_bytes() {
+            return Err(Invalid);
+        }
+    }
     check_chain(
         &ChainInput {
             rows: input.rows.clone(),
@@ -1509,10 +1518,14 @@ pub fn encode_anchored_export(
     // Aggregate ceilings at encode (reference anchored_export_codec.ex:69 ->
     // validate_chunks :337-340): chunk count <= archive_chunks and total bytes
     // <= archive_bytes, checked BEFORE assembling so an over-budget input cannot
-    // force a full-archive allocation. Chunk count = header + start + transitions
-    // + rows + end; total = magic + sum(4-byte length prefix + content) per frame.
+    // force a full-archive allocation. Chunk count = magic + header + start +
+    // transitions + rows + end — the reference's build_chunks emits the archive
+    // magic as the FIRST chunk and validate_chunks counts it (the maximum
+    // archive_chunks = 4 + 256 + 65,536 includes it); total = magic +
+    // sum(4-byte length prefix + content) per frame.
     let frame_count = 1u64
         .checked_add(1)
+        .and_then(|n| n.checked_add(1))
         .and_then(|n| n.checked_add(input.transitions.len() as u64))
         .and_then(|n| n.checked_add(input.rows.len() as u64))
         .and_then(|n| n.checked_add(1))

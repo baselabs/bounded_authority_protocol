@@ -1563,3 +1563,30 @@ def test_encode_parity_tightened_outer_bounds_row_rejects():
     tight = bounds_new({"chain_row_bytes": 156})
     r = encode_anchored_export(input_, _replace(expected, bounds=tight))
     assert not r.is_ok, "tightened outer bounds must take effect at the encode row walk"
+
+
+def test_encode_parity_nested_anchor_bounds_mismatch_rejects():
+    """The reference pins ALL FOUR nested bounds to the outer (anchored_export_codec.ex:352-354,
+    :404-406); this leg pins the anchor sweep beyond the F1 chain pin."""
+    from dataclasses import replace as _replace
+
+    from bounded_authority_verifier.bounds import bounds_new
+
+    input_, expected = _conformant_export()
+    tight = bounds_new({"chain_row_bytes": 156})
+    r = encode_anchored_export(input_, _replace(expected, start_anchor=_replace(expected.start_anchor, bounds=tight)))
+    assert not r.is_ok, "nested anchor-bounds mismatch must reject at encode"
+
+
+def test_encode_parity_identity_overrides_are_not_tightening():
+    """An outer bounds built from an explicit MAXIMUM value is an identity override: the
+    reference merges it into the full maximum struct and accepts absent nested bounds
+    (struct equality); map-size gating wrong-rejected this (cross-vendor)."""
+    from dataclasses import replace as _replace
+
+    from bounded_authority_verifier.bounds import bounds_new
+
+    input_, expected = _conformant_export()
+    identity = bounds_new({"chain_row_bytes": 4096})  # == MAXIMA
+    r = encode_anchored_export(input_, _replace(expected, bounds=identity))
+    assert r.is_ok, "identity overrides must encode (not tightening)"
