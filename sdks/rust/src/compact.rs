@@ -67,8 +67,9 @@ pub(crate) fn compose_compact(input: &SigningInput, signature: &[u8; 64]) -> Res
 /// (borrowed from `text`); the caller decodes them via
 /// [`base64url_decode`] / [`crate::json::json_decode`] as needed. The
 /// signature-segment width (must decode to 64 bytes) is NOT enforced here —
-/// that is the façade's responsibility; this parser only asserts the
-/// `REQ1-SIGNING-exact-input` shape.
+/// that is the decode path's responsibility (each `decode_*_parts` fn in
+/// [`crate::v1`] gates it, mirroring the reference codecs); this parser only
+/// asserts the `REQ1-SIGNING-exact-input` shape.
 ///
 /// Rejects (`Invalid`): more or fewer than three segments, an empty segment
 /// (leading / trailing / doubled `.`), and any segment that is not canonical

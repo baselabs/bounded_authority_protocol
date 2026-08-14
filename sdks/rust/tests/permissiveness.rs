@@ -307,3 +307,362 @@ fn base64url_non_canonical_pad_bits_rejected() {
     assert_eq!(base64url_decode(b"AA"), Ok(vec![0x00]));
     assert_eq!(base64url_decode(b"AAA"), Ok(vec![0x00, 0x00]));
 }
+
+// =============================================================================
+// Decode-path conformance — canonical form + decoded signature width
+// (reference boundary_anchor_codec.ex / key_transition_codec.ex / runtime.ex)
+// =============================================================================
+//
+// Two conformance closures the corpus does not express (it is frozen; the
+// drifted-accept classes below have no vector) and the shared validators own:
+//
+// (a) CANONICAL FORM — the reference anchor/transition codecs require the
+//     protected AND payload segments to equal their exact JCS re-encoding
+//     (boundary_anchor_codec.ex:95-96 + :118-119; key_transition_codec.ex:127-128
+//     + :151-152). The Rust validators checked only the closed member set, so a
+//     member-REORDERED (non-canonical) segment with valid fields was accepted.
+//     RED-capable mutation: drop the `jcs_encode(value) == bytes` equality in
+//     `validate_anchor_header` / `validate_anchor_payload` /
+//     `validate_transition_header` / `validate_transition_payload` → the
+//     corresponding test goes RED. Exercised through `assemble_compact`, which
+//     validates structure WITHOUT cryptographic verification (no key argument),
+//     so a dummy 64-byte signature reaches the checks; every verify/encode path
+//     rides the same validators via `decode_anchor_parts`/`decode_transition_parts`.
+//
+// (b) DECODED SIGNATURE WIDTH — the reference gates byte_size(signature) == 64
+//     at DECODE (runtime.ex:237 parse_grant + :259 parse_proof;
+//     boundary_anchor_codec.ex:88; key_transition_codec.ex:120). The Rust
+//     `decode_grant`/`decode_proof` accepted any width (verify checked later),
+//     and `encode_anchored_export`'s start-anchor parse (v1.rs:1387) never
+//     width-checked at all. RED-capable mutation: delete the width clause in
+//     `decode_grant_parts` / `decode_proof_parts` / `decode_anchor_parts` → the
+//     corresponding test goes RED. (The transition width clause in
+//     `decode_transition_parts` is verdict-inert placement parity — every public
+//     path already rejected wrong-width transitions — and carries no test leg;
+//     see the BAP-15 evidence amendment.)
+
+use bounded_authority_protocol::types::{
+    AnchoredExportInput, BoundaryAnchor, ExpectedAnchor, ExpectedChain, ExpectedExport, GrantInput,
+    GrantOperation, KeyTransition, ProofInput, SigningInput, SigningKind,
+};
+use bounded_authority_protocol::{
+    assemble_compact, base64url_encode, boundary_anchor_signing_input, decode_grant, decode_proof,
+    encode_anchored_export, grant_signing_input, key_transition_signing_input, proof_signing_input,
+};
+
+/// Minimal JSON string literal serializer for fixture members (plain ASCII
+/// values; `"`, `\`, and control bytes escaped — nothing else reachable here).
+fn json_str(s: &str) -> String {
+    let mut out = String::from("\"");
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// Re-serializes a flat object's members in REVERSE source order (values
+/// untouched). The input segment is JCS-canonical (sorted), so the reversal of
+/// a >=2-member object is a valid-JSON, non-canonical byte sequence.
+fn reversed_segment(segment: &[u8]) -> Vec<u8> {
+    let decoded = base64url_decode(segment).expect("canonical segment decodes");
+    let value = json_decode(&decoded, &max()).expect("canonical segment parses");
+    let members = match &value {
+        JsonValue::Object(m) => m,
+        _ => panic!("fixture: object segment expected"),
+    };
+    let mut parts: Vec<String> = members
+        .iter()
+        .map(|(k, v)| {
+            let vs = match v {
+                JsonValue::String(s) => json_str(s),
+                JsonValue::Int(i) => i.to_string(),
+                _ => panic!("fixture: flat string/int members only"),
+            };
+            format!("{}:{}", json_str(k), vs)
+        })
+        .collect();
+    parts.reverse();
+    base64url_encode(format!("{{{}}}", parts.join(",")).as_bytes())
+}
+
+/// The all-zero chain hash (sequence-0 anchor requirement).
+const Z32: [u8; 32] = [0u8; 32];
+
+fn anchor_fixture() -> BoundaryAnchor {
+    BoundaryAnchor {
+        anchor_id: "anchor-start".to_string(),
+        anchored_at: 1000,
+        chain_hash: Z32,
+        chain_id: "chain-x".to_string(),
+        key_id: "anchor-a".to_string(),
+        public_key: [7u8; 32],
+        sequence: 0,
+    }
+}
+
+fn transition_fixture() -> KeyTransition {
+    KeyTransition {
+        chain_id: "chain-x".to_string(),
+        current_key_id: "anchor-a".to_string(),
+        current_public_key: [7u8; 32],
+        effective_at: 1500,
+        next_key_id: "anchor-b".to_string(),
+        next_public_key: [8u8; 32],
+        transition_id: "transition-1".to_string(),
+    }
+}
+
+fn compact_with_signature(protected: &[u8], payload: &[u8], signature: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(protected.len() + payload.len() + signature.len() + 2);
+    out.extend_from_slice(protected);
+    out.push(b'.');
+    out.extend_from_slice(payload);
+    out.push(b'.');
+    out.extend_from_slice(&base64url_encode(signature));
+    out
+}
+
+#[test]
+fn canonical_form_anchor_header_rejected() {
+    let produced =
+        boundary_anchor_signing_input(&anchor_fixture(), &max()).expect("anchor signing input ok");
+    // Control: the canonical segments assemble Ok (fixture would pass but-for order).
+    let canonical = assemble_compact(
+        &SigningInput {
+            kind: SigningKind::ChainAnchor,
+            protected_segment: produced.protected_segment.clone(),
+            payload_segment: produced.payload_segment.clone(),
+        },
+        &[0u8; 64],
+    );
+    assert!(canonical.is_ok(), "canonical anchor must assemble");
+    // Non-canonical protected header (members reversed, values untouched).
+    let r = assemble_compact(
+        &SigningInput {
+            kind: SigningKind::ChainAnchor,
+            protected_segment: reversed_segment(&produced.protected_segment),
+            payload_segment: produced.payload_segment.clone(),
+        },
+        &[0u8; 64],
+    );
+    assert!(r.is_err(), "non-canonical anchor header must reject");
+}
+
+#[test]
+fn canonical_form_anchor_payload_rejected() {
+    let produced =
+        boundary_anchor_signing_input(&anchor_fixture(), &max()).expect("anchor signing input ok");
+    // Non-canonical payload (members reversed, values untouched).
+    let r = assemble_compact(
+        &SigningInput {
+            kind: SigningKind::ChainAnchor,
+            protected_segment: produced.protected_segment.clone(),
+            payload_segment: reversed_segment(&produced.payload_segment),
+        },
+        &[0u8; 64],
+    );
+    assert!(r.is_err(), "non-canonical anchor payload must reject");
+}
+
+#[test]
+fn canonical_form_transition_header_rejected() {
+    let produced = key_transition_signing_input(&transition_fixture(), &max())
+        .expect("transition signing input ok");
+    // Control: the canonical segments assemble Ok.
+    let canonical = assemble_compact(
+        &SigningInput {
+            kind: SigningKind::KeyTransition,
+            protected_segment: produced.protected_segment.clone(),
+            payload_segment: produced.payload_segment.clone(),
+        },
+        &[0u8; 64],
+    );
+    assert!(canonical.is_ok(), "canonical transition must assemble");
+    // Non-canonical protected header.
+    let r = assemble_compact(
+        &SigningInput {
+            kind: SigningKind::KeyTransition,
+            protected_segment: reversed_segment(&produced.protected_segment),
+            payload_segment: produced.payload_segment.clone(),
+        },
+        &[0u8; 64],
+    );
+    assert!(r.is_err(), "non-canonical transition header must reject");
+}
+
+#[test]
+fn canonical_form_transition_payload_rejected() {
+    let produced = key_transition_signing_input(&transition_fixture(), &max())
+        .expect("transition signing input ok");
+    // Non-canonical payload.
+    let r = assemble_compact(
+        &SigningInput {
+            kind: SigningKind::KeyTransition,
+            protected_segment: produced.protected_segment.clone(),
+            payload_segment: reversed_segment(&produced.payload_segment),
+        },
+        &[0u8; 64],
+    );
+    assert!(r.is_err(), "non-canonical transition payload must reject");
+}
+
+#[test]
+fn signature_width_grant_decode_rejected() {
+    let grant = GrantInput {
+        issuer: "issuer-a".to_string(),
+        grant_id: "grant-1".to_string(),
+        key_id: "issuer-key-1".to_string(),
+        holder_thumbprint: Z32,
+        issued_at: 1000,
+        not_before: 1000,
+        expires_at: 2000,
+        audiences: vec!["aud-a".to_string()],
+        operations: vec![GrantOperation {
+            name: "do.thing".to_string(),
+            selectors: vec![JsonValue::Object(vec![(
+                "kind".to_string(),
+                JsonValue::String("all".to_string()),
+            )])],
+        }],
+    };
+    let produced = grant_signing_input(&grant, &max()).expect("grant signing input ok");
+    // Control: a 64-byte signature segment decodes Ok (decode does not verify).
+    let ok = decode_grant(
+        &compact_with_signature(
+            &produced.protected_segment,
+            &produced.payload_segment,
+            &[0u8; 64],
+        ),
+        &max(),
+    );
+    assert!(ok.is_ok(), "64-byte-signature grant must decode");
+    // A 32-byte signature segment must reject at decode.
+    let r = decode_grant(
+        &compact_with_signature(
+            &produced.protected_segment,
+            &produced.payload_segment,
+            &[0u8; 32],
+        ),
+        &max(),
+    );
+    assert!(
+        r.is_err(),
+        "wrong-width grant signature must reject at decode"
+    );
+}
+
+#[test]
+fn signature_width_proof_decode_rejected() {
+    let proof = ProofInput {
+        proof_id: "proof-1".to_string(),
+        method: "POST".to_string(),
+        target_uri: "https://example.test/api".to_string(),
+        invocation_id: "01234567-89ab-cdef-0123-456789abcdef".to_string(),
+        operation: "do.thing".to_string(),
+        cast_arguments: JsonValue::Object(vec![(
+            "q".to_string(),
+            JsonValue::String("v".to_string()),
+        )]),
+        grant_compact: b"grant.gher.compact".to_vec(),
+        holder_public_key: [9u8; 32],
+        issued_at: 2000,
+    };
+    let produced = proof_signing_input(&proof, &max()).expect("proof signing input ok");
+    // Control: a 64-byte signature segment decodes Ok.
+    let ok = decode_proof(
+        &compact_with_signature(
+            &produced.protected_segment,
+            &produced.payload_segment,
+            &[0u8; 64],
+        ),
+        &max(),
+    );
+    assert!(ok.is_ok(), "64-byte-signature proof must decode");
+    // A 32-byte signature segment must reject at decode.
+    let r = decode_proof(
+        &compact_with_signature(
+            &produced.protected_segment,
+            &produced.payload_segment,
+            &[0u8; 32],
+        ),
+        &max(),
+    );
+    assert!(
+        r.is_err(),
+        "wrong-width proof signature must reject at decode"
+    );
+}
+
+#[test]
+fn signature_width_export_encode_start_anchor_rejected() {
+    // The encode path parses the START anchor (v1.rs decode_anchor_parts) and
+    // never width-checks its signature segment elsewhere — this is the anchor
+    // width gate's one public flip (the plan-review F1 leg).
+    let produced =
+        boundary_anchor_signing_input(&anchor_fixture(), &max()).expect("anchor signing input ok");
+    let expected = ExpectedExport {
+        chain: ExpectedChain {
+            chain_id: "chain-x".to_string(),
+            first_sequence: 1, // start_anchor.sequence + 1 (the :1390 binding)
+            last_sequence: 1,
+            row_count: 1,
+            previous_hash: Z32,
+            head_hash: [1u8; 32],
+        },
+        digest: Z32,
+        start_anchor: ExpectedAnchor {
+            anchor_id: "anchor-start".to_string(),
+            anchored_at: 1000,
+            chain_hash: Z32,
+            chain_id: "chain-x".to_string(),
+            key_fingerprint: Z32,
+            key_id: "anchor-a".to_string(),
+            sequence: 0,
+        },
+        end_anchor: ExpectedAnchor {
+            anchor_id: "anchor-end".to_string(),
+            anchored_at: 1100,
+            chain_hash: [1u8; 32],
+            chain_id: "chain-x".to_string(),
+            key_fingerprint: Z32,
+            key_id: "anchor-a".to_string(),
+            sequence: 1,
+        },
+        transitions: vec![],
+        object_version: "v1".to_string(),
+    };
+    // Control: a 64-byte-signature start anchor encodes Ok (rows/end frame raw).
+    let ok_input = AnchoredExportInput {
+        start_anchor: compact_with_signature(
+            &produced.protected_segment,
+            &produced.payload_segment,
+            &[0u8; 64],
+        ),
+        end_anchor: b"end-anchor-bytes".to_vec(),
+        transitions: vec![],
+        rows: vec![b"row-0".to_vec()],
+    };
+    assert!(
+        encode_anchored_export(&ok_input, &expected).is_ok(),
+        "64-byte-signature start anchor must encode"
+    );
+    // A 32-byte-signature start anchor must reject at the parse.
+    let bad_input = AnchoredExportInput {
+        start_anchor: compact_with_signature(
+            &produced.protected_segment,
+            &produced.payload_segment,
+            &[0u8; 32],
+        ),
+        ..ok_input
+    };
+    assert!(
+        encode_anchored_export(&bad_input, &expected).is_err(),
+        "wrong-width start-anchor signature must reject at encode"
+    );
+}
