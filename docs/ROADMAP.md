@@ -603,7 +603,8 @@ NON-STRICT end-anchor chronology). 19 mutation-proven battery legs (permissivene
 verified against the Elixir reference oracle (20/20 — the receipt is a re-runnable local
 .forge artifact under reviews/results/rust-encode-path-parity/oracle-probe/). The TS/Python sibling permissiveness
 closed in the immediately-following commit (same contract, 15 legs each at closeout,
-proven red-capable and re-isolated under their named mutations); the SDK-wide maximum-bounds encode posture
+proven red-capable — the five pin legs each isolated under their named mutation, the
+threading leg joint-by-construction per the settled diff-review record); the SDK-wide maximum-bounds encode posture
 remains a NAMED delta (caller-tightened `expected.bounds` = a public-API change, its own
 reviewed slice). The Go SDK (BAP-16) picks the whole contract up at authoring.
 
