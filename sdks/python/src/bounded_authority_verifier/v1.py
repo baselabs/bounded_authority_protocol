@@ -1543,6 +1543,10 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     # must coerce-equal the outer (anchored_export_codec.ex:352-354). Correctness-lens
     # F1: resolving only the chain's own bounds let a tightened outer wrong-ACCEPT.
     _require_bounds_equal(expected.chain.bounds, b, "encode_anchored_export: chain bounds")
+    _require_bounds_equal(expected.start_anchor.bounds, b, "encode_anchored_export: start anchor bounds")
+    _require_bounds_equal(expected.end_anchor.bounds, b, "encode_anchored_export: end anchor bounds")
+    for _i, _t in enumerate(expected.transitions):
+        _require_bounds_equal(_t.bounds, b, f"encode_anchored_export: transition {_i} bounds")
     _require_ok(
         check_chain(
             ChainInput(
@@ -2217,8 +2221,13 @@ def _require_bounds_equal(nested: Bounds | None, top: Bounds, ctx: str) -> None:
     carry the same tightening.
     """
     if nested is None:
-        if top.overrides:
-            fail(f"{ctx}: nested bounds absent under tightened top")
+        # Gate on EFFECTIVE tightening, not override-map size: an identity override
+        # (value == the maximum) merges to the full maximum struct in the reference
+        # (bounds.ex merge), so the pin's struct equality accepts an absent nested
+        # bounds (cross-vendor finding: map-size gating wrong-rejected identity).
+        for _k, _v in top.overrides.items():
+            if _v != MAXIMA[_k]:
+                fail(f"{ctx}: nested bounds absent under tightened top")
         return
     coerced = coerce_bounds(nested)
     for key in MAXIMA:
