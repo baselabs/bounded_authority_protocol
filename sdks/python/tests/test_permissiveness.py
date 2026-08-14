@@ -1694,3 +1694,50 @@ def test_verify_parity_expected_anchor_chain_id_rejects():
     )
     r = verify_anchored_export(obj, keys, v_expected)
     assert not r.is_ok, "caller-inconsistent expected anchor chain_id must reject at verify"
+
+
+def test_bounds_magnitude_gate_rejects():
+    """The key-window magnitude gate (all-SDK convergence — the Rust round-4 fix
+    mirrored): a REAL runtime signature so the control verifies Ok and only the
+    magnitude gate rejects the bad case."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from bounded_authority_verifier.v1 import verify_historical_anchor
+
+    priv = Ed25519PrivateKey.generate()
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+    pub = priv.public_key().public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
+    si = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="anchor-mag", anchored_at=1000, chain_id="chain-x",
+            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=pub,
+        )
+    )
+    assert si.is_ok
+    _msg = si.value.protected_segment + b"." + si.value.payload_segment
+    sig = priv.sign(_msg)
+    from bounded_authority_verifier.jwk import public_key_thumbprint_raw
+
+    expected = ExpectedAnchor(
+        anchor_id="anchor-mag", anchored_at=1000, chain_id="chain-x",
+        sequence=0, chain_hash=_Z32P, key_id="anchor-a",
+        key_fingerprint=public_key_thumbprint_raw(pub), bounds=None,
+    )
+    key_kw = {
+        "key_id": "anchor-a",
+        "public_key": pub,
+        "valid_from": 0,
+        "valid_before": None,
+    }
+    from bounded_authority_verifier.v1 import HistoricalPublicKey
+
+    # Control: normal windows verify Ok (the real signature).
+    ok_key = HistoricalPublicKey(valid_before=2000, **{k: v for k, v in key_kw.items() if k != "valid_before"})
+    compact = si.value.protected_segment + b"." + si.value.payload_segment + b"." + _b64e(sig)
+    assert verify_historical_anchor(compact, ok_key, expected).is_ok
+    # Huge bounded valid_before (2^62): membership holds; the magnitude gate fires.
+    from bounded_authority_verifier.v1 import HistoricalPublicKey as HPK
+
+    bad_key = HPK(valid_before=4611686018427387904, **{k: v for k, v in key_kw.items() if k != "valid_before"})
+    assert not verify_historical_anchor(compact, bad_key, expected).is_ok
