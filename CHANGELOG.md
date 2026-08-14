@@ -18,6 +18,18 @@ All notable changes to `bounded_authority_protocol` are documented here.
   92 unit + conformance 283/283; Python 62 unit + conformance 283/283. (The Rust/Go SDKs — BAP-15/16
   — may carry the same gaps; a separate check is owed.)
 
+- **Rust SDK bounds parity (BAP-15; closes the LAST named delta).** Caller-tightenable
+  bounds through the expected structs — the exact reference/sibling shape: five additive
+  `Option<Bounds>` fields (None = the profile maximum), the nested-bounds pins with identity
+  semantics (a present nested must coerce-equal the outer; an absent nested is valid only under
+  an effectively-untightened outer — identity overrides are NOT tightening), and the resolved
+  bounds threaded through every ceiling at encode AND verify + the standalone chain/anchor/
+  transition entries. 12 mutation-proven legs (permissiveness 39 → 51; the standalone leg on a
+  REAL corpus-signed anchor), the chunk-count MAGIC pin now reachable and landed, and a 7/7
+  Elixir oracle receipt (local re-runnable .forge artifact). `assemble_compact` stays at maximum
+  (the siblings too). This slice was executed under the user's 2026-08-14 directive to resolve
+  every named residual with zero carried debt.
+
 - **TypeScript + Python encode-path validation parity (BAP-15).** Both sibling SDKs gain the
   same producer contract the Rust SDK just closed: a full `checkChain` re-check of the rows, and
   gated parses + 7-field matches for the START anchor, the END anchor, and every transition
