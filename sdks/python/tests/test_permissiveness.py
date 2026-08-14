@@ -1775,3 +1775,35 @@ def test_bounds_magnitude_valid_from_half_rejects():
         key_id="anchor-a", public_key=pub, valid_from=-4611686018427387904, valid_before=2000
     )
     assert not verify_historical_anchor(compact, bad, expected).is_ok
+
+
+def test_bounds_magnitude_non_integral_rejects():
+    """Cross-vendor (codex live probe): bool/fractional key-validity endpoints must
+    fail closed — Python ``1 == True`` and floats pass ``abs()``; the type-strict
+    integral gate refuses them."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+    from bounded_authority_verifier.jwk import public_key_thumbprint_raw
+    from bounded_authority_verifier.v1 import HistoricalPublicKey, verify_historical_anchor
+
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key().public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
+    si = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="anchor-int", anchored_at=1000, chain_id="chain-x",
+            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=pub,
+        )
+    )
+    assert si.is_ok
+    msg = si.value.protected_segment + b"." + si.value.payload_segment
+    sig = priv.sign(msg)
+    compact = si.value.protected_segment + b"." + si.value.payload_segment + b"." + _b64e(sig)
+    expected = ExpectedAnchor(
+        anchor_id="anchor-int", anchored_at=1000, chain_id="chain-x",
+        sequence=0, chain_hash=_Z32P, key_id="anchor-a",
+        key_fingerprint=public_key_thumbprint_raw(pub), bounds=None,
+    )
+    for bad_from, bad_before in [(True, None), (0.5, None), (0, 2000.5), (False, None)]:
+        key = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=bad_from, valid_before=bad_before)  # type: ignore[arg-type]
+        assert not verify_historical_anchor(compact, key, expected).is_ok, (bad_from, bad_before)
