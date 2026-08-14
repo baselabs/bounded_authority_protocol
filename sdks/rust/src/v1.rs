@@ -1698,6 +1698,34 @@ pub fn verify_anchored_export(
     expected: &ExpectedAnchoredExport,
 ) -> Result<AnchoredExportFacts> {
     let bounds = Bounds::maximum();
+
+    // Static expected-side bindings (reference validate_expected_anchored_export
+    // → validate_expected_export, anchored_export_codec.ex:362-371, reached at
+    // verify :92/:387): the caller's expected anchors belong to the expected chain
+    // — sequence/hash bindings are re-checked on the verified facts below, but the
+    // chain_id membership is ONLY checked here (cross-vendor round 2: all three
+    // SDKs enforced none of the six at verify; Rust had hash+sequence via the
+    // fact comparison but not chain_id).
+    let expected_start_seq = expected
+        .chain
+        .first_sequence
+        .checked_sub(1)
+        .ok_or(Invalid)?;
+    if expected.start_anchor.chain_id != expected.chain.chain_id
+        || expected.end_anchor.chain_id != expected.chain.chain_id
+        || expected.start_anchor.sequence != expected_start_seq
+        || expected.start_anchor.chain_hash != expected.chain.previous_hash
+        || expected.end_anchor.sequence != expected.chain.last_sequence
+        || expected.end_anchor.chain_hash != expected.chain.head_hash
+    {
+        return Err(Invalid);
+    }
+    for t in &expected.transitions {
+        if t.chain_id != expected.chain.chain_id {
+            return Err(Invalid);
+        }
+    }
+
     let chunks = &obj.chunks;
 
     // Bounded nonempty proper flat chunk list; each chunk non-empty.

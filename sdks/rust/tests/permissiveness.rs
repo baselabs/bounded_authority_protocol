@@ -346,12 +346,14 @@ fn base64url_non_canonical_pad_bits_rejected() {
 //     `encode_transition_signature_width_rejected`.)
 
 use bounded_authority_protocol::types::{
-    AnchoredExportInput, BoundaryAnchor, ExpectedAnchor, ExpectedChain, ExpectedExport, GrantInput,
-    GrantOperation, KeyTransition, ProofInput, SigningInput, SigningKind,
+    AnchoredExportInput, ArchivedObject, BoundaryAnchor, ExpectedAnchor, ExpectedAnchoredExport,
+    ExpectedChain, ExpectedExport, GrantInput, GrantOperation, HistoricalKeyChain,
+    HistoricalPublicKey, KeyTransition, ProofInput, SigningInput, SigningKind, ValidityUpperBound,
 };
 use bounded_authority_protocol::{
     assemble_compact, base64url_encode, boundary_anchor_signing_input, decode_grant, decode_proof,
     encode_anchored_export, grant_signing_input, key_transition_signing_input, proof_signing_input,
+    verify_anchored_export,
 };
 
 /// Minimal JSON string literal serializer for fixture members (plain ASCII
@@ -1522,5 +1524,74 @@ fn encode_key_path_non_chronology_rejected() {
     assert!(
         encode_anchored_export(&f.input, &f.expected).is_err(),
         "non-chronological transition must reject"
+    );
+}
+
+// Cross-vendor round-2 leg — the verify-side static expected↔chain bindings.
+// (The anchor_bytes encode ceiling is TS/Python-specific at the default bounds:
+// Rust's identifier_bytes maximum (512) makes a valid anchor compact physically
+// unable to exceed the 8192 default anchor_bytes — the Rust pre-check at the
+// encode entry is unreachable-at-maximum defense-in-depth, Q4-class. The codex
+// probe was the caller-TIGHTENED case, which only the sibling SDKs accept today
+// and which the bounds-parity slice will bring to Rust with its own leg.)
+
+#[test]
+fn verify_expected_anchor_chain_id_binding_rejected() {
+    // Verify-side static binding (round 2): the caller's expected end anchor
+    // carries a chain_id from another chain — one-sided expected tamper; the
+    // static check fires before any parse.
+    let f = conformant_export();
+    let encoded = encode_anchored_export(&f.input, &f.expected).expect("encodes");
+    let obj = ArchivedObject {
+        chunks: {
+            // split the archive back into frames: magic + header + start + t + row + end
+            let mut chunks: Vec<Vec<u8>> = Vec::new();
+            let bytes = &encoded.bytes;
+            let magic_len = 20; // "BAP1-ARCHIVE\0EXPORT\0"
+            let mut off = magic_len;
+            while off < bytes.len() {
+                let len = u32::from_be_bytes([
+                    bytes[off],
+                    bytes[off + 1],
+                    bytes[off + 2],
+                    bytes[off + 3],
+                ]) as usize;
+                chunks.push(bytes[off + 4..off + 4 + len].to_vec());
+                off += 4 + len;
+            }
+            chunks
+        },
+        version: "v1".to_string(),
+    };
+    let keys = HistoricalKeyChain {
+        keys: vec![
+            HistoricalPublicKey {
+                key_id: "anchor-a".to_string(),
+                public_key: KEY_A,
+                valid_from: 900,
+                valid_before: ValidityUpperBound::Unbounded,
+            },
+            HistoricalPublicKey {
+                key_id: "anchor-b".to_string(),
+                public_key: KEY_B,
+                valid_from: 1400,
+                valid_before: ValidityUpperBound::Unbounded,
+            },
+        ],
+    };
+    let mut v_expected = ExpectedAnchoredExport {
+        chain: f.expected.chain.clone(),
+        digest: encoded.digest,
+        start_anchor: f.expected.start_anchor.clone(),
+        end_anchor: f.expected.end_anchor.clone(),
+        transitions: f.expected.transitions.clone(),
+        object_version: "v1".to_string(),
+    };
+    // One-sided: the signed anchors are untouched; only the expected end anchor's
+    // chain_id is caller-inconsistent.
+    v_expected.end_anchor.chain_id = "chain-OTHER".to_string();
+    assert!(
+        verify_anchored_export(&obj, &keys, &v_expected).is_err(),
+        "a caller-inconsistent expected anchor chain_id must reject at verify"
     );
 }

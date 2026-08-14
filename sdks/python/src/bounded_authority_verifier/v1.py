@@ -1586,6 +1586,14 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     return EncodedAnchoredExport(archive=archive, digest=sha256(archive))
 
 
+def _expected_int(v: object, ctx: str) -> int:
+    """Type-strict expected-side integer (cross-vendor round 2: Python ``1 == True``,
+    so an untyped boolean expected field would equal a decoded 0/1 at the match)."""
+    if not isinstance(v, int) or isinstance(v, bool):
+        fail(ctx)
+    return v
+
+
 def _require_ok(result: Result[Any], ctx: str) -> Any:
     """Unwrap a Result or fail closed (encode-path helper)."""
     if not result.is_ok:
@@ -1609,11 +1617,15 @@ def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str
         fail(f"encode_anchored_export: {which} anchor payload")
     if _require_string_or_uri(p.v.get("anchor_id"), "anchor_id", b) != expected.anchor_id:
         fail(f"encode_anchored_export: {which} anchor_id")
-    if _require_int(p.v.get("anchored_at"), "anchored_at") != expected.anchored_at:
+    if _require_int(p.v.get("anchored_at"), "anchored_at") != _expected_int(
+        expected.anchored_at, f"encode_anchored_export: {which} anchored_at type"
+    ):
         fail(f"encode_anchored_export: {which} anchored_at")
     if _require_string_or_uri(p.v.get("chain_id"), "chain_id", b) != expected.chain_id:
         fail(f"encode_anchored_export: {which} chain_id")
-    if _require_int(p.v.get("sequence"), "sequence") != expected.sequence:
+    if _require_int(p.v.get("sequence"), "sequence") != _expected_int(
+        expected.sequence, f"encode_anchored_export: {which} sequence type"
+    ):
         fail(f"encode_anchored_export: {which} sequence")
     if not _bytes_equal(_require_b64url_n(p.v.get("chain_hash"), "chain_hash", 32), expected.chain_hash):
         fail(f"encode_anchored_export: {which} chain_hash")
@@ -1636,7 +1648,9 @@ def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition,
         fail(f"encode_anchored_export: transition {i} transition_id")
     if _require_string_or_uri(p.v.get("chain_id"), "chain_id", b) != expected.chain_id:
         fail(f"encode_anchored_export: transition {i} chain_id")
-    if _require_int(p.v.get("effective_at"), "effective_at") != expected.effective_at:
+    if _require_int(p.v.get("effective_at"), "effective_at") != _expected_int(
+        expected.effective_at, f"encode_anchored_export: transition {i} effective_at type"
+    ):
         fail(f"encode_anchored_export: transition {i} effective_at")
     if not _bytes_equal(_require_b64url_n(p.v.get("from_key_fingerprint"), "from_key_fingerprint", 32), expected.current_key_fingerprint):
         fail(f"encode_anchored_export: transition {i} from_key_fingerprint")
@@ -1839,6 +1853,26 @@ def verify_anchored_export(archived: ArchivedObject, key_chain: HistoricalKeyCha
 
 
 def _verify_anchored_export_body(archived: ArchivedObject, key_chain: HistoricalKeyChain, expected: ExpectedExport) -> AnchoredExportFacts:
+    # Static expected-side bindings (reference validate_expected_anchored_export →
+    # validate_expected_export, anchored_export_codec.ex:362-371, reached at verify
+    # :92/:387): the caller's expected anchors + transitions belong to the expected
+    # chain (cross-vendor round 2: none of the six were enforced at verify).
+    if expected.start_anchor.chain_id != expected.chain.chain_id:
+        fail("verify_anchored_export: start chain_id")
+    if expected.end_anchor.chain_id != expected.chain.chain_id:
+        fail("verify_anchored_export: end chain_id")
+    if expected.start_anchor.sequence != expected.chain.first_sequence - 1:
+        fail("verify_anchored_export: start sequence")
+    if not _bytes_equal(expected.start_anchor.chain_hash, expected.chain.previous_hash):
+        fail("verify_anchored_export: start chain_hash")
+    if expected.end_anchor.sequence != expected.chain.last_sequence:
+        fail("verify_anchored_export: end sequence")
+    if not _bytes_equal(expected.end_anchor.chain_hash, expected.chain.last_hash):
+        fail("verify_anchored_export: end chain_hash")
+    for _i, _t in enumerate(expected.transitions):
+        if _t.chain_id != expected.chain.chain_id:
+            fail(f"verify_anchored_export: transition {_i} chain_id")
+
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once
     # (anchored_export_codec.ex:84-185) and threads it into validate_chunks (archive_chunks,
     # archive_bytes), parse_archive (frame reads), and every row check. The inner anchors/transitions
