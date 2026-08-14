@@ -1590,3 +1590,39 @@ def test_encode_parity_identity_overrides_are_not_tightening():
     identity = bounds_new({"chain_row_bytes": 4096})  # == MAXIMA
     r = encode_anchored_export(input_, _replace(expected, bounds=identity))
     assert r.is_ok, "identity overrides must encode (not tightening)"
+
+
+def test_encode_parity_nested_end_anchor_bounds_mismatch_rejects():
+    from dataclasses import replace as _replace
+
+    from bounded_authority_verifier.bounds import bounds_new
+
+    input_, expected = _conformant_export()
+    tight = bounds_new({"chain_row_bytes": 156})
+    r = encode_anchored_export(input_, _replace(expected, end_anchor=_replace(expected.end_anchor, bounds=tight)))
+    assert not r.is_ok, "end-anchor nested-bounds mismatch must reject at encode"
+
+
+def test_encode_parity_nested_transition_bounds_mismatch_rejects():
+    from dataclasses import replace as _replace
+
+    from bounded_authority_verifier.bounds import bounds_new
+
+    input_, expected = _conformant_export()
+    tight = bounds_new({"chain_row_bytes": 156})
+    r = encode_anchored_export(input_, _replace(expected, transitions=[_replace(expected.transitions[0], bounds=tight)]))
+    assert not r.is_ok, "transition nested-bounds mismatch must reject at encode"
+
+
+def test_encode_parity_chain_pin_isolated_rejects():
+    """Isolates the CHAIN nested-bounds pin from the row walk: the tightened outer
+    stays above the row size, so only the pin fires on the mismatched chain.bounds."""
+    from dataclasses import replace as _replace
+
+    from bounded_authority_verifier.bounds import bounds_new
+
+    input_, expected = _conformant_export()
+    outer = bounds_new({"chain_row_bytes": 4000})
+    chain_nested = bounds_new({"chain_row_bytes": 4096})
+    r = encode_anchored_export(input_, _replace(expected, bounds=outer, chain=_replace(expected.chain, bounds=chain_nested)))
+    assert not r.is_ok, "chain nested-bounds mismatch must reject (isolated from the row walk)"
