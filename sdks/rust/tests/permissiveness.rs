@@ -2577,9 +2577,11 @@ fn corpus_transition_parts() -> (
 
 #[test]
 fn bounds_anchor_inverted_window_rejects() {
-    // Both endpoints in-magnitude and integral; valid_before <= valid_from —
-    // the ordering gate fires (membership alone would also reject, but the gate
-    // is the named clause; mutation-proven at the gate).
+    // Both endpoints in-magnitude and integral; valid_before <= valid_from.
+    // Honest red-capability: the ordering gate is BACKSTOPPED by membership
+    // here (an inverted window admits no time), so this leg pins the clause
+    // JOINTLY — removing the ordering gate alone leaves it green; the gate is
+    // defense-in-depth for future gate reuse without membership.
     let (compact, key, expected) = corpus_anchor_triple();
     let mut k = key;
     k.valid_before = ValidityUpperBound::Bounded(k.valid_from);
