@@ -27,6 +27,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/adr/0013-capability-authorization-extension.md",
                     "docs/adr/0014-cross-language-verifier-sdks.md",
                     "docs/adr/0015-sdk-graduation-and-publish-topology.md",
+                    "docs/adr/0016-offline-eligible-grant-claims.md",
                     "docs/protocol-v1.md",
                     "docs/release-candidate-contract.md",
                     "docs/errata.md",
