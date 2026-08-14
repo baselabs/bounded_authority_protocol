@@ -601,7 +601,8 @@ reference producer's full contract (expected-side consistency, row chain re-chec
 parses + 7-field matches for both anchors and every transition, the key-path walk with
 NON-STRICT end-anchor chronology). 15 mutation-proven battery legs (permissiveness 34), each
 verified against the Elixir reference oracle (16/16). The TS/Python sibling permissiveness
-closes in the immediately-following commit; the SDK-wide maximum-bounds encode posture
+closed in the immediately-following commit (same contract, 9 legs each, proven red-capable
+against the neutralized pre-parity state); the SDK-wide maximum-bounds encode posture
 remains a NAMED delta (caller-tightened `expected.bounds` = a public-API change, its own
 reviewed slice). The Go SDK (BAP-16) picks the whole contract up at authoring.
 

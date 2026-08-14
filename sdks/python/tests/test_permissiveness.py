@@ -1346,3 +1346,205 @@ def test_decode_grant_rejects_wrong_signature_width():
     assert not r.is_ok, "wrong-width signature must reject"
 
 
+
+
+# ============================================================================
+# Encode-path validation parity (reference anchored_export_codec.ex encode):
+# the row chain re-check + gated parses + full matches for both anchors and
+# every transition. One red-capable leg per NEW clause (red-capability proven
+# by neutralizing the encode wiring — the pre-parity state — in the task log).
+# ============================================================================
+
+_KEY_A = bytes([7]) * 32
+_KEY_B = bytes([8]) * 32
+_Z32P = bytes(32)
+_SIG64 = bytes(64)
+_SIG32 = bytes(32)
+
+
+def _b64e(raw: bytes) -> bytes:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=")
+
+
+def _conformant_export():
+    row_r = encode_consumption_entry(
+        ConsumptionEntry(chain_id="chain-x", sequence=1, previous_hash=_Z32P, commitment=bytes([5]) * 32)
+    )
+    assert row_r.is_ok
+    row, head = row_r.value.bytes_, row_r.value.hash_
+    fp_a = public_key_thumbprint_raw(_KEY_A)
+    fp_b = public_key_thumbprint_raw(_KEY_B)
+    start_r = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="anchor-start", anchored_at=1000, chain_id="chain-x",
+            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=_KEY_A,
+        )
+    )
+    assert start_r.is_ok
+    start = assemble_compact(start_r.value, _SIG64).value
+    end_r = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="anchor-end", anchored_at=1600, chain_id="chain-x",
+            sequence=1, chain_hash=head, key_id="anchor-b", public_key=_KEY_B,
+        )
+    )
+    assert end_r.is_ok
+    end = assemble_compact(end_r.value, _SIG64).value
+    t_r = key_transition_signing_input(
+        KeyTransitionProducer(
+            transition_id="transition-1", chain_id="chain-x", effective_at=1500,
+            current_key_id="anchor-a", current_public_key=_KEY_A,
+            next_key_id="anchor-b", next_public_key=_KEY_B,
+        )
+    )
+    assert t_r.is_ok
+    t = assemble_compact(t_r.value, _SIG64).value
+    chain = ExpectedChain(
+        chain_id="chain-x", first_sequence=1, last_sequence=1, row_count=1,
+        previous_hash=_Z32P, last_hash=head,
+    )
+    expected = ExpectedExport(
+        chain=chain,
+        digest=_Z32P,
+        start_anchor=ExpectedAnchor(
+            anchor_id="anchor-start", anchored_at=1000, chain_id="chain-x",
+            sequence=0, chain_hash=_Z32P, key_id="anchor-a", key_fingerprint=fp_a,
+        ),
+        end_anchor=ExpectedAnchor(
+            anchor_id="anchor-end", anchored_at=1600, chain_id="chain-x",
+            sequence=1, chain_hash=head, key_id="anchor-b", key_fingerprint=fp_b,
+        ),
+        transitions=[
+            ExpectedKeyTransition(
+                transition_id="transition-1", chain_id="chain-x", effective_at=1500,
+                current_key_id="anchor-a", current_key_fingerprint=fp_a,
+                next_key_id="anchor-b", next_key_fingerprint=fp_b,
+            )
+        ],
+        object_version="v1",
+    )
+    input_ = AnchoredExportInput(
+        rows=[row], start_anchor=start, end_anchor=end, transitions=[t],
+        chain_id="chain-x", first_sequence=1, last_sequence=1,
+        row_count=1, previous_hash=_Z32P, last_hash=head,
+    )
+    return input_, expected
+
+
+def _expect_encode_err(input_, expected):
+    r = encode_anchored_export(input_, expected)
+    assert not r.is_ok, "encode must reject"
+
+
+def test_encode_parity_control_encodes():
+    input_, expected = _conformant_export()
+    r = encode_anchored_export(input_, expected)
+    assert r.is_ok
+
+
+def test_encode_parity_tampered_row_rejects():
+    input_, expected = _conformant_export()
+    bad = bytearray(input_.rows[0])
+    bad[0] ^= 1
+    _expect_encode_err(replace_row(input_, bytes(bad)), expected)
+
+
+def replace_row(input_, row):
+    from dataclasses import replace
+
+    return replace(input_, rows=[row])
+
+
+def test_encode_parity_start_anchor_mismatch_rejects():
+    input_, expected = _conformant_export()
+    wrong = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="anchor-WRONG", anchored_at=1000, chain_id="chain-x",
+            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=_KEY_A,
+        )
+    )
+    from dataclasses import replace
+
+    _expect_encode_err(replace(input_, start_anchor=assemble_compact(wrong.value, _SIG64).value), expected)
+
+
+def test_encode_parity_end_anchor_mismatch_rejects():
+    input_, expected = _conformant_export()
+    wrong = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="anchor-WRONG", anchored_at=1600, chain_id="chain-x",
+            sequence=1, chain_hash=expected.chain.last_hash, key_id="anchor-b", public_key=_KEY_B,
+        )
+    )
+    from dataclasses import replace
+
+    _expect_encode_err(replace(input_, end_anchor=assemble_compact(wrong.value, _SIG64).value), expected)
+
+
+def _swap_segment(compact: bytes, index: int, replacement_b64: bytes) -> bytes:
+    segs = compact.split(b".")
+    segs[index] = replacement_b64
+    return b".".join(segs)
+
+
+def _reversed_payload(compact: bytes) -> bytes:
+    import json as _json
+
+    segs = compact.split(b".")
+    pad = b"=" * (-len(segs[1]) % 4)
+    obj = _json.loads(base64.urlsafe_b64decode(segs[1] + pad).decode("utf-8"))
+    body = "{" + ",".join(
+        _json.dumps(k) + ":" + _json.dumps(obj[k]) for k in reversed(list(obj.keys()))
+    ) + "}"
+    return b".".join([segs[0], _b64e(body.encode("utf-8")), segs[2]])
+
+
+def test_encode_parity_end_anchor_noncanonical_rejects():
+    input_, expected = _conformant_export()
+    from dataclasses import replace
+
+    _expect_encode_err(replace(input_, end_anchor=_reversed_payload(input_.end_anchor)), expected)
+
+
+def test_encode_parity_end_anchor_width_rejects():
+    input_, expected = _conformant_export()
+    from dataclasses import replace
+
+    _expect_encode_err(
+        replace(input_, end_anchor=_swap_segment(input_.end_anchor, 2, _b64e(_SIG32))), expected
+    )
+
+
+def test_encode_parity_transition_mismatch_rejects():
+    input_, expected = _conformant_export()
+    wrong = key_transition_signing_input(
+        KeyTransitionProducer(
+            transition_id="transition-1", chain_id="chain-x", effective_at=1501,
+            current_key_id="anchor-a", current_public_key=_KEY_A,
+            next_key_id="anchor-b", next_public_key=_KEY_B,
+        )
+    )
+    from dataclasses import replace
+
+    _expect_encode_err(
+        replace(input_, transitions=[assemble_compact(wrong.value, _SIG64).value]), expected
+    )
+
+
+def test_encode_parity_transition_noncanonical_rejects():
+    input_, expected = _conformant_export()
+    from dataclasses import replace
+
+    _expect_encode_err(
+        replace(input_, transitions=[_reversed_payload(input_.transitions[0])]), expected
+    )
+
+
+def test_encode_parity_transition_width_rejects():
+    input_, expected = _conformant_export()
+    from dataclasses import replace
+
+    _expect_encode_err(
+        replace(input_, transitions=[_swap_segment(input_.transitions[0], 2, _b64e(_SIG32))]),
+        expected,
+    )

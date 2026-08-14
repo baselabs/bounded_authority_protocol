@@ -18,6 +18,16 @@ All notable changes to `bounded_authority_protocol` are documented here.
   92 unit + conformance 283/283; Python 62 unit + conformance 283/283. (The Rust/Go SDKs — BAP-15/16
   — may carry the same gaps; a separate check is owed.)
 
+- **TypeScript + Python encode-path validation parity (BAP-15).** Both sibling SDKs gain the
+  same producer contract the Rust SDK just closed: a full `checkChain` re-check of the rows, and
+  gated parses + 7-field matches for the START anchor, the END anchor, and every transition
+  (their expected-side + key-path validations were already present — the deltas were the parses,
+  the matches, and the row re-check; the start anchor was framed raw too, plan-review F1).
+  9 legs per SDK (control + 8 tampers), each proven red-capable against the neutralized
+  pre-parity state; TS 101 unit + conformance 283/283; Python 70 + conformance 283/283;
+  mypy/ruff/purity/license clean. With this, all three shipped SDKs enforce the reference
+  producer's full contract; the Go SDK (BAP-16) picks it up at authoring.
+
 - **Rust SDK encode-path validation parity (BAP-15).** `encode_anchored_export` now enforces the
   Elixir reference producer's FULL validation contract (`anchored_export_codec.ex` encode):
   expected-side consistency (chain_id binding of both anchors + all transitions; the
