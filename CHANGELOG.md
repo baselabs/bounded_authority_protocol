@@ -24,8 +24,10 @@ All notable changes to `bounded_authority_protocol` are documented here.
   semantics (a present nested must coerce-equal the outer; an absent nested is valid only under
   an effectively-untightened outer — identity overrides are NOT tightening), and the resolved
   bounds threaded through every ceiling at encode AND verify + the standalone chain/anchor/
-  transition entries. 12 mutation-proven legs (permissiveness 39 → 51; the standalone leg on a
-  REAL corpus-signed anchor), the chunk-count MAGIC pin now reachable and landed, and a 7/7
+  transition entries. 17 mutation-proven legs at closeout (permissiveness 39 → 56 — the original 12 plus
+  the five the four closeout lenses forced: the chain_rows count, the standalone
+  transition, the verify-pin family on a REAL corpus-signed archive, and the two
+  encode-pin isolations; the standalone anchor leg, the chunk-count MAGIC pin now reachable and landed, and a 7/7
   Elixir oracle receipt (local re-runnable .forge artifact). `assemble_compact` stays at maximum
   (the siblings too). This slice was executed under the user's 2026-08-14 directive to resolve
   every named residual with zero carried debt.

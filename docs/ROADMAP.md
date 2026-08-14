@@ -607,8 +607,8 @@ proven red-capable — the five pin legs each isolated under their named mutatio
 threading leg joint-by-construction per the settled diff-review record). **The SDK-wide
 maximum-bounds delta is CLOSED** (`b4ca616`): five `Option<Bounds>` fields, the nested pins
 with identity semantics, threading at encode/verify/standalone, the chunk-count magic pin,
-12 mutation-proven legs (permissiveness 51), a 7/7 Elixir oracle receipt — executed under
-the user's 2026-08-14 zero-residuals directive. The Go SDK (BAP-16) picks the whole contract up at authoring.
+17 mutation-proven legs at closeout (permissiveness 56), a 7/7 Elixir oracle receipt (the 2026-08-14 zero-residuals direction is process
+history; the closure stands on the evidence). The Go SDK (BAP-16) picks the whole contract up at authoring.
 
 ## BAP-17 closeout evidence
 
