@@ -366,9 +366,31 @@ fn json_str(s: &str) -> String {
     out
 }
 
-/// Re-serializes a flat object's members in REVERSE source order (values
-/// untouched). The input segment is JCS-canonical (sorted), so the reversal of
-/// a >=2-member object is a valid-JSON, non-canonical byte sequence.
+/// Serializes a JsonValue in SOURCE member order (no JCS sorting) — the
+/// order-preserving counterpart `jcs_encode` refuses to be.
+fn raw_json(value: &JsonValue) -> String {
+    match value {
+        JsonValue::Object(members) => {
+            let parts: Vec<String> = members
+                .iter()
+                .map(|(k, v)| format!("{}:{}", json_str(k), raw_json(v)))
+                .collect();
+            format!("{{{}}}", parts.join(","))
+        }
+        JsonValue::Array(items) => {
+            let parts: Vec<String> = items.iter().map(raw_json).collect();
+            format!("[{}]", parts.join(","))
+        }
+        JsonValue::String(s) => json_str(s),
+        JsonValue::Int(i) => i.to_string(),
+        _ => panic!("fixture: string/int/array/object values only"),
+    }
+}
+
+/// Re-serializes an object's members in REVERSE source order (values
+/// untouched, nested values preserved as-is). The input segment is
+/// JCS-canonical (sorted), so the reversal of a >=2-member object is a
+/// valid-JSON, non-canonical byte sequence.
 fn reversed_segment(segment: &[u8]) -> Vec<u8> {
     let decoded = base64url_decode(segment).expect("canonical segment decodes");
     let value = json_decode(&decoded, &max()).expect("canonical segment parses");
@@ -378,14 +400,7 @@ fn reversed_segment(segment: &[u8]) -> Vec<u8> {
     };
     let mut parts: Vec<String> = members
         .iter()
-        .map(|(k, v)| {
-            let vs = match v {
-                JsonValue::String(s) => json_str(s),
-                JsonValue::Int(i) => i.to_string(),
-                _ => panic!("fixture: flat string/int members only"),
-            };
-            format!("{}:{}", json_str(k), vs)
-        })
+        .map(|(k, v)| format!("{}:{}", json_str(k), raw_json(v)))
         .collect();
     parts.reverse();
     base64url_encode(format!("{{{}}}", parts.join(",")).as_bytes())
@@ -664,5 +679,87 @@ fn signature_width_export_encode_start_anchor_rejected() {
     assert!(
         encode_anchored_export(&bad_input, &expected).is_err(),
         "wrong-width start-anchor signature must reject at encode"
+    );
+}
+
+// =============================================================================
+// Canonical-EXCLUSION pinning — grant/proof compacts have NO canonical-form gate
+// =============================================================================
+//
+// The reference parse_grant/parse_proof (runtime.ex:237/:259) gate the decoded
+// signature width but impose NO Jcs.encode byte-equality on grant/proof
+// segments (REQ1-SIGNING-any-order; canonical-form is an anchor/transition
+// codec property only). These legs PIN that exclusion: a member-reordered
+// grant/proof compact with valid fields MUST still decode Ok. RED-capable
+// mutation: add a `jcs_encode(value) == bytes` check to
+// `validate_grant_header`/`validate_grant_payload` (or the proof validators) —
+// an over-rejection divergence from the reference that would otherwise land
+// silently green (no other leg covers the exclusion).
+
+#[test]
+fn canonical_exclusion_grant_reorder_still_decodes() {
+    let grant = GrantInput {
+        issuer: "issuer-a".to_string(),
+        grant_id: "grant-1".to_string(),
+        key_id: "issuer-key-1".to_string(),
+        holder_thumbprint: Z32,
+        issued_at: 1000,
+        not_before: 1000,
+        expires_at: 2000,
+        audiences: vec!["aud-a".to_string()],
+        operations: vec![GrantOperation {
+            name: "do.thing".to_string(),
+            selectors: vec![JsonValue::Object(vec![(
+                "kind".to_string(),
+                JsonValue::String("all".to_string()),
+            )])],
+        }],
+    };
+    let produced = grant_signing_input(&grant, &max()).expect("grant signing input ok");
+    // Member-reordered (non-canonical) header AND payload still decode Ok — the
+    // reference imposes no canonical-form gate on grant compacts.
+    let r = decode_grant(
+        &compact_with_signature(
+            &reversed_segment(&produced.protected_segment),
+            &reversed_segment(&produced.payload_segment),
+            &[0u8; 64],
+        ),
+        &max(),
+    );
+    assert!(
+        r.is_ok(),
+        "non-canonical grant must still decode (reference has no canonical gate)"
+    );
+}
+
+#[test]
+fn canonical_exclusion_proof_reorder_still_decodes() {
+    let proof = ProofInput {
+        proof_id: "proof-1".to_string(),
+        method: "POST".to_string(),
+        target_uri: "https://example.test/api".to_string(),
+        invocation_id: "01234567-89ab-cdef-0123-456789abcdef".to_string(),
+        operation: "do.thing".to_string(),
+        cast_arguments: JsonValue::Object(vec![(
+            "q".to_string(),
+            JsonValue::String("v".to_string()),
+        )]),
+        grant_compact: b"grant.gher.compact".to_vec(),
+        holder_public_key: [9u8; 32],
+        issued_at: 2000,
+    };
+    let produced = proof_signing_input(&proof, &max()).expect("proof signing input ok");
+    // Member-reordered (non-canonical) header AND payload still decode Ok.
+    let r = decode_proof(
+        &compact_with_signature(
+            &reversed_segment(&produced.protected_segment),
+            &reversed_segment(&produced.payload_segment),
+            &[0u8; 64],
+        ),
+        &max(),
+    );
+    assert!(
+        r.is_ok(),
+        "non-canonical proof must still decode (reference has no canonical gate)"
     );
 }

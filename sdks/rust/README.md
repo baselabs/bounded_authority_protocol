@@ -37,7 +37,10 @@ Beyond the frozen corpus, the crate ships a **per-language permissiveness mutati
 decoder, source-order preservation, raw-lexeme scan, single-value, int/float tag distinction, and the
 `(d)`-class per-node encode-bounds in `jcs_encode`), a red-capable test that constructs the host-specific
 defect the closure defeats and proves it goes RED when the closure is removed. The base64url non-canonical
-pad-bits rejection (corpus-blind) is covered there too.
+pad-bits rejection (corpus-blind) is covered there too, as is the decode-path conformance
+class (decoded signature width at decode + anchor/transition canonical-form byte-equality,
+including the pinning legs that guard the grant/proof canonical EXCLUSION the reference
+imposes nowhere).
 
 ```bash
 cargo test --test permissiveness   # 9 closures, each red-capable
