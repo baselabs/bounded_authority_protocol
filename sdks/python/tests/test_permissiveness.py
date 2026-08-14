@@ -1741,3 +1741,37 @@ def test_bounds_magnitude_gate_rejects():
 
     bad_key = HPK(valid_before=4611686018427387904, **{k: v for k, v in key_kw.items() if k != "valid_before"})
     assert not verify_historical_anchor(compact, bad_key, expected).is_ok
+
+
+def test_bounds_magnitude_valid_from_half_rejects():
+    """The valid_from half (negative out-of-magnitude — membership holds; the
+    unsigned-abs sign symmetry fires)."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+    from bounded_authority_verifier.jwk import public_key_thumbprint_raw
+    from bounded_authority_verifier.v1 import HistoricalPublicKey, verify_historical_anchor
+
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key().public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
+    si = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="anchor-mag2", anchored_at=1000, chain_id="chain-x",
+            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=pub,
+        )
+    )
+    assert si.is_ok
+    msg = si.value.protected_segment + b"." + si.value.payload_segment
+    sig = priv.sign(msg)
+    compact = si.value.protected_segment + b"." + si.value.payload_segment + b"." + _b64e(sig)
+    expected = ExpectedAnchor(
+        anchor_id="anchor-mag2", anchored_at=1000, chain_id="chain-x",
+        sequence=0, chain_hash=_Z32P, key_id="anchor-a",
+        key_fingerprint=public_key_thumbprint_raw(pub), bounds=None,
+    )
+    ok = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=0, valid_before=2000)
+    assert verify_historical_anchor(compact, ok, expected).is_ok
+    bad = HistoricalPublicKey(
+        key_id="anchor-a", public_key=pub, valid_from=-4611686018427387904, valid_before=2000
+    )
+    assert not verify_historical_anchor(compact, bad, expected).is_ok

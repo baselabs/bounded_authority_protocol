@@ -609,7 +609,7 @@ maximum-bounds delta is CLOSED** — `assemble_compact` alone stays at maximum (
 reference threads caller limits there too, runtime.ex:147-151; a named
 one-entry residual, disclosed in the CHANGELOG) — (`b4ca616`): five `Option<Bounds>` fields, the nested pins
 with identity semantics, threading at encode/verify/standalone, the chunk-count magic pin,
-19 mutation-proven legs at closeout (permissiveness 61), a 7/7 Elixir oracle receipt (the 2026-08-14 zero-residuals direction is process
+25 mutation-proven legs at closeout (permissiveness 64), a 7/7 Elixir oracle receipt (the 2026-08-14 zero-residuals direction is process
 history; the closure stands on the evidence). The Go SDK (BAP-16) picks the whole contract up at authoring.
 
 ## BAP-17 closeout evidence
