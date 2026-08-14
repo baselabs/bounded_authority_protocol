@@ -1203,6 +1203,11 @@ pub fn verify_historical_anchor(
         if v.unsigned_abs() > bounds.integer_magnitude() {
             return Err(Invalid);
         }
+        // The reference's valid_before? also requires valid_before > valid_from
+        // (context_validation.ex:139-140 — the closing cross-vendor note).
+        if v <= key.valid_from {
+            return Err(Invalid);
+        }
     }
     let a = decode_anchor_parts(compact, &bounds)?;
 
@@ -1286,12 +1291,18 @@ pub fn verify_key_transition(
         if v.unsigned_abs() > bounds.integer_magnitude() {
             return Err(Invalid);
         }
+        if v <= current.valid_from {
+            return Err(Invalid);
+        }
     }
     if next.valid_from.unsigned_abs() > bounds.integer_magnitude() {
         return Err(Invalid);
     }
     if let ValidityUpperBound::Bounded(v) = next.valid_before {
         if v.unsigned_abs() > bounds.integer_magnitude() {
+            return Err(Invalid);
+        }
+        if v <= next.valid_from {
             return Err(Invalid);
         }
     }
