@@ -580,10 +580,10 @@ compatibility.
 **2026-08-14 amendment — Rust SDK decode-path conformance fix (`103e095`).** The Rust SDK
 carried the two conformance gaps the TS/Python SDKs' fix (`18c6467`, BAP-09) closed: no decoded
 signature-width gate at decode and no canonical-form byte-equality for anchor/transition
-segments. Both closed RED-first (7 battery legs, each mutation-proven; the plan-review BLOCKING
+segments. Both closed RED-first (9 battery legs — 7 conformance + 2 canonical-exclusion pins, each mutation-proven; the plan-review BLOCKING
 finding surfaced a third public flip — `encode_anchored_export`'s start-anchor signature was
 never width-checked — which gained its own leg). Gates: `cargo test --locked` 338 unit +
-conformance agreed=283 + permissiveness 17; fmt/clippy clean. Honest residuals, routed (closeout-lens-completed
+conformance agreed=283 + permissiveness 19; fmt/clippy clean. Honest residuals, routed (closeout-lens-completed
 enumeration): the encode path validates less than the reference producer — the END anchor and
 every TRANSITION are framed raw, unparsed (the reference parses both anchors + all transitions
 through the width/canonical-gating codecs, `anchored_export_codec.ex:40-52`; a non-canonical or

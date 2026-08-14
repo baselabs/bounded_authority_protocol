@@ -30,9 +30,10 @@ All notable changes to `bounded_authority_protocol` are documented here.
   payload (mirroring `boundary_anchor_codec.ex:95-96,118-119` +
   `key_transition_codec.ex:127-128,151-152`), so a non-canonical (member-reordered) segment is
   rejected across `assemble_compact`, `verify_historical_anchor`, `verify_key_transition`,
-  `encode_anchored_export`, and `verify_anchored_export`. Seven red-capable battery legs
-  (4 canonical + 2 decode-width + 1 export-encode width), each mutation-proven. Verified: cargo
-  338 unit + conformance 283/283 + permissiveness 17; clippy/fmt clean. Honest residuals, all
+  `encode_anchored_export`, and `verify_anchored_export`. Nine red-capable battery legs
+  (4 canonical + 2 decode-width + 1 export-encode width + 2 canonical-exclusion pins), each
+  mutation-proven. Verified: cargo 338 unit + conformance 283/283 + permissiveness 19;
+  clippy/fmt clean. Honest residuals, all
   routed: the encode path validates less than the reference producer — it frames the END
   anchor AND every TRANSITION raw without parsing them (the reference parses both anchors +
   all transitions through the width/canonical-gating codecs,

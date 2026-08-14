@@ -1,8 +1,12 @@
 //! Permissiveness mutation-gate battery — BAP-15 Task 15.
 //!
-//! Each test names one ADR 0014 D6 permissiveness closure, asserts the SDK
+//! Three families live here: the ADR 0014 D6 permissiveness closures (each
+//! asserts the SDK
 //! REJECTs the host-specific permissive defect that closure defeats, and names
-//! the exact mechanical mutation that makes the SAME test go RED (the ADR
+//! the exact mechanical mutation that makes the SAME test go RED), the decode-path
+//! conformance legs (signature width + canonical form; same RED discipline), and
+//! the canonical-exclusion pins (grant/proof have NO canonical gate — pinned).
+//! Each carries the exact mechanical mutation that makes the SAME test go RED (the ADR
 //! 0005:240-246 discipline — a gate that cannot go red is vacuous). The closures
 //! are exercised through the PUBLIC crate surface only (this file lives outside
 //! `src/` so it cannot reach internals), which is the boundary a consumer sees.
