@@ -1896,9 +1896,9 @@ fn bounds_standalone_anchor_verify_tightened_rejects() {
             pk
         },
         valid_from: sj_key["valid_from"].as_i64().expect("vf"),
-        valid_before: match sj_key["valid_before"].as_str() {
-            Some(":unbounded") | None => ValidityUpperBound::Unbounded,
-            Some(_) => ValidityUpperBound::Bounded(sj_key["valid_before"].as_i64().expect("vb")),
+        valid_before: match sj_key["valid_before"].as_i64() {
+            Some(vb) => ValidityUpperBound::Bounded(vb),
+            None => ValidityUpperBound::Unbounded,
         },
     };
     let sj_exp = &input["expected"];
