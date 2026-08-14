@@ -1643,9 +1643,9 @@ fn corpus_export_verify_fixture() -> CorpusVerifyFixture {
             key_id: v["key_id"].as_str().expect("kid").to_string(),
             public_key: pk,
             valid_from: v["valid_from"].as_i64().expect("vf"),
-            valid_before: match v["valid_before"].as_str() {
-                Some(":unbounded") | None => ValidityUpperBound::Unbounded,
-                Some(_) => ValidityUpperBound::Bounded(v["valid_before"].as_i64().expect("vb")),
+            valid_before: match v["valid_before"].as_i64() {
+                Some(vb) => ValidityUpperBound::Bounded(vb),
+                None => ValidityUpperBound::Unbounded,
             },
         }
     };
@@ -2089,9 +2089,9 @@ fn bounds_standalone_transition_verify_tightened_rejects() {
             key_id: v["key_id"].as_str().expect("kid").to_string(),
             public_key: pk,
             valid_from: v["valid_from"].as_i64().expect("vf"),
-            valid_before: match v["valid_before"].as_str() {
-                Some(":unbounded") | None => ValidityUpperBound::Unbounded,
-                Some(_) => ValidityUpperBound::Bounded(v["valid_before"].as_i64().expect("vb")),
+            valid_before: match v["valid_before"].as_i64() {
+                Some(vb) => ValidityUpperBound::Bounded(vb),
+                None => ValidityUpperBound::Unbounded,
             },
         }
     };
