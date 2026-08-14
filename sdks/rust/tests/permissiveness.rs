@@ -1605,6 +1605,120 @@ fn verify_expected_anchor_chain_id_binding_rejected() {
     );
 }
 
+/// The corpus anchored-export verify fixture (REAL signatures — the only way a
+/// verify leg reaches the deep bounds gates past crypto).
+struct CorpusVerifyFixture {
+    obj: ArchivedObject,
+    keys: HistoricalKeyChain,
+    expected: ExpectedAnchoredExport,
+}
+
+fn corpus_export_verify_fixture() -> CorpusVerifyFixture {
+    let case_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/conformance/corpus/cases/anchored-export/verify.json"
+    );
+    let raw = std::fs::read(case_path).expect("corpus readable");
+    let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
+    let c = root["cases"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|c| c["class"].as_str() == Some("valid"))
+        .expect("valid case");
+    let input = &c["input"];
+    let b64_vec = |v: &serde_json::Value| -> Vec<Vec<u8>> {
+        v.as_array()
+            .expect("chunks array")
+            .iter()
+            .map(|x| base64url_decode(x.as_str().expect("b64").as_bytes()).expect("decodes"))
+            .collect()
+    };
+    let mk_key = |v: &serde_json::Value| -> HistoricalPublicKey {
+        let raw_pk = base64url_decode(v["public_key"].as_str().expect("pk").as_bytes())
+            .expect("key decodes");
+        let mut pk = [0u8; 32];
+        pk.copy_from_slice(&raw_pk);
+        HistoricalPublicKey {
+            key_id: v["key_id"].as_str().expect("kid").to_string(),
+            public_key: pk,
+            valid_from: v["valid_from"].as_i64().expect("vf"),
+            valid_before: match v["valid_before"].as_str() {
+                Some(":unbounded") | None => ValidityUpperBound::Unbounded,
+                Some(_) => ValidityUpperBound::Bounded(v["valid_before"].as_i64().expect("vb")),
+            },
+        }
+    };
+    let b64_32 = |v: &serde_json::Value, k: &str| -> [u8; 32] {
+        let t = v[k].as_str().unwrap();
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&base64url_decode(t.as_bytes()).expect("32 bytes"));
+        out
+    };
+    let e = &input["expected"];
+    let ea = |v: &serde_json::Value| -> ExpectedAnchor {
+        ExpectedAnchor {
+            anchor_id: v["anchor_id"].as_str().unwrap().to_string(),
+            anchored_at: v["anchored_at"].as_i64().unwrap(),
+            chain_hash: b64_32(v, "chain_hash"),
+            chain_id: v["chain_id"].as_str().unwrap().to_string(),
+            key_fingerprint: b64_32(v, "key_fingerprint"),
+            key_id: v["key_id"].as_str().unwrap().to_string(),
+            sequence: v["sequence"].as_i64().unwrap(),
+            bounds: None,
+        }
+    };
+    let ec = &e["chain"];
+    let expected = ExpectedAnchoredExport {
+        chain: ExpectedChain {
+            chain_id: ec["chain_id"].as_str().unwrap().to_string(),
+            first_sequence: ec["first_sequence"].as_i64().unwrap(),
+            last_sequence: ec["last_sequence"].as_i64().unwrap(),
+            row_count: ec["row_count"].as_i64().unwrap(),
+            previous_hash: b64_32(ec, "previous_hash"),
+            head_hash: b64_32(ec, "last_hash"),
+            bounds: None,
+        },
+        digest: b64_32(e, "digest"),
+        start_anchor: ea(&e["start_anchor"]),
+        end_anchor: ea(&e["end_anchor"]),
+        transitions: e["transitions"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .map(|t| ExpectedKeyTransition {
+                        chain_id: t["chain_id"].as_str().unwrap().to_string(),
+                        current_key_fingerprint: b64_32(t, "current_key_fingerprint"),
+                        current_key_id: t["current_key_id"].as_str().unwrap().to_string(),
+                        effective_at: t["effective_at"].as_i64().unwrap(),
+                        next_key_fingerprint: b64_32(t, "next_key_fingerprint"),
+                        next_key_id: t["next_key_id"].as_str().unwrap().to_string(),
+                        transition_id: t["transition_id"].as_str().unwrap().to_string(),
+                        bounds: None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+        object_version: e["object_version"].as_str().unwrap().to_string(),
+        bounds: None,
+    };
+    CorpusVerifyFixture {
+        obj: ArchivedObject {
+            chunks: b64_vec(&input["chunks"]),
+            version: input["version"].as_str().unwrap().to_string(),
+        },
+        keys: HistoricalKeyChain {
+            keys: input["keys"]
+                .as_array()
+                .expect("keys")
+                .iter()
+                .map(mk_key)
+                .collect(),
+        },
+        expected,
+    }
+}
+
 // =============================================================================
 // Bounds parity — caller-tightenable bounds through the expected structs.
 // Fixture discipline (plan S1): every tightened-outer leg carries present-and-
@@ -1612,7 +1726,7 @@ fn verify_expected_anchor_chain_id_binding_rejected() {
 // pin's own legs (7/7b/8).
 // =============================================================================
 
-use bounded_authority_protocol::{resolve_bounds, verify_historical_anchor};
+use bounded_authority_protocol::{resolve_bounds, verify_historical_anchor, verify_key_transition};
 
 fn tight(v: &[(&str, u64)]) -> Bounds {
     let mut m = std::collections::BTreeMap::<String, JsonValue>::new();
@@ -1726,58 +1840,26 @@ fn bounds_encode_identity_outer_absent_nested_accepts() {
 
 #[test]
 fn bounds_verify_tightened_rejects() {
-    // Verify-side: a MAXIMUM-encoded archive under a TIGHTENED verify-only expected.
-    let mut g = conformant_export();
-    let enc = encode_anchored_export(&g.input, &g.expected).expect("encodes at maximum");
-    let vb = tight(&[("archive_chunks", 3)]);
-    g.expected.bounds = Some(vb);
-    all_nested_equal(&mut g, vb);
-    // build the archived object (the round-trip helper from the round-2 leg)
-    let obj = ArchivedObject {
-        chunks: {
-            let mut chunks: Vec<Vec<u8>> = Vec::new();
-            let bytes = &enc.bytes;
-            let mut off = 20;
-            while off < bytes.len() {
-                let len = u32::from_be_bytes([
-                    bytes[off],
-                    bytes[off + 1],
-                    bytes[off + 2],
-                    bytes[off + 3],
-                ]) as usize;
-                chunks.push(bytes[off + 4..off + 4 + len].to_vec());
-                off += 4 + len;
-            }
-            chunks
-        },
-        version: "v1".to_string(),
-    };
-    let keys = HistoricalKeyChain {
-        keys: vec![
-            HistoricalPublicKey {
-                key_id: "anchor-a".to_string(),
-                public_key: KEY_A,
-                valid_from: 900,
-                valid_before: ValidityUpperBound::Unbounded,
-            },
-            HistoricalPublicKey {
-                key_id: "anchor-b".to_string(),
-                public_key: KEY_B,
-                valid_from: 1400,
-                valid_before: ValidityUpperBound::Unbounded,
-            },
-        ],
-    };
-    let v_expected = ExpectedAnchoredExport {
-        chain: g.expected.chain.clone(),
-        digest: enc.digest,
-        start_anchor: g.expected.start_anchor.clone(),
-        end_anchor: g.expected.end_anchor.clone(),
-        transitions: g.expected.transitions.clone(),
-        object_version: "v1".to_string(),
-        bounds: g.expected.bounds,
-    };
-    assert!(verify_anchored_export(&obj, &keys, &v_expected).is_err());
+    // On the corpus' REAL signed archive: control Ok at maximum, Err under a
+    // tightened archive_chunks (the correctness lens' F1 — the prior fixture
+    // was content-only-chunked + zero-signature, vacuously rejecting at the
+    // digest compare before any bounds gate).
+    let f = corpus_export_verify_fixture();
+    // Control: the corpus archive verifies Ok at maximum (real signatures).
+    assert!(verify_anchored_export(&f.obj, &f.keys, &f.expected).is_ok());
+    let mut v = f.expected.clone();
+    let b = tight(&[("archive_chunks", 3)]);
+    v.bounds = Some(b);
+    // S1 discipline: present-and-equal nested (the absent-under-tightened pin
+    // would otherwise reject first — the mutation-proof caught it).
+    v.chain.bounds = Some(b);
+    v.start_anchor.bounds = Some(b);
+    v.end_anchor.bounds = Some(b);
+    for t in &mut v.transitions {
+        t.bounds = Some(b);
+    }
+    // The corpus archive has more than 3 chunks -> Err at the verify chunk gate.
+    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err());
 }
 
 #[test]
@@ -1974,4 +2056,111 @@ fn two_transition_export() -> ConformantExport {
         rows: vec![row1, row2],
     };
     ConformantExport { input, expected }
+}
+
+#[test]
+fn bounds_standalone_transition_verify_tightened_rejects() {
+    // The F1 leg (gate-integrity + security lenses, convergent): the standalone
+    // verify_key_transition threading, on a REAL corpus-signed transition (the
+    // dummy-signature fixtures fail crypto-verify before the gate).
+    let case_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/conformance/corpus/cases/key-transition/verify.json"
+    );
+    let raw = std::fs::read(case_path).expect("corpus readable");
+    let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
+    let valid_case = root["cases"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|c| c["class"].as_str() == Some("valid"))
+        .expect("a valid case exists");
+    let input = &valid_case["input"];
+    let compact = input["compact"]
+        .as_str()
+        .expect("compact")
+        .as_bytes()
+        .to_vec();
+    let mk_key = |v: &serde_json::Value| -> HistoricalPublicKey {
+        let raw_pk = base64url_decode(v["public_key"].as_str().expect("pk").as_bytes())
+            .expect("key decodes");
+        let mut pk = [0u8; 32];
+        pk.copy_from_slice(&raw_pk);
+        HistoricalPublicKey {
+            key_id: v["key_id"].as_str().expect("kid").to_string(),
+            public_key: pk,
+            valid_from: v["valid_from"].as_i64().expect("vf"),
+            valid_before: match v["valid_before"].as_str() {
+                Some(":unbounded") | None => ValidityUpperBound::Unbounded,
+                Some(_) => ValidityUpperBound::Bounded(v["valid_before"].as_i64().expect("vb")),
+            },
+        }
+    };
+    let current = mk_key(&input["current_key"]);
+    let next = mk_key(&input["next_key"]);
+    let b64_32 = |v: &serde_json::Value, k: &str| -> [u8; 32] {
+        let t = v[k].as_str().unwrap();
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&base64url_decode(t.as_bytes()).expect("32 bytes"));
+        out
+    };
+    let e = &input["expected"];
+    let expected = ExpectedKeyTransition {
+        chain_id: e["chain_id"].as_str().unwrap().to_string(),
+        current_key_fingerprint: b64_32(e, "current_key_fingerprint"),
+        current_key_id: e["current_key_id"].as_str().unwrap().to_string(),
+        effective_at: e["effective_at"].as_i64().unwrap(),
+        next_key_fingerprint: b64_32(e, "next_key_fingerprint"),
+        next_key_id: e["next_key_id"].as_str().unwrap().to_string(),
+        transition_id: e["transition_id"].as_str().unwrap().to_string(),
+        bounds: None,
+    };
+    // Control at maximum: Ok.
+    assert!(verify_key_transition(&compact, &current, &next, &expected).is_ok());
+    // Tightened anchor_bytes below the compact length: Err at the standalone entry.
+    let mut tight_expected = expected;
+    tight_expected.bounds = Some(tight(&[("anchor_bytes", 10)]));
+    assert!(verify_key_transition(&compact, &current, &next, &tight_expected).is_err());
+}
+
+#[test]
+fn bounds_encode_tightened_chain_rows_count_rejects() {
+    // The F4 leg: the chain_rows COUNT ceiling (not the per-row byte ceiling) —
+    // two rows, limit 1.
+    let mut f = two_transition_export();
+    let b = tight(&[("chain_rows", 1)]);
+    f.expected.bounds = Some(b);
+    all_nested_equal(&mut f, b);
+    assert!(encode_anchored_export(&f.input, &f.expected).is_err());
+}
+
+#[test]
+fn bounds_verify_nested_pin_mismatch_rejects() {
+    // The verify-side nested pin (F2): the corpus archive + expected at maximum
+    // verifies Ok; a mismatched chain nested under an absent outer rejects at
+    // the verify-side pin.
+    let f = corpus_export_verify_fixture();
+    assert!(verify_anchored_export(&f.obj, &f.keys, &f.expected).is_ok());
+    let mut v = f.expected.clone();
+    v.chain.bounds = Some(tight(&[("chain_row_bytes", 4000)]));
+    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err());
+}
+
+#[test]
+fn bounds_verify_absent_nested_under_tightened_outer_rejects() {
+    // The verify-side absent branch (F2): outer tightened + all nested None.
+    let f = corpus_export_verify_fixture();
+    let mut v = f.expected.clone();
+    v.bounds = Some(tight(&[("chain_row_bytes", 4000)]));
+    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err());
+}
+
+#[test]
+fn bounds_verify_identity_outer_absent_nested_accepts() {
+    // The identity acceptance at verify: an outer built from an explicit maximum
+    // value is not tightening; the corpus archive verifies Ok.
+    let f = corpus_export_verify_fixture();
+    let mut v = f.expected.clone();
+    v.bounds = Some(tight(&[("chain_row_bytes", 4096)])); // == the maximum
+    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_ok());
 }
