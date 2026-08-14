@@ -1761,6 +1761,8 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
         fail("verify_historical_anchor: valid_from magnitude")
     if _vb is not None and abs(_vb) > _mag:
         fail("verify_historical_anchor: valid_before magnitude")
+    if _vb is not None and _vb <= _vf:
+        fail("verify_historical_anchor: valid_before ordering")
     seg = parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != key.key_id:
@@ -1836,6 +1838,8 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
         fail("verify_key_transition: valid_from magnitude")
     if (_ovb is not None and abs(_ovb) > _mag) or (_nvb is not None and abs(_nvb) > _mag):
         fail("verify_key_transition: valid_before magnitude")
+    if (_ovb is not None and _ovb <= _ovf) or (_nvb is not None and _nvb <= _nvf):
+        fail("verify_key_transition: valid_before ordering")
     seg = parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != old_key.key_id:
@@ -2067,6 +2071,8 @@ def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: E
         fail(f"{ctx}: valid_from magnitude")
     if _vb is not None and abs(_vb) > _mag:
         fail(f"{ctx}: valid_before magnitude")
+    if _vb is not None and _vb <= _vf:
+        fail(f"{ctx}: valid_before ordering")
     seg = parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != key.key_id:
@@ -2126,6 +2132,8 @@ def _verify_transition_compact(compact: bytes, current_key: HistoricalPublicKey,
         fail(f"{ctx}: valid_from magnitude")
     if (_ovb is not None and abs(_ovb) > _mag) or (_nvb is not None and abs(_nvb) > _mag):
         fail(f"{ctx}: valid_before magnitude")
+    if (_ovb is not None and _ovb <= _ovf) or (_nvb is not None and _nvb <= _nvf):
+        fail(f"{ctx}: valid_before ordering")
     seg = parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != current_key.key_id:

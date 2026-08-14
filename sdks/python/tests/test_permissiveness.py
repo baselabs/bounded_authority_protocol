@@ -1877,3 +1877,36 @@ def test_archive_verify_key_validity_guards():
     # Huge bounded valid_before (2^62) on the last key -> fail closed.
     bad1 = HistoricalPublicKey(key_id=keys_ok.keys[1].key_id, public_key=keys_ok.keys[1].public_key, valid_from=keys_ok.keys[1].valid_from, valid_before=4611686018427387904)
     assert not verify_anchored_export(obj, HistoricalKeyChain(keys=[keys_ok.keys[0], bad1]), exp).is_ok
+
+
+def test_bounds_inverted_window_rejects():
+    """The ordering leg (valid_before > valid_from, context_validation.ex:139-140):
+    an inverted window (both endpoints in-magnitude, integral) rejects — jointly
+    with membership (an inverted window admits no time); the gate pins the clause."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+    from bounded_authority_verifier.jwk import public_key_thumbprint_raw
+    from bounded_authority_verifier.v1 import HistoricalPublicKey, verify_historical_anchor
+
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key().public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
+    si = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="anchor-ord", anchored_at=1000, chain_id="chain-x",
+            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=pub,
+        )
+    )
+    assert si.is_ok
+    msg = si.value.protected_segment + b"." + si.value.payload_segment
+    sig = priv.sign(msg)
+    compact = si.value.protected_segment + b"." + si.value.payload_segment + b"." + _b64e(sig)
+    expected = ExpectedAnchor(
+        anchor_id="anchor-ord", anchored_at=1000, chain_id="chain-x",
+        sequence=0, chain_hash=_Z32P, key_id="anchor-a",
+        key_fingerprint=public_key_thumbprint_raw(pub), bounds=None,
+    )
+    ok = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=0, valid_before=2000)
+    assert verify_historical_anchor(compact, ok, expected).is_ok
+    bad = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=1000, valid_before=1000)
+    assert not verify_historical_anchor(compact, bad, expected).is_ok

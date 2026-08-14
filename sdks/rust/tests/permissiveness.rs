@@ -2284,6 +2284,9 @@ fn bounds_standalone_anchor_key_window_magnitude_rejects() {
         bounds: None,
     };
     assert!(verify_historical_anchor(&compact, &key, &expected).is_err());
+    // Control: the untampered corpus key verifies Ok (the fixture is sound).
+    key.valid_before = ValidityUpperBound::Unbounded;
+    assert!(verify_historical_anchor(&compact, &key, &expected).is_ok());
 }
 
 // Round-5 legs (the claude peer): the transition-path round-4 gates + the
@@ -2462,6 +2465,9 @@ fn bounds_standalone_anchor_key_window_magnitude_valid_from_rejects() {
         bounds: None,
     };
     assert!(verify_historical_anchor(&compact, &key, &expected).is_err());
+    // Control: the untampered corpus key verifies Ok (the fixture is sound).
+    key.valid_from = 0;
+    assert!(verify_historical_anchor(&compact, &key, &expected).is_ok());
 }
 
 // Delta-review legs: the remaining magnitude-gate halves on the transition path.
@@ -2489,6 +2495,16 @@ fn bounds_transition_next_valid_from_magnitude_rejects() {
     // (effective_at 1500 >= -2^62), only the magnitude gate fires.
     next.valid_from = -(4_611_686_018_427_387_904i64);
     assert!(verify_key_transition(&compact, &current, &next, &expected).is_err());
+}
+
+#[test]
+fn bounds_transition_corpus_fixture_control_verifies_ok() {
+    // The green control for the three legs sharing corpus_transition_parts():
+    // the UNTAMpered corpus transition verifies Ok (a construction defect in
+    // the loader would turn the legs red for the wrong reason — the closing
+    // cross-vendor note).
+    let (compact, current, next, expected) = corpus_transition_parts();
+    assert!(verify_key_transition(&compact, &current, &next, &expected).is_ok());
 }
 
 /// The corpus transition fixture loader (shared by the three magnitude legs).
@@ -2553,4 +2569,74 @@ fn corpus_transition_parts() -> (
         mk_key(&input["next_key"]),
         expected,
     )
+}
+
+// The closing cross-vendor notes: the ordering leg (valid_before > valid_from,
+// context_validation.ex:139-140) — verdict-equivalent today (an inverted window
+// admits no time) but a gate reused without membership would inherit the gap.
+
+#[test]
+fn bounds_anchor_inverted_window_rejects() {
+    // Both endpoints in-magnitude and integral; valid_before <= valid_from —
+    // the ordering gate fires (membership alone would also reject, but the gate
+    // is the named clause; mutation-proven at the gate).
+    let (compact, key, expected) = corpus_anchor_triple();
+    let mut k = key;
+    k.valid_before = ValidityUpperBound::Bounded(k.valid_from);
+    assert!(verify_historical_anchor(&compact, &k, &expected).is_err());
+}
+
+/// The corpus anchor triple (compact, key, expected) — shared.
+fn corpus_anchor_triple() -> (Vec<u8>, HistoricalPublicKey, ExpectedAnchor) {
+    let case_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/conformance/corpus/cases/boundary-anchor/verify.json"
+    );
+    let raw = std::fs::read(case_path).expect("corpus readable");
+    let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
+    let valid_case = root["cases"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|c| c["class"].as_str() == Some("valid"))
+        .expect("valid");
+    let input = &valid_case["input"];
+    let compact = input["compact"]
+        .as_str()
+        .expect("compact")
+        .as_bytes()
+        .to_vec();
+    let k = &input["key"];
+    let key = HistoricalPublicKey {
+        key_id: k["key_id"].as_str().expect("kid").to_string(),
+        public_key: {
+            let mut pk = [0u8; 32];
+            pk.copy_from_slice(
+                &base64url_decode(k["public_key"].as_str().expect("pk").as_bytes()).expect("k"),
+            );
+            pk
+        },
+        valid_from: k["valid_from"].as_i64().expect("vf"),
+        valid_before: match k["valid_before"].as_i64() {
+            Some(vb) => ValidityUpperBound::Bounded(vb),
+            None => ValidityUpperBound::Unbounded,
+        },
+    };
+    let e = &input["expected"];
+    let b64_32 = |k: &str| -> [u8; 32] {
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&base64url_decode(e[k].as_str().unwrap().as_bytes()).expect("32"));
+        out
+    };
+    let expected = ExpectedAnchor {
+        anchor_id: e["anchor_id"].as_str().unwrap().to_string(),
+        anchored_at: e["anchored_at"].as_i64().unwrap(),
+        chain_hash: b64_32("chain_hash"),
+        chain_id: e["chain_id"].as_str().unwrap().to_string(),
+        key_fingerprint: b64_32("key_fingerprint"),
+        key_id: e["key_id"].as_str().unwrap().to_string(),
+        sequence: e["sequence"].as_i64().unwrap(),
+        bounds: None,
+    };
+    (compact, key, expected)
 }
