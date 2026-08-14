@@ -2485,11 +2485,8 @@ fn bounds_transition_next_valid_before_magnitude_rejects() {
 #[test]
 fn bounds_transition_next_valid_from_magnitude_rejects() {
     let (compact, current, mut next, expected) = corpus_transition_parts();
-    next.valid_from = 4_611_686_018_427_387_905;
-    // Membership: effective_at 1500 >= valid_from fails — pad the window so
-    // membership holds via the next-key lower bound being far below the time.
-    // (The corpus effective_at is 1500; a huge positive valid_from breaks
-    // membership, so this leg uses the NEGATIVE magnitude: membership holds.)
+    // Negative out-of-magnitude valid_from (-2^62): membership holds
+    // (effective_at 1500 >= -2^62), only the magnitude gate fires.
     next.valid_from = -(4_611_686_018_427_387_904i64);
     assert!(verify_key_transition(&compact, &current, &next, &expected).is_err());
 }
