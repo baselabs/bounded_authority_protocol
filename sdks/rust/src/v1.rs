@@ -2037,11 +2037,12 @@ fn decode_transition_parts<'a>(
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
     // REQ1-BOUNDS-fixed-widths: the decoded signature is exactly 64 bytes
-    // (key_transition_codec.ex:120). Verdict-inert placement parity: no PUBLIC
-    // input can reach this gate with a wrong-width signature (assemble_compact
-    // is [u8; 64]-type-locked; verify_key_transition's decode_signature64
-    // rejects first; the encode path never parses transitions) — kept for
-    // structural faithfulness to the reference; see the battery header.
+    // (key_transition_codec.ex:120). Publicly reachable through
+    // encode_anchored_export, which parses caller-supplied transitions here —
+    // battery leg `encode_transition_signature_width_rejected` drives a
+    // 32-byte signature to exactly this gate. assemble_compact stays
+    // [u8; 64]-type-locked and verify_key_transition's decode_signature64
+    // independently enforces the width on the verify path.
     let sig_raw = base64url_decode(signature_seg)?;
     if sig_raw.len() != 64 {
         return Err(Invalid);

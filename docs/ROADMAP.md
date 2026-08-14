@@ -599,7 +599,7 @@ the evidence amendment is this repo's docs-currency rule, not the sibling's patt
 residual of amendment #1 is CLOSED for Rust: `encode_anchored_export` now mirrors the
 reference producer's full contract (expected-side consistency, row chain re-check, gated
 parses + 7-field matches for both anchors and every transition, the key-path walk with
-NON-STRICT end-anchor chronology). 15 mutation-proven battery legs (permissiveness 34), each
+NON-STRICT end-anchor chronology). 19 mutation-proven battery legs (permissiveness 38 — incl. the closeout lenses' chronology-equality pin), each
 verified against the Elixir reference oracle (16/16). The TS/Python sibling permissiveness
 closed in the immediately-following commit (same contract, 9 legs each, proven red-capable
 against the neutralized pre-parity state); the SDK-wide maximum-bounds encode posture
