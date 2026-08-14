@@ -1628,3 +1628,69 @@ def test_encode_parity_chain_pin_isolated_rejects():
     chain_nested = bounds_new({"chain_row_bytes": 4000})
     r = encode_anchored_export(input_, _replace(expected, chain=_replace(expected.chain, bounds=chain_nested)))
     assert not r.is_ok, "chain nested-bounds mismatch must reject (isolated)"
+
+
+def test_encode_parity_tightened_anchor_bytes_rejects():
+    """Round-2 codex probe: anchor_bytes=1 tightened outer — parse_compact only gates
+    compact_bytes, so without the explicit per-anchor ceiling the ~440-byte anchors
+    framed fine (the reference gates anchor_bytes at :82/:114)."""
+    from dataclasses import replace as _replace
+
+    from bounded_authority_verifier.bounds import bounds_new
+
+    input_, expected = _conformant_export()
+    tight = bounds_new({"anchor_bytes": 1})
+    r = encode_anchored_export(input_, _replace(expected, bounds=tight))
+    assert not r.is_ok, "tightened anchor_bytes must reject the anchor compacts at encode"
+
+
+def test_encode_parity_expected_bool_rejected():
+    """Round-2: Python ``1 == True`` — an untyped boolean expected field would equal a
+    decoded 0/1 at the match; the type-strict gate refuses it."""
+    from dataclasses import replace as _replace
+
+    input_, expected = _conformant_export()
+    bad = _replace(expected, end_anchor=_replace(expected.end_anchor, sequence=True))
+    r = encode_anchored_export(input_, bad)
+    assert not r.is_ok, "a boolean expected sequence must reject (type-strict)"
+
+
+def test_verify_parity_expected_anchor_chain_id_rejects():
+    """Round-2: the static expected↔chain bindings at verify (the reference enforces
+    the six at :362-371 via :92/:387); a caller-inconsistent expected end-anchor
+    chain_id rejects before any parse."""
+    from dataclasses import replace as _replace
+
+    from bounded_authority_verifier.v1 import (
+        ArchivedObject,
+        HistoricalKeyChain,
+        HistoricalPublicKey,
+    )
+
+    input_, expected = _conformant_export()
+    enc = encode_anchored_export(input_, expected)
+    assert enc.is_ok
+    archive = enc.value.archive
+    chunks = []
+    off = 20
+    while off < len(archive):
+        (ln,) = struct.unpack_from(">I", archive, off)
+        chunks.append(archive[off + 4 : off + 4 + ln])
+        off += 4 + ln
+    obj = ArchivedObject(chunks=chunks, version="v1")
+    keys = HistoricalKeyChain(
+        keys=[
+            HistoricalPublicKey(key_id="anchor-a", public_key=_KEY_A, valid_from=900, valid_before=None),
+            HistoricalPublicKey(key_id="anchor-b", public_key=_KEY_B, valid_from=1400, valid_before=None),
+        ]
+    )
+    v_expected = ExpectedExport(
+        chain=expected.chain,
+        digest=enc.value.digest,
+        start_anchor=expected.start_anchor,
+        end_anchor=_replace(expected.end_anchor, chain_id="chain-OTHER"),
+        transitions=expected.transitions,
+        object_version="v1",
+    )
+    r = verify_anchored_export(obj, keys, v_expected)
+    assert not r.is_ok, "caller-inconsistent expected anchor chain_id must reject at verify"
