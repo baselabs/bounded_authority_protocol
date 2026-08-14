@@ -833,6 +833,7 @@ fn expected_start_anchor(chain_hash: [u8; 32]) -> ExpectedAnchor {
         key_fingerprint: public_key_thumbprint_raw(&KEY_A),
         key_id: "anchor-a".to_string(),
         sequence: 0,
+        bounds: None,
     }
 }
 
@@ -850,6 +851,7 @@ fn expected_end_anchor(
         key_fingerprint: public_key_thumbprint_raw(&public_key),
         key_id: key_id.to_string(),
         sequence: 1,
+        bounds: None,
     }
 }
 
@@ -873,6 +875,7 @@ fn conformant_export() -> ConformantExport {
         row_count: 1,
         previous_hash: Z32,
         head_hash,
+        bounds: None,
     };
     let transitions = vec![build_transition(1500)];
     let expected = ExpectedExport {
@@ -888,8 +891,10 @@ fn conformant_export() -> ConformantExport {
             next_key_fingerprint: public_key_thumbprint_raw(&KEY_B),
             next_key_id: "anchor-b".to_string(),
             transition_id: "transition-1".to_string(),
+            bounds: None,
         }],
         object_version: "v1".to_string(),
+        bounds: None,
     };
     let input = AnchoredExportInput {
         start_anchor: build_start_anchor(Z32),
@@ -1164,6 +1169,7 @@ fn encode_key_path_end_time_equality_accepted() {
             row_count: 1,
             previous_hash: Z32,
             head_hash,
+            bounds: None,
         },
         digest: Z32,
         start_anchor: expected_start_anchor(Z32),
@@ -1176,8 +1182,10 @@ fn encode_key_path_end_time_equality_accepted() {
             next_key_fingerprint: public_key_thumbprint_raw(&KEY_B),
             next_key_id: "anchor-b".to_string(),
             transition_id: "transition-1".to_string(),
+            bounds: None,
         }],
         object_version: "v1".to_string(),
+        bounds: None,
     };
     let input = AnchoredExportInput {
         start_anchor: build_start_anchor(Z32),
@@ -1586,6 +1594,7 @@ fn verify_expected_anchor_chain_id_binding_rejected() {
         end_anchor: f.expected.end_anchor.clone(),
         transitions: f.expected.transitions.clone(),
         object_version: "v1".to_string(),
+        bounds: None,
     };
     // One-sided: the signed anchors are untouched; only the expected end anchor's
     // chain_id is caller-inconsistent.
@@ -1594,4 +1603,375 @@ fn verify_expected_anchor_chain_id_binding_rejected() {
         verify_anchored_export(&obj, &keys, &v_expected).is_err(),
         "a caller-inconsistent expected anchor chain_id must reject at verify"
     );
+}
+
+// =============================================================================
+// Bounds parity — caller-tightenable bounds through the expected structs.
+// Fixture discipline (plan S1): every tightened-outer leg carries present-and-
+// equal nested bounds on chain + both anchors + every transition, EXCEPT the
+// pin's own legs (7/7b/8).
+// =============================================================================
+
+use bounded_authority_protocol::{resolve_bounds, verify_historical_anchor};
+
+fn tight(v: &[(&str, u64)]) -> Bounds {
+    let mut m = std::collections::BTreeMap::<String, JsonValue>::new();
+    for (k, n) in v {
+        m.insert(k.to_string(), JsonValue::Int(*n as i64));
+    }
+    Bounds::new(Some(&JsonValue::Object(m.into_iter().collect()))).expect("tight bounds construct")
+}
+
+/// The full nested-equal overlay for a tightened outer (S1 discipline).
+fn all_nested_equal(f: &mut ConformantExport, b: Bounds) {
+    f.expected.chain.bounds = Some(b);
+    f.expected.start_anchor.bounds = Some(b);
+    f.expected.end_anchor.bounds = Some(b);
+    for t in &mut f.expected.transitions {
+        t.bounds = Some(b);
+    }
+}
+
+#[test]
+fn bounds_resolve_none_is_maximum_and_identity_not_tightening() {
+    assert_eq!(resolve_bounds(None), Bounds::maximum());
+    // identity override: value == the maximum merges to the maximum struct
+    let identity = tight(&[("anchor_bytes", 8192)]);
+    assert_eq!(resolve_bounds(Some(&identity)), Bounds::maximum());
+    // a real tightening differs
+    let t = tight(&[("anchor_bytes", 100)]);
+    assert_ne!(resolve_bounds(Some(&t)), Bounds::maximum());
+}
+
+#[test]
+fn bounds_encode_tightened_anchor_bytes_rejects() {
+    let mut f = conformant_export();
+    let b = tight(&[("anchor_bytes", 100)]);
+    f.expected.bounds = Some(b);
+    all_nested_equal(&mut f, b);
+    assert!(encode_anchored_export(&f.input, &f.expected).is_err());
+}
+
+#[test]
+fn bounds_encode_tightened_key_transitions_rejects() {
+    // Two transitions (the second chained after the first), limit 1 (S2: 0 is
+    // unconstructable — the constructors floor at 1).
+    let mut f = two_transition_export();
+    let b = tight(&[("key_transitions", 1)]);
+    f.expected.bounds = Some(b);
+    all_nested_equal(&mut f, b);
+    assert!(encode_anchored_export(&f.input, &f.expected).is_err());
+}
+
+#[test]
+fn bounds_encode_tightened_chain_row_bytes_rejects() {
+    let mut f = conformant_export();
+    // the fixture's single row is ~130 bytes; 100 rejects it
+    let b = tight(&[("chain_row_bytes", 100)]);
+    f.expected.bounds = Some(b);
+    all_nested_equal(&mut f, b);
+    assert!(encode_anchored_export(&f.input, &f.expected).is_err());
+}
+
+#[test]
+fn bounds_encode_tightened_archive_chunks_pins_the_magic() {
+    // THE chunk-count magic pin: the fixture's frames = magic + header + start +
+    // 1 transition + 1 row + end = 6 WITH the magic, 5 without. Tighten
+    // archive_chunks to 5: the count passes WITHOUT the magic and rejects WITH
+    // it — this leg goes red exactly if the magic leaves the count.
+    let mut f = conformant_export();
+    let b = tight(&[("archive_chunks", 5)]);
+    f.expected.bounds = Some(b);
+    all_nested_equal(&mut f, b);
+    assert!(encode_anchored_export(&f.input, &f.expected).is_err());
+}
+
+#[test]
+fn bounds_encode_tightened_archive_bytes_rejects() {
+    let mut f = conformant_export();
+    let b = tight(&[("archive_bytes", 100)]);
+    f.expected.bounds = Some(b);
+    all_nested_equal(&mut f, b);
+    assert!(encode_anchored_export(&f.input, &f.expected).is_err());
+}
+
+#[test]
+fn bounds_encode_nested_pin_mismatch_rejects() {
+    // Isolated: outer at maximum (untightened — absent nested passes), only the
+    // chain nested mismatched.
+    let mut f = conformant_export();
+    f.expected.chain.bounds = Some(tight(&[("chain_row_bytes", 4000)]));
+    assert!(encode_anchored_export(&f.input, &f.expected).is_err());
+}
+
+#[test]
+fn bounds_encode_absent_nested_under_tightened_outer_rejects() {
+    // B1: the pin's absent branch — outer tightened, ALL nested None → reject
+    // (the wrong-ACCEPT direction; the reference rejects at .ex:352-354).
+    let mut f = conformant_export();
+    f.expected.bounds = Some(tight(&[("anchor_bytes", 8192)])); // real tightening < maximum? identity!
+                                                                // use a genuinely tightening value so the absent branch is the rejector
+    f.expected.bounds = Some(tight(&[("chain_row_bytes", 4000)]));
+    assert!(encode_anchored_export(&f.input, &f.expected).is_err());
+}
+
+#[test]
+fn bounds_encode_identity_outer_absent_nested_accepts() {
+    // identity override (anchor_bytes=8192 == the maximum) is NOT tightening:
+    // absent nested passes.
+    let mut f = conformant_export();
+    f.expected.bounds = Some(tight(&[("anchor_bytes", 8192)]));
+    assert!(encode_anchored_export(&f.input, &f.expected).is_ok());
+}
+
+#[test]
+fn bounds_verify_tightened_rejects() {
+    // Verify-side: a MAXIMUM-encoded archive under a TIGHTENED verify-only expected.
+    let mut g = conformant_export();
+    let enc = encode_anchored_export(&g.input, &g.expected).expect("encodes at maximum");
+    let vb = tight(&[("archive_chunks", 3)]);
+    g.expected.bounds = Some(vb);
+    all_nested_equal(&mut g, vb);
+    // build the archived object (the round-trip helper from the round-2 leg)
+    let obj = ArchivedObject {
+        chunks: {
+            let mut chunks: Vec<Vec<u8>> = Vec::new();
+            let bytes = &enc.bytes;
+            let mut off = 20;
+            while off < bytes.len() {
+                let len = u32::from_be_bytes([
+                    bytes[off],
+                    bytes[off + 1],
+                    bytes[off + 2],
+                    bytes[off + 3],
+                ]) as usize;
+                chunks.push(bytes[off + 4..off + 4 + len].to_vec());
+                off += 4 + len;
+            }
+            chunks
+        },
+        version: "v1".to_string(),
+    };
+    let keys = HistoricalKeyChain {
+        keys: vec![
+            HistoricalPublicKey {
+                key_id: "anchor-a".to_string(),
+                public_key: KEY_A,
+                valid_from: 900,
+                valid_before: ValidityUpperBound::Unbounded,
+            },
+            HistoricalPublicKey {
+                key_id: "anchor-b".to_string(),
+                public_key: KEY_B,
+                valid_from: 1400,
+                valid_before: ValidityUpperBound::Unbounded,
+            },
+        ],
+    };
+    let v_expected = ExpectedAnchoredExport {
+        chain: g.expected.chain.clone(),
+        digest: enc.digest,
+        start_anchor: g.expected.start_anchor.clone(),
+        end_anchor: g.expected.end_anchor.clone(),
+        transitions: g.expected.transitions.clone(),
+        object_version: "v1".to_string(),
+        bounds: g.expected.bounds,
+    };
+    assert!(verify_anchored_export(&obj, &keys, &v_expected).is_err());
+}
+
+#[test]
+fn bounds_standalone_anchor_verify_tightened_rejects() {
+    // A REAL corpus-signed anchor (the battery's own dummies fail crypto-verify
+    // first, masking the bounds gate): the valid boundary-anchor case verifies
+    // Ok at maximum and Err under a tightened anchor_bytes — the standalone
+    // entry's bounds threading, red-capable at its own gate.
+    let case_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/conformance/corpus/cases/boundary-anchor/verify.json"
+    );
+    let raw = std::fs::read(case_path).expect("corpus readable");
+    let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
+    let valid_case = root["cases"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|c| c["class"].as_str() == Some("valid"))
+        .expect("a valid case exists");
+    let input = &valid_case["input"];
+    let sj_key = &input["key"];
+    let compact = input["compact"]
+        .as_str()
+        .expect("compact")
+        .as_bytes()
+        .to_vec();
+    let key = HistoricalPublicKey {
+        key_id: sj_key["key_id"].as_str().expect("kid").to_string(),
+        public_key: {
+            let raw_pk = base64url_decode(sj_key["public_key"].as_str().expect("pk").as_bytes())
+                .expect("key decodes");
+            let mut pk = [0u8; 32];
+            pk.copy_from_slice(&raw_pk);
+            pk
+        },
+        valid_from: sj_key["valid_from"].as_i64().expect("vf"),
+        valid_before: match sj_key["valid_before"].as_str() {
+            Some(":unbounded") | None => ValidityUpperBound::Unbounded,
+            Some(_) => ValidityUpperBound::Bounded(sj_key["valid_before"].as_i64().expect("vb")),
+        },
+    };
+    let sj_exp = &input["expected"];
+    let b64_32 = |k: &str| -> [u8; 32] {
+        let t = sj_exp[k].as_str().unwrap();
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&base64url_decode(t.as_bytes()).expect("32 bytes"));
+        out
+    };
+    let expected = ExpectedAnchor {
+        anchor_id: sj_exp["anchor_id"].as_str().unwrap().to_string(),
+        anchored_at: sj_exp["anchored_at"].as_i64().unwrap(),
+        chain_hash: b64_32("chain_hash"),
+        chain_id: sj_exp["chain_id"].as_str().unwrap().to_string(),
+        key_fingerprint: b64_32("key_fingerprint"),
+        key_id: sj_exp["key_id"].as_str().unwrap().to_string(),
+        sequence: sj_exp["sequence"].as_i64().unwrap(),
+        bounds: None,
+    };
+    // Control at maximum: Ok (the real signature verifies).
+    assert!(verify_historical_anchor(&compact, &key, &expected).is_ok());
+    // Tightened anchor_bytes below the compact length: Err at the standalone entry.
+    let mut tight_expected = expected;
+    tight_expected.bounds = Some(tight(&[("anchor_bytes", 10)]));
+    assert!(verify_historical_anchor(&compact, &key, &tight_expected).is_err());
+}
+
+#[test]
+fn bounds_two_transition_control_encodes() {
+    // The control for the tightened legs: the multi-row/multi-transition fixture
+    // must encode Ok at maximum bounds (if this fails, the tightened legs are
+    // red for the wrong reason).
+    let f = two_transition_export();
+    assert!(encode_anchored_export(&f.input, &f.expected).is_ok());
+}
+
+fn two_transition_export() -> ConformantExport {
+    // Chain: start (A) → t1 (A→B) → t2 (B→C) → end (C, seq 2). Two rows.
+    let (row1, h1) = encode_consumption_entry(
+        &ConsumptionEntry {
+            chain_id: "chain-x".to_string(),
+            commitment: [5u8; 32],
+            previous_hash: Z32,
+            sequence: 1,
+        },
+        &max(),
+    )
+    .expect("row1");
+    let (row2, h2) = encode_consumption_entry(
+        &ConsumptionEntry {
+            chain_id: "chain-x".to_string(),
+            commitment: [6u8; 32],
+            previous_hash: h1,
+            sequence: 2,
+        },
+        &max(),
+    )
+    .expect("row2");
+    let key_c = [3u8; 32];
+    let t1 = {
+        let p = key_transition_signing_input(
+            &KeyTransition {
+                chain_id: "chain-x".to_string(),
+                current_key_id: "anchor-a".to_string(),
+                current_public_key: KEY_A,
+                effective_at: 1500,
+                next_key_id: "anchor-b".to_string(),
+                next_public_key: KEY_B,
+                transition_id: "transition-1".to_string(),
+            },
+            &max(),
+        )
+        .expect("t1");
+        compact_with_signature(&p.protected_segment, &p.payload_segment, &[0u8; 64])
+    };
+    let t2 = {
+        let p = key_transition_signing_input(
+            &KeyTransition {
+                chain_id: "chain-x".to_string(),
+                current_key_id: "anchor-b".to_string(),
+                current_public_key: KEY_B,
+                effective_at: 1550,
+                next_key_id: "anchor-c".to_string(),
+                next_public_key: key_c,
+                transition_id: "transition-2".to_string(),
+            },
+            &max(),
+        )
+        .expect("t2");
+        compact_with_signature(&p.protected_segment, &p.payload_segment, &[0u8; 64])
+    };
+    let end = {
+        let p = boundary_anchor_signing_input(
+            &BoundaryAnchor {
+                anchor_id: "anchor-end".to_string(),
+                anchored_at: 1600,
+                chain_hash: h2,
+                chain_id: "chain-x".to_string(),
+                key_id: "anchor-c".to_string(),
+                public_key: key_c,
+                sequence: 2,
+            },
+            &max(),
+        )
+        .expect("end anchor (seq 2)");
+        compact_with_signature(&p.protected_segment, &p.payload_segment, &[0u8; 64])
+    };
+    let expected = ExpectedExport {
+        chain: ExpectedChain {
+            chain_id: "chain-x".to_string(),
+            first_sequence: 1,
+            last_sequence: 2,
+            row_count: 2,
+            previous_hash: Z32,
+            head_hash: h2,
+            bounds: None,
+        },
+        digest: Z32,
+        start_anchor: expected_start_anchor(Z32),
+        end_anchor: {
+            let mut ea = expected_end_anchor(h2, "anchor-c", key_c, 1600);
+            ea.sequence = 2;
+            ea
+        },
+        transitions: vec![
+            ExpectedKeyTransition {
+                chain_id: "chain-x".to_string(),
+                current_key_fingerprint: public_key_thumbprint_raw(&KEY_A),
+                current_key_id: "anchor-a".to_string(),
+                effective_at: 1500,
+                next_key_fingerprint: public_key_thumbprint_raw(&KEY_B),
+                next_key_id: "anchor-b".to_string(),
+                transition_id: "transition-1".to_string(),
+                bounds: None,
+            },
+            ExpectedKeyTransition {
+                chain_id: "chain-x".to_string(),
+                current_key_fingerprint: public_key_thumbprint_raw(&KEY_B),
+                current_key_id: "anchor-b".to_string(),
+                effective_at: 1550,
+                next_key_fingerprint: public_key_thumbprint_raw(&key_c),
+                next_key_id: "anchor-c".to_string(),
+                transition_id: "transition-2".to_string(),
+                bounds: None,
+            },
+        ],
+        object_version: "v1".to_string(),
+        bounds: None,
+    };
+    let input = AnchoredExportInput {
+        start_anchor: build_start_anchor(Z32),
+        end_anchor: end,
+        transitions: vec![t1, t2],
+        rows: vec![row1, row2],
+    };
+    ConformantExport { input, expected }
 }

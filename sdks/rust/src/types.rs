@@ -355,6 +355,9 @@ pub struct ExpectedChain {
     pub previous_hash: [u8; 32],
     /// Raw 32-byte caller head (corpus `last_hash`).
     pub head_hash: [u8; 32],
+    /// Caller-tightened bounds (None = the profile maximum; a present value
+    /// must coerce-equal the outer bounds — the reference's nested pin).
+    pub bounds: Option<Bounds>,
 }
 
 /// A single canonical consumption row the caller asks the encoder to frame.
@@ -495,6 +498,9 @@ pub struct ExpectedAnchor {
     pub key_id: String,
     /// Expected anchor sequence.
     pub sequence: i64,
+    /// Caller-tightened bounds (None = the profile maximum; a present value
+    /// must coerce-equal the outer bounds — the reference's nested pin).
+    pub bounds: Option<Bounds>,
 }
 
 /// Caller-expected signed key-transition values for `verify_key_transition`.
@@ -517,6 +523,9 @@ pub struct ExpectedKeyTransition {
     pub next_key_id: String,
     /// Expected `transition_id`.
     pub transition_id: String,
+    /// Caller-tightened bounds (None = the profile maximum; a present value
+    /// must coerce-equal the outer bounds — the reference's nested pin).
+    pub bounds: Option<Bounds>,
 }
 
 // ============================================================================
@@ -579,6 +588,9 @@ pub struct ExpectedExport {
     pub transitions: Vec<ExpectedKeyTransition>,
     /// Expected object-store version.
     pub object_version: String,
+    /// Caller-tightened bounds (None = the profile maximum; a present value
+    /// must coerce-equal the outer bounds — the reference's nested pin).
+    pub bounds: Option<Bounds>,
 }
 
 /// Caller-expected anchored-export boundaries (the verify path).
@@ -601,6 +613,9 @@ pub struct ExpectedAnchoredExport {
     pub transitions: Vec<ExpectedKeyTransition>,
     /// Expected object-store version (`REQ1-EXPORT-version-exact`).
     pub object_version: String,
+    /// Caller-tightened bounds (None = the profile maximum; a present value
+    /// must coerce-equal the outer bounds — the reference's nested pin).
+    pub bounds: Option<Bounds>,
 }
 
 /// The encode-anchored-export producer result.
@@ -929,6 +944,7 @@ mod tests {
             row_count: 2,
             previous_hash: zero32(),
             head_hash: zero32(),
+            bounds: None,
         };
         assert_eq!(input.rows.len(), 2);
         assert_eq!(expected.row_count, 2);
@@ -1024,6 +1040,7 @@ mod tests {
             key_fingerprint: zero32(),
             key_id: "archive-a".to_string(),
             sequence: 0,
+            bounds: None,
         };
         let transition = ExpectedKeyTransition {
             chain_id: "urn:example:chain".to_string(),
@@ -1033,6 +1050,7 @@ mod tests {
             next_key_fingerprint: zero32(),
             next_key_id: "archive-b".to_string(),
             transition_id: "urn:example:transition:a-b".to_string(),
+            bounds: None,
         };
         let _ = anchor.clone();
         let _ = transition.clone();
@@ -1058,6 +1076,7 @@ mod tests {
             key_fingerprint: zero32(),
             key_id: String::new(),
             sequence: 0,
+            bounds: None,
         };
         let expected_chain = ExpectedChain {
             chain_id: String::new(),
@@ -1066,6 +1085,7 @@ mod tests {
             row_count: 1,
             previous_hash: zero32(),
             head_hash: zero32(),
+            bounds: None,
         };
         let expected_export = ExpectedExport {
             chain: expected_chain.clone(),
@@ -1074,6 +1094,7 @@ mod tests {
             end_anchor: expected_anchor.clone(),
             transitions: vec![],
             object_version: "v1".to_string(),
+            bounds: None,
         };
         let expected_verify = ExpectedAnchoredExport {
             chain: expected_chain,
@@ -1082,6 +1103,7 @@ mod tests {
             end_anchor: expected_anchor,
             transitions: vec![],
             object_version: "v1".to_string(),
+            bounds: None,
         };
         let encoded = AnchoredExportEncoded {
             bytes: b"archive".to_vec(),

@@ -73,3 +73,4 @@ pub use jwk::{
     thumbprint_preimage, thumbprint_raw,
 };
 pub use uri::uri_normalize;
+pub use v1::{require_bounds_equal, resolve_bounds};
