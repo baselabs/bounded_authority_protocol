@@ -577,6 +577,20 @@ compatibility.
   `cargo clippy --locked --all-targets -- -D warnings`; `sh tools/purity_check.sh`;
   `sh tools/license_check.sh` (15 runtime deps).
 
+**2026-08-14 amendment — Rust SDK decode-path conformance fix (`103e095`).** The Rust SDK
+carried the two conformance gaps the TS/Python SDKs' fix (`18c6467`, BAP-09) closed: no decoded
+signature-width gate at decode and no canonical-form byte-equality for anchor/transition
+segments. Both closed RED-first (7 battery legs, each mutation-proven; the plan-review BLOCKING
+finding surfaced a third public flip — `encode_anchored_export`'s start-anchor signature was
+never width-checked — which gained its own leg). Gates: `cargo test --locked` 338 unit +
+conformance agreed=283 + permissiveness 17; fmt/clippy clean. Honest residual, routed: the
+encode path frames the END anchor unparsed (the reference parses both anchors through the
+gating codec, `anchored_export_codec.ex:40/:42`) — a non-canonical or wrong-width end anchor is
+still accepted at Rust encode; fixing it flips a third verdict class and is its own reviewed
+change. The Go SDK (BAP-16) picks both classes up at authoring. (This slice lands under BAP-15
+as its owning row — the same provenance as `18c6467` under BAP-09 — rather than as a new row;
+the evidence amendment is this repo's docs-currency rule, not the sibling's pattern.)
+
 ## BAP-17 closeout evidence
 
 - **Slice:** `bap-17-offline-grant-format` (reserve + specify). **Activation decision (user,

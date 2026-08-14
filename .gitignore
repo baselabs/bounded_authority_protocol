@@ -6,6 +6,7 @@
 /.elixir_ls/
 /.lexical/
 /.serena/
+/.zcode/
 /graphify-out/
 /.env
 /.env.*

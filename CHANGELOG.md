@@ -18,6 +18,24 @@ All notable changes to `bounded_authority_protocol` are documented here.
   92 unit + conformance 283/283; Python 62 unit + conformance 283/283. (The Rust/Go SDKs — BAP-15/16
   — may carry the same gaps; a separate check is owed.)
 
+- **Rust SDK conformance hardening (BAP-15).** The Rust verifier SDK now enforces the same two
+  checks the Elixir reference has (closing the "separate check owed" note above, mirroring
+  `18c6467`): (1) a decoded **signature-width gate** in all four `decode_*_parts` fns
+  (`REQ1-BOUNDS-fixed-widths`, mirroring `runtime.ex:237`/`:259`,
+  `boundary_anchor_codec.ex:88`, `key_transition_codec.ex:120`) — public verdict flips on
+  `decode_grant`/`decode_proof` (accepted a wrong-width signature at decode) and
+  `encode_anchored_export` (the start-anchor parse never width-checked its signature segment);
+  (2) **canonical-form equality** for boundary-anchor + key-transition compacts — the four
+  validators now assert `jcs_encode(value) == segment_bytes` for the protected header AND
+  payload (mirroring `boundary_anchor_codec.ex:95-96,118-119` +
+  `key_transition_codec.ex:127-128,151-152`), so a non-canonical (member-reordered) segment is
+  rejected across `assemble_compact`, `verify_historical_anchor`, `verify_key_transition`,
+  `encode_anchored_export`, and `verify_anchored_export`. Seven red-capable battery legs
+  (4 canonical + 2 decode-width + 1 export-encode width), each mutation-proven. Verified: cargo
+  338 unit + conformance 283/283 + permissiveness 17; clippy/fmt clean. Honest residual: the
+  encode path still frames the END anchor without parsing it (the reference parses both) —
+  routed as a follow-up finding; the Go SDK (BAP-16) picks both classes up at authoring.
+
 - **BAP-17 — offline-eligible grant claims (reserve + specify).** Reserve the `ba_offline`
   grant-payload claim name in the [registries](docs/design/registries.md) (issuer-set offline
   floor limits: maximum value with explicit currency, maximum offline use count, offline-window
