@@ -23,9 +23,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
   gated parses + 7-field matches for the START anchor, the END anchor, and every transition
   (their expected-side + key-path validations were already present — the deltas were the parses,
   the matches, and the row re-check; the start anchor was framed raw too, plan-review F1).
-  12 legs per SDK at closeout (control + 8 tampers + the three pin-isolation legs the
-  delta-review forced), each proven red-capable; TS 107 unit + conformance 283/283;
-  Python 77 + conformance 283/283;
+  15 legs per SDK at closeout (control + 8 tampers + the six pin/threading legs the
+  delta- and diff-reviews forced, each re-isolated under its named mutation), each
+  proven red-capable; TS 107 unit + conformance 283/283; Python 77 + conformance 283/283.
   mypy/ruff/purity/license clean. With this, all three shipped SDKs enforce the reference
   producer's full contract; the Go SDK (BAP-16) picks it up at authoring.
 

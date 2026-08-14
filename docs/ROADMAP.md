@@ -600,10 +600,10 @@ residual of amendment #1 is CLOSED for Rust: `encode_anchored_export` now mirror
 reference producer's full contract (expected-side consistency, row chain re-check, gated
 parses + 7-field matches for both anchors and every transition, the key-path walk with
 NON-STRICT end-anchor chronology). 19 mutation-proven battery legs (permissiveness 38 — incl. the closeout lenses' chronology-equality pin), each
-verified against the Elixir reference oracle (20/20 — the receipt is a re-runnable in-repo
-artifact under .forge/reviews/results/rust-encode-path-parity/oracle-probe/). The TS/Python sibling permissiveness
-closed in the immediately-following commit (same contract, 9 legs each, proven red-capable
-against the neutralized pre-parity state); the SDK-wide maximum-bounds encode posture
+verified against the Elixir reference oracle (20/20 — the receipt is a re-runnable local
+.forge artifact under reviews/results/rust-encode-path-parity/oracle-probe/). The TS/Python sibling permissiveness
+closed in the immediately-following commit (same contract, 15 legs each at closeout,
+proven red-capable and re-isolated under their named mutations); the SDK-wide maximum-bounds encode posture
 remains a NAMED delta (caller-tightened `expected.bounds` = a public-API change, its own
 reviewed slice). The Go SDK (BAP-16) picks the whole contract up at authoring.
 

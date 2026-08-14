@@ -1622,7 +1622,9 @@ def test_encode_parity_chain_pin_isolated_rejects():
     from bounded_authority_verifier.bounds import bounds_new
 
     input_, expected = _conformant_export()
-    outer = bounds_new({"chain_row_bytes": 4000})
-    chain_nested = bounds_new({"chain_row_bytes": 4096})
-    r = encode_anchored_export(input_, _replace(expected, bounds=outer, chain=_replace(expected.chain, bounds=chain_nested)))
-    assert not r.is_ok, "chain nested-bounds mismatch must reject (isolated from the row walk)"
+    # Isolated the diff-review's way: the OUTER stays at maximum (the sibling
+    # absent-nested pins pass); ONLY chain.bounds is mismatched (4000 < 4096,
+    # row-safe).
+    chain_nested = bounds_new({"chain_row_bytes": 4000})
+    r = encode_anchored_export(input_, _replace(expected, chain=_replace(expected.chain, bounds=chain_nested)))
+    assert not r.is_ok, "chain nested-bounds mismatch must reject (isolated)"
