@@ -1808,6 +1808,23 @@ pub fn verify_anchored_export(
         require_bounds_equal(t.bounds.as_ref(), &bounds)?;
     }
 
+    // Key-window validity BEFORE chunk processing/hashing (the reference
+    // validates key shapes at :91 before validate_chunks — malformed intervals
+    // should not force processing of the full archive).
+    for k in &keys.keys {
+        if k.valid_from.unsigned_abs() > bounds.integer_magnitude() {
+            return Err(Invalid);
+        }
+        if let ValidityUpperBound::Bounded(v) = k.valid_before {
+            if v.unsigned_abs() > bounds.integer_magnitude() {
+                return Err(Invalid);
+            }
+            if v <= k.valid_from {
+                return Err(Invalid);
+            }
+        }
+    }
+
     // Static expected-side bindings (reference validate_expected_anchored_export
     // → validate_expected_export, anchored_export_codec.ex:362-371, reached at
     // verify :92/:387): the caller's expected anchors belong to the expected chain
