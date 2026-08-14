@@ -947,10 +947,11 @@ pub fn encode_consumption_entry(
 ///
 /// The row-count (≤ 65,536) and per-row-byte (≤ 4,096) ceilings are the
 /// immutable profile maxima from [`Bounds::maximum`]
-/// (`REQ1-CHAIN-raw-rows-bounds`); they are not caller-tightenable through this
-/// façade entry (the entry takes no `Bounds` argument).
+/// (`REQ1-CHAIN-raw-rows-bounds`); caller-tightenable via `expected.bounds`
+/// (None = the immutable profile maxima — the reference threads the caller's
+/// bounds here too, consumption_chain.ex:43).
 pub fn check_chain(input: &ChainInput, expected: &ExpectedChain) -> Result<ChainFacts> {
-    let bounds = Bounds::maximum();
+    let bounds = resolve_bounds(expected.bounds.as_ref());
     let rows = &input.rows;
 
     // REQ1-CHAIN-raw-rows-bounds: nonempty + ≤ chain_rows; each row ≤ chain_row_bytes.
@@ -1191,7 +1192,7 @@ pub fn verify_historical_anchor(
     key: &HistoricalPublicKey,
     expected: &ExpectedAnchor,
 ) -> Result<AnchorFacts> {
-    let bounds = Bounds::maximum();
+    let bounds = resolve_bounds(expected.bounds.as_ref());
     let a = decode_anchor_parts(compact, &bounds)?;
 
     // Key ID: header.kid == key.key_id == expected.key_id.
@@ -1265,7 +1266,7 @@ pub fn verify_key_transition(
     next: &HistoricalPublicKey,
     expected: &ExpectedKeyTransition,
 ) -> Result<KeyTransitionFacts> {
-    let bounds = Bounds::maximum();
+    let bounds = resolve_bounds(expected.bounds.as_ref());
     let t = decode_transition_parts(compact, &bounds)?;
 
     // header.kid == current.key_id == expected.current_key_id.
@@ -1368,7 +1369,16 @@ pub fn encode_anchored_export(
     input: &AnchoredExportInput,
     expected: &ExpectedExport,
 ) -> Result<AnchoredExportEncoded> {
-    let bounds = Bounds::maximum();
+    let bounds = resolve_bounds(expected.bounds.as_ref());
+
+    // The nested-bounds pins (the reference applies them at encode AND verify —
+    // validate_expected_export :352-354/:404-406 via :33 AND :387).
+    require_bounds_equal(expected.chain.bounds.as_ref(), &bounds)?;
+    require_bounds_equal(expected.start_anchor.bounds.as_ref(), &bounds)?;
+    require_bounds_equal(expected.end_anchor.bounds.as_ref(), &bounds)?;
+    for t in &expected.transitions {
+        require_bounds_equal(t.bounds.as_ref(), &bounds)?;
+    }
 
     // Consistency between the artifacts and the caller's expected boundaries.
     if input.rows.len() as i64 != expected.chain.row_count {
@@ -1434,7 +1444,10 @@ pub fn encode_anchored_export(
         &ChainInput {
             rows: input.rows.clone(),
         },
-        &expected.chain,
+        &ExpectedChain {
+            bounds: Some(bounds),
+            ..expected.chain.clone()
+        },
     )?;
 
     // Start-anchor binding: parse through the width+canonical-gated decoder,
@@ -1597,6 +1610,43 @@ pub fn encode_anchored_export(
     })
 }
 
+/// Resolves a caller-supplied optional bounds to the effective value: `None`
+/// is the profile maximum (the reference's `%{}` default-to-maximum coerce,
+/// bounds.ex:139-147). Tighten-only by construction — `Bounds::new` rejects
+/// widenings and merges overrides onto the maximum struct, so an identity
+/// override (value == maximum) resolves EQUAL to the maximum: the sibling
+/// map-size trap is structurally inexpressible against the full-struct
+/// `PartialEq` this helper uses.
+pub fn resolve_bounds(nested: Option<&Bounds>) -> Bounds {
+    match nested {
+        None => Bounds::maximum(),
+        Some(b) => *b,
+    }
+}
+
+/// The nested-bounds pin (reference `{:ok, ^bounds} <- Bounds.coerce(x.bounds)`,
+/// anchored_export_codec.ex:352-354/:404-406): a present nested bounds must
+/// equal the outer; an absent nested is valid only when the outer is
+/// effectively maximum (identity overrides are NOT tightening — struct
+/// equality against the maximum, the semantics the siblings' cross-vendor
+/// finding corrected).
+pub fn require_bounds_equal(nested: Option<&Bounds>, outer: &Bounds) -> Result<()> {
+    match nested {
+        Some(b) => {
+            if b != outer {
+                return Err(Invalid);
+            }
+            Ok(())
+        }
+        None => {
+            if *outer != Bounds::maximum() {
+                return Err(Invalid);
+            }
+            Ok(())
+        }
+    }
+}
+
 /// Full signed-field match of a parsed anchor against its expected values
 /// (reference `anchor_matches?`, anchored_export_codec.ex:485-492 — all seven
 /// fields).
@@ -1697,7 +1747,16 @@ pub fn verify_anchored_export(
     keys: &HistoricalKeyChain,
     expected: &ExpectedAnchoredExport,
 ) -> Result<AnchoredExportFacts> {
-    let bounds = Bounds::maximum();
+    let bounds = resolve_bounds(expected.bounds.as_ref());
+
+    // The nested-bounds pins at verify (validate_expected_anchored_export :387
+    // -> validate_expected_export :352-354/:404-406).
+    require_bounds_equal(expected.chain.bounds.as_ref(), &bounds)?;
+    require_bounds_equal(expected.start_anchor.bounds.as_ref(), &bounds)?;
+    require_bounds_equal(expected.end_anchor.bounds.as_ref(), &bounds)?;
+    for t in &expected.transitions {
+        require_bounds_equal(t.bounds.as_ref(), &bounds)?;
+    }
 
     // Static expected-side bindings (reference validate_expected_anchored_export
     // → validate_expected_export, anchored_export_codec.ex:362-371, reached at
@@ -1870,7 +1929,13 @@ pub fn verify_anchored_export(
     // Re-check every row (canonical re-encode, predecessor links, genesis,
     // sequence, count, head — reused from Façade B).
     let chain_input = ChainInput { rows };
-    check_chain(&chain_input, &expected.chain)?;
+    check_chain(
+        &chain_input,
+        &ExpectedChain {
+            bounds: Some(bounds),
+            ..expected.chain.clone()
+        },
+    )?;
 
     Ok(AnchoredExportFacts {
         chain_id: header.chain_id,
@@ -4212,6 +4277,7 @@ mod tests {
             row_count: 1,
             previous_hash: [0u8; 32],
             head_hash: hash, // honest head; the canonical check fires first
+            bounds: None,
         };
         assert_eq!(check_chain(&input, &expected), Err(Invalid));
     }
@@ -4230,6 +4296,7 @@ mod tests {
             row_count: 1,
             previous_hash: [0u8; 32],
             head_hash: [0u8; 32],
+            bounds: None,
         };
         assert_eq!(check_chain(&input, &expected), Err(Invalid));
     }
@@ -4261,6 +4328,7 @@ mod tests {
             row_count: 2,
             previous_hash: [0u8; 32],
             head_hash: hash0, // the link check fires before the head check
+            bounds: None,
         };
         assert_ne!(
             [9u8; 32], hash0,
@@ -4342,6 +4410,7 @@ mod tests {
                 row_count: input["row_count"].as_i64().unwrap_or(0),
                 previous_hash: b64url_to_32(&input["previous_hash"]).unwrap_or([0u8; 32]),
                 head_hash: b64url_to_32(&input["last_hash"]).unwrap_or([0u8; 32]),
+                bounds: None,
             };
             let result = check_chain(&chain_input, &expected);
             let agree = match (expected_verdict, &result) {
@@ -4850,6 +4919,7 @@ mod tests {
             key_fingerprint: b64url_to_32(&v["key_fingerprint"]).expect("32-byte fp"),
             key_id: v["key_id"].as_str().unwrap().to_string(),
             sequence: v["sequence"].as_i64().unwrap(),
+            bounds: None,
         }
     }
 
@@ -4863,6 +4933,7 @@ mod tests {
             next_key_fingerprint: b64url_to_32(&v["next_key_fingerprint"]).expect("32"),
             next_key_id: v["next_key_id"].as_str().unwrap().to_string(),
             transition_id: v["transition_id"].as_str().unwrap().to_string(),
+            bounds: None,
         }
     }
 
@@ -4876,6 +4947,7 @@ mod tests {
             row_count: v["row_count"].as_i64().unwrap(),
             previous_hash: b64url_to_32(&v["previous_hash"]).expect("32"),
             head_hash: b64url_to_32(&v["last_hash"]).expect("32"),
+            bounds: None,
         }
     }
 
@@ -4893,6 +4965,7 @@ mod tests {
                 .map(expected_transition_from)
                 .collect(),
             object_version: exp["object_version"].as_str().unwrap().to_string(),
+            bounds: None,
         }
     }
 
@@ -5058,6 +5131,7 @@ mod tests {
                 .as_str()
                 .unwrap()
                 .to_string(),
+            bounds: None,
         };
         let encoded = encode_anchored_export(&anchored_input, &expected).expect("encodes");
         let exp = &case["expected"];
@@ -5108,6 +5182,7 @@ mod tests {
                 .as_str()
                 .unwrap()
                 .to_string(),
+            bounds: None,
         };
         assert_eq!(
             encode_anchored_export(&anchored_input, &expected),
@@ -5470,6 +5545,7 @@ mod tests {
                     .as_str()
                     .unwrap()
                     .to_string(),
+                bounds: None,
             };
             let result = encode_anchored_export(&anchored_input, &expected);
             let agree = match (expected_verdict, &result) {

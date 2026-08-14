@@ -224,6 +224,7 @@ fn expected_anchor_from(v: &serde_json::Value) -> ExpectedAnchor {
         key_fingerprint: b64url_to_32(&v["key_fingerprint"]).expect("32-byte fp"),
         key_id: v["key_id"].as_str().unwrap().to_string(),
         sequence: v["sequence"].as_i64().unwrap(),
+        bounds: None,
     }
 }
 
@@ -236,6 +237,7 @@ fn expected_transition_from(v: &serde_json::Value) -> ExpectedKeyTransition {
         next_key_fingerprint: b64url_to_32(&v["next_key_fingerprint"]).expect("32"),
         next_key_id: v["next_key_id"].as_str().unwrap().to_string(),
         transition_id: v["transition_id"].as_str().unwrap().to_string(),
+        bounds: None,
     }
 }
 
@@ -247,6 +249,7 @@ fn expected_chain_from(v: &serde_json::Value) -> ExpectedChain {
         row_count: v["row_count"].as_i64().unwrap(),
         previous_hash: b64url_to_32(&v["previous_hash"]).expect("32"),
         head_hash: b64url_to_32(&v["last_hash"]).expect("32"),
+        bounds: None,
     }
 }
 
@@ -263,6 +266,7 @@ fn expected_anchored_export_from(exp: &serde_json::Value) -> ExpectedAnchoredExp
             .map(expected_transition_from)
             .collect(),
         object_version: exp["object_version"].as_str().unwrap().to_string(),
+        bounds: None,
     }
 }
 
@@ -704,6 +708,7 @@ fn d_check_chain(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
         row_count: input["row_count"].as_i64().unwrap_or(0),
         previous_hash: b64url_to_32(&input["previous_hash"]).unwrap_or([0u8; 32]),
         head_hash: b64url_to_32(&input["last_hash"]).unwrap_or([0u8; 32]),
+        bounds: None,
     };
     match bap::check_chain(&chain_input, &expected) {
         Ok(facts) => match expected_verdict {
@@ -894,6 +899,7 @@ fn d_encode_anchored_export(case: &serde_json::Value, _census: &mut KeyCensus) -
             .as_str()
             .unwrap()
             .to_string(),
+        bounds: None,
     };
     match bap::encode_anchored_export(&anchored_input, &expected) {
         Ok(encoded) => match expected_verdict {
