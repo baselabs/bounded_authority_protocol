@@ -29,8 +29,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
   transition, the verify-pin family on a REAL corpus-signed archive, and the two
   encode-pin isolations; the standalone anchor leg, the chunk-count MAGIC pin now reachable and landed, and a 7/7
   Elixir oracle receipt (local re-runnable .forge artifact). `assemble_compact` stays at maximum
-  (the siblings too). (The 2026-08-14 zero-residuals direction is process history; the closure
-  stands on the evidence in this entry.)
+  (the siblings too). (Scope driver: the 2026-08-14 session direction — the session's input,
+  not this entry's verdict.)
 
 - **TypeScript + Python encode-path validation parity (BAP-15).** Both sibling SDKs gain the
   same producer contract the Rust SDK just closed: a full `checkChain` re-check of the rows, and
