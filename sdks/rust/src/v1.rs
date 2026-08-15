@@ -1895,12 +1895,14 @@ pub fn verify_anchored_export(
     {
         return Err(Invalid);
     }
-    if keys.keys.len() as u64 != expected.transitions.len() as u64 + 1 {
-        return Err(Invalid);
-    }
-    // Key ID/public-key shape before the digest (round 14).
+    // (the key-count gate ran earlier — the 1813 check; this dup removed round 15.)
+    // Key ID/public-key shape + the reference's ASCII-unreserved class before
+    // the digest (rounds 14-15).
     for k in &keys.keys {
         if k.key_id.is_empty() || k.key_id.len() as u64 > bounds.kid_bytes() {
+            return Err(Invalid);
+        }
+        if !k.key_id.is_ascii() || !k.key_id.bytes().all(is_kid_byte) {
             return Err(Invalid);
         }
         if k.public_key.len() != 32 {
