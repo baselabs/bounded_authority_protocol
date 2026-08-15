@@ -1615,6 +1615,13 @@ def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str
     anchored_export_codec.ex:40-42/:485-492). Encode never verifies a signature
     (a producer, not an authority) — it mirrors the reference's structural gates
     (width, canonical form) and the signed-field match."""
+    # The reference codec bounds every anchor compact at anchor_bytes
+    # (boundary_anchor_codec.ex:82) — stricter than parse_compact's whole-input
+    # compact_bytes ceiling; without it the producer mints archives its own
+    # verifier rejects at the frame read (cross-vendor round 2, the sibling fix
+    # this helper had missed).
+    if len(compact) > bounds_resolve(b, "anchor_bytes"):
+        fail(f"encode_anchored_export: {which} anchor anchor_bytes")
     seg = parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != expected.key_id:
@@ -1644,6 +1651,10 @@ def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str
 def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition, i: int, b: Bounds) -> None:
     """Gated parse + full 7-field match of a transition compact (reference
     KeyTransitionCodec.parse + transition_matches?, anchored_export_codec.ex:443-504)."""
+    # Same anchor_bytes ceiling the reference enforces on transitions
+    # (key_transition_codec.ex:114).
+    if len(compact) > bounds_resolve(b, "anchor_bytes"):
+        fail(f"encode_anchored_export: transition {i} anchor_bytes")
     seg = parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != expected.current_key_id:
