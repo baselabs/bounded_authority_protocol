@@ -1084,6 +1084,11 @@ def check_chain(chain: ChainInput, expected: ExpectedChain) -> Result[ChainFacts
 
 
 def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
+    # Expected-side chain integers type-strict (cross-vendor round 14: Python
+    # 1 == True wrong-accepted row_count=True where TS/Rust reject).
+    _expected_int(expected.first_sequence, "check_chain: first_sequence type")
+    _expected_int(expected.last_sequence, "check_chain: last_sequence type")
+    _expected_int(expected.row_count, "check_chain: row_count type")
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (consumption_chain.ex
     # check_chain) and threads it into the row-count bound + every parse_row (chain_row_bytes). A
     # caller tightening via expected.bounds now takes effect.
@@ -1586,14 +1591,6 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     return EncodedAnchoredExport(archive=archive, digest=sha256(archive))
 
 
-def _expected_time(v: object, ctx: str) -> int:
-    """Type-strict INTEGRAL time (cross-vendor: Python ``1 == True`` and floats
-    pass ``abs()`` comparisons; the reference's valid_time? demands an integer)."""
-    if not isinstance(v, int) or isinstance(v, bool):
-        fail(ctx)
-    return v
-
-
 def _expected_int(v: object, ctx: str) -> int:
     """Type-strict expected-side integer (cross-vendor round 2: Python ``1 == True``,
     so an untyped boolean expected field would equal a decoded 0/1 at the match)."""
@@ -1617,8 +1614,8 @@ def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str
     (width, canonical form) and the signed-field match."""
     # The reference codec bounds every anchor compact at anchor_bytes
     # (boundary_anchor_codec.ex:82) — stricter than parse_compact's whole-input
-    # compact_bytes ceiling (encode AND the standalone verify share this helper
-    # path; the context disambiguates in the failure message).
+    # compact_bytes ceiling. (The ENCODE path only — the standalone verify has
+    # its own gates.)
     if len(compact) > bounds_resolve(b, "anchor_bytes"):
         fail(f"encode_anchored_export: {which} anchor anchor_bytes")
     seg = parse_compact(compact, b)
@@ -1765,9 +1762,9 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
     # round 12: the encode helper's check does not run on this path).
     if len(compact) > bounds_resolve(b, "anchor_bytes"):
         fail("verify_historical_anchor: anchor_bytes")
-    _vf = _expected_time(key.valid_from, "verify_historical_anchor: valid_from type")
+    _vf = _expected_int(key.valid_from, "verify_historical_anchor: valid_from type")
     _vb = (
-        _expected_time(key.valid_before, "verify_historical_anchor: valid_before type")
+        _expected_int(key.valid_before, "verify_historical_anchor: valid_before type")
         if key.valid_before is not None
         else None
     )
@@ -1792,7 +1789,7 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
     if anchor_id != expected.anchor_id:
         fail("verify_historical_anchor: anchor_id")
     anchored_at = _require_int(p.v.get("anchored_at"), "anchored_at")
-    if anchored_at != _expected_time(
+    if anchored_at != _expected_int(
         expected.anchored_at, "verify_historical_anchor: anchored_at type"
     ):
         fail("verify_historical_anchor: anchored_at")
@@ -1800,7 +1797,7 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
     if chain_id != expected.chain_id:
         fail("verify_historical_anchor: chain_id")
     sequence = _require_int(p.v.get("sequence"), "sequence")
-    if sequence != _expected_time(
+    if sequence != _expected_int(
         expected.sequence, "verify_historical_anchor: sequence type"
     ):
         fail("verify_historical_anchor: sequence")
@@ -1844,15 +1841,15 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
     # (key_transition_codec.ex:114 — cross-vendor round 12).
     if len(compact) > bounds_resolve(b, "anchor_bytes"):
         fail("verify_key_transition: anchor_bytes")
-    _ovf = _expected_time(old_key.valid_from, "verify_key_transition: valid_from type")
-    _nvf = _expected_time(new_key.valid_from, "verify_key_transition: valid_from type")
+    _ovf = _expected_int(old_key.valid_from, "verify_key_transition: valid_from type")
+    _nvf = _expected_int(new_key.valid_from, "verify_key_transition: valid_from type")
     _ovb = (
-        _expected_time(old_key.valid_before, "verify_key_transition: valid_before type")
+        _expected_int(old_key.valid_before, "verify_key_transition: valid_before type")
         if old_key.valid_before is not None
         else None
     )
     _nvb = (
-        _expected_time(new_key.valid_before, "verify_key_transition: valid_before type")
+        _expected_int(new_key.valid_before, "verify_key_transition: valid_before type")
         if new_key.valid_before is not None
         else None
     )
@@ -1882,7 +1879,7 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
     if chain_id != expected.chain_id:
         fail("verify_key_transition: chain_id")
     effective_at = _require_int(p.v.get("effective_at"), "effective_at")
-    if effective_at != _expected_time(
+    if effective_at != _expected_int(
         expected.effective_at, "verify_key_transition: effective_at type"
     ):
         fail("verify_key_transition: effective_at")
@@ -1933,9 +1930,17 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # force processing of the full archive).
     if len(key_chain.keys) != len(expected.transitions) + 1:
         fail("verify_anchored_export: key count bound")
+    # Key ID/public-key SHAPE before the digest (cross-vendor round 14: an
+    # oversized key ID reached the SHA-256 call in a live probe — the window
+    # gates alone were incomplete pre-hash validation).
     for _k in key_chain.keys:
-        _vf0 = _expected_time(_k.valid_from, "verify_anchored_export: key valid_from type")
-        _vbv0 = _expected_time(_k.valid_before, "verify_anchored_export: key valid_before type") if _k.valid_before is not None else None
+        if not isinstance(_k.key_id, str) or not _k.key_id or len(_k.key_id.encode("utf-8")) > bounds_resolve(_vb0, "kid_bytes"):
+            fail("verify_anchored_export: key id shape")
+        if not isinstance(_k.public_key, (bytes, bytearray)) or len(_k.public_key) != 32:
+            fail("verify_anchored_export: key width")
+    for _k in key_chain.keys:
+        _vf0 = _expected_int(_k.valid_from, "verify_anchored_export: key valid_from type")
+        _vbv0 = _expected_int(_k.valid_before, "verify_anchored_export: key valid_before type") if _k.valid_before is not None else None
         _mag0 = bounds_resolve(_vb0, "integer_magnitude")
         if abs(_vf0) > _mag0:
             fail("verify_anchored_export: key valid_from magnitude")
@@ -2117,8 +2122,8 @@ def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: E
     b = bounds if bounds is not None else (expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     # Key-window endpoints: integral + magnitude-bounded (the standalone path's
     # gates — cross-vendor round 7: the archive path skipped them).
-    _vf = _expected_time(key.valid_from, f"{ctx}: valid_from type")
-    _vb = _expected_time(key.valid_before, f"{ctx}: valid_before type") if key.valid_before is not None else None
+    _vf = _expected_int(key.valid_from, f"{ctx}: valid_from type")
+    _vb = _expected_int(key.valid_before, f"{ctx}: valid_before type") if key.valid_before is not None else None
     _mag = bounds_resolve(b, "integer_magnitude")
     if abs(_vf) > _mag:
         fail(f"{ctx}: valid_from magnitude")
@@ -2140,7 +2145,7 @@ def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: E
     if anchor_id != expected.anchor_id:
         fail(f"{ctx}: anchor_id")
     anchored_at = _require_int(p.v.get("anchored_at"), "anchored_at")
-    if anchored_at != _expected_time(
+    if anchored_at != _expected_int(
         expected.anchored_at, f"{ctx}: anchored_at type"
     ):
         fail(f"{ctx}: anchored_at")
@@ -2148,7 +2153,7 @@ def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: E
     if chain_id != expected.chain_id:
         fail(f"{ctx}: chain_id")
     sequence = _require_int(p.v.get("sequence"), "sequence")
-    if sequence != _expected_time(
+    if sequence != _expected_int(
         expected.sequence, f"{ctx}: sequence type"
     ):
         fail(f"{ctx}: sequence")
@@ -2180,10 +2185,10 @@ def _verify_transition_compact(compact: bytes, current_key: HistoricalPublicKey,
     b = bounds if bounds is not None else (expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     # Key-window endpoints: integral + magnitude-bounded for BOTH keys (the
     # standalone path's gates — cross-vendor round 7).
-    _ovf = _expected_time(current_key.valid_from, f"{ctx}: valid_from type")
-    _nvf = _expected_time(next_key.valid_from, f"{ctx}: valid_from type")
-    _ovb = _expected_time(current_key.valid_before, f"{ctx}: valid_before type") if current_key.valid_before is not None else None
-    _nvb = _expected_time(next_key.valid_before, f"{ctx}: valid_before type") if next_key.valid_before is not None else None
+    _ovf = _expected_int(current_key.valid_from, f"{ctx}: valid_from type")
+    _nvf = _expected_int(next_key.valid_from, f"{ctx}: valid_from type")
+    _ovb = _expected_int(current_key.valid_before, f"{ctx}: valid_before type") if current_key.valid_before is not None else None
+    _nvb = _expected_int(next_key.valid_before, f"{ctx}: valid_before type") if next_key.valid_before is not None else None
     _mag = bounds_resolve(b, "integer_magnitude")
     if abs(_ovf) > _mag or abs(_nvf) > _mag:
         fail(f"{ctx}: valid_from magnitude")
@@ -2210,7 +2215,7 @@ def _verify_transition_compact(compact: bytes, current_key: HistoricalPublicKey,
     if chain_id != expected.chain_id:
         fail(f"{ctx}: chain_id")
     effective_at = _require_int(p.v.get("effective_at"), "effective_at")
-    if effective_at != _expected_time(
+    if effective_at != _expected_int(
         expected.effective_at, f"{ctx}: effective_at type"
     ):
         fail(f"{ctx}: effective_at")

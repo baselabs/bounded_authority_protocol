@@ -1884,17 +1884,29 @@ pub fn verify_anchored_export(
     // incremental SHA-256 over each chunk, no concat). A huge inauthentic
     // archive fails this compare before the buf is allocated, so the materialize
     // step below runs only for digest-matching (caller-legitimate) archives.
-    // Version shape + key-count BEFORE the digest (cross-vendor round 12:
-    // malformed metadata should not force maximum-sized hashing — the
-    // reference validates both before chunk processing, :91).
+    // Version shape + EQUALITY + key-count + key shape BEFORE the digest
+    // (cross-vendor rounds 12-14: malformed metadata should not force
+    // maximum-sized hashing — the reference validates at :91/:101-104).
     if obj.version.is_empty()
         || obj.version.len() as u64 > bounds.object_version_bytes()
         || expected.object_version.is_empty()
         || expected.object_version.len() as u64 > bounds.object_version_bytes()
+        || obj.version != expected.object_version
     {
         return Err(Invalid);
     }
-    // (the key-count gate ran before the digest — round 12.)
+    if keys.keys.len() as u64 != expected.transitions.len() as u64 + 1 {
+        return Err(Invalid);
+    }
+    // Key ID/public-key shape before the digest (round 14).
+    for k in &keys.keys {
+        if k.key_id.is_empty() || k.key_id.len() as u64 > bounds.kid_bytes() {
+            return Err(Invalid);
+        }
+        if k.public_key.len() != 32 {
+            return Err(Invalid);
+        }
+    }
 
     let mut hasher = Sha256::new();
     for c in chunks {
@@ -1906,12 +1918,7 @@ pub fn verify_anchored_export(
         return Err(Invalid);
     }
 
-    // Out-of-band object-store version exact equality (after the digest, before
-    // the byte stream is materialized).
-    // (the version-shape gate ran before the digest — round 12.)
-    if obj.version != expected.object_version {
-        return Err(Invalid);
-    }
+    // (the version gates ran before the digest — rounds 12-14.)
 
     // Materialize the byte stream for the magic check + incremental frame scan.
     let mut buf = Vec::with_capacity(total as usize);

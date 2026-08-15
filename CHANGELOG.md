@@ -24,7 +24,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
   semantics (a present nested must coerce-equal the outer; an absent nested is valid only under
   an effectively-untightened outer — identity overrides are NOT tightening), and the resolved
   bounds threaded through every ceiling at encode AND verify + the standalone chain/anchor/
-  transition entries. 27 mutation-proven legs at closeout (permissiveness 39 → 66 — the original 12 plus
+  transition entries. 27 mutation-proven legs at closeout (permissiveness 39 → 67 — the original 12 plus
   the five the four closeout lenses forced: the chain_rows count, the standalone
   transition, the verify-pin family on a REAL corpus-signed archive, and the two
   encode-pin isolations; the standalone anchor leg, the chunk-count MAGIC pin now reachable and landed, and a 7/7

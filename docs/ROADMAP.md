@@ -611,7 +611,7 @@ the reference threads caller limits there too (runtime.ex:147-151) — a
 disclosed open divergence awaiting the user's direction
 (`b4ca616`): five `Option<Bounds>` fields, the nested pins
 with identity semantics, threading at encode/verify/standalone, the chunk-count magic pin,
-27 mutation-proven legs at closeout (permissiveness 66), a 7/7 Elixir oracle receipt (scope driver: the 2026-08-14 session direction — recorded here as the
+27 mutation-proven legs at closeout (permissiveness 67), a 7/7 Elixir oracle receipt (scope driver: the 2026-08-14 session direction — recorded here as the
 session's input, not as this record's verdict). The Go SDK (BAP-16) picks the whole contract up at authoring.
 
 ## BAP-17 closeout evidence
