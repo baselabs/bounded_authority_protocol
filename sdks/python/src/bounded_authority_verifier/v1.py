@@ -2392,15 +2392,15 @@ def _validate_key_path(
 
 
 def _validate_chunks(chunks: Sequence[bytes], bounds: Bounds = MAXIMUM_BOUNDS) -> None:
+    """Validate the chunk list BEFORE concatenation (anchored_export_codec.ex:333-342
+    validate_chunks): at least one chunk, each chunk nonempty, count < archive_chunks, running total
+    ≤ archive_bytes."""
     # Chunk elements must be bytes-like (cross-vendor round 17: a str chunk
     # passed the len gate then raised TypeError at the hash — the escape class
     # the adjacent gates close).
     for _c in chunks:
         if not isinstance(_c, (bytes, bytearray)):
             fail("verify_anchored_export: chunk type")
-    """Validate the chunk list BEFORE concatenation (anchored_export_codec.ex:333-342
-    validate_chunks): at least one chunk, each chunk nonempty, count < archive_chunks, running total
-    ≤ archive_bytes."""
     if len(chunks) == 0:
         fail("archive: no chunks")
     # Cross-vendor re-review Finding 2: the reference's validate_chunks guard is

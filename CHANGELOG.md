@@ -27,6 +27,16 @@ All notable changes to `bounded_authority_protocol` are documented here.
   (Python's UnicodeEncodeError escape closed; TS's silent U+FFFD replacement closed), and
   frame reads are role-bounded per chain_row_bytes/anchor_bytes.
 
+- **Result-contract fail-closure + ChainInput type strictness (BAP-15, cross-vendor rounds 16-17).**
+  Every path where a caller-supplied Python value could raise out of the closed Result API
+  now fails closed instead: ill-formed or non-str identifier strings (`_utf8_bytes` gates
+  chain_ids, key_ids, versions, and every expected-side string the header construction
+  encodes), non-int chain integers (gated before the sequence arithmetic), non-bytes chunk
+  elements, and Boolean ChainInput integers (True == 1 no longer verifies — TS's strict
+  equality and Rust's typing already rejected them). The TS chunk-type sibling gate added
+  for family symmetry; the check_chain chain_id StringOrURI shape validation that only
+  Rust carried is now in all three SDKs.
+
 - **Rust SDK bounds parity (BAP-15; closes the LAST named delta).** Caller-tightenable
   bounds through the expected structs — the exact reference/sibling shape: five additive
   `Option<Bounds>` fields (None = the profile maximum), the nested-bounds pins with identity
