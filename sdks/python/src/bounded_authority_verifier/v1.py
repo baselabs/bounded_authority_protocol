@@ -1617,13 +1617,10 @@ def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str
     (width, canonical form) and the signed-field match."""
     # The reference codec bounds every anchor compact at anchor_bytes
     # (boundary_anchor_codec.ex:82) — stricter than parse_compact's whole-input
-    # compact_bytes ceiling; without it the producer mints archives its own
-    # verifier rejects at the frame read (cross-vendor round 2, the sibling fix
-    # this helper had missed).
+    # compact_bytes ceiling (encode AND the standalone verify share this helper
+    # path; the context disambiguates in the failure message).
     if len(compact) > bounds_resolve(b, "anchor_bytes"):
         fail(f"encode_anchored_export: {which} anchor anchor_bytes")
-    if len(compact) > bounds_resolve(b, "anchor_bytes"):
-        fail("verify_historical_anchor: anchor_bytes")
     seg = parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != expected.key_id:
@@ -1657,8 +1654,6 @@ def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition,
     # (key_transition_codec.ex:114).
     if len(compact) > bounds_resolve(b, "anchor_bytes"):
         fail(f"encode_anchored_export: transition {i} anchor_bytes")
-    if len(compact) > bounds_resolve(b, "anchor_bytes"):
-        fail("verify_key_transition: anchor_bytes")
     seg = parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != expected.current_key_id:
@@ -1765,6 +1760,11 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
     # Key-window endpoints magnitude-bounded under the resolved bounds
     # (context_validation.ex valid_time? — the Rust round-4 parity fix; without
     # this the SDKs diverge on in-window times with out-of-magnitude windows).
+    # The anchor_bytes compact ceiling at the STANDALONE verify entry (the
+    # reference's parse guard, boundary_anchor_codec.ex:81-82 — cross-vendor
+    # round 12: the encode helper's check does not run on this path).
+    if len(compact) > bounds_resolve(b, "anchor_bytes"):
+        fail("verify_historical_anchor: anchor_bytes")
     _vf = _expected_time(key.valid_from, "verify_historical_anchor: valid_from type")
     _vb = (
         _expected_time(key.valid_before, "verify_historical_anchor: valid_before type")
@@ -1840,6 +1840,10 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
     # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check.
     b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     # Key-window endpoints magnitude-bounded (both keys — the Rust parity).
+    # The anchor_bytes compact ceiling at the STANDALONE verify entry
+    # (key_transition_codec.ex:114 — cross-vendor round 12).
+    if len(compact) > bounds_resolve(b, "anchor_bytes"):
+        fail("verify_key_transition: anchor_bytes")
     _ovf = _expected_time(old_key.valid_from, "verify_key_transition: valid_from type")
     _nvf = _expected_time(new_key.valid_from, "verify_key_transition: valid_from type")
     _ovb = (
@@ -1975,6 +1979,13 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     _require_bounds_equal(expected.end_anchor.bounds, b, "verify_anchored_export: end anchor bounds")
     for ti, texp in enumerate(expected.transitions):
         _require_bounds_equal(texp.bounds, b, f"verify_anchored_export: transition {ti} bounds")
+    # Version shape (UTF-8 BYTES, the reference byte_size) + equality BEFORE the
+    # digest (cross-vendor round 12: malformed metadata should not force
+    # maximum-sized hashing).
+    if not isinstance(archived.version, str) or not archived.version or len(archived.version.encode("utf-8")) > bounds_resolve(b, "object_version_bytes") or not expected.object_version or len(expected.object_version.encode("utf-8")) > bounds_resolve(b, "object_version_bytes"):
+        fail("verify_anchored_export: version shape")
+    if archived.version != expected.object_version:
+        fail("verify_anchored_export: object version")
     # Validate the chunk list BEFORE concatenation (mirrors anchored_export_codec.ex:101-102,333-342
     # validate_chunks): each chunk nonempty, count < archive_chunks, total ≤ archive_bytes. Hashing
     # happens after the shape is validated.
@@ -1987,10 +1998,7 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     digest = sha256(*archived.chunks)
     if not _bytes_equal(digest, expected.digest):
         fail("verify_anchored_export: digest")
-    if not isinstance(archived.version, str) or not archived.version or len(archived.version) > bounds_resolve(b, "object_version_bytes") or not expected.object_version or len(expected.object_version) > bounds_resolve(b, "object_version_bytes"):
-        fail("verify_anchored_export: version shape")
-    if archived.version != expected.object_version:
-        fail("verify_anchored_export: object version")
+    # (the version SHAPE + equality gates ran before the digest — round 12.)
     # Materialize for parsing ONLY after the digest matches (caller-legitimate, bounded archive).
     archive = b"".join(archived.chunks)
     if len(archive) <= len(ARCHIVE_PREFIX):

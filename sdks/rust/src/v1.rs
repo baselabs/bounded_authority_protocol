@@ -1810,7 +1810,7 @@ pub fn verify_anchored_export(
 
     // Key-count ceiling BEFORE the per-key window walk (cross-vendor: the walk
     // previously consumed the entire caller chain before keys == transitions + 1).
-    if keys.keys.len() as u64 > bounds.key_transitions() as u64 + 1 {
+    if keys.keys.len() as u64 != expected.transitions.len() as u64 + 1 {
         return Err(Invalid);
     }
     // Key-window validity BEFORE chunk processing/hashing (the reference
@@ -1884,6 +1884,20 @@ pub fn verify_anchored_export(
     // incremental SHA-256 over each chunk, no concat). A huge inauthentic
     // archive fails this compare before the buf is allocated, so the materialize
     // step below runs only for digest-matching (caller-legitimate) archives.
+    // Version shape + key-count BEFORE the digest (cross-vendor round 12:
+    // malformed metadata should not force maximum-sized hashing — the
+    // reference validates both before chunk processing, :91).
+    if obj.version.is_empty()
+        || obj.version.len() as u64 > bounds.object_version_bytes()
+        || expected.object_version.is_empty()
+        || expected.object_version.len() as u64 > bounds.object_version_bytes()
+    {
+        return Err(Invalid);
+    }
+    if keys.keys.len() as u64 != expected.transitions.len() as u64 + 1 {
+        return Err(Invalid);
+    }
+
     let mut hasher = Sha256::new();
     for c in chunks {
         hasher.update(c);
