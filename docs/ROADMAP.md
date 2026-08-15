@@ -614,6 +614,30 @@ with identity semantics, threading at encode/verify/standalone, the chunk-count 
 27 mutation-proven legs at closeout (permissiveness 67), a 7/7 Elixir oracle receipt (scope driver: the 2026-08-14 session direction — recorded here as the
 session's input, not as this record's verdict). The Go SDK (BAP-16) picks the whole contract up at authoring.
 
+**2026-08-14 amendment #3 — the cross-vendor hardening arc + the terminal range state
+(`a4deac2..06c9f82`).** The bounds-parity landing was followed by **17 dispatched cross-vendor
+rounds (codex + claude, the mandatory zcode T2 lens) plus delta-reviews between fix clusters**.
+Every named BLOCKING finding was fixed in-slice — the arc's user-facing fixes are the CHANGELOG
+rows above: nested-bounds pins + identity semantics (rounds 2-5), compact-bytes ceilings +
+key-window magnitude/ordering gates (rounds 4-10), the complete pre-hash validation family
+(version shape/equality, key count, key-id ASCII class, chunk typing — rounds 11-15), the
+Result-contract fail-closure + ChainInput type strictness (rounds 16-17). No confirmed-real
+finding is parked. **Terminal state, recorded per the bound-the-review-recursion rule:** the last
+cross-vendor receipt binds `a4deac2..8c5d0f4` (round 17's dispatch range); the round-17 fix
+(`226e847`) and the delta-4 reconciliation (`06c9f82`) trail that receipt — a source fix advances
+HEAD and re-invalidates the range receipt, and re-cross-vendoring one's own fix of its findings is
+the forbidden unbounded regress. The trailing deltas carry delta-review coverage instead: round-16
+delta + delta-4, both reconciled (delta-4's F2/F3/F4 fixed; its F1 ROUTED to the user — see the
+residual below). Full battery green at `06c9f82`: Rust `cargo test --locked` 338 unit + 5 + 67
+permissiveness, conformance `agreed=283`; TS 114 unit + 283/283; Python 86 unit + 283/283; all
+floors clean (fmt/clippy `-D warnings`, mypy, ruff, tsc). **Named residuals (routed, not parked):**
+(1) **F1 test debt** — the round-12..17 gates ship with zero per-clause red-capable battery legs;
+every gate is proven load-bearing (the delta-4 mutation probe shows each round-15 defect re-emerges
+when its gate is removed) but a full revert of the gate cluster still passes the SDK battery green —
+the per-leg pins are owed as a user-directed follow-up; (2) `assemble_compact` stays at
+maximum-bounds in all three SDKs (amendment #2's disclosed divergence); (3) the Go SDK (BAP-16) is
+un-started and picks the whole accumulated contract up at authoring.
+
 ## BAP-17 closeout evidence
 
 - **Slice:** `bap-17-offline-grant-format` (reserve + specify). **Activation decision (user,
