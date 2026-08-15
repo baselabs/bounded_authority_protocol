@@ -607,8 +607,8 @@ proven red-capable — the five pin legs each isolated under their named mutatio
 threading leg joint-by-construction per the settled diff-review record). **The SDK-wide
 maximum-bounds delta is CLOSED for the archive façades** (`b4ca616`); ONE named
 residual remains: `assemble_compact` stays at maximum in all three SDKs while
-the reference threads caller limits there too (runtime.ex:147-151) — an
-accepted, disclosed divergence, pending the user's explicit direction
+the reference threads caller limits there too (runtime.ex:147-151) — a
+disclosed open divergence awaiting the user's direction
 (`b4ca616`): five `Option<Bounds>` fields, the nested pins
 with identity semantics, threading at encode/verify/standalone, the chunk-count magic pin,
 27 mutation-proven legs at closeout (permissiveness 66), a 7/7 Elixir oracle receipt (scope driver: the 2026-08-14 session direction — recorded here as the
