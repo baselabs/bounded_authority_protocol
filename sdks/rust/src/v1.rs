@@ -1808,6 +1808,11 @@ pub fn verify_anchored_export(
         require_bounds_equal(t.bounds.as_ref(), &bounds)?;
     }
 
+    // Key-count ceiling BEFORE the per-key window walk (cross-vendor: the walk
+    // previously consumed the entire caller chain before keys == transitions + 1).
+    if keys.keys.len() as u64 > bounds.key_transitions() as u64 + 1 {
+        return Err(Invalid);
+    }
     // Key-window validity BEFORE chunk processing/hashing (the reference
     // validates key shapes at :91 before validate_chunks — malformed intervals
     // should not force processing of the full archive).
@@ -1871,9 +1876,8 @@ pub fn verify_anchored_export(
     if total < ARCHIVE_MAGIC.len() as u64 {
         return Err(Invalid);
     }
-    if obj.version.len() as u64 > bounds.object_version_bytes() {
-        return Err(Invalid);
-    }
+    // (the full version shape gate — non-empty, ≤ object_version_bytes, both
+    // sides — runs at the compare below; cross-vendor round 11.)
 
     // Stream the digest over the chunks WITHOUT materializing the whole archive
     // first (reference hash_chunks, anchored_export_codec.ex:705-714 —
@@ -1892,6 +1896,13 @@ pub fn verify_anchored_export(
 
     // Out-of-band object-store version exact equality (after the digest, before
     // the byte stream is materialized).
+    if obj.version.is_empty()
+        || obj.version.len() as u64 > bounds.object_version_bytes()
+        || expected.object_version.is_empty()
+        || expected.object_version.len() as u64 > bounds.object_version_bytes()
+    {
+        return Err(Invalid);
+    }
     if obj.version != expected.object_version {
         return Err(Invalid);
     }
@@ -1910,7 +1921,7 @@ pub fn verify_anchored_export(
     // Incremental frame scan.
     let mut cursor = ARCHIVE_MAGIC.len();
     let header_frame = read_frame(&buf, &mut cursor)?;
-    let start_anchor_compact = read_frame(&buf, &mut cursor)?;
+    let start_anchor_compact = read_frame_bounded(&buf, &mut cursor, bounds.anchor_bytes())?;
     let header = decode_archive_header(header_frame, &bounds)?;
 
     // Header's closed claims == caller's chain boundaries + transition count.
@@ -1932,9 +1943,9 @@ pub fn verify_anchored_export(
     }
     let mut rows: Vec<Vec<u8>> = Vec::with_capacity(header.row_count as usize);
     for _ in 0..header.row_count {
-        rows.push(read_frame(&buf, &mut cursor)?.to_vec());
+        rows.push(read_frame_bounded(&buf, &mut cursor, bounds.chain_row_bytes())?.to_vec());
     }
-    let end_anchor_compact = read_frame(&buf, &mut cursor)?;
+    let end_anchor_compact = read_frame_bounded(&buf, &mut cursor, bounds.anchor_bytes())?;
     // Exact EOF — nothing follows the end-anchor frame.
     if cursor != buf.len() {
         return Err(Invalid);
@@ -2448,6 +2459,18 @@ fn frame_into(content: &[u8], out: &mut Vec<u8>) {
 /// Reads one archive frame at `*cursor`: a UINT32_BE nonzero length prefix
 /// followed by exactly that many bytes. Returns a borrowed slice of the frame
 /// payload and advances `*cursor` past it.
+/// read_frame with a per-frame byte ceiling — the row/anchor reads cap each
+/// frame at its role's bound (chain_row_bytes / anchor_bytes) so a
+/// digest-matching malformed archive cannot materialize a ~full-archive frame
+/// before check_chain's per-row gate (cross-vendor round 11).
+fn read_frame_bounded<'a>(buf: &'a [u8], cursor: &mut usize, ceiling: u64) -> Result<&'a [u8]> {
+    let frame = read_frame(buf, cursor)?;
+    if frame.len() as u64 > ceiling {
+        return Err(Invalid);
+    }
+    Ok(frame)
+}
+
 fn read_frame<'a>(buf: &'a [u8], cursor: &mut usize) -> Result<&'a [u8]> {
     let prefix_end = cursor.checked_add(4).ok_or(Invalid)?;
     if prefix_end > buf.len() {
