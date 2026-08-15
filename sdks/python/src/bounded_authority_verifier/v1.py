@@ -1622,6 +1622,8 @@ def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str
     # this helper had missed).
     if len(compact) > bounds_resolve(b, "anchor_bytes"):
         fail(f"encode_anchored_export: {which} anchor anchor_bytes")
+    if len(compact) > bounds_resolve(b, "anchor_bytes"):
+        fail("verify_historical_anchor: anchor_bytes")
     seg = parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != expected.key_id:
@@ -1655,6 +1657,8 @@ def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition,
     # (key_transition_codec.ex:114).
     if len(compact) > bounds_resolve(b, "anchor_bytes"):
         fail(f"encode_anchored_export: transition {i} anchor_bytes")
+    if len(compact) > bounds_resolve(b, "anchor_bytes"):
+        fail("verify_key_transition: anchor_bytes")
     seg = parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != expected.current_key_id:
@@ -1923,6 +1927,8 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # Key-window validity BEFORE chunk processing/hashing (the reference validates
     # key shapes at :91 before validate_chunks — malformed intervals should not
     # force processing of the full archive).
+    if len(key_chain.keys) > len(expected.transitions) + 1:
+        fail("verify_anchored_export: key count bound")
     for _k in key_chain.keys:
         _vf0 = _expected_time(_k.valid_from, "verify_anchored_export: key valid_from type")
         _vbv0 = _expected_time(_k.valid_before, "verify_anchored_export: key valid_before type") if _k.valid_before is not None else None
@@ -1981,6 +1987,8 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     digest = sha256(*archived.chunks)
     if not _bytes_equal(digest, expected.digest):
         fail("verify_anchored_export: digest")
+    if not isinstance(archived.version, str) or not archived.version or len(archived.version) > bounds_resolve(b, "object_version_bytes") or not expected.object_version or len(expected.object_version) > bounds_resolve(b, "object_version_bytes"):
+        fail("verify_anchored_export: version shape")
     if archived.version != expected.object_version:
         fail("verify_anchored_export: object version")
     # Materialize for parsing ONLY after the digest matches (caller-legitimate, bounded archive).
