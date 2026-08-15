@@ -1902,8 +1902,8 @@ pub fn verify_anchored_export(
         if k.key_id.is_empty() || k.key_id.len() as u64 > bounds.kid_bytes() {
             return Err(Invalid);
         }
-        if !k.key_id.is_ascii() || !k.key_id.bytes().all(is_kid_byte) {
-            return Err(Invalid);
+        if !k.key_id.bytes().all(is_kid_byte) {
+            return Err(Invalid); // ASCII-unreserved class (is_kid_byte admits only ASCII)
         }
         if k.public_key.len() != 32 {
             return Err(Invalid);
@@ -1974,6 +1974,9 @@ pub fn verify_anchored_export(
     // this check a 0-transition archive carrying two distinct keys (start
     // signed by keys[0], end by keys[1]) would be accepted — both anchors
     // verify individually, but no transition authenticates the rollover.
+    // Deliberate redundancy (cross-vendor round 16: implied by the pre-digest
+    // keys==transitions+1 gate + the header equality — kept as defense-in-depth
+    // for future header-economy changes, NOT load-bearing today).
     if keys.keys.len() as i64 != header.transition_count + 1 {
         return Err(Invalid);
     }

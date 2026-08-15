@@ -1939,6 +1939,15 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # force processing of the full archive).
     if len(key_chain.keys) != len(expected.transitions) + 1:
         fail("verify_anchored_export: key count bound")
+    # Expected-side identifier strings used in header construction must be
+    # well-formed BEFORE the digest (cross-vendor round 16: a lone-surrogate
+    # chain_id raised UnicodeEncodeError out of the Result API at the
+    # str_utf8() header encode — the same escape class as key_id/version).
+    _utf8_bytes(expected.chain.chain_id, "verify_anchored_export: chain_id encoding")
+    _utf8_bytes(expected.start_anchor.chain_id, "verify_anchored_export: chain_id encoding")
+    _utf8_bytes(expected.end_anchor.chain_id, "verify_anchored_export: chain_id encoding")
+    for _t in expected.transitions:
+        _utf8_bytes(_t.chain_id, "verify_anchored_export: chain_id encoding")
     # Key ID/public-key SHAPE before the digest (cross-vendor round 14: an
     # oversized key ID reached the SHA-256 call in a live probe — the window
     # gates alone were incomplete pre-hash validation).
