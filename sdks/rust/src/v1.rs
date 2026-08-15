@@ -1894,9 +1894,7 @@ pub fn verify_anchored_export(
     {
         return Err(Invalid);
     }
-    if keys.keys.len() as u64 != expected.transitions.len() as u64 + 1 {
-        return Err(Invalid);
-    }
+    // (the key-count gate ran before the digest — round 12.)
 
     let mut hasher = Sha256::new();
     for c in chunks {
@@ -1910,13 +1908,7 @@ pub fn verify_anchored_export(
 
     // Out-of-band object-store version exact equality (after the digest, before
     // the byte stream is materialized).
-    if obj.version.is_empty()
-        || obj.version.len() as u64 > bounds.object_version_bytes()
-        || expected.object_version.is_empty()
-        || expected.object_version.len() as u64 > bounds.object_version_bytes()
-    {
-        return Err(Invalid);
-    }
+    // (the version-shape gate ran before the digest — round 12.)
     if obj.version != expected.object_version {
         return Err(Invalid);
     }
@@ -1953,7 +1945,11 @@ pub fn verify_anchored_export(
     // Read transition_count + row_count frames (counts come from the header).
     let mut transition_compacts: Vec<&[u8]> = Vec::with_capacity(header.transition_count as usize);
     for _ in 0..header.transition_count {
-        transition_compacts.push(read_frame(&buf, &mut cursor)?);
+        transition_compacts.push(read_frame_bounded(
+            &buf,
+            &mut cursor,
+            bounds.anchor_bytes(),
+        )?);
     }
     let mut rows: Vec<Vec<u8>> = Vec::with_capacity(header.row_count as usize);
     for _ in 0..header.row_count {
