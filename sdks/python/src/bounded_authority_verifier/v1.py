@@ -1591,6 +1591,15 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     return EncodedAnchoredExport(archive=archive, digest=sha256(archive))
 
 
+def _utf8_bytes(v: str, ctx: str) -> int:
+    """UTF-8 byte length, fail-closed on ill-formed (lone-surrogate) input —
+    .encode raises UnicodeEncodeError, which would escape the Result contract."""
+    try:
+        return len(v.encode("utf-8"))
+    except UnicodeEncodeError:
+        fail(ctx)
+
+
 def _expected_int(v: object, ctx: str) -> int:
     """Type-strict expected-side integer (cross-vendor round 2: Python ``1 == True``,
     so an untyped boolean expected field would equal a decoded 0/1 at the match)."""
@@ -1934,8 +1943,11 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # oversized key ID reached the SHA-256 call in a live probe — the window
     # gates alone were incomplete pre-hash validation).
     for _k in key_chain.keys:
-        if not isinstance(_k.key_id, str) or not _k.key_id or len(_k.key_id.encode("utf-8")) > bounds_resolve(_vb0, "kid_bytes"):
+        if not isinstance(_k.key_id, str) or not _k.key_id or len(_k.key_id) > bounds_resolve(_vb0, "kid_bytes") or _utf8_bytes(_k.key_id, "verify_anchored_export: key id encoding") > bounds_resolve(_vb0, "kid_bytes"):
             fail("verify_anchored_export: key id shape")
+        # the reference's ASCII-unreserved key_id class, pre-hash (round 15)
+        if not _k.key_id.isascii() or not all(c.isalnum() or c in "-._~" for c in _k.key_id):
+            fail("verify_anchored_export: key id charset")
         if not isinstance(_k.public_key, (bytes, bytearray)) or len(_k.public_key) != 32:
             fail("verify_anchored_export: key width")
     for _k in key_chain.keys:
@@ -1987,7 +1999,7 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # Version shape (UTF-8 BYTES, the reference byte_size) + equality BEFORE the
     # digest (cross-vendor round 12: malformed metadata should not force
     # maximum-sized hashing).
-    if not isinstance(archived.version, str) or not archived.version or len(archived.version.encode("utf-8")) > bounds_resolve(b, "object_version_bytes") or not isinstance(expected.object_version, str) or not expected.object_version or len(expected.object_version.encode("utf-8")) > bounds_resolve(b, "object_version_bytes"):
+    if not isinstance(archived.version, str) or not archived.version or len(archived.version) > bounds_resolve(b, "object_version_bytes") or not isinstance(expected.object_version, str) or not expected.object_version or len(expected.object_version) > bounds_resolve(b, "object_version_bytes") or _utf8_bytes(archived.version, "verify_anchored_export: version encoding") > bounds_resolve(b, "object_version_bytes") or _utf8_bytes(expected.object_version, "verify_anchored_export: version encoding") > bounds_resolve(b, "object_version_bytes"):
         fail("verify_anchored_export: version shape")
     if archived.version != expected.object_version:
         fail("verify_anchored_export: object version")
