@@ -1084,16 +1084,20 @@ def check_chain(chain: ChainInput, expected: ExpectedChain) -> Result[ChainFacts
 
 
 def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
-    # Expected-side chain integers type-strict (cross-vendor round 14: Python
-    # 1 == True wrong-accepted row_count=True where TS/Rust reject).
+    # Expected-side AND ChainInput-side chain integers type-strict (cross-vendor
+    # rounds 14+17: Python 1 == True wrong-accepted row_count=True /
+    # first_sequence=True where TS/Rust reject).
     _expected_int(expected.first_sequence, "check_chain: first_sequence type")
     _expected_int(expected.last_sequence, "check_chain: last_sequence type")
     _expected_int(expected.row_count, "check_chain: row_count type")
+    _expected_int(chain.first_sequence, "check_chain: input first_sequence type")
+    _expected_int(chain.last_sequence, "check_chain: input last_sequence type")
+    _expected_int(chain.row_count, "check_chain: input row_count type")
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (consumption_chain.ex
     # check_chain) and threads it into the row-count bound + every parse_row (chain_row_bytes). A
     # caller tightening via expected.bounds now takes effect.
     b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
-    if expected.chain_id != chain.chain_id:
+    if not isinstance(chain.chain_id, str) or not _is_string_or_uri(chain.chain_id) or expected.chain_id != chain.chain_id:
         fail("check_chain: chain_id")
     if expected.first_sequence != chain.first_sequence:
         fail("check_chain: first_sequence")
@@ -1591,9 +1595,12 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     return EncodedAnchoredExport(archive=archive, digest=sha256(archive))
 
 
-def _utf8_bytes(v: str, ctx: str) -> int:
-    """UTF-8 byte length, fail-closed on ill-formed (lone-surrogate) input —
-    .encode raises UnicodeEncodeError, which would escape the Result contract."""
+def _utf8_bytes(v: object, ctx: str) -> int:
+    """UTF-8 byte length, fail-closed on non-str AND ill-formed (lone-surrogate)
+    input — .encode raises UnicodeEncodeError/AttributeError, either of which
+    would escape the Result contract."""
+    if not isinstance(v, str):
+        fail(ctx)
     try:
         return len(v.encode("utf-8"))
     except UnicodeEncodeError:
@@ -1928,6 +1935,12 @@ def verify_anchored_export(archived: ArchivedObject, key_chain: HistoricalKeyCha
 
 
 def _verify_anchored_export_body(archived: ArchivedObject, key_chain: HistoricalKeyChain, expected: ExpectedExport) -> AnchoredExportFacts:
+    # Expected chain integers type-strict BEFORE the sequence arithmetic
+    # (cross-vendor round 17: a non-int first_sequence raised TypeError at the
+    # `- 1` where TS fails closed and Rust is typed).
+    _expected_int(expected.chain.first_sequence, "verify_anchored_export: first_sequence type")
+    _expected_int(expected.chain.last_sequence, "verify_anchored_export: last_sequence type")
+    _expected_int(expected.chain.row_count, "verify_anchored_export: row_count type")
     # The count ceiling FIRST (cross-vendor: even the static-bindings walk ran
     # unbounded caller input before it — instrumented 257-element inputs were
     # fully read before rejection).
@@ -2379,6 +2392,12 @@ def _validate_key_path(
 
 
 def _validate_chunks(chunks: Sequence[bytes], bounds: Bounds = MAXIMUM_BOUNDS) -> None:
+    # Chunk elements must be bytes-like (cross-vendor round 17: a str chunk
+    # passed the len gate then raised TypeError at the hash — the escape class
+    # the adjacent gates close).
+    for _c in chunks:
+        if not isinstance(_c, (bytes, bytearray)):
+            fail("verify_anchored_export: chunk type")
     """Validate the chunk list BEFORE concatenation (anchored_export_codec.ex:333-342
     validate_chunks): at least one chunk, each chunk nonempty, count < archive_chunks, running total
     ≤ archive_bytes."""
