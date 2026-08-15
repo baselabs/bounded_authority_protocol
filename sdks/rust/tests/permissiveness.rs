@@ -2642,3 +2642,24 @@ fn corpus_anchor_triple() -> (Vec<u8>, HistoricalPublicKey, ExpectedAnchor) {
     };
     (compact, key, expected)
 }
+
+#[test]
+fn bounds_rust_archive_key_window_guards() {
+    // The archive-path key-window loop (round 9's before-hashing validation).
+    // Honest red-capability: the loop is BACKSTOPPED by delegation — the inner
+    // path calls the gated public verify_historical_anchor/verify_key_transition
+    // — so removing the loop alone leaves this leg green (probe-verified). What
+    // the loop adds is the WORK ORDER (rejection before archive hashing, the
+    // reference's :91 ordering); this leg pins the loop's presence on the
+    // tampered-window corpus archive with an Ok control, jointly.
+    let f = corpus_export_verify_fixture();
+    assert!(verify_anchored_export(&f.obj, &f.keys, &f.expected).is_ok());
+    // Fractional/bool endpoints and inverted windows reject at the archive entry.
+    let mut keys = f.keys.clone();
+    keys.keys[0].valid_from = -(4_611_686_018_427_387_904i64);
+    assert!(verify_anchored_export(&f.obj, &keys, &f.expected).is_err());
+    let mut keys2 = f.keys.clone();
+    let last = keys2.keys.len() - 1;
+    keys2.keys[last].valid_before = ValidityUpperBound::Bounded(4_611_686_018_427_387_904);
+    assert!(verify_anchored_export(&f.obj, &keys2, &f.expected).is_err());
+}
