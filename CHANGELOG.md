@@ -18,6 +18,15 @@ All notable changes to `bounded_authority_protocol` are documented here.
   92 unit + conformance 283/283; Python 62 unit + conformance 283/283. (The Rust/Go SDKs — BAP-15/16
   — may carry the same gaps; a separate check is owed.)
 
+- **All-SDK pre-hash validation hardening (BAP-15, cross-vendor rounds 11-15).** The archive
+  verify paths across Rust/TS/Python now validate the full caller-context shape BEFORE the
+  digest: the object versions (string, non-empty, UTF-8 bytes <= 512, well-formed, equal),
+  the key chain (exact count, key-id ASCII-unreserved class + width), key windows
+  (integral + magnitude + ordering), and identifier well-formedness — malformed metadata
+  no longer forces maximum-sized hashing, ill-formed strings fail closed in every SDK
+  (Python's UnicodeEncodeError escape closed; TS's silent U+FFFD replacement closed), and
+  frame reads are role-bounded per chain_row_bytes/anchor_bytes.
+
 - **Rust SDK bounds parity (BAP-15; closes the LAST named delta).** Caller-tightenable
   bounds through the expected structs — the exact reference/sibling shape: five additive
   `Option<Bounds>` fields (None = the profile maximum), the nested-bounds pins with identity
