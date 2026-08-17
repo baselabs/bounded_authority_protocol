@@ -16,6 +16,13 @@
 # 194 findings (`jwt` 104, `generic-api-key` 90 — corpus only; the priv totals above include
 # vectors/). Measured 2026-08-17 when the 80-commit push first carried the vendored copy.
 #
+# sdks/rust/src/ed25519.rs quotes the RFC 8032 §7.1 public Ed25519 test vectors in doc comments
+# (source URL cited inline); their 32-hex fragments match `generic-api-key` (1 finding at the
+# introducing commit). Allowlisted by path for that one rule. NOTE: an inline `# gitleaks:allow`
+# marker does NOT work for this case — the push-range scan attributes findings to the commit
+# that INTRODUCED the bytes, and a marker added later never exists at that revision; only the
+# config (read from the working tree, applied to every scanned revision) reaches back.
+#
 # RESIDUAL, measured and stated rather than claimed away: a credential committed under
 # priv/conformance/v1/{corpus,vectors} or sdks/rust/conformance/corpus/ that matches ONLY `jwt`
 # or ONLY `generic-api-key` is NOT
@@ -52,4 +59,11 @@ paths = [
   '''priv/conformance/v1/corpus/.*''',
   '''priv/conformance/v1/vectors/.*''',
   '''sdks/rust/conformance/corpus/.*''',
+]
+
+[[allowlists]]
+description = "RFC 8032 §7.1 public Ed25519 test vectors quoted in the Rust SDK's ed25519 doc comments"
+targetRules = ["generic-api-key"]
+paths = [
+  '''sdks/rust/src/ed25519\.rs''',
 ]
