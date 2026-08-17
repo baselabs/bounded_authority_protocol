@@ -518,7 +518,7 @@ compatibility.
   profile from `docs/protocol-v1.md` + ADRs + the corpus **alone** (ADR 0014 D5:
   no code-level derivation from the Elixir reference — the closeout grep confirms
   no Elixir/sibling-SDK module path appears in `sdks/rust/src/`).
-- **Library (T1–T14):** the 15-function façade + the versioned primitives
+- **Library (T1–T14):** the 17-function façade + the versioned primitives
   (`json`/`jcs`/`jwk`/`uri`/`base64url`/`bounds`), `#![forbid(unsafe_code)]`, the
   283-vector conformance runner (vendored corpus, startup SHA-256 assertion, two-
   boundary key census — `agreed=283 disagreed=0`), all green.
@@ -605,14 +605,13 @@ verified against the Elixir reference oracle (20/20 — the receipt is a re-runn
 closed in the immediately-following commit (same contract, 15 legs each at closeout,
 proven red-capable — the five pin legs each isolated under their named mutation, the
 threading leg joint-by-construction per the settled diff-review record). **The SDK-wide
-maximum-bounds delta is CLOSED for the archive façades** (`b4ca616`); ONE named
-residual remains: `assemble_compact` stays at maximum in all three SDKs while
-the reference threads caller limits there too (runtime.ex:147-151) — a
-disclosed open divergence awaiting the user's direction
-(`b4ca616`): five `Option<Bounds>` fields, the nested pins
+maximum-bounds delta is CLOSED for the archive façades** (`b4ca616`): five `Option<Bounds>` fields, the nested pins
 with identity semantics, threading at encode/verify/standalone, the chunk-count magic pin,
-27 mutation-proven legs at closeout (permissiveness 67), a 7/7 Elixir oracle receipt (scope driver: the 2026-08-14 session direction — recorded here as the
-session's input, not as this record's verdict). The Go SDK (BAP-16) picks the whole contract up at authoring.
+27 mutation-proven legs at closeout (permissiveness 67), and a 7/7 Elixir oracle receipt (scope driver: the 2026-08-14 session direction — recorded here as the
+session's input, not as this record's verdict). **ONE named residual remains:**
+`assemble_compact` stays at maximum in all three SDKs while the reference threads caller limits
+there too (`runtime.ex:147-151`) — a disclosed open divergence awaiting the user's direction.
+The Go SDK (BAP-16) picks the whole contract up at authoring.
 
 **2026-08-14 amendment #3 — the cross-vendor hardening arc + the terminal range state
 (`a4deac2..06c9f82`).** The bounds-parity landing was followed by **17 dispatched cross-vendor
@@ -691,7 +690,8 @@ un-started and picks the whole accumulated contract up at authoring.
 
 ## Next action
 
-BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, and BAP-15 are complete. BAP-09 shipped the cross-language verifier SDKs
+BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, BAP-15, and BAP-17 are
+complete. BAP-09 shipped the first two cross-language verifier SDKs
 (TypeScript `@bounded-authority/verifier` + Python `bounded-authority-verifier` under `sdks/`, each
 passing all 283 conformance vectors + per-language permissiveness mutation-gates; ADR 0014). BAP-05 shipped the portable v1 conformance
 corpus (283 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI
@@ -713,7 +713,10 @@ specification ([ADR 0010](adr/0010-delegation-with-attenuation.md)): the `ba_dlg
 claim, the `ba+cap-delegated` typ with header-`jwk` parent-holder key binding, the four-part
 attenuation relation (set-containment-on-distinct-tuples selector narrowing proven decidable against the existing
 selector algebra), and the depth-bounded chain-verification algorithm — design-only, zero wire
-change, names stay reserved-and-rejected.
+change, names stay reserved-and-rejected. BAP-17 reserved the `ba_offline` floor-limit claim name
+and carried its activating-major mechanism to ADR quality
+([ADR 0016](adr/0016-offline-eligible-grant-claims.md)) — design-only, zero wire-behavior change
+(see the BAP-17 closeout evidence above).
 
 The standards track charter (ADR 0006, [standards-track.md](design/standards-track.md)) gates that
 cannot be retrofitted after third parties implement the profile are now closed: BAP-10 (normative

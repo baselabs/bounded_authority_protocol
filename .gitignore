@@ -23,3 +23,4 @@
 # uv.lock would be a second dependency truth. The TS pnpm-lock differs: its CI installs
 # FROM the lockfile, so it is tracked.
 /sdks/python/uv.lock
+.kimosabe/

@@ -245,6 +245,25 @@ All notable changes to `bounded_authority_protocol` are documented here.
   charter § The evolution contract + § Governance; [governance.md](docs/governance.md) re-synced).
   Deployment-policy refinement only — zero wire byte, bound, or verdict change.
 
+### Changed
+
+- **Documentation reconciliation — status prose frozen at the BAP-10 era (alignment-audit items
+  1–9).** `AGENTS.md` "Current state" rewritten from the tracker: names the closed set (BAP-00..06,
+  08..11, 13..15, 17), the three verifier SDKs under `sdks/` (ADR 0014/0015 graduation topology,
+  none published), ADRs 0001–0016, and the 283-case corpus + verifier CLI. README's status section
+  corrected the same way; the BAP-07 framing in README, SECURITY.md, and the release-candidate
+  contract now records the maintainer decision (Hex publication deferred — internal consumption via
+  the `v0.1.0` git tag at `c65d3be`, not a registry pin). SECURITY.md now cites the most recent
+  package-bearing verified head (BAP-06 `4c64be3`) with the BAP-05/BAP-04 history retained. The
+  TypeScript and Python SDK READMEs no longer point Install at registry URLs that do not resolve —
+  they carry the Rust README's reserved-identifier/not-yet-published framing, and "one of two" SDK
+  prose corrected to three; `sdks/README.md` floor corrected to Node >= 22 with the not-published
+  disclaimer. `docs/design/offline-authorization-requirements.md` status now points at the closed
+  BAP-17 row (ADR 0016). ROADMAP repairs: BAP-17 added to the complete list, the Rust façade count
+  corrected 15 → 17 (the exported public contract), and amendment #2's garbled closure/residual
+  splice repaired so the `assemble_compact` maximum-bounds residual stands as its own sentence,
+  consistent with amendment #3's restatement. Docs-only — no code, wire, bound, or verdict change.
+
 ## [0.1.0] — release candidate
 
 ### Added

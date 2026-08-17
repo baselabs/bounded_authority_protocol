@@ -17,11 +17,15 @@ bounded proof-of-possession authority.
 The unpublished `0.1.0` package is a **release candidate**: the public API surface is locked
 ([release-candidate contract](docs/release-candidate-contract.md), [ADR 0008](docs/adr/0008-release-candidate-contract.md)),
 the candidate archive is reproducibility-checked on every quality run, and nothing is published to
-Hex yet — BAP-07 (connected verification and first public release) publishes the exact candidate
-after the private-runtime connected gates pass. The public/private boundary is complete under
+Hex yet — BAP-07 (connected verification and first public release) remains gated on the
+private-runtime connected gates, and the Hex-publication half is deferred by maintainer decision
+(internal consumption uses the `v0.1.0` git tag, not a registry pin). The public/private boundary is complete under
 [`BAP-00`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). The source tree now
 contains the unpublished `:bounded_authority_protocol` 0.1.0 Mix package scaffold and its enforced
-release boundary. `BAP-01` through `BAP-04` are complete. BAP-04's package-bearing closeout head
+release boundary. `BAP-01` through `BAP-06`, `BAP-08` through `BAP-11`, `BAP-13` through `BAP-15`,
+and `BAP-17` (design-only) are complete; `BAP-07`, `BAP-12` (IANA templates), and `BAP-16` (the Go
+verifier SDK) remain open — see
+[`docs/ROADMAP.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). BAP-04's package-bearing closeout head
 `c4d7716de6499f29524e60638207b1c36e9484b3` passed the supported CI matrix and exact unpublished
 package, checksum, provenance, and SBOM gates. The package implements deterministic standard
 compact-JWS grant and RFC 9449 holder-proof production, bounded decoding, standalone raw-grant
@@ -74,10 +78,14 @@ widening, or fixed-width-changing values fail with the fixed value-free `{:error
 structural Draft 2020-12 schemas accompany the decoders but do not replace duplicate-name,
 raw-number, UTF-8 byte, depth, node-count, or canonical-encoding enforcement.
 
-Later rows will provide:
+The remaining future row provides:
 
-- the portable conformance corpus and verifier CLI;
-- release-candidate and connected-release gates.
+- the connected-release gate (BAP-07 — connected verification and first public release).
+
+The portable conformance corpus and verifier CLI shipped with
+[BAP-05](docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md) (see
+[Conformance](#conformance) below), and the release-candidate contract and reproducibility gate
+with [BAP-06](docs/adr/0008-release-candidate-contract.md).
 
 All verification inputs are explicit: already-trusted public key, expected audience and instance,
 server-derived method, normalized URI, invocation ID, operation, cast arguments, evaluation time,

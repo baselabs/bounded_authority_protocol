@@ -3,7 +3,11 @@
 Typed, provider-neutral verifier libraries that reimplement the BAP v1 verification profile from the
 published spec ([`docs/protocol-v1.md`](../docs/protocol-v1.md)) and consume the published conformance
 corpus ([`priv/conformance/v1/corpus/`](../priv/conformance/v1/corpus/)). They are **distribution
-surfaces** — published, typed client libraries — not additional normativity. BAP-05 already closed the
+surfaces** — typed client libraries for third-party verifiers, not additional normativity — and
+**none is published to a registry yet**: per
+[ADR 0015](../docs/adr/0015-sdk-graduation-and-publish-topology.md), each graduates to its own
+per-SDK repository on first publication, never from this monorepo (the `sdk-publish-guard`
+pre-commit hook and CI job reject registry-publish infrastructure here). BAP-05 already closed the
 corpus's normativity question via the independent Node runner
 ([`conformance/corpus_independent.mjs`](../conformance/corpus_independent.mjs)); these SDKs let third-party
 verifiers consume the frozen v1 profile in their own language, with conformance independently verifiable
@@ -11,7 +15,7 @@ against the same published corpus.
 
 ## What is here
 
-- **[`typescript/`](typescript/)** — `@bounded-authority/verifier` (npm). Node >= 20, `node:crypto` (zero
+- **[`typescript/`](typescript/)** — `@bounded-authority/verifier` (npm). Node >= 22, `node:crypto` (zero
   non-stdlib deps by default).
 - **[`python/`](python/)** — `bounded-authority-verifier` (PyPI). Python >= 3.10, `cryptography` for
   Ed25519.
