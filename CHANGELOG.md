@@ -6,6 +6,21 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- **The SDK contract ADRs (BAP-15 documentation slice).** Three new accepted ADRs record contracts
+  that had shipped as code + ROADMAP evidence amendments only: [ADR 0017](docs/adr/0017-inter-sdk-behavioral-contract.md)
+  (the inter-SDK behavioral contract the 17-round cross-vendor hardening arc converged on — closed
+  Result surface, type strictness, pre-hash validation, canonical-form byte equality +
+  signature-width gates, role-bounded frame reads), [ADR 0018](docs/adr/0018-sdk-bounds-contract.md)
+  (the caller-tightenable bounds contract through the expected structs, including the
+  nested-pins identity semantics and the named `assemble_compact` maximum-bounds divergence), and
+  [ADR 0019](docs/adr/0019-corpus-artifact-distribution.md) (ADR 0015 Decision 6's deferred
+  corpus-artifact question settled: per-SDK binding until the first SDK graduation, on the traced
+  two-SDK bump-amplitude evidence). Fact corrections in the same landing: ADR 0014's Node floor
+  corrected to >= 22 (raised at `d9df0bf` on Node 20 EOL) and its `@noble/curves` "optional
+  browser-build path" claim withdrawn (never present in `sdks/` history); ADR 0008's BAP-07
+  "publishes the exact candidate" consequence annotated with the maintainer's Hex-publication
+  deferral (the `v0.1.0` git tag at `c65d3be` is the internal pin). Zero wire-behavior change.
+
 - **BAP-09 SDK conformance hardening (TypeScript + Python).** The TS + Python verifier SDKs now
   enforce two checks the Elixir reference has and the SDKs were missing: (1) a decoded
   **signature-width gate** in `parseCompact`/`parse_compact` (`len(signature) == signature_bytes`,

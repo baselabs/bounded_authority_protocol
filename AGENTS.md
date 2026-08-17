@@ -68,7 +68,9 @@ extension drafts under `docs/extensions/`,
 [ADR 0013](docs/adr/0013-capability-authorization-extension.md)), BAP-13 (published governance,
 [docs/governance.md](docs/governance.md)), and BAP-17 (the reserved `ba_offline` floor-limit claim
 and its activating-major mechanism,
-[ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)). Accepted ADRs run 0001–0016 under
+[ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)). The BAP-15 hardening-arc contracts are
+recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK bounds contract), and
+ADR 0019 (corpus-artifact distribution). Accepted ADRs run 0001–0019 under
 [`docs/adr/`](docs/adr/). Commercial release readiness remains open.
 
 ## Critical rules

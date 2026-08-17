@@ -119,3 +119,7 @@ no `receipt`/`decision`).
 - The 0.1.0 candidate is locked but not stable; stability is the 1.0.0 commitment (BAP-07 or later).
 - BAP-07 publishes the exact candidate BAP-06 froze; the candidate-evidence record (CI-attested
   SHA-256 + `gh attestation verify` constraints) is the publication receipt, recorded in ROADMAP.
+  *(Amendment 2026-08-17: the Hex-publication half of BAP-07 is deferred by maintainer decision —
+  internal consumption uses the `v0.1.0` git tag at `c65d3be`, not a registry pin; the deferral is
+  recorded in the ROADMAP at the BAP-07 status. The lock and reproducibility decisions
+  above are unchanged; "publishes" remains the recorded intent for whenever publication proceeds.)*

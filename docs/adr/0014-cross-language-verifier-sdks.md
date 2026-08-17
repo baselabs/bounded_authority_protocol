@@ -72,11 +72,14 @@ reading `lib/`. This ADR records how the two statements are reconciled without v
    the Elixir `{:ok, value}` / `{:error, :invalid}` shape. **No `allowed`/`authorized`/`decision`/
    verify-then-act surface** (AGENTS rule 1). Facts are value-bearing and redacted exactly as the
    Elixir facts are (`authorization: "not_evaluated"` for Grant/Envelope/Export;
-   `trust: "not_evaluated"` for Chain/Anchor/Transition). Version floors: **Node >= 20** (matches the
-   existing Node runner's baseline + the repo's CI Node pin; `node:crypto` Ed25519 + WebCrypto stable
-   on 20), **Python >= 3.10** (the floor where `match` statements + modern typing land; `cryptography`
-   supports 3.10+). The TS SDK defaults to `node:crypto` (stdlib-only, matching the Node runner);
-   `@noble/curves` is a documented optional browser-build path, not a default dependency. The Python
+   `trust: "not_evaluated"` for Chain/Anchor/Transition). Version floors: **Node >= 22**
+   *(corrected 2026-08-17: authored as Node >= 20 on the then-current CI pin; raised to the 22 LTS
+   floor at `d9df0bf` when Node 20 reached EOL — `sdks/typescript/package.json` `engines` + the CI
+   pin are the live authority)*, **Python >= 3.10** (the floor where `match` statements + modern
+   typing land; `cryptography` supports 3.10+). The TS SDK uses `node:crypto` only (stdlib-only,
+   matching the Node runner). *(Corrected 2026-08-17: this ADR originally named `@noble/curves` as
+   "a documented optional browser-build path" — no such path exists or ever did; `@noble/curves`
+   appears nowhere in `sdks/` history.)* The Python
    SDK uses the `cryptography` package (the one unavoidable crypto dep — stdlib has no Ed25519) +
    stdlib `hashlib`/`urllib`/`base64`. Maintenance posture: the SDKs track the published corpus; a
    corpus amendment is a SDK MINOR bump.

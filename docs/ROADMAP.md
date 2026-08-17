@@ -595,7 +595,9 @@ change. The Go SDK (BAP-16) picks both classes up at authoring. (This slice land
 as its owning row — the same provenance as `18c6467` under BAP-09 — rather than as a new row;
 the evidence amendment is this repo's docs-currency rule, not the sibling's pattern.)
 
-**2026-08-14 amendment #2 — Rust encode-path validation parity (`8de07dd`).** The routed
+**2026-08-14 amendment #2 — Rust encode-path validation parity (`8de07dd`; the bounds contract this
+amendment's parity landing closed is the contract of record in
+[ADR 0018](adr/0018-sdk-bounds-contract.md)).** The routed
 residual of amendment #1 is CLOSED for Rust: `encode_anchored_export` now mirrors the
 reference producer's full contract (expected-side consistency, row chain re-check, gated
 parses + 7-field matches for both anchors and every transition, the key-path walk with
@@ -614,7 +616,8 @@ there too (`runtime.ex:147-151`) — a disclosed open divergence awaiting the us
 The Go SDK (BAP-16) picks the whole contract up at authoring.
 
 **2026-08-14 amendment #3 — the cross-vendor hardening arc + the terminal range state
-(`a4deac2..06c9f82`).** The bounds-parity landing was followed by **17 dispatched cross-vendor
+(`a4deac2..06c9f82`; the shared semantics this arc converged on are the contract of record in
+[ADR 0017](adr/0017-inter-sdk-behavioral-contract.md)).** The bounds-parity landing was followed by **17 dispatched cross-vendor
 rounds (codex + claude, the mandatory zcode T2 lens) plus delta-reviews between fix clusters**.
 Every named BLOCKING finding was fixed in-slice — the arc's user-facing fixes are the CHANGELOG
 rows above: nested-bounds pins + identity semantics (rounds 2-5), compact-bytes ceilings +
@@ -737,7 +740,9 @@ rides the BAP-08 external submission path, gated on the same official-submission
 **SDK graduation and publish topology ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)).**
 Cross-language verifier SDKs are authored under `sdks/` (ADR 0014) but each graduates to its own
 per-SDK repository (`bounded_authority_protocol_<lang>`) on first publication — the boundary is
-publication irreversibility, not SDK count. No SDK publishes from this monorepo: a local pre-commit
+publication irreversibility, not SDK count. ADR 0015 Decision 6's deferred corpus-artifact question
+is settled by [ADR 0019](adr/0019-corpus-artifact-distribution.md): per-SDK binding stays until the
+first SDK graduation. No SDK publishes from this monorepo: a local pre-commit
 hook (`scripts/hooks/pre-commit`, installed via `scripts/install-hooks.sh`) and the CI
 `sdk-publish-guard` job ([`.github/workflows/sdk-publish-guard.yml`](../.github/workflows/sdk-publish-guard.yml))
 reject registry-publish infrastructure (publish commands, publish actions, npm publish lifecycle
