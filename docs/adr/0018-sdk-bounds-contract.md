@@ -25,13 +25,14 @@ primitives without specifying the threading semantics. This ADR is the contract 
 
 ## Decision
 
-1. **Additive optional bounds on the expected structs.** Each archive/chain input struct carries an
-   optional bounds field — Rust: `Option<Bounds>` on `ExpectedChain`, `ExpectedAnchor`,
-   `ExpectedKeyTransition`, `AnchoredExportInput`, `ExpectedAnchoredExport`
-   (`sdks/rust/src/types.rs`); TypeScript: `bounds?: Bounds` on the corresponding input types;
+1. **Additive optional bounds on the expected structs.** Each archive/chain expected struct carries
+   an optional bounds field — Rust: `Option<Bounds>` on `ExpectedChain`, `ExpectedAnchor`,
+   `ExpectedKeyTransition`, `ExpectedExport`, `ExpectedAnchoredExport`
+   (`sdks/rust/src/types.rs`); TypeScript: `bounds?: Bounds` on the corresponding expected types;
    Python: `bounds: Bounds | None = None`. **Absent means the profile maximum** — the additive
    default preserves every existing call; a present value may only tighten below the profile
-   maxima ([ADR 0002]'s tightening-only discipline — a caller can never loosen above them).
+   maxima ([ADR 0002](0002-normative-v1-parsing-profile.md)'s tightening-only discipline — a caller
+   can never loosen above them).
 
 2. **Nested-pins identity semantics.** Where an expected struct nests another expected struct
    (an anchored export carrying an expected chain, anchors, and transitions), a present nested

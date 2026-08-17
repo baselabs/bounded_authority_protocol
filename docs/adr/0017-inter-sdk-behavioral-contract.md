@@ -37,9 +37,12 @@ closes.
 
 ## Decision
 
-The inter-SDK behavioral contract is the definition of "conformant SDK" **beyond** the corpus: every
-current SDK (Rust, TypeScript, Python) conforms, and every future SDK (Go, BAP-16) adopts it at
-authoring. Five clauses:
+The inter-SDK behavioral contract is the definition of "conformant SDK" **beyond** the corpus: it is
+normative for every current SDK (Rust, TypeScript, Python) and every future SDK (Go, BAP-16) adopts
+it at authoring. Conformance is claimed for the clauses as the hardening arc closed them, **with two
+named exceptions this ADR's own authoring review surfaced and verified live (2026-08-17)** — both
+routed as SDK-code fixes and disclosed under Honest limit below; this ADR does not certify the
+exceptions away. Five clauses:
 
 1. **Closed Result surface — no escape hatches.** Every path where a caller-supplied value could
    raise out of the SDK's closed `Ok<Facts>` / `Err(Invalid)` API fails closed instead. A host
@@ -54,14 +57,18 @@ authoring. Five clauses:
    Rust's typing already rejected them); non-string identifiers, non-integer chain values, and
    non-bytes chunk elements are gated before any arithmetic or encoding consumes them.
 
-3. **Pre-hash validation — shape before digest.** The full caller-context shape is validated BEFORE
-   the digest is computed, so malformed metadata fails closed without forcing maximum-sized hashing:
+3. **Pre-hash validation — shape before digest.** The caller-context shape is validated BEFORE the
+   digest is computed, so malformed metadata fails closed without forcing maximum-sized hashing:
    object versions (string, non-empty, UTF-8 ≤ 512 bytes, well-formed, equal across expected and
    input), the key chain (exact count; key-id in the ASCII-unreserved class with width bounds), key
    windows (integral endpoints, symmetric magnitude bounds, `valid_before > valid_from` ordering),
-   and identifier well-formedness. This is the DoS-shaped clause: the reference's bounds exist so
-   that rejection cost never scales with attacker-controlled magnitude (RFC 7515's own rejection
-   posture — §5.2/§10.12 — is total, but this protocol bounds the work to get there).
+   chain identifier well-formedness, and — per the reference's
+   `validate_expected_anchored_export` → `ContextValidation.expected_anchor`
+   (`anchored_export_codec.ex:92/:356-358`) — the expected-anchor identity fields
+   (`anchor_id`, `anchored_at`, `chain_id`, `key_id`). This is the DoS-shaped clause: the
+   reference's bounds exist so that rejection cost never scales with attacker-controlled magnitude
+   (RFC 7515's own rejection posture — §5.2/§10.12 — is total, but this protocol bounds the work to
+   get there).
 
 4. **Canonical-form byte equality + signature-width gates.** A compact JWS segment is accepted only
    if its bytes equal the exact canonical re-encoding of its decoded value — for the protected
@@ -87,6 +94,22 @@ without per-clause red-capable battery legs: every gate is proven load-bearing (
 mutation probe shows each round-15 defect re-emerging when its gate is removed), but a full revert
 of the gate cluster still passes the SDK battery green. The per-leg pins are owed follow-up work
 (maintainer-directed). This ADR records the contract; it does not claim the pin debt is paid.
+
+**Two verified exceptions, surfaced by this ADR's own authoring review (cross-vendor, 2026-08-17)
+and routed as SDK-code fixes — the ADR does not certify them away:**
+
+1. **Python closed-Result escape (clause 1).** A non-string `request_digest` operation (or
+   `ConsumptionEntry.chain_id`) raises `AttributeError` out of the public façade — the `_trying`
+   wrapper catches only `InvalidError`, and `str_utf8` is a bare `s.encode("utf-8")`
+   (`sdks/python/src/bounded_authority_verifier/v1.py:693-698`, `json_alg.py:532`; live-probed:
+   `request_digest(123, …)` → `AttributeError`). Rust excludes the class by typing; TypeScript
+   excludes it for TS callers by compile-time types (an untyped JS caller gets host string coercion
+   at the `TextEncoder` boundary — a disclosed margin, not an exception escape).
+2. **Expected-anchor identity validated post-digest (clause 3, all three SDKs).** The reference
+   validates `anchor_id`/`anchored_at`/`key_id` pre-digest (clause 3 above); all three SDKs verify
+   the anchor fields only inside the post-digest anchor-compact checks. The bounded-work property
+   still holds — chunk-shape gates bound every digest — but the ordering diverges from the
+   reference's pre-digest discipline.
 
 ## Alternatives considered
 
