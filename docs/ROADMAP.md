@@ -638,7 +638,14 @@ every gate is proven load-bearing (the delta-4 mutation probe shows each round-1
 when its gate is removed) but a full revert of the gate cluster still passes the SDK battery green —
 the per-leg pins are owed as a user-directed follow-up; (2) `assemble_compact` stays at
 maximum-bounds in all three SDKs (amendment #2's disclosed divergence); (3) the Go SDK (BAP-16) is
-un-started and picks the whole accumulated contract up at authoring.
+un-started and picks the whole accumulated contract up at authoring. **2026-08-17 addendum — two
+verified contract exceptions from the ADR-0017 authoring review** (cross-vendor, both probed
+against substrate; disclosed as ADR 0017's named exceptions, routed as SDK-code fixes): (4) a
+Python closed-Result escape — a non-string `request_digest` operation or `ConsumptionEntry.chain_id`
+raises `AttributeError` out of the façade (`_trying` catches only `InvalidError`); (5) all three
+SDKs validate the expected-anchor identity fields only post-digest where the reference validates
+them pre-digest (`ContextValidation.expected_anchor`) — bounded work still holds via the
+chunk-shape gates, but the ordering diverges from the reference.
 
 ## BAP-17 closeout evidence
 

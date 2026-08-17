@@ -17,10 +17,11 @@ amplitude at that point." The trigger's first half has fired: the third SDK (Rus
 complete. This ADR reads the bump-amplitude evidence and decides.
 
 **The evidence, traced at commit level (2026-08-17).** The corpus grew 259 → 283 across four
-landings (`0719387` → 280, `52a927a` rework → 279, `584f539` → 280, `696384c` → 283, all
-2026-08-12). Each landing coordinated, in one atomic commit: the corpus itself, the certified
-index-SHA constants in the TypeScript and Python runners, the SDK READMEs' case counts, and the CI
-matrix — a **two-SDK amplitude, observed four times**. The Rust SDK did not exist for those bumps;
+landings (`0719387` → 280, `52a927a` rework → 279, `584f539` → 280 — all 2026-08-11 — and
+`696384c` → 283, 2026-08-12). Each landing coordinated, in one atomic commit: the corpus itself,
+the certified index-SHA constants in the TypeScript and Python runners, the SDK READMEs' case
+counts, and the CI matrix — a **two-SDK amplitude, observed four times**. The Rust SDK did not
+exist for those bumps;
 it vendored the post-bump 283-case snapshot once, at its own authoring (`66d5ebb`), as a
 self-contained `sdks/rust/conformance/corpus/` copy. So: **no corpus amendment has yet been paid at
 three SDKs.** The current per-SDK cost is also asymmetric — Rust vendors a snapshot (~a full corpus
