@@ -105,7 +105,7 @@ mod tests {
     ///                0ee172f3daa62325af021a68f707511a
     ///   MESSAGE:     (empty, length 0)
     ///   SIGNATURE:   e5564300c360ac729086e2cc806e828a
-    ///                84877f1eb8e5d974d873e06522490155
+    ///                84877f1eb8e5d974d873e06522490155 # gitleaks:allow (RFC 8032 public test vector)
     ///                5fb8821590a33bacc61e39701cf9b46b
     ///                d25bf5f0595bbe24655141438e7a100b
     fn rfc8032_test_1_public() -> ([u8; 32], [u8; 64]) {
