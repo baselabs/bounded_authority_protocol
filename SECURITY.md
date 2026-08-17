@@ -4,8 +4,10 @@
 
 The unpublished `0.1.0` package is a **release candidate** — no version is published to Hex. The
 public API surface is locked ([release-candidate contract](docs/release-candidate-contract.md));
-BAP-07 (connected verification and first public release) publishes the exact candidate after the
-private-runtime connected gates pass. This file becomes version-specific with that first release.
+BAP-07 (connected verification and first public release) remains gated on the private-runtime
+connected gates, and the Hex-publication half is deferred by maintainer decision — internal
+consumption uses the `v0.1.0` git tag, not a registry pin. This file becomes version-specific with
+that first release.
 
 The current unpublished 0.1.0 source implements bounded parsing, deterministic standard compact
 JWS grant and RFC 9449 holder-proof production, standalone raw-grant verification, and combined
@@ -16,14 +18,24 @@ authorization, where the result carries it, explicitly not evaluated; the packag
 trust, reserve replay, inspect live revocation state, certify deletion/retention, remove archives,
 or authorize an effect.
 
-Final BAP-04 package-bearing verification source
-`c4d7716de6499f29524e60638207b1c36e9484b3` passed
-[CI run 30414161666](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30414161666)
+The most recent package-bearing verified source is the BAP-06 closeout head
+`4c64be36ada1c167214471847d4061ea5ff63c56`, which passed
+[CI run 31029289860](https://github.com/baselabs/bounded_authority_protocol/actions/runs/31029289860)
 and
-[supply-chain run 30414161690](https://github.com/baselabs/bounded_authority_protocol/actions/runs/30414161690)
-at that exact revision. The unpublished archive SHA-256 is
-`b947777a512e0e917eb42aa85fc9525087f1e555c0eba1944832431a8978a169`; its checksum,
-SLSA provenance, and CycloneDX SBOM attestation were independently verified.
+[supply-chain run 31029289864](https://github.com/baselabs/bounded_authority_protocol/actions/runs/31029289864)
+at that exact revision. The CI-attested (ubuntu-built) candidate archive SHA-256 is
+`abe962eb7fddefdc1906d5bb6baea38518ca017e0b6dab957497293ee12cf515`; its checksum and
+build-provenance attestation were independently verified against that source digest. (The local
+`release.candidate` gate's SHA differs because it builds on darwin — the gate compares two builds
+within one run on one platform, not cross-platform.)
+
+Earlier package-bearing verified heads, each with checksum, provenance, and SBOM attestations at
+that exact revision: BAP-05 `ce20a8b12e7b715f5373a72763e46adff7b3e30f` (CI run 30918991087,
+supply-chain run 30918990587; unpublished archive SHA-256
+`dd0a17eada43f1f60c8f2f23f92575dd4f995a02d93043b1ac097bb954f936df`) and BAP-04
+`c4d7716de6499f29524e60638207b1c36e9484b3` (CI run 30414161666, supply-chain run 30414161690;
+unpublished archive SHA-256
+`b947777a512e0e917eb42aa85fc9525087f1e555c0eba1944832431a8978a169`).
 
 ## Reporting a vulnerability
 

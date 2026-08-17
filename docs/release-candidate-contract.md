@@ -10,9 +10,10 @@ reviewer compares**, not an authority shape — there is no decision, receipt, o
 ## Status
 
 `0.1.0` is a **release candidate**. No version is published to Hex. BAP-06 froze this candidate;
-BAP-07 (connected verification and first public release) publishes the exact candidate, after the
-private-runtime connected gates pass and a fresh correctness/security/gate-integrity/cross-vendor
-review closes with zero open findings.
+BAP-07 (connected verification and first public release) remains gated on the private-runtime
+connected gates and a fresh correctness/security/gate-integrity/cross-vendor review closing with
+zero open findings, and the Hex-publication half is deferred by maintainer decision — internal
+consumption uses the `v0.1.0` git tag (at `c65d3be`), not a registry pin.
 
 ## Locked public API surface (0.1.0)
 

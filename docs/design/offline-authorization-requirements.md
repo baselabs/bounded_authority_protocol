@@ -1,7 +1,9 @@
 # Offline authorization — protocol requirements (BAP side)
 
-**Status:** requirement inputs to a future roadmap row (owner-set, 2026-08-02; row not
-yet authored). Nothing here changes protocol v1 — offline eligibility is a strictly
+**Status:** requirement inputs consumed by the closed BAP-17 row (owner-set, 2026-08-02; the
+roadmap row is closed — see [ADR 0016](../adr/0016-offline-eligible-grant-claims.md): the
+`ba_offline` claim name is reserved in the registries and the activating-major mechanism is
+specified; the offline arc itself is successor-major-gated). Nothing here changes protocol v1 — offline eligibility is a strictly
 additive capability, and until it ships, every conforming verifier's existing behavior
 (deny on unknown claims) already produces the correct result. Keywords
 MUST/SHOULD/MUST NOT read per RFC 2119 intent.
