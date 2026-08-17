@@ -7,12 +7,18 @@
 # `generic-api-key` (174) on the 32-byte base64url values, which are dominated by SHA-256 key
 # FINGERPRINTS (`key_fingerprint` 82, `current_/next_key_fingerprint` 24 each,
 # `from_/to_key_fingerprint` 16 each, `start_/end_key_fingerprint` 6 each) rather than by public
-# keys. Those two rules are allowlisted for those two paths. Re-measure both totals whenever
+# keys. Those two rules are allowlisted for those paths. Re-measure both totals whenever
 # fixtures are added — each new corpus case carrying a grant + proof adds 2 `jwt` hits. Every other default rule still applies in these trees, and every rule applies
 # everywhere else in the repository.
 #
+# The Rust SDK's vendored corpus snapshot (sdks/rust/conformance/corpus/, BAP-15 — ADR 0015 D5)
+# is a byte-identical copy of the source corpus tree and fires the same two rules there:
+# 194 findings (`jwt` 104, `generic-api-key` 90 — corpus only; the priv totals above include
+# vectors/). Measured 2026-08-17 when the 80-commit push first carried the vendored copy.
+#
 # RESIDUAL, measured and stated rather than claimed away: a credential committed under
-# priv/conformance/v1/{corpus,vectors} that matches ONLY `jwt` or ONLY `generic-api-key` is NOT
+# priv/conformance/v1/{corpus,vectors} or sdks/rust/conformance/corpus/ that matches ONLY `jwt`
+# or ONLY `generic-api-key` is NOT
 # flagged here. Verified with canaries — a `ghp_…` GitHub token under the corpus path IS caught
 # (rule `github-pat`), a 36-character generic key under the same path is NOT. The bounding factor
 # is that both directories hold only machine-generated conformance fixtures; nothing is
@@ -45,4 +51,5 @@ targetRules = ["jwt", "generic-api-key"]
 paths = [
   '''priv/conformance/v1/corpus/.*''',
   '''priv/conformance/v1/vectors/.*''',
+  '''sdks/rust/conformance/corpus/.*''',
 ]
