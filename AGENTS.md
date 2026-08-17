@@ -51,8 +51,10 @@ Cross-language verifier SDKs live under [`sdks/`](sdks/)
 ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)): TypeScript
 (`@bounded-authority/verifier`), Python (`bounded-authority-verifier`), and Rust
 (`bounded-authority-protocol`, BAP-15) — each reimplements the frozen v1 profile from the spec and
-corpus alone, passes all 283 vectors against a SHA-asserted vendored corpus snapshot, and ships a
-red-capable per-language permissiveness mutation-gate. None is published to a registry: per
+corpus alone, passes all 283 vectors with the certified corpus index SHA-256 asserted at load (the
+Rust SDK vendors a self-contained snapshot; the TypeScript and Python runners consume the monorepo
+corpus in place), and ships a red-capable per-language permissiveness mutation-gate. None is
+published to a registry: per
 [ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md), each graduates to its own per-SDK
 repository on first publication, and the `sdk-publish-guard` pre-commit hook and CI job reject
 registry-publish infrastructure in this monorepo.
