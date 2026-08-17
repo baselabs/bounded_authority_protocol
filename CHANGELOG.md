@@ -19,7 +19,12 @@ All notable changes to `bounded_authority_protocol` are documented here.
   corrected to >= 22 (raised at `d9df0bf` on Node 20 EOL) and its `@noble/curves` "optional
   browser-build path" claim withdrawn (never present in `sdks/` history); ADR 0008's BAP-07
   "publishes the exact candidate" consequence annotated with the maintainer's Hex-publication
-  deferral (the `v0.1.0` git tag at `c65d3be` is the internal pin). Zero wire-behavior change.
+  deferral (the `v0.1.0` git tag at `c65d3be` is the internal pin). Zero wire-behavior change. The
+  ADR-0017 authoring review (cross-vendor) surfaced two verified SDK contract exceptions, disclosed
+  as ADR 0017's named exceptions and routed as SDK-code fixes: a Python closed-Result escape
+  (non-string `request_digest` operation / `ConsumptionEntry.chain_id` raises `AttributeError` past
+  the façade), and all three SDKs validating the expected-anchor identity fields post-digest where
+  the reference validates them pre-digest.
 
 - **BAP-09 SDK conformance hardening (TypeScript + Python).** The TS + Python verifier SDKs now
   enforce two checks the Elixir reference has and the SDKs were missing: (1) a decoded
@@ -44,7 +49,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 - **Result-contract fail-closure + ChainInput type strictness (BAP-15, cross-vendor rounds 16-17).**
   Every path where a caller-supplied Python value could raise out of the closed Result API
-  now fails closed instead: ill-formed or non-str identifier strings (`_utf8_bytes` gates
+  now fails closed instead *(2026-08-17 delta: "every" was overclaimed — two further escape paths
+  were found by the ADR-0017 review and routed; see the SDK contract ADRs row below)*: ill-formed
+  or non-str identifier strings (`_utf8_bytes` gates
   chain_ids, key_ids, versions, and every expected-side string the header construction
   encodes), non-int chain integers (gated before the sequence arithmetic), non-bytes chunk
   elements, and Boolean ChainInput integers (True == 1 no longer verifies — TS's strict
