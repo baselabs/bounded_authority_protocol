@@ -111,6 +111,26 @@ and routed as SDK-code fixes — the ADR does not certify them away:**
    still holds — chunk-shape gates bound every digest — but the ordering diverges from the
    reference's pre-digest discipline.
 
+**Resolution of exception 1 (2026-08-18, maintainer-authorized fix).** Closed in both dynamic SDKs
+by a closed-Result shape gate on every façade, after a mechanical family sweep (2026-08-18, the
+alignment-audit session) proved the class total rather than two-instance. Python: 31 of 34
+parameter sites and every caller-supplied struct field escaped as `AttributeError`/`TypeError`
+(`_trying` catches only `InvalidError`); fixed by the annotation-driven `_closed_shape` decorator
+on all 17 façades (`sdks/python/src/bounded_authority_verifier/v1.py`) — each argument is validated
+recursively through its dataclass fields against the declared shape (`bool` is not `int`, per
+clause 2) and returns `Err` before any attribute deref, `len()`, or encode runs. TypeScript: the
+"disclosed margin" above was in fact a live clause-2 breach, not a margin — an untyped caller's
+`requestDigest(123/true/null/{})` was silently coerced at the `TextEncoder` boundary and returned
+`Ok` with the digest of the coerced text, and 109 parameter positions threw `TypeError` past
+`trying()` on null/undefined/array/object arguments; fixed by the `closedShape` gate on all 17
+façades (`sdks/typescript/src/v1.ts`) — argument shapes (bytes = real `Uint8Array`, struct =
+non-null object with the consumed fields, str = `typeof string`) checked before the body runs.
+Rust remains excluded by static typing. Red-capable evidence: the per-SDK family-sweep batteries
+(`sdks/python/tests/test_permissiveness.py`, `sdks/typescript/test/permissiveness.ts`) ARE the
+pre-fix red run (Python: 237 param + 516 field probe findings; TS: 109 sweep escapes + the
+coercion set), and both are mutation-proven — removing any single façade's gate reddens exactly
+that façade's cases. Exception 2 below remains open pending its fix.
+
 ## Alternatives considered
 
 - **Leave the contract in the ROADMAP amendment.** Rejected: an evidence amendment records what a
