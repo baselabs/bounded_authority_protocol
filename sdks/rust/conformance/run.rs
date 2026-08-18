@@ -451,7 +451,7 @@ fn d_assemble_compact(case: &serde_json::Value, _census: &mut KeyCensus) -> bool
                 protected_segment: protected.to_vec(),
                 payload_segment: payload.to_vec(),
             };
-            match bap::assemble_compact(&input, &sig) {
+            match bap::assemble_compact(&input, &sig, None) {
                 Ok(compact) => {
                     let want = case["expected"]["compact"].as_str().unwrap();
                     String::from_utf8(compact).unwrap() == want

@@ -49,13 +49,20 @@ primitives without specifying the threading semantics. This ADR is the contract 
    some ceiling is a contract breach even when the unthreaded ceiling coincides with the maximum:
    the contract is the threading, not the value.
 
-4. **Named open divergence — `assemble_compact` stays at maximum in all three SDKs.** The Elixir
-   reference threads caller limits through `assemble_compact` (`runtime.ex:147-151`: `Bounds.coerce`
-   → `CompactJws.assemble` → `validate_assembled_compact`); the SDKs' `assemble_compact` equivalents
-   run at profile maximum only. This is a disclosed divergence awaiting maintainer direction —
-   closing it is a public-API change per SDK (a new parameter on an existing function), its own
-   slice, not a silent widening. The Go SDK (BAP-16) picks the full contract — including the
-   question this divergence leaves open — up at authoring.
+4. **Named divergence — `assemble_compact` stayed at maximum in all three SDKs; RESOLVED
+   2026-08-18 on maintainer direction.** The Elixir reference threads caller limits through
+   `assemble_compact` (`runtime.ex:147-151`: `Bounds.coerce` → `CompactJws.assemble` →
+   `validate_assembled_compact`); the SDKs' `assemble_compact` equivalents ran at profile maximum
+   only. Resolution (dated amendment; the original divergence text is preserved above): all three
+   SDKs now take an optional bounds parameter (Python `bounds: Bounds | None = None`, TypeScript
+   `bounds?: Bounds`, Rust `bounds: Option<&Bounds>` — a public-API addition per SDK, landed as its
+   own slice, never a silent widening) and thread it through the reference's assemble gates:
+   encoded-segment bounds on both segments, compact_bytes on the assembled output, and the
+   kind re-parse. `signature_bytes` carries no assemble-time gate in any implementation — it is a
+   FIXED-WIDTH key rejected at Bounds construction unless 64, so the reference's assemble-time
+   check is subsumed by Bounds validation itself. Mutation-proven per SDK (reverting the threading
+   to maximum reddens each battery's tightened-bounds legs). The Go SDK (BAP-16) picks the full
+   contract up at authoring.
 
 ## Alternatives considered
 
