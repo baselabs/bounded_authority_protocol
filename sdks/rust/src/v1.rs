@@ -1821,6 +1821,12 @@ pub fn verify_anchored_export(
     // battery's sha256-call-count leg carries the behavioral proof, this ordering is
     // pinned structurally by the Rust battery).
     {
+        // Cross-vendor round 18 (claude): the count ceiling BEFORE the hoisted per-element
+        // walk (the round-3 invariant — the hoist must not regress it; the TS sibling
+        // ordered this way from the start).
+        if expected.transitions.len() as u64 > bounds.key_transitions() {
+            return Err(Invalid);
+        }
         validate_identifier(&expected.chain.chain_id, &bounds)?;
         let mag = bounds.integer_magnitude();
         if expected.chain.first_sequence < 1
@@ -1875,11 +1881,6 @@ pub fn verify_anchored_export(
                 return Err(Invalid);
             }
         }
-    }
-
-    // The count ceiling BEFORE any per-element walk (cross-vendor round 3).
-    if expected.transitions.len() as u64 > bounds.key_transitions() {
-        return Err(Invalid);
     }
 
     // The nested-bounds pins at verify (validate_expected_anchored_export :387
