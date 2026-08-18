@@ -717,6 +717,10 @@ def _trying(fn: Callable[[], _T]) -> Result[_T]:
 # algebra (JNull..JObject) and Bounds are matched opaquely: their interiors are validated by the
 # bodies' own bounds/semantic gates, which already existed. An annotation form the gate does not
 # understand raises at import (fail fast for the developer), never silently under-validates.
+# Accepted margin (cross-vendor round 18, claude note): the gate walks caller sequences
+# element-by-element BEFORE the bodies' count ceilings run — inherent to entry-position
+# gating; the per-element cost is an isinstance check only, and constructing an oversized
+# caller list costs the caller more than the walk costs us.
 
 _OPAQUE_ANNOTATIONS = (Bounds, JNull, JBool, JInt, JFloat, JString, JArray, JObject)
 _DATACLASS_HINTS: dict[type, dict[str, object]] = {}
@@ -2140,6 +2144,11 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # malformed-expected legs assert zero sha256 calls).
     _bpre = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     _mpre = bounds_resolve(_bpre, "integer_magnitude")
+    # Cross-vendor round 18 (claude): the count ceiling BEFORE the hoisted per-element walk
+    # (the round-3 invariant — the hoist must not regress it; the TS sibling ordered this
+    # way from the start).
+    if len(expected.transitions) > bounds_resolve(_bpre, "key_transitions"):
+        fail("verify_anchored_export: transition count bound")
     _pre_identifier(expected.chain.chain_id, "verify_anchored_export: chain chain_id", _bpre)
     if (
         expected.chain.first_sequence < 1 or expected.chain.first_sequence > _mpre
@@ -2191,12 +2200,7 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
                 fail(f"verify_anchored_export: transition {_ti} key_id")
         if len(_t.current_key_fingerprint) != 32 or len(_t.next_key_fingerprint) != 32 or _bytes_equal(_t.current_key_fingerprint, _t.next_key_fingerprint):
             fail(f"verify_anchored_export: transition {_ti} fingerprints")
-    # The count ceiling FIRST (cross-vendor: even the static-bindings walk ran
-    # unbounded caller input before it — instrumented 257-element inputs were
-    # fully read before rejection).
-    _vb0 = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
-    if len(expected.transitions) > bounds_resolve(_vb0, "key_transitions"):
-        fail("verify_anchored_export: transition count bound")
+    _vb0 = _bpre
     # Key-window validity BEFORE chunk processing/hashing (the reference validates
     # key shapes at :91 before validate_chunks — malformed intervals should not
     # force processing of the full archive).
@@ -2220,7 +2224,9 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
         # the reference's ASCII-unreserved key_id class, pre-hash (round 15)
         if not _k.key_id.isascii() or not all(c.isalnum() or c in "-._~" for c in _k.key_id):
             fail("verify_anchored_export: key id charset")
-        if not isinstance(_k.public_key, (bytes, bytearray)) or len(_k.public_key) != 32:
+        # (the isinstance half is owned by the _closed_shape gate — exact bytes;
+        # the WIDTH is still this gate's to check)
+        if len(_k.public_key) != 32:
             fail("verify_anchored_export: key width")
     for _k in key_chain.keys:
         _vf0 = _expected_int(_k.valid_from, "verify_anchored_export: key valid_from type")
@@ -2645,12 +2651,9 @@ def _validate_chunks(chunks: Sequence[bytes], bounds: Bounds = MAXIMUM_BOUNDS) -
     """Validate the chunk list BEFORE concatenation (anchored_export_codec.ex:333-342
     validate_chunks): at least one chunk, each chunk nonempty, count < archive_chunks, running total
     ≤ archive_bytes."""
-    # Chunk elements must be bytes-like (cross-vendor round 17: a str chunk
-    # passed the len gate then raised TypeError at the hash — the escape class
-    # the adjacent gates close).
-    for _c in chunks:
-        if not isinstance(_c, (bytes, bytearray)):
-            fail("verify_anchored_export: chunk type")
+    # (chunk TYPE is owned by the _closed_shape gate — tuple[bytes, ...]; cross-vendor
+    # round 18 reconciled the previously bytearray-tolerant arm to the gate's exact-bytes
+    # contract. The round-17 escape class it closed is pinned by the family sweep.)
     if len(chunks) == 0:
         fail("archive: no chunks")
     # Cross-vendor re-review Finding 2: the reference's validate_chunks guard is

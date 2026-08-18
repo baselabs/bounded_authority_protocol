@@ -6,6 +6,21 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- **Cross-vendor review round 18 (codex blocking + claude should-fix/notes, all closed).**
+  Codex (blocking): the TS shape gate's nested expected-export members were opaque `"object"`
+  specs, so a malformed nested struct (chain missing `previousHash`, empty anchor) passed the
+  gate and the clause-3 hoist then derefed the missing field — a `TypeError` escape past
+  `trying()`; the nested members are now fully specified (chain/anchor/transition field shapes,
+  `archived.chunks` as a bytes sequence), red-leg + mutation proven (opaque specs → RED). Claude
+  (should-fix): the Python and Rust hoists walked `expected.transitions` per-element BEFORE the
+  `key_transitions` count ceiling, regressing the round-3 ceiling-first invariant the TS sibling
+  kept; the ceiling now runs at the top of the hoist in both (the dead later duplicate removed).
+  Claude (notes, reconciled): the entry-position shape gate's sequence walks before count
+  ceilings are a documented accepted margin (typeof-only per element); Python's body-level
+  `bytearray` tolerance was dead under the exact-bytes gate and is reconciled to bytes-only.
+  The timed-out fable peer's transcript was mined: it was converging on the ordering finding
+  (fixed) and an API-shape note that is benign (the SDKs' optional bounds default to maximum —
+  behavior-identical to the reference's public façade).
 - **Round-12..14 per-clause pin debt paid on the touched surfaces (ADR 0017's Honest limit,
   amended).** The 2026-08-18 cluster's legs double as the owed per-clause pins: the pre-digest
   export gates (version shape/equality, key-count, key-id charset, key magnitude) are now pinned as
