@@ -95,6 +95,23 @@ mutation probe shows each round-15 defect re-emerging when its gate is removed),
 of the gate cluster still passes the SDK battery green. The per-leg pins are owed follow-up work
 (maintainer-directed). This ADR records the contract; it does not claim the pin debt is paid.
 
+**Pin-debt payment, 2026-08-18 (maintainer-directed: legs land alongside the fix that touches each
+clause's surface).** The 2026-08-18 fix cluster paid per-clause pins on its touched surfaces:
+the closed-Result family sweeps (clause 1, all 17 façades, mutation-proven per façade in Python and
+TypeScript); the expected-struct pre-digest hoist work pin (clause 3, Python monkeypatched-counter,
+mutation-proven) with TS/Rust structural order pins; the assemble_compact bounds threading legs
+(ADR 0018 resolution, mutation-proven per SDK); and the round-12..14 pre-digest export gates —
+version shape/equality, key-count, key-id charset, key magnitude — as WORK pins (Python,
+all five mutation-proven load-bearing) plus TS/Rust verdict matrices. ROOT CAUSE the arc's own
+symptom exposed ("a full revert still passes green"): each pre-digest gate is VERDICT-SUBSUMED by a
+later gate (probe-evidenced: count → key-chain-length, charset → anchor kid-match, magnitude → the
+per-anchor window re-check), so verdict legs are structurally impossible — the red-capable form is
+the work pin (reject with zero hash calls), which is why the debt looked unpayable in verdict form.
+**Still owed:** per-clause pins on untouched surfaces — the standalone
+`verify_historical_anchor`/`verify_key_transition` `anchor_bytes` gates (round 12) and the
+allocation-bounds family (round 15) — and per-SDK work pins in TS/Rust await a host work-observation
+channel (none exists today; the Python pin is normative for the inter-SDK clause).
+
 **Two verified exceptions, surfaced by this ADR's own authoring review (cross-vendor, 2026-08-17)
 and routed as SDK-code fixes — the ADR does not certify them away:**
 

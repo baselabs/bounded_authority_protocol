@@ -610,9 +610,12 @@ threading leg joint-by-construction per the settled diff-review record). **The S
 maximum-bounds delta is CLOSED for the archive façades** (`b4ca616`): five `Option<Bounds>` fields, the nested pins
 with identity semantics, threading at encode/verify/standalone, the chunk-count magic pin,
 27 mutation-proven legs at closeout (permissiveness 67), and a 7/7 Elixir oracle receipt (scope driver: the 2026-08-14 session direction — recorded here as the
-session's input, not as this record's verdict). **ONE named residual remains:**
+session's input, not as this record's verdict). **ONE named residual remained:**
 `assemble_compact` stays at maximum in all three SDKs while the reference threads caller limits
-there too (`runtime.ex:147-151`) — a disclosed open divergence awaiting the user's direction.
+there too (`runtime.ex:147-151`) — a disclosed open divergence awaiting the user's direction —
+**resolved 2026-08-18 on maintainer direction**: all three SDKs take an optional bounds parameter
+and thread the reference's assemble gates (segment bounds, compact_bytes, kind re-parse);
+mutation-proven per SDK. See ADR 0018 decision 4's dated resolution.
 The Go SDK (BAP-16) picks the whole contract up at authoring.
 
 **2026-08-14 amendment #3 — the cross-vendor hardening arc + the terminal range state
@@ -636,8 +639,9 @@ floors clean (fmt/clippy `-D warnings`, mypy, ruff, tsc). **Named residuals (rou
 (1) **F1 test debt** — the round-12..17 gates ship with zero per-clause red-capable battery legs;
 every gate is proven load-bearing (the delta-4 mutation probe shows each round-15 defect re-emerges
 when its gate is removed) but a full revert of the gate cluster still passes the SDK battery green —
-the per-leg pins are owed as a user-directed follow-up; (2) `assemble_compact` stays at
-maximum-bounds in all three SDKs (amendment #2's disclosed divergence); (3) the Go SDK (BAP-16) is
+the per-leg pins are owed as a user-directed follow-up; (2) ~~`assemble_compact` stays at
+maximum-bounds in all three SDKs~~ **resolved 2026-08-18** — bounds threaded per ADR 0018
+decision 4's resolution; (3) the Go SDK (BAP-16) is
 un-started and picks the whole accumulated contract up at authoring. **2026-08-17 addendum — two
 verified contract exceptions from the ADR-0017 authoring review** (cross-vendor, both probed
 against substrate; disclosed as ADR 0017's named exceptions, routed as SDK-code fixes): (4) a

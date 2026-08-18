@@ -2269,13 +2269,13 @@ def test_verify_export_malformed_expected_rejects_before_hashing(monkeypatch):
         return verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected)
 
     malformed_cases = [
-        ("anchor_id over identifier_bytes", dict(anchor_id="x" * 600)),
-        ("anchor key_id charset", dict(key_id="bad key!")),
-        ("anchored_at over magnitude", dict(anchored_at=10 ** 16)),
-        ("anchor sequence negative", dict(sequence=-1)),
-        ("key_fingerprint width", dict(key_fingerprint=b"\x00" * 31)),
-        ("chain row_count zero", dict(chain_row_count=0)),
-        ("chain first > last", dict(chain_first_sequence=5)),
+        ("anchor_id over identifier_bytes", {"anchor_id": "x" * 600}),
+        ("anchor key_id charset", {"key_id": "bad key!"}),
+        ("anchored_at over magnitude", {"anchored_at": 10 ** 16}),
+        ("anchor sequence negative", {"sequence": -1}),
+        ("key_fingerprint width", {"key_fingerprint": b"\x00" * 31}),
+        ("chain row_count zero", {"chain_row_count": 0}),
+        ("chain first > last", {"chain_first_sequence": 5}),
     ]
     for label, mutations in malformed_cases:
         calls.clear()
@@ -2308,3 +2308,143 @@ def test_verify_export_malformed_expected_transition_verdicts():
         reset_census()
         r = verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected)
         assert not r.is_ok, f"{label}: must reject"
+
+
+# ---------------------------------------------------------------------------
+# The assemble_compact caller-bounds threading (ADR 0018's named divergence,
+# closed 2026-08-18). The reference takes limits at assemble (runtime.ex:147-155 →
+# CompactJws.assemble:34-48 — encoded segment bounds, signature width ≤ signature_bytes,
+# compact_bytes, and the kind re-parse, all against Bounds.coerce(limits)); the SDKs
+# hardcoded maximum. Maintainer direction 2026-08-18: thread caller-tightenable bounds.
+#
+# RED-CAPABILITY: pre-fix, assemble_compact took no bounds parameter at all — this test
+# failed with TypeError on the kwarg (the API-shape red); with the parameter present but
+# unthreaded (revert to MAXIMUM_BOUNDS internally), the three tightened cases return Ok
+# and the assertions go RED.
+# ---------------------------------------------------------------------------
+
+
+def test_assemble_compact_threads_caller_bounds():
+    grant = GrantProducer(
+        key_id="k1", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        holder_thumbprint=_b64url(bytes([1] * 32)),
+        operations=(OperationInput(name="read", selectors=("all",)),),
+    )
+    si = grant_signing_input(grant)
+    assert si.is_ok
+    sig = b"\x05" * 64
+    # Control: absent bounds = maximum → assembly succeeds.
+    control = assemble_compact(si.value, sig)
+    assert control.is_ok, "control: maximum-bounds assembly must succeed"
+    n = len(control.value)
+    # Tightened compact_bytes just below the assembled size → reject.
+    r = assemble_compact(si.value, sig, bounds=bounds_new({"compact_bytes": n - 1}))
+    assert not r.is_ok, "tightened compact_bytes must reject the assembly"
+    # (signature_bytes is a FIXED-WIDTH bound — untightenable by design; the gate exists
+    # in the impl for reference fidelity but no leg can exercise it below 64.)
+    # Tightened encoded_segment_bytes below the protected segment length → reject.
+    r = assemble_compact(si.value, sig, bounds=bounds_new({"encoded_segment_bytes": len(si.value.protected_segment) - 1}))
+    assert not r.is_ok, "tightened encoded_segment_bytes must reject the protected segment"
+    # Tightened kid_bytes below the produced kid ("k1" is 2 bytes; 1 rejects at the re-parse).
+    r = assemble_compact(si.value, sig, bounds=bounds_new({"kid_bytes": 1}))
+    assert not r.is_ok, "tightened kid_bytes must reject at the kind re-parse"
+
+
+# ---------------------------------------------------------------------------
+# The round-12..17 per-clause pin debt, paid on the surfaces the 2026-08-18 fix
+# cluster touched (maintainer direction: legs land alongside the fix that touches
+# each clause's surface). These legs pin the pre-digest export-verify gates the
+# hardening arc added (rounds 12-14). Each gate is VERDICT-SUBSUMED by a later
+# gate (probe-evidenced: count → "key chain length", charset → "start: kid",
+# magnitude → "end: valid_before magnitude", shape/equality → the parse), so the
+# red-capable pin is the WORK form in the monkeypatched-counter leg below — each
+# was verified load-bearing at authoring by mechanically removing its gate and
+# watching the work pin go RED (all five proven 2026-08-18). The verdict-matrix
+# leg that follows is regression coverage, not the red-capable pin. Clauses on
+# UNTOUCHED surfaces (the standalone verify_historical_anchor /
+# verify_key_transition anchor_bytes gates, allocation bounds) remain disclosed
+# debt per ADR 0017's Honest limit.
+# ---------------------------------------------------------------------------
+
+
+def test_round12_14_export_predigest_gates_work_pinned(monkeypatch):
+    """The round-12..14 pre-digest export gates as WORK pins. Each is verdict-subsumed by a
+    later gate (probe-evidenced 2026-08-18: count → "key chain length", charset → "start:
+    kid", magnitude → "end: valid_before magnitude" fire AFTER the digest when the pre-digest
+    gate is removed), so a verdict leg cannot be red-capable — the red-capable form is the
+    work pin: each malformation must reject with ZERO sha256 calls. Removing any pre-digest
+    gate sends its case to the subsuming post-digest gate → the count goes RED."""
+    from dataclasses import replace as _replace
+
+    import bounded_authority_verifier.v1 as v1mod
+
+    calls = []
+    real = v1mod.sha256
+
+    def counting(prefix, *data):
+        calls.append(1)
+        return real(prefix, *data)
+
+    monkeypatch.setattr(v1mod, "sha256", counting)
+    built = _build_archive([_fresh_key(), _fresh_key()])
+    kc, exp = built["key_chain"], built["expected"]
+
+    def verify(o, keys=kc, expected=exp):
+        reset_census()
+        return verify_anchored_export(o, keys, expected)
+
+    base_obj = ArchivedObject(chunks=(built["archive"],), version="v1")
+    assert verify(base_obj).is_ok, "control"
+    extra = HistoricalPublicKey(key_id="k-x", public_key=_fresh_key()[0], valid_from=0, valid_before=None)
+    bad_charset = _replace(kc.keys[0], key_id="bad key!")
+    huge = _replace(kc.keys[1], valid_before=10 ** 16)
+    long_version = "x" * 600
+    cases = [
+        ("version shape (both equal, over bound)",
+         lambda: verify(ArchivedObject(chunks=(built["archive"],), version=long_version),
+                        expected=_replace(exp, object_version=long_version))),
+        ("version equality", lambda: verify(ArchivedObject(chunks=(built["archive"],), version="v2"))),
+        ("key count (extra unused key)",
+         lambda: verify(base_obj, keys=HistoricalKeyChain(keys=kc.keys + (extra,)))),
+        ("key charset", lambda: verify(base_obj, keys=HistoricalKeyChain(keys=(bad_charset,) + kc.keys[1:]))),
+        ("key magnitude", lambda: verify(base_obj, keys=HistoricalKeyChain(keys=kc.keys[:1] + (huge,)))),
+    ]
+    for label, run in cases:
+        calls.clear()
+        r = run()
+        assert not r.is_ok, f"{label}: must reject"
+        assert calls == [], f"{label}: rejected only AFTER hashing ({len(calls)} calls) — the pre-digest gate is missing or unthreaded"
+
+
+def test_round12_14_export_predigest_gates_pinned():
+    from dataclasses import replace as _replace
+
+    built = _build_archive([_fresh_key(), _fresh_key()])
+    obj = lambda version: ArchivedObject(chunks=(built["archive"],), version=version)  # noqa: E731
+    kc, exp = built["key_chain"], built["expected"]
+
+    def verify(o=obj("v1"), keys=kc, expected=exp):
+        reset_census()
+        return verify_anchored_export(o, keys, expected)
+
+    # Control.
+    assert verify().is_ok
+    # R12/R13: version SHAPE — both versions identical but over object_version_bytes.
+    long_version = "x" * 600
+    assert not verify(o=obj(long_version), expected=_replace(exp, object_version=long_version)).is_ok, \
+        "an over-bound object version (both sides equal) must reject at the shape gate"
+    # R13/R14: version EQUALITY — shape-fine, values differ.
+    assert not verify(o=obj("v2")).is_ok, "a version mismatch must reject at the equality gate"
+    # R13: strict pre-digest key-count — an extra valid-but-unused key.
+    extra = HistoricalPublicKey(key_id="k-x", public_key=_fresh_key()[0], valid_from=0, valid_before=None)
+    assert not verify(keys=HistoricalKeyChain(keys=kc.keys + (extra,))).is_ok, \
+        "keys != transitions + 1 must reject pre-digest even when every used key verifies"
+    # R15: key-window key_id charset class, pre-hash.
+    bad_charset = _replace(kc.keys[0], key_id="bad key!")
+    assert not verify(keys=HistoricalKeyChain(keys=(bad_charset,) + kc.keys[1:])).is_ok, \
+        "a non-ASCII-unreserved key-window key_id must reject pre-hash"
+    # R14: key-window magnitude, pre-hash.
+    huge = _replace(kc.keys[1], valid_before=10 ** 16)
+    assert not verify(keys=HistoricalKeyChain(keys=kc.keys[:1] + (huge,))).is_ok, \
+        "an over-magnitude valid_before must reject pre-hash"

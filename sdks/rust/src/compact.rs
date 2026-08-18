@@ -325,7 +325,7 @@ mod tests {
                     // per-kind content validation), not the internal composer —
                     // so the conformance corpus covers the spec surface.
                     let compact =
-                        crate::assemble_compact(&input, &sig).expect("valid case assembles");
+                        crate::assemble_compact(&input, &sig, None).expect("valid case assembles");
                     let expected_compact = case["expected"]["compact"]
                         .as_str()
                         .unwrap_or_else(|| panic!("valid case {id} missing expected.compact"));

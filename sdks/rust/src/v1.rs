@@ -531,9 +531,27 @@ fn scan_compact(compact: &[u8], bounds: &Bounds) -> Result<()> {
 /// to a structurally-invalid credential — wrong segment count, non-canonical
 /// base64url, or a header/payload that does not parse as the declared kind's
 /// closed header/claim set — is rejected.
-pub fn assemble_compact(input: &SigningInput, signature: &[u8; 64]) -> Result<Vec<u8>> {
+pub fn assemble_compact(
+    input: &SigningInput,
+    signature: &[u8; 64],
+    bounds: Option<&Bounds>,
+) -> Result<Vec<u8>> {
+    // ADR 0018 divergence closed (2026-08-18): the reference takes limits at assemble
+    // (runtime.ex:147-155 → CompactJws.assemble:34-48 — encoded segment bounds, signature
+    // width ≤ signature_bytes, compact_bytes, and the kind re-parse, all against
+    // Bounds.coerce(limits)); the SDK previously hardcoded maximum. None = maximum.
+    let bounds = resolve_bounds(bounds);
+    if input.protected_segment.len() as u64 > bounds.encoded_segment_bytes()
+        || input.payload_segment.len() as u64 > bounds.encoded_segment_bytes()
+    {
+        return Err(Invalid);
+    }
+    // (signature_bytes needs no gate: it is a FIXED-WIDTH key rejected at Bounds
+    // construction unless 64 — the reference's assemble-time check is subsumed.)
     let compact = compact::compose_compact(input, signature)?;
-    let bounds = Bounds::maximum();
+    if compact.len() as u64 > bounds.compact_bytes() {
+        return Err(Invalid);
+    }
     match input.kind {
         SigningKind::Grant => {
             decode_grant_parts(&compact, &bounds)?;
@@ -4253,7 +4271,7 @@ mod tests {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: produced.payload_segment.clone(),
         };
-        let compact = crate::assemble_compact(&signing_input, &sig).expect("assemble");
+        let compact = crate::assemble_compact(&signing_input, &sig, None).expect("assemble");
         // decode_grant round-trips the protected header + payload.
         let decoded = decode_grant(&compact, &max()).expect("decode");
         assert_eq!(decoded.key_id, grant.key_id);
@@ -4276,7 +4294,7 @@ mod tests {
             protected_segment: b"YQ".to_vec(), // decodes to "a" — not a grant header
             payload_segment: b"Yg".to_vec(),   // decodes to "b"
         };
-        assert_eq!(crate::assemble_compact(&bad, &sig), Err(Invalid));
+        assert_eq!(crate::assemble_compact(&bad, &sig, None), Err(Invalid));
     }
 
     // ==========================================================================

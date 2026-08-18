@@ -1562,9 +1562,17 @@ def _jwk_to_tagged(jwk: OkpPublic) -> Tagged:
 # oversized segment, non-base64url payload, or malformed payload content fails closed — the producer
 # must not mint bytes its own consumer (verify) would reject.
 @_closed_shape
-def assemble_compact(input_: SigningInput, signature: bytes) -> Result[bytes]:
+def assemble_compact(input_: SigningInput, signature: bytes, bounds: Bounds | None = None) -> Result[bytes]:
     def body() -> bytes:
-        b = MAXIMUM_BOUNDS
+        # ADR 0018 divergence closed (2026-08-18): the reference takes limits at assemble
+        # (runtime.ex:147-155 → CompactJws.assemble:34-48 — encoded segment bounds, signature
+        # width ≤ signature_bytes, compact_bytes, all against Bounds.coerce(limits)); the SDK
+        # previously hardcoded maximum. Absent bounds = maximum (backward compatible).
+        b = coerce_bounds(bounds if bounds is not None else MAXIMUM_BOUNDS)
+        if len(input_.protected_segment) > bounds_resolve(b, "encoded_segment_bytes") or len(input_.payload_segment) > bounds_resolve(b, "encoded_segment_bytes"):
+            fail("assemble_compact: segment bound")
+        # (signature_bytes needs no gate: it is a FIXED-WIDTH key rejected at bounds_new
+        # unless 64 — the reference's assemble-time check is subsumed.)
         assembled = assemble_segments(input_, signature)
         if not isinstance(assembled, Ok):
             fail("assemble_compact: signing input")

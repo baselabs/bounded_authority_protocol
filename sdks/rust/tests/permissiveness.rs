@@ -460,7 +460,7 @@ fn canonical_form_anchor_header_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64],
+        &[0u8; 64], None
     );
     assert!(canonical.is_ok(), "canonical anchor must assemble");
     // Non-canonical protected header (members reversed, values untouched).
@@ -470,7 +470,7 @@ fn canonical_form_anchor_header_rejected() {
             protected_segment: reversed_segment(&produced.protected_segment),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64],
+        &[0u8; 64], None
     );
     assert!(r.is_err(), "non-canonical anchor header must reject");
 }
@@ -486,7 +486,7 @@ fn canonical_form_anchor_payload_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: reversed_segment(&produced.payload_segment),
         },
-        &[0u8; 64],
+        &[0u8; 64], None
     );
     assert!(r.is_err(), "non-canonical anchor payload must reject");
 }
@@ -502,7 +502,7 @@ fn canonical_form_transition_header_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64],
+        &[0u8; 64], None
     );
     assert!(canonical.is_ok(), "canonical transition must assemble");
     // Non-canonical protected header.
@@ -512,7 +512,7 @@ fn canonical_form_transition_header_rejected() {
             protected_segment: reversed_segment(&produced.protected_segment),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64],
+        &[0u8; 64], None
     );
     assert!(r.is_err(), "non-canonical transition header must reject");
 }
@@ -528,7 +528,7 @@ fn canonical_form_transition_payload_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: reversed_segment(&produced.payload_segment),
         },
-        &[0u8; 64],
+        &[0u8; 64], None
     );
     assert!(r.is_err(), "non-canonical transition payload must reject");
 }
@@ -2730,3 +2730,94 @@ fn verify_export_malformed_expected_verdict_matrix() {
     assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "chain row_count zero");
 }
 
+
+// =============================================================================
+// The assemble_compact caller-bounds threading (ADR 0018's named divergence,
+// closed 2026-08-18). The reference takes limits at assemble (runtime.ex:147-155
+// → CompactJws.assemble:34-48 — encoded segment bounds, signature width ≤
+// signature_bytes, compact_bytes, and the kind re-parse, all against
+// Bounds.coerce(limits)); the SDK hardcoded maximum. Maintainer direction
+// 2026-08-18: thread caller-tightenable bounds.
+//
+// RED-CAPABILITY: pre-fix this test did not COMPILE — assemble_compact took no
+// bounds parameter (the arity IS the API-shape red; recorded in the landing).
+// With the parameter present but unthreaded (revert the internals to maximum),
+// the tightened cases return Ok and the assertions go RED.
+// =============================================================================
+
+#[test]
+fn assemble_compact_threads_caller_bounds() {
+    use bounded_authority_protocol::{
+        assemble_compact, grant_signing_input, types::GrantInput, types::GrantOperation,
+        types::SigningInput, types::SigningKind, JsonValue,
+    };
+
+    let grant = GrantInput {
+        key_id: "k1".to_string(),
+        issuer: "https://issuer.example.test".to_string(),
+        grant_id: "urn:example:grant:1".to_string(),
+        audiences: vec!["https://resource.example.test".to_string()],
+        issued_at: 1000,
+        not_before: 1000,
+        expires_at: 2000,
+        holder_thumbprint: [1u8; 32],
+        operations: vec![GrantOperation {
+            name: "read".to_string(),
+            selectors: vec![JsonValue::Object(vec![(
+                "kind".to_string(),
+                JsonValue::String("all".to_string()),
+            )])],
+        }],
+    };
+    let produced = grant_signing_input(&grant, &max()).expect("signing input");
+    let si = SigningInput {
+        kind: SigningKind::Grant,
+        protected_segment: produced.protected_segment.clone(),
+        payload_segment: produced.payload_segment.clone(),
+    };
+    let sig = [5u8; 64];
+    // Control: None = maximum → assembly succeeds.
+    let control = assemble_compact(&si, &sig, None).expect("control: maximum-bounds assembly");
+    let n = control.len();
+    assert!(assemble_compact(&si, &sig, Some(&tight(&[("compact_bytes", n as u64 - 1)]))).is_err(),
+        "tightened compact_bytes must reject the assembly");
+    // (signature_bytes is a FIXED-WIDTH bound — untightenable by design; no leg can
+    // exercise it below 64.)
+    assert!(assemble_compact(&si, &sig, Some(&tight(&[("encoded_segment_bytes", si.protected_segment.len() as u64 - 1)]))).is_err(),
+        "tightened encoded_segment_bytes must reject the protected segment");
+    assert!(assemble_compact(&si, &sig, Some(&tight(&[("kid_bytes", 1)]))).is_err(),
+        "tightened kid_bytes must reject at the kind re-parse");
+}
+
+// =============================================================================
+// The round-12..14 pre-digest export gates — verdict-matrix regression pins (the
+// Rust half of the 2026-08-18 pin-debt payment). The red-capable WORK form of
+// these pins lives in the Python battery (verdict-subsumed gates; static calls
+// give Rust no sha256-count channel — the established convention from the
+// exception-2 hoist).
+// =============================================================================
+
+#[test]
+fn round12_14_predigest_export_gates_verdict_matrix() {
+    use bounded_authority_protocol::{verify_anchored_export, types::HistoricalPublicKey};
+    let f = corpus_export_verify_fixture();
+    assert!(verify_anchored_export(&f.obj, &f.keys, &f.expected).is_ok(), "control must verify");
+
+    let mut v = f.expected.clone();
+    v.object_version = "v2".to_string();
+    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "version equality");
+
+    let extra = HistoricalPublicKey {
+        key_id: "k-x".to_string(),
+        public_key: KEY_A,
+        valid_from: 0,
+        valid_before: ValidityUpperBound::Unbounded,
+    };
+    let mut keys = f.keys.clone();
+    keys.keys.push(extra);
+    assert!(verify_anchored_export(&f.obj, &keys, &f.expected).is_err(), "key count");
+
+    let mut bad = f.keys.clone();
+    bad.keys[0].key_id = "bad key!".to_string();
+    assert!(verify_anchored_export(&f.obj, &bad, &f.expected).is_err(), "key charset");
+}

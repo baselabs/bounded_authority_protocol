@@ -6,6 +6,23 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- **Round-12..14 per-clause pin debt paid on the touched surfaces (ADR 0017's Honest limit,
+  amended).** The 2026-08-18 cluster's legs double as the owed per-clause pins: the pre-digest
+  export gates (version shape/equality, key-count, key-id charset, key magnitude) are now pinned as
+  WORK legs in the Python battery (reject with zero sha256 calls — all five mutation-proven
+  load-bearing) with TS/Rust verdict matrices. Root cause of the "unpayable" debt: each gate is
+  verdict-subsumed by a later gate, so verdict legs were structurally impossible; the work form is
+  the red-capable pin. Still owed and disclosed: the standalone anchor-path `anchor_bytes` gates
+  (round 12) and allocation bounds (round 15) on untouched surfaces.
+- **ADR 0018's named `assemble_compact` divergence closed: caller bounds threaded through
+  assembly in all three SDKs.** The reference takes limits at assemble (`runtime.ex:147-155` →
+  `CompactJws.assemble` — encoded-segment bounds, compact_bytes, and the kind re-parse against
+  `Bounds.coerce(limits)`); the SDKs hardcoded maximum. Each SDK now takes an optional bounds
+  parameter (Python `bounds: Bounds | None = None`, TypeScript `bounds?: Bounds`, Rust
+  `bounds: Option<&Bounds>` — an additive public-API change; absent bounds = maximum, backward
+  compatible) and threads it through the reference's gates. `signature_bytes` carries no
+  assemble-time gate — fixed-width at Bounds construction (the reference's check is subsumed).
+  Mutation-proven per SDK (reverting the threading reddens each battery's tightened-bounds legs).
 - **ADR 0017 exception 2 closed: the expected-anchor identity ordering divergence (all three
   SDKs).** The reference validates the expected struct (chain + both anchors' identity/binding
   well-formedness + transitions) BEFORE hashing the archive chunks (`anchored_export_codec.ex:88-104`);
