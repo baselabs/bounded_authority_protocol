@@ -324,6 +324,19 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- **Documentation corrections (2026-08-18 alignment-audit items 1, 4, 7).** SECURITY.md's "most
+  recent package-bearing verified source" re-anchored from the BAP-06 head to the SDK
+  behavioral-closure cluster head `c281938`, with the superlative date-bounded ("as of
+  2026-08-18") so the claim expires visibly instead of silently: CI run 32118915019 and
+  supply-chain run 32118915034 passed at that exact revision, and the doc's own verification
+  recipe was re-run against the downloaded archive — checksum OK (ubuntu-built archive SHA-256
+  `c9b5b0cf…`), SLSA build-provenance attestation verified constrained to this repository, the
+  supply-chain workflow, `refs/heads/main`, that source digest, and GitHub-hosted runners; BAP-06
+  `4c64be3` joins the earlier-heads list. The TypeScript conformance runner's startup comment
+  miscited the corpus binding as "ADR 0014 D8" (enforcement posture) — corrected to D4, matching
+  the file's own correct citations. usage-rules rule 13's era-frozen "BAP-04 verification is
+  implemented" now states the v1 verification surface is implemented. Docs-only — no code, wire,
+  bound, or verdict change.
 - **Documentation reconciliation — status prose frozen at the BAP-10 era (alignment-audit items
   1–9).** `AGENTS.md` "Current state" rewritten from the tracker: names the closed set (BAP-00..06,
   08..11, 13..15, 17), the three verifier SDKs under `sdks/` (ADR 0014/0015 graduation topology,
