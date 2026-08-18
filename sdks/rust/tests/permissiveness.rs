@@ -460,7 +460,8 @@ fn canonical_form_anchor_header_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64], None
+        &[0u8; 64],
+        None,
     );
     assert!(canonical.is_ok(), "canonical anchor must assemble");
     // Non-canonical protected header (members reversed, values untouched).
@@ -470,7 +471,8 @@ fn canonical_form_anchor_header_rejected() {
             protected_segment: reversed_segment(&produced.protected_segment),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64], None
+        &[0u8; 64],
+        None,
     );
     assert!(r.is_err(), "non-canonical anchor header must reject");
 }
@@ -486,7 +488,8 @@ fn canonical_form_anchor_payload_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: reversed_segment(&produced.payload_segment),
         },
-        &[0u8; 64], None
+        &[0u8; 64],
+        None,
     );
     assert!(r.is_err(), "non-canonical anchor payload must reject");
 }
@@ -502,7 +505,8 @@ fn canonical_form_transition_header_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64], None
+        &[0u8; 64],
+        None,
     );
     assert!(canonical.is_ok(), "canonical transition must assemble");
     // Non-canonical protected header.
@@ -512,7 +516,8 @@ fn canonical_form_transition_header_rejected() {
             protected_segment: reversed_segment(&produced.protected_segment),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64], None
+        &[0u8; 64],
+        None,
     );
     assert!(r.is_err(), "non-canonical transition header must reject");
 }
@@ -528,7 +533,8 @@ fn canonical_form_transition_payload_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: reversed_segment(&produced.payload_segment),
         },
-        &[0u8; 64], None
+        &[0u8; 64],
+        None,
     );
     assert!(r.is_err(), "non-canonical transition payload must reject");
 }
@@ -2711,25 +2717,39 @@ fn verify_export_malformed_expected_verdict_matrix() {
     // them; the identifier/magnitude/charset/sequence cases carry the matrix.)
     let mut v = f.expected.clone();
     v.start_anchor.anchor_id = "x".repeat(600);
-    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "anchor_id over identifier_bytes");
+    assert!(
+        verify_anchored_export(&f.obj, &f.keys, &v).is_err(),
+        "anchor_id over identifier_bytes"
+    );
 
     let mut v = f.expected.clone();
     v.start_anchor.key_id = "bad key!".to_string();
-    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "anchor key_id charset");
+    assert!(
+        verify_anchored_export(&f.obj, &f.keys, &v).is_err(),
+        "anchor key_id charset"
+    );
 
     let mut v = f.expected.clone();
     v.start_anchor.anchored_at = 10_i64.pow(16);
-    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "anchored_at over magnitude");
+    assert!(
+        verify_anchored_export(&f.obj, &f.keys, &v).is_err(),
+        "anchored_at over magnitude"
+    );
 
     let mut v = f.expected.clone();
     v.start_anchor.sequence = -1;
-    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "anchor sequence negative");
+    assert!(
+        verify_anchored_export(&f.obj, &f.keys, &v).is_err(),
+        "anchor sequence negative"
+    );
 
     let mut v = f.expected.clone();
     v.chain.row_count = 0;
-    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "chain row_count zero");
+    assert!(
+        verify_anchored_export(&f.obj, &f.keys, &v).is_err(),
+        "chain row_count zero"
+    );
 }
-
 
 // =============================================================================
 // The assemble_compact caller-bounds threading (ADR 0018's named divergence,
@@ -2779,14 +2799,28 @@ fn assemble_compact_threads_caller_bounds() {
     // Control: None = maximum → assembly succeeds.
     let control = assemble_compact(&si, &sig, None).expect("control: maximum-bounds assembly");
     let n = control.len();
-    assert!(assemble_compact(&si, &sig, Some(&tight(&[("compact_bytes", n as u64 - 1)]))).is_err(),
-        "tightened compact_bytes must reject the assembly");
+    assert!(
+        assemble_compact(&si, &sig, Some(&tight(&[("compact_bytes", n as u64 - 1)]))).is_err(),
+        "tightened compact_bytes must reject the assembly"
+    );
     // (signature_bytes is a FIXED-WIDTH bound — untightenable by design; no leg can
     // exercise it below 64.)
-    assert!(assemble_compact(&si, &sig, Some(&tight(&[("encoded_segment_bytes", si.protected_segment.len() as u64 - 1)]))).is_err(),
-        "tightened encoded_segment_bytes must reject the protected segment");
-    assert!(assemble_compact(&si, &sig, Some(&tight(&[("kid_bytes", 1)]))).is_err(),
-        "tightened kid_bytes must reject at the kind re-parse");
+    assert!(
+        assemble_compact(
+            &si,
+            &sig,
+            Some(&tight(&[(
+                "encoded_segment_bytes",
+                si.protected_segment.len() as u64 - 1
+            )]))
+        )
+        .is_err(),
+        "tightened encoded_segment_bytes must reject the protected segment"
+    );
+    assert!(
+        assemble_compact(&si, &sig, Some(&tight(&[("kid_bytes", 1)]))).is_err(),
+        "tightened kid_bytes must reject at the kind re-parse"
+    );
 }
 
 // =============================================================================
@@ -2799,13 +2833,19 @@ fn assemble_compact_threads_caller_bounds() {
 
 #[test]
 fn round12_14_predigest_export_gates_verdict_matrix() {
-    use bounded_authority_protocol::{verify_anchored_export, types::HistoricalPublicKey};
+    use bounded_authority_protocol::{types::HistoricalPublicKey, verify_anchored_export};
     let f = corpus_export_verify_fixture();
-    assert!(verify_anchored_export(&f.obj, &f.keys, &f.expected).is_ok(), "control must verify");
+    assert!(
+        verify_anchored_export(&f.obj, &f.keys, &f.expected).is_ok(),
+        "control must verify"
+    );
 
     let mut v = f.expected.clone();
     v.object_version = "v2".to_string();
-    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "version equality");
+    assert!(
+        verify_anchored_export(&f.obj, &f.keys, &v).is_err(),
+        "version equality"
+    );
 
     let extra = HistoricalPublicKey {
         key_id: "k-x".to_string(),
@@ -2815,9 +2855,15 @@ fn round12_14_predigest_export_gates_verdict_matrix() {
     };
     let mut keys = f.keys.clone();
     keys.keys.push(extra);
-    assert!(verify_anchored_export(&f.obj, &keys, &f.expected).is_err(), "key count");
+    assert!(
+        verify_anchored_export(&f.obj, &keys, &f.expected).is_err(),
+        "key count"
+    );
 
     let mut bad = f.keys.clone();
     bad.keys[0].key_id = "bad key!".to_string();
-    assert!(verify_anchored_export(&f.obj, &bad, &f.expected).is_err(), "key charset");
+    assert!(
+        verify_anchored_export(&f.obj, &bad, &f.expected).is_err(),
+        "key charset"
+    );
 }
