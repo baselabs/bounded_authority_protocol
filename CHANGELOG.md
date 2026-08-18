@@ -4,6 +4,21 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **ADR 0017 exception 1 closed: the SDK closed-Result escape family (Python + TypeScript).** A
+  mechanical family sweep (every façade × every parameter × wrong-typed values, then every struct
+  field the same way) proved the 2026-08-17 ledgered Python escapes were not two instances but a
+  total class: 31/34 Python parameter sites and every caller-supplied struct field raised
+  `AttributeError`/`TypeError` past the closed `Result`, and TypeScript — whose coercion the ADR
+  had classed as a "disclosed margin" — silently accepted `requestDigest(123/true/null/{})`
+  (digesting the coerced text) and threw `TypeError` past `trying()` on 109 parameter positions.
+  Both dynamic SDKs now gate every façade argument's shape before the body runs (Python:
+  annotation-driven `_closed_shape` over the declared dataclass shapes, `bool` ≠ `int`; TS:
+  `closedShape` with per-façade shape specs). Rust excludes the class by typing. The per-SDK
+  family-sweep batteries in `tests/test_permissiveness.{py,ts}` are the pre-fix red run and are
+  mutation-proven per façade. Exception 2 (expected-anchor identity post-digest) remains open.
+
 ### Added
 
 - **The SDK contract ADRs (BAP-15 documentation slice).** Three new accepted ADRs record contracts

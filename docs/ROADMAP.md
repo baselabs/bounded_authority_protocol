@@ -642,7 +642,10 @@ un-started and picks the whole accumulated contract up at authoring. **2026-08-1
 verified contract exceptions from the ADR-0017 authoring review** (cross-vendor, both probed
 against substrate; disclosed as ADR 0017's named exceptions, routed as SDK-code fixes): (4) a
 Python closed-Result escape — a non-string `request_digest` operation or `ConsumptionEntry.chain_id`
-raises `AttributeError` out of the façade (`_trying` catches only `InvalidError`); (5) all three
+raises `AttributeError` out of the façade (`_trying` catches only `InvalidError`) — **resolved
+2026-08-18** by the annotation-driven `_closed_shape` gate on all 17 Python façades plus the
+`closedShape` gate on all 17 TS façades, after a family sweep proved the class total (237+516
+Python, 109+coercion TS findings); see ADR 0017's resolution amendment; (5) all three
 SDKs validate the expected-anchor identity fields only post-digest where the reference validates
 them pre-digest (`ContextValidation.expected_anchor`) — bounded work still holds via the
 chunk-shape gates, but the ordering diverges from the reference.

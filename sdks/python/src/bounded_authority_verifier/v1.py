@@ -11,10 +11,13 @@ for each façade). They use ``bytes`` for raw-32 fields and ``int`` / ``str`` fo
 
 from __future__ import annotations
 
+import functools
+import inspect
 import re
+import types as _types
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field, replace
-from typing import Any, TypeVar, cast
+from dataclasses import dataclass, field, is_dataclass, replace
+from typing import Any, TypeVar, Union, cast, get_args, get_origin, get_type_hints
 
 from .base64url import base64url_decode, base64url_encode
 from .bounds import (  # noqa: F401
@@ -49,8 +52,10 @@ from .facts import (
 from .jcs import jcs_encode
 from .json_alg import (
     JArray,
+    JBool,
     JFloat,
     JInt,
+    JNull,
     JObject,
     JString,
     Tagged,
@@ -698,7 +703,156 @@ def _trying(fn: Callable[[], _T]) -> Result[_T]:
         return err()
 
 
+# --- the closed-Result shape gate (ADR 0017 clauses 1-2) ---
+#
+# A wrong-typed caller value (non-string chain_id, non-bytes hash, a bool in an int field, an
+# entirely non-struct argument) must return Err, never raise AttributeError/TypeError out of the
+# public façade and never be silently coerced. The 2026-08-17 ledger named two escape paths; the
+# 2026-08-18 family sweep proved the class total (31/34 parameter sites, every struct field), so
+# the gate is annotation-driven and total over the declared contract instead of per-site: the
+# façade signatures and dataclass fields ARE the shape contract (the reference enforces the same
+# via pattern matching + guards at every struct access). Shape rules are exact on scalars — bool is
+# not int (clause 2), bytearray is not bytes — while sequence containers (tuple[X, ...],
+# Sequence[X]) accept list|tuple, the input surface the bodies have always iterated. The tagged JSON
+# algebra (JNull..JObject) and Bounds are matched opaquely: their interiors are validated by the
+# bodies' own bounds/semantic gates, which already existed. An annotation form the gate does not
+# understand raises at import (fail fast for the developer), never silently under-validates.
+
+_OPAQUE_ANNOTATIONS = (Bounds, JNull, JBool, JInt, JFloat, JString, JArray, JObject)
+_DATACLASS_HINTS: dict[type, dict[str, object]] = {}
+
+
+class _MissingField:
+    """Sentinel: a struct attribute absent entirely (malformed construction)."""
+
+
+_MISSING = _MissingField()
+
+
+def _dataclass_hints(cls: type) -> dict[str, object]:
+    hints = _DATACLASS_HINTS.get(cls)
+    if hints is None:
+        hints = get_type_hints(cls)
+        _DATACLASS_HINTS[cls] = hints
+    return hints
+
+
+def _is_union(annotation: object) -> bool:
+    return get_origin(annotation) is Union or isinstance(annotation, _types.UnionType)
+
+
+def _walk_annotation(annotation: object) -> None:
+    """Fail fast at decoration time on any annotation form the gate cannot validate exactly."""
+    if annotation is Any or annotation is object or annotation is type(None):
+        return
+    if isinstance(annotation, type):
+        if annotation in _OPAQUE_ANNOTATIONS or annotation in (str, bytes, int, float, bool):
+            return
+        if is_dataclass(annotation):
+            for sub in _dataclass_hints(annotation).values():
+                _walk_annotation(sub)
+            return
+        raise TypeError(f"closed_shape: unsupported annotation {annotation!r}")
+    if _is_union(annotation):
+        for member in get_args(annotation):
+            _walk_annotation(member)
+        return
+    origin = get_origin(annotation)
+    if origin is tuple:
+        (elem, rest) = get_args(annotation)
+        if rest is not Ellipsis:
+            raise TypeError(f"closed_shape: fixed-arity tuple not supported: {annotation!r}")
+        _walk_annotation(elem)
+        return
+    if origin is Sequence or origin is Mapping:
+        for elem in get_args(annotation):
+            _walk_annotation(elem)
+        return
+    raise TypeError(f"closed_shape: unsupported annotation {annotation!r}")
+
+
+def _shape_ok(value: object, annotation: object) -> bool:
+    """True iff value matches the declared annotation shape exactly (ADR 0017 clauses 1-2)."""
+    if annotation is Any or annotation is object:
+        return True
+    if annotation is type(None):
+        return value is None
+    if isinstance(annotation, type):
+        if annotation in _OPAQUE_ANNOTATIONS:
+            return isinstance(value, annotation)
+        if annotation is str:
+            return isinstance(value, str)
+        if annotation is bytes:
+            return isinstance(value, bytes)
+        if annotation is int:
+            return isinstance(value, int) and not isinstance(value, bool)
+        if annotation is float:
+            return isinstance(value, float)
+        if annotation is bool:
+            return isinstance(value, bool)
+        if is_dataclass(annotation):
+            if not isinstance(value, annotation):
+                return False
+            # A struct can arrive malformed (constructed via __new__ or a broken subclass) with
+            # attributes missing entirely — that is a shape failure, never a crash (the gate
+            # itself must uphold the closed surface it enforces).
+            hints = _dataclass_hints(annotation)
+            for name, sub in hints.items():
+                member = getattr(value, name, _MISSING)
+                if member is _MISSING or not _shape_ok(member, sub):
+                    return False
+            return True
+        return False  # unreachable — _walk_annotation rejects unsupported types at import
+    if _is_union(annotation):
+        return any(_shape_ok(value, member) for member in get_args(annotation))
+    origin = get_origin(annotation)
+    if origin is tuple:
+        # Variadic tuple[X, ...] carries the ELEMENT contract; the container accepts list|tuple
+        # (the historical input surface — conformant fixtures pass lists; bodies iterate).
+        if not isinstance(value, (list, tuple)):
+            return False
+        (elem, _rest) = get_args(annotation)
+        return all(_shape_ok(item, elem) for item in value)
+    if origin is Sequence:
+        if not isinstance(value, (list, tuple)):
+            return False
+        (elem,) = get_args(annotation)
+        return all(_shape_ok(item, elem) for item in value)
+    if origin is Mapping:
+        return isinstance(value, Mapping)
+    return False  # unreachable — _walk_annotation rejects unsupported origins at import
+
+
+def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
+    """Façade decorator: validate caller arguments against their declared shapes before the
+    body runs; a wrong-typed argument returns the closed Err directly (never raises, never
+    coerces). Applied to all 17 public functions. Hints resolve lazily on the first call —
+    façade signatures forward-reference structs defined later in this module (ExpectedExport);
+    an unsupported annotation form therefore fails on first call (the family sweep exercises
+    every façade, so it fails in CI, just not at import)."""
+    resolved: list[tuple[dict[str, object], inspect.Signature]] = []
+
+    @functools.wraps(fn)
+    def wrapper(*args: object, **kwargs: object) -> Result[Any]:
+        if not resolved:
+            hints = get_type_hints(fn)
+            for name, annotation in hints.items():
+                if name != "return":
+                    _walk_annotation(annotation)
+            resolved.append((hints, inspect.signature(fn)))
+        hints, signature = resolved[0]
+        bound = signature.bind(*args, **kwargs)
+        for name, value in bound.arguments.items():
+            annotation = hints.get(name)
+            if annotation is not None and not _shape_ok(value, annotation):
+                return err()
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
 # 1. untrusted_key_locator (protocol-v1.md § Untrusted key locator).
+@_closed_shape
 def untrusted_key_locator(compact: bytes, bounds: Bounds | None = None) -> Result[KeyLocator]:
     return _trying(lambda: _untrusted_key_locator_body(compact, bounds))
 
@@ -748,6 +902,7 @@ def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLoc
 
 
 # 2. decode_grant (REQ1-VERIFY-decode-not-evaluated).
+@_closed_shape
 def decode_grant(compact: bytes, bounds: Bounds | None = None) -> Result[GrantDecoded]:
     return _trying(lambda: _decode_grant_body(compact, bounds))
 
@@ -780,6 +935,7 @@ def _decode_grant_body(compact: bytes, bounds: Bounds | None) -> GrantDecoded:
 
 
 # 3. decode_proof.
+@_closed_shape
 def decode_proof(compact: bytes, bounds: Bounds | None = None) -> Result[ProofDecoded]:
     return _trying(lambda: _decode_proof_body(compact, bounds))
 
@@ -799,6 +955,7 @@ def _decode_proof_body(compact: bytes, bounds: Bounds | None) -> ProofDecoded:
 
 
 # 4. verify_grant (REQ1-VERIFY-grant-exact, grant-times, no-iat-nbf-order).
+@_closed_shape
 def verify_grant(compact: bytes, trusted: TrustedIssuer, expected: ExpectedGrant) -> Result[GrantFacts]:
     return _trying(lambda: _verify_grant_body(compact, trusted, expected))
 
@@ -865,6 +1022,7 @@ def _verify_grant_body(compact: bytes, trusted: TrustedIssuer, expected: Expecte
 
 
 # 5. check_envelope (REQ1-VERIFY-envelope-binding).
+@_closed_shape
 def check_envelope(grant_compact: bytes, proof_compact: bytes, expected: ExpectedRequest) -> Result[EnvelopeFacts]:
     return _trying(lambda: _check_envelope_body(grant_compact, proof_compact, expected))
 
@@ -1026,11 +1184,13 @@ def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: E
 
 # 6. request_digest (the façade; returns Ok<raw 32-byte digest> | Err — cross-vendor #21: mirror
 # the Elixir {:ok, binary} | {:error, :invalid} and the other 15 façade functions).
+@_closed_shape
 def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds | None = None) -> Result[bytes]:
     return _trying(lambda: compute_request_digest(operation, cast_arguments, bounds if bounds is not None else MAXIMUM_BOUNDS))
 
 
 # 7. encode_consumption_entry (ADR 0004 § Consumption rows). Returns canonical row bytes + hash.
+@_closed_shape
 def encode_consumption_entry(entry: ConsumptionEntry, bounds: Bounds | None = None) -> Result[EncodedConsumptionEntry]:
     return _trying(lambda: _encode_consumption_entry_body(entry, bounds))
 
@@ -1079,6 +1239,7 @@ def _canonical_row_bytes(
 
 
 # 8. check_chain (ADR 0004 § Consumption rows; REQ1-CHAIN-raw-rows-bounds).
+@_closed_shape
 def check_chain(chain: ChainInput, expected: ExpectedChain) -> Result[ChainFacts]:
     return _trying(lambda: _check_chain_body(chain, expected))
 
@@ -1168,6 +1329,7 @@ def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
 
 
 # 9. grant_signing_input (the deterministic producer; REQ1-SIGNING-deterministic-produce).
+@_closed_shape
 def grant_signing_input(grant: GrantProducer, bounds: Bounds | None = None) -> Result[SigningInput]:
     return _trying(lambda: _grant_signing_input_body(grant, bounds))
 
@@ -1315,6 +1477,7 @@ def _check_node(v: Tagged, depth: int, b: Bounds) -> None:
 
 
 # 10. proof_signing_input (REQ1-SIGNING-deterministic-produce).
+@_closed_shape
 def proof_signing_input(proof: ProofProducer, bounds: Bounds | None = None) -> Result[SigningInput]:
     return _trying(lambda: _proof_signing_input_body(proof, bounds))
 
@@ -1398,6 +1561,7 @@ def _jwk_to_tagged(jwk: OkpPublic) -> Tagged:
 # no caller bounds, so the profile maximum (MAXIMUM_BOUNDS) is used. A mislabeled kind (typ ≠ kind),
 # oversized segment, non-base64url payload, or malformed payload content fails closed — the producer
 # must not mint bytes its own consumer (verify) would reject.
+@_closed_shape
 def assemble_compact(input_: SigningInput, signature: bytes) -> Result[bytes]:
     def body() -> bytes:
         b = MAXIMUM_BOUNDS
@@ -1435,6 +1599,7 @@ def assemble_compact(input_: SigningInput, signature: bytes) -> Result[bytes]:
 
 
 # 12. boundary_anchor_signing_input (ADR 0004 § Boundary anchors).
+@_closed_shape
 def boundary_anchor_signing_input(anchor: BoundaryAnchorProducer, bounds: Bounds | None = None) -> Result[SigningInput]:
     return _trying(lambda: _boundary_anchor_signing_input_body(anchor, bounds))
 
@@ -1484,6 +1649,7 @@ def _boundary_anchor_signing_input_body(anchor: BoundaryAnchorProducer, bounds: 
 
 
 # 13. key_transition_signing_input (ADR 0004 § Authenticated key transitions).
+@_closed_shape
 def key_transition_signing_input(t: KeyTransitionProducer, bounds: Bounds | None = None) -> Result[SigningInput]:
     return _trying(lambda: _key_transition_signing_input_body(t, bounds))
 
@@ -1533,6 +1699,7 @@ def _key_transition_signing_input_body(t: KeyTransitionProducer, bounds: Bounds 
 
 
 # 14. encode_anchored_export (ADR 0004 § Anchored export; REQ1-EXPORT-input-shape).
+@_closed_shape
 def encode_anchored_export(input_: AnchoredExportInput, expected: ExpectedExport) -> Result[EncodedAnchoredExport]:
     return _trying(lambda: _encode_anchored_export_body(input_, expected))
 
@@ -1761,6 +1928,7 @@ def _frame(data: bytes) -> bytes:
 
 
 # 15. verify_historical_anchor (ADR 0004 § Boundary anchors; protocol-v1.md § Historical anchor).
+@_closed_shape
 def verify_historical_anchor(compact: bytes, key: HistoricalPublicKey, expected: ExpectedAnchor) -> Result[AnchorFacts]:
     return _trying(lambda: _verify_historical_anchor_body(compact, key, expected))
 
@@ -1842,6 +2010,7 @@ def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, exp
 
 
 # 16. verify_key_transition (ADR 0004 § Authenticated key transitions).
+@_closed_shape
 def verify_key_transition(compact: bytes, old_key: HistoricalPublicKey, new_key: HistoricalPublicKey, expected: ExpectedKeyTransition) -> Result[KeyTransitionFacts]:
     return _trying(lambda: _verify_key_transition_body(compact, old_key, new_key, expected))
 
@@ -1930,6 +2099,7 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
 
 
 # 17. verify_anchored_export (ADR 0004 § Anchored export; REQ1-EXPORT-complete-scan).
+@_closed_shape
 def verify_anchored_export(archived: ArchivedObject, key_chain: HistoricalKeyChain, expected: ExpectedExport) -> Result[AnchoredExportFacts]:
     return _trying(lambda: _verify_anchored_export_body(archived, key_chain, expected))
 

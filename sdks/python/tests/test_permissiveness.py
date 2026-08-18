@@ -1956,3 +1956,267 @@ def replace_ok(ok, **kw):
     from dataclasses import replace as _r
 
     return _r(ok, **kw)
+
+
+# ---------------------------------------------------------------------------
+# The closed-Result family sweep (ADR 0017 clauses 1-2; the 2026-08-18 alignment-audit
+# §1 defect, swept across the whole façade surface).
+#
+# The 2026-08-17 risk ledger named two Python escape paths (request_digest operation,
+# ConsumptionEntry.chain_id). A mechanical sibling sweep (every façade × every parameter ×
+# every wrong-typed sentinel, then every dataclass FIELD the same way) found the family is
+# total: 31/34 parameter sites and every caller-supplied struct field escape the closed
+# Result as AttributeError/TypeError (237 + 516 pre-fix findings, probe-evidenced 2026-08-18).
+# The fix is the annotation-driven _closed_shape gate on all 17 public façades (v1.py), so a
+# wrong-typed caller value returns Err BEFORE any attribute deref, len(), or encode consumes it.
+#
+# RED-CAPABILITY: every case below raised (AttributeError/TypeError) at the pre-fix tree —
+# the sweep IS the red run. Mutation-proven 2026-08-18: removing the _closed_shape decorator
+# from any single façade reddens exactly that façade's cases (verified for request_digest:
+# 2 failures). The shape layer's bool-is-not-int exclusion is DEFENSE-IN-DEPTH — every current
+# bool-on-int path is also body-gated (probe-verified for issued_at/anchored_at/sequence), so
+# no sweep case pins it alone; the body-level type-strict tests (cross-vendor rounds 14/17)
+# own that contract. The named legs pin the two ledgered paths specifically.
+# ---------------------------------------------------------------------------
+
+_SWEEP_SENTINELS = [123, True, None, "s", b"s", [], {}, 3.5, object()]
+
+
+def _sweep_valid_args():
+    """Valid arguments for all 17 façades, reusing this file's fixtures. Mirrors the
+    probe's control set (all 17 verified Ok at the pre-fix tree)."""
+    from bounded_authority_verifier.v1 import (
+        decode_proof,
+        verify_grant,
+        verify_historical_anchor,
+        verify_key_transition,
+    )
+
+    issuer_pub, issuer_priv = _fresh_key()
+    holder_pub, holder_priv = _fresh_key()
+    holder_fp = public_key_thumbprint_raw(holder_pub)
+    grant = GrantProducer(
+        key_id="issuer-123456", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        holder_thumbprint=_b64url(holder_fp),
+        operations=(OperationInput(name="read", selectors=("all",)),),
+    )
+    gsi = grant_signing_input(grant).value
+    gc = _must_assemble(gsi, issuer_priv.sign(gsi.protected_segment + b"." + gsi.payload_segment))
+    proof = ProofProducer(
+        holder_public_key=holder_pub, proof_id="urn:example:proof:1", method="POST",
+        target_uri="https://resource.example.test/invoke", issued_at=1400,
+        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
+        grant_compact=gc, cast_arguments=_NULL_ARGS,
+    )
+    psi = proof_signing_input(proof).value
+    pc = _must_assemble(psi, holder_priv.sign(psi.protected_segment + b"." + psi.payload_segment))
+    base_req = ExpectedRequest(
+        trusted_issuer=TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
+        issuer="https://issuer.example.test", audience="https://resource.example.test",
+        method="POST", target_uri="https://resource.example.test/invoke",
+        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
+        cast_arguments=_NULL_ARGS, evaluation_time=1500, clock_skew=60, proof_max_age=300,
+        nonce=NonceNotRequired(),
+    )
+    enc = encode_consumption_entry(ConsumptionEntry(
+        chain_id="urn:example:chain", sequence=1, previous_hash=Z32, commitment=bytes([7] * 32),
+    ))
+    assert enc.is_ok
+    row, head = enc.value.bytes_, enc.value.hash_
+    good_chain = ChainInput(
+        rows=(row,), chain_id="urn:example:chain", first_sequence=1, last_sequence=1,
+        row_count=1, previous_hash=Z32, last_hash=head,
+    )
+    expected_chain = ExpectedChain(
+        chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1,
+        previous_hash=Z32, last_hash=head,
+    )
+    ka_pub, ka_priv = _fresh_key()
+    kb_pub, _ = _fresh_key()
+    fp_a, fp_b = public_key_thumbprint_raw(ka_pub), public_key_thumbprint_raw(kb_pub)
+    anchor_prod = BoundaryAnchorProducer(
+        anchor_id="a0", anchored_at=1000, chain_id="chain-x", sequence=0,
+        chain_hash=Z32, key_id="ka", public_key=ka_pub,
+    )
+    start_compact = _signed_anchor_compact(anchor_prod, ka_priv)
+    t_prod = KeyTransitionProducer(
+        transition_id="t1", chain_id="chain-x", effective_at=1500,
+        current_key_id="ka", current_public_key=ka_pub, next_key_id="kb", next_public_key=kb_pub,
+    )
+    tsi = key_transition_signing_input(t_prod).value
+    t_compact = _must_assemble(tsi, ka_priv.sign(tsi.protected_segment + b"." + tsi.payload_segment))
+    ce = _conformant_export()
+    built = _build_archive([_fresh_key()])
+    return {
+        "untrusted_key_locator": (untrusted_key_locator, {"compact": gc}, {"compact": "bytes"}),
+        "decode_grant": (decode_grant, {"compact": gc}, {"compact": "bytes"}),
+        "decode_proof": (decode_proof, {"compact": pc}, {"compact": "bytes"}),
+        "verify_grant": (
+            verify_grant,
+            {"compact": gc, "trusted": TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
+             "expected": ExpectedGrant(issuer="https://issuer.example.test", audience="https://resource.example.test", evaluation_time=1500, clock_skew=60)},
+            {"compact": "bytes", "trusted": "struct", "expected": "struct"},
+        ),
+        "check_envelope": (check_envelope, {"grant_compact": gc, "proof_compact": pc, "expected": base_req},
+                           {"grant_compact": "bytes", "proof_compact": "bytes", "expected": "struct"}),
+        "request_digest": (request_digest, {"operation": "read", "cast_arguments": _NULL_ARGS},
+                           {"operation": "str", "cast_arguments": "tagged"}),
+        "encode_consumption_entry": (
+            encode_consumption_entry,
+            {"entry": ConsumptionEntry(chain_id="chain-x", sequence=1, previous_hash=Z32, commitment=bytes([7] * 32))},
+            {"entry": "struct"},
+        ),
+        "check_chain": (check_chain, {"chain": good_chain, "expected": expected_chain},
+                        {"chain": "struct", "expected": "struct"}),
+        "grant_signing_input": (grant_signing_input, {"grant": grant}, {"grant": "struct"}),
+        "proof_signing_input": (proof_signing_input, {"proof": proof}, {"proof": "struct"}),
+        "assemble_compact": (assemble_compact, {"input_": gsi, "signature": b"\x05" * 64},
+                             {"input_": "struct", "signature": "bytes"}),
+        "boundary_anchor_signing_input": (boundary_anchor_signing_input, {"anchor": anchor_prod}, {"anchor": "struct"}),
+        "key_transition_signing_input": (key_transition_signing_input, {"t": t_prod}, {"t": "struct"}),
+        "encode_anchored_export": (encode_anchored_export, {"input_": ce[0], "expected": ce[1]},
+                                   {"input_": "struct", "expected": "struct"}),
+        "verify_historical_anchor": (
+            verify_historical_anchor,
+            {"compact": start_compact,
+             "key": HistoricalPublicKey(key_id="ka", public_key=ka_pub, valid_from=0, valid_before=None),
+             "expected": ExpectedAnchor(anchor_id="a0", anchored_at=1000, chain_id="chain-x", sequence=0, chain_hash=Z32, key_id="ka", key_fingerprint=fp_a)},
+            {"compact": "bytes", "key": "struct", "expected": "struct"},
+        ),
+        "verify_key_transition": (
+            verify_key_transition,
+            {"compact": t_compact,
+             "old_key": HistoricalPublicKey(key_id="ka", public_key=ka_pub, valid_from=0, valid_before=None),
+             "new_key": HistoricalPublicKey(key_id="kb", public_key=kb_pub, valid_from=1500, valid_before=None),
+             "expected": ExpectedKeyTransition(transition_id="t1", chain_id="chain-x", effective_at=1500, current_key_id="ka", current_key_fingerprint=fp_a, next_key_id="kb", next_key_fingerprint=fp_b)},
+            {"compact": "bytes", "old_key": "struct", "new_key": "struct", "expected": "struct"},
+        ),
+        "verify_anchored_export": (
+            verify_anchored_export,
+            {"archived": ArchivedObject(chunks=(built["archive"],), version="v1"),
+             "key_chain": built["key_chain"], "expected": built["expected"]},
+            {"archived": "struct", "key_chain": "struct", "expected": "struct"},
+        ),
+    }
+
+
+def _sentinel_may_be_ok(kind: str, sentinel) -> bool:
+    """A wrong-typed sentinel can never be Ok; the SAME-typed ones may be (semantics decide):
+    "s" for str params, b"s" for bytes, [] for Sequence, None for optionals."""
+    if kind == "str":
+        return sentinel == "s"
+    if kind == "bytes":
+        return sentinel == b"s"
+    if kind == "tagged":
+        return False
+    return sentinel is None  # structs: only the optional None (where annotated)
+
+
+def test_closed_result_family_param_sweep():
+    """Every façade × every parameter × wrong-typed sentinel: the call must return a Result
+    (never raise past the closed surface), and any never-valid sentinel must yield Err.
+    Pre-fix: 237 of these raised AttributeError/TypeError."""
+    cases = []
+    valid = _sweep_valid_args()
+    for name, (fn, kwargs, kinds) in valid.items():
+        for param, kind in kinds.items():
+            for sentinel in _SWEEP_SENTINELS:
+                probe = dict(kwargs)
+                probe[param] = sentinel
+                cases.append((f"{name}.{param}={sentinel!r}", fn, probe, _sentinel_may_be_ok(kind, sentinel)))
+    for label, fn, probe, may_ok in cases:
+        reset_census()
+        r = fn(**probe)
+        try:
+            is_ok = r.is_ok
+        except AttributeError:
+            is_ok = None
+        assert is_ok is not None, f"{label}: raised out of the closed Result surface (pre-fix escape)"
+        if not may_ok:
+            assert not is_ok, f"{label}: wrong-typed input must fail closed, got Ok"
+
+
+def test_closed_result_family_field_sweep():
+    """Same sweep one level deeper: with correctly-typed structs, every mutated FIELD of a
+    wrong type must fail closed (Err), never raise. Pre-fix: 516 field-level escapes."""
+    import dataclasses
+
+    valid = _sweep_valid_args()
+    struct_params = {
+        name: [p for p, k in kinds.items() if k == "struct"]
+        for name, (fn, kwargs, kinds) in valid.items()
+    }
+    cases = []
+    for name, params in struct_params.items():
+        fn, kwargs, _ = valid[name]
+        for param in params:
+            base = kwargs[param]
+            if not dataclasses.is_dataclass(base):
+                continue
+            for f in dataclasses.fields(base):
+                if f.name == "kind":  # init=False discriminator
+                    continue
+                ann = f.type
+                for sentinel in _SWEEP_SENTINELS:
+                    try:
+                        mutated = dataclasses.replace(base, **{f.name: sentinel})
+                    except TypeError:
+                        continue
+                    if sentinel is None:
+                        may_ok = "None" in ann
+                    elif sentinel == "s":
+                        may_ok = "str" in ann
+                    elif sentinel == b"s":
+                        may_ok = "bytes" in ann
+                    elif sentinel == []:
+                        may_ok = "Sequence" in ann or "tuple" in ann
+                    elif sentinel == 123:
+                        may_ok = "int" in ann
+                    elif sentinel is True:
+                        may_ok = "bool" in ann
+                    elif sentinel == 3.5:
+                        may_ok = "float" in ann
+                    else:
+                        may_ok = False
+                    probe = dict(kwargs)
+                    probe[param] = mutated
+                    cases.append((f"{name}.{param}.{f.name}={sentinel!r}", fn, probe, may_ok))
+    for label, fn, probe, may_ok in cases:
+        reset_census()
+        r = fn(**probe)
+        try:
+            is_ok = r.is_ok
+        except AttributeError:
+            is_ok = None
+        assert is_ok is not None, f"{label}: raised out of the closed Result surface (pre-fix escape)"
+        if not may_ok:
+            assert not is_ok, f"{label}: wrong-typed field must fail closed, got Ok"
+
+
+def test_request_digest_nonstring_operation_returns_err():
+    """The ledgered defect (2026-08-17 risk ledger; ADR 0017 exception 1): a non-string
+    operation must return Err — pre-fix it raised AttributeError('int' object has no
+    attribute 'encode') out of the public façade."""
+    for bad in [123, True, None, b"read", 3.5, [], {}]:
+        r = request_digest(bad, json_decode(b"null"))
+        assert not r.is_ok, f"operation={bad!r} must fail closed"
+
+
+def test_encode_consumption_entry_wrong_typed_fields_return_err():
+    """The ledgered defect's entry point + its len() siblings: non-string chain_id and
+    non-bytes previous_hash/commitment must return Err — pre-fix chain_id raised
+    AttributeError and non-sized hashes raised TypeError."""
+    zeros, ones = bytes(32), bytes([7] * 32)
+    bad_entries = [
+        ConsumptionEntry(chain_id=123, sequence=1, previous_hash=zeros, commitment=ones),
+        ConsumptionEntry(chain_id=True, sequence=1, previous_hash=zeros, commitment=ones),
+        ConsumptionEntry(chain_id=None, sequence=1, previous_hash=zeros, commitment=ones),
+        ConsumptionEntry(chain_id=b"c", sequence=1, previous_hash=zeros, commitment=ones),
+        ConsumptionEntry(chain_id="chain-x", sequence=1, previous_hash=123, commitment=ones),
+        ConsumptionEntry(chain_id="chain-x", sequence=1, previous_hash=zeros, commitment=True),
+        ConsumptionEntry(chain_id="chain-x", sequence=1, previous_hash=None, commitment=ones),
+    ]
+    for bad in bad_entries:
+        r = encode_consumption_entry(bad)
+        assert not r.is_ok, f"{bad!r} must fail closed"
