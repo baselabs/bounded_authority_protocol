@@ -1839,14 +1839,18 @@ pub fn verify_anchored_export(
         }
         if expected.chain.row_count < 1
             || expected.chain.row_count as u64 > bounds.chain_rows()
-            || expected.chain.row_count != expected.chain.last_sequence - expected.chain.first_sequence + 1
+            || expected.chain.row_count
+                != expected.chain.last_sequence - expected.chain.first_sequence + 1
         {
             return Err(Invalid);
         }
         if expected.chain.first_sequence == 1 && expected.chain.previous_hash != [0u8; 32] {
             return Err(Invalid);
         }
-        for (anch, which) in [(&expected.start_anchor, "start"), (&expected.end_anchor, "end")] {
+        for (anch, which) in [
+            (&expected.start_anchor, "start"),
+            (&expected.end_anchor, "end"),
+        ] {
             validate_identifier(&anch.anchor_id, &bounds)?;
             validate_identifier(&anch.chain_id, &bounds)?;
             if anch.anchored_at.unsigned_abs() > mag {
@@ -1873,7 +1877,10 @@ pub fn verify_anchored_export(
                 return Err(Invalid);
             }
             for kid in [&t.current_key_id, &t.next_key_id] {
-                if kid.is_empty() || kid.len() as u64 > bounds.kid_bytes() || !kid.bytes().all(is_kid_byte) {
+                if kid.is_empty()
+                    || kid.len() as u64 > bounds.kid_bytes()
+                    || !kid.bytes().all(is_kid_byte)
+                {
                     return Err(Invalid);
                 }
             }
