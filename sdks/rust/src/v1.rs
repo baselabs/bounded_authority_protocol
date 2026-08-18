@@ -1794,6 +1794,71 @@ pub fn verify_anchored_export(
 ) -> Result<AnchoredExportFacts> {
     let bounds = resolve_bounds(expected.bounds.as_ref());
 
+    // ADR 0017 clause-3 hoist: expected-struct well-formedness BEFORE the digest
+    // (2026-08-18, exception 2 closed). The reference validates chain + both anchors +
+    // transitions (ContextValidation.expected_chain/expected_anchor/expected_transition via
+    // validate_expected_export, anchored_export_codec.ex:88-98/:345-371) before key shapes,
+    // chunks, and hash_chunks; the SDK previously ran these gates only post-digest
+    // (verdict-invariant by subsumption — the WORK ordering is the contract; the Python
+    // battery's sha256-call-count leg carries the behavioral proof, this ordering is
+    // pinned structurally by the Rust battery).
+    {
+        validate_identifier(&expected.chain.chain_id, &bounds)?;
+        let mag = bounds.integer_magnitude();
+        if expected.chain.first_sequence < 1
+            || expected.chain.first_sequence.unsigned_abs() > mag
+            || expected.chain.last_sequence < 1
+            || expected.chain.last_sequence.unsigned_abs() > mag
+            || expected.chain.first_sequence > expected.chain.last_sequence
+        {
+            return Err(Invalid);
+        }
+        if expected.chain.row_count < 1
+            || expected.chain.row_count as u64 > bounds.chain_rows()
+            || expected.chain.row_count != expected.chain.last_sequence - expected.chain.first_sequence + 1
+        {
+            return Err(Invalid);
+        }
+        if expected.chain.first_sequence == 1 && expected.chain.previous_hash != [0u8; 32] {
+            return Err(Invalid);
+        }
+        for (anch, which) in [(&expected.start_anchor, "start"), (&expected.end_anchor, "end")] {
+            validate_identifier(&anch.anchor_id, &bounds)?;
+            validate_identifier(&anch.chain_id, &bounds)?;
+            if anch.anchored_at.unsigned_abs() > mag {
+                return Err(Invalid);
+            }
+            if anch.sequence < 0 || anch.sequence.unsigned_abs() > mag {
+                return Err(Invalid);
+            }
+            if anch.key_id.is_empty()
+                || anch.key_id.len() as u64 > bounds.kid_bytes()
+                || !anch.key_id.bytes().all(is_kid_byte)
+            {
+                return Err(Invalid);
+            }
+            if anch.sequence == 0 && anch.chain_hash != [0u8; 32] {
+                return Err(Invalid);
+            }
+            let _ = which;
+        }
+        for t in &expected.transitions {
+            validate_identifier(&t.transition_id, &bounds)?;
+            validate_identifier(&t.chain_id, &bounds)?;
+            if t.effective_at.unsigned_abs() > mag {
+                return Err(Invalid);
+            }
+            for kid in [&t.current_key_id, &t.next_key_id] {
+                if kid.is_empty() || kid.len() as u64 > bounds.kid_bytes() || !kid.bytes().all(is_kid_byte) {
+                    return Err(Invalid);
+                }
+            }
+            if t.current_key_fingerprint == t.next_key_fingerprint {
+                return Err(Invalid);
+            }
+        }
+    }
+
     // The count ceiling BEFORE any per-element walk (cross-vendor round 3).
     if expected.transitions.len() as u64 > bounds.key_transitions() {
         return Err(Invalid);

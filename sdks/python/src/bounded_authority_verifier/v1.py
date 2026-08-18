@@ -2104,6 +2104,18 @@ def verify_anchored_export(archived: ArchivedObject, key_chain: HistoricalKeyCha
     return _trying(lambda: _verify_anchored_export_body(archived, key_chain, expected))
 
 
+def _pre_identifier(value: object, ctx: str, bounds: Bounds) -> None:
+    """The clause-3 pre-digest identifier gate: non-empty str, UTF-8 byte length within
+    identifier_bytes, string-or-uri well-formedness (the reference's valid_identifier?)."""
+    if (
+        not isinstance(value, str)
+        or _utf8_bytes(value, ctx) < 1
+        or _utf8_bytes(value, ctx) > bounds_resolve(bounds, "identifier_bytes")
+        or not _is_string_or_uri(value)
+    ):
+        fail(ctx)
+
+
 def _verify_anchored_export_body(archived: ArchivedObject, key_chain: HistoricalKeyChain, expected: ExpectedExport) -> AnchoredExportFacts:
     # Expected chain integers type-strict BEFORE the sequence arithmetic
     # (cross-vendor round 17: a non-int first_sequence raised TypeError at the
@@ -2111,6 +2123,66 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     _expected_int(expected.chain.first_sequence, "verify_anchored_export: first_sequence type")
     _expected_int(expected.chain.last_sequence, "verify_anchored_export: last_sequence type")
     _expected_int(expected.chain.row_count, "verify_anchored_export: row_count type")
+    # ADR 0017 clause-3 hoist (2026-08-18, exception 2 closed): expected-struct
+    # well-formedness BEFORE the digest. The reference validates chain + both anchors +
+    # transitions (ContextValidation.expected_chain/expected_anchor/expected_transition via
+    # validate_expected_export, anchored_export_codec.ex:88-98/:345-371) before key shapes,
+    # chunks, and hash_chunks; the SDK previously ran these gates only post-digest
+    # (verdict-invariant by subsumption — the WORK ordering is the contract, and the
+    # malformed-expected legs assert zero sha256 calls).
+    _bpre = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    _mpre = bounds_resolve(_bpre, "integer_magnitude")
+    _pre_identifier(expected.chain.chain_id, "verify_anchored_export: chain chain_id", _bpre)
+    if (
+        expected.chain.first_sequence < 1 or expected.chain.first_sequence > _mpre
+        or expected.chain.last_sequence < 1 or expected.chain.last_sequence > _mpre
+        or expected.chain.first_sequence > expected.chain.last_sequence
+    ):
+        fail("verify_anchored_export: chain range")
+    if (
+        expected.chain.row_count < 1
+        or expected.chain.row_count > bounds_resolve(_bpre, "chain_rows")
+        or expected.chain.row_count != expected.chain.last_sequence - expected.chain.first_sequence + 1
+    ):
+        fail("verify_anchored_export: chain count")
+    if len(expected.chain.previous_hash) != 32 or len(expected.chain.last_hash) != 32:
+        fail("verify_anchored_export: chain hash width")
+    if expected.chain.first_sequence == 1 and not _bytes_equal(expected.chain.previous_hash, DEFAULT_HASH):
+        fail("verify_anchored_export: chain genesis")
+    for _anch, _which in ((expected.start_anchor, "start"), (expected.end_anchor, "end")):
+        _pre_identifier(_anch.anchor_id, f"verify_anchored_export: {_which} anchor_id", _bpre)
+        _pre_identifier(_anch.chain_id, f"verify_anchored_export: {_which} chain_id", _bpre)
+        _aa = _expected_int(_anch.anchored_at, f"verify_anchored_export: {_which} anchored_at type")
+        if abs(_aa) > _mpre:
+            fail(f"verify_anchored_export: {_which} anchored_at magnitude")
+        _sq = _expected_int(_anch.sequence, f"verify_anchored_export: {_which} sequence type")
+        if _sq < 0 or _sq > _mpre:
+            fail(f"verify_anchored_export: {_which} sequence range")
+        if (
+            not isinstance(_anch.key_id, str)
+            or not (1 <= _utf8_bytes(_anch.key_id, f"verify_anchored_export: {_which} key_id") <= bounds_resolve(_bpre, "kid_bytes"))
+            or _KID_CHARSET.match(_anch.key_id) is None
+        ):
+            fail(f"verify_anchored_export: {_which} key_id")
+        if len(_anch.chain_hash) != 32 or len(_anch.key_fingerprint) != 32:
+            fail(f"verify_anchored_export: {_which} hash width")
+        if _sq == 0 and not _bytes_equal(_anch.chain_hash, DEFAULT_HASH):
+            fail(f"verify_anchored_export: {_which} genesis")
+    for _ti, _t in enumerate(expected.transitions):
+        _pre_identifier(_t.transition_id, f"verify_anchored_export: transition {_ti} id", _bpre)
+        _pre_identifier(_t.chain_id, f"verify_anchored_export: transition {_ti} chain_id", _bpre)
+        _eat = _expected_int(_t.effective_at, f"verify_anchored_export: transition {_ti} effective_at type")
+        if abs(_eat) > _mpre:
+            fail(f"verify_anchored_export: transition {_ti} effective_at magnitude")
+        for _kid in (_t.current_key_id, _t.next_key_id):
+            if (
+                not isinstance(_kid, str)
+                or not (1 <= _utf8_bytes(_kid, f"verify_anchored_export: transition {_ti} key_id") <= bounds_resolve(_bpre, "kid_bytes"))
+                or _KID_CHARSET.match(_kid) is None
+            ):
+                fail(f"verify_anchored_export: transition {_ti} key_id")
+        if len(_t.current_key_fingerprint) != 32 or len(_t.next_key_fingerprint) != 32 or _bytes_equal(_t.current_key_fingerprint, _t.next_key_fingerprint):
+            fail(f"verify_anchored_export: transition {_ti} fingerprints")
     # The count ceiling FIRST (cross-vendor: even the static-bindings walk ran
     # unbounded caller input before it — instrumented 257-element inputs were
     # fully read before rejection).
