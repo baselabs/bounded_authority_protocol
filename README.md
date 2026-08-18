@@ -17,8 +17,9 @@ bounded proof-of-possession authority.
 The unpublished `0.1.0` package is a **release candidate**: the public API surface is locked
 ([release-candidate contract](docs/release-candidate-contract.md), [ADR 0008](docs/adr/0008-release-candidate-contract.md)),
 the candidate archive is reproducibility-checked on every quality run, and nothing is published to
-Hex yet — BAP-07 (connected verification and first public release) remains gated on the
-private-runtime connected gates, and the Hex-publication half is deferred by maintainer decision
+Hex yet — BAP-07 (connected verification and first public release) is fully unblocked (its
+private-runtime dependency, BA-14, completed 2026-08-18) and is the next row; the Hex-publication
+half is deferred by maintainer decision
 (internal consumption uses the `v0.1.0` git tag, not a registry pin). The public/private boundary is complete under
 [`BAP-00`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). The source tree now
 contains the unpublished `:bounded_authority_protocol` 0.1.0 Mix package scaffold and its enforced
