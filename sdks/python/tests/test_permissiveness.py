@@ -2220,3 +2220,91 @@ def test_encode_consumption_entry_wrong_typed_fields_return_err():
     for bad in bad_entries:
         r = encode_consumption_entry(bad)
         assert not r.is_ok, f"{bad!r} must fail closed"
+
+
+# ---------------------------------------------------------------------------
+# The pre-digest expected-struct validation hoist (ADR 0017 clause 3 / exception 2,
+# closed 2026-08-18). The reference validates the expected struct (chain + BOTH anchors'
+# identity/binding well-formedness + transitions, ContextValidation.expected_chain/
+# expected_anchor/expected_transition) BEFORE validate_chunks/hash_chunks
+# (anchored_export_codec.ex:88-104); the SDKs ran only the static bindings pre-digest and
+# left the well-formedness gates post-digest. VERDICT-INVARIANT by subsumption (post-digest
+# equality against bounded parsed values rejects every malformed expected) — the observable
+# is the WORK: a malformed expected struct must reject WITHOUT hashing the archive chunks.
+#
+# RED-CAPABILITY: pre-fix, the sha256 monkeypatch count for each malformed case was > 0
+# (the chunk digest ran before any anchor-identity rejection) — the count == 0 assertion is
+# the red run. Verdict-matrix cases pin the semantics against regressions.
+# ---------------------------------------------------------------------------
+
+
+def test_verify_export_malformed_expected_rejects_before_hashing(monkeypatch):
+    """The clause-3 work-discipline leg: semantic malformation of the expected struct
+    (well-typed, so the Fix-A shape gate passes it) must reject BEFORE the chunk digest."""
+    import bounded_authority_verifier.v1 as v1mod
+
+    calls = []
+    real = v1mod.sha256
+
+    def counting(prefix, *data):
+        calls.append(1)
+        return real(prefix, *data)
+
+    monkeypatch.setattr(v1mod, "sha256", counting)
+    built = _build_archive([_fresh_key()])
+
+    def verify_with(**anchor_and_chain_mutations):
+        from dataclasses import replace as _replace
+
+        expected = _replace(
+            built["expected"],
+            start_anchor=_replace(built["expected"].start_anchor, **{
+                k: v for k, v in anchor_and_chain_mutations.items() if not k.startswith("chain_")
+            }),
+            chain=_replace(built["expected"].chain, **{
+                k.replace("chain_", ""): v for k, v in anchor_and_chain_mutations.items() if k.startswith("chain_")
+            }),
+        )
+        reset_census()
+        return verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected)
+
+    malformed_cases = [
+        ("anchor_id over identifier_bytes", dict(anchor_id="x" * 600)),
+        ("anchor key_id charset", dict(key_id="bad key!")),
+        ("anchored_at over magnitude", dict(anchored_at=10 ** 16)),
+        ("anchor sequence negative", dict(sequence=-1)),
+        ("key_fingerprint width", dict(key_fingerprint=b"\x00" * 31)),
+        ("chain row_count zero", dict(chain_row_count=0)),
+        ("chain first > last", dict(chain_first_sequence=5)),
+    ]
+    for label, mutations in malformed_cases:
+        calls.clear()
+        r = verify_with(**mutations)
+        assert not r.is_ok, f"{label}: must reject"
+        assert calls == [], f"{label}: rejected only AFTER hashing the chunks ({len(calls)} sha256 calls) — the clause-3 hoist is missing"
+
+    # Control: the unmutated expected DOES hash (the digest gate runs) and verifies Ok.
+    calls.clear()
+    reset_census()
+    r = verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], built["expected"])
+    assert r.is_ok
+    assert len(calls) > 0, "control: the valid path must actually hash"
+
+
+def test_verify_export_malformed_expected_transition_verdicts():
+    """Verdict-matrix for the transition half of the hoist (a 2-key archive): each
+    well-typed-but-malformed expected transition field rejects closed."""
+    from dataclasses import replace as _replace
+
+    built = _build_archive([_fresh_key(), _fresh_key()])
+    t0 = built["expected"].transitions[0]
+    for label, mutated_t in [
+        ("transition_id over identifier_bytes", _replace(t0, transition_id="x" * 600)),
+        ("effective_at over magnitude", _replace(t0, effective_at=10 ** 16)),
+        ("current_key_id charset", _replace(t0, current_key_id="bad key!")),
+        ("current_key_fingerprint width", _replace(t0, current_key_fingerprint=b"\x00" * 31)),
+    ]:
+        expected = _replace(built["expected"], transitions=[mutated_t])
+        reset_census()
+        r = verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected)
+        assert not r.is_ok, f"{label}: must reject"

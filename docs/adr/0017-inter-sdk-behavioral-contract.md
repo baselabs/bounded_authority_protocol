@@ -129,7 +129,24 @@ Rust remains excluded by static typing. Red-capable evidence: the per-SDK family
 (`sdks/python/tests/test_permissiveness.py`, `sdks/typescript/test/permissiveness.ts`) ARE the
 pre-fix red run (Python: 237 param + 516 field probe findings; TS: 109 sweep escapes + the
 coercion set), and both are mutation-proven — removing any single façade's gate reddens exactly
-that façade's cases. Exception 2 below remains open pending its fix.
+that façade's cases. Exception 2 below remained open at that landing; its resolution follows.
+
+**Resolution of exception 2 (2026-08-18, maintainer-authorized fix).** Closed in all three
+SDKs by hoisting the expected-struct well-formedness suite — chain (identifier, positive
+range, count, hash widths, genesis), both anchors (identity: anchor_id/anchored_at/chain_id/
+key_id; binding: sequence range, chain_hash/key_fingerprint widths, genesis zero-hash), and
+transitions (identifiers, effective_at magnitude, key-id class, fingerprint widths +
+distinctness) — to BEFORE the archive digest, mirroring the reference's
+`validate_expected_anchored_export` → `ContextValidation` sequence
+(`anchored_export_codec.ex:88-104`). The change is VERDICT-INVARIANT by subsumption (the
+post-digest equality checks against bounded parsed values reject every malformed expected
+either way) — what it fixes is the clause-3 WORK ordering: malformed caller metadata now
+rejects without hashing the archive. Verification honors that invariance honestly: the
+Python battery carries the behavioral proof (a monkeypatched sha256 counter asserts ZERO
+hash calls on each malformed-expected rejection — pre-fix it counted 1+, mutation-proven),
+while the TS and Rust batteries pin the gate ordering structurally (the hoist block must
+precede the digest call site — mutation-proven in both) plus verdict-matrix regression
+legs; ESM bindings and static calls give those hosts no runtime work-observation channel.
 
 ## Alternatives considered
 

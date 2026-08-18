@@ -648,7 +648,10 @@ raises `AttributeError` out of the façade (`_trying` catches only `InvalidError
 Python, 109+coercion TS findings); see ADR 0017's resolution amendment; (5) all three
 SDKs validate the expected-anchor identity fields only post-digest where the reference validates
 them pre-digest (`ContextValidation.expected_anchor`) — bounded work still holds via the
-chunk-shape gates, but the ordering diverges from the reference.
+chunk-shape gates, but the ordering diverges from the reference — **resolved 2026-08-18** by
+the clause-3 hoist in all three SDKs (expected-struct well-formedness before the archive
+digest; verdict-invariant, work-ordered to the reference); see ADR 0017's resolution
+amendments.
 
 ## BAP-17 closeout evidence
 

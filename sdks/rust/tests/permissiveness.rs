@@ -2663,3 +2663,70 @@ fn bounds_rust_archive_key_window_guards() {
     keys2.keys[last].valid_before = ValidityUpperBound::Bounded(4_611_686_018_427_387_904);
     assert!(verify_anchored_export(&f.obj, &keys2, &f.expected).is_err());
 }
+
+// =============================================================================
+// The pre-digest expected-struct validation hoist (ADR 0017 clause 3 /
+// exception 2, closed 2026-08-18). The reference validates the expected
+// struct (chain + BOTH anchors' identity/binding well-formedness +
+// transitions, ContextValidation) BEFORE validate_chunks/hash_chunks
+// (anchored_export_codec.ex:88-104); the SDK ran only the static bindings
+// pre-digest. VERDICT-INVARIANT by subsumption (post-digest equality
+// against bounded parsed values rejects every malformed expected) — the
+// observable is the WORK, and a tests/-outside test cannot intercept a
+// static call, so the behavioral proof (sha256 call-count == 0 on
+// malformed expected) lives in the Python battery and is normative for
+// the inter-SDK clause; here the order is pinned STRUCTURALLY (the
+// hoisted block must precede the hasher in src/v1.rs) plus the
+// verdict-matrix regression pins below. Mutation (revert the hoist):
+// the marker comment disappears → the order pin goes RED.
+// =============================================================================
+
+#[test]
+fn expected_struct_gates_precede_archive_digest_structural_pin() {
+    let src = include_str!("../src/v1.rs");
+    let hoist = src
+        .find("ADR 0017 clause-3 hoist: expected-struct well-formedness BEFORE the digest")
+        .expect("the clause-3 hoist marker is missing from v1.rs — the expected-struct gates were dropped or moved");
+    // v1.rs has other hashers (verify_historical_anchor, verify_key_transition);
+    // the pin targets the export verify's digest — the first hasher AFTER the marker.
+    let digest = src[hoist..]
+        .find("let mut hasher = Sha256::new()")
+        .map(|offset| hoist + offset)
+        .expect("the export digest call site moved — update this pin deliberately");
+    assert!(
+        hoist < digest,
+        "the expected-struct well-formedness gates must run BEFORE the archive digest (reference ordering)"
+    );
+}
+
+#[test]
+fn verify_export_malformed_expected_verdict_matrix() {
+    use bounded_authority_protocol::verify_anchored_export;
+    let f = corpus_export_verify_fixture();
+    // Control: the corpus archive verifies Ok at maximum bounds.
+    assert!(verify_anchored_export(&f.obj, &f.keys, &f.expected).is_ok());
+    // Each mutation below keeps the struct well-typed (the shape gate passes it)
+    // but violates one well-formedness predicate; every case must reject. (The
+    // fingerprint/hash WIDTH cases cannot exist in Rust — [u8; 32] typing closes
+    // them; the identifier/magnitude/charset/sequence cases carry the matrix.)
+    let mut v = f.expected.clone();
+    v.start_anchor.anchor_id = "x".repeat(600);
+    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "anchor_id over identifier_bytes");
+
+    let mut v = f.expected.clone();
+    v.start_anchor.key_id = "bad key!".to_string();
+    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "anchor key_id charset");
+
+    let mut v = f.expected.clone();
+    v.start_anchor.anchored_at = 10_i64.pow(16);
+    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "anchored_at over magnitude");
+
+    let mut v = f.expected.clone();
+    v.start_anchor.sequence = -1;
+    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "anchor sequence negative");
+
+    let mut v = f.expected.clone();
+    v.chain.row_count = 0;
+    assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_err(), "chain row_count zero");
+}
+

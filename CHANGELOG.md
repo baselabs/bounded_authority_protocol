@@ -6,6 +6,14 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- **ADR 0017 exception 2 closed: the expected-anchor identity ordering divergence (all three
+  SDKs).** The reference validates the expected struct (chain + both anchors' identity/binding
+  well-formedness + transitions) BEFORE hashing the archive chunks (`anchored_export_codec.ex:88-104`);
+  the SDKs ran those gates only post-digest. Verdict-invariant by subsumption — the fix restores the
+  clause-3 work ordering: malformed caller metadata now rejects without hashing the archive. The
+  Python battery proves it behaviorally (sha256 call-count == 0 on malformed-expected rejections,
+  mutation-proven); TS and Rust pin the ordering structurally (hoist block before the digest site,
+  mutation-proven) plus verdict-matrix legs.
 - **ADR 0017 exception 1 closed: the SDK closed-Result escape family (Python + TypeScript).** A
   mechanical family sweep (every façade × every parameter × wrong-typed values, then every struct
   field the same way) proved the 2026-08-17 ledgered Python escapes were not two instances but a
