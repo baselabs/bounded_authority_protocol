@@ -6,6 +6,13 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- **BAP-07 readiness reconciled across the repo docs.** The ROADMAP row's acceptance still named
+  the retired private-runtime PG 16/17/18 matrix (the private runtime's ADR 0010 made PostgreSQL 18
+  the sole supported major); the ROADMAP Next-action note, the release-candidate contract's Status,
+  the README Status, and SECURITY.md's supported-versions note each described BAP-07 as gated on the
+  private runtime's connected gates —
+  private BA-14 completed 2026-08-18, so BAP-07 is fully unblocked (the Hex-publication half stays
+  deferred by maintainer decision). Docs-only: zero code, wire, bound, or verdict change.
 - **Cross-vendor review round 18 (codex blocking + claude should-fix/notes, all closed).**
   Codex (blocking): the TS shape gate's nested expected-export members were opaque `"object"`
   specs, so a malformed nested struct (chain missing `previousHash`, empty anchor) passed the
