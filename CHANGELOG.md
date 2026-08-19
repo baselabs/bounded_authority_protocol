@@ -68,6 +68,15 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- **Bounds-aware public compact assembly and current-major issuer posture.** Add the public
+  `BoundedAuthorityProtocol.V1.assemble_compact/3` facade over the existing bounded runtime
+  primitive; `/2` remains exactly `/3` with profile maxima. Native tests cover byte equality for
+  grant, proof, boundary-anchor, and key-transition compacts; tightened encoded-segment and final-
+  compact rejection; and continued rejection of `ba_dlg` / `ba+cap-delegated` in current v1.
+  [ADR 0020](docs/adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md) records that
+  a private authority may issue an independently valid, narrower current-v1 grant to a new holder,
+  while lineage remains runtime-only and portable holder-signed delegation remains successor-major.
+
 - **The SDK contract ADRs (BAP-15 documentation slice).** Three new accepted ADRs record contracts
   that had shipped as code + ROADMAP evidence amendments only: [ADR 0017](docs/adr/0017-inter-sdk-behavioral-contract.md)
   (the inter-SDK behavioral contract the 17-round cross-vendor hardening arc converged on — closed

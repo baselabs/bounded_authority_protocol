@@ -45,7 +45,8 @@ readers, and the submodule gap is noted honestly rather than overclaimed.**
 `BoundedAuthorityProtocol.V1` facade (`lib/bounded_authority_protocol/v1.ex`):
 
 - Producer functions: `grant_signing_input/2`, `proof_signing_input/2`,
-  `boundary_anchor_signing_input/2`, `key_transition_signing_input/2`, `assemble_compact/2`.
+  `boundary_anchor_signing_input/2`, `key_transition_signing_input/2`, `assemble_compact/2`,
+  `assemble_compact/3`.
 - Decode/verify functions: `untrusted_key_locator/2` (the default-arg `untrusted_key_locator/1` is
   also pinned by the gate), `decode_grant/2`, `decode_proof/2`, `verify_grant/3`,
   `check_envelope/2`, `request_digest/3`, `encode_consumption_entry/2`, `check_chain/2`,
@@ -67,6 +68,11 @@ The doc lists PRIMARY arities where a function has a default-arg variant (e.g.
 `untrusted_key_locator/2`); the gate pins ALL compiled arities (including the default-arg `/1`).
 The gate is the authoritative full-arity lock; a divergence between the doc and the gate is a
 docs-currency finding, not a contract change.
+
+**Amendment 2026-08-19.** [ADR 0020](0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md)
+adds `assemble_compact/3` as the bounds-aware public form. This is the additive optional-argument
+case described below: `/2` stays locked and delegates to `/3` with profile-maximum bounds, while
+the architecture gate pins both compiled arities.
 
 ### 2. SemVer convention for 0.1.0
 

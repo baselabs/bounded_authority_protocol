@@ -21,8 +21,8 @@ grant operational authority by itself.
 
 ## Current state
 
-Closed: `BAP-00` through `BAP-06`, `BAP-08` through `BAP-11`, `BAP-13` through `BAP-15`, and
-`BAP-17` (design-only). Open: `BAP-07` (connected verification and first public release — the
+Closed: `BAP-00` through `BAP-06`, `BAP-08` through `BAP-11`, `BAP-13` through `BAP-15`,
+`BAP-17` (design-only), and `BAP-18`. Open: `BAP-07` (connected verification and first public release — the
 public-protocol side is unblocked, the remaining dependency is the private runtime's BA-14, and the
 Hex-publication half is deferred by maintainer decision: internal consumption uses the `v0.1.0` git
 tag at `c65d3be`, not a registry pin), `BAP-12` (IANA templates, gated on the BAP-08 external
@@ -70,7 +70,8 @@ extension drafts under `docs/extensions/`,
 and its activating-major mechanism,
 [ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)). The BAP-15 hardening-arc contracts are
 recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK bounds contract), and
-ADR 0019 (corpus-artifact distribution). Accepted ADRs run 0001–0019 under
+ADR 0019 (corpus-artifact distribution), and ADR 0020 (bounds-aware assembly and issuer-mediated
+reauthorization posture). Accepted ADRs run 0001–0020 under
 [`docs/adr/`](docs/adr/). Commercial release readiness remains open.
 
 ## Critical rules

@@ -31,6 +31,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/adr/0017-inter-sdk-behavioral-contract.md",
                     "docs/adr/0018-sdk-bounds-contract.md",
                     "docs/adr/0019-corpus-artifact-distribution.md",
+                    "docs/adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md",
                     "docs/protocol-v1.md",
                     "docs/release-candidate-contract.md",
                     "docs/errata.md",
@@ -359,6 +360,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
           alias BoundedAuthorityProtocol.V1.Credentials
           alias BoundedAuthorityProtocol.V1.ExpectedGrant
           alias BoundedAuthorityProtocol.V1.ExpectedRequest
+          alias BoundedAuthorityProtocol.V1.SigningInput
           alias BoundedAuthorityProtocol.V1.TrustedIssuer
 
           bounds = Bounds.maximum()
@@ -409,6 +411,16 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
           }
 
           credentials = %Credentials{grant: @grant, proof: @proof}
+          [protected, payload, signature_segment] = String.split(@grant, ".")
+
+          signing_input = %SigningInput{
+            kind: :grant,
+            protected_segment: protected,
+            payload_segment: payload,
+            message: protected <> "." <> payload
+          }
+
+          signature = Base.url_decode64!(signature_segment, padding: false)
 
           with {:ok, decoded_grant} <- V1.decode_grant(@grant, bounds),
                true <- decoded_grant.verification == :not_evaluated,
@@ -419,6 +431,8 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                {:ok, envelope_facts} <- V1.check_envelope(credentials, expected_request),
                true <- envelope_facts.authorization == :not_evaluated,
                {:ok, _digest} <- V1.request_digest("read_record", arguments, bounds),
+               {:ok, @grant} <- V1.assemble_compact(signing_input, signature),
+               {:ok, @grant} <- V1.assemble_compact(signing_input, signature, bounds),
                {:error, :invalid} <- V1.decode_grant(@proof, bounds),
                {:error, :invalid} <-
                  V1.check_envelope(%{credentials | proof: @grant}, expected_request) do

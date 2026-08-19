@@ -32,6 +32,7 @@ compatibility.
 | BAP-15 | **Rust verifier SDK** — A typed Rust verifier SDK reimplementing the frozen v1 profile from spec + corpus alone (no code-level derivation from the Elixir reference), authored under `sdks/rust/` and graduating to a per-SDK repository on first publication ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)), slug:bap-15-rust-sdk | Passes all 283 conformance vectors from a vendored corpus snapshot with startup SHA-256 assertion; per-language permissiveness mutation-gate (duplicate-reject, null-prototype-equivalent, raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction) each proven red-capable; purity lint (no I/O/clock/RNG/network in the library path); dependency-license gate; a deployment guide covering AWS Lambda (`provided.al2023`) and PostgreSQL `plrust` binding; NOT in the Hex `files:` list | BAP-05, BAP-09 | [ADR 0014](adr/0014-cross-language-verifier-sdks.md) and [ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md) |
 | BAP-16 | **Go verifier SDK** — A typed Go verifier SDK reimplementing the frozen v1 profile from spec + corpus alone (stdlib `crypto/ed25519` + `crypto/sha256`, zero crypto dependencies), authored under `sdks/go/` and graduating to a per-SDK repository on first publication ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)), slug:bap-16-go-sdk | Passes all 283 conformance vectors from a vendored corpus snapshot with startup SHA-256 assertion; per-language permissiveness mutation-gate (duplicate-reject, raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction) each proven red-capable; purity vet (no I/O/clock/RNG/network in the library path); dependency-license gate; NOT in the Hex `files:` list | BAP-05, BAP-09 | [ADR 0014](adr/0014-cross-language-verifier-sdks.md) and [ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md) |
 | BAP-17 | **Offline-eligible grant claims (reserve + specify)** — Reserve the `ba_offline` floor-limit claim name and carry the activating-major mechanism to ADR quality (the closed v1 profile rejects the name today; activation is a successor contract-major), slug:bap-17 | `ba_offline` reserved in [registries](design/registries.md); [ADR 0016](adr/0016-offline-eligible-grant-claims.md) specifies the closed `{cnt, cur, max, win}` object, the facts contract (flag + `win` only; magnitudes from the decoded grant), malformed⇒`:invalid`, the `max × cnt` wire-layer ceiling, the `ba_dlg` attenuation composition, and the freshness scoping; the R-BAP-2 legacy-rejection tripwire is red-capable; **zero wire-behavior change** — `git diff <base>..HEAD -- lib/ docs/protocol-v1.md priv/conformance/` is empty (mirror BAP-11/BAP-14; the cross-implementation corpus vector is deferred to the activating major per ADR 0010:286-289) | BAP-10 | [ADR 0016](adr/0016-offline-eligible-grant-claims.md), [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md), and the [offline requirements](design/offline-authorization-requirements.md) |
+| BAP-18 | **Bounds-aware assembly and issuer-mediated reauthorization posture** — Expose caller bounds on compact assembly and define the current-major boundary between ordinary issuer-signed child grants and successor-major portable delegation, slug:bap-18 | `assemble_compact/3` delegates to the existing bounded runtime primitive; `/2` remains the byte-identical profile-maximum default; all four signing kinds enforce tightened segment/final-compact bounds; the facade export lock and unpacked consumer exercise both arities; `ba_dlg` and `ba+cap-delegated` remain rejected | BAP-06, BAP-14, BAP-15 | [ADR 0020](adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md), [ADR 0010](adr/0010-delegation-with-attenuation.md), and [ADR 0018](adr/0018-sdk-bounds-contract.md) |
 
 ## BAP-00 closeout evidence
 
@@ -710,7 +711,7 @@ amendments.
 
 ## Next action
 
-BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, BAP-15, and BAP-17 are
+BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, BAP-15, BAP-17, and BAP-18 are
 complete. BAP-09 shipped the first two cross-language verifier SDKs
 (TypeScript `@bounded-authority/verifier` + Python `bounded-authority-verifier` under `sdks/`, each
 passing all 283 conformance vectors + per-language permissiveness mutation-gates; ADR 0014). BAP-05 shipped the portable v1 conformance
@@ -737,6 +738,12 @@ change, names stay reserved-and-rejected. BAP-17 reserved the `ba_offline` floor
 and carried its activating-major mechanism to ADR quality
 ([ADR 0016](adr/0016-offline-eligible-grant-claims.md)) — design-only, zero wire-behavior change
 (see the BAP-17 closeout evidence above).
+
+BAP-18 adds the public bounds-aware `assemble_compact/3` facade while retaining `/2` as the
+profile-maximum default, and records the current-major issuer-mediated reauthorization boundary in
+[ADR 0020](adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md). The current v1
+wire profile still rejects `ba_dlg` and `ba+cap-delegated`; portable holder-signed delegation stays
+successor-major under ADR 0010.
 
 The standards track charter (ADR 0006, [standards-track.md](design/standards-track.md)) gates that
 cannot be retrofitted after third parties implement the profile are now closed: BAP-10 (normative

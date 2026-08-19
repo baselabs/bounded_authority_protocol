@@ -186,6 +186,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
                                   "Elixir.BoundedAuthorityProtocol.V1.beam" => [
                                     __info__: 1,
                                     assemble_compact: 2,
+                                    assemble_compact: 3,
                                     boundary_anchor_signing_input: 2,
                                     check_chain: 2,
                                     check_envelope: 2,

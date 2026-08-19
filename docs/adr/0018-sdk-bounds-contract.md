@@ -79,8 +79,9 @@ primitives without specifying the threading semantics. This ADR is the contract 
 
 - A caller tightening via the expected structs now gets enforcement at every ceiling in all three
   SDKs — parity with the reference on the archive façades, proven mutation-red per SDK.
-- The `assemble_compact` divergence is the single named exception; it is tracked as the ROADMAP
-  BAP-15 amendment #2 residual and in [ADR 0017](0017-inter-sdk-behavioral-contract.md)'s successor
-  scope, and closes only on maintainer direction.
+- The `assemble_compact` divergence is closed in all three SDKs, and the Elixir reference exposes
+  the same optional-bounds shape publicly through `assemble_compact/3` under
+  [ADR 0020](0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md). The retained
+  two-argument Elixir form and absent SDK bounds all mean profile maximum.
 - The Go SDK (BAP-16) implements this contract at authoring; its acceptance bar cites this ADR
   alongside ADR 0014/0017.

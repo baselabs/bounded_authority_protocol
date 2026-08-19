@@ -297,6 +297,7 @@ untrusted_key_locator(binary(), Bounds.t() | map())
 grant_signing_input(Grant.t(), Bounds.t() | map())
 proof_signing_input(Proof.t(), Bounds.t() | map())
 assemble_compact(SigningInput.t(), binary())
+assemble_compact(SigningInput.t(), binary(), Bounds.t() | map())
 decode_grant(binary(), Bounds.t() | map())
 decode_proof(binary(), Bounds.t() | map())
 verify_grant(binary(), TrustedIssuer.t(), ExpectedGrant.t())
@@ -316,7 +317,9 @@ verify_anchored_export(ArchivedObject.t(), HistoricalKeyChain.t(),
 
 Every function returns `{:ok, value}` or exactly `{:error, :invalid}` (`REQ1-VERIFY-return-shape`).
 Only bounds accept a map; all other structured inputs are exact named structs and each public entry
-revalidates every field (`REQ1-VERIFY-revalidate`). `assemble_compact/2` accepts exactly a
+revalidates every field (`REQ1-VERIFY-revalidate`). `assemble_compact/3` applies the caller's
+tightening-only bounds to both encoded segments, the final compact, and the kind-specific reparse;
+`assemble_compact/2` is exactly `/3` with profile-maximum bounds. Both accept exactly a
 `SigningInput` and a 64-byte signature, never a key, signer, or callback
 (`REQ1-VERIFY-no-signer-callback`). Decode results carry `verification: :not_evaluated`
 (`REQ1-VERIFY-decode-not-evaluated`).

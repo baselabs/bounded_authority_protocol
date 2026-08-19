@@ -24,7 +24,7 @@ half is deferred by maintainer decision
 [`BAP-00`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). The source tree now
 contains the unpublished `:bounded_authority_protocol` 0.1.0 Mix package scaffold and its enforced
 release boundary. `BAP-01` through `BAP-06`, `BAP-08` through `BAP-11`, `BAP-13` through `BAP-15`,
-and `BAP-17` (design-only) are complete; `BAP-07`, `BAP-12` (IANA templates), and `BAP-16` (the Go
+`BAP-17` (design-only), and `BAP-18` are complete; `BAP-07`, `BAP-12` (IANA templates), and `BAP-16` (the Go
 verifier SDK) remain open — see
 [`docs/ROADMAP.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). BAP-04's package-bearing closeout head
 `c4d7716de6499f29524e60638207b1c36e9484b3` passed the supported CI matrix and exact unpublished
@@ -55,6 +55,8 @@ The v1 profile now provides:
   base64url decoding;
 - a protected-header-only `untrusted_key_locator/2` that returns `trust: :not_evaluated`;
 - deterministic grant and proof signing-input production with external signature assembly;
+- bounds-aware external-signature assembly through `assemble_compact/3`, with `/2` retained as the
+  byte-identical profile-maximum default;
 - exact public Ed25519 JWK encoding, decoding, and RFC 7638 thumbprints;
 - bounded HTTPS target-URI normalization and type-preserving request digests;
 - bounded grant/proof decoding with `verification: :not_evaluated`;
