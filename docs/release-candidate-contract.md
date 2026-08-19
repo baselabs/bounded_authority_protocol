@@ -34,7 +34,7 @@ enumeration below lists primary arities.
 
 | Category | Functions |
 |---|---|
-| Producer | `grant_signing_input/2`, `proof_signing_input/2`, `boundary_anchor_signing_input/2`, `key_transition_signing_input/2`, `assemble_compact/2` |
+| Producer | `grant_signing_input/2`, `proof_signing_input/2`, `boundary_anchor_signing_input/2`, `key_transition_signing_input/2`, `assemble_compact/2`, `assemble_compact/3` |
 | Decode / verify | `untrusted_key_locator/2`, `decode_grant/2`, `decode_proof/2`, `verify_grant/3`, `check_envelope/2`, `request_digest/3`, `encode_consumption_entry/2`, `check_chain/2`, `encode_anchored_export/2`, `verify_historical_anchor/3`, `verify_key_transition/4`, `verify_anchored_export/3` |
 
 **Named submodules:** `BoundedAuthorityProtocol.V1.Json.decode/2`,
@@ -46,6 +46,10 @@ enumeration below lists primary arities.
 consumer builds, and `BoundedAuthorityProtocol.V1.Bounds` (the tightening-only bounds constructor).
 
 Anything else in `lib/` is internal.
+
+`assemble_compact/3` is the additive bounds-aware form accepted on 2026-08-19 under
+[ADR 0020](adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md). `/2` remains the
+profile-maximum default and is byte-identical to `/3` with `%{}` or `Bounds.maximum()`.
 
 ## Versioning posture
 

@@ -54,6 +54,13 @@ never accepts private key material, a signer, or a signing callback.
 Unknown versions, algorithms, headers, claims, selectors, duplicate keys, encodings, or
 over-limit structures fail closed. The verifier does not use `kid` to discover trust.
 
+A stateful authority may issue a separate, narrower current-v1 `ba+cap` to a new holder, but the
+resulting compact is an ordinary issuer-signed grant and carries no parent proof. Parent comparison,
+lineage, ancestor revocation, and fan-out policy remain online runtime responsibilities. The
+current profile still rejects `ba_dlg` and `ba+cap-delegated`; portable holder-signed delegation
+remains the successor-major design in [ADR 0010](../adr/0010-delegation-with-attenuation.md), as
+clarified by [ADR 0020](../adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md).
+
 ## Holder proof
 
 Each invocation supplies compact RFC 9449 DPoP:
