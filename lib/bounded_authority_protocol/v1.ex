@@ -7,6 +7,7 @@ defmodule BoundedAuthorityProtocol.V1 do
   alias BoundedAuthorityProtocol.V1.KeyLocator
   alias BoundedAuthorityProtocol.V1.RequestDigest
   alias BoundedAuthorityProtocol.V1.Runtime
+  alias BoundedAuthorityProtocol.V1.SigningInput
 
   @doc """
   Parses only the protected grant header and returns its untrusted `kid` hint.
@@ -56,9 +57,17 @@ defmodule BoundedAuthorityProtocol.V1 do
   @doc "Frames an exact deterministic anchored export after semantic validation."
   defdelegate encode_anchored_export(input, expected), to: Runtime
 
-  @doc "Assembles a validated signing input and raw Ed25519 signature."
+  @doc "Assembles a validated signing input and raw Ed25519 signature at profile maxima."
+  @spec assemble_compact(SigningInput.t(), binary()) ::
+          {:ok, binary()} | {:error, :invalid}
   def assemble_compact(signing_input, signature),
-    do: Runtime.assemble_compact(signing_input, signature, %{})
+    do: assemble_compact(signing_input, signature, %{})
+
+  @doc "Assembles a validated signing input and raw Ed25519 signature under caller bounds."
+  @spec assemble_compact(SigningInput.t(), binary(), Bounds.t() | map()) ::
+          {:ok, binary()} | {:error, :invalid}
+  def assemble_compact(signing_input, signature, limits),
+    do: Runtime.assemble_compact(signing_input, signature, limits)
 
   @doc "Boundedly decodes a raw compact grant without evaluating trust."
   defdelegate decode_grant(compact, limits), to: Runtime
