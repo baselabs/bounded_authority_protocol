@@ -26,18 +26,32 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
 
   @usage "usage: bounded_authority_conformance --corpus DIR [--report PATH]\n"
 
+  # The certified corpus identity (ADR 0014 D4): base64url SHA-256 of the exact index.json bytes
+  # this verifier was certified against. The three SDK runners pin the identical value; this closes
+  # the parity gap so `mix conformance.verify` fails closed on a corpus that is internally
+  # self-consistent but is NOT the certified corpus (e.g. a regenerated index over a shrunken case
+  # set — which passes integrity + agreement, so nothing else here would catch it). To rotate the
+  # corpus, bump this constant AND every SDK runner's CERTIFIED_INDEX_SHA in the same change.
+  @certified_index_sha256 "paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw"
+
   @doc """
   Runs the CLI against `argv` and returns the contract exit status (0/1/2).
 
   Does NOT halt — the escript entry `Main.main/1` calls `System.halt(Cli.run(argv))`. The corpus
   directory is loaded via `File.ls`/`File.read` into the `%{path => binary}` map the pure
   `Corpus.load/1` consumes (paths relative to the corpus dir, e.g. "cases/json/decode.json").
+
+  The optional second argument overrides the certified index SHA-256; it exists ONLY so the pin's
+  non-vacuity is unit-testable (feed a mismatched expectation, observe exit 1). The escript entry
+  always calls `run/1`, so production verification always binds the real `@certified_index_sha256`
+  — this seam cannot weaken the pin in any shipped path.
   """
   @spec run([binary()]) :: 0 | 1 | 2
-  def run(argv) do
+  @spec run([binary()], binary()) :: 0 | 1 | 2
+  def run(argv, certified_index \\ @certified_index_sha256) do
     case parse(argv) do
       {:ok, corpus_dir, report_path} ->
-        load_and_run(corpus_dir, report_path)
+        load_and_run(corpus_dir, report_path, certified_index)
 
       :usage ->
         IO.binwrite(@usage)
@@ -65,19 +79,33 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
 
   defp parse_args([_unknown | _rest], _acc), do: :usage
 
-  defp load_and_run(corpus_dir, report_path) do
+  defp load_and_run(corpus_dir, report_path, certified_index) do
     with {:ok, map} <- read_corpus_dir(corpus_dir),
          {:ok, corpus} <- Corpus.load(map),
+         :ok <- assert_certified_corpus(corpus, certified_index),
          results <- Runner.run(corpus),
          {:ok, bytes} <- Report.to_bytes(corpus, results),
          :ok <- write_report(bytes, report_path) do
       report = Report.build(corpus, results)
       report.exit_status
     else
-      # Any integrity or load failure, a report-encoding failure, OR a failed report write is
-      # exit 1 (closed). A swallowed --report write would exit 0 with no report on disk — a
-      # quiet failure of the evidence artifact in the tool built to eliminate quiet failure.
+      # Any integrity or load failure, a NON-CERTIFIED corpus, a report-encoding failure, OR a
+      # failed report write is exit 1 (closed). A swallowed --report write would exit 0 with no
+      # report on disk — a quiet failure of the evidence artifact in the tool built to eliminate
+      # quiet failure.
       _ -> 1
+    end
+  end
+
+  # ADR 0014 D4: fail closed unless the loaded corpus is the exact certified snapshot. Corpus.load
+  # proves internal self-consistency; this proves the corpus IS the one the verifier was certified
+  # against, so a regenerated-index shrunken corpus (self-consistent, all present cases agree) does
+  # not pass verification.
+  defp assert_certified_corpus(corpus, certified_index) do
+    if Report.index_identity(corpus.index_bytes) == certified_index do
+      :ok
+    else
+      {:error, :uncertified_corpus}
     end
   end
 
