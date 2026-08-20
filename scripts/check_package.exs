@@ -37,7 +37,6 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/errata.md",
                     "docs/governance.md",
                     "docs/design/conformance-contract.md",
-                    "docs/design/consumer-seams-application-report-path.md",
                     "docs/design/offline-authorization-requirements.md",
                     "docs/design/protocol-charter.md",
                     "docs/design/registries.md",

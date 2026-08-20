@@ -20,8 +20,8 @@
 11. Treat chain consistency as consistency only. It cannot by itself prove that a validly
     shortened or relinked history omitted nothing.
 12. Keep commitment preimages private. The public row carries only a fixed-width commitment.
-13. Treat the current 0.1.0 package as unpublished. The v1 verification surface is implemented,
-    but no public release exists.
+13. Consume the published Hex release (`{:bounded_authority_protocol, "~> 0.1.0"}`). The v1
+    verification surface is implemented and the published archive is the exact reviewed candidate.
 14. Run the verifier CLI with an explicit `--corpus DIR` pointing at the packaged corpus
     (`deps/bounded_authority_protocol/priv/conformance/v1/corpus` from a consumer). Never rely on
     a default corpus path. Treat exit 0 as conformance evidence only — it does not authorize.

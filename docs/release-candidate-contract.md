@@ -1,6 +1,6 @@
 # Release-candidate contract
 
-This document is the candidate-facing contract for the unpublished `0.1.0` package. It states the
+This document is the candidate-facing contract for the `0.1.0` package. It states the
 locked public API surface, the versioning posture, and the candidate-verification recipe a reviewer
 follows to compare a local candidate against a CI-attested candidate. It is **evidence a human
 reviewer compares**, not an authority shape — there is no decision, receipt, or authorization here
@@ -9,12 +9,12 @@ reviewer compares**, not an authority shape — there is no decision, receipt, o
 
 ## Status
 
-`0.1.0` is a **release candidate**. No version is published to Hex. BAP-06 froze this candidate;
-BAP-07 (connected verification and first public release) is unblocked — the private-runtime
-dependency (BA-14) completed 2026-08-18 — and is gated only on its own work: the
-connected-verification run plus a fresh correctness/security/gate-integrity/cross-vendor review
-closing with zero open findings. The Hex-publication half is deferred by maintainer decision —
-internal consumption uses the `v0.1.0` git tag (at `c65d3be`), not a registry pin.
+`0.1.0` is the **published first release** — the exact reviewed candidate. BAP-06 froze the
+candidate; BAP-07 (connected verification and first public release) executed 2026-08-20 by owner
+decision: the exact candidate passed the private runtime's PostgreSQL 18 gate and the consumer
+connected gates, the fresh correctness/security/gate-integrity/cross-vendor review set closed, and
+the same archive published to Hex. Consumption uses the Hex release; the `v0.1.0` git tag marks the
+published commit.
 
 ## Locked public API surface (0.1.0)
 
@@ -39,10 +39,13 @@ enumeration below lists primary arities.
 
 **Named submodules:** `BoundedAuthorityProtocol.V1.Json.decode/2`,
 `BoundedAuthorityProtocol.V1.Base64Url.decode/2` (the only decoder façade, per
-[ADR 0002](adr/0002-normative-v1-parsing-profile.md)).
+[ADR 0002](adr/0002-normative-v1-parsing-profile.md)), and
+`BoundedAuthorityProtocol.V1.Bounds.new/1` / `Bounds.maximum/0` (the tightening-only bounds
+constructor `assemble_compact/3` consumes).
 
 **Public structs:** `GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`,
-`KeyTransitionFacts`, `AnchoredExportFacts`, plus the `Expected*` / `Historical*` / input structs a
+`KeyTransitionFacts`, `AnchoredExportFacts`, `SigningInput` (the producer functions' return and
+`assemble_compact`'s first argument), plus the `Expected*` / `Historical*` / input structs a
 consumer builds, and `BoundedAuthorityProtocol.V1.Bounds` (the tightening-only bounds constructor).
 
 Anything else in `lib/` is internal.
@@ -61,7 +64,7 @@ version bumps with a [CHANGELOG](CHANGELOG.md) entry, never silently.
 - Removal, rename, signature change, or a new REQUIRED argument to a locked function: a major
   change (`0.x→0.(x+1)` before 1.0.0), requiring an `@compiled_export_allowances` allowlist edit in
   the same commit.
-- A new optional argument or a new additive function: a minor change (`0.0.x→0.0.(x+1)`), requiring
+- A new optional argument or a new additive function: a minor change (`0.x.y→0.x.(y+1)`), requiring
   an allowlist extension.
 - 1.0.0 (first stable) is a future decision; BAP-06 does not declare stability.
 
@@ -87,8 +90,9 @@ BAP-07. The full security policy, including vulnerability reporting, is in
 ### Reproducibility
 
 The candidate archive is checked for reproducibility on every `mix quality` run (local, CI, and
-supply-chain) via the `release.candidate` gate. The gate builds the archive twice with `_build` and
-`deps` purged between builds and asserts byte-identical SHA-256. A green run prints the candidate
+supply-chain) via the `release.candidate` gate. The gate copies the source tree into two fresh,
+cache-isolated build roots (no `_build`, no `deps`), builds the archive in each, and asserts
+byte-identical SHA-256. A green run prints the candidate
 archive SHA-256 — the same yardstick `SHA256SUMS` uses — so a local candidate and a CI-attested
 candidate at the same commit compare on the same basis.
 

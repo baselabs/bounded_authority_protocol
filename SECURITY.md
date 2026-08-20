@@ -2,15 +2,12 @@
 
 ## Supported versions
 
-The unpublished `0.1.0` package is a **release candidate** — no version is published to Hex. The
-public API surface is locked ([release-candidate contract](docs/release-candidate-contract.md));
-BAP-07 (connected verification and first public release) is fully unblocked (its private-runtime
-dependency, BA-14, completed 2026-08-18) and is the next row; the Hex-publication half is deferred
-by maintainer decision — internal
-consumption uses the `v0.1.0` git tag, not a registry pin. This file becomes version-specific with
-that first release.
+The published `0.1.0` package is the exact reviewed release candidate — BAP-07 (connected
+verification and first public release) executed 2026-08-20. The public API surface is locked
+([release-candidate contract](docs/release-candidate-contract.md)); consumption uses the Hex
+release, and `0.1.0` is the only supported version.
 
-The current unpublished 0.1.0 source implements bounded parsing, deterministic standard compact
+The current 0.1.0 source implements bounded parsing, deterministic standard compact
 JWS grant and RFC 9449 holder-proof production, standalone raw-grant verification, and combined
 raw-envelope verification. It also implements canonical consumption-chain, historical-anchor,
 authenticated rollover, and exact anchored-export verification against caller-supplied

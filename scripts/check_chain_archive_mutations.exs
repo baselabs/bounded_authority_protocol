@@ -373,6 +373,8 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
   end
 
   defp run_mutation(mutation) do
+    baseline_green!(mutation)
+
     scratch =
       Path.join(
         System.tmp_dir!(),
@@ -402,6 +404,48 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
     after
       File.rm_rf!(scratch)
     end
+  end
+
+  # Baseline non-vacuity: before any mutation, the entry's UNMUTATED command must run green in a
+  # clean scratch. Without this, a deleted or drifted target test makes `mix test` exit non-zero
+  # and the battery scores the red as "caught" — the deleted-test false-green the 2026-08-20
+  # gate-integrity review named. Cached per unique command so shared targets pay once per run.
+  defp baseline_green!(mutation) do
+    key = {:baseline_green, mutation.command}
+
+    if Process.get(key) != :ok do
+      scratch =
+        Path.join(
+          System.tmp_dir!(),
+          "bap04-baseline-#{System.unique_integer([:positive, :monotonic])}"
+        )
+
+      File.mkdir_p!(scratch)
+
+      try do
+        Enum.each(@copy_paths, &copy_path(&1, scratch))
+        File.ln_s!(Path.join(@root, "deps"), Path.join(scratch, "deps"))
+        copy_build(scratch)
+
+        {output, status} =
+          System.cmd(hd(mutation.command), tl(mutation.command) ++ ["--max-cases", "1"],
+            cd: scratch,
+            env: [{"MIX_ENV", "test"}],
+            stderr_to_stdout: true
+          )
+
+        if status != 0 do
+          raise "baseline not green for #{mutation.name}: the unmutated target command exited " <>
+                  "#{status}, so a post-mutation red cannot be attributed to the mutation\n#{output}"
+        end
+
+        Process.put(key, :ok)
+      after
+        File.rm_rf!(scratch)
+      end
+    end
+
+    :ok
   end
 
   defp copy_path(relative, scratch) do

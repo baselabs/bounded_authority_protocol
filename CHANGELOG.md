@@ -4,6 +4,26 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-08-20
+
+### Added
+
+- **First public release (BAP-07, executed 2026-08-20 by owner decision).** The exact reviewed
+  candidate published to Hex as `bounded_authority_protocol` 0.1.0. Connected verification: the
+  private runtime's PostgreSQL 18 gate passed 996/996 against the pinned candidate, and the
+  consumer's gates passed 819 tests including the immutable authority-contract bundle's 15
+  consumer cases; the opt-in live-endpoint consumer gate was provisioned and run for this
+  closeout. Fresh correctness, security, and gate-integrity reviews closed with their findings
+  fixed in this landing; the cross-vendor peer (codex) returned no findings, and the third-family
+  GLM lens was a named sensitivity-policy skip. The publication sweep in this landing: the
+  private-strategy links left the README, every unpublished/deferred claim in the shipped docs
+  became the published truth, ADR 0008 gained the 2026-08-20 amendment lifting the deferral, the
+  consumer-seams design note left the package and hexdocs, the mutation batteries gained
+  baseline-green runs (an entry now fails if its target test cannot run green unmutated), the
+  bounds-aware facade gained widening/malformed-bounds rejection legs, and `.gitignore`/dependabot
+  gained the public-repo hygiene the security review named. The `v0.1.0` tag moved to the
+  published commit so hexdocs `source_ref` links resolve.
+
 ### Fixed
 
 - **BAP-07 readiness reconciled across the repo docs.** The ROADMAP row's acceptance still named
@@ -370,7 +390,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
   splice repaired so the `assemble_compact` maximum-bounds residual stands as its own sentence,
   consistent with amendment #3's restatement. Docs-only — no code, wire, bound, or verdict change.
 
-## [0.1.0] — release candidate
+## 0.1.0 release-candidate record — 2026-08-17 (published above as [0.1.0])
 
 ### Added
 
@@ -572,11 +592,5 @@ All notable changes to `bounded_authority_protocol` are documented here.
   `@compiled_export_allowances` architecture-gate pin; [ADR 0008](adr/0008-release-candidate-contract.md)),
   add the `release.candidate` reproducibility gate (two cache-isolated builds, byte-equal SHA-256,
   wired into `mix quality`), and author the candidate-facing docs (release-candidate-contract.md,
-  SECURITY.md, CHANGELOG `[0.1.0]`, README). Zero wire byte, bound, or verdict change. Not yet
-  published — BAP-07 publishes the exact candidate after the connected gates pass.
-
-
-### Not yet available
-
-- A public Hex release remains planned (BAP-07). The current package is an unpublished release
-  candidate; the portable verifier CLI shipped in BAP-05.
+  SECURITY.md, CHANGELOG `[0.1.0]`, README). Zero wire byte, bound, or verdict change. Published
+  2026-08-20 — BAP-07 published the exact candidate after the connected gates passed.
