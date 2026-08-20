@@ -61,27 +61,21 @@ status=0
 # Read stdin once; the two checks below both read from this variable.
 content="$(cat)"
 
-# Registry-publish commands AND registry-publish GitHub Actions — blocked on every
-# scanned surface. Fixed-string match (grep -F), so '.', '@', '/', and spaces are
-# literal. The action references (pypa/gh-action-pypi-publish, etc.) catch the
-# idiomatic GitHub-Actions publish path that contains no CLI command string —
-# without them, a workflow `uses: pypa/gh-action-pypi-publish@...` would pass the
-# gate while being exactly the registry-publish CI step ADR 0015 forbids.
-# Deliberately does NOT include 'npm version' (version bumping is allowed in the
-# monorepo), 'mix hex.build' (building an unpublished archive is allowed;
-# supply-chain.yml does this), or 'gh release create' (a release may accompany a
-# non-publish artifact). Adding a real publish command or action here is the one
-# edit both callers pick up.
-publish_cmds='npm publish
-pnpm publish
-yarn publish
-twine upload
-hatch publish
-flit publish
-uv publish
-cargo publish
-cargo release publish
-cargo-release publish
+# Registry-publish CLI commands — matched with a REGEX (grep -E) that tolerates flags and args
+# between the tool and the publish subcommand: `cargo +stable publish`, `npm --access public
+# publish`, `yarn -s publish` all count. The subcommand is token-bounded (a leading boundary + a
+# trailing space/EOL) so `npm run publish-docs` (the token is `publish-docs`, not `publish`) does
+# NOT match. The tool is preceded by a non-identifier boundary so `cargo-release` is not read as
+# `cargo` (its contiguous form is caught by the fixed list below).
+#   npm/pnpm/yarn/cargo/hatch/flit/uv ... publish   |   twine ... upload
+cli_publish_re='(^|[^[:alnum:]._/-])(npm|pnpm|yarn|cargo|hatch|flit|uv)([[:space:]]+[^[:space:]]+)*[[:space:]]+publish([[:space:]]|$)'
+twine_upload_re='(^|[^[:alnum:]._/-])twine([[:space:]]+[^[:space:]]+)*[[:space:]]+upload([[:space:]]|$)'
+
+# Registry-publish GitHub Actions + the two contiguous forms a subcommand regex can't express
+# (`mix hex.publish`, `cargo-release publish`). Fixed-string (grep -F): '.', '@', '/', '-' literal.
+# The action refs catch the idiomatic Actions publish path that carries no CLI command string.
+# Deliberately excludes 'npm version', 'mix hex.build', and 'gh release create' (all allowed).
+publish_cmds='cargo-release publish
 mix hex.publish
 pypa/gh-action-pypi-publish
 JS-DevTools/npm-publish
@@ -95,7 +89,16 @@ prepack
 prepublish
 publishConfig'
 
-# Publish commands: every scanned surface.
+# Publish CLI subcommands (regex, flag-tolerant): every scanned surface.
+for re in "$cli_publish_re" "$twine_upload_re"; do
+  if printf '%s' "$content" 2>/dev/null | grep -qE -- "$re"; then
+    printf '%s: registry-publish command — SDKs must not publish from the monorepo (ADR 0015)\n' \
+      "$path" >&2
+    status=1
+  fi
+done
+
+# Publish actions + contiguous forms (fixed string): every scanned surface.
 while IFS= read -r cmd; do
   [ -n "$cmd" ] || continue
   if printf '%s' "$content" 2>/dev/null | grep -qF -- "$cmd"; then

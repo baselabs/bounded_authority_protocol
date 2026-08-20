@@ -36,9 +36,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # System. Proves the carve-out allowance is keyed per-file.
       name: "cli-halt-inversion",
       path: "lib/bounded_authority_protocol/conformance/cli.ex",
-      from: "  def run(argv, certified_index \\\\ @certified_index_sha256) do\n",
-      to:
-        "  def run(argv, certified_index \\\\ @certified_index_sha256) do\n    System.halt(0)\n",
+      from: "  def run(argv) do\n",
+      to: "  def run(argv) do\n    System.halt(0)\n",
       command: ["mix", "architecture"]
     },
     %{
@@ -336,7 +335,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "         :ok <- Selector.match_all(operation.selectors, expected.cast_arguments, bounds),\n",
       to:
         "         :ok <-\n           (if is_nil(operation.selectors),\n              do: Selector.match_all(operation.selectors, expected.cast_arguments, bounds),\n              else: :ok),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:36"]
+      command: ["mix", "test", "test/conformance/cli_test.exs:38"]
     },
     # --- check_envelope authority bindings (BAP-05 selector closeout) ----------
     # Each binding below is the SOLE rejecter of one shipped invalid_claim case, so neutralizing it
@@ -352,7 +351,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "    with true <- secure_equal?(proof.holder_thumbprint, grant.holder_thumbprint),\n",
       to:
         "    with true <-\n           (if is_nil(proof.holder_thumbprint),\n              do: secure_equal?(proof.holder_thumbprint, grant.holder_thumbprint),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:36"]
+      command: ["mix", "test", "test/conformance/cli_test.exs:38"]
     },
     %{
       # Grant binding (`ath`): without it a proof minted over one grant is replayable against a
@@ -363,7 +362,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "         true <- secure_equal?(proof.grant_hash, grant_hash),\n",
       to:
         "         true <-\n           (if is_nil(proof.grant_hash),\n              do: secure_equal?(proof.grant_hash, grant_hash),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:36"]
+      command: ["mix", "test", "test/conformance/cli_test.exs:38"]
     },
     %{
       # Request-argument binding (`ba_req`): without it a proof is replayable with different cast
@@ -374,7 +373,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "         true <- secure_equal?(proof.request_hash, request_hash),\n",
       to:
         "         true <-\n           (if is_nil(proof.request_hash),\n              do: secure_equal?(proof.request_hash, request_hash),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:36"]
+      command: ["mix", "test", "test/conformance/cli_test.exs:38"]
     },
     %{
       # Operation binding (`ba_op`): the request digest is computed over the SERVER-derived
@@ -389,7 +388,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "         true <- secure_equal?(proof.operation, expected.operation),\n",
       to:
         "         true <-\n           (if is_nil(proof.operation),\n              do: secure_equal?(proof.operation, expected.operation),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:36"]
+      command: ["mix", "test", "test/conformance/cli_test.exs:38"]
     },
     %{
       # Node-side selector PATH validation. The official rejects an empty selector path at grant

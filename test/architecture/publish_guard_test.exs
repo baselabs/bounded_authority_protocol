@@ -60,6 +60,30 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
     assert run(File.read!(@guard_source), "scripts/check_sdk_publish_infra.sh") == 0
   end
 
+  test "publish commands with flags/args between tool and subcommand are caught" do
+    # grep -F contiguous matching missed these; the flag-tolerant regex catches them.
+    for cmd <- [
+          "cargo +stable publish",
+          "npm --access public publish",
+          "yarn -s publish",
+          "twine --repository x upload dist/*"
+        ] do
+      assert run(cmd <> "\n", "sdks/rust/scripts/release.sh") == 1, "expected #{cmd} caught"
+    end
+  end
+
+  test "publish-adjacent but non-publishing commands are not false-positives" do
+    for cmd <- [
+          "npm run publish-docs",
+          "npm version patch",
+          "mix hex.build",
+          "echo publishing",
+          "npm run build"
+        ] do
+      assert run(cmd <> "\n", "sdks/typescript/scripts/build.sh") == 0, "expected #{cmd} allowed"
+    end
+  end
+
   test "a clean SDK script exits 0" do
     assert run("#!/bin/sh\nnpm run build\n", "sdks/typescript/scripts/build.sh") == 0
   end

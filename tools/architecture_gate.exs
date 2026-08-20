@@ -482,13 +482,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         ]
 
       ebin_paths ->
-        present_union =
-          ebin_paths
-          |> Enum.flat_map(fn p -> p |> Path.join("*.beam") |> Path.wildcard() end)
-          |> MapSet.new(&Path.basename/1)
-
-        (missing_pinned_beam_violations(present_union) ++
-           Enum.flat_map(ebin_paths, &compiled_violations/1))
+        ebin_paths
+        |> Enum.flat_map(&compiled_violations/1)
         |> Enum.uniq()
         |> Enum.sort_by(&{&1.category, &1.path, &1.detail})
     end
@@ -1517,12 +1512,12 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp compiled_violations(ebin_path) do
     app_path = Path.join(ebin_path, "bounded_authority_protocol.app")
+    beam_paths = ebin_path |> Path.join("*.beam") |> Path.wildcard()
+    present = MapSet.new(beam_paths, &Path.basename/1)
 
     app_metadata_violations(app_path) ++
-      (ebin_path
-       |> Path.join("*.beam")
-       |> Path.wildcard()
-       |> Enum.flat_map(&beam_violations/1))
+      missing_pinned_beam_violations(present) ++
+      Enum.flat_map(beam_paths, &beam_violations/1)
   end
 
   defp app_metadata_violations(app_path) do

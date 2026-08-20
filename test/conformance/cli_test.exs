@@ -8,6 +8,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   use ExUnit.Case, async: false
 
   alias BoundedAuthorityProtocol.Conformance.Cli
+  alias BoundedAuthorityProtocol.Conformance.Corpus
+  alias BoundedAuthorityProtocol.Conformance.Report
 
   @moduletag timeout: 600_000
 
@@ -38,22 +40,43 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   end
 
   # --- ADR 0014 D4: the certified-corpus pin (index-SHA) ---------------------
-  # The shipped corpus IS the certified snapshot, so the default pin passes it; a MISMATCHED
-  # certified expectation reds it. This is the tripwire: it catches the exact quiet failure a
-  # self-consistent-but-shrunken corpus would slip through — one whose regenerated index passes
-  # integrity + agreement (exit 0) but is not the corpus this verifier was certified against.
+  # The pin fails closed on any corpus that is NOT the certified snapshot, and the certified value
+  # is NOT caller-overridable (no seam). Proven WITHOUT a seam: a corpus whose index.json carries
+  # insignificant trailing whitespace still decodes, verifies, and agrees (integrity is over the
+  # parsed index, not its raw bytes) — but its raw-byte index SHA differs, so it is exactly the
+  # "not the certified corpus" case a shrunken/regenerated-index corpus embodies. Corpus.load
+  # accepts it AND the identity differs AND run/1 exits 1 ⟹ the pin (not integrity) caught it.
 
   @certified_index_sha256 "paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw"
 
-  test "exit 0 when the corpus index SHA matches the certified snapshot (explicit)" do
-    assert Cli.run(["--corpus", @shipped_corpus], @certified_index_sha256) == 0
+  defp whitespace_perturbed_corpus do
+    dst = unique_tmp("cli-noncertified") |> Path.dirname()
+    File.cp_r!(@shipped_corpus, dst)
+    index = Path.join(dst, "index.json")
+    File.write!(index, File.read!(index) <> "\n")
+    dst
   end
 
-  test "exit 1 when the corpus index SHA does not match the certified snapshot" do
-    # Real (agreeing, integral) corpus, but a mismatched certified expectation: the pin fires
-    # BEFORE agreement, so a corpus that would otherwise exit 0 fails closed. Removing the
-    # assert_certified_corpus check makes this return 0 (mutation-proven load-bearing).
-    assert Cli.run(["--corpus", @shipped_corpus], "not-the-certified-index-sha") == 1
+  test "a non-certified corpus (different index SHA) still loads + agrees but the pin fails it closed" do
+    dir = whitespace_perturbed_corpus()
+    on_exit(fn -> File.rm_rf!(dir) end)
+
+    # 1. Integrity + agreement still pass: Corpus.load accepts the perturbed index...
+    map =
+      dir
+      |> Path.join("**/*")
+      |> Path.wildcard()
+      |> Enum.reject(&File.dir?/1)
+      |> Map.new(fn p -> {Path.relative_to(p, dir), File.read!(p)} end)
+
+    assert {:ok, corpus} = Corpus.load(map)
+
+    # 2. ...but its raw-byte index identity differs from the certified snapshot...
+    refute Report.index_identity(corpus.index_bytes) == @certified_index_sha256
+
+    # 3. ...so run/1 fails it closed. Integrity green + identity differs + exit 1 ⟹ the pin caught
+    # it (not integrity). Neutering assert_certified_corpus makes this return 0 (mutation-proven).
+    assert Cli.run(["--corpus", dir]) == 1
   end
 
   test "exit 0 with --report writes a deterministic report that binds the index digest" do
