@@ -67,9 +67,13 @@ defmodule BoundedAuthorityProtocol.Conformance.Report do
     Jcs.encode(value, Bounds.maximum())
   end
 
-  defp index_identity(index_bytes) do
-    # The report binds the index identity: the SHA-256 of the exact index.json bytes the run
-    # loaded. This is the canonical corpus identity, recomputed at load and bound to HEAD.
+  @doc """
+  The canonical corpus identity: base64url of the SHA-256 of the exact `index.json` bytes the run
+  loaded. Recomputed at load; bound into the report and asserted against the certified snapshot by
+  the CLI (ADR 0014 D4 — parity with the SDK runners, which pin the same value).
+  """
+  @spec index_identity(binary()) :: binary()
+  def index_identity(index_bytes) do
     Base.url_encode64(:crypto.hash(:sha256, index_bytes), padding: false)
   end
 end

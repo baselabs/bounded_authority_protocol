@@ -37,6 +37,25 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     assert Cli.run(["--corpus", @shipped_corpus]) == 0
   end
 
+  # --- ADR 0014 D4: the certified-corpus pin (index-SHA) ---------------------
+  # The shipped corpus IS the certified snapshot, so the default pin passes it; a MISMATCHED
+  # certified expectation reds it. This is the tripwire: it catches the exact quiet failure a
+  # self-consistent-but-shrunken corpus would slip through — one whose regenerated index passes
+  # integrity + agreement (exit 0) but is not the corpus this verifier was certified against.
+
+  @certified_index_sha256 "paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw"
+
+  test "exit 0 when the corpus index SHA matches the certified snapshot (explicit)" do
+    assert Cli.run(["--corpus", @shipped_corpus], @certified_index_sha256) == 0
+  end
+
+  test "exit 1 when the corpus index SHA does not match the certified snapshot" do
+    # Real (agreeing, integral) corpus, but a mismatched certified expectation: the pin fires
+    # BEFORE agreement, so a corpus that would otherwise exit 0 fails closed. Removing the
+    # assert_certified_corpus check makes this return 0 (mutation-proven load-bearing).
+    assert Cli.run(["--corpus", @shipped_corpus], "not-the-certified-index-sha") == 1
+  end
+
   test "exit 0 with --report writes a deterministic report that binds the index digest" do
     tmp = unique_tmp("cli-report")
     on_exit(fn -> File.rm_rf!(Path.dirname(tmp)) end)
