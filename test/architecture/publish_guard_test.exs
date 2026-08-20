@@ -1,0 +1,61 @@
+defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
+  @moduledoc """
+  Non-vacuity + scope tests for `scripts/check_sdk_publish_infra.sh` (ADR 0015 Decision 5: no SDK
+  publishes from the monorepo). The guard is invoked with `<content-on-stdin> | script <path>`;
+  these drive it directly with crafted (content, path) pairs.
+
+  The broadened scan (workflows + composite actions + SDK shell scripts / Makefiles / justfiles +
+  root Makefile/justfile) closes the gap where a registry-publish command hid in an executable
+  surface that is not a workflow or manifest. The shell-script scan is scoped to `sdks/`
+  deliberately — the guard and the pre-commit hook carry the publish-command patterns as literal
+  data, so a repo-wide `*.sh` scan would self-match them; these tests pin BOTH the reach (a
+  publish command in an SDK script/Makefile/composite action is caught) AND the non-self-match.
+  """
+
+  use ExUnit.Case, async: true
+
+  @script Path.expand("../../scripts/check_sdk_publish_infra.sh", __DIR__)
+  @guard_source Path.expand("../../scripts/check_sdk_publish_infra.sh", __DIR__)
+
+  defp run(content, path) do
+    {_out, status} =
+      System.cmd("sh", [@script, path], stderr_to_stdout: true, input: content)
+
+    status
+  end
+
+  test "a registry-publish command in an SDK release script is caught" do
+    assert run("npm publish --access public\n", "sdks/typescript/scripts/release.sh") == 1
+  end
+
+  test "a registry-publish command in an SDK Makefile is caught" do
+    assert run("publish:\n\ttwine upload dist/*\n", "sdks/python/Makefile") == 1
+  end
+
+  test "a registry-publish command in an SDK justfile is caught" do
+    assert run("publish:\n    cargo publish\n", "sdks/rust/justfile") == 1
+  end
+
+  test "a registry-publish command in a composite action is caught" do
+    action = "runs:\n  using: composite\n  steps:\n    - run: cargo publish\n"
+    assert run(action, ".github/actions/release/action.yml") == 1
+  end
+
+  test "a registry-publish command in a workflow is caught (unchanged)" do
+    assert run("jobs:\n  x:\n    steps:\n      - run: npm publish\n", ".github/workflows/x.yml") ==
+             1
+  end
+
+  test "the guard does not self-match its own literal pattern list" do
+    # The guard file carries every publish command string as data; scanning it must NOT red.
+    assert run(File.read!(@guard_source), "scripts/check_sdk_publish_infra.sh") == 0
+  end
+
+  test "a clean SDK script exits 0" do
+    assert run("#!/bin/sh\nnpm run build\n", "sdks/typescript/scripts/build.sh") == 0
+  end
+
+  test "an out-of-scope file carrying a publish string is not scanned" do
+    assert run("do not run `npm publish` here\n", "docs/notes.md") == 0
+  end
+end
