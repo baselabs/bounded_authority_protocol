@@ -1358,7 +1358,7 @@ function verifyManifest(manifest, fixture, fixturePath, additionalScanPath) {
   );
   exactKeys(
     manifest.verifier_public_key_fingerprints,
-    ["bap03_independent.mjs", "chain_archive_independent.mjs", "corpus_independent.mjs"],
+    ["grant_proof_independent.mjs", "chain_archive_independent.mjs", "corpus_independent.mjs"],
     "manifest verifier fingerprints",
   );
   assert(
@@ -1458,7 +1458,7 @@ function main() {
   const tamperCases = runTamperMatrix(fixture);
   const fingerprints = verifyManifest(manifest, fixture, fixturePath, additionalScanPath);
   process.stdout.write(
-      `bap04 independent verification: ok archives=${fixture.archives.length} ` +
+      `chain_archive independent verification: ok archives=${fixture.archives.length} ` +
       `boundary_adversaries=${fixture.boundary_adversaries.length} ` +
       `chain_cases=${chainCases} public_key_fingerprints=${fingerprints} ` +
       `tamper_cases=${tamperCases} ` +
@@ -1469,6 +1469,6 @@ function main() {
 try {
   main();
 } catch (error) {
-  process.stderr.write(`bap04 independent verification: error: ${error.message}\n`);
+  process.stderr.write(`chain_archive independent verification: error: ${error.message}\n`);
   process.exitCode = 1;
 }
