@@ -18,10 +18,19 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
   @guard_source Path.expand("../../scripts/check_sdk_publish_infra.sh", __DIR__)
 
   defp run(content, path) do
-    {_out, status} =
-      System.cmd("sh", [@script, path], stderr_to_stdout: true, input: content)
+    tmp = Path.join(System.tmp_dir!(), "pubguard-#{System.unique_integer([:positive])}")
+    File.write!(tmp, content)
 
-    status
+    try do
+      # The guard reads content on stdin; feed it from the temp file (System.cmd has no stdin
+      # option on this Elixir). @script and path carry no shell metacharacters in these cases.
+      {_out, status} =
+        System.cmd("sh", ["-c", "#{@script} #{path} < #{tmp}"], stderr_to_stdout: true)
+
+      status
+    after
+      File.rm(tmp)
+    end
   end
 
   test "a registry-publish command in an SDK release script is caught" do
