@@ -63,13 +63,16 @@ content="$(cat)"
 
 # Registry-publish CLI commands — matched with a REGEX (grep -E) that tolerates flags and args
 # between the tool and the publish subcommand: `cargo +stable publish`, `npm --access public
-# publish`, `yarn -s publish` all count. The subcommand is token-bounded (a leading boundary + a
-# trailing space/EOL) so `npm run publish-docs` (the token is `publish-docs`, not `publish`) does
-# NOT match. The tool is preceded by a non-identifier boundary so `cargo-release` is not read as
-# `cargo` (its contiguous form is caught by the fixed list below).
+# publish`, `yarn -s publish` all count. The tool boundary is start-of-line, whitespace, OR a
+# path separator, so a path-qualified command (`/usr/local/bin/npm publish`,
+# `./node_modules/.bin/npm publish`) is caught, while an alnum/`-`/`.` run before the tool is NOT a
+# boundary (so `foocargo` and `cargo-release` are not read as `cargo` — the latter's contiguous
+# form is caught by the fixed list below). The subcommand is token-bounded (leading boundary +
+# trailing space/EOL) so `npm run publish-docs` (token `publish-docs`, not `publish`) does NOT
+# match.
 #   npm/pnpm/yarn/cargo/hatch/flit/uv ... publish   |   twine ... upload
-cli_publish_re='(^|[^[:alnum:]._/-])(npm|pnpm|yarn|cargo|hatch|flit|uv)([[:space:]]+[^[:space:]]+)*[[:space:]]+publish([[:space:]]|$)'
-twine_upload_re='(^|[^[:alnum:]._/-])twine([[:space:]]+[^[:space:]]+)*[[:space:]]+upload([[:space:]]|$)'
+cli_publish_re='(^|[[:space:]/])(npm|pnpm|yarn|cargo|hatch|flit|uv)([[:space:]]+[^[:space:]]+)*[[:space:]]+publish([[:space:]]|$)'
+twine_upload_re='(^|[[:space:]/])twine([[:space:]]+[^[:space:]]+)*[[:space:]]+upload([[:space:]]|$)'
 
 # Registry-publish GitHub Actions + the two contiguous forms a subcommand regex can't express
 # (`mix hex.publish`, `cargo-release publish`). Fixed-string (grep -F): '.', '@', '/', '-' literal.
