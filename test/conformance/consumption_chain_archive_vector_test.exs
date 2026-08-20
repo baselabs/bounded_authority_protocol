@@ -29,7 +29,7 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
     assert {output, 0} = run_node(@fixture, @manifest)
 
     assert output =~
-             "bap04 independent verification: ok archives=3 boundary_adversaries=2 " <>
+             "chain_archive independent verification: ok archives=3 boundary_adversaries=2 " <>
                "chain_cases=2 public_key_fingerprints=22 tamper_cases=49 semantic_cases=7"
   end
 
@@ -153,7 +153,7 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
 
     with_temp_json(%{"signing_material" => Base.encode64(malformed)}, fn path ->
       assert {output, 0} = run_node(@fixture, @manifest, ["--scan", path])
-      assert output =~ "bap04 independent verification: ok"
+      assert output =~ "chain_archive independent verification: ok"
     end)
   end
 
@@ -408,7 +408,7 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
         retained
       )
       |> update_in(
-        ["verifier_public_key_fingerprints", "bap03_independent.mjs"],
+        ["verifier_public_key_fingerprints", "grant_proof_independent.mjs"],
         &Enum.sort([moved | &1])
       )
 
@@ -570,7 +570,7 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
     path =
       Path.join(
         System.tmp_dir!(),
-        "bap04-vector-#{System.unique_integer([:positive, :monotonic])}.json"
+        "chain_archive-vector-#{System.unique_integer([:positive, :monotonic])}.json"
       )
 
     File.write!(path, bytes)

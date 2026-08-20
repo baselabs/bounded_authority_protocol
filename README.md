@@ -1,224 +1,149 @@
 # bounded_authority_protocol
 
-Public Apache-2.0 protocol, deterministic verifier, and conformance suite for cryptographically
-bounded proof-of-possession authority.
+Deterministic, dependency-free verification for cryptographically bounded, argument-level
+proof-of-possession authority — the open wire profile, verifier, and conformance suite for the
+Bounded Authority Protocol (BAP v1).
 
-> **Where this fits:** this is the open format, deterministic verifier, and conformance suite —
-> the standard any party can implement. A stateful authority service (issuance, key custody, live
-> revocation, replay, evidence) and holder-side signer SDKs build on top of it; this package
-> deliberately contains neither.
+An issuer signs a **capability grant** that names exactly which operations a holder may invoke and
+with exactly which arguments. On each call the holder presents a **proof-of-possession** bound to
+that grant, the operation, and a digest of the typed arguments. A verifier checks the exact bytes
+and returns cryptographic facts — never an authorization decision. The wire profile is closed: a
+conforming verifier rejects every unlisted member, value, encoding, or extension with a single
+value-free error, which structurally forecloses the `alg:"none"` and permissive-parsing failure
+class.
 
-## Status
+This package is the **standard any party can implement**: the normative profile, the verifier, and
+the conformance corpus. A stateful authority service (issuance, key custody, live revocation,
+replay, evidence) and holder-side signer SDKs build on top of it; this package deliberately
+contains neither, holds no keys, performs no I/O, and runs no service.
 
-The published `0.1.0` package is the **exact reviewed release candidate**: the public API surface
-is locked
-([release-candidate contract](docs/release-candidate-contract.md), [ADR 0008](docs/adr/0008-release-candidate-contract.md)),
-the archive is reproducibility-checked on every quality run, and the bytes on Hex are the bytes the
-release gates reviewed — BAP-07 (connected verification and first public release) executed
-2026-08-20: the private stateful-runtime PostgreSQL 18 gate and the consumer connected gates passed
-against this exact candidate, with fresh correctness, security, gate-integrity, and cross-vendor
-reviews closed. The public/private boundary is complete under
-[`BAP-00`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md).
-`BAP-01` through `BAP-11`, `BAP-13` through `BAP-15`,
-`BAP-17` (design-only), and `BAP-18` are complete; `BAP-12` (IANA templates) and `BAP-16` (the Go
-verifier SDK) remain open — see
-[`docs/ROADMAP.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). BAP-04's package-bearing closeout head
-`c4d7716de6499f29524e60638207b1c36e9484b3` passed the supported CI matrix and exact
-package, checksum, provenance, and SBOM gates. The package implements deterministic standard
-compact-JWS grant and RFC 9449 holder-proof production, bounded decoding, standalone raw-grant
-verification, and combined raw-envelope verification. Its public-only vectors are independently
-verified and cover exact key census, meaningful byte tampering, duplicate members, holder binding,
-request digests, selectors, time boundaries, and URI normalization. Portable timing/allocation
-bounds and the unpacked external-consumer gate exercise the same public API. BAP-04 adds canonical
-consumption chains, signed boundary anchors, authenticated historical-key rollover, deterministic
-anchored archives, and atomic raw-archive verification against mandatory caller boundaries,
-digest, and object version. Its public-only corpus and resource limits are independently verified.
-The package is published to Hex as `bounded_authority_protocol`; consumption uses the Hex release.
+Built on IETF primitives: compact JWS (RFC 7515), DPoP proof-of-possession (RFC 9449), JCS
+canonicalization (RFC 8785), JWK thumbprints (RFC 7638), and EdDSA over Ed25519 (RFC 8032). The
+current cryptographic suite is `BAP1-Ed25519-SHA256`.
 
-The scaffold has zero production dependencies, no application callback, and no supervision tree.
-Source AST, compiled BEAM imports, generated application metadata, dependency declarations, and
-the unpacked Hex archive are all checked to preserve that boundary.
+## Installation
 
-## Public contract
-
-The v1 profile now provides:
-
-- immutable protected-header, claim, selector, separator, URI, encoding, and resource-limit tables;
-- `BoundedAuthorityProtocol.V1.Json.decode/2`, returning the closed tagged JSON algebra with
-  recursive duplicate rejection and no input-name atomization;
-- raw numeric-lexeme and exact-decimal magnitude enforcement before numeric conversion;
-- `BoundedAuthorityProtocol.V1.Base64Url.decode/2`, providing strict canonical unpadded
-  base64url decoding;
-- a protected-header-only `untrusted_key_locator/2` that returns `trust: :not_evaluated`;
-- deterministic grant and proof signing-input production with external signature assembly;
-- bounds-aware external-signature assembly through `assemble_compact/3`, with `/2` retained as the
-  byte-identical profile-maximum default;
-- exact public Ed25519 JWK encoding, decoding, and RFC 7638 thumbprints;
-- bounded HTTPS target-URI normalization and type-preserving request digests;
-- bounded grant/proof decoding with `verification: :not_evaluated`;
-- `verify_grant/3`, returning redacted, non-authorizing `GrantFacts`;
-- `check_envelope/2`, re-verifying the raw grant and binding the holder signature, request,
-  nonce, time, digest, operation, and selectors before returning redacted, non-authorizing
-  `EnvelopeFacts`.
-- canonical consumption-row production and raw range checking against exact predecessor/head
-  boundaries;
-- deterministic boundary-anchor and historical-key-transition standard-JWS signing inputs with
-  external signature assembly;
-- deterministic anchored-export framing and `verify_anchored_export/3`, which scans raw chunks to
-  exact EOF, verifies the complete digest and out-of-band object version, authenticates the
-  positional key path and both boundaries, and checks every row;
-- fixed-redacted, non-authorizing chain, anchor, transition, and anchored-export facts.
-
-The two decoder functions live in named public submodules under the explicit
-`BoundedAuthorityProtocol.V1` namespace. There is no duplicate decoder façade and no implicit
-latest profile. Resource limits are tightening-only positive integers; the Ed25519 key/signature
-and SHA-256 digest widths are immutable protocol constants. Unknown, non-integer, zero/negative,
-widening, or fixed-width-changing values fail with the fixed value-free `{:error, :invalid}`. The
-structural Draft 2020-12 schemas accompany the decoders but do not replace duplicate-name,
-raw-number, UTF-8 byte, depth, node-count, or canonical-encoding enforcement.
-
-The remaining future row provides:
-
-- the connected-release gate (BAP-07 — connected verification and first public release).
-
-The portable conformance corpus and verifier CLI shipped with
-[BAP-05](docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md) (see
-[Conformance](#conformance) below), and the release-candidate contract and reproducibility gate
-with [BAP-06](docs/adr/0008-release-candidate-contract.md).
-
-All verification inputs are explicit: already-trusted public key, expected audience and instance,
-server-derived method, normalized URI, invocation ID, operation, cast arguments, evaluation time,
-and limits. A successful result means only that the supplied bytes satisfy those supplied inputs.
-
-The public package exposes a bounded `untrusted_key_locator/2` preparse that returns only the
-closed protected-header `kid` as an explicitly untrusted lookup hint. It does not decode payload
-or signature segments and never selects or marks a key trusted.
-
-## Deliberate exclusions
-
-This package does not discover trust, issue grants, hold keys, read a database, reserve replay,
-check live revocation state, claim an execution, authorize a business effect, append outcomes or
-consumptions, remove archived evidence, submit witnesses, or run an OTP service.
-
-Those stateful responsibilities belong to the private
-[`bounded_authority`](https://github.com/baselabs/bounded_authority) runtime. Product integration
-belongs to the consuming host. QorPay is unchanged; its private authority schemas and wire formats
-are not protocol compatibility targets.
-
-## Dependency direction
-
-```text
-bounded_authority          -> bounded_authority_protocol
-private_consumer                -> bounded_authority + application transport libraries
-bounded_authority_protocol -> no private or product package
+```elixir
+def deps do
+  [
+    {:bounded_authority_protocol, "~> 0.1"}
+  ]
+end
 ```
 
-A production consumer routes an operational decision through a stateful authority runtime built on
-this package, not through a direct public-verifier result — verification returns facts, and the
-authority decision is a separate step.
+The package has **zero production dependencies**, no application callback, and no supervision tree.
 
-See the [normative v1 profile](docs/protocol-v1.md),
-[protocol charter](docs/design/protocol-charter.md), [threat model](docs/design/threat-model.md),
-[conformance contract](docs/design/conformance-contract.md), and
-[ADR 0001](docs/adr/0001-public-protocol-verifier-boundary.md) plus
-[ADR 0002](docs/adr/0002-normative-v1-parsing-profile.md) and
-[ADR 0003](docs/adr/0003-standard-jws-and-verified-grant-results.md), plus
-[ADR 0004](docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md), plus
-[ADR 0005](docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md). See
-[docs/governance.md](docs/governance.md) for the change-control, errata, deprecation, and
-security-release policy. Pre-submission MCP extension drafts (capability-authorization, targeted at
-the MCP experimental track) live under `docs/extensions/`.
+## What it provides
+
+Verification (all results are redacted and non-authorizing — they carry
+`authorization: :not_evaluated`):
+
+- `verify_grant/3` — verifies a raw compact grant against an exact public key, issuer, audience,
+  time, and bounds; returns `GrantFacts`.
+- `check_envelope/2` — re-verifies the raw grant and binds the holder signature, method,
+  normalized URI, invocation id, operation, argument digest, time, nonce, and every selector;
+  returns `EnvelopeFacts`, or exactly `{:error, :invalid}`.
+- `untrusted_key_locator/2` — a bounded protected-header preparse returning only the `kid` as an
+  explicitly untrusted lookup hint; it decodes no payload or signature and never marks a key
+  trusted.
+- `check_chain/2`, `verify_historical_anchor/3`, `verify_key_transition/4`,
+  `verify_anchored_export/3` — evidence verification: canonical consumption chains, signed boundary
+  anchors, authenticated historical-key rollover, and anchored archives checked to exact EOF,
+  digest, and out-of-band object version.
+
+Production (the package emits deterministic signing inputs and assembles compact forms from a
+caller-supplied signature; it never accepts private key material or a signer):
+
+- `grant_signing_input/2`, `proof_signing_input/2`, `boundary_anchor_signing_input/2`,
+  `key_transition_signing_input/2`, `assemble_compact/2,3`, `encode_consumption_entry/2`,
+  `encode_anchored_export/2`, `request_digest/3`.
+
+Decoding:
+
+- `BoundedAuthorityProtocol.V1.Json.decode/2` — the closed tagged-JSON algebra with recursive
+  duplicate rejection and no input-name atomization.
+- `BoundedAuthorityProtocol.V1.Base64Url.decode/2` — strict canonical unpadded base64url.
+
+All verification inputs are explicit: the already-trusted public key, expected audience and
+instance, server-derived method, normalized URI, invocation id, operation, cast arguments,
+evaluation time, and limits. A successful result means only that the supplied bytes satisfy those
+supplied inputs. Resource limits are tightening-only positive integers; the Ed25519 key/signature
+and SHA-256 digest widths are immutable protocol constants. Unknown, non-integer, zero, negative,
+widening, or width-changing values fail with the fixed `{:error, :invalid}`.
+
+## What it does not do
+
+This package does not discover trust, issue grants, hold keys, read a database, reserve replay,
+check live revocation, claim an execution, authorize a business effect, append outcomes, remove
+archived evidence, submit witnesses, or run a service. Those responsibilities belong to a stateful
+authority runtime and the consuming host. Verification returns facts; the authorization decision is
+a separate step the host owns.
 
 ## Conformance
 
 The package ships a language-neutral v1 conformance corpus and a deterministic offline verifier
 CLI. The corpus (`priv/conformance/v1/corpus`) is the normative evidence: 283 cases across 28
-surfaces with a total surface × class applicability matrix, re-derived from the official
-implementation and independently re-verified by a second Node implementation
-(`conformance/corpus_independent.mjs`) that recomputes every verdict from scratch. A value that
-only round-trips the official implementation is not normative until the independent runner agrees.
-
-Build the verifier and run it against the shipped corpus:
+surfaces with a full surface × class applicability matrix, independently re-verified by a second
+implementation that recomputes every verdict from scratch — a value that only round-trips the
+reference implementation is not normative until the independent runner agrees. Every invalid case
+is constructed one defect away from a passing case, so a verifier that skips the named check
+accepts it.
 
 ```bash
 mix escript.build
 ./bounded_authority_conformance --corpus priv/conformance/v1/corpus
 ```
 
-`--corpus DIR` is required (no default — a wrong-corpus run that exits 0 is a quiet
+`--corpus DIR` is required (no default — a wrong-corpus run that exits 0 would be a quiet
 misverification path in the tool built to eliminate quiet misverification). It exits `0` only on
-complete agreement, `1` on any integrity/verdict failure, `2` on usage error. From a consumer
+complete agreement, `1` on any integrity or verdict failure, `2` on usage error. From a consumer
 dependency, point `--corpus` at the packaged path under `deps/bounded_authority_protocol/`. The
-report is deterministic JCS bytes binding the corpus index SHA-256. See
-[`docs/design/conformance-contract.md`](docs/design/conformance-contract.md) and
-[ADR 0005](docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md).
+oracle vectors used by holder-side consumers to verify their own production live under
+`priv/conformance/v1/vectors`.
 
 ## Cross-language verifier SDKs
 
-In addition to the Elixir package, the repository authors typed **verifier** SDK reimplementations of
-the frozen v1 profile, built from the spec + corpus alone with no code-level derivation from the
-Elixir reference ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)):
+Alongside the Elixir package, the repository authors typed **verifier** SDKs of the frozen v1
+profile — TypeScript (Node, zero runtime dependencies), Python (single dependency), and Rust
+(`#![forbid(unsafe_code)]`) — each written from the specification and corpus alone, with no
+code-level derivation from the reference implementation. Each passes all 283 conformance vectors
+recomputed from scratch, asserts the corpus digest at startup, and proves every parser-layer
+closure red-capable via a per-language mutation gate. Each SDK graduates to its own repository on
+first publication.
 
-- **TypeScript** — `sdks/typescript/` (`@bounded-authority/verifier`, to be published on npm; Node
-  `>= 22`, zero runtime dependencies; Ed25519 via `node:crypto`).
-- **Python** — `sdks/python/` (`bounded-authority-verifier`, to be published on PyPI; Python
-  `>= 3.10`, single runtime dependency `cryptography`).
-- **Rust** — `sdks/rust/` (`bounded-authority-protocol`, to be published on crates.io; Rust MSRV 1.81;
-  `ed25519-dalek` serial backend + `sha2` + `ryu-js`). See its `README` (`sdks/rust/README.md`) and the
-  deployment guide (`docs/deployment/rust-sdk.md`) for the AWS Lambda (`provided.al2023`) and PostgreSQL
-  (`plrust`) posture.
+## Standards posture
 
-**None of the SDKs is published to a registry yet.** They are authored in this monorepo but, per the SDK
-graduation model ([ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md)), each publishes
-from its own per-SDK repository (`bounded_authority_protocol_<lang>`) on first publication — never
-from here. A local pre-commit hook and the `sdk-publish-guard` CI job reject registry-publish
-infrastructure committed to this repo; see `CONTRIBUTING.md`. The npm/PyPI/crates.io package names are reserved
-identifiers recorded for the graduated publish, not live registry links.
+The wire profile is closed permanently; evolution happens above it through parallel
+contract-majors that never downgrade, with a minimum twelve-month deprecation window and published
+change-control, errata, and security-release policy (see `docs/governance.md`). Cryptographic
+agility is a named-suite succession, with a post-quantum path (ML-DSA) and cross-suite evidence
+attestation designed in. A pre-submission MCP authorization extension draft targeting the MCP
+extensions track lives under `docs/extensions/`.
 
-Each SDK passes all **283** published conformance vectors (recomputed from scratch, not cached),
-asserts the corpus `index.json` SHA-256 at startup, and proves every parser-layer permissiveness
-closure **red-capable** via a per-language mutation-gate. They are **verifiers**, not authority
-runtimes: a successful result proves only that caller-supplied bytes satisfy caller-supplied trusted
-inputs — it never selects keys, reserves replay, or grants execution. The `sdks-conformance` CI job
-([`.github/workflows/sdks.yml`](https://github.com/baselabs/bounded_authority_protocol/blob/main/.github/workflows/sdks.yml)) runs on every change to `sdks/**` or
-`priv/conformance/**`. See each SDK's `README.md` for build + test details.
+## Documentation
+
+- `docs/protocol-v1.md` — the normative v1 wire profile.
+- `docs/design/protocol-charter.md` — what the verifier does and the verification chain.
+- `docs/design/conformance-contract.md` — how conformance is proven.
+- `docs/design/standards-track.md` — evolution, suite succession, governance, and venue strategy.
+- `docs/governance.md` — change classes, errata, deprecation, and security-release policy.
 
 ## Development
 
-The supported CI matrix is Elixir 1.18/OTP 27, Elixir 1.19/OTP 28, and Elixir 1.20/OTP 29.
-After installing a supported pair:
+Supported Elixir/OTP: 1.18/27, 1.19/28, 1.20/29.
 
 ```bash
 mix deps.get
 mix quality
 ```
 
-`mix quality` runs formatting, warnings-as-errors compilation, the purity architecture gate,
-Credo, tests with coverage, Dialyzer, documentation, unused/retired/vulnerable dependency checks,
-closed dependency-license and CycloneDX checks, and an exact packed/unpacked consumer test.
+`mix quality` runs formatting, warnings-as-errors compilation, the purity architecture gate, Credo,
+tests with coverage, Dialyzer, documentation, dependency and license audits, CycloneDX SBOM
+generation, the conformance corpus and mutation gates, and an exact packed/unpacked consumer test.
 
-Useful focused gates are:
+## Security
 
-```bash
-mix architecture
-mix audit
-mix bap03.performance
-mix bap04.performance
-mix conformance.verify
-mix chain_archive.mutations
-mix conformance.mutations
-mix package.check
-mix sbom.generate
-```
-
-`mix.exs` is the executable authority for the supported Elixir floor, and
-`.github/workflows/ci.yml` is the executable authority for tested Elixir/OTP pairs. Each
-trusted-main workflow run, checksum, and attestation identifies its own source revision and
-artifact. These executable facts deliberately have no duplicate lifecycle ADR.
-
-Main-branch CI builds an unpublished package archive, records its SHA-256 checksum, produces
-release and tooling CycloneDX documents, and creates separate GitHub build-provenance and SBOM
-attestations. That CI artifact is not a release candidate and is never published by BAP-01.
+See [`SECURITY.md`](SECURITY.md) for the vulnerability-reporting process.
 
 ## License
 

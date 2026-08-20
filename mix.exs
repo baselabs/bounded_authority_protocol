@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.1"
   @source_url "https://github.com/baselabs/bounded_authority_protocol"
 
   def project do
@@ -39,8 +39,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
       preferred_envs: [
         architecture: :test,
         audit: :test,
-        "bap03.performance": :test,
-        "bap04.performance": :test,
+        "verification.performance": :test,
+        "chain_archive.performance": :test,
         "chain_archive.mutations": :test,
         "conformance.mutations": :test,
         "conformance.verify": :test,
@@ -77,6 +77,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "lib",
         "priv/conformance/v1/corpus",
         "priv/conformance/v1/schemas",
+        "priv/conformance/v1/vectors",
         ".formatter.exs",
         "mix.exs",
         "README.md",
@@ -187,10 +188,10 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "license.check",
         "sbom.check"
       ],
-      "bap03.performance": [
-        "run --no-start scripts/check_bap03_performance.exs"
+      "verification.performance": [
+        "run --no-start scripts/check_verification_performance.exs"
       ],
-      "bap04.performance": [
+      "chain_archive.performance": [
         "run --no-start scripts/check_chain_archive_performance.exs"
       ],
       "chain_archive.mutations": [
@@ -222,8 +223,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "compile --warnings-as-errors",
         "architecture",
         "credo --strict",
-        "bap03.performance",
-        "bap04.performance",
+        "verification.performance",
+        "chain_archive.performance",
         "test --cover --seed 42",
         "dialyzer",
         "docs --warnings-as-errors",

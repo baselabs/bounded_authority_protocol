@@ -692,7 +692,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
 
   def run do
     Enum.each(@mutations, &run_mutation/1)
-    IO.puts("bap05 mutation gate: ok mutations=#{length(@mutations)}")
+    IO.puts("conformance mutation gate: ok mutations=#{length(@mutations)}")
   end
 
   defp run_mutation(mutation) do
@@ -701,7 +701,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     scratch =
       Path.join(
         System.tmp_dir!(),
-        "bap05-mutation-#{mutation.name}-#{System.unique_integer([:positive, :monotonic])}"
+        "conformance-mutation-#{mutation.name}-#{System.unique_integer([:positive, :monotonic])}"
       )
 
     File.mkdir_p!(scratch)
@@ -746,7 +746,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       scratch =
         Path.join(
           System.tmp_dir!(),
-          "bap05-baseline-#{System.unique_integer([:positive, :monotonic])}"
+          "conformance-baseline-#{System.unique_integer([:positive, :monotonic])}"
         )
 
       File.mkdir_p!(scratch)

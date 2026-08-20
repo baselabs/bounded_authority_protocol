@@ -334,7 +334,7 @@ function fingerprint(publicKey) {
 }
 
 // Census discovery: fingerprint every public-key-labeled field in the corpus case data, mirroring
-// the bap03 discovery model (isPublicKeyLabel: any *public_key*/holder_public_key/etc. field
+// the grant_proof discovery model (isPublicKeyLabel: any *public_key*/holder_public_key/etc. field
 // holding a 32-byte base64url). This makes the runner's observed import-boundary set equal the
 // corpus's FULL declared key set — including invalid_key cases' wrong keys, which the runner reads
 // from case data even though their Ed25519 verification fails. Without this, the observed set
@@ -976,7 +976,7 @@ function loadCorpus(corpusDir) {
       assert(typeof c.surface === "string", `${c.id}: surface`);
       assert(typeof c.class === "string", `${c.id}: class`);
       assert(c.expected && typeof c.expected === "object", `${c.id}: expected`);
-      // Census: fingerprint every public-key field in this case's data (mirrors the bap03
+      // Census: fingerprint every public-key field in this case's data (mirrors the grant_proof
       // discovery model) so the observed import-boundary set equals the corpus's declared set.
       discoverCaseKeys(c);
       cases.push({ caseObj: c, fileRel: rel });
@@ -1712,7 +1712,7 @@ function dispatchCheckChain(input) {
   return {};
 }
 
-// --- typed JSON algebra (mirrors runner.ex to_tagged / bap03 typedJsonMember) -
+// --- typed JSON algebra (mirrors runner.ex to_tagged / grant_proof typedJsonMember) -
 // The request digest and ba_req are computed over the typed-cast form, where each
 // JSON value is wrapped in a [tag, value] pair that preserves the integer/float
 // distinction. The canonical serialization of a tagged value is the JCS of its

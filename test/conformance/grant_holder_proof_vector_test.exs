@@ -2,14 +2,14 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
   use ExUnit.Case, async: true
 
   @root Path.expand("../..", __DIR__)
-  @script Path.join(@root, "conformance/bap03_independent.mjs")
+  @script Path.join(@root, "conformance/grant_proof_independent.mjs")
   @fixture Path.join(@root, "priv/conformance/v1/vectors/grant-holder-proof.json")
   @manifest Path.join(@root, "priv/conformance/v1/vectors/manifest.json")
 
   test "independent Node verifier recomputes every public byte and verdict" do
     {output, 0} = run_node([])
 
-    assert output =~ "bap03 independent verification: ok"
+    assert output =~ "grant_proof independent verification: ok"
 
     assert output =~
              "vectors=3 public_key_fingerprints=22 tamper_cases=7 duplicate_cases=1 uri_cases=18"
@@ -57,7 +57,7 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
              Enum.sort(Enum.uniq(manifest["canonical_public_key_fingerprints"]))
 
     assert manifest["verifier_public_key_fingerprints"] == %{
-             "bap03_independent.mjs" => [
+             "grant_proof_independent.mjs" => [
                "0qPOlfSr_giHdRaDK18shLtG5DoQL1a2nrHVDeWruJI",
                "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk",
                "b5dejonEMNbWuAUspTppNgiUa6QUXdzk40kdsDcWK6g",
@@ -122,11 +122,13 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
 
   test "moving a reached key to the other verifier fails import-boundary ownership" do
     manifest = json!(@manifest)
-    [moved | retained] = manifest["verifier_public_key_fingerprints"]["bap03_independent.mjs"]
+
+    [moved | retained] =
+      manifest["verifier_public_key_fingerprints"]["grant_proof_independent.mjs"]
 
     manifest =
       manifest
-      |> put_in(["verifier_public_key_fingerprints", "bap03_independent.mjs"], retained)
+      |> put_in(["verifier_public_key_fingerprints", "grant_proof_independent.mjs"], retained)
       |> update_in(
         ["verifier_public_key_fingerprints", "chain_archive_independent.mjs"],
         &Enum.sort([moved | &1])
@@ -185,7 +187,7 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
 
     with_temp_json(%{"signing_material" => Base.encode64(malformed)}, fn path ->
       {output, 0} = run_node(["--scan", path])
-      assert output =~ "bap03 independent verification: ok"
+      assert output =~ "grant_proof independent verification: ok"
     end)
   end
 
@@ -220,7 +222,7 @@ defmodule BoundedAuthorityProtocol.Conformance.GrantHolderProofVectorTest do
     path =
       Path.join(
         System.tmp_dir!(),
-        "bap03-vector-#{System.unique_integer([:positive, :monotonic])}.json"
+        "grant_proof-vector-#{System.unique_integer([:positive, :monotonic])}.json"
       )
 
     File.write!(path, :json.encode(value))
