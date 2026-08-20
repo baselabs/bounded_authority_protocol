@@ -41,17 +41,16 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   directory is loaded via `File.ls`/`File.read` into the `%{path => binary}` map the pure
   `Corpus.load/1` consumes (paths relative to the corpus dir, e.g. "cases/json/decode.json").
 
-  The optional second argument overrides the certified index SHA-256; it exists ONLY so the pin's
-  non-vacuity is unit-testable (feed a mismatched expectation, observe exit 1). The escript entry
-  always calls `run/1`, so production verification always binds the real `@certified_index_sha256`
-  — this seam cannot weaken the pin in any shipped path.
+  The certified index SHA-256 is bound from `@certified_index_sha256` and is NOT caller-overridable
+  — there is no seam by which a caller can supply its own expected value and pass a non-certified
+  corpus. The pin's non-vacuity is proven without a seam (see cli_test: a corpus with insignificant
+  index.json whitespace loads + agrees but has a different index SHA, and `run/1` fails it closed).
   """
   @spec run([binary()]) :: 0 | 1 | 2
-  @spec run([binary()], binary()) :: 0 | 1 | 2
-  def run(argv, certified_index \\ @certified_index_sha256) do
+  def run(argv) do
     case parse(argv) do
       {:ok, corpus_dir, report_path} ->
-        load_and_run(corpus_dir, report_path, certified_index)
+        load_and_run(corpus_dir, report_path)
 
       :usage ->
         IO.binwrite(@usage)
@@ -79,10 +78,10 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
 
   defp parse_args([_unknown | _rest], _acc), do: :usage
 
-  defp load_and_run(corpus_dir, report_path, certified_index) do
+  defp load_and_run(corpus_dir, report_path) do
     with {:ok, map} <- read_corpus_dir(corpus_dir),
          {:ok, corpus} <- Corpus.load(map),
-         :ok <- assert_certified_corpus(corpus, certified_index),
+         :ok <- assert_certified_corpus(corpus),
          results <- Runner.run(corpus),
          {:ok, bytes} <- Report.to_bytes(corpus, results),
          :ok <- write_report(bytes, report_path) do
@@ -101,8 +100,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   # proves internal self-consistency; this proves the corpus IS the one the verifier was certified
   # against, so a regenerated-index shrunken corpus (self-consistent, all present cases agree) does
   # not pass verification.
-  defp assert_certified_corpus(corpus, certified_index) do
-    if Report.index_identity(corpus.index_bytes) == certified_index do
+  defp assert_certified_corpus(corpus) do
+    if Report.index_identity(corpus.index_bytes) == @certified_index_sha256 do
       :ok
     else
       {:error, :uncertified_corpus}
