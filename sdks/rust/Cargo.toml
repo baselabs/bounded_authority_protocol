@@ -10,7 +10,7 @@ keywords = ["authentication", "authorization", "dpop", "ed25519", "security"]
 categories = ["cryptography", "authentication"]
 
 [dependencies]
-ed25519-dalek = { version = "2.2", default-features = false }
+ed25519-dalek = { version = "3.0", default-features = false }
 sha2 = "0.10"
 ryu-js = "1.0"
 
