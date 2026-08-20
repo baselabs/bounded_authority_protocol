@@ -11,7 +11,7 @@ categories = ["cryptography", "authentication"]
 
 [dependencies]
 ed25519-dalek = { version = "2.2", default-features = false }
-sha2 = "0.10"
+sha2 = "0.11"
 ryu-js = "1.0"
 
 [dev-dependencies]
