@@ -711,7 +711,8 @@ amendments.
 
 ## Next action
 
-BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, BAP-15, BAP-17, and BAP-18 are
+BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, BAP-15, BAP-17, BAP-18, and
+BAP-07 (connected verification and first public release, executed 2026-08-20) are
 complete. BAP-09 shipped the first two cross-language verifier SDKs
 (TypeScript `@bounded-authority/verifier` + Python `bounded-authority-verifier` under `sdks/`, each
 passing all 283 conformance vectors + per-language permissiveness mutation-gates; ADR 0014). BAP-05 shipped the portable v1 conformance
@@ -756,10 +757,18 @@ BAP-08 (capability-authorization extension proposal) is drafted as a pre-submiss
 MCP experimental-extension track (`docs/extensions/`, [ADR 0013](adr/0013-capability-authorization-extension.md))
 — partial conformance to the official-submission bar, with the reference-SDK / working-group / SEP-
 acceptance gates recorded as external preconditions. **BAP-07 (connected verification and first
-public release) is fully unblocked** — its last declared dependency, private BA-14 (the private
-runtime's connected gates), completed 2026-08-18; the shippable scope is the connected-verification
-run plus the fresh review set (the Hex-publication half is deferred by maintainer decision —
-internal consumption uses the `v0.1.0` git tag, not a registry pin). BAP-12 (IANA templates)
+public release) executed 2026-08-20 by owner decision** — the exact candidate passed the private
+runtime's PostgreSQL 18 gate (996/996, quality exit 0, with the runtime's deliverable-manifest pin
+re-recorded for its own intentional docs commit) and the consumer connected gates (819 tests green;
+the immutable authority-contract bundle verified its 15 consumer cases against the candidate; the
+opt-in live-endpoint gate provisioned and run as part of this closeout); the fresh
+correctness/security/gate-integrity reviews closed with their findings fixed in the release landing,
+and the cross-vendor peer (codex) returned no findings (the third-family GLM lens was a named
+sensitivity-policy skip). The archive published to Hex as `bounded_authority_protocol` 0.1.0; the
+`v0.1.0` tag moved to the published commit. Deferred as recorded follow-ups from the gate-integrity
+review: a corpus index-SHA pin in the Elixir `conformance.verify` stage (the SDK runners already
+pin it), mutation-battery baseline-green runs (landed in this closeout), export pins for the
+currently-unpinned beams, and broader sdk-publish-guard file coverage. BAP-12 (IANA templates)
 rides the BAP-08 external submission path, gated on the same official-submission preconditions.
 
 **SDK graduation and publish topology ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)).**
@@ -771,8 +780,8 @@ first SDK graduation. No SDK publishes from this monorepo: a local pre-commit
 hook (`scripts/hooks/pre-commit`, installed via `scripts/install-hooks.sh`) and the CI
 `sdk-publish-guard` job ([`.github/workflows/sdk-publish-guard.yml`](../.github/workflows/sdk-publish-guard.yml))
 reject registry-publish infrastructure (publish commands, publish actions, npm publish lifecycle
-keys) committed here. The `v0.1.0` git tag (at `c65d3be`) is the internal-reference pin; no Hex
-release has been published. See `CONTRIBUTING.md` for the install + bypass (`git commit --no-verify`).
+keys) committed here. Consumption uses the published Hex release; the `v0.1.0` git tag marks the
+published commit. See `CONTRIBUTING.md` for the install + bypass (`git commit --no-verify`).
 
 **BAP-15 (Rust) and BAP-16 (Go) SDK rows are authored, post-1.0.** A spec/corpus review surfaced
 three gaps where neither `protocol-v1.md` nor the corpus pinned behavior the TS/Python SDKs had

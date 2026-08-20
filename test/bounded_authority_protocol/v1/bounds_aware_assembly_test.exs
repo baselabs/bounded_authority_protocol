@@ -47,6 +47,33 @@ defmodule BoundedAuthorityProtocol.V1.BoundsAwareAssemblyTest do
     end
   end
 
+  test "the facade rejects widening, unknown, malformed, and non-map bounds for every kind" do
+    maximum_compact = Bounds.maximum().compact_bytes
+
+    for {kind, signing_input, signature} <- signing_cases() do
+      assert {:error, :invalid} =
+               V1.assemble_compact(signing_input, signature, %{
+                 compact_bytes: maximum_compact + 1
+               }),
+             inspect({kind, :widening})
+
+      assert {:error, :invalid} =
+               V1.assemble_compact(signing_input, signature, %{unknown_bound: 1}),
+             inspect({kind, :unknown_key})
+
+      assert {:error, :invalid} =
+               V1.assemble_compact(signing_input, signature, %{compact_bytes: 0}),
+             inspect({kind, :zero})
+
+      assert {:error, :invalid} =
+               V1.assemble_compact(signing_input, signature, %{signature_bytes: 32}),
+             inspect({kind, :fixed_width_mutation})
+
+      assert {:error, :invalid} = V1.assemble_compact(signing_input, signature, :not_bounds),
+             inspect({kind, :non_map})
+    end
+  end
+
   test "bounds-aware assembly does not activate successor-major delegated grants" do
     fixture = fixture!()
     {:ok, signing_input} = V1.grant_signing_input(grant(fixture), %{})

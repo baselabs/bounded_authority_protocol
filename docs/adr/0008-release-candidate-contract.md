@@ -129,3 +129,10 @@ no `receipt`/`decision`).
   internal consumption uses the `v0.1.0` git tag at `c65d3be`, not a registry pin; the deferral is
   recorded in the ROADMAP at the BAP-07 status. The lock and reproducibility decisions
   above are unchanged; "publishes" remains the recorded intent for whenever publication proceeds.)*
+  *(Amendment 2026-08-20: the deferral is lifted by owner decision — BAP-07 executed: the exact
+  candidate passed the private runtime's PostgreSQL 18 gate and the consumer connected gates, the
+  fresh correctness/security/gate-integrity/cross-vendor review set closed, and the archive
+  published to Hex as `bounded_authority_protocol` 0.1.0. The `v0.1.0` tag moves to the published
+  commit so `source_ref` resolves; internal consumers pin the Hex release going forward. The
+  publication act was manual (`mix hex.publish`), outside the CI attestation chain; the local
+  `release.candidate` gate's archive SHA-256 at the published commit is the publication receipt.)*
