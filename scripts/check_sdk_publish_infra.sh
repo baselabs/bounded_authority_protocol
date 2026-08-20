@@ -32,13 +32,25 @@ if [ -z "$path" ]; then
 fi
 
 # Classify by path to decide which pattern set applies. A file that is neither a
-# workflow nor an SDK manifest is not a scanned surface — exit 0 immediately.
+# scanned executable surface nor an SDK manifest is not scanned — exit 0 immediately.
+# Scanned surfaces run the publish-command check; only manifests add the
+# publish-lifecycle-key check.
+#
+# Executable surfaces where a registry-publish command can hide (a workflow `run:`
+# step is not the only place): GitHub workflows AND composite actions; any shell
+# script, Makefile, or justfile UNDER sdks/ (an SDK release script — the review's
+# `sdks/typescript/scripts/release.sh` gap); and a repo-root Makefile/justfile (a
+# top-level target that publishes an SDK). NOTE the shell-script scan is scoped to
+# `sdks/` deliberately: this guard script and scripts/hooks/pre-commit both carry the
+# publish-command patterns as literal data, and a repo-wide `*.sh` scan would
+# self-match them. SDK release scripts live under sdks/, so that scope has the reach
+# without the self-match.
 is_sdk_manifest=0
 case "$path" in
-  # Workflows match so they DON'T hit the `*) exit 0` fall-through: every scanned
-  # surface runs the publish-command check below; only manifests add the
-  # publish-lifecycle-key check. No flag is needed for the workflow branch.
   .github/workflows/*.yml | .github/workflows/*.yaml) ;;
+  .github/actions/*action.yml | .github/actions/*action.yaml) ;;
+  sdks/*.sh | sdks/*Makefile | sdks/*makefile | sdks/*justfile | sdks/*Justfile) ;;
+  Makefile | makefile | justfile | Justfile) ;;
   sdks/*/package.json | sdks/*/pyproject.toml | sdks/*/setup.py | sdks/*/setup.cfg | sdks/*/Cargo.toml)
     is_sdk_manifest=1 ;;
   *) exit 0 ;;
