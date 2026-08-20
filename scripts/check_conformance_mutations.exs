@@ -36,8 +36,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # System. Proves the carve-out allowance is keyed per-file.
       name: "cli-halt-inversion",
       path: "lib/bounded_authority_protocol/conformance/cli.ex",
-      from: "  def run(argv) do\n",
-      to: "  def run(argv) do\n    System.halt(0)\n",
+      from: "  def run(argv, certified_index \\\\ @certified_index_sha256) do\n",
+      to:
+        "  def run(argv, certified_index \\\\ @certified_index_sha256) do\n    System.halt(0)\n",
       command: ["mix", "architecture"]
     },
     %{

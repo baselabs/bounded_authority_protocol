@@ -4,6 +4,21 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-08-20
+
+### Changed — release/verification gate hardening (no wire, bound, or verdict change)
+
+- **`mix conformance.verify` pins the certified corpus index SHA-256** (ADR 0014 D4). The Elixir
+  verifier CLI now fails closed unless the loaded corpus is the exact certified snapshot — closing
+  the gap where a self-consistent but shrunken corpus (regenerated index) passed integrity and
+  agreement. Parity with the three SDK runners, which already pin the identical value.
+- **The architecture gate asserts every pinned beam is present** (keys-⊆-present). A pinned public
+  surface deleted or renamed without updating the allowance now reds the gate instead of vanishing
+  silently.
+- **The SDK publish guard scans SDK scripts, Makefiles, justfiles, and composite actions**, not
+  only workflows and top-level manifests — a registry-publish command can no longer hide in an SDK
+  release script or a composite action.
+
 ## [0.1.1] — 2026-08-20
 
 ### Added

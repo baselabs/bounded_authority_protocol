@@ -158,7 +158,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     source_root = Path.expand("..", __DIR__)
     scratch_root = unique_tmp_root!()
     package_root = Path.join(scratch_root, "package")
-    archive_path = Path.join(scratch_root, "bounded_authority_protocol-0.1.1.tar")
+    archive_path = Path.join(scratch_root, "bounded_authority_protocol-0.1.2.tar")
     consumer_root = Path.join(scratch_root, "consumer")
 
     try do
@@ -230,7 +230,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       "licenses" => ["Apache-2.0"],
       "name" => "bounded_authority_protocol",
       "requirements" => [],
-      "version" => "0.1.1"
+      "version" => "0.1.2"
     }
 
     Enum.each(expected, fn {key, expected_value} ->
