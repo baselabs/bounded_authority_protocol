@@ -482,11 +482,49 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         ]
 
       ebin_paths ->
-        ebin_paths
-        |> Enum.flat_map(&compiled_violations/1)
+        present_union =
+          ebin_paths
+          |> Enum.flat_map(fn p -> p |> Path.join("*.beam") |> Path.wildcard() end)
+          |> MapSet.new(&Path.basename/1)
+
+        (missing_pinned_beam_violations(present_union) ++
+           Enum.flat_map(ebin_paths, &compiled_violations/1))
         |> Enum.uniq()
         |> Enum.sort_by(&{&1.category, &1.path, &1.detail})
     end
+  end
+
+  @doc """
+  Every pinned beam — exact-export OR dynamic-call-count allowance. `check_compiled` inspects only
+  beams that EXIST, so without this a pinned module's deletion or rename removes its beam and no
+  export check runs: a pinned public surface could vanish with the gate green. The
+  keys-subset-of-present assertion (below) closes that: `Map.keys(allowances)` MUST be a subset of
+  the compiled beams.
+  """
+  @spec pinned_beams() :: [binary()]
+  def pinned_beams do
+    (Map.keys(@compiled_export_allowances) ++ Map.keys(@compiled_dynamic_allowances))
+    |> Enum.uniq()
+  end
+
+  @doc """
+  Violations for pinned beams absent from `present` (a MapSet of compiled beam basenames). Pure and
+  public so its non-vacuity is unit-testable directly (drop one pinned key from a full present set,
+  observe a violation).
+  """
+  @spec missing_pinned_beam_violations(MapSet.t()) :: [map()]
+  def missing_pinned_beam_violations(present) do
+    pinned_beams()
+    |> Enum.reject(&MapSet.member?(present, &1))
+    |> Enum.sort()
+    |> Enum.map(fn beam ->
+      violation(
+        :public_surface,
+        beam,
+        "pinned module #{beam} is absent from the compiled application — a pinned surface was " <>
+          "deleted or renamed without updating the export/dynamic allowance"
+      )
+    end)
   end
 
   def format(violations) do

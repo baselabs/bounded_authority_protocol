@@ -15,6 +15,26 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     assert [] == ArchitectureGate.check_compiled(@root)
   end
 
+  # Deletion-invisibility guard (keys-subset-of-present): a pinned module deleted or renamed
+  # without updating the allowance must RED, not vanish silently.
+  test "every pinned beam is present in the compiled application" do
+    present = MapSet.new(ArchitectureGate.pinned_beams())
+    assert [] == ArchitectureGate.missing_pinned_beam_violations(present)
+  end
+
+  test "a deleted pinned beam is a public-surface violation (non-vacuity)" do
+    pinned = ArchitectureGate.pinned_beams()
+    refute pinned == []
+    dropped = hd(pinned)
+    present = pinned |> MapSet.new() |> MapSet.delete(dropped)
+
+    violations = ArchitectureGate.missing_pinned_beam_violations(present)
+
+    assert Enum.any?(violations, fn v -> v.path == dropped and v.category == :public_surface end),
+           "dropping the pinned beam #{dropped} must produce a public-surface violation; got: " <>
+             inspect(violations)
+  end
+
   test "the source gate rejects every prohibited surface family" do
     cases = [
       database: "Ecto.Query.from(item in Item)",
