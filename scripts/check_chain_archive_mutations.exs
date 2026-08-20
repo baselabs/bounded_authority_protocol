@@ -256,98 +256,98 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
       command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
     },
     %{
-      name: "bap03-own-json-members",
-      path: "conformance/bap03_independent.mjs",
+      name: "grant_proof-own-json-members",
+      path: "conformance/grant_proof_independent.mjs",
       from: "const value = Object.create(null);",
       to: "const value = {};",
       command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
     },
     %{
-      name: "bap03-private-pem",
-      path: "conformance/bap03_independent.mjs",
+      name: "grant_proof-private-pem",
+      path: "conformance/grant_proof_independent.mjs",
       from: ~S"!/-----BEGIN (?:ENCRYPTED |ED25519 )?PRIVATE KEY-----/.test(value)",
       to: ~S"!/-----BEGIN (?:ENCRYPTED |ED25519 )?PRIVATE MATERIAL-----/.test(value)",
       command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
     },
     %{
-      name: "bap03-private-der-byte-array",
-      path: "conformance/bap03_independent.mjs",
+      name: "grant_proof-private-der-byte-array",
+      path: "conformance/grant_proof_independent.mjs",
       from: "value.length >= 48 &&",
       to: "value.length >= 49 &&",
       command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
     },
     %{
-      name: "bap03-private-der-hex",
-      path: "conformance/bap03_independent.mjs",
+      name: "grant_proof-private-der-hex",
+      path: "conformance/grant_proof_independent.mjs",
       from: ~S|/^[0-9A-Fa-f]{96,}$/.test(value)|,
       to: ~S|/^[0-9A-Fa-f]{97,}$/.test(value)|,
       command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
     },
     %{
-      name: "bap03-private-der-base64",
-      path: "conformance/bap03_independent.mjs",
+      name: "grant_proof-private-der-base64",
+      path: "conformance/grant_proof_independent.mjs",
       from: "value.length >= 64 && value.length % 4 === 0",
       to: "value.length >= 65 && value.length % 4 === 0",
       command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
     },
     %{
-      name: "bap03-private-der-base64url",
-      path: "conformance/bap03_independent.mjs",
+      name: "grant_proof-private-der-base64url",
+      path: "conformance/grant_proof_independent.mjs",
       from: ~S|/^[A-Za-z0-9_-]{64,}$/.test(value)|,
       to: ~S|/^[A-Za-z0-9_-]{65,}$/.test(value)|,
       command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
     },
     %{
-      name: "bap03-private-der-key-type",
-      path: "conformance/bap03_independent.mjs",
+      name: "grant_proof-private-der-key-type",
+      path: "conformance/grant_proof_independent.mjs",
       from: ~S|return key.asymmetricKeyType === "ed25519";|,
       to: "return false;",
       command: ["mix", "test", "test/conformance/grant_holder_proof_vector_test.exs"]
     },
     %{
-      name: "bap04-own-json-members",
+      name: "chain_archive-own-json-members",
       path: "conformance/chain_archive_independent.mjs",
       from: "const value = Object.create(null);",
       to: "const value = {};",
       command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
     },
     %{
-      name: "bap04-private-pem",
+      name: "chain_archive-private-pem",
       path: "conformance/chain_archive_independent.mjs",
       from: ~S"!/-----BEGIN (?:ENCRYPTED |ED25519 )?PRIVATE KEY-----/.test(value)",
       to: ~S"!/-----BEGIN (?:ENCRYPTED |ED25519 )?PRIVATE MATERIAL-----/.test(value)",
       command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
     },
     %{
-      name: "bap04-private-der-byte-array",
+      name: "chain_archive-private-der-byte-array",
       path: "conformance/chain_archive_independent.mjs",
       from: "value.length >= 48 &&",
       to: "value.length >= 49 &&",
       command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
     },
     %{
-      name: "bap04-private-der-hex",
+      name: "chain_archive-private-der-hex",
       path: "conformance/chain_archive_independent.mjs",
       from: ~S|/^[0-9A-Fa-f]{96,}$/.test(value)|,
       to: ~S|/^[0-9A-Fa-f]{97,}$/.test(value)|,
       command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
     },
     %{
-      name: "bap04-private-der-base64",
+      name: "chain_archive-private-der-base64",
       path: "conformance/chain_archive_independent.mjs",
       from: "value.length >= 64 && value.length % 4 === 0",
       to: "value.length >= 65 && value.length % 4 === 0",
       command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
     },
     %{
-      name: "bap04-private-der-base64url",
+      name: "chain_archive-private-der-base64url",
       path: "conformance/chain_archive_independent.mjs",
       from: ~S|/^[A-Za-z0-9_-]{64,}$/.test(value)|,
       to: ~S|/^[A-Za-z0-9_-]{65,}$/.test(value)|,
       command: ["mix", "test", "test/conformance/consumption_chain_archive_vector_test.exs"]
     },
     %{
-      name: "bap04-private-der-key-type",
+      name: "chain_archive-private-der-key-type",
       path: "conformance/chain_archive_independent.mjs",
       from: ~S|return key.asymmetricKeyType === "ed25519";|,
       to: "return false;",
@@ -369,7 +369,7 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
 
   def run do
     Enum.each(@mutations, &run_mutation/1)
-    IO.puts("bap04 mutation gate: ok mutations=#{length(@mutations)}")
+    IO.puts("chain_archive mutation gate: ok mutations=#{length(@mutations)}")
   end
 
   defp run_mutation(mutation) do
@@ -378,7 +378,7 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
     scratch =
       Path.join(
         System.tmp_dir!(),
-        "bap04-mutation-#{mutation.name}-#{System.unique_integer([:positive, :monotonic])}"
+        "chain_archive-mutation-#{mutation.name}-#{System.unique_integer([:positive, :monotonic])}"
       )
 
     File.mkdir_p!(scratch)
@@ -417,7 +417,7 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
       scratch =
         Path.join(
           System.tmp_dir!(),
-          "bap04-baseline-#{System.unique_integer([:positive, :monotonic])}"
+          "chain_archive-baseline-#{System.unique_integer([:positive, :monotonic])}"
         )
 
       File.mkdir_p!(scratch)

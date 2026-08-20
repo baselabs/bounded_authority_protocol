@@ -4,6 +4,19 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-08-20
+
+### Added
+
+- **Ship `priv/conformance/v1/vectors/` in the Hex package.** The four named vectors
+  (`grant-holder-proof`, `chain-semantic-edge`, `consumption-chain-archive`, `manifest`)
+  are the acceptance oracle a holder-side consumer verifies its envelope production against
+  (ADR 0013's corpus-as-oracle posture). 0.1.0 shipped `corpus` + `schemas` but not
+  `vectors`, so a Hex consumer could not reach the oracle vector; 0.1.1 ships it. Public
+  test data, same class as the already-shipped corpus — no private material (verified: the
+  manifest carries only discovery roots and public-key fingerprints). The exact-file
+  package census is extended to match. Zero wire byte, bound, or verdict change.
+
 ## [0.1.0] — 2026-08-20
 
 ### Added

@@ -1,4 +1,4 @@
-defmodule BoundedAuthorityProtocol.Bap03Performance do
+defmodule BoundedAuthorityProtocol.VerificationPerformance do
   @moduledoc false
 
   alias BoundedAuthorityProtocol.V1
@@ -98,7 +98,7 @@ defmodule BoundedAuthorityProtocol.Bap03Performance do
       )
     end)
 
-    IO.puts("bap03 portable timing/allocation bounds passed")
+    IO.puts("verification portable timing/allocation bounds passed")
   end
 
   defp measure(operation) do
@@ -129,4 +129,4 @@ defmodule BoundedAuthorityProtocol.Bap03Performance do
   end
 end
 
-BoundedAuthorityProtocol.Bap03Performance.run!()
+BoundedAuthorityProtocol.VerificationPerformance.run!()

@@ -125,7 +125,7 @@ case. Applicability: `check_envelope/valid` is `2`, `invalid_selector` is `2` (t
 empty-path case recorded below). Re-signing required
 two new deterministic conformance keypairs (the original corpus keys' private seeds are unrecoverable
 — generation was throwaway), growing the corpus key census 6→8; see "Census evolution" below.
-The cross-verifier discovery scan (bap03 + chain_archive `discoverPublicKeys`) finds keys in
+The cross-verifier discovery scan (grant_proof + chain_archive `discoverPublicKeys`) finds keys in
 labeled JSON fields only — it never decodes compact JWS — so every canonical key must appear in at
 least one labeled field under the discovery roots. The new issuer key is carried by the selector
 cases' `trusted_issuer.public_key`; the new holder key lives only inside the proof compacts, so a
@@ -280,7 +280,7 @@ pinned in ExUnit (the two keys' `maximum_plus_one` absence is asserted).
 ### Legacy-depth subsumption (V5) + the [:::] divergence
 
 The corpus subsumes the legacy code-embedded case sets as data: all 18 legacy URI byte-values
-from `conformance/bap03_independent.mjs:22-41` and the legacy duplicate-member case appear as
+from `conformance/grant_proof_independent.mjs:22-41` and the legacy duplicate-member case appear as
 corpus data. The 6 idempotent-valid legacy URIs port as `uri.normalize` `valid` cases (normalized
 output equals input); the 5 normalizable-but-non-idempotent legacy URIs (e.g. default-port,
 uppercase-host, percent-encoded-tilde, dot-segments) port as `valid` cases whose pinned normalized
@@ -307,7 +307,7 @@ because the original corpus keys' private seeds are unrecoverable). An independe
 runner's published-mode census is HARD two-way: the keys observed at its crypto import boundary
 must equal the index's declared set exactly, both directions, always — no softness (a vacuous
 green is the V4 hole this design exists to kill). The vector manifest grows to three partitions
-(bap03 + chain_archive + corpus); the three-partition union equals the canonical set (19 keys),
+(grant_proof + chain_archive + corpus); the three-partition union equals the canonical set (19 keys),
 and the corpus partition (8) equals the index list.
 
 The census is TWO-BOUNDARY (BAP-05 hardening): the discovery census above is the

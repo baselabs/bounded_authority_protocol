@@ -76,7 +76,7 @@ verifies a candidate against the CI-attested record with:
 
 ```bash
 sha256sum --check SHA256SUMS
-gh attestation verify bounded_authority_protocol-0.1.0.tar \
+gh attestation verify bounded_authority_protocol-<version>.tar \
   --repo baselabs/bounded_authority_protocol \
   --signer-workflow baselabs/bounded_authority_protocol/.github/workflows/supply-chain.yml \
   --source-ref refs/heads/main \

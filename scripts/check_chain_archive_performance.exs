@@ -100,7 +100,7 @@ defmodule BoundedAuthorityProtocol.ChainArchivePerformanceGate do
     Enum.each(measurements, &enforce!/1)
 
     IO.puts(
-      "bap04 performance gate: ok rows=#{length(rows)} transitions=#{length(input.transitions)} " <>
+      "chain_archive performance gate: ok rows=#{length(rows)} transitions=#{length(input.transitions)} " <>
         "chunks=#{length(encoded.chunks)} archive_bytes=#{encoded.byte_count}"
     )
   end

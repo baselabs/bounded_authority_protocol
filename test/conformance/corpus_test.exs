@@ -1406,7 +1406,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   end
 
   # Legacy-depth subsumption (V5): the 18 legacy URI byte-values from
-  # conformance/bap03_independent.mjs:22-41 appear as corpus data. The 6 VALID (idempotent)
+  # conformance/grant_proof_independent.mjs:22-41 appear as corpus data. The 6 VALID (idempotent)
   # + 5 normalizable-but-non-idempotent appear as valid uri.normalize cases; the 6 rejected
   # by both implementations appear as invalid_uri. https://[:::]/ is implementation-divergent
   # (Elixir rejects, Node accepts) and is omitted — recorded in ADR 0005. 17 of 18 ported.
@@ -1458,7 +1458,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
       |> Enum.map(& &1["input"]["text"])
       |> MapSet.new()
 
-    # The legacy bap03 duplicate-member target was a JWS header with a duplicated "alg" member.
+    # The legacy grant_proof duplicate-member target was a JWS header with a duplicated "alg" member.
     assert MapSet.member?(dup_inputs, "{\"alg\":\"EdDSA\",\"alg\":\"none\"}")
   end
 

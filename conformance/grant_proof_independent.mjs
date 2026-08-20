@@ -64,7 +64,7 @@ try {
   verifyFixture(fixture);
   await verifyManifest(manifest, scanPath);
   process.stdout.write(
-    `bap03 independent verification: ok\n` +
+    `grant_proof independent verification: ok\n` +
       `vectors=${manifest.vectors.length} public_key_fingerprints=` +
       `${manifest.canonical_public_key_fingerprints.length} tamper_cases=` +
       `${Object.keys(fixture.expected.tamper_verdicts).length} duplicate_cases=1 uri_cases=` +
@@ -525,7 +525,7 @@ async function verifyManifest(manifest, additionalScanPath) {
   );
   exactKeys(
     manifest.verifier_public_key_fingerprints,
-    ["bap03_independent.mjs", "chain_archive_independent.mjs", "corpus_independent.mjs"],
+    ["grant_proof_independent.mjs", "chain_archive_independent.mjs", "corpus_independent.mjs"],
     "manifest verifier fingerprints",
   );
   assertDeepEqual(
@@ -562,8 +562,8 @@ async function verifyManifest(manifest, additionalScanPath) {
   );
   assertDeepEqual(
     actual,
-    manifest.verifier_public_key_fingerprints["bap03_independent.mjs"],
-    `manifest verifier import set mismatch listed=${manifest.verifier_public_key_fingerprints["bap03_independent.mjs"].join(",")} actual=${actual.join(",")}`,
+    manifest.verifier_public_key_fingerprints["grant_proof_independent.mjs"],
+    `manifest verifier import set mismatch listed=${manifest.verifier_public_key_fingerprints["grant_proof_independent.mjs"].join(",")} actual=${actual.join(",")}`,
   );
   assertDeepEqual(
     declaredKeys,
@@ -1275,6 +1275,6 @@ function parseJsonNoDuplicates(text, label) {
 }
 
 function fail(message) {
-  process.stderr.write(`bap03 independent verification: invalid (${message})\n`);
+  process.stderr.write(`grant_proof independent verification: invalid (${message})\n`);
   process.exit(1);
 }

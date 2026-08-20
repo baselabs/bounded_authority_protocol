@@ -1,6 +1,6 @@
 # Bounded Authority Protocol v1 wire profile
 
-Status: normative for v1. The package is published to Hex as `bounded_authority_protocol` 0.1.0.
+Status: normative for v1. The package is published to Hex as `bounded_authority_protocol` (0.1.x).
 ADR 0003 explicitly supersedes the
 earlier grant/proof separator rows before release; every other change requires the contract-major
 and SemVer process.

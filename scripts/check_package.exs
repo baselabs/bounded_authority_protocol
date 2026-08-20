@@ -116,6 +116,10 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "priv/conformance/v1/schemas/proof-payload.schema.json",
                     "priv/conformance/v1/schemas/public-okp-jwk.schema.json",
                     "priv/conformance/v1/schemas/selector.schema.json",
+                    "priv/conformance/v1/vectors/chain-semantic-edge.json",
+                    "priv/conformance/v1/vectors/consumption-chain-archive.json",
+                    "priv/conformance/v1/vectors/grant-holder-proof.json",
+                    "priv/conformance/v1/vectors/manifest.json",
                     "priv/conformance/v1/corpus/cases/anchored-export/encode.json",
                     "priv/conformance/v1/corpus/cases/anchored-export/verify.json",
                     "priv/conformance/v1/corpus/cases/assemble-compact/assemble.json",
@@ -154,7 +158,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     source_root = Path.expand("..", __DIR__)
     scratch_root = unique_tmp_root!()
     package_root = Path.join(scratch_root, "package")
-    archive_path = Path.join(scratch_root, "bounded_authority_protocol-0.1.0.tar")
+    archive_path = Path.join(scratch_root, "bounded_authority_protocol-0.1.1.tar")
     consumer_root = Path.join(scratch_root, "consumer")
 
     try do
@@ -226,7 +230,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       "licenses" => ["Apache-2.0"],
       "name" => "bounded_authority_protocol",
       "requirements" => [],
-      "version" => "0.1.0"
+      "version" => "0.1.1"
     }
 
     Enum.each(expected, fn {key, expected_value} ->
@@ -353,7 +357,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
           end
         end
 
-        def bap03_contract? do
+        def grant_proof_contract? do
           alias BoundedAuthorityProtocol.V1
           alias BoundedAuthorityProtocol.V1.Bounds
           alias BoundedAuthorityProtocol.V1.Credentials
@@ -441,7 +445,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
           end
         end
 
-        def bap04_contract? do
+        def chain_archive_contract? do
           alias BoundedAuthorityProtocol.V1
           alias BoundedAuthorityProtocol.V1.AnchoredExportInput
           alias BoundedAuthorityProtocol.V1.ArchivedObject
@@ -611,8 +615,8 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
         "-e",
         "unless BoundedAuthorityProtocolConsumer.package_contract?() and " <>
           "BoundedAuthorityProtocolConsumer.decoder_contract?() and " <>
-          "BoundedAuthorityProtocolConsumer.bap03_contract?() and " <>
-          "BoundedAuthorityProtocolConsumer.bap04_contract?(), do: System.halt(1)"
+          "BoundedAuthorityProtocolConsumer.grant_proof_contract?() and " <>
+          "BoundedAuthorityProtocolConsumer.chain_archive_contract?(), do: System.halt(1)"
       ],
       consumer_root,
       environment
