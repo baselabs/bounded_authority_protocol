@@ -72,6 +72,25 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
     end
   end
 
+  test "path-qualified publish commands are caught (the tool boundary includes /)" do
+    # A `/` before the tool is a boundary, so an absolute or relative executable path does not
+    # bypass the guard.
+    for cmd <- [
+          "/usr/local/bin/npm publish",
+          "./node_modules/.bin/npm publish",
+          "/opt/homebrew/bin/cargo publish",
+          "/usr/bin/twine upload dist/*"
+        ] do
+      assert run(cmd <> "\n", "sdks/rust/scripts/release.sh") == 1, "expected #{cmd} caught"
+    end
+  end
+
+  test "an alnum/`-` run before the tool name is not a false boundary" do
+    # `foocargo`/`cargo-release` must not be read as `cargo` by the regex (the latter's contiguous
+    # form is caught by the fixed list, verified elsewhere).
+    assert run("foocargo publish\n", "sdks/rust/scripts/build.sh") == 0
+  end
+
   test "publish-adjacent but non-publishing commands are not false-positives" do
     for cmd <- [
           "npm run publish-docs",
