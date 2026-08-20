@@ -2,7 +2,7 @@ defmodule BoundedAuthorityProtocol.SbomCheck do
   @moduledoc false
 
   @name "bounded_authority_protocol"
-  @version "0.1.1"
+  @version "0.1.2"
 
   def run!([release_path, tooling_path]) do
     release = load_and_check_document!(release_path)
