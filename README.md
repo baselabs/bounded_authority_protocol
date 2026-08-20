@@ -3,31 +3,27 @@
 Public Apache-2.0 protocol, deterministic verifier, and conformance suite for cryptographically
 bounded proof-of-possession authority.
 
-> **Where this fits:** this is the open format/verifier (the standard) in BaseLabs's commercial
-> agent-authority platform. For the one-page product picture (what it is, the market, the play),
-> see
-> [`bounded_authority` → `docs/strategy/overview.html`](https://github.com/baselabs/bounded_authority/blob/master/docs/strategy/overview.html)
-> or [`overview.md`](https://github.com/baselabs/bounded_authority/blob/master/docs/strategy/overview.md).
-> Engineering detail: [`product-identity.md`](https://github.com/baselabs/bounded_authority/blob/master/docs/strategy/product-identity.md).
-
-**Looking for a specific doc?** [`doc-map.md`](https://github.com/baselabs/bounded_authority/blob/master/docs/doc-map.md) is the cross-repo document tracker — every doc across all four repos, organized by reader intent.
+> **Where this fits:** this is the open format, deterministic verifier, and conformance suite —
+> the standard any party can implement. A stateful authority service (issuance, key custody, live
+> revocation, replay, evidence) and holder-side signer SDKs build on top of it; this package
+> deliberately contains neither.
 
 ## Status
 
-The unpublished `0.1.0` package is a **release candidate**: the public API surface is locked
+The published `0.1.0` package is the **exact reviewed release candidate**: the public API surface
+is locked
 ([release-candidate contract](docs/release-candidate-contract.md), [ADR 0008](docs/adr/0008-release-candidate-contract.md)),
-the candidate archive is reproducibility-checked on every quality run, and nothing is published to
-Hex yet — BAP-07 (connected verification and first public release) is fully unblocked (its
-private-runtime dependency, BA-14, completed 2026-08-18) and is the next row; the Hex-publication
-half is deferred by maintainer decision
-(internal consumption uses the `v0.1.0` git tag, not a registry pin). The public/private boundary is complete under
-[`BAP-00`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). The source tree now
-contains the unpublished `:bounded_authority_protocol` 0.1.0 Mix package scaffold and its enforced
-release boundary. `BAP-01` through `BAP-06`, `BAP-08` through `BAP-11`, `BAP-13` through `BAP-15`,
-`BAP-17` (design-only), and `BAP-18` are complete; `BAP-07`, `BAP-12` (IANA templates), and `BAP-16` (the Go
+the archive is reproducibility-checked on every quality run, and the bytes on Hex are the bytes the
+release gates reviewed — BAP-07 (connected verification and first public release) executed
+2026-08-20: the private stateful-runtime PostgreSQL 18 gate and the consumer connected gates passed
+against this exact candidate, with fresh correctness, security, gate-integrity, and cross-vendor
+reviews closed. The public/private boundary is complete under
+[`BAP-00`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md).
+`BAP-01` through `BAP-11`, `BAP-13` through `BAP-15`,
+`BAP-17` (design-only), and `BAP-18` are complete; `BAP-12` (IANA templates) and `BAP-16` (the Go
 verifier SDK) remain open — see
 [`docs/ROADMAP.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/ROADMAP.md). BAP-04's package-bearing closeout head
-`c4d7716de6499f29524e60638207b1c36e9484b3` passed the supported CI matrix and exact unpublished
+`c4d7716de6499f29524e60638207b1c36e9484b3` passed the supported CI matrix and exact
 package, checksum, provenance, and SBOM gates. The package implements deterministic standard
 compact-JWS grant and RFC 9449 holder-proof production, bounded decoding, standalone raw-grant
 verification, and combined raw-envelope verification. Its public-only vectors are independently
@@ -37,7 +33,7 @@ bounds and the unpacked external-consumer gate exercise the same public API. BAP
 consumption chains, signed boundary anchors, authenticated historical-key rollover, deterministic
 anchored archives, and atomic raw-archive verification against mandatory caller boundaries,
 digest, and object version. Its public-only corpus and resource limits are independently verified.
-Nothing in this repository has been published to Hex.
+The package is published to Hex as `bounded_authority_protocol`; consumption uses the Hex release.
 
 The scaffold has zero production dependencies, no application callback, and no supervision tree.
 Source AST, compiled BEAM imports, generated application metadata, dependency declarations, and
@@ -117,9 +113,9 @@ navyler_cdc                -> bounded_authority + CDC transport libraries
 bounded_authority_protocol -> no private or product package
 ```
 
-`navyler_cdc` is the product consumer (`beamline_ash` is deprecated). It routes an operational
-decision through the private runtime, not a direct public-verifier result — see
-[consumer-seams-cdc-report-path.md](docs/design/consumer-seams-cdc-report-path.md).
+A production consumer routes an operational decision through a stateful authority runtime built on
+this package, not through a direct public-verifier result — verification returns facts, and the
+authority decision is a separate step.
 
 See the [normative v1 profile](docs/protocol-v1.md),
 [protocol charter](docs/design/protocol-charter.md), [threat model](docs/design/threat-model.md),
@@ -184,7 +180,7 @@ asserts the corpus `index.json` SHA-256 at startup, and proves every parser-laye
 closure **red-capable** via a per-language mutation-gate. They are **verifiers**, not authority
 runtimes: a successful result proves only that caller-supplied bytes satisfy caller-supplied trusted
 inputs — it never selects keys, reserves replay, or grants execution. The `sdks-conformance` CI job
-([`.github/workflows/sdks.yml`](.github/workflows/sdks.yml)) runs on every change to `sdks/**` or
+([`.github/workflows/sdks.yml`](https://github.com/baselabs/bounded_authority_protocol/blob/main/.github/workflows/sdks.yml)) runs on every change to `sdks/**` or
 `priv/conformance/**`. See each SDK's `README.md` for build + test details.
 
 ## Development

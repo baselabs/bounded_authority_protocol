@@ -21,15 +21,16 @@ grant operational authority by itself.
 
 ## Current state
 
-Closed: `BAP-00` through `BAP-06`, `BAP-08` through `BAP-11`, `BAP-13` through `BAP-15`,
-`BAP-17` (design-only), and `BAP-18`. Open: `BAP-07` (connected verification and first public release — the
-public-protocol side is unblocked, the remaining dependency is the private runtime's BA-14, and the
-Hex-publication half is deferred by maintainer decision: internal consumption uses the `v0.1.0` git
-tag at `c65d3be`, not a registry pin), `BAP-12` (IANA templates, gated on the BAP-08 external
-submission preconditions), and `BAP-16` (the Go verifier SDK — authored, not started). Consult
+Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-15`,
+`BAP-17` (design-only), and `BAP-18` — including `BAP-07` (connected verification and first public
+release, executed 2026-08-20 by owner decision: the exact candidate passed the private runtime's
+PostgreSQL 18 gate and the consumer connected gates, the fresh review set closed, and the archive
+published to Hex; consumption uses the Hex release). Open: `BAP-12` (IANA templates, gated on the
+BAP-08 external submission preconditions) and `BAP-16` (the Go verifier SDK — authored, not
+started). Consult
 [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence blocks are the status authority.
 
-The unpublished 0.1.0 package retains zero production dependencies, no application callback, and no
+The published 0.1.0 package retains zero production dependencies, no application callback, and no
 supervision tree. The v1 surface is complete: the normative tables and bounds, raw-number preflight,
 the bounded ordered JSON decoder with recursive duplicate rejection, strict base64url decoding,
 Draft 2020-12 structural schemas, architecture mutation gates, public compatibility CI, exact-package
@@ -124,12 +125,9 @@ bounded_authority_protocol -> pure protocol/crypto dependencies only
 qorpay                     -> no authority dependency
 ```
 
-`navyler_cdc` obtains an operational decision from the private runtime. It does not treat a
-direct public-verifier result as execution authority or call this package directly. The private
-runtime accepts raw credentials at its public boundary, not a caller-provided `EnvelopeFacts`.
-(`beamline_ash` was the first product consumer historically; it is deprecated in favor of
-`navyler_cdc`. See `docs/design/consumer-seams-cdc-report-path.md` for the navyler_cdc CDC report
-seam.)
+A production consumer obtains an operational decision from a stateful authority runtime. It does
+not treat a direct public-verifier result as execution authority or call this package directly.
+The runtime accepts raw credentials at its public boundary, not a caller-provided `EnvelopeFacts`.
 
 ## Workflow
 

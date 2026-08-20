@@ -8,8 +8,11 @@
 /.serena/
 /.zcode/
 /graphify-out/
-/.env
-/.env.*
+.env
+.env.*
+.DS_Store
+/.claude/
+/.mcp.json
 
 # Forge lifecycle artifacts are local; only the critical-surface declaration is tracked.
 /.forge/*
