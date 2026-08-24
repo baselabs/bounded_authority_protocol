@@ -21,16 +21,16 @@ grant operational authority by itself.
 
 ## Current state
 
-Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-15`,
-`BAP-17` (design-only), and `BAP-18` — including `BAP-07` (connected verification and first public
+Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-18`
+(`BAP-17` design-only) — including `BAP-07` (connected verification and first public
 release, executed 2026-08-20 by owner decision: the exact candidate passed the private runtime's
 PostgreSQL 18 gate and the consumer connected gates, the fresh review set closed, and the archive
 published to Hex; consumption uses the Hex release). Open: `BAP-12` (IANA templates, gated on the
-BAP-08 external submission preconditions) and `BAP-16` (the Go verifier SDK — authored, not
-started). Consult
+BAP-08 external submission preconditions) only — `BAP-16` (the Go verifier SDK) closed 2026-08-24
+(283/283 conformance from the vendored corpus snapshot, census-clean, no-F1-debt battery). Consult
 [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence blocks are the status authority.
 
-The published 0.1.0 package retains zero production dependencies, no application callback, and no
+The published 0.1.2 package retains zero production dependencies, no application callback, and no
 supervision tree. The v1 surface is complete: the normative tables and bounds, raw-number preflight,
 the bounded ordered JSON decoder with recursive duplicate rejection, strict base64url decoding,
 Draft 2020-12 structural schemas, architecture mutation gates, public compatibility CI, exact-package

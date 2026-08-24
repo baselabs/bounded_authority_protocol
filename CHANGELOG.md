@@ -4,6 +4,22 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — Go verifier SDK (BAP-16; no Elixir package change)
+
+- **`sdks/go/` — the typed Go verifier SDK** for the frozen v1 profile, authored from the spec +
+  ADRs + conformance corpus alone (ADR 0014 D5): the 17-function façade plus versioned primitives,
+  zero runtime dependencies (stdlib `crypto/ed25519` + `crypto/sha256` only), Go floor 1.25. Passes
+  all 283 conformance vectors from a vendored corpus snapshot with startup index SHA-256 assertion
+  and the two-boundary key census (`agreed=283 disagreed=0 census=11`). The per-language
+  permissiveness battery ships with per-clause red-capable legs for every closure and gate (no F1
+  debt: 14 mechanical mutation probes proven RED at authoring), including ADR 0017's five clauses
+  (closed Result panic guard, pre-digest hoist with a zero-hash work pin via the internal
+  `archiveDigest` seam, canonical byte-equality, signature width at decode, role-bounded frame
+  reads) and ADR 0018's bounds threading incl. `assemble_compact` caller limits and nested-pins
+  identity semantics. Purity vet + zero-dependency license gate (each red-capable) and a
+  `go-conformance` CI job. Not in the Hex `files:` list; no registry-publish infrastructure
+  (ADR 0015 graduation posture).
+
 ## [0.1.2] — 2026-08-20
 
 ### Changed — release/verification gate hardening (no wire, bound, or verdict change)
