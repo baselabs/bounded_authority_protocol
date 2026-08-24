@@ -1012,7 +1012,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
 
   # --- .raw hash binding (C2 sidecar) --------------------------------------
 
-  test "a .raw sidecar whose hash disagrees with the index entry is rejected" do
+  test "a.raw sidecar whose hash disagrees with the index entry is rejected" do
     raw_bytes = :crypto.strong_rand_bytes(64)
 
     case_obj =
@@ -1044,7 +1044,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert {:error, :invalid} = Corpus.load(map)
   end
 
-  test "a VALID .raw-bearing corpus loads and the runner feeds sidecar bytes to the facade" do
+  test "a VALID.raw-bearing corpus loads and the runner feeds sidecar bytes to the facade" do
     # A .raw sidecar carrying raw JSON bytes 'false' — fed to json.decode (verdict: invalid because
     # 'false' alone is valid JSON, but we declare invalid to isolate the load+dispatch path; the
     # point of this test is that the corpus LOADS with a .raw file present and the runner reads it).
@@ -1084,7 +1084,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert raw_result.agree == true
   end
 
-  test "a bounds.new case with string-keyed overrides converts and agrees (F3 regression)" do
+  test "a bounds.new case with string-keyed overrides converts and agrees (regression)" do
     # tighten compact_bytes to its exact maximum = valid (Bounds.new accepts it).
     case_obj =
       {:object,
@@ -1112,7 +1112,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert bounds_result.agree == true
   end
 
-  test "a bounds.new case with an unknown override key fails (F3 negative)" do
+  test "a bounds.new case with an unknown override key fails (negative)" do
     case_obj =
       {:object,
        [
@@ -1327,7 +1327,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert required?.("check_envelope", "invalid_claim")
   end
 
-  test "every n_a applicability leaf carries a falsifiable reason (Q29 obligation)" do
+  test "every n_a applicability leaf carries a falsifiable reason (obligation)" do
     # The n_a half of the matrix is derived, not authored: a cell may be n_a ONLY when the
     # surface's input algebra cannot express the class. Each n_a leaf carries a one-line
     # reason so flipping a required cell to n_a requires writing a falsifiable impossibility
@@ -1410,7 +1410,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   # + 5 normalizable-but-non-idempotent appear as valid uri.normalize cases; the 6 rejected
   # by both implementations appear as invalid_uri. https://[:::]/ is implementation-divergent
   # (Elixir rejects, Node accepts) and is omitted — recorded in ADR 0005. 17 of 18 ported.
-  test "the corpus subsumes the 17 port-able legacy URI byte-values (V5)" do
+  test "the corpus subsumes the 17 port-able legacy URI byte-values " do
     legacy_inputs = [
       "https://example.com/",
       "https://example.com/a/~",
@@ -1447,7 +1447,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     end
   end
 
-  test "the corpus subsumes the legacy duplicate-member case (V5)" do
+  test "the corpus subsumes the legacy duplicate-member case " do
     map = shipped_corpus_map()
     {:ok, corpus} = Corpus.load(map)
 
@@ -1590,7 +1590,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
 
   # --- private-material sweep (closes census window until Task 4) ----------
 
-  test "no corpus JSON file under priv/conformance/v1/corpus carries a private key or seed" do
+  test "no corpus JSON file under the current conformance corpus carries a private key or seed" do
     corpus_dir = "priv/conformance/v1/corpus"
 
     if File.dir?(corpus_dir) do
@@ -1613,7 +1613,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
 
   # --- coverage: Corpus loader defensive/error arms ---
 
-  test "load_raw_entry halts when an indexed .raw file is absent from the map (L148)" do
+  test "load_raw_entry halts when an indexed.raw file is absent from the map " do
     # An index that declares a .raw file, but the corpus map does not carry that path, trips
     # load_raw_entry's `{:halt, {:error, :invalid}}` arm during the files reduce.
     raw_bytes = :crypto.strong_rand_bytes(64)
@@ -1642,7 +1642,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert {:error, :invalid} = Corpus.load(map)
   end
 
-  test "count_surface_class skips a case with non-binary surface/class (L296)" do
+  test "count_surface_class skips a case with non-binary surface/class " do
     # A case whose surface/class are not binaries is skipped by count_surface_class (else -> acc),
     # so it does NOT increment the observed applicability. The declared applicability therefore
     # matches the valid synthetic cases only (the malformed one is invisible to the census). This
@@ -1668,7 +1668,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert {:ok, _corpus} = Corpus.load(map)
   end
 
-  test "tamper_source_bytes :error arm (L389) via a base case with malformed base64url" do
+  test "tamper_source_bytes:error arm via a base case with malformed base64url" do
     # tamper_source_bytes decodes the BASE case's input; a malformed base64url in the base hits
     # `:error -> :error` (L389). The tamper case references this base, so verify_tampers runs
     # tamper_source_bytes(base) -> :error -> the with short-circuits -> load fails closed.
@@ -1710,7 +1710,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert {:error, :invalid} = Corpus.load(map)
   end
 
-  test "tamper_derived_bytes :error and true arms (L389/L392) via a tamper case with no byte key" do
+  test "tamper_derived_bytes:error and true arms via a tamper case with no byte key" do
     # A tamper case whose input has neither text nor base64url hits the `true -> :error` arm of
     # tamper_derived_bytes; the base64url `:error -> :error` arm is hit by a malformed b64 input.
     # Both are reached during corpus load's verify_raw_bindings/tamper derivation pass.
@@ -1741,7 +1741,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert {:error, :invalid} = Corpus.load(map)
   end
 
-  test "tamper_verbatim_bytes :error and true arms (L405/L408) via a tamper case whose verbatim input is malformed" do
+  test "tamper_verbatim_bytes:error and true arms via a tamper case whose verbatim input is malformed" do
     # tamper_verbatim_matches? runs tamper_source_bytes(base) THEN tamper_verbatim_bytes(case).
     # The verbatim :error/true arms (L405/L408) are only reached when the BASE has valid bytes
     # (so source succeeds) but the tamper CASE's own input is malformed. Build a valid base case
@@ -1787,7 +1787,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert {:error, :invalid} = Corpus.load(map)
   end
 
-  test "tamper_verbatim_bytes true arm (L408) via a tamper case whose verbatim input has no byte key" do
+  test "tamper_verbatim_bytes true arm via a tamper case whose verbatim input has no byte key" do
     # The `true -> :error` arm fires when the tamper case input has neither text nor base64url.
     base_case =
       {:object,
@@ -1829,7 +1829,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert {:error, :invalid} = Corpus.load(map)
   end
 
-  test "check_raw_binding error passthrough (L430) when a prior raw binding already errored" do
+  test "check_raw_binding error passthrough when a prior raw binding already errored" do
     # verify_raw_bindings reduces cases; if the first raw-bearing case's binding errors, the
     # accumulator carries the error and check_raw_binding/3's `error -> error` arm fires for
     # subsequent cases. Build two raw-bearing cases: the first with a wrong hash, the second valid.
@@ -1880,7 +1880,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert {:error, :invalid} = Corpus.load(map)
   end
 
-  test "verify_raw_entry missing-path arm (L439) when a raw_file is not in the loaded raws" do
+  test "verify_raw_entry missing-path arm when a raw_file is not in the loaded raws" do
     # A case references a raw_file whose path was never registered in raws (e.g., a .raw that
     # the index did not declare, or a typo). verify_raw_entry's `_ -> {:error, :invalid}` fires.
     case_obj =
@@ -1905,7 +1905,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert {:error, :invalid} = Corpus.load(map)
   end
 
-  test "member/2 nil arm (L459) via a case file object missing the queried key" do
+  test "member/2 nil arm via a case file object missing the queried key" do
     # member/2 returns nil when List.keyfind finds nothing (key absent from the object). The
     # case-file decoder calls member(members, "format") and member(members, "cases"); a case
     # file whose decoded object lacks the "cases" key reaches member's `nil -> nil` arm and the
