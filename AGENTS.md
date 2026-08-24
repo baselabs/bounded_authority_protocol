@@ -46,15 +46,16 @@ by the architecture gate, [ADR 0008](docs/adr/0008-release-candidate-contract.md
 two-build `release.candidate` reproducibility check); BAP-05 shipped the portable conformance corpus
 (283 cases across 28 surfaces, dual-verified by the independent Node runner) and the deterministic
 verifier CLI, with the 55/55 conformance mutation battery and `conformance.verify` (agreed=283)
-wired into `mix quality` alongside the full suite (295 tests + 13 properties).
+wired into `mix quality` alongside the full suite (314 tests + 13 properties).
 
 Cross-language verifier SDKs live under [`sdks/`](sdks/)
 ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)): TypeScript
-(`@bounded-authority/verifier`), Python (`bounded-authority-verifier`), and Rust
-(`bounded-authority-protocol`, BAP-15) — each reimplements the frozen v1 profile from the spec and
-corpus alone, passes all 283 vectors with the certified corpus index SHA-256 asserted at load (the
-Rust SDK vendors a self-contained snapshot; the TypeScript and Python runners consume the monorepo
-corpus in place), and ships a red-capable per-language permissiveness mutation-gate. None is
+(`@bounded-authority/verifier`), Python (`bounded-authority-verifier`), Rust
+(`bounded-authority-protocol`, BAP-15), and Go (`bounded_authority_protocol_go`, BAP-16) — each
+reimplements the frozen v1 profile from the spec and corpus alone, passes all 283 vectors with the
+certified corpus index SHA-256 asserted at load (the
+Rust and Go SDKs vendor self-contained snapshots; the TypeScript and Python runners consume the
+monorepo corpus in place), and ships a red-capable per-language permissiveness mutation-gate. None is
 published to a registry: per
 [ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md), each graduates to its own per-SDK
 repository on first publication, and the `sdk-publish-guard` pre-commit hook and CI job reject
@@ -71,8 +72,8 @@ extension drafts under `docs/extensions/`,
 and its activating-major mechanism,
 [ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)). The BAP-15 hardening-arc contracts are
 recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK bounds contract), and
-ADR 0019 (corpus-artifact distribution), and ADR 0020 (bounds-aware assembly and issuer-mediated
-reauthorization posture). Accepted ADRs run 0001–0020 under
+ADR 0019 (corpus-artifact distribution), ADR 0020 (bounds-aware assembly and issuer-mediated
+reauthorization posture), and ADR 0021 (the v1 `all` selector recognized-shapes erratum). Accepted ADRs run 0001–0021 under
 [`docs/adr/`](docs/adr/). Commercial release readiness remains open.
 
 ## Critical rules

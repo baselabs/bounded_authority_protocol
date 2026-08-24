@@ -49,8 +49,8 @@ versioned primitives, translated to Go idioms:
 - **Versioned primitives**: `JsonDecode` / `JcsEncode` (the tagged JSON algebra), `Base64urlDecode` /
   `Base64urlEncode`, `UriNormalize`, the `Jwk*` thumbprint family, `BoundsMaximum` / `BoundsNew`.
 
-Every function returns `(T, error)` where the error is either `nil` or exactly `ErrInvalid` — the closed,
-value-free result contract. The facts structs (`GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`,
+Every fallible function returns `(T, error)` where the error is either `nil` or exactly `ErrInvalid`;
+infallible constructors and encoders return their value directly. The facts structs (`GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`,
 `KeyTransitionFacts`, `AnchoredExportFacts`) are value-bearing and redacted by construction: they contain only
 their documented fields and carry `AuthorizationNotEvaluated` / `TrustNotEvaluated`. There is no
 `Authorized`/`Allowed`/decision surface.

@@ -84,6 +84,26 @@
           "additionalProperties": false,
           "required": ["kind", "path", "value"],
           "properties": {
+            "kind": {"const": "all"},
+            "path": {"$ref": "#/$defs/jsonValue"},
+            "value": {"$ref": "#/$defs/jsonValue"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "path", "values"],
+          "properties": {
+            "kind": {"const": "all"},
+            "path": {"$ref": "#/$defs/jsonValue"},
+            "values": {"$ref": "#/$defs/jsonValue"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "path", "value"],
+          "properties": {
             "kind": {"const": "equals"},
             "path": {"$ref": "#/$defs/path"},
             "value": {"$ref": "#/$defs/jsonValue"}

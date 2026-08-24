@@ -42,6 +42,33 @@ func TestReviewProofClaimPresence(t *testing.T) {
 	}
 }
 
+func TestReviewAllSelectorRecognizedMemberSets(t *testing.T) {
+	b := BoundsMaximum()
+	recognized := []Value{
+		Obj{{Key: "kind", Val: Str("all")}},
+		Obj{{Key: "kind", Val: Str("all")}, {Key: "path", Val: Bool(false)}, {Key: "value", Val: Null{}}},
+		Obj{{Key: "kind", Val: Str("all")}, {Key: "path", Val: Int(7)}, {Key: "values", Val: Str("inert")}},
+	}
+	for _, selector := range recognized {
+		if err := validateSelector(selector, &b); err != nil {
+			t.Fatalf("recognized all-selector member set rejected: %v", err)
+		}
+	}
+
+	unrecognized := []Value{
+		Obj{{Key: "kind", Val: Str("all")}, {Key: "path", Val: Arr{}}},
+		Obj{{Key: "kind", Val: Str("all")}, {Key: "value", Val: Null{}}},
+		Obj{{Key: "kind", Val: Str("all")}, {Key: "values", Val: Arr{}}},
+		Obj{{Key: "kind", Val: Str("all")}, {Key: "path", Val: Arr{}}, {Key: "value", Val: Null{}}, {Key: "values", Val: Arr{}}},
+		Obj{{Key: "kind", Val: Str("all")}, {Key: "extra", Val: Null{}}},
+	}
+	for _, selector := range unrecognized {
+		if err := validateSelector(selector, &b); err == nil {
+			t.Fatal("all selector accepted an unrecognized member set")
+		}
+	}
+}
+
 // F3 (BLOCKING, both peers): the genesis zero-hash rule binds the standalone
 // anchor codec too, not only the export path.
 func TestReviewStandaloneGenesisZeroHash(t *testing.T) {
@@ -201,7 +228,34 @@ func TestReviewVersionUTF8AndChunkBounds(t *testing.T) {
 
 // F13 (should-fix, claude): the proof producer can emit the nonce claim.
 func TestReviewProofProducerNonce(t *testing.T) {
-	t.Skip("F13: compile-red until the Proof nonce field lands")
+	proof := Proof{
+		ProofID:         "urn:example:proof:nonce-regression",
+		HolderPublicKey: make([]byte, 32),
+		InvocationID:    "550e8400-e29b-41d4-a716-446655440000",
+		Operation:       "read",
+		Method:          "POST",
+		TargetURI:       "https://resource.example.test/invoke",
+		IssuedAt:        1_100,
+		GrantCompact:    "grant.payload.signature",
+		CastArguments:   Obj{{Key: "record", Val: Obj{{Key: "id", Val: Str("rec-1")}}}},
+		HasNonce:        true,
+		Nonce:           "server-nonce-x",
+	}
+	si, err := ProofSigningInput(proof, nil)
+	if err != nil {
+		t.Fatalf("proof signing input with nonce rejected: %v", err)
+	}
+	compact, err := AssembleCompact(si, make([]byte, 64), nil)
+	if err != nil {
+		t.Fatalf("assemble proof with nonce: %v", err)
+	}
+	decoded, err := DecodeProof(compact, nil)
+	if err != nil {
+		t.Fatalf("decode produced proof with nonce: %v", err)
+	}
+	if !decoded.HasNonce || decoded.Nonce != proof.Nonce {
+		t.Fatalf("produced nonce lost: has_nonce=%v nonce=%q", decoded.HasNonce, decoded.Nonce)
+	}
 }
 
 // F12 (should-fix, both peers): the export producer derives its own digest;
@@ -258,9 +312,9 @@ func swapAnchorChainHash(t *testing.T, compact, newHash string) string {
 // corpusEnvelopeProof extracts the corpus envelope-valid proof compact.
 func corpusEnvelopeProof(t *testing.T) string {
 	t.Helper()
-	raw, err := os.ReadFile("../../priv/conformance/v1/corpus/cases/envelope/check.json")
+	raw, err := os.ReadFile("conformance/corpus/cases/envelope/check.json")
 	if err != nil {
-		t.Skipf("corpus unreachable: %v", err)
+		t.Fatalf("vendored corpus unreachable: %v", err)
 	}
 	var cf struct {
 		Cases []struct {
