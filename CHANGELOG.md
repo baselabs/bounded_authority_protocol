@@ -19,6 +19,14 @@ All notable changes to `bounded_authority_protocol` are documented here.
   identity semantics. Purity vet + zero-dependency license gate (each red-capable) and a
   `go-conformance` CI job. Not in the Hex `files:` list; no registry-publish infrastructure
   (ADR 0015 graduation posture).
+- **Cross-vendor hardening (codex + claude review, fix pass `fbff228`):** proof-claim presence
+  tracking, export anchor-chain cross-binding, standalone genesis zero-hash, port-overflow
+  closure, embedded-IPv6 group counting with dotted-form preservation, post-decode host
+  classification with lowercased decoded bytes, tightened integer-magnitude enforcement,
+  UTF-8 object-version validation, chunk-vs-byte bound separation at encode, a digest-deriving
+  export producer, proof-producer nonce support, constant-time nonce comparison, and
+  runner/purity-gate hardening — each behavioral fix pinned by a red-capable
+  review-regression leg.
 
 ## [0.1.2] — 2026-08-20
 
