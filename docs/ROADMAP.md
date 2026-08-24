@@ -709,6 +709,48 @@ amendments.
   online-only" re-scoped to the issuance layer) + the BA ROADMAP BA-20 acceptance, reflecting that
   the offline arc is successor-major-gated.
 
+## BAP-16 closeout evidence
+
+- The slice authors the typed Go verifier SDK under `sdks/go/` from `docs/protocol-v1.md` + the
+  ADRs + RFCs + the conformance corpus **alone** (ADR 0014 D5). The closeout derivation-hygiene
+  grep confirms no Elixir module path and no sibling-SDK source path appears in `sdks/go` source;
+  the Rust SDK was consulted for envelope shape only (file layout, gate posture, CI wiring,
+  vendored-snapshot binding).
+- **Library:** the 17-function façade + versioned primitives (`JsonDecode`/`JcsEncode` tagged
+  algebra, `Base64url*`, `UriNormalize`, the `Jwk*` thumbprint family, `BoundsMaximum`/`BoundsNew`),
+  zero runtime dependencies (stdlib `crypto/ed25519` + `crypto/sha256` + pure stdlib), Go floor 1.25
+  (`go.mod`; the CI job installs exactly 1.25 so the floor is the tested floor). Every public
+  function returns `(T, error)` with error ∈ {nil, `ErrInvalid`} — the closed result contract.
+- **Conformance:** 283-vector runner over the vendored corpus snapshot with startup SHA-256
+  assertion (`index.json` = `paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw`, cross-verified against
+  the Elixir gate's live report), per-file SHA + case-count verification, and the two-boundary key
+  census at the runner's import boundary — `agreed=283 disagreed=0 census=11` (the full
+  `public_key_fingerprints` set).
+- **Permissiveness battery with NO F1 debt:** every closure and gate ships with a per-clause
+  red-capable leg, and every leg was mechanically mutation-proven RED at authoring (14 probes:
+  duplicate-reject, raw-lexeme ceiling, single-value, int/float tag, source-order preservation,
+  base64url canonicality, per-node JCS encode-bounds closure incl. duplicate keys, signature-width
+  at decode, canonical byte-equality, skew/proof-max-age ceilings, pre-digest hoist, panic guard,
+  chain + assemble bounds threading). ADR 0017's five clauses and ADR 0018's threading (incl.
+  `assemble_compact` caller limits, nested-pins identity semantics) are picked up at authoring.
+  Two disclosed subsumption limits, per ADR 0017's own pattern: the canonical byte-equality gate's
+  macro-path verdict is subsumed (verify: by Ed25519; encode: by the archive digest) so its
+  red-capable pin is the unit-level `TestCanonicalGateUnit`; and Go's work-observation channel for
+  the clause-3 zero-hash pin is the internal `archiveDigest` seam (same-package tests only —
+  stronger than the TS/Rust structural-order pins, without Python's monkeypatching).
+- **Gates:** `gofmt`/`go vet` clean; `go test ./...` green (library unit + battery + conformance);
+  `tools/purity_check.sh` (code-only scan — comment tails stripped — with a stdlib import
+  allowlist; proven red-capable by planting `os.ReadFile`) and `tools/license_check.sh`
+  (zero-dependency assertion with a fail-closed floor; proven red-capable by fabricating a
+  require). New `go-conformance` CI job in `sdks.yml` (SHA-pinned actions, same path filter).
+- **No wire byte, bound, or verdict change to the Elixir package** (Go-only SDK + CI/docs); the
+  vendored corpus snapshot is a byte-identical copy of `priv/conformance/v1/corpus/`.
+- **Corpus calibration facts recorded:** depth counts containers only (32 nested arrays + inner
+  scalar valid at the bound); the `all` selector is an open pattern (extra members tolerated —
+  `node-selector-all-open-pattern`); selector values reject `__proto__` members recursively; the
+  archive header is the closed 8-member form; fingerprint-cycle detection seeds with the start
+  anchor's fingerprint. All pinned by corpus cases the SDK now agrees with.
+
 ## Next action
 
 BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, BAP-15, BAP-17, BAP-18, and
@@ -812,4 +854,6 @@ implementation + its CI/gate/docs envelope + cross-vendor closeout) is now COMPL
 BAP-15 closeout evidence above; the cross-vendor pass closed thirteen real T1–T14 divergences from the
 reference (jcs closure #6 completion, timing ceilings, an archive-encode panic, the license gate's
 fail-open, un-locked CI, genesis/transition/archive/selector/compact/chain-id/ath gaps). BAP-16 (the Go
-verifier SDK) remains authored, not started.
+verifier SDK) is COMPLETE — see the BAP-16 closeout evidence above; it picked the whole accumulated
+contract (ADR 0017 clauses, ADR 0018 threading incl. decision 4, encode-path parity, decode-path
+conformance classes) up at authoring with per-clause red-capable battery legs from the start.
