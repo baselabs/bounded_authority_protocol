@@ -86,7 +86,7 @@ qualifier makes a stale mapping a detectable drift rather than a silent false cl
 | REQ1-SELECTOR-path-shape | Path 1–32 member names, 1–128 bytes, objects only | verify_grant | invalid_selector | populated | verify_grant.invalid_selector=2 |
 | REQ1-SELECTOR-one-of-size | `one_of` ≤ 256 values | verify_grant | invalid_selector | populated | verify_grant.invalid_selector=2 |
 | REQ1-SELECTOR-path-required | `equals`/`one_of` require the path to exist | verify_grant | invalid_selector | populated | verify_grant.invalid_selector=2 |
-| REQ1-SELECTOR-semantic-identity; REQ1-SELECTOR-no-tag-collapse | Tagged scalar distinctions preserved; arrays positional; objects unordered; int/float not collapsed | verify_grant | invalid_selector | populated | verify_grant.invalid_selector=2 |
+| REQ1-SELECTOR-semantic-identity; REQ1-SELECTOR-no-tag-collapse | Tagged scalar distinctions preserved; arrays positional; objects unordered; int/float not collapsed | verify_grant, request_digest | invalid_selector, valid | populated | verify_grant.invalid_selector=2; request_digest.valid float projection present |
 | REQ1-SELECTOR-not-authorization | No selector grants business authorization | verify_grant | valid | populated | verify_grant.valid=1 (facts carry `authorization: :not_evaluated`) |
 
 ## URI — URI normalization (`uri.normalize`, `proof_signing_input`)

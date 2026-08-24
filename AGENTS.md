@@ -73,7 +73,8 @@ and its activating-major mechanism,
 [ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)). The BAP-15 hardening-arc contracts are
 recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK bounds contract), and
 ADR 0019 (corpus-artifact distribution), ADR 0020 (bounds-aware assembly and issuer-mediated
-reauthorization posture), and ADR 0021 (the v1 `all` selector recognized-shapes erratum). Accepted ADRs run 0001–0021 under
+reauthorization posture), ADR 0021 (the v1 `all` selector recognized-shapes erratum), and ADR 0022
+(durable contract identities). Accepted ADRs run 0001–0022 under
 [`docs/adr/`](docs/adr/). Commercial release readiness remains open.
 
 ## Critical rules

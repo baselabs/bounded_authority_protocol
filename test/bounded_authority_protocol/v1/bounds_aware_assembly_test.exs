@@ -14,7 +14,7 @@ defmodule BoundedAuthorityProtocol.V1.BoundsAwareAssemblyTest do
                   __DIR__
                 )
 
-  test "public bounds-aware assembly is byte-identical for every current-v1 signing kind" do
+  test "public bounds-aware assembly is byte-identical for every current-major signing kind" do
     for {kind, signing_input, signature} <- signing_cases() do
       assert {:ok, compact} = V1.assemble_compact(signing_input, signature)
       assert {:ok, ^compact} = V1.assemble_compact(signing_input, signature, %{}), inspect(kind)
