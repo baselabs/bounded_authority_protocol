@@ -282,7 +282,7 @@ var requestDigestPrefix = []byte("BAP1-REQUEST\x00")
 //
 // where typed/1 projects the tagged algebra to the closed tagged JSON form
 // before JCS, preserving the integer/float distinction
-// (REQ1-DIGEST-typed-projection).
+// (REQ1-SELECTOR-semantic-identity).
 func RequestDigest(operation string, castArguments Value, bounds *Bounds) (string, error) {
 	raw, err := requestDigestRaw(operation, castArguments, bounds)
 	if err != nil {

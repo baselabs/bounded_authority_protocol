@@ -89,7 +89,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert {:error, :invalid} = Corpus.load(%{"c.json" => case_bytes, "index.json" => idx})
   end
 
-  test "a .json file with a .raw extension in the index is rejected" do
+  test "a.json file with a.raw extension in the index is rejected" do
     idx =
       jcs(
         {:object,
@@ -986,7 +986,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "signing-input facade-error passthrough (L255) via grant_signing_input with too many audiences" do
+  test "signing-input facade-error passthrough via grant_signing_input with too many audiences" do
     # The facade's valid_string_list? enforces the audiences COUNT bound (max 64). A list of
     # 65 audiences trips it AFTER build_grant constructs the struct, so the dispatch reaches
     # its `error -> error` arm rather than the with-chain's fetch failures.
@@ -1024,7 +1024,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "check_chain facade-error passthrough (L341)" do
+  test "check_chain facade-error passthrough " do
     # Build a chain whose row hashes are internally inconsistent so verify_chain rejects it.
     alias BoundedAuthorityProtocol.V1
     zero = <<0::256>>
@@ -1061,7 +1061,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "verify_anchored_export facade-error passthrough (L409)" do
+  test "verify_anchored_export facade-error passthrough " do
     # Encode a real export, then build a verify case whose expected digest deliberately
     # disagrees with the archive's digest -> the facade returns {:error, :invalid} and the
     # dispatch `error -> error` arm fires. The chunks/version come from the real encoded
@@ -1211,7 +1211,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "request_digest facade-error passthrough (L427)" do
+  test "request_digest facade-error passthrough " do
     # cast_arguments as an operation+args whose digest bound is tripped: an oversized operation name.
     result =
       run_one(
@@ -1229,7 +1229,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
 
   # --- input_bytes / raw_bytes error arms -----------------------------------
 
-  test "input_bytes true->error arm (L451): input with no recognized byte key" do
+  test "input_bytes true->error arm: input with no recognized byte key" do
     # json.decode with an input map missing text/base64url/raw_file -> input_bytes errors.
     result =
       run_one(
@@ -1241,7 +1241,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "raw_bytes nil->error arm (L458): raw_file path absent from raws" do
+  test "raw_bytes nil->error arm: raw_file path absent from raws" do
     # A raw_file input whose path is not present in the loaded raws -> raw_bytes errors.
     # The corpus loader only registers raws declared in the index, so a path that wasn't
     # indexed is missing at run time.
@@ -1261,7 +1261,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
 
   # --- compare? branches ----------------------------------------------------
 
-  test "compare? value-via-json tag (L510) via a json.decode valid agreement" do
+  test "compare? value-via-json tag via a json.decode valid agreement" do
     # Already covered indirectly by other value-agreement tests, but pin the {:json, actual}
     # clause explicitly: a valid json.decode case whose expected compares a JSON value.
     result =
@@ -1275,7 +1275,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == true
   end
 
-  test "compare? bounds clause (L514) via bounds.new with bounds in expected" do
+  test "compare? bounds clause via bounds.new with bounds in expected" do
     # bounds.new dispatch returns %{"bounds" => %Bounds{}}; an expected "bounds" key projects
     # the actual to the %Bounds{} struct and hits compare?("bounds", _, %Bounds{}) -> true.
     # Any expected value works since the clause returns true unconditionally (the bounds struct
@@ -1294,7 +1294,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == true
   end
 
-  test "byte_string_compare :error arm (L525): expected not base64url-decodable" do
+  test "byte_string_compare:error arm: expected not base64url-decodable" do
     # A verify_grant case where the case-expected grant_id is not base64url and differs from
     # the actual grant_id -> byte_string_compare's decode fails (:error) and falls back to a
     # direct == that is false. build_verify_grant reads its inputs from FLAT top-level keys
@@ -1345,7 +1345,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
 
   # --- proof_nonce / build_operations / int_field / decode_b64_item / json_field / to_tagged(null) ---
 
-  test "proof_nonce encoded arm (L602) via proof_signing_input with a nonce" do
+  test "proof_nonce encoded arm via proof_signing_input with a nonce" do
     # proof_signing_input's build_proof reads input["nonce"] through proof_nonce/1; a present
     # base64url nonce hits the `encoded when is_binary` clause and decodes into the Proof.
     alias BoundedAuthorityProtocol.V1
@@ -1399,7 +1399,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == true
   end
 
-  test "proof_nonce catch-all non-binary arm (L603) via proof_signing_input with non-string nonce" do
+  test "proof_nonce catch-all non-binary arm via proof_signing_input with non-string nonce" do
     # input["nonce"] present but not a binary (an integer) -> proof_nonce's `_ -> nil` clause.
     # build_proof still succeeds (nonce becomes nil), and proof_signing_input produces output.
     alias BoundedAuthorityProtocol.V1
@@ -1449,7 +1449,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == true
   end
 
-  test "proof_nonce malformed-b64 arm (L612) normalizes to nil (fail-closed)" do
+  test "proof_nonce malformed-b64 arm normalizes to nil (fail-closed)" do
     # input["nonce"] is a binary but not valid base64url -> proof_nonce's :error -> nil arm.
     # The proof builds with nonce: nil; proof_signing_input succeeds (nil nonce is valid when
     # not required by the envelope). This is the fail-closed normalization replacing the prior
@@ -1502,7 +1502,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == true
   end
 
-  test "expected_nonce malformed-b64 arm (L1017) returns :malformed sentinel (fail-closed)" do
+  test "expected_nonce malformed-b64 arm returns:malformed sentinel (fail-closed)" do
     # A check_envelope case whose expected.nonce.required is malformed base64url -> expected_nonce's
     # :error -> :malformed arm. The :malformed sentinel fails valid_nonce_expectation? (catch-all
     # false) and nonce_matches? (catch-all false), so verify returns {:error, :invalid} -> agree
@@ -1581,7 +1581,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "build_operations non-list arm (L610) via grant_signing_input" do
+  test "build_operations non-list arm via grant_signing_input" do
     alias BoundedAuthorityProtocol.V1
 
     {:ok, hk} =
@@ -1614,7 +1614,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "int_field non-integer arm (L1128) via verify_grant with non-int evaluation_time" do
+  test "int_field non-integer arm via verify_grant with non-int evaluation_time" do
     alias BoundedAuthorityProtocol.V1
     {pub_i, priv_i} = :crypto.generate_key(:eddsa, :ed25519, <<91::256>>)
     {pub_h, _} = :crypto.generate_key(:eddsa, :ed25519, <<92::256>>)
@@ -1658,7 +1658,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "decode_b64_item :error arm (L1166) via check_chain with a malformed-b64 row" do
+  test "decode_b64_item:error arm via check_chain with a malformed-b64 row" do
     # byte_list reduces rows via decode_b64_item; a binary element that fails base64url decode
     # hits decode_b64_item's :error -> {:error, :invalid} arm.
     result =
@@ -1685,7 +1685,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "decode_b64_item non-binary catch-all (L1171) via check_chain with a non-string row" do
+  test "decode_b64_item non-binary catch-all via check_chain with a non-string row" do
     # byte_list reduces rows via decode_b64_item; a non-binary element hits decode_b64_item(_).
     result =
       run_one(
@@ -1711,7 +1711,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "json_field nil arm (L1162) via proof_signing_input missing cast_arguments" do
+  test "json_field nil arm via proof_signing_input missing cast_arguments" do
     alias BoundedAuthorityProtocol.V1
     {pub_h, _} = :crypto.generate_key(:eddsa, :ed25519, <<93::256>>)
 
@@ -1739,7 +1739,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "to_tagged null arm (L1200) via proof_signing_input with a nested null in cast_arguments" do
+  test "to_tagged null arm via proof_signing_input with a nested null in cast_arguments" do
     # to_tagged/1 recurses into map/list values via json_field. A JSON null NESTED inside an
     # object (e.g. cast_arguments: {"n": null}) loads as Elixir nil at the leaf, and the top-level
     # object passes json_field's nil guard; recursion then calls to_tagged(nil) -> the `true ->`
@@ -1793,7 +1793,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == true
   end
 
-  test "decode_b64_value :error arm (L456) via json.decode with malformed base64url" do
+  test "decode_b64_value:error arm via json.decode with malformed base64url" do
     # input_bytes decodes input["base64url"]; a malformed (non-base64url) string hits
     # decode_b64_value's :error -> {:error, :invalid} arm.
     result =
@@ -1810,7 +1810,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "decode_b64_value success arm (L455) via json.decode with valid base64url" do
+  test "decode_b64_value success arm via json.decode with valid base64url" do
     # input_bytes decodes input["base64url"]; a valid base64url string hits the
     # {:ok, decoded} success arm and the facade decodes the underlying JSON.
     result =
@@ -1827,7 +1827,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == true
   end
 
-  test "fallback_segment error arm (L477) via base64url.decode with no recognized byte key" do
+  test "fallback_segment error arm via base64url.decode with no recognized byte key" do
     # base64url.decode with no base64url/text/raw_file -> b64url_segment falls through to
     # fallback_segment -> input_bytes errors -> `_ -> ""` returns an empty string, which the
     # facade then rejects.
@@ -1845,7 +1845,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "input_public_key :error arm (L485) via jwk.encode_public with malformed b64" do
+  test "input_public_key:error arm via jwk.encode_public with malformed b64" do
     # jwk.encode_public builds via input_public_key, which decodes input["public_key"]; a
     # malformed base64url hits the :error -> {:error, :invalid} arm.
     result =
@@ -1862,7 +1862,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "b64_field :error arm (L1141) via grant_signing_input with malformed holder_thumbprint" do
+  test "b64_field:error arm via grant_signing_input with malformed holder_thumbprint" do
     # build_grant decodes holder_thumbprint via b64_field; malformed base64url hits :error arm.
     result =
       run_one(
@@ -1888,7 +1888,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "encode_anchored_export facade-error passthrough (L339) via a transition whose bytes mismatch" do
+  test "encode_anchored_export facade-error passthrough via a transition whose bytes mismatch" do
     # encode_anchored_export dispatch: build_encode_export succeeds but encode_anchored_export
     # rejects (e.g., a transition compact that does not parse) -> the `error -> error` arm fires.
     alias BoundedAuthorityProtocol.V1
@@ -1982,7 +1982,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     assert result.agree == false
   end
 
-  test "expected_transitions empty verify-side arm (L941) via verify_anchored_export without transitions" do
+  test "expected_transitions empty verify-side arm via verify_anchored_export without transitions" do
     # expected with NO "transitions" key -> expected_transitions(nil) -> [] (L951/L941). The
     # archive has no transitions, so verify still succeeds and agreement is on the facts.
     alias BoundedAuthorityProtocol.V1
