@@ -23,27 +23,32 @@ func validateSelector(v Value, bounds *Bounds) error {
 	}
 	var kind *Str
 	var path Arr
-	var hasPath bool
+	var pathPresent bool
+	var pathValid bool
 	var value Value
 	var hasValue bool
 	var values Arr
-	var hasValues bool
+	var valuesPresent bool
+	var valuesValid bool
+	seen := make(map[string]struct{}, 4)
 	for _, m := range obj {
+		if _, duplicate := seen[m.Key]; duplicate {
+			return ErrInvalid
+		}
+		seen[m.Key] = struct{}{}
 		switch m.Key {
 		case "kind":
 			if s, ok := m.Val.(Str); ok {
 				kind = &s
 			}
 		case "path":
-			if p, ok := m.Val.(Arr); ok {
-				path, hasPath = p, true
-			}
+			pathPresent = true
+			path, pathValid = m.Val.(Arr)
 		case "value":
 			value, hasValue = m.Val, true
 		case "values":
-			if vs, ok := m.Val.(Arr); ok {
-				values, hasValues = vs, true
-			}
+			valuesPresent = true
+			values, valuesValid = m.Val.(Arr)
 		default:
 			return ErrInvalid // unlisted member
 		}
@@ -51,18 +56,22 @@ func validateSelector(v Value, bounds *Bounds) error {
 	if kind == nil {
 		return ErrInvalid
 	}
+	recognizedMembers := len(obj) == 1 ||
+		(len(obj) == 3 && pathPresent && (hasValue != valuesPresent))
+	if !recognizedMembers {
+		return ErrInvalid
+	}
 	switch *kind {
 	case "all":
-		// open pattern (corpus: check-envelope-valid-selector-all-with-extra-members):
-		// all matches any root and tolerates extra members — only the kind
-		// member is interpreted.
+		// The released profile recognizes exactly three member sets. On either
+		// three-member set, path/value(s) are inert for all.
 		return nil
 	case "equals":
-		if len(obj) != 3 || !hasPath || !hasValue {
+		if len(obj) != 3 || !pathValid || !hasValue {
 			return ErrInvalid
 		}
 	case "one_of":
-		if len(obj) != 3 || !hasPath || !hasValues {
+		if len(obj) != 3 || !pathValid || !valuesValid {
 			return ErrInvalid
 		}
 		if len(values) == 0 || len(values) > b.OneOfValues {
@@ -91,7 +100,7 @@ func validateSelector(v Value, bounds *Bounds) error {
 			return ErrInvalid
 		}
 	}
-	if hasValues {
+	if valuesPresent {
 		for _, item := range values {
 			if _, err := JcsEncode(item, &b); err != nil {
 				return ErrInvalid

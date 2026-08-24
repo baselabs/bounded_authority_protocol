@@ -607,6 +607,9 @@ pub fn grant_signing_input(grant: &GrantInput, bounds: &Bounds) -> Result<Produc
         if op.selectors.is_empty() || op.selectors.len() as u64 > bounds.selectors() {
             return Err(Invalid);
         }
+        for selector in &op.selectors {
+            selector::validate(selector, bounds)?;
+        }
     }
 
     // Build header object (JCS sorts members: alg < kid < typ).
@@ -3384,43 +3387,13 @@ fn validate_operations(value: Option<&JsonValue>, bounds: &Bounds) -> Result<()>
         if sel_items.is_empty() || sel_items.len() as u64 > bounds.selectors() {
             return Err(Invalid);
         }
-        // Each selector MUST carry a known `kind` (REQ1-SELECTOR-closed-set).
-        // This is the structural check exercised at grant-verify time (corpus
-        // `verify-grant-invalid-selector-operation-selector-content`: a
-        // `kind:"bogus"` selector is rejected here, before the signature check).
-        // Path/value shape and the equals/one_of exact-member sets are enforced
-        // at envelope time by selector::evaluate; JSON-decoder bounds catch
-        // oversized selector values and lone-surrogate path bytes (corpus
-        // `verify-grant-invalid-selector-path-lone-surrogate`,
-        // `-selector-value-object-members`, `-selector-value-magnitude`).
+        // Grant decode/verify validates the complete selector shape before
+        // signature acceptance; envelope evaluation reuses the same validator.
         for sel in sel_items {
-            validate_selector_kind(sel)?;
+            selector::validate(sel, bounds)?;
         }
     }
     Ok(())
-}
-
-/// Structural selector check at decode time: the selector MUST be a JSON object
-/// whose `kind` member is exactly one of the closed set {all, equals, one_of}
-/// (`REQ1-SELECTOR-closed-set`). Catches an unknown `kind` (corpus
-/// `kind:"bogus"`) before signature verification. Per-kind member/path/value
-/// validation runs in `selector::evaluate` at envelope time (which needs the
-/// cast arguments a grant-verify does not have).
-fn validate_selector_kind(selector: &JsonValue) -> Result<()> {
-    let members = match selector {
-        JsonValue::Object(m) => m,
-        _ => return Err(Invalid),
-    };
-    let mut kind = None;
-    for (k, v) in members {
-        if k == "kind" {
-            kind = Some(v);
-        }
-    }
-    match kind {
-        Some(JsonValue::String(s)) if matches!(s.as_str(), "all" | "equals" | "one_of") => Ok(()),
-        _ => Err(Invalid),
-    }
 }
 
 /// Extracts an `htm` method token (1–32 bytes of the RFC 9110 token alphabet).
@@ -3723,6 +3696,41 @@ mod tests {
             String::from_utf8(crate::base64url_encode(payload)).unwrap(),
         );
         assert_eq!(decode_grant(compact.as_bytes(), &max()), Err(Invalid));
+    }
+
+    #[test]
+    fn red_grant_decode_rejects_unrecognized_selector_member_set() {
+        let payload = br#"{"aud":["x"],"cnf":{"jkt":"d4ucEZwvJTfwxXCN4f2xmIE5ZBFoH5i5mlzeWZaB3yI"},"exp":2000,"iat":1000,"iss":"https://i.test","jti":"g1","nbf":1000,"operations":[{"name":"read","selectors":[{"kind":"all","extra":null}]}],"v":1}"#;
+        let header = br#"{"alg":"EdDSA","kid":"issuer","typ":"ba+cap"}"#;
+        let compact = format!(
+            "{}.{}.{}",
+            String::from_utf8(crate::base64url_encode(header)).unwrap(),
+            String::from_utf8(crate::base64url_encode(payload)).unwrap(),
+            String::from_utf8(crate::base64url_encode(&[0u8; 64])).unwrap(),
+        );
+        assert_eq!(decode_grant(compact.as_bytes(), &max()), Err(Invalid));
+    }
+
+    #[test]
+    fn red_grant_producer_rejects_unrecognized_selector_member_set() {
+        let grant = GrantInput {
+            issuer: "https://i.test".to_string(),
+            grant_id: "g1".to_string(),
+            key_id: "issuer".to_string(),
+            holder_thumbprint: [0u8; 32],
+            issued_at: 1_000,
+            not_before: 1_000,
+            expires_at: 2_000,
+            audiences: vec!["x".to_string()],
+            operations: vec![GrantOperation {
+                name: "read".to_string(),
+                selectors: vec![JsonValue::Object(vec![
+                    ("kind".to_string(), JsonValue::String("all".to_string())),
+                    ("extra".to_string(), JsonValue::Null),
+                ])],
+            }],
+        };
+        assert_eq!(grant_signing_input(&grant, &max()), Err(Invalid));
     }
 
     // --- kid bytes ---
