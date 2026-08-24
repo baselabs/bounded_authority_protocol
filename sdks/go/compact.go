@@ -187,7 +187,7 @@ func ProofSigningInput(p Proof, bounds *Bounds) (si SigningInput, err error) {
 	if err != nil {
 		return SigningInput{}, ErrInvalid
 	}
-	payload, err := JcsEncode(Obj{
+	members := Obj{
 		{Key: "ath", Val: Str(Base64urlEncode(athRaw[:]))},
 		{Key: "ba_inv", Val: Str(p.InvocationID)},
 		{Key: "ba_op", Val: Str(p.Operation)},
@@ -197,7 +197,15 @@ func ProofSigningInput(p Proof, bounds *Bounds) (si SigningInput, err error) {
 		{Key: "iat", Val: Int(p.IssuedAt)},
 		{Key: "jti", Val: Str(p.ProofID)},
 		{Key: "v", Val: Int(1)},
-	}, &b)
+	}
+	if p.HasNonce {
+		if len(p.Nonce) == 0 || len(p.Nonce) > b.NonceBytes {
+			return SigningInput{}, ErrInvalid
+		}
+		// JCS orders members, so appending here cannot change the output
+		members = append(members, Member{Key: "nonce", Val: Str(p.Nonce)})
+	}
+	payload, err := JcsEncode(members, &b)
 	if err != nil {
 		return SigningInput{}, ErrInvalid
 	}

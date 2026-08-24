@@ -410,7 +410,7 @@ func (d *jsonDecoder) parseNumber() (Value, error) {
 		if digits[0] == '-' {
 			digits = digits[1:]
 		}
-		if cmpDigits(string(digits), "9007199254740991") > 0 {
+		if cmpDigits(string(digits), strconv.Itoa(d.b.IntegerMagnitude)) > 0 {
 			return nil, ErrInvalid
 		}
 		// safe: |v| <= 2^53-1

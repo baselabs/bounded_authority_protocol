@@ -1,6 +1,9 @@
 package verifier
 
-import "crypto/sha256"
+import (
+	"crypto/sha256"
+	"crypto/subtle"
+)
 
 // The grant/proof verification core (docs/protocol-v1.md § Claims, § Public
 // verification contract). Correctly signed closed JSON objects may use ANY
@@ -267,6 +270,17 @@ func decodeProofPayload(p compactParts, b Bounds) (proofClaimsData, error) {
 	obj, ok := v.(Obj)
 	if !ok || len(obj) < 9 || len(obj) > 10 {
 		return out, ErrInvalid
+	}
+	// presence tracking: every claim except nonce is REQUIRED — a member
+	// count within 9..10 alone cannot prove completeness (cross-vendor F1)
+	present := map[string]bool{}
+	for _, m := range obj {
+		present[m.Key] = true
+	}
+	for _, required := range []string{"v", "jti", "htm", "htu", "iat", "ba_inv", "ba_op", "ath", "ba_req"} {
+		if !present[required] {
+			return out, ErrInvalid // missing required claim (REQ1-CLAIM-proof-required)
+		}
 	}
 	for _, m := range obj {
 		switch m.Key {
@@ -647,8 +661,8 @@ func CheckEnvelope(creds Credentials, expected ExpectedRequest) (f EnvelopeFacts
 	}
 	// 6. nonce mode
 	if expected.Nonce.required {
-		if proof.Nonce == nil || *proof.Nonce != expected.Nonce.nonce {
-			return EnvelopeFacts{}, ErrInvalid
+		if proof.Nonce == nil || subtle.ConstantTimeCompare([]byte(*proof.Nonce), []byte(expected.Nonce.nonce)) != 1 {
+			return EnvelopeFacts{}, ErrInvalid // constant-time (parity with the reference's secure_equal)
 		}
 	} else if proof.Nonce != nil {
 		return EnvelopeFacts{}, ErrInvalid // must be absent
