@@ -386,6 +386,12 @@ func verifyAnchorCompact(compact string, key HistoricalPublicKey, expected Expec
 	if !ok {
 		return anchorClaims{}, ErrInvalid
 	}
+	// the genesis rule binds EVERY anchor validation (standalone included),
+	// not only the export path (cross-vendor F3); the gate precedes the
+	// signature check, which would otherwise subsume its verdict
+	if err := enforceAnchorGenesis(claims); err != nil {
+		return anchorClaims{}, ErrInvalid
+	}
 	// 7-field expected match
 	if claims.AnchorID != expected.AnchorID || claims.ChainID != expected.ChainID ||
 		claims.Sequence != expected.Sequence || claims.AnchoredAt != expected.AnchoredAt ||
@@ -505,4 +511,13 @@ func verifyTransitionCompact(compact string, currentKey, nextKey HistoricalPubli
 		return transitionClaims{}, ErrInvalid
 	}
 	return claims, nil
+}
+
+// enforceAnchorGenesis is the seq-zero all-zero-hash invariant of ADR 0004,
+// extracted so the standalone and export paths enforce it identically.
+func enforceAnchorGenesis(claims anchorClaims) error {
+	if claims.Sequence == 0 && claims.ChainHash != [32]byte{} {
+		return ErrInvalid
+	}
+	return nil
 }

@@ -164,15 +164,15 @@ func TestConformance(t *testing.T) {
 	agreed := 0
 	for _, lf := range files {
 		for _, c := range lf.cf.Cases {
-			censusFile = lf.path
 			if os.Getenv("BAP_TRACE") != "" {
 				fmt.Fprintf(os.Stderr, "TRACE2 %s %s (%s)\n", lf.path, c.ID, c.Surface)
 			}
 			c := c
-			t.Run(c.ID, func(t *testing.T) {
+			if t.Run(c.ID, func(t *testing.T) {
 				runCase(t, c)
-			})
-			agreed++
+			}) {
+				agreed++ // counts AGREED subtests, not merely executed ones
+			}
 		}
 	}
 	// Two-boundary key census: observed import-boundary set == index set.
@@ -186,8 +186,6 @@ func TestConformance(t *testing.T) {
 	}
 	t.Logf("agreed=%d disagreed=0 census=%d", agreed, len(census))
 }
-
-var censusFile string
 
 // runCase dispatches one corpus case to its public-surface driver. Any
 // disagreement is fatal; agreed cases fall through.
@@ -712,7 +710,6 @@ func exportEncodeInput(t *testing.T, c corpusCase) (v.AnchoredExportInput, v.Exp
 			t.Fatalf("case %s transitions: %v", c.ID, err)
 		}
 	}
-	censusExportKeys(t, exp)
 	return v.AnchoredExportInput{
 		Rows:        rows,
 		StartAnchor: rawString(t, c.Input, "start_anchor"),
@@ -742,20 +739,10 @@ func exportVerifyInput(t *testing.T, c corpusCase) (v.ArchivedObject, v.Historic
 		keys = append(keys, historicalKey(t, rk, pk))
 	}
 	exp := subObject(t, c.Input, "expected")
-	censusExportKeys(t, exp)
 	return v.ArchivedObject{
 		Chunks:  chunks,
 		Version: rawString(t, c.Input, "version"),
 	}, keys, expectedExport(t, exp)
-}
-
-func censusExportKeys(t *testing.T, exp map[string]json.RawMessage) {
-	t.Helper()
-	// fingerprints in the expected context identify the archive keys; the
-	// census keys themselves are imported from the `keys` list in verify cases
-	// (verify) or from the anchor/transition producer inputs (encode cases do
-	// not carry raw keys — their fingerprints are textual).
-	_ = exp
 }
 
 func expectedExport(t *testing.T, exp map[string]json.RawMessage) v.ExpectedAnchoredExport {

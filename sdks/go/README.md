@@ -19,6 +19,8 @@ recorded for the graduated publish.
 - Go floor: **1.25** (`go.mod`); the CI job installs exactly 1.25 so the floor is the tested floor.
 - Runtime dependencies: **zero** — stdlib only (`crypto/ed25519`, `crypto/sha256`, and pure stdlib
   parsing/formatting packages). Verified by [`tools/license_check.sh`](tools/license_check.sh).
+- Platform floor: **64-bit** — the bounds fields hold 9,007,199,254,740,991 as `int` (compile-time
+  overflow on 32-bit targets; fail-closed, but unsupported).
 
 ## Conformance
 
