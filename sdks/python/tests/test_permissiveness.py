@@ -62,6 +62,7 @@ from bounded_authority_verifier.json_alg import (
 )
 from bounded_authority_verifier.jwk import public_key_thumbprint_raw
 from bounded_authority_verifier.selector import (
+    SelAll,
     parse_selector,
     selector_matches,
     semantic_identity,
@@ -208,6 +209,25 @@ def test_equals_selector_distinguishes_int_from_float():
     sel_float = parse_selector(dec(b'{"kind":"equals","path":["n"],"value":1.0}'))
     assert selector_matches(sel_int, args) is True
     assert selector_matches(sel_float, args) is False  # float 1.0 != integer 1
+
+
+def test_all_selector_accepts_only_the_three_recognized_member_sets():
+    for encoded in (
+        b'{"kind":"all"}',
+        b'{"kind":"all","path":false,"value":null}',
+        b'{"kind":"all","path":7,"values":"inert"}',
+    ):
+        assert isinstance(parse_selector(dec(encoded)), SelAll)
+
+    for encoded in (
+        b'{"kind":"all","path":[]}',
+        b'{"kind":"all","value":null}',
+        b'{"kind":"all","values":[]}',
+        b'{"kind":"all","path":[],"value":null,"values":[]}',
+        b'{"kind":"all","extra":null}',
+    ):
+        with pytest.raises(InvalidError):
+            parse_selector(dec(encoded))
 
 
 # 6. JCS float canonicalization (RFC 8785 §3.2.2 / ECMAScript Number.prototype.toString). The host

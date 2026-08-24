@@ -1,8 +1,9 @@
 """Closed selector algebra (protocol-v1.md § Selectors, L179-199; REQ1-SELECTOR-closed-set).
 
-Three kinds, exact member sets::
+Three recognized member sets. ``all`` may use any of them and ignores the
+other members; ``equals`` and ``one_of`` use their matching three-member set::
 
-    all      → {kind:"all"}
+    all      → {kind} | {kind,path,value} | {kind,path,values}
     equals   → {kind:"equals", path:[names], value:<JSON>}
     one_of   → {kind:"one_of", path:[names], values:[<JSON>...]}
 
@@ -22,6 +23,11 @@ from .jcs import jcs_encode
 from .json_alg import JArray, JObject, JString, Tagged, utf8_str
 
 _SELECTOR_KINDS = {"all", "equals", "one_of"}
+_SELECTOR_MEMBER_SETS = {
+    frozenset({"kind"}),
+    frozenset({"kind", "path", "value"}),
+    frozenset({"kind", "path", "values"}),
+}
 
 
 @dataclass(frozen=True)
@@ -55,15 +61,9 @@ def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Selector:
     kind = utf8_str(kind_v.v)
     if kind not in _SELECTOR_KINDS:
         fail("selector: kind closed set")
-    # The member-set check mirrors the official open-map `selector/2` clause for `all`: a selector
-    # carrying kind:"all" decodes as :all on ANY of the three closed member sets (kind / kind,path,value
-    # / kind,path,values). Requiring members === "kind" alone made this runner STRICTER than the
-    # official — the one divergence direction that fails a conforming implementation.
-    # The reference accepts kind:"all" on ANY of the three closed member sets (kind / kind,path,value
-    # / kind,path,values) — verified by the corpus case check-envelope-valid-selector-all-with-extra-
-    # members, which the Elixir reference accepts (conformance reports agreed=283 including it). The
-    # reference's closed_map_one_of matches kind:"all" against all three alternatives. Requiring
-    # exactly one member would be STRICTER than the reference and fail that valid case.
+    if frozenset(members) not in _SELECTOR_MEMBER_SETS:
+        fail("selector: member set")
+    # For all, path/value(s) are inert and need not satisfy active-kind shapes.
     if kind == "all":
         return SelAll()
     if kind == "equals":

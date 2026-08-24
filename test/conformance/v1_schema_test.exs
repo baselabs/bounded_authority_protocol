@@ -136,19 +136,37 @@ defmodule BoundedAuthorityProtocol.Conformance.V1SchemaTest do
     end
   end
 
-  test "selector schema freezes all three exact forms and structural maxima" do
+  test "selector schemas preserve the three recognized member sets and structural maxima" do
     schema = compiled!("selector.schema.json")
+    grant_schema = compiled!("grant-payload.schema.json")
+    grant = fixture!()["grant"]["payload"]
+    [operation | remaining_operations] = grant["operations"]
 
     valid = [
       %{"kind" => "all"},
+      %{"kind" => "all", "path" => false, "value" => nil},
+      %{"kind" => "all", "path" => 7, "values" => "inert"},
       %{"kind" => "equals", "path" => ["record", "region"], "value" => "us-east"},
       %{"kind" => "one_of", "path" => ["tier"], "values" => ["gold", "platinum"]}
     ]
 
-    for selector <- valid, do: assert(:ok = JSONSchex.validate(schema, selector))
+    for selector <- valid do
+      assert :ok = JSONSchex.validate(schema, selector)
+
+      grant_with_selector =
+        Map.put(grant, "operations", [
+          Map.put(operation, "selectors", [selector]) | remaining_operations
+        ])
+
+      assert :ok = JSONSchex.validate(grant_schema, grant_with_selector)
+    end
 
     for invalid <- [
+          %{"kind" => "all", "path" => []},
           %{"kind" => "all", "value" => nil},
+          %{"kind" => "all", "values" => []},
+          %{"kind" => "all", "path" => [], "value" => nil, "values" => []},
+          %{"kind" => "all", "extra" => nil},
           %{"kind" => "equals", "path" => [], "value" => nil},
           %{"kind" => "one_of", "path" => ["tier"], "values" => []},
           %{"kind" => "unknown"},
@@ -164,6 +182,13 @@ defmodule BoundedAuthorityProtocol.Conformance.V1SchemaTest do
           }
         ] do
       assert {:error, _errors} = JSONSchex.validate(schema, invalid)
+
+      grant_with_selector =
+        Map.put(grant, "operations", [
+          Map.put(operation, "selectors", [invalid]) | remaining_operations
+        ])
+
+      assert {:error, _errors} = JSONSchex.validate(grant_schema, grant_with_selector)
     end
   end
 

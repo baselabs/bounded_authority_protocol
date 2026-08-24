@@ -4,6 +4,13 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Fixed — v1 selector contract reconciliation
+
+- The protocol and both shipped selector schemas now describe the released `all` behavior: `all`
+  accepts any of the three recognized member sets and treats `path`/`value(s)` as inert. Go,
+  TypeScript, Python, and Rust now reject every other member combination, matching the Elixir
+  reference and independent runner. ADR 0021 records the zero-verdict-change erratum.
+
 ### Added — Go verifier SDK (BAP-16; no Elixir package change)
 
 - **`sdks/go/` — the typed Go verifier SDK** for the frozen v1 profile, authored from the spec +

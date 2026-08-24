@@ -379,7 +379,8 @@ compatibility.
     [SECURITY.md](../SECURITY.md) reporting gains a one-line LINK to governance.md § Security policy
     (not a restated rule). [README.md](../README.md) gains a governance pointer (consistency with
     the existing docs-graph links). The [errata registry](errata.md) header retargets to
-    governance.md as the published policy home; the registry body is unchanged (live, zero entries).
+    governance.md as the published policy home. At BAP-13 closeout the live registry had zero
+    entries; Erratum 1 was added on 2026-08-24 by ADR 0021 without changing a corpus verdict.
   - The design-adversarial pass ran twice (fresh-context): the first raised 9 challenges and forced
     a blocking reframe — the original "stub the charter + relocate single-source" plan contradicted
     the charter's standing-authority claim with no precedent (BAP-11/BAP-14 edited charter sections
@@ -719,8 +720,9 @@ amendments.
 - **Library:** the 17-function façade + versioned primitives (`JsonDecode`/`JcsEncode` tagged
   algebra, `Base64url*`, `UriNormalize`, the `Jwk*` thumbprint family, `BoundsMaximum`/`BoundsNew`),
   zero runtime dependencies (stdlib `crypto/ed25519` + `crypto/sha256` + pure stdlib), Go floor 1.25
-  (`go.mod`; the CI job installs exactly 1.25 so the floor is the tested floor). Every public
-  function returns `(T, error)` with error ∈ {nil, `ErrInvalid`} — the closed result contract.
+  (`go.mod`; the CI job installs exactly 1.25 so the floor is the tested floor). Every fallible
+  public function returns `(T, error)` with error ∈ {nil, `ErrInvalid`}; infallible constructors
+  and encoders return their value directly.
 - **Conformance:** 283-vector runner over the vendored corpus snapshot with startup SHA-256
   assertion (`index.json` = `paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw`, cross-verified against
   the Elixir gate's live report), per-file SHA + case-count verification, and the two-boundary key
@@ -743,8 +745,11 @@ amendments.
   allowlist; proven red-capable by planting `os.ReadFile`) and `tools/license_check.sh`
   (zero-dependency assertion with a fail-closed floor; proven red-capable by fabricating a
   require). New `go-conformance` CI job in `sdks.yml` (SHA-pinned actions, same path filter).
-- **No wire byte, bound, or verdict change to the Elixir package** (Go-only SDK + CI/docs); the
-  vendored corpus snapshot is a byte-identical copy of `priv/conformance/v1/corpus/`.
+- **No wire byte, bound, or corpus-verdict change**; the vendored corpus snapshot is a byte-identical
+  copy of `priv/conformance/v1/corpus/`. The closeout review found and corrected a normative-artifact
+  contradiction around the released `all` selector behavior (ADR 0021): all four SDKs now accept
+  only the same three recognized member sets as the Elixir reference and independent runner, while
+  the protocol and both schemas describe the already-released inert-member behavior.
 - **Cross-vendor (codex + claude — MANDATORY zcode T2):** both peers returned rc=0 with
   findings — 10 blocking + 9 should-fix + 11 notes (codex), 4 blocking + 4 should-fix + 5 notes
   (claude), with heavy independent corroboration of the blocking set. Every confirmed finding
@@ -766,8 +771,9 @@ amendments.
   re-cross-vendored; the accumulated fix diff was re-read hunk-by-hunk and the full suite is
   green at `fbff228` (283/283, census=11, gates green).
 - **Corpus calibration facts recorded:** depth counts containers only (32 nested arrays + inner
-  scalar valid at the bound); the `all` selector is an open pattern (extra members tolerated —
-  `node-selector-all-open-pattern`); selector values reject `__proto__` members recursively; the
+  scalar valid at the bound); the `all` selector is valid on any of the three recognized member sets
+  and rejects every other combination (`node-selector-all-open-pattern`); selector values reject
+  `__proto__` members recursively; the
   archive header is the closed 8-member form; fingerprint-cycle detection seeds with the start
   anchor's fingerprint. All pinned by corpus cases the SDK now agrees with.
 
