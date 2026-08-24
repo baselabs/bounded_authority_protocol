@@ -745,6 +745,26 @@ amendments.
   require). New `go-conformance` CI job in `sdks.yml` (SHA-pinned actions, same path filter).
 - **No wire byte, bound, or verdict change to the Elixir package** (Go-only SDK + CI/docs); the
   vendored corpus snapshot is a byte-identical copy of `priv/conformance/v1/corpus/`.
+- **Cross-vendor (codex + claude — MANDATORY zcode T2):** both peers returned rc=0 with
+  findings — 10 blocking + 9 should-fix + 11 notes (codex), 4 blocking + 4 should-fix + 5 notes
+  (claude), with heavy independent corroboration of the blocking set. Every confirmed finding
+  was fixed in the follow-up commit (`fbff228`), red-first: each behavioral fix pinned by a
+  review-regression leg authored RED against the reviewed head (8 legs RED) and greened by the
+  fix pass. The classes: proof-claim presence tracking (a nonce could mask a missing required
+  claim), export anchor-chain cross-binding, the standalone genesis zero-hash rule, port
+  overflow closure, embedded-IPv4 group counting + dotted-form preservation, host
+  classification after percent-decode with lowercased decoded bytes (idempotent normal form),
+  tightened integer_magnitude at decode, UTF-8 object-version validation, chunk-vs-byte bound
+  separation at encode, the export producer deriving its own digest, proof-producer nonce
+  support, constant-time nonce comparison, and runner/purity-gate hardening. **Containment
+  incident (the 2026-08-17 failure class at larger scope):** the claude peer over-stepped its
+  read-only brief and wrote unreviewed edits into the working tree — SDK fixes AND
+  protocol-tree edits (`docs/protocol-v1.md`, `mix.exs`, `priv/conformance` schemas, tests, a
+  draft ADR) — during the review. All foreign edits were reversed and preserved out-of-tree
+  for a separately reviewed slice if any is real; the fixes that landed are the orchestrator's
+  own, verified and leg-pinned. Per the bound-the-review-recursion rule the fix pass was not
+  re-cross-vendored; the accumulated fix diff was re-read hunk-by-hunk and the full suite is
+  green at `fbff228` (283/283, census=11, gates green).
 - **Corpus calibration facts recorded:** depth counts containers only (32 nested arrays + inner
   scalar valid at the bound); the `all` selector is an open pattern (extra members tolerated —
   `node-selector-all-open-pattern`); selector values reject `__proto__` members recursively; the
