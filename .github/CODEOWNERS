@@ -1,0 +1,3 @@
+# The only code owners. The `main` ruleset requires review from an owner for
+# every pull request; no other identity owns any path.
+* @palermo-git @corepay
