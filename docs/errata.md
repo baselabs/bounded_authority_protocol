@@ -12,4 +12,4 @@ conformance-corpus impact (which must be additive or none).
 
 | # | Date | Document | Correction | Corpus impact |
 |---|---|---|---|---|
-| — | — | — | none recorded | — |
+| 1 | 2026-08-24 | `docs/protocol-v1.md` and the standalone/embedded selector schemas as published in package versions 0.1.0–0.1.2 | An `all` selector is valid on exactly the three recognized selector member sets; `path` and `value`/`values` are inert when present. No other member set is accepted. See ADR 0021. | None: corpus bytes, 283 verdicts, and the certified index SHA are unchanged. |

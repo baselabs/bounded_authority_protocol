@@ -32,6 +32,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/adr/0018-sdk-bounds-contract.md",
                     "docs/adr/0019-corpus-artifact-distribution.md",
                     "docs/adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md",
+                    "docs/adr/0021-v1-all-selector-recognized-shapes-erratum.md",
                     "docs/protocol-v1.md",
                     "docs/release-candidate-contract.md",
                     "docs/errata.md",

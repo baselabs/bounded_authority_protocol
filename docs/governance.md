@@ -90,9 +90,9 @@ verdict-change rule lives in one place.
 
 ## Errata registry posture
 
-The errata registry at [docs/errata.md](errata.md) is **live** — it is operational as the
-no-verdict-flip governance instrument, with its numbered-entry shape and its per-entry corpus-impact
-field defined. It currently carries zero entries ([errata.md](errata.md); the registry body is
-unchanged from its BAP-10 establishment). The first erratum, if any, follows the § Errata channel
-no-verdict-flip process above. *(This statement is this document's own framing of the registry's
-operational posture, not a charter extract — labeled as such.)*
+The errata registry at [docs/errata.md](errata.md) is **live** — it is the operational
+no-verdict-flip governance instrument, with a numbered entry and per-entry corpus impact. It
+currently carries Erratum 1, the correction for the v1 `all` selector's three recognized member
+sets (ADR 0021). New errata follow the § Errata channel no-verdict-flip process above. *(This
+statement is this document's own framing of the registry's operational posture, not a charter
+extract — labeled as such.)*

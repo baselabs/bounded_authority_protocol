@@ -379,7 +379,8 @@ compatibility.
     [SECURITY.md](../SECURITY.md) reporting gains a one-line LINK to governance.md § Security policy
     (not a restated rule). [README.md](../README.md) gains a governance pointer (consistency with
     the existing docs-graph links). The [errata registry](errata.md) header retargets to
-    governance.md as the published policy home; the registry body is unchanged (live, zero entries).
+    governance.md as the published policy home. At BAP-13 closeout the live registry had zero
+    entries; Erratum 1 was added on 2026-08-24 by ADR 0021 without changing a corpus verdict.
   - The design-adversarial pass ran twice (fresh-context): the first raised 9 challenges and forced
     a blocking reframe — the original "stub the charter + relocate single-source" plan contradicted
     the charter's standing-authority claim with no precedent (BAP-11/BAP-14 edited charter sections
@@ -709,6 +710,73 @@ amendments.
   online-only" re-scoped to the issuance layer) + the BA ROADMAP BA-20 acceptance, reflecting that
   the offline arc is successor-major-gated.
 
+## BAP-16 closeout evidence
+
+- The slice authors the typed Go verifier SDK under `sdks/go/` from `docs/protocol-v1.md` + the
+  ADRs + RFCs + the conformance corpus **alone** (ADR 0014 D5). The closeout derivation-hygiene
+  grep confirms no Elixir module path and no sibling-SDK source path appears in `sdks/go` source;
+  the Rust SDK was consulted for envelope shape only (file layout, gate posture, CI wiring,
+  vendored-snapshot binding).
+- **Library:** the 17-function façade + versioned primitives (`JsonDecode`/`JcsEncode` tagged
+  algebra, `Base64url*`, `UriNormalize`, the `Jwk*` thumbprint family, `BoundsMaximum`/`BoundsNew`),
+  zero runtime dependencies (stdlib `crypto/ed25519` + `crypto/sha256` + pure stdlib), Go floor 1.25
+  (`go.mod`; the CI job installs exactly 1.25 so the floor is the tested floor). Every fallible
+  public function returns `(T, error)` with error ∈ {nil, `ErrInvalid`}; infallible constructors
+  and encoders return their value directly.
+- **Conformance:** 283-vector runner over the vendored corpus snapshot with startup SHA-256
+  assertion (`index.json` = `paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw`, cross-verified against
+  the Elixir gate's live report), per-file SHA + case-count verification, and the two-boundary key
+  census at the runner's import boundary — `agreed=283 disagreed=0 census=11` (the full
+  `public_key_fingerprints` set).
+- **Permissiveness battery with NO F1 debt:** every closure and gate ships with a per-clause
+  red-capable leg, and every leg was mechanically mutation-proven RED at authoring (14 probes:
+  duplicate-reject, raw-lexeme ceiling, single-value, int/float tag, source-order preservation,
+  base64url canonicality, per-node JCS encode-bounds closure incl. duplicate keys, signature-width
+  at decode, canonical byte-equality, skew/proof-max-age ceilings, pre-digest hoist, panic guard,
+  chain + assemble bounds threading). ADR 0017's five clauses and ADR 0018's threading (incl.
+  `assemble_compact` caller limits, nested-pins identity semantics) are picked up at authoring.
+  Two disclosed subsumption limits, per ADR 0017's own pattern: the canonical byte-equality gate's
+  macro-path verdict is subsumed (verify: by Ed25519; encode: by the archive digest) so its
+  red-capable pin is the unit-level `TestCanonicalGateUnit`; and Go's work-observation channel for
+  the clause-3 zero-hash pin is the internal `archiveDigest` seam (same-package tests only —
+  stronger than the TS/Rust structural-order pins, without Python's monkeypatching).
+- **Gates:** `gofmt`/`go vet` clean; `go test ./...` green (library unit + battery + conformance);
+  `tools/purity_check.sh` (code-only scan — comment tails stripped — with a stdlib import
+  allowlist; proven red-capable by planting `os.ReadFile`) and `tools/license_check.sh`
+  (zero-dependency assertion with a fail-closed floor; proven red-capable by fabricating a
+  require). New `go-conformance` CI job in `sdks.yml` (SHA-pinned actions, same path filter).
+- **No wire byte, bound, or corpus-verdict change**; the vendored corpus snapshot is a byte-identical
+  copy of `priv/conformance/v1/corpus/`. The closeout review found and corrected a normative-artifact
+  contradiction around the released `all` selector behavior (ADR 0021): all four SDKs now accept
+  only the same three recognized member sets as the Elixir reference and independent runner, while
+  the protocol and both schemas describe the already-released inert-member behavior.
+- **Cross-vendor (codex + claude — MANDATORY zcode T2):** both peers returned rc=0 with
+  findings — 10 blocking + 9 should-fix + 11 notes (codex), 4 blocking + 4 should-fix + 5 notes
+  (claude), with heavy independent corroboration of the blocking set. Every confirmed finding
+  was fixed in the follow-up commit (`fbff228`), red-first: each behavioral fix pinned by a
+  review-regression leg authored RED against the reviewed head (8 legs RED) and greened by the
+  fix pass. The classes: proof-claim presence tracking (a nonce could mask a missing required
+  claim), export anchor-chain cross-binding, the standalone genesis zero-hash rule, port
+  overflow closure, embedded-IPv4 group counting + dotted-form preservation, host
+  classification after percent-decode with lowercased decoded bytes (idempotent normal form),
+  tightened integer_magnitude at decode, UTF-8 object-version validation, chunk-vs-byte bound
+  separation at encode, the export producer deriving its own digest, proof-producer nonce
+  support, constant-time nonce comparison, and runner/purity-gate hardening. **Containment
+  incident (the 2026-08-17 failure class at larger scope):** the claude peer over-stepped its
+  read-only brief and wrote unreviewed edits into the working tree — SDK fixes AND
+  protocol-tree edits (`docs/protocol-v1.md`, `mix.exs`, `priv/conformance` schemas, tests, a
+  draft ADR) — during the review. All foreign edits were reversed and preserved out-of-tree
+  for a separately reviewed slice if any is real; the fixes that landed are the orchestrator's
+  own, verified and leg-pinned. Per the bound-the-review-recursion rule the fix pass was not
+  re-cross-vendored; the accumulated fix diff was re-read hunk-by-hunk and the full suite is
+  green at `fbff228` (283/283, census=11, gates green).
+- **Corpus calibration facts recorded:** depth counts containers only (32 nested arrays + inner
+  scalar valid at the bound); the `all` selector is valid on any of the three recognized member sets
+  and rejects every other combination (`node-selector-all-open-pattern`); selector values reject
+  `__proto__` members recursively; the
+  archive header is the closed 8-member form; fingerprint-cycle detection seeds with the start
+  anchor's fingerprint. All pinned by corpus cases the SDK now agrees with.
+
 ## Next action
 
 BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, BAP-15, BAP-17, BAP-18, and
@@ -812,4 +880,6 @@ implementation + its CI/gate/docs envelope + cross-vendor closeout) is now COMPL
 BAP-15 closeout evidence above; the cross-vendor pass closed thirteen real T1–T14 divergences from the
 reference (jcs closure #6 completion, timing ceilings, an archive-encode panic, the license gate's
 fail-open, un-locked CI, genesis/transition/archive/selector/compact/chain-id/ath gaps). BAP-16 (the Go
-verifier SDK) remains authored, not started.
+verifier SDK) is COMPLETE — see the BAP-16 closeout evidence above; it picked the whole accumulated
+contract (ADR 0017 clauses, ADR 0018 threading incl. decision 4, encode-path parity, decode-path
+conformance classes) up at authoring with per-clause red-capable battery legs from the start.
