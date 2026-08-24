@@ -204,13 +204,18 @@ exactly the integer `1` (`REQ1-CLAIM-proof-v`).
 
 ## Selector algebra
 
-Selectors are closed ordered objects (`REQ1-SELECTOR-closed-set`):
+Selectors are closed ordered objects with exactly one of three recognized member sets:
+`{kind}`, `{kind,path,value}`, or `{kind,path,values}`
+(`REQ1-SELECTOR-closed-set`). The `kind` selects how that recognized set is interpreted:
 
-| Kind | Exact members |
+| Kind | Recognized members and interpretation |
 |---|---|
-| all | `{kind: "all"}` |
-| equals | `{kind: "equals", path: path, value: JSON_value}` |
-| one-of | `{kind: "one_of", path: path, values: non_empty_JSON_array}` |
+| all | Any recognized member set; `path`, `value`, and `values` are inert when present |
+| equals | Exactly `{kind: "equals", path: path, value: JSON_value}` |
+| one-of | Exactly `{kind: "one_of", path: path, values: non_empty_JSON_array}` |
+
+An `all` selector's inert members remain subject to the enclosing bounded JSON decoder but do not
+need to satisfy the active `equals` or `one_of` shapes. No other member combination is recognized.
 
 A path has 1–32 object-member names, each 1–128 UTF-8 bytes. Paths traverse objects only and never
 index arrays (`REQ1-SELECTOR-path-shape`). `one_of` contains at most 256 values

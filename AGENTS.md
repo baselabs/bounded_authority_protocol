@@ -21,16 +21,16 @@ grant operational authority by itself.
 
 ## Current state
 
-Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-15`,
-`BAP-17` (design-only), and `BAP-18` — including `BAP-07` (connected verification and first public
+Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-18`
+(`BAP-17` design-only) — including `BAP-07` (connected verification and first public
 release, executed 2026-08-20 by owner decision: the exact candidate passed the private runtime's
 PostgreSQL 18 gate and the consumer connected gates, the fresh review set closed, and the archive
 published to Hex; consumption uses the Hex release). Open: `BAP-12` (IANA templates, gated on the
-BAP-08 external submission preconditions) and `BAP-16` (the Go verifier SDK — authored, not
-started). Consult
+BAP-08 external submission preconditions) only — `BAP-16` (the Go verifier SDK) closed 2026-08-24
+(283/283 conformance from the vendored corpus snapshot, census-clean, no-F1-debt battery). Consult
 [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence blocks are the status authority.
 
-The published 0.1.0 package retains zero production dependencies, no application callback, and no
+The published 0.1.2 package retains zero production dependencies, no application callback, and no
 supervision tree. The v1 surface is complete: the normative tables and bounds, raw-number preflight,
 the bounded ordered JSON decoder with recursive duplicate rejection, strict base64url decoding,
 Draft 2020-12 structural schemas, architecture mutation gates, public compatibility CI, exact-package
@@ -46,15 +46,16 @@ by the architecture gate, [ADR 0008](docs/adr/0008-release-candidate-contract.md
 two-build `release.candidate` reproducibility check); BAP-05 shipped the portable conformance corpus
 (283 cases across 28 surfaces, dual-verified by the independent Node runner) and the deterministic
 verifier CLI, with the 55/55 conformance mutation battery and `conformance.verify` (agreed=283)
-wired into `mix quality` alongside the full suite (295 tests + 13 properties).
+wired into `mix quality` alongside the full suite (314 tests + 13 properties).
 
 Cross-language verifier SDKs live under [`sdks/`](sdks/)
 ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)): TypeScript
-(`@bounded-authority/verifier`), Python (`bounded-authority-verifier`), and Rust
-(`bounded-authority-protocol`, BAP-15) — each reimplements the frozen v1 profile from the spec and
-corpus alone, passes all 283 vectors with the certified corpus index SHA-256 asserted at load (the
-Rust SDK vendors a self-contained snapshot; the TypeScript and Python runners consume the monorepo
-corpus in place), and ships a red-capable per-language permissiveness mutation-gate. None is
+(`@bounded-authority/verifier`), Python (`bounded-authority-verifier`), Rust
+(`bounded-authority-protocol`, BAP-15), and Go (`bounded_authority_protocol_go`, BAP-16) — each
+reimplements the frozen v1 profile from the spec and corpus alone, passes all 283 vectors with the
+certified corpus index SHA-256 asserted at load (the
+Rust and Go SDKs vendor self-contained snapshots; the TypeScript and Python runners consume the
+monorepo corpus in place), and ships a red-capable per-language permissiveness mutation-gate. None is
 published to a registry: per
 [ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md), each graduates to its own per-SDK
 repository on first publication, and the `sdk-publish-guard` pre-commit hook and CI job reject
@@ -71,8 +72,8 @@ extension drafts under `docs/extensions/`,
 and its activating-major mechanism,
 [ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)). The BAP-15 hardening-arc contracts are
 recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK bounds contract), and
-ADR 0019 (corpus-artifact distribution), and ADR 0020 (bounds-aware assembly and issuer-mediated
-reauthorization posture). Accepted ADRs run 0001–0020 under
+ADR 0019 (corpus-artifact distribution), ADR 0020 (bounds-aware assembly and issuer-mediated
+reauthorization posture), and ADR 0021 (the v1 `all` selector recognized-shapes erratum). Accepted ADRs run 0001–0021 under
 [`docs/adr/`](docs/adr/). Commercial release readiness remains open.
 
 ## Critical rules

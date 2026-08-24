@@ -8,9 +8,9 @@
 //!
 //! Three kinds form a closed set (`REQ1-SELECTOR-closed-set`):
 //!
-//! | kind | exact members |
+//! | kind | recognized members and interpretation |
 //! |---|---|
-//! | `all` | `{kind: "all"}` — matches any JSON root |
+//! | `all` | `{kind}`, `{kind,path,value}`, or `{kind,path,values}`; inert members ignored |
 //! | `equals` | `{kind: "equals", path, value}` — path must exist |
 //! | `one_of` | `{kind: "one_of", path, values}` — path must exist |
 //!
@@ -35,7 +35,45 @@
 
 use crate::bounds::Bounds;
 use crate::error::{Invalid, Result};
+use crate::jcs::jcs_encode;
 use crate::json::JsonValue;
+
+/// Validate the complete selector shape independently of request matching.
+/// Grant production, decode, and verification call this directly; envelope
+/// evaluation calls it before applying the selector to request arguments.
+pub(crate) fn validate(selector: &JsonValue, bounds: &Bounds) -> Result<()> {
+    let members = match selector {
+        JsonValue::Object(m) => m,
+        _ => return Err(Invalid),
+    };
+    let kind = member_str(members, "kind")?;
+    if !recognized_member_set(members) {
+        return Err(Invalid);
+    }
+    match kind {
+        "all" => Ok(()),
+        "equals" => {
+            extract_path(members, "path", bounds)?;
+            jcs_encode(member_value(members, "value")?, bounds)?;
+            Ok(())
+        }
+        "one_of" => {
+            extract_path(members, "path", bounds)?;
+            let values = match member_value(members, "values")? {
+                JsonValue::Array(values) => values,
+                _ => return Err(Invalid),
+            };
+            if values.is_empty() || values.len() as u64 > bounds.one_of_values() {
+                return Err(Invalid);
+            }
+            for value in values {
+                jcs_encode(value, bounds)?;
+            }
+            Ok(())
+        }
+        _ => Err(Invalid),
+    }
+}
 
 /// Conjunctively evaluate one selector against the server-derived tagged
 /// arguments.
@@ -51,6 +89,7 @@ pub(crate) fn evaluate(
     cast_arguments: &JsonValue,
     bounds: &Bounds,
 ) -> Result<bool> {
+    validate(selector, bounds)?;
     // REQ1-SELECTOR-closed-set: a selector MUST be a JSON object.
     let members = match selector {
         JsonValue::Object(m) => m,
@@ -58,28 +97,29 @@ pub(crate) fn evaluate(
     };
     // `kind` MUST be present and a string of the closed set.
     let kind = member_str(members, "kind")?;
+    if !recognized_member_set(members) {
+        return Err(Invalid);
+    }
     match kind {
         "all" => {
-            // `all` matches any JSON root. The conformance corpus
-            // (`check-envelope-valid-selector-all-with-extra-members`, jti
-            // `urn:example:grant:fat-all`) establishes that an `all` selector
-            // carrying inert extra members (e.g. a stray `path`/`value`) still
-            // matches. The canonical closed form is `{kind:"all"}`
-            // (REQ1-SELECTOR-closed-set; selector.schema.json), but extra members
-            // on `all` are not authorization-relevant — `all` returns true
-            // regardless of any other members — so they are tolerated rather
-            // than rejected. (Schemas are explicitly NOT byte-level oracles —
-            // protocol-v1.md line 126 — the corpus is.) Only the `kind` itself
-            // is examined here; `equals`/`one_of` below remain strict about
-            // their exact member sets, which is security-relevant (an extra
-            // `value`/`values` would be ambiguous) and uncontradicted by the
-            // corpus.
+            // `all` matches any root on any recognized member set. The
+            // path/value(s), when present, are inert.
             Ok(true)
         }
         "equals" => eval_equals(members, cast_arguments, bounds),
         "one_of" => eval_one_of(members, cast_arguments, bounds),
         _ => Err(Invalid), // unknown kind — closed set
     }
+}
+
+fn recognized_member_set(members: &[(String, JsonValue)]) -> bool {
+    let count = |name: &str| members.iter().filter(|(key, _)| key == name).count();
+    let kind = count("kind") == 1;
+    let path = count("path") == 1;
+    let value = count("value") == 1;
+    let values = count("values") == 1;
+
+    (members.len() == 1 && kind) || (members.len() == 3 && kind && path && (value ^ values))
 }
 
 /// `equals`: exactly `{kind, path, value}`; traverse the path (fail-closed on
@@ -435,9 +475,8 @@ mod tests {
     #[test]
     fn all_tolerates_inert_extra_members() {
         // Corpus-driven (`check-envelope-valid-selector-all-with-extra-members`):
-        // an `all` selector with inert extra members still matches any root.
-        // `all` returns true regardless of the extra members, so tolerating them
-        // is not authorization-relevant. Both a bare and a "fat" `all` match.
+        // an `all` selector on either recognized three-member set still matches
+        // any root. No unrecognized member combination is accepted.
         let bare = j(br#"{"kind":"all"}"#);
         let fat = j(br#"{"kind":"all","path":["record"],"value":"zz"}"#);
         assert_eq!(evaluate(&bare, &JsonValue::Null, &max()), Ok(true));
@@ -445,6 +484,21 @@ mod tests {
             evaluate(&fat, &j(br#"{"limit":10,"record":{"id":"rec-1"}}"#), &max()),
             Ok(true)
         );
+        let alternate = j(br#"{"kind":"all","path":7,"values":"inert"}"#);
+        assert_eq!(evaluate(&alternate, &JsonValue::Null, &max()), Ok(true));
+
+        for unrecognized in [
+            br#"{"kind":"all","path":[]}"#.as_slice(),
+            br#"{"kind":"all","value":null}"#.as_slice(),
+            br#"{"kind":"all","values":[]}"#.as_slice(),
+            br#"{"kind":"all","path":[],"value":null,"values":[]}"#.as_slice(),
+            br#"{"kind":"all","extra":null}"#.as_slice(),
+        ] {
+            assert_eq!(
+                evaluate(&j(unrecognized), &JsonValue::Null, &max()),
+                Err(Invalid)
+            );
+        }
     }
 
     #[test]
