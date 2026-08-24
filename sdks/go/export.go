@@ -3,7 +3,7 @@ package verifier
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"strings"
+	"unicode/utf8"
 )
 
 // The anchored export (ADR 0004): the exact binary concatenation
@@ -82,6 +82,13 @@ func validateExpectedAnchoredExport(expected *ExpectedAnchoredExport, obj Archiv
 		return ErrInvalid
 	}
 	if err := validateExpectedAnchorTuple(expected.EndAnchor, expected.Chain.LastSequence, false, b); err != nil {
+		return ErrInvalid
+	}
+	// cross-binding (cross-vendor F2): the anchors attest THE chain's
+	// boundaries — same chain identity, start binds the caller predecessor,
+	// end binds the caller head (the reference enforces all four)
+	if expected.StartAnchor.ChainID != expected.Chain.ChainID || expected.EndAnchor.ChainID != expected.Chain.ChainID ||
+		expected.StartAnchor.ChainHash != expected.Chain.PreviousHash || expected.EndAnchor.ChainHash != expected.Chain.LastHash {
 		return ErrInvalid
 	}
 	if len(expected.Transitions) > b.KeyTransitions {
@@ -172,12 +179,7 @@ func validateExpectedAnchorTuple(a ExpectedAnchor, wantSequence int64, isStart b
 }
 
 func isWellFormedUTF8(s string) bool {
-	for _, r := range s {
-		if r == 0xFFFD && !strings.ContainsRune(s, 0xFFFD) {
-			return false
-		}
-	}
-	return true
+	return utf8.ValidString(s)
 }
 
 // verifyAnchoredExportCore is the seam-bearing core; the public façade passes
@@ -530,14 +532,15 @@ func EncodeAnchoredExport(input AnchoredExportInput, expected ExpectedAnchoredEx
 		archive = appendFrame(archive, r)
 	}
 	archive = appendFrame(archive, []byte(input.EndAnchor))
-	if int64(len(archive)) > int64(b.ArchiveBytes) || len(archive) > int(b.ArchiveChunks) {
-		return EncodedExport{}, ErrInvalid // aggregate archive bounds
+	// aggregate archive bounds: chunks count CHUNKS (magic + frames), bytes
+	// count bytes (cross-vendor F11 — the two bounds are distinct ceilings)
+	chunkCount := 1 + 1 + 1 + len(input.Transitions) + len(input.Rows) + 1
+	if int64(len(archive)) > int64(b.ArchiveBytes) || chunkCount > b.ArchiveChunks {
+		return EncodedExport{}, ErrInvalid
 	}
+	// the producer derives its own digest (cross-vendor F12): expected.Digest
+	// is shape-validated by the hoist; it is not a predeclared output contract
 	digestRaw := sha256.Sum256(archive)
-	wantDigest, _ := canonicalDigestString(expected.Digest)
-	if digestRaw != wantDigest {
-		return EncodedExport{}, ErrInvalid // produced bytes must equal the expected digest
-	}
 	return EncodedExport{Archive: archive, Digest: digestRaw, ByteCount: int64(len(archive))}, nil
 }
 
@@ -545,16 +548,8 @@ func EncodeAnchoredExport(input AnchoredExportInput, expected ExpectedAnchoredEx
 // encode-side expected validation (the producer holds no public keys).
 func keysFromExpected(expected ExpectedAnchoredExport, b Bounds) HistoricalKeyChain {
 	keys := make(HistoricalKeyChain, 0, len(expected.Transitions)+1)
-	unbounded := HistoricalPublicKey{
-		KeyID:                expected.StartAnchor.KeyID,
-		PublicKey:            nil, // fingerprints validated textually at encode
-		ValidFrom:            0,
-		ValidBefore:          0,
-		ValidBeforeUnbounded: true,
-	}
-	_ = unbounded
 	// The encode path validates key geometry through the expected tuples; the
-	// pseudo chain satisfies the count invariant only.
+	// pseudo chain satisfies the count invariant only (no public keys held).
 	for i := 0; i <= len(expected.Transitions); i++ {
 		k := HistoricalPublicKey{ValidBeforeUnbounded: true}
 		if i == 0 {

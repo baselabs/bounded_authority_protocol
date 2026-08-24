@@ -56,6 +56,8 @@ type Proof struct {
 	IssuedAt        int64
 	GrantCompact    string
 	CastArguments   Value
+	HasNonce        bool
+	Nonce           string
 }
 
 // BoundaryAnchor is the producer-side anchor structure.

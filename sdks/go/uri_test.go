@@ -37,7 +37,7 @@ func TestUriNormalizeValid(t *testing.T) {
 		{"https://a--b.example.test/x", "https://a--b.example.test/x"},
 		// bracketed IPv6
 		{"https://[2001:db8::1]/x", "https://[2001:db8::1]/x"},
-		{"https://[2001:0db8:0000:0000:0000:0000:0000:0001]/x", "https://[2001:db8:0:0:0:0:0:1]/x"}, // no recompression: structure preserved
+		{"https://[2001:0db8:0000:0000:0000:0000:0000:0001]/x", "https://[2001:0db8:0000:0000:0000:0000:0000:0001]/x"}, // downcase-only: digit width preserved
 		{"https://[::1]/x", "https://[::1]/x"},
 		{"https://[2001:db8::192.0.2.1]/x", "https://[2001:db8::192.0.2.1]/x"}, // embedded IPv4
 		// IPvFuture

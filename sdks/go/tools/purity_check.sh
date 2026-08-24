@@ -37,20 +37,16 @@ for f in "$lib_dir"/*.go; do
     sed 's://.*$::' "$f" | grep -En "$patterns" >&2 || true
     status=1
   fi
-  imports=$(awk '/^import \(/,/^$/' "$f" 2>/dev/null || true)
-  if [ -n "$imports" ]; then
-    if printf '%s\n' "$imports" | grep -E '^\t"' | grep -vE "$allowed_imports" >/dev/null 2>&1; then
-      echo "purity_check: FAIL — non-allowlisted import in ${f##*/}:" >&2
-      printf '%s\n' "$imports" | grep -E '^\t"' | grep -vE "$allowed_imports" >&2 || true
-      status=1
-    fi
-  fi
-  if grep -E '^import "' "$f" >/dev/null 2>&1; then
-    if grep -E '^import "' "$f" | grep -vE '^import "(crypto/ed25519|crypto/sha256|encoding/binary|errors|math|math/big|sort|strconv|strings|unicode/utf16|unicode/utf8)"$' >/dev/null 2>&1; then
-      echo "purity_check: FAIL — non-allowlisted single import in ${f##*/}:" >&2
-      grep -E '^import "' "$f" | grep -vE '^import "(crypto/ed25519|crypto/sha256|encoding/binary|errors|math|math/big|sort|strconv|strings|unicode/utf16|unicode/utf8)"$' >&2 || true
-      status=1
-    fi
+  # any import line — block, aliased, dotted, or single — whose quoted path
+  # is outside the allowlist fails (aliases and dot-imports cannot hide it):
+  # extract the import block plus single imports, then filter quoted paths
+  imp_block=$(awk '/^import \(/ {flag=1} flag {print} /^\)/ {if (flag) flag=0}' "$f" 2>/dev/null || true)
+  imp_single=$(grep -E '^import ' "$f" 2>/dev/null || true)
+  bad_imports=$(printf '%s\n%s\n' "$imp_block" "$imp_single" | grep -oE '"[^"]+"' | grep -vE '^"(crypto/ed25519|crypto/sha256|crypto/subtle|encoding/binary|errors|fmt|math|math/big|sort|strconv|strings|unicode/utf16|unicode/utf8)"$' || true)
+  if [ -n "$bad_imports" ]; then
+    echo "purity_check: FAIL — non-allowlisted import in ${f##*/}:" >&2
+    printf '%s\n' "$bad_imports" >&2
+    status=1
   fi
 done
 

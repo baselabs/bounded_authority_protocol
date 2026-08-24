@@ -1,6 +1,9 @@
 package verifier
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // URI normalization (docs/protocol-v1.md § URI normalization; RFC 3986).
 //
@@ -147,14 +150,11 @@ func normalizeHost(host string) (string, error) {
 	if host == "" {
 		return "", ErrInvalid // nonempty host required
 	}
-	// reg-name: unreserved / sub-delim / valid pct-encoded, with unreserved
-	// escapes decoded. All-numeric dotted hosts must be exact IPv4.
-	if isNumericDotted(host) {
-		if !validIPv4(host) {
-			return "", ErrInvalid
-		}
-		return host, nil
-	}
+	// reg-name: unreserved / sub-delim / valid pct-encoded. Decode FIRST,
+	// then classify: a percent-decoded numeric-dotted host faces the exact
+	// IPv4 gate like its literal form (cross-vendor F6). Decoded unreserved
+	// bytes are lowercased exactly like literal bytes, so the normal form is
+	// idempotent.
 	var out strings.Builder
 	for i := 0; i < len(host); i++ {
 		c := host[i]
@@ -165,7 +165,7 @@ func normalizeHost(host string) (string, error) {
 			}
 			i += n - 1
 			if strings.IndexByte(unreservedBytes, dec) >= 0 {
-				out.WriteByte(dec)
+				out.WriteByte(lowerByte(dec))
 			} else {
 				out.WriteByte('%')
 				out.WriteByte(upperHex(dec >> 4))
@@ -178,7 +178,14 @@ func normalizeHost(host string) (string, error) {
 		}
 		out.WriteByte(lowerByte(c))
 	}
-	return out.String(), nil
+	normalized := out.String()
+	if isNumericDotted(normalized) {
+		if !validIPv4(normalized) {
+			return "", ErrInvalid
+		}
+		return normalized, nil
+	}
+	return normalized, nil
 }
 
 func lowerByte(c byte) byte {
@@ -242,32 +249,38 @@ func normalizePort(port string) (string, error) {
 	if port == "" {
 		return "", nil
 	}
-	v := 0
+	// canonical form first strips leading zeroes; the 5-digit cap on the
+	// stripped form makes decimal accumulation overflow-impossible
+	// (cross-vendor F4) while legal zero-padded ports stay valid
+	dec := []byte{}
+	started := false
 	for i := 0; i < len(port); i++ {
 		c := port[i]
 		if c < '0' || c > '9' {
 			return "", ErrInvalid
 		}
-		v = v*10 + int(c-'0')
+		if c != '0' {
+			started = true
+		}
+		if started {
+			dec = append(dec, c)
+		}
+	}
+	if len(dec) == 0 {
+		return "", ErrInvalid // all zeroes: no port value in 1..65535
+	}
+	if len(dec) > 5 {
+		return "", ErrInvalid // cannot be a port; rejects before overflow
+	}
+	v := 0
+	for i := 0; i < len(dec); i++ {
+		v = v*10 + int(dec[i]-'0')
 	}
 	if v < 1 || v > 65535 {
 		return "", ErrInvalid
 	}
 	if v == 443 {
 		return "", nil
-	}
-	dec := []byte{}
-	started := false
-	for i := 0; i < len(port); i++ {
-		if port[i] != '0' {
-			started = true
-		}
-		if started {
-			dec = append(dec, port[i])
-		}
-	}
-	if len(dec) == 0 {
-		return "0", nil // unreachable (v>=1); fail-closed default
 	}
 	return string(dec), nil
 }
@@ -383,36 +396,60 @@ func normalizeIPv6(lit string) (string, error) {
 	if hasElision && strings.Contains(tail, "::") {
 		return "", ErrInvalid // two elisions
 	}
+	// parseSide returns the side's groups; an embedded trailing IPv4 counts
+	// as TWO groups (cross-vendor F5) and is preserved in dotted form as the
+	// final TWO entries (rendered back as one dotted group on output).
 	parseSide := func(side string, allowIPv4 bool) ([]string, error) {
 		if side == "" {
 			return nil, nil
 		}
+		parts := strings.Split(side, ":")
 		var groups []string
-		for _, part := range strings.Split(side, ":") {
+		for _, part := range parts[:len(parts)-1] {
 			if part == "" {
 				return nil, ErrInvalid // empty group outside the elision
 			}
+			if len(part) > 4 {
+				return nil, ErrInvalid
+			}
+			for i := 0; i < len(part); i++ {
+				if hexVal(part[i]) < 0 {
+					return nil, ErrInvalid
+				}
+			}
 			groups = append(groups, part)
 		}
-		// the LAST group may be an embedded IPv4
-		last := groups[len(groups)-1]
+		last := parts[len(parts)-1]
+		if last == "" {
+			return nil, ErrInvalid
+		}
 		if strings.Contains(last, ".") {
 			if !allowIPv4 || !validIPv4(last) {
 				return nil, ErrInvalid
 			}
-		} else {
-			for _, g := range groups {
-				if len(g) > 4 {
-					return nil, ErrInvalid
+			// expand to TWO hextet entries (count and render as a pair)
+			v := [4]int{}
+			for i, p := range strings.Split(last, ".") {
+				x := 0
+				for j := 0; j < len(p); j++ {
+					x = x*10 + int(p[j]-'0')
 				}
-				for i := 0; i < len(g); i++ {
-					if hexVal(g[i]) < 0 {
-						return nil, ErrInvalid
-					}
-				}
+				v[i] = x
+			}
+			groups = append(groups,
+				fmt.Sprintf("%x", v[0]<<8|v[1]),
+				fmt.Sprintf("%x", v[2]<<8|v[3]))
+			return groups, nil
+		}
+		if len(last) > 4 {
+			return nil, ErrInvalid
+		}
+		for i := 0; i < len(last); i++ {
+			if hexVal(last[i]) < 0 {
+				return nil, ErrInvalid
 			}
 		}
-		return groups, nil
+		return append(groups, last), nil
 	}
 	headGroups, err := parseSide(head, !hasElision || tail != "")
 	if err != nil {
@@ -422,24 +459,32 @@ func normalizeIPv6(lit string) (string, error) {
 	if err != nil {
 		return "", ErrInvalid
 	}
+	headIPv4, tailIPv4 := "", ""
+	if strings.Contains(head, ".") {
+		headIPv4 = head[strings.LastIndex(head, ":")+1:]
+	}
+	if strings.Contains(tail, ".") {
+		tailIPv4 = tail[strings.LastIndex(tail, ":")+1:]
+	}
 	total := len(headGroups) + len(tailGroups)
 	if hasElision {
 		if total > 7 {
 			return "", ErrInvalid
 		}
-	} else if total != 8 || strings.Count(lit, ":") != 7 {
-		return "", ErrInvalid
+	} else {
+		// eight groups: 7 colons in pure-hextet form, or 6 colons when the
+		// final group is an embedded dotted IPv4 (which counts as two)
+		ipv4Tail := strings.Contains(lit, ".")
+		colons := strings.Count(lit, ":")
+		if total != 8 || colons != 7 && !(ipv4Tail && colons == 6) {
+			return "", ErrInvalid
+		}
 	}
 	normalizeGroup := func(g string) string {
-		if strings.Contains(g, ".") {
-			return g // embedded IPv4 kept in dotted form
-		}
-		s := lowerHexStr(g)
-		i := 0
-		for i < len(s)-1 && s[i] == '0' {
-			i++
-		}
-		return s[i:]
+		// downcase-only: the reference's normal form preserves per-group digit
+		// width (no leading-zero stripping), so `2001:0db8::1` is its own
+		// normal form
+		return lowerHexStr(g)
 	}
 	var out strings.Builder
 	for i, g := range headGroups {
@@ -457,20 +502,37 @@ func normalizeIPv6(lit string) (string, error) {
 		}
 		out.WriteString(normalizeGroup(g))
 	}
+	// an embedded IPv4 tail renders in its original dotted form (the
+	// reference normal form preserves it) while counting as two groups: cut
+	// back to the SECOND-to-last colon (the two expanded hextet entries) and
+	// append the original dotted text
+	if headIPv4 != "" && !hasElision {
+		if s, ok := replaceLastTwoGroups(out.String(), headIPv4); ok {
+			out.Reset()
+			out.WriteString(s)
+		}
+	}
+	if tailIPv4 != "" {
+		if s, ok := replaceLastTwoGroups(out.String(), tailIPv4); ok {
+			out.Reset()
+			out.WriteString(s)
+		}
+	}
 	return out.String(), nil
 }
 
-func lowerHexGroup(v int) string {
-	s := ""
-	for i := 3; i >= 0; i-- {
-		d := (v >> (4 * i)) & 0xf
-		if d < 10 {
-			s += string(rune('0' + d))
-		} else {
-			s += string(rune('a' + d - 10))
-		}
+// replaceLastTwoGroups rewrites the final two colon-separated groups as one
+// dotted-quad string.
+func replaceLastTwoGroups(s, dotted string) (string, bool) {
+	last := strings.LastIndex(s, ":")
+	if last < 0 {
+		return "", false
 	}
-	return s
+	second := strings.LastIndex(s[:last], ":")
+	if second < 0 {
+		return "", false
+	}
+	return s[:second+1] + dotted, true
 }
 
 func lowerHexStr(g string) string {
@@ -482,14 +544,6 @@ func lowerHexStr(g string) string {
 		}
 	}
 	return string(out)
-}
-
-func stripLeadingZerosHex(g string) string {
-	i := 0
-	for i < len(g)-1 && g[i] == '0' {
-		i++
-	}
-	return g[i:]
 }
 
 // normalizeIPvFuture parses "v" 1*HEXDIG "." 1*(unreserved / sub-delims / ":").
