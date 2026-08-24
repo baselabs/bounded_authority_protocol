@@ -7,7 +7,7 @@
 //! is a comparison key, never an execution credential.
 //!
 //! Rules enforced (`docs/protocol-v1.md` §URI normalization, lines 226–244):
-//! - `REQ1-URI-https-only`: the scheme MUST be exactly `https` (ASCII
+//! - `REQ1-URI-reject-list`: the scheme MUST be exactly `https` (ASCII
 //!   case-insensitive; normalized lowercase). HTTP or any other scheme →
 //!   [`Invalid`].
 //! - `REQ1-URI-reject-list`: HTTP / other scheme, an authority-less form,
@@ -79,7 +79,7 @@ pub fn uri_normalize(text: &str, bounds: &Bounds) -> Result<String> {
         }
     }
 
-    // REQ1-URI-https-only: scheme MUST be exactly `https` (ASCII
+    // REQ1-URI-reject-list: scheme MUST be exactly `https` (ASCII
     // case-insensitive) followed by `://`. Checking the literal `://` after a
     // 5-byte scheme also rejects longer schemes (`httpsx://`) and the
     // authority-less single-slash form (`https:/path`).
@@ -543,7 +543,7 @@ mod tests {
     const B: fn() -> Bounds = Bounds::maximum;
 
     // ------------------------------------------------------------------
-    // Scheme normalization — REQ1-URI-https-only
+    // Scheme normalization — REQ1-URI-reject-list
     // ------------------------------------------------------------------
 
     #[test]

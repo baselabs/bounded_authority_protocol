@@ -125,14 +125,14 @@ closures stay as per-SDK mutation-gates (the corpus cannot express them).
 | astral codepoint → 4-byte UTF-8 raw | `jcs.encode` | valid | RFC 8785 §3.2.2.2 | `jcs-encode-astral-raw` |
 | DEL `U+007F` raw-emit (not `\u007f`) | `jcs.encode` | valid | RFC 8785 §3.2.2.2 + `protocol-v1.md` JCS subsection | `jcs-encode-del-raw` |
 | ECMAScript float thresholds (`e<-6`,`e>=21`) | `jcs.encode` | valid | RFC 8785 §3.2.2.3 + ECMA §7.1.12.1 / TC39 §6.1.6.1.20 | `jcs-encode-float-*` (5 cases, both sides) |
-| float `cast_arguments` digest | `request_digest` | valid | REQ1-DIGEST-typed-projection | `request-digest-float-cast-arguments` |
+| float `cast_arguments` digest | `request_digest` | valid | REQ1-SELECTOR-semantic-identity | `request-digest-float-cast-arguments` |
 | malformed UTF-8 member name | `json.decode` | invalid_encoding | REQ1-JSON-no-normalization | `json-decode-malformed-utf8-member-name` |
 | float magnitude over bound | `json.decode` | invalid_encoding | REQ1-JSON-raw-lexeme | `json-decode-float-magnitude` |
 | malformed IPv6 literals | `uri.normalize` | invalid_uri | REQ1-URI-reject-list | `uri-normalize-ipv6-*` (3 cases) |
 | locator decodes protected only | `untrusted_key_locator` | valid | REQ1-LOCATOR-opaque-payload | `untrusted-key-locator-empty-payload-signature` |
-| canonical re-encode of raw rows | `check_chain` | invalid_encoding | REQ1-CHAIN-raw-rows | `check-chain-canonical-reencode` |
+| canonical re-encode of raw rows | `check_chain` | invalid_encoding | REQ1-CHAIN-raw-rows-bounds | `check-chain-canonical-reencode` |
 | rejects sequence 0 | `check_chain` | invalid_claim | ADR 0004 | `check-chain-sequence-zero-row` |
-| genesis previous_hash binding | `check_chain` | invalid_claim | REQ1-CHAIN-raw-rows | `check-chain-genesis-previous-hash-forge` |
+| genesis previous_hash binding | `check_chain` | invalid_claim | REQ1-CHAIN-raw-rows-bounds | `check-chain-genesis-previous-hash-forge` |
 | seq-1 + nonzero previous | `encode_consumption_entry` | invalid_encoding | ADR 0004 (genesis row) | `encode-consumption-entry-invalid-seq1-nonzero-previous` |
 | seq-0 + nonzero chain_hash | `boundary_anchor_signing_input` | invalid_key | ADR 0004 (genesis anchor) | `boundary-anchor-signing-input-invalid-seq0-nonzero-chain-hash` |
 | start-anchor binding (`seq == first_sequence-1`) | `encode_anchored_export` | invalid_encoding | ADR 0004 | `encode-anchored-export-invalid-start-anchor-binding` |
