@@ -160,3 +160,43 @@ jobs:
       - name: license check
         run: sh tools/license_check.sh
         working-directory: sdks/rust
+
+  # Go is Node-independent; per ADR 0015 D4 it runs as its OWN job on the same
+  # sdks/** + priv/conformance/** trigger. The go.mod floor (1.25) is the
+  # CI-tested floor: this job installs exactly 1.25, mirroring the Rust MSRV
+  # pattern. Zero runtime dependencies means no go.sum to lock; `go vet` +
+  # `go test ./...` cover the library unit suite, the permissiveness
+  # mutation-gate battery (incl. the white-box work-pin legs), and the
+  # conformance runner that asserts agreed=283 disagreed=0 + the key census
+  # against the vendored, startup-SHA-bound corpus snapshot.
+  go-conformance:
+    name: Cross-language SDK conformance (Go 1.25)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+
+      - name: gofmt
+        run: test -z "$(gofmt -l .)"
+        working-directory: sdks/go
+
+      - name: vet
+        run: go vet ./...
+        working-directory: sdks/go
+
+      - name: unit + permissiveness + conformance (283 + census)
+        run: go test ./...
+        working-directory: sdks/go
+
+      - name: purity check
+        run: sh tools/purity_check.sh
+        working-directory: sdks/go
+
+      - name: license check
+        run: sh tools/license_check.sh
+        working-directory: sdks/go
