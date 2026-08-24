@@ -104,9 +104,9 @@ oracle vectors used by holder-side consumers to verify their own production live
 ## Cross-language verifier SDKs
 
 Alongside the Elixir package, the repository authors typed **verifier** SDKs of the frozen v1
-profile — TypeScript (Node, zero runtime dependencies), Python (single dependency), and Rust
-(`#![forbid(unsafe_code)]`) — each written from the specification and corpus alone, with no
-code-level derivation from the reference implementation. Each passes all 283 conformance vectors
+profile — TypeScript (Node, zero runtime dependencies), Python (single dependency), Rust
+(`#![forbid(unsafe_code)]`), and Go (stdlib-only) — each written from the specification and corpus
+alone, with no code-level derivation from the reference implementation. Each passes all 283 conformance vectors
 recomputed from scratch, asserts the corpus digest at startup, and proves every parser-layer
 closure red-capable via a per-language mutation gate. Each SDK graduates to its own repository on
 first publication.
