@@ -42,8 +42,9 @@ operations. Those responsibilities are reusable but remain a private differentia
    and resolution, revocation state and ordering, replay reservation, invocation/execution claims,
    PostgreSQL persistence, outcome/consumption writes, archive removal, witnesses, recovery,
    telemetry, health, and operator workflows.
-6. Keep `retired_private_consumer` dependent on the private runtime. It must not convert a direct public
-   verification result into operational authority or bypass the private runtime.
+6. Keep private product consumers dependent on the private runtime. They must not convert a direct
+   public verification result into operational authority or bypass the private runtime. Their
+   repository identities and deployment topology are not public-protocol material.
 7. Keep Beamline core and QorPay independent of both packages.
 8. Version public formats and APIs under SemVer and contract-major discipline. Unknown versions
    and extensions fail closed.
