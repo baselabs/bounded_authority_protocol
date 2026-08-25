@@ -701,10 +701,10 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     scratch =
       Path.join(
         System.tmp_dir!(),
-        "conformance-mutation-#{mutation.name}-#{System.unique_integer([:positive, :monotonic])}"
+        "conformance-mutation-#{System.pid()}-#{mutation.name}-#{System.unique_integer([:positive, :monotonic])}"
       )
 
-    File.mkdir_p!(scratch)
+    File.mkdir!(scratch)
 
     try do
       Enum.each(@copy_paths, &copy_path(&1, scratch))
@@ -746,10 +746,10 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       scratch =
         Path.join(
           System.tmp_dir!(),
-          "conformance-baseline-#{System.unique_integer([:positive, :monotonic])}"
+          "conformance-baseline-#{System.pid()}-#{System.unique_integer([:positive, :monotonic])}"
         )
 
-      File.mkdir_p!(scratch)
+      File.mkdir!(scratch)
 
       try do
         Enum.each(@copy_paths, &copy_path(&1, scratch))
