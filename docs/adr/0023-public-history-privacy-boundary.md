@@ -29,9 +29,10 @@ stateful application.
    exact release; readiness or a prior approval is not publication authority.
 4. The public branches and release tags are rewritten in place to remove the historical disclosure
    while preserving their names and release content. Old object identifiers are invalidated.
-5. A repository gate scans the tracked tree, reachable commit messages, and reachable patches for
-   the prohibited topology class. Exact private identifiers live only in the ignored local guard
-   manifest; publishing their plaintext or unsalted hashes would create a confirmation oracle.
+5. A repository gate scans the tracked tree, reachable commit messages, merge-aware historical
+   paths, every reachable commit snapshot, and annotated-tag messages for the prohibited topology
+   class. Exact private identifiers live only in the ignored local guard manifest; publishing their
+   plaintext or unsalted hashes would create a confirmation oracle.
 6. Hosting-provider cached object pages and pull-request references are outside Git's ref rewrite.
    They remain open until the provider confirms garbage collection and anonymous requests for the
    affected old identifiers return `404`.
