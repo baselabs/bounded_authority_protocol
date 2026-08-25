@@ -115,14 +115,17 @@ reauthorization posture), ADR 0021 (the v1 `all` selector recognized-shapes erra
 ## Repository relationships
 
 - Public protocol: [`baselabs/bounded_authority_protocol`](https://github.com/baselabs/bounded_authority_protocol)
-- Private runtime consumer: `baselabs/bounded_authority` (private)
-- Product consumer: `baselabs/private_consumer` (private; the successor product — `retired_private_consumer` is
-  deprecated and not a current consumer)
+- Private runtime consumer: `baselabs/bounded_authority` (a private commercial application; it
+  must never be published as a public Hex package, is not currently distributed through private
+  Hex, and any future private-Hex release requires a paid subscription plus fresh owner approval
+  for that exact release)
+- Product consumers: private; their repository identities and deployment topology are not part of
+  this public protocol's documentation or history
 - QorPay: unchanged and not a dependency
 
 ```text
-bounded_authority          -> bounded_authority_protocol + ecto_sql + postgrex + runtime deps
-private_consumer                -> bounded_authority + application transport libraries (transport component, transport component)
+private authority runtime  -> bounded_authority_protocol + runtime dependencies
+private product consumers  -> private authority runtime
 bounded_authority_protocol -> pure protocol/crypto dependencies only
 qorpay                     -> no authority dependency
 ```

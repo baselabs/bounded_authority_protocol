@@ -4,6 +4,14 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Fixed — public-history privacy boundary
+
+- Public documentation and reachable Git history no longer identify private product repositories
+  or their deployment topology. ADR 0023 records the durable boundary and the all-ref rewrite.
+- `bounded_authority` is explicitly a private commercial application: it must never be published
+  to public Hex, is not currently distributed through private Hex, and any future private-Hex
+  release requires both a paid subscription and fresh owner approval for that exact release.
+
 ### Fixed — v1 selector contract reconciliation
 
 - The protocol and both shipped selector schemas now describe the released `all` behavior: `all`
