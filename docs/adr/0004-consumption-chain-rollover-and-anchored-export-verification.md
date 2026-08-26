@@ -19,6 +19,7 @@ alone cannot prove that the caller retrieved the intended object generation.
 
 ### Consumption rows
 
+<!-- facts:archive-framing -->
 One row is the closed JCS object:
 
 ```json

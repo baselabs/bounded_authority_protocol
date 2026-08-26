@@ -140,6 +140,7 @@ rejecting non-zero unused pad bits and alternate encodings (`REQ1-B64-canonical`
 The protected headers bind the suite `BAP1-Ed25519-SHA256` via their `alg` and `typ` values.
 Member order is insignificant and the member sets are exact:
 
+<!-- facts:header-members -->
 | Compact value | Members |
 |---|---|
 | grant | `alg: "EdDSA"`, `typ: "ba+cap"`, `kid: key_identifier` |
@@ -168,6 +169,7 @@ uses the same construction over the caller's raw 32-byte public key; `kid` is ex
 All claim objects are closed (`REQ1-CLAIM-closed-set`). Names and string values are case-sensitive
 (`REQ1-CLAIM-case-sensitive`).
 
+<!-- facts:grant-claims -->
 | Grant claim | Type |
 |---|---|
 | `v` | integer, exactly `1` |
@@ -181,6 +183,7 @@ An operation is exactly `{name: string, selectors: selector_array}`. Names are u
 grant and contain 1–128 printable ASCII bytes. The ordered selector array has 1–64 members
 (`REQ1-CLAIM-operation-shape`).
 
+<!-- facts:proof-claims -->
 | Proof claim | Type |
 |---|---|
 | `v` | integer, exactly `1` |
@@ -208,6 +211,7 @@ Selectors are closed ordered objects with exactly one of three recognized member
 `{kind}`, `{kind,path,value}`, or `{kind,path,values}`
 (`REQ1-SELECTOR-closed-set`). The `kind` selects how that recognized set is interpreted:
 
+<!-- facts:selector-kinds -->
 | Kind | Recognized members and interpretation |
 |---|---|
 | all | Any recognized member set; `path`, `value`, and `values` are inert when present |
@@ -251,6 +255,7 @@ normalizer performs no DNS, IDNA, or network work (`REQ1-URI-no-network`).
 
 ## Signing and digest inputs
 
+<!-- facts:digest-constructions -->
 Grant and proof compact values use the exact RFC 7515 signing input:
 
 ```text
@@ -285,6 +290,7 @@ projects the tagged JSON algebra to the following closed JSON form before JCS:
 | `{:array, values}` | `["array", [typed(value), ...]]` |
 | `{:object, members}` | `["object", {member: typed(value), ...}]` |
 
+<!-- facts:domain-separators -->
 JCS orders projected object members. The explicit scalar tags preserve the protocol's semantic
 distinction between an integer and an integral float even though RFC 8785 emits both numeric
 payloads with the same JSON number bytes. `cast_arguments` may be any tagged JSON value.
@@ -321,6 +327,7 @@ verify_anchored_export(ArchivedObject.t(), HistoricalKeyChain.t(),
   ExpectedAnchoredExport.t())
 ```
 
+<!-- facts:error-shape -->
 Every function returns `{:ok, value}` or exactly `{:error, :invalid}` (`REQ1-VERIFY-return-shape`).
 Only bounds accept a map; all other structured inputs are exact named structs and each public entry
 revalidates every field (`REQ1-VERIFY-revalidate`). `assemble_compact/3` applies the caller's
@@ -383,6 +390,7 @@ containers, or nonces, and neither is accepted as credentials. `GrantFacts` carr
 
 ## Hard maxima
 
+<!-- facts:bounds -->
 | Resource | Maximum |
 |---|---:|
 | compact input bytes | 65,536 |

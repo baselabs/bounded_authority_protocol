@@ -36,6 +36,7 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 
 ## `typ` values
 
+<!-- facts:typ-values -->
 | Value | Status | Purpose |
 |---|---|---|
 | `ba+cap` | active | Capability grant (compact JWS) |
