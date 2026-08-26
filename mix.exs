@@ -213,6 +213,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "cmd ./bounded_authority_conformance --corpus priv/conformance/v1/corpus"
       ],
       "corpus.digests": ["run --no-start scripts/regen_corpus_digests.exs"],
+      "corpus.sync": ["run --no-start scripts/check_corpus_sync.exs"],
       "spec.facts": ["run --no-start scripts/check_spec_facts.exs"],
       "spec.examples": ["run --no-start spec/tools/build_examples.exs"],
       "spec.render": ["run --no-start spec/tools/render_derived.exs"],
@@ -236,6 +237,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "architecture",
+        "corpus.sync",
         "corpus.digests",
         "spec.facts",
         "spec.examples",
