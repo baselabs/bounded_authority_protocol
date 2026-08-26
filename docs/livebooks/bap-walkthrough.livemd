@@ -5,7 +5,7 @@ livebook:{"persist_outputs":true}
 # Bounded Authority Protocol — end-to-end walkthrough
 
 ```elixir
-Mix.install([{:bounded_authority_protocol, "~> 0.1"}])
+Mix.install([{:bounded_authority_protocol, "~> 0.2"}])
 ```
 
 ## What this notebook covers

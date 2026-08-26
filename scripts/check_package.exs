@@ -246,7 +246,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       "licenses" => ["Apache-2.0"],
       "name" => "bounded_authority_protocol",
       "requirements" => [],
-      "version" => "0.1.2"
+      "version" => Mix.Project.config() |> Keyword.fetch!(:version)
     }
 
     Enum.each(expected, fn {key, expected_value} ->
@@ -706,6 +706,23 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     case System.cmd(command, arguments, options) do
       {_output, 0} -> :ok
       {_output, status} -> fail!("#{command} exited with status #{status}")
+    end
+  end
+
+  # The package version derived from mix.exs (works under `elixir script` invocation where
+  # Mix.Project is not alive — the same derivation the supply-chain workflow uses).
+  defp mix_exs_version do
+    root = Path.expand("..", __DIR__)
+
+    case File.read(Path.join(root, "mix.exs")) do
+      {:ok, source} ->
+        case Regex.run(~r/@version\s+"([^"]+)"/, source) do
+          [_, version] -> version
+          _ -> raise "cannot derive the package version from mix.exs"
+        end
+
+      _ ->
+        raise "cannot read mix.exs to derive the package version"
     end
   end
 

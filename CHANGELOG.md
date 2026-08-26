@@ -4,6 +4,19 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-26
+
+### Changed — release 0.2.0
+
+The spec-decoupling program's public surface, released: the specification
+`spec/bap-v1.md` is the single normative authority (ships in the package);
+`docs/protocol-v1.md` is its generated view; the spec-facts drift gates, the
+corpus tooling (six-pin digest rotation, revision sidecar, re-derivability
+generator, vendored-snapshot sync), the formal model (ProVerif, P1–P4 proven),
+the IANA templates, the guides set, and the interoperability report land
+together. Zero wire, bound, verdict, or SDK behavior change — every entry
+below is the 0.2.0 content.
+
 ### Fixed — program closeout cross-vendor review findings
 
 The closeout review (two peer families over the full program range) returned two blocking and
