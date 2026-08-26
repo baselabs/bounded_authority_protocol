@@ -113,6 +113,7 @@ what makes parallel majors safe — an artifact of any other major or suite fail
 [@RFC8032]: Edwards-Curve Digital Signature Algorithm (EdDSA)
 [@RFC8037]: Algorithm Identifiers for Ed25519 in JOSE
 [@RFC3986]: Uniform Resource Identifier (URI): Generic Syntax
+[@RFC6838]: Media Type Specifications and Registration Procedures
 [@RFC9449]: OAuth 2.0 Demonstrating Proof-of-Possession (DPoP)
 
 These references supply generic encodings. The closed fields, values, digest prefixes, and
@@ -562,8 +563,27 @@ The `typ` registry of this profile:
 | `ba+suite-attestation` | reserved | Cross-suite content-covering countersignature |
 
 The closed v1 profile rejects the reserved values today; their activation is a successor
-contract-major. IANA registration templates for these values and the profile's claim names are
-carried in the IANA considerations (added by a companion landing).
+contract-major.
+
+## 20. IANA considerations
+
+IANA is asked to register the following claim names in the JSON Web Token Claims Registry
+[@RFC7519] (Specification Required): `ba_inv` (invocation UUID), `ba_op` (operation name), and
+`ba_req` (request digest). The names `ba_dlg`, `ba_offline`, and `ba_sut` are reserved by this
+profile and are NOT registered; no implementation or deployment may use them for anything else
+before their activating contract-major.
+
+IANA is asked to register the media types `application/ba-cap+jwt`,
+`application/ba-chain-anchor+jwt`, and `application/ba-key-transition+jwt` (RFC 6838 [@RFC6838]
+field template; LIMITED USE). The names `application/ba-cap-delegated+jwt` and
+`application/ba-suite-attestation+jwt` are reserved for a successor contract-major and are NOT
+registered. The media-type namespace is distinct from the wire `typ` header values, which are
+unchanged by this section.
+
+The ready-to-file registration templates, their machine-readable sources, and the exact
+reconciliation with the profile's registries document are published with the specification's
+companion artifacts; the filing itself follows the profile's external submission
+preconditions.
 
 # Appendix B. CDDL representation (informative) {#cddl}
 
