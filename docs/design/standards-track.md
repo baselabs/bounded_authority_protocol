@@ -229,8 +229,11 @@ credibility step and the policy is what makes single-maintainer tolerable to ado
   from the twelve-month deprecation minimum above (§ The evolution contract), yet still a published,
   deployment-decided sunset, not a flag-day — never as a silent verdict change.
 
-The governance policy is also published as a standalone normative project document at
-[docs/governance.md](../governance.md); this charter section remains its authoritative source.
+The governance policy's single normative home is [docs/governance.md](../governance.md);
+this charter cites it and carries no independent policy statements (the single-home
+discipline: a policy sentence lives in exactly one normative document, and every other
+document points at it — including this one, for the governance paragraph that previously
+duplicated content here).
 
 ## Venue strategy
 
