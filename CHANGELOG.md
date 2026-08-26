@@ -4,6 +4,41 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — the v1 specification `spec/bap-v1.md`; authority swap certified with an EMPTY delta
+
+- **`spec/bap-v1.md`** (kramdown-rfc conventions, `[@RFC2119]`-style citations, no IETF
+  stream/IPR title-block fields — in-repo readiness, zero submission intent): the complete
+  normative v1 profile in one language-neutral document — conformance language and the
+  closed-rejection invariant, suite identity, normative references without repo paths, the
+  abstract tagged data model and typed projection, JSON decoding and JCS serialization,
+  base64url, wire objects (headers, claims, selectors, URI normalization), signing and digest
+  inputs with the `BAP1-*` domain separators, the consumption chain / boundary anchors /
+  authenticated key transitions / anchored export framing folded NORMATIVE from ADR 0004, the
+  public verification contract as algorithm prose (the Elixir bindings and frozen façade moved
+  to informative Appendix C), hard maxima, the untrusted key locator, and the `typ` registry.
+  Informative appendices: B the CDDL summary, C the reference mappings and tagged-algebra
+  binding table, D the requirement-inventory pointer.
+- **The authority swap is certified**: the spec-facts extractor now reads `spec/bap-v1.md`
+  (all ten anchors in the one normative document) and `extract(new spec) ==
+  spec/facts/baseline-v1.json` byte-for-byte — the frozen pre-swap extraction, EMPTY delta.
+  `docs/protocol-v1.md` keeps its anchors but is no longer read (the derived view lands with
+  its own landing); ADR 0004 and registries.md remain extended records.
+- **Framing oracle** (new spec-facts rule): a corpus archive-bearing valid case's real bytes
+  are re-parsed against the EXTRACTED framing facts (archive prefix, UINT32_BE nonzero-length
+  frames, exact EOF) — a spec whose framing prose drifts from accepted bytes reds even when
+  the delta gate happens to pass. Proven red twice during construction (wrong prefix form,
+  wrong chunk decoding) and green on the shipped corpus.
+- **`spec/cddl/bap-v1.cddl`** (informative): the closed wire objects in CDDL, honest about
+  CDDL-inexpressible invariants (duplicate names, canonical bytes, tagged integer/float,
+  binary framing). **CI coherence job** (`scripts/check_cddl_coherence.rb`, pinned cddl
+  validator 0.12.14, executed locally at authoring): every valid corpus case's CDDL-covered
+  artifact validates (grant/proof/anchor/transition payloads, consumption rows), and four
+  PINNED invalid exemplars (regexp/size/closed-set violations) reject — the pinned list cannot
+  go vacuous. A pinned-and-checksummed kramdown-rfc 1.7.40 render job renders the spec to
+  xml2rfc v3 (verified locally: renders clean).
+- The spec-facts battery entries re-anchored at the spec (a digit drift or deleted anchor in
+  `spec/bap-v1.md` reds). `mix spec.facts` green against the NEW authority in ~0.1s.
+
 ### Added — spec-facts mutation battery (no wire, bound, or verdict change)
 
 - **`scripts/check_spec_facts_mutations.exs` + `mix spec_facts.mutations` (wired into

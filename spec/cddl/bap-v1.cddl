@@ -1,0 +1,108 @@
+; Bounded Authority Protocol v1 — CDDL representation (INFORMATIVE)
+;
+; This CDDL summarizes the closed wire objects of the v1 profile for implementer readability.
+; It is NOT a machine-checked authority: the structural authority is the set of JSON Schemas
+; and the conformance corpus. CDDL cannot express several closed-profile invariants —
+; duplicate-name rejection at the byte level, exact canonical encodings, raw numeric-lexeme
+; bounds, the tagged integer/float distinction, and the exact-frame archive layout (binary,
+; not JSON). Where this file and the corpus disagree, the corpus is right.
+
+bap-grant-header = {
+  alg: "EdDSA",
+  typ: "ba+cap",
+  kid: tstr .regexp "[A-Za-z0-9._~-]{1,128}"
+}
+
+bap-proof-header = {
+  alg: "EdDSA",
+  typ: "dpop+jwt",
+  jwk: bap-okp-jwk
+}
+
+bap-okp-jwk = {
+  crv: "Ed25519",
+  kty: "OKP",
+  x: tstr .regexp "[A-Za-z0-9_-]{43}"
+}
+
+bap-grant-payload = {
+  v: 1,
+  iss: bap-identifier,
+  jti: bap-identifier,
+  aud: bap-audience,
+  iat: bap-numericdate,
+  nbf: bap-numericdate,
+  exp: bap-numericdate,
+  cnf: { jkt: bap-base64url-32 },
+  operations: [1*64 bap-operation]
+}
+
+bap-operation = {
+  name: tstr .regexp "[\\x20-\\x7E]{1,128}",
+  selectors: [1*64 bap-selector]
+}
+
+bap-selector = bap-selector-all / bap-selector-equals / bap-selector-one-of
+
+; `all` accepts any of the three recognized member sets (inert extras allowed); CDDL expresses
+; the closed kinds, not the exact member-set rule — the corpus is the oracle.
+bap-selector-all = { kind: "all" } / { kind: "all", path: bap-path, value: any } / { kind: "all", path: bap-path, values: [any] }
+bap-selector-equals = { kind: "equals", path: bap-path, value: any }
+bap-selector-one-of = { kind: "one_of", path: bap-path, values: [1*256 any] }
+
+bap-path = [1*32 tstr]
+
+bap-proof-payload = {
+  v: 1,
+  jti: bap-identifier,
+  htm: tstr .regexp "[\\x21-\\x7E]{1,32}",
+  htu: bap-uri,
+  iat: bap-numericdate,
+  ? nonce: tstr .size (1..512),
+  ba_inv: tstr .regexp "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+  ba_op: tstr .regexp "[\\x20-\\x7E]{1,128}",
+  ath: bap-base64url-32,
+  ba_req: bap-base64url-32
+}
+
+bap-consumption-row = {
+  chain_id: bap-identifier,
+  commitment: bap-base64url-32,
+  previous: bap-base64url-32,
+  sequence: uint,
+  v: 1
+}
+
+bap-boundary-anchor-payload = {
+  v: 1,
+  anchor_id: bap-identifier,
+  anchored_at: int,
+  chain_id: bap-identifier,
+  sequence: uint,
+  chain_hash: bap-base64url-32,
+  key_fingerprint: bap-base64url-32
+}
+
+bap-key-transition-payload = {
+  v: 1,
+  transition_id: bap-identifier,
+  chain_id: bap-identifier,
+  effective_at: int,
+  from_key_fingerprint: bap-base64url-32,
+  to_key_id: tstr .regexp "[A-Za-z0-9._~-]{1,128}",
+  to_key_fingerprint: bap-base64url-32
+}
+
+; The archive itself is a binary framing (prefix + UINT32_BE length-framed members + exact
+; EOF), not a JSON object; its JSON members are the header above and the compact JWS values.
+bap-archive-header = {
+  v: 1
+}
+
+bap-identifier = tstr .size (1..512)
+bap-audience = bap-identifier / [1*64 bap-identifier]
+; the ±9007199254740991 magnitude bound is a decoder limit, not CDDL-expressible
+bap-numericdate = int
+; the 8,192-byte ceiling is a decoder limit (bounds table), not repeated here
+bap-uri = tstr .regexp "^https://.*"
+bap-base64url-32 = tstr .regexp "[A-Za-z0-9_-]{43}"

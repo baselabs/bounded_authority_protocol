@@ -1,11 +1,9 @@
 defmodule BoundedAuthorityProtocol.ExtractFacts do
   # Spec-facts extractor (spec-decoupling L2). Reads the `<!-- facts:key -->` anchor-annotated
-  # normative blocks of the CURRENT authority and emits a deterministic, canonical-JSON facts
-  # map. At the pre-swap landing the authority is docs/protocol-v1.md + ADR 0004 byte
-  # definitions + docs/design/registries.md (typ values); after the authority swap the same
-  # extractor runs unchanged against spec/bap-v1.md (the anchors are toolchain-independent
-  # source text) and the L3 certification is extract(new) == spec/facts/baseline-v1.json with
-  # an empty delta.
+  # normative blocks of the CURRENT authority (spec/bap-v1.md since the authority swap; the
+  # pre-swap extraction from docs/protocol-v1.md + ADR 0004 + registries.md is preserved
+  # byte-for-byte in spec/facts/baseline-v1.json) and emits a deterministic, canonical-JSON
+  # facts map. The swap certification was extract(spec) == baseline with an empty delta.
   #
   # Region rule: an anchor's region runs from the anchor line to the next `#` heading or the
   # next facts anchor, whichever comes first. The anchor set is closed — exactly the ten keys
@@ -17,10 +15,11 @@ defmodule BoundedAuthorityProtocol.ExtractFacts do
 
   @root Path.expand("../..", __DIR__)
 
+  # The single normative authority since the spec swap: every facts anchor lives in the spec.
+  # (docs/protocol-v1.md becomes a generated derived view; ADR 0004 and registries.md retain
+  # their content as extended records — none is extracted.)
   @authority_files [
-    "docs/protocol-v1.md",
-    "docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md",
-    "docs/design/registries.md"
+    "spec/bap-v1.md"
   ]
 
   @anchor_keys [

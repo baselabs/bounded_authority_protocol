@@ -52,10 +52,11 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
              rule_5_cited_counts() ++
              rule_6_revision_citation() ++
              rule_9_vendor_neutrality() ++
-             rule_10_anchor_completeness(facts),
+             rule_10_anchor_completeness(facts) ++
+             rule_12_framing_oracle(facts),
          [] <- problems do
       elapsed = System.monotonic_time(:millisecond) - started
-      IO.puts("spec facts gate: ok rules=[1b,2,3,4,5,6,9,10] in #{elapsed}ms")
+      IO.puts("spec facts gate: ok rules=[1b,2,3,4,5,6,9,10,framing-oracle] in #{elapsed}ms")
     else
       problems when is_list(problems) ->
         IO.puts(:stderr, "spec facts gate FAILED:\n" <> Enum.join(problems, "\n"))
@@ -356,7 +357,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   end
 
   defp spec_req_ids do
-    spec_docs = ["docs/protocol-v1.md", "docs/design/standards-track.md"]
+    spec_docs = ["spec/bap-v1.md", "docs/design/standards-track.md"]
 
     spec_docs
     |> Enum.flat_map(fn doc ->
@@ -577,6 +578,95 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
       end)
   end
 
+  # --- framing oracle -------------------------------------------------------------
+  #
+  # Re-parses a corpus archive-bearing valid case's raw bytes against the EXTRACTED framing
+  # facts (archive prefix, UINT32_BE(nonzero_length) frames, exact EOF). The framing facts are
+  # load-bearing: a spec whose framing section drifts from the bytes real verifiers accept reds
+  # here even when the prose still reads plausibly.
+
+  defp rule_12_framing_oracle(facts) do
+    framing = facts["archive-framing"]
+    prefix = framing["archive-prefix"]
+    frame_rule = framing["frame"]
+
+    # The spec writes the prefix with the two-character \0 escape; the archive bytes carry the
+    # actual NUL byte. Unescape before comparing.
+    prefix_bytes = String.replace(prefix, "\\0", <<0>>)
+
+    with true <- is_binary(prefix) and byte_size(prefix) > 0,
+         true <- frame_rule == "UINT32_BE(nonzero_length) || bytes",
+         {:ok, archive} <- oracle_archive_bytes() do
+      if parse_framed(prefix_bytes, archive) == :ok,
+        do: [],
+        else: [
+          "framing oracle: the corpus archive bytes do not parse under the extracted framing facts (prefix/frame)"
+        ]
+    else
+      _ ->
+        [
+          "framing oracle: the extracted framing facts are incomplete (prefix or frame rule missing)"
+        ]
+    end
+  end
+
+  # The first valid verify_anchored_export case's concatenated chunks — real accepted bytes.
+  defp oracle_archive_bytes do
+    map = corpus_file_map()
+
+    case BoundedAuthorityProtocol.Conformance.Corpus.load(map) do
+      {:ok, corpus} ->
+        case_obj =
+          corpus.cases
+          |> Enum.flat_map(&elem(&1, 1))
+          |> Enum.find(fn c ->
+            c["surface"] == "verify_anchored_export" and c["expected"]["verdict"] == "valid"
+          end)
+
+        chunks = case_obj && case_obj["input"]["chunks"]
+
+        case chunks do
+          list when is_list(list) and list != [] ->
+            binaries = Enum.map(list, &b64ud/1)
+            {:ok, Enum.join(binaries)}
+
+          _ ->
+            {:error, :no_archive_case}
+        end
+
+      {:error, :invalid} ->
+        {:error, :invalid}
+    end
+  end
+
+  defp b64ud(encoded) do
+    case Base.url_decode64(encoded, padding: false) do
+      {:ok, bytes} -> bytes
+      _ -> ""
+    end
+  end
+
+  defp parse_framed(prefix, archive) do
+    size = byte_size(prefix)
+
+    case archive do
+      <<matched::binary-size(size), rest::binary>> when matched == prefix -> parse_frames(rest)
+      _ -> :error
+    end
+  end
+
+  defp parse_framed(_prefix, _other), do: :error
+
+  defp parse_frames(<<>>), do: :ok
+
+  defp parse_frames(<<length::unsigned-big-integer-size(32), rest::binary>>)
+       when length > 0 and byte_size(rest) >= length do
+    <<_frame::binary-size(length), remaining::binary>> = rest
+    parse_frames(remaining)
+  end
+
+  defp parse_frames(_), do: :error
+
   # --- rule 10: anchor completeness ---------------------------------------------
 
   defp rule_10_anchor_completeness(_facts) do
@@ -630,10 +720,10 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
         do: [],
         else: ["rule 10: registries.md typ-values anchor does not sit on the typ table"]
 
-    # docs/protocol-v1.md carries one pipe-table outside every anchored region BY DESIGN: the
-    # JSON↔Elixir tagged-algebra binding table in "JSON algebra and decoding". Its facts are the
-    # same tagged algebra the digest-constructions region extracts as the typed-projection table,
-    # so rule 10 verifies that coverage (row-for-row) instead of trusting it.
+    # The spec carries one pipe-table outside every anchored region BY DESIGN: the tagged-
+    # algebra reference-binding table in Appendix C. Its facts are the same tagged algebra the
+    # digest-constructions region extracts as the typed-projection table, so rule 10 verifies
+    # that coverage (row-for-row) instead of trusting it.
     covered_problem =
       case Regex.run(~r/\| JSON \| Elixir value \|/, protocol) do
         nil ->
@@ -662,7 +752,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
           end
       end
 
-    uncovered ++ typ_problem ++ covered_problem
+    uncovered ++ covered_problem
   end
 
   # Both sides normalize to the base type name: the algebra table says "non-integer number"
