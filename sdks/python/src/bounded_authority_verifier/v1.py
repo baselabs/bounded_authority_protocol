@@ -1557,7 +1557,7 @@ def _jwk_to_tagged(jwk: OkpPublic) -> Tagged:
     return JObject(members)
 
 
-# 11. assemble_compact (REQ1-VERIFY-no-signer-callback; public /2 contract, spec/bap-v1.md,319).
+# 11. assemble_compact (REQ1-VERIFY-no-signer-callback; public /2 contract, spec/bap-v1.md § Public verification contract).
 # Mirrors runtime.ex:147-155 assemble_compact: assemble via the low-level assembler, then
 # validate_assembled_compact (runtime.ex:754-780) re-parses the composed compact per kind. The
 # signing-input gates (kind↔typ, segment bounds, base64url payload, compact_bytes) come from

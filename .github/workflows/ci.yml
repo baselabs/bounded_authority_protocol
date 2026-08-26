@@ -125,8 +125,11 @@ jobs:
         with:
           ruby-version: "3.3"
 
-      - name: Install pinned cddl validator
-        run: gem install cddl -v 0.12.14
+      - name: Install pinned cddl validator 0.12.14 (version + checksum)
+        run: |
+          curl -fsSLo /tmp/cddl.gem https://rubygems.org/downloads/cddl-0.12.14.gem
+          echo "$(cat scripts/cddl-gem.sha256)  /tmp/cddl.gem" | sha256sum -c -
+          gem install --local /tmp/cddl.gem
 
       - name: Validate the CDDL source itself
         run: |
@@ -143,7 +146,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up OCaml
-        uses: ocaml/setup-ocaml@v3
+        uses: ocaml/setup-ocaml@f92e0606b7ae4873dd1238465ea4bf6f8e40d85c # v3
 
       - name: Install pinned ProVerif 2.05
         run: opam install proverif.2.05 -y

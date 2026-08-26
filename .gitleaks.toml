@@ -1,16 +1,41 @@
-# gitleaks allowlist — scoped, auditable false positives only.
+# gitleaks config — default rules EXTENDED with scoped, auditable allowlists.
 #
-# The specification's generated Appendix A (and its derived view) embeds the
-# PUBLISHED conformance-corpus compact JWS test vectors: public-key-only
-# fixtures, verifiable against the certified corpus. gitleaks' jwt rule flags
-# every compact JWS; these entries allow exactly that shape in exactly the two
-# generated documents and nothing else.
-title = "bounded_authority_protocol gitleaks config"
+# This repository's fixtures are PUBLIC-KEY-ONLY by construction (critical rule 6,
+# enforced by the architecture gate and the public-surface privacy test): the
+# conformance corpus, the vector manifests, the vendored SDK snapshots, and the
+# two generated specification documents carry published Ed25519 public keys,
+# thumbprints, and compact JWS test vectors that gitleaks' jwt/generic-api-key
+# rules flag. These allowlists cover exactly those fixture-bearing surfaces;
+# every other default rule fires everywhere else.
+[extend]
+useDefault = true
 
 [[allowlists]]
-description = "Published conformance-corpus compact JWS test vectors (public keys only)"
+description = "Published conformance-corpus compact JWS test vectors (public keys only) — generated spec documents"
 paths = [
   '''spec/bap-v1\.md''',
   '''docs/protocol-v1\.md''',
 ]
 regexes = ['''eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+''']
+
+[[allowlists]]
+description = "Public-key-only conformance fixtures: corpus, vectors, vendored SDK snapshots, independent runners — public material by construction (critical rule 6)"
+paths = [
+  '''priv/conformance/.*''',
+  '''sdks/(rust|go)/conformance/corpus/.*''',
+  '''sdks/(typescript|python)/conformance/.*''',
+  '''conformance/.*\.mjs''',
+  '''spec/facts/.*''',
+]
+
+[[allowlists]]
+description = "SDK test sources embedding the same public fixtures (permissiveness batteries, facade tests)"
+paths = [
+  '''sdks/.*/test.*''',
+  '''sdks/go/.*_test\.go''',
+  '''sdks/rust/src/ed25519\.rs''',
+]
+
+[[allowlists]]
+description = "Historical forge-era review transcripts under .forge/: immutable committed history quoting the same public fixtures and canonical fake PATs (ghp_zyxwv...) used by gate self-test documentation — no real credential material; frozen history, never re-staged"
+paths = ['''\.forge/.*''']

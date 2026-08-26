@@ -106,6 +106,7 @@ function loadCorpus(): { index: Record<string, unknown>; cases: CorpusCase[]; ra
       const sidecar = JSON.parse(bytes.toString("utf8"));
       const keys = Object.keys(sidecar).sort().join(",");
       if (keys !== "format,generated_from,revision") abort("revision.json: closed member set");
+      if (entry.cases !== 0) abort("revision.json: case-free declaration");
       if (sidecar.format !== "bounded-authority-protocol-v1-conformance-corpus-revision") {
         abort("revision.json: format");
       }
