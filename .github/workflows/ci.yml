@@ -134,3 +134,19 @@ jobs:
 
       - name: Corpus coherence (valid cases parse; invalid exemplars reject)
         run: ruby scripts/check_cddl_coherence.rb
+
+  formal-analysis:
+    name: Pinned ProVerif re-run + ledger checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
+
+      - name: Install pinned ProVerif 2.05
+        run: opam install proverif.2.05 -y
+
+      - name: Run the formal harness
+        run: opam exec -- scripts/run_formal.sh
