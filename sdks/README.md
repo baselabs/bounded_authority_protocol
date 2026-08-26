@@ -24,7 +24,7 @@ against the same published corpus.
   [deployment guide](../docs/deployment/rust-sdk.md) (AWS Lambda `provided.al2023` + PostgreSQL `plrust`
   posture).
 
-All three are **pure verification libraries** (no I/O, clock, RNG, or network in the verify path). They return
+All four are **pure verification libraries** (no I/O, clock, RNG, or network in the verify path). They return
 value-bearing redacted facts or `Invalid` — never an authorization decision. See
 [ADR 0014](../docs/adr/0014-cross-language-verifier-sdks.md) for the packaging, support-surface, and
 derivation-hygiene decisions.

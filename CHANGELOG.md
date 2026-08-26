@@ -4,6 +4,20 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Changed — housekeeping: SDK README, supply-chain derivation, dependabot, deployment guides
+
+- **`sdks/README.md`**: the Go SDK entry and the four-SDK count (the stale "all three" is
+  gone); per-SDK deployment-guide links.
+- **`supply-chain.yml`**: the artifact filename is DERIVED from `mix.exs` `@version` at run
+  time — the hardcoded `0.1.0` filename (a quiet-mislabel class the moment the version moves)
+  is gone from the workflow; actionlint clean.
+- **`dependabot.yml`**: pip (sdks/python) and gomod (sdks/go) ecosystems join mix,
+  github-actions, npm, and cargo — all four SDKs now covered.
+- **Deployment guides**: `docs/deployment/{typescript,python,go}-sdk.md` join the existing
+  Rust guide — runtime posture, deployment targets, supply-chain posture, and the
+  verification-is-not-authority boundary per SDK; the Rust guide's spec pointer repointed at
+  the normative authority.
+
 ### Added — the Livebook walkthrough (no wire change)
 
 - **`docs/livebooks/bap-walkthrough.livemd`**: the end-to-end produce → assemble → verify →
