@@ -11,6 +11,7 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
                        "scripts/check_chain_archive_performance.exs",
                        "scripts/check_verification_performance.exs",
                        "scripts/check_spec_facts.exs",
+                       "spec/tools/build_examples.exs",
                        "test/architecture/purity_test.exs",
                        "test/spec_facts_test.exs"
                      ])

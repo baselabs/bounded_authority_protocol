@@ -4,6 +4,23 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — generated worked examples (spec Appendix A; no wire change)
+
+- **`spec/tools/build_examples.exs` + `mix spec.examples` (quality leg)**: Appendix A of the
+  specification is now GENERATED from the conformance corpus — thirteen representative cases by
+  id (a valid grant/proof/envelope/chain/anchored-export per surface family, plus rejected
+  exemplars across the invalid-class families), each embedding the exact compact bytes, the
+  public key material, and the single expected outcome (accepted-with-redacted-facts or the one
+  closed error), labeled with its corpus case id. Corpus PUBLIC keys only — no private material
+  can appear (the corpus is public-only by construction and the tool copies verbatim).
+- The regeneration gate reds on a hand-edited example byte (mutation leg executed: flipped
+  compact byte caught, restored) and on a deleted/renamed cited case id (mutation leg executed:
+  the rebuild raises naming the missing id, restored) — the appendix cannot drift from the
+  corpus and cannot go vacuous.
+- The write path is idempotent (byte-identical across consecutive regenerations); the
+  empty-delta certification is untouched (the appendix carries no facts anchors and no
+  capitalized keywords).
+
 ### Added — Security and Privacy Considerations + spec-facts rule 11 (no wire change)
 
 - **Spec section 21 (Security considerations, RFC 3552 grade)**: assets and goals (integrity,
