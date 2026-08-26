@@ -87,3 +87,50 @@ jobs:
 
       - name: Run complete quality gate
         run: mix quality
+
+  spec-render:
+    name: Spec renders under pinned kramdown-rfc
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@1288f1ab957809bedf79f08200f446bf2f7f9c1d # v1
+        with:
+          ruby-version: "3.3"
+
+      # Pin by version AND gem checksum (the A2 amendment: Ruby gem pinned by version+checksum).
+      - name: Install pinned kramdown-rfc 1.7.40
+        run: |
+          curl -fsSLo /tmp/kramdown-rfc.gem https://rubygems.org/downloads/kramdown-rfc-1.7.40.gem
+          echo "6eac9c860c823a1d47c13c47cff04f91f3c6e02f699f9a64800b4bbf15e6989f  /tmp/kramdown-rfc.gem" | sha256sum -c -
+          gem install --local /tmp/kramdown-rfc.gem
+
+      - name: Render spec/bap-v1.md through kramdown-rfc
+        run: kramdown-rfc spec/bap-v1.md > /tmp/bap-v1.xml
+
+      - name: Rendered output is a nonempty xml2rfc v3 document
+        run: grep -q '<rfc ' /tmp/bap-v1.xml
+
+  cddl-coherence:
+    name: Informative CDDL stays coherent with the corpus
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@1288f1ab957809bedf79f08200f446bf2f7f9c1d # v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install pinned cddl validator
+        run: gem install cddl -v 0.12.14
+
+      - name: Validate the CDDL source itself
+        run: |
+          ruby -r cddl -e 'CDDL::Parser.new(File.read("spec/cddl/bap-v1.cddl")); puts "cddl parses"'
+
+      - name: Corpus coherence (valid cases parse; invalid exemplars reject)
+        run: ruby scripts/check_cddl_coherence.rb

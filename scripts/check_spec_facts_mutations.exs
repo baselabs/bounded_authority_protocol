@@ -25,10 +25,10 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
 
   @mutations [
     %{
-      # A digit changed in the authority's bounds table diverges the extraction from the frozen
-      # baseline (rule 1b). The owning gate is mix spec.facts.
+      # A digit changed in the authority's bounds table (the spec since the authority swap)
+      # diverges the extraction from the frozen baseline (rule 1b).
       name: "spec-bounds-digit",
-      path: "docs/protocol-v1.md",
+      path: "spec/bap-v1.md",
       from: "| nesting depth | 32 |",
       to: "| nesting depth | 33 |",
       command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
@@ -71,7 +71,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
     %{
       # A deleted anchor breaks the closed anchor set (extraction fails, anchor named).
       name: "deleted-anchor",
-      path: "docs/protocol-v1.md",
+      path: "spec/bap-v1.md",
       from: "<!-- facts:bounds -->\n",
       to: "\n",
       command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
