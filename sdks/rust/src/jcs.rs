@@ -5,7 +5,7 @@
 //! the v1 profile is computed over JCS bytes, so a single byte of divergence
 //! here silently breaks (or silently accepts) a credential. The encoder is
 //! derived first-hand from RFC 8785 (§3.2.2.2 strings, §3.2.2.3 numbers) +
-//! ECMA-262 §6.1.6.1.20 `Number::toString` + `docs/protocol-v1.md` § JCS, NOT
+//! ECMA-262 §6.1.6.1.20 `Number::toString` + `spec/bap-v1.md` § JCS, NOT
 //! from any sibling-SDK or Elixir source (ADR 0014 D5).
 //!
 //! Rules enforced:

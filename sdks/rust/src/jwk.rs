@@ -1,7 +1,7 @@
 //! JWK encode/decode + the RFC 7638 thumbprint family for the fixed
 //! Ed25519/OKP profile.
 //!
-//! Derived first-hand from `docs/protocol-v1.md` § Protected headers
+//! Derived first-hand from `spec/bap-v1.md` § Protected headers
 //! (lines 152–163), RFC 7638 §3.2 (canonical hash), and RFC 8037
 //! (EdDSA/OKP in JOSE) — NOT from any sibling-SDK or Elixir source
 //! (ADR 0014 D5).

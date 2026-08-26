@@ -1,6 +1,6 @@
 package verifier
 
-// Caller-supplied context structs (docs/protocol-v1.md § Public verification
+// Caller-supplied context structs (spec/bap-v1.md § Public verification
 // contract). Every public entry revalidates every field
 // (REQ1-VERIFY-revalidate); structs are exact — no extra members exist.
 

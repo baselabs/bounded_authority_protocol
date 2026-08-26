@@ -122,7 +122,7 @@ extensions track lives under `docs/extensions/`.
 
 ## Documentation
 
-- `docs/protocol-v1.md` — the normative v1 wire profile.
+- `spec/bap-v1.md` — the normative v1 wire profile (docs/protocol-v1.md is its generated view).
 - `docs/design/protocol-charter.md` — what the verifier does and the verification chain.
 - `docs/design/conformance-contract.md` — how conformance is proven.
 - `docs/design/standards-track.md` — evolution, suite succession, governance, and venue strategy.

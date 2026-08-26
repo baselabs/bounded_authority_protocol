@@ -12,13 +12,13 @@ retrofit after.
 
 This document is the standing authority for standards-track decisions. The
 [protocol charter](protocol-charter.md) defines what the verifier does; the
-[normative profile](../protocol-v1.md) freezes the current contract-major's bytes; the
+`normative profile` freezes the current contract-major's bytes; the
 [conformance contract](conformance-contract.md) defines how conformance is proven. This charter
 defines how all three survive time.
 
 Normative keywords in this charter (MUST, MUST NOT, MAY) carry the meanings defined in BCP 14
 [RFC2119] [RFC8174] when, and only when, they appear in all capitals, as carried by the
-[normative profile](../protocol-v1.md). Evolution-contract requirements use the stable identifier
+`normative profile`. Evolution-contract requirements use the stable identifier
 scheme of [ADR 0007](../adr/0007-normative-requirement-identifiers.md) under the `REQ1-EVO-*`
 prefix and are traced to conformance cells in the requirement map
 [requirement map](requirement-map.md).

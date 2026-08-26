@@ -16,7 +16,7 @@ Naming scheme: `BAP<contract-major>-<signature>-<digest>`.
 
 | Suite | Status | Definition |
 |---|---|---|
-| `BAP1-Ed25519-SHA256` | active | EdDSA/Ed25519, SHA-256, RFC 8785 JCS, `BAP1-*` domain separators, fixed 32-byte keys / 64-byte signatures — the complete current [normative profile](../protocol-v1.md) |
+| `BAP1-Ed25519-SHA256` | active | EdDSA/Ed25519, SHA-256, RFC 8785 JCS, `BAP1-*` domain separators, fixed 32-byte keys / 64-byte signatures — the complete current `normative profile` |
 | ML-DSA (FIPS 204) successor | anticipated | Named on definition per the scheme (`BAP<contract-major>-ML-DSA-<digest>`); the anticipated parameter sets are ML-DSA-44 (NIST category 2), ML-DSA-65 (category 3), ML-DSA-87 (category 5); hybrid Ed25519+ML-DSA composite evaluated at that time; see [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) and charter § Cryptographic suite identity |
 
 ## Claim names

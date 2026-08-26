@@ -75,6 +75,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       maintainers: ["rjpalermo"],
       files: [
         "lib",
+        "spec",
         "priv/conformance/v1/corpus",
         "priv/conformance/v1/schemas",
         "priv/conformance/v1/vectors",
@@ -211,6 +212,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       "corpus.digests": ["run --no-start scripts/regen_corpus_digests.exs"],
       "spec.facts": ["run --no-start scripts/check_spec_facts.exs"],
       "spec.examples": ["run --no-start spec/tools/build_examples.exs"],
+      "spec.render": ["run --no-start spec/tools/render_derived.exs"],
       "spec_facts.mutations": ["run --no-start scripts/check_spec_facts_mutations.exs"],
       "license.check": [
         "cmd elixir scripts/check_dependency_licenses.exs artifacts/tooling.cdx.json"
@@ -233,6 +235,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "corpus.digests",
         "spec.facts",
         "spec.examples",
+        "spec.render",
         "credo --strict",
         "verification.performance",
         "chain_archive.performance",

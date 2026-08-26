@@ -1,6 +1,6 @@
 //! Profile maxima + tightening-only overrides.
 //!
-//! [`Bounds`] carries the immutable v1 maxima from `docs/protocol-v1.md`
+//! [`Bounds`] carries the immutable v1 maxima from `spec/bap-v1.md`
 //! § Hard maxima, optionally tightened by caller-supplied overrides. The
 //! 32-byte Ed25519 public-key/digest widths and the 64-byte signature width
 //! are immutable cryptographic constants of the `BAP1-Ed25519-SHA256` suite
@@ -9,7 +9,7 @@
 //! crate. The overrides map recognizes them only to reject any attempt to
 //! change them.
 //!
-//! Enforcement rules (`docs/protocol-v1.md` § Hard maxima, lines 417–424):
+//! Enforcement rules (`spec/bap-v1.md` § Hard maxima, lines 417–424):
 //! - `REQ1-BOUNDS-tighten-only`: callers MAY tighten ceilings with a positive
 //!   integer; widening is invalid.
 //! - `REQ1-BOUNDS-reject-list`: unknown, non-integer, zero, negative, widening,
@@ -79,7 +79,7 @@ pub struct Bounds {
 
 impl Bounds {
     // ------------------------------------------------------------------------
-    // Immutable profile maxima — docs/protocol-v1.md § Hard maxima (lines 377–415)
+    // Immutable profile maxima — spec/bap-v1.md § Hard maxima (lines 377–415)
     // ------------------------------------------------------------------------
 
     const MAX_COMPACT_BYTES: u64 = 65536;
@@ -485,7 +485,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // maximum() — every value must match docs/protocol-v1.md § Hard maxima
+    // maximum() — every value must match spec/bap-v1.md § Hard maxima
     // ------------------------------------------------------------------
 
     #[test]

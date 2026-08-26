@@ -1,4 +1,4 @@
-"""RFC 8785 JSON Canonicalization Scheme over the tagged JSON algebra (protocol-v1.md:91-95,
+"""RFC 8785 JSON Canonicalization Scheme over the tagged JSON algebra (spec/bap-v1.md,
 REQ1-JSON-jcs-exact).
 
 Accepts only the tagged algebra. Enforces the ``jcs_bytes`` output bound while emitting RFC 8785

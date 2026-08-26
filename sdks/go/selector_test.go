@@ -2,7 +2,7 @@ package verifier
 
 import "testing"
 
-// Selector algebra (docs/protocol-v1.md § Selector algebra) + typed request
+// Selector algebra (spec/bap-v1.md § Selector algebra) + typed request
 // digest (§ Signing and digest inputs). Formula values pinned numerically at
 // authoring against the corpus fixtures.
 func mustDecode(t *testing.T, s string) Value {

@@ -154,6 +154,14 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "priv/conformance/v1/corpus/cases/uri/normalize.json",
                     "priv/conformance/v1/corpus/index.json",
                     "priv/conformance/v1/corpus/revision.json",
+                    "spec/bap-v1.md",
+                    "spec/cddl/bap-v1.cddl",
+                    "spec/facts/baseline-v1.json",
+                    "spec/facts/coverage-v1.json",
+                    "spec/facts/requirement-statements-v1.json",
+                    "spec/tools/build_examples.exs",
+                    "spec/tools/extract_facts.exs",
+                    "spec/tools/render_derived.exs",
                     "usage-rules.md"
                   ])
 

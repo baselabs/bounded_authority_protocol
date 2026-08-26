@@ -1,4 +1,4 @@
-"""Tagged JSON algebra (protocol-v1.md § JSON algebra and decoding, L72-95).
+"""Tagged JSON algebra (spec/bap-v1.md § JSON algebra and decoding, L72-95).
 
 Each JSON value is tagged so the integer/float distinction survives — selector semantic identity
 (REQ1-SELECTOR-semantic-identity) and the typed request-digest projection both depend on it::

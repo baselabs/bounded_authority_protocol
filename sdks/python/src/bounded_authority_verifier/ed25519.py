@@ -1,7 +1,7 @@
 """Ed25519 verification via the ``cryptography`` package (the crypto import boundary the two-boundary
 census tracks) + SHA-256 via ``hashlib``.
 
-Per protocol-v1.md § Signing and digest inputs + RFC 8032. The verifier validates the fixed 32-byte
+Per spec/bap-v1.md § Signing and digest inputs + RFC 8032. The verifier validates the fixed 32-byte
 public-key and 64-byte signature encodings, then delegates Ed25519 verification to the backend. A
 backend rejection or exception returns exactly Invalid (REQ1-SIGNING-backend-reject).
 

@@ -1,11 +1,11 @@
-"""Unpadded base64url decode + encode, canonical per REQ1-B64-* (protocol-v1.md:107-110):
+"""Unpadded base64url decode + encode, canonical per REQ1-B64-* (spec/bap-v1.md):
 
 - REQ1-B64-alphabet: only ``A-Za-z0-9-_`` (no ``+``, no ``/``, no padding ``=``, no whitespace)
 - REQ1-B64-no-padding: padding/whitespace forbidden
 - REQ1-B64-length: length mod 4 == 1 is invalid (cannot decode)
 - REQ1-B64-canonical: decode succeeds only if unpadded re-encode reproduces the input exactly
 
-Derived from protocol-v1.md § base64url + RFC 4648 §5. NOT using ``base64.urlsafe_b64decode`` for
+Derived from spec/bap-v1.md § base64url + RFC 4648 §5. NOT using ``base64.urlsafe_b64decode`` for
 decode because the stdlib accepts padding/whitespace and is permissive; the bounds-checked canonical
 decoder is hand-rolled.
 """

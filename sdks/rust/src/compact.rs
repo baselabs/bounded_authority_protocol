@@ -16,7 +16,7 @@
 //! the signature is base64url-encoded. [`parse_compact`] is the inverse
 //! structural split, enforcing exactly three non-empty canonical segments.
 //!
-//! Derived first-hand from `docs/protocol-v1.md` § Signing and digest inputs
+//! Derived first-hand from `spec/bap-v1.md` § Signing and digest inputs
 //! (lines 246–261) and RFC 7515 §7.1 — NOT from any sibling-SDK or Elixir
 //! source (ADR 0014 D5).
 

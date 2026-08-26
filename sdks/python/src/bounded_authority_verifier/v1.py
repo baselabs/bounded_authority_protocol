@@ -1,8 +1,8 @@
-"""The v1 verification façade (protocol-v1.md § Public verification contract, L270-290).
+"""The v1 verification façade (spec/bap-v1.md § Public verification contract, L270-290).
 
 17 public functions, each returning ``Result[T] = Ok | Err`` (the ``{:ok, value} | {:error, :invalid}``
 mirror). No ``authorized`` / ``decision`` surface (AGENTS rule 1). All claims revalidated at every
-public entry (REQ1-VERIFY-revalidate). Wire formats derived from ``docs/protocol-v1.md`` + ADR 0004 +
+public entry (REQ1-VERIFY-revalidate). Wire formats derived from ``spec/bap-v1.md`` + ADR 0004 +
 the corpus; the corpus is the byte-level arbiter.
 
 The dispatch structs here are frozen dataclasses mirroring the TS ``interface`` shapes (the contract
@@ -308,7 +308,7 @@ class EncodedAnchoredExport:
     digest: bytes
 
 
-# --- shared closed-header / claim validators (derived from protocol-v1.md + RFCs) ---
+# --- shared closed-header / claim validators (derived from spec/bap-v1.md + RFCs) ---
 
 
 def _parse_grant_header(seg: CompactSegments, bounds: Bounds) -> str:
@@ -855,7 +855,7 @@ def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
     return wrapper
 
 
-# 1. untrusted_key_locator (protocol-v1.md § Untrusted key locator).
+# 1. untrusted_key_locator (spec/bap-v1.md § Untrusted key locator).
 @_closed_shape
 def untrusted_key_locator(compact: bytes, bounds: Bounds | None = None) -> Result[KeyLocator]:
     return _trying(lambda: _untrusted_key_locator_body(compact, bounds))
@@ -1557,7 +1557,7 @@ def _jwk_to_tagged(jwk: OkpPublic) -> Tagged:
     return JObject(members)
 
 
-# 11. assemble_compact (REQ1-VERIFY-no-signer-callback; public /2 contract, protocol-v1.md:299,319).
+# 11. assemble_compact (REQ1-VERIFY-no-signer-callback; public /2 contract, spec/bap-v1.md,319).
 # Mirrors runtime.ex:147-155 assemble_compact: assemble via the low-level assembler, then
 # validate_assembled_compact (runtime.ex:754-780) re-parses the composed compact per kind. The
 # signing-input gates (kind↔typ, segment bounds, base64url payload, compact_bytes) come from
@@ -1939,7 +1939,7 @@ def _frame(data: bytes) -> bytes:
     return bytes([(v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF]) + data
 
 
-# 15. verify_historical_anchor (ADR 0004 § Boundary anchors; protocol-v1.md § Historical anchor).
+# 15. verify_historical_anchor (ADR 0004 § Boundary anchors; spec/bap-v1.md § Historical anchor).
 @_closed_shape
 def verify_historical_anchor(compact: bytes, key: HistoricalPublicKey, expected: ExpectedAnchor) -> Result[AnchorFacts]:
     return _trying(lambda: _verify_historical_anchor_body(compact, key, expected))

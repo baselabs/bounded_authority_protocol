@@ -11,7 +11,7 @@ This is the independent conformance proof: the SDK is the implementation under t
 the arbiter. A disagreement aborts nonzero with the case id + the expected/actual verdict.
 
 Derivation: the corpus is the published normative artifact (BAP-05); the runner is a consumer.
-The SDK façade was derived from protocol-v1.md + ADR 0004 + RFCs; this runner exercises it.
+The SDK façade was derived from spec/bap-v1.md + ADR 0004 + RFCs; this runner exercises it.
 """
 
 from __future__ import annotations

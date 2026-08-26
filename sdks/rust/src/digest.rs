@@ -2,7 +2,7 @@
 //!
 //! The request digest binds a specific operation + cast-arguments pair to the
 //! proof's `ba_req` claim. A wrong digest → wrong `ba_req` → silent
-//! request-binding bypass. The formula (`docs/protocol-v1.md` § Signing and
+//! request-binding bypass. The formula (`spec/bap-v1.md` § Signing and
 //! digest inputs, lines 263–289):
 //!
 //! ```text
@@ -20,7 +20,7 @@
 //! `operation` is the RAW operation string (the first signing-array element),
 //! NOT `typed`-wrapped — only `cast_arguments` goes through `typed`.
 //!
-//! Per `protocol-v1.md` §lines 329–330, request-digest's typed projection is an
+//! Per `spec/bap-v1.md` §lines 329–330, request-digest's typed projection is an
 //! internal mechanic behind the v1 façade; this module is `pub(crate)` and
 //! [`request_digest`] is re-exported through the façade at Task 12.
 
@@ -80,7 +80,7 @@ pub fn request_digest(
 }
 
 /// Projects a tagged [`JsonValue`] to the closed typed JSON form per
-/// `protocol-v1.md` §lines 271–281.
+/// `spec/bap-v1.md` §lines 271–281.
 ///
 /// `Null` → `["null"]` (a 1-element tag array); every other variant → a
 /// 2-element `["<kind>", value]` tag array, recursing into arrays/objects so

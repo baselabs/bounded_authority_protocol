@@ -1,7 +1,7 @@
 # Bounded Authority Protocol — Cross-language verifier SDKs
 
 Typed, provider-neutral verifier libraries that reimplement the BAP v1 verification profile from the
-published spec ([`docs/protocol-v1.md`](../docs/protocol-v1.md)) and consume the published conformance
+published spec ([`spec/bap-v1.md`](../spec/bap-v1.md)) and consume the published conformance
 corpus ([`priv/conformance/v1/corpus/`](../priv/conformance/v1/corpus/)). They are **distribution
 surfaces** — typed client libraries for third-party verifiers, not additional normativity — and
 **none is published to a registry yet**: per

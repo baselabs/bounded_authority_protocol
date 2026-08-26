@@ -1,4 +1,4 @@
-"""Closed selector algebra (protocol-v1.md § Selectors, L179-199; REQ1-SELECTOR-closed-set).
+"""Closed selector algebra (spec/bap-v1.md § Selectors, L179-199; REQ1-SELECTOR-closed-set).
 
 Three recognized member sets. ``all`` may use any of them and ignores the
 other members; ``equals`` and ``one_of`` use their matching three-member set::

@@ -2,7 +2,7 @@
 
 This is the BAP-10 acceptance artifact: the traceability map from every normative requirement
 identifier (per [ADR 0007](../adr/0007-normative-requirement-identifiers.md), `REQ1-<SURFACE>-<tag>`
-for the [normative profile](../protocol-v1.md) and `REQ1-EVO-*` for the
+for the `normative profile` and `REQ1-EVO-*` for the
 [evolution contract](standards-track.md)) to the conformance corpus cells that prove it.
 
 The BAP-10 acceptance bar ([ADR 0006](../adr/0006-standards-evolution-suite-identity-and-delegation-posture.md)
@@ -204,8 +204,8 @@ never silently overstated as `populated`.
 
 ## Coverage summary
 
-- **86 requirement ids** total: 76 `REQ1-*` (protocol-v1.md) + 10 `REQ1-EVO-*` (standards-track.md).
-- **MUST/MUST NOT requirements mapped to populated cells:** all protocol-v1.md `REQ1-*` map to ≥1
+- **86 requirement ids** total: 76 `REQ1-*` (spec/bap-v1.md) + 10 `REQ1-EVO-*` (standards-track.md).
+- **MUST/MUST NOT requirements mapped to populated cells:** all spec `REQ1-*` map to ≥1
   populated conformance cell. One profile-level invariant (`REQ1-CORE-reject-unlisted`) is recorded as
   a `gap` with its input-algebra reason (it is the rationale for the per-surface closed-set MUSTs, each
   of which maps to populated rejection cells — the rule is proven by that union).

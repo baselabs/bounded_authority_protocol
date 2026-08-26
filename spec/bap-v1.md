@@ -830,8 +830,39 @@ tagged-value notation the typed projection in (#datamodel) uses):
 | object | `{:object, [{UTF-8_binary, value}]}` |
 
 The frozen reference implementation of this profile is the `bounded_authority_protocol`
-package (v1 façade functions listed in the package's locked API surface). Its Elixir bindings
-map the tagged algebra as: `:null`, `{:boolean, b}`, `{:integer, n}`, `{:float, f}`,
+package. Its public v1 façade is the following locked API surface (enforced by the package's
+architecture gate; listed here informatively):
+
+```elixir
+untrusted_key_locator(binary(), Bounds.t() | map())
+grant_signing_input(Grant.t(), Bounds.t() | map())
+proof_signing_input(Proof.t(), Bounds.t() | map())
+assemble_compact(SigningInput.t(), binary())
+assemble_compact(SigningInput.t(), binary(), Bounds.t() | map())
+decode_grant(binary(), Bounds.t() | map())
+decode_proof(binary(), Bounds.t() | map())
+verify_grant(binary(), TrustedIssuer.t(), ExpectedGrant.t())
+check_envelope(Credentials.t(), ExpectedRequest.t())
+request_digest(binary(), Json.value(), Bounds.t() | map())
+encode_consumption_entry(ConsumptionEntry.t(), Bounds.t() | map())
+check_chain(ChainInput.t(), ExpectedChain.t())
+boundary_anchor_signing_input(BoundaryAnchor.t(), Bounds.t() | map())
+key_transition_signing_input(KeyTransition.t(), Bounds.t() | map())
+encode_anchored_export(AnchoredExportInput.t(), ExpectedExport.t())
+verify_historical_anchor(binary(), HistoricalPublicKey.t(), ExpectedAnchor.t())
+verify_key_transition(binary(), HistoricalPublicKey.t(), HistoricalPublicKey.t(),
+  ExpectedKeyTransition.t())
+verify_anchored_export(ArchivedObject.t(), HistoricalKeyChain.t(),
+  ExpectedAnchoredExport.t())
+```
+
+The untrusted key locator returns exactly:
+
+```elixir
+{:ok, %BoundedAuthorityProtocol.V1.KeyLocator{kid: kid, trust: :not_evaluated}}
+```
+
+The Elixir bindings map the tagged algebra as: `:null`, `{:boolean, b}`, `{:integer, n}`, `{:float, f}`,
 `{:string, s}`, `{:array, [value]}`, `{:object, [{name, value}]}`; the closed error value is
 `{:error, :invalid}`. Companion artifacts: the conformance corpus (283 cases over 28 surfaces,
 certified index digest and monotone revision integer in its `revision.json` sidecar), the

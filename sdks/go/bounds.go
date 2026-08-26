@@ -3,7 +3,7 @@ package verifier
 import "sort"
 
 // Bounds carries the profile's caller-tightenable resource ceilings
-// (docs/protocol-v1.md § Hard maxima). Only two constructors produce a valid
+// (spec/bap-v1.md § Hard maxima). Only two constructors produce a valid
 // Bounds: BoundsMaximum (the immutable profile maxima) and BoundsNew (a
 // tightening-only override map). A zero-value Bounds is invalid and fails
 // closed at every boundary that revalidates it.

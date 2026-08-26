@@ -12,7 +12,7 @@ selects trusted keys, reserves replay, grants execution, or overrides a host pol
 
 [adr14]: https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0014-cross-language-verifier-sdks.md
 [adr15]: https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0015-sdk-graduation-and-publish-topology.md
-[spec]: https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/protocol-v1.md
+[spec]: https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v1.md
 [corpus]: https://github.com/baselabs/bounded_authority_protocol/blob/main/priv/conformance/v1/corpus/
 
 ## Status
@@ -96,7 +96,7 @@ credentials.
 
 ## The public façade
 
-The 17 frozen v1 functions ([protocol-v1.md § Public verification contract][spec]):
+The 17 frozen v1 functions ([spec/bap-v1.md § Public verification contract][spec]):
 
 | Function | Returns | Purpose |
 |---|---|---|
