@@ -696,8 +696,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   # Every spec/formal companion names the specification revision it was written against; a
   # spec revision bump without the companion update (or vice versa) reds.
 
-  # spec/formal/proverif/bap-core.pv joins this list at its own landing (the model + CI).
-  @companion_files ["spec/formal/attacker-model.md"]
+  @companion_files ["spec/formal/attacker-model.md", "spec/formal/proverif/bap-core.pv"]
 
   defp rule_8_companion_revisions do
     spec_text = Path.join(@root, "spec/bap-v1.md") |> File.read!()

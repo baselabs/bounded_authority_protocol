@@ -4,6 +4,30 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — ProVerif model + CI harness + findings ledger (no wire change)
+
+- **`spec/formal/proverif/bap-core.pv`**: the stateless-core model under ProVerif 2.05 —
+  Dolev-Yao network attacker plus a malicious holder with a fully-controlled signing oracle;
+  the typed projection and compact framing as free constructors (the recorded symbolic
+  assumptions); every verifier step annotated with its REQ id. **All four properties PROVEN
+  TRUE**: P1 (a proof binds exactly the `ath`-named grant — the verifier event carries the
+  digest of the grant IT was presented), P2 (request-digest equality with the verifier-derived
+  pair), P3 (context-tuple equality), P4 (the server-derived cast arguments stay secret — the
+  facts output constructor takes only declared fields).
+- **Model non-vacuity proven by mutation**: removing the `ath` check makes P1 unprovable; the
+  strengthened query and per-issuance grant freshness were themselves the ledger's first
+  (refuted) finding — the initial P1 was too weak to see cross-grant replay.
+- **`scripts/run_formal.sh` + `mix formal` (quality leg) + a CI job**: pinned ProVerif
+  re-run with the RESULT-line diff against the frozen `expected-summary.txt` (a
+  verdict-changing model edit reds — leg executed), REQ-id coverage with a pinned step-
+  annotation set (dropping an annotation reds — leg executed), and the findings-ledger schema
+  check (an undispositioned entry reds — leg executed). An escalated disposition prints
+  loudly and blocks the program done-claim (ADR 0025).
+- **`spec/formal/FINDINGS.md`**: the ledger, one terminal disposition per finding
+  (refuted/documented/escalated); first entry dispositioned refuted; none escalated.
+- The model joins the rule-8 companion pin (spec Doc-Revision); `spec/formal/` ships in the
+  package; census extended exactly.
+
 ### Added — formal attacker model + ADR 0025 + gate rule 8 (no wire change)
 
 - **`spec/formal/attacker-model.md`**: the formal attacker — Dolev-Yao network attacker plus a

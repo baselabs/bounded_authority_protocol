@@ -213,6 +213,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       "spec.facts": ["run --no-start scripts/check_spec_facts.exs"],
       "spec.examples": ["run --no-start spec/tools/build_examples.exs"],
       "spec.render": ["run --no-start spec/tools/render_derived.exs"],
+      formal: ["cmd env BAP_FORMAL_OPTIONAL=1 scripts/run_formal.sh"],
       "spec_facts.mutations": ["run --no-start scripts/check_spec_facts_mutations.exs"],
       "license.check": [
         "cmd elixir scripts/check_dependency_licenses.exs artifacts/tooling.cdx.json"
@@ -236,6 +237,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "spec.facts",
         "spec.examples",
         "spec.render",
+        "formal",
         "credo --strict",
         "verification.performance",
         "chain_archive.performance",
