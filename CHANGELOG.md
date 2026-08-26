@@ -4,6 +4,22 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — the interoperability report (no wire change)
+
+- **`docs/design/interoperability-report.md`**: the cross-validation evidence document for
+  the frozen v1 profile — the reference Elixir verifier, the four cross-language SDKs (each
+  authored from the spec + corpus alone per ADR 0014's derivation-hygiene rule), and the
+  THREE independent Node second-implementation runners (corrected count:
+  corpus/chain-archive/grant-proof), each 283/283 agreed with the two-boundary key census
+  two-way equal (11 keys). Framed as TEST VECTORS + INDEPENDENT CROSS-VALIDATION (the IETF
+  evidence norm), explicitly NOT an implementer's list; methodology, per-implementation
+  corpus bindings (in-place vs vendored snapshot, both startup-digest-asserted), and the
+  reproduction path. Stated limitations: no registry publication yet (ADR 0015), v1 only.
+- **No hand numbers**: the report's certified digest (both encodings), the corpus revision
+  integer, the case/surface/key counts are pinned to the LIVE corpus identity by a new
+  docs-currency leg — a rotated corpus without a report update reds with the expected value
+  named.
+
 ### Added — docs-currency gate + the upgrading contract (no wire change)
 
 - **`test/docs_currency_test.exs`**: pins the public documentation surfaces to CURRENT facts —

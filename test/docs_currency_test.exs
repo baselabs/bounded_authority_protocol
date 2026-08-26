@@ -68,6 +68,27 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
            "the derived view's footer must name the spec authority and its revision"
   end
 
+  test "the interoperability report's cited figures match the live corpus identity" do
+    report = File.read!("docs/design/interoperability-report.md")
+
+    # The certified digest (both encodings) and the revision integer come from the same
+    # machine sources the corpus.digests gate uses.
+    {:ok, index_bytes} = File.read("priv/conformance/v1/corpus/index.json")
+    digest = :crypto.hash(:sha256, index_bytes)
+    b64 = Base.url_encode64(digest, padding: false)
+    hex = Base.encode16(digest, case: :lower)
+    revision = File.read!("priv/conformance/v1/corpus/revision.json")
+
+    assert report =~ b64, "the report must cite the certified index digest (#{b64})"
+    assert report =~ hex, "the report must cite the hex form (#{hex})"
+    assert report =~ "corpus revision 1"
+    assert revision =~ ~s("revision":1)
+    assert report =~ "283/283 agreed"
+    assert report =~ "283 cases"
+    assert report =~ "28 surfaces"
+    assert report =~ "11 keys"
+  end
+
   test "the spec pins its Doc-Revision and the companions agree" do
     spec = File.read!("spec/bap-v1.md")
     assert spec =~ "Document revision: rev #{@spec_revision}"
