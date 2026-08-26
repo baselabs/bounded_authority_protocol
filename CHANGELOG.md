@@ -4,6 +4,25 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — the Livebook walkthrough (no wire change)
+
+- **`docs/livebooks/bap-walkthrough.livemd`**: the end-to-end produce → assemble → verify →
+  reject notebook. It mints its OWN ephemeral Ed25519 keys at runtime via `:crypto` (zero
+  tracked private material — critical rule 6; the package accepts public keys only and the
+  notebook does the signing), builds a grant and proof through the deterministic producers,
+  assembles both compacts, verifies the grant and the full envelope with caller-supplied
+  trusted context, and then fails three classic attacks closed (a tampered signature byte, a
+  selector-disallowed argument swap, a stale proof outside the max-age+skew window). The
+  notebook's cells were executed VERBATIM (extracted and run as a script): all three attacks
+  return exactly `{:error, :invalid}`. Two authoring bugs found and fixed by that verbatim
+  run: a mis-grouped expiry literal and a `defp` helper cell that cannot exist at Livebook
+  top level.
+- **`test/bap_walkthrough_test.exs`** (the notebook's mirror): re-executes the walkthrough's
+  exact code shape against the real package — if the notebook's code stops running, the test
+  fails (a non-running livebook is worse than none) — and a shape-parity leg pins the
+  notebook's code markers to the test (mutation leg executed: breaking the notebook's code
+  shape reds with the marker named; restored green).
+
 ### Added — corpus vendored-snapshot sync gate (no wire change)
 
 - **`scripts/check_corpus_sync.exs` + `mix corpus.sync` (quality leg)**: byte-compares the
