@@ -4,6 +4,17 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — corpus vendored-snapshot sync gate (no wire change)
+
+- **`scripts/check_corpus_sync.exs` + `mix corpus.sync` (quality leg)**: byte-compares the
+  certified corpus (`priv/conformance/v1/corpus/`) against BOTH vendored SDK snapshots
+  (Rust, Go) — every file, both directions, content equality. A snapshot drift is caught at
+  COMMIT time instead of as a red SDK suite or a confusing digest rotation. Within ADR 0019
+  (an intra-repo drift check, not a distribution artifact). Mutation leg executed: a flipped
+  byte in a vendored revision.json reds with the file named; restored green.
+- The CI quality job already runs `mix quality`, so the new leg is enforced there without a
+  new workflow.
+
 ### Added — the implementer's guide (fifth-SDK recipe; no wire change)
 
 - **`docs/guides/implementers-guide.md`** (replacing its placeholder): everything a fifth
