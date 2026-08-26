@@ -51,12 +51,13 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
              rule_4_statement_hashes() ++
              rule_5_cited_counts() ++
              rule_6_revision_citation() ++
+             rule_7_iana_templates() ++
              rule_9_vendor_neutrality() ++
              rule_10_anchor_completeness(facts) ++
              rule_12_framing_oracle(facts),
          [] <- problems do
       elapsed = System.monotonic_time(:millisecond) - started
-      IO.puts("spec facts gate: ok rules=[1b,2,3,4,5,6,9,10,framing-oracle] in #{elapsed}ms")
+      IO.puts("spec facts gate: ok rules=[1b,2,3,4,5,6,7,9,10,framing-oracle] in #{elapsed}ms")
     else
       problems when is_list(problems) ->
         IO.puts(:stderr, "spec facts gate FAILED:\n" <> Enum.join(problems, "\n"))
@@ -528,6 +529,121 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
     do:
       {:error,
        "map cites corpus revision #{cited} but the corpus sidecar is at revision #{revision}"}
+
+  # --- rule 7: IANA templates == registries.md ------------------------------------
+  #
+  # BAP-12's acceptance criterion mechanized: the machine-readable IANA template sources must
+  # agree with docs/design/registries.md EXACTLY (names, statuses, purposes) in both directions.
+  # Two documented allowsets cover rows that exist in registries.md without a template by
+  # design: the claim `ba_obo` (reserved, no IANA template — no wire presence) and the typ
+  # `dpop+jwt` (registered by RFC 9449, not by this profile).
+
+  @claims_without_templates MapSet.new(["ba_obo"])
+  @typs_without_templates MapSet.new(["dpop+jwt"])
+
+  defp rule_7_iana_templates do
+    with {:ok, claims} <- read_iana_source("jwt-claims.json"),
+         {:ok, media} <- read_iana_source("media-types.json") do
+      registries = Path.join(@root, "docs/design/registries.md") |> File.read!()
+      claim_rows = registry_rows(registries, "| Claim | Status | Purpose |")
+      typ_rows = registry_rows(registries, "| Value | Status | Media type | Purpose |")
+
+      claim_problems =
+        compare_exact(
+          claims["entries"],
+          fn e -> e["claim_name"] end,
+          claim_rows,
+          fn [_claim, status, purpose], e ->
+            status == e["status"] and purpose == e["spec_purpose"]
+          end,
+          "claim",
+          @claims_without_templates
+        )
+
+      typ_problems =
+        compare_exact(
+          media["entries"],
+          fn e -> e["wire_typ"] end,
+          typ_rows,
+          fn [_value, status, media_column, purpose], e ->
+            status == e["status"] and purpose == e["spec_purpose"] and
+              String.contains?(media_column, e["subtype_name"])
+          end,
+          "typ/media-type",
+          @typs_without_templates
+        )
+
+      claim_problems ++ typ_problems
+    else
+      {:error, reason} -> ["rule 7: #{reason}"]
+    end
+  end
+
+  defp read_iana_source(name) do
+    path = Path.join(@root, "docs/design/iana/#{name}")
+
+    case File.read(path) do
+      {:ok, bytes} ->
+        case Json.decode(bytes, Bounds.maximum()) do
+          {:ok, tagged} -> {:ok, plain(tagged)}
+          _ -> {:error, "#{name} is not decodable"}
+        end
+
+      _ ->
+        {:error, "#{name} is missing from docs/design/iana/"}
+    end
+  end
+
+  defp registry_rows(text, header) do
+    text
+    |> String.split("\n")
+    |> Enum.drop_while(fn line -> not String.starts_with?(line, header) end)
+    |> Enum.drop(1)
+    |> Enum.take_while(&String.starts_with?(&1, "|"))
+    |> Enum.reject(&Regex.match?(~r/^[|\s\-:]+$/, &1))
+    |> Enum.map(fn row ->
+      row
+      |> String.trim_leading("|")
+      |> String.trim_trailing("|")
+      |> String.split("|")
+      |> Enum.map(&String.trim/1)
+    end)
+    |> Enum.map(fn [name | rest] -> [String.trim(name, "`") | rest] end)
+  end
+
+  # Both directions, exact: every template entry matches a registries row (name + the comparator),
+  # and every registries row is either templated or in the documented allowset.
+  defp compare_exact(entries, key_of, rows, comparator, label, allowset) do
+    row_names = rows |> Enum.map(&hd/1) |> MapSet.new()
+    entry_names = entries |> Enum.map(key_of) |> MapSet.new()
+
+    unmatched =
+      Enum.flat_map(entries, fn e ->
+        name = key_of.(e)
+
+        case Enum.find(rows, fn cells -> hd(cells) == name end) do
+          nil ->
+            ["rule 7: #{label} #{inspect(name)} has an IANA template but no registries.md row"]
+
+          cells ->
+            if comparator.(cells, e),
+              do: [],
+              else: [
+                "rule 7: #{label} #{inspect(name)} template disagrees with registries.md (status/purpose/media-type)"
+              ]
+        end
+      end)
+
+    extra =
+      MapSet.difference(row_names, entry_names) |> MapSet.difference(allowset) |> Enum.sort()
+
+    unmatched ++
+      Enum.map(extra, fn name ->
+        "rule 7: registries.md #{label} #{inspect(name)} has no IANA template and is not in the documented allowset"
+      end)
+  end
+
+  defp strip_ticks(name), do: String.trim(name, "`")
 
   # --- rule 9: vendor neutrality via tracked files ------------------------------
 

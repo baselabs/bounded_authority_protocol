@@ -37,14 +37,14 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 ## `typ` values
 
 <!-- facts:typ-values -->
-| Value | Status | Purpose |
-|---|---|---|
-| `ba+cap` | active | Capability grant (compact JWS) |
-| `dpop+jwt` | active | Holder proof (RFC 9449) |
-| `ba+chain-anchor` | active | Signed consumption-chain boundary anchor |
-| `ba+key-transition` | active | Authenticated historical-key transition |
-| `ba+cap-delegated` | reserved | Delegated attenuated grant — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md) |
-| `ba+suite-attestation` | reserved | Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
+| Value | Status | Media type | Purpose |
+|---|---|---|---|
+| `ba+cap` | active | `application/ba-cap+jwt` | Capability grant (compact JWS) |
+| `dpop+jwt` | active | registered by RFC 9449 | Holder proof (RFC 9449) |
+| `ba+chain-anchor` | active | `application/ba-chain-anchor+jwt` | Signed consumption-chain boundary anchor |
+| `ba+key-transition` | active | `application/ba-key-transition+jwt` | Authenticated historical-key transition |
+| `ba+cap-delegated` | reserved | `application/ba-cap-delegated+jwt` | Delegated attenuated grant — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md) |
+| `ba+suite-attestation` | reserved | `application/ba-suite-attestation+jwt` | Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
 
 ## Selector kinds
 
@@ -78,3 +78,7 @@ MUST NOT be used by deployments.
 `ba_inv`, `ba_op`, `ba_req` (JWT Claims registry) and the `ba+*` media-type suffix values are
 filed at first external submission (roadmap row BAP-12). Until then this document is the
 authoritative namespace and the `ba_`/`ba+` prefixes are the collision-avoidance convention.
+
+The media-type column names the RFC 6838 registration (or reservation) associated with each
+value — a related but distinct namespace from the wire `typ` itself; the wire values are
+unchanged. Templates and their machine-readable sources live in [iana/README.md](iana/README.md).

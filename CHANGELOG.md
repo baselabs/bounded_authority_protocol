@@ -4,6 +4,28 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — IANA registration templates + spec-facts rule 7 (no wire change)
+
+- **`docs/design/iana/`**: the machine-readable registration sources and rendered ready-to-file
+  markdown for the profile's IANA entries. JSON Web Token Claims Registry (its published
+  four-field format, Specification Required): `ba_inv`, `ba_op`, `ba_req` ready to file;
+  `ba_dlg`, `ba_offline`, `ba_sut` reserved-marked and NOT filed. Media types (RFC 6838
+  section 5.6 field template, LIMITED USE): `application/ba-cap+jwt`,
+  `application/ba-chain-anchor+jwt`, `application/ba-key-transition+jwt` ready to file;
+  `application/ba-cap-delegated+jwt`, `application/ba-suite-attestation+jwt` reserved. The
+  drafted `ba+*` wire `typ` values are NOT registrable as-is (`+cap` is not a registered
+  structured suffix; `+jwt` is) — **the wire `typ` values are unchanged**; the media-type
+  namespace is distinct. Filing is externally gated (the BAP-08 official-submission
+  preconditions); the templates make in-repo readiness verifiable.
+- **Spec §IANA considerations** (section 20): the registration requests, the reserved names,
+  and the namespace distinction, per RFC 8126 guidance (read first-hand).
+- **registries.md typ table gains the media-type column**; purposes are now byte-exact shared
+  facts between the registries document and the IANA sources.
+- **Spec-facts rule 7**: registries.md == IANA template sources, exact names/statuses/purposes
+  both directions, with two documented allowsets (`ba_obo`: reserved without a template by
+  design; `dpop+jwt`: registered by RFC 9449) — BAP-12's acceptance criterion mechanized.
+  Mutation leg proven red (flipped template status caught, named) and restored.
+
 ### Added — the v1 specification `spec/bap-v1.md`; authority swap certified with an EMPTY delta
 
 - **`spec/bap-v1.md`** (kramdown-rfc conventions, `[@RFC2119]`-style citations, no IETF
