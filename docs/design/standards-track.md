@@ -91,8 +91,10 @@ contract-major — the same closed posture, different constants. The `kid`/thumb
 the key-locator boundary is already key-type independent, so trusted-key resolution survives suite
 succession unchanged.
 
-The anticipated successor signature family is ML-DSA (FIPS 204), with a hybrid
-(Ed25519 + ML-DSA composite) posture to be evaluated when the successor suite is defined.
+The successor candidate family is the `BAP2-*` ML-DSA family (FIPS 204, JOSE mapping per
+RFC 9964), with a hybrid Ed25519+ML-DSA composite posture reserved per
+draft-ietf-jose-pq-composite-sigs — the concrete names, parameter sets, quantum-readiness
+statement, and revisit triggers are recorded in `docs/adr/0026-pq-successor-suite.md`.
 Post-quantum migration is a decade-scale industry program already underway; this charter's
 commitment is that the migration is a suite succession, not a redesign.
 
