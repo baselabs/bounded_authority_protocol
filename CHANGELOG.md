@@ -4,6 +4,19 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — ADR 0026: the post-quantum successor-suite statement (design-only, no wire change)
+
+- **ADR 0026 (accepted)**: the concrete successor statement — the `BAP2-*` candidate family
+  (ML-DSA-65 baseline, ML-DSA-87 higher tier; RFC 9964's JOSE mapping as the wire vehicle),
+  hybrid-composite posture room reserved (draft-ietf-jose-pq-composite-sigs, decided at
+  successor definition time), the quantum-readiness statement (NIST IR 8547 IPD 2030/2035
+  horizon; long-lived chain/archive evidence should plan re-anchoring under cross-suite
+  attestation), and the recorded bets with revisit triggers (pq-composite RFC; IR 8547
+  final). Activation stays successor-major only (ADR 0009); every name here remains
+  reserved-and-rejected in v1 with the 283-green corpus proving it.
+- **Registries + standards-track reconciled**: the anticipated-suite row now names the
+  `BAP2-*` family with ADR 0026; the charter's succession paragraph cites it.
+
 ### Added — the interoperability report (no wire change)
 
 - **`docs/design/interoperability-report.md`**: the cross-validation evidence document for
