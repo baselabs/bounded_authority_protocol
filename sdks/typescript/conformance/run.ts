@@ -65,7 +65,8 @@ interface Raws extends Map<string, Uint8Array> {}
 
 // The certified index.json SHA-256 (base64url of the SHA-256 digest). ADR 0014 D4: the SDK binds to
 // the exact corpus it was certified against; a mismatched vendored corpus fails closed rather than
-// drifting silently. This MUST match the Python runner's hex SHA (a5ac7361...04dcc → base64url).
+// drifting silently. Same digest as the Python and Rust runners' hex pins — rotate every pin with
+// scripts/regen_corpus_digests.exs in the same change.
 const CERTIFIED_INDEX_SHA = "paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw";
 
 function loadCorpus(): { index: Record<string, unknown>; cases: CorpusCase[]; raws: Raws } {
