@@ -106,6 +106,8 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes
                 abort("revision.json: closed member set")
             if sidecar["format"] != "bounded-authority-protocol-v1-conformance-corpus-revision":
                 abort("revision.json: format")
+            if entry.get("cases") != 0:
+                abort("revision.json: case-free declaration")
             if (
                 not isinstance(sidecar["revision"], int)
                 or isinstance(sidecar["revision"], bool)

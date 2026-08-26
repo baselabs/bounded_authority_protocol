@@ -4,6 +4,36 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Fixed — program closeout cross-vendor review findings
+
+The closeout review (two peer families over the full program range) returned two blocking and
+several note findings, all in surfaces this program touched. All fixed:
+
+- **[blocking] .gitleaks.toml silently disabled ALL default detection rules** — a config file
+  defining only an allowlist replaces gitleaks' rule set entirely. The config now
+  `[extend] useDefault = true` plus scoped, documented allowlists for the public-key-only
+  fixture surfaces (the generated spec documents, the corpus/vectors trees, the vendored SDK
+  snapshots, SDK test sources, and the frozen .forge historical transcripts whose "PATs" are
+  canonical reverse-alphabet gate self-test fakes). Verified both directions: a fake PAT in a
+  scratch tree is DETECTED (3 findings) under the config, and the tracked tree scans clean
+  (the only residuals are untracked gitignored build artifacts).
+- **[blocking] supply-chain checksum step always failed** — `working-directory: artifacts`
+  plus `cd artifacts` targeted a nonexistent `artifacts/artifacts`. The double-entry removed.
+- **[note] Python/TS runners now check the revision sidecar's index entry declares zero
+  cases** (Rust already asserted it) — a nonzero declaration fails all five consumers now.
+- **[note] CI pin consistency** — `ocaml/setup-ocaml` SHA-pinned like every other action;
+  the cddl gem checksum-pinned (`scripts/cddl-gem.sha256`) like kramdown-rfc per the A2
+  amendment.
+- **[note] comment anchors garbled by the spec-path rewrite** ("spec/bap-v1.md,319") fixed to
+  section citations in the Python and TypeScript SDK sources.
+- Residual, stated: a duplicate-member revision sidecar would pass the four SDK runners'
+  permissive host JSON parsers (only the Elixir bounded decoder and the independent Node
+  checker reject duplicates). The certified index SHA pin (any byte change fails all six
+  pins), the corpus sync gate, and the two duplicate-rejecting consumers bound this state to
+  "unreachable without simultaneously defeating the corpus identity architecture";
+  duplicate-rejecting JSON parsers in four host languages for that state is disproportionate,
+  recorded as accepted residual.
+
 ### Added — the successor-major charter + governance single-home + ROADMAP backfill (design-only)
 
 - **`docs/design/successor-major-charter.md`**: the consolidated successor-major scope — delegation
