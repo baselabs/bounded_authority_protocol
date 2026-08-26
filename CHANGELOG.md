@@ -4,6 +4,23 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — the implementer's guide (fifth-SDK recipe; no wire change)
+
+- **`docs/guides/implementers-guide.md`** (replacing its placeholder): everything a fifth
+  implementer needs without reading a sibling runner's source — the conformance-runner
+  contract (startup corpus-identity assertion, full integrity verification, total verdict
+  comparison: crashes are failures, never skips); the 28-surface dispatch table with each
+  surface's role; the two-boundary key census (discovery == verify-import == index set,
+  and the two runner cheats it catches); the corpus formats including the revision sidecar;
+  the permissiveness-mutation expectation with the six language trap classes
+  (duplicate-member rejection, null-prototype equivalence, the raw-lexeme ceiling,
+  single-value/trailing, the integer/float tag distinction, decode-depth scalar asymmetry)
+  each required red-capable in the implementer's own language; and the facts-anchor contract
+  for embedding the spec.
+- **Acceptance leg**: `test/docs_guides_test.exs` cross-checks the guide's dispatch table
+  against the LIVE corpus surface enumeration, both directions named on drift (a corpus
+  surface without a guide row, or a phantom guide row, reds).
+
 ### Added — code of conduct, guides taxonomy, README restructure (no wire change)
 
 - **`CODE_OF_CONDUCT.md`** (Contributor Covenant v2.1, canonical text) at the root, linked
