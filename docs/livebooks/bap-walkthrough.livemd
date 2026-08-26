@@ -1,0 +1,211 @@
+<!--
+livebook:{"persist_outputs":true}
+-->
+
+# Bounded Authority Protocol — end-to-end walkthrough
+
+```elixir
+Mix.install([{:bounded_authority_protocol, "~> 0.1"}])
+```
+
+## What this notebook covers
+
+The full produce → assemble → verify → reject loop with the verifier package alone. We mint
+our OWN ephemeral Ed25519 keys at runtime (nothing tracked, nothing persisted — the package
+accepts public keys only; the notebook does the signing, the package does the verifying),
+build a grant and a proof through the package's deterministic producers, verify the envelope,
+and then watch every classic attack fail.
+
+Run top to bottom. Every cell is pure — rerunning the notebook mints fresh keys and produces
+different bytes with the same verdicts.
+
+## 1. Ephemeral keys
+
+```elixir
+{issuer_public, issuer_private} = :crypto.generate_key(:eddsa, :ed25519)
+{holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
+
+{:ok, holder_thumbprint} =
+  BoundedAuthorityProtocol.V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
+
+%{issuer_public: issuer_public, holder_thumbprint_raw: holder_thumbprint}
+```
+
+## 2. Build and sign a grant
+
+```elixir
+alias BoundedAuthorityProtocol.V1.{Grant, Operation}
+
+grant = %Grant{
+  key_id: "issuer-1",
+  issuer: "https://issuer.example",
+  grant_id: "grant-2026-001",
+  audiences: ["https://service.example"],
+  issued_at: 1_800_000_000,
+  not_before: 1_800_000_000,
+  expires_at: 1_800_003_600,
+  holder_thumbprint: holder_thumbprint,
+  operations: [
+    %Operation{
+      name: "read_record",
+      selectors: [
+        {:equals, ["record", "region"], {:string, "us-east"}},
+        {:one_of, ["record", "tier"], [{:string, "gold"}, {:string, "platinum"}]},
+        :all
+      ]
+    }
+  ]
+}
+
+{:ok, signing_input} = BoundedAuthorityProtocol.V1.grant_signing_input(grant, %{})
+issuer_signature = :crypto.sign(:eddsa, :none, signing_input.message, [issuer_private, :ed25519])
+{:ok, grant_compact} = BoundedAuthorityProtocol.V1.assemble_compact(signing_input, issuer_signature)
+
+grant_compact
+```
+
+## 3. Build and sign the holder proof
+
+The proof binds THIS grant (via `ath`, the digest of the exact grant compact bytes), THIS
+request (via the server-derived operation and typed arguments), and THIS context.
+
+```elixir
+alias BoundedAuthorityProtocol.V1.Proof
+
+now = 1_800_001_000
+
+proof = %Proof{
+  holder_public_key: holder_public,
+  proof_id: "proof-2026-001",
+  method: "GET",
+  target_uri: "https://service.example/records/1",
+  issued_at: now,
+  nonce: nil,
+  invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120002",
+  operation: "read_record",
+  grant_compact: grant_compact,
+  cast_arguments:
+    {:object,
+     [
+       {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
+     ]}
+}
+
+{:ok, proof_input} = BoundedAuthorityProtocol.V1.proof_signing_input(proof, %{})
+holder_signature = :crypto.sign(:eddsa, :none, proof_input.message, [holder_private, :ed25519])
+{:ok, proof_compact} = BoundedAuthorityProtocol.V1.assemble_compact(proof_input, holder_signature)
+
+proof_compact
+```
+
+## 4. Verify the grant
+
+The verifier holds no state and reads no clock — we supply the trusted key, the expected
+context, and the evaluation time.
+
+```elixir
+alias BoundedAuthorityProtocol.V1.{TrustedIssuer, ExpectedGrant, Bounds}
+
+trusted = %TrustedIssuer{key_id: "issuer-1", public_key: issuer_public}
+
+expected_grant = %ExpectedGrant{
+  issuer: "https://issuer.example",
+  audience: "https://service.example",
+  evaluation_time: now,
+  clock_skew: 60,
+  bounds: %{}
+}
+
+{:ok, grant_facts} = BoundedAuthorityProtocol.V1.verify_grant(grant_compact, trusted, expected_grant)
+
+# Facts are value-bearing and redacted, and authorization is explicitly not evaluated:
+Map.from_struct(grant_facts) |> Map.take([:issuer, :grant_id, :authorization])
+```
+
+## 5. Verify the full envelope
+
+```elixir
+alias BoundedAuthorityProtocol.V1.{Credentials, ExpectedRequest}
+
+credentials = %Credentials{grant: grant_compact, proof: proof_compact}
+
+expected_request = %ExpectedRequest{
+  trusted_issuer: trusted,
+  issuer: "https://issuer.example",
+  audience: "https://service.example",
+  method: "GET",
+  target_uri: "https://service.example/records/1",
+  invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120002",
+  operation: "read_record",
+  cast_arguments:
+    {:object,
+     [
+       {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
+     ]},
+  evaluation_time: now,
+  clock_skew: 60,
+  proof_max_age: 300,
+  nonce: :not_required,
+  bounds: %{}
+}
+
+{:ok, envelope_facts} = BoundedAuthorityProtocol.V1.check_envelope(credentials, expected_request)
+
+Map.from_struct(envelope_facts) |> Map.take([:operation, :authorization])
+```
+
+## 6. Every attack fails closed
+
+```elixir
+# A tampered signature byte:
+tampered =
+  grant_compact
+  |> String.split(".")
+  |> List.update_at(2, fn segment ->
+    i = div(String.length(segment), 2)
+    <<head::binary-size(i), byte, tail::binary>> = segment
+    head <> <<Bitwise.bxor(byte, 1)>> <> tail
+  end)
+  |> Enum.join(".")
+
+# The SAME proof against DIFFERENT arguments (selector-disallowed):
+wrong_args = %ExpectedRequest{expected_request |
+  cast_arguments:
+    {:object,
+     [
+       {"record", {:object, [{"tier", {:string, "bronze"}}, {"region", {:string, "us-east"}}]}}
+     ]}
+}
+
+# A stale proof (outside the max-age + skew window):
+stale = %ExpectedRequest{expected_request | evaluation_time: now + 361}
+
+results = %{
+  tampered_grant:
+    BoundedAuthorityProtocol.V1.check_envelope(
+      %Credentials{grant: tampered, proof: proof_compact},
+      expected_request
+    ),
+  selector_disallowed:
+    BoundedAuthorityProtocol.V1.check_envelope(credentials, wrong_args),
+  stale_proof: BoundedAuthorityProtocol.V1.check_envelope(credentials, stale)
+}
+
+# Every one is exactly {:error, :invalid} — no partial information, no exceptions.
+Enum.map(results, fn {k, v} -> {k, v == {:error, :invalid}} end)
+```
+
+
+
+## What you just saw
+
+- Deterministic producers + `assemble_compact` built exact compact JWS values from ephemeral
+  signatures — the package never sees a private key.
+- `verify_grant` and `check_envelope` checked every binding from caller-supplied trusted
+  inputs and returned redacted, non-authorizing facts.
+- A tampered byte, a selector-disallowed argument swap, and a stale proof each failed closed
+  with the single error value.
+
+What this notebook did NOT do: select trusted keys, reserve replay, check revocation, or make
+an authorization decision — those belong to a stateful authority runtime. See the
+specification's verification-contract section for the boundary in normative terms.
