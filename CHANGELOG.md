@@ -4,6 +4,30 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — corpus revision sidecar + re-derivability generator (no case byte or verdict change)
+
+- **`priv/conformance/v1/corpus/revision.json`**: the corpus's monotone revision integer (1)
+  with a generated-from provenance note, hash-covered as an entry in `index.json`'s per-file
+  SHA `files` set and enforced by exact file-set equality in every consumer — a tampered,
+  deleted, malformed, or wrongly-shaped sidecar fails every loader closed. `index.json` bytes
+  change once (the single files entry; 283 cases, verdicts, counts, and applicability are
+  byte-identical). The corpus-index schema's file-path pattern admits exactly the one reserved
+  root path. All six certified-index-SHA pins rotated in the same commit via the regeneration
+  script (ADR 0019 atomic-landing template), and both vendored SDK snapshots re-copied.
+- **`conformance/generators/`**: the corpus re-derivability tooling (authoring tooling, not a
+  runner, not in the published package). `build_corpus.mjs --verify` proves the shipped corpus
+  equals a rebuild from its frozen case files plus the shipped curated inputs (n_a reasons +
+  the public-key fingerprint census), including re-derivation of every tamper case's verbatim
+  artifact; `--rebuild-index`/`--bump-revision` are the amendment path. The README records the
+  honest provenance: the signed fixtures were minted with ephemeral keys at authoring time and
+  cannot be re-minted; everything derived is machine-rebuilt and byte-verified.
+- Every corpus consumer recognizes the sidecar fail-closed (Elixir loader + CLI, the
+  independent Node runner, and the TypeScript/Python/Rust/Go SDK runners — the two loaders that
+  previously skipped case-free files silently now enforce the sidecar's SHA and closed shape).
+- `docs/design/requirement-map.md` cites the revision integer (the `format`-string citation
+  was constant across revisions and could detect nothing); the five consumer-doc digest
+  citations refreshed to the rotated values.
+
 ### Added — corpus digest regeneration gate (no wire, bound, or verdict change)
 
 - **`scripts/regen_corpus_digests.exs` + `mix corpus.digests`**: one command regenerates every

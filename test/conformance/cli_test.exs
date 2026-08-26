@@ -47,7 +47,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   # "not the certified corpus" case a shrunken/regenerated-index corpus embodies. Corpus.load
   # accepts it AND the identity differs AND run/1 exits 1 ⟹ the pin (not integrity) caught it.
 
-  @certified_index_sha256 "paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw"
+  @certified_index_sha256 "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs"
 
   defp whitespace_perturbed_corpus do
     dst = unique_tmp("cli-noncertified") |> Path.dirname()

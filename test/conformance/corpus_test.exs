@@ -288,6 +288,17 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     %{"cases/json/trivial.json" => bytes}
   end
 
+  defp revision_sidecar_bytes do
+    jcs(
+      {:object,
+       [
+         {"format", {:string, "bounded-authority-protocol-v1-conformance-corpus-revision"}},
+         {"revision", {:integer, 1}},
+         {"generated_from", {:string, "conformance/generators/build_corpus.mjs"}}
+       ]}
+    )
+  end
+
   defp holder_thumbprint do
     {:ok, raw} =
       V1.Jwk.public_key_thumbprint_raw(
@@ -466,6 +477,108 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     corpus = synthetic_corpus() |> full_corpus_map([])
     extra = Map.put(corpus, "cases/extra/unlisted.json", trivial_case_bytes())
     assert {:error, :invalid} = Corpus.load(extra)
+  end
+
+  # --- revision sidecar (root revision.json entry) ---------------------------
+
+  test "a corpus carrying the revision sidecar loads (recognized, hash-covered, case-free)" do
+    map =
+      synthetic_corpus()
+      |> Map.put("revision.json", revision_sidecar_bytes())
+      |> full_corpus_map([])
+
+    assert {:ok, _corpus} = Corpus.load(map)
+  end
+
+  test "a tampered revision sidecar byte is rejected" do
+    corpus =
+      synthetic_corpus()
+      |> Map.put("revision.json", revision_sidecar_bytes())
+      |> full_corpus_map([])
+
+    # Tamper WITHOUT re-hashing the index entry: the per-file SHA-256 must fail it.
+    tampered =
+      Map.put(
+        corpus,
+        "revision.json",
+        String.replace(revision_sidecar_bytes(), "\"revision\":1", "\"revision\":2")
+      )
+
+    assert {:error, :invalid} = Corpus.load(tampered)
+  end
+
+  test "a self-consistent revision sidecar with a wrong shape is rejected" do
+    # Wrong shape BUT re-hashed into the index (self-consistent): only the sidecar's closed
+    # shape validation can fail it — an unknown member must not load.
+    wrong =
+      jcs(
+        {:object,
+         [
+           {"format", {:string, "bounded-authority-protocol-v1-conformance-corpus-revision"}},
+           {"revision", {:integer, 1}},
+           {"extra", {:boolean, true}}
+         ]}
+      )
+
+    map = synthetic_corpus() |> Map.put("revision.json", wrong) |> full_corpus_map([])
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "a declared-but-missing revision sidecar is rejected" do
+    corpus =
+      synthetic_corpus()
+      |> Map.put("revision.json", revision_sidecar_bytes())
+      |> full_corpus_map([])
+
+    # Keep the index entry, drop the file: the loader's sidecar fetch must fail closed.
+    dropped = Map.delete(corpus, "revision.json")
+    assert {:error, :invalid} = Corpus.load(dropped)
+  end
+
+  test "a revision sidecar whose bytes are not valid JSON is rejected" do
+    map = synthetic_corpus() |> Map.put("revision.json", "{") |> full_corpus_map([])
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "a self-consistent revision sidecar with a non-integer revision is rejected" do
+    wrong =
+      jcs(
+        {:object,
+         [
+           {"format", {:string, "bounded-authority-protocol-v1-conformance-corpus-revision"}},
+           {"revision", {:string, "one"}},
+           {"generated_from", {:string, "conformance/generators/build_corpus.mjs"}}
+         ]}
+      )
+
+    map = synthetic_corpus() |> Map.put("revision.json", wrong) |> full_corpus_map([])
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "a self-consistent revision sidecar with a non-string generated_from is rejected" do
+    wrong =
+      jcs(
+        {:object,
+         [
+           {"format", {:string, "bounded-authority-protocol-v1-conformance-corpus-revision"}},
+           {"revision", {:integer, 1}},
+           {"generated_from", {:integer, 7}}
+         ]}
+      )
+
+    map = synthetic_corpus() |> Map.put("revision.json", wrong) |> full_corpus_map([])
+    assert {:error, :invalid} = Corpus.load(map)
+  end
+
+  test "a revision sidecar at a non-reserved path is rejected" do
+    # revision.json is reserved at the corpus root only; under cases/ it is just a .json file
+    # that is not a case file, and must stay rejected.
+    map =
+      synthetic_corpus()
+      |> Map.put("cases/revision.json", revision_sidecar_bytes())
+      |> full_corpus_map([])
+
+    assert {:error, :invalid} = Corpus.load(map)
   end
 
   # --- counts (V1) ---------------------------------------------------------

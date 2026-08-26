@@ -153,6 +153,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "priv/conformance/v1/corpus/cases/signing-input/transition.json",
                     "priv/conformance/v1/corpus/cases/uri/normalize.json",
                     "priv/conformance/v1/corpus/index.json",
+                    "priv/conformance/v1/corpus/revision.json",
                     "usage-rules.md"
                   ])
 

@@ -90,7 +90,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "      {:ok, ^total} -> :ok",
       to: "      {:ok, _} -> :ok",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:473"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:586"]
     },
     %{
       # Disabling the per-file SHA-256 equality (always-true guard) lets a corpus with a stale
@@ -100,7 +100,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "           true <- sha256_b64(bytes) == hash do",
       to: "           true <- true do",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:438"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:449"]
     },
     # --- V3 corpus integrity: exact file-set equality -------------------------
     %{
@@ -114,7 +114,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "    if MapSet.equal?(declared, present),",
       to: "    if true,",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:465"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:476"]
     },
     # --- V2 corpus integrity: applicability required cells --------------------
     %{
@@ -126,7 +126,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "      n when is_integer(n) and n >= 1 -> observed_count == n",
       to: "      n when is_integer(n) and n >= 1 -> true",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:508"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:621"]
     },
     # --- Q25 corpus integrity: tamper verbatim-vs-derived equality ------------
     %{
@@ -138,7 +138,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "      derived == verbatim_bytes",
       to: "      true",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:564"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:677"]
     },
     # --- independent runner verdict agreement ---------------------------------
     %{
@@ -197,7 +197,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "      t when t in [\"compact\", \"grant\", \"proof\"] -> string_target_bytes(input, t)",
       to: "      t when t in [\"compact\", \"grant\", \"proof\"] -> text_target_bytes(input)",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:649"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:762"]
     },
     %{
       # The independent Node runner's verbatim-vs-derived tamper audit must run at load. Removing
@@ -592,7 +592,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "    if length(all_ids) == MapSet.size(MapSet.new(all_ids)) and Enum.all?(all_ids, &is_binary/1),",
       to: "    if true,",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:555"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:668"]
     },
     # --- runner permissiveness residuals: the four closed permissive gaps + the guard family -----
     %{

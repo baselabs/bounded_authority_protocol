@@ -25,7 +25,7 @@ recorded for the graduated publish.
 ## Conformance
 
 Passes all **283** published conformance vectors, recomputed from scratch, and SHA-binds the vendored corpus
-`index.json` at startup (`paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw`) — a mismatched vendored corpus fails
+`index.json` at startup (`TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs`) — a mismatched vendored corpus fails
 closed rather than drifting silently. Every case file is verified against the index's per-file SHA-256, and
 the two-boundary key census is asserted per run (observed import-boundary thumbprints ==
 `index.json` `public_key_fingerprints`, both directions; at authoring: `agreed=283 disagreed=0 census=11`).
