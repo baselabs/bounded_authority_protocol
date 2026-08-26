@@ -6,7 +6,7 @@
 //! algebra. This decoder is permissiveness closures #1/#3/#4/#5 (the JCS encoder
 //! owns the `(d)`-class per-node encode-bounds closure #6).
 //!
-//! Rules enforced (`docs/protocol-v1.md` § JSON algebra and decoding, lines 67–95):
+//! Rules enforced (`spec/bap-v1.md` § JSON algebra and decoding, lines 67–95):
 //! - `REQ1-JSON-no-duplicate`: a duplicate member name at ANY depth is rejected
 //!   before any map conversion.
 //! - `REQ1-JSON-single-value`: the input is exactly one RFC 8259 value followed
@@ -24,7 +24,7 @@
 use crate::bounds::Bounds;
 use crate::error::{Invalid, Result};
 
-/// The tagged JSON algebra — mirrors `docs/protocol-v1.md` § JSON algebra table.
+/// The tagged JSON algebra — mirrors `spec/bap-v1.md` § JSON algebra table.
 ///
 /// `Int(i64)` and `Float(f64)` are DISTINCT variants: `1` decodes to `Int(1)`,
 /// `1.0` to `Float(1.0)` (permissiveness closure #5 — selector semantic identity

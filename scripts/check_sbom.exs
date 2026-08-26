@@ -2,7 +2,6 @@ defmodule BoundedAuthorityProtocol.SbomCheck do
   @moduledoc false
 
   @name "bounded_authority_protocol"
-  @version "0.1.2"
 
   def run!([release_path, tooling_path]) do
     release = load_and_check_document!(release_path)
@@ -45,7 +44,7 @@ defmodule BoundedAuthorityProtocol.SbomCheck do
 
     checks = [
       {component["name"] == @name, "name"},
-      {component["version"] == @version, "version"},
+      {component["version"] == mix_exs_version(), "version"},
       {component["type"] == "library", "type"},
       {license_ids == ["Apache-2.0"], "license"},
       {is_binary(component["bom-ref"]), "bom-ref"},
@@ -127,6 +126,23 @@ defmodule BoundedAuthorityProtocol.SbomCheck do
       %{"license" => %{"id" => identifier}} -> [identifier]
       _other -> []
     end)
+  end
+
+  # The package version derived from mix.exs (works under `elixir script` invocation where
+  # Mix.Project is not alive — the same derivation the supply-chain workflow uses).
+  defp mix_exs_version do
+    root = Path.expand("..", __DIR__)
+
+    case File.read(Path.join(root, "mix.exs")) do
+      {:ok, source} ->
+        case Regex.run(~r/@version\s+"([^"]+)"/, source) do
+          [_, version] -> version
+          _ -> raise "cannot derive the package version from mix.exs"
+        end
+
+      _ ->
+        raise "cannot read mix.exs to derive the package version"
+    end
   end
 
   defp fail!(message), do: raise("SBOM check failed: #{message}")

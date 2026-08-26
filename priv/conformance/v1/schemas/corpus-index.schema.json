@@ -43,7 +43,7 @@
       "properties": {
         "path": {
           "type": "string",
-          "pattern": "^cases/.+\\.(json|raw)$"
+          "pattern": "^(cases/.+\\.(json|raw)|revision\\.json)$"
         },
         "sha256_base64url": {
           "type": "string",

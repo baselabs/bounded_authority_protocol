@@ -1,4 +1,4 @@
-"""Value-bearing, redacted, non-authorizing facts (protocol-v1.md § Public verification contract,
+"""Value-bearing, redacted, non-authorizing facts (spec/bap-v1.md § Public verification contract,
 REQ1-VERIFY-facts-redacted, REQ1-VERIFY-facts-not-credentials).
 
 No generic encoder, no ``asdict``, no authorization/decision method (AGENTS rule 1). Grant/Envelope/
@@ -16,7 +16,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class GrantFacts:
-    """GrantFacts (protocol-v1.md:322-324): version, issuer, grant_id, issuer-key fingerprint (raw 32),
+    """GrantFacts (spec/bap-v1.md): version, issuer, grant_id, issuer-key fingerprint (raw 32),
     holder thumbprint (raw 32), matched audience, grant times, authorization=not_evaluated."""
 
     version: int
@@ -33,7 +33,7 @@ class GrantFacts:
 
 @dataclass(frozen=True)
 class EnvelopeFacts:
-    """EnvelopeFacts (protocol-v1.md:342-348): GrantFacts + proof_id, invocation_id, operation, uri,
+    """EnvelopeFacts (spec/bap-v1.md): GrantFacts + proof_id, invocation_id, operation, uri,
     grant hash (ath raw 32), request hash (ba_req raw 32), proof issued_at."""
 
     version: int
@@ -75,7 +75,7 @@ class ChainFacts:
 
 @dataclass(frozen=True)
 class AnchorFacts:
-    """AnchorFacts (protocol-v1.md § Historical anchor verify): trust=not_evaluated.
+    """AnchorFacts (spec/bap-v1.md § Historical anchor verify): trust=not_evaluated.
 
     Field set mirrors the Elixir reference AnchorFacts (anchor_facts.ex) exactly. The reference
     carries NO key_id (only the key_fingerprint).
@@ -112,7 +112,7 @@ class KeyTransitionFacts:
 
 @dataclass(frozen=True)
 class AnchoredExportFacts:
-    """AnchoredExportFacts (protocol-v1.md:437-440): the ONLY facts type with an authorization field.
+    """AnchoredExportFacts (spec/bap-v1.md): the ONLY facts type with an authorization field.
 
     Field set mirrors the Elixir reference AnchoredExportFacts (anchored_export_facts.ex) exactly.
     """

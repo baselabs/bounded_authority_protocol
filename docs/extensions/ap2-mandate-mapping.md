@@ -48,9 +48,13 @@ an **Amount Range**, a **Budget** total, and an **Execution Date** range (AP2 v0
 Protocol's selector algebra does **not** express: its `equals`/`one_of` kinds bind exact-value and
 enumerated-set arguments only (see [`capability-authorization.mdx`](./capability-authorization.mdx)
 § 5). So the Payment Mandate correspondence is partial — AP2's set-membership constraints (Allowed
-Payee / Allowed Payment Instrument / Allowed PISP) map to `one_of` selectors, but its amount,
-budget, and date-range constraints have no selector representation and would remain a deployment-side
-policy check, not a bound the grant itself carries.
+Payee / Allowed Payment Instrument / Allowed PISP) map to `one_of` selectors, and its
+amount/date-range constraints are DECIDED successor-major scope: per-request range selector
+kinds (the natural extension of the selector algebra, verifiable statelessly). Its cumulative
+budget constraints are deliberately NOT selector scope — a stateless verifier cannot check a
+cumulative bound, so budgets route to the issuer-attestation/runtime-accounting posture.
+Both decisions are recorded in the successor-major charter (`docs/design/successor-major-charter.md`
+§ Selector expressiveness) rather than left as a deployment-side gap.
 
 ## The host-protocol question (open)
 

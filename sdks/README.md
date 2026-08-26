@@ -1,7 +1,7 @@
 # Bounded Authority Protocol — Cross-language verifier SDKs
 
 Typed, provider-neutral verifier libraries that reimplement the BAP v1 verification profile from the
-published spec ([`docs/protocol-v1.md`](../docs/protocol-v1.md)) and consume the published conformance
+published spec ([`spec/bap-v1.md`](../spec/bap-v1.md)) and consume the published conformance
 corpus ([`priv/conformance/v1/corpus/`](../priv/conformance/v1/corpus/)). They are **distribution
 surfaces** — typed client libraries for third-party verifiers, not additional normativity — and
 **none is published to a registry yet**: per
@@ -23,8 +23,11 @@ against the same published corpus.
   (serial backend) + `sha2` + `ryu-js`. See its [README](rust/README.md) and the
   [deployment guide](../docs/deployment/rust-sdk.md) (AWS Lambda `provided.al2023` + PostgreSQL `plrust`
   posture).
+- **[`go/`](go/)** — `bounded_authority_protocol_go`. Go 1.25 floor, zero runtime dependencies
+  (stdlib `crypto/ed25519` + `crypto/sha256` only). See its [README](go/README.md) and the
+  [deployment guide](../docs/deployment/go-sdk.md).
 
-All three are **pure verification libraries** (no I/O, clock, RNG, or network in the verify path). They return
+All four are **pure verification libraries** (no I/O, clock, RNG, or network in the verify path). They return
 value-bearing redacted facts or `Invalid` — never an authorization decision. See
 [ADR 0014](../docs/adr/0014-cross-language-verifier-sdks.md) for the packaging, support-surface, and
 derivation-hygiene decisions.

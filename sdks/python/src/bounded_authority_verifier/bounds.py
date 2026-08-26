@@ -1,4 +1,4 @@
-"""The fixed v1 profile maxima — the 38-row Hard maxima table (protocol-v1.md:352-390).
+"""The fixed v1 profile maxima — the 38-row Hard maxima table (spec/bap-v1.md).
 
 Pinned by the corpus ``bounds.new`` cases so any mistyped constant fails. Fixed-width keys
 (REQ1-BOUNDS-fixed-widths, L395): ``digest_bytes``, ``public_key_bytes``, ``signature_bytes`` are the
@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from types import MappingProxyType
 
-# The 38-row Hard maxima table (protocol-v1.md:352-390). Derived from the spec, NOT from lib/*.ex.
+# The 38-row Hard maxima table (spec/bap-v1.md). Derived from the spec, NOT from lib/*.ex.
 MAXIMA: Mapping[str, int] = {
     "compact_bytes": 65536,
     "encoded_segment_bytes": 32768,

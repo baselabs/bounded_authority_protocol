@@ -19,7 +19,7 @@
 //! cryptographic widths (`[u8; 32]` / `[u8; 64]`) are enforced as array types,
 //! not stored in [`Bounds`] (`REQ1-BOUNDS-fixed-widths`).
 //!
-//! Derived first-hand from `docs/protocol-v1.md` § Public verification contract
+//! Derived first-hand from `spec/bap-v1.md` § Public verification contract
 //! (lines 291–373) and § Consumption chain and anchored export (lines 443–465),
 //! `docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md`,
 //! and the conformance corpus under `priv/conformance/v1/corpus/cases/` — NOT
@@ -107,7 +107,7 @@ pub struct SigningInput {
 /// A caller-trusted issuer key: exact `kid` + raw 32-byte Ed25519 public key.
 ///
 /// "`TrustedIssuer` contains exact `kid` and raw 32-byte public key"
-/// (`docs/protocol-v1.md` line 336). The verifier accepts public keys only;
+/// (`spec/bap-v1.md` line 336). The verifier accepts public keys only;
 /// there is no field for a private exponent (`REQ1-HEADER-no-private-jwk`).
 /// Sourced from the `grant-verify` / `envelope/check` corpus `trusted_issuer`
 /// / `key_id`+`public_key` members.
@@ -122,7 +122,7 @@ pub struct TrustedIssuer {
 /// Caller expectation for grant verification.
 ///
 /// "`ExpectedGrant` contains issuer, audience, integral evaluation time,
-/// nonnegative skew, and tightening bounds" (`docs/protocol-v1.md` lines
+/// nonnegative skew, and tightening bounds" (`spec/bap-v1.md` lines
 /// 336–338). The corpus `grant-verify` input supplies `issuer`, `audience`,
 /// `evaluation_time`, `clock_skew`; `bounds` defaults to
 /// [`Bounds::maximum()`] when the corpus carries no overrides, stored here so
@@ -145,7 +145,7 @@ pub struct ExpectedGrant {
 /// Whether a proof nonce is required by the caller's replay policy.
 ///
 /// The protocol's `:not_required | {:required, nonce}` spelled as a Rust enum
-/// (`docs/protocol-v1.md` line 353). In `NotRequired` mode the proof MUST NOT
+/// (`spec/bap-v1.md` line 353). In `NotRequired` mode the proof MUST NOT
 /// carry a `nonce`; in `Required(nonce)` it MUST carry exactly that nonce
 /// (`REQ1-VERIFY-nonce-mode`).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,7 +161,7 @@ pub enum NonceMode {
 /// "`ExpectedRequest` additionally contains a case-sensitive RFC 9110 token
 /// method, normalized HTTPS URI, lowercase RFC 4122 invocation UUID, operation,
 /// any tagged JSON cast arguments, positive proof maximum age, and
-/// `:not_required | {:required, nonce}`" (`docs/protocol-v1.md` lines 351–353),
+/// `:not_required | {:required, nonce}`" (`spec/bap-v1.md` lines 351–353),
 /// on top of the [`ExpectedGrant`] scalar/timing fields. The corpus
 /// `envelope/check.json` `input.expected` object also embeds the
 /// [`TrustedIssuer`] (the `check_envelope(Credentials, ExpectedRequest)` façade
@@ -207,7 +207,7 @@ pub struct ExpectedRequest {
 /// Mirrors the `envelope/check.json` corpus `input.{grant, proof}` pair: the
 /// received grant compact and proof compact bytes. Not in the T9 plan's
 /// explicit name list, but required by the `check_envelope(Credentials,
-/// ExpectedRequest)` façade signature (`docs/protocol-v1.md` line 303).
+/// ExpectedRequest)` façade signature (`spec/bap-v1.md` line 303).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Credentials {
     /// The received grant compact bytes (ASCII).
@@ -223,7 +223,7 @@ pub struct Credentials {
 /// The non-authorizing locator result: a `kid` hint plus `trust: not_evaluated`.
 ///
 /// `untrusted_key_locator` "returns only `{:ok, %KeyLocator{kid: kid, trust:
-/// :not_evaluated}}`" (`docs/protocol-v1.md` lines 433–435). It does not select
+/// :not_evaluated}}`" (`spec/bap-v1.md` lines 433–435). It does not select
 /// a key, decode claims, verify, evaluate trust, or authorize
 /// (`REQ1-LOCATOR-not-authority`). Sourced from `key-locator/untrusted.json`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -535,7 +535,7 @@ pub struct ExpectedKeyTransition {
 /// The retrieved archived object an anchored-export verification binds.
 ///
 /// "`anchored export verification accepts only %ArchivedObject{chunks:
-/// raw_binary_chunks, version: version}`" (`docs/protocol-v1.md` lines
+/// raw_binary_chunks, version: version}`" (`spec/bap-v1.md` lines
 /// 450–452). `chunks` is the bounded nonempty proper flat chunk list (each
 /// `base64url`-decoded from `anchored-export/verify.json` `input.chunks`);
 /// `version` is the observed object-store version, compared for exact equality
@@ -661,7 +661,7 @@ pub struct ProducedSigningInput {
 /// One operation of a grant the producer frames into a grant payload.
 ///
 /// An operation is exactly `{name: string, selectors: selector_array}`
-/// (`docs/protocol-v1.md` § Claims). `selectors` is stored as the tagged
+/// (`spec/bap-v1.md` § Claims). `selectors` is stored as the tagged
 /// [`JsonValue`] selector objects (each `{kind, ...}`) the corpus supplies;
 /// the producer emits them verbatim inside the payload's `operations` array.
 #[derive(Debug, Clone, PartialEq)]

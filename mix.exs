@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.MixProject do
   use Mix.Project
 
-  @version "0.1.2"
+  @version "0.2.0"
   @source_url "https://github.com/baselabs/bounded_authority_protocol"
 
   def project do
@@ -75,6 +75,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       maintainers: ["rjpalermo"],
       files: [
         "lib",
+        "spec",
         "priv/conformance/v1/corpus",
         "priv/conformance/v1/schemas",
         "priv/conformance/v1/vectors",
@@ -136,6 +137,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
       source_url: @source_url,
       extras: [
         "README.md",
+        "docs/guides/getting-started.md",
+        "docs/guides/implementers-guide.md",
+        "docs/guides/upgrading.md",
         "CHANGELOG.md",
         "LICENSE",
         "NOTICE",
@@ -208,6 +212,13 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "escript.build",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/v1/corpus"
       ],
+      "corpus.digests": ["run --no-start scripts/regen_corpus_digests.exs"],
+      "corpus.sync": ["run --no-start scripts/check_corpus_sync.exs"],
+      "spec.facts": ["run --no-start scripts/check_spec_facts.exs"],
+      "spec.examples": ["run --no-start spec/tools/build_examples.exs"],
+      "spec.render": ["run --no-start spec/tools/render_derived.exs"],
+      formal: ["cmd env BAP_FORMAL_OPTIONAL=1 scripts/run_formal.sh"],
+      "spec_facts.mutations": ["run --no-start scripts/check_spec_facts_mutations.exs"],
       "license.check": [
         "cmd elixir scripts/check_dependency_licenses.exs artifacts/tooling.cdx.json"
       ],
@@ -226,6 +237,12 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "architecture",
+        "corpus.sync",
+        "corpus.digests",
+        "spec.facts",
+        "spec.examples",
+        "spec.render",
+        "formal",
         "credo --strict",
         "verification.performance",
         "chain_archive.performance",
@@ -237,7 +254,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "release.candidate",
         "chain_archive.mutations",
         "conformance.mutations",
-        "conformance.verify"
+        "conformance.verify",
+        "spec_facts.mutations"
       ]
     ]
   end

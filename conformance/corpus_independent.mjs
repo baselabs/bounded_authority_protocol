@@ -955,6 +955,30 @@ function loadCorpus(corpusDir) {
   const caseIds = new Set();
   for (const [rel, bytes] of fileBytes) {
     if (extname(rel) !== ".json") continue;
+    // The revision sidecar occupies the one reserved non-case JSON path: closed 3-member
+    // shape, case-free (declared count 0, checked by the index total sum above).
+    if (rel === "revision.json") {
+      const sidecar = parseJsonNoDuplicates(bytes.toString("utf8"), "revision.json");
+      assert(
+        Object.keys(sidecar).sort().join(",") === "format,generated_from,revision",
+        "revision.json: closed member set",
+      );
+      assert(
+        sidecar.format === "bounded-authority-protocol-v1-conformance-corpus-revision",
+        "revision.json: format",
+      );
+      assert(
+        Number.isSafeInteger(sidecar.revision) && sidecar.revision >= 1,
+        "revision.json: monotone integer revision",
+      );
+      assert(
+        typeof sidecar.generated_from === "string" &&
+          sidecar.generated_from.length >= 1 &&
+          sidecar.generated_from.length <= 256,
+        "revision.json: generated_from provenance string",
+      );
+      continue;
+    }
     const fileCases = parseJsonNoDuplicates(
       bytes.toString("utf8"),
       `case file ${rel}`,

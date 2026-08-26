@@ -1,7 +1,7 @@
 //! Selector evaluation — the request-binding algebra (silent auth class).
 //!
 //! Selectors are the closed-set predicates a grant's operation uses to bind a
-//! specific request's server-derived tagged arguments (`docs/protocol-v1.md`
+//! specific request's server-derived tagged arguments (`spec/bap-v1.md`
 //! § Selector algebra, lines 204–224). A selector bug that accepts a forged
 //! token, or a tag-collapse that matches the wrong value, yields WRONG
 //! AUTHORIZATION silently — this is the silent-auth-class module.
@@ -25,7 +25,7 @@
 //! objects as unordered key/value sets. No selector grants business
 //! authorization (`REQ1-SELECTOR-not-authorization`).
 //!
-//! Derived first-hand from `docs/protocol-v1.md` § Selector algebra — NOT from
+//! Derived first-hand from `spec/bap-v1.md` § Selector algebra — NOT from
 //! any sibling-SDK or Elixir source (ADR 0014 D5).
 
 // `evaluate` / `semantic_identity` are `pub(crate)` and are wired by the v1

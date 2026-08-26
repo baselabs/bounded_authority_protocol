@@ -16,8 +16,8 @@ Naming scheme: `BAP<contract-major>-<signature>-<digest>`.
 
 | Suite | Status | Definition |
 |---|---|---|
-| `BAP1-Ed25519-SHA256` | active | EdDSA/Ed25519, SHA-256, RFC 8785 JCS, `BAP1-*` domain separators, fixed 32-byte keys / 64-byte signatures — the complete current [normative profile](../protocol-v1.md) |
-| ML-DSA (FIPS 204) successor | anticipated | Named on definition per the scheme (`BAP<contract-major>-ML-DSA-<digest>`); the anticipated parameter sets are ML-DSA-44 (NIST category 2), ML-DSA-65 (category 3), ML-DSA-87 (category 5); hybrid Ed25519+ML-DSA composite evaluated at that time; see [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) and charter § Cryptographic suite identity |
+| `BAP1-Ed25519-SHA256` | active | EdDSA/Ed25519, SHA-256, RFC 8785 JCS, `BAP1-*` domain separators, fixed 32-byte keys / 64-byte signatures — the complete current `normative profile` |
+| `BAP2-*` ML-DSA family (FIPS 204 / RFC 9964) | anticipated | The post-quantum successor candidate family per `docs/adr/0026-pq-successor-suite.md`: ML-DSA-65 (category 3) baseline, ML-DSA-87 (category 5) higher tier, JOSE mapping per RFC 9964, hybrid Ed25519+ML-DSA composite posture reserved per draft-ietf-jose-pq-composite-sigs (decided at successor definition time); quantum-readiness statement and revisit triggers recorded there; activation successor-major only (ADR 0009) |
 
 ## Claim names
 
@@ -36,14 +36,15 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 
 ## `typ` values
 
-| Value | Status | Purpose |
-|---|---|---|
-| `ba+cap` | active | Capability grant (compact JWS) |
-| `dpop+jwt` | active | Holder proof (RFC 9449) |
-| `ba+chain-anchor` | active | Signed consumption-chain boundary anchor |
-| `ba+key-transition` | active | Authenticated historical-key transition |
-| `ba+cap-delegated` | reserved | Delegated attenuated grant — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md) |
-| `ba+suite-attestation` | reserved | Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
+<!-- facts:typ-values -->
+| Value | Status | Media type | Purpose |
+|---|---|---|---|
+| `ba+cap` | active | `application/ba-cap+jwt` | Capability grant (compact JWS) |
+| `dpop+jwt` | active | registered by RFC 9449 | Holder proof (RFC 9449) |
+| `ba+chain-anchor` | active | `application/ba-chain-anchor+jwt` | Signed consumption-chain boundary anchor |
+| `ba+key-transition` | active | `application/ba-key-transition+jwt` | Authenticated historical-key transition |
+| `ba+cap-delegated` | reserved | `application/ba-cap-delegated+jwt` | Delegated attenuated grant — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md) |
+| `ba+suite-attestation` | reserved | `application/ba-suite-attestation+jwt` | Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
 
 ## Selector kinds
 
@@ -77,3 +78,7 @@ MUST NOT be used by deployments.
 `ba_inv`, `ba_op`, `ba_req` (JWT Claims registry) and the `ba+*` media-type suffix values are
 filed at first external submission (roadmap row BAP-12). Until then this document is the
 authoritative namespace and the `ba_`/`ba+` prefixes are the collision-avoidance convention.
+
+The media-type column names the RFC 6838 registration (or reservation) associated with each
+value — a related but distinct namespace from the wire `typ` itself; the wire values are
+unchanged. Templates and their machine-readable sources live in [iana/README.md](iana/README.md).

@@ -2,7 +2,7 @@ package verifier
 
 import "strings"
 
-// Claim-shape validators transcribed from docs/protocol-v1.md § Claims and
+// Claim-shape validators transcribed from spec/bap-v1.md § Claims and
 // § Protected headers. All are fail-closed and value-free on rejection.
 
 // allZeroHashB64 is the all-zero SHA-256 digest in canonical base64url: the

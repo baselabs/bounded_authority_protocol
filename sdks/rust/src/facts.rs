@@ -26,7 +26,7 @@
 //!
 //! # Derivation
 //!
-//! Derived first-hand from `docs/protocol-v1.md` § Public verification contract
+//! Derived first-hand from `spec/bap-v1.md` § Public verification contract
 //! (lines 336–373) and § Consumption chain and anchored export (lines 443–465),
 //! and `docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md`
 //! § Results and authority (lines 82–91) — NOT from any sibling-SDK or Elixir
@@ -60,7 +60,7 @@ pub struct NotEvaluated;
 ///
 /// "contains exactly version, issuer, grant ID, raw 32-byte issuer-key
 /// fingerprint, raw 32-byte holder thumbprint, matched audience, grant times,
-/// and `authorization: :not_evaluated`" (`docs/protocol-v1.md` lines 347–349).
+/// and `authorization: :not_evaluated`" (`spec/bap-v1.md` lines 347–349).
 /// Grant times are the decoded `iat` / `nbf` / `exp` NumericDates. The
 /// fingerprints/thumbprints are raw 32-byte SHA-256 digests, not raw keys.
 ///
@@ -96,7 +96,7 @@ pub struct GrantFacts {
 /// Redacted facts returned by combined envelope verification (`check_envelope`).
 ///
 /// "adds proof ID, invocation ID, operation, normalized URI, raw grant/request
-/// hashes, and proof issuance time" (`docs/protocol-v1.md` lines 369–370) on top
+/// hashes, and proof issuance time" (`spec/bap-v1.md` lines 369–370) on top
 /// of the grant result. `check_envelope` re-verifies the raw grant, so
 /// `EnvelopeFacts` **embeds** [`GrantFacts`] (the grant view it re-established)
 /// rather than duplicating its fields. Both the embedded grant view and the
@@ -140,7 +140,7 @@ pub struct EnvelopeFacts {
 /// (`check_chain`).
 ///
 /// "Successful facts state the performed cryptographic checks and always retain
-/// `trust: :not_evaluated`" (`docs/protocol-v1.md` line 462). The fields are the
+/// `trust: :not_evaluated`" (`spec/bap-v1.md` line 462). The fields are the
 /// VERIFIED chain boundaries: chain identity, row count, first/last sequence,
 /// and the caller predecessor / caller head the range was bound against
 /// (ADR 0004 § Consumption rows: "requires ... chain identity, consecutive
