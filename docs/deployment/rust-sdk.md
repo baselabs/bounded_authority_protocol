@@ -5,7 +5,7 @@ fail-closed reimplementation of the BAP v1 profile. It is a **verifier**: it ret
 facts or `Invalid`, never an authorization decision. This guide covers the two serverless/edge deployment
 targets named in the BAP-15 acceptance bar: AWS Lambda (`provided.al2023`) and PostgreSQL (`plrust`).
 
-See [`docs/protocol-v1.md`](../protocol-v1.md) for the verification contract and
+See `spec/bap-v1.md` (the normative authority; `docs/protocol-v1.md` is its generated view) for the verification contract and
 [`../adr/0014-cross-language-verifier-sdks.md`](../adr/0014-cross-language-verifier-sdks.md) for the
 packaging and derivation-hygiene decisions.
 

@@ -37,21 +37,27 @@ jobs:
         run: mix quality
 
       - name: Build exact unpublished archive
-        run: mix hex.build --output artifacts/bounded_authority_protocol-0.1.0.tar
+        # Derive the artifact name from mix.exs @version — a hardcoded filename is the
+        # quiet-mislabel class (the docs-currency test pins this derivation).
+        run: |
+          VERSION="$(grep -m1 '@version ' mix.exs | sed -E 's/.*@version "([^"]+)".*/\1/')"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          mix hex.build --output "artifacts/bounded_authority_protocol-$VERSION.tar"
 
       - name: Record archive checksum
         working-directory: artifacts
-        run: sha256sum bounded_authority_protocol-0.1.0.tar > SHA256SUMS
+        run: |
+          cd artifacts && sha256sum "bounded_authority_protocol-$VERSION.tar" > SHA256SUMS
 
       - name: Attest build provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
-          subject-path: artifacts/bounded_authority_protocol-0.1.0.tar
+          subject-path: artifacts/bounded_authority_protocol-${{ env.VERSION }}.tar
 
       - name: Attest release SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
-          subject-path: artifacts/bounded_authority_protocol-0.1.0.tar
+          subject-path: artifacts/bounded_authority_protocol-${{ env.VERSION }}.tar
           sbom-path: artifacts/release.cdx.json
 
       - name: Upload CI package evidence
@@ -59,7 +65,7 @@ jobs:
         with:
           name: bounded-authority-protocol-${{ github.sha }}
           path: |
-            artifacts/bounded_authority_protocol-0.1.0.tar
+            artifacts/bounded_authority_protocol-${{ env.VERSION }}.tar
             artifacts/release.cdx.json
             artifacts/tooling.cdx.json
             artifacts/SHA256SUMS
