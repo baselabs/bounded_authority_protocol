@@ -137,6 +137,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
       source_url: @source_url,
       extras: [
         "README.md",
+        "docs/guides/getting-started.md",
+        "docs/guides/implementers-guide.md",
+        "docs/guides/upgrading.md",
         "CHANGELOG.md",
         "LICENSE",
         "NOTICE",

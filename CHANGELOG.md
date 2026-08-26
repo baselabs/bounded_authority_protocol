@@ -4,6 +4,21 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — code of conduct, guides taxonomy, README restructure (no wire change)
+
+- **`CODE_OF_CONDUCT.md`** (Contributor Covenant v2.1, canonical text) at the root, linked
+  from CONTRIBUTING.md.
+- **Guides taxonomy** under `docs/guides/`: getting-started.md (zero to a verified envelope,
+  the three rules that surprise newcomers) and a curated-order README; wired as ExDoc extras
+  in reading order (implementers-guide and upgrading land with their own slices as wired
+  placeholders).
+- **README restructure**: a Documentation section leading with the guides index; a "When NOT
+  to use this" section (authorization decisions, transport/confidentiality/storage,
+  permissive parsing, online revocation/replay — each pointing at what to use instead); and a
+  Named-misuses section (facts-as-authority, facts-as-runtime-input, kid-as-key-selector,
+  bound-loosening, client-derived request context) — the ash_onetime anti-pattern format,
+  product-neutral.
+
 ### Added — ProVerif model + CI harness + findings ledger (no wire change)
 
 - **`spec/formal/proverif/bap-core.pv`**: the stateless-core model under ProVerif 2.05 —

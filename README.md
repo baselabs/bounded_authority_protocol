@@ -122,11 +122,56 @@ extensions track lives under `docs/extensions/`.
 
 ## Documentation
 
+Guides, in curated reading order:
+
+1. [Getting started](docs/guides/getting-started.md) — zero to a verified envelope, and the
+   three rules that surprise newcomers.
+2. [The implementer's guide](docs/guides/implementers-guide.md) — building a conforming
+   verifier in any language.
+3. [Upgrading](docs/guides/upgrading.md) — the published compatibility contract.
+
+Reference set:
+
 - `spec/bap-v1.md` — the normative v1 wire profile (docs/protocol-v1.md is its generated view).
 - `docs/design/protocol-charter.md` — what the verifier does and the verification chain.
 - `docs/design/conformance-contract.md` — how conformance is proven.
 - `docs/design/standards-track.md` — evolution, suite succession, governance, and venue strategy.
 - `docs/governance.md` — change classes, errata, deprecation, and security-release policy.
+
+## When NOT to use this
+
+- **You need an authorization decision.** This package verifies bytes; it never decides. An
+  operational decision requires a stateful authority runtime that owns trust selection,
+  replay reservation, and revocation. Treating a verification result as execution authority
+  moves all of those checks to nothing.
+- **You need transport security, confidentiality, or storage.** Every wire object is plaintext
+  JSON by design; the profile provides authenticity and integrity over TLS-transported,
+  runtime-stored artifacts.
+- **You want permissive parsing.** There is no compatibility mode, no tolerance for unknown
+  members, and no alternate-encoding acceptance — the closed rejection IS the product.
+- **You need online revocation or replay defense.** Those are runtime responsibilities; the
+  verifier is stateless by contract.
+
+## Named misuses
+
+Misuse: treating `GrantFacts` or `EnvelopeFacts` as a decision or credential. Facts carry
+`authorization: :not_evaluated` and are redacted; an accepting them as authority is the
+central anti-pattern this package exists to prevent.
+
+Misuse: passing a caller-provided facts struct to the runtime boundary. The runtime accepts
+RAW credentials at its public boundary and performs its own verification; a facts struct is an
+output, never an input.
+
+Misuse: re-deriving trusted keys from the credential (e.g., using the untrusted `kid` as a
+lookup the attacker controls). `kid` is a case-sensitive hint; key selection belongs to the
+caller's trusted-key set.
+
+Misuse: loosening bounds because a "legitimate" payload exceeded them. The bounds are part of
+the wire contract; an oversized payload is non-conforming, not a bug.
+
+Misuse: accepting the proof without the server-derived request context. The request digest is
+computed over the SERVER's derived operation and typed arguments — never over anything the
+presenting client asserts.
 
 ## Development
 
