@@ -209,6 +209,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "cmd ./bounded_authority_conformance --corpus priv/conformance/v1/corpus"
       ],
       "corpus.digests": ["run --no-start scripts/regen_corpus_digests.exs"],
+      "spec.facts": ["run --no-start scripts/check_spec_facts.exs"],
       "license.check": [
         "cmd elixir scripts/check_dependency_licenses.exs artifacts/tooling.cdx.json"
       ],
@@ -228,6 +229,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "compile --warnings-as-errors",
         "architecture",
         "corpus.digests",
+        "spec.facts",
         "credo --strict",
         "verification.performance",
         "chain_archive.performance",

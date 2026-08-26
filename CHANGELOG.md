@@ -4,6 +4,34 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — spec-facts drift gate against the current authority (no wire, bound, or verdict change)
+
+- **`spec/tools/extract_facts.exs` + `spec/facts/baseline-v1.json`**: the normative facts of the
+  CURRENT authority (`docs/protocol-v1.md` + ADR 0004 byte definitions + the registries typ
+  table) are now machine-extracted from ten closed `<!-- facts:key -->` anchor regions (bounds,
+  header members, grant/proof claims, selector kinds, typ values, domain separators, digest
+  constructions, archive framing, error shape) and frozen as a byte-deterministic baseline. A
+  future editor who changes any normative fact — spec, bound, corpus, requirement map, or
+  registry — is stopped by `mix spec.facts` naming the divergent pole pair.
+- **`scripts/check_spec_facts.exs` + `mix spec.facts` (wired into `mix quality`)**: rule 1b
+  (extraction == frozen baseline), rule 2 (spec closed sets ⊇ the corpus's valid-case member
+  unions, direction-aware, with justified optional-unobserved marks in
+  `spec/facts/coverage-v1.json`), rule 3 (spec REQ-id set == requirement-map set, each defined
+  once), rule 4 (requirement-statement hashes == `spec/facts/requirement-statements-v1.json` —
+  silent softening reds), rule 5 (map-cited counts re-derived from the live corpus index),
+  rule 6 (map cites the corpus revision integer), rule 9 (every authority file git-tracked and
+  thus inside the public-surface privacy gate's full-tree canary sweep — the ADR 0023 topology;
+  no term list is tracked), rule 10 (anchor completeness: every normative table inside exactly
+  one anchored region, with the JSON-algebra binding table's coverage mechanically verified
+  against the typed-projection facts). Rule 1's bounds-dump equality lives as
+  `test/spec_facts_test.exs` (needs the compiled Bounds module).
+- The gate ships GREEN against the old authority — the guards are proven against the world they
+  protect BEFORE the authority swap. Every rule proven red-capable at landing by a named
+  mutation (spec digit, Bounds digit, map statement softening, cited count, revision citation,
+  a planted privacy-canary term in an authority doc, a deleted anchor — each caught, each
+  restored). Gate runtime ~0.2s; rules 7 (IANA), 8 (formal companions), and 11 (keyword census)
+  arrive with their owning landings.
+
 ### Added — corpus revision sidecar + re-derivability generator (no case byte or verdict change)
 
 - **`priv/conformance/v1/corpus/revision.json`**: the corpus's monotone revision integer (1)
