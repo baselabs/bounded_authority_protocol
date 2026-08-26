@@ -57,7 +57,7 @@ from bounded_authority_verifier.uri import uri_normalize  # noqa: E402
 
 CORPUS_DIR = _REPO_ROOT / "priv" / "conformance" / "v1" / "corpus"
 # The certified index.json SHA-256 (ADR 0014 D4). A mismatched vendored corpus fails closed.
-CERTIFIED_INDEX_SHA = "a5ac7361c508d2bb55c6ca3045a5cc06ec4a3f64f65904214108c6f10c704dcc"
+CERTIFIED_INDEX_SHA = "4cb5072ab40ffd4b111659e6d4ab20209202380505f1f8424b96d22e533cb91b"
 
 INVALID = object()  # sentinel: any genuine protocol rejection maps to this
 
@@ -93,6 +93,28 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes
         path = entry["path"]
         if path.endswith(".raw"):
             raws[path] = (CORPUS_DIR / path).read_bytes()
+            continue
+        # The revision sidecar occupies the one reserved non-case JSON path: verify its SHA
+        # (no agreement backstop) and its closed shape; it declares zero cases.
+        if path == "revision.json":
+            sidecar_raw = (CORPUS_DIR / path).read_bytes()
+            sha = entry.get("sha256_base64url")
+            if not sha or _b64e(sha256(sidecar_raw)) != sha:
+                abort("revision.json: hash mismatch")
+            sidecar = json.loads(sidecar_raw.decode("utf8"))
+            if sorted(sidecar.keys()) != ["format", "generated_from", "revision"]:
+                abort("revision.json: closed member set")
+            if sidecar["format"] != "bounded-authority-protocol-v1-conformance-corpus-revision":
+                abort("revision.json: format")
+            if (
+                not isinstance(sidecar["revision"], int)
+                or isinstance(sidecar["revision"], bool)
+                or sidecar["revision"] < 1
+            ):
+                abort("revision.json: monotone integer revision")
+            source = sidecar["generated_from"]
+            if not isinstance(source, str) or not 1 <= len(source) <= 256:
+                abort("revision.json: generated_from provenance string")
             continue
         file_json = json.loads((CORPUS_DIR / path).read_text("utf8"))
         cases.extend(file_json["cases"])

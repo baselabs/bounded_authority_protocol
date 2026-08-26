@@ -22,7 +22,7 @@ import (
 // certifiedIndexSHA256 is the SHA-256 of the certified corpus index.json this
 // SDK was conformed against (base64url). A vendored corpus that hashes to
 // anything else fails closed here — silent drift is impossible.
-const certifiedIndexSHA256 = "paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw"
+const certifiedIndexSHA256 = "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs"
 
 const corpusDir = "corpus"
 
@@ -128,6 +128,35 @@ func loadCorpus(t *testing.T) (*corpusIndex, []loadedFile) {
 		}
 		if f.Cases == 0 && strings.HasSuffix(f.Path, ".raw") {
 			continue // integrity-verified sidecar blob, not a case file
+		}
+		// The revision sidecar occupies the one reserved non-case JSON path: closed 3-member
+		// shape, case-free. Its SHA-256 was verified generically above.
+		if f.Path == "revision.json" && f.Cases == 0 {
+			var members map[string]json.RawMessage
+			if err := json.Unmarshal(raw, &members); err != nil {
+				t.Fatalf("revision.json parse: %v", err)
+			}
+			if len(members) != 3 || members["format"] == nil ||
+				members["revision"] == nil || members["generated_from"] == nil {
+				t.Fatalf("revision.json: closed member set")
+			}
+			var format string
+			if err := json.Unmarshal(members["format"], &format); err != nil {
+				t.Fatalf("revision.json: format: %v", err)
+			}
+			if format != "bounded-authority-protocol-v1-conformance-corpus-revision" {
+				t.Fatalf("revision.json: format const")
+			}
+			var revision int
+			if err := json.Unmarshal(members["revision"], &revision); err != nil || revision < 1 {
+				t.Fatalf("revision.json: monotone integer revision")
+			}
+			var generatedFrom string
+			if err := json.Unmarshal(members["generated_from"], &generatedFrom); err != nil ||
+				len(generatedFrom) < 1 || len(generatedFrom) > 256 {
+				t.Fatalf("revision.json: generated_from provenance string")
+			}
+			continue
 		}
 		var cf caseFile
 		if err := json.Unmarshal(raw, &cf); err != nil {

@@ -457,7 +457,7 @@ compatibility.
   the Elixir reference ([ADR 0014](adr/0014-cross-language-verifier-sdks.md)).
 - Each SDK passes all **283** published conformance vectors, recomputed from
   scratch (not cached verdicts), and asserts the corpus `index.json` SHA-256
-  (`a5ac7361c508d2bb55c6ca3045a5cc06ec4a3f64f65904214108c6f10c704dcc`) at startup
+  (`4cb5072ab40ffd4b111659e6d4ab20209202380505f1f8424b96d22e533cb91b`) at startup
   — a mismatched vendored corpus fails closed rather than drifting silently. The
   two-boundary key census is asserted per-runner (discovery == verify-import ==
   index `public_key_fingerprints`, 11 keys both directions).
@@ -724,7 +724,7 @@ amendments.
   public function returns `(T, error)` with error ∈ {nil, `ErrInvalid`}; infallible constructors
   and encoders return their value directly.
 - **Conformance:** 283-vector runner over the vendored corpus snapshot with startup SHA-256
-  assertion (`index.json` = `paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw`, cross-verified against
+  assertion (`index.json` = `TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs`, cross-verified against
   the Elixir gate's live report), per-file SHA + case-count verification, and the two-boundary key
   census at the runner's import boundary — `agreed=283 disagreed=0 census=11` (the full
   `public_key_fingerprints` set).

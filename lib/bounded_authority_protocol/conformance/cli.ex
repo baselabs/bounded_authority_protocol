@@ -32,7 +32,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   # self-consistent but is NOT the certified corpus (e.g. a regenerated index over a shrunken case
   # set — which passes integrity + agreement, so nothing else here would catch it). To rotate the
   # corpus, bump this constant AND every SDK runner's CERTIFIED_INDEX_SHA in the same change.
-  @certified_index_sha256 "paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw"
+  @certified_index_sha256 "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs"
 
   @doc """
   Runs the CLI against `argv` and returns the contract exit status (0/1/2).

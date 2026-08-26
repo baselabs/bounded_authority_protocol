@@ -45,7 +45,7 @@ use sha2::{Digest, Sha256};
 // ============================================================================
 
 const CERTIFIED_INDEX_SHA: &str =
-    "a5ac7361c508d2bb55c6ca3045a5cc06ec4a3f64f65904214108c6f10c704dcc";
+    "4cb5072ab40ffd4b111659e6d4ab20209202380505f1f8424b96d22e533cb91b";
 
 /// The vendored corpus root (self-contained SDK test corpus — ADR 0015 D5).
 fn corpus_root() -> PathBuf {
@@ -1115,6 +1115,45 @@ fn conformance_full_corpus() {
     for entry in index["files"].as_array().expect("files array") {
         let path = entry["path"].as_str().expect("file path");
         let case_count = entry["cases"].as_u64().unwrap_or(0);
+        // The revision sidecar occupies the one reserved non-case JSON path. It has no
+        // agreement backstop, so its SHA-256 is verified against the index entry here and its
+        // member set is closed (exactly format/revision/generated_from).
+        if path == "revision.json" {
+            let bytes =
+                fs::read(root.join(path)).unwrap_or_else(|e| panic!("read {path}: {e}"));
+            let digest = Sha256::digest(&bytes);
+            let want = entry["sha256_base64url"].as_str().expect("revision.json index hash");
+            assert!(
+                bap::base64url_encode(&digest).as_slice() == want.as_bytes(),
+                "revision.json SHA-256 mismatch"
+            );
+            let sidecar: serde_json::Value =
+                serde_json::from_slice(&bytes).expect("revision.json is valid JSON");
+            let members = sidecar.as_object().expect("revision.json object");
+            assert!(
+                members.len() == 3
+                    && members.contains_key("format")
+                    && members.contains_key("revision")
+                    && members.contains_key("generated_from"),
+                "revision.json: closed member set"
+            );
+            assert_eq!(
+                members["format"].as_str(),
+                Some("bounded-authority-protocol-v1-conformance-corpus-revision"),
+                "revision.json: format const"
+            );
+            assert!(
+                members["revision"].as_u64().is_some_and(|r| r >= 1),
+                "revision.json: monotone integer revision"
+            );
+            let source_len = members["generated_from"].as_str().map_or(0, str::len);
+            assert!(
+                (1..=256).contains(&source_len),
+                "revision.json: generated_from provenance string"
+            );
+            assert_eq!(case_count, 0, "revision.json: case-free declaration");
+            continue;
+        }
         if case_count == 0 {
             // The 5 `.raw` sidecars (raw byte inputs, not case containers).
             continue;

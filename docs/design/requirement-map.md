@@ -25,11 +25,13 @@ self-contradiction ADR 0005 warns about and is a blocking finding).
 | Cell class(es) | The conformance class(es) on that surface proving the requirement. |
 | Cell-type | `populated` (≥1 executed case — satisfies §3) · `n/a` (matrix marks it not-applicable, with reason) · `gap` (no cell on any surface; falsifiable reason required). |
 | Evidence / falsifiable reason | The `index.json` cell count for populated; the ADR 0005 input-algebra reason for n/a/gap. |
-| Corpus rev | The `index.json` `format` field this row was validated against. |
+| Corpus rev | The corpus revision integer (`revision.json` sidecar) this row was validated against. |
 
-**Corpus revision for every row:** `bounded-authority-protocol-v1-conformance-corpus-index`.
-A successor-corpus slice that changes the applicability matrix MUST re-walk this map; the revision
-qualifier makes a stale mapping a detectable drift rather than a silent false claim. See § Maintenance.
+**Corpus revision for every row:** `1`.
+A successor-corpus slice that changes the applicability matrix MUST re-walk this map and bump
+the cited integer; the revision qualifier makes a stale mapping a detectable drift rather than a
+silent false claim (the `format` string this column once cited is constant across revisions and
+could detect nothing — the sidecar's monotone integer replaced it). See § Maintenance.
 
 ## CORE — profile-level invariants
 

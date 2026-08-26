@@ -122,6 +122,22 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     end)
   end
 
+  # The revision sidecar occupies the one reserved non-case path in the files set. It is
+  # fetched (missing → invalid) and shape-validated here; its SHA-256 is enforced by the same
+  # generic per-file pass as every other declared file, and its file-set membership by
+  # verify_file_set. It contributes no cases and is not carried on the loaded corpus.
+  defp load_one_file("revision.json" = path, _hash, map, cases, raws) do
+    case fetch_path(map, path) do
+      {:ok, bytes} ->
+        if valid_revision_sidecar?(bytes),
+          do: {:cont, {:ok, cases, raws}},
+          else: {:halt, {:error, :invalid}}
+
+      _ ->
+        {:halt, {:error, :invalid}}
+    end
+  end
+
   defp load_one_file(path, hash, map, cases, raws) do
     cond do
       String.ends_with?(path, ".json") ->
@@ -134,6 +150,37 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
         {:halt, {:error, :invalid}}
     end
   end
+
+  @revision_format "bounded-authority-protocol-v1-conformance-corpus-revision"
+
+  # Closed 3-member shape: exactly {format, revision, generated_from}, the format const, a
+  # monotone integer revision (1..integer_magnitude), and a non-empty bounded provenance string.
+  # A self-consistent sidecar of any other shape fails closed — the per-file hash cannot catch
+  # a sidecar that was rewritten together with its index entry.
+  defp valid_revision_sidecar?(bytes) do
+    case Json.decode(bytes, Bounds.maximum()) do
+      {:ok, {:object, members}} ->
+        keys = Enum.map(members, &elem(&1, 0))
+
+        # Exact-member-set check without Enum.sort (forbidden in this module by the
+        # architecture gate): 3 keys whose difference with the closed set is empty both ways.
+        length(keys) == 3 and keys -- ["format", "generated_from", "revision"] == [] and
+          member(members, "format") == {:string, @revision_format} and
+          revision_integer?(member(members, "revision")) and
+          generated_from_string?(member(members, "generated_from"))
+
+      _ ->
+        false
+    end
+  end
+
+  defp revision_integer?({:integer, n}), do: n >= 1 and n <= 9_007_199_254_740_991
+  defp revision_integer?(_), do: false
+
+  defp generated_from_string?({:string, source}),
+    do: byte_size(source) >= 1 and byte_size(source) <= 256
+
+  defp generated_from_string?(_), do: false
 
   defp load_json_entry(map, path, cases, raws) do
     case load_json_file(map, path) do
@@ -221,12 +268,17 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
 
     declared_total =
       Enum.reduce_while(files, {:ok, 0}, fn %{"path" => path, "cases" => count}, {:ok, acc} ->
-        case {observed_file_count(per_file_sums, path), String.ends_with?(path, ".raw"), count} do
-          {observed, false, _} when observed != :absent and observed == count ->
+        case {observed_file_count(per_file_sums, path), String.ends_with?(path, ".raw"), count,
+              path} do
+          {observed, false, _, _} when observed != :absent and observed == count ->
             {:cont, {:ok, acc + count}}
 
           # .raw sidecars carry no cases; their declared count must be 0.
-          {:absent, true, 0} ->
+          {:absent, true, 0, _} ->
+            {:cont, {:ok, acc}}
+
+          # The revision sidecar (reserved root path only) is likewise case-free.
+          {:absent, false, 0, "revision.json"} ->
             {:cont, {:ok, acc}}
 
           _ ->
