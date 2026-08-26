@@ -9,7 +9,7 @@ import (
 )
 
 // JcsEncode serializes a tagged JSON value to exact RFC 8785 (JCS) bytes as
-// transcribed by docs/protocol-v1.md (REQ1-JSON-jcs-exact):
+// transcribed by spec/bap-v1.md (REQ1-JSON-jcs-exact):
 //
 //   - exact string escaping: \b\t\n\f\r, lowercase \u00xx for the remaining
 //     U+0000..U+001F controls, every other code point raw UTF-8 except the

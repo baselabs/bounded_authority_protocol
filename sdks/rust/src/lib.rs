@@ -1,7 +1,7 @@
 //! Bounded proof-of-possession authority verification — frozen v1 profile.
 //!
 //! Pure, deterministic, fail-closed reimplementation of the v1 profile from
-//! `docs/protocol-v1.md`, governed by the ADRs and the conformance corpus.
+//! `spec/bap-v1.md`, governed by the ADRs and the conformance corpus.
 //! **Verification is not authority**: a successful result proves only that
 //! caller-supplied bytes satisfy caller-supplied trusted inputs and expected
 //! context. It never selects keys, reserves replay, grants execution, or
@@ -25,7 +25,7 @@ pub mod uri;
 pub mod v1;
 
 // `compact`, `digest`, `ed25519`, and `selector` are internal mechanics behind
-// the v1 façade (protocol-v1.md §lines 329–330 names only `jcs`/`jwk`/`uri`/
+// the v1 façade (spec/bap-v1.md §lines 329–330 names only `jcs`/`jwk`/`uri`/
 // `base64url`/`bounds`/`json` as public primitives, and notes that request-
 // digest, selector, and compact-JWS composition mechanics "remain internal
 // implementation behind the supported façade; their modules are not additional
@@ -38,7 +38,7 @@ pub mod v1;
 // One distinction the line-329 note draws: request-digest, selector, and
 // compact-JWS MODULES are not additional stable façade contracts, BUT
 // `request_digest/3` IS named in the 17-function public verification contract
-// (protocol-v1.md line 304). So the `digest` MODULE stays `pub(crate)` while
+// (spec/bap-v1.md line 304). So the `digest` MODULE stays `pub(crate)` while
 // its `request_digest` FUNCTION is re-exported at the crate root as a public
 // façade entry point (the conformance runner — Task 14 — dispatches the 9-case
 // `request_digest` corpus through this public re-export). `selector` and
@@ -52,7 +52,7 @@ pub(crate) mod selector;
 // at the crate root. `assemble_compact` is re-exported from the `v1` façade
 // (compose + per-kind content validation); the pure composer lives internal to
 // `compact`. `request_digest` is re-exported from the internal `digest` MODULE
-// (the function is public — protocol-v1.md line 304 — even though the module is
+// (the function is public — spec/bap-v1.md line 304 — even though the module is
 // not a stable façade contract — line 329).
 pub use digest::request_digest;
 pub use v1::assemble_compact;

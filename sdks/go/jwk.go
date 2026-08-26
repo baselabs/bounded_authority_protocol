@@ -2,7 +2,7 @@ package verifier
 
 import "crypto/sha256"
 
-// The public OKP JWK surface (docs/protocol-v1.md § Protected headers):
+// The public OKP JWK surface (spec/bap-v1.md § Protected headers):
 // exactly {crv:"Ed25519", kty:"OKP", x:canonical_base64url_32_bytes} in any
 // member order; every additional member — private `d` included — is invalid
 // (REQ1-HEADER-proof-jwk, REQ1-HEADER-no-private-jwk). The RFC 7638

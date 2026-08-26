@@ -1,4 +1,4 @@
-//! HTTPS-only URI normalization (RFC 3986 §3, §6.2; `docs/protocol-v1.md` §URI).
+//! HTTPS-only URI normalization (RFC 3986 §3, §6.2; `spec/bap-v1.md` §URI).
 //!
 //! Target URIs are bounded ASCII, hierarchical, and HTTPS-only, with a nonempty
 //! authority and host and no user information, fragment, or query. This module
@@ -6,7 +6,7 @@
 //! (`REQ1-URI-no-network`). Verification is not authority: the normalized string
 //! is a comparison key, never an execution credential.
 //!
-//! Rules enforced (`docs/protocol-v1.md` §URI normalization, lines 226–244):
+//! Rules enforced (`spec/bap-v1.md` §URI normalization, lines 226–244):
 //! - `REQ1-URI-reject-list`: the scheme MUST be exactly `https` (ASCII
 //!   case-insensitive; normalized lowercase). HTTP or any other scheme →
 //!   [`Invalid`].

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// JCS encode (RFC 8785 as transcribed in docs/protocol-v1.md § JCS string and
+// JCS encode (RFC 8785 as transcribed in spec/bap-v1.md § JCS string and
 // number serialization). Spec worked examples + threshold + sort legs; the
 // corpus jcs-encode-* cases run in the conformance runner.
 func TestJcsEncodeBasics(t *testing.T) {

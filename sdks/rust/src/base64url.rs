@@ -4,7 +4,7 @@
 //! check is protocol-specific (`REQ1-B64-canonical`), so dropping the `base64`
 //! crate both hand-verifies the semantics and shrinks the supply-chain surface.
 //!
-//! Rules enforced (`docs/protocol-v1.md` § Base64url, lines 131–135):
+//! Rules enforced (`spec/bap-v1.md` § Base64url, lines 131–135):
 //! - `REQ1-B64-alphabet`: only `A`–`Z`, `a`–`z`, `0`–`9`, `-`, `_`.
 //! - `REQ1-B64-no-padding`: padding (`=`) and whitespace are forbidden.
 //! - `REQ1-B64-length`: `input.len() % 4 == 1` is invalid.

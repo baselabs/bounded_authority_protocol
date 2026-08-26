@@ -4,6 +4,32 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Changed — docs/protocol-v1.md becomes a generated view; repoint census; ADR 0024
+
+- **`spec/tools/render_derived.exs` + `mix spec.render` (quality leg)**: the package-facing
+  `docs/protocol-v1.md` is no longer authored — it is generated from the normative
+  `spec/bap-v1.md` (front matter stripped, citations normalized, generation footer naming the
+  authority and revision). Hand edits are gate-red; the write is idempotent.
+- **Repoint census**: the living normative citations now point at the spec — README, the
+  requirement map, registries, standards-track charter, conformance contract, and the four SDK
+  sources' docstrings (comment-only; zero behavioral SDK change; all four suites re-verified
+  283/283 + census). Historical records (ADR bodies, ROADMAP rows, errata) keep their
+  closure-time citations as history.
+- **ADR 0004** gains the supersession note (the spec is the normative home of the byte
+  definitions; the ADR remains the decision record). **ADR 0024** (accepted) records the
+  decoupling decision: the single-authority swap, the certification-not-trust posture, the
+  derived view, the ADR 0022 same-major-document-relocation amendment, toolchain provenance
+  (kramdown-rfc 1.7.40 version+checksum-pinned, cddl 0.12.14, both executed locally), and the
+  I-D-shaped-readiness venue posture.
+- **Package census**: `spec/` ships in the package (the specification, its CDDL, its facts
+  baselines, and its three generator tools); `check_package.exs` @expected_files extended
+  exactly; the architecture-gate package boundary green.
+- **The one-time full comparative read** of the new spec against the old authority was
+  performed with written dispositions (mechanical parity: 76/76 REQ ids, 37 bounds rows,
+  byte-identical constructions; one real gap found and fixed — the frozen façade listing now
+  restored verbatim into informative Appendix C). Disposition record: the swap's review
+  artifact; the empty-delta certification continues to run in `mix quality`.
+
 ### Added — generated worked examples (spec Appendix A; no wire change)
 
 - **`spec/tools/build_examples.exs` + `mix spec.examples` (quality leg)**: Appendix A of the

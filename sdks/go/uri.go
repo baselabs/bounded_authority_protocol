@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// URI normalization (docs/protocol-v1.md § URI normalization; RFC 3986).
+// URI normalization (spec/bap-v1.md § URI normalization; RFC 3986).
 //
 // Targets are bounded ASCII, hierarchical, HTTPS-only, with a nonempty
 // authority and host, no user information, fragment, or query. Normalization

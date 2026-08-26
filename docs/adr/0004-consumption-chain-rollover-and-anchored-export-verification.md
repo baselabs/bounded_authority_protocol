@@ -1,7 +1,14 @@
 # ADR 0004: Consumption-chain rollover and anchored-export verification
 
-- Status: accepted
+- Status: accepted (superseded as the NORMATIVE home of the byte definitions — see below)
 - Date: 2026-07-28
+
+> **Supersession note (2026-08-26).** The consumption row, boundary-anchor, key-transition,
+> and archive-framing byte definitions this ADR froze are now NORMATIVE in
+> `spec/bap-v1.md` (sections "Consumption chain and anchored export"),
+> machine-extracted and drift-gated by the spec-facts machinery. This ADR remains the accepted
+> decision record for WHY those formats are shaped as they are; where the two documents could
+> ever disagree, the spec is the authority and the disagreement is a gate-red defect.
 
 ## Context
 

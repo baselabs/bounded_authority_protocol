@@ -5,7 +5,7 @@ import (
 	"crypto/subtle"
 )
 
-// The grant/proof verification core (docs/protocol-v1.md § Claims, § Public
+// The grant/proof verification core (spec/bap-v1.md § Claims, § Public
 // verification contract). Correctly signed closed JSON objects may use ANY
 // member order — verification uses the exact received segments
 // (REQ1-SIGNING-any-order); canonical byte-equality applies only to the

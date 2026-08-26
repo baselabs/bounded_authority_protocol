@@ -2,7 +2,7 @@ package verifier
 
 import "testing"
 
-// URI normalization (docs/protocol-v1.md § URI normalization; RFC 3986).
+// URI normalization (spec/bap-v1.md § URI normalization; RFC 3986).
 // Representative legs; the full 26-case corpus surface runs in the
 // conformance runner (including the malformed-IPv6 corpus class).
 func TestUriNormalizeValid(t *testing.T) {

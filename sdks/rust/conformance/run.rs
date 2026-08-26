@@ -22,7 +22,7 @@
 //! 4. Asserts `agreed == total_cases (283)` and `disagreed == 0`.
 //!
 //! Derivation hygiene (ADR 0014 §D5): the runner is derived from ADR 0014,
-//! `docs/protocol-v1.md`, and the existing in-crate harnesses only. It does NOT
+//! `spec/bap-v1.md`, and the existing in-crate harnesses only. It does NOT
 //! read the reference Elixir implementation or any sibling SDK. The corpus is
 //! the falsifier; the SHA binding + census are the mechanisms.
 
