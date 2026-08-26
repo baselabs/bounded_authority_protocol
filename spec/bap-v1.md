@@ -585,6 +585,122 @@ reconciliation with the profile's registries document are published with the spe
 companion artifacts; the filing itself follows the profile's external submission
 preconditions.
 
+## 21. Security considerations
+
+### Assets and security goals
+
+The assets are the integrity properties of the wire objects: a grant may only be minted by the
+issuer's key; a proof only by the holder's key; a request binding only to the exact bytes it
+names; a consumption chain only to the exact ordered rows and caller boundaries it records; an
+anchored export only to the complete archived object generation it frames
+(`REQ1-CORE-reject-unlisted`). Confidentiality is NOT an asset of this profile: every wire
+object is plaintext JSON by design; the profile provides authenticity and integrity, and
+callers transport it over TLS like any other bearer-presented credential.
+
+### Adversaries and trust boundaries
+
+The profile assumes the standard Internet threat position for the verifier's inputs: an
+attacker controls the network path and can read, drop, reorder, or forge every delivered byte.
+Specific adversaries: (i) a thief of presented credentials lacking the holder's private key;
+(ii) the legitimate holder attempting request, operation, URI, selector, algorithm, claim,
+encoding, or time/nonce substitution within an otherwise valid proof; (iii) a malicious or
+compromised issuer attempting scope widening across grants; (iv) an archive controller
+supplying a validly signed but shortened, relinked, cross-chain, or wrong-generation history;
+(v) a contributor weakening the profile itself. The trust boundary is exact: raw credential
+bytes cross INTO verification; only caller-supplied trusted keys and expected context cross
+with them; redacted facts and nothing else cross out.
+
+### Controls, each mapped to its requirement
+
+Bounded closed parsing precedes all cryptography, defeating allocation amplification and
+encoding smuggling (`REQ1-BOUNDS-ordering`, `REQ1-CORE-reject-unlisted`). Exact-byte
+constructions — the RFC 7515 signing input, RFC 8785 canonical bytes, the typed projection,
+and the domain-separated digests — remove ambient-byte and canonicalization-confusion attacks
+(`REQ1-SIGNING-exact-input`, `REQ1-SIGNING-digest-prefix`). Holder possession is proven by the
+`cnf` thumbprint and proof-key binding (`REQ1-VERIFY-envelope-binding`); grant binding by the
+`ath` grant digest (`REQ1-CLAIM-ath`); request binding by the server-derived request digest
+over `[operation, typed(cast_arguments)]` (`REQ1-CLAIM-ath`, `REQ1-VERIFY-envelope-binding`);
+temporal validity by bounded signed times with capped skew and proof age
+(`REQ1-VERIFY-time-bounds`); freshness by exact nonce mode semantics
+(`REQ1-VERIFY-nonce-mode`). Historical key paths advance only through positionally
+authenticated, strictly time-increasing, cycle-free transitions
+(`REQ1-CORE-cross-major-reject` frames the suite identity; the transition controls are the
+archive-section closed-set requirements), and archive acceptance requires the complete scan,
+exact EOF, and exact caller boundaries so that validly signed truncations fail
+(`REQ1-EXPORT-complete-scan`, `REQ1-CHAIN-no-deletion-cert`).
+
+### Verification is not authority (a security property, not a disclaimer)
+
+A successful verification proves only that caller-supplied bytes satisfy caller-supplied
+trusted inputs and expected context (`REQ1-LOCATOR-not-authority`,
+`REQ1-CHAIN-facts-not-evaluated`). Trust selection, replay reservation, revocation state, and
+every operational decision are outside this profile BY DESIGN — an implementation that treats
+a facts result as execution authority has moved those checks to nothing, which is a security
+hole in that implementation, not a gap in this profile. Facts are value-bearing, redacted, and
+carry explicit not-evaluated markers so they cannot silently become credentials
+(`REQ1-VERIFY-facts-not-credentials`).
+
+### Out of scope, explicitly
+
+Key custody, trusted-key discovery and rotation policy, issuance policy, revocation checking,
+replay reservation, storage of consumption evidence, witness or recovery processes, denial-of-
+service mitigation at the deployment boundary, and side-channel hardening of the host platform
+are outside this profile (the profile's own fixed-width comparisons are constant-time where
+they compare secrets-adjacent digests). Cryptographic primitive compromise (Ed25519, SHA-256)
+breaks the corresponding suite entirely; the profile's succession design confines the response
+to a new contract-major with its own closed suite.
+
+### Residual risks
+
+A presented-but-stolen-then-replayed proof inside the skew/proof-age window is indistinguish
+from fresh use: replay reservation is the runtime's responsibility, and the window bounds
+(rather than eliminates) exposure. A fully compromised issuer mints valid grants; detection is
+an operational concern. A conforming verifier that receives correct-but-wrong trusted keys
+(the wrong issuer key, the wrong expected context) verifies garbage as valid: the profile
+binds bytes to inputs, not inputs to reality. Archive completeness against a malicious
+controller requires the caller to retain or derive the intended boundaries
+(`REQ1-CHAIN-no-deletion-cert`). Implementation error is a standing residual risk; the
+conformance corpus and the mutation gates exist to make the common classes loud.
+
+## 22. Privacy considerations
+
+### Correlation surfaces
+
+The profile's identifiers are correlation surfaces. A grant `jti` is globally unique per grant
+and observable by every verifier the holder presents to; the proof `jti` is unique per proof;
+`ba_inv` binds a single logical invocation across grant, proof, and the consumption row that
+records it. Issuer identifiers (`iss`) and audiences (`aud`) name services and can cluster
+holders by the set of issuers they present credentials from. Deployments minimize linkage by
+scoping identifier allocation per audience where the runtime supports it and by treating the
+correlation of presentation patterns across verifiers as an accepted property of
+proof-of-possession credentials of this shape.
+
+### Longitudinal evidence in chains and archives
+
+Consumption chains and anchored exports are designed to be durable, verifiable evidence: rows
+commit to invocation-level digests and are sequentially hash-linked, anchors sign the range
+ends, and archives freeze complete object generations. The privacy consequence is that
+retention decisions made by the runtime ARE the privacy posture — the profile makes evidence
+compact and independently checkable, and it makes deletion detectable (a shortened archive
+fails the original boundaries), which is a integrity-privacy tension deployments resolve by
+policy: retention windows, minimization of commitment preimages (which stay opaque and private
+by construction), and audience-scoped chain identifiers are the available controls.
+
+### Nonce handling
+
+Proof nonces are single-use correlation values visible to the verifier that demanded them.
+They enable per-verifier linkability of otherwise unlinkable presentations. Deployments that
+require nonces scope them per verifier and rotate them; deployments that do not require them
+leave the claim absent (its optionality is a privacy feature).
+
+### Redacted facts as a privacy control
+
+Verification facts are value-bearing but redacted: they carry identifiers and digests, never
+cast arguments, selector values, raw credentials, signatures, JWK containers, or nonces
+(`REQ1-VERIFY-facts-redacted`). This bounds what a logging or telemetry layer can accumulate
+from verification outcomes — the loudest privacy control in the profile — and deployments keep
+it intact by not logging the raw inputs alongside the facts. (informative)
+
 # Appendix B. CDDL representation (informative) {#cddl}
 
 An informative CDDL summary of the wire objects is published alongside this specification. It

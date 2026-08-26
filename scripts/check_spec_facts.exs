@@ -52,12 +52,13 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
              rule_5_cited_counts() ++
              rule_6_revision_citation() ++
              rule_7_iana_templates() ++
+             rule_11_keyword_census() ++
              rule_9_vendor_neutrality() ++
              rule_10_anchor_completeness(facts) ++
              rule_12_framing_oracle(facts),
          [] <- problems do
       elapsed = System.monotonic_time(:millisecond) - started
-      IO.puts("spec facts gate: ok rules=[1b,2,3,4,5,6,7,9,10,framing-oracle] in #{elapsed}ms")
+      IO.puts("spec facts gate: ok rules=[1b,2,3,4,5,6,7,9,10,11,framing-oracle] in #{elapsed}ms")
     else
       problems when is_list(problems) ->
         IO.puts(:stderr, "spec facts gate FAILED:\n" <> Enum.join(problems, "\n"))
@@ -644,6 +645,47 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   end
 
   defp strip_ticks(name), do: String.trim(name, "`")
+
+  # --- rule 11: RFC-2119 keyword census ---------------------------------------------
+  #
+  # Every capitalized MUST / MUST NOT / SHOULD / SHOULD NOT / REQUIRED / SHALL / SHALL NOT in
+  # the normative document is either a QUOTED mention (the keyword as a word — excluded), or
+  # shares its sentence with a `REQ1-*` requirement id, or sits in text carrying an explicit
+  # informative marker. A naked keyword in unanchored prose is exactly how a soft requirement
+  # smuggles past the requirement map, so it reds with the sentence quoted.
+
+  defp rule_11_keyword_census do
+    text = Path.join(@root, "spec/bap-v1.md") |> File.read!()
+
+    text
+    |> String.split(~r/(?<=[.!?])\s+/)
+    |> Enum.flat_map(fn sentence ->
+      keywords = unquoted_keywords(sentence)
+
+      if keywords == [] do
+        []
+      else
+        if String.contains?(sentence, "REQ1-") or String.contains?(sentence, "(informative)") or
+             String.contains?(sentence, "<!-- informative") do
+          []
+        else
+          [
+            "rule 11: naked RFC-2119 keyword(s) #{inspect(keywords)} with no REQ id and no informative marker: " <>
+              String.trim(sentence)
+          ]
+        end
+      end
+    end)
+  end
+
+  defp unquoted_keywords(sentence) do
+    # Strip double-quoted spans first: quoted keywords are mentions of the words, not uses.
+    sentence
+    |> String.replace(~r/"[^"]*"/, "")
+    |> then(&Regex.scan(~r/\b(MUST NOT|MUST|SHOULD NOT|SHOULD|REQUIRED|SHALL NOT|SHALL)\b/, &1))
+    |> Enum.map(&hd/1)
+    |> Enum.uniq()
+  end
 
   # --- rule 9: vendor neutrality via tracked files ------------------------------
 

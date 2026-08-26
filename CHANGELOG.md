@@ -4,6 +4,28 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — Security and Privacy Considerations + spec-facts rule 11 (no wire change)
+
+- **Spec section 21 (Security considerations, RFC 3552 grade)**: assets and goals (integrity,
+  not confidentiality — every wire object is plaintext by design), adversaries and the exact
+  trust boundary (raw bytes in, redacted facts out), the per-control mapping to REQ ids
+  (parsing-before-crypto, exact-byte constructions, holder/grant/request bindings, temporal
+  and nonce semantics, authenticated transitions, complete-scan archive acceptance),
+  verification-is-not-authority stated as a security property, explicitly out-of-scope
+  operational controls, and residual risks (in-window replay, compromised issuer, correct-but-
+  wrong trusted keys, malicious archive controllers, implementation error). Self-contained;
+  the threat model, charter, and extension security sections remain as extended records.
+- **Spec section 22 (Privacy considerations, RFC 6973 shape)**: the correlation surfaces
+  (`jti`, `ba_inv`, `aud`, issuer identifiers), chains and archives as deliberately durable
+  longitudinal evidence with the retention-policy tension stated, nonce linkability and the
+  optionality-as-privacy-feature note, and redacted facts as the profile's loudest privacy
+  control. Deployment recommendations carry NO capitalized RFC-2119 keywords.
+- **Spec-facts rule 11 (keyword census)**: every capitalized MUST/MUST NOT/SHOULD/SHOULD
+  NOT/REQUIRED/SHALL/SHALL NOT in the spec is either a quoted mention, or shares its sentence
+  with a `REQ1-*` id, or sits under an explicit informative marker — a naked keyword in
+  unanchored prose reds with the sentence quoted. Mutation leg red-quoted (planted naked MUST
+  caught) and restored; every mapped id exists in the requirement map (rule 3).
+
 ### Added — IANA registration templates + spec-facts rule 7 (no wire change)
 
 - **`docs/design/iana/`**: the machine-readable registration sources and rendered ready-to-file
