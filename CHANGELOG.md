@@ -4,6 +4,24 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — docs-currency gate + the upgrading contract (no wire change)
+
+- **`test/docs_currency_test.exs`**: pins the public documentation surfaces to CURRENT facts —
+  the changelog/version cross-reference, the four-SDK listing (case-insensitive stale-count
+  check), the 283-case corpus counts, the supply-chain artifact-filename DERIVATION (no
+  hardcoded versioned filename may return), the derived view's spec-revision footer, and the
+  spec Doc-Revision pin shared by its formal companions. All three mutation legs executed
+  red and restored: a version/changelog drift, a stale SDK count (this leg immediately caught
+  a real defect — the ticket-18 README edit had landed "All four" without the Go bullet,
+  now fixed), and a returning hardcoded supply-chain filename.
+- **`docs/guides/upgrading.md`** (replacing its placeholder): the published compatibility
+  contract — per-release-kind labels (patch/minor/major), what may never change inside v1,
+  what a minor may do (corpus growth with revision bump + the six-pin rotation), the
+  three-step unaffectedness check, and the deprecation pointer. The 0.1.0 RC contract remains
+  the historical record.
+- `/doc/` (generated ExDoc output) is confirmed gitignored — the doc/ vs docs/ hazard stays
+  dead.
+
 ### Changed — housekeeping: SDK README, supply-chain derivation, dependabot, deployment guides
 
 - **`sdks/README.md`**: the Go SDK entry and the four-SDK count (the stale "all three" is

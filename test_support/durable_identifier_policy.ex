@@ -15,6 +15,7 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
                        "test/architecture/purity_test.exs",
                        "test/docs_guides_test.exs",
                        "test/bap_walkthrough_test.exs",
+                       "test/docs_currency_test.exs",
                        "test/spec_facts_test.exs"
                      ])
   @requirement_ids "test/fixtures/durable_identifier_requirements.txt"

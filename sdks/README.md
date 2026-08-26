@@ -23,6 +23,9 @@ against the same published corpus.
   (serial backend) + `sha2` + `ryu-js`. See its [README](rust/README.md) and the
   [deployment guide](../docs/deployment/rust-sdk.md) (AWS Lambda `provided.al2023` + PostgreSQL `plrust`
   posture).
+- **[`go/`](go/)** — `bounded_authority_protocol_go`. Go 1.25 floor, zero runtime dependencies
+  (stdlib `crypto/ed25519` + `crypto/sha256` only). See its [README](go/README.md) and the
+  [deployment guide](../docs/deployment/go-sdk.md).
 
 All four are **pure verification libraries** (no I/O, clock, RNG, or network in the verify path). They return
 value-bearing redacted facts or `Invalid` — never an authorization decision. See
