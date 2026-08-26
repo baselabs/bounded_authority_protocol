@@ -4,6 +4,29 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — formal attacker model + ADR 0025 + gate rule 8 (no wire change)
+
+- **`spec/formal/attacker-model.md`**: the formal attacker — Dolev-Yao network attacker plus a
+  malicious holder attempting cross-grant/cross-operation/cross-endpoint/cross-invocation
+  confusion — and the four modeled properties: P1 (a proof binds exactly the `ath`-named
+  grant), P2 (the request digest binds the verifier-derived operation + typed arguments
+  exactly; typed-projection injectivity is the load-bearing lemma), P3 (context-binding
+  completeness across method/URI/invocation/nonce, with time abstracted symbolically and the
+  assumption recorded), P4 (facts disclose nothing beyond declared fields). Scope and
+  symbolic assumptions stated; self-contained and vendor-neutral; pinned to the spec's
+  Doc-Revision.
+- **ADR 0025 (accepted)**: the formal-analysis program — ProVerif chosen for automation fit on
+  the stateless core (decision recorded as decided-with-open-evidence: no published
+  machine-checked DPoP-family model exists; FAPI 2.0 CCS 2024 defers formal models), Tamarin
+  named follow-on with a recorded trigger (first chain/archive ordering or timepoint lemma
+  need), the standing CI posture, and the three-valued findings-ledger disposition contract —
+  `escalated` routes to the owner via SECURITY.md and blocks the program's done-claim until
+  the owner rules; the coupling is stated, not hidden.
+- **Spec-facts rule 8**: every spec/formal companion names the revision it was written
+  against; a spec revision bump without the companion (or vice versa) reds with both values
+  named. Mutation leg executed: a lone spec rev bump reds, restored green. (The ProVerif model
+  joins the companion list at its own landing.)
+
 ### Changed — docs/protocol-v1.md becomes a generated view; repoint census; ADR 0024
 
 - **`spec/tools/render_derived.exs` + `mix spec.render` (quality leg)**: the package-facing

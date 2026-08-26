@@ -52,13 +52,17 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
              rule_5_cited_counts() ++
              rule_6_revision_citation() ++
              rule_7_iana_templates() ++
+             rule_8_companion_revisions() ++
              rule_11_keyword_census() ++
              rule_9_vendor_neutrality() ++
              rule_10_anchor_completeness(facts) ++
              rule_12_framing_oracle(facts),
          [] <- problems do
       elapsed = System.monotonic_time(:millisecond) - started
-      IO.puts("spec facts gate: ok rules=[1b,2,3,4,5,6,7,9,10,11,framing-oracle] in #{elapsed}ms")
+
+      IO.puts(
+        "spec facts gate: ok rules=[1b,2,3,4,5,6,7,8,9,10,11,framing-oracle] in #{elapsed}ms"
+      )
     else
       problems when is_list(problems) ->
         IO.puts(:stderr, "spec facts gate FAILED:\n" <> Enum.join(problems, "\n"))
@@ -685,6 +689,47 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
     |> then(&Regex.scan(~r/\b(MUST NOT|MUST|SHOULD NOT|SHOULD|REQUIRED|SHALL NOT|SHALL)\b/, &1))
     |> Enum.map(&hd/1)
     |> Enum.uniq()
+  end
+
+  # --- rule 8: companions pinned to the spec Doc-Revision -------------------------
+  #
+  # Every spec/formal companion names the specification revision it was written against; a
+  # spec revision bump without the companion update (or vice versa) reds.
+
+  # spec/formal/proverif/bap-core.pv joins this list at its own landing (the model + CI).
+  @companion_files ["spec/formal/attacker-model.md"]
+
+  defp rule_8_companion_revisions do
+    spec_text = Path.join(@root, "spec/bap-v1.md") |> File.read!()
+
+    case Regex.run(~r/Document revision: rev (\d+)/, spec_text) do
+      [_, spec_rev] ->
+        Enum.flat_map(@companion_files, fn file ->
+          path = Path.join(@root, file)
+
+          case File.read(path) do
+            {:ok, text} ->
+              case Regex.run(~r/rev (\d+)/, text) do
+                [_, companion_rev] when companion_rev == spec_rev ->
+                  []
+
+                [_, companion_rev] ->
+                  [
+                    "rule 8: #{file} pins rev #{companion_rev} but the spec is at rev #{spec_rev} — update the companion or the spec, together"
+                  ]
+
+                _ ->
+                  ["rule 8: #{file} carries no revision pin"]
+              end
+
+            _ ->
+              ["rule 8: companion #{file} is missing"]
+          end
+        end)
+
+      _ ->
+        ["rule 8: the spec carries no \"Document revision: rev N\" line"]
+    end
   end
 
   # --- rule 9: vendor neutrality via tracked files ------------------------------
