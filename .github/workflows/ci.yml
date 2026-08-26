@@ -101,11 +101,13 @@ jobs:
           ruby-version: "3.3"
 
       # Pin by version AND gem checksum (the A2 amendment: Ruby gem pinned by version+checksum).
+      # The primary .gem is checksum-verified before install; its version-constrained
+      # dependencies resolve from rubygems over TLS (--local cannot resolve them).
       - name: Install pinned kramdown-rfc 1.7.40
         run: |
           curl -fsSLo /tmp/kramdown-rfc.gem https://rubygems.org/downloads/kramdown-rfc-1.7.40.gem
           echo "6eac9c860c823a1d47c13c47cff04f91f3c6e02f699f9a64800b4bbf15e6989f  /tmp/kramdown-rfc.gem" | sha256sum -c -
-          gem install --local /tmp/kramdown-rfc.gem
+          gem install /tmp/kramdown-rfc.gem
 
       - name: Render spec/bap-v1.md through kramdown-rfc
         run: kramdown-rfc spec/bap-v1.md > /tmp/bap-v1.xml
@@ -129,7 +131,7 @@ jobs:
         run: |
           curl -fsSLo /tmp/cddl.gem https://rubygems.org/downloads/cddl-0.12.14.gem
           echo "$(cat scripts/cddl-gem.sha256)  /tmp/cddl.gem" | sha256sum -c -
-          gem install --local /tmp/cddl.gem
+          gem install /tmp/cddl.gem
 
       - name: Validate the CDDL source itself
         run: |
