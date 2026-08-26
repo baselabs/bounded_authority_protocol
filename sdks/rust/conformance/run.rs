@@ -1119,10 +1119,11 @@ fn conformance_full_corpus() {
         // agreement backstop, so its SHA-256 is verified against the index entry here and its
         // member set is closed (exactly format/revision/generated_from).
         if path == "revision.json" {
-            let bytes =
-                fs::read(root.join(path)).unwrap_or_else(|e| panic!("read {path}: {e}"));
+            let bytes = fs::read(root.join(path)).unwrap_or_else(|e| panic!("read {path}: {e}"));
             let digest = Sha256::digest(&bytes);
-            let want = entry["sha256_base64url"].as_str().expect("revision.json index hash");
+            let want = entry["sha256_base64url"]
+                .as_str()
+                .expect("revision.json index hash");
             assert!(
                 bap::base64url_encode(&digest).as_slice() == want.as_bytes(),
                 "revision.json SHA-256 mismatch"
