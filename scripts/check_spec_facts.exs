@@ -531,6 +531,16 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   # --- rule 9: vendor neutrality via tracked files ------------------------------
 
   defp rule_9_vendor_neutrality do
+    # Outside a git worktree (the mutation batteries' scratch copies) there is no index to
+    # consult; the rule is enforced by the mix quality leg in the real repository.
+    if File.dir?(Path.join(@root, ".git")) do
+      rule_9_vendor_neutrality_in_worktree()
+    else
+      []
+    end
+  end
+
+  defp rule_9_vendor_neutrality_in_worktree do
     files =
       @spec_docs ++
         [@map_path, @revision_path, @index_path] ++
