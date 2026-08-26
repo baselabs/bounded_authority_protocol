@@ -835,8 +835,9 @@ and the cross-vendor peer (codex) returned no findings (the third-family GLM len
 sensitivity-policy skip). The archive published to Hex as `bounded_authority_protocol` 0.1.0; the
 `v0.1.0` tag moved to the published commit. Deferred as recorded follow-ups from the gate-integrity
 review: a corpus index-SHA pin in the Elixir `conformance.verify` stage (the SDK runners already
-pin it), mutation-battery baseline-green runs (landed in this closeout), export pins for the
-currently-unpinned beams, and broader sdk-publish-guard file coverage. BAP-12 (IANA templates)
+pin it; landed in the 0.1.2 hardening), mutation-battery baseline-green runs (landed in this
+closeout), export pins for the currently-unpinned beams, and broader sdk-publish-guard file
+coverage. BAP-12 (IANA templates)
 rides the BAP-08 external submission path, gated on the same official-submission preconditions.
 
 **SDK graduation and publish topology ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)).**

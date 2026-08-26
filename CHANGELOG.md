@@ -4,6 +4,19 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — corpus digest regeneration gate (no wire, bound, or verdict change)
+
+- **`scripts/regen_corpus_digests.exs` + `mix corpus.digests`**: one command regenerates every
+  certified corpus index-SHA machine pin — the four SDK conformance runners in their native
+  encodings (base64url: TypeScript, Go; hex: Python, Rust) plus the two Elixir pins (the CLI's
+  fail-closed certified-corpus assertion and its test mirror) — and the check leg, wired into
+  `mix quality`, fails red the moment any pinned constant drifts from the live `index.json`
+  digest (corrupt-one-constant and scratch-index-byte mutation legs proven red at landing). The
+  Elixir-side pin itself landed in the 0.1.2 hardening; this closes the tooling gap the BAP-07
+  gate-integrity review recorded and makes every future corpus rotation a single-command,
+  same-commit affair (ADR 0019 atomic-landing template). No corpus byte changes in this landing:
+  all six constants keep their current values, and `--write` is byte-idempotent today.
+
 ### Fixed — public-history privacy boundary
 
 - Public documentation and reachable Git history no longer identify private product repositories
