@@ -26,7 +26,7 @@ current cryptographic suite is `BAP1-Ed25519-SHA256`.
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.1"}
+    {:bounded_authority_protocol, "~> 0.2"}
   ]
 end
 ```

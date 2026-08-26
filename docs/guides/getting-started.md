@@ -15,7 +15,7 @@ profile; this guide is operational.
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 0.1"}]
+  [{:bounded_authority_protocol, "~> 0.2"}]
 end
 ```
 
