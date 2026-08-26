@@ -4,6 +4,34 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — the successor-major charter + governance single-home + ROADMAP backfill (design-only)
+
+- **`docs/design/successor-major-charter.md`**: the consolidated successor-major scope — delegation
+  with attenuation (ADR 0010), offline floor limits (ADR 0016), suite succession and
+  cross-suite evidence (ADR 0009 + 0026), the revocation/freshness posture (what a successor
+  major MAY standardize at the interface — freshness-bearing claim shapes with stateless
+  window semantics — vs what stays runtime-private permanently: live revocation lookup,
+  replay reservation, trust selection, per-invocation accounting), and — per the owner's
+  2026-08-26 directive — the DECIDED selector-expressiveness posture: per-request range
+  selector kinds are successor-major scope (statelessly verifiable inequality kinds); a
+  naive cumulative `budget` selector is explicitly rejected as a silent false security
+  property, with budgets routed to issuer-attestation/runtime accounting. The parked fork in
+  the AP2 mandate-mapping document is replaced by a pointer here. The absolute constants
+  (stateless verifier, non-authorizing facts, closed rejection, named-suite succession) head
+  the charter; an activation checklist closes it. Activates nothing.
+- **Governance single-normative-home**: docs/governance.md is the one home for policy
+  statements; the standards-track charter's duplicate-content claim is replaced by a
+  citation — the line-cite dual-source drift class is dead. No line-number citations between
+  the two remain.
+- **ROADMAP backfill (additive, ADR 0023 — no rewrites)**: BAP-07's closeout evidence now
+  records the index-SHA-pin deferral's double closure (the 0.1.2 pin landing + the
+  spec-decoupling program's six-pin one-command rotation gate and the tamper-covered corpus
+  revision sidecar); BAP-18's records the authority swap's documentation catch-up (spec as
+  single authority, derived view, bounds gated at all poles).
+- **Vendor-neutrality sweep re-proven live**: a planted topology canary in the new tracked
+  charter file reds the privacy gate ("found forbidden generic topology", exit 2) and the
+  clean file passes — rule 9's mechanism covers every program-touched tracked file.
+
 ### Added — ADR 0026: the post-quantum successor-suite statement (design-only, no wire change)
 
 - **ADR 0026 (accepted)**: the concrete successor statement — the `BAP2-*` candidate family
