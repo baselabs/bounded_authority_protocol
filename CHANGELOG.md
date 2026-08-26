@@ -4,6 +4,20 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — spec-facts mutation battery (no wire, bound, or verdict change)
+
+- **`scripts/check_spec_facts_mutations.exs` + `mix spec_facts.mutations` (wired into
+  `mix quality`)**: the spec-facts gate's own red-capability battery, mirroring the conformance
+  mutation-gate doctrine — scratch-copy isolation, one anchored source mutation per entry,
+  baseline-green non-vacuity (a deleted target can never score as "caught"), and one
+  inverted-assertion calibration self-proof executed at authoring (under a neutered rule-1
+  assertion the bounds mutation SURVIVES green — the exact condition the battery raises on).
+  Seven entries, each proven red in-landing: spec bounds digit, live Bounds digit, requirement
+  statement softening, cited-count drift, revision-citation drift, deleted anchor, and a
+  renamed optional-unobserved coverage mark (the marks file is load-bearing). The privacy-canary
+  mutation stays outside the battery by design — the canary sweep needs the real git worktree
+  and carries its own calibration tests.
+
 ### Added — spec-facts drift gate against the current authority (no wire, bound, or verdict change)
 
 - **`spec/tools/extract_facts.exs` + `spec/facts/baseline-v1.json`**: the normative facts of the
