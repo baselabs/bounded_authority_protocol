@@ -1,0 +1,53 @@
+{
+ "format": "bounded-authority-protocol-iana-jwt-claims-source",
+ "entries": [
+  {
+   "claim_name": "ba_inv",
+   "status": "active",
+   "claim_description": "Invocation UUID",
+   "change_controller": "IETF",
+   "reference": "spec/bap-v1.md (Bounded Authority Protocol v1 Wire Profile), Claims section",
+   "spec_purpose": "Invocation UUID bound into the holder proof"
+  },
+  {
+   "claim_name": "ba_op",
+   "status": "active",
+   "claim_description": "Operation name",
+   "change_controller": "IETF",
+   "reference": "spec/bap-v1.md (Bounded Authority Protocol v1 Wire Profile), Claims section",
+   "spec_purpose": "Operation name bound into the holder proof"
+  },
+  {
+   "claim_name": "ba_req",
+   "status": "active",
+   "claim_description": "Request digest",
+   "change_controller": "IETF",
+   "reference": "spec/bap-v1.md (Bounded Authority Protocol v1 Wire Profile), Signing and digest inputs section",
+   "spec_purpose": "Request digest (`BAP1-REQUEST\\0` domain) over `[operation, typed(cast_arguments)]`"
+  },
+  {
+   "claim_name": "ba_dlg",
+   "status": "reserved",
+   "claim_description": "Delegation parent-grant hash (reserved)",
+   "change_controller": "IETF",
+   "reference": "spec/bap-v1.md (Bounded Authority Protocol v1 Wire Profile), typ registry section",
+   "spec_purpose": "Parent-grant hash binding a delegated (attenuated) grant to its parent — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md)"
+  },
+  {
+   "claim_name": "ba_offline",
+   "status": "reserved",
+   "claim_description": "Offline floor limits (reserved)",
+   "change_controller": "IETF",
+   "reference": "spec/bap-v1.md (Bounded Authority Protocol v1 Wire Profile), typ registry section",
+   "spec_purpose": "Issuer-set offline floor limits (maximum value with explicit currency, maximum offline use count, and offline-window expiry) as a closed nested grant-payload object — charter § Revocation and freshness; [offline requirements](offline-authorization-requirements.md) R-BAP-1; absence means online-only. Full mechanism (the closed `{cnt, cur, max, win}` object, the facts contract, the `max × cnt` ceiling, the `ba_dlg` attenuation interaction) specified in [ADR 0016](../adr/0016-offline-eligible-grant-claims.md); activation is a successor contract-major (the closed v1 profile rejects the name today)"
+  },
+  {
+   "claim_name": "ba_sut",
+   "status": "reserved",
+   "claim_description": "Suite-attestation payload binding (reserved)",
+   "change_controller": "IETF",
+   "reference": "spec/bap-v1.md (Bounded Authority Protocol v1 Wire Profile), typ registry section",
+   "spec_purpose": "Suite-attestation payload binding (chain identity, sequence range, archive content digest, original suite, attestation time, typed suite-parameterized key) — [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3"
+  }
+ ]
+}

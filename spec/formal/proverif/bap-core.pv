@@ -1,0 +1,177 @@
+(*************************************************************************)
+(* BAP v1 core — formal model of the stateless verification algebra.     *)
+(* Pinned to spec/bap-v1.md rev 1 (Doc-Revision; spec-facts rule 8).     *)
+(*                                                                       *)
+(* Properties (spec/formal/attacker-model.md):                           *)
+(*   P1 a proof binds exactly the ath-named grant                        *)
+(*   P2 the request digest binds the verifier-derived operation + args   *)
+(*   P3 context-binding completeness (method/URI/invocation/nonce)       *)
+(*   P4 facts disclose nothing beyond declared fields                    *)
+(*                                                                       *)
+(* Symbolic assumptions (recorded, not derived):                         *)
+(*   - perfect cryptography: sign and h are free constructors            *)
+(*     (REQ1-SIGNING-backend-reject abstracts the concrete backend);     *)
+(*   - canonicalization is an injective encoding: the typed projection   *)
+(*     (REQ1-SIGNING-digest-prefix) is a free constructor, so distinct   *)
+(*     typed values are distinct symbolic terms;                         *)
+(*   - time is an ordered predicate assumed by the verifier (the window  *)
+(*     arithmetic of REQ1-VERIFY-time-bounds is not modeled).            *)
+(*                                                                       *)
+(* Every verifier step carries the REQ id it operationalizes; the CI     *)
+(* coverage check asserts each annotated id exists in the requirement    *)
+(* map.                                                                  *)
+(*************************************************************************)
+
+free pub: channel.
+
+type skey.
+type pkey.
+type digest.
+
+fun pk(skey): pkey.
+
+(* Signatures: free constructor; anyone can open a signature under the
+   matching public key (Dolev-Yao: signatures are public-readable). *)
+fun sign(bitstring, skey): bitstring. (* REQ1-SIGNING-backend-reject *)
+reduc forall m: bitstring, k: skey; open(sign(m, k), pk(k)) = m.
+
+(* REQ1-CLAIM-ath: ath is the digest of the COMPLETE received grant
+   compact (payload AND signature), not of the payload alone. *)
+fun h(bitstring): digest.
+
+(* Compact containers (data constructors make the framing injective). *)
+fun grantCompact(bitstring, bitstring): bitstring [data].
+fun proofCompact(bitstring, bitstring): bitstring [data].
+
+(* REQ1-SIGNING-digest-prefix: the request digest covers the pair
+   [operation, typed(cast_arguments)]. The typed projection is a free
+   constructor: distinct (operation, arguments) pairs are distinct terms,
+   and h is one-way — the injectivity lemma P2 rests on. *)
+fun typed(bitstring, bitstring): bitstring [data].
+fun requestDigest(bitstring, bitstring): digest. (* REQ1-SIGNING-digest-prefix *)
+
+(* REQ1-HEADER-thumbprint / REQ1-HEADER-proof-jwk: cnf.jkt binds the
+   holder key by the digest of its public part. *)
+fun jkt(pkey): digest. (* REQ1-HEADER-proof-jwk *)
+
+(* Payload shapes. *)
+fun grantPayload(bitstring, bitstring, digest, bitstring): bitstring [data].
+fun proofPayload(bitstring, bitstring, digest, digest): bitstring [data].
+
+(* REQ1-VERIFY-envelope-binding: the context tuple. *)
+fun ctx(bitstring, bitstring, bitstring, bitstring, bitstring): bitstring [data]. (* REQ1-VERIFY-time-bounds *)
+
+(* REQ1-VERIFY-facts-redacted (P4): the verifier's output constructor takes
+   ONLY the declared fields — the grant digest, the proof id, and the
+   holder thumbprint. Anything else can appear in the output only if it
+   were an argument to this constructor; it is not. *)
+fun facts(digest, bitstring, digest): bitstring [data]. (* REQ1-VERIFY-facts-redacted *)
+
+(* REQ1-VERIFY-return-shape: the single closed error value. *)
+fun invalid(): bitstring [data].
+
+(* Events. *)
+event holderProof(digest, bitstring).
+event verifierAccept(digest, bitstring).
+event verifierAcceptReq(digest, digest).
+event verifierAcceptCtx(bitstring, bitstring).
+
+(* P4 probe: the server-derived cast arguments are private to the verifier
+   (they never appear on the network in this model — the runtime derives
+   them out-of-band; the attacker model records this). *)
+free castArgs: bitstring [private].
+
+(* Verifier: the check_envelope core. Every input the attacker controls
+   arrives on pub; every trusted input is a private parameter. *)
+let verifier(pkI: pkey, pkH: pkey, issuerName: bitstring, audience: bitstring,
+             expectedCtx: bitstring, expectedReq: digest) =
+  in(pub, gcompact: bitstring);
+  in(pub, pcompact: bitstring);
+  let grantCompact(gp, sigI) = gcompact in
+  let proofCompact(pp, sigH) = pcompact in
+  let grantPayload(iss, aud, holderJkt, ops) = gp in
+  let proofPayload(pid, pctx, baReq, ath) = pp in
+  (* P1 anchor: the digest of the grant THIS verifier was presented. *)
+  let vAth = h(gcompact) in
+  if iss = issuerName && aud = audience &&
+     open(sigI, pkI) = gp &&                                (* REQ1-VERIFY-grant-exact *)
+     open(sigH, pkH) = pp &&                                (* REQ1-VERIFY-envelope-binding *)
+     holderJkt = jkt(pkH) &&                                (* REQ1-HEADER-thumbprint *)
+     ath = vAth &&                                           (* REQ1-CLAIM-ath *)
+     baReq = expectedReq &&                                 (* P2 gate *)
+     pctx = expectedCtx                                     (* P3 gate *)
+  then
+    (
+      out(pub, facts(vAth, pid, holderJkt));                (* P4: the only output *)
+      event verifierAccept(vAth, pid);                      (* P1 *)
+      event verifierAcceptReq(baReq, expectedReq);          (* P2 *)
+      event verifierAcceptCtx(pctx, expectedCtx)            (* P3 *)
+    )
+  else out(pub, invalid()).                                 (* REQ1-VERIFY-return-shape *)
+
+(* Issuer: mints the grant for the holder key, once. *)
+let issuer(skI: skey, pkH: pkey, authChan: channel, issuerName: bitstring,
+           audience: bitstring, ops: bitstring) =
+  (* Fresh seed per issuance: each replicated grant is a DISTINCT term (the
+     wire's unique jti buys this; REQ1-CLAIM-case-sensitive makes it exact). *)
+  new grantSeed: bitstring; (* REQ1-CLAIM-case-sensitive *)
+  let gp = grantPayload(issuerName, audience, jkt(pkH), grantSeed) in
+  let sigI = sign(gp, skI) in
+  let gcompact = grantCompact(gp, sigI) in
+  out(authChan, gcompact);
+  out(pub, gcompact).
+
+(* Honest holder: signs proofs ONLY for the grant it holds, with the
+   expected context and the verifier-derived request digest. *)
+let holder(skH: skey, authChan: channel, expectedCtx: bitstring,
+           expectedReq: digest) =
+  in(authChan, gcompact: bitstring);
+  ( new pid: bitstring;
+    let ath = h(gcompact) in
+    let pp = proofPayload(pid, expectedCtx, expectedReq, ath) in
+    let sigH = sign(pp, skH) in
+    event holderProof(ath, pid);
+    out(pub, proofCompact(pp, sigH)) ).
+
+(* The malicious-holder / network-attacker signing oracle: a DIFFERENT key
+   the attacker fully controls. Proofs signed here are well-formed under
+   pkA — the confusion P1 must reject (the grant names jkt(pkH)). *)
+let attackerOracle(skA: skey) =
+  in(pub, pp: bitstring);
+  out(pub, proofCompact(pp, sign(pp, skA))).
+
+
+(* Queries: P1-P4. *)
+query ath: digest, pid: bitstring;
+event(verifierAccept(ath, pid)) ==> event(holderProof(ath, pid)).
+
+query r1: digest, r2: digest;
+event(verifierAcceptReq(r1, r2)) ==> (r1 = r2).
+
+query c1: bitstring, c2: bitstring;
+event(verifierAcceptCtx(c1, c2)) ==> (c1 = c2).
+
+query attacker(castArgs).
+
+process
+  new skI: skey; let pkI = pk(skI) in out(pub, pkI);
+  new skH: skey; let pkH = pk(skH) in out(pub, pkH);
+  new skA: skey; out(pub, pk(skA));
+  new authChan: channel;
+
+  new issuerName: bitstring; out(pub, issuerName);
+  new audience: bitstring; out(pub, audience);
+  new ops: bitstring; out(pub, ops);
+  new method: bitstring; out(pub, method);
+  new uri: bitstring; out(pub, uri);
+  new invocation: bitstring; out(pub, invocation);
+  new operation: bitstring; out(pub, operation);
+  new nonceMode: bitstring; out(pub, nonceMode);
+
+  let expectedCtx = ctx(method, uri, invocation, operation, nonceMode) in
+  let expectedReq = requestDigest(operation, typed(operation, castArgs)) in
+
+  ( !(issuer(skI, pkH, authChan, issuerName, audience, ops))
+  | !(holder(skH, authChan, expectedCtx, expectedReq))
+  | !(verifier(pkI, pkH, issuerName, audience, expectedCtx, expectedReq))
+  | !(attackerOracle(skA)) )

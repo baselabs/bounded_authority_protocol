@@ -2,7 +2,7 @@ package verifier
 
 import "crypto/sha256"
 
-// Selector algebra (docs/protocol-v1.md § Selector algebra): closed ordered
+// Selector algebra (spec/bap-v1.md § Selector algebra): closed ordered
 // objects of kind all | equals | one_of over object-member paths. Selectors
 // are applied conjunctively to the server-derived tagged arguments. Semantic
 // identity preserves tagged scalar distinctions (integer and integral float

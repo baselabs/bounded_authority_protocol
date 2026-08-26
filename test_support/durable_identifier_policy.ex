@@ -10,7 +10,13 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
                        "lib/bounded_authority_protocol/conformance/runner.ex",
                        "scripts/check_chain_archive_performance.exs",
                        "scripts/check_verification_performance.exs",
-                       "test/architecture/purity_test.exs"
+                       "scripts/check_spec_facts.exs",
+                       "spec/tools/build_examples.exs",
+                       "test/architecture/purity_test.exs",
+                       "test/docs_guides_test.exs",
+                       "test/bap_walkthrough_test.exs",
+                       "test/docs_currency_test.exs",
+                       "test/spec_facts_test.exs"
                      ])
   @requirement_ids "test/fixtures/durable_identifier_requirements.txt"
                    |> File.read!()

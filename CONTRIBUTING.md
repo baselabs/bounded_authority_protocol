@@ -35,3 +35,7 @@ dependency direction.
 
 By contributing, you agree that your contribution is licensed under Apache License 2.0. No
 contributor license agreement or DCO sign-off is currently required.
+
+## Code of Conduct
+
+By participating in this project you agree to uphold the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md) (v2.1).

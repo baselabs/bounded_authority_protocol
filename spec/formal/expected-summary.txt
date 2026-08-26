@@ -1,0 +1,6 @@
+# Frozen ProVerif output summary (non-regression diff target).
+# Tool: proverif 2.05 (opam pin; see ADR 0025 + CI job).
+RESULT event(verifierAccept(ath_2,pid_2)) ==> event(holderProof(ath_2,pid_2)) is true.
+RESULT event(verifierAcceptReq(r1,r2)) ==> r1 = r2 is true.
+RESULT event(verifierAcceptCtx(c1,c2)) ==> c1 = c2 is true.
+RESULT not attacker(castArgs[]) is true.

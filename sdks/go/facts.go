@@ -1,6 +1,6 @@
 package verifier
 
-// Verified facts (docs/protocol-v1.md § Public verification contract). Facts
+// Verified facts (spec/bap-v1.md § Public verification contract). Facts
 // are value-bearing and redacted: they contain only their exact documented
 // fields, no raw credentials, signatures, JWK containers, nonces, request
 // argument values, or selector values. They carry no JSON, string, or generic

@@ -1,7 +1,7 @@
 # `bounded-authority-protocol-go`
 
 Typed, provider-neutral **verifier** library that reimplements the BAP v1 verification profile from the
-published spec ([`docs/protocol-v1.md`](../../docs/protocol-v1.md)), the governing ADRs, and the published
+published spec ([`spec/bap-v1.md`](../../spec/bap-v1.md)), the governing ADRs, and the published
 conformance corpus ([`priv/conformance/v1/corpus/`](../../priv/conformance/v1/corpus/)) — authored from spec +
 corpus **alone** with no code-level derivation from the Elixir reference or the sibling SDKs
 ([ADR 0014](../../docs/adr/0014-cross-language-verifier-sdks.md) D5).
@@ -25,7 +25,7 @@ recorded for the graduated publish.
 ## Conformance
 
 Passes all **283** published conformance vectors, recomputed from scratch, and SHA-binds the vendored corpus
-`index.json` at startup (`paxzYcUI0rtVxsowRaXMBuxKP2T2WQQhQQjG8QxwTcw`) — a mismatched vendored corpus fails
+`index.json` at startup (`TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs`) — a mismatched vendored corpus fails
 closed rather than drifting silently. Every case file is verified against the index's per-file SHA-256, and
 the two-boundary key census is asserted per run (observed import-boundary thumbprints ==
 `index.json` `public_key_fingerprints`, both directions; at authoring: `agreed=283 disagreed=0 census=11`).
@@ -36,7 +36,7 @@ go test ./conformance/   # agreed=283 disagreed=0 + census
 
 ## The public façade
 
-The 17-function v1 verification contract (see `docs/protocol-v1.md` § Public verification contract) plus the
+The 17-function v1 verification contract (see `spec/bap-v1.md` § Public verification contract) plus the
 versioned primitives, translated to Go idioms:
 
 - **Producers**: `GrantSigningInput`, `ProofSigningInput`, `BoundaryAnchorSigningInput`,
@@ -96,7 +96,7 @@ go test ./...                            # library + battery + conformance (283 
 sh tools/purity_check.sh && sh tools/license_check.sh
 ```
 
-The library path is built from `docs/protocol-v1.md` + the ADRs + RFCs + the conformance corpus **only**
+The library path is built from `spec/bap-v1.md` + the ADRs + RFCs + the conformance corpus **only**
 (ADR 0014 D5: no derivation from the Elixir reference or a sibling SDK).
 
 ## License

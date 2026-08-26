@@ -1,7 +1,7 @@
 package verifier
 
 // base64url, protocol profile (RFC 4648 §5 as transcribed by
-// docs/protocol-v1.md § Base64url):
+// spec/bap-v1.md § Base64url):
 //
 //   - alphabet A-Z a-z 0-9 '-' '_' only (REQ1-B64-alphabet);
 //   - padding and whitespace forbidden (REQ1-B64-no-padding);

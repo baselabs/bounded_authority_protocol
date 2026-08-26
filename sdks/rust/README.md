@@ -1,7 +1,7 @@
 # `bounded-authority-protocol` (Rust)
 
 Typed, provider-neutral **verifier** library that reimplements the BAP v1 verification profile from the
-published spec ([`docs/protocol-v1.md`](../../docs/protocol-v1.md)) and the published conformance corpus
+published spec ([`spec/bap-v1.md`](../../spec/bap-v1.md)) and the published conformance corpus
 ([`priv/conformance/v1/corpus/`](../../priv/conformance/v1/corpus/)). Authored from the spec + corpus
 **alone** with no code-level derivation from the Elixir reference ([ADR 0014](../../docs/adr/0014-cross-language-verifier-sdks.md)).
 
@@ -48,7 +48,7 @@ cargo test --test permissiveness   # 67 tests: closures + decode-path + exclusio
 
 ## The public façade
 
-The 17-function v1 verification contract (see [`docs/protocol-v1.md`](../../docs/protocol-v1.md) § Public
+The 17-function v1 verification contract (see [`spec/bap-v1.md`](../../spec/bap-v1.md) § Public
 verification contract) plus the versioned primitives:
 
 - **Producers**: `grant_signing_input`, `proof_signing_input`, `boundary_anchor_signing_input`,
@@ -81,7 +81,7 @@ cargo test                                   # lib + permissiveness + conformanc
 sh tools/purity_check.sh && sh tools/license_check.sh
 ```
 
-The library path is built from `docs/protocol-v1.md` + the ADRs + RFCs + the conformance corpus **only**
+The library path is built from `spec/bap-v1.md` + the ADRs + RFCs + the conformance corpus **only**
 (ADR 0014 D5: no derivation from the Elixir reference or a sibling SDK).
 
 ## Deployment

@@ -2,7 +2,7 @@
 proof-of-possession authority (the BAP v1 verification profile, reimplemented in Python).
 
 The public surface re-exports the 17-function façade + the versioned primitives the public contract
-names (protocol-v1.md § Public verification contract, L266-309).
+names (spec/bap-v1.md § Public verification contract, L266-309).
 
 No ``authorized`` / ``decision`` surface (AGENTS rule 1); every function returns ``Result[T] =
 Ok | Err``, mirroring ``{:ok, value} | {:error, :invalid}``. Facts are value-bearing, redacted, and

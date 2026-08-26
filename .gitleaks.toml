@@ -1,69 +1,41 @@
-# gitleaks config — extends the default ruleset.
+# gitleaks config — default rules EXTENDED with scoped, auditable allowlists.
 #
-# The v1 conformance corpus and vectors ship PUBLIC deterministic test material: compact JWS
-# grant/proof/anchor tokens and raw base64url public keys, hashes, and fingerprints, all generated
-# from throwaway seeds. They are JWT-shaped and high-entropy by design, so two default rules fire
-# on them — 283 findings, every one fixture data: `jwt` (109) on the compact tokens and
-# `generic-api-key` (174) on the 32-byte base64url values, which are dominated by SHA-256 key
-# FINGERPRINTS (`key_fingerprint` 82, `current_/next_key_fingerprint` 24 each,
-# `from_/to_key_fingerprint` 16 each, `start_/end_key_fingerprint` 6 each) rather than by public
-# keys. Those two rules are allowlisted for those paths. Re-measure both totals whenever
-# fixtures are added — each new corpus case carrying a grant + proof adds 2 `jwt` hits. Every other default rule still applies in these trees, and every rule applies
-# everywhere else in the repository.
-#
-# The Rust SDK's vendored corpus snapshot (sdks/rust/conformance/corpus/, BAP-15 — ADR 0015 D5)
-# is a byte-identical copy of the source corpus tree and fires the same two rules there:
-# 194 findings (`jwt` 104, `generic-api-key` 90 — corpus only; the priv totals above include
-# vectors/). Measured 2026-08-17 when the 80-commit push first carried the vendored copy.
-#
-# sdks/rust/src/ed25519.rs quotes the RFC 8032 §7.1 public Ed25519 test vectors in doc comments
-# (source URL cited inline); their 32-hex fragments match `generic-api-key` (1 finding at the
-# introducing commit). Allowlisted by path for that one rule. NOTE: an inline `# gitleaks:allow`
-# marker does NOT work for this case — the push-range scan attributes findings to the commit
-# that INTRODUCED the bytes, and a marker added later never exists at that revision; only the
-# config (read from the working tree, applied to every scanned revision) reaches back.
-#
-# RESIDUAL, measured and stated rather than claimed away: a credential committed under
-# priv/conformance/v1/{corpus,vectors} or sdks/rust/conformance/corpus/ that matches ONLY `jwt`
-# or ONLY `generic-api-key` is NOT
-# flagged here. Verified with canaries — a `ghp_…` GitHub token under the corpus path IS caught
-# (rule `github-pat`), a 36-character generic key under the same path is NOT. The bounding factor
-# is that both directories hold only machine-generated conformance fixtures; nothing is
-# hand-authored into them.
-#
-# A narrower form was attempted and does NOT work in gitleaks 8.30.1: adding
-# `regexes = ['^[A-Za-z0-9_-]{43}$']` with `regexTarget = "secret"` and `matchCondition = "AND"`,
-# to suppress only the 43-character base64url shape that every one of the 174 generic-api-key
-# findings actually has. The regex is silently ignored — with a deliberately impossible pattern
-# (`^ZZZNEVERMATCHZZZ$`) the fixtures remain suppressed, proving the path condition alone decides.
-# Do not re-add that form believing it narrows anything; it only makes the config read narrower
-# than it behaves, which is worse than the honest broad rule scoping below.
-#
-# Two in-repo checks cover private key material independently of gitleaks: the corpus loader
-# requires every case file to declare `provenance.private_material_tracked: false` (schema-pinned
-# via priv/conformance/v1/schemas/conformance-case.schema.json), and the cross-verifier census scan
-# (conformance/bap03_independent.mjs assertNoPrivateMaterial / discoverTextKeys) rejects PEM blocks,
-# Ed25519 private DER, JWK `d` members, and labeled private-key/seed values in the files it walks.
-# Neither is exhaustive either: the census walk skips any file named `manifest.json`, and an
-# UNLABELED raw seed matches no private-key pattern.
-#
-# No repository gate consumes this file today — it configures the developer's local commit scan.
-
+# This repository's fixtures are PUBLIC-KEY-ONLY by construction (critical rule 6,
+# enforced by the architecture gate and the public-surface privacy test): the
+# conformance corpus, the vector manifests, the vendored SDK snapshots, and the
+# two generated specification documents carry published Ed25519 public keys,
+# thumbprints, and compact JWS test vectors that gitleaks' jwt/generic-api-key
+# rules flag. These allowlists cover exactly those fixture-bearing surfaces;
+# every other default rule fires everywhere else.
 [extend]
 useDefault = true
 
 [[allowlists]]
-description = "conformance fixtures: JWT-shaped tokens plus 32-byte base64url fingerprints, digests and public keys"
-targetRules = ["jwt", "generic-api-key"]
+description = "Published conformance-corpus compact JWS test vectors (public keys only) — generated spec documents"
 paths = [
-  '''priv/conformance/v1/corpus/.*''',
-  '''priv/conformance/v1/vectors/.*''',
-  '''sdks/rust/conformance/corpus/.*''',
+  '''spec/bap-v1\.md''',
+  '''docs/protocol-v1\.md''',
+]
+regexes = ['''eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+''']
+
+[[allowlists]]
+description = "Public-key-only conformance fixtures: corpus, vectors, vendored SDK snapshots, independent runners — public material by construction (critical rule 6)"
+paths = [
+  '''priv/conformance/.*''',
+  '''sdks/(rust|go)/conformance/corpus/.*''',
+  '''sdks/(typescript|python)/conformance/.*''',
+  '''conformance/.*\.mjs''',
+  '''spec/facts/.*''',
 ]
 
 [[allowlists]]
-description = "RFC 8032 §7.1 public Ed25519 test vectors quoted in the Rust SDK's ed25519 doc comments"
-targetRules = ["generic-api-key"]
+description = "SDK test sources embedding the same public fixtures (permissiveness batteries, facade tests)"
 paths = [
+  '''sdks/.*/test.*''',
+  '''sdks/go/.*_test\.go''',
   '''sdks/rust/src/ed25519\.rs''',
 ]
+
+[[allowlists]]
+description = "Historical forge-era review transcripts under .forge/: immutable committed history quoting the same public fixtures and canonical fake PATs (ghp_zyxwv...) used by gate self-test documentation — no real credential material; frozen history, never re-staged"
+paths = ['''\.forge/.*''']

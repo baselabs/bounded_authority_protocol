@@ -42,6 +42,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
@@ -64,6 +66,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
@@ -83,3 +87,73 @@ jobs:
 
       - name: Run complete quality gate
         run: mix quality
+
+  spec-render:
+    name: Spec renders under pinned kramdown-rfc
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1
+        with:
+          ruby-version: "3.3"
+
+      # Pin by version AND gem checksum (the A2 amendment: Ruby gem pinned by version+checksum).
+      # The primary .gem is checksum-verified before install; its version-constrained
+      # dependencies resolve from rubygems over TLS (--local cannot resolve them).
+      - name: Install pinned kramdown-rfc 1.7.40
+        run: |
+          curl -fsSLo /tmp/kramdown-rfc.gem https://rubygems.org/downloads/kramdown-rfc-1.7.40.gem
+          echo "6eac9c860c823a1d47c13c47cff04f91f3c6e02f699f9a64800b4bbf15e6989f  /tmp/kramdown-rfc.gem" | sha256sum -c -
+          gem install /tmp/kramdown-rfc.gem
+
+      - name: Render spec/bap-v1.md through kramdown-rfc
+        run: kramdown-rfc spec/bap-v1.md > /tmp/bap-v1.xml
+
+      - name: Rendered output is a nonempty xml2rfc v3 document
+        run: grep -q '<rfc ' /tmp/bap-v1.xml
+
+  cddl-coherence:
+    name: Informative CDDL stays coherent with the corpus
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install pinned cddl validator 0.12.14 (version + checksum)
+        run: |
+          curl -fsSLo /tmp/cddl.gem https://rubygems.org/downloads/cddl-0.12.14.gem
+          echo "$(cat scripts/cddl-gem.sha256)  /tmp/cddl.gem" | sha256sum -c -
+          gem install /tmp/cddl.gem
+
+      - name: Validate the CDDL source itself
+        run: |
+          ruby -r cddl -e 'CDDL::Parser.new(File.read("spec/cddl/bap-v1.cddl")); puts "cddl parses"'
+
+      - name: Corpus coherence (valid cases parse; invalid exemplars reject)
+        run: ruby scripts/check_cddl_coherence.rb
+
+  formal-analysis:
+    name: Pinned ProVerif re-run + ledger checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@f92e0606b7ae4873dd1238465ea4bf6f8e40d85c # v3
+        with:
+          ocaml-compiler: "5.1"
+
+      - name: Install pinned ProVerif 2.05
+        run: opam install proverif.2.05 -y
+
+      - name: Run the formal harness
+        run: opam exec -- scripts/run_formal.sh

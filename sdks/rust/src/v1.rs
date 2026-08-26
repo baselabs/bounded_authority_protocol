@@ -1,7 +1,7 @@
 //! Façade A — the public v1 verification entry points (Tasks 10–13).
 //!
 //! This module is the implementation home for the frozen v1 façade functions
-//! named in `docs/protocol-v1.md` § Public verification contract (lines
+//! named in `spec/bap-v1.md` § Public verification contract (lines
 //! 291–373). Task 10 lands Façade A: the untrusted key locator, the grant/proof
 //! decodes, and the four signing-input producers (the first half of the 17-
 //! function public surface).
@@ -17,7 +17,7 @@
 //!
 //! # Derivation
 //!
-//! Derived first-hand from `docs/protocol-v1.md` (§ Protected headers,
+//! Derived first-hand from `spec/bap-v1.md` (§ Protected headers,
 //! § Claims, § Signing and digest inputs, § Untrusted key locator, § Public
 //! verification contract), `docs/adr/0004-...` (§ Boundary anchors, §
 //! Authenticated key transitions), RFC 7515/7638/8785, and the conformance
@@ -526,7 +526,7 @@ fn scan_compact(compact: &[u8], bounds: &Bounds) -> Result<()> {
 /// with the per-kind CONTENT validation the reference's
 /// `validate_assembled_compact` performs (runtime.ex:151 — it re-parses the
 /// composed output as a grant/proof/anchor/transition). The public contract is
-/// `/2` (no caller bounds — protocol-v1.md:299), so the per-kind parse runs
+/// `/2` (no caller bounds — spec/bap-v1.md), so the per-kind parse runs
 /// against the profile maximum bounds. A caller passing segments that compose
 /// to a structurally-invalid credential — wrong segment count, non-canonical
 /// base64url, or a header/payload that does not parse as the declared kind's

@@ -12,13 +12,13 @@ retrofit after.
 
 This document is the standing authority for standards-track decisions. The
 [protocol charter](protocol-charter.md) defines what the verifier does; the
-[normative profile](../protocol-v1.md) freezes the current contract-major's bytes; the
+`normative profile` freezes the current contract-major's bytes; the
 [conformance contract](conformance-contract.md) defines how conformance is proven. This charter
 defines how all three survive time.
 
 Normative keywords in this charter (MUST, MUST NOT, MAY) carry the meanings defined in BCP 14
 [RFC2119] [RFC8174] when, and only when, they appear in all capitals, as carried by the
-[normative profile](../protocol-v1.md). Evolution-contract requirements use the stable identifier
+`normative profile`. Evolution-contract requirements use the stable identifier
 scheme of [ADR 0007](../adr/0007-normative-requirement-identifiers.md) under the `REQ1-EVO-*`
 prefix and are traced to conformance cells in the requirement map
 [requirement map](requirement-map.md).
@@ -91,8 +91,10 @@ contract-major — the same closed posture, different constants. The `kid`/thumb
 the key-locator boundary is already key-type independent, so trusted-key resolution survives suite
 succession unchanged.
 
-The anticipated successor signature family is ML-DSA (FIPS 204), with a hybrid
-(Ed25519 + ML-DSA composite) posture to be evaluated when the successor suite is defined.
+The successor candidate family is the `BAP2-*` ML-DSA family (FIPS 204, JOSE mapping per
+RFC 9964), with a hybrid Ed25519+ML-DSA composite posture reserved per
+draft-ietf-jose-pq-composite-sigs — the concrete names, parameter sets, quantum-readiness
+statement, and revisit triggers are recorded in `docs/adr/0026-pq-successor-suite.md`.
 Post-quantum migration is a decade-scale industry program already underway; this charter's
 commitment is that the migration is a suite succession, not a redesign.
 
@@ -227,8 +229,11 @@ credibility step and the policy is what makes single-maintainer tolerable to ado
   from the twelve-month deprecation minimum above (§ The evolution contract), yet still a published,
   deployment-decided sunset, not a flag-day — never as a silent verdict change.
 
-The governance policy is also published as a standalone normative project document at
-[docs/governance.md](../governance.md); this charter section remains its authoritative source.
+The governance policy's single normative home is [docs/governance.md](../governance.md);
+this charter cites it and carries no independent policy statements (the single-home
+discipline: a policy sentence lives in exactly one normative document, and every other
+document points at it — including this one, for the governance paragraph that previously
+duplicated content here).
 
 ## Venue strategy
 

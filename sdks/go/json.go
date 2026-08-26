@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 )
 
-// The tagged JSON algebra (docs/protocol-v1.md § JSON algebra and decoding):
+// The tagged JSON algebra (spec/bap-v1.md § JSON algebra and decoding):
 // the protocol preserves the integer/float distinction, source member order,
 // and exact bounds that host JSON decoders erase.
 

@@ -115,7 +115,7 @@ failures only if those classes cannot widen the runtime surface.
 
 The cross-language SDKs (BAP-09) were hardened by a multi-vendor review that surfaced byte-level
 divergences from the Elixir reference. To keep the ADR 0014 D5 bar — a new SDK is authored from
-`docs/protocol-v1.md` + ADRs + the corpus **alone**, with no code-level derivation from the Elixir
+`spec/bap-v1.md` + the corpus **alone**, with no code-level derivation from the Elixir
 reference or a sibling SDK — each behavior the review pinned is reachable from the spec or carried as
 a corpus case. The table maps every byte-level finding to its pinning artifact; `(d)`-class host
 closures stay as per-SDK mutation-gates (the corpus cannot express them).

@@ -1,4 +1,4 @@
-"""The request digest (protocol-v1.md § Signing and digest inputs, L238-264)::
+"""The request digest (spec/bap-v1.md § Signing and digest inputs, L238-264)::
 
     base64url(SHA-256("BAP1-REQUEST\\0" || JCS([operation, typed(cast_arguments)])))
 
@@ -21,7 +21,7 @@ REQUEST_PREFIX = b"BAP1-REQUEST\x00"
 
 
 def typed_project(value: Tagged) -> Tagged:
-    """``typed()`` projection: tagged value → ``["tag", value]`` JSON array (protocol-v1.md:247-256).
+    """``typed()`` projection: tagged value → ``["tag", value]`` JSON array (spec/bap-v1.md).
 
     - ``null`` → ``["null"]``; ``bool`` → ``["boolean", v]``; ``int`` → ``["integer", v]``;
       ``float`` → ``["float", v]``; ``string`` → ``["string", v]``;
