@@ -5,7 +5,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     credo: {"~> 1.7", [:dev, :test]},
     dialyxir: {"~> 1.4", [:dev, :test]},
     ex_doc: {"~> 0.40.3", [:dev, :test]},
-    jsonschex: {"~> 0.8.1", [:dev, :test]},
+    jsonschex: {"~> 0.9.2", [:dev, :test]},
     mix_audit: {"~> 2.1", [:dev, :test]},
     sbom: {"~> 0.10.0", [:dev, :test]},
     stream_data: {"~> 1.1", [:dev, :test]}
