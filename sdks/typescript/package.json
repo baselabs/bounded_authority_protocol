@@ -26,7 +26,7 @@
     "census": "tsx conformance/census.ts"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "eslint": "^10.9.0",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3",
