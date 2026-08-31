@@ -205,10 +205,8 @@ func proofSigningInputFor(p Proof, bounds *Bounds, profile proofProfile) (si Sig
 	if len(p.GrantCompact) == 0 || len(p.GrantCompact) > b.CompactBytes {
 		return SigningInput{}, ErrInvalid // producer ath compact-bytes bound
 	}
-	if profile == proofProfileLocalLoopbackHTTP {
-		if err := scanCompact(p.GrantCompact, b); err != nil {
-			return SigningInput{}, ErrInvalid
-		}
+	if err := scanCompact(p.GrantCompact, b); err != nil {
+		return SigningInput{}, ErrInvalid
 	}
 	athRaw := sha256.Sum256([]byte(p.GrantCompact))
 	baReqRaw, err := requestDigestRaw(p.Operation, p.CastArguments, &b)
@@ -414,7 +412,7 @@ func assembleCompactFor(si SigningInput, signature []byte, bounds *Bounds, profi
 		if _, err := decodeProofHeaderFor(parts, b, proofProfileStandard); err != nil {
 			return "", ErrInvalid
 		}
-		if _, err := JsonDecode(parts.Payload, &b); err != nil {
+		if _, err := decodeProofPayloadFor(parts, b, proofProfileStandard); err != nil {
 			return "", ErrInvalid
 		}
 	case KindLocalLoopbackHTTPProof:
