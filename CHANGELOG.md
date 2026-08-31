@@ -4,6 +4,31 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-30
+
+### Added — byte-distinct local-loopback HTTP application proof
+
+- Add normative profile `bap-application-proof/local-loopback-http/1`, protected
+  `typ: "ba+loopback-proof"`, mandatory nonce, and exact `127.0.0.1`/`[::1]` HTTP URI rules.
+- Add separate five-surface Elixir, TypeScript, Python, Rust, and Go APIs. Standard `dpop+jwt`
+  functions reject the new bytes and the sibling profile rejects standard proof bytes.
+- Add a secret-free certified language-neutral profile corpus plus real IPv4/IPv6 HTTP socket drill
+  using fresh in-memory keys. The certified index SHA-256 is
+  `10fc4cf05affcddc9e6340ff392c247e25ab038cd938f2557829a7ce63b1a5e4` (revision 1, 36 URI cases,
+  8 proof cases, exact `profile.json` + `proof-cases.json` set).
+- Update the README, security and usage policies, contributor guidance, installation/upgrading/
+  implementer guides, all SDK guides, ExDoc extras, and the runnable Livebook. The package now
+  ships the curated guides, Livebook, and ready-to-file IANA registration sources alongside the
+  normative profile and corpus.
+
+### Compatibility and distribution
+
+- Standard v1 remains byte- and verdict-identical: its 283-case corpus and every standard
+  `dpop+jwt` API continue unchanged. Profile selection is explicit and fail-closed.
+- `v0.3.0` identifies the exact source release. Hex archive publication and registry checksum
+  read-back are separate release actions; consumers must not adopt from the tag or a mutable
+  checkout as though either were an immutable package identity.
+
 ## [0.2.0] — 2026-08-26
 
 ### Changed — release 0.2.0
@@ -1097,8 +1122,9 @@ several note findings, all in surfaces this program touched. All fixed:
   node/byte bounds are inline-expressible and now tested; only compact-carried whole-payload
   `total_nodes` and an inline 65-member `object_members` remain enforced-without-a-red-case.
 - Close BAP-06: lock the 0.1.0 release-candidate public API surface (enumerated in the
-  [release-candidate contract](release-candidate-contract.md) and enforced by the
-  `@compiled_export_allowances` architecture-gate pin; [ADR 0008](adr/0008-release-candidate-contract.md)),
+  [release-candidate contract](docs/release-candidate-contract.md) and enforced by the
+  `@compiled_export_allowances` architecture-gate pin;
+  [ADR 0008](docs/adr/0008-release-candidate-contract.md)),
   add the `release.candidate` reproducibility gate (two cache-isolated builds, byte-equal SHA-256,
   wired into `mix quality`), and author the candidate-facing docs (release-candidate-contract.md,
   SECURITY.md, CHANGELOG `[0.1.0]`, README). Zero wire byte, bound, or verdict change. Published

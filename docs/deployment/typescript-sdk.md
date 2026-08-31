@@ -26,6 +26,14 @@ derivation-hygiene decisions.
 | Node service (Express/Fastify middleware) | Verify at the boundary; pass RAW credential bytes to the verifier, never pre-decoded structs |
 | Edge runtimes supporting node:crypto | The verifier core is synchronous and allocation-bounded; check the runtime's `crypto.verify` (Ed25519) availability |
 
+## Local-loopback application profile
+
+Local development listeners select `localLoopbackHttpUriNormalize`,
+`localLoopbackHttpProofSigningInput`, `assembleLocalLoopbackHttpCompact`,
+`decodeLocalLoopbackHttpProof`, and `checkLocalLoopbackHttpEnvelope` explicitly. Admit only direct
+literal `127.0.0.1`/`[::1]` HTTP targets and require the server nonce. Never derive the target from
+`Forwarded`/`X-Forwarded-*`, accept `localhost`, or retry standard `dpop+jwt` after rejection.
+
 ## Supply-chain posture
 
 Zero non-stdlib runtime dependencies by default; the development toolchain (tests, the

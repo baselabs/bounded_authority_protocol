@@ -1349,7 +1349,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     # proof_signing_input's build_proof reads input["nonce"] through proof_nonce/1; a present
     # base64url nonce hits the `encoded when is_binary` clause and decodes into the Proof.
     alias BoundedAuthorityProtocol.V1
-    {pub_i, priv_i} = :crypto.generate_key(:eddsa, :ed25519, <<70::256>>)
+    {_pub_i, priv_i} = :crypto.generate_key(:eddsa, :ed25519, <<70::256>>)
     {pub_h, _} = :crypto.generate_key(:eddsa, :ed25519, <<71::256>>)
     {:ok, hk} = V1.Jwk.public_key_thumbprint_raw(pub_h, %{})
     nonce = "nonce-within-bound"
@@ -1403,7 +1403,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     # input["nonce"] present but not a binary (an integer) -> proof_nonce's `_ -> nil` clause.
     # build_proof still succeeds (nonce becomes nil), and proof_signing_input produces output.
     alias BoundedAuthorityProtocol.V1
-    {pub_i, priv_i} = :crypto.generate_key(:eddsa, :ed25519, <<70::256>>)
+    {_pub_i, priv_i} = :crypto.generate_key(:eddsa, :ed25519, <<70::256>>)
     {pub_h, _} = :crypto.generate_key(:eddsa, :ed25519, <<72::256>>)
     {:ok, hk} = V1.Jwk.public_key_thumbprint_raw(pub_h, %{})
 
@@ -1455,7 +1455,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     # not required by the envelope). This is the fail-closed normalization replacing the prior
     # raising Base.url_decode64! — verified non-crashing here.
     alias BoundedAuthorityProtocol.V1
-    {pub_i, priv_i} = :crypto.generate_key(:eddsa, :ed25519, <<70::256>>)
+    {_pub_i, priv_i} = :crypto.generate_key(:eddsa, :ed25519, <<70::256>>)
     {pub_h, _} = :crypto.generate_key(:eddsa, :ed25519, <<74::256>>)
     {:ok, hk} = V1.Jwk.public_key_thumbprint_raw(pub_h, %{})
 
@@ -1746,7 +1746,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     # catch-all (none of the is_* guards match nil). A top-level null is guarded out by json_field
     # before to_tagged runs, so the nested form is the reachable path.
     alias BoundedAuthorityProtocol.V1
-    {pub_i, priv_i} = :crypto.generate_key(:eddsa, :ed25519, <<70::256>>)
+    {_pub_i, priv_i} = :crypto.generate_key(:eddsa, :ed25519, <<70::256>>)
     {pub_h, _} = :crypto.generate_key(:eddsa, :ed25519, <<73::256>>)
     {:ok, hk} = V1.Jwk.public_key_thumbprint_raw(pub_h, %{})
 

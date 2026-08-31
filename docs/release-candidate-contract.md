@@ -59,7 +59,7 @@ profile-maximum default and is byte-identical to `/3` with `%{}` or `Bounds.maxi
 0.1.0 is the first release-candidate version. Under pre-1.0 SemVer (SemVer §4), the 0.x.y line
 reserves the right to break compatibility until 1.0.0. The API lock above is the commitment that the
 enumerated surface is the intended 1.0.0 surface; breaking changes before 1.0.0 land as `0.x.0`
-version bumps with a [CHANGELOG](CHANGELOG.md) entry, never silently.
+version bumps with a [CHANGELOG](../CHANGELOG.md) entry, never silently.
 
 - Removal, rename, signature change, or a new REQUIRED argument to a locked function: a major
   change (`0.x→0.(x+1)` before 1.0.0), requiring an `@compiled_export_allowances` allowlist edit in
@@ -85,7 +85,7 @@ gh attestation verify bounded_authority_protocol-<version>.tar \
 
 These are not releases, do not grant authority, and do not replace the connected release gates in
 BAP-07. The full security policy, including vulnerability reporting, is in
-[SECURITY.md](SECURITY.md).
+[SECURITY.md](../SECURITY.md).
 
 ### Reproducibility
 

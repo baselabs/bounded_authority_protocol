@@ -22,6 +22,9 @@
   satisfy exact caller boundaries and complete-object verification.
 - An unauthenticated, reordered, duplicated, cyclic, reverse-time, or out-of-window key transition
   cannot advance the historical verification key.
+- Literal-loopback HTTP cannot be smuggled through the standard `dpop+jwt` profile, selected from
+  untrusted metadata, widened to another loopback spelling, hostname, proxy target, or non-loopback
+  endpoint, or accepted without an exact server nonce.
 
 ## Primary adversaries
 
@@ -37,6 +40,8 @@
   ambiguous URIs, malformed Ed25519 points/signatures, or maximum-plus-one structures.
 - an archive controller supplying a validly signed shorter history, relinked omission, stale object
   generation, incomplete chunk stream, or forged historical-key path.
+- local malware or another same-host process attempting proof replay, alternate-host spelling,
+  `Host`/forwarding-header confusion, or cross-profile fallback against a development listener.
 
 ## Required controls
 
@@ -51,6 +56,9 @@
   tamper, duplicate/encoding, property/fuzz, timing/allocation, and source-isolated mutation-red
   gates;
 - architecture/package tests rejecting runtime, product, private, encoder, or inspection leaks.
+- a byte-distinct signed application-profile identity; exact literal-loopback URI normalization;
+  mandatory nonce; one trusted caller-selected profile; real IPv4/IPv6 socket drills deriving the
+  target from listener/request state rather than proxy metadata.
 - mandatory caller chain/anchor/transition/digest/object-version context; exact archive EOF;
   lower-inclusive/upper-exclusive historical windows; authenticated positional rollover; and
   constant-time fixed-width hash/fingerprint comparisons.
@@ -60,3 +68,6 @@
 Trusted-key resolution, key custody, issuance, revocation ordering, replay reservation, execution
 claims, evidence appends, archive privileges, witnesses, readiness, transport authentication, and
 host business authorization remain mandatory but are owned by the private runtime or host.
+For literal-loopback HTTP, TLS confidentiality and server authentication are absent and same-host
+process isolation is not provided. The host must reserve nonce and invocation before effect and
+must not treat loopback reachability as caller identity.

@@ -50,7 +50,7 @@ defmodule BoundedAuthorityProtocol.Fuzz.FacadeFuzzTest do
       pos = if max_pos == 0, do: 0, else: rem(pos, max_pos + 1)
       byte = rem(byte, 256)
 
-      <<pre::binary-size(pos), orig, rest::binary>> = b
+      <<pre::binary-size(^pos), orig, rest::binary>> = b
       mutated = <<pre::binary, Bitwise.bxor(orig, byte), rest::binary>>
       [{mutated, s2} | acc]
     end)

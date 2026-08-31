@@ -17,7 +17,7 @@ import re
 import types as _types
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, is_dataclass, replace
-from typing import Any, TypeVar, Union, cast, get_args, get_origin, get_type_hints
+from typing import Any, Literal, TypeVar, Union, cast, get_args, get_origin, get_type_hints
 
 from .base64url import base64url_decode, base64url_encode
 from .bounds import (  # noqa: F401
@@ -70,13 +70,14 @@ from .jwk import (
     thumbprint_raw,
 )
 from .selector import parse_selector, selector_matches
-from .uri import uri_normalize
+from .uri import local_loopback_http_uri_normalize, uri_normalize
 
 # --- constants (the closed v1 profile header/claim literals) ---
 
 ALG = "EdDSA"
 GRANT_TYP = "ba+cap"
 PROOF_TYP = "dpop+jwt"
+LOCAL_LOOPBACK_PROOF_TYP = "ba+loopback-proof"
 ANCHOR_TYP = "ba+chain-anchor"
 TRANSITION_TYP = "ba+key-transition"
 VERSION = 1
@@ -319,12 +320,21 @@ def _parse_grant_header(seg: CompactSegments, bounds: Bounds) -> str:
     return _require_kid(h, bounds)
 
 
-def _parse_proof_header(seg: CompactSegments, bounds: Bounds) -> tuple[bytes, bytes]:
+ProofProfile = Literal["standard", "local_loopback_http"]
+
+
+def _proof_typ(profile: ProofProfile) -> str:
+    return PROOF_TYP if profile == "standard" else LOCAL_LOOPBACK_PROOF_TYP
+
+
+def _parse_proof_header(
+    seg: CompactSegments, bounds: Bounds, profile: ProofProfile = "standard"
+) -> tuple[bytes, bytes]:
     """Returns (holderThumbprint raw32, holderKey raw32)."""
     h = json_decode(seg.protected_bytes, bounds)
     h = _require_object_exact(h, ["alg", "typ", "jwk"], "proof header")
     _require_string_lit(h, "alg", ALG, "proof header alg")
-    _require_string_lit(h, "typ", PROOF_TYP, "proof header typ")
+    _require_string_lit(h, "typ", _proof_typ(profile), "proof header typ")
     jwk_v = h.v.get("jwk")
     if not isinstance(jwk_v, JObject):
         fail("proof header: jwk object")
@@ -519,16 +529,20 @@ def _require_method(v: Tagged | None, key: str, bounds: Bounds = MAXIMUM_BOUNDS)
     return s
 
 
-def _require_normalized_uri(v: Tagged | None, key: str, bounds: Bounds = MAXIMUM_BOUNDS) -> str:
+def _require_normalized_uri(
+    v: Tagged | None,
+    key: str,
+    bounds: Bounds = MAXIMUM_BOUNDS,
+    profile: ProofProfile = "standard",
+) -> str:
     if v is None or not isinstance(v, JString):
         fail(f"claim: {key} uri string")
     b = v.v
     if not (1 <= len(b) <= bounds_resolve(bounds, "uri_bytes")):
         fail(f"claim: {key} uri bytes")
     s = utf8_str(b)
-    if not s.lower().startswith("https://"):
-        fail(f"claim: {key} https scheme")
-    norm = uri_normalize(b)
+    normalizer = uri_normalize if profile == "standard" else local_loopback_http_uri_normalize
+    norm = normalizer(b, bounds)
     if not isinstance(norm, Ok):
         fail(f"claim: {key} uri normalized")
     if utf8_str(norm.value) != s:
@@ -595,10 +609,14 @@ def _extract_audience(v: Tagged | None, bounds: Bounds = MAXIMUM_BOUNDS) -> list
     raise invalid_error("claim: aud shape")
 
 
-def _validate_proof_payload(p: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
+def _validate_proof_payload(
+    p: Tagged, bounds: Bounds = MAXIMUM_BOUNDS, profile: ProofProfile = "standard"
+) -> None:
     if not isinstance(p, JObject):
         fail("proof payload: object")
     has_nonce = "nonce" in p.v
+    if profile == "local_loopback_http" and not has_nonce:
+        fail("proof: nonce required")
     keys = (
         ["v", "jti", "htm", "htu", "iat", "ba_inv", "ba_op", "ath", "ba_req", "nonce"]
         if has_nonce
@@ -610,7 +628,7 @@ def _validate_proof_payload(p: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
         fail("proof: v=1")
     _require_string_or_uri(p.v.get("jti"), "jti", bounds)
     _require_method(p.v.get("htm"), "htm", bounds)
-    _require_normalized_uri(p.v.get("htu"), "htu", bounds)
+    _require_normalized_uri(p.v.get("htu"), "htu", bounds, profile)
     _require_int(p.v.get("iat"), "iat")
     _require_uuid(p.v.get("ba_inv"), "ba_inv")
     _require_operation(p.v.get("ba_op"), "ba_op", bounds)
@@ -941,15 +959,24 @@ def _decode_grant_body(compact: bytes, bounds: Bounds | None) -> GrantDecoded:
 # 3. decode_proof.
 @_closed_shape
 def decode_proof(compact: bytes, bounds: Bounds | None = None) -> Result[ProofDecoded]:
-    return _trying(lambda: _decode_proof_body(compact, bounds))
+    return _trying(lambda: _decode_proof_body(compact, bounds, "standard"))
 
 
-def _decode_proof_body(compact: bytes, bounds: Bounds | None) -> ProofDecoded:
+@_closed_shape
+def decode_local_loopback_http_proof(
+    compact: bytes, bounds: Bounds | None = None
+) -> Result[ProofDecoded]:
+    return _trying(lambda: _decode_proof_body(compact, bounds, "local_loopback_http"))
+
+
+def _decode_proof_body(
+    compact: bytes, bounds: Bounds | None, profile: ProofProfile
+) -> ProofDecoded:
     b = bounds if bounds is not None else MAXIMUM_BOUNDS
     seg = parse_compact(compact, b)
-    holder_thumbprint, _ = _parse_proof_header(seg, b)
+    holder_thumbprint, _ = _parse_proof_header(seg, b, profile)
     p = json_decode(seg.payload_bytes, b)
-    _validate_proof_payload(p, b)
+    _validate_proof_payload(p, b, profile)
     if not isinstance(p, JObject):
         fail("decode_proof: payload object")
     jti = _require_string_or_uri(p.v.get("jti"), "jti", b)
@@ -1028,10 +1055,26 @@ def _verify_grant_body(compact: bytes, trusted: TrustedIssuer, expected: Expecte
 # 5. check_envelope (REQ1-VERIFY-envelope-binding).
 @_closed_shape
 def check_envelope(grant_compact: bytes, proof_compact: bytes, expected: ExpectedRequest) -> Result[EnvelopeFacts]:
-    return _trying(lambda: _check_envelope_body(grant_compact, proof_compact, expected))
+    return _trying(lambda: _check_envelope_body(grant_compact, proof_compact, expected, "standard"))
 
 
-def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: ExpectedRequest) -> EnvelopeFacts:
+@_closed_shape
+def check_local_loopback_http_envelope(
+    grant_compact: bytes, proof_compact: bytes, expected: ExpectedRequest
+) -> Result[EnvelopeFacts]:
+    return _trying(
+        lambda: _check_envelope_body(
+            grant_compact, proof_compact, expected, "local_loopback_http"
+        )
+    )
+
+
+def _check_envelope_body(
+    grant_compact: bytes,
+    proof_compact: bytes,
+    expected: ExpectedRequest,
+    profile: ProofProfile,
+) -> EnvelopeFacts:
     t = expected.trusted_issuer
     # Cross-vendor #22 (fail-closed shallow): a None or malformed trusted_issuer must fail closed,
     # not raise AttributeError on the .public_key deref below. The reference returns {:error,:invalid}
@@ -1056,6 +1099,8 @@ def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: E
         fail("check_envelope: skew")
     if not _is_int(expected.proof_max_age) or expected.proof_max_age <= 0 or expected.proof_max_age > bounds_resolve(b, "proof_max_age"):
         fail("check_envelope: proof_max_age")
+    if profile == "local_loopback_http" and not isinstance(expected.nonce, NonceRequired):
+        fail("check_envelope: nonce required")
     # --- verify grant (issuer signature + context) ---
     gseg = parse_compact(grant_compact, b)
     gkid = _parse_grant_header(gseg, b)
@@ -1091,9 +1136,9 @@ def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: E
         fail("check_envelope: grant signature")
     # --- verify proof (holder signature) ---
     pseg = parse_compact(proof_compact, b)
-    holder_thumbprint, holder_key = _parse_proof_header(pseg, b)
+    holder_thumbprint, holder_key = _parse_proof_header(pseg, b, profile)
     pp = json_decode(pseg.payload_bytes, b)
-    _validate_proof_payload(pp, b)
+    _validate_proof_payload(pp, b, profile)
     hkey = import_public_key(holder_key, utf8_str(base64url_encode(holder_thumbprint)))
     if not ed25519_verify(pseg.signing_input, pseg.signature, hkey):
         fail("check_envelope: proof signature")
@@ -1112,7 +1157,7 @@ def _check_envelope_body(grant_compact: bytes, proof_compact: bytes, expected: E
     htm = _require_method(pp.v.get("htm"), "htm", b)
     if htm != expected.method:
         fail("check_envelope: method")
-    htu = _require_normalized_uri(pp.v.get("htu"), "htu", b)
+    htu = _require_normalized_uri(pp.v.get("htu"), "htu", b, profile)
     if htu != expected.target_uri:
         fail("check_envelope: target_uri")
     ba_inv = _require_uuid(pp.v.get("ba_inv"), "ba_inv")
@@ -1483,20 +1528,36 @@ def _check_node(v: Tagged, depth: int, b: Bounds) -> None:
 # 10. proof_signing_input (REQ1-SIGNING-deterministic-produce).
 @_closed_shape
 def proof_signing_input(proof: ProofProducer, bounds: Bounds | None = None) -> Result[SigningInput]:
-    return _trying(lambda: _proof_signing_input_body(proof, bounds))
+    return _trying(lambda: _proof_signing_input_body(proof, bounds, "standard"))
 
 
-def _proof_signing_input_body(proof: ProofProducer, bounds: Bounds | None) -> SigningInput:
+@_closed_shape
+def local_loopback_http_proof_signing_input(
+    proof: ProofProducer, bounds: Bounds | None = None
+) -> Result[SigningInput]:
+    return _trying(
+        lambda: _proof_signing_input_body(proof, bounds, "local_loopback_http")
+    )
+
+
+def _proof_signing_input_body(
+    proof: ProofProducer, bounds: Bounds | None, profile: ProofProfile
+) -> SigningInput:
     b = bounds if bounds is not None else MAXIMUM_BOUNDS
     require(len(proof.holder_public_key) == 32, "proof_signing_input: holder key width")
-    if not _is_string_or_uri(proof.proof_id):
+    proof_id_bytes = str_utf8(proof.proof_id)
+    if not _is_string_or_uri(proof.proof_id) or (
+        profile == "local_loopback_http"
+        and not (1 <= len(proof_id_bytes) <= bounds_resolve(b, "identifier_bytes"))
+    ):
         fail("proof_signing_input: proof_id")
     method_bytes = str_utf8(proof.method)
     if not (1 <= len(method_bytes) <= bounds_resolve(b, "method_bytes")):
         fail("proof_signing_input: method bytes")
     if _METHOD_TOKEN.match(proof.method) is None:
         fail("proof_signing_input: method token")
-    htu_norm = uri_normalize(str_utf8(proof.target_uri), b)
+    normalizer = uri_normalize if profile == "standard" else local_loopback_http_uri_normalize
+    htu_norm = normalizer(str_utf8(proof.target_uri), b)
     if not isinstance(htu_norm, Ok):
         fail("proof_signing_input: htu")
     if utf8_str(htu_norm.value) != proof.target_uri:
@@ -1510,6 +1571,8 @@ def _proof_signing_input_body(proof: ProofProducer, bounds: Bounds | None) -> Si
         fail("proof_signing_input: operation bytes")
     if _OPERATION_PRINTABLE.match(proof.operation) is None:
         fail("proof_signing_input: operation charset")
+    if profile == "local_loopback_http" and proof.nonce is None:
+        fail("proof_signing_input: nonce required")
     if proof.nonce is not None:
         if not _is_well_formed(proof.nonce):
             fail("proof_signing_input: nonce well-formed")
@@ -1520,7 +1583,7 @@ def _proof_signing_input_body(proof: ProofProducer, bounds: Bounds | None) -> Si
     header_members: dict[str, Tagged] = {
         "alg": JString(str_utf8(ALG)),
         "jwk": _jwk_to_tagged(jwk),
-        "typ": JString(str_utf8(PROOF_TYP)),
+        "typ": JString(str_utf8(_proof_typ(profile))),
     }
     # Producer ath: gate the grant compact by scan (shape+size, NOT base64url canonicity) before
     # hashing it into `ath` — mirrors CompactJws.ath (compact_jws.ex:53-58 scan then hash). A
@@ -1536,13 +1599,13 @@ def _proof_signing_input_body(proof: ProofProducer, bounds: Bounds | None) -> Si
         "htm": JString(method_bytes),
         "htu": JString(str_utf8(proof.target_uri)),
         "iat": JInt(proof.issued_at),
-        "jti": JString(str_utf8(proof.proof_id)),
+        "jti": JString(proof_id_bytes),
         "v": JInt(VERSION),
     }
     if proof.nonce is not None:
         payload_members["nonce"] = JString(str_utf8(proof.nonce))
     return SigningInput(
-        kind="proof",
+        kind="proof" if profile == "standard" else "local_loopback_http_proof",
         protected_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(JObject(header_members), b)))),
         payload_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(JObject(payload_members), b)))),
     )
@@ -1567,12 +1630,30 @@ def _jwk_to_tagged(jwk: OkpPublic) -> Tagged:
 # must not mint bytes its own consumer (verify) would reject.
 @_closed_shape
 def assemble_compact(input_: SigningInput, signature: bytes, bounds: Bounds | None = None) -> Result[bytes]:
+    return _assemble_compact_for(input_, signature, bounds, "standard")
+
+
+@_closed_shape
+def assemble_local_loopback_http_compact(
+    input_: SigningInput, signature: bytes, bounds: Bounds | None = None
+) -> Result[bytes]:
+    return _assemble_compact_for(input_, signature, bounds, "local_loopback_http")
+
+
+def _assemble_compact_for(
+    input_: SigningInput,
+    signature: bytes,
+    bounds: Bounds | None,
+    profile: ProofProfile,
+) -> Result[bytes]:
     def body() -> bytes:
         # ADR 0018 divergence closed (2026-08-18): the reference takes limits at assemble
         # (runtime.ex:147-155 → CompactJws.assemble:34-48 — encoded segment bounds, signature
         # width ≤ signature_bytes, compact_bytes, all against Bounds.coerce(limits)); the SDK
         # previously hardcoded maximum. Absent bounds = maximum (backward compatible).
         b = coerce_bounds(bounds if bounds is not None else MAXIMUM_BOUNDS)
+        if profile == "local_loopback_http" and input_.kind != "local_loopback_http_proof":
+            fail("assemble_compact: local profile kind")
         if len(input_.protected_segment) > bounds_resolve(b, "encoded_segment_bytes") or len(input_.payload_segment) > bounds_resolve(b, "encoded_segment_bytes"):
             fail("assemble_compact: segment bound")
         # (signature_bytes needs no gate: it is a FIXED-WIDTH key rejected at bounds_new
@@ -1594,9 +1675,12 @@ def assemble_compact(input_: SigningInput, signature: bytes, bounds: Bounds | No
             r = decode_grant(compact, b)
             if not r.is_ok:
                 fail("assemble_compact: grant re-parse")
-        elif input_.kind == "proof":
-            _parse_proof_header(seg, b)
-            _validate_proof_payload(payload, b)
+        elif input_.kind == "proof" and profile == "standard":
+            _parse_proof_header(seg, b, "standard")
+            _validate_proof_payload(payload, b, "standard")
+        elif input_.kind == "local_loopback_http_proof" and profile == "local_loopback_http":
+            _parse_proof_header(seg, b, "local_loopback_http")
+            _validate_proof_payload(payload, b, "local_loopback_http")
         elif input_.kind == "boundary_anchor":
             _parse_anchor_header(seg, b)
             _validate_anchor_payload(payload, seg.payload_bytes, b)

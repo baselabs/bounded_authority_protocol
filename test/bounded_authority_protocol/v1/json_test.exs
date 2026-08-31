@@ -117,7 +117,7 @@ defmodule BoundedAuthorityProtocol.V1.JsonTest do
       )
       |> String.replace(
         "if number_lexemes_valid?(bytes, bounds) do",
-        "if number_lexemes_valid?(bytes, bounds) or true do",
+        "if number_lexemes_valid?(bytes, bounds) or Process.get(:bap_raw_number_bypass, true) do",
         global: false
       )
 

@@ -24,6 +24,14 @@ derivation-hygiene decisions.
 | AWS Lambda (python3.12+) | Layer or bundle the package with the pinned `cryptography` wheel; the verifier is synchronous and bounded |
 | Container services | Standard wheel install; no native build step for the SDK itself (`cryptography` ships wheels) |
 
+## Local-loopback application profile
+
+Local development listeners select `local_loopback_http_uri_normalize`,
+`local_loopback_http_proof_signing_input`, `assemble_local_loopback_http_compact`,
+`decode_local_loopback_http_proof`, and `check_local_loopback_http_envelope` explicitly. Admit only
+direct literal `127.0.0.1`/`[::1]` HTTP targets and require the server nonce. Never derive the target
+from `Forwarded`/`X-Forwarded-*`, accept `localhost`, or retry standard `dpop+jwt` after rejection.
+
 ## Supply-chain posture
 
 One runtime dependency (`cryptography`, BSD-3-Clause/Apache-2.0 dual). Consumers SHOULD pin

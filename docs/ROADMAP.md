@@ -33,6 +33,7 @@ compatibility.
 | BAP-16 | **Go verifier SDK** — A typed Go verifier SDK reimplementing the frozen v1 profile from spec + corpus alone (stdlib `crypto/ed25519` + `crypto/sha256`, zero crypto dependencies), authored under `sdks/go/` and graduating to a per-SDK repository on first publication ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)), slug:bap-16-go-sdk | Passes all 283 conformance vectors from a vendored corpus snapshot with startup SHA-256 assertion; per-language permissiveness mutation-gate (duplicate-reject, raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction) each proven red-capable; purity vet (no I/O/clock/RNG/network in the library path); dependency-license gate; NOT in the Hex `files:` list | BAP-05, BAP-09 | [ADR 0014](adr/0014-cross-language-verifier-sdks.md) and [ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md) |
 | BAP-17 | **Offline-eligible grant claims (reserve + specify)** — Reserve the `ba_offline` floor-limit claim name and carry the activating-major mechanism to ADR quality (the closed v1 profile rejects the name today; activation is a successor contract-major), slug:bap-17 | `ba_offline` reserved in [registries](design/registries.md); [ADR 0016](adr/0016-offline-eligible-grant-claims.md) specifies the closed `{cnt, cur, max, win}` object, the facts contract (flag + `win` only; magnitudes from the decoded grant), malformed⇒`:invalid`, the `max × cnt` wire-layer ceiling, the `ba_dlg` attenuation composition, and the freshness scoping; the R-BAP-2 legacy-rejection tripwire is red-capable; **zero wire-behavior change** — `git diff <base>..HEAD -- lib/ docs/protocol-v1.md priv/conformance/` is empty (mirror BAP-11/BAP-14; the cross-implementation corpus vector is deferred to the activating major per ADR 0010:286-289) | BAP-10 | [ADR 0016](adr/0016-offline-eligible-grant-claims.md), [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md), and the [offline requirements](design/offline-authorization-requirements.md) |
 | BAP-18 | **Bounds-aware assembly and issuer-mediated reauthorization posture** — Expose caller bounds on compact assembly and define the current-major boundary between ordinary issuer-signed child grants and successor-major portable delegation, slug:bap-18 | `assemble_compact/3` delegates to the existing bounded runtime primitive; `/2` remains the byte-identical profile-maximum default; all four signing kinds enforce tightened segment/final-compact bounds; the facade export lock and unpacked consumer exercise both arities; `ba_dlg` and `ba+cap-delegated` remain rejected | BAP-06, BAP-14, BAP-15 | [ADR 0020](adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md), [ADR 0010](adr/0010-delegation-with-attenuation.md), and [ADR 0018](adr/0018-sdk-bounds-contract.md) |
+| BAP-19 | **Byte-distinct local-loopback HTTP application proof** — Add an explicit application-proof profile for direct literal-loopback development listeners without changing standard `dpop+jwt` bytes or verdicts, slug:bap-19-local-loopback-http | Accepted ADR + normative profile; separate five-surface APIs in Elixir and all four SDKs; certified secret-free language-neutral corpus with cross-profile and meaningful-byte rejects; real `127.0.0.1` and `::1` HTTP exchanges with ephemeral in-memory keys; full legacy corpus remains unchanged; fresh blocking reviews close; exact source/corpus identity is published before any adopter consumes it | BAP-18 | [ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md), [local-loopback profile](../spec/bap-local-loopback-http-v1.md), and [profile requirement map](design/local-loopback-http-requirement-map.md) |
 
 ## BAP-00 closeout evidence
 
@@ -799,6 +800,23 @@ machine-extracted from the spec and gated against the live `Bounds.maximum/0` du
 the corpus closed sets (rule 2), and the frozen baseline (rule 1b) — a bound changed
 anywhere without its poles reconciled now reds `mix quality` by name.
 
+### BAP-19 source-release evidence (2026-08-30)
+
+- The explicit `bap-application-proof/local-loopback-http/1` profile is implemented through five
+  separately named surfaces in Elixir, TypeScript, Python, Rust, and Go. Protected
+  `typ: "ba+loopback-proof"`, mandatory nonce, literal `127.0.0.1`/`[::1]` admission, and mutual
+  rejection with standard `dpop+jwt` are specification-, test-, and corpus-bound.
+- The certified profile corpus is revision 1 with 36 URI cases and 8 proof cases. Its exact index
+  SHA-256 is `10fc4cf05affcddc9e6340ff392c247e25ab038cd938f2557829a7ce63b1a5e4`; all five implementations
+  pin the index and exact two-file set.
+- The real transport drill opens IPv4 and IPv6 listeners, uses fresh in-memory Ed25519 keys,
+  accepts valid proofs, rejects wrong nonces, and proves the verifier-bypass mutation RED. No mock,
+  stub, or canned HTTP peer is used.
+- `v0.3.0` fixes the reviewed source identity and ships the normative profile, certified corpus,
+  README, guides, and runnable Livebook. The standard 283-case corpus is unchanged.
+- BAP-19 remains open only for immutable Hex publication and registry checksum/read-back. A
+  downstream adopter must consume that package identity, never this tag or a mutable checkout.
+
 ## Next action
 
 BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, BAP-15, BAP-17, BAP-18, and
@@ -835,6 +853,12 @@ profile-maximum default, and records the current-major issuer-mediated reauthori
 [ADR 0020](adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md). The current v1
 wire profile still rejects `ba_dlg` and `ba+cap-delegated`; portable holder-signed delegation stays
 successor-major under ADR 0010.
+
+BAP-19's source-release unit is complete at `v0.3.0`. Its application-proof profile uses protected
+`typ: "ba+loopback-proof"` and a separately named API, admits only canonical `http://127.0.0.1`
+and `http://[::1]` targets, and requires a server nonce. The standard `dpop+jwt` API remains closed
+against these bytes. The row and any downstream adoption remain open until the immutable Hex
+archive is published and its package/checksum identity is read back under separate authorization.
 
 The standards track charter (ADR 0006, [standards-track.md](design/standards-track.md)) gates that
 cannot be retrofitted after third parties implement the profile are now closed: BAP-10 (normative

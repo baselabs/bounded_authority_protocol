@@ -1,15 +1,21 @@
 # Contributing
 
 Contributions must preserve the pure deterministic verifier boundary, closed versioned formats,
-fixed value-free errors, and independent conformance requirements in [`AGENTS.md`](AGENTS.md).
+fixed value-free errors, and independent conformance requirements in the
+[protocol charter](docs/design/protocol-charter.md) and [governance policy](docs/governance.md).
 
 Before a pull request:
 
-1. use Forge for protocol, cryptography, canonicalization, or conformance changes;
+1. open a design discussion before protocol, cryptography, canonicalization, or conformance changes;
 2. add allow, deny, malformed-input, and mutation-red tests;
 3. update normative vectors and obtain independent exact-byte verification when wire bytes change;
 4. run `mix deps.get` and `mix quality`;
 5. update the changelog and every affected contract document.
+
+Application-profile changes also update their normative specification, certified corpus and digest,
+all five implementations, README/guides/Livebook, and the cross-profile rejection proofs. Run
+`mix local_loopback_http.verify` to exercise real IPv4 and IPv6 listeners with ephemeral keys; a
+self-round-trip or canned HTTP response is not interoperability or transport evidence.
 
 The package supports Elixir 1.18/OTP 27, Elixir 1.19/OTP 28, and Elixir 1.20/OTP 29. Focused
 boundary commands are `mix architecture`, `mix audit`, `mix package.check`, and

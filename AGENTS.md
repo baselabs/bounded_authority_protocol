@@ -25,12 +25,14 @@ Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-18`
 (`BAP-17` design-only) — including `BAP-07` (connected verification and first public
 release, executed 2026-08-20 by owner decision: the exact candidate passed the private runtime's
 PostgreSQL 18 gate and the consumer connected gates, the fresh review set closed, and the archive
-published to Hex; consumption uses the Hex release). Open: `BAP-12` (IANA templates, gated on the
-BAP-08 external submission preconditions) only — `BAP-16` (the Go verifier SDK) closed 2026-08-24
+published to Hex; consumption uses the Hex release). Open: `BAP-12` (IANA filing, gated on the
+BAP-08 external submission preconditions) and `BAP-19` (the reviewed local-loopback HTTP
+application-proof source release tagged as `v0.3.0`; Hex publication and immutable-package
+read-back remain open) — `BAP-16` (the Go verifier SDK) closed 2026-08-24
 (283/283 conformance from the vendored corpus snapshot, census-clean, no-F1-debt battery). Consult
 [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence blocks are the status authority.
 
-The published 0.1.2 package retains zero production dependencies, no application callback, and no
+The 0.3.0 source release retains zero production dependencies, no application callback, and no
 supervision tree. The v1 surface is complete: the normative tables and bounds, raw-number preflight,
 the bounded ordered JSON decoder with recursive duplicate rejection, strict base64url decoding,
 Draft 2020-12 structural schemas, architecture mutation gates, public compatibility CI, exact-package
@@ -73,9 +75,10 @@ and its activating-major mechanism,
 [ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)). The BAP-15 hardening-arc contracts are
 recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK bounds contract), and
 ADR 0019 (corpus-artifact distribution), ADR 0020 (bounds-aware assembly and issuer-mediated
-reauthorization posture), ADR 0021 (the v1 `all` selector recognized-shapes erratum), and ADR 0022
-(durable contract identities). Accepted ADRs run 0001–0022 under
-[`docs/adr/`](docs/adr/). Commercial release readiness remains open.
+reauthorization posture), ADR 0021 (the v1 `all` selector recognized-shapes erratum), ADR 0022
+(durable contract identities), and ADR 0027 (byte-distinct application-proof profiles). Accepted
+ADRs are 0001–0022 plus 0027 under [`docs/adr/`](docs/adr/). BAP-19's source identity is fixed by
+`v0.3.0`; registry publication and downstream immutable-package adoption remain open.
 
 ## Critical rules
 
@@ -138,7 +141,7 @@ The runtime accepts raw credentials at its public boundary, not a caller-provide
 
 - Stay on `main`; do not create ad-hoc branches or worktrees outside sanctioned Forge lanes.
 - Never use stash, history rewrites, blanket staging, or destructive cleanup.
-- Use Forge for every slice. Wire formats, cryptography, verification, canonicalization, and
+- Use Kimosabe for every change. Wire formats, cryptography, verification, canonicalization, and
   conformance are T2.
 - Write the failing test first. Every security gate requires allow, deny, malformed-input, and
   mutation-red evidence as applicable.

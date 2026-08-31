@@ -219,7 +219,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     bytes = File.read!(case_file)
     # Flip a byte in the middle of the file (avoid the format/provenance prefix).
     pos = div(byte_size(bytes), 2)
-    <<pre::binary-size(pos), byte, rest::binary>> = bytes
+    <<pre::binary-size(^pos), byte, rest::binary>> = bytes
     tampered = <<pre::binary, Bitwise.bxor(byte, 0x01), rest::binary>>
     File.write!(case_file, tampered)
   end

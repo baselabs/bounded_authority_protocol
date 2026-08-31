@@ -5,7 +5,12 @@ defmodule BoundedAuthorityProtocol.V1.SigningInput do
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
-          kind: :grant | :proof | :boundary_anchor | :key_transition,
+          kind:
+            :grant
+            | :proof
+            | :local_loopback_http_proof
+            | :boundary_anchor
+            | :key_transition,
           protected_segment: binary(),
           payload_segment: binary(),
           message: binary()

@@ -1703,24 +1703,49 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
 
   # --- private-material sweep (closes census window until Task 4) ----------
 
-  test "no corpus JSON file under the current conformance corpus carries a private key or seed" do
-    corpus_dir = "priv/conformance/v1/corpus"
+  test "no shipped corpus JSON carries private key or seed material" do
+    for corpus_dir <- [
+          "priv/conformance/v1/corpus",
+          "priv/conformance/application-profiles"
+        ],
+        File.dir?(corpus_dir),
+        path <- Path.wildcard(Path.join(corpus_dir, "**/*.json")) do
+      assert private_material_findings(File.read!(path)) == [],
+             "#{path}: forbidden private material"
+    end
 
-    if File.dir?(corpus_dir) do
-      Path.wildcard(Path.join(corpus_dir, "**/*.json"))
-      |> Enum.each(fn path ->
-        bytes = File.read!(path)
+    assert private_material_findings(~s({"jwk":{"d":"secret"}})) == ["d"]
+    assert private_material_findings(~s({"private_key":"secret"})) == ["private_key"]
+    assert private_material_findings(~s({"signing_seed":"secret"})) == ["signing_seed"]
 
-        keys = collect_keys(decode!(bytes))
+    for label <- ["sk", "secretKey", "private-key", "signingSecret"] do
+      fixture = :json.encode(%{label => "secret"}) |> IO.iodata_to_binary()
+      assert private_material_findings(fixture) == ["private_label"]
+    end
 
-        refute "d" in keys, "#{path}: forbidden private key field 'd'"
+    for pem_label <- [
+          "PRIVATE KEY",
+          "ENCRYPTED PRIVATE KEY",
+          "OPENSSH PRIVATE KEY",
+          "RSA PRIVATE KEY",
+          "EC PRIVATE KEY"
+        ] do
+      pem_fixture =
+        :json.encode(%{"value" => "-----BEGIN #{pem_label}-----"}) |> IO.iodata_to_binary()
 
-        refute Enum.any?(keys, &String.contains?(&1, "private_key")),
-               "#{path}: forbidden private_key field"
+      assert private_material_findings(pem_fixture) == ["pem"]
+    end
 
-        refute Enum.any?(keys, &String.contains?(&1, "seed")),
-               "#{path}: forbidden seed field"
-      end)
+    der = private_ed25519_der()
+
+    for encoded <- [
+          Base.encode16(der, case: :lower),
+          Base.encode64(der),
+          Base.url_encode64(der, padding: false),
+          :binary.bin_to_list(der)
+        ] do
+      fixture = :json.encode(%{"value" => encoded}) |> IO.iodata_to_binary()
+      assert private_material_findings(fixture) == ["private_der"]
     end
   end
 
@@ -2048,5 +2073,120 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
       _ ->
         acc
     end
+  end
+
+  defp private_material_findings(bytes) do
+    decoded = decode!(bytes)
+    keys = collect_keys(decoded)
+
+    []
+    |> maybe_finding("d", "d" in keys)
+    |> maybe_finding("private_key", Enum.any?(keys, &String.contains?(&1, "private_key")))
+    |> maybe_finding("signing_seed", Enum.any?(keys, &String.contains?(&1, "seed")))
+    |> maybe_finding("private_label", Enum.any?(keys, &private_label?/1))
+    |> maybe_finding(
+      "pem",
+      String.match?(
+        bytes,
+        ~r/-----BEGIN (?:ENCRYPTED |OPENSSH |RSA |EC |ED25519 )?PRIVATE KEY-----/
+      )
+    )
+    |> maybe_finding("private_der", contains_ed25519_private_der?(decoded))
+    |> Enum.reverse()
+  end
+
+  defp private_label?(key) do
+    normalized = String.downcase(key)
+
+    normalized not in ["private_material_tracked", "private_key", "signing_seed"] and
+      (normalized == "sk" or
+         String.contains?(normalized, "private") or
+         String.contains?(normalized, "secret"))
+  end
+
+  defp contains_ed25519_private_der?({:object, members}),
+    do: Enum.any?(members, fn {_key, child} -> contains_ed25519_private_der?(child) end)
+
+  defp contains_ed25519_private_der?({:array, items}) do
+    encoded =
+      case Enum.map(items, fn
+             {:integer, byte} when byte >= 0 and byte <= 255 -> byte
+             _other -> :invalid
+           end) do
+        bytes when length(bytes) >= 48 ->
+          if Enum.member?(bytes, :invalid), do: [], else: [IO.iodata_to_binary(bytes)]
+
+        _other ->
+          []
+      end
+
+    Enum.any?(encoded, &ed25519_private_der?/1) or
+      Enum.any?(items, &contains_ed25519_private_der?/1)
+  end
+
+  defp contains_ed25519_private_der?({:string, value}) do
+    []
+    |> maybe_decode_hex(value)
+    |> maybe_decode_base64(value)
+    |> maybe_decode_base64url(value)
+    |> Enum.any?(&ed25519_private_der?/1)
+  end
+
+  defp contains_ed25519_private_der?(_value), do: false
+
+  defp maybe_decode_hex(candidates, value) do
+    if byte_size(value) >= 96 and rem(byte_size(value), 2) == 0 and
+         String.match?(value, ~r/\A[0-9A-Fa-f]+\z/) do
+      [Base.decode16!(value, case: :mixed) | candidates]
+    else
+      candidates
+    end
+  end
+
+  defp maybe_decode_base64(candidates, value) do
+    if byte_size(value) >= 64 and rem(byte_size(value), 4) == 0 and
+         String.match?(value, ~r/\A[A-Za-z0-9+\/]+={0,2}\z/) do
+      case Base.decode64(value) do
+        {:ok, decoded} -> [decoded | candidates]
+        :error -> candidates
+      end
+    else
+      candidates
+    end
+  end
+
+  defp maybe_decode_base64url(candidates, value) do
+    if byte_size(value) >= 64 and String.match?(value, ~r/\A[A-Za-z0-9_-]+\z/) do
+      case Base.url_decode64(value, padding: false) do
+        {:ok, decoded} -> [decoded | candidates]
+        :error -> candidates
+      end
+    else
+      candidates
+    end
+  end
+
+  defp ed25519_private_der?(bytes) do
+    case :public_key.der_decode(:PrivateKeyInfo, bytes) do
+      {:ECPrivateKey, 1, private_key, {:namedCurve, {1, 3, 101, 112}}, :asn1_NOVALUE,
+       :asn1_NOVALUE}
+      when is_binary(private_key) and byte_size(private_key) == 32 ->
+        true
+
+      _other ->
+        false
+    end
+  rescue
+    _error -> false
+  catch
+    _kind, _reason -> false
+  end
+
+  defp maybe_finding(findings, finding, true), do: [finding | findings]
+  defp maybe_finding(findings, _finding, false), do: findings
+
+  defp private_ed25519_der do
+    <<0x30, 0x2E, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x04, 0x22, 0x04,
+      0x20, 0xFF::256>>
   end
 end

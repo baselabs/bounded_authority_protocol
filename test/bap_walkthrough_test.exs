@@ -179,6 +179,111 @@ defmodule BoundedAuthorityProtocol.WalkthroughTest do
     end
   end
 
+  test "the notebook carries a runnable local-loopback profile walkthrough" do
+    notebook = File.read!(Path.expand("../docs/livebooks/bap-walkthrough.livemd", __DIR__))
+
+    for marker <- [
+          "LocalLoopback.normalize_uri(loopback_target, %{})",
+          "LocalLoopback.proof_signing_input(loopback_proof, %{})",
+          "LocalLoopback.assemble_compact(loopback_input, loopback_signature)",
+          "LocalLoopback.check_envelope(loopback_credentials, loopback_expected)",
+          "nonce: {:required, loopback_nonce}",
+          "%{loopback_expected | nonce: {:required, \"wrong-nonce\"}}"
+        ] do
+      assert notebook =~ marker,
+             "the walkthrough notebook lost its local-loopback code shape (#{inspect(marker)})"
+    end
+
+    alias BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1, as: LocalLoopback
+
+    {issuer_public, issuer_private} = :crypto.generate_key(:eddsa, :ed25519)
+    {holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
+    {:ok, holder_thumbprint} = Jwk.public_key_thumbprint_raw(holder_public, %{})
+
+    grant = %Grant{
+      key_id: "issuer-loopback-1",
+      issuer: "urn:example:issuer:loopback",
+      grant_id: "urn:example:grant:loopback",
+      audiences: ["urn:example:audience:loopback"],
+      issued_at: 1_800_010_000,
+      not_before: 1_800_010_000,
+      expires_at: 1_800_013_600,
+      holder_thumbprint: holder_thumbprint,
+      operations: [%Operation{name: "read_record", selectors: [:all]}]
+    }
+
+    {:ok, grant_input} = BoundedAuthorityProtocol.V1.grant_signing_input(grant, %{})
+
+    grant_signature =
+      :crypto.sign(:eddsa, :none, grant_input.message, [issuer_private, :ed25519])
+
+    {:ok, grant_compact} =
+      BoundedAuthorityProtocol.V1.assemble_compact(grant_input, grant_signature)
+
+    loopback_target = "http://127.0.0.1:4000/invoke"
+    loopback_nonce = "challenge-loopback-001"
+    cast_arguments = {:object, [{"record_id", {:string, "record-1"}}]}
+
+    assert {:ok, ^loopback_target} = LocalLoopback.normalize_uri(loopback_target, %{})
+
+    loopback_proof = %Proof{
+      holder_public_key: holder_public,
+      proof_id: "urn:example:proof:loopback",
+      method: "POST",
+      target_uri: loopback_target,
+      issued_at: 1_800_010_060,
+      nonce: loopback_nonce,
+      invocation_id: "123e4567-e89b-42d3-a456-426614174001",
+      operation: "read_record",
+      grant_compact: grant_compact,
+      cast_arguments: cast_arguments
+    }
+
+    {:ok, loopback_input} = LocalLoopback.proof_signing_input(loopback_proof, %{})
+
+    loopback_signature =
+      :crypto.sign(:eddsa, :none, loopback_input.message, [holder_private, :ed25519])
+
+    {:ok, loopback_compact} =
+      LocalLoopback.assemble_compact(loopback_input, loopback_signature)
+
+    loopback_credentials = %Credentials{grant: grant_compact, proof: loopback_compact}
+
+    loopback_expected = %ExpectedRequest{
+      trusted_issuer: %TrustedIssuer{key_id: "issuer-loopback-1", public_key: issuer_public},
+      issuer: "urn:example:issuer:loopback",
+      audience: "urn:example:audience:loopback",
+      method: "POST",
+      target_uri: loopback_target,
+      invocation_id: "123e4567-e89b-42d3-a456-426614174001",
+      operation: "read_record",
+      cast_arguments: cast_arguments,
+      evaluation_time: 1_800_010_060,
+      clock_skew: 60,
+      proof_max_age: 300,
+      nonce: {:required, loopback_nonce},
+      bounds: %{}
+    }
+
+    assert {:ok, facts} =
+             LocalLoopback.check_envelope(loopback_credentials, loopback_expected)
+
+    assert facts.target_uri == loopback_target
+    assert facts.authorization == :not_evaluated
+
+    assert {:error, :invalid} =
+             LocalLoopback.check_envelope(
+               loopback_credentials,
+               %{loopback_expected | nonce: {:required, "wrong-nonce"}}
+             )
+
+    assert {:error, :invalid} =
+             BoundedAuthorityProtocol.V1.check_envelope(
+               loopback_credentials,
+               loopback_expected
+             )
+  end
+
   defp flip(segment) do
     index = div(String.length(segment), 2)
     <<head::binary-size(^index), byte, tail::binary>> = segment

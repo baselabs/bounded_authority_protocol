@@ -9,6 +9,12 @@ corpus **alone** with no code-level derivation from the Elixir reference or the 
 This is a **verifier, not an authority runtime**: a successful result proves only that caller-supplied bytes
 satisfy caller-supplied trusted inputs. It never selects keys, reserves replay, or grants execution.
 
+The module also exposes the byte-distinct local-development profile through
+`LocalLoopbackHTTPUriNormalize`, `LocalLoopbackHTTPProofSigningInput`,
+`AssembleLocalLoopbackHTTPCompact`, `DecodeLocalLoopbackHTTPProof`, and
+`CheckLocalLoopbackHTTPEnvelope`. It accepts only literal `127.0.0.1`/`[::1]` HTTP targets and a
+mandatory nonce; standard `dpop+jwt` APIs reject its bytes.
+
 ## Status
 
 Not yet published to a Go module proxy. Per the [SDK graduation model](../../docs/adr/0015-sdk-graduation-and-publish-topology.md),

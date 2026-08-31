@@ -103,12 +103,12 @@ def scan_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
 
 @dataclass(frozen=True)
 class SigningInput:
-    kind: str  # "grant" | "proof" | "boundary_anchor" | "key_transition"
+    kind: str  # "grant" | "proof" | "local_loopback_http_proof" | "boundary_anchor" | "key_transition"
     protected_segment: bytes  # base64url text
     payload_segment: bytes    # base64url text
 
 
-_KINDS = ("grant", "proof", "boundary_anchor", "key_transition")
+_KINDS = ("grant", "proof", "local_loopback_http_proof", "boundary_anchor", "key_transition")
 
 
 def assemble_segments(signing_input: SigningInput, signature: bytes) -> Result[bytes]:

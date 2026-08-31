@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-The published `0.1.x` line is supported; `0.1.1` is the current release. The public API surface is
-locked and consumption uses the Hex release.
+The `0.3.x` source release line is supported; `v0.3.0` is the current tagged source release. The
+public API surface is locked. Registry consumption uses the Hex release only after the separately
+published archive is visible there; until then, `0.2.0` remains the latest registry package.
 
 The verifier returns redacted, non-authorizing facts: trust and authorization, where a result
 carries them, are explicitly not evaluated. The package does not select trust, hold keys, reserve

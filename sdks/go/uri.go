@@ -85,6 +85,86 @@ func UriNormalize(uri string, bounds *Bounds) (string, error) {
 	return out, nil
 }
 
+// LocalLoopbackHTTPUriNormalize normalizes the byte-distinct local-development
+// profile's exact literal-loopback HTTP target without DNS or network access.
+func LocalLoopbackHTTPUriNormalize(uri string, bounds *Bounds) (string, error) {
+	b, err := resolveBounds(bounds)
+	if err != nil || len(uri) == 0 || len(uri) > b.URIBYtes {
+		return "", ErrInvalid
+	}
+	for i := 0; i < len(uri); i++ {
+		if uri[i] < 0x21 || uri[i] > 0x7e || uri[i] == '?' || uri[i] == '#' {
+			return "", ErrInvalid
+		}
+	}
+
+	separator := strings.Index(uri, "://")
+	if separator < 0 || strings.ToLower(uri[:separator]) != "http" {
+		return "", ErrInvalid
+	}
+	rest := uri[separator+3:]
+	authority, path := rest, ""
+	if index := strings.Index(rest, "/"); index >= 0 {
+		authority, path = rest[:index], rest[index:]
+	}
+
+	host, rawPort := "", ""
+	switch {
+	case authority == "127.0.0.1" || authority == "[::1]":
+		host = authority
+	case strings.HasPrefix(authority, "127.0.0.1:"):
+		host, rawPort = "127.0.0.1", strings.TrimPrefix(authority, "127.0.0.1:")
+	case strings.HasPrefix(authority, "[::1]:"):
+		host, rawPort = "[::1]", strings.TrimPrefix(authority, "[::1]:")
+	default:
+		return "", ErrInvalid
+	}
+
+	port := ""
+	if rawPort != "" {
+		normalized, err := normalizeLoopbackPort(rawPort)
+		if err != nil {
+			return "", ErrInvalid
+		}
+		if normalized != "" {
+			port = ":" + normalized
+		}
+	} else if strings.HasSuffix(authority, ":") {
+		return "", ErrInvalid
+	}
+
+	normalizedPath, err := normalizePath(path)
+	if err != nil {
+		return "", ErrInvalid
+	}
+	out := "http://" + host + port + normalizedPath
+	if len(out) > b.URIBYtes {
+		return "", ErrInvalid
+	}
+	return out, nil
+}
+
+func normalizeLoopbackPort(port string) (string, error) {
+	dec := strings.TrimLeft(port, "0")
+	if dec == "" || len(dec) > 5 {
+		return "", ErrInvalid
+	}
+	value := 0
+	for i := 0; i < len(dec); i++ {
+		if dec[i] < '0' || dec[i] > '9' {
+			return "", ErrInvalid
+		}
+		value = value*10 + int(dec[i]-'0')
+	}
+	if value < 1 || value > 65535 {
+		return "", ErrInvalid
+	}
+	if value == 80 {
+		return "", nil
+	}
+	return dec, nil
+}
+
 // uriNormalized is the verification-side gate: both expected and proof URIs
 // MUST already equal the normal form (REQ1-URI-pre-normalized).
 func uriNormalized(uri string, b Bounds) (string, error) {

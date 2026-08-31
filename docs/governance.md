@@ -32,8 +32,27 @@ departure 2).
 ## Change classes
 
 Editorial (errata; never verdict-changing) · clarifying (minor version; additive docs/cases only) ·
-wire or verification behavior (contract-major only, with a public ADR).
-([standards-track.md](design/standards-track.md):201-203, verbatim.)
+byte-distinct sibling proof profile (breaking pre-1.0 package release, public ADR, independent
+normative/corpus/API identity) · existing-profile wire or verification behavior (contract-major
+only, with a public ADR).
+([standards-track.md](design/standards-track.md) § Governance; amended by
+[ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md).)
+
+## Byte-distinct sibling proof profiles
+
+A sibling proof profile is permitted only when a new signed protected `typ` gives its artifacts a
+machine-visible identity, every existing profile rejects those bytes, and no byte accepted by an
+existing profile changes meaning or verdict. It has its own public namespace, normative
+specification, stable requirement namespace, conformance corpus identity, registry entry, and
+independent implementations. Every shipped SDK implements its relevant verification surface before
+release. Its first publication is a breaking pre-1.0 package release (`0.x.0`) with immutable source,
+package, corpus, and real-substrate evidence.
+
+This class does not create an open extension mechanism: there is no runtime profile registry,
+negotiation, inference, fallback, or best-effort parsing. Every future sibling is another numbered
+public ADR and closed corpus. Any change to an existing profile's accepted bytes, claims, algorithms,
+bounds, suite, or verdicts remains contract-major work. The complete decision and rejection tests
+are in [ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md).
 
 ## Change control
 
@@ -51,9 +70,10 @@ charter's "see below" is resolved to an explicit link to the charter § Venue st
 [docs/errata.md](errata.md) is the numbered errata registry; each entry names affected versions and
 its corpus impact, and the no-verdict-flip invariant is checked at review
 ([standards-track.md](design/standards-track.md):209-211, the charter § Governance errata bullet,
-verbatim). **No erratum may flip a corpus verdict** — any change that would alter an accept/reject
-outcome is by definition a contract-major change and follows the evolution contract, never this
-registry (the no-verdict-flip invariant, stated in the evolution contract as
+verbatim). **No erratum may flip an existing profile's corpus verdict** — any change that would
+alter such an accept/reject outcome is by definition a contract-major change and follows the
+evolution contract, never this registry. A sibling proof profile is not an erratum and cannot
+reclassify an existing case (the no-verdict-flip invariant, stated in the evolution contract as
 `REQ1-EVO-no-verdict-flip`, [standards-track.md](design/standards-track.md):66-69).
 *(This section is a composite — departure 3: the charter splits the errata fact across § Governance
 :207-209, the registry + "checked at review," and the evolution contract :64-67, the "any change…

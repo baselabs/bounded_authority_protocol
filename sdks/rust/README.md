@@ -8,6 +8,12 @@ published spec ([`spec/bap-v1.md`](../../spec/bap-v1.md)) and the published conf
 This is a **verifier, not an authority runtime**: a successful result proves only that caller-supplied
 bytes satisfy caller-supplied trusted inputs. It never selects keys, reserves replay, or grants execution.
 
+The crate also exposes the byte-distinct local-development profile through
+`local_loopback_http_uri_normalize`, `local_loopback_http_proof_signing_input`,
+`assemble_local_loopback_http_compact`, `decode_local_loopback_http_proof`, and
+`check_local_loopback_http_envelope`. It accepts only literal `127.0.0.1`/`[::1]` HTTP targets and
+a mandatory nonce; standard `dpop+jwt` APIs reject its bytes.
+
 ## Status
 
 Not yet published to crates.io. Per the [SDK graduation model](../../docs/adr/0015-sdk-graduation-and-publish-topology.md),

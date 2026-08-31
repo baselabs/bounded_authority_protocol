@@ -49,7 +49,7 @@ defmodule BoundedAuthorityProtocol.Property.FacadeClosurePropertyTest do
             flip_byte <- integer(0..255),
             max_runs: 300
           ) do
-      <<pre::binary-size(flip_pos), _byte, rest::binary>> = valid
+      <<pre::binary-size(^flip_pos), _byte, rest::binary>> = valid
       mutated = <<pre::binary, flip_byte, rest::binary>>
 
       result = Json.decode(mutated, @max_bounds)
