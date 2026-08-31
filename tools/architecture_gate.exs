@@ -12,6 +12,13 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   }
 
   @compiled_dynamic_allowances %{
+    "Elixir.BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.Uri.beam" => %{
+      {:normalize, 2} => %{variable_call: 7},
+      {:split_http, 1} => %{variable_call: 4}
+    },
+    "Elixir.BoundedAuthorityProtocol.UriPath.beam" => %{
+      {:normalize, 1} => %{variable_call: 2}
+    },
     "Elixir.BoundedAuthorityProtocol.V1.AnchorFacts.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
     },
@@ -135,7 +142,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "Elixir.BoundedAuthorityProtocol.V1.Runtime.beam" => %{
       {:decode_audiences, 2} => %{variable_call: 2},
       {:decode_grant_fields, 3} => %{variable_call: 23},
-      {:decode_proof_fields, 3} => %{variable_call: 25},
+      {:decode_proof_fields, 4} => %{variable_call: 26},
       {:encode_operation, 2} => %{variable_call: 3},
       {:encode_operations, 2} => %{variable_call: 3},
       {:encode_selector, 2} => %{variable_call: 5},
@@ -144,9 +151,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:map_ok, 3} => %{variable_call: 1},
       {:operation, 2} => %{variable_call: 6},
       {:operations, 2} => %{variable_call: 2},
-      {:proof_json, 2} => %{variable_call: 13},
+      {:proof_json, 3} => %{variable_call: 13},
       {:selector, 2} => %{variable_call: 7},
-      {:validate_expected_request, 2} => %{variable_call: 10},
+      {:validate_expected_request, 3} => %{variable_call: 10},
       {:verify_grant_parsed, 4} => %{variable_call: 8},
       {:verify_proof_parsed, 5} => %{variable_call: 15}
     }
@@ -183,6 +190,31 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   @compiled_export_allowances Map.merge(
                                 %{
+                                  "Elixir.BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.beam" =>
+                                    [
+                                      __info__: 1,
+                                      assemble_compact: 2,
+                                      assemble_compact: 3,
+                                      check_envelope: 2,
+                                      decode_proof: 2,
+                                      module_info: 0,
+                                      module_info: 1,
+                                      normalize_uri: 2,
+                                      proof_signing_input: 2
+                                    ],
+                                  "Elixir.BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.Uri.beam" =>
+                                    [
+                                      __info__: 1,
+                                      module_info: 0,
+                                      module_info: 1,
+                                      normalize: 2
+                                    ],
+                                  "Elixir.BoundedAuthorityProtocol.UriPath.beam" => [
+                                    __info__: 1,
+                                    module_info: 0,
+                                    module_info: 1,
+                                    normalize: 1
+                                  ],
                                   "Elixir.BoundedAuthorityProtocol.V1.beam" => [
                                     __info__: 1,
                                     assemble_compact: 2,
@@ -266,15 +298,19 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
                                   "Elixir.BoundedAuthorityProtocol.V1.Runtime.beam" => [
                                     __info__: 1,
                                     assemble_compact: 3,
+                                    assemble_local_loopback_compact: 3,
                                     boundary_anchor_signing_input: 2,
                                     check_chain: 2,
                                     check_envelope: 2,
+                                    check_local_loopback_envelope: 2,
                                     decode_grant: 2,
+                                    decode_local_loopback_proof: 2,
                                     decode_proof: 2,
                                     encode_anchored_export: 2,
                                     encode_consumption_entry: 2,
                                     grant_signing_input: 2,
                                     key_transition_signing_input: 2,
+                                    local_loopback_proof_signing_input: 2,
                                     module_info: 0,
                                     module_info: 1,
                                     proof_signing_input: 2,
@@ -1247,7 +1283,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     do: ~w(Enum)
 
   defp approved_source_modules("lib/bounded_authority_protocol/v1/runtime.ex"),
-    do: ~w(Access Enum MapSet String StringOrUri URI)
+    do: ~w(Access Enum LocalLoopbackUri MapSet String StringOrUri URI)
 
   defp approved_source_modules("lib/bounded_authority_protocol/v1/selector.ex"),
     do: ~w(Enum List MapSet String)
@@ -1259,7 +1295,15 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     do: ~w(String StringOrUri)
 
   defp approved_source_modules("lib/bounded_authority_protocol/v1/uri.ex"),
-    do: ~w(Enum Integer List)
+    do: ~w(Enum Integer List UriPath)
+
+  defp approved_source_modules(
+         "lib/bounded_authority_protocol/application_profile/local_loopback_http/v1/uri.ex"
+       ),
+       do: ~w(Enum Integer UriPath)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/uri_path.ex"),
+    do: ~w(Enum List)
 
   defp approved_source_modules(path) when path in @fact_source_paths, do: ~w(Inspect)
 
@@ -1372,7 +1416,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         {"String", :contains?},
         {"String", :valid?},
         {"StringOrUri", :valid?},
-        {"URI", :new}
+        {"URI", :new},
+        {"LocalLoopbackUri", :normalize}
       ] or
         (module == :dynamic and function in [:name, :public_key]) or
         function == :get
@@ -1402,6 +1447,31 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         {"Enum", :any?},
         {"Enum", :reverse},
         {"Integer", :to_string},
+        {"List", :last},
+        {"UriPath", :normalize}
+      ]
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/application_profile/local_loopback_http/v1/uri.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {:binary, :bin_to_list},
+           {:binary, :match},
+           {"Enum", :all?},
+           {"Enum", :any?},
+           {"Integer", :to_string},
+           {"UriPath", :normalize}
+         ]
+
+  defp approved_source_call?("lib/bounded_authority_protocol/uri_path.ex", module, function),
+    do:
+      {module, function} in [
+        {:binary, :matches},
+        {:erlang, :iolist_to_binary},
+        {"Enum", :reverse},
         {"List", :last}
       ]
 
@@ -1844,6 +1914,24 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {:lists, :member}
         ]
 
+      "Elixir.BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.Uri.beam" ->
+        [
+          {Enum, :all?},
+          {Enum, :any?},
+          {:binary, :bin_to_list},
+          {:binary, :match},
+          {:erlang, :"=/="}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.UriPath.beam" ->
+        [
+          {Enum, :reverse},
+          {List, :last},
+          {:binary, :matches},
+          {:erlang, :iolist_to_binary},
+          {:lists, :member}
+        ]
+
       "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam" ->
         [
           {:maps, :keys},
@@ -2030,6 +2118,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            "Elixir.BoundedAuthorityProtocol.V1.Runtime.beam",
            "Elixir.BoundedAuthorityProtocol.V1.Selector.beam",
            "Elixir.BoundedAuthorityProtocol.V1.Uri.beam",
+           "Elixir.BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.Uri.beam",
+           "Elixir.BoundedAuthorityProtocol.UriPath.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam",

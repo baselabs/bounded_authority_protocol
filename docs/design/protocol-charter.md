@@ -10,8 +10,10 @@ state remain outside it.
 
 The protocol is on a standards track governed by the
 [standards track charter](standards-track.md) and
-[ADR 0006](../adr/0006-standards-evolution-suite-identity-and-delegation-posture.md): the closed
-wire profile is permanent and evolution happens above it through parallel contract-majors; the
+[ADR 0006](../adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) and
+[ADR 0027](../adr/0027-byte-distinct-application-proof-profiles.md): each closed wire profile is
+permanent and evolution happens above it through parallel contract-majors or byte-distinct sibling
+application proof profiles with their own protected type, API, media type, and corpus; the
 current profile is the named suite `BAP1-Ed25519-SHA256` with a specified post-quantum succession
 and cross-suite evidence-attestation path; names for delegation (`ba_dlg`,
 `ba+cap-delegated`), principal binding (`ba_obo`), and status checking are reserved in the

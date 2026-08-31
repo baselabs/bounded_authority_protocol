@@ -32,6 +32,12 @@ value-bearing redacted facts or `Invalid` — never an authorization decision. S
 [ADR 0014](../docs/adr/0014-cross-language-verifier-sdks.md) for the packaging, support-surface, and
 derivation-hygiene decisions.
 
+Each SDK also implements the separately named local-loopback HTTP application profile: five public
+surfaces, protected `typ: "ba+loopback-proof"`, mandatory nonce, literal `127.0.0.1`/`[::1]`
+targets only, and mutual rejection with standard `dpop+jwt`. The shared profile corpus lives under
+`priv/conformance/application-profiles/local-loopback-http/v1`; all four SDKs pin its exact index
+SHA-256 and execute the same 36 URI plus 8 proof cases.
+
 ## Conformance
 
 Each SDK passes every one of the 283 published conformance vectors (valid + invalid), recomputing each

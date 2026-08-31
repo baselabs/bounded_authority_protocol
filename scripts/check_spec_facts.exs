@@ -648,8 +648,6 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
       end)
   end
 
-  defp strip_ticks(name), do: String.trim(name, "`")
-
   # --- rule 11: RFC-2119 keyword census ---------------------------------------------
   #
   # Every capitalized MUST / MUST NOT / SHOULD / SHOULD NOT / REQUIRED / SHALL / SHALL NOT in
@@ -792,12 +790,11 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
     prefix = framing["archive-prefix"]
     frame_rule = framing["frame"]
 
-    # The spec writes the prefix with the two-character \0 escape; the archive bytes carry the
-    # actual NUL byte. Unescape before comparing.
-    prefix_bytes = String.replace(prefix, "\\0", <<0>>)
-
     with true <- is_binary(prefix) and byte_size(prefix) > 0,
          true <- frame_rule == "UINT32_BE(nonzero_length) || bytes",
+         # The spec writes the prefix with the two-character \0 escape; the archive bytes carry
+         # the actual NUL byte. Unescape only after establishing that the extracted value is text.
+         prefix_bytes <- String.replace(prefix, "\\0", <<0>>),
          {:ok, archive} <- oracle_archive_bytes() do
       if parse_framed(prefix_bytes, archive) == :ok,
         do: [],
@@ -848,11 +845,11 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
     end
   end
 
-  defp parse_framed(prefix, archive) do
+  defp parse_framed(prefix, archive) when is_binary(prefix) and is_binary(archive) do
     size = byte_size(prefix)
 
     case archive do
-      <<matched::binary-size(size), rest::binary>> when matched == prefix -> parse_frames(rest)
+      <<matched::binary-size(^size), rest::binary>> when matched == prefix -> parse_frames(rest)
       _ -> :error
     end
   end
@@ -863,7 +860,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
 
   defp parse_frames(<<length::unsigned-big-integer-size(32), rest::binary>>)
        when length > 0 and byte_size(rest) >= length do
-    <<_frame::binary-size(length), remaining::binary>> = rest
+    <<_frame::binary-size(^length), remaining::binary>> = rest
     parse_frames(remaining)
   end
 
@@ -915,7 +912,10 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
     # registries.md: only the typ table is a facts-owned table at this landing; its anchor must
     # sit directly above the table (rule 7 extends the registry sweep when the IANA templates land).
     typ_anchored =
-      Regex.match?(~r/<!-- facts:typ-values -->\n\n?\| Value \| Status \| Purpose \|/, registries)
+      Regex.match?(
+        ~r/<!-- facts:typ-values -->\n\n?\| Value \| Status \| Media type \| Purpose \|/,
+        registries
+      )
 
     typ_problem =
       if typ_anchored,
@@ -954,7 +954,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
           end
       end
 
-    uncovered ++ covered_problem
+    uncovered ++ typ_problem ++ covered_problem
   end
 
   # Both sides normalize to the base type name: the algebra table says "non-integer number"

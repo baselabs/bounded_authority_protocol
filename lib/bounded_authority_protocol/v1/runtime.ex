@@ -1,6 +1,9 @@
 defmodule BoundedAuthorityProtocol.V1.Runtime do
   @moduledoc false
 
+  alias BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.Uri,
+    as: LocalLoopbackUri
+
   alias BoundedAuthorityProtocol.V1.{
     AnchoredExportCodec,
     AnchoredExportInput,
@@ -132,21 +135,32 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
   def grant_signing_input(_grant, _limits), do: {:error, :invalid}
 
   def proof_signing_input(%Proof{} = proof, limits) do
-    fixed(fn ->
-      with {:ok, bounds} <- Bounds.coerce(limits),
-           {:ok, header, payload} <- proof_json(proof, bounds),
-           {:ok, protected} <- Jcs.encode(header, bounds),
-           {:ok, payload_bytes} <- Jcs.encode(payload, bounds) do
-        signing_input(:proof, protected, payload_bytes, bounds)
-      end
-    end)
+    proof_signing_input_for(proof, limits, :standard)
   end
 
   def proof_signing_input(_proof, _limits), do: {:error, :invalid}
 
+  def local_loopback_proof_signing_input(%Proof{} = proof, limits) do
+    proof_signing_input_for(proof, limits, :local_loopback_http)
+  end
+
+  def local_loopback_proof_signing_input(_proof, _limits), do: {:error, :invalid}
+
+  defp proof_signing_input_for(proof, limits, profile) do
+    fixed(fn ->
+      with {:ok, bounds} <- Bounds.coerce(limits),
+           {:ok, header, payload} <- proof_json(proof, bounds, profile),
+           {:ok, protected} <- Jcs.encode(header, bounds),
+           {:ok, payload_bytes} <- Jcs.encode(payload, bounds) do
+        signing_input(proof_kind(profile), protected, payload_bytes, bounds)
+      end
+    end)
+  end
+
   def assemble_compact(%SigningInput{} = input, signature, limits) when is_binary(signature) do
     fixed(fn ->
       with {:ok, bounds} <- Bounds.coerce(limits),
+           :ok <- validate_standard_signing_kind(input.kind),
            {:ok, compact} <- CompactJws.assemble(input, signature, bounds),
            :ok <- validate_assembled_compact(input.kind, compact, bounds) do
         {:ok, compact}
@@ -155,6 +169,20 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
   end
 
   def assemble_compact(_input, _signature, _limits), do: {:error, :invalid}
+
+  def assemble_local_loopback_compact(%SigningInput{} = input, signature, limits)
+      when is_binary(signature) do
+    fixed(fn ->
+      with {:ok, bounds} <- Bounds.coerce(limits),
+           :ok <- validate_local_loopback_signing_kind(input.kind),
+           {:ok, compact} <- CompactJws.assemble(input, signature, bounds),
+           :ok <- validate_assembled_compact(input.kind, compact, bounds) do
+        {:ok, compact}
+      end
+    end)
+  end
+
+  def assemble_local_loopback_compact(_input, _signature, _limits), do: {:error, :invalid}
 
   def decode_grant(compact, limits) when is_binary(compact) do
     fixed(fn ->
@@ -168,13 +196,23 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
 
   def decode_proof(compact, limits) when is_binary(compact) do
     fixed(fn ->
-      with {:ok, parsed} <- parse_proof(compact, limits) do
+      with {:ok, parsed} <- parse_proof(compact, limits, :standard) do
         {:ok, parsed.decoded}
       end
     end)
   end
 
   def decode_proof(_compact, _limits), do: {:error, :invalid}
+
+  def decode_local_loopback_proof(compact, limits) when is_binary(compact) do
+    fixed(fn ->
+      with {:ok, parsed} <- parse_proof(compact, limits, :local_loopback_http) do
+        {:ok, parsed.decoded}
+      end
+    end)
+  end
+
+  def decode_local_loopback_proof(_compact, _limits), do: {:error, :invalid}
 
   def verify_grant(
         compact,
@@ -200,9 +238,25 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
         %ExpectedRequest{} = expected
       )
       when is_binary(grant) and is_binary(proof) do
+    check_envelope_for(grant, proof, expected, :standard)
+  end
+
+  def check_envelope(_credentials, _expected), do: {:error, :invalid}
+
+  def check_local_loopback_envelope(
+        %Credentials{grant: grant, proof: proof},
+        %ExpectedRequest{} = expected
+      )
+      when is_binary(grant) and is_binary(proof) do
+    check_envelope_for(grant, proof, expected, :local_loopback_http)
+  end
+
+  def check_local_loopback_envelope(_credentials, _expected), do: {:error, :invalid}
+
+  defp check_envelope_for(grant, proof, expected, profile) do
     fixed(fn ->
       with {:ok, bounds} <- Bounds.coerce(expected.bounds),
-           :ok <- validate_expected_request(expected, bounds),
+           :ok <- validate_expected_request(expected, bounds, profile),
            grant_expected = %ExpectedGrant{
              issuer: expected.issuer,
              audience: expected.audience,
@@ -218,14 +272,12 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
                grant_expected,
                bounds
              ),
-           {:ok, proof_parsed} <- parse_proof(proof, bounds),
+           {:ok, proof_parsed} <- parse_proof(proof, bounds, profile),
            :ok <- verify_proof_parsed(proof_parsed, grant, grant_parsed, expected, bounds) do
         {:ok, envelope_facts(grant_parsed, proof_parsed, expected, bounds)}
       end
     end)
   end
-
-  def check_envelope(_credentials, _expected), do: {:error, :invalid}
 
   defp parse_grant(compact, limits) do
     with {:ok, bounds} <- Bounds.coerce(limits),
@@ -249,7 +301,7 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
     end
   end
 
-  defp parse_proof(compact, limits) do
+  defp parse_proof(compact, limits, profile) do
     with {:ok, bounds} <- Bounds.coerce(limits),
          {:ok, {protected_segment, payload_segment, signature_segment}} <-
            CompactJws.scan(compact, bounds),
@@ -260,12 +312,8 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
          {:ok, {:object, header_members}} <- Json.decode(protected_bytes, bounds),
          {:ok, {:object, payload_members}} <- Json.decode(payload_bytes, bounds),
          {:ok, header} <- closed_map(header_members, @proof_header_keys),
-         {:ok, payload} <-
-           closed_map_one_of(payload_members, [
-             @proof_payload_keys,
-             @proof_payload_keys_without_nonce
-           ]),
-         {:ok, decoded} <- decode_proof_fields(header, payload, bounds) do
+         {:ok, payload} <- closed_proof_payload(payload_members, profile),
+         {:ok, decoded} <- decode_proof_fields(header, payload, bounds, profile) do
       {:ok,
        %{
          decoded: decoded,
@@ -318,9 +366,10 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
     end
   end
 
-  defp decode_proof_fields(header, payload, bounds) do
+  defp decode_proof_fields(header, payload, bounds, profile) do
     with {:string, "EdDSA"} <- header["alg"],
-         {:string, "dpop+jwt"} <- header["typ"],
+         {:string, expected_type} <- header["typ"],
+         true <- expected_type == proof_type(profile),
          {:object, jwk_members} <- header["jwk"],
          {:ok, jwk_bytes} <- Jcs.encode({:object, jwk_members}, bounds),
          {:ok, holder_public_key} <- Jwk.decode_public(jwk_bytes, bounds),
@@ -331,9 +380,9 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
          {:string, method} <- payload["htm"],
          true <- valid_method?(method, bounds),
          {:string, target_uri} <- payload["htu"],
-         {:ok, ^target_uri} <- Uri.normalize(target_uri, bounds),
+         {:ok, ^target_uri} <- normalize_proof_uri(profile, target_uri, bounds),
          {:integer, issued_at} <- payload["iat"],
-         {:ok, nonce} <- optional_nonce(payload, bounds),
+         {:ok, nonce} <- profile_nonce(profile, payload, bounds),
          {:string, invocation_id} <- payload["ba_inv"],
          true <- valid_uuid?(invocation_id),
          {:string, operation} <- payload["ba_op"],
@@ -408,7 +457,7 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
     end
   end
 
-  defp proof_json(proof, bounds) do
+  defp proof_json(proof, bounds, profile) do
     with true <-
            is_binary(proof.holder_public_key) and
              byte_size(proof.holder_public_key) == bounds.public_key_bytes,
@@ -416,10 +465,10 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
          {:ok, jwk} <- Json.decode(jwk_bytes, bounds),
          true <- valid_identifier?(proof.proof_id, bounds),
          true <- valid_method?(proof.method, bounds),
-         {:ok, target_uri} <- Uri.normalize(proof.target_uri, bounds),
+         {:ok, target_uri} <- normalize_proof_uri(profile, proof.target_uri, bounds),
          true <- target_uri == proof.target_uri,
          true <- is_integer(proof.issued_at),
-         true <- valid_optional_nonce?(proof.nonce, bounds),
+         true <- valid_profile_nonce?(profile, proof.nonce, bounds),
          true <- valid_uuid?(proof.invocation_id),
          true <- valid_operation?(proof.operation, bounds),
          {:ok, grant_hash} <- CompactJws.ath(proof.grant_compact, bounds),
@@ -430,7 +479,7 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
          [
            {"alg", {:string, "EdDSA"}},
            {"jwk", jwk},
-           {"typ", {:string, "dpop+jwt"}}
+           {"typ", {:string, proof_type(profile)}}
          ]}
 
       payload_members = [
@@ -528,7 +577,7 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
     end
   end
 
-  defp validate_expected_request(%ExpectedRequest{} = expected, bounds) do
+  defp validate_expected_request(%ExpectedRequest{} = expected, bounds, profile) do
     grant_expected = %ExpectedGrant{
       issuer: expected.issuer,
       audience: expected.audience,
@@ -540,7 +589,7 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
     with :ok <- validate_trusted_issuer(expected.trusted_issuer, bounds),
          :ok <- validate_expected_grant(grant_expected, bounds),
          true <- valid_method?(expected.method, bounds),
-         {:ok, normalized_uri} <- Uri.normalize(expected.target_uri, bounds),
+         {:ok, normalized_uri} <- normalize_proof_uri(profile, expected.target_uri, bounds),
          true <- normalized_uri == expected.target_uri,
          true <- valid_uuid?(expected.invocation_id),
          true <- valid_operation?(expected.operation, bounds),
@@ -549,7 +598,7 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
          true <-
            is_integer(expected.proof_max_age) and expected.proof_max_age > 0 and
              expected.proof_max_age <= bounds.proof_max_age,
-         true <- valid_nonce_expectation?(expected.nonce, bounds) do
+         true <- valid_profile_nonce_expectation?(profile, expected.nonce, bounds) do
       :ok
     else
       _failure -> {:error, :invalid}
@@ -759,7 +808,14 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
   end
 
   defp validate_assembled_compact(:proof, compact, bounds) do
-    case parse_proof(compact, bounds) do
+    case parse_proof(compact, bounds, :standard) do
+      {:ok, _parsed} -> :ok
+      {:error, :invalid} -> {:error, :invalid}
+    end
+  end
+
+  defp validate_assembled_compact(:local_loopback_http_proof, compact, bounds) do
+    case parse_proof(compact, bounds, :local_loopback_http) do
       {:ok, _parsed} -> :ok
       {:error, :invalid} -> {:error, :invalid}
     end
@@ -847,6 +903,51 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
     end
   end
 
+  defp closed_proof_payload(members, :standard) do
+    closed_map_one_of(members, [@proof_payload_keys, @proof_payload_keys_without_nonce])
+  end
+
+  defp closed_proof_payload(members, :local_loopback_http),
+    do: closed_map(members, @proof_payload_keys)
+
+  defp profile_nonce(:standard, payload, bounds), do: optional_nonce(payload, bounds)
+
+  defp profile_nonce(:local_loopback_http, payload, bounds) do
+    case Map.fetch(payload, "nonce") do
+      {:ok, {:string, nonce}} ->
+        if valid_nonce?(nonce, bounds), do: {:ok, nonce}, else: {:error, :invalid}
+
+      _missing_or_invalid ->
+        {:error, :invalid}
+    end
+  end
+
+  defp proof_kind(:standard), do: :proof
+  defp proof_kind(:local_loopback_http), do: :local_loopback_http_proof
+
+  defp proof_type(:standard), do: "dpop+jwt"
+  defp proof_type(:local_loopback_http), do: "ba+loopback-proof"
+
+  defp normalize_proof_uri(:standard, uri, bounds), do: Uri.normalize(uri, bounds)
+
+  defp normalize_proof_uri(:local_loopback_http, uri, bounds),
+    do: LocalLoopbackUri.normalize(uri, bounds)
+
+  defp valid_profile_nonce?(:standard, nonce, bounds),
+    do: valid_optional_nonce?(nonce, bounds)
+
+  defp valid_profile_nonce?(:local_loopback_http, nonce, bounds),
+    do: valid_nonce?(nonce, bounds)
+
+  defp validate_standard_signing_kind(kind)
+       when kind in [:grant, :proof, :boundary_anchor, :key_transition],
+       do: :ok
+
+  defp validate_standard_signing_kind(_kind), do: {:error, :invalid}
+
+  defp validate_local_loopback_signing_kind(:local_loopback_http_proof), do: :ok
+  defp validate_local_loopback_signing_kind(_kind), do: {:error, :invalid}
+
   defp unique_operation(operations, name) do
     Enum.find_value(operations, {:error, :invalid}, fn operation ->
       secure_equal?(operation.name, name) && {:ok, operation}
@@ -921,6 +1022,14 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
     do: valid_nonce?(nonce, bounds)
 
   defp valid_nonce_expectation?(_value, _bounds), do: false
+
+  defp valid_profile_nonce_expectation?(:standard, expectation, bounds),
+    do: valid_nonce_expectation?(expectation, bounds)
+
+  defp valid_profile_nonce_expectation?(:local_loopback_http, {:required, nonce}, bounds),
+    do: valid_nonce?(nonce, bounds)
+
+  defp valid_profile_nonce_expectation?(:local_loopback_http, _expectation, _bounds), do: false
 
   defp valid_optional_nonce?(nil, _bounds), do: true
   defp valid_optional_nonce?(nonce, bounds), do: valid_nonce?(nonce, bounds)

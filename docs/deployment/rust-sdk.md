@@ -9,6 +9,14 @@ See `spec/bap-v1.md` (the normative authority; `docs/protocol-v1.md` is its gene
 [`../adr/0014-cross-language-verifier-sdks.md`](../adr/0014-cross-language-verifier-sdks.md) for the
 packaging and derivation-hygiene decisions.
 
+## Local-loopback application profile
+
+The crate also exposes `local_loopback_http_uri_normalize`,
+`local_loopback_http_proof_signing_input`, `assemble_local_loopback_http_compact`,
+`decode_local_loopback_http_proof`, and `check_local_loopback_http_envelope` for direct local
+development listeners. Select them explicitly, admit only literal `127.0.0.1`/`[::1]` HTTP targets,
+require the server nonce, and never infer or retry the standard profile.
+
 ## Supply-chain posture
 
 Runtime dependencies (the consumer-facing closure, audited by `sdks/rust/tools/license_check.sh`):

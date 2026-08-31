@@ -22,9 +22,17 @@ derivation-hygiene decisions.
 
 | Target | Notes |
 |---|---|
-| Any Go service | `go get` the module; the 17-function façade plus versioned primitives is the whole surface |
+| Any Go service | `go get` the module; the standard 17-function façade, five local-profile functions, and versioned primitives are the whole surface |
 | Static binaries / distroless containers | Zero-dependency closure means `CGO_ENABLED=0` builds with no tag set |
 | AWS Lambda (provided.al2023 custom runtime) | Build the bootstrap binary statically; cold start is the binary load |
+
+## Local-loopback application profile
+
+Local development listeners select `LocalLoopbackHTTPUriNormalize`,
+`LocalLoopbackHTTPProofSigningInput`, `AssembleLocalLoopbackHTTPCompact`,
+`DecodeLocalLoopbackHTTPProof`, and `CheckLocalLoopbackHTTPEnvelope` explicitly. Admit only direct
+literal `127.0.0.1`/`[::1]` HTTP targets and require the server nonce. Never derive the target from
+`Forwarded`/`X-Forwarded-*`, accept `localhost`, or retry standard `dpop+jwt` after rejection.
 
 ## Supply-chain posture
 

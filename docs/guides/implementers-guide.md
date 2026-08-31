@@ -130,3 +130,19 @@ Run the corpus. A conforming implementation reports 283/283 agreement, census tw
 equality, and the certified index digest. The reference CLI ships in the package as the shape
 of the expected output. When you publish, the repository's interoperability record is where
 independent implementations record their results.
+
+## 9. Implementing the local-loopback application profile
+
+The standard corpus above remains unchanged. The byte-distinct local-development profile is a
+sibling contract defined by `spec/bap-local-loopback-http-v1.md` and certified independently under
+`priv/conformance/application-profiles/local-loopback-http/v1`.
+
+A conforming implementation exposes five separately named surfaces: URI normalization, proof
+signing-input production, compact assembly, proof decode, and envelope verification. It admits
+only literal `127.0.0.1` and `[::1]` HTTP authorities, requires a nonce, signs protected
+`typ: "ba+loopback-proof"`, and never infers or retries the standard profile. Pin the exact profile
+index SHA-256 (`10fc4cf05affcddc9e6340ff392c247e25ab038cd938f2557829a7ce63b1a5e4`), verify the declared
+two-file set and per-file hashes, execute all 36 URI and 8 proof cases, then prove both directions
+of cross-profile rejection. The repository's real-socket drill additionally exercises IPv4 and
+IPv6 listeners plus a verifier-bypass mutation; self-round-trip corpus agreement alone is not
+transport evidence.

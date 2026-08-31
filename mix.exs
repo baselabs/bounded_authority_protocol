@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.3.0"
   @source_url "https://github.com/baselabs/bounded_authority_protocol"
 
   def project do
@@ -79,10 +79,13 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "priv/conformance/v1/corpus",
         "priv/conformance/v1/schemas",
         "priv/conformance/v1/vectors",
+        "priv/conformance/application-profiles/local-loopback-http/v1",
         ".formatter.exs",
         "mix.exs",
         "README.md",
         "CHANGELOG.md",
+        "CODE_OF_CONDUCT.md",
+        "CONTRIBUTING.md",
         "LICENSE",
         "NOTICE",
         "SECURITY.md",
@@ -109,15 +112,28 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md",
         "docs/adr/0021-v1-all-selector-recognized-shapes-erratum.md",
         "docs/adr/0022-durable-contract-identities.md",
+        "docs/adr/0027-byte-distinct-application-proof-profiles.md",
         "docs/protocol-v1.md",
         "docs/release-candidate-contract.md",
         "docs/errata.md",
         "docs/governance.md",
+        "docs/guides/README.md",
+        "docs/guides/getting-started.md",
+        "docs/guides/implementers-guide.md",
+        "docs/guides/upgrading.md",
+        "docs/livebooks/bap-walkthrough.livemd",
+        "docs/deployment/go-sdk.md",
+        "docs/deployment/python-sdk.md",
+        "docs/deployment/rust-sdk.md",
+        "docs/deployment/typescript-sdk.md",
         "docs/design/conformance-contract.md",
+        "docs/design/iana",
+        "docs/design/interoperability-report.md",
         "docs/design/offline-authorization-requirements.md",
         "docs/design/protocol-charter.md",
         "docs/design/registries.md",
         "docs/design/requirement-map.md",
+        "docs/design/local-loopback-http-requirement-map.md",
         "docs/design/standards-track.md",
         "docs/design/threat-model.md"
       ],
@@ -137,14 +153,23 @@ defmodule BoundedAuthorityProtocol.MixProject do
       source_url: @source_url,
       extras: [
         "README.md",
+        "CODE_OF_CONDUCT.md",
+        "CONTRIBUTING.md",
         "docs/guides/getting-started.md",
         "docs/guides/implementers-guide.md",
         "docs/guides/upgrading.md",
+        "docs/livebooks/bap-walkthrough.livemd",
+        "docs/deployment/typescript-sdk.md",
+        "docs/deployment/python-sdk.md",
+        "docs/deployment/rust-sdk.md",
+        "docs/deployment/go-sdk.md",
         "CHANGELOG.md",
         "LICENSE",
         "NOTICE",
         "SECURITY.md",
         "usage-rules.md",
+        "spec/bap-v1.md",
+        "spec/bap-local-loopback-http-v1.md",
         "docs/protocol-v1.md",
         "docs/release-candidate-contract.md",
         "docs/adr/0001-public-protocol-verifier-boundary.md",
@@ -169,13 +194,18 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md",
         "docs/adr/0021-v1-all-selector-recognized-shapes-erratum.md",
         "docs/adr/0022-durable-contract-identities.md",
+        "docs/adr/0027-byte-distinct-application-proof-profiles.md",
         "docs/errata.md",
         "docs/governance.md",
         "docs/design/conformance-contract.md",
+        "docs/design/iana/jwt-claims.md",
+        "docs/design/iana/media-types.md",
+        "docs/design/interoperability-report.md",
         "docs/design/offline-authorization-requirements.md",
         "docs/design/protocol-charter.md",
         "docs/design/registries.md",
         "docs/design/requirement-map.md",
+        "docs/design/local-loopback-http-requirement-map.md",
         "docs/design/standards-track.md",
         "docs/design/threat-model.md"
       ]
@@ -211,6 +241,10 @@ defmodule BoundedAuthorityProtocol.MixProject do
       "conformance.verify": [
         "escript.build",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/v1/corpus"
+      ],
+      "local_loopback_http.verify": [
+        "run scripts/check_local_loopback_http.exs",
+        "run --no-start scripts/check_local_loopback_http_mutations.exs"
       ],
       "corpus.digests": ["run --no-start scripts/regen_corpus_digests.exs"],
       "corpus.sync": ["run --no-start scripts/check_corpus_sync.exs"],
@@ -255,6 +289,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "chain_archive.mutations",
         "conformance.mutations",
         "conformance.verify",
+        "local_loopback_http.verify",
         "spec_facts.mutations"
       ]
     ]

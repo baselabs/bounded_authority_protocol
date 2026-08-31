@@ -44,11 +44,11 @@ use crate::types::{
     AnchoredExportEncoded, AnchoredExportInput, ArchivedObject, BoundaryAnchor, ChainInput,
     ConsumptionEntry, Credentials, ExpectedAnchor, ExpectedAnchoredExport, ExpectedChain,
     ExpectedExport, ExpectedGrant, ExpectedKeyTransition, ExpectedRequest, GrantDecoded,
-    GrantInput, HistoricalKeyChain, HistoricalPublicKey, KeyLocator, KeyTransition, NonceMode,
-    ProducedSigningInput, ProofDecoded, ProofInput, SigningInput, SigningKind, TrustedIssuer,
-    ValidityUpperBound,
+    GrantInput, HistoricalKeyChain, HistoricalPublicKey, KeyLocator, KeyTransition,
+    LocalLoopbackHttpProofInput, NonceMode, ProducedSigningInput, ProofDecoded, ProofInput,
+    SigningInput, SigningKind, TrustedIssuer, ValidityUpperBound,
 };
-use crate::uri::uri_normalize;
+use crate::uri::{local_loopback_http_uri_normalize, uri_normalize};
 
 use sha2::{Digest, Sha256};
 
@@ -59,6 +59,7 @@ use sha2::{Digest, Sha256};
 const ALG_EDDSA: &str = "EdDSA";
 const TYP_GRANT: &str = "ba+cap";
 const TYP_PROOF: &str = "dpop+jwt";
+const TYP_LOCAL_LOOPBACK_HTTP_PROOF: &str = "ba+loopback-proof";
 const TYP_CHAIN_ANCHOR: &str = "ba+chain-anchor";
 const TYP_KEY_TRANSITION: &str = "ba+key-transition";
 const CRV_ED25519: &str = "Ed25519";
@@ -78,6 +79,19 @@ const CHAIN_DIGEST_PREFIX: &[u8] = b"BAP1-CHAIN\0";
 /// ASCII bytes `BAP1-ARCHIVE\0EXPORT\0` (12 + NUL + 6 + NUL = 20). Confirmed
 /// byte-exact against the corpus `anchored-export/verify.json` `chunks[0]`.
 const ARCHIVE_MAGIC: &[u8] = b"BAP1-ARCHIVE\0EXPORT\0";
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ProofProfile {
+    Standard,
+    LocalLoopbackHttp,
+}
+
+fn proof_typ(profile: ProofProfile) -> &'static str {
+    match profile {
+        ProofProfile::Standard => TYP_PROOF,
+        ProofProfile::LocalLoopbackHttp => TYP_LOCAL_LOOPBACK_HTTP_PROOF,
+    }
+}
 
 // ============================================================================
 // untrusted_key_locator
@@ -164,7 +178,20 @@ pub fn decode_grant(compact: &[u8], bounds: &Bounds) -> Result<GrantDecoded> {
 /// (every claim required except `nonce`; `REQ1-CLAIM-proof-required`,
 /// `REQ1-CLAIM-no-extra`).
 pub fn decode_proof(compact: &[u8], bounds: &Bounds) -> Result<ProofDecoded> {
-    let p = decode_proof_parts(compact, bounds)?;
+    decode_proof_for(compact, bounds, ProofProfile::Standard)
+}
+
+/// Decode the byte-distinct literal-loopback HTTP application proof.
+pub fn decode_local_loopback_http_proof(compact: &[u8], bounds: &Bounds) -> Result<ProofDecoded> {
+    decode_proof_for(compact, bounds, ProofProfile::LocalLoopbackHttp)
+}
+
+fn decode_proof_for(
+    compact: &[u8],
+    bounds: &Bounds,
+    profile: ProofProfile,
+) -> Result<ProofDecoded> {
+    let p = decode_proof_parts_for(compact, bounds, profile)?;
     let holder_thumbprint = thumbprint_raw(&p.holder_public_key);
     Ok(ProofDecoded {
         // The proof header carries a JWK, not a kid; the field is empty.
@@ -317,6 +344,22 @@ pub fn check_envelope(
     credentials: &Credentials,
     expected: &ExpectedRequest,
 ) -> Result<EnvelopeFacts> {
+    check_envelope_for(credentials, expected, ProofProfile::Standard)
+}
+
+/// Verify a byte-distinct literal-loopback HTTP application proof envelope.
+pub fn check_local_loopback_http_envelope(
+    credentials: &Credentials,
+    expected: &ExpectedRequest,
+) -> Result<EnvelopeFacts> {
+    check_envelope_for(credentials, expected, ProofProfile::LocalLoopbackHttp)
+}
+
+fn check_envelope_for(
+    credentials: &Credentials,
+    expected: &ExpectedRequest,
+    profile: ProofProfile,
+) -> Result<EnvelopeFacts> {
     let bounds = &expected.bounds;
 
     // REQ1-VERIFY-time-bounds: proof_max_age MUST be positive AND MUST NOT exceed
@@ -325,6 +368,11 @@ pub fn check_envelope(
     // the skew window (no max-age floor). The skew ceiling is enforced by the
     // verify_grant call below (which carries expected.skew through ExpectedGrant).
     if expected.proof_max_age < 1 || expected.proof_max_age > bounds.proof_max_age() {
+        return Err(Invalid);
+    }
+    if profile == ProofProfile::LocalLoopbackHttp
+        && !matches!(expected.nonce_mode, NonceMode::Required(_))
+    {
         return Err(Invalid);
     }
 
@@ -352,7 +400,7 @@ pub fn check_envelope(
     let operations = extract_operations(&grant_parts.payload_json)?;
 
     // Decode the proof (header + payload + holder key + segments).
-    let proof = decode_proof_parts(&credentials.proof, bounds)?;
+    let proof = decode_proof_parts_for(&credentials.proof, bounds, profile)?;
 
     // Holder thumbprint binding: the proof header JWK RFC 7638 thumbprint MUST
     // equal the grant's cnf.jkt (REQ1-VERIFY-envelope-binding). This binds the
@@ -408,7 +456,12 @@ pub fn check_envelope(
 
     // URI binding: the expected URI MUST be pre-normalized (REQ1-URI-pre-
     // normalized) and the proof htu MUST equal it.
-    let normalized_uri = uri_normalize(&expected.target_uri, bounds)?;
+    let normalized_uri = match profile {
+        ProofProfile::Standard => uri_normalize(&expected.target_uri, bounds)?,
+        ProofProfile::LocalLoopbackHttp => {
+            local_loopback_http_uri_normalize(&expected.target_uri, bounds)?
+        }
+    };
     if normalized_uri != expected.target_uri {
         return Err(Invalid);
     }
@@ -536,6 +589,29 @@ pub fn assemble_compact(
     signature: &[u8; 64],
     bounds: Option<&Bounds>,
 ) -> Result<Vec<u8>> {
+    assemble_compact_for(input, signature, bounds, ProofProfile::Standard)
+}
+
+/// Assemble the byte-distinct local-loopback HTTP application proof compact.
+pub fn assemble_local_loopback_http_compact(
+    input: &SigningInput,
+    signature: &[u8; 64],
+    bounds: Option<&Bounds>,
+) -> Result<Vec<u8>> {
+    assemble_compact_for(input, signature, bounds, ProofProfile::LocalLoopbackHttp)
+}
+
+fn assemble_compact_for(
+    input: &SigningInput,
+    signature: &[u8; 64],
+    bounds: Option<&Bounds>,
+    profile: ProofProfile,
+) -> Result<Vec<u8>> {
+    if profile == ProofProfile::LocalLoopbackHttp
+        && input.kind != SigningKind::LocalLoopbackHttpProof
+    {
+        return Err(Invalid);
+    }
     // ADR 0018 divergence closed (2026-08-18): the reference takes limits at assemble
     // (runtime.ex:147-155 → CompactJws.assemble:34-48 — encoded segment bounds, signature
     // width ≤ signature_bytes, compact_bytes, and the kind re-parse, all against
@@ -557,7 +633,16 @@ pub fn assemble_compact(
             decode_grant_parts(&compact, &bounds)?;
         }
         SigningKind::Proof => {
-            decode_proof_parts(&compact, &bounds)?;
+            if profile != ProofProfile::Standard {
+                return Err(Invalid);
+            }
+            decode_proof_parts_for(&compact, &bounds, ProofProfile::Standard)?;
+        }
+        SigningKind::LocalLoopbackHttpProof => {
+            if profile != ProofProfile::LocalLoopbackHttp {
+                return Err(Invalid);
+            }
+            decode_proof_parts_for(&compact, &bounds, ProofProfile::LocalLoopbackHttp)?;
         }
         SigningKind::ChainAnchor => {
             decode_anchor_parts(&compact, &bounds)?;
@@ -671,13 +756,51 @@ pub fn grant_signing_input(grant: &GrantInput, bounds: &Bounds) -> Result<Produc
 /// `htu = uri_normalize(target_uri, bounds)` (`REQ1-URI-pre-normalized`). The
 /// header `jwk` is built from `holder_public_key` via the canonical OKP form.
 pub fn proof_signing_input(proof: &ProofInput, bounds: &Bounds) -> Result<ProducedSigningInput> {
+    proof_signing_input_for(proof, bounds, ProofProfile::Standard, None)
+}
+
+/// Produce the byte-distinct literal-loopback HTTP application proof input.
+pub fn local_loopback_http_proof_signing_input(
+    proof: &LocalLoopbackHttpProofInput,
+    bounds: &Bounds,
+) -> Result<ProducedSigningInput> {
+    let common = ProofInput {
+        proof_id: proof.proof_id.clone(),
+        method: proof.method.clone(),
+        target_uri: proof.target_uri.clone(),
+        invocation_id: proof.invocation_id.clone(),
+        operation: proof.operation.clone(),
+        cast_arguments: proof.cast_arguments.clone(),
+        grant_compact: proof.grant_compact.clone(),
+        holder_public_key: proof.holder_public_key,
+        issued_at: proof.issued_at,
+    };
+    proof_signing_input_for(
+        &common,
+        bounds,
+        ProofProfile::LocalLoopbackHttp,
+        Some(&proof.nonce),
+    )
+}
+
+fn proof_signing_input_for(
+    proof: &ProofInput,
+    bounds: &Bounds,
+    profile: ProofProfile,
+    nonce: Option<&str>,
+) -> Result<ProducedSigningInput> {
     // REQ1-VERIFY-revalidate.
     validate_identifier(&proof.proof_id, bounds)?;
     validate_method_token(&proof.method, bounds)?;
     validate_operation_name(&proof.operation, bounds)?;
     validate_uuid(&proof.invocation_id)?;
     // htu MUST already be the normal form (REQ1-URI-pre-normalized).
-    let htu = uri_normalize(&proof.target_uri, bounds)?;
+    let htu = match profile {
+        ProofProfile::Standard => uri_normalize(&proof.target_uri, bounds)?,
+        ProofProfile::LocalLoopbackHttp => {
+            local_loopback_http_uri_normalize(&proof.target_uri, bounds)?
+        }
+    };
     if htu != proof.target_uri {
         return Err(Invalid);
     }
@@ -711,12 +834,15 @@ pub fn proof_signing_input(proof: &ProofInput, bounds: &Bounds) -> Result<Produc
     let header = JsonValue::Object(vec![
         ("alg".to_string(), JsonValue::String(ALG_EDDSA.to_string())),
         ("jwk".to_string(), jwk),
-        ("typ".to_string(), JsonValue::String(TYP_PROOF.to_string())),
+        (
+            "typ".to_string(),
+            JsonValue::String(proof_typ(profile).to_string()),
+        ),
     ]);
 
     // Build payload (member names derived first-hand from the corpus's proof
     // payload_segment: ath, ba_inv, ba_op, ba_req, htm, htu, iat, jti, v).
-    let payload = JsonValue::Object(vec![
+    let mut payload_members = vec![
         ("ath".to_string(), JsonValue::String(ath)),
         (
             "ba_inv".to_string(),
@@ -735,7 +861,15 @@ pub fn proof_signing_input(proof: &ProofInput, bounds: &Bounds) -> Result<Produc
         ("iat".to_string(), JsonValue::Int(proof.issued_at)),
         ("jti".to_string(), JsonValue::String(proof.proof_id.clone())),
         ("v".to_string(), JsonValue::Int(1)),
-    ]);
+    ];
+    if profile == ProofProfile::LocalLoopbackHttp {
+        let nonce = nonce.ok_or(Invalid)?;
+        if nonce.is_empty() || nonce.len() as u64 > bounds.nonce_bytes() {
+            return Err(Invalid);
+        }
+        payload_members.push(("nonce".to_string(), JsonValue::String(nonce.to_string())));
+    }
+    let payload = JsonValue::Object(payload_members);
 
     build_produced(&header, &payload, bounds)
 }
@@ -2789,7 +2923,11 @@ struct DecodedProof<'a> {
 /// holder public key) and payload claims. The decoded signature segment MUST be
 /// exactly 64 bytes (REQ1-BOUNDS-fixed-widths, mirroring runtime.ex:259
 /// parse_proof).
-fn decode_proof_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedProof<'a>> {
+fn decode_proof_parts_for<'a>(
+    compact: &'a [u8],
+    bounds: &Bounds,
+    profile: ProofProfile,
+) -> Result<DecodedProof<'a>> {
     if compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
     }
@@ -2804,8 +2942,8 @@ fn decode_proof_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedP
     }
     let header = json_decode(&header_bytes, bounds)?;
     let payload_json = json_decode(&payload_bytes, bounds)?;
-    let holder_public_key = validate_proof_header(&header, bounds)?;
-    let payload = validate_proof_payload(&payload_json, bounds)?;
+    let holder_public_key = validate_proof_header_for(&header, bounds, profile)?;
+    let payload = validate_proof_payload_for(&payload_json, bounds, profile)?;
     Ok(DecodedProof {
         protected_seg,
         payload_seg,
@@ -2951,7 +3089,11 @@ fn validate_grant_header(header: &JsonValue, bounds: &Bounds) -> Result<String> 
 /// `{alg:"EdDSA", typ:"dpop+jwt", jwk:{crv,kty,x}}` (`REQ1-HEADER-closed-set`,
 /// `REQ1-HEADER-proof-jwk`, `REQ1-HEADER-no-private-jwk`). Returns the decoded
 /// 32-byte holder public key.
-fn validate_proof_header(header: &JsonValue, bounds: &Bounds) -> Result<[u8; 32]> {
+fn validate_proof_header_for(
+    header: &JsonValue,
+    bounds: &Bounds,
+    profile: ProofProfile,
+) -> Result<[u8; 32]> {
     let members = match header {
         JsonValue::Object(m) => m,
         _ => return Err(Invalid),
@@ -2972,7 +3114,7 @@ fn validate_proof_header(header: &JsonValue, bounds: &Bounds) -> Result<[u8; 32]
         _ => return Err(Invalid),
     }
     match typ {
-        Some(JsonValue::String(s)) if s == TYP_PROOF => {}
+        Some(JsonValue::String(s)) if s == proof_typ(profile) => {}
         _ => return Err(Invalid),
     }
     let jwk_val = jwk.ok_or(Invalid)?;
@@ -3072,7 +3214,11 @@ struct ProofPayload {
 /// Validates the proof payload against the closed claim table. Every claim
 /// except `nonce` is required; no other claim is accepted
 /// (`REQ1-CLAIM-proof-required`, `REQ1-CLAIM-no-extra`).
-fn validate_proof_payload(payload: &JsonValue, bounds: &Bounds) -> Result<ProofPayload> {
+fn validate_proof_payload_for(
+    payload: &JsonValue,
+    bounds: &Bounds,
+    profile: ProofProfile,
+) -> Result<ProofPayload> {
     let members = match payload {
         JsonValue::Object(m) => m,
         _ => return Err(Invalid),
@@ -3115,14 +3261,8 @@ fn validate_proof_payload(payload: &JsonValue, bounds: &Bounds) -> Result<ProofP
     let request_hash = take_digest_b64u(ba_req, bounds)?;
     let issued_at = take_integral_date(iat)?;
     // htu MUST already be normalized (REQ1-URI-pre-normalized).
-    let target_uri = match htu {
-        Some(JsonValue::String(s)) => {
-            let normalized = uri_normalize(s, bounds)?;
-            if normalized != *s {
-                return Err(Invalid);
-            }
-            s.clone()
-        }
+    let target_uri_input = match htu {
+        Some(JsonValue::String(s)) => s.clone(),
         _ => return Err(Invalid),
     };
     // nonce is OPTIONAL but, if present, MUST be a non-empty string ≤512 bytes.
@@ -3139,6 +3279,18 @@ fn validate_proof_payload(payload: &JsonValue, bounds: &Bounds) -> Result<ProofP
         }
         _ => return Err(Invalid),
     };
+    if profile == ProofProfile::LocalLoopbackHttp && nonce.is_none() {
+        return Err(Invalid);
+    }
+    let target_uri = match profile {
+        ProofProfile::Standard => uri_normalize(&target_uri_input, bounds)?,
+        ProofProfile::LocalLoopbackHttp => {
+            local_loopback_http_uri_normalize(&target_uri_input, bounds)?
+        }
+    };
+    if target_uri != target_uri_input {
+        return Err(Invalid);
+    }
     Ok(ProofPayload {
         proof_id,
         method,

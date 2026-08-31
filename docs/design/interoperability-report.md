@@ -40,6 +40,19 @@ carries its own per-language permissiveness mutation-gate proving its closures r
 | `bounded-authority-protocol` | Rust, MSRV 1.81, `ed25519-dalek`+`sha2` | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 | `bounded_authority_protocol_go` | Go 1.25, stdlib only | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 
+### Local-loopback HTTP application-profile implementations
+
+The byte-distinct `bap-application-proof/local-loopback-http/1` profile is certified by its own
+revision-1 corpus at `priv/conformance/application-profiles/local-loopback-http/v1`. Its exact
+index SHA-256 is `10fc4cf05affcddc9e6340ff392c247e25ab038cd938f2557829a7ce63b1a5e4`; the index binds exactly
+`profile.json` and `proof-cases.json`.
+
+The Elixir reference plus the TypeScript, Python, Rust, and Go implementations each report
+**36/36 URI cases** and **8/8 proof cases**, including signed IPv4 and IPv6 artifacts, exact
+producer/assembly bytes, trust and invocation binding, mandatory nonce, meaningful-byte tamper,
+and mutual standard/local profile rejection. Each implementation pins the same index and per-file
+hashes. This is repository-executed cross-validation; the four SDK packages are still unpublished.
+
 ### Independent Node second-implementation runners
 
 Three runner-authored-from-the-corpus Node implementations (node:* only; the corpus is the
@@ -64,17 +77,23 @@ normative oracle for their verdicts):
 4. Every implementation additionally ships a permissiveness mutation battery: the guard
    families that keep it from being MORE permissive than the reference are each proven
    red-capable (construct the defect, watch the test go green, fix).
+5. The application-profile corpus is separate from the standard corpus. Each implementation
+   verifies the exact two-file set and counts, then executes all URI and proof cases through its
+   separately named local-profile surfaces; no implementation infers or retries a profile.
 
 ## Reproducing
 
 Any implementation can reproduce this report: obtain the corpus (it ships in the package and
 the repository), verify the certified digest above, run all 283 cases, and check the census.
 The repository's `mix quality` runs the reference CLI, all three independent Node runners,
-and the corpus-identity gates on every change.
+the corpus-identity gates, and the real IPv4/IPv6 local-profile transport drill on every change.
+The four SDK suites execute the same application-profile corpus through their native APIs.
 
 ## Current limitations (stated, not hidden)
 
 - The SDKs are not published to registries (ADR 0015: graduation on first publication); the
   cross-validation above is repository-executed, not registry-distributed.
-- The report covers the frozen v1 profile only; successor-majors carry their own corpus and
-  their own report sections when they activate.
+- The report covers the frozen standard v1 profile and the local-loopback HTTP application
+  profile only; successor-majors carry their own corpus and report sections when they activate.
+- The local-profile real-socket drill is implemented in the Elixir release gate. The other SDK
+  results certify bytes and verdicts against the shared corpus, not live transport composition.

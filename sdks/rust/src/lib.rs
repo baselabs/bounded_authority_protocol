@@ -57,9 +57,11 @@ pub(crate) mod selector;
 pub use digest::request_digest;
 pub use v1::assemble_compact;
 pub use v1::{
-    boundary_anchor_signing_input, check_chain, check_envelope, decode_grant, decode_proof,
-    encode_anchored_export, encode_consumption_entry, grant_signing_input,
-    key_transition_signing_input, proof_signing_input, untrusted_key_locator,
+    assemble_local_loopback_http_compact, boundary_anchor_signing_input, check_chain,
+    check_envelope, check_local_loopback_http_envelope, decode_grant,
+    decode_local_loopback_http_proof, decode_proof, encode_anchored_export,
+    encode_consumption_entry, grant_signing_input, key_transition_signing_input,
+    local_loopback_http_proof_signing_input, proof_signing_input, untrusted_key_locator,
     verify_anchored_export, verify_grant, verify_historical_anchor, verify_key_transition,
 };
 
@@ -72,5 +74,5 @@ pub use jwk::{
     jwk_decode_public, jwk_encode_public, public_key_thumbprint_raw, thumbprint,
     thumbprint_preimage, thumbprint_raw,
 };
-pub use uri::uri_normalize;
+pub use uri::{local_loopback_http_uri_normalize, uri_normalize};
 pub use v1::{require_bounds_equal, resolve_bounds};

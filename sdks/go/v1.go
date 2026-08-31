@@ -5,6 +5,20 @@ import (
 	"crypto/subtle"
 )
 
+type proofProfile uint8
+
+const (
+	proofProfileStandard proofProfile = iota
+	proofProfileLocalLoopbackHTTP
+)
+
+func proofTyp(profile proofProfile) string {
+	if profile == proofProfileLocalLoopbackHTTP {
+		return "ba+loopback-proof"
+	}
+	return "dpop+jwt"
+}
+
 // The grant/proof verification core (spec/bap-v1.md § Claims, § Public
 // verification contract). Correctly signed closed JSON objects may use ANY
 // member order — verification uses the exact received segments
@@ -52,6 +66,10 @@ func decodeGrantHeader(p compactParts, b Bounds) (string, error) {
 // holder public key. Every additional JWK member — private `d` included — is
 // invalid (REQ1-HEADER-no-private-jwk).
 func decodeProofHeader(p compactParts, b Bounds) ([]byte, error) {
+	return decodeProofHeaderFor(p, b, proofProfileStandard)
+}
+
+func decodeProofHeaderFor(p compactParts, b Bounds, profile proofProfile) ([]byte, error) {
 	v, err := JsonDecode(p.Protected, &b)
 	if err != nil {
 		return nil, ErrInvalid
@@ -68,7 +86,7 @@ func decodeProofHeader(p compactParts, b Bounds) ([]byte, error) {
 				return nil, ErrInvalid
 			}
 		case "typ":
-			if s, ok := m.Val.(Str); !ok || s != "dpop+jwt" {
+			if s, ok := m.Val.(Str); !ok || string(s) != proofTyp(profile) {
 				return nil, ErrInvalid
 			}
 		case "jwk":
@@ -262,6 +280,10 @@ type proofClaimsData struct {
 // required and no other claim is accepted (REQ1-CLAIM-proof-required,
 // REQ1-CLAIM-no-extra).
 func decodeProofPayload(p compactParts, b Bounds) (proofClaimsData, error) {
+	return decodeProofPayloadFor(p, b, proofProfileStandard)
+}
+
+func decodeProofPayloadFor(p compactParts, b Bounds, profile proofProfile) (proofClaimsData, error) {
 	var out proofClaimsData
 	v, err := JsonDecode(p.Payload, &b)
 	if err != nil {
@@ -349,8 +371,17 @@ func decodeProofPayload(p compactParts, b Bounds) (proofClaimsData, error) {
 		!validUUID(out.Invocation) || !validOperationName(out.Operation, b.OperationBytes) {
 		return out, ErrInvalid
 	}
-	if _, err := uriNormalized(out.TargetURI, b); err != nil {
+	var normalized string
+	if profile == proofProfileLocalLoopbackHTTP {
+		normalized, err = LocalLoopbackHTTPUriNormalize(out.TargetURI, &b)
+	} else {
+		normalized, err = uriNormalized(out.TargetURI, b)
+	}
+	if err != nil || normalized != out.TargetURI {
 		return out, ErrInvalid // REQ1-URI-pre-normalized
+	}
+	if profile == proofProfileLocalLoopbackHTTP && out.Nonce == nil {
+		return out, ErrInvalid
 	}
 	return out, nil
 }
@@ -430,6 +461,15 @@ func DecodeGrant(compact string, bounds *Bounds) (d GrantDecoded, err error) {
 
 // DecodeProof decodes and closed-set-validates a raw proof compact.
 func DecodeProof(compact string, bounds *Bounds) (d ProofDecoded, err error) {
+	return decodeProofFor(compact, bounds, proofProfileStandard)
+}
+
+// DecodeLocalLoopbackHTTPProof decodes the byte-distinct loopback profile.
+func DecodeLocalLoopbackHTTPProof(compact string, bounds *Bounds) (d ProofDecoded, err error) {
+	return decodeProofFor(compact, bounds, proofProfileLocalLoopbackHTTP)
+}
+
+func decodeProofFor(compact string, bounds *Bounds, profile proofProfile) (d ProofDecoded, err error) {
 	defer closedResult(&err)
 	b, err := resolveBounds(bounds)
 	if err != nil {
@@ -439,10 +479,10 @@ func DecodeProof(compact string, bounds *Bounds) (d ProofDecoded, err error) {
 	if err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
-	if _, err := decodeProofHeader(parts, b); err != nil {
+	if _, err := decodeProofHeaderFor(parts, b, profile); err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
-	claims, err := decodeProofPayload(parts, b)
+	claims, err := decodeProofPayloadFor(parts, b, profile)
 	if err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
@@ -585,6 +625,15 @@ func VerifyGrant(compact string, issuer TrustedIssuer, expected ExpectedGrant) (
 // thumbprint, and binds ath, method, URI, invocation, operation, ba_req,
 // time, nonce, and every selector (REQ1-VERIFY-envelope-binding).
 func CheckEnvelope(creds Credentials, expected ExpectedRequest) (f EnvelopeFacts, err error) {
+	return checkEnvelopeFor(creds, expected, proofProfileStandard)
+}
+
+// CheckLocalLoopbackHTTPEnvelope verifies the byte-distinct loopback profile.
+func CheckLocalLoopbackHTTPEnvelope(creds Credentials, expected ExpectedRequest) (f EnvelopeFacts, err error) {
+	return checkEnvelopeFor(creds, expected, proofProfileLocalLoopbackHTTP)
+}
+
+func checkEnvelopeFor(creds Credentials, expected ExpectedRequest, profile proofProfile) (f EnvelopeFacts, err error) {
 	defer closedResult(&err)
 	b, err := resolveBounds(expected.Bounds)
 	if err != nil {
@@ -594,7 +643,16 @@ func CheckEnvelope(creds Credentials, expected ExpectedRequest) (f EnvelopeFacts
 	if !validHTM(expected.Method, b.MethodBytes) {
 		return EnvelopeFacts{}, ErrInvalid
 	}
-	if _, err := uriNormalized(expected.TargetURI, b); err != nil {
+	var normalizedTarget string
+	if profile == proofProfileLocalLoopbackHTTP {
+		normalizedTarget, err = LocalLoopbackHTTPUriNormalize(expected.TargetURI, &b)
+	} else {
+		normalizedTarget, err = uriNormalized(expected.TargetURI, b)
+	}
+	if err != nil || normalizedTarget != expected.TargetURI {
+		return EnvelopeFacts{}, ErrInvalid
+	}
+	if profile == proofProfileLocalLoopbackHTTP && !expected.Nonce.required {
 		return EnvelopeFacts{}, ErrInvalid
 	}
 	if !validUUID(expected.InvocationID) || !validOperationName(expected.Operation, b.OperationBytes) {
@@ -625,15 +683,19 @@ func CheckEnvelope(creds Credentials, expected ExpectedRequest) (f EnvelopeFacts
 	if err != nil {
 		return EnvelopeFacts{}, ErrInvalid
 	}
-	holderKey, err := decodeProofHeader(parts, b)
+	holderKey, err := decodeProofHeaderFor(parts, b, profile)
 	if err != nil {
 		return EnvelopeFacts{}, ErrInvalid
 	}
-	proof, err := decodeProofPayload(parts, b)
+	proof, err := decodeProofPayloadFor(parts, b, profile)
 	if err != nil {
 		return EnvelopeFacts{}, ErrInvalid
 	}
-	si := SigningInput{Kind: KindProof, Protected: parts.Protected, Payload: parts.Payload}
+	proofKind := KindProof
+	if profile == proofProfileLocalLoopbackHTTP {
+		proofKind = KindLocalLoopbackHTTPProof
+	}
+	si := SigningInput{Kind: proofKind, Protected: parts.Protected, Payload: parts.Payload}
 	if err := verifyEd25519(holderKey, signingInputMessage(si), parts.Signature); err != nil {
 		return EnvelopeFacts{}, ErrInvalid
 	}

@@ -22,6 +22,44 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
            "CHANGELOG must either carry Unreleased work or a section for the current version #{@version}"
   end
 
+  test "every live release surface derives from the package version" do
+    [major, minor, _patch] = String.split(@version, ".")
+    series = "#{major}.#{minor}"
+    requirement = "~> #{@version}"
+
+    expectations = [
+      {"README install", "README.md", "{:bounded_authority_protocol, \"#{requirement}\"}"},
+      {"getting-started install", "docs/guides/getting-started.md",
+       "{:bounded_authority_protocol, \"#{requirement}\"}"},
+      {"Livebook install", "docs/livebooks/bap-walkthrough.livemd",
+       "{:bounded_authority_protocol, \"#{requirement}\"}"},
+      {"security support", "SECURITY.md", "`#{series}.x` source release line is supported"},
+      {"security current", "SECURITY.md", "`v#{@version}` is the current tagged source release"},
+      {"usage rules install", "usage-rules.md",
+       "{:bounded_authority_protocol, \"#{requirement}\"}"}
+    ]
+
+    mismatches =
+      for {label, path, expected} <- expectations,
+          source = File.read!(path),
+          not String.contains?(source, expected),
+          do: "#{label}: #{path} must contain #{inspect(expected)}"
+
+    assert mismatches == [], Enum.join(mismatches, "\n")
+  end
+
+  test "release docs do not present the source tag as an immutable package identity" do
+    for path <- [
+          "README.md",
+          "docs/guides/getting-started.md",
+          "docs/livebooks/bap-walkthrough.livemd"
+        ] do
+      refute File.read!(path) =~
+               ~r/bounded_authority_protocol,[\s\S]{0,120}tag: "v#{Regex.escape(@version)}"/,
+             "#{path} must not prescribe the source tag as a package dependency"
+    end
+  end
+
   test "the sdks README names all four SDKs" do
     readme = File.read!("sdks/README.md")
 
@@ -87,6 +125,21 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
     assert report =~ "283 cases"
     assert report =~ "28 surfaces"
     assert report =~ "11 keys"
+  end
+
+  test "the interoperability report cites the certified application-profile corpus" do
+    report = File.read!("docs/design/interoperability-report.md")
+
+    index_bytes =
+      File.read!("priv/conformance/application-profiles/local-loopback-http/v1/index.json")
+
+    index = :json.decode(index_bytes)
+    digest = :crypto.hash(:sha256, index_bytes) |> Base.encode16(case: :lower)
+
+    assert report =~ digest
+    assert report =~ "#{index["uri_cases"]}/#{index["uri_cases"]} URI cases"
+    assert report =~ "#{index["proof_cases"]}/#{index["proof_cases"]} proof cases"
+    assert report =~ index["profile"]
   end
 
   test "the spec pins its Doc-Revision and the companions agree" do

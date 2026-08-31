@@ -8,10 +8,11 @@ package verifier
 type Kind string
 
 const (
-	KindGrant          Kind = "grant"
-	KindProof          Kind = "proof"
-	KindBoundaryAnchor Kind = "boundary_anchor"
-	KindKeyTransition  Kind = "key_transition"
+	KindGrant                  Kind = "grant"
+	KindProof                  Kind = "proof"
+	KindLocalLoopbackHTTPProof Kind = "local_loopback_http_proof"
+	KindBoundaryAnchor         Kind = "boundary_anchor"
+	KindKeyTransition          Kind = "key_transition"
 )
 
 // SigningInput is a canonical JWS signing-input pair: the exact canonical

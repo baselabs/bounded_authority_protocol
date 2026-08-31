@@ -94,10 +94,12 @@ This profile constitutes the cryptographic suite `BAP1-Ed25519-SHA256`: EdDSA ov
 [@RFC8032] [@RFC8037], SHA-256 digests, RFC 8785 canonical bytes [@RFC8785], and the `BAP1-*`
 domain separators, with the fixed widths listed in the bounds table (#maxima). Every artifact
 self-declares this identity through its `v` claim, `typ` header, `alg` value, and domain
-separators. Evolution happens above this profile, never inside it: successor contract-majors
-carry their own complete closed profiles and suites, a proof's contract-major MUST equal its
-grant's (`REQ1-CORE-proof-major-equals-grant`), and the closed-rejection rule above is exactly
-what makes parallel majors safe — an artifact of any other major or suite fails closed here
+separators. Evolution happens above this profile, never inside it: successor contract-majors carry
+their own complete closed profiles and suites, while an ADR 0027 sibling application proof profile
+carries a byte-distinct protected type, API, media type, and corpus and remains rejected by this
+profile. A proof's contract-major MUST equal its grant's (`REQ1-CORE-proof-major-equals-grant`), and
+the closed-rejection rule above is exactly what makes parallel majors and sibling profiles safe —
+an artifact of any other major, suite, or proof profile fails closed here
 (`REQ1-CORE-cross-major-reject`).
 
 ## 6. Normative references

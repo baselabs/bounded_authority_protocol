@@ -1,12 +1,13 @@
 # Protocol registries
 
 Authoritative name coordination for the Bounded Authority Protocol, per the
-[standards track charter](standards-track.md). Reservation is immediate and cheap; activation of
-reserved semantics arrives only with a contract-major. The closed wire posture is unchanged: a
-conforming verifier of the current contract-major rejects every reserved-but-inactive name exactly
-as it rejects any other unlisted member.
+[standards track charter](standards-track.md). Reservation is immediate and cheap. Shared claims,
+selector kinds, and suite semantics activate only with a contract-major; a byte-distinct sibling
+proof `typ` may activate under [ADR 0027](../adr/0027-byte-distinct-application-proof-profiles.md).
+The closed-profile posture is unchanged: a conforming verifier rejects every unlisted or
+reserved-but-inactive name exactly as it rejects any other unlisted member.
 
-Registry policy: entries are added by ADR. `active` means normative in the current contract-major;
+Registry policy: entries are added by ADR. `active` means normative in a named closed profile;
 `reserved` means the name is held for a specified future purpose and MUST NOT be used for anything
 else by any implementation or deployment.
 
@@ -41,10 +42,17 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 |---|---|---|---|
 | `ba+cap` | active | `application/ba-cap+jwt` | Capability grant (compact JWS) |
 | `dpop+jwt` | active | registered by RFC 9449 | Holder proof (RFC 9449) |
+| `ba+loopback-proof` | active | `application/ba-loopback-proof+jwt` | Literal-loopback HTTP holder proof under `bap-application-proof/local-loopback-http/1` ([ADR 0027](../adr/0027-byte-distinct-application-proof-profiles.md)) |
 | `ba+chain-anchor` | active | `application/ba-chain-anchor+jwt` | Signed consumption-chain boundary anchor |
 | `ba+key-transition` | active | `application/ba-key-transition+jwt` | Authenticated historical-key transition |
 | `ba+cap-delegated` | reserved | `application/ba-cap-delegated+jwt` | Delegated attenuated grant — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md) |
 | `ba+suite-attestation` | reserved | `application/ba-suite-attestation+jwt` | Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
+
+## Application proof profiles
+
+| Identity | Status | Protected `typ` | Definition |
+|---|---|---|---|
+| `bap-application-proof/local-loopback-http/1` | active | `ba+loopback-proof` | Exact literal-loopback HTTP proof profile in [`spec/bap-local-loopback-http-v1.md`](../../spec/bap-local-loopback-http-v1.md); the current `dpop+jwt` profile rejects these bytes |
 
 ## Selector kinds
 
@@ -81,4 +89,6 @@ authoritative namespace and the `ba_`/`ba+` prefixes are the collision-avoidance
 
 The media-type column names the RFC 6838 registration (or reservation) associated with each
 value — a related but distinct namespace from the wire `typ` itself; the wire values are
-unchanged. Templates and their machine-readable sources live in [iana/README.md](iana/README.md).
+unchanged. The ready-to-file human-readable registrations are the [JWT claims](iana/jwt-claims.md) and
+[media types](iana/media-types.md); machine-readable JSON sources live beside each document in the
+source archive.

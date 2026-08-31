@@ -10,6 +10,12 @@ derivation from the Elixir reference. It is a **verification** library: a succes
 only that caller-supplied bytes satisfy caller-supplied trusted inputs and expected context. It never
 selects trusted keys, reserves replay, grants execution, or overrides a host policy.
 
+The SDK also exposes the byte-distinct local-development profile through
+`local_loopback_http_uri_normalize`, `local_loopback_http_proof_signing_input`,
+`assemble_local_loopback_http_compact`, `decode_local_loopback_http_proof`, and
+`check_local_loopback_http_envelope`. It accepts only literal `127.0.0.1`/`[::1]` HTTP targets and
+a mandatory nonce; standard `dpop+jwt` APIs reject its bytes.
+
 [adr14]: https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0014-cross-language-verifier-sdks.md
 [adr15]: https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0015-sdk-graduation-and-publish-topology.md
 [spec]: https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v1.md

@@ -23,15 +23,21 @@ current cryptographic suite is `BAP1-Ed25519-SHA256`.
 
 ## Installation
 
+After the separately authorized Hex 0.3.0 archive is published and its registry read-back
+succeeds, registry consumers can use the patch-bounded requirement:
+
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.2"}
+    {:bounded_authority_protocol, "~> 0.3.0"}
   ]
 end
 ```
 
 The package has **zero production dependencies**, no application callback, and no supervision tree.
+`v0.3.0` identifies the reviewable source release for the application-profile addition, but a Git
+tag is not the immutable package identity. Hex archive publication is a separate action and the
+dependency above does not resolve until that archive is present in the registry.
 
 ## What it provides
 
@@ -63,6 +69,14 @@ Decoding:
 - `BoundedAuthorityProtocol.V1.Json.decode/2` — the closed tagged-JSON algebra with recursive
   duplicate rejection and no input-name atomization.
 - `BoundedAuthorityProtocol.V1.Base64Url.decode/2` — strict canonical unpadded base64url.
+
+Application proof profiles are explicit sibling namespaces. The local-development profile
+`BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1` uses signed
+`typ: "ba+loopback-proof"`, mandatory nonces, and only canonical literal-loopback HTTP targets
+(`127.0.0.1` or `[::1]`). It exposes URI normalization, proof signing-input production, compact
+assembly, proof decode, and envelope verification. Standard `dpop+jwt` functions reject these
+bytes and the loopback functions reject `dpop+jwt`; callers must select one profile and never retry
+another after failure. Loopback HTTP is not TLS and is not process isolation.
 
 All verification inputs are explicit: the already-trusted public key, expected audience and
 instance, server-derived method, normalized URI, invocation id, operation, cast arguments,
@@ -101,6 +115,15 @@ dependency, point `--corpus` at the packaged path under `deps/bounded_authority_
 oracle vectors used by holder-side consumers to verify their own production live under
 `priv/conformance/v1/vectors`.
 
+The local-loopback application profile has a separate certified corpus under
+`priv/conformance/application-profiles/local-loopback-http/v1`. Its Elixir, TypeScript, Python,
+Rust, and Go consumers assert the same file hashes and verdicts. The non-mock transport drill opens
+real IPv4 and IPv6 listeners, uses fresh in-memory keys, and prints a secret-free JSON receipt:
+
+```bash
+mix local_loopback_http.verify
+```
+
 ## Cross-language verifier SDKs
 
 Alongside the Elixir package, the repository authors typed **verifier** SDKs of the frozen v1
@@ -113,9 +136,12 @@ first publication.
 
 ## Standards posture
 
-The wire profile is closed permanently; evolution happens above it through parallel
-contract-majors that never downgrade, with a minimum twelve-month deprecation window and published
-change-control, errata, and security-release policy (see `docs/governance.md`). Cryptographic
+Each wire profile is closed permanently. Evolution happens through parallel contract-majors or an
+explicitly identified byte-distinct application profile with its own protected `typ`, public APIs,
+normative specification, and certified corpus; no sibling profile changes standard `dpop+jwt` bytes
+or verdicts, and implementations never infer or fall back between profiles. Contract-majors never
+downgrade, with a minimum twelve-month deprecation window and published change-control, errata, and
+security-release policy (see `docs/governance.md`). Cryptographic
 agility is a named-suite succession, with a post-quantum path (ML-DSA) and cross-suite evidence
 attestation designed in. A pre-submission MCP authorization extension draft targeting the MCP
 extensions track lives under `docs/extensions/`.
@@ -129,12 +155,18 @@ Guides, in curated reading order:
 2. [The implementer's guide](docs/guides/implementers-guide.md) — building a conforming
    verifier in any language.
 3. [Upgrading](docs/guides/upgrading.md) — the published compatibility contract.
+4. [Runnable Livebook walkthrough](docs/livebooks/bap-walkthrough.livemd) — standard HTTPS and
+   literal-loopback HTTP proof production, verification, and fail-closed rejection with ephemeral
+   keys.
 
 Reference set:
 
 - `spec/bap-v1.md` — the normative v1 wire profile (docs/protocol-v1.md is its generated view).
+- `spec/bap-local-loopback-http-v1.md` — the normative literal-loopback HTTP application profile.
 - `docs/design/protocol-charter.md` — what the verifier does and the verification chain.
 - `docs/design/conformance-contract.md` — how conformance is proven.
+- `docs/design/interoperability-report.md` — exact standard and application-profile
+  cross-validation identities and results.
 - `docs/design/standards-track.md` — evolution, suite succession, governance, and venue strategy.
 - `docs/governance.md` — change classes, errata, deprecation, and security-release policy.
 
@@ -155,7 +187,7 @@ Reference set:
 ## Named misuses
 
 Misuse: treating `GrantFacts` or `EnvelopeFacts` as a decision or credential. Facts carry
-`authorization: :not_evaluated` and are redacted; an accepting them as authority is the
+`authorization: :not_evaluated` and are redacted; accepting them as authority is the
 central anti-pattern this package exists to prevent.
 
 Misuse: passing a caller-provided facts struct to the runtime boundary. The runtime accepts

@@ -8,6 +8,8 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
   @expected_files MapSet.new([
                     ".formatter.exs",
                     "CHANGELOG.md",
+                    "CODE_OF_CONDUCT.md",
+                    "CONTRIBUTING.md",
                     "LICENSE",
                     "NOTICE",
                     "README.md",
@@ -34,15 +36,32 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md",
                     "docs/adr/0021-v1-all-selector-recognized-shapes-erratum.md",
                     "docs/adr/0022-durable-contract-identities.md",
+                    "docs/adr/0027-byte-distinct-application-proof-profiles.md",
                     "docs/protocol-v1.md",
                     "docs/release-candidate-contract.md",
                     "docs/errata.md",
                     "docs/governance.md",
+                    "docs/guides/README.md",
+                    "docs/guides/getting-started.md",
+                    "docs/guides/implementers-guide.md",
+                    "docs/guides/upgrading.md",
+                    "docs/livebooks/bap-walkthrough.livemd",
+                    "docs/deployment/go-sdk.md",
+                    "docs/deployment/python-sdk.md",
+                    "docs/deployment/rust-sdk.md",
+                    "docs/deployment/typescript-sdk.md",
                     "docs/design/conformance-contract.md",
+                    "docs/design/iana/README.md",
+                    "docs/design/iana/jwt-claims.json",
+                    "docs/design/iana/jwt-claims.md",
+                    "docs/design/iana/media-types.json",
+                    "docs/design/iana/media-types.md",
+                    "docs/design/interoperability-report.md",
                     "docs/design/offline-authorization-requirements.md",
                     "docs/design/protocol-charter.md",
                     "docs/design/registries.md",
                     "docs/design/requirement-map.md",
+                    "docs/design/local-loopback-http-requirement-map.md",
                     "docs/design/standards-track.md",
                     "docs/design/threat-model.md",
                     "hex_metadata.config",
@@ -52,6 +71,9 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "lib/bounded_authority_protocol/conformance/corpus.ex",
                     "lib/bounded_authority_protocol/conformance/report.ex",
                     "lib/bounded_authority_protocol/conformance/runner.ex",
+                    "lib/bounded_authority_protocol/application_profile/local_loopback_http/v1.ex",
+                    "lib/bounded_authority_protocol/application_profile/local_loopback_http/v1/uri.ex",
+                    "lib/bounded_authority_protocol/uri_path.ex",
                     "lib/bounded_authority_protocol/v1.ex",
                     "lib/bounded_authority_protocol/v1/anchor_facts.ex",
                     "lib/bounded_authority_protocol/v1/anchored_export_codec.ex",
@@ -104,6 +126,9 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "lib/bounded_authority_protocol/v1/uri.ex",
                     "lib/bounded_authority_protocol/v1/violation.ex",
                     "mix.exs",
+                    "priv/conformance/application-profiles/local-loopback-http/v1/index.json",
+                    "priv/conformance/application-profiles/local-loopback-http/v1/profile.json",
+                    "priv/conformance/application-profiles/local-loopback-http/v1/proof-cases.json",
                     "priv/conformance/v1/schemas/conformance-case.schema.json",
                     "priv/conformance/v1/schemas/corpus-index.schema.json",
                     "priv/conformance/v1/schemas/grant-payload.schema.json",
@@ -155,6 +180,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "priv/conformance/v1/corpus/index.json",
                     "priv/conformance/v1/corpus/revision.json",
                     "spec/bap-v1.md",
+                    "spec/bap-local-loopback-http-v1.md",
                     "spec/cddl/bap-v1.cddl",
                     "spec/facts/baseline-v1.json",
                     "spec/formal/FINDINGS.md",
@@ -174,7 +200,10 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     source_root = Path.expand("..", __DIR__)
     scratch_root = unique_tmp_root!()
     package_root = Path.join(scratch_root, "package")
-    archive_path = Path.join(scratch_root, "bounded_authority_protocol-0.1.2.tar")
+
+    archive_path =
+      Path.join(scratch_root, "bounded_authority_protocol-#{mix_exs_version()}.tar")
+
     consumer_root = Path.join(scratch_root, "consumer")
 
     try do

@@ -73,6 +73,24 @@ func splitCompact(compact string, b Bounds) (compactParts, error) {
 	}, nil
 }
 
+// scanCompact is the pre-hash structural gate: exact three nonempty segments
+// within the compact and encoded-segment ceilings. It intentionally does not
+// decode base64url or enforce signature width; those belong to verification.
+func scanCompact(compact string, b Bounds) error {
+	if len(compact) == 0 || len(compact) > b.CompactBytes {
+		return ErrInvalid
+	}
+	first := strings.IndexByte(compact, '.')
+	last := strings.LastIndexByte(compact, '.')
+	if first <= 0 || last <= first+1 || last >= len(compact)-1 || strings.Count(compact, ".") != 2 {
+		return ErrInvalid
+	}
+	if first > b.EncodedSegmentBytes || last-first-1 > b.EncodedSegmentBytes || len(compact)-last-1 > b.EncodedSegmentBytes {
+		return ErrInvalid
+	}
+	return nil
+}
+
 // GrantSigningInput composes the deterministic canonical grant signing input
 // (REQ1-SIGNING-deterministic-produce). It accepts no private key, signer, or
 // callback (REQ1-VERIFY-no-signer-callback).
@@ -151,6 +169,15 @@ func GrantSigningInput(g Grant, bounds *Bounds) (si SigningInput, err error) {
 // input. ath is SHA-256 over the ASCII bytes of the complete received grant
 // compact value (REQ1-CLAIM-ath); ba_req is the BAP1-REQUEST\0 request digest.
 func ProofSigningInput(p Proof, bounds *Bounds) (si SigningInput, err error) {
+	return proofSigningInputFor(p, bounds, proofProfileStandard)
+}
+
+// LocalLoopbackHTTPProofSigningInput produces the byte-distinct loopback proof.
+func LocalLoopbackHTTPProofSigningInput(p Proof, bounds *Bounds) (si SigningInput, err error) {
+	return proofSigningInputFor(p, bounds, proofProfileLocalLoopbackHTTP)
+}
+
+func proofSigningInputFor(p Proof, bounds *Bounds, profile proofProfile) (si SigningInput, err error) {
 	defer closedResult(&err)
 	b, err := resolveBounds(bounds)
 	if err != nil {
@@ -160,8 +187,16 @@ func ProofSigningInput(p Proof, bounds *Bounds) (si SigningInput, err error) {
 		!validOperationName(p.Operation, b.OperationBytes) || !validHTM(p.Method, b.MethodBytes) {
 		return SigningInput{}, ErrInvalid
 	}
-	htu, err := uriNormalized(p.TargetURI, b)
+	var htu string
+	if profile == proofProfileLocalLoopbackHTTP {
+		htu, err = LocalLoopbackHTTPUriNormalize(p.TargetURI, &b)
+	} else {
+		htu, err = uriNormalized(p.TargetURI, b)
+	}
 	if err != nil {
+		return SigningInput{}, ErrInvalid
+	}
+	if htu != p.TargetURI {
 		return SigningInput{}, ErrInvalid
 	}
 	if len(p.HolderPublicKey) != b.PublicKeyBytes {
@@ -169,6 +204,11 @@ func ProofSigningInput(p Proof, bounds *Bounds) (si SigningInput, err error) {
 	}
 	if len(p.GrantCompact) == 0 || len(p.GrantCompact) > b.CompactBytes {
 		return SigningInput{}, ErrInvalid // producer ath compact-bytes bound
+	}
+	if profile == proofProfileLocalLoopbackHTTP {
+		if err := scanCompact(p.GrantCompact, b); err != nil {
+			return SigningInput{}, ErrInvalid
+		}
 	}
 	athRaw := sha256.Sum256([]byte(p.GrantCompact))
 	baReqRaw, err := requestDigestRaw(p.Operation, p.CastArguments, &b)
@@ -183,7 +223,7 @@ func ProofSigningInput(p Proof, bounds *Bounds) (si SigningInput, err error) {
 	if err != nil {
 		return SigningInput{}, ErrInvalid
 	}
-	protected, err := JcsEncode(Obj{{Key: "alg", Val: Str("EdDSA")}, {Key: "jwk", Val: jwkValue}, {Key: "typ", Val: Str("dpop+jwt")}}, &b)
+	protected, err := JcsEncode(Obj{{Key: "alg", Val: Str("EdDSA")}, {Key: "jwk", Val: jwkValue}, {Key: "typ", Val: Str(proofTyp(profile))}}, &b)
 	if err != nil {
 		return SigningInput{}, ErrInvalid
 	}
@@ -198,6 +238,9 @@ func ProofSigningInput(p Proof, bounds *Bounds) (si SigningInput, err error) {
 		{Key: "jti", Val: Str(p.ProofID)},
 		{Key: "v", Val: Int(1)},
 	}
+	if profile == proofProfileLocalLoopbackHTTP && !p.HasNonce {
+		return SigningInput{}, ErrInvalid
+	}
 	if p.HasNonce {
 		if len(p.Nonce) == 0 || len(p.Nonce) > b.NonceBytes {
 			return SigningInput{}, ErrInvalid
@@ -209,7 +252,11 @@ func ProofSigningInput(p Proof, bounds *Bounds) (si SigningInput, err error) {
 	if err != nil {
 		return SigningInput{}, ErrInvalid
 	}
-	return SigningInput{Kind: KindProof, Protected: protected, Payload: payload}, nil
+	kind := KindProof
+	if profile == proofProfileLocalLoopbackHTTP {
+		kind = KindLocalLoopbackHTTPProof
+	}
+	return SigningInput{Kind: kind, Protected: protected, Payload: payload}, nil
 }
 
 // BoundaryAnchorSigningInput composes the deterministic anchor signing input
@@ -317,7 +364,19 @@ func KeyTransitionSigningInput(t KeyTransition, bounds *Bounds) (si SigningInput
 // compact-bytes ceiling on the assembled output, and the kind-specific
 // re-parse (ADR 0018 decision 4). A nil bounds is the profile maximum.
 func AssembleCompact(si SigningInput, signature []byte, bounds *Bounds) (compact string, err error) {
+	return assembleCompactFor(si, signature, bounds, proofProfileStandard)
+}
+
+// AssembleLocalLoopbackHTTPCompact assembles only the loopback proof kind.
+func AssembleLocalLoopbackHTTPCompact(si SigningInput, signature []byte, bounds *Bounds) (compact string, err error) {
+	return assembleCompactFor(si, signature, bounds, proofProfileLocalLoopbackHTTP)
+}
+
+func assembleCompactFor(si SigningInput, signature []byte, bounds *Bounds, profile proofProfile) (compact string, err error) {
 	defer closedResult(&err)
+	if profile == proofProfileLocalLoopbackHTTP && si.Kind != KindLocalLoopbackHTTPProof {
+		return "", ErrInvalid
+	}
 	b, err := resolveBounds(bounds)
 	if err != nil {
 		return "", ErrInvalid
@@ -349,10 +408,23 @@ func AssembleCompact(si SigningInput, signature []byte, bounds *Bounds) (compact
 			return "", ErrInvalid
 		}
 	case KindProof:
-		if _, err := decodeProofHeader(parts, b); err != nil {
+		if profile != proofProfileStandard {
+			return "", ErrInvalid
+		}
+		if _, err := decodeProofHeaderFor(parts, b, proofProfileStandard); err != nil {
 			return "", ErrInvalid
 		}
 		if _, err := JsonDecode(parts.Payload, &b); err != nil {
+			return "", ErrInvalid
+		}
+	case KindLocalLoopbackHTTPProof:
+		if profile != proofProfileLocalLoopbackHTTP {
+			return "", ErrInvalid
+		}
+		if _, err := decodeProofHeaderFor(parts, b, proofProfileLocalLoopbackHTTP); err != nil {
+			return "", ErrInvalid
+		}
+		if _, err := decodeProofPayloadFor(parts, b, proofProfileLocalLoopbackHTTP); err != nil {
 			return "", ErrInvalid
 		}
 	case KindBoundaryAnchor:

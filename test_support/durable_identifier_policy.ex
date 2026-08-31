@@ -10,14 +10,23 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
                        "lib/bounded_authority_protocol/conformance/runner.ex",
                        "scripts/check_chain_archive_performance.exs",
                        "scripts/check_verification_performance.exs",
+                       "scripts/check_local_loopback_http.exs",
                        "scripts/check_spec_facts.exs",
                        "spec/tools/build_examples.exs",
                        "test/architecture/purity_test.exs",
                        "test/docs_guides_test.exs",
                        "test/bap_walkthrough_test.exs",
+                       "test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",
                        "test/docs_currency_test.exs",
                        "test/spec_facts_test.exs"
                      ])
+  @local_loopback_profile_paths MapSet.new([
+                                  "lib/bounded_authority_protocol/application_profile/local_loopback_http/v1.ex",
+                                  "lib/bounded_authority_protocol/application_profile/local_loopback_http/v1/uri.ex",
+                                  "priv/conformance/application-profiles/local-loopback-http/v1/index.json",
+                                  "priv/conformance/application-profiles/local-loopback-http/v1/profile.json",
+                                  "priv/conformance/application-profiles/local-loopback-http/v1/proof-cases.json"
+                                ])
   @requirement_ids "test/fixtures/durable_identifier_requirements.txt"
                    |> File.read!()
                    |> String.split()
@@ -177,6 +186,10 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
     ((name == "BoundedAuthorityProtocol.V1" or
         String.starts_with?(name, "BoundedAuthorityProtocol.V1.")) and
        current_major_source_path?(path)) or
+      (String.starts_with?(
+         name,
+         "BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1"
+       ) and local_loopback_profile_source_path?(path)) or
       (name == "BoundedAuthorityProtocol.Conformance.V1SchemaTest" and
          path == "test/conformance/v1_schema_test.exs")
   end
@@ -185,7 +198,8 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
 
   defp contract_identity?(_path, _kind, _name), do: false
 
-  defp current_major_path?(path, "v1"), do: current_major_source_path?(path)
+  defp current_major_path?(path, "v1"),
+    do: current_major_source_path?(path) or MapSet.member?(@local_loopback_profile_paths, path)
 
   defp current_major_path?(path, name) do
     {path, name} in [
@@ -193,8 +207,16 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
       {"docs/adr/0002-normative-v1-parsing-profile.md", "0002-normative-v1-parsing-profile"},
       {"docs/adr/0021-v1-all-selector-recognized-shapes-erratum.md",
        "0021-v1-all-selector-recognized-shapes-erratum"},
-      {"test/conformance/v1_schema_test.exs", "v1_schema_test"}
+      {"test/conformance/v1_schema_test.exs", "v1_schema_test"},
+      {"test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",
+       "v1_test"}
     ]
+  end
+
+  defp local_loopback_profile_source_path?(path) do
+    MapSet.member?(@local_loopback_profile_paths, path) or
+      path ==
+        "test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs"
   end
 
   defp current_major_source_path?(path) do
@@ -315,6 +337,7 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
 
   defp external_namespace_path?(path) do
     current_major_source_path?(path) or
+      MapSet.member?(@local_loopback_profile_paths, path) or
       MapSet.member?(@external_v1_paths, path) or
       path == "scripts/check_package.exs" or
       String.starts_with?(path, "test/conformance/") or

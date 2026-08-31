@@ -22,6 +22,24 @@ Filing is externally gated.
 - **Change controller:** Bounded Authority Protocol maintainers
 - **Wire `typ`:** `ba+cap`
 
+## application/ba-loopback-proof+jwt (active)
+
+- **Type name:** application
+- **Subtype name:** ba-loopback-proof+jwt
+- **Required parameters:** None
+- **Optional parameters:** None
+- **Encoding considerations:** Compact JWS (RFC 7515) serialization of a closed JSON object; UTF-8; base64url segments; binary-safe
+- **Security considerations:** See the Security and Host Obligations of the BAP Local Loopback HTTP Proof Profile 1
+- **Interoperability considerations:** The payload is a closed profile; unknown members are non-conforming; the profile is only for exact literal-loopback HTTP targets
+- **Published specification:** spec/bap-local-loopback-http-v1.md (BAP Local Loopback HTTP Proof Profile 1)
+- **Applications that use this media type:** Proof-of-possession authority verification for direct literal-loopback HTTP application transports
+- **Fragment identifier considerations:** N/A
+- **Intended usage:** LIMITED USE
+- **Restrictions on usage:** Exact literal-loopback HTTP targets only
+- **Author:** Bounded Authority Protocol maintainers
+- **Change controller:** Bounded Authority Protocol maintainers
+- **Wire `typ`:** `ba+loopback-proof`
+
 ## application/ba-chain-anchor+jwt (active)
 
 - **Type name:** application

@@ -67,7 +67,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsTest do
 
     # Every live field must appear in the extracted table (a dropped row is silent loosening).
     covered_fields =
-      Enum.flat_map(extracted, fn {label, value} ->
+      Enum.flat_map(extracted, fn {label, _value} ->
         case label do
           @widths_row -> @widths_fields
           _ -> [@label_to_field[label]]

@@ -64,6 +64,27 @@ class names, so a verifier that skips that check would accept it — confirmed r
 implementations before it is normative (a wrong invalid vector silently certifies nonconforming
 verifiers, so it is worse than a missing one). BAP-06 owns immutable candidate-archive proof.
 
+## Local-loopback HTTP application profile
+
+The byte-distinct profile `bap-application-proof/local-loopback-http/1` has its own certified corpus
+under `priv/conformance/application-profiles/local-loopback-http/v1`. `index.json` SHA-256 binds the
+profile fixture and proof-case file. The corpus contains public keys and signed compacts but no
+private key, seed, nonce reservation state, production identifier, or endpoint.
+
+Elixir, TypeScript, Python, Rust, and Go consume the same files. They agree on URI verdicts,
+deterministic producer and assembly bytes, local-versus-standard decode, mandatory nonce, exact
+envelope verification, and meaningful signature/header/payload mutations. The complete 283-case
+standard corpus still runs unchanged; this profile is additive and cannot alter a `dpop+jwt`
+verdict.
+
+`mix local_loopback_http.verify` is the release transport gate. It opens real ephemeral HTTP
+listeners on `127.0.0.1` and `::1`, derives expected targets from listener `sockname` plus the HTTP
+request line, signs with fresh in-memory Ed25519 keys, verifies through the public profile API, and
+prints a secret-free JSON receipt. It uses no mock server, proxy, canned response, private fixture,
+or forwarded-header input. Passing this drill proves only direct local transport composition; the
+adopting authority runtime still owns nonce/invocation reservation, trust configuration, replay,
+revocation, and effects.
+
 BAP-04's public-only chain/archive corpus includes genesis, continuation, same-key boundaries,
 one-step rollover, multi-step rollover, same-ID/equal-time rollover, and separately valid
 shortened, relinked-omission, signed cross-chain, signed reverse-time, and signed

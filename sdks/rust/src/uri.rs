@@ -127,6 +127,75 @@ pub fn uri_normalize(text: &str, bounds: &Bounds) -> Result<String> {
     Ok(normalized)
 }
 
+/// Normalize the byte-distinct local-development profile's exact loopback HTTP target.
+pub fn local_loopback_http_uri_normalize(text: &str, bounds: &Bounds) -> Result<String> {
+    if text.len() as u64 > bounds.uri_bytes() {
+        return Err(Invalid);
+    }
+    let bytes = text.as_bytes();
+    if bytes
+        .iter()
+        .any(|&byte| !(0x21..=0x7e).contains(&byte) || byte == b'?' || byte == b'#')
+    {
+        return Err(Invalid);
+    }
+
+    let scheme_end = bytes
+        .windows(3)
+        .position(|window| window == b"://")
+        .ok_or(Invalid)?;
+    if !bytes[..scheme_end].eq_ignore_ascii_case(b"http") {
+        return Err(Invalid);
+    }
+    let rest = &bytes[scheme_end + 3..];
+    let (authority, raw_path) = match rest.iter().position(|&byte| byte == b'/') {
+        Some(index) => (&rest[..index], &rest[index..]),
+        None => (rest, &[][..]),
+    };
+
+    let (host, raw_port) = if authority == b"127.0.0.1" || authority == b"[::1]" {
+        (authority, None)
+    } else if let Some(port) = authority.strip_prefix(b"127.0.0.1:") {
+        (b"127.0.0.1".as_slice(), Some(port))
+    } else if let Some(port) = authority.strip_prefix(b"[::1]:") {
+        (b"[::1]".as_slice(), Some(port))
+    } else {
+        return Err(Invalid);
+    };
+
+    let port = match raw_port {
+        None => None,
+        Some(bytes) => {
+            if bytes.is_empty() || !bytes.iter().all(u8::is_ascii_digit) {
+                return Err(Invalid);
+            }
+            let value: u32 = std::str::from_utf8(bytes)
+                .map_err(|_| Invalid)?
+                .parse()
+                .map_err(|_| Invalid)?;
+            if !(1..=65_535).contains(&value) {
+                return Err(Invalid);
+            }
+            (value != 80).then_some(value)
+        }
+    };
+
+    let path = normalize_path(raw_path)?;
+    let mut out = Vec::new();
+    out.extend_from_slice(b"http://");
+    out.extend_from_slice(host);
+    if let Some(port) = port {
+        out.push(b':');
+        out.extend_from_slice(port.to_string().as_bytes());
+    }
+    out.extend_from_slice(&path);
+    let normalized = String::from_utf8(out).map_err(|_| Invalid)?;
+    if normalized.len() as u64 > bounds.uri_bytes() {
+        return Err(Invalid);
+    }
+    Ok(normalized)
+}
+
 // ============================================================================
 // Authority — RFC 3986 §3.2: [ userinfo "@" ] host [ ":" port ]
 // ============================================================================

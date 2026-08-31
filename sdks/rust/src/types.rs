@@ -47,6 +47,8 @@ pub enum SigningKind {
     Grant,
     /// A proof compact (`typ: "ba+cap-proof"`).
     Proof,
+    /// A byte-distinct literal-loopback HTTP proof (`typ: "ba+loopback-proof"`).
+    LocalLoopbackHttpProof,
     /// A signed consumption-chain boundary anchor.
     ChainAnchor,
     /// A signed historical-key transition.
@@ -71,6 +73,7 @@ impl SigningKind {
         Ok(match s {
             "grant" => Self::Grant,
             "proof" => Self::Proof,
+            "local_loopback_http_proof" => Self::LocalLoopbackHttpProof,
             "chain_anchor" => Self::ChainAnchor,
             "key_transition" => Self::KeyTransition,
             _ => return Err(Invalid),
@@ -732,6 +735,25 @@ pub struct ProofInput {
     pub holder_public_key: [u8; 32],
     /// Proof `iat` (integral NumericDate).
     pub issued_at: i64,
+}
+
+/// Producer input for the byte-distinct local-loopback HTTP application proof.
+///
+/// The nonce is mandatory for this profile. The remaining claims deliberately
+/// reuse the BAP v1 proof claim schema while the signed `typ` and signing kind
+/// keep these bytes outside the standard `dpop+jwt` verifier namespace.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LocalLoopbackHttpProofInput {
+    pub proof_id: String,
+    pub method: String,
+    pub target_uri: String,
+    pub invocation_id: String,
+    pub operation: String,
+    pub cast_arguments: JsonValue,
+    pub grant_compact: Vec<u8>,
+    pub holder_public_key: [u8; 32],
+    pub issued_at: i64,
+    pub nonce: String,
 }
 
 #[cfg(test)]

@@ -447,7 +447,7 @@ defmodule BoundedAuthorityProtocol.Conformance.ConsumptionChainArchiveVectorTest
 
   defp split_archive(bytes, chunks) do
     width = min(17, byte_size(bytes))
-    <<chunk::binary-size(width), rest::binary>> = bytes
+    <<chunk::binary-size(^width), rest::binary>> = bytes
     split_archive(rest, [chunk | chunks])
   end
 

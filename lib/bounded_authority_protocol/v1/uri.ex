@@ -3,6 +3,7 @@ defmodule BoundedAuthorityProtocol.V1.Uri do
   Pure bounded normalization for hierarchical HTTPS DPoP target URIs.
   """
 
+  alias BoundedAuthorityProtocol.UriPath
   alias BoundedAuthorityProtocol.V1.Bounds
 
   @unreserved ~c"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
@@ -16,7 +17,7 @@ defmodule BoundedAuthorityProtocol.V1.Uri do
          true <- ascii_uri?(uri),
          {:ok, authority, raw_path} <- split_https(uri),
          {:ok, host, port} <- normalize_authority(authority),
-         {:ok, path} <- normalize_path(raw_path),
+         {:ok, path} <- UriPath.normalize(raw_path),
          normalized <- build_uri(host, port, path),
          true <- byte_size(normalized) <= bounds.uri_bytes do
       {:ok, normalized}
@@ -252,77 +253,6 @@ defmodule BoundedAuthorityProtocol.V1.Uri do
       if value in 1..65_535, do: {:ok, value}, else: {:error, :invalid}
     else
       {:error, :invalid}
-    end
-  end
-
-  defp normalize_path(<<>>), do: {:ok, <<"/">>}
-
-  defp normalize_path(<<?/, _rest::binary>> = path) do
-    with {:ok, percent_normalized} <- normalize_path_bytes(path, []),
-         normalized <- remove_dot_segments(percent_normalized, <<>>),
-         true <- normalized != <<>> do
-      {:ok, normalized}
-    else
-      _failure -> {:error, :invalid}
-    end
-  end
-
-  defp normalize_path_bytes(<<>>, accumulator),
-    do: {:ok, accumulator |> Enum.reverse() |> :erlang.iolist_to_binary()}
-
-  defp normalize_path_bytes(<<?%, high, low, rest::binary>>, accumulator)
-       when high in ~c"0123456789ABCDEFabcdef" and low in ~c"0123456789ABCDEFabcdef" do
-    byte = hex_value(high) * 16 + hex_value(low)
-
-    encoded =
-      if byte in @unreserved do
-        <<byte>>
-      else
-        <<?%, upper_hex(high), upper_hex(low)>>
-      end
-
-    normalize_path_bytes(rest, [encoded | accumulator])
-  end
-
-  defp normalize_path_bytes(<<?%, _rest::binary>>, _accumulator), do: {:error, :invalid}
-
-  defp normalize_path_bytes(<<byte, rest::binary>>, accumulator)
-       when byte in @unreserved or byte in @sub_delims or byte in ~c"/:@" do
-    normalize_path_bytes(rest, [<<byte>> | accumulator])
-  end
-
-  defp normalize_path_bytes(_path, _accumulator), do: {:error, :invalid}
-
-  defp remove_dot_segments(<<"/./", rest::binary>>, output),
-    do: remove_dot_segments(<<"/", rest::binary>>, output)
-
-  defp remove_dot_segments(<<"/.">>, output), do: output <> <<"/">>
-
-  defp remove_dot_segments(<<"/../", rest::binary>>, output),
-    do: remove_dot_segments(<<"/", rest::binary>>, remove_last_segment(output))
-
-  defp remove_dot_segments(<<"/..">>, output), do: remove_last_segment(output) <> <<"/">>
-  defp remove_dot_segments(<<>>, output), do: output
-
-  defp remove_dot_segments(path, output) do
-    length = first_segment_length(path)
-    <<segment::binary-size(^length), rest::binary>> = path
-    remove_dot_segments(rest, output <> segment)
-  end
-
-  defp first_segment_length(<<?/, rest::binary>>), do: 1 + until_slash(rest, 0)
-  defp until_slash(<<>>, count), do: count
-  defp until_slash(<<?/, _rest::binary>>, count), do: count
-  defp until_slash(<<_byte, rest::binary>>, count), do: until_slash(rest, count + 1)
-
-  defp remove_last_segment(output) do
-    case :binary.matches(output, <<"/">>) do
-      [] ->
-        <<>>
-
-      matches ->
-        {index, 1} = List.last(matches)
-        binary_part(output, 0, index)
     end
   end
 

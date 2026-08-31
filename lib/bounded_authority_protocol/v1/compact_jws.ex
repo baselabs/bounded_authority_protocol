@@ -89,7 +89,13 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
   end
 
   defp valid_kind_and_segments?(input) do
-    input.kind in [:grant, :proof, :boundary_anchor, :key_transition] and
+    input.kind in [
+      :grant,
+      :proof,
+      :local_loopback_http_proof,
+      :boundary_anchor,
+      :key_transition
+    ] and
       is_binary(input.protected_segment) and
       is_binary(input.payload_segment) and is_binary(input.message) and
       byte_size(input.protected_segment) > 0 and byte_size(input.payload_segment) > 0
@@ -129,6 +135,26 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
         "alg" => {:string, "EdDSA"},
         "jwk" => jwk,
         "typ" => {:string, "dpop+jwt"}
+      } ->
+        with {:ok, encoded_jwk} <- Jcs.encode(jwk, bounds),
+             {:ok, _public_key} <- Jwk.decode_public(encoded_jwk, bounds) do
+          true
+        else
+          _invalid -> false
+        end
+
+      _invalid ->
+        false
+    end
+  end
+
+  defp exact_signing_header?(:local_loopback_http_proof, members, bounds)
+       when length(members) == 3 do
+    case Map.new(members) do
+      %{
+        "alg" => {:string, "EdDSA"},
+        "jwk" => jwk,
+        "typ" => {:string, "ba+loopback-proof"}
       } ->
         with {:ok, encoded_jwk} <- Jcs.encode(jwk, bounds),
              {:ok, _public_key} <- Jwk.decode_public(encoded_jwk, bounds) do

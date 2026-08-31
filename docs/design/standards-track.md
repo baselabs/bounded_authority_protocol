@@ -25,18 +25,21 @@ prefix and are traced to conformance cells in the requirement map
 
 ## The evolution contract
 
-The wire profile is closed: a conforming verifier rejects every unlisted member, value, encoding,
+Each wire profile is closed: a conforming verifier rejects every unlisted member, value, encoding,
 or extension. That posture is permanent (`REQ1-EVO-closed-format-permanent`). It is what
 structurally kills the `alg:"none"`, `crit`-confusion, and permissive-compatibility class that
 destroyed the security reputation of prior token formats, and no evolution need weakens it.
-Evolution therefore happens **above** the wire format, through parallel contract-majors, never
-through in-place extension of an open format (`REQ1-EVO-evolution-above-wire`).
+Evolution therefore happens through complete parallel contract-majors or the byte-distinct sibling
+proof-profile class defined by [ADR 0027](../adr/0027-byte-distinct-application-proof-profiles.md),
+never by widening an existing profile in place (`REQ1-EVO-evolution-above-wire`). A sibling profile
+has a new signed `typ`, separate normative/corpus/API identity, and is rejected by every existing
+profile; it is not an erratum or alternate interpretation of existing bytes.
 
 ### Self-declaration and negotiation
 
-Every artifact already declares its contract-major mechanically: the `v` claim, the `typ` header,
-and the version-bound domain separators (`BAP1-REQUEST\0` and siblings). A verifier detects the
-major of any artifact from its bytes alone. Negotiation is therefore discovery, not handshake:
+Every artifact declares its contract-major and exact profile mechanically: the `v` claim, protected
+`typ` header, and version-bound domain separators (`BAP1-REQUEST\0` and siblings). A verifier detects
+the profile of any artifact from its bytes alone. Negotiation is therefore discovery, not handshake:
 
 - A verifying deployment publishes the set of contract-majors it accepts (the discovery-document
   shape is defined at first external submission; its name is reserved in the
@@ -48,6 +51,9 @@ major of any artifact from its bytes alone. Negotiation is therefore discovery, 
 - Acceptance of an older major never weakens a newer one: each accepted major is verified under its
   own complete closed profile. There is no cross-major fallback, no downgrade path, and no
   best-effort parsing (`REQ1-EVO-no-downgrade`).
+- Acceptance of a byte-distinct sibling proof profile is an explicit deployment choice through its
+  separately named API. A deployment never infers it from URI or request metadata and never retries
+  another profile after failure (ADR 0027).
 
 ### Parallel-version support and deprecation
 
@@ -70,13 +76,13 @@ Successor contract-majors overlap rather than flag-day:
 
 ### Registries
 
-Two things genuinely vary within the protocol's lifetime and are governed by
-[registries](registries.md) rather than by code: **operation-name conventions** and **selector
-kinds**. The registries also carry reserved claim names, `typ` values, and cryptographic suite
-identifiers. Reservation is cheap and immediate; activation of reserved semantics arrives only
-with a contract-major. This is how the closed wire format and forward compatibility coexist: names
-are coordinated ahead of time so independent implementers never collide, while the bytes of the
-current major never widen.
+Operation-name conventions and selector kinds genuinely vary within the protocol's lifetime and are
+governed by [registries](registries.md) rather than by code. The registries also carry reserved
+claim names, `typ` values, application-proof profiles, and cryptographic suite identifiers.
+Reservation is cheap and immediate. Reserved shared claims, selector kinds, and suite semantics
+activate only with a contract-major. A byte-distinct sibling proof `typ` may activate under ADR 0027
+because it creates a new closed profile and every existing profile continues to reject it. Names are
+coordinated so independent implementers never collide while no accepted byte changes meaning.
 
 ## Cryptographic suite identity
 
@@ -133,7 +139,7 @@ missing corpus case, and the mapping exposes which.
 ## Registrations
 
 The protocol's claim names (`ba_inv`, `ba_op`, `ba_req`) and `typ` values (`ba+cap`,
-`ba+chain-anchor`, `ba+key-transition`) are currently unregistered. For the standards track they
+`ba+loopback-proof`, `ba+chain-anchor`, `ba+key-transition`) are currently unregistered. For the standards track they
 are registered with IANA — the JWT Claims registry and the media-type suffix conventions
 respectively — both for collision safety and because registration is the visible signal of a
 standards posture rather than a vendor format. Registration templates are prepared as their own
@@ -210,9 +216,9 @@ audit story has a designed home.
 Published now, while the project is single-maintainer, because publishing the policy is the
 credibility step and the policy is what makes single-maintainer tolerable to adopters:
 
-- **Change classes.** Editorial (errata; never verdict-changing) · clarifying (minor version;
-  additive docs/cases only) · wire or verification behavior (contract-major only, with a public
-  ADR).
+- **Change classes.** The normative classes live in
+  [governance.md](../governance.md), including ADR 0027's byte-distinct sibling-proof-profile class;
+  existing-profile wire or verification changes remain contract-major only.
 - **Change control.** Every product-shaping decision lands as a numbered public ADR. Once at least
   two independent external implementations pass the conformance corpus, contract-major ADRs gain a
   published comment window of no fewer than thirty days and a change-control group with implementer

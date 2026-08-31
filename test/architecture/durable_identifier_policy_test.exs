@@ -30,7 +30,17 @@ defmodule BoundedAuthorityProtocol.Architecture.DurableIdentifierPolicyTest do
             kind: :requirement_id,
             name: "REQ1-HEADER-issuer-fingerprint"
           },
-          %{path: "priv/conformance/v1/corpus/index.json", kind: :wire_field, name: ~s("v": 1)}
+          %{path: "priv/conformance/v1/corpus/index.json", kind: :wire_field, name: ~s("v": 1)},
+          %{
+            path: "lib/bounded_authority_protocol/application_profile/local_loopback_http/v1.ex",
+            kind: :module,
+            name: "BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1"
+          },
+          %{
+            path: "priv/conformance/application-profiles/local-loopback-http/v1/index.json",
+            kind: :path,
+            name: "v1"
+          }
         ] do
       assert :ok = DurableIdentifierPolicy.check(fixture)
     end
@@ -72,6 +82,11 @@ defmodule BoundedAuthorityProtocol.Architecture.DurableIdentifierPolicyTest do
             path: "docs/example.md",
             kind: :package_source_ref,
             name: ~s(source_ref: "v\#{@version}")
+          },
+          %{
+            path: "lib/bounded_authority_protocol/application_profile/local_loopback_http/v2.ex",
+            kind: :module,
+            name: "BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V2"
           }
         ] do
       assert {:error, :implementation_lifecycle_identifier} =

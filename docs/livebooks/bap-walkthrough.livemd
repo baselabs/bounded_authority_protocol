@@ -5,8 +5,13 @@ livebook:{"persist_outputs":true}
 # Bounded Authority Protocol — end-to-end walkthrough
 
 ```elixir
-Mix.install([{:bounded_authority_protocol, "~> 0.2"}])
+Mix.install([
+  {:bounded_authority_protocol, "~> 0.3.0"}
+])
 ```
+
+Run this notebook after the separately authorized Hex 0.3.0 publication and registry read-back.
+The source tag is reviewable release evidence, not a substitute package identity.
 
 ## What this notebook covers
 
@@ -195,6 +200,91 @@ results = %{
 Enum.map(results, fn {k, v} -> {k, v == {:error, :invalid}} end)
 ```
 
+## 7. Produce and verify the local-loopback application proof
+
+The local-development profile is byte-distinct from standard `dpop+jwt`. It accepts only
+canonical literal-loopback HTTP targets and requires a server nonce. The target below represents
+a direct listener-derived request target; never substitute `localhost`, a forwarding header, or a
+client-asserted authority.
+
+```elixir
+alias BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1, as: LocalLoopback
+
+loopback_target = "http://127.0.0.1:4000/invoke"
+loopback_nonce = "challenge-loopback-001"
+
+{:ok, ^loopback_target} = LocalLoopback.normalize_uri(loopback_target, %{})
+
+loopback_proof = %Proof{
+  holder_public_key: holder_public,
+  proof_id: "proof-loopback-2026-001",
+  method: "POST",
+  target_uri: loopback_target,
+  issued_at: now,
+  nonce: loopback_nonce,
+  invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120003",
+  operation: "read_record",
+  grant_compact: grant_compact,
+  cast_arguments:
+    {:object,
+     [
+       {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
+     ]}
+}
+
+{:ok, loopback_input} = LocalLoopback.proof_signing_input(loopback_proof, %{})
+
+loopback_signature =
+  :crypto.sign(:eddsa, :none, loopback_input.message, [holder_private, :ed25519])
+
+{:ok, loopback_compact} =
+  LocalLoopback.assemble_compact(loopback_input, loopback_signature)
+
+loopback_credentials = %Credentials{grant: grant_compact, proof: loopback_compact}
+
+loopback_expected = %ExpectedRequest{
+  trusted_issuer: trusted,
+  issuer: "https://issuer.example",
+  audience: "https://service.example",
+  method: "POST",
+  target_uri: loopback_target,
+  invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120003",
+  operation: "read_record",
+  cast_arguments: loopback_proof.cast_arguments,
+  evaluation_time: now,
+  clock_skew: 60,
+  proof_max_age: 300,
+  nonce: {:required, loopback_nonce},
+  bounds: %{}
+}
+
+{:ok, loopback_facts} =
+  LocalLoopback.check_envelope(loopback_credentials, loopback_expected)
+
+Map.from_struct(loopback_facts) |> Map.take([:target_uri, :operation, :authorization])
+```
+
+## 8. Cross-profile, wrong-nonce, and hostname attempts fail closed
+
+```elixir
+loopback_rejections = %{
+  wrong_nonce:
+    LocalLoopback.check_envelope(
+      loopback_credentials,
+      %{loopback_expected | nonce: {:required, "wrong-nonce"}}
+    ),
+  standard_profile:
+    BoundedAuthorityProtocol.V1.check_envelope(loopback_credentials, loopback_expected),
+  hostname: LocalLoopback.normalize_uri("http://localhost:4000/invoke", %{})
+}
+
+Enum.map(loopback_rejections, fn {k, v} -> {k, v == {:error, :invalid}} end)
+```
+
+This notebook exercises the pure profile APIs. The repository's
+`mix local_loopback_http.verify` gate separately opens real IPv4 and IPv6 listeners and proves a
+verifier-bypass mutation RED. Loopback HTTP is not TLS and does not isolate another local process.
+
 
 
 ## What you just saw
@@ -205,6 +295,8 @@ Enum.map(results, fn {k, v} -> {k, v == {:error, :invalid}} end)
   inputs and returned redacted, non-authorizing facts.
 - A tampered byte, a selector-disallowed argument swap, and a stale proof each failed closed
   with the single error value.
+- The local-loopback profile produced and verified byte-distinct proof bytes with a required nonce;
+  the wrong nonce, the standard verifier, and a hostname target each failed closed.
 
 What this notebook did NOT do: select trusted keys, reserve replay, check revocation, or make
 an authorization decision — those belong to a stateful authority runtime. See the
