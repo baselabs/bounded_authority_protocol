@@ -65,7 +65,13 @@ def test_local_loopback_http_uri_profile_accepts_only_exact_loopback_literals() 
 
     forged = Bounds({"uri_bytes": 9000})
     assert not local_loopback_http_uri_normalize(b"http://127.0.0.1/", forged).is_ok
-    assert uri_normalize(b"https://resource.example.test/[]").is_ok
+
+    for invalid_standard_path in [
+        b"https://resource.example.test/[]",
+        b"https://resource.example.test/a|b",
+        b'https://resource.example.test/a"b',
+    ]:
+        assert not uri_normalize(invalid_standard_path).is_ok
 
 
 def _keypair() -> tuple[bytes, Ed25519PrivateKey]:

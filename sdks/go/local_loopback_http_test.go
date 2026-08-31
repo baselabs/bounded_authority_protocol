@@ -210,8 +210,8 @@ func TestCertifiedLocalLoopbackCorpusDrivesGoVerdicts(t *testing.T) {
 	standardProof := proof
 	standardProof.TargetURI = "https://resource.example.test/invoke"
 	standardProof.GrantCompact = "not-a-compact"
-	if _, err := ProofSigningInput(standardProof, nil); err != nil {
-		t.Fatal("local profile changed the standard producer's bounded opaque grant behavior")
+	if _, err := ProofSigningInput(standardProof, nil); err == nil {
+		t.Fatal("standard producer hashed a malformed grant compact")
 	}
 	standardProof.GrantCompact = proof.GrantCompact
 	standardInput, err := ProofSigningInput(standardProof, nil)
@@ -219,8 +219,8 @@ func TestCertifiedLocalLoopbackCorpusDrivesGoVerdicts(t *testing.T) {
 		t.Fatal(err)
 	}
 	standardInput.Payload = []byte("{}")
-	if _, err := AssembleCompact(standardInput, signature, nil); err != nil {
-		t.Fatal("standard assembler no longer preserves its header-plus-JSON payload contract")
+	if _, err := AssembleCompact(standardInput, signature, nil); err == nil {
+		t.Fatal("standard assembler accepted an invalid proof payload")
 	}
 	if _, err := ProofSigningInput(proof, nil); err == nil {
 		t.Fatal("standard producer accepted loopback HTTP target")

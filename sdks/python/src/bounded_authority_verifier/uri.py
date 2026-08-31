@@ -143,7 +143,7 @@ def _normalize(data: bytes, bounds: Bounds) -> str:
             fail("uri: port range")
         port = b"" if port_number == 443 else f":{port_number}".encode("ascii")
 
-    normalized_path = _normalize_path(m.group(3))
+    normalized_path = _normalize_path(m.group(3), enforce_pchar=True)
     return f"https://{host.decode('ascii')}{port.decode('ascii')}{normalized_path.decode('ascii')}"
 
 

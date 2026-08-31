@@ -23,8 +23,12 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Compatibility and distribution
 
-- Standard v1 remains byte- and verdict-identical: its 283-case corpus and every standard
-  `dpop+jwt` API continue unchanged. Profile selection is explicit and fail-closed.
+- Standard v1's normative bytes and all 283 certified corpus verdicts remain unchanged. Profile
+  selection is explicit and fail-closed.
+- Correct three pre-release SDK conformance defects without changing the normative standard
+  profile: TypeScript and Python now reject non-RFC-3986 path characters like the Elixir, Rust,
+  and Go verifiers; the Go proof producer scans the grant compact before hashing it; and the Go
+  standard assembler validates the complete proof payload rather than JSON shape alone.
 - `v0.3.0` identifies the exact source release. Hex archive publication and registry checksum
   read-back are separate release actions; consumers must not adopt from the tag or a mutable
   checkout as though either were an immutable package identity.
