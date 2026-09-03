@@ -4,6 +4,16 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Changed — repository hygiene
+
+- Retire the legacy `.forge/` artifact tree. The tracked critical-surface declaration
+  moves to `.kimosabe/critical-surfaces` (the path the current kimosabe guards read;
+  ADR 0011's decision stands, only the manifest location changes), and the stale
+  `.gitignore` forge exception lines are removed. The four forge-era project memory
+  notes are ported verbatim to the local `.kimosabe/memory/`; all other forge-era
+  process artifacts were local-only superseded residue. No code, wire, bound, or
+  verdict change.
+
 ## [0.3.0] — 2026-08-30
 
 ### Added — byte-distinct local-loopback HTTP application proof
