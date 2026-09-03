@@ -152,6 +152,12 @@ jobs:
         with:
           ocaml-compiler: "5.1"
 
+      # opam depext apt-installs system packages (libgtk2.0-dev et al.); the runner
+      # image's apt index can be stale enough that those fetches 404 against the
+      # moved Ubuntu archive (observed 2026-09-03). Refresh before installing.
+      - name: Refresh apt index for opam depext
+        run: sudo apt-get update
+
       - name: Install pinned ProVerif 2.05
         run: opam install proverif.2.05 -y
 
