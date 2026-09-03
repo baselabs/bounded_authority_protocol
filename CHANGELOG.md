@@ -4,6 +4,17 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Closed — BAP-19 publication (status-record reconciliation)
+
+- Record the 2026-08-31 owner-authorized Hex publication and registry read-back that executed
+  without a tracked record: release 0.3.0 (registry insert 2026-08-31T06:08:42Z, source commit
+  `c76b031` = peeled `v0.3.0`), registry checksum
+  `029ee7d75641850e330d12ac41fcc24fe026f65694ad28f4ea120d871114ff89` equal to the tagged-tree
+  two-build candidate, the served tarball, and a fresh external `~> 0.3.0` consumer resolution;
+  served 187-file census byte-identical to the tagged tree; hexdocs live. BAP-19 closes; the
+  README, getting-started guide, and Livebook installation prose now state the package resolves
+  from the public registry. Zero code, wire, bound, or verdict change.
+
 ### Changed — repository hygiene
 
 - Retire the legacy `.forge/` artifact tree. The tracked critical-surface declaration

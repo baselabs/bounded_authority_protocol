@@ -10,8 +10,9 @@ Mix.install([
 ])
 ```
 
-Run this notebook after the separately authorized Hex 0.3.0 publication and registry read-back.
-The source tag is reviewable release evidence, not a substitute package identity.
+Hex 0.3.0 is published (2026-08-31), so the `Mix.install` above resolves from the public
+registry. The immutable package identity is the published Hex release; the source tag is
+reviewable release evidence, not a substitute for it.
 
 ## What this notebook covers
 

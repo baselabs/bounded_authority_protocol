@@ -814,8 +814,18 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   stub, or canned HTTP peer is used.
 - `v0.3.0` fixes the reviewed source identity and ships the normative profile, certified corpus,
   README, guides, and runnable Livebook. The standard 283-case corpus is unchanged.
-- BAP-19 remains open only for immutable Hex publication and registry checksum/read-back. A
-  downstream adopter must consume that package identity, never this tag or a mutable checkout.
+- BAP-19 closed 2026-08-31 by owner-authorized Hex publication and registry read-back. The
+  release is `bounded_authority_protocol` 0.3.0 (registry insert 2026-08-31T06:08:42Z, source
+  commit `c76b0316ddd9797cfa1223a9b1076f4860e164f0` = peeled tag `v0.3.0`); the registry checksum
+  `029ee7d75641850e330d12ac41fcc24fe026f65694ad28f4ea120d871114ff89` equals the tagged-tree
+  two-build `release.candidate` digest, the served tarball sha256, and the checksum a fresh
+  external `~> 0.3.0` consumer resolved and pinned from hexpm; the served 187-file census is
+  byte-identical to the tagged tree; hexdocs is live for 0.3.0. These facts re-derive from the
+  public registry (hex.pm package page, checksums endpoint, hexdocs) — the local execution
+  record with the full gate snapshot is
+  `.kimosabe/reviews/2026-08-31-hex-0.3.0-publication-receipts.md` (gitignored). A downstream
+  adopter must consume that package identity, never this tag or a mutable checkout; adoption
+  itself is the private runtime's out-of-repo follow-up, not a BAP-19 deliverable.
 
 ## Next action
 
@@ -857,8 +867,9 @@ successor-major under ADR 0010.
 BAP-19's source-release unit is complete at `v0.3.0`. Its application-proof profile uses protected
 `typ: "ba+loopback-proof"` and a separately named API, admits only canonical `http://127.0.0.1`
 and `http://[::1]` targets, and requires a server nonce. The standard `dpop+jwt` API remains closed
-against these bytes. The row and any downstream adoption remain open until the immutable Hex
-archive is published and its package/checksum identity is read back under separate authorization.
+against these bytes. The row closed 2026-08-31 with the owner-authorized Hex publication and
+registry checksum read-back (release 0.3.0, registry checksum `029ee7d7…ff89` — closeout evidence
+above); downstream adoption is the private runtime's separate follow-up, not a BAP-19 deliverable.
 
 The standards track charter (ADR 0006, [standards-track.md](design/standards-track.md)) gates that
 cannot be retrofitted after third parties implement the profile are now closed: BAP-10 (normative

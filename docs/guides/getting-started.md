@@ -13,7 +13,7 @@ normative profile; this guide is operational.
 
 ## Installation
 
-After 0.3.0 is separately published to Hex and the registry exposes the immutable archive:
+The package is published on Hex (release 0.3.0, published 2026-08-31):
 
 ```elixir
 defp deps do
@@ -21,8 +21,9 @@ defp deps do
 end
 ```
 
-`v0.3.0` is the reviewable source release; it does not stand in for an immutable Hex package
-identity, and the dependency above does not resolve before publication and registry read-back.
+`v0.3.0` is the reviewable source release; the immutable package identity is the published Hex
+release, whose registry checksum was read back against the tagged-tree build. Depend on the
+package identity — never a tag or a mutable checkout.
 
 Zero runtime dependencies. The verification surfaces live under `BoundedAuthorityProtocol.V1`.
 
