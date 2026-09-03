@@ -53,7 +53,8 @@ not deferred (§2).
 - Comparison is by NUMERIC VALUE on finite IEEE 754 binary64 — language-independent and
   totally ordered on the finite domain, so every verifier SDK implements the same verdict
   without a profile-defined order derivation. Under IEEE 754 numeric comparison `−0.0 = 0.0`;
-  this is comparison semantics, distinct from JCS byte identity (where `-0` and `0` differ).
+  JCS likewise serializes both as `0` (RFC 8785 §3.2.2.3, the `Number::toString` rule), so
+  signed zero distinguishes no authority in either dimension.
 - Non-finite operands cannot occur: JSON grammar carries no `NaN`/`Infinity` literal, and the
   bounded decoder's numeric domain (`REQ1-JSON-number-bounds`, finite binary64 floats) rejects
   everything else at decode.
@@ -107,9 +108,12 @@ of the existing selector algebra:
 
 ### 6. Facts: no change
 
-Selector matching is verdict-internal — `match_all` runs inside `check_envelope`
-(`runtime.ex:547`) and inside grant verification, and its outcome only contributes to the
-accept/reject verdict. `GrantFacts` and `EnvelopeFacts` shapes are unchanged; in particular a
+Selector matching is verdict-internal — `Selector.match_all/3` runs only inside envelope
+proof verification (`verify_proof_parsed/5`, reached from `check_envelope/2`;
+`runtime.ex:547`), where the typed cast arguments exist; the standalone `verify_grant/3`
+path (`runtime.ex:217` → `verify_grant_parsed/4`) checks signature, issuer, audience, and
+times only and never evaluates selectors — a verified grant is not a selector-checked grant.
+The match outcome only contributes to the accept/reject verdict. `GrantFacts` and `EnvelopeFacts` shapes are unchanged; in particular a
 range bound is a payload magnitude read from the `DecodedGrant` of the same verified bytes
 (the [ADR 0016](0016-offline-eligible-grant-claims.md) §3 discipline — value-bearing
 magnitudes are never facts), and there is no `allowed?`/`decision` anywhere (critical rule 1).
@@ -202,9 +206,13 @@ review of §4.
 
 ## Consequences
 
-- The reserved `lte`/`gte` kinds are REJECTED by the current major's closed profile at all
-  three choke points (decode kind dispatch, producer arm fall-through, matcher fall-through),
-  proven by the T1/T2 tripwires and both executed mutation classes above.
+- The reserved `lte`/`gte` kinds are REJECTED by the current major's closed profile at the
+  three wire-profile choke points (decode kind dispatch, producer arm fall-through, matcher
+  fall-through), proven by the T1/T2 tripwires and both executed mutation classes above. A
+  fourth kind-sensitive site exists outside the wire profile: the conformance corpus
+  runner's selector builder (`lib/bounded_authority_protocol/conformance/runner.ex`,
+  `build_selector/1`) also fails closed on the reserved names through its catch-all, and the
+  activating major extends it alongside its corpus vectors.
 - The current major's wire profile, bounds, and verdicts are UNCHANGED — this is a design-only
   slice: `git diff <base>..HEAD -- lib/ docs/protocol-v1.md priv/conformance/ spec/ sdks/` is
   empty over the slice range, and the corpus is untouched.
