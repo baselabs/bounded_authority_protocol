@@ -115,3 +115,13 @@ mechanism): ADR 0006 §7 stays the decision; this ADR records the publication ex
   `requirement-map.md`, `release-candidate-contract.md`) is flagged as follow-up.
 - No wire byte, bound, or verdict change. `git diff -- lib/ test/ priv/conformance/ mix.lock` is
   empty at closeout; the conformance corpus is unchanged at `agreed=259`.
+
+## Amendment — 2026-09-03 (manifest relocation)
+
+At commit `1448102` the tracked critical-surface declaration moved from
+`.forge/critical-surfaces` to `.kimosabe/critical-surfaces` — the path the current kimosabe
+guards read; nothing reads `.forge/`. This decision stands unchanged: the manifest content is
+byte-identical, the honor-system `track: T2` regime is unchanged, and the follow-up audit named
+above (manifest completeness for the remaining shipped normative docs) still rides with the
+manifest wherever it lives. References to `.forge/critical-surfaces` elsewhere in this ADR are
+historical (the path as it stood at decision time).

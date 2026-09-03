@@ -221,3 +221,11 @@ reading `lib/`. This ADR records how the two statements are reconciled without v
 - The four-way agreement (Elixir reference + Node runner + TS SDK + Python SDK) is marginally stronger
   evidence of corpus correctness, but is NOT the bar BAP-09 was ratified against and is not claimed as
   a justification.
+
+## Amendment — 2026-09-03 (manifest relocation)
+
+At commit `1448102` the tracked critical-surface declaration moved from
+`.forge/critical-surfaces` to `.kimosabe/critical-surfaces` (path consumed by the current
+kimosabe guards). Decision 3 stands unchanged: `sdks/**` remains a manifest entry with identical
+content, and the honor-system `track: T2` regime for `sdks/**` touches is unchanged. The
+`.forge/critical-surfaces` path in the decision text above is historical.
