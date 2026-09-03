@@ -13,6 +13,13 @@ All notable changes to `bounded_authority_protocol` are documented here.
   notes are ported verbatim to the local `.kimosabe/memory/`; all other forge-era
   process artifacts were local-only superseded residue. No code, wire, bound, or
   verdict change.
+- Record the two dependency sweeps that landed without changelog entries: `bedd1fb`
+  (batched TS dev deps + actions/setup-python v7 + jsonschex 0.9.2, superseding
+  Dependabot PRs #18/#19/#22/#23/#24/#26/#29) and `9ff0c34` (typescript-eslint,
+  @types/node, eslint batch, superseding #31/#32/#33). Dev/tooling-only surfaces;
+  no runtime dependency, wire, bound, or verdict change.
+- Amend ADR 0011 and ADR 0014 with dated relocation notes for the critical-surface
+  manifest path (`.forge/` → `.kimosabe/`); decisions unchanged.
 
 ## [0.3.0] — 2026-08-30
 
