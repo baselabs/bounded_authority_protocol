@@ -23,8 +23,8 @@ current cryptographic suite is `BAP1-Ed25519-SHA256`.
 
 ## Installation
 
-After the separately authorized Hex 0.3.0 archive is published and its registry read-back
-succeeds, registry consumers can use the patch-bounded requirement:
+The package is published on Hex (release 0.3.0, published 2026-08-31 with its registry checksum
+read back against the tagged-tree build). Registry consumers use the patch-bounded requirement:
 
 ```elixir
 def deps do
@@ -35,9 +35,10 @@ end
 ```
 
 The package has **zero production dependencies**, no application callback, and no supervision tree.
-`v0.3.0` identifies the reviewable source release for the application-profile addition, but a Git
-tag is not the immutable package identity. Hex archive publication is a separate action and the
-dependency above does not resolve until that archive is present in the registry.
+`v0.3.0` identifies the reviewable source release for the application-profile addition; the
+immutable package identity is the published Hex release (registry checksum
+`029ee7d75641850e330d12ac41fcc24fe026f65694ad28f4ea120d871114ff89`), not the Git tag. Depend on
+the package identity — never a tag or a mutable checkout.
 
 ## What it provides
 
