@@ -61,6 +61,8 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 | `all` | active | Matches any argument root |
 | `equals` | active | Non-empty object path must exist; tagged semantic identity with the given value |
 | `one_of` | active | Non-empty object path must exist; tagged semantic identity with any listed value |
+| `lte` | reserved | Inclusive upper bound — the value at the path must be same-tag numeric and numerically ≤ the bound (finite IEEE 754 binary64 comparison; cross-tag does not match); full mechanism specified in `docs/adr/0028-range-selector-kinds.md`; activation is a successor contract-major (the closed v1 profile rejects the kind today) |
+| `gte` | reserved | Inclusive lower bound — the value at the path must be same-tag numeric and numerically ≥ the bound (finite IEEE 754 binary64 comparison; cross-tag does not match); full mechanism specified in `docs/adr/0028-range-selector-kinds.md`; activation is a successor contract-major (the closed v1 profile rejects the kind today) |
 
 New selector kinds activate only with a contract-major; candidate kinds are reserved here first so
 independent implementations never collide. Attenuation (charter § Delegation) adds no kind: it is

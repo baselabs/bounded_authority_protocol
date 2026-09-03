@@ -113,6 +113,38 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
              V1.decode_grant(replace_segment(compact, 1, duplicate_payload), %{})
   end
 
+  test "reserved range selector kinds are rejected by the closed v1 profile" do
+    fixture = fixture!()
+    compact = fixture["grant"]["compact"]
+    grant = grant(fixture)
+
+    # BAP-20 / ADR 0028: the reserved-but-inactive range selector kinds (`lte`, `gte`) are
+    # rejected by the closed v1 kind set exactly like any other unlisted kind. Each object
+    # sits on the recognized `kind,path,value` member set, so the kind dispatch in the
+    # decoder is the sole rejector. Activation is a successor contract-major.
+    for kind <- ["lte", "gte"] do
+      reserved_operations = [
+        %{
+          "name" => "read_record",
+          "selectors" => [%{"kind" => kind, "path" => ["amount"], "value" => 100}]
+        }
+      ]
+
+      assert {:error, :invalid} =
+               V1.decode_grant(
+                 replace_json(compact, 1, &Map.put(&1, "operations", reserved_operations)),
+                 %{}
+               )
+    end
+
+    for selector <- [{:lte, ["amount"], {:integer, 100}}, {:gte, ["amount"], {:float, 50.0}}] do
+      operation = struct!(Operation, name: "read_record", selectors: [selector])
+
+      assert {:error, :invalid} =
+               V1.grant_signing_input(%{grant | operations: [operation]}, %{})
+    end
+  end
+
   test "issuer, key, audience, and every caller time boundary fail closed" do
     fixture = fixture!()
     compact = fixture["grant"]["compact"]

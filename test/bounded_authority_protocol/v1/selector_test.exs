@@ -156,6 +156,23 @@ defmodule BoundedAuthorityProtocol.V1.SelectorTest do
     end
   end
 
+  test "reserved range selector kinds never match at the term level" do
+    # BAP-20 / ADR 0028: the reserved kinds are closed-v1 rejects at the term level too — the
+    # matches? fall-through never admits a reserved-kind tuple. The arguments are chosen so a
+    # kind-admitting mutation with the ADR's same-tag semantics would MATCH, keeping every
+    # entry red-capable against exactly the fall-through under test.
+    arguments = {:object, [{"id", {:integer, 5}}, {"amount", {:float, 5.5}}]}
+
+    for selector <- [
+          {:lte, ["id"], {:integer, 10}},
+          {:gte, ["id"], {:integer, 1}},
+          {:lte, ["amount"], {:float, 10.0}},
+          {:gte, ["amount"], {:float, 1.0}}
+        ] do
+      assert {:error, :invalid} = match([selector], arguments)
+    end
+  end
+
   test "semantic equality covers every closed scalar and malformed object shape" do
     assert Selector.semantic_equal?(:null, :null)
     assert Selector.semantic_equal?({:integer, 1}, {:integer, 1})
