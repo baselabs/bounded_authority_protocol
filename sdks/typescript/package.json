@@ -28,7 +28,7 @@
   "devDependencies": {
     "@types/node": "^26.4.0",
     "eslint": "^10.9.1",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.13",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0"
   }
