@@ -2069,11 +2069,15 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
              "Elixir.BoundedAuthorityProtocol.V2.ConsumptionChain.beam",
              "Elixir.BoundedAuthorityProtocol.V2.KeyTransitionCodec.beam"
            ] ->
+        # Membership lowering differs by compiler: Enum.__in__/2 on Elixir 1.20, Enum.member?/2 on
+        # 1.18/1.19, plus Function.identity/1 on 1.18. The V2 lists carry the same forms as V1.
         [
           {Access, :get},
           {Enum, :__in__},
           {Enum, :map},
+          {Enum, :member?},
           {Enum, :sort},
+          {Function, :identity},
           {Map, :new},
           {Range, :new}
         ]
@@ -2082,7 +2086,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         [
           {Enum, :all?},
           {Enum, :__in__},
+          {Enum, :member?},
           {Enum, :reverse},
+          {Function, :identity},
           {Range, :new},
           {:binary, :bin_to_list}
         ]
@@ -2095,13 +2101,16 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Enum, :find_value},
           {Enum, :__in__},
           {Enum, :map},
+          {Enum, :member?},
           {Enum, :reverse},
           {Enum, :sort},
+          {Function, :identity},
           {Map, :new},
           {MapSet, :new},
           {MapSet, :size},
           {Range, :new},
-          {:binary, :bin_to_list}
+          {:binary, :bin_to_list},
+          {:lists, :member}
         ]
 
       "Elixir.BoundedAuthorityProtocol.V2.Selector.beam" ->
@@ -2110,6 +2119,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Enum, :any?},
           {Enum, :__in__},
           {Enum, :map},
+          {Enum, :member?},
+          {Function, :identity},
           {List, :keyfind},
           {String, :valid?},
           {Range, :new}

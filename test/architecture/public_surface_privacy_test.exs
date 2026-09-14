@@ -1,5 +1,6 @@
 defmodule BoundedAuthorityProtocol.PublicSurfacePrivacyTest do
   use ExUnit.Case, async: false
+  use ExUnitProperties
 
   @moduletag timeout: 180_000
 
@@ -40,6 +41,19 @@ defmodule BoundedAuthorityProtocol.PublicSurfacePrivacyTest do
         assert forbidden?(Enum.join(parts, separator))
       end
     end)
+  end
+
+  property "candidate windows are exactly every contiguous run of one to three tokens" do
+    check all(tokens <- list_of(string(:alphanumeric, min_length: 1), max_length: 12)) do
+      count = length(tokens)
+
+      expected =
+        for size <- 1..3//1,
+            offset <- 0..(count - size)//1,
+            do: Enum.slice(tokens, offset, size)
+
+      assert Enum.sort(windows(tokens, 3)) == Enum.sort(expected)
+    end
   end
 
   test "invalid UTF-8 is handled deterministically" do
@@ -291,16 +305,21 @@ defmodule BoundedAuthorityProtocol.PublicSurfacePrivacyTest do
     |> Enum.uniq()
   end
 
-  defp windows(tokens, max_size) do
-    case length(tokens) do
-      0 ->
-        []
+  # One pass over the list tails: every contiguous window of 1..max_size tokens, each exactly
+  # once. Slicing a linked list per offset was quadratic in the token count of the scanned
+  # history and exceeded the module timeout as the history grew.
+  defp windows(tokens, max_size), do: windows(tokens, max_size, [])
 
-      count ->
-        for size <- 1..min(max_size, count),
-            offset <- 0..(count - size),
-            do: Enum.slice(tokens, offset, size)
-    end
+  defp windows([], _max_size, acc), do: acc
+
+  defp windows([_token | rest] = tail, max_size, acc) do
+    acc =
+      Enum.reduce(1..max_size, acc, fn size, acc ->
+        window = Enum.take(tail, size)
+        if length(window) == size, do: [window | acc], else: acc
+      end)
+
+    windows(rest, max_size, acc)
   end
 
   defp digest(value), do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower)
