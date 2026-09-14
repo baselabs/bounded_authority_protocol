@@ -52,7 +52,7 @@ mechanism): ADR 0006 §7 stays the decision; this ADR records the publication ex
    every charter § Governance edit. This obligation rides with the charter section, recorded here.
 
 3. **`SECURITY.md`, `docs/governance.md`, and `docs/design/standards-track.md` are added to
-   `.forge/critical-surfaces`.** The manifest is not the strict-T2 code/wire set — AGENTS.md defines
+   the local-harness critical-surface manifest.** The manifest is not the strict-T2 code/wire set — AGENTS.md defines
    T2 as wire, cryptography, verification, canonicalization, and conformance, yet the manifest
    already carries `usage-rules.md`, `docs/design/threat-model.md`, and `docs/adr/**`, none of which
    is a wire/crypto surface. Its operative criterion is *shipped public-contract or normative docs
@@ -87,7 +87,8 @@ mechanism): ADR 0006 §7 stays the decision; this ADR records the publication ex
 - **Restate the verdict-change rule in SECURITY.md.** Rejected (design-adversarial): a second copy
   of a single-place rule is the drift hazard the design's no-dual-copy discipline exists to prevent;
   asymmetric with the deprecation cross-ref. SECURITY.md carries a one-line link.
-- **Exclude `docs/governance.md` from `.forge/critical-surfaces` on strict-T2 grounds.** Rejected:
+- **Exclude `docs/governance.md` from the local-harness critical-surface manifest on strict-T2
+  grounds.** Rejected:
   the manifest is not the strict-T2 set — it already carries `usage-rules.md` and
   `docs/design/threat-model.md`, neither a wire/crypto surface — so "not a wire surface" does not
   exclude. A published normative doc with a controlled dual-copy whose only failure mode is silent
@@ -108,7 +109,7 @@ mechanism): ADR 0006 §7 stays the decision; this ADR records the publication ex
   companion republication. The post-publication sync mechanism (fidelity check re-run on charter §
   Governance edits) governs drift, recorded here.
 - `SECURITY.md`, `docs/governance.md`, and `docs/design/standards-track.md` join
-  `.forge/critical-surfaces` (SECURITY.md a retroactive gap close since BAP-06; standards-track.md a
+  the local-harness critical-surface manifest (SECURITY.md a retroactive gap close since BAP-06; standards-track.md a
   pre-existing gap for the standing authority); future edits to any of them carry `track: T2` under
   the manifest's honor-system regime (the commit hook is not installed in this repo). A
   manifest-completeness audit for the remaining shipped normative docs (`registries.md`,
@@ -118,10 +119,11 @@ mechanism): ADR 0006 §7 stays the decision; this ADR records the publication ex
 
 ## Amendment — 2026-09-03 (manifest relocation)
 
-At commit `1448102` the tracked critical-surface declaration moved from
-`.forge/critical-surfaces` to `.kimosabe/critical-surfaces` — the path the current kimosabe
-guards read; nothing reads `.forge/`. This decision stands unchanged: the manifest content is
-byte-identical, the honor-system `track: T2` regime is unchanged, and the follow-up audit named
-above (manifest completeness for the remaining shipped normative docs) still rides with the
-manifest wherever it lives. References to `.forge/critical-surfaces` elsewhere in this ADR are
-historical (the path as it stood at decision time).
+At commit `1448102` the tracked critical-surface declaration moved to its current
+local-harness path — the path the current local guards read; nothing reads the legacy path.
+(2026-09-14: internal local-tooling path names in this ADR were neutralized for the published
+package; the moves and decisions they describe are unchanged.) This decision stands unchanged:
+the manifest content is byte-identical, the honor-system `track: T2` regime is unchanged, and the
+follow-up audit named above (manifest completeness for the remaining shipped normative docs)
+still rides with the manifest wherever it lives. References to the legacy manifest path
+elsewhere in this ADR are historical (the path as it stood at decision time).

@@ -13,7 +13,7 @@ scanner permanently red.
 
 ## Decision
 
-Project versioning is enabled at the kimosabe policy boundary, then narrowed by
+Project versioning is enabled at the local policy-tooling boundary, then narrowed by
 the tracked architecture gate to the current accepted contract families:
 
 - the `BoundedAuthorityProtocol.V1` namespace and the exact current-major source,
@@ -45,5 +45,5 @@ narrower allowlist and proves both accepted and rejected fixtures.
 
 Contract-major identity remains explicit and independently testable. A new
 major cannot enter accidentally through a filename or helper name. The
-canonical kimosabe sweep continues to reject generic phase, task, slice,
+canonical durable-identifier sweep continues to reject generic phase, task, slice,
 sprint, step, and work-order names.

@@ -16,7 +16,7 @@ closure class (duplicate-rejecting decode, null-prototype containers, raw-lexeme
 int/float tags). That ADR's contract ended at "passes the corpus + the permissiveness gates."
 
 The BAP-15 hardening arc exposed a class that contract did not cover. The Rust SDK's bounds-parity
-landing (`b4ca616`) was followed by **17 dispatched cross-vendor review rounds (codex + claude peers)
+landing (`b4ca616`) was followed by **17 dispatched cross-vendor review rounds (two independent vendor peers)
 plus delta-reviews between fix clusters** (`3e8524a..226e847`, 28 commits). The rounds surfaced
 roughly 25 byte-level behavioral divergences between the three SDKs (and from the Elixir reference)
 on surfaces the corpus had no cases for — escapes out of the closed Result API, host-type coercions,

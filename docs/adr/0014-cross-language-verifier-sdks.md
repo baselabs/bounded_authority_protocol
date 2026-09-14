@@ -149,7 +149,7 @@ reading `lib/`. This ADR records how the two statements are reconciled without v
    `scripts/check_dependency_licenses.exs` operates on the Elixir tooling SBOM only. Without new
    in-slice gates the SDKs would ship with weaker purity + license enforcement than the Elixir
    reference. This ADR closes both gaps:
-   - **Critical-surface declaration:** `sdks/**` is added to `.forge/critical-surfaces` (tracked via
+   - **Critical-surface declaration:** `sdks/**` is added to the local-harness critical-surface manifest (tracked via
      `git add -f`) — the "user declares critical" trigger that makes any touch of `sdks/**` a T2-gauge
      slice. The repo's critical-surface commit hook is not installed, so the declaration governs via
      honor-system `track: T2` + the closeout lenses (the gauge is auditable via the `track:` field).
@@ -224,8 +224,9 @@ reading `lib/`. This ADR records how the two statements are reconciled without v
 
 ## Amendment — 2026-09-03 (manifest relocation)
 
-At commit `1448102` the tracked critical-surface declaration moved from
-`.forge/critical-surfaces` to `.kimosabe/critical-surfaces` (path consumed by the current
-kimosabe guards). Decision 3 stands unchanged: `sdks/**` remains a manifest entry with identical
-content, and the honor-system `track: T2` regime for `sdks/**` touches is unchanged. The
-`.forge/critical-surfaces` path in the decision text above is historical.
+At commit `1448102` the tracked critical-surface declaration moved to its current
+local-harness path (consumed by the current local guards). (2026-09-14: internal local-tooling
+path names in this ADR were neutralized for the published package; the moves and decisions they
+describe are unchanged.) Decision 3 stands unchanged: `sdks/**` remains a manifest entry with
+identical content, and the honor-system `track: T2` regime for `sdks/**` touches is unchanged.
+The legacy manifest path in the decision text above is historical.

@@ -75,11 +75,11 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed — repository hygiene
 
-- Retire the legacy `.forge/` artifact tree. The tracked critical-surface declaration
-  moves to `.kimosabe/critical-surfaces` (the path the current kimosabe guards read;
+- Retire the legacy local-harness artifact tree. The tracked critical-surface declaration
+  moves to the local-harness critical-surfaces path (the path the current local guards read;
   ADR 0011's decision stands, only the manifest location changes), and the stale
-  `.gitignore` forge exception lines are removed. The four forge-era project memory
-  notes are ported verbatim to the local `.kimosabe/memory/`; all other forge-era
+  `.gitignore` harness exception lines are removed. The four legacy project-memory
+  notes are ported verbatim to the local-harness memory directory; all other legacy
   process artifacts were local-only superseded residue. No code, wire, bound, or
   verdict change.
 - Record the two dependency sweeps that landed without changelog entries: `bedd1fb`
@@ -88,7 +88,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
   @types/node, eslint batch, superseding #31/#32/#33). Dev/tooling-only surfaces;
   no runtime dependency, wire, bound, or verdict change.
 - Amend ADR 0011 and ADR 0014 with dated relocation notes for the critical-surface
-  manifest path (`.forge/` → `.kimosabe/`); decisions unchanged.
+  manifest path (the legacy harness path → the local-harness path); decisions unchanged.
 
 ## [0.3.0] — 2026-08-30
 
@@ -141,7 +141,7 @@ several note findings, all in surfaces this program touched. All fixed:
   defining only an allowlist replaces gitleaks' rule set entirely. The config now
   `[extend] useDefault = true` plus scoped, documented allowlists for the public-key-only
   fixture surfaces (the generated spec documents, the corpus/vectors trees, the vendored SDK
-  snapshots, SDK test sources, and the frozen .forge historical transcripts whose "PATs" are
+  snapshots, SDK test sources, and the frozen legacy-harness historical transcripts whose "PATs" are
   canonical reverse-alphabet gate self-test fakes). Verified both directions: a fake PAT in a
   scratch tree is DETECTED (3 findings) under the config, and the tracked tree scans clean
   (the only residuals are untracked gitignored build artifacts).
@@ -591,7 +591,7 @@ several note findings, all in surfaces this program touched. All fixed:
   identity semantics. Purity vet + zero-dependency license gate (each red-capable) and a
   `go-conformance` CI job. Not in the Hex `files:` list; no registry-publish infrastructure
   (ADR 0015 graduation posture).
-- **Cross-vendor hardening (codex + claude review, fix pass `fbff228`):** proof-claim presence
+- **Cross-vendor hardening (cross-vendor review, fix pass `fbff228`):** proof-claim presence
   tracking, export anchor-chain cross-binding, standalone genesis zero-hash, port-overflow
   closure, embedded-IPv6 group counting with dotted-form preservation, post-decode host
   classification with lowercased decoded bytes, tightened integer-magnitude enforcement,
@@ -638,8 +638,8 @@ several note findings, all in surfaces this program touched. All fixed:
   consumer's gates passed 819 tests including the immutable authority-contract bundle's 15
   consumer cases; the opt-in live-endpoint consumer gate was provisioned and run for this
   closeout. Fresh correctness, security, and gate-integrity reviews closed with their findings
-  fixed in this landing; the cross-vendor peer (codex) returned no findings, and the third-family
-  GLM lens was a named sensitivity-policy skip. The publication sweep in this landing: the
+  fixed in this landing; the cross-vendor peer returned no findings, and the third-family
+  lens was a named sensitivity-policy skip. The publication sweep in this landing: the
   private-strategy links left the README, every unpublished/deferred claim in the shipped docs
   became the published truth, ADR 0008 gained the 2026-08-20 amendment lifting the deferral, the
   consumer-seams design note left the package and hexdocs, the mutation batteries gained
@@ -657,16 +657,16 @@ several note findings, all in surfaces this program touched. All fixed:
   private runtime's connected gates —
   private BA-14 completed 2026-08-18, so BAP-07 is fully unblocked (the Hex-publication half stays
   deferred by maintainer decision). Docs-only: zero code, wire, bound, or verdict change.
-- **Cross-vendor review round 18 (codex blocking + claude should-fix/notes, all closed).**
-  Codex (blocking): the TS shape gate's nested expected-export members were opaque `"object"`
+- **Cross-vendor review round 18 (blocking + should-fix/notes across the vendor lenses, all
+  closed).** Blocking findings: the TS shape gate's nested expected-export members were opaque `"object"`
   specs, so a malformed nested struct (chain missing `previousHash`, empty anchor) passed the
   gate and the clause-3 hoist then derefed the missing field — a `TypeError` escape past
   `trying()`; the nested members are now fully specified (chain/anchor/transition field shapes,
-  `archived.chunks` as a bytes sequence), red-leg + mutation proven (opaque specs → RED). Claude
-  (should-fix): the Python and Rust hoists walked `expected.transitions` per-element BEFORE the
+  `archived.chunks` as a bytes sequence), red-leg + mutation proven (opaque specs → RED).
+  Should-fix findings: the Python and Rust hoists walked `expected.transitions` per-element BEFORE the
   `key_transitions` count ceiling, regressing the round-3 ceiling-first invariant the TS sibling
   kept; the ceiling now runs at the top of the hoist in both (the dead later duplicate removed).
-  Claude (notes, reconciled): the entry-position shape gate's sequence walks before count
+  Notes, reconciled: the entry-position shape gate's sequence walks before count
   ceilings are a documented accepted margin (typeof-only per element); Python's body-level
   `bytearray` tolerance was dead under the exact-bytes gate and is reconciled to bytes-only.
   The timed-out fable peer's transcript was mined: it was converging on the ordering finding
@@ -784,8 +784,8 @@ several note findings, all in surfaces this program touched. All fixed:
   the five the four closeout lenses forced: the chain_rows count, the standalone
   transition, the verify-pin family on a REAL corpus-signed archive, and the two
   encode-pin isolations; the standalone anchor leg, the chunk-count MAGIC pin now reachable and landed, and a 7/7
-  Elixir oracle receipt (local re-runnable .forge artifact). `assemble_compact` stays at maximum
-  (the siblings too). (Scope driver: the 2026-08-14 session direction — the session's input,
+  Elixir oracle receipt (local re-runnable oracle artifact). `assemble_compact` stays at maximum
+  (the siblings too). (Scope driver: the 2026-08-14 maintainer direction — direction input,
   not this entry's verdict.)
 
 - **TypeScript + Python encode-path validation parity (BAP-15).** Both sibling SDKs gain the
@@ -809,7 +809,7 @@ several note findings, all in surfaces this program touched. All fixed:
   seen-list cycle guard, end anchor binding the final key with NON-STRICT `>=` chronology).
   19 red-capable battery legs at closeout (permissiveness 19 → 38), each mutation-proven; every leg
   verified against the Elixir reference oracle (20/20 fixtures — the 15 + control + the four
-  closeout-lens additions; the receipt is a local re-runnable .forge artifact). Honest
+  closeout-lens additions; the receipt is a local re-runnable oracle artifact). Honest
   residuals, both NAMED: the TypeScript/Python SDKs carried the same producer permissiveness
   (CLOSED by the sibling entries above); the Rust SDK is a documented maximum-bounds posture
   at encode (the reference + siblings thread caller-tightened `expected.bounds` — carrying
@@ -972,7 +972,7 @@ several note findings, all in surfaces this program touched. All fixed:
   [SECURITY.md](SECURITY.md) cross-references the verdict-change rule; the
   [errata registry](docs/errata.md) header retargets to governance.md as the published policy home;
   `SECURITY.md`, `docs/governance.md`, and `docs/design/standards-track.md` join
-  `.forge/critical-surfaces` (SECURITY.md a retroactive gap close since BAP-06). Zero wire byte,
+  the local-harness critical-surfaces manifest (SECURITY.md a retroactive gap close since BAP-06). Zero wire byte,
   bound, or verdict change.
 - Resolve a contradiction in the deprecation/security policy: the twelve-month deprecation-window
   minimum (`REQ1-EVO-deprecation-window-minimum`) is scoped to planned deprecations, and a security
