@@ -4,6 +4,24 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Documentation — published-surface corrections
+
+- v1 privacy considerations gain "Digests of guessable inputs": facts carry unkeyed digests, so
+  a request digest over a small argument space can be confirmed by hashing candidates, and
+  deployments sharing facts or evidence outside their trust boundary treat it as revealing the
+  request (informative; applies to v2 by incorporation).
+- v1 residual risks now state that the evaluation time and the cast arguments are part of the
+  expected context, so taking either from the presenter reopens time and request substitution.
+- v2 selector section gains informative issuer guidance: pair each range selector with an
+  `equals` selector on the unit member it depends on, and shape arguments so bounded values are
+  object members, because paths never index arrays.
+- ADR 0028, ADR 0030, and the roadmap now mark ADR 0029 (`ba+budget-window`) as planned and not
+  yet written; ADR 0030 no longer calls the name reserved, because the registry does not list it.
+- ADR 0030 gains a release note: 0.4.0 published contract-major 2 alongside v1 without
+  deprecating v1. The roadmap records the 0.4.0 v2 release and the npm TypeScript verifier.
+- AGENTS.md lists the accepted ADRs as 0001–0028 and 0030.
+- Two typos in the v1 spec are fixed.
+
 ### Changed — repository hygiene
 
 - The legacy local-harness tree is purged from the entire git history (owner-executed

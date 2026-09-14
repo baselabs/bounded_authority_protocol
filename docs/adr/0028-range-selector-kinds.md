@@ -18,7 +18,7 @@ the wire; today the private runtime and consumer policy engines enforce them pri
 The successor-major charter settled the scope (§5, owner decision 2026-08-26): per-request range
 constraints are pure inequality selector kinds and BELONG in the successor major's selector
 design; cumulative budgets ("up to $500/day") are NOT statelessly checkable and route to a
-signed budget-window assertion (that half is ADR 0029, `ba+budget-window`, the companion
+signed budget-window assertion (that half is the planned ADR 0029, `ba+budget-window`, not yet written, the companion
 mechanism of the same program — it lands with or after this ADR). This ADR carries
 charter §5's inequality half.
 
@@ -235,7 +235,7 @@ review of §4.
 - [ADR 0003](0003-standard-jws-and-verified-grant-results.md) §7 — the facts discipline §6
   restates for range bounds.
 - [ADR 0007](0007-normative-requirement-identifiers.md) — the successor major's `REQ2-*` range.
-- ADR 0029 (`ba+budget-window`, the budget-window assertion) — the companion mechanism
+- ADR 0029 (planned and not yet written; `ba+budget-window`, the budget-window assertion) — the companion mechanism
   carrying charter §5's cumulative half; same program, lands with or after this ADR.
 - [successor-major charter](../design/successor-major-charter.md) §5 — the owner decision this
   ADR mechanizes; [registries](../design/registries.md) — the selector-kind reservations.

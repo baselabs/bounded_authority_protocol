@@ -114,6 +114,11 @@ profile and corpus in-tree; the published-package and external-implementation co
 release and adoption events, not code events, and remain owner decisions. Until then, v1
 remains the published package profile and v2 is available in-tree and in the SDKs.
 
+Release note (2026-09-14): the 0.4.0 Hex release published contract-major 2 in the package
+alongside v1, and the TypeScript verifier published to npm supports both majors. The sentence
+above describes the state at this ADR's landing. The release does not deprecate v1; deprecation
+still follows the governance policy stated above.
+
 ## Alternatives considered
 
 - **Activating `lte`/`gte` inside v1.** Rejected: verdict flip
@@ -143,12 +148,13 @@ remains the published package profile and v2 is available in-tree and in the SDK
   is empty for this landing, and the v1 certified pin (`TLUHKrQP…`) still verifies its corpus.
 - Issuers can express per-request ranges on the wire for v2 audiences: "the argument at this
   path is ≤/≥ this value", intervals as two conjuncts, verified statelessly by every conforming
-  v2 verifier. Cumulative budgets remain out of scope (ADR 0029 `ba+budget-window`, reserved).
+  v2 verifier. Cumulative budgets remain out of scope (ADR 0029 `ba+budget-window`, planned; not yet
+  written, and the name is not yet registered).
 - The durable-contract-identity scanner enumerates the accepted v2 families (namespace, paths,
   wire fields, domains, suite, `REQ2-*`); the next unaccepted major (V3/`BAP3-*`/`REQ3-*`)
   remains rejected exactly as V2 was before this ADR.
 - Named follow-ups: v2 corpus depth growth; the `spec.facts` v2 baseline; ADR 0029
-  `ba+budget-window`; the remaining charter successor-major scope (delegation, offline claims,
+  `ba+budget-window` (planned, not yet written); the remaining charter successor-major scope (delegation, offline claims,
   suite succession) as separately activated majors; SDK publication and any v2 Hex release are
   owner decisions outside this landing.
 

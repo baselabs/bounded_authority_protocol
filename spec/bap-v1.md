@@ -654,12 +654,16 @@ to a new contract-major with its own closed suite.
 
 ### Residual risks
 
-A presented-but-stolen-then-replayed proof inside the skew/proof-age window is indistinguish
+A presented-but-stolen-then-replayed proof inside the skew/proof-age window is indistinguishable
 from fresh use: replay reservation is the runtime's responsibility, and the window bounds
 (rather than eliminates) exposure. A fully compromised issuer mints valid grants; detection is
 an operational concern. A conforming verifier that receives correct-but-wrong trusted keys
 (the wrong issuer key, the wrong expected context) verifies garbage as valid: the profile
-binds bytes to inputs, not inputs to reality. Archive completeness against a malicious
+binds bytes to inputs, not inputs to reality. The expected context includes the evaluation time and the
+cast arguments: a host that takes the evaluation time from presenter-supplied values, such as the
+proof's `iat` or a request header, or that accepts cast arguments from the presenter instead of
+deriving them from the request it serves, reopens the time and request substitution the profile
+otherwise closes. Archive completeness against a malicious
 controller requires the caller to retain or derive the intended boundaries
 (`REQ1-CHAIN-no-deletion-cert`). Implementation error is a standing residual risk; the
 conformance corpus and the mutation gates exist to make the common classes loud.
@@ -684,7 +688,7 @@ commit to invocation-level digests and are sequentially hash-linked, anchors sig
 ends, and archives freeze complete object generations. The privacy consequence is that
 retention decisions made by the runtime ARE the privacy posture — the profile makes evidence
 compact and independently checkable, and it makes deletion detectable (a shortened archive
-fails the original boundaries), which is a integrity-privacy tension deployments resolve by
+fails the original boundaries), which is an integrity-privacy tension deployments resolve by
 policy: retention windows, minimization of commitment preimages (which stay opaque and private
 by construction), and audience-scoped chain identifiers are the available controls.
 
@@ -702,6 +706,16 @@ cast arguments, selector values, raw credentials, signatures, JWK containers, or
 (`REQ1-VERIFY-facts-redacted`). This bounds what a logging or telemetry layer can accumulate
 from verification outcomes — the loudest privacy control in the profile — and deployments keep
 it intact by not logging the raw inputs alongside the facts. (informative)
+
+### Digests of guessable inputs
+
+Redaction removes arguments, not what their digests reveal. Facts carry unkeyed SHA-256 digests,
+including the request digest over `[operation, typed(cast_arguments)]`. When the operation and
+argument space is small (a short list of recipients and a bounded amount, for example), an
+observer holding the facts can confirm which request was made by hashing candidates. Digests are
+integrity bindings, not confidentiality: deployments that share facts, logs, or evidence outside
+their trust boundary treat a request digest as revealing its request, and apply access control or
+keyed commitments where that matters. (informative)
 
 # Appendix A. Worked examples (generated from the conformance corpus)
 

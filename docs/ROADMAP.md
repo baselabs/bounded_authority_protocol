@@ -856,9 +856,10 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   four vendored snapshots; `spec.facts`/`spec.examples`/`spec.render` green; the digest-pin
   rotation script covers both majors' twelve pins (six per major).
 - **Known follow-ups (named, not blocking):** v2 corpus depth growth beyond the v1-populated
-  cells; the `spec.facts` v2 extraction baseline; ADR 0029 `ba+budget-window`; the remaining
+  cells; the `spec.facts` v2 extraction baseline; ADR 0029 `ba+budget-window` (planned, not yet written); the remaining
   charter successor-major scope (delegation, offline claims, suite succession) as separately
-  activated majors; SDK publication and any v2 Hex release are owner decisions.
+  activated majors; SDK publication and any v2 Hex release are owner decisions (both happened on
+  2026-09-14: the 0.4.0 Hex release carries v2, and the TypeScript verifier was published to npm).
 
 ## Next action
 

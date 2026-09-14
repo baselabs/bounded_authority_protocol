@@ -115,6 +115,13 @@ unchanged — a range bound is a payload magnitude read from the decoded grant o
 verified bytes, never a fact, and no selector grants business authorization
 (`REQ2-SELECTOR-not-authorization`).
 
+Issuer guidance (informative). A range selector compares numbers only. When an argument's meaning
+depends on a unit carried in another member (a currency code, a scale, or a decimal exponent), the
+issuer pairs each range selector with an `equals` selector on that unit member; without that
+conjunct, a bound of 25000 authorizes 25000 in any unit. Because paths never index arrays, a bound
+cannot reach each element of a list; issuers shape arguments so that every bounded value is an
+object member.
+
 Attenuation (when a successor major activates delegation) composes conjunctively over selector
 tuples and never inspects kind; the new kinds are new tuple inhabitants of the existing algebra,
 and a child that adds a cross-tag conjunct produces an unsatisfiable conjunction — fail closed,
