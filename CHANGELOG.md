@@ -4,6 +4,14 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Changed — repository hygiene
+
+- The legacy local-harness tree is purged from the entire git history (owner-executed
+  rewrite, 2026-09-14). The repository had no tracked `.forge` files at tip, so surviving
+  content is byte-identical at every release tag (main tree `d2ffb518…` pre- and
+  post-rewrite); the now-moot gitleaks history allowlist is removed. Historical commit SHAs
+  cited in earlier entries describe the pre-rewrite history.
+
 ## [0.4.0] — 2026-09-14
 
 ### Changed — TypeScript SDK graduated (ADR 0015 executed)

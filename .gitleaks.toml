@@ -36,6 +36,3 @@ paths = [
   '''sdks/rust/src/ed25519\.rs''',
 ]
 
-[[allowlists]]
-description = "Historical forge-era review transcripts under .forge/: immutable committed history quoting the same public fixtures and canonical fake PATs (ghp_zyxwv...) used by gate self-test documentation — no real credential material; frozen history, never re-staged"
-paths = ['''\.forge/.*''']
