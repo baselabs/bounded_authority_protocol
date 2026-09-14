@@ -1,15 +1,22 @@
 defmodule BoundedAuthorityProtocol.CorpusSyncGate do
   # Corpus vendored-snapshot sync gate (spec-decoupling L1; ADR 0019 intra-repo drift check,
-  # NOT a distribution artifact). The Rust and Go SDKs vendor self-contained corpus snapshots;
-  # a byte drift between the certified corpus and either snapshot is exactly the silent-drift
-  # class their startup SHA assertion exists to catch at RUNTIME — this gate catches it at
-  # COMMIT time instead, before a red SDK suite or a confusing rotation.
+  # NOT a distribution artifact). The Rust, Go, and TypeScript SDKs vendor self-contained corpus
+  # snapshots (the TS snapshots landed with its ADR 0015 graduation); a byte drift between the
+  # certified corpus and any snapshot is exactly the silent-drift class their startup SHA
+  # assertion exists to catch at RUNTIME — this gate catches it at COMMIT time instead, before
+  # a red SDK suite or a confusing rotation. The TS curated-inputs entry pins the v2 key-census
+  # source the TS runner's census leg consumes (the same artifact the Go/Rust runners still
+  # read monorepo-relative — to be vendored at their own graduations).
 
   @snapshots [
     {"sdks/rust/conformance/corpus", "priv/conformance/v1/corpus"},
     {"sdks/go/conformance/corpus", "priv/conformance/v1/corpus"},
     {"sdks/rust/conformance/corpus-v2", "priv/conformance/v2/corpus"},
-    {"sdks/go/conformance/corpus-v2", "priv/conformance/v2/corpus"}
+    {"sdks/go/conformance/corpus-v2", "priv/conformance/v2/corpus"},
+    {"sdks/typescript/conformance/corpus", "priv/conformance/v1/corpus"},
+    {"sdks/typescript/conformance/corpus-v2", "priv/conformance/v2/corpus"},
+    {"sdks/typescript/conformance/curated-inputs-v2.json",
+     "conformance/generators/curated-inputs-v2.json"}
   ]
 
   def run do
