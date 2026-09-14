@@ -66,6 +66,14 @@ All notable changes to `bounded_authority_protocol` are documented here.
   major. [ADR 0030](docs/adr/0030-v2-contract-major-activation.md) records the activation,
   the inherited-bounds review, and the named follow-ups.
 
+### Closed — 0.4.0 publication record
+
+- Published 2026-09-14 (registry insert 2026-09-14T06:10:54Z, source commit `5390e97` = `v0.4.0`):
+  registry checksum `e6b812fa96211614608a3a8e926381856f575b9656689265ae86a1a83105a60e` equal to
+  the tagged-tree two-build candidate; hexdocs live; zero requirements on the registry; a fresh
+  external `~> 0.4.0` consumer resolves the release and the `V2` namespace compiles from the
+  served package.
+
 ### Compatibility
 
 - The v1 wire profile, corpus (283 verdicts, certified pin unchanged), SDK v1 behavior, and

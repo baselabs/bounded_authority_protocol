@@ -23,7 +23,7 @@ current cryptographic suite is `BAP1-Ed25519-SHA256`.
 
 ## Installation
 
-The package is published on Hex (release 0.3.0, published 2026-08-31 with its registry checksum
+The package is published on Hex (release 0.4.0, published 2026-09-14 with its registry checksum
 read back against the tagged-tree build). Registry consumers use the patch-bounded requirement:
 
 ```elixir
@@ -35,9 +35,9 @@ end
 ```
 
 The package has **zero production dependencies**, no application callback, and no supervision tree.
-`v0.3.0` identifies the reviewable source release for the application-profile addition; the
+`v0.4.0` identifies the reviewable source release for the v2 contract-major activation; the
 immutable package identity is the published Hex release (registry checksum
-`029ee7d75641850e330d12ac41fcc24fe026f65694ad28f4ea120d871114ff89`), not the Git tag. Depend on
+`e6b812fa96211614608a3a8e926381856f575b9656689265ae86a1a83105a60e`), not the Git tag. Depend on
 the package identity — never a tag or a mutable checkout.
 
 ## What it provides

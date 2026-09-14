@@ -13,7 +13,7 @@ normative profile; this guide is operational.
 
 ## Installation
 
-The package is published on Hex (release 0.3.0, published 2026-08-31):
+The package is published on Hex (release 0.4.0, published 2026-09-14):
 
 ```elixir
 defp deps do
@@ -21,7 +21,7 @@ defp deps do
 end
 ```
 
-`v0.3.0` is the reviewable source release; the immutable package identity is the published Hex
+`v0.4.0` is the reviewable source release; the immutable package identity is the published Hex
 release, whose registry checksum was read back against the tagged-tree build. Depend on the
 package identity — never a tag or a mutable checkout.
 
