@@ -47,6 +47,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from bounded_authority_verifier import v2
 from bounded_authority_verifier.bounds import Bounds, bounds_new
 from bounded_authority_verifier.ed25519 import reset_census, sha256
 from bounded_authority_verifier.error import InvalidError
@@ -2468,3 +2469,143 @@ def test_round12_14_export_predigest_gates_pinned():
     huge = _replace(kc.keys[1], valid_before=10 ** 16)
     assert not verify(keys=HistoricalKeyChain(keys=kc.keys[:1] + (huge,))).is_ok, \
         "an over-magnitude valid_before must reject pre-hash"
+
+
+# ---------------------------------------------------------------------------
+# The v2 profile (contract-major 2) — permissiveness mutation battery
+# (ADR 0028 range selector kinds + the cross-major version gate). Mirrors the
+# defect-injection discipline of the 8-item battery at the top of this file: each
+# entry names the closure, the mutation, and the test that goes RED when the
+# mutation is applied. All four mutations were executed at authoring
+# (2026-09-13: mutation applied → pytest run → observed red → reverted):
+#   v2-1. INCLUSIVE boundary (ADR 0028 §1): `<=`/`>=` mutated to `<`/`>` in
+#         v2.selector_matches → test_v2_range_selectors_are_inclusive goes RED
+#         (boundary-equal stops matching). Observed: 1 failed; the v2 corpus
+#         runner also went 259/268 with the boundary-equal family disagreeing
+#         (check-envelope-v2-valid-{lte,gte}-boundary-equal et al.).
+#   v2-2. SAME-TAG operand domain (ADR 0028 §2): the same-tag arms collapsed to a
+#         plain numeric comparison (float(...) both sides) in
+#         v2.selector_matches → test_v2_range_selectors_same_tag_only goes RED
+#         (a float bound starts satisfying an integer value). Observed: 1
+#         failed; the v2 corpus runner went 267/268 with
+#         check-envelope-v2-invalid-selector-cross-tag-float-bound disagreeing.
+#   v2-3. lte/gte DECODE DISPATCH swapped (SelLte↔SelGte in v2.parse_selector's
+#         return) → test_v2_range_selector_direction goes RED (each kind asserts
+#         the wrong side of its bound). Observed: 1 failed.
+#   v2-4. VERSION WIDENING: the `!= VERSION` claim gate in v2's
+#         _validate_grant_payload widened to `not in (1, VERSION)` →
+#         test_v2_and_v1_facades_reject_each_others_bytes goes RED (a v1 grant
+#         decodes Ok under the v2 façade). Observed: 1 failed; the v2 corpus
+#         runner went 265/268 with the three cross-major cases disagreeing.
+# ---------------------------------------------------------------------------
+
+
+def test_range_selectors_are_inclusive():
+    """ADR 0028 §1: both range kinds are INCLUSIVE. A traversed value exactly equal to the bound
+    satisfies lte and gte alike. Defect: mutate `<=` to `<` (and `>=` to `>`) in
+    v2.selector_matches → both boundary assertions go RED."""
+    args = json_decode(b'{"amount":50}')
+    lte = v2.parse_selector(json_decode(b'{"kind":"lte","path":["amount"],"value":50}'))
+    gte = v2.parse_selector(json_decode(b'{"kind":"gte","path":["amount"],"value":50}'))
+    assert v2.selector_matches(lte, args) is True, "boundary-equal satisfies lte (inclusive)"
+    assert v2.selector_matches(gte, args) is True, "boundary-equal satisfies gte (inclusive)"
+
+
+def test_range_selector_direction():
+    """lte asserts value <= bound; gte asserts value >= bound — the directions are not
+    interchangeable. Defect: swap the SelLte/SelGte dispatch in v2.parse_selector
+    (returning SelGte for kind "lte" and SelLte for kind "gte") → every off-bound assertion
+    goes RED."""
+    lte = v2.parse_selector(json_decode(b'{"kind":"lte","path":["amount"],"value":5000}'))
+    gte = v2.parse_selector(json_decode(b'{"kind":"gte","path":["amount"],"value":50}'))
+    below = json_decode(b'{"amount":49}')
+    above = json_decode(b'{"amount":5001}')
+    assert v2.selector_matches(lte, below) is True
+    assert v2.selector_matches(lte, above) is False, "5001 must NOT satisfy lte 5000"
+    assert v2.selector_matches(gte, above) is True
+    assert v2.selector_matches(gte, below) is False, "49 must NOT satisfy gte 50"
+
+
+def test_range_selectors_same_tag_only():
+    """ADR 0028 §2: the traversed value and the bound must carry the SAME numeric tag
+    (both integer-tagged or both float-tagged); a cross-tag pair NEVER matches, and
+    non-numeric operands never match (a missing path fails closed like equals/one_of).
+    Defect: collapse the same-tag arms in v2.selector_matches to a plain numeric
+    comparison → the cross-tag assertions go RED."""
+    flt_bound = v2.parse_selector(json_decode(b'{"kind":"gte","path":["amount"],"value":-0.5}'))
+    int_bound = v2.parse_selector(json_decode(b'{"kind":"lte","path":["amount"],"value":5000}'))
+    int_target = json_decode(b'{"amount":5}')
+    float_target = json_decode(b'{"amount":5.0}')
+    assert v2.selector_matches(flt_bound, int_target) is False, \
+        "float bound vs integer-tagged value is cross-tag — never matches"
+    assert v2.selector_matches(int_bound, float_target) is False, \
+        "integer bound vs float-tagged value is cross-tag — never matches"
+    # Controls: same-tag pairs compare by numeric value.
+    assert v2.selector_matches(flt_bound, float_target) is True
+    assert v2.selector_matches(int_bound, int_target) is True
+    # Non-numeric operand at the path never matches; missing path fails closed.
+    assert v2.selector_matches(int_bound, json_decode(b'{"amount":"75"}')) is False
+    assert v2.selector_matches(int_bound, json_decode(b'{"other":75}')) is False
+
+
+def test_non_numeric_bound_rejects_at_decode():
+    """The range-kind bound is numeric-only AT DECODE (a string/boolean/null/array/object bound
+    rejects in v2.parse_selector — the producer must not mint one). The corpus's
+    grant-signing-input-v2-invalid-non-numeric-bound case is the wire-level analogue."""
+    for encoded in (
+        b'{"kind":"lte","path":["amount"],"value":"5000"}',
+        b'{"kind":"gte","path":["amount"],"value":true}',
+        b'{"kind":"lte","path":["amount"],"value":null}',
+        b'{"kind":"gte","path":["amount"],"value":[1]}',
+        b'{"kind":"lte","path":["amount"],"value":{"n":1}}',
+    ):
+        with pytest.raises(InvalidError):
+            v2.parse_selector(json_decode(encoded))
+
+
+def test_range_member_set_is_kind_path_value():
+    """ADR 0028 §3: lte/gte use EXACTLY the existing {kind, path, value} recognized member set —
+    no fourth member set. A `values` member, a missing member, an empty path, or an extra member
+    rejects at decode."""
+    for encoded in (
+        b'{"kind":"lte","path":["a"],"value":1,"values":[1]}',
+        b'{"kind":"gte","path":["a"]}',
+        b'{"kind":"lte","value":1}',
+        b'{"kind":"lte","path":[],"value":1}',
+        b'{"kind":"gte","path":["a"],"value":1,"extra":2}',
+    ):
+        with pytest.raises(InvalidError):
+            v2.parse_selector(json_decode(encoded))
+
+
+def test_facades_reject_each_others_major_bytes():
+    """Cross-major isolation (the successor-major charter): the v2 façade rejects v1 bytes and
+    the v1 façade rejects v2 bytes — an in-major decode of the other major's grant is Err on the
+    version claim alone, and the v1 façade still rejects the v2-only selector kinds. Defect:
+    widen v2's `v != VERSION` grant gate to accept v:1 → the v2-decodes-v1 assertion goes RED."""
+    issuer_pub, issuer_priv = _fresh_key()
+    holder_fp = public_key_thumbprint_raw(_fresh_key()[0])
+    # One kwarg set per major: the structs are per-façade (the closed-shape gate rejects a v1
+    # OperationInput inside a v2 GrantProducer — the gates are module-scoped).
+    v1_kwargs: dict = {
+        "key_id": "issuer-123456", "issuer": "https://issuer.example.test", "grant_id": "urn:example:grant:x-1",
+        "audiences": ("https://resource.example.test",), "issued_at": 1000, "not_before": 1000, "expires_at": 2000,
+        "holder_thumbprint": _b64url(holder_fp),
+        "operations": (OperationInput(name="read", selectors=("all",)),),
+    }
+    v2_kwargs = {**v1_kwargs, "operations": (v2.OperationInput(name="read", selectors=("all",)),)}
+    v1_si = grant_signing_input(GrantProducer(**v1_kwargs))
+    assert v1_si.is_ok
+    v1_compact = _must_assemble(v1_si.value, issuer_priv.sign(
+        v1_si.value.protected_segment + b"." + v1_si.value.payload_segment))
+    v2_si = v2.grant_signing_input(v2.GrantProducer(**v2_kwargs))
+    assert v2_si.is_ok
+    v2_compact = _must_assemble(v2_si.value, issuer_priv.sign(
+        v2_si.value.protected_segment + b"." + v2_si.value.payload_segment))
+    assert decode_grant(v1_compact).is_ok, "control: the v1 grant decodes under v1"
+    assert v2.decode_grant(v2_compact).is_ok, "control: the v2 grant decodes under v2"
+    assert not v2.decode_grant(v1_compact).is_ok, "v1 bytes (v:1) must reject under the v2 façade"
+    assert not decode_grant(v2_compact).is_ok, "v2 bytes (v:2) must reject under the v1 façade"
+    # The v1 closed kind set is unchanged: lte rejects under the shared (v1) selector parse.
+    with pytest.raises(InvalidError):
+        parse_selector(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))

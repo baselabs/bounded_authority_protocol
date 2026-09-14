@@ -1,17 +1,17 @@
 defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
   # Corpus digest regeneration + drift check (spec-decoupling L1, ADR 0019 atomic-landing tooling).
   #
-  # The certified corpus identity is the SHA-256 of priv/conformance/v1/corpus/index.json. It is
-  # machine-pinned in SIX constants — the four SDK conformance runners in their native encodings
-  # (base64url: TypeScript, Go; hex: Python, Rust — encodings stay as-is) plus the two Elixir
-  # pins (the CLI's fail-closed certified-corpus assertion and its test mirror). A rotation that
-  # misses any one of them leaves a runner bound to a stale corpus or the Elixir verifier red;
-  # per the cli.ex rotation contract they all move in the same change, and this script is the one
-  # command that does it.
+  # The certified corpus identity of each major is the SHA-256 of its
+  # priv/conformance/<major>/corpus/index.json. Each is machine-pinned in its constants — the
+  # SDK conformance runners in their native encodings (base64url: TypeScript, Go; hex: Python,
+  # Rust — encodings stay as-is) plus the two Elixir pins (the CLI's fail-closed
+  # certified-corpus map and its test mirror). A rotation that misses any one of them leaves a
+  # runner bound to a stale corpus or the Elixir verifier red; per the cli.ex rotation contract
+  # they all move in the same change, and this script is the one command that does it.
   #
   # Usage:
   #   mix corpus.digests                # CHECK (default): exits red on any drifted/missing pin
-  #   elixir scripts/regen_corpus_digests.exs --write   # rewrite all six constants in place
+  #   elixir scripts/regen_corpus_digests.exs --write   # rewrite all twelve constants in place
   #
   # The check is wired into `mix quality` (corpus.digests leg). Anchors are value-independent
   # (line-prefix matches on each declaration), each must match exactly one line, and every
@@ -19,21 +19,40 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
   # chars) so an anchor that drifts onto the wrong line fails loudly instead of silently.
 
   @root Path.expand("..", __DIR__)
-  @index_path Path.join(@root, "priv/conformance/v1/corpus/index.json")
 
-  # Single-line declarations: {file, encoding, line prefix, line suffix}. The Rust pin is
-  # two-line and handled separately below.
-  @single_line_pins [
-    {"sdks/typescript/conformance/run.ts", :base64url, "const CERTIFIED_INDEX_SHA = \"", "\";"},
-    {"sdks/go/conformance/run_test.go", :base64url, "const certifiedIndexSHA256 = \"", "\""},
-    {"sdks/python/tests/conformance/run.py", :hex, "CERTIFIED_INDEX_SHA = \"", "\""},
-    {"lib/bounded_authority_protocol/conformance/cli.ex", :base64url,
-     "@certified_index_sha256 \"", "\""},
-    {"test/conformance/cli_test.exs", :base64url, "@certified_index_sha256 \"", "\""}
-  ]
+  @majors [1, 2]
+
+  defp index_path(1), do: Path.join(@root, "priv/conformance/v1/corpus/index.json")
+  defp index_path(2), do: Path.join(@root, "priv/conformance/v2/corpus/index.json")
+
+  # Single-line declarations: {file, encoding, line prefix, line suffix}. The Rust pins are
+  # two-line and handled separately below. Each major pins in the same files; the anchors
+  # differ so a major's pin can never silently bind the other's digest.
+  defp single_line_pins(1) do
+    [
+      {"sdks/typescript/conformance/run.ts", :base64url, "const CERTIFIED_INDEX_SHA = \"", "\";"},
+      {"sdks/go/conformance/run_test.go", :base64url, "const certifiedIndexSHA256 = \"", "\""},
+      {"sdks/python/tests/conformance/run.py", :hex, "CERTIFIED_INDEX_SHA = \"", "\""},
+      {"lib/bounded_authority_protocol/conformance/cli.ex", :base64url, "1 => \"", "\","},
+      {"test/conformance/cli_test.exs", :base64url, "1 => \"", "\","}
+    ]
+  end
+
+  defp single_line_pins(2) do
+    [
+      {"sdks/typescript/conformance/run_v2.ts", :base64url, "const CERTIFIED_INDEX_SHA = \"",
+       "\";"},
+      {"sdks/go/conformance/v2_test.go", :base64url, "const certifiedIndexSHA256 = \"", "\""},
+      {"sdks/python/tests/conformance/run_v2.py", :hex, "CERTIFIED_INDEX_SHA = \"", "\""},
+      {"lib/bounded_authority_protocol/conformance/cli.ex", :base64url, "2 => \"", "\""},
+      {"test/conformance/cli_test.exs", :base64url, "2 => \"", "\""}
+    ]
+  end
 
   @rust_pin_file "sdks/rust/conformance/run.rs"
   @rust_pin_marker "const CERTIFIED_INDEX_SHA: &str ="
+  @rust_v2_pin_file "sdks/rust/conformance/run_v2.rs"
+  @rust_v2_pin_marker "const CERTIFIED_INDEX_SHA: &str ="
 
   def run(argv) do
     case argv do
@@ -46,21 +65,22 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
   # --- check -----------------------------------------------------------------
 
   defp check do
-    digests = digests()
-    pin_count = length(@single_line_pins) + 1
+    Enum.each(@majors, fn major ->
+      digests = digests(major)
+      pins = single_line_pins(major)
 
-    problems =
-      Enum.flat_map(@single_line_pins, &check_single_pin(&1, digests)) ++
-        check_rust_pin(digests)
+      problems =
+        Enum.flat_map(pins, &check_single_pin(&1, digests)) ++ check_rust_pin(major, digests)
 
-    case problems do
-      [] ->
-        IO.puts("corpus digests: ok pins=#{pin_count} hex=#{digests.hex}")
-        IO.puts("corpus digests: base64url=#{digests.base64url}")
+      case problems do
+        [] ->
+          IO.puts("corpus digests: major=#{major} ok pins=#{length(pins) + 1} hex=#{digests.hex}")
+          IO.puts("corpus digests: major=#{major} base64url=#{digests.base64url}")
 
-      problems ->
-        raise "corpus digest pin check FAILED:\n" <> Enum.join(problems, "\n")
-    end
+        problems ->
+          raise "corpus digest pin check FAILED (major #{major}):\n" <> Enum.join(problems, "\n")
+      end
+    end)
   end
 
   defp check_single_pin({file, encoding, prefix, suffix}, digests) do
@@ -72,10 +92,17 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
     end
   end
 
-  defp check_rust_pin(digests) do
-    case locate_rust_pin() do
+  defp check_rust_pin(1, digests) do
+    case locate_rust_pin(@rust_pin_file, @rust_pin_marker) do
       {:ok, value} -> shape_problems(:hex, value, @rust_pin_file, digests.hex)
       {:error, reason} -> ["#{@rust_pin_file}: #{reason}"]
+    end
+  end
+
+  defp check_rust_pin(2, digests) do
+    case locate_rust_pin(@rust_v2_pin_file, @rust_v2_pin_marker) do
+      {:ok, value} -> shape_problems(:hex, value, @rust_v2_pin_file, digests.hex)
+      {:error, reason} -> ["#{@rust_v2_pin_file}: #{reason}"]
     end
   end
 
@@ -115,23 +142,27 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
   # --- write -----------------------------------------------------------------
 
   defp write_all do
-    digests = digests()
+    Enum.each(@majors, fn major ->
+      digests = digests(major)
+      pins = single_line_pins(major)
 
-    Enum.each(@single_line_pins, fn {file, encoding, prefix, suffix} ->
-      expected = expected_for(encoding, digests)
+      Enum.each(pins, fn {file, encoding, prefix, suffix} ->
+        expected = expected_for(encoding, digests)
 
-      case rewrite_pin_line(file, prefix, suffix, prefix <> expected <> suffix) do
-        :ok -> IO.puts("rewrote #{file} (#{encoding})")
-        {:error, reason} -> raise "#{file}: #{reason}"
+        case rewrite_pin_line(file, prefix, suffix, prefix <> expected <> suffix) do
+          :ok -> IO.puts("rewrote #{file} major=#{major} (#{encoding})")
+          {:error, reason} -> raise "#{file}: #{reason}"
+        end
+      end)
+
+      rust_file = if(major == 1, do: @rust_pin_file, else: @rust_v2_pin_file)
+
+      case rewrite_rust_line(rust_file, "    \"#{digests.hex}\";") do
+        :ok -> IO.puts("rewrote #{rust_file} major=#{major} (hex)")
+        {:error, reason} -> raise "#{rust_file}: #{reason}"
       end
     end)
 
-    case rewrite_rust_line("    \"#{digests.hex}\";") do
-      :ok -> IO.puts("rewrote #{@rust_pin_file} (hex)")
-      {:error, reason} -> raise "#{@rust_pin_file}: #{reason}"
-    end
-
-    IO.puts("corpus digests: rewrote #{length(@single_line_pins) + 1} pins")
     check()
   end
 
@@ -190,9 +221,9 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
   end
 
   # The Rust constant is the marker line followed by an indented string literal on the next line.
-  defp locate_rust_pin do
-    with {:ok, contents} <- read(Path.join(@root, @rust_pin_file)) do
-      case rust_marker_index(contents) do
+  defp locate_rust_pin(file, marker) do
+    with {:ok, contents} <- read(Path.join(@root, file)) do
+      case rust_marker_index(contents, marker) do
         {:ok, index} ->
           value_line = value_line_after(contents, index)
           extract_value(value_line, "    \"", "\";")
@@ -203,23 +234,24 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
     end
   end
 
-  defp rewrite_rust_line(new_line) do
-    path = Path.join(@root, @rust_pin_file)
+  defp rewrite_rust_line(file, new_line) do
+    path = Path.join(@root, file)
+    marker = if(file == @rust_pin_file, do: @rust_pin_marker, else: @rust_v2_pin_marker)
 
     with {:ok, contents} <- read(path),
-         {:ok, _value} <- locate_rust_pin(),
-         {:ok, index} <- rust_marker_index(contents) do
+         {:ok, _value} <- locate_rust_pin(file, marker),
+         {:ok, index} <- rust_marker_index(contents, marker) do
       write_rewritten(path, contents, fn _line -> false end, new_line, index + 1)
     end
   end
 
-  defp rust_marker_index(contents) do
+  defp rust_marker_index(contents, marker) do
     lines = String.split(contents, "\n")
 
-    case Enum.with_index(lines) |> Enum.filter(fn {line, _i} -> line == @rust_pin_marker end) do
+    case Enum.with_index(lines) |> Enum.filter(fn {line, _i} -> line == marker end) do
       [{_line, index}] -> {:ok, index}
-      [] -> {:error, "no exact #{@rust_pin_marker} line (pin deleted or renamed?)"}
-      _ -> {:error, "multiple #{@rust_pin_marker} lines (ambiguous anchor)"}
+      [] -> {:error, "no exact #{marker} line (pin deleted or renamed?)"}
+      _ -> {:error, "multiple #{marker} lines (ambiguous anchor)"}
     end
   end
 
@@ -263,8 +295,8 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
 
   # --- corpus digest -----------------------------------------------------------
 
-  defp digests do
-    case File.read(@index_path) do
+  defp digests(major) do
+    case File.read(index_path(major)) do
       {:ok, bytes} ->
         digest = :crypto.hash(:sha256, bytes)
 
@@ -274,7 +306,7 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
         }
 
       {:error, reason} ->
-        raise "cannot read corpus index #{@index_path}: #{inspect(reason)}"
+        raise "cannot read corpus index #{index_path(major)}: #{inspect(reason)}"
     end
   end
 

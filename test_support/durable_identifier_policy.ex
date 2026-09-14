@@ -2,8 +2,8 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
   @moduledoc false
 
   @owned_roots ["lib", "priv", "scripts", "sdks", "test", "test_support", "docs"]
-  @requirement_surfaces ~w(B64 BOUNDS CHAIN CLAIM CORE DIGEST EVO EXPORT HEADER JSON LOCATOR SCHEMA SELECTOR SIGNING URI VERIFY)
-  @wire_domains ~w(BAP1-ARCHIVE BAP1-CHAIN BAP1-GRANT BAP1-PROOF BAP1-REQUEST)
+  @requirement_surfaces ~w(B64 BOUNDS CHAIN CLAIM CORE CORPUS DIGEST EVO EXPORT HEADER JSON LOCATOR SCHEMA SELECTOR SIGNING URI VERIFY)
+  @wire_domains ~w(BAP1-ARCHIVE BAP1-CHAIN BAP1-GRANT BAP1-PROOF BAP1-REQUEST BAP2-ARCHIVE BAP2-CHAIN BAP2-REQUEST)
   @external_v1_paths MapSet.new([
                        "lib/bounded_authority_protocol/conformance/corpus.ex",
                        "lib/bounded_authority_protocol/conformance/report.ex",
@@ -154,23 +154,26 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
   defp contract_identity?("mix.exs", :package_source_ref, ~S(source_ref: "v#{@version}")),
     do: true
 
-  defp contract_identity?(path, :wire_suite, "BAP1-Ed25519-SHA256"),
-    do: contract_content_surface?(path)
+  defp contract_identity?(path, :wire_suite, suite)
+      when suite in ["BAP1-Ed25519-SHA256", "BAP2-Ed25519-SHA256"],
+      do: contract_content_surface?(path)
 
   defp contract_identity?(path, :wire_domain, name),
     do: name in @wire_domains and contract_content_surface?(path)
 
-  defp contract_identity?(path, :wire_field, ~s("v": 1)),
-    do: contract_content_surface?(path)
+  defp contract_identity?(path, :wire_field, field)
+      when field in [~s("v": 1), ~s("v": 2)],
+      do: contract_content_surface?(path)
 
-  defp contract_identity?(path, :external_wire_module, "BoundedAuthorityProtocol.V1"),
-    do: external_namespace_path?(path)
+  defp contract_identity?(path, :external_wire_module, namespace)
+      when namespace in ["BoundedAuthorityProtocol.V1", "BoundedAuthorityProtocol.V2"],
+      do: external_namespace_path?(path)
 
   defp contract_identity?("scripts/check_package.exs", :atom, "V1"), do: true
 
   defp contract_identity?(path, :requirement_id, name) do
-    case Regex.run(~r/\AREQ1-([A-Z0-9]+)-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\z/, name) do
-      [_, surface] ->
+    case Regex.run(~r/\AREQ([12])-([A-Z0-9]+)-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\z/, name) do
+      [_, _major, surface] ->
         contract_content_surface?(path) and surface in @requirement_surfaces and
           MapSet.member?(@requirement_ids, name)
 
@@ -186,6 +189,9 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
     ((name == "BoundedAuthorityProtocol.V1" or
         String.starts_with?(name, "BoundedAuthorityProtocol.V1.")) and
        current_major_source_path?(path)) or
+      ((name == "BoundedAuthorityProtocol.V2" or
+          String.starts_with?(name, "BoundedAuthorityProtocol.V2.")) and
+         successor_major_source_path?(path)) or
       (String.starts_with?(
          name,
          "BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1"
@@ -194,16 +200,43 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
          path == "test/conformance/v1_schema_test.exs")
   end
 
-  defp contract_identity?("sdks/rust/src/lib.rs", :sdk_identifier, "v1"), do: true
+  defp contract_identity?("sdks/rust/src/lib.rs", :sdk_identifier, name) when name in ["v1", "v2"],
+    do: true
+
+  # Shared-module API names that deliberately carry the successor major (the v2 request
+  # digest lives beside the unsuffixed v1 one in the same shared module): accepted only on
+  # their enumerated files.
+  defp contract_identity?(
+         path,
+         :sdk_identifier,
+         name
+       )
+       when path in ["sdks/python/src/bounded_authority_verifier/digest.py", "sdks/python/src/bounded_authority_verifier/__init__.py"] and
+              name in ["REQUEST_PREFIX_V2", "request_digest_v2", "ROW_PREFIX_V2", "ARCHIVE_PREFIX_V2", "VERSION_2"],
+    do: true
 
   defp contract_identity?(_path, _kind, _name), do: false
 
   defp current_major_path?(path, "v1"),
     do: current_major_source_path?(path) or MapSet.member?(@local_loopback_profile_paths, path)
 
+  defp current_major_path?(path, "v2"), do: successor_major_source_path?(path)
+  defp current_major_path?(path, "run_v2")
+      when path in ["sdks/python/tests/conformance/run_v2.py", "sdks/rust/conformance/run_v2.rs",
+                    "sdks/typescript/conformance/run_v2.ts"],
+      do: true
+  defp current_major_path?(path, "v2_test"), do: path == "sdks/go/conformance/v2_test.go"
+
+  defp current_major_path?(path, "corpus-v2"),
+    do:
+      String.starts_with?(path, "sdks/go/conformance/corpus-v2/") or
+        String.starts_with?(path, "sdks/rust/conformance/corpus-v2/")
+
   defp current_major_path?(path, name) do
     {path, name} in [
       {"docs/protocol-v1.md", "protocol-v1"},
+      {"spec/bap-v2.md", "bap-v2"},
+      {"docs/adr/0030-v2-contract-major-activation.md", "0030-v2-contract-major-activation"},
       {"docs/adr/0002-normative-v1-parsing-profile.md", "0002-normative-v1-parsing-profile"},
       {"docs/adr/0021-v1-all-selector-recognized-shapes-erratum.md",
        "0021-v1-all-selector-recognized-shapes-erratum"},
@@ -228,6 +261,26 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
         "sdks/python/src/bounded_authority_verifier/v1.py",
         "sdks/rust/src/v1.rs",
         "sdks/typescript/src/v1.ts"
+      ]
+  end
+
+  # The accepted successor-major contract families (ADR 0030 activation): the V2 namespace,
+  # the v2 corpus, the v2 SDK profiles, and the v2 conformance runners.
+  defp successor_major_source_path?(path) do
+    Regex.match?(~r"\Alib/bounded_authority_protocol/v2(?:\.ex|/)", path) or
+      String.starts_with?(path, "test/bounded_authority_protocol/v2/") or
+      String.starts_with?(path, "priv/conformance/v2/") or
+      path in [
+        "sdks/go/v2.go",
+        "sdks/go/conformance/v2_test.go",
+        "sdks/python/src/bounded_authority_verifier/v2.py",
+        "sdks/python/tests/conformance/run_v2.py",
+        "sdks/rust/src/v2.rs",
+        "sdks/rust/conformance/run_v2.rs",
+        "sdks/typescript/src/v2.ts",
+        "sdks/typescript/conformance/run_v2.ts",
+        "conformance/generators/build_corpus.mjs",
+        "conformance/generators/curated-inputs-v2.json"
       ]
   end
 
@@ -336,7 +389,10 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
   end
 
   defp external_namespace_path?(path) do
-    current_major_source_path?(path) or
+    successor_major_source_path?(path) or
+      String.starts_with?(path, "test/bounded_authority_protocol/v2/") or
+      String.starts_with?(path, "test/conformance/") or
+      current_major_source_path?(path) or
       MapSet.member?(@local_loopback_profile_paths, path) or
       MapSet.member?(@external_v1_paths, path) or
       path == "scripts/check_package.exs" or

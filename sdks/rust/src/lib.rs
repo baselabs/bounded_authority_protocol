@@ -1,11 +1,13 @@
-//! Bounded proof-of-possession authority verification — frozen v1 profile.
+//! Bounded proof-of-possession authority verification — frozen v1 profile and
+//! contract-major v2 profile.
 //!
 //! Pure, deterministic, fail-closed reimplementation of the v1 profile from
-//! `spec/bap-v1.md`, governed by the ADRs and the conformance corpus.
-//! **Verification is not authority**: a successful result proves only that
-//! caller-supplied bytes satisfy caller-supplied trusted inputs and expected
-//! context. It never selects keys, reserves replay, grants execution, or
-//! overrides a host policy.
+//! `spec/bap-v1.md` and the v2 profile (`BAP2-Ed25519-SHA256`) from the same
+//! requirement table carried at major 2, governed by the ADRs and the
+//! per-major conformance corpora. **Verification is not authority**: a
+//! successful result proves only that caller-supplied bytes satisfy
+//! caller-supplied trusted inputs and expected context. It never selects
+//! keys, reserves replay, grants execution, or overrides a host policy.
 //!
 //! Every public function returns [`Result<T>`](crate::Result), the Rust
 //! spelling of `{:ok, value}` / `{:error, :invalid}`. There is exactly one
@@ -23,6 +25,7 @@ pub mod jwk;
 pub mod types;
 pub mod uri;
 pub mod v1;
+pub mod v2;
 
 // `compact`, `digest`, `ed25519`, and `selector` are internal mechanics behind
 // the v1 façade (spec/bap-v1.md §lines 329–330 names only `jcs`/`jwk`/`uri`/
@@ -54,6 +57,11 @@ pub(crate) mod selector;
 // `compact`. `request_digest` is re-exported from the internal `digest` MODULE
 // (the function is public — spec/bap-v1.md line 304 — even though the module is
 // not a stable façade contract — line 329).
+//
+// The v2 façade keeps its entry points on the `v2` module (`v2::verify_grant`
+// etc.): the two majors expose same-named functions with byte-distinct
+// contracts, so a root-level re-export set would collide; the module path IS
+// the major namespace.
 pub use digest::request_digest;
 pub use v1::assemble_compact;
 pub use v1::{

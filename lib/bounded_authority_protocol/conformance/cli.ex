@@ -26,13 +26,17 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
 
   @usage "usage: bounded_authority_conformance --corpus DIR [--report PATH]\n"
 
-  # The certified corpus identity (ADR 0014 D4): base64url SHA-256 of the exact index.json bytes
-  # this verifier was certified against. The three SDK runners pin the identical value; this closes
-  # the parity gap so `mix conformance.verify` fails closed on a corpus that is internally
-  # self-consistent but is NOT the certified corpus (e.g. a regenerated index over a shrunken case
-  # set — which passes integrity + agreement, so nothing else here would catch it). To rotate the
-  # corpus, bump this constant AND every SDK runner's CERTIFIED_INDEX_SHA in the same change.
-  @certified_index_sha256 "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs"
+  # The certified corpus identities (ADR 0014 D4): base64url SHA-256 of the exact index.json
+  # bytes this verifier was certified against, keyed by the corpus's contract-major. The SDK
+  # runners pin the identical values; this closes the parity gap so `mix conformance.verify`
+  # fails closed on a corpus that is internally self-consistent but is NOT the certified corpus
+  # (e.g. a regenerated index over a shrunken case set — which passes integrity + agreement, so
+  # nothing else here would catch it). To rotate either corpus, bump its constant AND every SDK
+  # runner's certified pin for that major in the same change (scripts/regen_corpus_digests.exs).
+  @certified_index_sha256 %{
+    1 => "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs",
+    2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A"
+  }
 
   @doc """
   Runs the CLI against `argv` and returns the contract exit status (0/1/2).
@@ -101,7 +105,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   # against, so a regenerated-index shrunken corpus (self-consistent, all present cases agree) does
   # not pass verification.
   defp assert_certified_corpus(corpus) do
-    if Report.index_identity(corpus.index_bytes) == @certified_index_sha256 do
+    if Report.index_identity(corpus.index_bytes) == Map.get(@certified_index_sha256, corpus.major) do
       :ok
     else
       {:error, :uncertified_corpus}

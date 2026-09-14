@@ -34,11 +34,17 @@ use crate::jcs::jcs_encode;
 use crate::json::JsonValue;
 use sha2::{Digest, Sha256};
 
-/// The ASCII domain-separation prefix for the request digest, including its
+/// The ASCII domain-separation prefix for the v1 request digest, including its
 /// FINAL NUL byte (`REQ1-SIGNING-digest-prefix`).
 ///
 /// `"BAP1-REQUEST\0"` = `[B, A, P, 1, -, R, E, Q, U, E, S, T, 0x00]` (13 bytes).
 const REQUEST_DIGEST_PREFIX: &[u8] = b"BAP1-REQUEST\0";
+
+/// The v2 domain-separation prefix (the `BAP2-Ed25519-SHA256` suite): the same
+/// 13-byte shape with the major digit advanced. A v1 preimage hashed under this
+/// prefix (or vice versa) yields a different digest — the two majors never share
+/// a request-binding domain.
+const SUCCESSOR_REQUEST_DIGEST_PREFIX: &[u8] = b"BAP2-REQUEST\0";
 
 /// Compute the v1 request digest.
 ///
@@ -49,6 +55,33 @@ const REQUEST_DIGEST_PREFIX: &[u8] = b"BAP1-REQUEST\0";
 /// object-name ceilings), the structure contains a non-finite float, or the JCS
 /// encoding exceeds `bounds.jcs_bytes()`.
 pub fn request_digest(
+    operation: &str,
+    cast_arguments: &JsonValue,
+    bounds: &Bounds,
+) -> Result<Vec<u8>> {
+    request_digest_with(REQUEST_DIGEST_PREFIX, operation, cast_arguments, bounds)
+}
+
+/// Compute the v2 request digest — the identical typed projection and JCS
+/// preimage, hashed under `BAP2-REQUEST\0` (the v2 façade's binding primitive).
+pub(crate) fn request_digest_successor(
+    operation: &str,
+    cast_arguments: &JsonValue,
+    bounds: &Bounds,
+) -> Result<Vec<u8>> {
+    request_digest_with(
+        SUCCESSOR_REQUEST_DIGEST_PREFIX,
+        operation,
+        cast_arguments,
+        bounds,
+    )
+}
+
+/// The shared digest pipeline: bound the raw operation, project `cast_arguments`
+/// through `typed/1`, bound the projected structure, JCS-encode, and SHA-256
+/// under the caller's major-specific domain prefix.
+fn request_digest_with(
+    prefix: &[u8],
     operation: &str,
     cast_arguments: &JsonValue,
     bounds: &Bounds,
@@ -72,7 +105,7 @@ pub fn request_digest(
 
     // SHA-256 over the exact prefix || JCS preimage.
     let mut hasher = Sha256::new();
-    hasher.update(REQUEST_DIGEST_PREFIX);
+    hasher.update(prefix);
     hasher.update(&jcs_bytes);
     let output = hasher.finalize();
 
@@ -218,6 +251,32 @@ mod tests {
         assert_ne!(
             correct, wrong,
             "digest MUST change when the NUL byte is dropped"
+        );
+    }
+
+    // ==========================================================================
+    // v2 domain separation — BAP2-REQUEST\0 (the v2 façade's binding primitive)
+    // ==========================================================================
+
+    #[test]
+    fn successor_prefix_is_exact_ascii_with_nul_byte() {
+        // "BAP2-REQUEST\0" = 12 ASCII chars + 1 NUL byte = 13 bytes.
+        assert_eq!(SUCCESSOR_REQUEST_DIGEST_PREFIX, b"BAP2-REQUEST\0");
+        assert_eq!(SUCCESSOR_REQUEST_DIGEST_PREFIX.len(), 13);
+        assert_eq!(SUCCESSOR_REQUEST_DIGEST_PREFIX.last(), Some(&0u8));
+    }
+
+    #[test]
+    fn the_two_major_prefixes_yield_distinct_digests_for_identical_input() {
+        // Domain separation: the SAME operation + cast_arguments MUST produce
+        // different digests under the two majors — a shared digest would let a
+        // v1 proof's ba_req satisfy a v2 binding (and vice versa).
+        let args = JsonValue::Object(vec![("limit".to_string(), JsonValue::Int(10))]);
+        let prior = request_digest("read", &args, &max()).expect("v1 digest");
+        let successor = request_digest_successor("read", &args, &max()).expect("v2 digest");
+        assert_ne!(
+            prior, successor,
+            "BAP1/BAP2 request digests must never collide"
         );
     }
 

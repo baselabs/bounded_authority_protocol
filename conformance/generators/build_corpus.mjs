@@ -18,23 +18,36 @@
 //     tamper case's verbatim bytes equal base-with-one-flip re-derived from its base case).
 //
 // Usage:
-//   node conformance/generators/build_corpus.mjs --verify [--corpus DIR]
-//   node conformance/generators/build_corpus.mjs --rebuild-index [--corpus DIR]   # requires revision.json
-//   node conformance/generators/build_corpus.mjs --bump-revision --note TEXT [--corpus DIR]
+//   node conformance/generators/build_corpus.mjs --verify [--corpus DIR] [--major 1|2]
+//   node conformance/generators/build_corpus.mjs --rebuild-index [--corpus DIR] [--major 1|2]
+//   node conformance/generators/build_corpus.mjs --bump-revision --note TEXT [--corpus DIR] [--major 1|2]
 //
-// DIR defaults to priv/conformance/v1/corpus (repo-relative).
+// DIR defaults to priv/conformance/<major>/corpus (repo-relative); --major selects the
+// corpus family's format constants and curated-inputs file (default 1).
 
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const REPO_ROOT = join(import.meta.dirname, "..", "..");
-const DEFAULT_CORPUS = join(REPO_ROOT, "priv", "conformance/v1/corpus");
-const CURATED_PATH = join(import.meta.dirname, "curated-inputs.json");
 
-const INDEX_FORMAT = "bounded-authority-protocol-v1-conformance-corpus-index";
-const CASES_FORMAT = "bounded-authority-protocol-v1-conformance-cases";
-const REVISION_FORMAT = "bounded-authority-protocol-v1-conformance-corpus-revision";
+const FORMATS_BY_MAJOR = {
+  1: {
+    corpus: join(REPO_ROOT, "priv", "conformance/v1/corpus"),
+    curated: join(import.meta.dirname, "curated-inputs.json"),
+    index: "bounded-authority-protocol-v1-conformance-corpus-index",
+    cases: "bounded-authority-protocol-v1-conformance-cases",
+    revision: "bounded-authority-protocol-v1-conformance-corpus-revision",
+  },
+  2: {
+    corpus: join(REPO_ROOT, "priv", "conformance/v2/corpus"),
+    curated: join(import.meta.dirname, "curated-inputs-v2.json"),
+    index: "bounded-authority-protocol-v2-conformance-corpus-index",
+    cases: "bounded-authority-protocol-v2-conformance-cases",
+    revision: "bounded-authority-protocol-v2-conformance-corpus-revision",
+  },
+};
+
 const REVISION_PATH = "revision.json";
 
 const SURFACES = [
@@ -87,16 +100,19 @@ function listFiles(dir) {
 }
 
 function parseArgs(argv) {
-  const args = { corpus: DEFAULT_CORPUS };
+  const args = { major: 1 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--corpus") args.corpus = argv[++i];
+    else if (a === "--major") args.major = Number(argv[++i]);
     else if (a === "--verify") args.mode = "verify";
     else if (a === "--rebuild-index") args.mode = "rebuild";
     else if (a === "--bump-revision") args.mode = "bump";
     else if (a === "--note") args.note = argv[++i];
     else fail(`unknown argument ${a}`);
   }
+  if (![1, 2].includes(args.major)) fail("--major must be 1 or 2");
+  if (!args.corpus) args.corpus = FORMATS_BY_MAJOR[args.major].corpus;
   if (!args.mode) fail("one of --verify | --rebuild-index | --bump-revision is required");
   if (args.mode === "bump" && !args.note) fail("--bump-revision requires --note");
   return args;
@@ -116,14 +132,14 @@ function loadCases(corpusDir) {
   return casesByPath;
 }
 
-function caseMeta(rel, bytes) {
+function caseMeta(rel, bytes, formats) {
   if (rel.endsWith(".raw")) return { cases: 0 };
   const parsed = JSON.parse(bytes.toString("utf8"));
-  if (parsed.format !== CASES_FORMAT) fail(`${rel}: not a case file (${parsed.format})`);
+  if (parsed.format !== formats.cases) fail(`${rel}: not a case file (${parsed.format})`);
   return { cases: parsed.cases.length, parsed };
 }
 
-function applicability(casesByPath, naReasons) {
+function applicability(casesByPath, naReasons, formats) {
   const counts = {};
   for (const surface of SURFACES) {
     counts[surface] = {};
@@ -131,7 +147,7 @@ function applicability(casesByPath, naReasons) {
   }
   for (const [rel, bytes] of casesByPath) {
     if (rel.endsWith(".raw")) continue;
-    const { parsed } = caseMeta(rel, bytes);
+    const { parsed } = caseMeta(rel, bytes, formats);
     for (const c of parsed.cases) {
       if (!(c.surface in counts) || !(c.class in counts[c.surface])) {
         fail(`${rel}: unknown surface/class ${c.surface}/${c.class}`);
@@ -155,12 +171,12 @@ function applicability(casesByPath, naReasons) {
   return matrix;
 }
 
-function buildIndex(corpusDir, casesByPath, curated, revisionBytes) {
+function buildIndex(corpusDir, casesByPath, curated, revisionBytes, formats) {
   const files = [...casesByPath.entries()]
     .map(([rel, bytes]) => ({
       path: rel,
       sha256_base64url: sha256B64u(bytes),
-      cases: caseMeta(rel, bytes).cases,
+      cases: caseMeta(rel, bytes, formats).cases,
     }));
   files.push({
     path: REVISION_PATH,
@@ -169,32 +185,32 @@ function buildIndex(corpusDir, casesByPath, curated, revisionBytes) {
   });
   files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   return {
-    format: INDEX_FORMAT,
+    format: formats.index,
     public_key_fingerprints: curated.public_key_fingerprints,
     files,
     total_cases: files.reduce((acc, f) => acc + f.cases, 0),
-    applicability: applicability(casesByPath, curated.applicability_n_a_reasons),
+    applicability: applicability(casesByPath, curated.applicability_n_a_reasons, formats),
   };
 }
 
 // ---- revision sidecar -------------------------------------------------------
 
-function revisionBytes(corpusDir) {
+function revisionBytes(corpusDir, formats) {
   const path = join(corpusDir, REVISION_PATH);
   const bytes = readFileSync(path);
   const parsed = JSON.parse(bytes.toString("utf8"));
-  if (parsed.format !== REVISION_FORMAT) fail(`${REVISION_PATH}: bad format`);
+  if (parsed.format !== formats.revision) fail(`${REVISION_PATH}: bad format`);
   if (!Number.isInteger(parsed.revision) || parsed.revision < 1) fail(`${REVISION_PATH}: bad revision`);
   return bytes;
 }
 
 // Every tamper case's verbatim artifact must equal its base case with exactly the documented
 // byte flipped (target resolution mirrors the loaders' tamper audit).
-function verifyTampers(casesByPath) {
+function verifyTampers(casesByPath, formats) {
   const byId = new Map();
   for (const [rel, bytes] of casesByPath) {
     if (rel.endsWith(".raw")) continue;
-    for (const c of caseMeta(rel, bytes).parsed.cases) byId.set(c.id, c);
+    for (const c of caseMeta(rel, bytes, formats).parsed.cases) byId.set(c.id, c);
   }
   let checked = 0;
   for (const c of byId.values()) {
@@ -233,21 +249,22 @@ function targetBytes(input, target) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  const curated = JSON.parse(readFileSync(CURATED_PATH, "utf8"));
+  const formats = FORMATS_BY_MAJOR[args.major];
+  const curated = JSON.parse(readFileSync(formats.curated, "utf8"));
   const casesByPath = loadCases(args.corpus);
 
   if (args.mode === "bump") {
-    const current = JSON.parse(revisionBytes(args.corpus).toString("utf8"));
+    const current = JSON.parse(revisionBytes(args.corpus, formats).toString("utf8"));
     const sidecar = {
-      format: REVISION_FORMAT,
+      format: formats.revision,
       revision: current.revision + 1,
       generated_from: args.note,
     };
     writeFileSync(join(args.corpus, REVISION_PATH), canonical(sidecar));
   }
 
-  const revBytes = revisionBytes(args.corpus);
-  const index = buildIndex(args.corpus, casesByPath, curated, revBytes);
+  const revBytes = revisionBytes(args.corpus, formats);
+  const index = buildIndex(args.corpus, casesByPath, curated, revBytes, formats);
   const rebuilt = canonical(index);
 
   if (args.mode === "rebuild" || args.mode === "bump") {
@@ -261,7 +278,7 @@ function main() {
   if (!shipped.equals(Buffer.from(rebuilt, "utf8"))) {
     fail("index.json does not equal the rebuild (corpus or curated inputs drifted)");
   }
-  const tampers = verifyTampers(casesByPath);
+  const tampers = verifyTampers(casesByPath, formats);
   const revision = JSON.parse(revBytes.toString("utf8")).revision;
   console.log(
     `build_corpus: verify ok (files=${index.files.length}, total_cases=${index.total_cases}, ` +

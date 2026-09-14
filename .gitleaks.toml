@@ -22,7 +22,7 @@ regexes = ['''eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+''']
 description = "Public-key-only conformance fixtures: corpus, vectors, vendored SDK snapshots, independent runners — public material by construction (critical rule 6)"
 paths = [
   '''priv/conformance/.*''',
-  '''sdks/(rust|go)/conformance/corpus/.*''',
+  '''sdks/(rust|go)/conformance/corpus(-v2)?/.*''',
   '''sdks/(typescript|python)/conformance/.*''',
   '''conformance/.*\.mjs''',
   '''spec/facts/.*''',

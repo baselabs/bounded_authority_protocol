@@ -29,6 +29,70 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
   # does NOT (it proxies args to `elixir scripts/check_architecture.exs`, which exits 2 on any
   # unknown flag — so appending would make every architecture entry spuriously red).
   @mutations [
+    # --- v2 range-selector + cross-major activation proofs (BAP-21 / ADR 0030) ----
+    %{
+      # Strictness mutation: the inclusive lte comparison flipped to strict reddens the
+      # boundary-equal corpus case (argument == bound must PASS for inclusive kinds).
+      name: "v2-selector-lte-strict",
+      path: "lib/bounded_authority_protocol/v2/selector.ex",
+      from: "  defp lte?({:integer, left}, {:integer, right}), do: left <= right\n",
+      to: "  defp lte?({:integer, left}, {:integer, right}), do: left < right\n",
+      command: ["mix", "test", "test/conformance/cli_test.exs:43"]
+    },
+    %{
+      # Same-tag domain removed: the cross-tag fall-through compares numerically, so the
+      # integer-bound/float-argument corpus case flips to valid.
+      name: "v2-selector-same-tag-removed",
+      path: "lib/bounded_authority_protocol/v2/selector.ex",
+      from:
+        "  defp lte?(_left, _right), do: false\n\n  defp gte?({:integer, left}, {:integer, right}), do: left >= right\n  defp gte?({:float, left}, {:float, right}), do: left >= right\n  defp gte?(_left, _right), do: false",
+      to:
+        "  defp lte?({_tag, left}, {_other, right}), do: is_number(left) and is_number(right) and left <= right\n\n  defp gte?({:integer, left}, {:integer, right}), do: left >= right\n  defp gte?({:float, left}, {:float, right}), do: left >= right\n  defp gte?({_tag, left}, {_other, right}), do: is_number(left) and is_number(right) and left >= right",
+      command: ["mix", "test", "test/conformance/cli_test.exs:43"]
+    },
+    %{
+      # Kind swap: decoding lte as gte and gte as lte (both clauses swapped, so
+      # range-bearing grants still decode — evaluated under the flipped kind)
+      # flips the exceeded/unmet reject cases.
+      name: "v2-selector-kinds-swapped",
+      path: "lib/bounded_authority_protocol/v2/runtime.ex",
+      from:
+        "      {:ok,\n       %{\n         \"kind\" => {:string, \"lte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end\n\n      {:ok,\n       %{\n         \"kind\" => {:string, \"gte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:gte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end",
+      to:
+        "      {:ok,\n       %{\n         \"kind\" => {:string, \"lte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:gte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end\n\n      {:ok,\n       %{\n         \"kind\" => {:string, \"gte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end",
+      command: ["mix", "test", "test/conformance/cli_test.exs:43"]
+    },
+    %{
+      # Numeric-bound check dropped at decode: a string lte bound now decodes, so the
+      # non-numeric-bound corpus cases flip to valid.
+      name: "v2-selector-non-numeric-bound-accepted",
+      path: "lib/bounded_authority_protocol/v2/runtime.ex",
+      from:
+        "             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}",
+      to:
+        "             true <- path != [],\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}",
+      command: ["mix", "test", "test/conformance/cli_test.exs:43"]
+    },
+    %{
+      # Cross-major downgrade: the v2 grant decode accepting v:1 reddens the cross-major
+      # corpus cases (a v1 grant must stay invalid under v2 — no downgrade path).
+      name: "v2-cross-major-grant-v-accepted",
+      path: "lib/bounded_authority_protocol/v2/runtime.ex",
+      from:
+        "         true <- valid_key_id?(key_id, bounds),\n         {:integer, 2} <- payload[\"v\"],\n         {:string, issuer} <- payload[\"iss\"],",
+      to:
+        "         true <- valid_key_id?(key_id, bounds),\n         true <- payload[\"v\"] in [{:integer, 1}, {:integer, 2}],\n         {:string, issuer} <- payload[\"iss\"],",
+      command: ["mix", "test", "test/conformance/cli_test.exs:43"]
+    },
+    %{
+      # Domain-separator downgrade: BAP2-REQUEST\\0 flipped to BAP1 reddens every
+      # request-digest corpus case (the digest is prefix-bound).
+      name: "v2-request-digest-prefix-downgraded",
+      path: "lib/bounded_authority_protocol/v2/request_digest.ex",
+      from: "  @prefix <<\"BAP2-REQUEST\", 0>>\n",
+      to: "  @prefix <<\"BAP1-REQUEST\", 0>>\n",
+      command: ["mix", "test", "test/conformance/cli_test.exs:43"]
+    },
     # --- C1 purity carve-out proofs (per-file keying) -------------------------
     %{
       # A planted System.halt(0) in cli.ex (the carve-out module that must NOT halt) turns the
@@ -90,7 +154,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "      {:ok, ^total} -> :ok",
       to: "      {:ok, _} -> :ok",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:586"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:607"]
     },
     %{
       # Disabling the per-file SHA-256 equality (always-true guard) lets a corpus with a stale
@@ -100,7 +164,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "           true <- sha256_b64(bytes) == hash do",
       to: "           true <- true do",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:449"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:470"]
     },
     # --- V3 corpus integrity: exact file-set equality -------------------------
     %{
@@ -114,7 +178,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "    if MapSet.equal?(declared, present),",
       to: "    if true,",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:476"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:497"]
     },
     # --- V2 corpus integrity: applicability required cells --------------------
     %{
@@ -126,7 +190,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "      n when is_integer(n) and n >= 1 -> observed_count == n",
       to: "      n when is_integer(n) and n >= 1 -> true",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:621"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:642"]
     },
     # --- Q25 corpus integrity: tamper verbatim-vs-derived equality ------------
     %{
@@ -138,7 +202,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "      derived == verbatim_bytes",
       to: "      true",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:677"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:698"]
     },
     # --- independent runner verdict agreement ---------------------------------
     %{
@@ -197,7 +261,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "      t when t in [\"compact\", \"grant\", \"proof\"] -> string_target_bytes(input, t)",
       to: "      t when t in [\"compact\", \"grant\", \"proof\"] -> text_target_bytes(input)",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:762"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:783"]
     },
     %{
       # The independent Node runner's verbatim-vs-derived tamper audit must run at load. Removing
@@ -335,7 +399,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "         :ok <- Selector.match_all(operation.selectors, expected.cast_arguments, bounds),\n",
       to:
         "         :ok <-\n           (if is_nil(operation.selectors),\n              do: Selector.match_all(operation.selectors, expected.cast_arguments, bounds),\n              else: :ok),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:38"]
+      command: ["mix", "test", "test/conformance/cli_test.exs:39"]
     },
     # --- check_envelope authority bindings (BAP-05 selector closeout) ----------
     # Each binding below is the SOLE rejecter of one shipped invalid_claim case, so neutralizing it
@@ -351,7 +415,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "    with true <- secure_equal?(proof.holder_thumbprint, grant.holder_thumbprint),\n",
       to:
         "    with true <-\n           (if is_nil(proof.holder_thumbprint),\n              do: secure_equal?(proof.holder_thumbprint, grant.holder_thumbprint),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:38"]
+      command: ["mix", "test", "test/conformance/cli_test.exs:39"]
     },
     %{
       # Grant binding (`ath`): without it a proof minted over one grant is replayable against a
@@ -362,7 +426,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "         true <- secure_equal?(proof.grant_hash, grant_hash),\n",
       to:
         "         true <-\n           (if is_nil(proof.grant_hash),\n              do: secure_equal?(proof.grant_hash, grant_hash),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:38"]
+      command: ["mix", "test", "test/conformance/cli_test.exs:39"]
     },
     %{
       # Request-argument binding (`ba_req`): without it a proof is replayable with different cast
@@ -373,7 +437,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "         true <- secure_equal?(proof.request_hash, request_hash),\n",
       to:
         "         true <-\n           (if is_nil(proof.request_hash),\n              do: secure_equal?(proof.request_hash, request_hash),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:38"]
+      command: ["mix", "test", "test/conformance/cli_test.exs:39"]
     },
     %{
       # Operation binding (`ba_op`): the request digest is computed over the SERVER-derived
@@ -388,7 +452,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "         true <- secure_equal?(proof.operation, expected.operation),\n",
       to:
         "         true <-\n           (if is_nil(proof.operation),\n              do: secure_equal?(proof.operation, expected.operation),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:38"]
+      command: ["mix", "test", "test/conformance/cli_test.exs:39"]
     },
     %{
       # Node-side selector PATH validation. The official rejects an empty selector path at grant
@@ -592,7 +656,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "    if length(all_ids) == MapSet.size(MapSet.new(all_ids)) and Enum.all?(all_ids, &is_binary/1),",
       to: "    if true,",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:668"]
+      command: ["mix", "test", "test/conformance/corpus_test.exs:689"]
     },
     # --- runner permissiveness residuals: the four closed permissive gaps + the guard family -----
     %{

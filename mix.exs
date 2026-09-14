@@ -79,6 +79,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "priv/conformance/v1/corpus",
         "priv/conformance/v1/schemas",
         "priv/conformance/v1/vectors",
+        "priv/conformance/v2/corpus",
         "priv/conformance/application-profiles/local-loopback-http/v1",
         ".formatter.exs",
         "mix.exs",
@@ -113,6 +114,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0021-v1-all-selector-recognized-shapes-erratum.md",
         "docs/adr/0022-durable-contract-identities.md",
         "docs/adr/0027-byte-distinct-application-proof-profiles.md",
+        "docs/adr/0028-range-selector-kinds.md",
+        "docs/adr/0030-v2-contract-major-activation.md",
         "docs/protocol-v1.md",
         "docs/release-candidate-contract.md",
         "docs/errata.md",
@@ -133,6 +136,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/design/protocol-charter.md",
         "docs/design/registries.md",
         "docs/design/requirement-map.md",
+        "docs/design/successor-major-charter.md",
         "docs/design/local-loopback-http-requirement-map.md",
         "docs/design/standards-track.md",
         "docs/design/threat-model.md"
@@ -169,6 +173,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "SECURITY.md",
         "usage-rules.md",
         "spec/bap-v1.md",
+        "spec/bap-v2.md",
         "spec/bap-local-loopback-http-v1.md",
         "docs/protocol-v1.md",
         "docs/release-candidate-contract.md",
@@ -195,6 +200,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0021-v1-all-selector-recognized-shapes-erratum.md",
         "docs/adr/0022-durable-contract-identities.md",
         "docs/adr/0027-byte-distinct-application-proof-profiles.md",
+        "docs/adr/0028-range-selector-kinds.md",
+        "docs/adr/0030-v2-contract-major-activation.md",
         "docs/errata.md",
         "docs/governance.md",
         "docs/design/conformance-contract.md",
@@ -207,6 +214,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/design/requirement-map.md",
         "docs/design/local-loopback-http-requirement-map.md",
         "docs/design/standards-track.md",
+        "docs/design/successor-major-charter.md",
         "docs/design/threat-model.md"
       ]
     ]
@@ -240,7 +248,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
       ],
       "conformance.verify": [
         "escript.build",
-        "cmd ./bounded_authority_conformance --corpus priv/conformance/v1/corpus"
+        "cmd ./bounded_authority_conformance --corpus priv/conformance/v1/corpus",
+        "cmd ./bounded_authority_conformance --corpus priv/conformance/v2/corpus"
       ],
       "local_loopback_http.verify": [
         "run scripts/check_local_loopback_http.exs",

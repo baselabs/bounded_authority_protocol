@@ -782,3 +782,315 @@ func expAnchor(m map[string]json.RawMessage, g func(map[string]json.RawMessage, 
 		KeyFingerprint: g(m, "key_fingerprint"),
 	}
 }
+
+// ---- successor-major range selectors (ADR 0028): four red-capable legs ----
+//
+// Fixtures come from the vendored successor corpus (corpus-v2), loaded by case
+// id exactly like the v1 corpus legs above. Every leg is red-capable: the
+// mutation named in its header comment makes exactly that leg fail.
+
+// successor is the successor-major facade under test (contract-major 2).
+var successor = v.Profile{}
+
+// loadSuccessorEnvelope loads one corpus-v2 check_envelope case by id.
+func loadSuccessorEnvelope(t *testing.T, id string) (v.Credentials, v.ExpectedRequest) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "conformance", "corpus-v2", "cases", "envelope", "check.json"))
+	if err != nil {
+		t.Fatalf("corpus: %v", err)
+	}
+	var cf struct {
+		Cases []struct {
+			ID    string `json:"id"`
+			Input struct {
+				Grant    string `json:"grant"`
+				Proof    string `json:"proof"`
+				Expected struct {
+					Audience       string          `json:"audience"`
+					CastArguments  json.RawMessage `json:"cast_arguments"`
+					ClockSkew      int64           `json:"clock_skew"`
+					EvaluationTime int64           `json:"evaluation_time"`
+					InvocationID   string          `json:"invocation_id"`
+					Issuer         string          `json:"issuer"`
+					Method         string          `json:"method"`
+					Operation      string          `json:"operation"`
+					ProofMaxAge    int64           `json:"proof_max_age"`
+					TargetURI      string          `json:"target_uri"`
+					TrustedIssuer  struct {
+						KeyID     string `json:"key_id"`
+						PublicKey string `json:"public_key"`
+					} `json:"trusted_issuer"`
+				} `json:"expected"`
+			} `json:"input"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(raw, &cf); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cf.Cases {
+		if c.ID != id {
+			continue
+		}
+		e := c.Input.Expected
+		args, err := v.JsonDecode(e.CastArguments, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v.Credentials{Grant: c.Input.Grant, Proof: c.Input.Proof}, v.ExpectedRequest{
+			TrustedIssuer:  v.TrustedIssuer{KeyID: e.TrustedIssuer.KeyID, PublicKey: mustB64(t, e.TrustedIssuer.PublicKey)},
+			Issuer:         e.Issuer,
+			Audience:       e.Audience,
+			EvaluationTime: e.EvaluationTime,
+			ClockSkew:      e.ClockSkew,
+			Method:         e.Method,
+			TargetURI:      e.TargetURI,
+			InvocationID:   e.InvocationID,
+			Operation:      e.Operation,
+			CastArguments:  args,
+			ProofMaxAge:    e.ProofMaxAge,
+			Nonce:          v.NonceNotRequired(),
+		}
+	}
+	t.Fatalf("corpus-v2 case %s missing", id)
+	return v.Credentials{}, v.ExpectedRequest{}
+}
+
+// loadGrantCompact loads one grant-decode case compact from a vendored corpus.
+func loadGrantCompact(t *testing.T, corpus, id string) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "conformance", corpus, "cases", "grant-decode", "decode.json"))
+	if err != nil {
+		t.Fatalf("corpus: %v", err)
+	}
+	var cf struct {
+		Cases []struct {
+			ID    string `json:"id"`
+			Input struct {
+				Compact string `json:"compact"`
+			} `json:"input"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(raw, &cf); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cf.Cases {
+		if c.ID == id {
+			return c.Input.Compact
+		}
+	}
+	t.Fatalf("corpus case %s missing", id)
+	return ""
+}
+
+// (n-a) inclusive bounds: mutating lte/gte comparison to strict (< / >)
+// reddens exactly this leg — every corpus boundary-equal case below would
+// fail its envelope verification (the traversed value equals the bound).
+func TestPermissiveSuccessorRangeInclusive(t *testing.T) {
+	for _, id := range []string{
+		"check-envelope-v2-valid-lte-boundary-equal",
+		"check-envelope-v2-valid-gte-boundary-equal",
+		"check-envelope-v2-valid-interval-endpoint-low",
+		"check-envelope-v2-valid-interval-endpoint-high",
+		"check-envelope-v2-valid-interval-float-boundary-low",
+		"check-envelope-v2-valid-extreme-integer-magnitude",
+		"check-envelope-v2-valid-extreme-integer-magnitude-negative",
+		"check-envelope-v2-valid-extreme-float-magnitude",
+	} {
+		creds, exp := loadSuccessorEnvelope(t, id)
+		if _, err := successor.CheckEnvelope(creds, exp); err != nil {
+			t.Fatalf("%s: boundary-equal range selector must verify inclusively: %v", id, err)
+		}
+	}
+}
+
+// (n-b) same-tag operand domain: removing the SAME-TAG check from rangeMatch
+// (v2.go) reddens exactly this leg — the cross-tag corpus cases would verify
+// (integer 5 satisfies the float bounds -0.5/10.5 by numeric value), and the
+// non-numeric/missing-path legs pin the remaining fail-closed operand rules.
+// The corpus-level mirror is TestConformance (conformance/v2_test.go) on the
+// check-envelope-v2-invalid-selector-cross-tag-* cases.
+func TestPermissiveSuccessorRangeSameTag(t *testing.T) {
+	for _, id := range []string{
+		"check-envelope-v2-invalid-selector-cross-tag-integer-bound",
+		"check-envelope-v2-invalid-selector-cross-tag-float-bound",
+		"check-envelope-v2-invalid-selector-non-numeric-operand",
+		"check-envelope-v2-invalid-selector-missing-path",
+	} {
+		creds, exp := loadSuccessorEnvelope(t, id)
+		if _, err := successor.CheckEnvelope(creds, exp); err == nil {
+			t.Fatalf("%s: cross-tag/non-numeric/missing-path range selector must be rejected", id)
+		}
+	}
+}
+
+// (n-c) comparator dispatch: swapping the lte/gte comparator dispatch in
+// rangeMatch (v2.go: lte arm comparing >=, gte arm comparing <=) reddens
+// exactly this leg — the exceeded/unmet corpus cases would verify.
+func TestPermissiveSuccessorRangeDispatch(t *testing.T) {
+	for _, id := range []string{
+		"check-envelope-v2-invalid-selector-lte-exceeded", // 5001 against lte 5000
+		"check-envelope-v2-invalid-selector-gte-unmet",    // 49 against gte 50
+	} {
+		creds, exp := loadSuccessorEnvelope(t, id)
+		if _, err := successor.CheckEnvelope(creds, exp); err == nil {
+			t.Fatalf("%s: the violated side of the range must be rejected", id)
+		}
+	}
+	// and the satisfiable interior still verifies (dispatch evaluates both ways)
+	creds, exp := loadSuccessorEnvelope(t, "check-envelope-v2-valid-interval")
+	if _, err := successor.CheckEnvelope(creds, exp); err != nil {
+		t.Fatalf("valid-interval: interior value must verify: %v", err)
+	}
+}
+
+// (n-d) major isolation: widening the successor payload v-check in v2.go
+// (accepting v:1 in addition to v:2) reddens the successor legs below;
+// widening the v1 v-check (v1.go accepting v:2) reddens the v1 legs. The
+// corpus-level mirror is TestConformance (conformance/v2_test.go) on the
+// cross-major case family (envelope, grant/proof decode, chain, anchor,
+// transition, archive).
+func TestPermissiveSuccessorMajorIsolation(t *testing.T) {
+	// the successor facade rejects v1 bytes...
+	for _, id := range []string{
+		"check-envelope-v2-invalid-cross-major-v1-grant",
+		"check-envelope-v2-invalid-cross-major-v1-proof",
+	} {
+		creds, exp := loadSuccessorEnvelope(t, id)
+		if _, err := successor.CheckEnvelope(creds, exp); err == nil {
+			t.Fatalf("%s: successor facade must reject v1 bytes", id)
+		}
+	}
+	if _, err := successor.DecodeGrant(loadGrantCompact(t, "corpus", "grant-decode-valid"), nil); err == nil {
+		t.Fatal("successor DecodeGrant must reject a v1 grant")
+	}
+	// ...and the v1 facade rejects successor bytes
+	v1creds, v1exp := loadCorpusEnvelopeValid(t)
+	if _, err := successor.CheckEnvelope(v1creds, v1exp); err == nil {
+		t.Fatal("successor facade must reject the v1 envelope")
+	}
+	if _, err := v.DecodeGrant(loadGrantCompact(t, "corpus-v2", "grant-decode-v2-valid"), nil); err == nil {
+		t.Fatal("v1 DecodeGrant must reject a successor grant")
+	}
+	v2creds, v2exp := loadSuccessorEnvelope(t, "check-envelope-v2-valid")
+	if _, err := v.CheckEnvelope(v2creds, v2exp); err == nil {
+		t.Fatal("v1 CheckEnvelope must reject the successor envelope")
+	}
+}
+
+// loadKindCompact loads one verify-case compact from a vendored corpus-v2
+// surface file (boundary-anchor / key-transition).
+func loadKindCompact(t *testing.T, surface, id string) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "conformance", "corpus-v2", "cases", surface, "verify.json"))
+	if err != nil {
+		t.Fatalf("corpus: %v", err)
+	}
+	var cf struct {
+		Cases []struct {
+			ID    string `json:"id"`
+			Input struct {
+				Compact string `json:"compact"`
+			} `json:"input"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(raw, &cf); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cf.Cases {
+		if c.ID == id {
+			return c.Input.Compact
+		}
+	}
+	t.Fatalf("case %s not found in %s", id, surface)
+	return ""
+}
+
+// (n-f) assembly revalidation: AssembleCompact must re-parse the payload
+// through this major's closed decoders — a well-formed signing input whose
+// payload members violate the profile ({"aud":"a"} decodes as JSON but is no
+// grant/anchor/transition payload) must be rejected. Removing the
+// decodeGrantPayload / reparse{Anchor,Transition}Payload calls in v2.go's
+// AssembleCompact reddens exactly this leg. Mirrors the Elixir reference's
+// validate_assembled_compact (v2/runtime.ex).
+func TestPermissiveSuccessorAssemblyRevalidates(t *testing.T) {
+	forged := []byte(`{"aud":"a"}`)
+	sig := make([]byte, 64)
+	for _, tc := range []struct {
+		kind    v.Kind
+		compact string
+	}{
+		{v.KindGrant, loadGrantCompact(t, "corpus-v2", "grant-decode-v2-valid")},
+		{v.KindBoundaryAnchor, loadKindCompact(t, "boundary-anchor", "verify-historical-anchor-v2-valid")},
+		{v.KindKeyTransition, loadKindCompact(t, "key-transition", "verify-key-transition-v2-valid")},
+	} {
+		seg := strings.Split(tc.compact, ".")
+		si := v.SigningInput{Kind: tc.kind, Protected: mustB64(t, seg[0]), Payload: forged}
+		if _, err := successor.AssembleCompact(si, sig, nil); err == nil {
+			t.Fatalf("kind %s: assembly must reject a well-formed input with invalid payload members", tc.kind)
+		}
+	}
+
+	// Canonical-payload leg: the identical closed member set with one inserted
+	// whitespace byte decodes and passes the member-set/genesis checks but is
+	// not the JCS encoding — anchor/transition payloads are canonical-bound
+	// (ADR 0017 clause 4). Removing the canonicalSegment call in
+	// reparseAnchorPayload/reparseTransitionPayload reddens exactly this leg.
+	anchorSeg := strings.Split(loadKindCompact(t, "boundary-anchor", "verify-historical-anchor-v2-valid"), ".")
+	anchorPayload := mustB64(t, anchorSeg[1])
+	nonCanon := append([]byte("{ "), anchorPayload[1:]...)
+	for _, tc := range []struct {
+		kind    v.Kind
+		payload []byte
+		header  string
+	}{
+		{v.KindBoundaryAnchor, nonCanon, anchorSeg[0]},
+		{v.KindKeyTransition, func() []byte {
+			tSeg := strings.Split(loadKindCompact(t, "key-transition", "verify-key-transition-v2-valid"), ".")
+			p := mustB64(t, tSeg[1])
+			out := append([]byte("{ "), p[1:]...)
+			return out
+		}(), ""},
+	} {
+		header := tc.header
+		if header == "" {
+			header = strings.Split(loadKindCompact(t, "key-transition", "verify-key-transition-v2-valid"), ".")[0]
+		}
+		si := v.SigningInput{Kind: tc.kind, Protected: mustB64(t, header), Payload: tc.payload}
+		if _, err := successor.AssembleCompact(si, sig, nil); err == nil {
+			t.Fatalf("kind %s: assembly must reject a non-canonical payload segment", tc.kind)
+		}
+	}
+
+	// Genesis leg: a JCS-canonical, closed-member anchor payload with
+	// sequence 0 and a NON-zero chain hash — the reference's
+	// BoundaryAnchorCodec.parse genesis binding (boundary_anchor_codec.ex:189).
+	// Removing the sequence-0/zero-hash check in reparseAnchorPayload reddens
+	// exactly this leg.
+	anchorObj, ok := func() (v.Obj, bool) {
+		raw, err := v.JsonDecode(anchorPayload, nil)
+		if err != nil {
+			return nil, false
+		}
+		o, ok := raw.(v.Obj)
+		return o, ok
+	}()
+	if !ok {
+		t.Fatal("anchor payload must decode as an object")
+	}
+	genesis := make(v.Obj, 0, len(anchorObj))
+	for _, m := range anchorObj {
+		if m.Key == "chain_hash" {
+			genesis = append(genesis, v.Member{Key: "chain_hash", Val: v.Str(strings.Repeat("Q", 42) + "A")})
+		} else {
+			genesis = append(genesis, m)
+		}
+	}
+	genesisBytes, err := v.JcsEncode(genesis, nil)
+	if err != nil {
+		t.Fatalf("jcs: %v", err)
+	}
+	si := v.SigningInput{Kind: v.KindBoundaryAnchor, Protected: mustB64(t, anchorSeg[0]), Payload: genesisBytes}
+	if _, err := successor.AssembleCompact(si, sig, nil); err == nil {
+		t.Fatal("assembly must reject a sequence-0 anchor with a non-zero chain hash (genesis binding)")
+	}
+}

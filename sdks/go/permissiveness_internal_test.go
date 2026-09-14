@@ -289,3 +289,66 @@ func TestCanonicalGateUnit(t *testing.T) {
 }
 
 const anchorCompactCorpus = "eyJhbGciOiJFZERTQSIsImtpZCI6ImFyY2hpdmUtYSIsInR5cCI6ImJhK2NoYWluLWFuY2hvciJ9.eyJhbmNob3JfaWQiOiJ1cm46ZXhhbXBsZTphbmNob3I6c3RhcnQiLCJhbmNob3JlZF9hdCI6MTAwMCwiY2hhaW5faGFzaCI6IkFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUEiLCJjaGFpbl9pZCI6InVybjpleGFtcGxlOmNoYWluIiwia2V5X2ZpbmdlcnByaW50IjoibzdnbDByZHhTUFUtcVhibU5vZDRSQWtWNXBVamFCNDdKaFBBNDNod0tQOCIsInNlcXVlbmNlIjowLCJ2IjoxfQ.Falux3uXvUy7PqELqVP_UNWWr3FDT6jUxT7IwtbHY27dqPqHxdsUrSvE216PAtOku9jjPCgoWHYds8YMLD4gAQ"
+
+// TestSuccessorRangeMatcherTag is the white-box red form of the same-tag
+// operand domain (ADR 0028 §2): removing the tag discrimination from
+// rangeMatch (v2.go) reddens exactly the cross-tag assertions below, and
+// mutating the comparators reddens the inclusive/equality assertions. Signed
+// zero is pinned too: IEEE 754 comparison holds −0.0 = 0.0 on the float tag.
+func TestSuccessorRangeMatcherTag(t *testing.T) {
+	mustSel := func(lit string) Value {
+		val, err := JsonDecode([]byte(lit), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return val
+	}
+	mustArgs := func(lit string) Value {
+		val, err := JsonDecode([]byte(lit), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return val
+	}
+	matches := func(sel, args string) bool {
+		return successor.applySelectors([]Value{mustSel(sel)}, mustArgs(args)) == nil
+	}
+	// same-tag inclusive comparisons hold at the boundary
+	if !matches(`{"kind":"lte","path":["amount"],"value":5000}`, `{"amount":5000}`) {
+		t.Fatal("same-tag lte must match at equality")
+	}
+	if !matches(`{"kind":"gte","path":["amount"],"value":50}`, `{"amount":50}`) {
+		t.Fatal("same-tag gte must match at equality")
+	}
+	if !matches(`{"kind":"gte","path":["amount"],"value":-0.5}`, `{"amount":-0.5}`) {
+		t.Fatal("same-tag float gte must match at equality")
+	}
+	// signed zero: -0.0 = 0.0 under IEEE 754 comparison on the float tag
+	if !matches(`{"kind":"gte","path":["amount"],"value":-0.0}`, `{"amount":0.0}`) {
+		t.Fatal("float comparison must hold -0.0 = 0.0")
+	}
+	if !matches(`{"kind":"lte","path":["amount"],"value":0.0}`, `{"amount":-0.0}`) {
+		t.Fatal("float comparison must hold 0.0 = -0.0")
+	}
+	// cross-tag NEVER matches, fail closed (integer 5 inside the float interval)
+	if matches(`{"kind":"gte","path":["amount"],"value":-0.5}`, `{"amount":5}`) {
+		t.Fatal("integer value must never satisfy a float bound")
+	}
+	if matches(`{"kind":"lte","path":["amount"],"value":5000}`, `{"amount":50.0}`) {
+		t.Fatal("float value must never satisfy an integer bound")
+	}
+	// non-numeric operands and missing paths fail closed
+	if matches(`{"kind":"lte","path":["amount"],"value":5000}`, `{"amount":"75"}`) {
+		t.Fatal("string operand must never satisfy a range selector")
+	}
+	if matches(`{"kind":"gte","path":["amount"],"value":50}`, `{"other":75}`) {
+		t.Fatal("missing path must fail closed")
+	}
+	// violated sides never match
+	if matches(`{"kind":"lte","path":["amount"],"value":5000}`, `{"amount":5001}`) {
+		t.Fatal("lte must not match above the bound")
+	}
+	if matches(`{"kind":"gte","path":["amount"],"value":50}`, `{"amount":49}`) {
+		t.Fatal("gte must not match below the bound")
+	}
+}

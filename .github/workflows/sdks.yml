@@ -84,6 +84,10 @@ jobs:
         run: pnpm conformance
         working-directory: sdks/typescript
 
+      - name: TS — v2 conformance (268 + census)
+        run: pnpm conformance:v2
+        working-directory: sdks/typescript
+
       # --- Python SDK gate ---
       - name: Python — install
         run: |
@@ -118,6 +122,10 @@ jobs:
 
       - name: Python — conformance (283 + census)
         run: python tests/conformance/run.py
+        working-directory: sdks/python
+
+      - name: Python — v2 conformance (268 + census)
+        run: python tests/conformance/run_v2.py
         working-directory: sdks/python
 
   # Rust is Node-independent; per ADR 0015 D4 it runs as its OWN job on the same

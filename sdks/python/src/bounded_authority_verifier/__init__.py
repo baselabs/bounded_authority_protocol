@@ -11,10 +11,11 @@ non-authorizing.
 
 from __future__ import annotations
 
+from . import v2
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMA, MAXIMUM_BOUNDS, Bounds, bounds_maximum, bounds_new, coerce_bounds
 from .compact import SigningInput
-from .digest import REQUEST_PREFIX, typed_project
+from .digest import REQUEST_PREFIX, REQUEST_PREFIX_V2, request_digest_v2, typed_project
 from .ed25519 import sha256
 from .error import Err, InvalidError, Ok, Result, err, fail, ok, require
 from .facts import (
@@ -106,6 +107,9 @@ from .v1 import (
     verify_historical_anchor,
     verify_key_transition,
 )
+from .v2 import ARCHIVE_PREFIX as ARCHIVE_PREFIX_V2
+from .v2 import ROW_PREFIX as ROW_PREFIX_V2
+from .v2 import VERSION as VERSION_2
 
 __all__ = [
     # 17 façade functions
@@ -146,6 +150,11 @@ __all__ = [
     "semantic_identity", "typed_project", "REQUEST_PREFIX", "ROW_PREFIX", "ARCHIVE_PREFIX",
     "sha256", "json_decode", "str_utf8", "utf8_str",
     "ALG", "GRANT_TYP", "PROOF_TYP", "LOCAL_LOOPBACK_PROOF_TYP", "ANCHOR_TYP",
+    # v2 profile (contract-major 2) — the v2 façade module + its byte-distinct constants. The
+    # 17 façade functions live on the module (``bounded_authority_verifier.v2``); the v1 names
+    # above stay the package's default surface.
+    "v2", "VERSION_2", "REQUEST_PREFIX_V2", "ROW_PREFIX_V2", "ARCHIVE_PREFIX_V2",
+    "request_digest_v2",
     # error + result
     "InvalidError", "Ok", "Err", "Result", "ok", "err", "fail", "require",
     # tagged algebra types

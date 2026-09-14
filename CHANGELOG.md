@@ -4,6 +4,49 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — v2 contract-major: `lte`/`gte` range selector kinds activated (BAP-21, ADR 0030)
+
+- Add the successor contract-major 2 profile per the successor-major charter activation
+  checklist and [ADR 0028](docs/adr/0028-range-selector-kinds.md): payload `v: 2`, the
+  `BAP2-Ed25519-SHA256` suite under the major-bound naming scheme, `BAP2-REQUEST\0` /
+  `BAP2-CHAIN\0` / `BAP2-ARCHIVE\0EXPORT\0` domain separators, and the two inclusive
+  one-sided selector kinds `lte`/`gte` (same-tag numeric operands, inclusive comparison on
+  the closed numeric domain, intervals as conjunctive composition, cross-tag and
+  non-numeric operands fail closed; strict kinds excluded permanently).
+- Add the `BoundedAuthorityProtocol.V2` Elixir namespace (explicit façade mirroring the v1
+  surface; version-neutral algebra single-sourced from the v1 modules) and the normative
+  spec [`spec/bap-v2.md`](spec/bap-v2.md) (complete closed profile; v1 sections
+  incorporated by enumerated reference).
+- Add the certified v2 conformance corpus (`priv/conformance/v2/corpus`, 268 cases across
+  the 28 surfaces and 16 classes, revision 1; certified index SHA-256
+  `6de6289b7f47b0e0a78ea4610e7844a0f1d5247d8eace02ec9cf9841308f13d0`). The verifier CLI
+  verifies both corpora with major-keyed certification; `mix conformance.verify` runs both.
+  Version-neutral primitive-surface cases are carried byte-for-byte from the certified v1
+  corpus; profile-bound surfaces carry v2-minted fixtures covering every v1-populated
+  applicability cell, the full range-selector class matrix, and cross-major rejection
+  vectors. Fixture keys were ephemeral and destroyed (provenance unchanged).
+- Add v2 profiles to all four SDKs (TypeScript `v2.ts`, Python `v2.py`, Rust `v2.rs`,
+  Go `v2.go`) with their own certified-digest-asserting conformance runners (Rust/Go vendor
+  corpus-v2 snapshots; the sync gate covers all four snapshots) and red-capable
+  permissiveness entries for the range kinds and cross-major checks.
+- Add the `REQ2-*` requirement range with its MUST-to-cell map
+  ([requirement map](docs/design/requirement-map.md) § v2) and six executed red proofs in
+  the conformance mutation battery (`v2-selector-lte-strict`,
+  `v2-selector-same-tag-removed`, `v2-selector-kinds-swapped`,
+  `v2-selector-non-numeric-bound-accepted`, `v2-cross-major-grant-v-accepted`,
+  `v2-request-digest-prefix-downgraded`).
+- Registries: `lte`/`gte` flip reserved → active (v2); the suite table gains
+  `BAP2-Ed25519-SHA256`; the anticipated ML-DSA family's index moves to the next successor
+  major. [ADR 0030](docs/adr/0030-v2-contract-major-activation.md) records the activation,
+  the inherited-bounds review, and the named follow-ups.
+
+### Compatibility
+
+- The v1 wire profile, corpus (283 verdicts, certified pin unchanged), SDK v1 behavior, and
+  all v1 verdicts are byte-frozen: each major verifies under its own complete closed
+  profile, v1 rejects v2 bytes and v2 rejects v1 bytes, and there is no fallback or
+  downgrade in either direction. v1 is not deprecated by this activation.
+
 ### Closed — BAP-19 publication (status-record reconciliation)
 
 - Record the 2026-08-31 owner-authorized Hex publication and registry read-back that executed

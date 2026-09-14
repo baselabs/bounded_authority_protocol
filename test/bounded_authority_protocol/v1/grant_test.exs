@@ -145,6 +145,30 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
     end
   end
 
+  test "successor-major grant bytes are rejected by the closed v1 profile" do
+    # BAP-21 / ADR 0030 cross-major tripwire: the v2 successor major self-declares with
+    # payload `v: 2`; the closed v1 decode (`{:integer, 1}` check) is the sole rejector on
+    # an otherwise-identical payload, mirroring the BAP-20 reserved-kind tripwire above.
+    # v1 stays byte-frozen — this pins the frozen behavior against the new major's existence.
+    fixture = fixture!()
+    compact = fixture["grant"]["compact"]
+
+    v2_payload =
+      compact
+      |> String.split(".")
+      |> Enum.at(1)
+      |> Base.url_decode64!(padding: false)
+      |> then(&String.replace(&1, ~S("v":1), ~S("v":2)))
+
+    v2_compact =
+      compact
+      |> String.split(".")
+      |> List.replace_at(1, Base.url_encode64(v2_payload, padding: false))
+      |> Enum.join(".")
+
+    assert {:error, :invalid} = V1.decode_grant(v2_compact, %{})
+  end
+
   test "issuer, key, audience, and every caller time boundary fail closed" do
     fixture = fixture!()
     compact = fixture["grant"]["compact"]

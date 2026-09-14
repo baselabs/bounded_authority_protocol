@@ -169,6 +169,35 @@ qualifier + re-walk obligation (§ Maintenance) makes that the successor slice's
 | REQ1-EVO-sunset-is-deployment-decision | Sunset is a deployment decision after the window, never a silent library change | `gap` | Input-algebra impossibility: "sunset is a deployment decision, never a silent library change" is a cross-release governance property over the library's version history; a v1 corpus case is a fixed `(compact bytes, bounds)→verdict` pair that cannot express a property spanning releases. |
 | REQ1-EVO-no-verdict-flip | No erratum may flip a corpus verdict | `gap` | Input-algebra impossibility: "no future erratum flips a corpus verdict" is a governance invariant over the errata process across releases; a v1 corpus case is a fixed `(compact bytes, bounds)→verdict` pair that cannot express a property over future errata. Verdict stability *within v1* is exercised by the mutation battery (conformance mutation gate, 55 mutations); the no-verdict-flip invariant is over the errata process, not a v1 input. |
 
+## v2 — the contract-major 2 profile (`spec/bap-v2.md`, corpus `priv/conformance/v2/corpus`, revision 1)
+
+The v2 profile activates the `lte`/`gte` range selector kinds ([ADR 0028](../adr/0028-range-selector-kinds.md),
+[ADR 0030](../adr/0030-v2-contract-major-activation.md)). Its requirement ids carry the `REQ2-*`
+range ([ADR 0007](../adr/0007-normative-requirement-identifiers.md)); cells cite the v2 index
+(`bounded-authority-protocol-v2-conformance-corpus-index`, 268 cases). The six new v2 gates'
+red proofs were executed against the mutation battery
+(`scripts/check_conformance_mutations.exs`, entries `v2-*`) on 2026-09-13 — each mutation was
+applied, `mix test test/conformance/cli_test.exs:43` (the shipped-v2-corpus CLI agreement test)
+observed failing, and the source restored byte-identical.
+
+| REQ-id | Requirement | Surface(s) | Cell class(es) | Cell-type | Evidence / reason + red proof |
+|---|---|---|---|---|---|
+| REQ2-CORE-cross-major-reject | A v2 verifier rejects every artifact whose `v` is not exactly 2 (all v1 bytes); v1 rejects v2 symmetrically; no fallback/downgrade | verify_grant, decode_grant, decode_proof, check_envelope, check_chain, verify_historical_anchor, verify_key_transition, verify_anchored_export | invalid_claim, invalid_encoding | populated | verify_grant.invalid_claim=1 (v1 bytes); decode_grant.invalid_claim=1; decode_proof.invalid_claim=1; check_envelope.invalid_claim=2 (v1 grant and v1 proof); check_chain.invalid_claim=2 (v1 rows); verify_historical_anchor/verify_key_transition.invalid_claim=1 each; verify_anchored_export.invalid_encoding=1 (v1 archive, prefix-bound). RED PROOF: mutation `v2-cross-major-grant-v-accepted` (grant decode accepts `v:1`) → cli_test.exs:43 fails |
+| REQ2-CORE-v1-incorporation | The v1 normative sections are incorporated with the enumerated substitutions (spec/bap-v2.md §2) | (all 28 surfaces) | — | populated | every surface carries at least one populated cell in the v2 index; the version-neutral primitive surfaces execute the identical shared modules via byte-carried v1 cases |
+| REQ2-CLAIM-v; REQ2-CLAIM-proof-v | Grant/proof `v` MUST be exactly integer 2 | verify_grant, check_envelope | invalid_claim | populated | see REQ2-CORE-cross-major-reject cells |
+| REQ2-EVO-proof-major-equals-grant; REQ2-EVO-mixed-major-invalid | A v2 proof MUST pair with a v2 grant; mixed-major credentials are invalid by construction | check_envelope | invalid_claim | populated | the check_envelope cross-major pair: `check-envelope-v2-invalid-cross-major-v1-grant` (v2 proof over a v1 grant — proof major ≠ grant major) and `check-envelope-v2-invalid-cross-major-v1-proof` (v1 proof over a v2 grant — mixed-major credentials) |
+| REQ2-SIGNING-digest-prefix | Request-digest prefix `BAP2-REQUEST\0` exact ASCII incl. final zero byte | request_digest | valid, exact_bound | populated | request_digest.valid=2, exact_bound=1 (digests are prefix-bound). RED PROOF: mutation `v2-request-digest-prefix-downgraded` (BAP2→BAP1) → cli_test.exs:43 fails |
+| REQ2-SELECTOR-closed-set | The kind set is exactly {all, equals, one_of, lte, gte}; unknown kinds and non-recognized member sets invalid | verify_grant, check_envelope | invalid_selector | populated | verify_grant.invalid_selector=4 (unknown kind `lt`, non-numeric bound, empty path, over-maxima); check_envelope.invalid_selector=8. RED PROOF: mutation `v2-selector-kinds-swapped` (decode lte⇄gte) → cli_test.exs:43 fails |
+| REQ2-SELECTOR-range-same-tag | Both range operands must carry the same numeric tag; cross-tag never matches | check_envelope | invalid_selector | populated | check_envelope.invalid_selector includes both cross-tag directions (integer-bound/float-argument and float-bound/integer-argument). RED PROOF: mutation `v2-selector-same-tag-removed` (both kind fall-throughs compare numerically) → cli_test.exs:43 fails |
+| REQ2-SELECTOR-range-inclusive | Bounds are inclusive: argument == bound MUST pass | check_envelope | exact_bound | populated | check_envelope.exact_bound=8 (lte/gte boundary-equal, both interval endpoints, integer extremes). RED PROOF: mutation `v2-selector-lte-strict` (`<=` → `<`) → cli_test.exs:43 fails |
+| REQ2-SELECTOR-range-numeric | A non-numeric `value` bound makes the whole grant invalid; non-numeric operands at the path never match | verify_grant, check_envelope | invalid_selector | populated | verify_grant.invalid_selector (string bound); check_envelope.invalid_selector (string argument at path). RED PROOF: mutation `v2-selector-non-numeric-bound-accepted` (decode drops the numeric-bound check) → cli_test.exs:43 fails |
+| REQ2-SELECTOR-range-signed-zero | −0.0 = 0.0 by numeric comparison and by JCS serialization; a zero-valued operand re-derives integer-tagged from the wire | (matcher-level) | — | `gap` | Input-algebra impossibility: RFC 8785 serializes −0.0 as `0`, so a corpus case's zero-valued float operand re-decodes integer-tagged from the case bytes — the wire cannot carry the distinction (ADR 0028 §2's rationale demonstrated by its inexpressibility). Proven at the matcher level by the Elixir and SDK unit suites (signed-zero equality in both directions). |
+| REQ2-SELECTOR-attenuation-unchanged | Attenuation (when a successor major activates delegation) composes conjunctively over selector tuples, never inspects kind, and never widens; a cross-tag conjunct is unsatisfiable | (no v2 surface) | — | `gap` | Delegation is not active in contract-major 2 (ADR 0010 charter scope; ADR 0030 names it successor-major work), so no corpus surface exists to populate. The invariant is carried normatively by spec/bap-v2.md §4 and ADR 0028 §5, and becomes cell-populatable at the activating major. |
+| REQ2-SELECTOR-range-path-required; REQ2-SELECTOR-path-shape; REQ2-SELECTOR-range-interval; REQ2-SELECTOR-no-strict-kinds; REQ2-SELECTOR-count | Missing path fails closed; path/selector maxima bind range kinds; intervals are conjunctive; crossed endpoints unsatisfiable-not-error; strict kinds excluded | verify_grant, check_envelope | invalid_selector, valid, exact_bound | populated | verify_grant.invalid_selector=4 (empty path, over-maxima 65 selectors); check_envelope valid interval cases (endpoints exact_bound) and the equals-mix valid case; `lt` unknown-kind reject |
+| REQ2-SELECTOR-not-authorization; REQ2-SELECTOR-verdict-internal | No selector grants authorization; standalone grant verification never evaluates selectors | verify_grant, check_envelope | valid | populated | verify_grant.valid=1, check_envelope.valid=6 (facts carry `authorization: :not_evaluated`; range-bearing grants verify standalone without selector evaluation) |
+| REQ2-BOUNDS-inherited | Every v1 bound carries over unchanged; no new bound (ADR 0028 §4 review) | bounds.new | exact_bound, maximum_plus_one, invalid_limit | populated | bounds.new.exact_bound=38, maximum_plus_one=33, invalid_limit=6 (byte-carried v1 cells; the bounds module is shared) |
+| REQ2-CORPUS-certified-identity | The v2 corpus is a certified artifact with its own pinned index identity | (CLI + SDK runners) | — | populated | certified SHA-256 `6de6289b…f13d0` pinned in the CLI (major-keyed map), the CLI test, and all four SDK v2 runners; `mix conformance.verify` runs both corpora (v1 = 283 unchanged pin, v2 = 268) |
+
 ## What a populated cell does and does not prove (reading guide)
 
 A `populated` mapping row certifies that the named conformance cell **directly exercises** the
@@ -205,6 +234,10 @@ never silently overstated as `populated`.
 ## Coverage summary
 
 - **86 requirement ids** total: 76 `REQ1-*` (spec/bap-v1.md) + 10 `REQ1-EVO-*` (standards-track.md).
+- **v2 (ADR 0030 activation):** 22 `REQ2-*` ids over `spec/bap-v2.md`; all map to populated
+  v2 corpus cells except the signed-zero row (input-algebra impossibility) and the
+  attenuation row (delegation is not active in major 2), both recorded above. Corpus: `bounded-authority-protocol-v2-conformance-corpus-index` (268 cases, 28
+  surfaces, 16 classes).
 - **MUST/MUST NOT requirements mapped to populated cells:** all spec `REQ1-*` map to ≥1
   populated conformance cell. One profile-level invariant (`REQ1-CORE-reject-unlisted`) is recorded as
   a `gap` with its input-algebra reason (it is the rationale for the per-surface closed-set MUSTs, each

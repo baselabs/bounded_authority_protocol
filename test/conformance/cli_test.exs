@@ -15,6 +15,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   @escript_path Path.expand("../../bounded_authority_conformance", __DIR__)
   @shipped_corpus Path.expand("../../priv/conformance/v1/corpus", __DIR__)
+  @shipped_v2_corpus Path.expand("../../priv/conformance/v2/corpus", __DIR__)
 
   # --- in-VM Cli.run/1 unit tests (the coverage path) -----------------------
 
@@ -39,6 +40,10 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     assert Cli.run(["--corpus", @shipped_corpus]) == 0
   end
 
+  test "exit 0 on the shipped v2 corpus (in-VM)" do
+    assert Cli.run(["--corpus", @shipped_v2_corpus]) == 0
+  end
+
   # --- ADR 0014 D4: the certified-corpus pin (index-SHA) ---------------------
   # The pin fails closed on any corpus that is NOT the certified snapshot, and the certified value
   # is NOT caller-overridable (no seam). Proven WITHOUT a seam: a corpus whose index.json carries
@@ -47,7 +52,10 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   # "not the certified corpus" case a shrunken/regenerated-index corpus embodies. Corpus.load
   # accepts it AND the identity differs AND run/1 exits 1 ⟹ the pin (not integrity) caught it.
 
-  @certified_index_sha256 "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs"
+  @certified_index_sha256 %{
+    1 => "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs",
+    2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A"
+  }
 
   defp whitespace_perturbed_corpus do
     dst = unique_tmp("cli-noncertified") |> Path.dirname()
@@ -72,7 +80,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     assert {:ok, corpus} = Corpus.load(map)
 
     # 2. ...but its raw-byte index identity differs from the certified snapshot...
-    refute Report.index_identity(corpus.index_bytes) == @certified_index_sha256
+    refute Report.index_identity(corpus.index_bytes) == @certified_index_sha256[corpus.major]
 
     # 3. ...so run/1 fails it closed. Integrity green + identity differs + exit 1 ⟹ the pin caught
     # it (not integrity). Neutering assert_certified_corpus makes this return 0 (mutation-proven).
@@ -113,6 +121,45 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     corpus = tampered_corpus_copy(&drop_one_case_from_file/1)
     on_exit(fn -> File.rm_rf!(corpus) end)
     assert Cli.run(["--corpus", corpus]) == 1
+  end
+
+  test "the v2 pin fails closed on a v2 corpus with a perturbed index (major-keyed certification)" do
+    dst = unique_tmp("cli-v2-noncertified") |> Path.dirname()
+    File.cp_r!(@shipped_v2_corpus, dst)
+    index = Path.join(dst, "index.json")
+    File.write!(index, File.read!(index) <> "\n")
+    on_exit(fn -> File.rm_rf!(dst) end)
+
+    map =
+      dst
+      |> Path.join("**/*")
+      |> Path.wildcard()
+      |> Enum.reject(&File.dir?/1)
+      |> Map.new(fn p -> {Path.relative_to(p, dst), File.read!(p)} end)
+
+    assert {:ok, corpus} = Corpus.load(map)
+    assert corpus.major == 2
+    refute Report.index_identity(corpus.index_bytes) == @certified_index_sha256[2]
+    assert Cli.run(["--corpus", dst]) == 1
+  end
+
+  test "a v1 corpus whose index declares a v2 format is rejected (no cross-major corpus)" do
+    dst = unique_tmp("cli-cross-major") |> Path.dirname()
+    File.cp_r!(@shipped_corpus, dst)
+    index = Path.join(dst, "index.json")
+
+    File.write!(
+      index,
+      String.replace(
+        File.read!(index),
+        "-v1-conformance-corpus-index",
+        "-v2-conformance-corpus-index"
+      )
+    )
+
+    on_exit(fn -> File.rm_rf!(dst) end)
+
+    assert Cli.run(["--corpus", dst]) == 1
   end
 
   test "exit 1 on a nonexistent corpus directory" do

@@ -2,7 +2,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   @moduledoc """
   Pure case executor for the loaded corpus.
 
-  `run/1` dispatches each case against the frozen v1 facade (no facade change, no second parser)
+  `run/1` dispatches each case against the corpus's declared contract-major facade (the frozen
+  v1 facade or the v2 facade; version-neutral primitive surfaces execute the shared modules)
   and compares the result to the case-declared expectation. `.raw` sidecar bytes pass through
   opaque. Every case result is `%{"actual" => ..., "agree" => boolean}` for a valid expectation or
   `%{"actual" => ..., "agree" => boolean}` for an invalid expectation (agreement = the facade
@@ -38,6 +39,24 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   alias BoundedAuthorityProtocol.V1.SigningInput
   alias BoundedAuthorityProtocol.V1.TrustedIssuer
   alias BoundedAuthorityProtocol.V1.Uri
+  alias BoundedAuthorityProtocol.V2, as: V2Facade
+
+  # Surfaces whose implementations are major-neutral shared modules: a v2 corpus case
+  # executes the identical function the v1 corpus certifies, so v2 dispatches to the same
+  # clause instead of duplicating it.
+  @shared_surfaces [
+    "json.decode",
+    "base64url.decode",
+    "uri.normalize",
+    "jcs.encode",
+    "jwk.encode_public",
+    "jwk.decode_public",
+    "jwk.thumbprint_preimage",
+    "jwk.thumbprint",
+    "jwk.thumbprint_raw",
+    "jwk.public_key_thumbprint_raw",
+    "bounds.new"
+  ]
 
   # Compile-time map from the JSON string form of each bounds key to its atom, so case
   # input overrides (string keys) convert to the atom keys Bounds.new expects without any
@@ -85,18 +104,18 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
 
   @doc "Executes every loaded case against the frozen facade."
   @spec run(Corpus.t()) :: [{binary(), [%{case_id: binary(), agree: boolean()}]}]
-  def run(%Corpus{cases: cases, raws: raws}) do
+  def run(%Corpus{cases: cases, raws: raws, major: major}) do
     Enum.map(cases, fn {path, file_cases} ->
-      results = Enum.map(file_cases, fn case_obj -> execute_case(case_obj, raws) end)
+      results = Enum.map(file_cases, fn case_obj -> execute_case(case_obj, raws, major) end)
       {path, results}
     end)
   end
 
-  defp execute_case(case_obj, raws) do
+  defp execute_case(case_obj, raws, major) do
     surface = case_obj["surface"]
     input = Map.get(case_obj, "input", %{})
     expected = case_obj["expected"]
-    actual = dispatch(surface, input, raws)
+    actual = dispatch(major, surface, input, raws)
     agree = agrees?(expected, actual)
     %{case_id: case_obj["id"], agree: agree}
   end
@@ -122,7 +141,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
 
   # --- dispatch table ------------------------------------------------------
 
-  defp dispatch("json.decode", input, raws) do
+  defp dispatch(1, "json.decode", input, raws) do
     with {:ok, bytes} <- input_bytes(input, raws) do
       case Json.decode(bytes, Bounds.maximum()) do
         {:ok, value} -> {:ok, {:json, value}}
@@ -131,7 +150,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("base64url.decode", input, _raws) do
+  defp dispatch(1, "base64url.decode", input, _raws) do
     # The input IS the base64url segment; read it raw (do not pre-decode via input_bytes).
     segment = b64url_segment(input)
 
@@ -145,7 +164,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("uri.normalize", input, raws) do
+  defp dispatch(1, "uri.normalize", input, raws) do
     with {:ok, bytes} <- input_bytes(input, raws) do
       case Uri.normalize(bytes, Bounds.maximum()) do
         {:ok, normalized} -> {:ok, %{"normalized" => normalized}}
@@ -154,7 +173,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jcs.encode", input, raws) do
+  defp dispatch(1, "jcs.encode", input, raws) do
     with {:ok, bytes} <- input_bytes(input, raws),
          {:ok, value} <- Json.decode(bytes, Bounds.maximum()),
          {:ok, encoded} <- Jcs.encode(value, Bounds.maximum()) do
@@ -162,7 +181,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jwk.encode_public", input, _raws) do
+  defp dispatch(1, "jwk.encode_public", input, _raws) do
     with {:ok, public_key} <- input_public_key(input) do
       case Jwk.encode_public(public_key, Bounds.maximum()) do
         {:ok, encoded} -> {:ok, %{"encoded" => encoded}}
@@ -171,7 +190,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jwk.decode_public", input, raws) do
+  defp dispatch(1, "jwk.decode_public", input, raws) do
     with {:ok, bytes} <- input_bytes(input, raws) do
       case Jwk.decode_public(bytes, Bounds.maximum()) do
         {:ok, public_key} -> {:ok, %{"public_key" => public_key}}
@@ -180,7 +199,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jwk.thumbprint_preimage", input, raws) do
+  defp dispatch(1, "jwk.thumbprint_preimage", input, raws) do
     with {:ok, bytes} <- input_bytes(input, raws) do
       case Jwk.thumbprint_preimage(bytes, Bounds.maximum()) do
         {:ok, preimage} -> {:ok, %{"preimage" => preimage}}
@@ -189,7 +208,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jwk.thumbprint", input, raws) do
+  defp dispatch(1, "jwk.thumbprint", input, raws) do
     with {:ok, bytes} <- input_bytes(input, raws) do
       case Jwk.thumbprint(bytes, Bounds.maximum()) do
         {:ok, thumbprint} -> {:ok, %{"thumbprint" => thumbprint}}
@@ -198,7 +217,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jwk.thumbprint_raw", input, raws) do
+  defp dispatch(1, "jwk.thumbprint_raw", input, raws) do
     with {:ok, bytes} <- input_bytes(input, raws) do
       case Jwk.thumbprint_raw(bytes, Bounds.maximum()) do
         {:ok, raw} -> {:ok, %{"thumbprint_raw" => raw}}
@@ -207,7 +226,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("jwk.public_key_thumbprint_raw", input, _raws) do
+  defp dispatch(1, "jwk.public_key_thumbprint_raw", input, _raws) do
     with {:ok, public_key} <- input_public_key(input) do
       case Jwk.public_key_thumbprint_raw(public_key, Bounds.maximum()) do
         {:ok, raw} -> {:ok, %{"thumbprint_raw" => raw}}
@@ -216,7 +235,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("bounds.new", input, _raws) do
+  defp dispatch(1, "bounds.new", input, _raws) do
     case normalize_bounds_overrides(Map.get(input, "overrides", %{})) do
       {:ok, overrides} ->
         case Bounds.new(overrides) do
@@ -229,7 +248,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("untrusted_key_locator", input, _raws) do
+  defp dispatch(1, "untrusted_key_locator", input, _raws) do
     with {:ok, compact} <- fetch_binary(input, "compact") do
       case BoundedAuthorityProtocol.V1.untrusted_key_locator(compact, %{}) do
         {:ok, locator} -> {:ok, %{"kid" => locator.kid}}
@@ -238,8 +257,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("grant_signing_input", input, _raws) do
-    with {:ok, grant} <- build_grant(input) do
+  defp dispatch(1, "grant_signing_input", input, _raws) do
+    with {:ok, grant} <- build_grant(input, 1) do
       case BoundedAuthorityProtocol.V1.grant_signing_input(grant, bounds(input)) do
         {:ok, si} ->
           {:ok,
@@ -255,8 +274,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("proof_signing_input", input, _raws) do
-    with {:ok, proof} <- build_proof(input) do
+  defp dispatch(1, "proof_signing_input", input, _raws) do
+    with {:ok, proof} <- build_proof(input, 1) do
       case BoundedAuthorityProtocol.V1.proof_signing_input(proof, bounds(input)) do
         {:ok, si} ->
           {:ok,
@@ -272,7 +291,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("encode_consumption_entry", input, _raws) do
+  defp dispatch(1, "encode_consumption_entry", input, _raws) do
     with {:ok, entry} <- build_consumption_entry(input) do
       case BoundedAuthorityProtocol.V1.encode_consumption_entry(entry, bounds(input)) do
         {:ok, encoded} -> {:ok, %{"bytes" => encoded.bytes, "hash" => encoded.hash}}
@@ -281,7 +300,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("check_chain", input, _raws) do
+  defp dispatch(1, "check_chain", input, _raws) do
     with {:ok, chain_input, expected_chain} <- build_chain(input, raws_for(input)) do
       case BoundedAuthorityProtocol.V1.check_chain(chain_input, expected_chain) do
         {:ok, facts} -> {:ok, chain_facts_map(facts)}
@@ -290,7 +309,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("boundary_anchor_signing_input", input, _raws) do
+  defp dispatch(1, "boundary_anchor_signing_input", input, _raws) do
     with {:ok, anchor} <- build_anchor(input) do
       case BoundedAuthorityProtocol.V1.boundary_anchor_signing_input(anchor, bounds(input)) do
         {:ok, si} ->
@@ -307,7 +326,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("key_transition_signing_input", input, _raws) do
+  defp dispatch(1, "key_transition_signing_input", input, _raws) do
     with {:ok, transition} <- build_transition(input) do
       case BoundedAuthorityProtocol.V1.key_transition_signing_input(transition, bounds(input)) do
         {:ok, si} ->
@@ -324,7 +343,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("encode_anchored_export", input, _raws) do
+  defp dispatch(1, "encode_anchored_export", input, _raws) do
     with {:ok, export_input, expected} <- build_anchored_export(input, raws_for(input)) do
       case BoundedAuthorityProtocol.V1.encode_anchored_export(export_input, expected) do
         {:ok, encoded} ->
@@ -341,7 +360,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("assemble_compact", input, _raws) do
+  defp dispatch(1, "assemble_compact", input, _raws) do
     with {:ok, signing_input, signature} <- build_assemble_input(input) do
       case BoundedAuthorityProtocol.V1.assemble_compact(signing_input, signature) do
         {:ok, compact} -> {:ok, %{"compact" => compact}}
@@ -350,7 +369,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("decode_grant", input, _raws) do
+  defp dispatch(1, "decode_grant", input, _raws) do
     with {:ok, compact} <- fetch_binary(input, "compact") do
       case BoundedAuthorityProtocol.V1.decode_grant(compact, bounds(input)) do
         {:ok, decoded} -> {:ok, decoded_grant_map(decoded)}
@@ -359,7 +378,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("decode_proof", input, _raws) do
+  defp dispatch(1, "decode_proof", input, _raws) do
     with {:ok, compact} <- fetch_binary(input, "compact") do
       case BoundedAuthorityProtocol.V1.decode_proof(compact, bounds(input)) do
         {:ok, decoded} -> {:ok, decoded_proof_map(decoded)}
@@ -368,7 +387,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("verify_grant", input, _raws) do
+  defp dispatch(1, "verify_grant", input, _raws) do
     with {:ok, compact, trusted, expected} <- build_verify_grant(input) do
       case BoundedAuthorityProtocol.V1.verify_grant(compact, trusted, expected) do
         {:ok, facts} -> {:ok, grant_facts_map(facts)}
@@ -377,7 +396,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("verify_historical_anchor", input, _raws) do
+  defp dispatch(1, "verify_historical_anchor", input, _raws) do
     with {:ok, compact, key, expected} <- build_verify_anchor(input) do
       case BoundedAuthorityProtocol.V1.verify_historical_anchor(compact, key, expected) do
         {:ok, facts} -> {:ok, anchor_facts_map(facts)}
@@ -386,7 +405,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("verify_key_transition", input, _raws) do
+  defp dispatch(1, "verify_key_transition", input, _raws) do
     with {:ok, compact, current_key, next_key, expected} <- build_verify_transition(input) do
       case BoundedAuthorityProtocol.V1.verify_key_transition(
              compact,
@@ -400,7 +419,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("verify_anchored_export", input, _raws) do
+  defp dispatch(1, "verify_anchored_export", input, _raws) do
     with {:ok, archived, key_chain, expected} <- build_verify_export(input, raws_for(input)) do
       case BoundedAuthorityProtocol.V1.verify_anchored_export(archived, key_chain, expected) do
         {:ok, facts} -> {:ok, export_facts_map(facts)}
@@ -409,7 +428,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("check_envelope", input, _raws) do
+  defp dispatch(1, "check_envelope", input, _raws) do
     with {:ok, credentials, expected_request} <- build_envelope(input) do
       case BoundedAuthorityProtocol.V1.check_envelope(credentials, expected_request) do
         {:ok, facts} -> {:ok, envelope_facts_map(facts)}
@@ -418,9 +437,208 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp dispatch("request_digest", input, _raws) do
+  defp dispatch(1, "request_digest", input, _raws) do
     with {:ok, operation, cast_args} <- build_request_digest(input) do
       case BoundedAuthorityProtocol.V1.request_digest(operation, cast_args, bounds(input)) do
+        {:ok, digest} -> {:ok, %{"digest" => digest}}
+        error -> error
+      end
+    end
+  end
+
+  # --- v2 dispatch ---------------------------------------------------------
+
+  # Version-neutral primitive surfaces execute the shared modules under either major.
+  defp dispatch(2, surface, input, raws) when surface in @shared_surfaces,
+    do: dispatch(1, surface, input, raws)
+
+  defp dispatch(2, "untrusted_key_locator", input, _raws) do
+    with {:ok, compact} <- fetch_binary(input, "compact") do
+      case V2Facade.untrusted_key_locator(compact, %{}) do
+        {:ok, locator} -> {:ok, %{"kid" => locator.kid}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(2, "grant_signing_input", input, _raws) do
+    with {:ok, grant} <- build_grant(input, 2) do
+      case V2Facade.grant_signing_input(grant, bounds(input)) do
+        {:ok, si} ->
+          {:ok,
+           %{
+             "protected_segment" => si.protected_segment,
+             "payload_segment" => si.payload_segment,
+             "message" => si.message
+           }}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp dispatch(2, "proof_signing_input", input, _raws) do
+    with {:ok, proof} <- build_proof(input, 2) do
+      case V2Facade.proof_signing_input(proof, bounds(input)) do
+        {:ok, si} ->
+          {:ok,
+           %{
+             "protected_segment" => si.protected_segment,
+             "payload_segment" => si.payload_segment,
+             "message" => si.message
+           }}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp dispatch(2, "encode_consumption_entry", input, _raws) do
+    with {:ok, entry} <- build_consumption_entry(input) do
+      case V2Facade.encode_consumption_entry(entry, bounds(input)) do
+        {:ok, encoded} -> {:ok, %{"bytes" => encoded.bytes, "hash" => encoded.hash}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(2, "check_chain", input, _raws) do
+    with {:ok, chain_input, expected_chain} <- build_chain(input, raws_for(input)) do
+      case V2Facade.check_chain(chain_input, expected_chain) do
+        {:ok, facts} -> {:ok, chain_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(2, "boundary_anchor_signing_input", input, _raws) do
+    with {:ok, anchor} <- build_anchor(input) do
+      case V2Facade.boundary_anchor_signing_input(anchor, bounds(input)) do
+        {:ok, si} ->
+          {:ok,
+           %{
+             "protected_segment" => si.protected_segment,
+             "payload_segment" => si.payload_segment,
+             "message" => si.message
+           }}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp dispatch(2, "key_transition_signing_input", input, _raws) do
+    with {:ok, transition} <- build_transition(input) do
+      case V2Facade.key_transition_signing_input(transition, bounds(input)) do
+        {:ok, si} ->
+          {:ok,
+           %{
+             "protected_segment" => si.protected_segment,
+             "payload_segment" => si.payload_segment,
+             "message" => si.message
+           }}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp dispatch(2, "encode_anchored_export", input, _raws) do
+    with {:ok, export_input, expected} <- build_anchored_export(input, raws_for(input)) do
+      case V2Facade.encode_anchored_export(export_input, expected) do
+        {:ok, encoded} ->
+          {:ok,
+           %{
+             "chunks" => encoded.chunks,
+             "digest" => encoded.digest,
+             "byte_count" => encoded.byte_count
+           }}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp dispatch(2, "assemble_compact", input, _raws) do
+    with {:ok, signing_input, signature} <- build_assemble_input(input) do
+      case V2Facade.assemble_compact(signing_input, signature) do
+        {:ok, compact} -> {:ok, %{"compact" => compact}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(2, "decode_grant", input, _raws) do
+    with {:ok, compact} <- fetch_binary(input, "compact") do
+      case V2Facade.decode_grant(compact, bounds(input)) do
+        {:ok, decoded} -> {:ok, decoded_grant_map(decoded)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(2, "decode_proof", input, _raws) do
+    with {:ok, compact} <- fetch_binary(input, "compact") do
+      case V2Facade.decode_proof(compact, bounds(input)) do
+        {:ok, decoded} -> {:ok, decoded_proof_map(decoded)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(2, "verify_grant", input, _raws) do
+    with {:ok, compact, trusted, expected} <- build_verify_grant(input) do
+      case V2Facade.verify_grant(compact, trusted, expected) do
+        {:ok, facts} -> {:ok, grant_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(2, "verify_historical_anchor", input, _raws) do
+    with {:ok, compact, key, expected} <- build_verify_anchor(input) do
+      case V2Facade.verify_historical_anchor(compact, key, expected) do
+        {:ok, facts} -> {:ok, anchor_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(2, "verify_key_transition", input, _raws) do
+    with {:ok, compact, current_key, next_key, expected} <- build_verify_transition(input) do
+      case V2Facade.verify_key_transition(compact, current_key, next_key, expected) do
+        {:ok, facts} -> {:ok, transition_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(2, "verify_anchored_export", input, _raws) do
+    with {:ok, archived, key_chain, expected} <- build_verify_export(input, raws_for(input)) do
+      case V2Facade.verify_anchored_export(archived, key_chain, expected) do
+        {:ok, facts} -> {:ok, export_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(2, "check_envelope", input, _raws) do
+    with {:ok, credentials, expected_request} <- build_envelope(input) do
+      case V2Facade.check_envelope(credentials, expected_request) do
+        {:ok, facts} -> {:ok, envelope_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(2, "request_digest", input, _raws) do
+    with {:ok, operation, cast_args} <- build_request_digest(input) do
+      case V2Facade.request_digest(operation, cast_args, bounds(input)) do
         {:ok, digest} -> {:ok, %{"digest" => digest}}
         error -> error
       end
@@ -550,7 +768,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   # inline. This stub keeps the signature consistent for surfaces that never need it.
   defp raws_for(_input), do: %{}
 
-  defp build_grant(input) do
+  defp build_grant(input, major) do
     with {:ok, key_id} <- fetch_binary(input, "key_id"),
          {:ok, issuer} <- fetch_binary(input, "issuer"),
          {:ok, grant_id} <- fetch_binary(input, "grant_id"),
@@ -559,9 +777,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
          {:ok, not_before} <- int_field(input, "not_before"),
          {:ok, expires_at} <- int_field(input, "expires_at"),
          {:ok, holder_thumbprint} <- b64_field(input, "holder_thumbprint"),
-         {:ok, operations} <- build_operations(input) do
+         {:ok, operations} <- build_operations(input, major) do
       {:ok,
-       %Grant{
+       struct!(grant_module(major),
          key_id: key_id,
          issuer: issuer,
          grant_id: grant_id,
@@ -571,11 +789,14 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
          expires_at: expires_at,
          holder_thumbprint: holder_thumbprint,
          operations: operations
-       }}
+       )}
     end
   end
 
-  defp build_proof(input) do
+  defp grant_module(1), do: Grant
+  defp grant_module(2), do: BoundedAuthorityProtocol.V2.Grant
+
+  defp build_proof(input, major) do
     with {:ok, holder_public_key} <- b64_field(input, "holder_public_key"),
          {:ok, proof_id} <- fetch_binary(input, "proof_id"),
          {:ok, method} <- fetch_binary(input, "method"),
@@ -586,7 +807,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
          {:ok, grant_compact} <- fetch_binary(input, "grant_compact"),
          {:ok, cast_arguments} <- json_field(input, "cast_arguments") do
       {:ok,
-       %Proof{
+       struct!(proof_module(major),
          holder_public_key: holder_public_key,
          proof_id: proof_id,
          method: method,
@@ -597,9 +818,12 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
          operation: operation,
          grant_compact: grant_compact,
          cast_arguments: cast_arguments
-       }}
+       )}
     end
   end
+
+  defp proof_module(1), do: Proof
+  defp proof_module(2), do: BoundedAuthorityProtocol.V2.Proof
 
   defp proof_nonce(input) do
     case Map.get(input, "nonce") do
@@ -619,39 +843,54 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
-  defp build_operations(input) do
+  defp build_operations(input, major) do
     case Map.get(input, "operations") do
-      ops when is_list(ops) -> reduce_build(ops, &build_operation/1)
+      ops when is_list(ops) -> reduce_build(ops, &build_operation(&1, major))
       _ -> {:error, :invalid}
     end
   end
 
-  defp build_operation(%{"name" => name, "selectors" => selectors})
+  defp build_operation(%{"name" => name, "selectors" => selectors}, major)
        when is_binary(name) and is_list(selectors) do
-    with {:ok, built_selectors} <- build_selectors(selectors) do
-      {:ok, %Operation{name: name, selectors: built_selectors}}
+    with {:ok, built_selectors} <- build_selectors(selectors, major) do
+      {:ok, struct!(operation_module(major), name: name, selectors: built_selectors)}
     end
   end
 
-  defp build_operation(_), do: {:error, :invalid}
+  defp build_operation(_, _major), do: {:error, :invalid}
 
-  defp build_selectors(selectors) do
-    reduce_build(selectors, &build_selector/1)
+  defp operation_module(1), do: Operation
+  defp operation_module(2), do: BoundedAuthorityProtocol.V2.Operation
+
+  defp build_selectors(selectors, major) do
+    reduce_build(selectors, &build_selector(&1, major))
   end
 
-  defp build_selector("all"), do: {:ok, :all}
+  defp build_selector("all", _major), do: {:ok, :all}
 
-  defp build_selector(%{"kind" => "equals", "path" => path, "value" => value})
+  defp build_selector(%{"kind" => "equals", "path" => path, "value" => value}, _major)
        when is_list(path) do
     {:ok, {:equals, path, to_tagged(value)}}
   end
 
-  defp build_selector(%{"kind" => "one_of", "path" => path, "values" => values})
+  defp build_selector(%{"kind" => "one_of", "path" => path, "values" => values}, _major)
        when is_list(path) and is_list(values) do
     {:ok, {:one_of, path, Enum.map(values, &to_tagged/1)}}
   end
 
-  defp build_selector(_), do: {:error, :invalid}
+  # The inclusive range kinds exist only in the v2 selector algebra (ADR 0028); the
+  # v1 builder admits no reserved-kind tuple.
+  defp build_selector(%{"kind" => "lte", "path" => path, "value" => value}, 2)
+       when is_list(path) do
+    {:ok, {:lte, path, to_tagged(value)}}
+  end
+
+  defp build_selector(%{"kind" => "gte", "path" => path, "value" => value}, 2)
+       when is_list(path) do
+    {:ok, {:gte, path, to_tagged(value)}}
+  end
+
+  defp build_selector(_, _major), do: {:error, :invalid}
 
   defp build_consumption_entry(input) do
     with {:ok, chain_id} <- fetch_binary(input, "chain_id"),

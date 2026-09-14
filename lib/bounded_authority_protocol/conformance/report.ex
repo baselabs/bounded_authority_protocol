@@ -12,6 +12,11 @@ defmodule BoundedAuthorityProtocol.Conformance.Report do
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Jcs
 
+  @report_formats %{
+    1 => "bounded-authority-protocol-v1-conformance-report",
+    2 => "bounded-authority-protocol-v2-conformance-report"
+  }
+
   @enforce_keys [:agreement, :exit_status, :total, :agreed, :disagreed]
   defstruct [:agreement, :exit_status, :total, :agreed, :disagreed]
 
@@ -55,7 +60,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Report do
     value =
       {:object,
        [
-         {"format", {:string, "bounded-authority-protocol-v1-conformance-report"}},
+         {"format", {:string, Map.get(@report_formats, corpus.major)}},
          {"agreement", {:boolean, report.agreement}},
          {"exit_status", {:integer, report.exit_status}},
          {"total", {:integer, report.total}},

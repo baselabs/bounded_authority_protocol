@@ -40,6 +40,32 @@ the two-boundary key census is asserted per run (observed import-boundary thumbp
 go test ./conformance/   # agreed=283 disagreed=0 + census
 ```
 
+## Successor-major profile (contract-major 2)
+
+[`v2.go`](v2.go) adds the successor contract-major profile behind the namespace type `Profile`
+(the file carries the major, so the method set mirrors the v1 entry names exactly — the Go
+analogue of the sibling SDKs' versioned modules). It is byte-honest with the frozen v1 surface
+except: `"v":2` payloads with cross-major rejection in both directions, the `BAP2-REQUEST\0` /
+`BAP2-CHAIN\0` / `BAP2-ARCHIVE\0EXPORT\0` domain separators (the v1 constants are untouched),
+and the two inclusive one-sided range selector kinds `lte`/`gte` on the existing
+`{kind, path, value}` member set — same-tag numeric operands only, comparison by numeric value
+(IEEE 754, `−0.0 = 0.0`), cross-tag never matches, and a non-numeric bound is rejected at decode
+([ADR 0028](../../docs/adr/0028-range-selector-kinds.md) §1-§4). The encode-side export contract
+carries no digest/object-version expected context (the producer derives its own digest; same
+shape as the reference's encode path).
+
+The vendored successor corpus lives at [`conformance/corpus-v2/`](conformance/corpus-v2/) and is
+executed by [`conformance/v2_test.go`](conformance/v2_test.go) (an external test package, so both
+majors' runners coexist): **268/268** vectors, index pin
+`beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A`, and the successor census semantics — curated ==
+index two-way (`conformance/generators/curated-inputs-v2.json`), the case-byte discovery as the
+fail-closed subset leg (one curated key emits no case: 16 of 17 by design), and the verify-import
+leg (at authoring: `agreed=268 disagreed=0 census=16 declared=17`).
+
+```bash
+go test ./conformance/   # both majors: 283 + 268 + censuses
+```
+
 ## The public façade
 
 The 17-function v1 verification contract (see `spec/bap-v1.md` § Public verification contract) plus the
@@ -86,6 +112,20 @@ BAP-16 was required not to repeat):
 - overflow fail-closure on extreme sequence values;
 - ADR 0018 bounds threading at every ceiling (chain, anchor, assemble, json, archive) and the D2
   nested-pins identity semantics on the export expected struct.
+
+The successor-major range-selector legs (`TestPermissiveSuccessorRangeInclusive`,
+`...RangeSameTag`, `...RangeDispatch`, `...MajorIsolation`, plus the white-box
+`TestSuccessorRangeMatcherTag`) were mutation-proven at authoring over the vendored corpus-v2:
+
+- inclusive `<=`/`>=` mutated to strict `<`/`>` in `rangeMatch` → every boundary-equal corpus
+  case and `RangeInclusive` RED;
+- the same-tag check removed (numeric-value comparison across tags) → the cross-tag corpus
+  cases, `RangeSameTag`, and the white-box matcher leg RED;
+- the lte/gte comparator dispatch swapped → `lte-exceeded` / `gte-unmet` and `RangeDispatch` RED;
+- the successor payload `v`-check widened to accept `v:1` → the cross-major corpus family
+  (envelope, grant decode, grant verify) and `MajorIsolation` RED.
+
+All four mutations were reverted byte-identical (`git diff` clean over the probes).
 
 ## What this SDK does NOT do
 

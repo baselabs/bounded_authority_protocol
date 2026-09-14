@@ -2867,3 +2867,286 @@ fn round12_14_predigest_export_gates_verdict_matrix() {
         "key charset"
     );
 }
+
+// =============================================================================
+// v2 range-selector + contract-major mutation entries (ADR 0028 + the
+// contract-major v2 profile). Same RED discipline as the families above: each
+// entry documents the exact source mutation that flips it (or its named
+// reddening gate), through the PUBLIC crate surface only. Selector EVALUATION
+// (`selector::evaluate_v2`) is reachable publicly only inside
+// `v2::check_envelope`, which requires a valid holder signature the battery
+// cannot produce (AGENTS.md rule #6: no secret material) — the evaluate-path
+// mutations below therefore name their reddening gates where they live: the
+// `conformance_v2` corpus gate (integration) and the `selector` in-module unit
+// tests (which call `evaluate_v2` directly).
+//
+// (a) `<=` mutated to `<` (and `>=` to `>`) in `selector::eval_range` →
+//     RED GATES: `conformance_v2::conformance_full_corpus` (the
+//     `check-envelope-v2-valid-lte-boundary-equal` /
+//     `check-envelope-v2-valid-gte-boundary-equal` corpus cases disagree) AND
+//     `selector::tests::range_lte_boundary_equal_matches` /
+//     `selector::tests::range_gte_boundary_equal_matches`.
+// (b) same-tag check removed in `selector::eval_range` (casting both operands
+//     to f64) → RED GATES: `selector::tests::range_cross_tag_pair_does_not_match`
+//     AND the corpus cross-tag vectors
+//     (`check-envelope-v2-invalid-selector-cross-tag-integer-bound` /
+//     `check-envelope-v2-invalid-selector-cross-tag-float-bound`).
+// (c) lte/gte dispatch swapped (the two `eval_range` arms exchanged, or the
+//     producer's kind strings swapped) → RED GATES: the battery legs below
+//     (`range_selector_kinds_encode_byte_exact`,
+//     `prior_major_producer_still_rejects_range_selectors`) AND
+//     `selector::tests::range_lte_and_gte_dispatch_is_distinct` AND the corpus
+//     `grant-signing-input-v2-valid-range-selectors` byte-exact pin.
+// (d) a v:2 check widened to accept v:1 (in any v2 payload validator) →
+//     RED GATES: the battery legs below
+//     (`grant_bytes_of_each_major_are_rejected_by_the_other`,
+//     `proof_bytes_of_each_major_are_rejected_by_the_other`,
+//     `chain_rows_of_each_major_are_rejected_by_the_other`) AND the corpus cross-major
+//     cases (`grant-decode-v2-invalid-cross-major-v1-bytes`,
+//     `proof-decode-v2-invalid-cross-major-v1-proof`,
+//     `check-chain-v2-invalid-cross-major-v1-rows`).
+
+use bounded_authority_protocol::{v1, v2};
+
+/// A minimal v2 grant input whose one operation carries BOTH range kinds —
+/// the producer's lte/gte encode arms are distinguishable in the emitted
+/// segment bytes (kind strings + bound values).
+fn successor_range_grant() -> GrantInput {
+    GrantInput {
+        issuer: "issuer-a".to_string(),
+        grant_id: "grant-1".to_string(),
+        key_id: "issuer-key-1".to_string(),
+        holder_thumbprint: Z32,
+        issued_at: 1000,
+        not_before: 1000,
+        expires_at: 2000,
+        audiences: vec!["aud-a".to_string()],
+        operations: vec![GrantOperation {
+            name: "do.thing".to_string(),
+            selectors: vec![
+                JsonValue::Object(vec![
+                    ("kind".to_string(), JsonValue::String("gte".to_string())),
+                    (
+                        "path".to_string(),
+                        JsonValue::Array(vec![JsonValue::String("amount".to_string())]),
+                    ),
+                    ("value".to_string(), JsonValue::Int(50)),
+                ]),
+                JsonValue::Object(vec![
+                    ("kind".to_string(), JsonValue::String("lte".to_string())),
+                    (
+                        "path".to_string(),
+                        JsonValue::Array(vec![JsonValue::String("amount".to_string())]),
+                    ),
+                    ("value".to_string(), JsonValue::Int(5000)),
+                ]),
+            ],
+        }],
+    }
+}
+
+#[test]
+fn range_selector_kinds_encode_byte_exact() {
+    // (c): the producer emits the lte/gte kind strings and their numeric
+    // bounds at their exact JCS positions — swapping the producer arms, a kind
+    // string, or a bound tag flips this byte-exact comparison RED.
+    let produced =
+        v2::grant_signing_input(&successor_range_grant(), &max()).expect("v2 range grant produces");
+    let payload = base64url_decode(&produced.payload_segment).expect("segment decodes");
+    let text = String::from_utf8(payload).expect("payload is ASCII");
+    // JCS sorts members: ...selectors[0] is the gte selector, [1] the lte.
+    assert!(
+        text.contains(r#""selectors":[{"kind":"gte","path":["amount"],"value":50},{"kind":"lte","path":["amount"],"value":5000}]"#),
+        "exact range-selector encoding expected in: {text}"
+    );
+    // The payload carries the v2 version member.
+    assert!(text.contains(r#""v":2"#), "v2 payload carries v:2");
+}
+
+#[test]
+fn prior_major_producer_still_rejects_range_selectors() {
+    // (c)/(closed-set): the identical range-selector grant is valid under v2
+    // and rejected by the v1 producer — admitting lte/gte in the v1 closed set
+    // (or dropping them from the v2 set) flips this RED.
+    assert!(v2::grant_signing_input(&successor_range_grant(), &max()).is_ok());
+    assert_eq!(
+        v1::grant_signing_input(&successor_range_grant(), &max()),
+        Err(bounded_authority_protocol::Invalid)
+    );
+}
+
+/// Decodes a produced two-segment signing input into a 3-segment compact with
+/// a dummy 64-byte signature (decode validates structure, never the
+/// signature).
+fn compact_with_dummy_signature(
+    produced: &bounded_authority_protocol::types::ProducedSigningInput,
+) -> Vec<u8> {
+    let mut out = Vec::new();
+    out.extend_from_slice(&produced.protected_segment);
+    out.push(b'.');
+    out.extend_from_slice(&produced.payload_segment);
+    out.push(b'.');
+    out.extend_from_slice(&base64url_encode(&[0u8; 64]));
+    out
+}
+
+#[test]
+fn grant_bytes_of_each_major_are_rejected_by_the_other() {
+    // (d): a v:1 check widened to accept v:1 (or a v1 validator widened to
+    // v:2) makes one of the two directions decode Ok — RED.
+    let successor_compact = compact_with_dummy_signature(
+        &v2::grant_signing_input(&successor_range_grant(), &max()).expect("v2 produces"),
+    );
+    assert!(v2::decode_grant(&successor_compact, &max()).is_ok());
+    assert_eq!(
+        v1::decode_grant(&successor_compact, &max()),
+        Err(bounded_authority_protocol::Invalid),
+        "v1 façade must reject v2 grant bytes"
+    );
+
+    let prior_major_grant = GrantInput {
+        operations: vec![GrantOperation {
+            name: "do.thing".to_string(),
+            selectors: vec![JsonValue::Object(vec![(
+                "kind".to_string(),
+                JsonValue::String("all".to_string()),
+            )])],
+        }],
+        ..successor_range_grant()
+    };
+    let prior_compact = compact_with_dummy_signature(
+        &v1::grant_signing_input(&prior_major_grant, &max()).expect("v1 produces"),
+    );
+    assert!(v1::decode_grant(&prior_compact, &max()).is_ok());
+    assert_eq!(
+        v2::decode_grant(&prior_compact, &max()),
+        Err(bounded_authority_protocol::Invalid),
+        "v2 façade must reject v1 grant bytes"
+    );
+}
+
+#[test]
+fn proof_bytes_of_each_major_are_rejected_by_the_other() {
+    // (d), proof payload leg.
+    let proof = ProofInput {
+        proof_id: "proof-1".to_string(),
+        method: "POST".to_string(),
+        target_uri: "https://example.test/api".to_string(),
+        invocation_id: "01234567-89ab-cdef-0123-456789abcdef".to_string(),
+        operation: "do.thing".to_string(),
+        cast_arguments: JsonValue::Object(vec![(
+            "q".to_string(),
+            JsonValue::String("v".to_string()),
+        )]),
+        grant_compact: b"grant.gher.compact".to_vec(),
+        holder_public_key: [9u8; 32],
+        issued_at: 2000,
+    };
+    let successor_compact = compact_with_dummy_signature(
+        &v2::proof_signing_input(&proof, &max()).expect("v2 produces"),
+    );
+    assert!(v2::decode_proof(&successor_compact, &max()).is_ok());
+    assert_eq!(
+        v1::decode_proof(&successor_compact, &max()),
+        Err(bounded_authority_protocol::Invalid)
+    );
+    let prior_compact = compact_with_dummy_signature(
+        &v1::proof_signing_input(&proof, &max()).expect("v1 produces"),
+    );
+    assert!(v1::decode_proof(&prior_compact, &max()).is_ok());
+    assert_eq!(
+        v2::decode_proof(&prior_compact, &max()),
+        Err(bounded_authority_protocol::Invalid)
+    );
+}
+
+#[test]
+fn chain_rows_of_each_major_are_rejected_by_the_other() {
+    // (d), chain-row leg: the v1 producer emits a `"v":1` row the v2
+    // check_chain must reject (and vice versa) — a widened version match in
+    // `parse_row` flips this RED.
+    let entry = ConsumptionEntry {
+        chain_id: "chain-x".to_string(),
+        commitment: [5u8; 32],
+        previous_hash: Z32,
+        sequence: 1,
+    };
+    let (successor_row, _) = v2::encode_consumption_entry(&entry, &max()).expect("v2 row");
+    let (prior_row, _) = v1::encode_consumption_entry(&entry, &max()).expect("v1 row");
+    // The two rows differ ONLY in the version member.
+    assert_ne!(successor_row, prior_row);
+    assert_eq!(
+        v2::check_chain(
+            &bounded_authority_protocol::types::ChainInput {
+                rows: vec![prior_row.clone()]
+            },
+            &ExpectedChain {
+                chain_id: "chain-x".to_string(),
+                first_sequence: 1,
+                last_sequence: 1,
+                row_count: 1,
+                previous_hash: Z32,
+                head_hash: successor_row_domain_hash(&successor_row),
+                bounds: None,
+            },
+        ),
+        Err(bounded_authority_protocol::Invalid),
+        "v2 check_chain must reject v1 rows"
+    );
+    assert_eq!(
+        v1::check_chain(
+            &bounded_authority_protocol::types::ChainInput {
+                rows: vec![successor_row]
+            },
+            &ExpectedChain {
+                chain_id: "chain-x".to_string(),
+                first_sequence: 1,
+                last_sequence: 1,
+                row_count: 1,
+                previous_hash: Z32,
+                head_hash: prior_row_domain_hash(&prior_row),
+                bounds: None,
+            },
+        ),
+        Err(bounded_authority_protocol::Invalid),
+        "v1 check_chain must reject v2 rows"
+    );
+}
+
+/// SHA-256("BAP2-CHAIN\0" || row) — the v2 row-domain hash (the runner-side
+/// twin of the façade's internal helper; needed to build a caller head).
+fn successor_row_domain_hash(row: &[u8]) -> [u8; 32] {
+    use sha2::Digest;
+    let mut h = sha2::Sha256::new();
+    h.update(b"BAP2-CHAIN\0");
+    h.update(row);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&h.finalize());
+    out
+}
+
+/// SHA-256("BAP1-CHAIN\0" || row) — the v1 row-domain hash.
+fn prior_row_domain_hash(row: &[u8]) -> [u8; 32] {
+    use sha2::Digest;
+    let mut h = sha2::Sha256::new();
+    h.update(b"BAP1-CHAIN\0");
+    h.update(row);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&h.finalize());
+    out
+}
+
+#[test]
+fn request_digests_are_domain_separated_across_majors() {
+    // (domain separation, battery leg): the identical operation + arguments
+    // produce different digests under the two majors — dropping the BAP2
+    // prefix (hashing v2 bindings under BAP1-REQUEST\0) makes the two digests
+    // collide, flipping this RED.
+    let args = JsonValue::Object(vec![("amount".to_string(), JsonValue::Int(10))]);
+    let prior_digest = request_digest("transfer", &args, &max()).expect("prior digest");
+    let successor_digest = v2::request_digest("transfer", &args, &max()).expect("successor digest");
+    assert_ne!(
+        prior_digest, successor_digest,
+        "BAP1/BAP2 request digests must never collide"
+    );
+}

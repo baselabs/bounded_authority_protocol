@@ -5,6 +5,10 @@
 The prefix is exact ASCII including its final zero byte (REQ1-SIGNING-digest-prefix). ``typed()``
 projects the tagged JSON algebra to the closed ``["tag", value]`` JSON form before JCS, preserving the
 int/float distinction (REQ1-SELECTOR-semantic-identity depends on it).
+
+The v2 profile (contract-major 2) uses the byte-distinct ``BAP2-REQUEST\\0`` separator over the
+same projection and bounds; ``request_digest_v2`` is that variant. The two digests never collide
+across majors (different prefix bytes, REQ1-SIGNING-digest-prefix per major).
 """
 
 from __future__ import annotations
@@ -18,6 +22,9 @@ from .json_alg import JArray, JBool, JFloat, JInt, JNull, JObject, JString, Tagg
 
 REQUEST_PREFIX = b"BAP1-REQUEST\x00"
 """The 13-byte ASCII prefix including its final zero byte (REQ1-SIGNING-digest-prefix)."""
+
+REQUEST_PREFIX_V2 = b"BAP2-REQUEST\x00"
+"""The v2 (contract-major 2) domain separator — same shape, byte-distinct from the v1 prefix."""
 
 
 def typed_project(value: Tagged) -> Tagged:
@@ -50,6 +57,22 @@ def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXI
 
     ``operation`` is validated printable ASCII 1..128.
     """
+    return _request_digest_with_prefix(REQUEST_PREFIX, operation, cast_arguments, bounds)
+
+
+def request_digest_v2(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> bytes:
+    """The v2-profile request digest (BAP2-REQUEST\\0 separator, identical projection + bounds)."""
+    return _request_digest_with_prefix(REQUEST_PREFIX_V2, operation, cast_arguments, bounds)
+
+
+def _request_digest_with_prefix(
+    prefix: bytes, operation: str, cast_arguments: Tagged, bounds: Bounds
+) -> bytes:
+    """The shared digest core: prefix || SHA-256 over JCS([operation, typed(cast_arguments)]).
+
+    The prefix is a module constant, never caller-supplied (REQ1-SIGNING-digest-prefix: the
+    domain separator is fixed per profile major).
+    """
     # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits).
     b = coerce_bounds(bounds)
     op_bytes = str_utf8(operation)
@@ -70,7 +93,7 @@ def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXI
     jcs = jcs_encode(array, b)
     if len(jcs) > bounds_resolve(b, "jcs_bytes"):
         fail("request_digest: jcs_bytes")
-    return sha256(REQUEST_PREFIX, jcs)
+    return sha256(prefix, jcs)
 
 
 def _within_tagged_bounds(v: Tagged, level: int, bounds: Bounds) -> bool:

@@ -16,7 +16,10 @@ ryu-js = "1.0"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip: the v2 corpus carries a float lexeme (4503599627370495.5)
+# whose default fast-path parse is off by one ulp; the runner reads corpus
+# files through serde_json and must see the correctly-rounded value.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 
 # The BAP-15 T14 conformance runner: the acceptance gate that vendors the 283-
 # case corpus, dispatches all 28 surfaces through the public façade, SHA-binds
@@ -30,3 +33,11 @@ serde_json = "1"
 [[test]]
 name = "conformance"
 path = "conformance/run.rs"
+
+# The v2 conformance runner: the contract-major 2 acceptance gate over the
+# vendored 268-case corpus-v2 snapshot (same SHA-bind + two-boundary census
+# discipline as the v1 runner, against the `v2` façade and the shared
+# primitives).
+[[test]]
+name = "conformance_v2"
+path = "conformance/run_v2.rs"

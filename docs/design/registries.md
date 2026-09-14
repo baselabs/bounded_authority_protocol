@@ -17,8 +17,9 @@ Naming scheme: `BAP<contract-major>-<signature>-<digest>`.
 
 | Suite | Status | Definition |
 |---|---|---|
-| `BAP1-Ed25519-SHA256` | active | EdDSA/Ed25519, SHA-256, RFC 8785 JCS, `BAP1-*` domain separators, fixed 32-byte keys / 64-byte signatures — the complete current `normative profile` |
-| `BAP2-*` ML-DSA family (FIPS 204 / RFC 9964) | anticipated | The post-quantum successor candidate family per `docs/adr/0026-pq-successor-suite.md`: ML-DSA-65 (category 3) baseline, ML-DSA-87 (category 5) higher tier, JOSE mapping per RFC 9964, hybrid Ed25519+ML-DSA composite posture reserved per draft-ietf-jose-pq-composite-sigs (decided at successor definition time); quantum-readiness statement and revisit triggers recorded there; activation successor-major only (ADR 0009) |
+| `BAP1-Ed25519-SHA256` | active | EdDSA/Ed25519, SHA-256, RFC 8785 JCS, `BAP1-*` domain separators, fixed 32-byte keys / 64-byte signatures — the complete contract-major 1 `normative profile` |
+| `BAP2-Ed25519-SHA256` | active | Contract-major 2 ([ADR 0030](../adr/0030-v2-contract-major-activation.md)): the same EdDSA/Ed25519, SHA-256, RFC 8785 JCS algorithms under the major-bound naming scheme, `BAP2-*` domain separators, payload `v: 2`, and the `lte`/`gte` selector kinds ([ADR 0028](../adr/0028-range-selector-kinds.md)) |
+| ML-DSA family (FIPS 204 / RFC 9964) | anticipated | The post-quantum successor candidate family per `docs/adr/0026-pq-successor-suite.md`: ML-DSA-65 (category 3) baseline, ML-DSA-87 (category 5) higher tier, JOSE mapping per RFC 9964, hybrid Ed25519+ML-DSA composite posture reserved per draft-ietf-jose-pq-composite-sigs (decided at successor definition time); quantum-readiness statement and revisit triggers recorded there; activation successor-major only (ADR 0009). The family binds to whichever contract-major activates it — with major 2 taken by ADR 0030, its anticipated index is the next successor major |
 
 ## Claim names
 
@@ -61,11 +62,12 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 | `all` | active | Matches any argument root |
 | `equals` | active | Non-empty object path must exist; tagged semantic identity with the given value |
 | `one_of` | active | Non-empty object path must exist; tagged semantic identity with any listed value |
-| `lte` | reserved | Inclusive upper bound — the value at the path must be same-tag numeric and numerically ≤ the bound (finite IEEE 754 binary64 comparison; cross-tag does not match); full mechanism specified in `docs/adr/0028-range-selector-kinds.md`; activation is a successor contract-major (the closed v1 profile rejects the kind today) |
-| `gte` | reserved | Inclusive lower bound — the value at the path must be same-tag numeric and numerically ≥ the bound (finite IEEE 754 binary64 comparison; cross-tag does not match); full mechanism specified in `docs/adr/0028-range-selector-kinds.md`; activation is a successor contract-major (the closed v1 profile rejects the kind today) |
+| `lte` | active | Inclusive upper bound — the value at the path must be same-tag numeric and numerically ≤ the bound (comparison on the closed decoder-bounded numeric domain; cross-tag does not match); full mechanism specified in [ADR 0028](../adr/0028-range-selector-kinds.md), activated in the contract-major 2 closed profile by [ADR 0030](../adr/0030-v2-contract-major-activation.md) (the v1 profile rejects the kind) |
+| `gte` | active | Inclusive lower bound — the value at the path must be same-tag numeric and numerically ≥ the bound (comparison on the closed decoder-bounded numeric domain; cross-tag does not match); full mechanism specified in [ADR 0028](../adr/0028-range-selector-kinds.md), activated in the contract-major 2 closed profile by [ADR 0030](../adr/0030-v2-contract-major-activation.md) (the v1 profile rejects the kind) |
 
 New selector kinds activate only with a contract-major; candidate kinds are reserved here first so
-independent implementations never collide. Attenuation (charter § Delegation) adds no kind: it is
+independent implementations never collide. `lte`/`gte` flipped reserved→active with contract-major 2
+(ADR 0030). Attenuation (charter § Delegation) adds no kind: it is
 the conjunctive composition of existing selectors.
 
 ## Operation names

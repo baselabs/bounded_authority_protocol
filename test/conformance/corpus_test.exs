@@ -28,6 +28,27 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
 
   defp jcs(value), do: Jcs.encode(value, %{}) |> elem(1)
 
+  test "load rejects a non-map corpus input" do
+    assert {:error, :invalid} = Corpus.load(:not_a_map)
+    assert {:error, :invalid} = Corpus.load(nil)
+  end
+
+  test "an index with an unknown corpus format is rejected before any file loads" do
+    {:ok, value} = Json.decode(File.read!(corpus_index_path()), Bounds.maximum())
+    {:object, members} = value
+    stripped = Enum.reject(members, fn {key, _value} -> key == "format" end)
+
+    bytes =
+      Jcs.encode({:object, stripped}, Bounds.maximum())
+      |> then(fn {:ok, encoded} -> encoded end)
+
+    assert {:error, :invalid} = Corpus.load(%{"index.json" => bytes})
+  end
+
+  defp corpus_index_path do
+    Path.expand("../../priv/conformance/v1/corpus/index.json", __DIR__)
+  end
+
   defp decode!(bytes) do
     {:ok, value} = Json.decode(bytes, Bounds.maximum())
     value

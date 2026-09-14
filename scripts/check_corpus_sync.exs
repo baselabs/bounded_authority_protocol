@@ -6,22 +6,22 @@ defmodule BoundedAuthorityProtocol.CorpusSyncGate do
   # COMMIT time instead, before a red SDK suite or a confusing rotation.
 
   @snapshots [
-    "sdks/rust/conformance/corpus",
-    "sdks/go/conformance/corpus"
+    {"sdks/rust/conformance/corpus", "priv/conformance/v1/corpus"},
+    {"sdks/go/conformance/corpus", "priv/conformance/v1/corpus"},
+    {"sdks/rust/conformance/corpus-v2", "priv/conformance/v2/corpus"},
+    {"sdks/go/conformance/corpus-v2", "priv/conformance/v2/corpus"}
   ]
-
-  @source "priv/conformance/v1/corpus"
 
   def run do
     problems =
-      Enum.flat_map(@snapshots, fn snapshot ->
-        compare(@source, snapshot)
+      Enum.flat_map(@snapshots, fn {snapshot, source} ->
+        compare(source, snapshot)
       end)
 
     case problems do
       [] ->
         IO.puts(
-          "corpus sync gate: ok snapshots=#{length(@snapshots)} byte-identical to #{@source}"
+          "corpus sync gate: ok snapshots=#{length(@snapshots)} byte-identical to their certified corpora"
         )
 
       problems ->

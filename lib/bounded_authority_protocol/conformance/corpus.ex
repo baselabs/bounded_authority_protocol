@@ -23,25 +23,42 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Json
 
-  @enforce_keys [:index, :index_bytes, :cases, :raws, :case_ids]
-  defstruct [:index, :index_bytes, :cases, :raws, :case_ids]
+  @enforce_keys [:index, :index_bytes, :cases, :raws, :case_ids, :major]
+  defstruct [:index, :index_bytes, :cases, :raws, :case_ids, :major]
 
   @type t :: %__MODULE__{
           index: map(),
           index_bytes: binary(),
           cases: [{binary(), [map()]}],
           raws: %{binary() => binary()},
-          case_ids: term()
+          case_ids: term(),
+          major: 1 | 2
         }
+
+  # The index format string names the corpus's contract-major; the loader derives
+  # every other format constant (revision sidecar, case files) from it so a corpus
+  # cannot mix materials across majors.
+  @index_formats %{
+    "bounded-authority-protocol-v1-conformance-corpus-index" => 1,
+    "bounded-authority-protocol-v2-conformance-corpus-index" => 2
+  }
+  @revision_formats %{
+    1 => "bounded-authority-protocol-v1-conformance-corpus-revision",
+    2 => "bounded-authority-protocol-v2-conformance-corpus-revision"
+  }
+  @case_formats %{
+    1 => "bounded-authority-protocol-v1-conformance-cases",
+    2 => "bounded-authority-protocol-v2-conformance-cases"
+  }
 
   @doc "Loads and integrity-verifies a `%{path => binary}` corpus map."
   @spec load(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
   def load(map) when is_map(map) do
     with {:ok, index_bytes} <- fetch_index(map),
          {:ok, index} <- decode_index(index_bytes),
-         :ok <- verify_structure(index),
+         {:ok, major} <- verify_structure(index),
          {:ok, files} <- ordered_files(index),
-         {:ok, cases, raws} <- load_files(files, map),
+         {:ok, cases, raws} <- load_files(files, map, major),
          :ok <- verify_file_set(files, map),
          :ok <- verify_hashes(files, map),
          :ok <- verify_counts(index, cases),
@@ -57,7 +74,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
          index_bytes: index_bytes,
          cases: cases,
          raws: raws,
-         case_ids: case_ids
+         case_ids: case_ids,
+         major: major
        }}
     end
   end
@@ -80,14 +98,19 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     end
   end
 
-  defp verify_structure(%{"format" => format} = index)
-       when format == "bounded-authority-protocol-v1-conformance-corpus-index" do
-    cond do
-      not is_list(index["files"]) -> {:error, :invalid}
-      not is_list(index["public_key_fingerprints"]) -> {:error, :invalid}
-      not is_integer(index["total_cases"]) -> {:error, :invalid}
-      not is_map(index["applicability"]) -> {:error, :invalid}
-      true -> :ok
+  defp verify_structure(%{"format" => format} = index) do
+    case Map.fetch(@index_formats, format) do
+      {:ok, major} ->
+        cond do
+          not is_list(index["files"]) -> {:error, :invalid}
+          not is_list(index["public_key_fingerprints"]) -> {:error, :invalid}
+          not is_integer(index["total_cases"]) -> {:error, :invalid}
+          not is_map(index["applicability"]) -> {:error, :invalid}
+          true -> {:ok, major}
+        end
+
+      :error ->
+        {:error, :invalid}
     end
   end
 
@@ -116,9 +139,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
 
   # --- file loading --------------------------------------------------------
 
-  defp load_files(files, map) do
+  defp load_files(files, map, major) do
     Enum.reduce_while(files, {:ok, [], %{}}, fn {path, hash, _count}, {:ok, cases, raws} ->
-      load_one_file(path, hash, map, cases, raws)
+      load_one_file(path, hash, map, major, cases, raws)
     end)
   end
 
@@ -126,10 +149,10 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   # fetched (missing → invalid) and shape-validated here; its SHA-256 is enforced by the same
   # generic per-file pass as every other declared file, and its file-set membership by
   # verify_file_set. It contributes no cases and is not carried on the loaded corpus.
-  defp load_one_file("revision.json" = path, _hash, map, cases, raws) do
+  defp load_one_file("revision.json" = path, _hash, map, major, cases, raws) do
     case fetch_path(map, path) do
       {:ok, bytes} ->
-        if valid_revision_sidecar?(bytes),
+        if valid_revision_sidecar?(bytes, major),
           do: {:cont, {:ok, cases, raws}},
           else: {:halt, {:error, :invalid}}
 
@@ -138,10 +161,10 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     end
   end
 
-  defp load_one_file(path, hash, map, cases, raws) do
+  defp load_one_file(path, hash, map, major, cases, raws) do
     cond do
       String.ends_with?(path, ".json") ->
-        load_json_entry(map, path, cases, raws)
+        load_json_entry(map, path, major, cases, raws)
 
       String.ends_with?(path, ".raw") ->
         load_raw_entry(map, path, hash, cases, raws)
@@ -151,13 +174,11 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     end
   end
 
-  @revision_format "bounded-authority-protocol-v1-conformance-corpus-revision"
-
-  # Closed 3-member shape: exactly {format, revision, generated_from}, the format const, a
-  # monotone integer revision (1..integer_magnitude), and a non-empty bounded provenance string.
-  # A self-consistent sidecar of any other shape fails closed — the per-file hash cannot catch
-  # a sidecar that was rewritten together with its index entry.
-  defp valid_revision_sidecar?(bytes) do
+  # Closed 3-member shape: exactly {format, revision, generated_from}, the major's format
+  # const, a monotone integer revision (1..integer_magnitude), and a non-empty bounded
+  # provenance string. A self-consistent sidecar of any other shape fails closed — the
+  # per-file hash cannot catch a sidecar that was rewritten together with its index entry.
+  defp valid_revision_sidecar?(bytes, major) do
     case Json.decode(bytes, Bounds.maximum()) do
       {:ok, {:object, members}} ->
         keys = Enum.map(members, &elem(&1, 0))
@@ -165,7 +186,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
         # Exact-member-set check without Enum.sort (forbidden in this module by the
         # architecture gate): 3 keys whose difference with the closed set is empty both ways.
         length(keys) == 3 and keys -- ["format", "generated_from", "revision"] == [] and
-          member(members, "format") == {:string, @revision_format} and
+          member(members, "format") == {:string, Map.get(@revision_formats, major)} and
           revision_integer?(member(members, "revision")) and
           generated_from_string?(member(members, "generated_from"))
 
@@ -182,8 +203,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
 
   defp generated_from_string?(_), do: false
 
-  defp load_json_entry(map, path, cases, raws) do
-    case load_json_file(map, path) do
+  defp load_json_entry(map, path, major, cases, raws) do
+    case load_json_file(map, path, major) do
       {:ok, decoded} -> {:cont, {:ok, [{path, decoded} | cases], raws}}
       :error -> {:halt, {:error, :invalid}}
     end
@@ -196,9 +217,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     end
   end
 
-  defp load_json_file(map, path) do
+  defp load_json_file(map, path, major) do
     with {:ok, bytes} <- fetch_path(map, path),
-         {:ok, decoded} <- decode_case_file(bytes) do
+         {:ok, decoded} <- decode_case_file(bytes, major) do
       {:ok, decoded}
     else
       _ -> :error
@@ -212,12 +233,12 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     end
   end
 
-  defp decode_case_file(bytes) do
+  defp decode_case_file(bytes, major) do
     case Json.decode(bytes, Bounds.maximum()) do
       {:ok, value} ->
         with {:object, members} <- value,
              {:string, format} <- member(members, "format"),
-             true <- format == "bounded-authority-protocol-v1-conformance-cases",
+             true <- format == Map.get(@case_formats, major),
              {:array, items} <- member(members, "cases") do
           {:ok, Enum.map(items, &to_plain/1)}
         else

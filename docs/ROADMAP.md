@@ -34,6 +34,7 @@ compatibility.
 | BAP-17 | **Offline-eligible grant claims (reserve + specify)** — Reserve the `ba_offline` floor-limit claim name and carry the activating-major mechanism to ADR quality (the closed v1 profile rejects the name today; activation is a successor contract-major), slug:bap-17 | `ba_offline` reserved in [registries](design/registries.md); [ADR 0016](adr/0016-offline-eligible-grant-claims.md) specifies the closed `{cnt, cur, max, win}` object, the facts contract (flag + `win` only; magnitudes from the decoded grant), malformed⇒`:invalid`, the `max × cnt` wire-layer ceiling, the `ba_dlg` attenuation composition, and the freshness scoping; the R-BAP-2 legacy-rejection tripwire is red-capable; **zero wire-behavior change** — `git diff <base>..HEAD -- lib/ docs/protocol-v1.md priv/conformance/` is empty (mirror BAP-11/BAP-14; the cross-implementation corpus vector is deferred to the activating major per ADR 0010:286-289) | BAP-10 | [ADR 0016](adr/0016-offline-eligible-grant-claims.md), [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md), and the [offline requirements](design/offline-authorization-requirements.md) |
 | BAP-18 | **Bounds-aware assembly and issuer-mediated reauthorization posture** — Expose caller bounds on compact assembly and define the current-major boundary between ordinary issuer-signed child grants and successor-major portable delegation, slug:bap-18 | `assemble_compact/3` delegates to the existing bounded runtime primitive; `/2` remains the byte-identical profile-maximum default; all four signing kinds enforce tightened segment/final-compact bounds; the facade export lock and unpacked consumer exercise both arities; `ba_dlg` and `ba+cap-delegated` remain rejected | BAP-06, BAP-14, BAP-15 | [ADR 0020](adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md), [ADR 0010](adr/0010-delegation-with-attenuation.md), and [ADR 0018](adr/0018-sdk-bounds-contract.md) |
 | BAP-19 | **Byte-distinct local-loopback HTTP application proof** — Add an explicit application-proof profile for direct literal-loopback development listeners without changing standard `dpop+jwt` bytes or verdicts, slug:bap-19-local-loopback-http | Accepted ADR + normative profile; separate five-surface APIs in Elixir and all four SDKs; certified secret-free language-neutral corpus with cross-profile and meaningful-byte rejects; real `127.0.0.1` and `::1` HTTP exchanges with ephemeral in-memory keys; full legacy corpus remains unchanged; fresh blocking reviews close; exact source/corpus identity is published before any adopter consumes it | BAP-18 | [ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md), [local-loopback profile](../spec/bap-local-loopback-http-v1.md), and [profile requirement map](design/local-loopback-http-requirement-map.md) |
+| BAP-21 | **v2 contract-major activation — `lte`/`gte` range selector kinds** — Execute the ADR 0028 activating-major obligations under the successor-major charter checklist: the complete v2 closed profile, its certified corpus, REQ2-* traceability, the four-SDK re-verification, and the registries flip, slug:bap-21 | `BoundedAuthorityProtocol.V2` namespace + [`spec/bap-v2.md`](../spec/bap-v2.md) + [ADR 0030](adr/0030-v2-contract-major-activation.md) land together; the v2 corpus (268 cases, 28 surfaces, certified index `6de6289b…f13d0`) verifies 268/268 through the CLI and all four SDKs with the digest pinned; six new mutation-battery entries executed RED with proofs recorded in the [requirement map](design/requirement-map.md) § v2; `lte`/`gte` active in registries; v1 byte-frozen with its certified pin unchanged | BAP-20 | [ADR 0028](adr/0028-range-selector-kinds.md), [ADR 0030](adr/0030-v2-contract-major-activation.md), and the [successor-major charter](design/successor-major-charter.md) |
 
 ## BAP-00 closeout evidence
 
@@ -826,6 +827,38 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   `.kimosabe/reviews/2026-08-31-hex-0.3.0-publication-receipts.md` (gitignored). A downstream
   adopter must consume that package identity, never this tag or a mutable checkout; adoption
   itself is the private runtime's out-of-repo follow-up, not a BAP-19 deliverable.
+
+## BAP-21 closeout evidence (2026-09-13)
+
+- **Profile:** `BoundedAuthorityProtocol.V2` (facade + 18 version-bound modules; version-neutral
+  algebra single-sourced from v1), [`spec/bap-v2.md`](../spec/bap-v2.md) (complete closed profile,
+  v1 incorporated by enumerated reference), suite `BAP2-Ed25519-SHA256`, payload `v: 2`, domain
+  separators `BAP2-REQUEST\0` / `BAP2-CHAIN\0` / `BAP2-ARCHIVE\0EXPORT\0`. 69 v2 ExUnit tests;
+  the five version-bound codec modules at 100% coverage.
+- **Corpus:** `priv/conformance/v2/corpus` — 268 cases, 28 surfaces, 16 classes, revision 1,
+  13 tamper audits; generator re-derivation byte-identical
+  (`node conformance/generators/build_corpus.mjs --verify --major 2`); certified index SHA-256
+  `6de6289b7f47b0e0a78ea4610e7844a0f1d5247d8eace02ec9cf9841308f13d0` pinned in the CLI
+  (major-keyed map), the CLI test, and the four SDK v2 runners; `mix conformance.verify` runs
+  both corpora (v1 = 283 with the unchanged shipped pin — the v1 absence proof — and
+  v2 = 268). Fixture keys ephemeral and destroyed; `provenance.private_material_tracked:false`.
+- **Red proofs:** six new mutation-battery entries, each executed against
+  `mix test test/conformance/cli_test.exs:43` and observed failing before restore:
+  `v2-selector-lte-strict` (`<=`→`<`), `v2-selector-same-tag-removed` (both kind fall-throughs
+  compare cross-tag), `v2-selector-kinds-swapped` (decode lte⇄gte),
+  `v2-selector-non-numeric-bound-accepted` (decode drops the numeric-bound check),
+  `v2-cross-major-grant-v-accepted` (v2 grant decode accepts `v:1`),
+  `v2-request-digest-prefix-downgraded` (BAP2→BAP1 prefix). Recorded in the
+  [requirement map](design/requirement-map.md) § v2 with the populated-cell citations.
+- **Gates:** architecture boundary green with the V2 allowances pinned (exact export sets for
+  the façade and runtime; exact dynamic-call counts per beam); the durable-identifier scanner
+  enumerates the accepted v2 families with V3 the new rejected frontier; corpus sync covers all
+  four vendored snapshots; `spec.facts`/`spec.examples`/`spec.render` green; the digest-pin
+  rotation script covers both majors' twelve pins (six per major).
+- **Known follow-ups (named, not blocking):** v2 corpus depth growth beyond the v1-populated
+  cells; the `spec.facts` v2 extraction baseline; ADR 0029 `ba+budget-window`; the remaining
+  charter successor-major scope (delegation, offline claims, suite succession) as separately
+  activated majors; SDK publication and any v2 Hex release are owner decisions.
 
 ## Next action
 
