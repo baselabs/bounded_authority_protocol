@@ -1,47 +1,43 @@
 # TypeScript verifier SDK — deployment guide
 
-The TypeScript verifier SDK (`sdks/typescript/`, package `@bounded-authority/verifier`) is a
-pure, deterministic, fail-closed reimplementation of the BAP v1 profile. It is a **verifier**:
-it returns redacted, value-bearing facts or a single `Invalid` outcome, never an authorization
-decision.
+The TypeScript verifier SDK is **published to npm as
+[`@bounded-authority-protocol/verifier`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier)**
+and developed in its own graduated repository,
+[`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript)
+(per [ADR 0015](../adr/0015-sdk-graduation-and-publish-topology.md): SDKs are authored in this
+monorepo while unpublished and graduate to a per-SDK repository on first publication — this guide
+stays here because the protocol package remains the normative entry point).
 
-See `spec/bap-v1.md` (the normative authority; `docs/protocol-v1.md` is its generated view)
-and [ADR 0014](../adr/0014-cross-language-verifier-sdks.md) for the packaging and
+The SDK is a pure, deterministic, fail-closed reimplementation of the wire profiles
+(contract-majors 1 and 2). It is a **verifier**: it returns redacted, value-bearing facts or a
+single `Invalid` outcome, never an authorization decision. See `spec/bap-v1.md` /
+`spec/bap-v2.md` (the normative authorities) and
+[ADR 0014](../adr/0014-cross-language-verifier-sdks.md) for the packaging and
 derivation-hygiene decisions.
 
 ## Runtime posture
 
-- Node >= 22; `node:crypto` for Ed25519 (zero non-stdlib dependencies by default).
+- Node >= 22; `node:crypto` for Ed25519 (zero non-stdlib dependencies).
 - Pure functions only: no clock, network, filesystem, or randomness in the verify path. Time,
   trusted keys, and expected context are explicit inputs.
-- Bundle shape: the published package carries the compiled verifier plus the conformance
-  runner; tree-shaking keeps serverless bundles small (the verifier core is a single module
-  closure).
+- Bundle shape: the published package carries the compiled verifier only (`dist/src`); the
+  conformance corpora and runners live in the repository, not the tarball. Tree-shaking keeps
+  serverless bundles small (the verifier core is a single module closure).
 
-## Deployment targets
+## Install and releases
 
-| Target | Notes |
-|---|---|
-| AWS Lambda (nodejs22.x) | Cold-start friendly: no dynamic requires, no wasm; pin the runtime and pin the package version in the lockfile |
-| Node service (Express/Fastify middleware) | Verify at the boundary; pass RAW credential bytes to the verifier, never pre-decoded structs |
-| Edge runtimes supporting node:crypto | The verifier core is synchronous and allocation-bounded; check the runtime's `crypto.verify` (Ed25519) availability |
+```bash
+npm install @bounded-authority-protocol/verifier
+```
 
-## Local-loopback application profile
+Releases are two-stage by owner decision: the graduated repository's release workflow stages
+each version to npm with provenance (GitHub Actions OIDC trusted publishing — no tokens), and a
+human approves the staged version on npmjs.com under the org's 2FA requirement. CI cannot make
+a version live alone.
 
-Local development listeners select `localLoopbackHttpUriNormalize`,
-`localLoopbackHttpProofSigningInput`, `assembleLocalLoopbackHttpCompact`,
-`decodeLocalLoopbackHttpProof`, and `checkLocalLoopbackHttpEnvelope` explicitly. Admit only direct
-literal `127.0.0.1`/`[::1]` HTTP targets and require the server nonce. Never derive the target from
-`Forwarded`/`X-Forwarded-*`, accept `localhost`, or retry standard `dpop+jwt` after rejection.
+## Corpus updates
 
-## Supply-chain posture
-
-Zero non-stdlib runtime dependencies by default; the development toolchain (tests, the
-conformance runner) is devDependency-only. Consumers SHOULD pin the exact version and verify
-the package integrity digest from the registry at install time.
-
-## Verification is not authority
-
-A green verification proves byte-level properties against the inputs the CALLER supplied.
-Trust selection, replay reservation, and revocation belong to a stateful authority runtime;
-see the specification's verification-contract section for the boundary in normative terms.
+The SDK vendors certified snapshots of both conformance corpora plus the local-loopback
+application-proof corpus and asserts each `index.json` SHA-256 at load. When this monorepo
+rotates a corpus, the SDK repository takes a snapshot-bump commit — the startup assertion
+fails loudly on any drift.

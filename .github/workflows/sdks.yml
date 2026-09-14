@@ -56,37 +56,9 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install pnpm
-        run: npm install -g pnpm@10.33.0
-
-      # --- TypeScript SDK gate ---
-      - name: TS — install
-        run: pnpm install --frozen-lockfile
-        working-directory: sdks/typescript
-
-      - name: TS — typecheck
-        run: pnpm typecheck
-        working-directory: sdks/typescript
-
-      - name: TS — lint (purity rule)
-        run: pnpm lint
-        working-directory: sdks/typescript
-
-      - name: TS — license check
-        run: pnpm license-check
-        working-directory: sdks/typescript
-
-      - name: TS — unit + permissiveness tests
-        run: pnpm test && pnpm test:permissiveness
-        working-directory: sdks/typescript
-
-      - name: TS — conformance (283 + census)
-        run: pnpm conformance
-        working-directory: sdks/typescript
-
-      - name: TS — v2 conformance (268 + census)
-        run: pnpm conformance:v2
-        working-directory: sdks/typescript
+      # The TypeScript SDK graduated to its own repository on first publication
+      # (ADR 0015, 2026-09-14): baselabs/bounded_authority_protocol_typescript
+      # carries its CI, conformance, and npm releases now.
 
       # --- Python SDK gate ---
       - name: Python — install

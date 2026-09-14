@@ -4,6 +4,21 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Changed — TypeScript SDK graduated (ADR 0015 executed)
+
+- The TypeScript verifier SDK moved out of this monorepo on its first npm publication and now
+  lives at
+  [baselabs/bounded_authority_protocol_typescript](https://github.com/baselabs/bounded_authority_protocol_typescript),
+  published as
+  [`@bounded-authority-protocol/verifier@0.2.0`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier)
+  (wire contract-majors 1 and 2, vendored certified corpora, self-contained CI, two-stage npm
+  publishing: the workflow stages with provenance and a human approves under 2FA). `sdks/`
+  now authors the Python, Rust, and Go SDKs; the `sdk-publish-guard` continues to reject
+  registry-publish infrastructure for them in this repository. A corpus rotation is now a
+  snapshot-bump commit in the graduated repository; the corpus-sync gate returns to the four
+  Rust/Go snapshots. The 0.1.0 seed under the retired `@bounded-authority/verifier` scope was
+  unpublished during the rename window.
+
 ### Added — v2 contract-major: `lte`/`gte` range selector kinds activated (BAP-21, ADR 0030)
 
 - Add the successor contract-major 2 profile per the successor-major charter activation

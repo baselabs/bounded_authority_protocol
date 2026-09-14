@@ -117,8 +117,9 @@ oracle vectors used by holder-side consumers to verify their own production live
 `priv/conformance/v1/vectors`.
 
 The local-loopback application profile has a separate certified corpus under
-`priv/conformance/application-profiles/local-loopback-http/v1`. Its Elixir, TypeScript, Python,
-Rust, and Go consumers assert the same file hashes and verdicts. The non-mock transport drill opens
+`priv/conformance/application-profiles/local-loopback-http/v1`. Its Elixir, Python,
+Rust, and Go consumers assert the same file hashes and verdicts (the TypeScript consumer now
+lives in that SDK's graduated repository). The non-mock transport drill opens
 real IPv4 and IPv6 listeners, uses fresh in-memory keys, and prints a secret-free JSON receipt:
 
 ```bash
@@ -127,10 +128,13 @@ mix local_loopback_http.verify
 
 ## Cross-language verifier SDKs
 
-Alongside the Elixir package, the repository authors typed **verifier** SDKs of the frozen v1
-profile — TypeScript (Node, zero runtime dependencies), Python (single dependency), Rust
+Alongside the Elixir package, the repository authors typed **verifier** SDKs of the frozen profiles
+— Python (single dependency), Rust
 (`#![forbid(unsafe_code)]`), and Go (stdlib-only) — each written from the specification and corpus
-alone, with no code-level derivation from the reference implementation. Each passes all 283 conformance vectors
+alone, with no code-level derivation from the reference implementation. The TypeScript SDK
+graduated on first publication (ADR 0015) and now lives at
+[`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript),
+published to npm as [`@bounded-authority-protocol/verifier`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier). Each passes all 283 conformance vectors
 recomputed from scratch, asserts the corpus digest at startup, and proves every parser-layer
 closure red-capable via a per-language mutation gate. Each SDK graduates to its own repository on
 first publication.

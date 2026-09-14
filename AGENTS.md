@@ -52,18 +52,25 @@ two-build `release.candidate` reproducibility check); BAP-05 shipped the portabl
 verifier CLI, with the 55/55 conformance mutation battery and `conformance.verify` (agreed=283)
 wired into `mix quality` alongside the full suite (355 tests + 13 properties at 0.3.0).
 
-Cross-language verifier SDKs live under [`sdks/`](sdks/)
-([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)): TypeScript
-(`@bounded-authority/verifier`), Python (`bounded-authority-verifier`), Rust
+Cross-language verifier SDKs are authored under [`sdks/`](sdks/)
+([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)): Python
+(`bounded-authority-verifier`), Rust
 (`bounded-authority-protocol`, BAP-15), and Go (`bounded_authority_protocol_go`, BAP-16) — each
-reimplements the frozen v1 profile from the spec and corpus alone, passes all 283 vectors with the
+reimplements the frozen profiles from the spec and corpus alone, passes all vectors with the
 certified corpus index SHA-256 asserted at load (the
-Rust and Go SDKs vendor self-contained snapshots; the TypeScript and Python runners consume the
-monorepo corpus in place), and ships a red-capable per-language permissiveness mutation-gate. None is
-published to a registry: per
+Rust and Go SDKs vendor self-contained snapshots; the Python runner consumes the
+monorepo corpus in place), and ships a red-capable per-language permissiveness mutation-gate. None of
+these is published to a registry: per
 [ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md), each graduates to its own per-SDK
 repository on first publication, and the `sdk-publish-guard` pre-commit hook and CI job reject
-registry-publish infrastructure in this monorepo.
+registry-publish infrastructure in this monorepo. The TypeScript SDK was the first to graduate
+(2026-09-14): it is published to npm as
+[`@bounded-authority-protocol/verifier`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier)
+from its own repository,
+[`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript)
+(vendored corpora, self-contained CI, and two-stage npm publishing — the workflow stages, a
+human approves under 2FA). Its source no longer lives in this monorepo; a corpus rotation is a
+snapshot-bump commit in that repository.
 
 Design-carrying slices (all zero wire-behavior change on the closed v1 profile): BAP-11
 (cryptographic-suite succession and cross-suite evidence longevity,

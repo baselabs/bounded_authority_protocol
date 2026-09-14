@@ -222,8 +222,7 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
 
   defp current_major_path?(path, "v2"), do: successor_major_source_path?(path)
   defp current_major_path?(path, "run_v2")
-      when path in ["sdks/python/tests/conformance/run_v2.py", "sdks/rust/conformance/run_v2.rs",
-                    "sdks/typescript/conformance/run_v2.ts"],
+      when path in ["sdks/python/tests/conformance/run_v2.py", "sdks/rust/conformance/run_v2.rs"],
       do: true
   defp current_major_path?(path, "v2_test"), do: path == "sdks/go/conformance/v2_test.go"
 
@@ -259,8 +258,7 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
       path in [
         "sdks/go/v1.go",
         "sdks/python/src/bounded_authority_verifier/v1.py",
-        "sdks/rust/src/v1.rs",
-        "sdks/typescript/src/v1.ts"
+        "sdks/rust/src/v1.rs"
       ]
   end
 
@@ -277,8 +275,6 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
         "sdks/python/tests/conformance/run_v2.py",
         "sdks/rust/src/v2.rs",
         "sdks/rust/conformance/run_v2.rs",
-        "sdks/typescript/src/v2.ts",
-        "sdks/typescript/conformance/run_v2.ts",
         "conformance/generators/build_corpus.mjs",
         "conformance/generators/curated-inputs-v2.json"
       ]

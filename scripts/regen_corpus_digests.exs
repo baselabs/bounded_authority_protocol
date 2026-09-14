@@ -3,7 +3,7 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
   #
   # The certified corpus identity of each major is the SHA-256 of its
   # priv/conformance/<major>/corpus/index.json. Each is machine-pinned in its constants — the
-  # SDK conformance runners in their native encodings (base64url: TypeScript, Go; hex: Python,
+  # SDK conformance runners in their native encodings (base64url: Go; hex: Python,
   # Rust — encodings stay as-is) plus the two Elixir pins (the CLI's fail-closed
   # certified-corpus map and its test mirror). A rotation that misses any one of them leaves a
   # runner bound to a stale corpus or the Elixir verifier red; per the cli.ex rotation contract
@@ -30,7 +30,6 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
   # differ so a major's pin can never silently bind the other's digest.
   defp single_line_pins(1) do
     [
-      {"sdks/typescript/conformance/run.ts", :base64url, "const CERTIFIED_INDEX_SHA = \"", "\";"},
       {"sdks/go/conformance/run_test.go", :base64url, "const certifiedIndexSHA256 = \"", "\""},
       {"sdks/python/tests/conformance/run.py", :hex, "CERTIFIED_INDEX_SHA = \"", "\""},
       {"lib/bounded_authority_protocol/conformance/cli.ex", :base64url, "1 => \"", "\","},
@@ -40,8 +39,6 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
 
   defp single_line_pins(2) do
     [
-      {"sdks/typescript/conformance/run_v2.ts", :base64url, "const CERTIFIED_INDEX_SHA = \"",
-       "\";"},
       {"sdks/go/conformance/v2_test.go", :base64url, "const certifiedIndexSHA256 = \"", "\""},
       {"sdks/python/tests/conformance/run_v2.py", :hex, "CERTIFIED_INDEX_SHA = \"", "\""},
       {"lib/bounded_authority_protocol/conformance/cli.ex", :base64url, "2 => \"", "\""},
