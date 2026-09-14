@@ -4,7 +4,7 @@
 **Architecture authority:** `docs/adr/0001-public-protocol-verifier-boundary.md` and
 `docs/design/`
 **Implementation authority when present locally:**
-`.forge/plans/2026-07-26-bounded-authority-protocol.md`
+the original 2026-07-26 plan in the retired local-harness tree (git history)
 
 The public package is deterministic and stateless. No row authorizes a database, key custody,
 trusted-key discovery, issuance, live revocation state, replay reservation, execution claims,
@@ -313,7 +313,7 @@ compatibility.
     fixed widths) — prose re-statement, no value change. [standards-track.md](design/standards-track.md)
     § Evidence longevity forward-refs ADR 0009 and tightens "countersignature chain" → "content-covering
     countersignature" to match the revised primitive. `docs/protocol-v1.md` is added to
-    `.forge/critical-surfaces` (declaration; the commit hook is not installed in this repo, so the
+    the local-harness critical-surface declaration (the commit hook is not installed in this repo, so the
     manifest governs via declaration + honor-system `track: T2`).
 
 ## BAP-14 closeout evidence
@@ -607,7 +607,7 @@ reference producer's full contract (expected-side consistency, row chain re-chec
 parses + 7-field matches for both anchors and every transition, the key-path walk with
 NON-STRICT end-anchor chronology). 19 mutation-proven battery legs (permissiveness 38 — incl. the closeout lenses' chronology-equality pin), each
 verified against the Elixir reference oracle (20/20 — the receipt is a re-runnable local
-.forge artifact under reviews/results/rust-encode-path-parity/oracle-probe/). The TS/Python sibling permissiveness
+artifact in git history under the retired local-harness tree's reviews/results/rust-encode-path-parity/oracle-probe/). The TS/Python sibling permissiveness
 closed in the immediately-following commit (same contract, 15 legs each at closeout,
 proven red-capable — the five pin legs each isolated under their named mutation, the
 threading leg joint-by-construction per the settled diff-review record). **The SDK-wide

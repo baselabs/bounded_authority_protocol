@@ -89,7 +89,7 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
   # Copy the source tree into dest, excluding build artifacts, fetched deps, editor/tool
   # state, and generated output. What remains is exactly the source a reproducible build
   # starts from: lib, priv, docs, scripts, tools, mix.exs, mix.lock, and the metadata/docs.
-  @copy_excludes ~w(_build deps .git .forge .zcode artifacts cover doc graphify-out
+  @copy_excludes ~w(_build deps .git .zcode artifacts cover doc graphify-out
                     bounded_authority_conformance conformance compliance erl_crash.dump)
 
   defp copy_source_tree!(source, dest) do
