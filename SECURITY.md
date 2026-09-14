@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The `0.3.x` source release line is supported; `v0.3.0` is the current tagged source release. The
+The `0.4.x` source release line is supported; `v0.4.0` is the current tagged source release. The
 public API surface is locked. Registry consumption uses the Hex release only after the separately
 published archive is visible there; until then, `0.2.0` remains the latest registry package.
 

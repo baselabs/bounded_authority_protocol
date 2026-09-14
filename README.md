@@ -29,7 +29,7 @@ read back against the tagged-tree build). Registry consumers use the patch-bound
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.3.0"}
+    {:bounded_authority_protocol, "~> 0.4.0"}
   ]
 end
 ```

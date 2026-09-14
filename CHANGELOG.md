@@ -4,6 +4,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-14
+
 ### Changed — TypeScript SDK graduated (ADR 0015 executed)
 
 - The TypeScript verifier SDK moved out of this monorepo on its first npm publication and now
@@ -18,6 +20,15 @@ All notable changes to `bounded_authority_protocol` are documented here.
   snapshot-bump commit in the graduated repository; the corpus-sync gate returns to the four
   Rust/Go snapshots. The 0.1.0 seed under the retired `@bounded-authority/verifier` scope was
   unpublished during the rename window.
+
+### Changed — published-surface hygiene
+
+- The shipped package surface (changelog and ADRs 0011/0014/0017/0022) carried internal
+  authoring-tooling vocabulary from the hardening-arc records; all references are reworded to
+  neutral engineering vocabulary with the substance, commit hashes, and decisions unchanged.
+  A new red-capable published-surface hygiene gate scans the package-files boundary for the
+  vocabulary class (word-bounded; the deliberately unshipped ROADMAP excluded; the legacy
+  local-harness path form banned while "forge" the cryptographic verb stays legal).
 
 ### Added — v2 contract-major: `lte`/`gte` range selector kinds activated (BAP-21, ADR 0030)
 
