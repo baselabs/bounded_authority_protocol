@@ -47,7 +47,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "license.check": :test,
         "package.check": :test,
         quality: :test,
+        "privacy.hooks": :test,
         "release.candidate": :test,
+        secrets: :test,
         "sbom.check": :test,
         "sbom.generate": :test
       ]
@@ -260,6 +262,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
       "spec.facts": ["run --no-start scripts/check_spec_facts.exs"],
       "spec.examples": ["run --no-start spec/tools/build_examples.exs"],
       "spec.render": ["run --no-start spec/tools/render_derived.exs"],
+      secrets: ["cmd scripts/secret_scan.sh"],
+      "privacy.hooks": ["cmd python3 scripts/test_private_identifier_guard.py"],
       formal: ["cmd env BAP_FORMAL_OPTIONAL=1 scripts/run_formal.sh"],
       "spec_facts.mutations": ["run --no-start scripts/check_spec_facts_mutations.exs"],
       "license.check": [
@@ -280,6 +284,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "architecture",
+        "secrets",
+        "privacy.hooks",
         "corpus.sync",
         "corpus.digests",
         "spec.facts",

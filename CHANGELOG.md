@@ -24,11 +24,23 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed — repository hygiene
 
-- The legacy local-harness tree is purged from the entire git history (owner-executed
-  rewrite, 2026-09-14). The repository had no tracked `.forge` files at tip, so surviving
-  content is byte-identical at every release tag (main tree `d2ffb518…` pre- and
-  post-rewrite); the now-moot gitleaks history allowlist is removed. Historical commit SHAs
-  cited in earlier entries describe the pre-rewrite history.
+- Correction: the September 14 rewrite removed the legacy local-harness tree from `main`
+  and release-tag histories, not from every public ref. OBSERVED September 15 UTC with a fresh
+  mirror fetched using `+refs/*:refs/*`: ten other branch histories retain the legacy tree,
+  and retained pull-request refs expose earlier confidential-content snapshots. Provider
+  removal remains open under ADR 0023. Historical commit SHAs cited in earlier entries
+  may describe pre-rewrite history.
+- Remaining internal-tooling phrases in ADRs 0014 and 0015 are reworded, and the published
+  surface check now rejects those phrases. OBSERVED: the expanded check rejects the original
+  ADR 0014 content and passes the corrected surface. The already-published 0.4.0 artifact
+  retains its original documentation; this correction does not replace that release.
+- The package hygiene check includes hidden files and asserts that its roots match the package
+  declaration. OBSERVED: the earlier implementation failed both the planted hidden-file check
+  and the root-equality check; the corrected focused run passed all 11 hygiene and structural
+  checks (`mix test test/architecture/tracked_authoring_paths_test.exs
+  test/architecture/published_surface_hygiene_test.exs`). The structural check rejects tracked
+  local authoring-tool directories and their HEAD history, with one byte-pinned public manifest
+  exception. These controls do not establish confidential-term coverage or provider removal.
 
 ## [0.4.0] — 2026-09-14
 
@@ -50,8 +62,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 ### Changed — published-surface hygiene
 
 - The shipped package surface (changelog and ADRs 0011/0014/0017/0022) carried internal
-  authoring-tooling vocabulary from the hardening-arc records; all references are reworded to
-  neutral engineering vocabulary with the substance, commit hashes, and decisions unchanged.
+  authoring-tooling vocabulary from the hardening-arc records; identified references were
+  reworded to neutral engineering vocabulary. The unreleased correction above records two
+  phrases that remained in the 0.4.0 documentation.
   A new red-capable published-surface hygiene gate scans the package-files boundary for the
   vocabulary class (word-bounded; the deliberately unshipped ROADMAP excluded; the legacy
   local-harness path form banned while "forge" the cryptographic verb stays legal).

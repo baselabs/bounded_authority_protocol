@@ -5,7 +5,7 @@
 Before work, read this file, [`README.md`](README.md), [`docs/ROADMAP.md`](docs/ROADMAP.md), the accepted ADRs under
 [`docs/adr/`](docs/adr/), and the stable contracts under [`docs/design/`](docs/design/).
 
-When local Forge artifacts exist, they are implementation aids, not the remote cold-start
+When local process artifacts exist, they are implementation aids, not the remote cold-start
 authority. The tracked roadmap, ADR, protocol charter, threat model, and conformance contract
 must always be sufficient to regenerate a reviewed implementation plan.
 
@@ -21,46 +21,26 @@ grant operational authority by itself.
 
 ## Current state
 
-Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`
-(`BAP-17` design-only) — including `BAP-07` (connected verification and first public
-release, executed 2026-08-20 by owner decision: the exact candidate passed the private runtime's
-PostgreSQL 18 gate and the consumer connected gates, the fresh review set closed, and the archive
-published to Hex; consumption uses the Hex release) and `BAP-19` (the reviewed local-loopback HTTP
-application-proof source release tagged as `v0.3.0`, closed 2026-08-31 by owner-authorized Hex
-publication: the 0.3.0 archive is live with its registry checksum read back byte-identical to the
-tagged-tree two-build candidate; downstream immutable-package adoption is the private runtime's
-out-of-repo follow-up). Open: `BAP-12` (IANA filing, gated on the
-BAP-08 external submission preconditions) — `BAP-16` (the Go verifier SDK) closed 2026-08-24
-(283/283 conformance from the vendored corpus snapshot, census-clean, no-F1-debt battery). Consult
-[`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence blocks are the status authority.
+Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, and `BAP-21`
+(`BAP-17` is design-only). Open: `BAP-12` (IANA filing, gated on the BAP-08 external
+submission preconditions). Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence
+blocks are the status authority.
 
-The 0.3.0 source release retains zero production dependencies, no application callback, and no
-supervision tree. The v1 surface is complete: the normative tables and bounds, raw-number preflight,
-the bounded ordered JSON decoder with recursive duplicate rejection, strict base64url decoding,
-Draft 2020-12 structural schemas, architecture mutation gates, public compatibility CI, exact-package
-consumer proof, CycloneDX output, and trusted-main provenance verification are closed. BAP-03 added
-standard RFC 7515 JWS signing-input production, deterministic grant/proof producers, bounded raw
-decode, standalone raw-grant and combined raw-envelope verification, value-bearing redacted facts,
-public-only independently verified vectors, and portable resource bounds. BAP-04 added canonical
-consumption rows and range verification, signed boundary anchors and historical-key transitions,
-authenticated rollover, and atomic raw archived-export verification. BAP-10 added the RFC 2119/8174
-normative rewrite with stable `REQ1-*` requirement identifiers and the MUST-to-conformance-cell
-traceability map; BAP-06 froze the 0.1.0 release candidate (the locked public API surface enforced
-by the architecture gate, [ADR 0008](docs/adr/0008-release-candidate-contract.md), plus the
-two-build `release.candidate` reproducibility check); BAP-05 shipped the portable conformance corpus
-(283 cases across 28 surfaces, dual-verified by the independent Node runner) and the deterministic
-verifier CLI, with the 55/55 conformance mutation battery and `conformance.verify` (agreed=283)
-wired into `mix quality` alongside the full suite (355 tests + 13 properties at 0.3.0).
+The current source and Hex release are 0.4.0, tagged `v0.4.0`. The package retains zero production
+dependencies, no application callback, and no supervision tree. Contract-major 1 remains frozen;
+contract-major 2 is active under `BoundedAuthorityProtocol.V2` with the `lte` and `gte` selector
+kinds, its own normative profile, certified 268-case corpus, `REQ2-*` traceability, and
+cross-major rejection. The v1 corpus remains 283 cases across 28 surfaces. See
+[ADR 0030](docs/adr/0030-v2-contract-major-activation.md), [`spec/bap-v1.md`](spec/bap-v1.md),
+and [`spec/bap-v2.md`](spec/bap-v2.md).
 
-Cross-language verifier SDKs are authored under [`sdks/`](sdks/)
+Unpublished cross-language verifier SDKs are authored under [`sdks/`](sdks/)
 ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)): Python
 (`bounded-authority-verifier`), Rust
 (`bounded-authority-protocol`, BAP-15), and Go (`bounded_authority_protocol_go`, BAP-16) — each
-reimplements the frozen profiles from the spec and corpus alone, passes all vectors with the
-certified corpus index SHA-256 asserted at load (the
-Rust and Go SDKs vendor self-contained snapshots; the Python runner consumes the
-monorepo corpus in place), and ships a red-capable per-language permissiveness mutation-gate. None of
-these is published to a registry: per
+reimplements the frozen profiles from the specs and corpora alone, passes the certified v1 and v2
+vectors with the corpus index SHA-256 asserted at load, and ships a red-capable per-language
+permissiveness mutation gate. None of these three is published to a registry. Per
 [ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md), each graduates to its own per-SDK
 repository on first publication, and the `sdk-publish-guard` pre-commit hook and CI job reject
 registry-publish infrastructure in this monorepo. The TypeScript SDK was the first to graduate
@@ -68,9 +48,8 @@ registry-publish infrastructure in this monorepo. The TypeScript SDK was the fir
 [`@bounded-authority-protocol/verifier`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier)
 from its own repository,
 [`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript)
-(vendored corpora, self-contained CI, and two-stage npm publishing — the workflow stages, a
-human approves under 2FA). Its source no longer lives in this monorepo; a corpus rotation is a
-snapshot-bump commit in that repository.
+(vendored corpora, self-contained CI, and two-stage npm publishing). Its source no longer lives in
+this monorepo; a corpus rotation is a snapshot-bump commit in that repository.
 
 Design-carrying slices (all zero wire-behavior change on the closed v1 profile): BAP-11
 (cryptographic-suite succession and cross-suite evidence longevity,
@@ -129,8 +108,8 @@ immutable-package adoption is tracked in the private runtime.
 
 - Public protocol: [`baselabs/bounded_authority_protocol`](https://github.com/baselabs/bounded_authority_protocol)
 - Private runtime consumer: `baselabs/bounded_authority` (a private commercial application; it
-  must never be published as a public Hex package, is not currently distributed through private
-  Hex, and any future private-Hex release requires a paid subscription plus fresh owner approval
+  must never be published as a public Hex package, and any private-Hex release requires
+  a paid subscription plus fresh owner approval
   for that exact release)
 - Product consumers: private; their repository identities and deployment topology are not part of
   this public protocol's documentation or history
@@ -149,10 +128,10 @@ The runtime accepts raw credentials at its public boundary, not a caller-provide
 
 ## Workflow
 
-- Stay on `main`; do not create ad-hoc branches or worktrees outside sanctioned Forge lanes.
+- Stay on `main`; do not create ad-hoc branches or worktrees.
 - Never use stash, history rewrites, blanket staging, or destructive cleanup.
-- Use Kimosabe for every change. Wire formats, cryptography, verification, canonicalization, and
-  conformance are T2.
+- Use Kimosabe for every change. Wire formats, cryptography, verification, canonicalization,
+  conformance, and verifier SDK surfaces are T2.
 - Write the failing test first. Every security gate requires allow, deny, malformed-input, and
   mutation-red evidence as applicable.
 - Run `mix quality` before landing. It is the complete local package, purity, documentation,

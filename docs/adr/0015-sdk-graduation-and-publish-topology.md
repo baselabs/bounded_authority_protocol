@@ -88,8 +88,8 @@ records the corrected boundary.)
    plainly:** neither layer can catch a literal ad-hoc publish command typed at a terminal against a working tree; that
    is a runtime act no commit gate sees. CI on `main` is the hard gate for committed infrastructure; the local hook is
    honor-system for contributors. The deliberate-admin bypass is `git commit --no-verify`, documented in
-   `CONTRIBUTING.md`. This matches the forge skill's honesty boundary for hooks: a gate the
-   agent's own process runs is a claim; a non-bypassable check on a machine it does not control is the proof.
+   `CONTRIBUTING.md`. A local hook supplies contributor feedback; the required CI check supplies
+   repository enforcement for committed changes.
 
 6. **Standalone versioned corpus artifact — deferred, not decided here.** At two SDKs, per-SDK
    vendoring (ADR 0014 Decision 4) suffices and the bump amplitude is small. As the number of SDKs grows, a standalone versioned corpus
@@ -137,3 +137,11 @@ records the corrected boundary.)
 - The standalone-corpus-artifact question (Decision 6) is a known follow-up for a future ADR, not a defect in this one.
 - This ADR records a corrected boundary (publication irreversibility, not SDK count). The earlier "decide at ~4 SDKs"
   framing is withdrawn here explicitly so it does not survive as latent advice.
+
+## Amendment — 2026-09-14 (TypeScript graduation)
+
+TypeScript became the first graduated SDK. Its source and vendored corpora moved to
+[`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript),
+and `@bounded-authority-protocol/verifier` is published from that repository. Python, Rust, and Go
+remain in this monorepo under the authoring phase until each crosses its own first-publication
+boundary.

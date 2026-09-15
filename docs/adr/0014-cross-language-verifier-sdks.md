@@ -61,8 +61,7 @@ reading `lib/`. This ADR records how the two statements are reconciled without v
    (PyPI). License is Apache-2.0 for both ([ADR 0001](0001-public-protocol-verifier-boundary.md)
    license decision; AGENTS rule 10) — the patent grant fits a cryptographic protocol. Each SDK
    subtree carries its own `LICENSE` + `NOTICE`. Package manifests are authored ready-to-publish, but
-   no `npm publish` / `twine upload` runs in-slice — publication is a separate, user-authorized step
-   (a new-authority action per the forge whitelist).
+   no `npm publish` / `twine upload` runs in-slice — publication is a separate, user-authorized step.
 
 3. **Support surface — the frozen v1 façade.** Each SDK exposes the 17 public verification functions
    ([protocol-v1.md § Public verification contract](../protocol-v1.md), lines 270-290) translated to
@@ -149,11 +148,9 @@ reading `lib/`. This ADR records how the two statements are reconciled without v
    `scripts/check_dependency_licenses.exs` operates on the Elixir tooling SBOM only. Without new
    in-slice gates the SDKs would ship with weaker purity + license enforcement than the Elixir
    reference. This ADR closes both gaps:
-   - **Critical-surface declaration:** `sdks/**` is added to the local-harness critical-surface manifest (tracked via
-     `git add -f`) — the "user declares critical" trigger that makes any touch of `sdks/**` a T2-gauge
-     slice. The repo's critical-surface commit hook is not installed, so the declaration governs via
-     honor-system `track: T2` + the closeout lenses (the gauge is auditable via the `track:` field).
-     This is the same regime the existing `lib/**` entry runs under.
+   - **Critical-surface declaration:** the tracked [contributor workflow](https://github.com/baselabs/bounded_authority_protocol/blob/main/AGENTS.md) classifies
+     `sdks/**` verifier surfaces as T2. This is the same review class as the protocol and cryptographic
+     implementation under `lib/**`.
    - **Purity lint:** each SDK ships a library-path purity linter that forbids I/O + clock + RNG +
      network + filesystem imports/calls in `src/` (TS: an ESLint rule; Python: an AST check). It runs
      in CI as part of the `sdks-conformance` job — the analog of `architecture_gate.exs`'s purity
@@ -222,11 +219,26 @@ reading `lib/`. This ADR records how the two statements are reconciled without v
   evidence of corpus correctness, but is NOT the bar BAP-09 was ratified against and is not claimed as
   a justification.
 
-## Amendment — 2026-09-03 (manifest relocation)
+## Amendment — September 3, 2026 (historical manifest relocation)
 
-At commit `1448102` the tracked critical-surface declaration moved to its current
-local-harness path (consumed by the current local guards). (2026-09-14: internal local-tooling
-path names in this ADR were neutralized for the published package; the moves and decisions they
-describe are unchanged.) Decision 3 stands unchanged: `sdks/**` remains a manifest entry with
-identical content, and the honor-system `track: T2` regime for `sdks/**` touches is unchanged.
-The legacy manifest path in the decision text above is historical.
+The September 3 amendment recorded relocation of the critical-surface declaration with the
+`sdks/**` manifest entry and review classification unchanged. It described the declaration as honor-system
+`track: T2` plus closeout review because the critical-surface commit hook was not installed.
+That is a historical configuration record; the former tooling-specific path and rewrite-era
+commit pointer are omitted. The current public review rule is clarified below.
+
+## Amendment — September 15, 2026 UTC (durable critical-surface rule)
+
+The public review rule lives in the tracked
+[contributor workflow](https://github.com/baselabs/bounded_authority_protocol/blob/main/AGENTS.md).
+The repository also retains one byte-pinned, tracked critical-surface manifest containing only
+public path patterns. Private authoring records remain local. The wording of Decision 2 and the
+critical-surface paragraph in Decision 8 was updated to remove retired process names; the review classification and
+protocol decisions remain unchanged.
+
+## Amendment — 2026-09-14 (first graduation)
+
+The TypeScript SDK graduated on first publication under ADR 0015. Its source and vendored corpora
+now live in [`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript),
+published to npm as `@bounded-authority-protocol/verifier`. Python, Rust, and Go remain under
+`sdks/` until their own first publication.

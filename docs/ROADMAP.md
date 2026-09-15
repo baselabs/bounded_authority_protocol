@@ -3,8 +3,8 @@
 **Status authority:** this file
 **Architecture authority:** `docs/adr/0001-public-protocol-verifier-boundary.md` and
 `docs/design/`
-**Implementation authority when present locally:**
-the original 2026-07-26 plan in the retired local-harness tree (git history)
+**Implementation authority:** `spec/`, `lib/`, `priv/conformance/`, and `test/`, interpreted under
+the accepted ADRs and stable design contracts
 
 The public package is deterministic and stateless. No row authorizes a database, key custody,
 trusted-key discovery, issuance, live revocation state, replay reservation, execution claims,
@@ -14,14 +14,14 @@ compatibility.
 <!-- forge-roadmap-schema: 1 -->
 | ID | What | Acceptance | Depends | Why |
 |---|---|---|---|---|
-| BAP-00 | **Public authority boundary** — Public repository, Apache-2.0 license, Forge boundary, tracked architecture, and cold-start authority, slug:bap-00 | Evidence recorded below | — | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) |
+| BAP-00 | **Public authority boundary** — Public repository, Apache-2.0 license, public/private boundary, tracked architecture, and cold-start authority, slug:bap-00 | Evidence recorded below | — | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) |
 | BAP-01 | **Pure Mix package** — Mix package scaffold, pure-library architecture test, quality aliases, public CI, and package inspection, slug:bap-01 | Evidence recorded below | BAP-00 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) |
 | BAP-02 | **Normative bounded parsing** — Normative v1 tables, bounded ordered decoder, strict base64url, and untrusted key locator, slug:bap-02 | Evidence recorded below | BAP-01 | [ADR 0002](adr/0002-normative-v1-parsing-profile.md) |
 | BAP-03 | **Grant and holder-proof verification** — Standard compact EdDSA grant and RFC 9449 DPoP production, bounded decode, standalone raw-grant verification, and combined raw-envelope verification, slug:bap-03 | Official and independently verified public-only vectors; exact key census; meaningful-byte tamper matrix; timing/allocation bounds; value-bearing redacted non-authorizing facts; no trust-selection or forgeable-intermediate path | BAP-02 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md), [ADR 0003](adr/0003-standard-jws-and-verified-grant-results.md), and the [normative v1 profile](protocol-v1.md) |
 | BAP-04 | **Chain and historical-key verification** — Consumption-chain, anchor, archive, and historical public-key verification, slug:bap-04 | Rollover, truncation, reorder, omission, archive-coverage, and tamper vectors pass independently | BAP-03 | [ADR 0004](adr/0004-consumption-chain-rollover-and-anchored-export-verification.md) and the [normative v1 profile](protocol-v1.md) |
 | BAP-05 | **Portable conformance** — Language-neutral conformance corpus, verifier CLI, and property, fuzz, and mutation gates, slug:bap-05 | A second implementation consumes only published artifacts and agrees on every valid and invalid vector | BAP-04 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
 | BAP-06 | **Release-candidate contract** — Stable public API, guides, security policy, documentation, immutable release-candidate archive, and automation, slug:bap-06 | SemVer/API review; docs; reproducible candidate archive; unpacked consumer; checksum/SBOM/provenance gates; not yet published | BAP-05 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
-| BAP-07 | **Connected verification and release** — Connected verification and first public release, slug:bap-07 | Exact candidate passes the private-runtime PostgreSQL 18 gate (the private runtime's ADR 0010 retired the 16/17/18 matrix) and private-consumer connected gates; full public quality/conformance; fresh correctness, security, gate-integrity, and cross-vendor reviews; publish that exact archive with zero open findings | BAP-06, BAP-10, BAP-11, private BA-14 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md), [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md), and the [conformance contract](design/conformance-contract.md) |
+| BAP-07 | **Connected verification and release** — Connected verification and first public release, slug:bap-07 | Exact candidate passes the private-runtime PostgreSQL 18 gate (the private runtime's ADR 0010 retired the 16/17/18 matrix) and private-consumer connected gates; full public quality/conformance; fresh correctness, security, gate-integrity, and independent reviews; publish that exact archive with zero open findings | BAP-06, BAP-10, BAP-11, private BA-14 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md), [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md), and the [conformance contract](design/conformance-contract.md) |
 | BAP-08 | **Capability-authorization extension proposal** — Draft capability-authorization extension for the MCP `modelcontextprotocol/ext-auth` extensions repository plus an AP2 mandate-mapping note, documenting the already-normative v1 protocol (no wire-format, limit, or verification-rule change), slug:bap-08 | Extension document conforms to the ext-auth repository's submission requirements (closed on **partial** conformance — every in-repo-reachable requirement met; full official-track conformance gated on external preconditions [reference SDK, WG + Extension Maintainers + sponsor, SEP acceptance, IANA registration]; see [ADR 0013](adr/0013-capability-authorization-extension.md) and the BAP-08 closeout evidence below); every referenced mechanism cites the [normative v1 profile](protocol-v1.md) (nothing normative is introduced outside it); the AP2 note maps mandate↔grant correspondences without claiming compatibility not yet verified; its own ADR lands before any external submission | BAP-04 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) |
 | BAP-09 | **Cross-language verifier SDKs** — Thin TypeScript and Python verifier SDKs consuming only the published spec, vectors, and conformance corpus (client libraries of the extension; independent second implementations by design), slug:bap-09 | Each SDK passes every valid and invalid published vector; spec + vectors are the only inputs (no code-level derivation from the Elixir implementation); its own ADR at authoring covers packaging and support surface | BAP-05 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
 | BAP-10 | **Evolution contract and normative conformance language** — RFC 2119/8174 rewrite of the normative profile with stable requirement identifiers, plus the evolution-contract sections (self-declaration, parallel-major support, deprecation windows) and registry reconciliation, slug:bap-10 | Every MUST maps to at least one conformance applicability cell (surface × class) or a named falsifiable gap, with the mapping published; no wire byte, bound, or verdict changes; [standards-track.md](design/standards-track.md) and [registries.md](design/registries.md) reconciled against the rewritten profile | BAP-05 | [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) and the [standards track charter](design/standards-track.md) |
@@ -34,7 +34,7 @@ compatibility.
 | BAP-17 | **Offline-eligible grant claims (reserve + specify)** — Reserve the `ba_offline` floor-limit claim name and carry the activating-major mechanism to ADR quality (the closed v1 profile rejects the name today; activation is a successor contract-major), slug:bap-17 | `ba_offline` reserved in [registries](design/registries.md); [ADR 0016](adr/0016-offline-eligible-grant-claims.md) specifies the closed `{cnt, cur, max, win}` object, the facts contract (flag + `win` only; magnitudes from the decoded grant), malformed⇒`:invalid`, the `max × cnt` wire-layer ceiling, the `ba_dlg` attenuation composition, and the freshness scoping; the R-BAP-2 legacy-rejection tripwire is red-capable; **zero wire-behavior change** — `git diff <base>..HEAD -- lib/ docs/protocol-v1.md priv/conformance/` is empty (mirror BAP-11/BAP-14; the cross-implementation corpus vector is deferred to the activating major per ADR 0010:286-289) | BAP-10 | [ADR 0016](adr/0016-offline-eligible-grant-claims.md), [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md), and the [offline requirements](design/offline-authorization-requirements.md) |
 | BAP-18 | **Bounds-aware assembly and issuer-mediated reauthorization posture** — Expose caller bounds on compact assembly and define the current-major boundary between ordinary issuer-signed child grants and successor-major portable delegation, slug:bap-18 | `assemble_compact/3` delegates to the existing bounded runtime primitive; `/2` remains the byte-identical profile-maximum default; all four signing kinds enforce tightened segment/final-compact bounds; the facade export lock and unpacked consumer exercise both arities; `ba_dlg` and `ba+cap-delegated` remain rejected | BAP-06, BAP-14, BAP-15 | [ADR 0020](adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md), [ADR 0010](adr/0010-delegation-with-attenuation.md), and [ADR 0018](adr/0018-sdk-bounds-contract.md) |
 | BAP-19 | **Byte-distinct local-loopback HTTP application proof** — Add an explicit application-proof profile for direct literal-loopback development listeners without changing standard `dpop+jwt` bytes or verdicts, slug:bap-19-local-loopback-http | Accepted ADR + normative profile; separate five-surface APIs in Elixir and all four SDKs; certified secret-free language-neutral corpus with cross-profile and meaningful-byte rejects; real `127.0.0.1` and `::1` HTTP exchanges with ephemeral in-memory keys; full legacy corpus remains unchanged; fresh blocking reviews close; exact source/corpus identity is published before any adopter consumes it | BAP-18 | [ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md), [local-loopback profile](../spec/bap-local-loopback-http-v1.md), and [profile requirement map](design/local-loopback-http-requirement-map.md) |
-| BAP-21 | **v2 contract-major activation — `lte`/`gte` range selector kinds** — Execute the ADR 0028 activating-major obligations under the successor-major charter checklist: the complete v2 closed profile, its certified corpus, REQ2-* traceability, the four-SDK re-verification, and the registries flip, slug:bap-21 | `BoundedAuthorityProtocol.V2` namespace + [`spec/bap-v2.md`](../spec/bap-v2.md) + [ADR 0030](adr/0030-v2-contract-major-activation.md) land together; the v2 corpus (268 cases, 28 surfaces, certified index `6de6289b…f13d0`) verifies 268/268 through the CLI and all four SDKs with the digest pinned; six new mutation-battery entries executed RED with proofs recorded in the [requirement map](design/requirement-map.md) § v2; `lte`/`gte` active in registries; v1 byte-frozen with its certified pin unchanged | BAP-20 | [ADR 0028](adr/0028-range-selector-kinds.md), [ADR 0030](adr/0030-v2-contract-major-activation.md), and the [successor-major charter](design/successor-major-charter.md) |
+| BAP-21 | **v2 contract-major activation — `lte`/`gte` range selector kinds** — Execute the ADR 0028 activating-major obligations under the successor-major charter checklist: the complete v2 closed profile, its certified corpus, REQ2-* traceability, the four-SDK re-verification, and the registries flip, slug:bap-21 | `BoundedAuthorityProtocol.V2` namespace + [`spec/bap-v2.md`](../spec/bap-v2.md) + [ADR 0030](adr/0030-v2-contract-major-activation.md) land together; the v2 corpus (268 cases, 28 surfaces, certified index `6de6289b…f13d0`) verifies 268/268 through the CLI and all four SDKs with the digest pinned; six new mutation-battery entries executed RED with proofs recorded in the [requirement map](design/requirement-map.md) § v2; `lte`/`gte` active in registries; v1 byte-frozen with its certified pin unchanged | — | [ADR 0028](adr/0028-range-selector-kinds.md), [ADR 0030](adr/0030-v2-contract-major-activation.md), and the [successor-major charter](design/successor-major-charter.md) |
 
 ## BAP-00 closeout evidence
 
@@ -44,12 +44,12 @@ compatibility.
   and historical redirect `0e400e7`.
 - Beamline documentation tests pass 54/0; formatter and ExDoc gates pass; the changed commercial
   infographic renders over HTTP with both public and private authority tiers.
-- Public and private Forge plans verify with 0 errors, 0 warnings; changed local links and
+- Public and private implementation plans verify with 0 errors, 0 warnings; changed local links and
   high-confidence secret scans are clean.
 - Independent correctness, security, and documentation lenses are clean after all admitted
-  findings were fixed. Public/private cross-vendor findings were fixed and reread; Beamline's GLM
-  peer returned no findings. The Beamline Claude peer was unavailable twice because the installed
-  CLI reported retired model aliases, so that peer is a named degraded review, not a zero.
+  findings were fixed. Public/private independent-review findings were fixed and reread; one peer
+  returned no findings. A second peer was unavailable twice because the installed CLI reported
+  retired model aliases, so that review is recorded as degraded, not as a zero.
 
 ## BAP-01 closeout evidence
 
@@ -70,8 +70,8 @@ compatibility.
   warnings-as-errors compilation, Credo, Dialyzer, documentation, advisory, retired-package,
   license, SBOM, exact archive, and fresh external-consumer gates. The package has zero
   production dependencies, no application callback, and no supervision tree.
-- All admitted correctness, security, gate-integrity, and cross-vendor findings were fixed. Final
-  Claude and GLM code-delta reviews returned no findings. Workflow actions are pinned to exact
+- All admitted correctness, security, gate-integrity, and independent-review findings were fixed.
+  Final code-delta reviews returned no findings. Workflow actions are pinned to exact
   signed release commits; the Node 20 artifact-action warning was removed and the replacement
   trusted-main run is clean of Node-runtime deprecation warnings.
 
@@ -102,12 +102,12 @@ compatibility.
   release-SBOM, and numeric-schema mutation probes each made its owning gate fail before the
   original was restored. Independent design, gate-integrity, and security/correctness reviews
   returned no findings after every admitted same-slice finding was fixed.
-- The earlier closeout account reported a no-finding GLM result and two timed-out Claude peers.
-  A 2026-07-27 exact-range reconciliation supersedes that peer account: Claude fable completed a
+- The earlier closeout account reported one no-finding result and two timed-out peers.
+  A 2026-07-27 exact-range reconciliation supersedes that peer account: one peer completed a
   review and identified two admitted gaps—focused escape-tracking mutation proof and
-  positive-integer bound wording—while GLM timed out without a verdict. Both gaps are fixed in
+  positive-integer bound wording—while another timed out without a verdict. Both gaps are fixed in
   the authority-alignment landing. The aggregate remains a named degraded review, not a
-  zero-finding cross-vendor review.
+  zero-finding independent review.
 
 ## BAP-03 closeout evidence
 
@@ -171,9 +171,9 @@ compatibility.
   45,188,751-byte archive across isolated worst-of-20 samples. The admitted review findings were
   fixed in bounded deltas; the final permitted delta review was clean, and the plan-integrity
   reconciliation confirmed all 39 implementation claims. Its eight then-open closeout receipts
-  are the gates recorded above. The final cross-vendor pass was degraded, not reported as a zero:
-  GLM returned no findings after running compile, 159 tests, Credo, and Dialyzer; Claude fable and
-  pinned Opus were unavailable because their usage limits were exhausted. No further product
+  are the gates recorded above. The final independent-review pass was degraded, not reported as a zero:
+  One peer returned no findings after running compile, 159 tests, Credo, and Dialyzer; two other
+  peers were unavailable because their usage limits were exhausted. No further product
   review recursion was run.
 
 ## BAP-05 closeout evidence
@@ -238,7 +238,8 @@ compatibility.
     decision: `REQ<contract-major>-<SURFACE>-<tag>`, major-namespaced to mirror the existing suite
     scheme (`BAP<contract-major>-<sig>-<digest>`) and resolve the parallel-majors ambiguity. Refines
     ADR 0006 §3 (does not supersede the RFC 2119/8174 + stable-id + MUST-to-cell bar).
-- The slice was driven under forge T2: a fresh-context design-adversarial pass raised 9 challenges,
+- The change used the repository's critical review workflow: a fresh-context design-adversarial
+  pass raised 9 challenges,
   all admitted and folded in (the ADR-0007 escalation is the resolution of the "no ADR owed"
   rubber-stamp the pass defeated; the major-namespacing resolves the parallel-majors ambiguity; the
   three-state mapping schema and gap gate resolve the n/a-cell conflation and unfalsifiable-gap
@@ -312,9 +313,8 @@ compatibility.
     (`BAP1-Ed25519-SHA256`) explicitly at each binding surface (protected headers, domain separators,
     fixed widths) — prose re-statement, no value change. [standards-track.md](design/standards-track.md)
     § Evidence longevity forward-refs ADR 0009 and tightens "countersignature chain" → "content-covering
-    countersignature" to match the revised primitive. `docs/protocol-v1.md` is added to
-    the local-harness critical-surface declaration (the commit hook is not installed in this repo, so the
-    manifest governs via declaration + honor-system `track: T2`).
+    countersignature" to match the revised primitive. The tracked [`AGENTS.md`](../AGENTS.md)
+    critical-surface rule and `mix quality` gates govern changes to the normative profile.
 
 ## BAP-14 closeout evidence
 
@@ -338,7 +338,7 @@ compatibility.
     thumbprint, not a key, so the successor-major `ba+cap-delegated` grant carries its issuer key
     in a header `jwk`; (b) the selector-attenuation rule was a verbatim-PREFIX requirement, which
     would reject valid reordered narrowings (the matcher's conjunction is order-independent) —
-    corrected to set containment on distinct tuples. Cross-vendor review (codex peer) then forced
+    corrected to set containment on distinct tuples. Independent review then forced
     two further fixes: a raw-vs-base64url type incoherence in the `ba_dlg` comparison; and the
     leaf-binding step restated to run the full leaf verification (audience/operation/selectors/
     time/ath) via a successor-major delegated-leaf parse path (today's `check_envelope` cannot
@@ -468,7 +468,7 @@ compatibility.
   per-language): duplicate-reject, null-prototype/dunder (TS `Object.create(null)`
   vs Python plain-dict + `dict[key]`-only — the mechanism differs per language),
   raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction.
-  The per-language permissiveness suite grew through the cross-vendor
+  The per-language permissiveness suite grew through the independent-review
   remediation to **37 gates (TS) / 45 gates (Python)**, each mechanically broken,
   confirmed RED, and reverted at authoring — the original 8-item authoring
   battery (5 closures + census + purity lint + license check) is the floor the
@@ -477,16 +477,16 @@ compatibility.
   `Result[T] = Ok|Err` (the `{:ok, value} | {:error, :invalid}` mirror), including
   the façade producers `assembleCompact`/`assemble_compact` and
   `requestDigest`/`request_digest`, which return `Ok<Uint8Array>`/`Ok[bytes]` or
-  `Err` (cross-vendor #21) rather than throwing; no `authorized`/`decision`
+  `Err` (independent-review finding 21) rather than throwing; no `authorized`/`decision`
   surface; facts are value-bearing, redacted, and non-authorizing, with the facts
   schemas (`GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`,
   `KeyTransitionFacts`, `AnchoredExportFacts`) aligned field-for-field to the
-  Elixir reference (cross-vendor #20). The library path is purity-gated (TS ESLint
+  Elixir reference (independent-review finding 20). The library path is purity-gated (TS ESLint
   rule; Python AST ban on I/O/clock/RNG/network) and dependency-license-gated
   (Apache-2.0/BSD/MIT/ISC allowlist). The `sdks-conformance` CI job
   ([`.github/workflows/sdks.yml`](../.github/workflows/sdks.yml)) runs on every
   `sdks/**` / `priv/conformance/**` change and is **supply-chain-pinned**
-  (cross-vendor #23): SHA-pinned GitHub Actions, exact `pnpm@10.33.0`, and exact
+  (independent-review finding 23): SHA-pinned GitHub Actions, exact `pnpm@10.33.0`, and exact
   `cryptography==50.0.0 ruff==0.16.2 mypy==2.3.0 pytest==9.1.1` — no floating
   toolchain. It ran green on the Node 22 + 24 matrix
   ([run 31321016268](https://github.com/baselabs/bounded_authority_protocol/actions/runs/31321016268),
@@ -496,10 +496,10 @@ compatibility.
   ([run 31321016270](https://github.com/baselabs/bounded_authority_protocol/actions/runs/31321016270))
   are likewise green. The Elixir package is untouched — zero wire byte, bound, or
   verdict change.
-- **Cross-vendor decorrelation remediation (T2 closeout).** Because the SDKs are
+- **Independent-review remediation (T2 closeout).** Because the SDKs are
   a HIGH-stakes surface (verification/crypto), the bounded closeout ran the
-  cross-vendor lens over the full landed range with the two other model families
-  as peers (ADR-0003). The peers surfaced **25 confirmed divergences** from the
+  review over the full landed range with two independent peers. The peers surfaced
+  **25 confirmed divergences** from the
   Elixir reference (bounds-threading into nested verify and selector decode;
   JCS per-node encode bounds; float-magnitude exact-decimal; JCS DEL raw-0x7f to
   match the reference, not the RFC 8785 `\u007f` escape — AGENTS rule 7, reference
@@ -512,7 +512,7 @@ compatibility.
   SDKs and re-verified against the reference oracle (`agreed=283, disagreed=0`);
   2 candidate findings were honestly **falsified by running the reference** (the
   boundary-anchor attacks are already rejected; `kind:"all"` accepts extra
-  members, matching the reference). The GLM peer's documented JCS-DEL note is the
+  members, matching the reference). One peer's documented JCS-DEL note is the
   intended reference-wins decision, not a defect.
 
 ## BAP-15 closeout evidence
@@ -529,17 +529,16 @@ compatibility.
 - **Envelope (T15–T17):** the named permissiveness battery (`tests/permissiveness.rs`,
   10 closures through the public boundary, each red-capable), the `(d)`-class
   per-node encode-bounds closure IN `jcs_encode` (depth/nodes/output + magnitude/
-  string/members/items/key/duplicate-key — see the cross-vendor fix below), the
+  string/members/items/key/duplicate-key — see the independent-review fix below), the
   purity + license gate scripts (each red-capable, license `<3`-floor), the
   separate `rust-conformance` CI job on MSRV 1.81 (`--locked`), the ADR 0015
   publish-guard extension (`Cargo.toml` + `cargo publish`/`crate-ci/cargo-release`),
   `sdks/rust/README.md` + `docs/deployment/rust-sdk.md` (AWS Lambda
   `provided.al2023`; PostgreSQL `plrust` — ed25519-dalek verification is NOT
   plrust-trusted-mode-compatible as built, D-RISK-1).
-- **Cross-vendor (codex + claude — MANDATORY zcode T2, ADR-0007; zcode's peers are
-  the two non-GLM families; NO alongside-GLM, ADR-0006):** the codex peer returned
-  rc=0; the claude fable peer hit its 1200s ceiling and the instrument's resilience
-  re-dispatched claude-opus-4-8 (rc=0). The review surfaced REAL divergences from
+- **Independent critical review:** one peer returned successfully; a second peer hit its
+  1200-second ceiling and the review runner dispatched an alternate peer successfully. The review
+  surfaced real divergences from
   the Elixir reference in the T1–T14 verify path that the 283-corpus does not pin
   (conformance is necessary-but-not-sufficient): (1) `jcs_encode` closure #6 was
   incomplete — the reference `jcs.ex` `encode_value` also enforces int/float
@@ -562,16 +561,15 @@ compatibility.
   and `assemble_compact` output validation. Three red-capable tests added
   (selector dup, assemble validation, chain_id). No confirmed-real finding is
   parked; lib 335 + conformance 283 + permissiveness 10 green under `--locked`.
-  Two codex findings were CONTESTED with reference evidence: the "small-order key
+  Two findings were contested with reference evidence: the "small-order key
   forgery" (the reference uses OpenSSL non-strict `:crypto.verify` = matches
   dalek's default `verify`; and public keys are caller-supplied trusted inputs, so
   it is unreachable under the verifier's threat model) and the "producer emits
   verifier-invalid credentials" cluster (the reference producers also just build;
   producers are deterministic signing-input composers, not validators). The
   decode/envelope selector-validation split is the reference's own design (verified),
-  not a defect. The always-on lenses (spec-conformance/correctness/security/
-  gate-integrity) were GLM-orchestrator self-review on this single-model host —
-  honestly NOT decorrelated; the cross-vendor pass was the decorrelation.
+  not a defect. The always-on spec-conformance, correctness, security, and gate-integrity checks
+  were same-runner checks; the independent peer pass supplied the separate review.
 - **No wire byte, bound, or verdict change to the Elixir package** (Rust-only SDK +
   its tooling/docs). `mix quality` was green at the pre-fix head `a4176e1` (295
   tests + 13 properties, 55/55 mutation gate, conformance agreed=283, release.
@@ -606,8 +604,8 @@ residual of amendment #1 is CLOSED for Rust: `encode_anchored_export` now mirror
 reference producer's full contract (expected-side consistency, row chain re-check, gated
 parses + 7-field matches for both anchors and every transition, the key-path walk with
 NON-STRICT end-anchor chronology). 19 mutation-proven battery legs (permissiveness 38 — incl. the closeout lenses' chronology-equality pin), each
-verified against the Elixir reference oracle (20/20 — the receipt is a re-runnable local
-artifact in git history under the retired local-harness tree's reviews/results/rust-encode-path-parity/oracle-probe/). The TS/Python sibling permissiveness
+verified against the Elixir reference oracle (20/20). The durable bounds contract is
+[ADR 0018](adr/0018-sdk-bounds-contract.md), with executable evidence in the SDK test suites. The TS/Python sibling permissiveness
 closed in the immediately-following commit (same contract, 15 legs each at closeout,
 proven red-capable — the five pin legs each isolated under their named mutation, the
 threading leg joint-by-construction per the settled diff-review record). **The SDK-wide
@@ -622,19 +620,19 @@ and thread the reference's assemble gates (segment bounds, compact_bytes, kind r
 mutation-proven per SDK. See ADR 0018 decision 4's dated resolution.
 The Go SDK (BAP-16) picks the whole contract up at authoring.
 
-**2026-08-14 amendment #3 — the cross-vendor hardening arc + the terminal range state
+**2026-08-14 amendment #3 — the independent-review hardening arc + the terminal range state
 (`a4deac2..06c9f82`; the shared semantics this arc converged on are the contract of record in
-[ADR 0017](adr/0017-inter-sdk-behavioral-contract.md)).** The bounds-parity landing was followed by **17 dispatched cross-vendor
-rounds (codex + claude, the mandatory zcode T2 lens) plus delta-reviews between fix clusters**.
+[ADR 0017](adr/0017-inter-sdk-behavioral-contract.md)).** The bounds-parity landing was followed by **17 dispatched independent-review
+rounds plus delta-reviews between fix clusters**.
 Every named BLOCKING finding was fixed in-slice — the arc's user-facing fixes are the CHANGELOG
 rows above: nested-bounds pins + identity semantics (rounds 2-5), compact-bytes ceilings +
 key-window magnitude/ordering gates (rounds 4-10), the complete pre-hash validation family
 (version shape/equality, key count, key-id ASCII class, chunk typing — rounds 11-15), the
 Result-contract fail-closure + ChainInput type strictness (rounds 16-17). No confirmed-real
 finding is parked. **Terminal state, recorded per the bound-the-review-recursion rule:** the last
-cross-vendor receipt binds `a4deac2..8c5d0f4` (round 17's dispatch range); the round-17 fix
+independent-review receipt binds `a4deac2..8c5d0f4` (round 17's dispatch range); the round-17 fix
 (`226e847`) and the delta-4 reconciliation (`06c9f82`) trail that receipt — a source fix advances
-HEAD and re-invalidates the range receipt, and re-cross-vendoring one's own fix of its findings is
+HEAD and re-invalidates the range receipt, and redispatching one's own fix of its findings is
 the forbidden unbounded regress. The trailing deltas carry delta-review coverage instead: round-16
 delta + delta-4, both reconciled (delta-4's F2/F3/F4 fixed; its F1 ROUTED to the user — see the
 residual below). Full battery green at `06c9f82`: Rust `cargo test --locked` 338 unit + 5 + 67
@@ -647,7 +645,7 @@ the per-leg pins are owed as a user-directed follow-up; (2) ~~`assemble_compact`
 maximum-bounds in all three SDKs~~ **resolved 2026-08-18** — bounds threaded per ADR 0018
 decision 4's resolution; (3) the Go SDK (BAP-16) is
 un-started and picks the whole accumulated contract up at authoring. **2026-08-17 addendum — two
-verified contract exceptions from the ADR-0017 authoring review** (cross-vendor, both probed
+verified contract exceptions from the ADR-0017 authoring review** (independently reviewed, both probed
 against substrate; disclosed as ADR 0017's named exceptions, routed as SDK-code fixes): (4) a
 Python closed-Result escape — a non-string `request_digest` operation or `ConsumptionEntry.chain_id`
 raises `AttributeError` out of the façade (`_trying` catches only `InvalidError`) — **resolved
@@ -693,19 +691,19 @@ amendments.
 - **Closeout lenses (4-lens same-family):** closeable, no BLOCKING; 2 SHOULD-FIX fixed (a
   self-inflicted `standards-track.md` line-cite drift `:201-203`→`:211-213` from this slice's own
   addition; the missing closeout section — this one) + 4 NOTEs. Security lens clean.
-- **Cross-vendor (codex `gpt-5.6-sol` + claude `claude-opus-4-8`, MANDATORY zcode):** claude — NO
-  FINDINGS (verified tripwire non-vacuity, zero-wire-change, ADR cites, security surface). Codex —
-  5 findings; 3 admitted as real ADR-accuracy fixes (the audience-multiplied exposure `max × cnt ×
+- **Independent critical review:** one peer returned no findings after verifying tripwire
+  non-vacuity, zero-wire-change, ADR citations, and the security surface. A second peer returned
+  5 findings; 3 were admitted as real ADR-accuracy fixes (the audience-multiplied exposure `max × cnt ×
   |audiences|`, not `max × cnt`; the `ba_dlg` non-additivity rule — a child of an online-only parent
   cannot add `ba_offline`; the facts "binding" re-framed to signature-integrity, not object-identity),
   1 clarification (the `win` clock-rollback is the priced EMV floor-limit model, not a verifier
   hole), 1 contested (provenance phrasing — softened). Delta-review of the ADR fix: zero BLOCKING,
   all 5 fixes verified CORRECT, one off-by-one cite (`runtime.ex:287`→`:288`) fixed.
-- **Incident (recorded honestly):** the cross-vendor claude peer over-stepped its read-only brief
+- **Incident (recorded honestly):** an independent peer overstepped its read-only brief
   and committed two unreviewed, out-of-scope SDK canonical-form fixes (typescript + python) to LOCAL
   `main` during the review — a containment failure. They were unpushed + mis-routed (the peer
   mis-claimed they were "in code this slice touched"). Per the user's decision, `main` was reset to
-  `963b6b5` (the peer commits preserved on the `cross-vendor-sdk-findings` branch for a separate,
+  `963b6b5` (the peer commits preserved on the historical review-findings branch for a separate,
   properly-reviewed SDK slice if the finding is real).
 - **Companion follow-up (separate BA-repo landing, NOT this slice):** amend the private
   `bounded_authority` ADR 0014 (d.2/d.10 → "reserved for successor major"; d.3 "malformed →
@@ -752,9 +750,9 @@ amendments.
   contradiction around the released `all` selector behavior (ADR 0021): all four SDKs now accept
   only the same three recognized member sets as the Elixir reference and independent runner, while
   the protocol and both schemas describe the already-released inert-member behavior.
-- **Cross-vendor (codex + claude — MANDATORY zcode T2):** both peers returned rc=0 with
-  findings — 10 blocking + 9 should-fix + 11 notes (codex), 4 blocking + 4 should-fix + 5 notes
-  (claude), with heavy independent corroboration of the blocking set. Every confirmed finding
+- **Independent critical review:** both peers returned successfully with findings — 10 blocking +
+  9 should-fix + 11 notes from one peer, 4 blocking + 4 should-fix + 5 notes from the other, with
+  heavy independent corroboration of the blocking set. Every confirmed finding
   was fixed in the follow-up commit (`fbff228`), red-first: each behavioral fix pinned by a
   review-regression leg authored RED against the reviewed head (8 legs RED) and greened by the
   fix pass. The classes: proof-claim presence tracking (a nonce could mask a missing required
@@ -764,13 +762,13 @@ amendments.
   tightened integer_magnitude at decode, UTF-8 object-version validation, chunk-vs-byte bound
   separation at encode, the export producer deriving its own digest, proof-producer nonce
   support, constant-time nonce comparison, and runner/purity-gate hardening. **Containment
-  incident (the 2026-08-17 failure class at larger scope):** the claude peer over-stepped its
+  incident (the 2026-08-17 failure class at larger scope):** one peer overstepped its
   read-only brief and wrote unreviewed edits into the working tree — SDK fixes AND
   protocol-tree edits (`docs/protocol-v1.md`, `mix.exs`, `priv/conformance` schemas, tests, a
   draft ADR) — during the review. All foreign edits were reversed and preserved out-of-tree
-  for a separately reviewed slice if any is real; the fixes that landed are the orchestrator's
-  own, verified and leg-pinned. Per the bound-the-review-recursion rule the fix pass was not
-  re-cross-vendored; the accumulated fix diff was re-read hunk-by-hunk and the full suite is
+  for a separately reviewed change if any is real; the fixes that landed are the maintainer's
+  own, verified and leg-pinned. The fix pass was not redispatched; the accumulated fix diff was
+  re-read hunk-by-hunk and the full suite is
   green at `fbff228` (283/283, census=11, gates green).
 - **Corpus calibration facts recorded:** depth counts containers only (32 nested arrays + inner
   scalar valid at the bound); the `all` selector is valid on any of the three recognized member sets
@@ -821,10 +819,9 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   `029ee7d75641850e330d12ac41fcc24fe026f65694ad28f4ea120d871114ff89` equals the tagged-tree
   two-build `release.candidate` digest, the served tarball sha256, and the checksum a fresh
   external `~> 0.3.0` consumer resolved and pinned from hexpm; the served 187-file census is
-  byte-identical to the tagged tree; hexdocs is live for 0.3.0. These facts re-derive from the
-  public registry (hex.pm package page, checksums endpoint, hexdocs) — the local execution
-  record with the full gate snapshot is
-  `.kimosabe/reviews/2026-08-31-hex-0.3.0-publication-receipts.md` (gitignored). A downstream
+  byte-identical to the tagged tree; hexdocs is live for 0.3.0. The durable publication
+  record is in [`CHANGELOG.md`](../CHANGELOG.md); the facts re-derive from the public Hex registry.
+  A downstream
   adopter must consume that package identity, never this tag or a mutable checkout; adoption
   itself is the private runtime's out-of-repo follow-up, not a BAP-19 deliverable.
 
@@ -863,11 +860,14 @@ anywhere without its poles reconciled now reds `mix quality` by name.
 
 ## Next action
 
-BAP-04, BAP-05, BAP-10, BAP-06, BAP-11, BAP-13, BAP-08, BAP-09, BAP-14, BAP-15, BAP-17, BAP-18, and
-BAP-07 (connected verification and first public release, executed 2026-08-20) are
-complete. BAP-09 shipped the first two cross-language verifier SDKs
-(TypeScript `@bounded-authority/verifier` + Python `bounded-authority-verifier` under `sdks/`, each
-passing all 283 conformance vectors + per-language permissiveness mutation-gates; ADR 0014). BAP-05 shipped the portable v1 conformance
+BAP-00 through BAP-11, BAP-13 through BAP-19, and BAP-21 are complete. BAP-12 remains
+open for the IANA filing and is gated on the BAP-08 external-submission preconditions. BAP-21
+activated contract-major 2 and shipped the 0.4.0 source and Hex release. BAP-09 shipped the first
+two cross-language verifier SDKs: TypeScript and Python. TypeScript has since graduated to
+[`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript)
+and is published to npm as `@bounded-authority-protocol/verifier`; Python remains under `sdks/`.
+Both pass the certified v1 and v2 corpora and carry per-language permissiveness mutation gates
+([ADR 0014](adr/0014-cross-language-verifier-sdks.md)). BAP-05 shipped the portable v1 conformance
 corpus (283 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI
 (escript, `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent
 Node second-implementation runner (node:* only — the corpus is normative), a three-partition
@@ -922,8 +922,8 @@ re-recorded for its own intentional docs commit) and the consumer connected gate
 the immutable authority-contract bundle verified its 15 consumer cases against the candidate; the
 opt-in live-endpoint gate provisioned and run as part of this closeout); the fresh
 correctness/security/gate-integrity reviews closed with their findings fixed in the release landing,
-and the cross-vendor peer (codex) returned no findings (the third-family GLM lens was a named
-sensitivity-policy skip). The archive published to Hex as `bounded_authority_protocol` 0.1.0; the
+and the independent peer returned no findings (another peer review was skipped under the recorded
+sensitivity policy). The archive published to Hex as `bounded_authority_protocol` 0.1.0; the
 `v0.1.0` tag moved to the published commit. Deferred as recorded follow-ups from the gate-integrity
 review: a corpus index-SHA pin in the Elixir `conformance.verify` stage (the SDK runners already
 pin it; landed in the 0.1.2 hardening), mutation-battery baseline-green runs (landed in this
@@ -940,15 +940,17 @@ first SDK graduation. No SDK publishes from this monorepo: a local pre-commit
 hook (`scripts/hooks/pre-commit`, installed via `scripts/install-hooks.sh`) and the CI
 `sdk-publish-guard` job ([`.github/workflows/sdk-publish-guard.yml`](../.github/workflows/sdk-publish-guard.yml))
 reject registry-publish infrastructure (publish commands, publish actions, npm publish lifecycle
-keys) committed here. Consumption uses the published Hex release; the `v0.1.0` git tag marks the
-published commit. See `CONTRIBUTING.md` for the install + bypass (`git commit --no-verify`).
+keys) committed here. TypeScript graduated on 2026-09-14; Python, Rust, and Go remain in this
+monorepo until their own first publication. Consumption of the Elixir package uses the published
+0.4.0 Hex release; `v0.4.0` marks its source release. See `CONTRIBUTING.md` for the hook install and
+bypass (`git commit --no-verify`).
 
 **BAP-15 (Rust) and BAP-16 (Go) SDK rows are authored, post-1.0.** A spec/corpus review surfaced
 three gaps where neither `protocol-v1.md` nor the corpus pinned behavior the TS/Python SDKs had
-reached by reading the Elixir reference during cross-vendor remediation — ECMAScript float
+reached by reading the Elixir reference during independent review — ECMAScript float
 formatting (JCS §3.2.2.3, zero float-valued corpus cases), DEL (`U+007F`) raw-emit vs RFC 8785
-`\u007f`, and the byte-level cross-vendor findings (~25 falsifiers carried only in
-`sdks/typescript/test/permissiveness.ts`). The no-key gap-closing slice landed: `protocol-v1.md`
+`\u007f`, and the byte-level independent-review findings (~25 falsifiers recorded by
+[ADR 0017](adr/0017-inter-sdk-behavioral-contract.md) and the SDK permissiveness suites). The no-key gap-closing change landed: `protocol-v1.md`
 now transcribes the JCS string/number serialization rules (float thresholds, `-0`→`0`, raw DEL per
 RFC 8785 §3.2.2.2), the corpus grows **259 → 283 cases** pinning both float-threshold sides, the
 astral-codepoint raw emit, malformed UTF-8/IPv6/float-magnitude rejects, the key-locator
@@ -968,8 +970,8 @@ three seeded Ed25519 keys, fingerprints 8→11) have since landed, growing the c
 reference's cross-transition chronology (strictly-increasing `effective_at`), fingerprint-no-cycle,
 and end-anchor-chronology invariants those cases exposed. BAP-15's corpus acceptance is now met
 under the ADR 0014 "no code-level derivation from the Elixir reference" bar. BAP-15 (the Rust SDK
-implementation + its CI/gate/docs envelope + cross-vendor closeout) is now COMPLETE — see the
-BAP-15 closeout evidence above; the cross-vendor pass closed thirteen real T1–T14 divergences from the
+implementation + its CI/gate/docs envelope + independent-review closeout) is now COMPLETE — see the
+BAP-15 closeout evidence above; the independent-review pass closed thirteen real T1–T14 divergences from the
 reference (jcs closure #6 completion, timing ceilings, an archive-encode panic, the license gate's
 fail-open, un-locked CI, genesis/transition/archive/selector/compact/chain-id/ath gaps). BAP-16 (the Go
 verifier SDK) is COMPLETE — see the BAP-16 closeout evidence above; it picked the whole accumulated

@@ -25,6 +25,14 @@ repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   exit 0
 }
 checker="$repo_root/scripts/check_sdk_publish_infra.sh"
+privacy_guard="$repo_root/scripts/private_identifier_guard.py"
+
+if [ ! -r "$privacy_guard" ] || ! command -v python3 >/dev/null 2>&1; then
+  printf 'pre-commit: private-identifier guard unavailable; failing closed\n' >&2
+  exit 1
+fi
+
+python3 "$privacy_guard" --repo "$repo_root" pre-commit || exit $?
 
 if [ ! -x "$checker" ]; then
   printf 'pre-commit: %s missing or not executable; cannot enforce SDK publish guard\n' "$checker" >&2
@@ -34,8 +42,8 @@ fi
 status=0
 # Stage the file list into a temp, then iterate. Avoids the here-doc-with-$()
 # pattern (shellcheck SC2094) and — critically — avoids a pipeline, which would
-# run the loop in a subshell and silently drop any failure (the "gate present
-# but vacuous" failure the forge skill warns about for hook surfaces).
+# run the loop in a subshell and silently drop any failure (a present but
+# ineffective gate).
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 git diff --cached --name-only --diff-filter=ACM --no-renames > "$tmp"
