@@ -6,7 +6,7 @@ import {
   verify as verifySignature,
 } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ARCHIVE_PREFIX = Buffer.from("BAP1-ARCHIVE\0EXPORT\0", "binary");
@@ -1377,7 +1377,9 @@ function verifyManifest(manifest, fixture, fixturePath, additionalScanPath) {
   for (const relativeRoot of manifest.discovery_roots) {
     const absolute = resolve(repositoryRoot, relativeRoot);
     assert(
-      absolute === repositoryRoot || absolute.startsWith(`${repositoryRoot}/`),
+      // Native-separator containment (see grant_proof_independent.mjs): a literal "/"
+      // prefix never matches Windows backslash-joined paths.
+      absolute === repositoryRoot || absolute.startsWith(repositoryRoot + sep),
       "manifest discovery root escape",
     );
     discoverPublicKeys(absolute, manifestPath, discovered);

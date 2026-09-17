@@ -8,7 +8,7 @@ import {
   verify,
 } from "node:crypto";
 import {readFile, readdir} from "node:fs/promises";
-import {extname, join, resolve} from "node:path";
+import {extname, join, resolve, sep} from "node:path";
 import {isIP} from "node:net";
 import {fileURLToPath} from "node:url";
 
@@ -537,7 +537,9 @@ async function verifyManifest(manifest, additionalScanPath) {
   const declared = new Set();
   for (const relativeRoot of requiredDiscoveryRoots) {
     const path = resolve(root, relativeRoot);
-    assert(path === root || path.startsWith(`${root}/`), "discovery root escape");
+    // Platform containment: path.resolve joins with the native separator (\ on Windows),
+    // so the child test must use path.sep — a literal "/" prefix never matches there.
+    assert(path === root || path.startsWith(root + sep), "discovery root escape");
     await discoverPublicKeys(path, declared);
   }
   if (additionalScanPath !== null) await discoverPublicKeys(additionalScanPath, declared);

@@ -49,7 +49,11 @@ defmodule BoundedAuthorityProtocol.Architecture.PackageTest do
         stderr_to_stdout: true
       )
 
-    assert generation_output =~ "creating #{scratch}"
+    # The tool prints the scratch path with forward slashes and a lowercased drive on
+    # Windows ("c:/Users/..."), while scratch carries native separators — match the
+    # stable basename instead of the full path string.
+    assert generation_output =~ "creating "
+    assert generation_output =~ Path.basename(scratch)
     document = scratch |> File.read!() |> :json.decode()
 
     tampered =
