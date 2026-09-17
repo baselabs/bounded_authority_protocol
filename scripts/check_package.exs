@@ -281,6 +281,47 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     end
   end
 
+  defp wipe_build!(root) do
+    build = Path.join(root, "_build")
+
+    root
+    |> File.ls!()
+    |> Enum.filter(&(&1 == "_build"))
+    |> Enum.each(fn _ ->
+      build
+      |> ls_r_with_symlinks()
+      |> Enum.filter(fn path ->
+        case File.lstat(path) do
+          {:ok, %File.Stat{type: :symlink}} -> true
+          _ -> false
+        end
+      end)
+      |> Enum.each(&File.rm/1)
+
+      rm_rf_tolerant!(build)
+    end)
+  end
+
+  defp ls_r_with_symlinks(path) do
+    case File.ls(path) do
+      {:ok, names} ->
+        Enum.flat_map(names, fn name ->
+          full = Path.join(path, name)
+
+          case File.lstat(full) do
+            {:ok, %File.Stat{type: :symlink}} ->
+              [full]
+
+            _ ->
+              if File.dir?(full), do: ls_r_with_symlinks(full), else: []
+          end
+        end)
+
+      _ ->
+        []
+    end
+  end
+
   defp rm_rf_tolerant!(path) do
     # Windows: the consumer's _build carries a symlinked priv whose removal reports
     # "not owner"; the OS temp sweep reclaims the root. Cleanup-only tolerance — never
@@ -737,6 +778,11 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
 
     # BAP-05 published-set sufficiency: build the packaged escript and run it against the
     # PACKAGED corpus (inside the unpacked archive), proving the published set alone verifies.
+    # The earlier compile pass leaves a linked priv in _build; a later mix pass that
+    # recompiles must REMOVE that link, which Windows refuses ("not owner"). Wiping the
+    # build first (links via File.rm, which handles them where rm_rf chokes on Windows)
+    # makes the escript pass a fresh compile with nothing to remove.
+    wipe_build!(package_root)
     run!("mix", ["escript.build"], package_root, environment)
 
     escript_path = Path.join(package_root, "bounded_authority_conformance")
