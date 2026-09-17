@@ -28,7 +28,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
   `mix`/`elixir`/`escript` spawning via `test_support/portable.ex`, `System.tmp_dir!()` scratch
   paths, guarded carve-outs for the chmod-based, symlink-based, and POSIX-shell tests); a
   `windows-2025` CI lane runs checkout, `deps.get`, `compile --warnings-as-errors`, and
-  `mix test` on every push (first run lands with this change). The full `mix quality` battery
+  `mix test` on every push (OBSERVED green: all 445 tests on the lane's first completed
+  run, 2026-09-17). The full `mix quality` battery
   remains POSIX-only tooling (CI or WSL on Windows).
 - Dependency currency is gated latest-first by `scripts/check_deps_currency.exs` (Elixir, not
   shell, per the tri-platform bar) inside `mix quality` via `mix deps.currency`: resolvable drift

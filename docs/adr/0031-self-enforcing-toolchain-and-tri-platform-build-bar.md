@@ -69,9 +69,9 @@ injection).
   load with the assert message (`supports Erlang/OTP 27/28/29; running 26` / `25`);
   Elixir 1.18.4/OTP 27 compiles green under `MIX_ENV=test`. The dev lane
   (`.tool-versions`, Elixir 1.20.2-otp-29 / Erlang 29.0.3) compiles green.
-- The Windows surface is gated, not yet observed green: the `windows-2025` lane runs
-  with this change's first push and proves checkout, `deps.get`, `compile
-  --warnings-as-errors`, and `mix test` continuously. The checkout-bytes claim is
+- The Windows surface is gated and observed green: the `windows-2025` lane proved
+  checkout, `deps.get`, `compile --warnings-as-errors`, and `mix test` (445/445) on
+  its first completed run (2026-09-17) and re-proves it on every push. The checkout-bytes claim is
   enforced by the eol policy (a default `core.autocrlf` clone would otherwise
   CRLF-convert the digest-pinned corpora); the POSIX-only test mechanisms (chmod-based
   unreadability, symlink-privilege cases, Win32-unrepresentable path components, the
