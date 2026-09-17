@@ -277,7 +277,18 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
 
       IO.puts("package archive boundary passed")
     after
-      File.rm_rf!(scratch_root)
+      rm_rf_tolerant!(scratch_root)
+    end
+  end
+
+  defp rm_rf_tolerant!(path) do
+    # Windows: the consumer's _build carries a symlinked priv whose removal reports
+    # "not owner"; the OS temp sweep reclaims the root. Cleanup-only tolerance — never
+    # masks a verdict (this runs in the after block).
+    try do
+      File.rm_rf!(path)
+    rescue
+      File.Error -> :ok
     end
   end
 
