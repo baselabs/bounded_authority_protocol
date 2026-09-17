@@ -26,4 +26,14 @@ defmodule BoundedAuthorityProtocol.TestSupport.Portable do
   def tmp_dir!(label) do
     Path.join(System.tmp_dir!(), "#{label}-#{System.unique_integer([:positive])}")
   end
+
+  # Glob patterns built with "/" literals (Path.join(dir, "**/*.json")) stay mixed-separator
+  # on Windows, and erlang's wildcard does not match them; normalize to the native separator.
+  def wildcard(pattern, opts \\ []) do
+    if windows?() do
+      pattern |> String.replace("/", "\\") |> Path.wildcard(opts)
+    else
+      Path.wildcard(pattern, opts)
+    end
+  end
 end

@@ -1,3 +1,5 @@
+Code.require_file("../../test_support/portable.ex", __DIR__)
+
 defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
   @moduledoc """
   Drives the independent Node second-implementation runner (`corpus_independent.mjs`) against the
@@ -8,6 +10,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
   """
 
   use ExUnit.Case, async: true
+
+  alias BoundedAuthorityProtocol.TestSupport.Portable
 
   @root Path.expand("../..", __DIR__)
   @script Path.join(@root, "conformance/corpus_independent.mjs")
@@ -121,7 +125,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
 
   defp flip_one_case_byte(dir) do
     case_file =
-      Path.wildcard(Path.join(dir, "cases/**/*.json"))
+      Portable.wildcard(Path.join(dir, "cases/**/*.json"))
       |> List.first()
 
     bytes = File.read!(case_file)
@@ -132,7 +136,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
 
   defp drop_one_case_file(dir) do
     case_file =
-      Path.wildcard(Path.join(dir, "cases/**/*.json"))
+      Portable.wildcard(Path.join(dir, "cases/**/*.json"))
       |> List.first()
 
     File.rm!(case_file)

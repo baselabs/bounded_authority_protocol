@@ -1,3 +1,5 @@
+Code.require_file("../../test_support/portable.ex", __DIR__)
+
 defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
   @moduledoc false
   use ExUnit.Case, async: true

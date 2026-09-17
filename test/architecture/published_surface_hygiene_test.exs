@@ -1,6 +1,10 @@
+Code.require_file("../../test_support/portable.ex", __DIR__)
+
 defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
   @moduledoc false
   use ExUnit.Case, async: true
+
+  alias BoundedAuthorityProtocol.TestSupport.Portable
 
   # Published-surface hygiene gate (2026-09-14): the Hex package and its rendered docs must
   # carry no internal authoring-tooling vocabulary. The class escaped once — the changelog and
@@ -149,7 +153,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
   defp wildcard(root) do
     case File.stat(root) do
       {:ok, %{type: :directory}} ->
-        Path.wildcard("#{root}/**/*", match_dot: true) |> Enum.filter(&File.regular?/1)
+        Portable.wildcard("#{root}/**/*", match_dot: true) |> Enum.filter(&File.regular?/1)
 
       {:ok, %{type: :regular}} ->
         [root]

@@ -1,3 +1,5 @@
+Code.require_file("../../test_support/portable.ex", __DIR__)
+
 defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   @moduledoc """
   Integrity, applicability, tamper, determinism, and decoder-loadability gates for the
@@ -10,6 +12,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   """
 
   use ExUnit.Case, async: true
+
+  alias BoundedAuthorityProtocol.TestSupport.Portable
 
   alias BoundedAuthorityProtocol.Conformance.Corpus
   alias BoundedAuthorityProtocol.Conformance.Report
@@ -1380,7 +1384,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   end
 
   test "every shipped corpus JSON file is normative-decoder-loadable and under the byte ceiling" do
-    for path <- Path.wildcard(Path.join(@shipped_corpus, "**/*.json")) do
+    for path <- Portable.wildcard(Path.join(@shipped_corpus, "**/*.json")) do
       bytes = File.read!(path)
       assert byte_size(bytes) <= 65_536, "#{path}: over the 65,536-byte ceiling"
       assert {:ok, _} = Json.decode(bytes, Bounds.maximum())
@@ -1714,7 +1718,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   end
 
   defp shipped_corpus_map do
-    Path.wildcard(Path.join(@shipped_corpus, "**/*"))
+    Portable.wildcard(Path.join(@shipped_corpus, "**/*"))
     |> Enum.filter(&File.regular?/1)
     |> Enum.map(fn path ->
       {Path.relative_to(path, @shipped_corpus), File.read!(path)}
@@ -1730,7 +1734,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
           "priv/conformance/application-profiles"
         ],
         File.dir?(corpus_dir),
-        path <- Path.wildcard(Path.join(corpus_dir, "**/*.json")) do
+        path <- Portable.wildcard(Path.join(corpus_dir, "**/*.json")) do
       assert private_material_findings(File.read!(path)) == [],
              "#{path}: forbidden private material"
     end

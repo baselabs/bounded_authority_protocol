@@ -17,7 +17,7 @@ import {
   verify as verifySignature,
 } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, extname, join, resolve, relative } from "node:path";
+import { dirname, extname, join, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isIP } from "node:net";
 
@@ -930,7 +930,9 @@ function loadCorpus(corpusDir) {
   const observedRelPaths = new Set();
   const fileBytes = new Map(); // rel path -> Buffer
   for (const absPath of listCorpusFiles(corpusDir)) {
-    const rel = relative(corpusDir, absPath);
+    // Normalized to "/"-separated keys: path.relative joins with the native separator
+    // on Windows, and the corpus declares forward-slash case paths.
+    const rel = relative(corpusDir, absPath).split(sep).join("/");
     if (rel === "index.json") continue;
     observedRelPaths.add(rel);
     fileBytes.set(rel, readFileSync(absPath));

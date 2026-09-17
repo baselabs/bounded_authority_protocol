@@ -76,7 +76,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     map =
       dir
       |> Path.join("**/*")
-      |> Path.wildcard()
+      |> Portable.wildcard()
       |> Enum.reject(&File.dir?/1)
       |> Map.new(fn p -> {Path.relative_to(p, dir), File.read!(p)} end)
 
@@ -136,7 +136,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     map =
       dst
       |> Path.join("**/*")
-      |> Path.wildcard()
+      |> Portable.wildcard()
       |> Enum.reject(&File.dir?/1)
       |> Map.new(fn p -> {Path.relative_to(p, dst), File.read!(p)} end)
 
@@ -294,7 +294,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   defp flip_one_case_byte(dir) do
     case_file =
-      Path.wildcard(Path.join(dir, "cases/**/*.json"))
+      Portable.wildcard(Path.join(dir, "cases/**/*.json"))
       |> List.first()
 
     bytes = File.read!(case_file)
@@ -308,14 +308,14 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   unless Portable.windows?() do
     defp make_one_file_unreadable(dir) do
       case_file =
-        Path.wildcard(Path.join(dir, "cases/**/*.json"))
+        Portable.wildcard(Path.join(dir, "cases/**/*.json"))
         |> List.first()
 
       File.chmod!(case_file, 0o000)
     end
 
     defp restore_readability(dir) do
-      Path.wildcard(Path.join(dir, "**/*.json"))
+      Portable.wildcard(Path.join(dir, "**/*.json"))
       |> Enum.each(fn f ->
         try do
           File.chmod!(f, 0o644)
@@ -328,7 +328,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   defp drop_one_case_file(dir) do
     case_file =
-      Path.wildcard(Path.join(dir, "cases/**/*.json"))
+      Portable.wildcard(Path.join(dir, "cases/**/*.json"))
       |> List.first()
 
     File.rm!(case_file)

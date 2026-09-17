@@ -299,9 +299,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
   defp check_exact_files!(package_root) do
     actual =
       package_root
-      |> Path.join("**/*")
-      |> Path.wildcard(match_dot: true)
-      |> Enum.filter(&File.regular?/1)
+      |> package_wildcard()
       |> Enum.map(&Path.relative_to(&1, package_root))
       |> MapSet.new()
 
@@ -794,6 +792,17 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       {_output, 0} -> :ok
       {_output, status} -> fail!("#{command} exited with status #{status}")
     end
+  end
+
+  defp package_wildcard(root) do
+    # The glob pattern carries "/" literals; erlang's wildcard does not match mixed-separator
+    # patterns on Windows, so normalize to the native separator there.
+    pattern = Path.join(root, "**/*")
+
+    pattern =
+      if match?({:win32, _}, :os.type()), do: String.replace(pattern, "/", "\\"), else: pattern
+
+    pattern |> Path.wildcard(match_dot: true) |> Enum.filter(&File.regular?/1)
   end
 
   # On Windows, mix/elixir/escript are .bat/.cmd shims that System.cmd (CreateProcess)
