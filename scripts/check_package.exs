@@ -795,14 +795,19 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
   end
 
   defp package_wildcard(root) do
-    # The glob pattern carries "/" literals; erlang's wildcard does not match mixed-separator
-    # patterns on Windows, so normalize to the native separator there.
-    pattern = Path.join(root, "**/*")
+    # Recursive walk, not the glob engine: erlang's wildcard matched NOTHING under the
+    # Windows runner's short-name TEMP root (both separator forms), while plain File
+    # operations worked everywhere. Hidden files are enumerated (the match_dot case).
+    ls_r(root) |> Enum.filter(&File.regular?/1)
+  end
 
-    pattern =
-      if match?({:win32, _}, :os.type()), do: String.replace(pattern, "/", "\\"), else: pattern
-
-    pattern |> Path.wildcard(match_dot: true) |> Enum.filter(&File.regular?/1)
+  defp ls_r(path) do
+    path
+    |> File.ls!()
+    |> Enum.flat_map(fn name ->
+      full = Path.join(path, name)
+      if File.dir?(full), do: ls_r(full), else: [full]
+    end)
   end
 
   # On Windows, mix/elixir/escript are .bat/.cmd shims that System.cmd (CreateProcess)

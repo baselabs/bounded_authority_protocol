@@ -118,7 +118,12 @@ write_pat() {
 
 write_generic_key() {
   target=$1
-  value=$(openssl rand -hex 24)
+  # FIXED high-entropy canary, not openssl rand: a random 48-hex draw occasionally
+  # lands below gitleaks' generic-api-key entropy discriminator (observed 2026-09-17:
+  # "missed 1 path group(s)" on an unlucky draw with identical config and gitleaks
+  # 8.30.1) — a probabilistic gate. The literal mixes digits and letters with no long
+  # runs, so the detector fires deterministically.
+  value='a3f1c9e7b5d2468f0a1e3c5b7d9f2e4a6c8b0d3f5a7c9e1b3d5f7a9c'
   printf '{"key_fingerprint": "%s"}\n' "$value" > "$target"
   printf '%s' "$value"
 }
@@ -127,7 +132,8 @@ write_jwt() {
   target=$1
   header=$(printf '{"alg":"HS256","typ":"JWT"}' | openssl base64 -A | tr '+/' '-_' | tr -d '=')
   payload=$(printf '{"sub":"runtime-sensitivity-probe","iat":1}' | openssl base64 -A | tr '+/' '-_' | tr -d '=')
-  signature=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')
+  # Fixed signature (same determinism rationale as write_generic_key).
+  signature='Uo1bVz9xQ3mK7cS2wE5nR8tY4uI6oP0aD3fG7hJ9kL1zM4xC6vB8nQ2wE5rT7yU'
   printf '%s.%s.%s\n' "$header" "$payload" "$signature" > "$target"
   printf '%s.%s.%s' "$header" "$payload" "$signature"
 }
