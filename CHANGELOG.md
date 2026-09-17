@@ -2,7 +2,7 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
-## [Unreleased]
+## [0.4.1] — 2026-09-17
 
 ### Changed — self-enforcing toolchain, dependency currency, tri-platform build bar
 

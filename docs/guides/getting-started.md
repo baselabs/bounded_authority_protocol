@@ -13,7 +13,7 @@ normative profile; this guide is operational.
 
 ## Installation
 
-The package is published on Hex (release 0.4.0, published 2026-09-14):
+The package is published on Hex (release 0.4.1, published 2026-09-17):
 
 ```elixir
 defp deps do
@@ -21,9 +21,12 @@ defp deps do
 end
 ```
 
-`v0.4.0` is the reviewable source release; the immutable package identity is the published Hex
-release, whose registry checksum was read back against the tagged-tree build. Depend on the
-package identity — never a tag or a mutable checkout.
+`v0.4.0` is the reviewable source release for v2; `v0.4.1` is a toolchain-and-platforms release
+with no wire or API change. The immutable package identity is the published Hex release, whose
+registry checksum was read back against the tagged-tree build. Depend on the package identity —
+never a tag or a mutable checkout. To produce (rather than verify) signed envelopes, see the
+holder-side companion package
+[`bounded_authority_report_adapter`](https://hex.pm/packages/bounded_authority_report_adapter).
 
 Zero runtime dependencies. The verification surfaces live under `BoundedAuthorityProtocol.V1`.
 

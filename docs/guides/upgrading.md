@@ -5,6 +5,14 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
+## 0.4.0 to 0.4.1
+
+No wire-format or public-API change: 0.4.1 lands the self-enforcing toolchain and the
+tri-platform build bar ([ADR 0031](../adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md))
+and the dependency-currency gate ([ADR 0032](../adr/0032-dependency-currency-gate.md)) inside the
+repository — the OTP assert is not shipped in the package, so consumer builds are unaffected.
+Bump the requirement as convenient; nothing else changes for consumers.
+
 ## 0.2.x to 0.3.0
 
 `0.3.0` adds `bap-application-proof/local-loopback-http/1` as a separately named application

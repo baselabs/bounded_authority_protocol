@@ -23,7 +23,7 @@ cryptographic suites are `BAP1-Ed25519-SHA256` for v1 and `BAP2-Ed25519-SHA256` 
 
 ## Installation
 
-The package is published on Hex (release 0.4.0, published 2026-09-14 with its registry checksum
+The package is published on Hex (release 0.4.1, published 2026-09-17 with its registry checksum
 read back against the tagged-tree build). Registry consumers use the patch-bounded requirement:
 
 ```elixir
@@ -35,10 +35,24 @@ end
 ```
 
 The package has **zero production dependencies**, no application callback, and no supervision tree.
-`v0.4.0` identifies the reviewable source release for the v2 contract-major activation; the
-immutable package identity is the published Hex release (registry checksum
-`e6b812fa96211614608a3a8e926381856f575b9656689265ae86a1a83105a60e`), not the Git tag. Depend on
-the package identity — never a tag or a mutable checkout.
+`v0.4.0` identifies the reviewable source release for the v2 contract-major activation;
+`v0.4.1` is a toolchain-and-platforms release (ADR 0031/0032) with **no wire-format or public-API
+change**. The immutable package identity is the published Hex release (registry checksum
+`8544a9ff8d364651c079975982586c130bbb33f19603dd3d5b639ffa987358a9`), not the Git tag. Depend on the package identity — never a tag or a mutable
+checkout.
+
+## Holder-side signer: the report adapter
+
+Producing a signed envelope needs a holder key — and this package deliberately has none: it
+computes the deterministic signing input for every protocol object and **refuses to sign**.
+The holder-side companion is
+[`bounded_authority_report_adapter`](https://hex.pm/packages/bounded_authority_report_adapter)
+([GitHub](https://github.com/baselabs/bounded_authority_report_adapter)): it takes a local
+key handle (`{module(), term()}` — your HSM, KMS, or in-process test key; the private key never
+enters the library) and a protocol signing input, and produces the signed compact form for
+holder proofs, local-loopback application proofs, boundary anchors, and key transitions.
+The dependency is one-directional: verifiers depend only on this protocol package; the adapter
+depends on this package; this package never depends on the adapter.
 
 ## What it provides
 
