@@ -41,7 +41,9 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
       path: "lib/bounded_authority_protocol/v1/bounds.ex",
       from: "    depth: 32,",
       to: "    depth: 33,",
-      command: ["mix", "test", "test/spec_facts_test.exs:57"]
+      target:
+        {"test/spec_facts_test.exs",
+         "rule 1: extracted bounds table equals the live Bounds.maximum/0 dump"}
     },
     %{
       # A softened requirement statement (unlisted -> listed) diverges from the frozen statement
@@ -127,7 +129,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
       mutate_once!(Path.join(scratch, mutation.path), mutation.from, mutation.to)
 
       {output, status} =
-        System.cmd(hd(mutation.command), command_args(mutation.command),
+        System.cmd(hd(command_for(mutation)), command_args(command_for(mutation)),
           cd: scratch,
           env: [{"MIX_ENV", "test"}],
           stderr_to_stdout: true
@@ -147,7 +149,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
   # clean scratch (a deleted or drifted target would otherwise score a red as "caught").
   # Cached per unique command so shared targets pay the baseline once per battery run.
   defp baseline_green!(mutation) do
-    key = {:baseline_green, mutation.command}
+    key = {:baseline_green, mutation.name}
 
     if Process.get(key) != :ok do
       scratch =
@@ -164,7 +166,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
         copy_build(scratch)
 
         {output, status} =
-          System.cmd(hd(mutation.command), command_args(mutation.command),
+          System.cmd(hd(command_for(mutation)), command_args(command_for(mutation)),
             cd: scratch,
             env: [{"MIX_ENV", "test"}],
             stderr_to_stdout: true
@@ -182,6 +184,28 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
     end
 
     :ok
+  end
+
+  # Name-resolved test targeting: line pins drifted three separate times (edits anywhere
+  # above the target silently re-pointed them); targets now carry the TEST NAME and the
+  # line is resolved against the (scratch) file at run time. Unresolvable => raise, not
+  # a silently-green gate.
+  defp command_for(%{target: {path, test_name}}) do
+    ["mix", "test", "#{path}:#{test_line!(path, test_name)}"]
+  end
+
+  defp command_for(%{command: command}), do: command
+
+  defp test_line!(path, test_name) do
+    prefix = ~s(test "#{test_name}")
+
+    case path
+         |> File.read!()
+         |> String.split("\n")
+         |> Enum.find_index(&String.contains?(&1, prefix)) do
+      nil -> raise "mutation target test not found in #{path}: #{test_name}"
+      index -> index + 1
+    end
   end
 
   defp command_args(["mix", "test" | rest]), do: ["test" | rest] ++ ["--max-cases", "1"]

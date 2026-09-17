@@ -37,7 +37,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/v2/selector.ex",
       from: "  defp lte?({:integer, left}, {:integer, right}), do: left <= right\n",
       to: "  defp lte?({:integer, left}, {:integer, right}), do: left < right\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:46"]
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
     },
     %{
       # Same-tag domain removed: the cross-tag fall-through compares numerically, so the
@@ -48,7 +48,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "  defp lte?(_left, _right), do: false\n\n  defp gte?({:integer, left}, {:integer, right}), do: left >= right\n  defp gte?({:float, left}, {:float, right}), do: left >= right\n  defp gte?(_left, _right), do: false",
       to:
         "  defp lte?({_tag, left}, {_other, right}), do: is_number(left) and is_number(right) and left <= right\n\n  defp gte?({:integer, left}, {:integer, right}), do: left >= right\n  defp gte?({:float, left}, {:float, right}), do: left >= right\n  defp gte?({_tag, left}, {_other, right}), do: is_number(left) and is_number(right) and left >= right",
-      command: ["mix", "test", "test/conformance/cli_test.exs:46"]
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
     },
     %{
       # Kind swap: decoding lte as gte and gte as lte (both clauses swapped, so
@@ -60,7 +60,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "      {:ok,\n       %{\n         \"kind\" => {:string, \"lte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end\n\n      {:ok,\n       %{\n         \"kind\" => {:string, \"gte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:gte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end",
       to:
         "      {:ok,\n       %{\n         \"kind\" => {:string, \"lte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:gte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end\n\n      {:ok,\n       %{\n         \"kind\" => {:string, \"gte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end",
-      command: ["mix", "test", "test/conformance/cli_test.exs:46"]
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
     },
     %{
       # Numeric-bound check dropped at decode: a string lte bound now decodes, so the
@@ -71,7 +71,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}",
       to:
         "             true <- path != [],\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}",
-      command: ["mix", "test", "test/conformance/cli_test.exs:46"]
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
     },
     %{
       # Cross-major downgrade: the v2 grant decode accepting v:1 reddens the cross-major
@@ -82,7 +82,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "         true <- valid_key_id?(key_id, bounds),\n         {:integer, 2} <- payload[\"v\"],\n         {:string, issuer} <- payload[\"iss\"],",
       to:
         "         true <- valid_key_id?(key_id, bounds),\n         true <- payload[\"v\"] in [{:integer, 1}, {:integer, 2}],\n         {:string, issuer} <- payload[\"iss\"],",
-      command: ["mix", "test", "test/conformance/cli_test.exs:46"]
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
     },
     %{
       # Domain-separator downgrade: BAP2-REQUEST\\0 flipped to BAP1 reddens every
@@ -91,7 +91,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/v2/request_digest.ex",
       from: "  @prefix <<\"BAP2-REQUEST\", 0>>\n",
       to: "  @prefix <<\"BAP1-REQUEST\", 0>>\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:46"]
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
     },
     # --- C1 purity carve-out proofs (per-file keying) -------------------------
     %{
@@ -154,7 +154,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "      {:ok, ^total} -> :ok",
       to: "      {:ok, _} -> :ok",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:607"]
+      target:
+        {"test/conformance/corpus_test.exs",
+         "an index total_cases that disagrees with the files is rejected"}
     },
     %{
       # Disabling the per-file SHA-256 equality (always-true guard) lets a corpus with a stale
@@ -164,7 +166,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "           true <- sha256_b64(bytes) == hash do",
       to: "           true <- true do",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:470"]
+      target:
+        {"test/conformance/corpus_test.exs",
+         "a tampered case byte (hash mismatch) is rejected at corpus load"}
     },
     # --- V3 corpus integrity: exact file-set equality -------------------------
     %{
@@ -178,7 +182,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "    if MapSet.equal?(declared, present),",
       to: "    if true,",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:497"]
+      target:
+        {"test/conformance/corpus_test.exs",
+         "an unlisted case file (present in corpus, absent from index) is rejected"}
     },
     # --- V2 corpus integrity: applicability required cells --------------------
     %{
@@ -190,7 +196,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "      n when is_integer(n) and n >= 1 -> observed_count == n",
       to: "      n when is_integer(n) and n >= 1 -> true",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:642"]
+      target:
+        {"test/conformance/corpus_test.exs",
+         "a required applicability cell declared but with zero executed cases is rejected"}
     },
     # --- Q25 corpus integrity: tamper verbatim-vs-derived equality ------------
     %{
@@ -202,7 +210,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "lib/bounded_authority_protocol/conformance/corpus.ex",
       from: "      derived == verbatim_bytes",
       to: "      true",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:698"]
+      target:
+        {"test/conformance/corpus_test.exs",
+         "a tamper case whose verbatim artifact disagrees with the derived bytes is rejected"}
     },
     # --- independent runner verdict agreement ---------------------------------
     %{
@@ -216,7 +226,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "  if (expected.verdict === \"invalid\") return actual === INVALID;\n  if (expected.verdict === \"valid\") {",
       to:
         "  if (expected.verdict === \"invalid\") return false;\n  if (expected.verdict === \"valid\") return false;\n  if (expected.verdict === \"valid\") {",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     # --- runner reject-vs-error typing (InvalidError whitelist) ---------------
     %{
@@ -232,7 +244,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "  assert(verifyEd25519(pub, jws.message, jws.signature), \"verify_grant: Ed25519 signature\");",
       to:
         "  if (!verifyEd25519(pub, jws.message, jws.signature)) throw new ReferenceError(\"planted runner bug on invalid path\");",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     # --- two-boundary census: verification-import truth -----------------------
     %{
@@ -245,7 +259,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "  importedPublicKeyFingerprints.add(fp);\n  verificationImportedFingerprints.add(fp);",
       to: "  importedPublicKeyFingerprints.add(fp);",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     # --- Task 2: tamper target resolution (audit binds to the addressed bytes) -
     %{
@@ -261,7 +277,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "      t when t in [\"compact\", \"grant\", \"proof\"] -> string_target_bytes(input, t)",
       to: "      t when t in [\"compact\", \"grant\", \"proof\"] -> text_target_bytes(input)",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:783"]
+      target:
+        {"test/conformance/corpus_test.exs",
+         "a compact-target tamper re-derives against input.compact (not input.text) and loads"}
     },
     %{
       # The independent Node runner's verbatim-vs-derived tamper audit must run at load. Removing
@@ -274,7 +292,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "  // Tamper verbatim-vs-derived audit (mirrors the official loader; a mismatch aborts the run).\n  verifyTampers(cases);",
       to: "  // tamper audit disabled (mutation)",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:74"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "exit 1 when a tamper case's verbatim disagrees with the re-derived bytes (tamper audit)"}
     },
     # --- Task 3: per-invariant-family rejection proofs ------------------------
     %{
@@ -287,7 +307,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "  assert(header.alg === \"EdDSA\" && header.typ === \"ba+cap\", \"decode_grant header values\");",
       to: "  assert(header.typ === \"ba+cap\", \"decode_grant header values\");",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Disabling the proof Ed25519 verification lets a meaningful-byte signature tamper pass:
@@ -298,7 +320,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "  assert(verifyEd25519(holderPub, proofJws.message, proofJws.signature), \"check_envelope: proof signature\");",
       to: "  assert(true, \"check_envelope: proof signature\");",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Disabling the method binding lets check-envelope-invalid-request-method (a mismatched
@@ -308,7 +332,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "  assert(proofPayload.htm === method, \"check_envelope: method\");",
       to: "  assert(true, \"check_envelope: method\");",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Disabling the nonce binding (a distinct mechanism from the ===-equality bindings) lets
@@ -319,7 +345,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "    assert(proofPayload.nonce === expNonce.required, \"check_envelope: nonce mismatch\");",
       to: "    assert(true, \"check_envelope: nonce mismatch\");",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Disabling the per-row previous-link check (comparing row.previous to itself always passes)
@@ -330,7 +358,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "equalBytes(strictB64(row.previous, 32), previous, ",
       to: "equalBytes(strictB64(row.previous, 32), strictB64(row.previous, 32), ",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Disabling the object-version binding lets verify-anchored-export-invalid-claim-version (a
@@ -340,7 +370,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "  assert(version === objectVersion, \"verify_anchored_export: object version\");",
       to: "  assert(true, \"verify_anchored_export: object version\");",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # The Node tamper audit's extended-target resolution must bind "compact" to input.compact
@@ -354,7 +386,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "      if (typeof input.compact === \"string\") return Buffer.from(input.compact, \"utf8\");",
       to: "      if (typeof input.text === \"string\") return Buffer.from(input.text, \"utf8\");",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     # --- Task 4: json.decode structural-limit boundary rejection -------------
     %{
@@ -368,7 +402,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "    assert(Buffer.byteLength(name, \"utf8\") <= 128, \"json object-name byte bound\");",
       to:
         "    assert(Buffer.byteLength(name, \"utf8\") <= 129, \"json object-name byte bound\");",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Loosening the string-value byte ceiling lets json-decode-string_bytes-maximum-plus-one (an
@@ -381,7 +417,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "        assert(Buffer.byteLength(parsed, \"utf8\") <= 8192, \"json string byte bound\");",
       to:
         "        assert(Buffer.byteLength(parsed, \"utf8\") <= 8193, \"json string byte bound\");",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     # --- check_envelope selector binding (BAP-05 selector remediation) --------
     %{
@@ -399,7 +437,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "         :ok <- Selector.match_all(operation.selectors, expected.cast_arguments, bounds),\n",
       to:
         "         :ok <-\n           (if is_nil(operation.selectors),\n              do: Selector.match_all(operation.selectors, expected.cast_arguments, bounds),\n              else: :ok),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:42"]
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped corpus (in-VM)"}
     },
     # --- check_envelope authority bindings (BAP-05 selector closeout) ----------
     # Each binding below is the SOLE rejecter of one shipped invalid_claim case, so neutralizing it
@@ -415,7 +453,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "    with true <- secure_equal?(proof.holder_thumbprint, grant.holder_thumbprint),\n",
       to:
         "    with true <-\n           (if is_nil(proof.holder_thumbprint),\n              do: secure_equal?(proof.holder_thumbprint, grant.holder_thumbprint),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:42"]
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped corpus (in-VM)"}
     },
     %{
       # Grant binding (`ath`): without it a proof minted over one grant is replayable against a
@@ -426,7 +464,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "         true <- secure_equal?(proof.grant_hash, grant_hash),\n",
       to:
         "         true <-\n           (if is_nil(proof.grant_hash),\n              do: secure_equal?(proof.grant_hash, grant_hash),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:42"]
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped corpus (in-VM)"}
     },
     %{
       # Request-argument binding (`ba_req`): without it a proof is replayable with different cast
@@ -437,7 +475,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "         true <- secure_equal?(proof.request_hash, request_hash),\n",
       to:
         "         true <-\n           (if is_nil(proof.request_hash),\n              do: secure_equal?(proof.request_hash, request_hash),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:42"]
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped corpus (in-VM)"}
     },
     %{
       # Operation binding (`ba_op`): the request digest is computed over the SERVER-derived
@@ -452,7 +490,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "         true <- secure_equal?(proof.operation, expected.operation),\n",
       to:
         "         true <-\n           (if is_nil(proof.operation),\n              do: secure_equal?(proof.operation, expected.operation),\n              else: true),\n",
-      command: ["mix", "test", "test/conformance/cli_test.exs:42"]
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped corpus (in-VM)"}
     },
     %{
       # Node-side selector PATH validation. The official rejects an empty selector path at grant
@@ -471,7 +509,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "  if (!Array.isArray(path) || path.length < 1 || path.length > MAXIMA.path_segments) return false;\n",
       to: "  if (!Array.isArray(path)) return false;\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     # --- independent-runner permissiveness (BAP-05 selector closeout, round 4) -
     # Each entry deletes one guard that keeps the Node runner from being MORE PERMISSIVE than the
@@ -484,7 +524,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "  exactKeys(grantPayload.cnf, [\"jkt\"], \"check_envelope grant cnf\");\n",
       to: "\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Operation names are printable ASCII in the official (valid_operation?).
@@ -492,7 +534,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "    /^[\\x20-\\x7E]*$/.test(name)\n",
       to: "    true\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # The official enforces global operation-name uniqueness (unique?).
@@ -501,7 +545,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "  assert(new Set(names).size === names.length, `${context}: duplicate operation name`);\n",
       to: "  void names;\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # The official validates EVERY operation's selectors, not just the requested one.
@@ -509,7 +555,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "    for (const selector of op.selectors) validSelectorShape(selector, context);\n",
       to: "\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Protocol strings must be valid UTF-8 (String.valid?); a byte-length check accepts a lone
@@ -518,7 +566,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "      wellFormedString(segment) &&\n",
       to: "      typeof segment === \"string\" &&\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # On a plain {} the tagged projection loses a `__proto__` member to the prototype setter, so
@@ -527,7 +577,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "  const obj = Object.create(null);\n",
       to: "  const obj = {};\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Selector values must satisfy the protocol JSON bounds (official: Jcs.encode(value, bounds)).
@@ -536,7 +588,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "function withinJsonBounds(value, level = 0) {\n",
       to: "function withinJsonBounds(value, level = 0) {\n  return true;\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # The official matches `all` on an OPEN pattern, so kind:"all" decodes as :all on ANY of the
@@ -547,7 +601,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "  if (selector.kind === \"all\") return;\n",
       to: "  if (selector.kind === \"all\" && members === \"kind\") return;\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Selector-value magnitude. The official caps |value| at 9007199254740991; without this the
@@ -557,7 +613,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "      Number.isFinite(value) &&\n      Math.abs(value) <= MAXIMA.integer_magnitude\n    );",
       to: "      Number.isFinite(value)\n    );",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Object member keys have NO one-byte floor in the official ({"":1} is accepted, probed
@@ -569,7 +627,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         "      wellFormedString(k) &&\n      Buffer.byteLength(k, \"utf8\") <= MAXIMA.key_bytes &&\n",
       to:
         "      wellFormedString(k) &&\n      Buffer.byteLength(k, \"utf8\") >= 1 &&\n      Buffer.byteLength(k, \"utf8\") <= MAXIMA.key_bytes &&\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     # --- payload field-validation mirror (decode surfaces) --------------------
     # Each validator mirrors a decode_grant_fields/decode_proof_fields check the runner did not
@@ -582,7 +642,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "function validIdentifier(value) {\n",
       to: "function validIdentifier(value) {\n  return true;\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # valid_method?: token charset; catches a method with a space.
@@ -590,7 +652,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "function validMethod(value) {\n",
       to: "function validMethod(value) {\n  return true;\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # valid_uuid?: exact UUID shape; catches a non-UUID ba_inv.
@@ -598,7 +662,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "function validUuid(value) {\n",
       to: "function validUuid(value) {\n  return true;\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # coherent_times?: iat<exp and nbf<exp; catches iat >= exp.
@@ -606,7 +672,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "function coherentTimes(iat, nbf, exp) {\n",
       to: "function coherentTimes(iat, nbf, exp) {\n  return true;\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # decode_audiences: count bound + per-element validity + uniqueness; catches over-max and duplicate aud.
@@ -614,7 +682,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "function decodeAudiences(aud) {\n",
       to: "function decodeAudiences(aud) {\n  return true;\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # decode_proof requires htu already normalized (Uri.normalize(htu) === htu); check_envelope
@@ -623,7 +693,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "  assert(normalized === payload.htu, \"decode_proof: htu normalized\");\n",
       to: "  void normalized;\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # StringOrURI structure: the official gates iss/jti/aud on URI.new (numeric port, terminated
@@ -633,7 +705,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "  return validUriAuthority(rest.slice(2).split(/[/?#]/, 1)[0]);\n",
       to: "  return true;\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # Optional proof nonce: present must be a well-formed string of 1..nonce_bytes
@@ -642,7 +716,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "  if (payload.nonce !== undefined) {\n",
       to: "  if (false) {\n",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     # --- calibration self-proof (battery raises on a green-under-mutation) ----
     %{
@@ -656,7 +732,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "    if length(all_ids) == MapSet.size(MapSet.new(all_ids)) and Enum.all?(all_ids, &is_binary/1),",
       to: "    if true,",
-      command: ["mix", "test", "test/conformance/corpus_test.exs:689"]
+      target: {"test/conformance/corpus_test.exs", "a duplicate case id across files is rejected"}
     },
     # --- runner permissiveness residuals: the four closed permissive gaps + the guard family -----
     %{
@@ -668,7 +744,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "level <= MAXIMA.depth &&\n      Number.isFinite(value) &&",
       to: "level < MAXIMA.depth &&\n      Number.isFinite(value) &&",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # isInteger magnitude: dropping the |value| <= integer_magnitude bound lets a proof with
@@ -678,7 +756,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "Number.isInteger(value) &&\n    Math.abs(value) <= MAXIMA.integer_magnitude",
       to: "Number.isInteger(value)",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # requestDigest total_nodes: removing the typed-projection node bound lets a value-carried
@@ -690,7 +770,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "if (countJsonNodes(projected) > MAXIMA.total_nodes) fail(\"request_digest: total_nodes\");",
       to: "// total_nodes check removed (mutation)",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # requestDigest jcs_bytes: removing the canonical byte bound lets a typed projection exceeding
@@ -700,7 +782,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from:
         "if (Buffer.byteLength(jcs, \"utf8\") > MAXIMA.jcs_bytes) fail(\"request_digest: jcs_bytes\");",
       to: "// jcs_bytes check removed (mutation)",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # requestDigest operation validation: neutering valid_operation? lets a 129-byte operation
@@ -710,7 +794,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "assert(validOperationName(operation), \"request_digest: operation\");",
       to: "assert(true, \"request_digest: operation\");",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # parseCanonicalJson whole-payload depth: neutering the container-depth gate lets a grant whose
@@ -721,7 +807,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       path: "conformance/corpus_independent.mjs",
       from: "assert(containerDepth(value) <= MAXIMA.depth, `${context}: depth`);",
       to: "assert(true, `${context}: depth`);",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
       # jsonDecode per-node-type depth — the guard-family sibling of withinJsonBounds and the ACTUAL
@@ -737,7 +825,9 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       from: "    skipWhitespace();\n    assert(index < text.length, \"json value\");",
       to:
         "    assert(depth <= 32, \"json depth bound\");\n    skipWhitespace();\n    assert(index < text.length, \"json value\");",
-      command: ["mix", "test", "test/conformance/corpus_independent_test.exs:17"]
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on every shipped corpus case (repo mode)"}
     }
   ]
 
@@ -778,7 +868,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       mutate_once!(Path.join(scratch, mutation.path), mutation.from, mutation.to)
 
       {output, status} =
-        System.cmd(hd(mutation.command), command_args(mutation.command),
+        System.cmd(hd(command_for(mutation)), command_args(command_for(mutation)),
           cd: scratch,
           env: [{"MIX_ENV", "test"}],
           stderr_to_stdout: true
@@ -805,7 +895,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
   # the deleted-test false-green the 2026-08-20 gate-integrity review named. Cached per unique
   # command so shared targets pay the baseline once per battery run.
   defp baseline_green!(mutation) do
-    key = {:baseline_green, mutation.command}
+    key = {:baseline_green, mutation.name}
 
     if Process.get(key) != :ok do
       scratch =
@@ -822,7 +912,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         copy_build(scratch)
 
         {output, status} =
-          System.cmd(hd(mutation.command), command_args(mutation.command),
+          System.cmd(hd(command_for(mutation)), command_args(command_for(mutation)),
             cd: scratch,
             env: [{"MIX_ENV", "test"}],
             stderr_to_stdout: true
@@ -847,6 +937,29 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
   # `mix architecture` is returned bare: its alias proxies extra args to
   # `elixir scripts/check_architecture.exs`, which exits 2 on any unknown flag — so appending
   # anything would make every architecture entry spuriously red.
+
+  # Name-resolved test targeting: line pins drifted three separate times (edits anywhere
+  # above the target silently re-pointed them); targets now carry the TEST NAME and the
+  # line is resolved against the (scratch) file at run time. Unresolvable => raise, not
+  # a silently-green gate.
+  defp command_for(%{target: {path, test_name}}) do
+    ["mix", "test", "#{path}:#{test_line!(path, test_name)}"]
+  end
+
+  defp command_for(%{command: command}), do: command
+
+  defp test_line!(path, test_name) do
+    prefix = ~s(test "#{test_name}")
+
+    case path
+         |> File.read!()
+         |> String.split("\n")
+         |> Enum.find_index(&String.contains?(&1, prefix)) do
+      nil -> raise "mutation target test not found in #{path}: #{test_name}"
+      index -> index + 1
+    end
+  end
+
   defp command_args(["mix", "test" | rest]) do
     ["test" | rest] ++ ["--max-cases", "1"]
   end

@@ -125,7 +125,9 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
 
   defp flip_one_case_byte(dir) do
     case_file =
-      Portable.wildcard(Path.join(dir, "cases/**/*.json"))
+      Portable.ls_r(dir)
+      |> Enum.filter(&String.ends_with?(&1, ".json"))
+      |> Enum.sort()
       |> List.first()
 
     bytes = File.read!(case_file)
@@ -136,7 +138,9 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
 
   defp drop_one_case_file(dir) do
     case_file =
-      Portable.wildcard(Path.join(dir, "cases/**/*.json"))
+      Portable.ls_r(dir)
+      |> Enum.filter(&String.ends_with?(&1, ".json"))
+      |> Enum.sort()
       |> List.first()
 
     File.rm!(case_file)

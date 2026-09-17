@@ -1384,7 +1384,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   end
 
   test "every shipped corpus JSON file is normative-decoder-loadable and under the byte ceiling" do
-    for path <- Portable.wildcard(Path.join(@shipped_corpus, "**/*.json")) do
+    for path <- Portable.ls_r(@shipped_corpus) |> Enum.filter(&String.ends_with?(&1, ".json")) do
       bytes = File.read!(path)
       assert byte_size(bytes) <= 65_536, "#{path}: over the 65,536-byte ceiling"
       assert {:ok, _} = Json.decode(bytes, Bounds.maximum())
@@ -1718,10 +1718,10 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   end
 
   defp shipped_corpus_map do
-    Portable.wildcard(Path.join(@shipped_corpus, "**/*"))
+    Portable.ls_r(@shipped_corpus)
     |> Enum.filter(&File.regular?/1)
     |> Enum.map(fn path ->
-      {Path.relative_to(path, @shipped_corpus), File.read!(path)}
+      {path |> Path.relative_to(@shipped_corpus) |> Portable.to_posix(), File.read!(path)}
     end)
     |> Map.new()
   end
@@ -1734,7 +1734,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
           "priv/conformance/application-profiles"
         ],
         File.dir?(corpus_dir),
-        path <- Portable.wildcard(Path.join(corpus_dir, "**/*.json")) do
+        path <- Portable.ls_r(corpus_dir) |> Enum.filter(&String.ends_with?(&1, ".json")) do
       assert private_material_findings(File.read!(path)) == [],
              "#{path}: forbidden private material"
     end

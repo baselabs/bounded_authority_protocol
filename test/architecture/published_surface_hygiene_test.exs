@@ -153,7 +153,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
   defp wildcard(root) do
     case File.stat(root) do
       {:ok, %{type: :directory}} ->
-        Portable.wildcard("#{root}/**/*", match_dot: true) |> Enum.filter(&File.regular?/1)
+        Portable.ls_r(root) |> Enum.filter(&File.regular?/1)
 
       {:ok, %{type: :regular}} ->
         [root]

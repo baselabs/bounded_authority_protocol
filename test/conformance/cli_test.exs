@@ -75,10 +75,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     # 1. Integrity + agreement still pass: Corpus.load accepts the perturbed index...
     map =
       dir
-      |> Path.join("**/*")
-      |> Portable.wildcard()
-      |> Enum.reject(&File.dir?/1)
-      |> Map.new(fn p -> {Path.relative_to(p, dir), File.read!(p)} end)
+      |> Portable.ls_r()
+      |> Map.new(fn p -> {p |> Path.relative_to(dir) |> Portable.to_posix(), File.read!(p)} end)
 
     assert {:ok, corpus} = Corpus.load(map)
 
@@ -135,10 +133,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
     map =
       dst
-      |> Path.join("**/*")
-      |> Portable.wildcard()
-      |> Enum.reject(&File.dir?/1)
-      |> Map.new(fn p -> {Path.relative_to(p, dst), File.read!(p)} end)
+      |> Portable.ls_r()
+      |> Map.new(fn p -> {p |> Path.relative_to(dst) |> Portable.to_posix(), File.read!(p)} end)
 
     assert {:ok, corpus} = Corpus.load(map)
     assert corpus.major == 2
@@ -294,7 +290,9 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   defp flip_one_case_byte(dir) do
     case_file =
-      Portable.wildcard(Path.join(dir, "cases/**/*.json"))
+      Portable.ls_r(dir)
+      |> Enum.filter(&String.ends_with?(&1, ".json"))
+      |> Enum.sort()
       |> List.first()
 
     bytes = File.read!(case_file)
@@ -308,14 +306,17 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   unless Portable.windows?() do
     defp make_one_file_unreadable(dir) do
       case_file =
-        Portable.wildcard(Path.join(dir, "cases/**/*.json"))
+        Portable.ls_r(dir)
+        |> Enum.filter(&String.ends_with?(&1, ".json"))
+        |> Enum.sort()
         |> List.first()
 
       File.chmod!(case_file, 0o000)
     end
 
     defp restore_readability(dir) do
-      Portable.wildcard(Path.join(dir, "**/*.json"))
+      Portable.ls_r(dir)
+      |> Enum.filter(&String.ends_with?(&1, ".json"))
       |> Enum.each(fn f ->
         try do
           File.chmod!(f, 0o644)
@@ -328,7 +329,9 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   defp drop_one_case_file(dir) do
     case_file =
-      Portable.wildcard(Path.join(dir, "cases/**/*.json"))
+      Portable.ls_r(dir)
+      |> Enum.filter(&String.ends_with?(&1, ".json"))
+      |> Enum.sort()
       |> List.first()
 
     File.rm!(case_file)
