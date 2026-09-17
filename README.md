@@ -29,7 +29,7 @@ read back against the tagged-tree build). Registry consumers use the patch-bound
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.4.0"}
+    {:bounded_authority_protocol, "~> 0.4.1"}
   ]
 end
 ```
@@ -38,7 +38,7 @@ The package has **zero production dependencies**, no application callback, and n
 `v0.4.0` identifies the reviewable source release for the v2 contract-major activation;
 `v0.4.1` is a toolchain-and-platforms release (ADR 0031/0032) with **no wire-format or public-API
 change**. The immutable package identity is the published Hex release (registry checksum
-`8544a9ff8d364651c079975982586c130bbb33f19603dd3d5b639ffa987358a9`), not the Git tag. Depend on the package identity — never a tag or a mutable
+`4648f545f681d540c965d460411133cf6188066439dbc37fc869288f9fcad1cf`), not the Git tag. Depend on the package identity — never a tag or a mutable
 checkout.
 
 ## Holder-side signer: the report adapter

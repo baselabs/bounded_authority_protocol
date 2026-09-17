@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The `0.4.x` source release line is supported. `v0.4.0` is the current tagged source release
+The `0.4.x` source release line is supported. `v0.4.1` is the current tagged source release
 and contains contract-majors 1 and 2; the public API surface is locked. Registry consumers
 use the published Hex archive.
 OBSERVED September 15, 2026 UTC: the Hex release API reports `0.4.0` published on September 14,

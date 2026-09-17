@@ -17,7 +17,7 @@ The package is published on Hex (release 0.4.1, published 2026-09-17):
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 0.4.0"}
+  [{:bounded_authority_protocol, "~> 0.4.1"}
 end
 ```
 
