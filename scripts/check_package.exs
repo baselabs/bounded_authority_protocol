@@ -715,19 +715,22 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
 
     environment = [{"MIX_ENV", "prod"}]
     run!("mix", ["deps.get"], consumer_root, environment)
-    run!("mix", ["compile", "--warnings-as-errors"], consumer_root, environment)
+
+    # ONE compile+check pass (mix do), not separate compile and run invocations: a later
+    # mix pass can decide the path dep is stale and recompile it, which removes the
+    # _build priv symlink — a removal Windows rejects ("not owner"), killing the gate.
+    # Inside one `mix do` the run rides the same VM and no second sync happens. The
+    # check code is deliberately comma-free (mix do splits tasks on commas).
+    check_code =
+      "unless BoundedAuthorityProtocolConsumer.package_contract?() and " <>
+        "BoundedAuthorityProtocolConsumer.decoder_contract?() and " <>
+        "BoundedAuthorityProtocolConsumer.grant_proof_contract?() and " <>
+        "BoundedAuthorityProtocolConsumer.chain_archive_contract?() do " <>
+        "System.halt(1) end"
 
     run!(
       "mix",
-      [
-        "run",
-        "--no-start",
-        "-e",
-        "unless BoundedAuthorityProtocolConsumer.package_contract?() and " <>
-          "BoundedAuthorityProtocolConsumer.decoder_contract?() and " <>
-          "BoundedAuthorityProtocolConsumer.grant_proof_contract?() and " <>
-          "BoundedAuthorityProtocolConsumer.chain_archive_contract?(), do: System.halt(1)"
-      ],
+      ["do", "compile", "--warnings-as-errors,", "run", "--no-start", "-e", check_code],
       consumer_root,
       environment
     )
