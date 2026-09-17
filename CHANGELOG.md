@@ -4,6 +4,42 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Changed — self-enforcing toolchain, dependency currency, tri-platform build bar
+
+- The repository now enforces its own toolchain before anything compiles: `config/config.exs`
+  raises at config load on an Erlang/OTP major outside the supported set **{27, 28, 29}**
+  (floor-limited by the stdlib `:json` module, OTP 27+; probed via asdf and the official Elixir
+  docker tags). The assert is not shipped in the Hex package (`files:` excludes `config/`), so
+  consumers enforce their own. OBSERVED: Elixir 1.19.6/OTP 26 and 1.18.4/OTP 25 refuse with the
+  assert message in throwaway docker copies; Elixir 1.17.3/OTP 27 refuses with Mix's declared-range
+  error; 1.18.4/OTP 27 compiles green under `MIX_ENV=test` ([ADR 0031](docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md)).
+- Lockstep rule recorded in mix.exs: the declared Elixir range (`~> 1.18`, unchanged), the config
+  supported-OTP set, `.tool-versions`, and the CI compatibility lanes move together in one commit.
+- `.tool-versions` now declares the test battery's Node dependency (`nodejs 22.23.1`, matching the
+  CI quality lane's Node 22): the independent Node verifier runner in `mix test` previously
+  depended on whatever `node` the host PATH provided — the dev shell's Homebrew node — and an
+  asdf-managed host had no `nodejs` pin at all (OBSERVED: asdf shim exit 126, "No version is set
+  for command node", 36 battery failures before the pin).
+- The clone → `deps.get` → compile → test contract is now gated for macOS, Linux, and Windows:
+  `.gitattributes` forces LF checkout (Git-for-Windows' documented `core.autocrlf=true` default
+  would CRLF-convert every tracked text file on checkout and byte-mangle the digest-pinned
+  certified corpora — INFERRED from git's default, removed by policy) with the byte-exact
+  conformance trees `-text`; the test path lost its POSIX-only mechanisms (portable
+  `mix`/`elixir`/`escript` spawning via `test_support/portable.ex`, `System.tmp_dir!()` scratch
+  paths, guarded carve-outs for the chmod-based, symlink-based, and POSIX-shell tests); a
+  `windows-2025` CI lane runs checkout, `deps.get`, `compile --warnings-as-errors`, and
+  `mix test` on every push (first run lands with this change). The full `mix quality` battery
+  remains POSIX-only tooling (CI or WSL on Windows).
+- Dependency currency is gated latest-first by `scripts/check_deps_currency.exs` (Elixir, not
+  shell, per the tri-platform bar) inside `mix quality` via `mix deps.currency`: resolvable drift
+  fails the gate naming the packages; resolver-rejected updates are reported with requirement
+  chains; no rendered table is an unverified state and fails. OBSERVED: green on the current lock;
+  a fabricated dialyxir revert in a scratch copy exits 1 naming dialyxir; the no-table path exits 1
+  ([ADR 0032](docs/adr/0032-dependency-currency-gate.md)).
+- Lock updated to the resolvable latest: dialyxir 1.4.8, ex_doc 0.40.4, ex_json_pointer 0.8.0.
+  `jsonschex` stays `~> 0.9.2` with an inline reason (0.10 is a major jump pending review against
+  the certified corpus schema gates).
+
 ### Documentation — published-surface corrections
 
 - v1 privacy considerations gain "Digests of guessable inputs": facts carry unkeyed digests, so

@@ -2,6 +2,8 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
   @moduledoc false
   use ExUnit.Case, async: true
 
+  alias BoundedAuthorityProtocol.TestSupport.Portable
+
   @manifest """
   lib/bounded_authority_protocol.ex
   lib/bounded_authority_protocol/**
@@ -34,15 +36,24 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     repo = repo!()
     assert scan(repo) == []
 
-    for path <- [
-          "lib/.kimosabe/x",
-          ".KIMOSABE/x",
-          ".kimosabe./x",
-          ".forge /x",
-          ".forge",
-          ".kimosabe/critical-surfaces.bak",
-          "sub/.kimosabe/critical-surfaces"
-        ] do
+    # Win32 cannot represent the trailing-dot/space names, and its case-insensitive
+    # filesystem collapses ".KIMOSABE" onto ".kimosabe"; those components stay
+    # covered on every POSIX lane.
+    win32_unrepresentable = [".KIMOSABE/x", ".kimosabe./x", ".forge /x"]
+
+    paths =
+      [
+        "lib/.kimosabe/x",
+        ".forge",
+        ".kimosabe/critical-surfaces.bak",
+        "sub/.kimosabe/critical-surfaces"
+      ] ++
+        if(Portable.windows?(),
+          do: [],
+          else: win32_unrepresentable
+        )
+
+    for path <- paths do
       put!(repo, path, "public canary\n")
       assert scan(repo) != [], path
       git!(repo, ["rm", "-f", "--", path])
@@ -76,8 +87,14 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
 
     git!(repo, ["update-index", "--cacheinfo", "100644,#{blob},#{@exception}"])
     File.rm!(Path.join(repo, @exception))
-    File.ln_s!("/nonexistent-public-probe", Path.join(repo, @exception))
-    assert scan(repo) != []
+
+    unless Portable.windows?() do
+      # Symlink creation needs SeCreateSymbolicLinkPrivilege on Windows; the
+      # linked-exception rejection stays covered on every POSIX lane.
+      File.ln_s!("/nonexistent-public-probe", Path.join(repo, @exception))
+      assert scan(repo) != []
+    end
+
     git!(repo, ["update-index", "--force-remove", @exception])
     git!(repo, ["update-index", "--add", "--cacheinfo", "160000,#{commit},.kimosabe"])
     assert scan(repo) != []
@@ -134,13 +151,19 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     File.rm!(manifest)
     assert_raise File.Error, fn -> scan(repo) end
     File.write!(manifest, @manifest)
-    File.chmod!(manifest, 0o755)
-    assert scan(repo) != []
-    File.chmod!(manifest, 0o644)
-    assert scan(repo) == []
-    File.rename!(Path.dirname(manifest), Path.join(repo, "public-target"))
-    File.ln_s!("public-target", Path.dirname(manifest))
-    assert scan(repo) != []
+
+    unless Portable.windows?() do
+      # Windows file modes never carry execute bits (the 0o755/0o644 discrimination
+      # cannot hold there) and symlink creation needs privilege; both stay covered on
+      # every POSIX lane.
+      File.chmod!(manifest, 0o755)
+      assert scan(repo) != []
+      File.chmod!(manifest, 0o644)
+      assert scan(repo) == []
+      File.rename!(Path.dirname(manifest), Path.join(repo, "public-target"))
+      File.ln_s!("public-target", Path.dirname(manifest))
+      assert scan(repo) != []
+    end
   end
 
   # Read the index and its blobs, never the contents of a tracked symlink. History is

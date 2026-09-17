@@ -357,6 +357,7 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
 
   @copy_paths [
     ".formatter.exs",
+    ".tool-versions",
     "conformance",
     "lib",
     "mix.exs",
@@ -364,6 +365,7 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
     "priv",
     "scripts",
     "test",
+    "test_support",
     "tools"
   ]
 

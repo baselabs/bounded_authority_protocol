@@ -39,6 +39,8 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/adr/0027-byte-distinct-application-proof-profiles.md",
                     "docs/adr/0028-range-selector-kinds.md",
                     "docs/adr/0030-v2-contract-major-activation.md",
+                    "docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md",
+                    "docs/adr/0032-dependency-currency-gate.md",
                     "docs/protocol-v1.md",
                     "docs/release-candidate-contract.md",
                     "docs/errata.md",
@@ -280,18 +282,17 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
   end
 
   defp unique_tmp_root! do
-    template = Path.join(System.tmp_dir!(), "bounded-authority-package.XXXXXX")
+    # Portable scratch root (tri-platform bar): a unique name plus File.mkdir!/1, which
+    # refuses an existing directory — no `mktemp` subprocess (POSIX-only tool).
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "bounded-authority-package.#{System.unique_integer([:positive])}"
+      )
 
-    case System.cmd("mktemp", ["-d", template], stderr_to_stdout: true) do
-      {path, 0} ->
-        path = String.trim(path)
-
-        if File.dir?(path),
-          do: path,
-          else: fail!("mktemp returned a missing directory")
-
-      {output, status} ->
-        fail!("mktemp exited with status #{status}: #{String.trim(output)}")
+    case File.mkdir(root) do
+      :ok -> root
+      {:error, reason} -> fail!("scratch root #{root} could not be created: #{inspect(reason)}")
     end
   end
 
@@ -729,8 +730,10 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     escript_path = Path.join(package_root, "bounded_authority_conformance")
     packaged_corpus = Path.join(package_root, "priv/conformance/v1/corpus")
 
+    # Run through the `escript` command (not direct exec of the shebang file), via the
+    # portable run helper — the direct form cannot execute on Windows.
     {output, 0} =
-      System.cmd(escript_path, ["--corpus", packaged_corpus], stderr_to_stdout: true)
+      portable_cmd("escript", [escript_path, "--corpus", packaged_corpus], stderr_to_stdout: true)
 
     unless output =~ ~s("agreement":true) do
       fail!("packaged escript did not agree on the packaged corpus:\n#{output}")
@@ -787,9 +790,19 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       stderr_to_stdout: true
     ]
 
-    case System.cmd(command, arguments, options) do
+    case portable_cmd(command, arguments, options) do
       {_output, 0} -> :ok
       {_output, status} -> fail!("#{command} exited with status #{status}")
+    end
+  end
+
+  # On Windows, mix/elixir/escript are .bat/.cmd shims that System.cmd (CreateProcess)
+  # cannot execute; route through cmd /c there (tri-platform bar, ADR 0031).
+  defp portable_cmd(command, arguments, options) do
+    if match?({:win32, _}, :os.type()) do
+      System.cmd("cmd", ["/s", "/c", command | arguments], options)
+    else
+      System.cmd(command, arguments, options)
     end
   end
 

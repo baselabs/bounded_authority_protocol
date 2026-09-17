@@ -81,6 +81,44 @@ jobs:
       - name: Run tests and coverage
         run: mix test --cover
 
+  # Tri-platform build bar (ADR 0031): the library contract — clone, deps.get,
+  # compile, test — must hold on Windows too. The full `mix quality` battery is
+  # POSIX-only tooling (shell gates, Gitleaks, ProVerif, kramdown) and stays on
+  # the Linux lanes; this lane proves the portable surface, including the
+  # LF-forcing .gitattributes (a default autocrlf checkout would otherwise
+  # CRLF-mangle the certified corpora and fail their digest pins).
+  windows-build:
+    name: Clone-build-test on Windows (tri-platform bar)
+    runs-on: windows-2025
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          elixir-version: "1.20.2"
+          otp-version: "29.0.3"
+
+      # The independent Node second-implementation runner in `mix test` needs Node
+      # (same rationale as the quality job's Node 22).
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile with warnings as errors
+        run: mix compile --warnings-as-errors
+
+      - name: Run tests
+        run: mix test
+
   quality:
     name: Complete quality and package boundary
     runs-on: ubuntu-24.04

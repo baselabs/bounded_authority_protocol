@@ -8,6 +8,11 @@ defmodule BoundedAuthorityProtocol.MixProject do
     [
       app: :bounded_authority_protocol,
       version: @version,
+      # Lockstep rule (ADR 0031): this range, config/config.exs's supported-OTP set,
+      # .tool-versions, and the CI compatibility lanes in .github/workflows/ci.yml
+      # move together in ONE commit. The range admits Elixir 1.18-1.20; Mix refuses
+      # anything outside it at compile. The supported-OTP set ({27, 28, 29}) is
+      # floor-limited by the stdlib :json module (OTP 27+), not by Elixir builds.
       elixir: "~> 1.18",
       deps: deps(),
       package: package(),
@@ -44,6 +49,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "chain_archive.mutations": :test,
         "conformance.mutations": :test,
         "conformance.verify": :test,
+        "deps.currency": :test,
         "license.check": :test,
         "package.check": :test,
         quality: :test,
@@ -65,6 +71,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.40.3", only: [:dev, :test], runtime: false},
+      # Deliberate pin, not drift: 0.10 is a major-version jump pending a review of
+      # its validator changes against the certified corpus schema gates.
       {:jsonschex, "~> 0.9.2", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       {:sbom, "~> 0.10.0", only: [:dev, :test], runtime: false},
@@ -118,6 +126,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0027-byte-distinct-application-proof-profiles.md",
         "docs/adr/0028-range-selector-kinds.md",
         "docs/adr/0030-v2-contract-major-activation.md",
+        "docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md",
+        "docs/adr/0032-dependency-currency-gate.md",
         "docs/protocol-v1.md",
         "docs/release-candidate-contract.md",
         "docs/errata.md",
@@ -204,6 +214,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0027-byte-distinct-application-proof-profiles.md",
         "docs/adr/0028-range-selector-kinds.md",
         "docs/adr/0030-v2-contract-major-activation.md",
+        "docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md",
+        "docs/adr/0032-dependency-currency-gate.md",
         "docs/errata.md",
         "docs/governance.md",
         "docs/design/conformance-contract.md",
@@ -236,6 +248,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "license.check",
         "sbom.check"
       ],
+      "deps.currency": ["run --no-start scripts/check_deps_currency.exs"],
       "verification.performance": [
         "run --no-start scripts/check_verification_performance.exs"
       ],
@@ -299,6 +312,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "dialyzer",
         "docs --warnings-as-errors",
         "audit",
+        "deps.currency",
         "package.check",
         "release.candidate",
         "chain_archive.mutations",

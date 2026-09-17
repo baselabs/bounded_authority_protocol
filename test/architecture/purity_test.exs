@@ -1,9 +1,11 @@
 Code.require_file("../../tools/architecture_gate.exs", __DIR__)
+Code.require_file("../../test_support/portable.ex", __DIR__)
 
 defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
   use ExUnit.Case, async: true
 
   alias BoundedAuthorityProtocol.ArchitectureGate
+  alias BoundedAuthorityProtocol.TestSupport.Portable
 
   @root Path.expand("../..", __DIR__)
 
@@ -281,7 +283,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       """)
 
     assert {_output, 0} =
-             System.cmd("mix", ["compile"],
+             Portable.cmd("mix", ["compile"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -344,7 +346,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       """)
 
     assert {_output, 0} =
-             System.cmd("mix", ["compile"],
+             Portable.cmd("mix", ["compile"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -365,7 +367,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     root = copy_actual_project!()
 
     assert {_output, 0} =
-             System.cmd("mix", ["compile"],
+             Portable.cmd("mix", ["compile"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -392,7 +394,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     File.write!(path, mutated)
 
     assert {_output, 0} =
-             System.cmd("mix", ["compile", "--force"],
+             Portable.cmd("mix", ["compile", "--force"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -417,7 +419,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
            end)
 
     assert {_output, 0} =
-             System.cmd("mix", ["compile", "--force"],
+             Portable.cmd("mix", ["compile", "--force"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -489,7 +491,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     root = copy_actual_project!()
 
     assert {_output, 0} =
-             System.cmd("mix", ["compile"],
+             Portable.cmd("mix", ["compile"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -515,7 +517,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     File.write!(path, mutated)
 
     assert {_output, 0} =
-             System.cmd("mix", ["compile", "--force"],
+             Portable.cmd("mix", ["compile", "--force"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -571,7 +573,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     script = Path.join(@root, "scripts/check_architecture.exs")
 
     assert {green_output, 0} =
-             System.cmd("elixir", [script, "--root", root, "--skip-compiled"],
+             Portable.cmd("elixir", [script, "--root", root, "--skip-compiled"],
                stderr_to_stdout: true
              )
 
@@ -591,7 +593,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     File.write!(mix_path, mutated)
 
     assert {red_output, status} =
-             System.cmd("elixir", [script, "--root", root, "--skip-compiled"],
+             Portable.cmd("elixir", [script, "--root", root, "--skip-compiled"],
                stderr_to_stdout: true
              )
 
@@ -601,7 +603,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     File.write!(mix_path, original)
 
     assert {_restored_output, 0} =
-             System.cmd("elixir", [script, "--root", root, "--skip-compiled"],
+             Portable.cmd("elixir", [script, "--root", root, "--skip-compiled"],
                stderr_to_stdout: true
              )
   end
@@ -632,16 +634,8 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
   end
 
   defp tmp_root! do
-    template = Path.join(System.tmp_dir!(), "bounded-authority-architecture.XXXXXX")
-
-    root =
-      case System.cmd("mktemp", ["-d", template], stderr_to_stdout: true) do
-        {path, 0} ->
-          String.trim(path)
-
-        {output, status} ->
-          raise "mktemp exited with status #{status}: #{String.trim(output)}"
-      end
+    root = Portable.tmp_dir!("bounded-authority-architecture")
+    File.mkdir!(root)
 
     on_exit(fn -> File.rm_rf!(root) end)
     root

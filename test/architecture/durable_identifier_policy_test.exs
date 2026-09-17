@@ -3,7 +3,7 @@ Code.require_file("../../test_support/durable_identifier_policy.ex", __DIR__)
 defmodule BoundedAuthorityProtocol.Architecture.DurableIdentifierPolicyTest do
   use ExUnit.Case, async: true
 
-  alias BoundedAuthorityProtocol.Test.DurableIdentifierPolicy
+  alias BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy
 
   test "enumerated package and wire identities are accepted" do
     for fixture <- [

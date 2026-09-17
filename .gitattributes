@@ -1,0 +1,9 @@
+# Tri-platform build bar (ADR 0031): a clone must build identically on macOS,
+# Linux, and Windows. Git-for-Windows defaults to core.autocrlf=true, which would
+# check text files out with CRLF and byte-mangle the certified corpora, digests,
+# and vectors that the project's own gates pin. `text=auto eol=lf` forces LF
+# checkout on every platform; the byte-exact conformance trees are additionally
+# marked -text so no eol attribute or future editor can ever touch them. The index
+# is already all-LF, so introducing this file renormalizes nothing.
+* text=auto eol=lf
+priv/conformance/** -text

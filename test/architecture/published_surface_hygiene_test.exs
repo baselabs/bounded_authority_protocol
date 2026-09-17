@@ -65,6 +65,8 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "docs/adr/0027-byte-distinct-application-proof-profiles.md",
     "docs/adr/0028-range-selector-kinds.md",
     "docs/adr/0030-v2-contract-major-activation.md",
+    "docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md",
+    "docs/adr/0032-dependency-currency-gate.md",
     "docs/protocol-v1.md",
     "docs/release-candidate-contract.md",
     "docs/errata.md",

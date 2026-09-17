@@ -17,8 +17,15 @@ all five implementations, README/guides/Livebook, and the cross-profile rejectio
 `mix local_loopback_http.verify` to exercise real IPv4 and IPv6 listeners with ephemeral keys; a
 self-round-trip or canned HTTP response is not interoperability or transport evidence.
 
-The package supports Elixir 1.18/OTP 27, Elixir 1.19/OTP 28, and Elixir 1.20/OTP 29. Focused
-boundary commands are `mix architecture`, `mix audit`, `mix package.check`, and
+The declared Elixir range is `~> 1.18` (1.18/1.19/1.20) and the supported Erlang/OTP majors are
+**27, 28, 29** — floor-limited by the stdlib `:json` module (OTP 27+) and enforced by
+`config/config.exs` at config load, before anything compiles; the assert is not shipped in the Hex
+package, so consumers enforce their own. The mix.exs range, the config set, `.tool-versions`, and
+the CI lanes move together in one commit
+([ADR 0031](docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md)). The clone →
+`deps.get` → compile → test contract must hold on macOS, Linux, and Windows; the full quality
+battery is POSIX-only tooling (run it through CI or WSL on Windows). Focused boundary commands are
+`mix architecture`, `mix audit`, `mix package.check`, `mix deps.currency`, and
 `mix sbom.generate`. The architecture and archive allowlists must be expanded only with a reviewed
 public protocol requirement and matching red-capable tests.
 

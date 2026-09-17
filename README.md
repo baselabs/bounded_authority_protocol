@@ -212,7 +212,13 @@ presenting client asserts.
 
 ## Development
 
-Supported Elixir/OTP: 1.18/27, 1.19/28, 1.20/29.
+Declared Elixir range: `~> 1.18` (1.18/1.19/1.20). Supported Erlang/OTP majors: **27, 28, 29** —
+enforced by the repository itself at config load, before anything compiles
+([ADR 0031](docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md)). The clone →
+`deps.get` → compile → test contract is gated for macOS, Linux, and Windows: the CI matrix runs
+one lane per supported major and a `windows-2025` lane proves the portable surface on every push.
+The full `mix quality` battery is POSIX-only tooling (shell gates, Gitleaks, ProVerif, kramdown) —
+Windows developers run it through CI or WSL.
 
 ```bash
 mix deps.get
@@ -220,8 +226,9 @@ mix quality
 ```
 
 `mix quality` runs formatting, warnings-as-errors compilation, the purity architecture gate, Credo,
-tests with coverage, Dialyzer, documentation, dependency and license audits, CycloneDX SBOM
-generation, the conformance corpus and mutation gates, and an exact packed/unpacked consumer test.
+tests with coverage, Dialyzer, documentation, dependency, license, and currency audits, CycloneDX
+SBOM generation, the conformance corpus and mutation gates, and an exact packed/unpacked consumer
+test.
 
 ## Security
 

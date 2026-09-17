@@ -1,4 +1,4 @@
-defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
+defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
   @moduledoc false
 
   @owned_roots ["lib", "priv", "scripts", "sdks", "test", "test_support", "docs"]
@@ -155,19 +155,19 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
     do: true
 
   defp contract_identity?(path, :wire_suite, suite)
-      when suite in ["BAP1-Ed25519-SHA256", "BAP2-Ed25519-SHA256"],
-      do: contract_content_surface?(path)
+       when suite in ["BAP1-Ed25519-SHA256", "BAP2-Ed25519-SHA256"],
+       do: contract_content_surface?(path)
 
   defp contract_identity?(path, :wire_domain, name),
     do: name in @wire_domains and contract_content_surface?(path)
 
   defp contract_identity?(path, :wire_field, field)
-      when field in [~s("v": 1), ~s("v": 2)],
-      do: contract_content_surface?(path)
+       when field in [~s("v": 1), ~s("v": 2)],
+       do: contract_content_surface?(path)
 
   defp contract_identity?(path, :external_wire_module, namespace)
-      when namespace in ["BoundedAuthorityProtocol.V1", "BoundedAuthorityProtocol.V2"],
-      do: external_namespace_path?(path)
+       when namespace in ["BoundedAuthorityProtocol.V1", "BoundedAuthorityProtocol.V2"],
+       do: external_namespace_path?(path)
 
   defp contract_identity?("scripts/check_package.exs", :atom, "V1"), do: true
 
@@ -200,8 +200,9 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
          path == "test/conformance/v1_schema_test.exs")
   end
 
-  defp contract_identity?("sdks/rust/src/lib.rs", :sdk_identifier, name) when name in ["v1", "v2"],
-    do: true
+  defp contract_identity?("sdks/rust/src/lib.rs", :sdk_identifier, name)
+       when name in ["v1", "v2"],
+       do: true
 
   # Shared-module API names that deliberately carry the successor major (the v2 request
   # digest lives beside the unsuffixed v1 one in the same shared module): accepted only on
@@ -211,9 +212,18 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
          :sdk_identifier,
          name
        )
-       when path in ["sdks/python/src/bounded_authority_verifier/digest.py", "sdks/python/src/bounded_authority_verifier/__init__.py"] and
-              name in ["REQUEST_PREFIX_V2", "request_digest_v2", "ROW_PREFIX_V2", "ARCHIVE_PREFIX_V2", "VERSION_2"],
-    do: true
+       when path in [
+              "sdks/python/src/bounded_authority_verifier/digest.py",
+              "sdks/python/src/bounded_authority_verifier/__init__.py"
+            ] and
+              name in [
+                "REQUEST_PREFIX_V2",
+                "request_digest_v2",
+                "ROW_PREFIX_V2",
+                "ARCHIVE_PREFIX_V2",
+                "VERSION_2"
+              ],
+       do: true
 
   defp contract_identity?(_path, _kind, _name), do: false
 
@@ -221,9 +231,11 @@ defmodule BoundedAuthorityProtocol.Test.DurableIdentifierPolicy do
     do: current_major_source_path?(path) or MapSet.member?(@local_loopback_profile_paths, path)
 
   defp current_major_path?(path, "v2"), do: successor_major_source_path?(path)
+
   defp current_major_path?(path, "run_v2")
-      when path in ["sdks/python/tests/conformance/run_v2.py", "sdks/rust/conformance/run_v2.rs"],
-      do: true
+       when path in ["sdks/python/tests/conformance/run_v2.py", "sdks/rust/conformance/run_v2.rs"],
+       do: true
+
   defp current_major_path?(path, "v2_test"), do: path == "sdks/go/conformance/v2_test.go"
 
   defp current_major_path?(path, "corpus-v2"),
