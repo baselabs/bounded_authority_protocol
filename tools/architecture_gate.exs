@@ -452,7 +452,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "Mint" => :http,
     "Plug" => :http,
     "Ash" => :product,
-    "Beamline" => :product,
+    "HostProduct" => :product,
     "QorPay" => :product,
     "Qorpay" => :product,
     "BoundedAuthority" => :private_runtime,

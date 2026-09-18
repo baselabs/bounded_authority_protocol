@@ -91,7 +91,7 @@ immutable-package adoption is tracked in the private runtime.
    revocation state, replay reservation, invocation claims, outcomes, consumption writes, archive
    removal, witnesses, recovery, and operational health belong to the private
    `bounded_authority` runtime.
-5. **No product vocabulary.** Runtime and wire surfaces contain no Beamline, Ash, AshAI, QorPay,
+5. **No product vocabulary.** Runtime and wire surfaces contain no host-product, Ash, AshAI, QorPay,
    ScopeAxis, tenant, merchant, asset, partition, or provider-specific semantics.
 6. **No secret material.** The verifier accepts public keys only. Private keys, signing callbacks,
    KMS/HSM clients, credentials, and secrets cannot enter the package or conformance fixtures.

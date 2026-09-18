@@ -8,7 +8,7 @@ the accepted ADRs and stable design contracts
 
 The public package is deterministic and stateless. No row authorizes a database, key custody,
 trusted-key discovery, issuance, live revocation state, replay reservation, execution claims,
-evidence writes, archive removal, network client, OTP server, Beamline vocabulary, or QorPay
+evidence writes, archive removal, network client, OTP server, host-product vocabulary, or QorPay
 compatibility.
 
 <!-- forge-roadmap-schema: 1 -->

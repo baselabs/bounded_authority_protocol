@@ -1,5 +1,7 @@
 # 1. Public protocol verifier and private authority runtime
 
+> **Note (September 18, 2026):** "Beamline" in this record names a private host product that was retired on August 1, 2026 and replaced by its successor; the boundary decided here is unchanged and applies to whatever host product consumes the public packages. The text below is kept as the record it was.
+
 Date: 2026-07-26
 
 ## Status
