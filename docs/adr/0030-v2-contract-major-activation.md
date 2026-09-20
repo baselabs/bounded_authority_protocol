@@ -148,13 +148,14 @@ still follows the governance policy stated above.
   is empty for this landing, and the v1 certified pin (`TLUHKrQP…`) still verifies its corpus.
 - Issuers can express per-request ranges on the wire for v2 audiences: "the argument at this
   path is ≤/≥ this value", intervals as two conjuncts, verified statelessly by every conforming
-  v2 verifier. Cumulative budgets remain out of scope (ADR 0029 `ba+budget-window`, planned; not yet
-  written, and the name is not yet registered).
+  v2 verifier. Cumulative budgets remain out of scope
+  ([ADR 0029](0029-budget-window-posture.md) records the posture and defers the
+  `ba+budget-window` attestation-shape design; the name remains unregistered).
 - The durable-contract-identity scanner enumerates the accepted v2 families (namespace, paths,
   wire fields, domains, suite, `REQ2-*`); the next unaccepted major (V3/`BAP3-*`/`REQ3-*`)
   remains rejected exactly as V2 was before this ADR.
 - Named follow-ups: v2 corpus depth growth; the `spec.facts` v2 baseline; ADR 0029
-  `ba+budget-window` (planned, not yet written); the remaining charter successor-major scope (delegation, offline claims,
+  `ba+budget-window` (posture consolidated, attestation-shape design explicitly deferred); the remaining charter successor-major scope (delegation, offline claims,
   suite succession) as separately activated majors; SDK publication and any v2 Hex release are
   owner decisions outside this landing.
 

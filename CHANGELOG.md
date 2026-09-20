@@ -2,6 +2,31 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
+## [Unreleased]
+
+### Changed — documentation truth: AP2 mapping note, selector-scope paragraph, ADR 0029
+
+- `docs/extensions/ap2-mandate-mapping.md` corrected against first-hand reads of AP2 v0.2
+  (pinned `e1ea56d`) and the published specs (OBSERVED: every cited line opened in both trees).
+  The grant's analog is now the **open** mandate (issuer-signed, constraint-bearing,
+  `cnf`-bound), with the closed-mandate key-binding hop mapped to the holder proof; the stale
+  claims that the selector algebra "does not express" range bounds and that range kinds are
+  successor-major scope are corrected (contract-major 2 ships `lte`/`gte`; ADR 0028/0030); and
+  the note now names the structural differences it previously omitted — mandate chains, the
+  verifier-signed Mandate Receipt versus facts marked `not_evaluated`, the fail-closed
+  unknown-constraint rule, the Trusted Surface, the signature-suite seam, and selective
+  disclosure. Still a pre-submission draft (BAP-08); still no compatibility claim.
+- `docs/extensions/capability-authorization.mdx` § 5: the selector-expressiveness paragraph is
+  scoped to contract-major 1 (this draft binds `v` exactly `1`) and points at the contract-major
+  2 range kinds; the budget-routing sentence now cites ADR 0029.
+- ADR 0029 added (`docs/adr/0029-budget-window-posture.md`): the cumulative-budget posture is
+  consolidated as citable law — no cumulative selector kind in any major; enforcement routes to
+  issuer attestation or runtime accounting — and the `ba+budget-window` attestation-shape design
+  is explicitly deferred (no wire name reserved, no shape specified, no code change). The
+  package files list and the published-surface hygiene roots gain the ADR file, and the
+  planned-but-unwritten forward references in ADR 0028 and ADR 0030 are reconciled to the
+  written ADR.
+
 ## [0.4.1] — 2026-09-17
 
 ### Changed — self-enforcing toolchain, dependency currency, tri-platform build bar

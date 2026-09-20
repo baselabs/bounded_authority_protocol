@@ -191,12 +191,20 @@ both treats the capability as an additional bound the invocation must satisfy; t
 not widen scope-permitted access. This extension does not define how an MCP deployment obtains or
 maps OAuth scopes to capabilities — that is the deployment's authorization-server concern.
 
-**Selector expressiveness (honest scope):** the v1 selector algebra is a closed set of three kinds —
-`all` (any argument root), `equals` (a path must equal a value), `one_of` (a path must be one of a
-listed value set). It does **not** include inequality or range selectors, so a capability cannot
-express "up to amount N" directly; it can express exact-value or enumerated-set bounds only. Range
-bounds are the deployment's responsibility (e.g. a separate policy check the server applies after
-verification), not the capability algebra's.
+**Selector expressiveness (honest scope):** this draft binds capability grants and holder proofs to
+contract-major 1 (`v` exactly `1`), whose selector algebra is a closed set of three kinds — `all`
+(any argument root), `equals` (a path must equal a value), `one_of` (a path must be one of a listed
+value set). V1 does **not** include inequality or range selectors, so a v1 capability cannot express
+"up to amount N" directly; it can express exact-value or enumerated-set bounds only, and in a
+v1-only deployment range bounds are the deployment's responsibility (e.g. a separate policy check
+the server applies after verification), not the capability algebra's. The protocol's contract-major
+2 adds the per-request range kinds `lte` and `gte` (same-tag numeric operands, inclusive comparison)
+([v2 profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v2.md);
+[ADR 0030](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0030-v2-contract-major-activation.md));
+a future revision of this extension may bind v2 grants — this draft does not. Cumulative budgets
+remain outside the selector algebra in both majors — a stateless verifier cannot check a cumulative
+bound — and route to the issuer-attestation / runtime-accounting posture
+([ADR 0029](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0029-budget-window-posture.md)).
 
 ## 6. Security considerations
 
