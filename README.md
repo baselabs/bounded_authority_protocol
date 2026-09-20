@@ -39,7 +39,9 @@ The package has **zero production dependencies**, no application callback, and n
 `v0.4.1` was the toolchain-and-platforms release (ADR 0031/0032); `v0.4.2` is a documentation-truth
 patch — the corrected AP2 mapping note, the extension's selector-scope paragraph, and ADR 0029 —
 with **no wire-format or public-API change**. The immutable package identity is the published Hex
-release (registry checksum read back against the tagged-tree build), not the Git tag. Depend on
+release (registry checksum
+`e3a6835b9315c464271757ed340eb3e8b7c9f2da013b40464395cbab27bdae21`, read back from the registry
+against the tagged-tree build), not the Git tag. Depend on
 the package identity — never a tag or a mutable checkout.
 
 ## Holder-side signer: the report adapter
