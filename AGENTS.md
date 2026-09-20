@@ -26,8 +26,9 @@ Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, and `BAP-21`
 submission preconditions). Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence
 blocks are the status authority.
 
-The current source and Hex release are 0.4.1, tagged `v0.4.1` (a toolchain-and-platforms patch;
-no wire or public-API change). The package retains zero production
+The current source and Hex release are 0.4.2, tagged `v0.4.2` (a documentation-truth patch: the
+AP2 mapping note, the selector-scope paragraph, and ADR 0029; no wire or public-API change). The
+package retains zero production
 dependencies, no application callback, and no supervision tree. Contract-major 1 remains frozen;
 contract-major 2 is active under `BoundedAuthorityProtocol.V2` with the `lte` and `gte` selector
 kinds, its own normative profile, certified 268-case corpus, `REQ2-*` traceability, and

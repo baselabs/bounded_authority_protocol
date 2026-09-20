@@ -13,16 +13,17 @@ normative profile; this guide is operational.
 
 ## Installation
 
-The package is published on Hex (release 0.4.1, published 2026-09-17):
+The package is published on Hex (release 0.4.2, published 2026-09-20):
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 0.4.1"}
+  [{:bounded_authority_protocol, "~> 0.4.2"}
 end
 ```
 
-`v0.4.0` is the reviewable source release for v2; `v0.4.1` is a toolchain-and-platforms release
-with no wire or API change. The immutable package identity is the published Hex release, whose
+`v0.4.0` is the reviewable source release for v2; `v0.4.1` was the toolchain-and-platforms
+release; `v0.4.2` is a documentation-truth patch with no wire or API change. The immutable
+package identity is the published Hex release, whose
 registry checksum was read back against the tagged-tree build. Depend on the package identity —
 never a tag or a mutable checkout. To produce (rather than verify) signed envelopes, see the
 holder-side companion package

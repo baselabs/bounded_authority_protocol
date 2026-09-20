@@ -2,7 +2,7 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
-## [Unreleased]
+## [0.4.2] — 2026-09-20
 
 ### Changed — documentation truth: AP2 mapping note, selector-scope paragraph, ADR 0029
 

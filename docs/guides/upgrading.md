@@ -5,6 +5,14 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
+## 0.4.1 to 0.4.2
+
+Documentation-truth patch: the corrected AP2 mandate-mapping note and the capability extension's
+selector-scope paragraph, [ADR 0029](../adr/0029-budget-window-posture.md) (the cumulative-budget
+posture; the `ba+budget-window` attestation-shape design explicitly deferred), the owner-directed
+tracked-authoring-paths exception for the adopted handoff record, and a batched dependency
+sweep. **No wire-format or public-API change**; no consumer action.
+
 ## 0.4.0 to 0.4.1
 
 No wire-format or public-API change: 0.4.1 lands the self-enforcing toolchain and the
