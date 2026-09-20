@@ -422,7 +422,11 @@ compatibility.
     (Google-originated, FIDO-donated); the note maps AP2 VDC mandates (Checkout Mandate, Payment
     Mandate) ↔ BAP grant/proof as structural correspondences, explicitly not claiming runtime
     compatibility, and records the host-protocol question (AP2 self-describes as an extension for
-    A2A, MCP, and UCP).
+    A2A, MCP, and UCP). A follow-on design contract graduated from that note on 2026-09-20
+    (owner-approved, independently reviewed): the [AP2 interop profile](design/ap2-interop-profile.md)
+    (`docs/design/ap2-interop-profile.md`) — suite bridge, digest-spelling map, the cast-argument
+    projection over integer minor units, and the open host-riding questions; zero wire, API, or
+    verifier change.
   - [ADR 0013](adr/0013-capability-authorization-extension.md) records the decisions: the
     experimental-track target; the owned-domain identifier (the project owns `bounded-authority.io`);
     the partial-conformance framing; and the official-submission gates (reference implementation in

@@ -2,6 +2,22 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
+## [Unreleased]
+
+### Added — AP2 interop profile (design contract, no wire or API change)
+
+- `docs/design/ap2-interop-profile.md` (owner-approved 2026-09-20 after independent adversarial
+  review: original FAIL with 3 P2 + 4 P3 findings, all repaired, repair-diff PASS): the
+  composition contract with AP2 v0.2 at pinned `e1ea56d` — the ES256 suite bridge contract
+  (`BAP<n>-ES256-SHA256`, suite ADR pending), the three-spelling digest map (AP2 bare
+  base64url / BAP wire-base64url and internal-raw / CAP tagged; lossless byte conversions, no
+  value-coincidence claims), the cast-argument projection over integer minor units (the
+  integer-vs-float decision is evidence-forced: AP2 schema and SDK integer, v2 same-tag range
+  rules; float money content never projects), host-riding questions recorded open (A2A binding
+  undecided), the CAP receipt join noted only, and the cross-vectors posture (AP2 ships no
+  in-tree vectors — probed with a working control). Structural-correspondence claims only; no
+  compatibility or runtime guarantee claimed.
+
 ## [0.4.2] — 2026-09-20
 
 ### Changed — CI is Linux-only (developer portability, not tri-OS proof)
