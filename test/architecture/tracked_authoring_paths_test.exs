@@ -23,15 +23,46 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
   sdks/**
   """
   @exception ".kimosabe/critical-surfaces"
+  # Owner-directed handoff adoption (2026-09-19, commit 47297b8) tracks exactly one handoff
+  # record in this repository. The exception admits that one path at exactly its committed
+  # blob: any other content at the path, any other mode or stage, and any other handoff path
+  # remain findings. A future adoption pins its own path and blob here, in its own commit.
+  @handoff ".kimosabe/handoffs/2026-09-19-ap2-interop-and-ecdsa-suite.md"
+  @handoff_blob "0fe6f3dc484badd574c2c35e741e57e2d2feffe4"
 
   test "real index and HEAD ancestry exclude local authoring directories" do
     entries = git!(".", ["ls-files", "-z"]) |> String.split(<<0>>, trim: true)
 
-    for positive <- [".gitleaks.toml", ".formatter.exs", @exception] do
+    for positive <- [".gitleaks.toml", ".formatter.exs", @exception, @handoff] do
       assert positive in entries
     end
 
     assert scan(".") == []
+  end
+
+  test "the handoff exception admits exactly the pinned path, blob, and mode" do
+    repo = repo!()
+    real_bytes = File.read!(@handoff)
+
+    # Wrong bytes at the pinned path stay a finding.
+    put!(repo, @handoff, "tampered handoff\n")
+    assert scan(repo) != []
+
+    # A different handoff path stays a finding even carrying the pinned bytes.
+    put!(repo, ".kimosabe/handoffs/2026-09-19-other.md", real_bytes)
+    assert scan(repo) != []
+
+    git!(repo, ["rm", "-f", "--", @handoff, ".kimosabe/handoffs/2026-09-19-other.md"])
+
+    # Wrong mode, and a gitlink, stay findings even with the pinned blob.
+    for mode <- ["100755", "120000", "160000"] do
+      git!(repo, ["update-index", "--add", "--cacheinfo", "#{mode},#{@handoff_blob},#{@handoff}"])
+      assert scan(repo) != []
+    end
+
+    # The pinned combination alone passes.
+    git!(repo, ["update-index", "--add", "--cacheinfo", "100644,#{@handoff_blob},#{@handoff}"])
+    assert scan(repo) == []
   end
 
   test "exact regular manifest passes; every path component is checked" do
@@ -192,7 +223,7 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
       ])
       |> String.split(<<0>>, trim: true)
       |> Enum.map(&String.trim_leading(&1, "\n"))
-      |> Enum.filter(&(&1 != @exception and forbidden_path?(&1)))
+      |> Enum.filter(&(&1 != @exception and &1 != @handoff and forbidden_path?(&1)))
       |> Enum.map(fn _path -> :historical_path end)
 
     tip ++ history
@@ -203,20 +234,28 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     [mode, blob, stage] = String.split(metadata, " ")
 
     cond do
-      path == @exception ->
-        if mode == "100644" and stage == "0" and
-             git!(repo, ["cat-file", "blob", blob]) == @manifest and
-             regular_manifest?(Path.join(repo, path)) do
-          []
-        else
-          [:manifest]
-        end
+      path == @exception -> manifest_finding(repo, {mode, blob, stage}, path)
+      path == @handoff -> handoff_finding({mode, blob, stage})
+      forbidden_path?(path) -> [:tracked_path]
+      true -> []
+    end
+  end
 
-      forbidden_path?(path) ->
-        [:tracked_path]
+  defp manifest_finding(repo, {mode, blob, stage}, path) do
+    if mode == "100644" and stage == "0" and
+         git!(repo, ["cat-file", "blob", blob]) == @manifest and
+         regular_manifest?(Path.join(repo, path)) do
+      []
+    else
+      [:manifest]
+    end
+  end
 
-      true ->
-        []
+  defp handoff_finding({mode, blob, stage}) do
+    if mode == "100644" and stage == "0" and blob == @handoff_blob do
+      []
+    else
+      [:handoff_pin]
     end
   end
 

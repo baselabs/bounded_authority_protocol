@@ -6,6 +6,12 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed — documentation truth: AP2 mapping note, selector-scope paragraph, ADR 0029
 
+- The `tracked-authoring-paths` gate gained an owner-directed exception (decided 2026-09-20,
+  per-file pin): the handoff record adopted at commit `47297b8` is admitted at exactly its
+  committed blob, mode, and stage 0. Any other content at that path, any other handoff path,
+  and every other authoring-directory path in the index or HEAD history remain findings; the
+  red-capability self-test covers tampered bytes, a sibling handoff path, wrong modes, and a
+  gitlink. The pinned path and blob live in the gate test itself.
 - `docs/extensions/ap2-mandate-mapping.md` corrected against first-hand reads of AP2 v0.2
   (pinned `e1ea56d`) and the published specs (OBSERVED: every cited line opened in both trees).
   The grant's analog is now the **open** mandate (issuer-signed, constraint-bearing,
