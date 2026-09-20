@@ -229,11 +229,14 @@ presenting client asserts.
 
 Declared Elixir range: `~> 1.18` (1.18/1.19/1.20). Supported Erlang/OTP majors: **27, 28, 29** —
 enforced by the repository itself at config load, before anything compiles
-([ADR 0031](docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md)). The clone →
-`deps.get` → compile → test contract is gated for macOS, Linux, and Windows: the CI matrix runs
-one lane per supported major and a `windows-2025` lane proves the portable surface on every push.
-The full `mix quality` battery is POSIX-only tooling (shell gates, Gitleaks, ProVerif, kramdown) —
-Windows developers run it through CI or WSL.
+([ADR 0031](docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md)). The
+platform contract is **developer portability** — a contributor on Windows, macOS, or Linux can
+clone, `deps.get`, compile, and test this repository — enforced in-repo (portable test support,
+the LF-forcing `.gitattributes`, no POSIX shell inside declared gates); CI itself runs on Linux
+only, one lane per supported major plus the complete-quality lane
+([ADR 0033](docs/adr/0033-developer-portability-ci-scope.md)). The full `mix quality` battery is
+POSIX-only tooling (shell gates, Gitleaks, ProVerif, kramdown) — Windows developers run it
+through WSL or ad-hoc lanes.
 
 ```bash
 mix deps.get

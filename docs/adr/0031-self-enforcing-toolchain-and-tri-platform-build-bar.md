@@ -1,6 +1,7 @@
 # ADR 0031: Self-enforcing toolchain and the tri-platform build bar
 
-- Status: accepted
+- Status: accepted (the per-push Windows CI lane element is superseded by
+  [ADR 0033](0033-developer-portability-ci-scope.md); the toolchain and pinning elements stand)
 - Date: 2026-09-16
 - Governs: the declared Elixir range, the supported Erlang/OTP major set, their
   enforcement point, and the platform portability bar for the library contract

@@ -4,6 +4,18 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [0.4.2] — 2026-09-20
 
+### Changed — CI is Linux-only (developer portability, not tri-OS proof)
+
+- Per the owner's directive (ADR 0033, superseding the per-push Windows-lane element of
+  ADR 0031): CI runs Linux only — the Elixir/OTP compatibility lanes and the
+  complete-quality lane. The portability contract for contributors (clone, `deps.get`,
+  compile, test on Windows/macOS/Linux) stays enforced in-repo at zero runner cost —
+  portable test support, the LF-forcing `.gitattributes`, no POSIX shell inside declared
+  gates — and non-Linux lanes run only ad hoc when a platform-specific defect is suspected.
+- The architecture gate's jsonschex pin moved to `~> 0.10.0` in lockstep with the batched
+  dependency sweep (the requirement bump without the pin mismatch is what reddened the first
+  post-sweep CI run).
+
 ### Changed — documentation truth: AP2 mapping note, selector-scope paragraph, ADR 0029
 
 - The `tracked-authoring-paths` gate gained an owner-directed exception (decided 2026-09-20,
