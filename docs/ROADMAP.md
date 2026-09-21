@@ -423,10 +423,15 @@ compatibility.
     Mandate) ↔ BAP grant/proof as structural correspondences, explicitly not claiming runtime
     compatibility, and records the host-protocol question (AP2 self-describes as an extension for
     A2A, MCP, and UCP). A follow-on design contract graduated from that note on 2026-09-20
-    (owner-approved, independently reviewed): the [AP2 interop profile](design/ap2-interop-profile.md)
-    (`docs/design/ap2-interop-profile.md`) — suite bridge, digest-spelling map, the cast-argument
-    projection over integer minor units, and the open host-riding questions; zero wire, API, or
-    verifier change.
+  (owner-approved, independently reviewed): the [AP2 interop profile](design/ap2-interop-profile.md)
+  (`docs/design/ap2-interop-profile.md`) — suite bridge, digest-spelling map, the cast-argument
+  projection over integer minor units, and the open host-riding questions; zero wire, API, or
+  verifier change. The A2A host-riding question was then decided 2026-09-20 (owner-approved,
+  independently reviewed, same method): the [A2A capability-binding profile](design/a2a-capability-binding-profile.md)
+  — composition of A2A-extension negotiation (empty `params`) with transport-layer proof binding
+  (unchanged `dpop+jwt` bytes, `BA-Grant`/`BA-Proof` carriage, bounded per-operation projection);
+  zero wire, API, or verifier change; delegation-shaped requirements routed to the
+  successor-major program and UCP riding left a separately-owned open question.
   - [ADR 0013](adr/0013-capability-authorization-extension.md) records the decisions: the
     experimental-track target; the owned-domain identifier (the project owns `bounded-authority.io`);
     the partial-conformance framing; and the official-submission gates (reference implementation in

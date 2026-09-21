@@ -4,6 +4,24 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — A2A capability-binding profile (design contract, no wire or API change)
+
+- `docs/design/a2a-capability-binding-profile.md` (owner-approved 2026-09-20 after the design
+  method: options analysis over the binding-layer fork, then independent adversarial review of
+  both the analysis and the specification — two rounds each, all findings repaired and
+  re-verified): the composition contract with A2A at pinned `afda8316` — extension-mechanism
+  negotiation (empty `params`, matching the MCP extension precedent) with transport-layer
+  proof binding (unchanged `dpop+jwt` bytes; `BA-Grant`/`BA-Proof` HTTP headers and gRPC
+  metadata; `htm`/`htu` per binding incl. the commit-pinned gRPC HTTP/2 grammar); the bounded
+  per-operation `cast_arguments` projection (per-part content digests inside the v1 §17
+  ceilings, tenant coverage including declared absence, one timestamp rendering); `ba_op`
+  spelled under a reverse-DNS vocabulary; `aud`/`ba_inv`/nonce placement; graceful degradation
+  with the client-optional-narrowing consequence stated; scope excludes custom bindings,
+  non-loopback plain HTTP, and push-notification webhooks. Delegation-shaped requirements
+  route to the successor-major program as a recorded dependency; UCP riding remains a
+  separately-owned open question. Structural-correspondence claims only; no compatibility or
+  runtime guarantee claimed.
+
 ### Added — AP2 interop profile (design contract, no wire or API change)
 
 - `docs/design/ap2-interop-profile.md` (owner-approved 2026-09-20 after independent adversarial

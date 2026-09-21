@@ -56,6 +56,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/deployment/python-sdk.md",
                     "docs/deployment/rust-sdk.md",
                     "docs/deployment/typescript-sdk.md",
+                    "docs/design/a2a-capability-binding-profile.md",
                     "docs/design/ap2-interop-profile.md",
                     "docs/design/conformance-contract.md",
                     "docs/design/iana/README.md",
