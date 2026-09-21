@@ -165,8 +165,10 @@ or verdicts, and implementations never infer or fall back between profiles. Cont
 downgrade, with a minimum twelve-month deprecation window and published change-control, errata, and
 security-release policy (see `docs/governance.md`). Cryptographic
 agility is a named-suite succession, with a post-quantum path (ML-DSA) and cross-suite evidence
-attestation designed in. A pre-submission MCP authorization extension draft targeting the MCP
-extensions track lives under `docs/extensions/`.
+attestation designed in. Pre-submission extension drafts live under `docs/extensions/`: an MCP
+authorization extension targeting the MCP extensions track, and an A2A capability-binding
+extension restating the [A2A binding profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/a2a-capability-binding-profile.md)
+for the A2A venue.
 
 ## Documentation
 

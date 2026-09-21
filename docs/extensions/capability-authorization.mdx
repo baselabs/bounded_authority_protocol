@@ -84,8 +84,11 @@ cataloged in the [Bounded Authority Protocol registries](https://github.com/base
 `ba_` / `ba+` collision-avoidance prefix, to be filed with IANA (the `ba_*` claims in the JWT Claims
 registry and `ba+cap` as a media-type structured suffix) at first external submission, coordinated
 via the Bounded Authority Protocol's BAP-12 roadmap row. The `dpop+jwt` proof type
-([RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449)), the `ath` and `cnf` claims
-([RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449) / [RFC 7638](https://datatracker.ietf.org/doc/html/rfc7638)),
+([RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449)), the `ath`, `htm`, and `htu` claims
+([RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449)), the `cnf` claim
+([RFC 7800](https://datatracker.ietf.org/doc/html/rfc7800), with RFC 9449 §6.1's `jkt`
+confirmation method over [RFC 7638](https://datatracker.ietf.org/doc/html/rfc7638)
+thumbprints),
 and the other standard JWT claims the profile reuses carry their already-registered meanings; the
 selector kinds and the `BAP1-Ed25519-SHA256` suite name are protocol-internal identifiers, not IANA
 registrations.

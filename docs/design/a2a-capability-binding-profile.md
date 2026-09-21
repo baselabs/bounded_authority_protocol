@@ -386,9 +386,11 @@ rule.
   human principal on whose behalf the client acts is the reserved on-behalf-of surface; both it
   and the delegation names stay at the reserved-registry-row level, enumerated only by §14's
   gate sentence.
-- **UCP.** Out of A4's scope; a separately-owned open
+- **UCP.** Outside this binding decision's scope; a separately-owned open
   question whose precondition is pinning and reading a UCP source first. Nothing in this
-  profile designs a UCP riding point.
+  profile designs a UCP riding point. That question is now closed by
+  [ADR 0034](../adr/0034-ucp-riding-point-scoping.md): the riding point is transport-composed,
+  and this profile covers UCP's A2A transport as-is for deployments speaking A2A 1.0.
 
 ## 13. Verification posture and vectors
 
@@ -400,7 +402,7 @@ rule.
   boundary, the tenant-absence shape, and the §6 per-binding `htu` spellings) are follow-on
   certified-corpus work. No interop claim will rest on self-round-trips; a cross-protocol claim
   would require an independent implementation exercising both sides.
-- The ES256 suite (B1 cohort) is orthogonal: this binding is suite- and major-agnostic — it
+- The ES256 suite is orthogonal: this binding is suite- and major-agnostic — it
   binds whatever contract-major the deployment's verifier accepts, under ADR 0009's succession
   rules unchanged.
 
@@ -422,7 +424,7 @@ existing reserved registry rows. Compliance read of this document:
 ## 15. Open questions
 
 1. A venue-facing A2A extension document (the `.mdx` analog of the MCP extension drafts) — owner-gated,
-   not part of A4; this repository's design spec is the current deliverable.
+   not part of this decision's scope; this repository's design spec is the current deliverable.
 2. Eventual IANA registration of the carriage header names (template path per A2A §14.2) —
    outside this slice; coordinates with the BAP-12 row's claims/media-type filings, which are
    separate registries.

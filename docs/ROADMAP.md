@@ -431,7 +431,9 @@ compatibility.
   — composition of A2A-extension negotiation (empty `params`) with transport-layer proof binding
   (unchanged `dpop+jwt` bytes, `BA-Grant`/`BA-Proof` carriage, bounded per-operation projection);
   zero wire, API, or verifier change; delegation-shaped requirements routed to the
-  successor-major program and UCP riding left a separately-owned open question.
+  successor-major program and UCP riding decided by [ADR 0034](adr/0034-ucp-riding-point-scoping.md)
+  (transport-composed; the A2A profile covers UCP's A2A transport). A pre-submission venue-facing
+  restatement of the binding lives under `docs/extensions/` beside the MCP drafts.
   - [ADR 0013](adr/0013-capability-authorization-extension.md) records the decisions: the
     experimental-track target; the owned-domain identifier (the project owns `bounded-authority.io`);
     the partial-conformance framing; and the official-submission gates (reference implementation in

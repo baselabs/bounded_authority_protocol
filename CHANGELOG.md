@@ -4,6 +4,25 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — UCP riding-point decision (ADR 0034) and A2A venue extension draft (no wire or API change)
+
+- `docs/adr/0034-ucp-riding-point-scoping.md` (owner-directed resolution of the open question
+  both interop profiles recorded; UCP read first-hand at pinned `d3ccb55`): the riding point is
+  transport-composed — UCP's A2A transport is covered as-is by the A2A binding profile for
+  deployments speaking A2A 1.0 (UCP's published A2A binding is at 0.3-era shapes —
+  `X-A2A-Extensions`, `message/send` — and reconciliation is UCP's); UCP's MCP transport is the
+  BAP-08 extension's scope; a UCP-REST binding profile is the named follow-on under the
+  project's own reverse-domain prefix (UCP reserves `dev.ucp.*`); Embedded is out of scope. The
+  three-layer composition doctrine (UCP's RFC 9421 transport identity, BAP invocation authority,
+  AP2 payment authorization — disjoint surfaces, none covers another) extends the AP2 profile's
+  §6 separation. Closed-by pointers added to both design profiles and the ROADMAP.
+- `docs/extensions/a2a-capability-binding.mdx`: pre-submission venue-facing restatement of the
+  A2A binding profile for the A2A ecosystem (not proposed to A2A's sponsorship/TSC path; no
+  submission implied). Carries the scope boundary, the one-hop-only rule, the
+  `required: true` narrowing consequence, name-registration status (incl. `cnf` correctly
+  attributed to RFC 7800, also fixed in the MCP precedent), and the no-implementation status.
+  README now names both extension drafts; `AGENTS.md` ADR roster corrected to 0001–0034.
+
 ### Added — A2A capability-binding profile (design contract, no wire or API change)
 
 - `docs/design/a2a-capability-binding-profile.md` (owner-approved 2026-09-20 after the design

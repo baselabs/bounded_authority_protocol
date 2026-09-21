@@ -1,0 +1,190 @@
+---
+title: A2A Capability-Binding Extension
+---
+
+<Info>**Status**: draft — pre-submission; not hosted under the `a2aproject` organization and not
+proposed to it. A2A extensions are permissionless — anyone may develop and publish an extension
+independently under its own URI, declared in an Agent Card. A2A additionally defines a
+sponsorship/TSC-vote path for extensions hosted under the `a2aproject` organization
+(`docs/topics/extension-and-binding-governance.md` in the A2A repository, with an official
+`https://a2a-protocol.org/extensions/` URI namespace); this extension is not on that path and has
+not been proposed. Hosting or publishing this extension's URI is the project owner's call, and
+nothing here submits, files, or promises either. This is a project-tracked draft from the
+[Bounded Authority Protocol](https://github.com/baselabs/bounded_authority_protocol). No
+implementation of this binding exists, no A2A agent has been shown to consume a BAP grant + proof,
+and conformance vectors and real-substrate evidence are future work; the [A2A capability-binding
+profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/a2a-capability-binding-profile.md)
+is the normative source this document restates.</Info>
+
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT",
+"RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as
+described in BCP 14 \[[RFC2119](https://datatracker.ietf.org/doc/html/rfc2119)]
+\[[RFC8174](https://datatracker.ietf.org/doc/html/rfc8174)] when, and only when, they appear in all
+capitals, as in the A2A specification.
+
+**Extension identifier:** `https://bounded-authority.io/extensions/a2a-capability-binding/v1`
+
+**Target:** the Agent2Agent (A2A) Protocol, specification version 1.0.x (pinned source:
+[a2aproject/A2A](https://github.com/a2aproject/A2A) at `afda8316`, 63 commits after the `v1.0.1`
+tag).
+
+## 1. Purpose and scope
+
+This extension defines an OPTIONAL, additive capability-binding model for A2A: an issuer grants
+a holder a cryptographically bounded capability over A2A operations; the holder (an A2A client
+agent) proves possession per request; the A2A server (or its authorization layer) verifies the
+capability against the request under a closed, fail-closed profile. The capability binds *who
+may invoke which operation, against which request content, until when* — finer-grained than the
+transport authentication an A2A deployment applies, and composable with it.
+
+The mechanism is the already-normative [Bounded Authority Protocol](https://github.com/baselabs/bounded_authority_protocol)
+v1/v2 profiles: the grant and proof bytes, claim sets, selector algebra, and verification are
+unchanged. This extension introduces nothing normative outside those profiles; what it defines
+is venue surface — declaration and negotiation (§3), carriage (§4), operation identity and
+request projection (§5), and graceful degradation (§6) — per the normative [A2A
+capability-binding
+profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/a2a-capability-binding-profile.md),
+which this document restates in A2A vocabulary and cites per claim. The Bounded Authority
+Protocol is a pure, deterministic verification library — **verification is not authority**
+(§7). The A2A server's authorization decision remains its own (A2A §7.5, §13.1).
+
+**Scope.** In scope: the three standard A2A bindings over HTTPS — JSON-RPC, HTTP+JSON/REST,
+gRPC (HTTP/2 with TLS). Out of scope, deliberately: custom (non-HTTP) bindings; plain-HTTP
+deployments other than literal-loopback development endpoints (which use the Bounded Authority
+Protocol's already-active `bap-application-proof/local-loopback-http/1` profile;
+non-loopback plain HTTP has no proof profile here — deployments use HTTPS); and
+push-notification webhooks, whose agent→client direction is A2A's own `AuthenticationInfo`
+mechanism — this extension binds the *configuration* of push notifications as request
+content, never the webhook delivery itself.
+
+## 2. Roles and terminology
+
+- **Issuer** — the principal that signs a capability grant.
+- **Holder** — the A2A client agent to whom the grant's capability is issued, identified by a
+  public-key thumbprint; proves possession per request.
+- **Verifier** — the A2A server (or its authorization layer) that checks the grant + proof
+  against the expected request context.
+
+## 3. Declaration and negotiation
+
+An agent that consumes this binding declares it in its Agent Card (A2A §4.6), with an empty
+`params` object:
+
+```json
+{
+  "capabilities": {
+    "extensions": [
+      {
+        "uri": "https://bounded-authority.io/extensions/a2a-capability-binding/v1",
+        "description": "Bounded Authority Protocol capability grants + holder proofs on A2A requests",
+        "required": false,
+        "params": {}
+      }
+    ]
+  }
+}
+```
+
+- Clients opt in per request via the `A2A-Extensions` service parameter (A2A §3.2.6, §4.6.1).
+- An agent that mandates the binding sets `required: true`; a client that then does not declare
+  support receives `ExtensionSupportRequiredError` semantics (A2A §3.3.4, which makes the error
+  a MUST for the agent).
+- The `params` field carries an empty object: publishing a deployment's accepted
+  contract-majors and suites is deferred to the Bounded Authority Protocol's reserved verifier
+  discovery document, not realized in this extension surface.
+- Breaking changes to this extension use a new URI (A2A §4.6.3).
+- `BA-*` carriage arriving without the declaration or opt-in is not processed — the headers
+  are ignored and the request proceeds under the card's declared posture. Consequence, stated
+  plainly: the opt-in is client-controlled, so a deployment that relies on this binding to
+  narrow its authorization posture MUST either set `required: true` or enforce the capability
+  check in its own authorization layer.
+
+## 4. Carriage
+
+The grant and proof ride outside the request body (the RFC 9449-shaped structure — the proof
+signs the request; the request does not contain the proof):
+
+| A2A binding | Grant | Proof |
+|---|---|---|
+| JSON-RPC (A2A §9) | HTTP header `BA-Grant` | HTTP header `BA-Proof` |
+| HTTP+JSON/REST (A2A §11) | HTTP header `BA-Grant` | HTTP header `BA-Proof` |
+| gRPC (A2A §10) | metadata `ba-grant` | metadata `ba-proof` |
+
+Values are the compact-JWS strings. The names are unregistered header field names (an eventual
+IANA registration would follow the template path A2A itself uses, A2A §14.2, and is outside
+this draft); they stay clear of the `a2a-` prefix, which A2A §3.2.6 says its own spec-defined
+service parameters carry. Issuers SHOULD keep grants inside the deployment's carriage budget
+(as guidance, ≤ 8 KiB of total `BA-*` carriage per request); oversized carriage fails closed at
+the carrier.
+
+## 5. Proof binding and operation identity
+
+Every proof is the published `dpop+jwt` profile with unchanged claims and semantics. `htm` /
+`htu` bind the concrete transport request of the A2A binding in use (for gRPC, the HTTP/2
+request target per the gRPC over HTTP/2 specification; for REST, the route per the normative
+proto HTTP annotations — note that for `SubscribeToTask` the proto annotations say `GET` while
+the specification text's §5.3/§11.3.2 tables say `POST`; this binding follows the proto).
+`ba_op` names the A2A operation under a reverse-DNS vocabulary
+(`io.bounded-authority/a2a/{Method}`, e.g. `io.bounded-authority/a2a/SendMessage`) — the
+PascalCase method identity shared by JSON-RPC and gRPC; REST routes are binding framing, not
+operation identity. `ba_req` digests the bounded per-operation projection of the canonical
+request object (value members as themselves; part content and other unbounded members as
+SHA-256 digests; the `tenant` member covered including its declared absence) inside the
+protocol's hard ceilings. The per-operation projection table, digest construction, ceiling
+rules (binding profile §8) and the recorded expressiveness boundary — selector paths never
+index arrays, so part content is bound by digest, not by selector (binding profile §10) — are
+normative in the [binding
+profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/a2a-capability-binding-profile.md).
+
+Grant audience names the target A2A server identity (deployment-fixed; exact match required).
+Each proof carries a fresh invocation UUID (`ba_inv`) minted per request. Nonce mode and replay
+reservation are the server's own state.
+
+## 6. Graceful degradation
+
+If one party supports this extension and the other does not, the supporting party reverts to
+the card's declared `securitySchemes` posture — the authorization posture it applied before
+adding the binding. The capability layer never widens that posture. When `required: true` is
+set and a client does not declare support, the agent MUST return `ExtensionSupportRequiredError`
+(A2A §3.3.4).
+
+## 7. Security considerations
+
+This extension's security posture is the Bounded Authority Protocol's, restated:
+
+- **Verification is not authority.** A verified grant + proof proves only that the bytes
+  satisfy the caller-supplied trusted key, expected audience, and request context. It does NOT
+  select trusted keys, reserve replay, check live revocation, or authorize an effect. The A2A
+  server's authorization decision — including replay reservation, revocation state, and the
+  actual effect — is the server's own responsibility.
+- **Closed, fail-closed profile.** Unknown algorithms, headers, claims, selector kinds,
+  duplicate members, invalid encodings, and over-limit structures return closed, value-free
+  errors; projections that exceed any published ceiling have no representable form.
+- **Holder binding.** The proof's `jwk` header key is bound to the grant's `cnf.jkt`
+  thumbprint (RFC 7638); a proof from any other key fails. `ath` binds the proof to the exact
+  grant bytes.
+- **Request binding.** `htm`, `htu`, `ba_inv`, `ba_op`, and the request digest bind the proof
+  to the specific invocation; a proof replayed against a different request, binding, or
+  invocation fails.
+- **One hop only.** This binding covers exactly one hop: issuer → holder (A2A client agent) →
+  verifier (A2A server or its authorization layer). Sub-agent chains, narrowed re-issuance by
+  the holder, and in-band grant forwarding are not defined by this extension.
+- **Card integrity.** The AgentCard is unsigned by default; a substituted card could strip the
+  extension declaration. Deployments relying on the binding SHOULD verify a card signature
+  (A2A §8.4) or pin the card out-of-band.
+
+Clients and servers SHOULD treat all extension-introduced fields as untrusted and validate
+them comprehensively.
+
+## 8. Name registration status
+
+Only the Bounded Authority Protocol's own names are unregistered: the `ba_inv`, `ba_op`, and
+`ba_req` claims and the `ba+cap` media-type suffix (reserved under the `ba_` / `ba+`
+collision-avoidance prefix, to be filed with IANA at first external submission per that
+project's BAP-12 roadmap row), and the `BA-Grant` / `BA-Proof` header field names (no filing
+exists or is implied by this draft). The `dpop+jwt` proof type (RFC 9449), the `ath`, `htm`,
+and `htu` claims (RFC 9449), the `cnf` claim (RFC 7800, with RFC 9449 §6.1's `jkt`
+confirmation method over RFC 7638 thumbprints), and the other standard JWT claims the profiles
+reuse carry their already-registered meanings; the selector kinds and suite names are
+protocol-internal identifiers, not IANA registrations. A venue reader should not read
+registration-looking spelling as registration.

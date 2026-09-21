@@ -67,8 +67,9 @@ recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK boun
 ADR 0019 (corpus-artifact distribution), ADR 0020 (bounds-aware assembly and issuer-mediated
 reauthorization posture), ADR 0021 (the v1 `all` selector recognized-shapes erratum), ADR 0022
 (durable contract identities), and ADR 0027 (byte-distinct application-proof profiles). Accepted
-ADRs are 0001–0032 (ADR 0029 records the cumulative-budget posture and explicitly defers the
-`ba+budget-window` attestation-shape design) under [`docs/adr/`](docs/adr/). BAP-19's source identity is fixed by
+ADRs are 0001–0034 (ADR 0029 records the cumulative-budget posture and explicitly defers the
+`ba+budget-window` attestation-shape design; ADR 0034 decides the UCP riding point as
+transport-composed) under [`docs/adr/`](docs/adr/). BAP-19's source identity is fixed by
 `v0.3.0`; the registry publication and checksum read-back closed 2026-08-31, and downstream
 immutable-package adoption is tracked in the private runtime.
 

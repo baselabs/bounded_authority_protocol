@@ -73,6 +73,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md",
     "docs/adr/0032-dependency-currency-gate.md",
     "docs/adr/0033-developer-portability-ci-scope.md",
+    "docs/adr/0034-ucp-riding-point-scoping.md",
     "docs/protocol-v1.md",
     "docs/release-candidate-contract.md",
     "docs/errata.md",

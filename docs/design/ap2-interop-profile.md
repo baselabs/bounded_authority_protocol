@@ -300,7 +300,10 @@ What this profile can state structurally (all OBSERVED or cited-to-published):
 
 **Element-4 output:** a recorded dependency and open question for the A2A-binding decision,
 plus the binding-surface separation above as the constraint any answer must respect. Nothing
-here settles that question.
+here settles that question. Both have since been settled: the A2A binding by the [A2A
+capability-binding profile](a2a-capability-binding-profile.md), and BAP's UCP riding point by
+[ADR 0034](../adr/0034-ucp-riding-point-scoping.md) (transport-composed; this profile's §6
+separation is the constraint both respected).
 
 ## 7. Element 5 — Receipt correspondence
 
