@@ -93,6 +93,122 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       to: "  @prefix <<\"BAP1-REQUEST\", 0>>\n",
       target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
     },
+    %{
+      # Same-tag domain removed: the cross-tag fall-through compares numerically, so the
+      # integer-bound/float-argument corpus case flips to valid.
+      name: "v2-selector-same-tag-removed",
+      path: "lib/bounded_authority_protocol/v2/selector.ex",
+      from:
+        "  defp lte?(_left, _right), do: false\n\n  defp gte?({:integer, left}, {:integer, right}), do: left >= right\n  defp gte?({:float, left}, {:float, right}), do: left >= right\n  defp gte?(_left, _right), do: false",
+      to:
+        "  defp lte?({_tag, left}, {_other, right}), do: is_number(left) and is_number(right) and left <= right\n\n  defp gte?({:integer, left}, {:integer, right}), do: left >= right\n  defp gte?({:float, left}, {:float, right}), do: left >= right\n  defp gte?({_tag, left}, {_other, right}), do: is_number(left) and is_number(right) and left >= right",
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
+    },
+    %{
+      # Kind swap: decoding lte as gte and gte as lte (both clauses swapped, so
+      # range-bearing grants still decode — evaluated under the flipped kind)
+      # flips the exceeded/unmet reject cases.
+      name: "v2-selector-kinds-swapped",
+      path: "lib/bounded_authority_protocol/v2/runtime.ex",
+      from:
+        "      {:ok,\n       %{\n         \"kind\" => {:string, \"lte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end\n\n      {:ok,\n       %{\n         \"kind\" => {:string, \"gte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:gte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end",
+      to:
+        "      {:ok,\n       %{\n         \"kind\" => {:string, \"lte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:gte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end\n\n      {:ok,\n       %{\n         \"kind\" => {:string, \"gte\"},\n         \"path\" => {:array, path_values},\n         \"value\" => bound\n       }} ->\n        with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),\n             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}\n        else\n          _failure -> {:error, :invalid}\n        end",
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
+    },
+    %{
+      # Numeric-bound check dropped at decode: a string lte bound now decodes, so the
+      # non-numeric-bound corpus cases flip to valid.
+      name: "v2-selector-non-numeric-bound-accepted",
+      path: "lib/bounded_authority_protocol/v2/runtime.ex",
+      from:
+        "             true <- path != [],\n             true <- numeric_bound?(bound),\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}",
+      to:
+        "             true <- path != [],\n             {:ok, _encoded} <- Jcs.encode(bound, bounds) do\n          {:ok, {:lte, path, bound}}",
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
+    },
+    %{
+      # Cross-major downgrade: the v2 grant decode accepting v:1 reddens the cross-major
+      # corpus cases (a v1 grant must stay invalid under v2 — no downgrade path).
+      name: "v2-cross-major-grant-v-accepted",
+      path: "lib/bounded_authority_protocol/v2/runtime.ex",
+      from:
+        "         true <- valid_key_id?(key_id, bounds),\n         {:integer, 2} <- payload[\"v\"],\n         {:string, issuer} <- payload[\"iss\"],",
+      to:
+        "         true <- valid_key_id?(key_id, bounds),\n         true <- payload[\"v\"] in [{:integer, 1}, {:integer, 2}],\n         {:string, issuer} <- payload[\"iss\"],",
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
+    },
+    %{
+      # Domain-separator downgrade: BAP2-REQUEST\\0 flipped to BAP1 reddens every
+      # request-digest corpus case (the digest is prefix-bound).
+      name: "v2-request-digest-prefix-downgraded",
+      path: "lib/bounded_authority_protocol/v2/request_digest.ex",
+      from: "  @prefix <<\"BAP2-REQUEST\", 0>>\n",
+      to: "  @prefix <<\"BAP1-REQUEST\", 0>>\n",
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
+    },
+    # --- v3 ES256 suite activation proofs (BAP-22 / ADR 0035) ------------------
+    %{
+      # Canonicality: dropping the low-S half-order rule lets the high-S corpus case
+      # (a genuinely verifying high-S signature — backend malleability, probe-observed)
+      # pass precheck and verify, so verify-grant-v3-invalid-signature-high-s agrees as
+      # valid, disagreeing with the corpus.
+      name: "v3-signature-low-s-removed",
+      path: "lib/bounded_authority_protocol/v3/es256.ex",
+      from: "    ri > 0 and ri < @n and si > 0 and si <= @half_n\n",
+      to: "    ri > 0 and ri < @n and si > 0\n",
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v3 corpus (in-VM)"}
+    },
+    %{
+      # Same-tag domain removed (the v2 mirror under v3's selector module): the
+      # cross-tag fall-through compares numerically, so both cross-tag corpus cases
+      # (integer-bound/float-argument and float-bound/integer-argument) flip to valid.
+      name: "v3-selector-range-cross-tag-accepted",
+      path: "lib/bounded_authority_protocol/v3/selector.ex",
+      from:
+        "  defp lte?(_left, _right), do: false\n\n  defp gte?({:integer, left}, {:integer, right}), do: left >= right\n  defp gte?({:float, left}, {:float, right}), do: left >= right\n  defp gte?(_left, _right), do: false",
+      to:
+        "  defp lte?({_tag, left}, {_other, right}), do: is_number(left) and is_number(right) and left <= right\n\n  defp gte?({:integer, left}, {:integer, right}), do: left >= right\n  defp gte?({:float, left}, {:float, right}), do: left >= right\n  defp gte?({_tag, left}, {_other, right}), do: is_number(left) and is_number(right) and left >= right",
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v3 corpus (in-VM)"}
+    },
+    %{
+      # Curve pin removed: any string crv decodes, so jwk-decode-public-invalid-crv-p384
+      # (valid P-256 coordinates under crv P-384) flips to valid.
+      name: "v3-jwk-curve-accepted",
+      path: "lib/bounded_authority_protocol/v3/ec_jwk.ex",
+      from: "            \"crv\" => {:string, \"P-256\"},",
+      to: "            \"crv\" => {:string, _curve},",
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v3 corpus (in-VM)"}
+    },
+    %{
+      # Thumbprint member set: the preimage without y changes every EC thumbprint, so the
+      # jwk thumbprint/encode valid cases disagree with their pinned expected outputs.
+      name: "v3-thumbprint-member-set-wrong",
+      path: "lib/bounded_authority_protocol/v3/ec_jwk.ex",
+      from: ~S|      ~s(","y":") <> Base.url_encode64(y, padding: false) <> ~s("})|,
+      to: ~S|      ~s("})|,
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v3 corpus (in-VM)"}
+    },
+    %{
+      # Cross-major downgrade (the v2 mirror under v3 constants): the v3 grant decode
+      # accepting v:1/v:2 reddens both cross-major corpus cases.
+      name: "v3-cross-major-grant-header-and-v-accepted",
+      path: "lib/bounded_authority_protocol/v3/runtime.ex",
+      from:
+        "    with {:string, \"ES256\"} <- header[\"alg\"],\n         {:string, \"ba+cap\"} <- header[\"typ\"],\n         {:string, key_id} <- header[\"kid\"],\n         true <- valid_key_id?(key_id, bounds),\n         {:integer, 3} <- payload[\"v\"],",
+      to:
+        "    with true <- header[\"alg\"] in [{:string, \"ES256\"}, {:string, \"EdDSA\"}],\n         {:string, \"ba+cap\"} <- header[\"typ\"],\n         {:string, key_id} <- header[\"kid\"],\n         true <- valid_key_id?(key_id, bounds),\n         true <- payload[\"v\"] in [{:integer, 1}, {:integer, 2}, {:integer, 3}],",
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v3 corpus (in-VM)"}
+    },
+    %{
+      # Domain-separator downgrade: BAP3-REQUEST\0 flipped to BAP1 reddens every
+      # request-digest corpus case (the digest is prefix-bound).
+      name: "v3-request-digest-prefix-downgraded",
+      path: "lib/bounded_authority_protocol/v3/request_digest.ex",
+      from: "  @prefix <<\"BAP3-REQUEST\", 0>>\n",
+      to: "  @prefix <<\"BAP1-REQUEST\", 0>>\n",
+      target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v3 corpus (in-VM)"}
+    },
     # --- C1 purity carve-out proofs (per-file keying) -------------------------
     %{
       # A planted System.halt(0) in cli.ex (the carve-out module that must NOT halt) turns the

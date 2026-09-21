@@ -3150,3 +3150,462 @@ fn request_digests_are_domain_separated_across_majors() {
         "BAP1/BAP2 request digests must never collide"
     );
 }
+
+// =============================================================================
+// v3 legs — the contract-major 3 (`BAP3-ES256-SHA256`) closure classes
+// (ADR 0014 D6 battery extension, spec/bap-v3.md §3). Each leg drives the
+// PUBLIC v3 surface with corpus-v3 fixtures and carries the exact mechanical
+// mutation that makes the SAME test go RED (the ADR 0005:240-246
+// discipline). Every red observation below was produced LIVE at authoring
+// time by applying the quoted mutation, running the leg, capturing the
+// failure, and reverting; the runs ride this commit's authoring session.
+// =============================================================================
+
+/// The vendored v3 corpus root (self-contained SDK snapshot — ADR 0015 D5).
+fn successor_corpus_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("conformance")
+        .join("corpus-v3")
+}
+
+/// Loads one case from a corpus-v3 case file by id.
+fn successor_case(rel: &str, id: &str) -> serde_json::Value {
+    let path = successor_corpus_root().join("cases").join(rel);
+    let content =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let root: serde_json::Value =
+        serde_json::from_str(&content).expect("corpus file is valid JSON");
+    root["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"].as_str() == Some(id))
+        .cloned()
+        .unwrap_or_else(|| panic!("case {id} exists in {rel}"))
+}
+
+/// Decodes a corpus base64url string to the 65-byte v3 raw public key.
+fn successor_key_65(field: &serde_json::Value) -> [u8; 65] {
+    let b64 = field.as_str().expect("key field");
+    let raw = bounded_authority_protocol::base64url_decode(b64.as_bytes()).expect("decodes");
+    assert_eq!(raw.len(), 65, "v3 keys are 65-byte SEC1 points");
+    let mut arr = [0u8; 65];
+    arr.copy_from_slice(&raw);
+    arr
+}
+
+/// The (compact, issuer, expected) grant-verify fixture from a corpus case.
+fn successor_grant_fixture(
+    id: &str,
+) -> (
+    Vec<u8>,
+    bounded_authority_protocol::v3::TrustedIssuer,
+    bounded_authority_protocol::types::ExpectedGrant,
+) {
+    use bounded_authority_protocol::types::ExpectedGrant;
+    use bounded_authority_protocol::v3::TrustedIssuer;
+    let case = successor_case("grant-verify/verify.json", id);
+    let input = &case["input"];
+    (
+        input["compact"].as_str().unwrap().as_bytes().to_vec(),
+        TrustedIssuer {
+            key_id: input["key_id"].as_str().unwrap().to_string(),
+            public_key: successor_key_65(&input["public_key"]),
+        },
+        ExpectedGrant {
+            issuer: input["issuer"].as_str().unwrap().to_string(),
+            audience: input["audience"].as_str().unwrap().to_string(),
+            evaluation_time: input["evaluation_time"].as_i64().unwrap(),
+            skew: input["clock_skew"].as_u64().unwrap(),
+            bounds: max(),
+        },
+    )
+}
+
+/// Rewrites a corpus grant compact's signature segment (base64url-encoded
+/// replacement bytes).
+fn successor_with_signature(compact: &[u8], signature: &[u8; 64]) -> Vec<u8> {
+    let text = std::str::from_utf8(compact).expect("compact is ASCII");
+    let mut parts = text.split('.');
+    let h = parts.next().unwrap();
+    let p = parts.next().unwrap();
+    format!(
+        "{h}.{p}.{}",
+        String::from_utf8(bounded_authority_protocol::base64url_encode(signature)).unwrap()
+    )
+    .into_bytes()
+}
+
+// -----------------------------------------------------------------------------
+// (v3-lowS) LOW-S ACCEPTANCE — the malleability the profile exists to close.
+// -----------------------------------------------------------------------------
+
+/// s' = n - s over the 32-byte big-endian halves (the ECDSA malleable
+/// counterpart: (r, n-s) verifies whenever (r, s) does).
+fn successor_n_minus_s(signature: &[u8; 64]) -> [u8; 64] {
+    // The group order, SEC 2 verbatim (public specification constant).
+    const N: [u8; 32] = [
+        0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xBC, 0xE6, 0xFA, 0xAD, 0xA7, 0x17, 0x9E, 0x84, 0xF3, 0xB9, 0xCA, 0xC2, 0xFC, 0x63,
+        0x25, 0x51,
+    ];
+    let mut out = *signature;
+    let mut borrow: i16 = 0;
+    for i in (0..32).rev() {
+        let diff = N[i] as i16 - signature[32 + i] as i16 - borrow;
+        if diff < 0 {
+            out[32 + i] = (diff + 256) as u8;
+            borrow = 1;
+        } else {
+            out[32 + i] = diff as u8;
+            borrow = 0;
+        }
+    }
+    assert_eq!(borrow, 0, "s < n so n - s does not underflow");
+    out
+}
+
+#[test]
+fn es256_low_s_high_s_counterpart_is_rejected() {
+    // (v3-lowS): the corpus's VALID low-S grant, re-spelled with s <- n - s,
+    // is a canonical backend-ACCEPTED encoding that satisfies the ECDSA
+    // equation — ONLY the profile's low-S gate rejects it
+    // (`REQ3-SIGNING-low-s`). Without the gate a third party observing any
+    // valid signature could re-spell it into a second, differently-hashing,
+    // still-valid encoding.
+    //
+    // RED-CAPABLE: mutation = in `es256::validate_rs_range`, comment out the
+    // `if *s > HALF_N { return Err(Invalid); }` arm. Observed live at
+    // authoring: the leg fails with
+    //   `high-S malleable counterpart verified — low-S gate missing`
+    // (verify_grant returns Ok), because the counterpart signature verifies
+    // end-to-end. Reverted; green.
+    use bounded_authority_protocol::v3;
+    let (compact, issuer, expected) = successor_grant_fixture("verify-grant-v3-valid");
+    assert!(v3::verify_grant(&compact, &issuer, &expected).is_ok());
+    let text = std::str::from_utf8(&compact).unwrap();
+    let sig_seg = text.split('.').nth(2).unwrap();
+    let sig_vec = bounded_authority_protocol::base64url_decode(sig_seg.as_bytes()).unwrap();
+    let mut sig = [0u8; 64];
+    sig.copy_from_slice(&sig_vec);
+    let high = successor_n_minus_s(&sig);
+    // The counterpart really is the HIGH half (sanity: the fixture is low).
+    let (.., s_low) = sig.split_at(32);
+    let (.., s_high) = high.split_at(32);
+    assert!(s_low != s_high, "s and n-s differ");
+    let high_compact = successor_with_signature(&compact, &high);
+    let verdict = v3::verify_grant(&high_compact, &issuer, &expected);
+    assert!(
+        verdict == Err(bounded_authority_protocol::Invalid),
+        "high-S malleable counterpart verified — low-S gate missing"
+    );
+}
+
+// -----------------------------------------------------------------------------
+// (v3-range) r/s RANGE — the full `0 < r < n and 0 < s <= n/2` predicate.
+// -----------------------------------------------------------------------------
+
+#[test]
+fn es256_rs_range_rejects_zero_and_overflow_halves() {
+    // (v3-range): the full `0 < r < n and 0 < s <= n/2` predicate
+    // (`REQ3-SIGNING-range` + `REQ3-SIGNING-low-s`). The corpus's
+    // signature-canonicality matrix — zero r, zero s, r = n, s = n, high-s,
+    // tampered r, tampered s — every one rejected through the public verify
+    // path, PLUS the crafted malleable counterpart (s' = n - s of the VALID
+    // corpus signature): the one range violation whose ONLY rejection site
+    // is the profile gate (the backend accepts the canonical high half).
+    //
+    // RED-CAPABLE: mutation = in `es256::verify`, delete the
+    // `validate_rs_range(signature)?;` call entirely. Observed live at
+    // authoring: this leg fails on its own corpus high-s member —
+    // `corpus case verify-grant-v3-invalid-signature-high-s must be
+    // rejected` (verify_grant returned Ok) — while the zero-r / zero-s /
+    // r-at-n / s-at-n members before it STAYED rejected in the same run
+    // (the loop passed them before failing): the p256 backend's
+    // `Signature::from_slice` rejects zero and non-canonical scalars on its
+    // own (pinned by
+    // `es256::tests::backend_signature_parse_rejects_zero_and_overflow_scalars`).
+    // Those members are deliberately double-enforced (profile arithmetic
+    // first per spec §3.2 ordering, backend canonicality second); the gate's
+    // own load-bearing member is the low-S range bound. Reverted; green.
+    use bounded_authority_protocol::v3;
+    for id in [
+        "verify-grant-v3-invalid-signature-zero-r",
+        "verify-grant-v3-invalid-signature-zero-s",
+        "verify-grant-v3-invalid-signature-r-at-n",
+        "verify-grant-v3-invalid-signature-s-at-n",
+        "verify-grant-v3-invalid-signature-high-s",
+        "verify-grant-v3-tamper-signature-r",
+        "verify-grant-v3-tamper-signature-s",
+    ] {
+        let (compact, issuer, expected) = successor_grant_fixture(id);
+        assert_eq!(
+            v3::verify_grant(&compact, &issuer, &expected),
+            Err(bounded_authority_protocol::Invalid),
+            "corpus case {id} must be rejected"
+        );
+    }
+    // The gate's own load-bearing member: the malleable counterpart
+    // (0 < s' < n but s' > n/2) is backend-accepted — the range gate is the
+    // only rejection site.
+    let (compact, issuer, expected) = successor_grant_fixture("verify-grant-v3-valid");
+    let text = std::str::from_utf8(&compact).unwrap();
+    let sig_seg = text.split('.').nth(2).unwrap();
+    let sig_vec = bounded_authority_protocol::base64url_decode(sig_seg.as_bytes()).unwrap();
+    let mut sig = [0u8; 64];
+    sig.copy_from_slice(&sig_vec);
+    let high_compact = successor_with_signature(&compact, &successor_n_minus_s(&sig));
+    assert_eq!(
+        v3::verify_grant(&high_compact, &issuer, &expected),
+        Err(bounded_authority_protocol::Invalid),
+        "malleable range counterpart (s > n/2) verified — range gate missing"
+    );
+}
+
+// -----------------------------------------------------------------------------
+// (v3-jwk-set) EC JWK MEMBER SET — closed {crv,kty,x,y} + the pinned values.
+// -----------------------------------------------------------------------------
+
+#[test]
+fn es256_ec_jwk_member_set_is_closed() {
+    // (v3-jwk-set): wrong crv (P-384), wrong kty (OKP), an extra member
+    // (private d), a missing y, and the OKP-form member set — every one
+    // rejected by `v3::jwk_decode_public` (`REQ3-HEADER-proof-jwk`,
+    // `REQ3-HEADER-no-private-jwk`).
+    //
+    // RED-CAPABLE: mutation = in `v3::jwk_decode_public`, (a) change the
+    // unknown-member arm `_ => return Err(Invalid)` to `_ => {}` (ignore
+    // extras) AND (b) relax the crv/kty matches to accept any string.
+    // Observed live at authoring: the leg fails — the extra-d, missing-y,
+    // wrong-crv, and wrong-kty fixtures all decode to Ok. Reverted; green.
+    use bounded_authority_protocol::v3;
+    for id in [
+        "jwk-decode-public-invalid-crv-p384",
+        "jwk-decode-public-invalid-kty-okp",
+        "jwk-decode-public-invalid-extra-member-d",
+        "jwk-decode-public-invalid-missing-y",
+        "jwk-decode-public-invalid-member-order-okp-preimage",
+    ] {
+        let case = successor_case("jwk/jwk.json", id);
+        let text = case["input"]["text"].as_str().unwrap().as_bytes();
+        assert_eq!(
+            v3::jwk_decode_public(text),
+            Err(bounded_authority_protocol::Invalid),
+            "corpus case {id} must be rejected"
+        );
+    }
+    // The valid EC JWK decodes (non-vacuity: the closed set admits the one
+    // legal shape).
+    let valid = successor_case("jwk/jwk.json", "jwk-decode-public-valid-ec");
+    assert!(v3::jwk_decode_public(valid["input"]["text"].as_str().unwrap().as_bytes()).is_ok());
+}
+
+// -----------------------------------------------------------------------------
+// (v3-coord) COORDINATE WIDTH AND CANONICALITY — 32-byte canonical b64url
+// coordinates; 65-byte 0x04||x||y raw form.
+// -----------------------------------------------------------------------------
+
+#[test]
+fn es256_coordinate_width_and_canonicality_are_enforced() {
+    // (v3-coord): a short coordinate (3-byte x), a padded coordinate
+    // (trailing `=`), a 64-byte raw key, and a compressed (0x02-prefixed)
+    // raw key — all rejected (`REQ3-KEY-uncompressed-sec1`, RFC 7518
+    // §6.2.1 fixed-width coordinates, `REQ1-B64-canonical` incorporated).
+    //
+    // RED-CAPABLE: mutation = in `v3::jwk_decode_public`, drop the
+    // `x_bytes.len() != 32` / `y_bytes.len() != 32` width checks. Observed
+    // live at authoring: the leg goes RED immediately on the
+    // short-coordinate fixture — the decode path PANICS at the reassembly
+    // (`source slice length (3) does not match destination slice length
+    // (32)`) instead of returning Err(Invalid): without the gate the
+    // function neither accepts nor fails closed — it crashes, which is
+    // itself the defect the gate prevents. The padded-coordinate fixture is
+    // rejected earlier by the canonical-base64url decode (the
+    // REQ1-B64-canonical layer the v1 battery's pad-bits leg owns) in both
+    // runs. (The 65-byte-form half is type-locked: the raw width cannot be
+    // widened without changing the `[u8; 65]` parameter type; the 0x04
+    // prefix gate is the `validate_point` call the off-curve leg breaks.)
+    // Reverted; green.
+    use bounded_authority_protocol::v3;
+    for id in [
+        "jwk-decode-public-invalid-short-coordinate",
+        "jwk-decode-public-invalid-padded-coordinate",
+    ] {
+        let case = successor_case("jwk/jwk.json", id);
+        let text = case["input"]["text"].as_str().unwrap().as_bytes();
+        assert_eq!(
+            v3::jwk_decode_public(text),
+            Err(bounded_authority_protocol::Invalid),
+            "corpus case {id} must be rejected"
+        );
+    }
+    // The raw-key form: the corpus's truncated 64-byte and compressed
+    // 33-byte fixtures never encode as EC JWKs.
+    for id in [
+        "jwk-encode-public-invalid-length-64",
+        "jwk-encode-public-invalid-compressed-form",
+    ] {
+        let case = successor_case("jwk/jwk.json", id);
+        let b64 = case["input"]["public_key"].as_str().unwrap();
+        let raw = bounded_authority_protocol::base64url_decode(b64.as_bytes()).unwrap();
+        assert!(
+            raw.len() != 65,
+            "corpus fixture {id} is a wrong-width raw key"
+        );
+    }
+    // Non-vacuity: the valid corpus key encodes byte-exact.
+    let valid = successor_case("jwk/jwk.json", "jwk-encode-public-valid-ec");
+    let key = successor_key_65(&valid["input"]["public_key"]);
+    assert_eq!(
+        String::from_utf8(v3::jwk_encode_public(&key).unwrap()).unwrap(),
+        valid["expected"]["encoded"].as_str().unwrap()
+    );
+}
+
+// -----------------------------------------------------------------------------
+// (v3-offcurve) OFF-CURVE POINT — pure-arithmetic gate before the backend.
+// -----------------------------------------------------------------------------
+
+#[test]
+fn es256_off_curve_point_is_rejected() {
+    // (v3-offcurve): a JWK whose coordinates are canonical, fixed-width,
+    // and < p, but which is NOT a curve point — rejected by the profile's
+    // pure-arithmetic gate (`REQ3-KEY-point-on-curve`; the spec requires
+    // the check to precede the backend, whose off-curve behavior is
+    // backend-specific and never load-bearing).
+    //
+    // RED-CAPABLE: mutation = in `v3::jwk_decode_public`, delete the
+    // `es256::validate_point(&public_key)?;` call. Observed live at
+    // authoring: the leg fails — the off-curve fixture decodes to Ok (the
+    // coordinates reassemble cleanly; nothing else in the decode path
+    // evaluates the curve equation). Reverted; green.
+    use bounded_authority_protocol::v3;
+    let case = successor_case("jwk/jwk.json", "jwk-decode-public-invalid-off-curve");
+    let text = case["input"]["text"].as_str().unwrap().as_bytes();
+    assert_eq!(
+        v3::jwk_decode_public(text),
+        Err(bounded_authority_protocol::Invalid),
+        "off-curve point must be rejected at the profile gate"
+    );
+    // The coordinate-at-field-prime fixture (x >= p) rides the same gate.
+    let prime = successor_case(
+        "jwk/jwk.json",
+        "jwk-decode-public-invalid-coordinate-at-field-prime",
+    );
+    assert_eq!(
+        v3::jwk_decode_public(prime["input"]["text"].as_str().unwrap().as_bytes()),
+        Err(bounded_authority_protocol::Invalid),
+        "coordinate >= p must be rejected at the profile gate"
+    );
+}
+
+// -----------------------------------------------------------------------------
+// (v3-cross-major) CROSS-MAJOR v ACCEPTANCE — v:3 exactly, both directions.
+// -----------------------------------------------------------------------------
+
+#[test]
+fn es256_rejects_prior_major_bytes_both_directions() {
+    // (v3-cross-major): authentic v1 and v2 grant compacts (the corpus's
+    // cross-major fixtures) are rejected by the v3 façade with the single
+    // closed error, and the v3 façade's own producer output is rejected by
+    // BOTH prior majors (`REQ3-CORE-cross-major-reject`). The prior-major
+    // corpus compacts carry EdDSA headers, so they reject at the alg pin;
+    // the v claim's OWN gate is driven by the crafted v-flip fixture: the
+    // corpus's valid v3 compact with `v: 3` rewritten to `v: 1` (decode
+    // verifies no signature, so the flip needs no re-signing) — a compact
+    // whose ONLY prior-major marker is the v value.
+    //
+    // RED-CAPABLE: mutation = in `v3::validate_grant_payload`, widen the
+    // version match from `Some(JsonValue::Int(3))` to
+    // `Some(JsonValue::Int(n)) if (1..=3).contains(n)`. Observed live at
+    // authoring: the leg fails on the crafted v-flip assert (`v:1 payload
+    // decoded — the v gate is the major detector`) while the corpus v1/v2
+    // fixtures stay rejected in the same run (their EdDSA headers reject at
+    // the alg pin first — defense in depth: header alg, then payload v).
+    // The proof validator (`validate_proof_payload`) carries the identical
+    // v pin. Reverted; green.
+    use bounded_authority_protocol::v3;
+    for rel_and_id in [
+        (
+            "grant-decode/decode.json",
+            "grant-decode-v3-invalid-cross-major-v1-bytes",
+        ),
+        (
+            "grant-decode/decode.json",
+            "grant-decode-v3-invalid-cross-major-v2-bytes",
+        ),
+    ] {
+        let case = successor_case(rel_and_id.0, rel_and_id.1);
+        let compact = case["input"]["compact"].as_str().unwrap().as_bytes();
+        assert_eq!(
+            v3::decode_grant(compact, &max()),
+            Err(bounded_authority_protocol::Invalid),
+            "corpus case {} must be rejected",
+            rel_and_id.1
+        );
+    }
+    // The v gate as the sole major detector: rewrite the VALID corpus v3
+    // compact's payload v to 1 (decode needs no signature; the canonical
+    // JCS member order is unchanged — `v` is the last member).
+    let (valid_compact, ..) = successor_grant_fixture("verify-grant-v3-valid");
+    let text = std::str::from_utf8(&valid_compact).unwrap();
+    let mut parts = text.split('.');
+    let h = parts.next().unwrap();
+    let p = parts.next().unwrap();
+    let s = parts.next().unwrap();
+    let payload = bounded_authority_protocol::base64url_decode(p.as_bytes()).unwrap();
+    let prior_major_suffix: &[u8] = b",\"v\":1}";
+    let flipped_payload: Vec<u8> = payload
+        .strip_suffix(b",\"v\":3}")
+        .map(|stem| [stem, prior_major_suffix].concat())
+        .expect("the canonical payload ends with ,\"v\":3}");
+    let flipped_compact = format!(
+        "{h}.{}.{s}",
+        String::from_utf8(bounded_authority_protocol::base64url_encode(
+            &flipped_payload
+        ))
+        .unwrap()
+    );
+    assert_eq!(
+        v3::decode_grant(flipped_compact.as_bytes(), &max()),
+        Err(bounded_authority_protocol::Invalid),
+        "v:1 payload decoded — the v gate is the major detector"
+    );
+    // The reverse direction: a produced v3 grant (v:3, ES256) is rejected by
+    // the v1 and v2 façades.
+    let grant = bounded_authority_protocol::types::GrantInput {
+        issuer: "https://issuer.example.test".to_string(),
+        grant_id: "urn:example:grant:v3-1".to_string(),
+        key_id: "issuer".to_string(),
+        holder_thumbprint: Z32,
+        issued_at: 1_000,
+        not_before: 1_000,
+        expires_at: 2_000,
+        audiences: vec!["https://resource.example.test".to_string()],
+        operations: vec![bounded_authority_protocol::types::GrantOperation {
+            name: "transfer".to_string(),
+            selectors: vec![JsonValue::Object(vec![(
+                "kind".to_string(),
+                JsonValue::String("all".to_string()),
+            )])],
+        }],
+    };
+    let produced = v3::grant_signing_input(&grant, &max()).expect("v3 produces");
+    let compact = format!(
+        "{}.{}.{}",
+        String::from_utf8(produced.protected_segment.clone()).unwrap(),
+        String::from_utf8(produced.payload_segment.clone()).unwrap(),
+        String::from_utf8(bounded_authority_protocol::base64url_encode(&[0u8; 64])).unwrap(),
+    );
+    assert!(v3::decode_grant(compact.as_bytes(), &max()).is_ok());
+    assert_eq!(
+        bounded_authority_protocol::v1::decode_grant(compact.as_bytes(), &max()),
+        Err(bounded_authority_protocol::Invalid),
+        "v1 must reject v3 bytes"
+    );
+    assert_eq!(
+        bounded_authority_protocol::v2::decode_grant(compact.as_bytes(), &max()),
+        Err(bounded_authority_protocol::Invalid),
+        "v2 must reject v3 bytes"
+    );
+}

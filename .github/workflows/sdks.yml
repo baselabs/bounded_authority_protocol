@@ -100,6 +100,10 @@ jobs:
         run: python tests/conformance/run_v2.py
         working-directory: sdks/python
 
+      - name: Python — v3 conformance (292 + census)
+        run: python tests/conformance/run_v3.py
+        working-directory: sdks/python
+
   # Rust is Node-independent; per ADR 0015 D4 it runs as its OWN job on the same
   # sdks/** + priv/conformance/** trigger (not folded into the Node matrix). The
   # MSRV (1.81) is pinned by sdks/rust/rust-toolchain.toml; this job installs
@@ -129,7 +133,7 @@ jobs:
       # battery, and the conformance runner that asserts agreed=283 disagreed=0
       # + the two-boundary key census. `--locked` makes the exact resolved
       # dependency versions a reviewed repo change, not a per-run resolution.
-      - name: unit + permissiveness + conformance (283 + census)
+      - name: unit + permissiveness + conformance (283 + 268 + 292 + census)
         run: cargo test --locked
         working-directory: sdks/rust
 
@@ -169,7 +173,7 @@ jobs:
         run: go vet ./...
         working-directory: sdks/go
 
-      - name: unit + permissiveness + conformance (283 + census)
+      - name: unit + permissiveness + conformance (283 + 268 + 292 + census)
         run: go test ./...
         working-directory: sdks/go
 

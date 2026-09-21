@@ -11,6 +11,18 @@ categories = ["cryptography", "authentication"]
 
 [dependencies]
 ed25519-dalek = { version = "2.2", default-features = false }
+# The v3 ES256 backend (contract-major 3, `BAP3-ES256-SHA256`): ECDSA over
+# NIST P-256 with SHA-256, verify-only. `default-features = false` matches the
+# ed25519-dalek posture (no `pem`/`pkcs8`/`std`/`serde`); the `ecdsa` feature
+# pulls the arithmetic + digest machinery `es256.rs` uses (VerifyingKey,
+# Signature, verify_prehash, AffinePoint). It reuses the tree's existing
+# sha2 0.10 / digest / subtle versions.
+p256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
+# Exact pin: zeroize is a transitive dep of p256 whose 1.9.x line requires the
+# edition2024 Cargo feature (Rust >= 1.85); this crate's toolchain is pinned
+# 1.81 (rust-toolchain.toml). The =1.8.1 pin keeps the resolver on the line
+# that builds under 1.81. No other dependency changes.
+zeroize = "=1.8.1"
 sha2 = "0.10"
 ryu-js = "1.0"
 
@@ -41,3 +53,11 @@ path = "conformance/run.rs"
 [[test]]
 name = "conformance_v2"
 path = "conformance/run_v2.rs"
+
+# The v3 conformance runner: the contract-major 3 acceptance gate over the
+# vendored 292-case corpus-v3 snapshot (same SHA-bind + two-boundary census
+# discipline as the v1/v2 runners, against the `v3` façade, the shared
+# primitives, and the v3 ES256 suite surfaces).
+[[test]]
+name = "conformance_v3"
+path = "conformance/run_v3.rs"

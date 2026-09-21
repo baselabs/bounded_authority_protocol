@@ -2,7 +2,7 @@
 
 Deterministic, dependency-free verification for cryptographically bounded, argument-level
 proof-of-possession authority — the open wire profile, verifier, and conformance suite for the
-Bounded Authority Protocol (contract-majors 1 and 2).
+Bounded Authority Protocol (contract-majors 1, 2, and 3).
 
 An issuer signs a **capability grant** that names exactly which operations a holder may invoke and
 with exactly which arguments. On each call the holder presents a **proof-of-possession** bound to
@@ -19,7 +19,7 @@ contains neither, holds no keys, performs no I/O, and runs no service.
 
 Built on IETF primitives: compact JWS (RFC 7515), DPoP proof-of-possession (RFC 9449), JCS
 canonicalization (RFC 8785), JWK thumbprints (RFC 7638), and EdDSA over Ed25519 (RFC 8032). The
-cryptographic suites are `BAP1-Ed25519-SHA256` for v1 and `BAP2-Ed25519-SHA256` for v2.
+cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for v2, and `BAP3-ES256-SHA256` for v3 (ECDSA P-256 with RFC 7518 §3.4 raw signatures and low-S canonicality).
 
 ## Installation
 

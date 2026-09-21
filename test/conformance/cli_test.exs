@@ -19,6 +19,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   @escript_path Path.expand("../../bounded_authority_conformance", __DIR__)
   @shipped_corpus Path.expand("../../priv/conformance/v1/corpus", __DIR__)
   @shipped_v2_corpus Path.expand("../../priv/conformance/v2/corpus", __DIR__)
+  @shipped_v3_corpus Path.expand("../../priv/conformance/v3/corpus", __DIR__)
 
   # --- in-VM Cli.run/1 unit tests (the coverage path) -----------------------
 
@@ -47,6 +48,10 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     assert Cli.run(["--corpus", @shipped_v2_corpus]) == 0
   end
 
+  test "exit 0 on the shipped v3 corpus (in-VM)" do
+    assert Cli.run(["--corpus", @shipped_v3_corpus]) == 0
+  end
+
   # --- ADR 0014 D4: the certified-corpus pin (index-SHA) ---------------------
   # The pin fails closed on any corpus that is NOT the certified snapshot, and the certified value
   # is NOT caller-overridable (no seam). Proven WITHOUT a seam: a corpus whose index.json carries
@@ -57,7 +62,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   @certified_index_sha256 %{
     1 => "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs",
-    2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A"
+    2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A",
+    3 => "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw"
   }
 
   defp whitespace_perturbed_corpus do
@@ -139,6 +145,24 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     assert {:ok, corpus} = Corpus.load(map)
     assert corpus.major == 2
     refute Report.index_identity(corpus.index_bytes) == @certified_index_sha256[2]
+    assert Cli.run(["--corpus", dst]) == 1
+  end
+
+  test "the v3 pin fails closed on a v3 corpus with a perturbed index (major-keyed certification)" do
+    dst = unique_tmp("cli-v3-noncertified") |> Path.dirname()
+    File.cp_r!(@shipped_v3_corpus, dst)
+    index = Path.join(dst, "index.json")
+    File.write!(index, File.read!(index) <> "\n")
+    on_exit(fn -> File.rm_rf!(dst) end)
+
+    map =
+      dst
+      |> Portable.ls_r()
+      |> Map.new(fn p -> {p |> Path.relative_to(dst) |> Portable.to_posix(), File.read!(p)} end)
+
+    assert {:ok, corpus} = Corpus.load(map)
+    assert corpus.major == 3
+    refute Report.index_identity(corpus.index_bytes) == @certified_index_sha256[3]
     assert Cli.run(["--corpus", dst]) == 1
   end
 

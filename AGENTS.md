@@ -32,9 +32,14 @@ package retains zero production
 dependencies, no application callback, and no supervision tree. Contract-major 1 remains frozen;
 contract-major 2 is active under `BoundedAuthorityProtocol.V2` with the `lte` and `gte` selector
 kinds, its own normative profile, certified 268-case corpus, `REQ2-*` traceability, and
-cross-major rejection. The v1 corpus remains 283 cases across 28 surfaces. See
-[ADR 0030](docs/adr/0030-v2-contract-major-activation.md), [`spec/bap-v1.md`](spec/bap-v1.md),
-and [`spec/bap-v2.md`](spec/bap-v2.md).
+cross-major rejection; contract-major 3 is active under `BoundedAuthorityProtocol.V3` — the
+`BAP3-ES256-SHA256` suite (ECDSA P-256/SHA-256, RFC 7518 §3.4 raw `r || s` signatures with
+low-S canonicality, EC JWK holder keys, `BAP3-*` separators) with its own normative profile,
+certified 292-case corpus, `REQ3-*` traceability, and cross-major rejection of v1 and v2 bytes.
+The v1 corpus remains 283 cases across 28 surfaces. See
+[ADR 0030](docs/adr/0030-v2-contract-major-activation.md),
+[ADR 0035](docs/adr/0035-es256-contract-major-activation.md), [`spec/bap-v1.md`](spec/bap-v1.md),
+[`spec/bap-v2.md`](spec/bap-v2.md), and [`spec/bap-v3.md`](spec/bap-v3.md).
 
 Unpublished cross-language verifier SDKs are authored under [`sdks/`](sdks/)
 ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)): Python
@@ -67,7 +72,7 @@ recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK boun
 ADR 0019 (corpus-artifact distribution), ADR 0020 (bounds-aware assembly and issuer-mediated
 reauthorization posture), ADR 0021 (the v1 `all` selector recognized-shapes erratum), ADR 0022
 (durable contract identities), and ADR 0027 (byte-distinct application-proof profiles). Accepted
-ADRs are 0001–0034 (ADR 0029 records the cumulative-budget posture and explicitly defers the
+ADRs are 0001–0035 (ADR 0035 activates the ES256 contract-major 3 suite; ADR 0029 records the cumulative-budget posture and explicitly defers the
 `ba+budget-window` attestation-shape design; ADR 0034 decides the UCP riding point as
 transport-composed) under [`docs/adr/`](docs/adr/). BAP-19's source identity is fixed by
 `v0.3.0`; the registry publication and checksum read-back closed 2026-08-31, and downstream

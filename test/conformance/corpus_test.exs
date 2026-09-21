@@ -22,6 +22,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Jcs
   alias BoundedAuthorityProtocol.V1.Json
+  alias BoundedAuthorityProtocol.V1.Jwk
+  alias BoundedAuthorityProtocol.V3.EcJwk
   alias JSONSchex.Draft202012.Schemas, as: Draft202012Schemas
 
   @json_bytes_max 65_536
@@ -2214,4 +2216,78 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     <<0x30, 0x2E, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x04, 0x22, 0x04,
       0x20, 0xFF::256>>
   end
+
+  # --- v3 suite fingerprint census (two-boundary: index vs case bytes) -------
+
+  test "the v3 index public-key fingerprint census equals the set derivable from the case bytes" do
+    # Boundary 1: the index's declared census. Boundary 2: a scanner that walks every case input,
+    # takes each public_key-bearing member, and derives its suite-native thumbprint (the EC
+    # RFC 7638 member-set thumbprint for 65-byte uncompressed-SEC1 keys, the v1 OKP thumbprint
+    # for 32-byte Ed25519 keys — the cross-major artifacts carry real prior-major keys). The
+    # two must be equal in BOTH directions: a census key nothing references, or a referenced
+    # key the census omits, is a corpus-authoring defect.
+    corpus_dir = Path.expand("../../priv/conformance/v3/corpus", __DIR__)
+    index = corpus_dir |> Path.join("index.json") |> File.read!() |> Jason.decode!()
+
+    derived =
+      corpus_dir
+      |> Portable.ls_r()
+      |> Enum.filter(&String.ends_with?(&1, ".json"))
+      |> Enum.flat_map(fn path ->
+        path
+        |> File.read!()
+        |> Jason.decode!()
+        |> case do
+          %{"cases" => cases} -> cases
+          _ -> []
+        end
+        |> Enum.flat_map(&collect_public_keys(&1["input"]))
+      end)
+      |> MapSet.new()
+
+    declared = index |> Map.fetch!("public_key_fingerprints") |> MapSet.new()
+
+    assert MapSet.equal?(declared, derived)
+  end
+
+  defp collect_public_keys(value), do: collect_public_keys(value, [])
+
+  defp collect_public_keys(%{"public_key" => encoded} = map, acc) when is_binary(encoded) do
+    case Base.url_decode64(encoded, padding: false) do
+      {:ok, pub} when byte_size(pub) == 65 ->
+        case EcJwk.public_key_thumbprint_raw(pub, %{}) do
+          {:ok, raw} ->
+            collect_public_keys(Map.delete(map, "public_key"), [
+              Base.url_encode64(raw, padding: false) | acc
+            ])
+
+          _error ->
+            collect_public_keys(Map.delete(map, "public_key"), acc)
+        end
+
+      {:ok, pub} when byte_size(pub) == 32 ->
+        case Jwk.public_key_thumbprint_raw(pub, %{}) do
+          {:ok, raw} ->
+            collect_public_keys(Map.delete(map, "public_key"), [
+              Base.url_encode64(raw, padding: false) | acc
+            ])
+
+          _error ->
+            collect_public_keys(Map.delete(map, "public_key"), acc)
+        end
+
+      _error ->
+        collect_public_keys(Map.delete(map, "public_key"), acc)
+    end
+  end
+
+  defp collect_public_keys(map, acc) when is_map(map) do
+    Enum.reduce(map, acc, fn {_k, v}, inner -> collect_public_keys(v, inner) end)
+  end
+
+  defp collect_public_keys(list, acc) when is_list(list) do
+    Enum.reduce(list, acc, &collect_public_keys/2)
+  end
+
+  defp collect_public_keys(_scalar, acc), do: acc
 end

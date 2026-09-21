@@ -108,6 +108,45 @@ defmodule BoundedAuthorityProtocol.V2.RuntimeTest do
     assert {:error, :invalid} = V2.decode_grant(v1_compact, %{})
   end
 
+  test "verify_grant rejects v3-major bytes (no cross-major fallback)" do
+    # BAP-22 / ADR 0035 cross-major tripwire, mirroring the v1 test above: a v3 payload
+    # (`v: 3`) on an otherwise-v2 artifact is rejected by the closed v2 decode's
+    # `{:integer, 2}` check — the sole rejector — and the real v3 header (`alg: "ES256"`)
+    # is rejected by the v2 alg pin. v2 stays byte-frozen past its activation.
+    {compact, public} = signed_grant()
+
+    v3_payload =
+      compact
+      |> String.split(".")
+      |> Enum.at(1)
+      |> Base.url_decode64!(padding: false)
+      |> then(&String.replace(&1, ~S("v":2), ~S("v":3)))
+
+    v3_compact =
+      compact
+      |> String.split(".")
+      |> List.replace_at(1, Base.url_encode64(v3_payload, padding: false))
+      |> Enum.join(".")
+
+    assert {:error, :invalid} = V2.decode_grant(v3_compact, %{})
+
+    es256_header =
+      compact
+      |> String.split(".")
+      |> Enum.at(0)
+      |> Base.url_decode64!(padding: false)
+      |> then(&String.replace(&1, ~S("EdDSA"), ~S("ES256")))
+
+    es256_compact =
+      v3_compact
+      |> String.split(".")
+      |> List.replace_at(0, Base.url_encode64(es256_header, padding: false))
+      |> Enum.join(".")
+
+    assert {:error, :invalid} =
+             V2.verify_grant(es256_compact, trusted(public), expected_grant())
+  end
+
   test "verify_grant rejects the v1 closed rejection classes under v2 constants" do
     {compact, public} = signed_grant()
 

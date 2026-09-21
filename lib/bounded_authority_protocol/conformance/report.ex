@@ -14,7 +14,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Report do
 
   @report_formats %{
     1 => "bounded-authority-protocol-v1-conformance-report",
-    2 => "bounded-authority-protocol-v2-conformance-report"
+    2 => "bounded-authority-protocol-v2-conformance-report",
+    3 => "bounded-authority-protocol-v3-conformance-report"
   }
 
   @enforce_keys [:agreement, :exit_status, :total, :agreed, :disagreed]

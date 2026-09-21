@@ -11,7 +11,7 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
   #
   # Usage:
   #   mix corpus.digests                # CHECK (default): exits red on any drifted/missing pin
-  #   elixir scripts/regen_corpus_digests.exs --write   # rewrite all twelve constants in place
+  #   elixir scripts/regen_corpus_digests.exs --write   # rewrite all fifteen constants in place
   #
   # The check is wired into `mix quality` (corpus.digests leg). Anchors are value-independent
   # (line-prefix matches on each declaration), each must match exactly one line, and every
@@ -20,10 +20,11 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
 
   @root Path.expand("..", __DIR__)
 
-  @majors [1, 2]
+  @majors [1, 2, 3]
 
   defp index_path(1), do: Path.join(@root, "priv/conformance/v1/corpus/index.json")
   defp index_path(2), do: Path.join(@root, "priv/conformance/v2/corpus/index.json")
+  defp index_path(3), do: Path.join(@root, "priv/conformance/v3/corpus/index.json")
 
   # Single-line declarations: {file, encoding, line prefix, line suffix}. The Rust pins are
   # two-line and handled separately below. Each major pins in the same files; the anchors
@@ -41,8 +42,17 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
     [
       {"sdks/go/conformance/v2_test.go", :base64url, "const certifiedIndexSHA256 = \"", "\""},
       {"sdks/python/tests/conformance/run_v2.py", :hex, "CERTIFIED_INDEX_SHA = \"", "\""},
-      {"lib/bounded_authority_protocol/conformance/cli.ex", :base64url, "2 => \"", "\""},
-      {"test/conformance/cli_test.exs", :base64url, "2 => \"", "\""}
+      {"lib/bounded_authority_protocol/conformance/cli.ex", :base64url, "2 => \"", "\","},
+      {"test/conformance/cli_test.exs", :base64url, "2 => \"", "\","}
+    ]
+  end
+
+  defp single_line_pins(3) do
+    [
+      {"sdks/go/conformance/v3_test.go", :base64url, "const certifiedIndexSHA256 = \"", "\""},
+      {"sdks/python/tests/conformance/run_v3.py", :hex, "CERTIFIED_INDEX_SHA = \"", "\""},
+      {"lib/bounded_authority_protocol/conformance/cli.ex", :base64url, "3 => \"", "\""},
+      {"test/conformance/cli_test.exs", :base64url, "3 => \"", "\""}
     ]
   end
 
@@ -50,6 +60,8 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
   @rust_pin_marker "const CERTIFIED_INDEX_SHA: &str ="
   @rust_v2_pin_file "sdks/rust/conformance/run_v2.rs"
   @rust_v2_pin_marker "const CERTIFIED_INDEX_SHA: &str ="
+  @rust_v3_pin_file "sdks/rust/conformance/run_v3.rs"
+  @rust_v3_pin_marker "const CERTIFIED_INDEX_SHA: &str ="
 
   def run(argv) do
     case argv do
@@ -103,6 +115,13 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
     end
   end
 
+  defp check_rust_pin(3, digests) do
+    case locate_rust_pin(@rust_v3_pin_file, @rust_v3_pin_marker) do
+      {:ok, value} -> shape_problems(:hex, value, @rust_v3_pin_file, digests.hex)
+      {:error, reason} -> ["#{@rust_v3_pin_file}: #{reason}"]
+    end
+  end
+
   defp expected_for(:hex, digests), do: digests.hex
   defp expected_for(:base64url, digests), do: digests.base64url
 
@@ -152,7 +171,12 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
         end
       end)
 
-      rust_file = if(major == 1, do: @rust_pin_file, else: @rust_v2_pin_file)
+      rust_file =
+        case major do
+          1 -> @rust_pin_file
+          2 -> @rust_v2_pin_file
+          3 -> @rust_v3_pin_file
+        end
 
       case rewrite_rust_line(rust_file, "    \"#{digests.hex}\";") do
         :ok -> IO.puts("rewrote #{rust_file} major=#{major} (hex)")
@@ -233,7 +257,14 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
 
   defp rewrite_rust_line(file, new_line) do
     path = Path.join(@root, file)
-    marker = if(file == @rust_pin_file, do: @rust_pin_marker, else: @rust_v2_pin_marker)
+
+    marker =
+      cond do
+        file == @rust_pin_file -> @rust_pin_marker
+        file == @rust_v2_pin_file -> @rust_v2_pin_marker
+        file == @rust_v3_pin_file -> @rust_v3_pin_marker
+        true -> @rust_pin_marker
+      end
 
     with {:ok, contents} <- read(path),
          {:ok, _value} <- locate_rust_pin(file, marker),

@@ -40,15 +40,18 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   # cannot mix materials across majors.
   @index_formats %{
     "bounded-authority-protocol-v1-conformance-corpus-index" => 1,
-    "bounded-authority-protocol-v2-conformance-corpus-index" => 2
+    "bounded-authority-protocol-v2-conformance-corpus-index" => 2,
+    "bounded-authority-protocol-v3-conformance-corpus-index" => 3
   }
   @revision_formats %{
     1 => "bounded-authority-protocol-v1-conformance-corpus-revision",
-    2 => "bounded-authority-protocol-v2-conformance-corpus-revision"
+    2 => "bounded-authority-protocol-v2-conformance-corpus-revision",
+    3 => "bounded-authority-protocol-v3-conformance-corpus-revision"
   }
   @case_formats %{
     1 => "bounded-authority-protocol-v1-conformance-cases",
-    2 => "bounded-authority-protocol-v2-conformance-cases"
+    2 => "bounded-authority-protocol-v2-conformance-cases",
+    3 => "bounded-authority-protocol-v3-conformance-cases"
   }
 
   @doc "Loads and integrity-verifies a `%{path => binary}` corpus map."

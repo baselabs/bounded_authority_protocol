@@ -59,7 +59,26 @@ defmodule BoundedAuthorityProtocol.Architecture.DurableIdentifierPolicyTest do
             kind: :requirement_id,
             name: "REQ1-HEADER-issuer-fingerprint"
           },
-          %{path: "priv/conformance/v2/corpus/index.json", kind: :wire_field, name: ~s("v": 2)}
+          %{path: "priv/conformance/v2/corpus/index.json", kind: :wire_field, name: ~s("v": 2)},
+          %{path: "lib/bounded_authority_protocol/v3.ex", kind: :path, name: "v3"},
+          %{
+            path: "lib/bounded_authority_protocol/v3/grant.ex",
+            kind: :module,
+            name: "BoundedAuthorityProtocol.V3.Grant"
+          },
+          %{path: "spec/bap-v3.md", kind: :path, name: "bap-v3"},
+          %{path: "spec/bap-v3.md", kind: :wire_suite, name: "BAP3-ES256-SHA256"},
+          %{
+            path: "lib/bounded_authority_protocol/v3/consumption_chain.ex",
+            kind: :wire_domain,
+            name: "BAP3-CHAIN"
+          },
+          %{
+            path: "spec/bap-v3.md",
+            kind: :requirement_id,
+            name: "REQ3-KEY-uncompressed-sec1"
+          },
+          %{path: "priv/conformance/v3/corpus/index.json", kind: :wire_field, name: ~s("v": 3)}
         ] do
       assert :ok = DurableIdentifierPolicy.check(fixture)
     end
@@ -67,11 +86,11 @@ defmodule BoundedAuthorityProtocol.Architecture.DurableIdentifierPolicyTest do
 
   test "implementation genealogy and unaccepted contract majors are rejected" do
     for fixture <- [
-          %{path: "lib/bounded_authority_protocol/v3.ex", kind: :path, name: "v3"},
+          %{path: "lib/bounded_authority_protocol/v4.ex", kind: :path, name: "v4"},
           %{
-            path: "lib/bounded_authority_protocol/v3/grant.ex",
+            path: "lib/bounded_authority_protocol/v4/grant.ex",
             kind: :module,
-            name: "BoundedAuthorityProtocol.V3.Grant"
+            name: "BoundedAuthorityProtocol.V4.Grant"
           },
           %{
             path: "lib/bounded_authority_protocol/v2/grant.ex",
@@ -145,7 +164,7 @@ defmodule BoundedAuthorityProtocol.Architecture.DurableIdentifierPolicyTest do
     map_ids =
       "docs/design/requirement-map.md"
       |> File.read!()
-      |> then(&Regex.scan(~r/\bREQ[12]-[A-Z0-9]+-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\b/, &1))
+      |> then(&Regex.scan(~r/\bREQ[123]-[A-Z0-9]+-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\b/, &1))
       |> Enum.map(fn [name] -> name end)
       |> MapSet.new()
 

@@ -64,3 +64,15 @@ decrypt-later sensitive deployments.
   corpus, the composite decision, and the re-anchoring procedure for long-lived evidence.
 - Long-evidence deployments have a published posture to plan against instead of an open
   question.
+
+---
+
+## Reconciliation note (2026-09-21, added by ADR 0035)
+
+This ADR's `BAP2-*` family index was written when the successor major was expected to be
+major 2; ADR 0030 took major 2 at unchanged algorithms, and ADR 0035 now takes major 3 for
+the ES256 suite. The decision substance is unchanged — the PQ successor candidate family is
+`BAP<next-successor-major>-*` — and the registries' ML-DSA anticipated row already indexes
+it that way (ADR 0030 first moved the anticipated index; ADR 0035 moves it once more to the
+next successor major). Read every `BAP2-*` below as the generic successor-major family
+index; the text is retained unmodified as the historical record.

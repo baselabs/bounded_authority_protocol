@@ -5,15 +5,23 @@
 [extend]
 useDefault = true
 
+
+[[allowlists]]
+description = "v3 ES256 corpus public compact JWS fixtures (machine-minted, certified, no private material - the corpus loader's private-material sweep and the certified mint prove it; path-scoped because enumerating a generated corpus's compacts is unmaintainable)"
+targetRules = ["jwt", "generic-api-key"]
+paths = [
+  '''^priv/conformance/v3/corpus/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
+  '''^sdks/(?:go|rust)/conformance/corpus-v3/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
+]
 [[allowlists]]
 description = "Current public fingerprint and public-key fixture matches"
 condition = "AND"
 targetRules = ["generic-api-key"]
 regexTarget = "match"
 paths = [
-  '''^priv/conformance/v[12]/corpus/cases/(?:anchored-export|boundary-anchor|key-transition|signing-input)/[^/]+\.json$''',
+  '''^priv/conformance/v[123]/corpus/cases/(?:anchored-export|boundary-anchor|key-transition|signing-input)/[^/]+\.json$''',
   '''^priv/conformance/v1/vectors/(?:chain-semantic-edge|consumption-chain-archive)\.json$''',
-  '''^sdks/(?:go|rust)/conformance/corpus(?:-v2)?/cases/(?:anchored-export|boundary-anchor|key-transition|signing-input)/[^/]+\.json$''',
+  '''^sdks/(?:go|rust)/conformance/corpus(?:-v2|-v3)?/cases/(?:anchored-export|boundary-anchor|key-transition|signing-input)/[^/]+\.json$''',
   '''^sdks/go/(?:jwk_test|permissiveness_internal_test|review_regressions_test)\.go$''',
   '''^sdks/go/tests/permissiveness_test\.go$''',
   '''^sdks/rust/src/ed25519\.rs$''',
@@ -108,9 +116,9 @@ regexTarget = "match"
 paths = [
   '''^(?:docs/protocol-v1|spec/bap-v1)\.md$''',
   '''^priv/conformance/application-profiles/local-loopback-http/v1/(?:profile|proof-cases)\.json$''',
-  '''^priv/conformance/v[12]/corpus/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
+  '''^priv/conformance/v[123]/corpus/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
   '''^priv/conformance/v1/vectors/(?:chain-semantic-edge|consumption-chain-archive|grant-holder-proof)\.json$''',
-  '''^sdks/(?:go|rust)/conformance/corpus(?:-v2)?/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
+  '''^sdks/(?:go|rust)/conformance/corpus(?:-v2|-v3)?/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
   '''^sdks/go/(?:permissiveness_internal_test|tests/permissiveness_test)\.go$''',
 ]
 regexes = [
@@ -358,7 +366,7 @@ commits = [
 ]
 regexTarget = "match"
 paths = [
-  '''^sdks/typescript/conformance/corpus(?:-v2)?/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
+  '''^sdks/typescript/conformance/corpus(?:-v2|-v3)?/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
 ]
 regexes = [
   '''^eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6IjJIWXZkSHV1OXBiSmVyWVpwWVE3WUNaWV8wbG5QQ2c4bkh6bEN1U3hCV3cifSwidHlwIjoiZHBvcCtqd3QifQ\.eyJhdGgiOiJGYmZHS1g2SDg5b25aMXdwYVZoYUVHZDBnWnpkM2tqYWxTbUJyeHU5WVRjIiwiYmFfaW52IjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwiYmFfb3AiOiJ0cmFuc2ZlciIsImJhX3JlcSI6Il9WZkdrSl9WbFNZOGtlMUlTZGY4NVJBbWZna2tnTkhQbWZ4dTBZTE42blEiLCJodG0iOiJQT1NUIiwiaHR1IjoiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QvaW52b2tlIiwiaWF0IjoxMTAwLCJqdGkiOiJ1cm46ZXhhbXBsZTpwcm9vZjp2Mi0xIiwidiI6Mn0\.7Aocf7CK4BS5ErMQcLb0CdvvA6veKlGUbWSNvj4YNyDsVMLgmOWfizFKEJpkYA_ZgGhg67W090sYa_h1vLbZBQ"$''',

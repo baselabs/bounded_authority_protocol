@@ -35,7 +35,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   # runner's certified pin for that major in the same change (scripts/regen_corpus_digests.exs).
   @certified_index_sha256 %{
     1 => "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs",
-    2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A"
+    2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A",
+    3 => "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw"
   }
 
   @doc """

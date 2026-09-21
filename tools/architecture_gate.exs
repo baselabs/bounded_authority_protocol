@@ -215,6 +215,65 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:verify, 3} => %{variable_call: 20},
       {:verify_transitions, 7} => %{variable_call: 2}
     },
+    # The v3 mirrors: counts computed from the compiled beams and pinned exactly
+    # (harvested from the gate's own observed-value output at authoring).
+    "Elixir.BoundedAuthorityProtocol.V3.Runtime.beam" => %{
+      {:decode_audiences, 2} => %{variable_call: 2},
+      {:decode_grant_fields, 3} => %{variable_call: 23},
+      {:decode_proof_fields, 3} => %{variable_call: 25},
+      {:encode_operation, 2} => %{variable_call: 3},
+      {:encode_operations, 2} => %{variable_call: 3},
+      {:encode_selector, 2} => %{variable_call: 11},
+      {:fixed, 1} => %{variable_call: 1},
+      {:grant_json, 2} => %{variable_call: 8},
+      {:map_ok, 3} => %{variable_call: 1},
+      {:operation, 2} => %{variable_call: 6},
+      {:operations, 2} => %{variable_call: 2},
+      {:proof_json, 2} => %{variable_call: 13},
+      {:selector, 2} => %{variable_call: 15},
+      {:validate_expected_request, 2} => %{variable_call: 10},
+      {:verify_grant_parsed, 4} => %{variable_call: 8},
+      {:verify_proof_parsed, 5} => %{variable_call: 15}
+    },
+    "Elixir.BoundedAuthorityProtocol.V3.Selector.beam" => %{
+      {:match_all, 3} => %{variable_call: 4}
+    },
+    "Elixir.BoundedAuthorityProtocol.V3.RequestDigest.beam" => %{
+      {:digest, 3} => %{variable_call: 4},
+      {:digest_raw, 3} => %{variable_call: 2}
+    },
+    "Elixir.BoundedAuthorityProtocol.V3.ConsumptionChain.beam" => %{
+      {:check, 2} => %{variable_call: 5},
+      {:check_rows, 5} => %{variable_call: 4},
+      {:encode, 2} => %{variable_call: 4},
+      {:parse_row, 2} => %{variable_call: 10}
+    },
+    "Elixir.BoundedAuthorityProtocol.V3.BoundaryAnchorCodec.beam" => %{
+      {:parse, 2} => %{variable_call: 27},
+      {:signing_input, 2} => %{variable_call: 5},
+      {:validate_anchor, 2} => %{variable_call: 3},
+      {:verify, 3} => %{variable_call: 16}
+    },
+    "Elixir.BoundedAuthorityProtocol.V3.KeyTransitionCodec.beam" => %{
+      {:parse, 2} => %{variable_call: 27},
+      {:signing_input, 2} => %{variable_call: 6},
+      {:validate_transition_input, 2} => %{variable_call: 5},
+      {:verify, 4} => %{variable_call: 21}
+    },
+    "Elixir.BoundedAuthorityProtocol.V3.AnchoredExportCodec.beam" => %{
+      {:encode, 2} => %{variable_call: 13},
+      {:parse_archive, 2} => %{variable_call: 10},
+      {:parse_expected_transitions, 5} => %{variable_call: 2},
+      {:parse_header, 2} => %{variable_call: 18},
+      {:read_frame, 2} => %{variable_call: 3},
+      {:read_transition_frames, 5} => %{variable_call: 2},
+      {:validate_expected_anchored_export, 2} => %{variable_call: 3},
+      {:validate_expected_export, 2} => %{variable_call: 18},
+      {:validate_expected_key_path, 6} => %{variable_call: 3},
+      {:validate_key_chain, 5} => %{variable_call: 4},
+      {:verify, 3} => %{variable_call: 20},
+      {:verify_transitions, 7} => %{variable_call: 2}
+    },
     "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam" => %{
       {:reduce_build, 2} => %{variable_call: 1}
     },
@@ -331,6 +390,50 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
                                     module_info: 0,
                                     module_info: 1,
                                     proof_signing_input: 2,
+                                    verify_anchored_export: 3,
+                                    verify_grant: 3,
+                                    verify_historical_anchor: 3,
+                                    verify_key_transition: 4
+                                  ],
+                                  "Elixir.BoundedAuthorityProtocol.V3.Runtime.beam" => [
+                                    __info__: 1,
+                                    assemble_compact: 3,
+                                    boundary_anchor_signing_input: 2,
+                                    check_chain: 2,
+                                    check_envelope: 2,
+                                    decode_grant: 2,
+                                    decode_proof: 2,
+                                    encode_anchored_export: 2,
+                                    encode_consumption_entry: 2,
+                                    grant_signing_input: 2,
+                                    key_transition_signing_input: 2,
+                                    module_info: 0,
+                                    module_info: 1,
+                                    proof_signing_input: 2,
+                                    verify_anchored_export: 3,
+                                    verify_grant: 3,
+                                    verify_historical_anchor: 3,
+                                    verify_key_transition: 4
+                                  ],
+                                  "Elixir.BoundedAuthorityProtocol.V3.beam" => [
+                                    __info__: 1,
+                                    assemble_compact: 2,
+                                    assemble_compact: 3,
+                                    boundary_anchor_signing_input: 2,
+                                    check_chain: 2,
+                                    check_envelope: 2,
+                                    decode_grant: 2,
+                                    decode_proof: 2,
+                                    encode_anchored_export: 2,
+                                    encode_consumption_entry: 2,
+                                    grant_signing_input: 2,
+                                    key_transition_signing_input: 2,
+                                    module_info: 0,
+                                    module_info: 1,
+                                    proof_signing_input: 2,
+                                    request_digest: 3,
+                                    untrusted_key_locator: 1,
+                                    untrusted_key_locator: 2,
                                     verify_anchored_export: 3,
                                     verify_grant: 3,
                                     verify_historical_anchor: 3,
@@ -487,7 +590,13 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "lib/bounded_authority_protocol/v2/chain_facts.ex",
     "lib/bounded_authority_protocol/v2/envelope_facts.ex",
     "lib/bounded_authority_protocol/v2/grant_facts.ex",
-    "lib/bounded_authority_protocol/v2/key_transition_facts.ex"
+    "lib/bounded_authority_protocol/v2/key_transition_facts.ex",
+    "lib/bounded_authority_protocol/v3/anchor_facts.ex",
+    "lib/bounded_authority_protocol/v3/anchored_export_facts.ex",
+    "lib/bounded_authority_protocol/v3/chain_facts.ex",
+    "lib/bounded_authority_protocol/v3/envelope_facts.ex",
+    "lib/bounded_authority_protocol/v3/grant_facts.ex",
+    "lib/bounded_authority_protocol/v3/key_transition_facts.ex"
   ]
 
   @chain_codec_source_paths [
@@ -498,7 +607,11 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "lib/bounded_authority_protocol/v2/anchored_export_codec.ex",
     "lib/bounded_authority_protocol/v2/boundary_anchor_codec.ex",
     "lib/bounded_authority_protocol/v2/consumption_chain.ex",
-    "lib/bounded_authority_protocol/v2/key_transition_codec.ex"
+    "lib/bounded_authority_protocol/v2/key_transition_codec.ex",
+    "lib/bounded_authority_protocol/v3/anchored_export_codec.ex",
+    "lib/bounded_authority_protocol/v3/boundary_anchor_codec.ex",
+    "lib/bounded_authority_protocol/v3/consumption_chain.ex",
+    "lib/bounded_authority_protocol/v3/key_transition_codec.ex"
   ]
 
   @erlang_module_categories %{
@@ -588,7 +701,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     elixir_erl_pass: ~w(no_parens_remote)a
   }
 
-  @approved_local_aliases ~w(AnchorFacts AnchoredExportCodec AnchoredExportFacts SharedSelector V1Facade V2Facade
+  @approved_local_aliases ~w(AnchorFacts AnchoredExportCodec AnchoredExportFacts SharedSelector SharedValidation V1Facade V2Facade V3Facade EcJwk Es256
     AnchoredExportInput ArchivedObject Base64Url BoundaryAnchor BoundaryAnchorCodec Bounds
     ChainFacts ChainInput CompactJws ConsumptionChain ConsumptionEntry Container ContextValidation Credentials
     Corpus DecodedGrant DecodedProof EncodedAnchoredExport EncodedConsumptionEntry EnvelopeFacts
@@ -994,6 +1107,32 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp source_dynamic_allowance_violations(
          ast,
+         "lib/bounded_authority_protocol/v3/runtime.ex" = path
+       ) do
+    {_ast, count} =
+      Macro.prewalk(ast, 0, fn
+        {{:., _dot_meta, [_callable_ast]}, _meta, args} = node, count when is_list(args) ->
+          {node, count + 1}
+
+        node, count ->
+          {node, count}
+      end)
+
+    if count == 2 do
+      []
+    else
+      [
+        violation(
+          :dynamic_dispatch,
+          path,
+          "source dynamic-call allowance expected 2, got #{count}"
+        )
+      ]
+    end
+  end
+
+  defp source_dynamic_allowance_violations(
+         ast,
          "lib/bounded_authority_protocol/v1/runtime.ex" = path
        ) do
     {_ast, count} =
@@ -1146,6 +1285,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     if path in [
          "lib/bounded_authority_protocol/v1/runtime.ex",
          "lib/bounded_authority_protocol/v2/runtime.ex",
+         "lib/bounded_authority_protocol/v3/runtime.ex",
          "lib/bounded_authority_protocol/conformance/runner.ex",
          "lib/bounded_authority_protocol/conformance/corpus.ex",
          "lib/bounded_authority_protocol/conformance/report.ex",
@@ -1449,6 +1589,34 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules("lib/bounded_authority_protocol/v2/selector.ex"),
     do: ~w(Enum List String)
 
+  # The v3 contract-major mirrors, plus the suite modules (EcJwk/Es256) the codecs pin.
+  defp approved_source_modules("lib/bounded_authority_protocol/v3/runtime.ex"),
+    do: ~w(Access EcJwk Es256 Enum MapSet String StringOrUri URI)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/v3/selector.ex"),
+    do: ~w(Enum List String)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/v3/request_digest.ex"),
+    do: ~w(Enum)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/v3/context_validation.ex"),
+    do: ~w(String StringOrUri)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/v3/ec_jwk.ex"),
+    do: ~w(Integer)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/v3/compact_jws.ex"),
+    do: ~w(EcJwk)
+
+  defp approved_source_modules(path)
+       when path in [
+              "lib/bounded_authority_protocol/v3/anchored_export_codec.ex",
+              "lib/bounded_authority_protocol/v3/boundary_anchor_codec.ex",
+              "lib/bounded_authority_protocol/v3/consumption_chain.ex",
+              "lib/bounded_authority_protocol/v3/key_transition_codec.ex"
+            ],
+       do: ~w(Access EcJwk Es256 Enum Map String StringOrUri URI)
+
   defp approved_source_modules("lib/bounded_authority_protocol/v2/request_digest.ex"),
     do: ~w(Enum)
 
@@ -1500,6 +1668,96 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          function
        ),
        do: {module, function} in [{:binary, :match}, {"Map", :new}]
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/v3/compact_jws.ex",
+         module,
+         function
+       ),
+       do: {module, function} in [{:binary, :match}, {"Map", :new}]
+
+  defp approved_source_call?("lib/bounded_authority_protocol/v3/ec_jwk.ex", module, function),
+    do:
+      {module, function} in [
+        {:binary, :decode_unsigned},
+        {"Integer", :mod},
+        {"Map", :new}
+      ]
+
+  defp approved_source_call?("lib/bounded_authority_protocol/v3/es256.ex", module, function),
+    do:
+      {module, function} in [
+        {:binary, :decode_unsigned},
+        {:binary, :encode_unsigned},
+        {:binary, :first}
+      ]
+
+  defp approved_source_call?("lib/bounded_authority_protocol/v3/runtime.ex", _module, :get),
+    do: true
+
+  defp approved_source_call?("lib/bounded_authority_protocol/v3/runtime.ex", :dynamic, function),
+    do: function in [:name, :public_key]
+
+  defp approved_source_call?("lib/bounded_authority_protocol/v3/runtime.ex", module, function),
+    do:
+      {module, function} in [
+        {:binary, :bin_to_list},
+        {"Access", :get},
+        {"Enum", :all?},
+        {"Enum", :any?},
+        {"Enum", :find_value},
+        {"Enum", :map},
+        {"Enum", :reverse},
+        {"Enum", :sort},
+        {"Map", :new},
+        {"MapSet", :new},
+        {"MapSet", :size},
+        {"String", :valid?},
+        {"StringOrUri", :valid?},
+        {"URI", :new}
+      ]
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/v3/request_digest.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {:binary, :bin_to_list},
+           {"Enum", :all?},
+           {"Enum", :reverse}
+         ]
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/v3/anchored_export_codec.ex",
+         _module,
+         :get
+       ),
+       do: true
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/v3/anchored_export_codec.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {:erlang, :iolist_to_binary},
+           {"Access", :get},
+           {"Enum", :map},
+           {"Enum", :sort},
+           {"Map", :new}
+         ]
+
+  defp approved_source_call?("lib/bounded_authority_protocol/v3/selector.ex", module, function),
+    do:
+      {module, function} in [
+        {"List", :keyfind},
+        {"String", :valid?},
+        {"Enum", :all?},
+        {"Enum", :any?}
+      ]
 
   defp approved_source_call?("lib/bounded_authority_protocol/v1/jcs.ex", module, function),
     do:
@@ -1989,6 +2247,17 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          "Elixir.BoundedAuthorityProtocol.V2.KeyTransitionFacts.beam",
          "Elixir.BoundedAuthorityProtocol.V2.Operation.beam",
          "Elixir.BoundedAuthorityProtocol.V2.Proof.beam",
+         "Elixir.BoundedAuthorityProtocol.V3.AnchorFacts.beam",
+         "Elixir.BoundedAuthorityProtocol.V3.AnchoredExportFacts.beam",
+         "Elixir.BoundedAuthorityProtocol.V3.ChainFacts.beam",
+         "Elixir.BoundedAuthorityProtocol.V3.DecodedGrant.beam",
+         "Elixir.BoundedAuthorityProtocol.V3.DecodedProof.beam",
+         "Elixir.BoundedAuthorityProtocol.V3.EnvelopeFacts.beam",
+         "Elixir.BoundedAuthorityProtocol.V3.Grant.beam",
+         "Elixir.BoundedAuthorityProtocol.V3.GrantFacts.beam",
+         "Elixir.BoundedAuthorityProtocol.V3.KeyTransitionFacts.beam",
+         "Elixir.BoundedAuthorityProtocol.V3.Operation.beam",
+         "Elixir.BoundedAuthorityProtocol.V3.Proof.beam",
          "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
          "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",
          "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam"
@@ -2114,6 +2383,91 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         ]
 
       "Elixir.BoundedAuthorityProtocol.V2.Selector.beam" ->
+        [
+          {Enum, :all?},
+          {Enum, :any?},
+          {Enum, :__in__},
+          {Enum, :map},
+          {Enum, :member?},
+          {Function, :identity},
+          {List, :keyfind},
+          {String, :valid?},
+          {Range, :new}
+        ]
+
+      # The v3 mirrors (observed compiled imports pinned exactly; the suite modules add
+      # the EC JWK and ES256 primitives' own imports).
+      "Elixir.BoundedAuthorityProtocol.V3.AnchoredExportCodec.beam" ->
+        [
+          {Access, :get},
+          {Enum, :map},
+          {Enum, :sort},
+          {Map, :new},
+          {:erlang, :iolist_to_binary}
+        ]
+
+      v3_codec_beam
+      when v3_codec_beam in [
+             "Elixir.BoundedAuthorityProtocol.V3.BoundaryAnchorCodec.beam",
+             "Elixir.BoundedAuthorityProtocol.V3.ConsumptionChain.beam",
+             "Elixir.BoundedAuthorityProtocol.V3.KeyTransitionCodec.beam"
+           ] ->
+        [
+          {Access, :get},
+          {Enum, :__in__},
+          {Enum, :map},
+          {Enum, :member?},
+          {Enum, :sort},
+          {Function, :identity},
+          {Map, :new},
+          {Range, :new}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.V3.CompactJws.beam" ->
+        [{Map, :new}, {:binary, :match}]
+
+      "Elixir.BoundedAuthorityProtocol.V3.EcJwk.beam" ->
+        [{Map, :new}, {:binary, :decode_unsigned}, {Integer, :mod}]
+
+      "Elixir.BoundedAuthorityProtocol.V3.Es256.beam" ->
+        [
+          {:binary, :decode_unsigned},
+          {:binary, :encode_unsigned},
+          {:binary, :first}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.V3.RequestDigest.beam" ->
+        [
+          {Enum, :all?},
+          {Enum, :__in__},
+          {Enum, :member?},
+          {Enum, :reverse},
+          {Function, :identity},
+          {Range, :new},
+          {:binary, :bin_to_list}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.V3.Runtime.beam" ->
+        [
+          {Access, :get},
+          {Enum, :all?},
+          {Enum, :any?},
+          {Enum, :find_value},
+          {Enum, :__in__},
+          {Enum, :map},
+          {Enum, :member?},
+          {Enum, :reverse},
+          {Enum, :sort},
+          {Function, :identity},
+          {Map, :new},
+          {MapSet, :new},
+          {MapSet, :size},
+          {Range, :new},
+          {:binary, :bin_to_list},
+          {:lists, :member}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.V3.Selector.beam" ->
         [
           {Enum, :all?},
           {Enum, :any?},
@@ -2413,6 +2767,17 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            "Elixir.BoundedAuthorityProtocol.V2.RequestDigest.beam",
            "Elixir.BoundedAuthorityProtocol.V2.Runtime.beam",
            "Elixir.BoundedAuthorityProtocol.V2.Selector.beam",
+           "Elixir.BoundedAuthorityProtocol.V3.beam",
+           "Elixir.BoundedAuthorityProtocol.V3.AnchoredExportCodec.beam",
+           "Elixir.BoundedAuthorityProtocol.V3.BoundaryAnchorCodec.beam",
+           "Elixir.BoundedAuthorityProtocol.V3.CompactJws.beam",
+           "Elixir.BoundedAuthorityProtocol.V3.ConsumptionChain.beam",
+           "Elixir.BoundedAuthorityProtocol.V3.EcJwk.beam",
+           "Elixir.BoundedAuthorityProtocol.V3.Es256.beam",
+           "Elixir.BoundedAuthorityProtocol.V3.KeyTransitionCodec.beam",
+           "Elixir.BoundedAuthorityProtocol.V3.RequestDigest.beam",
+           "Elixir.BoundedAuthorityProtocol.V3.Runtime.beam",
+           "Elixir.BoundedAuthorityProtocol.V3.Selector.beam",
            "Elixir.BoundedAuthorityProtocol.V1.beam",
            "Elixir.BoundedAuthorityProtocol.V1.Base64Url.beam",
            "Elixir.BoundedAuthorityProtocol.V1.AnchoredExportCodec.beam",

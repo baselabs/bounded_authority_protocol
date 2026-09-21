@@ -40,6 +40,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   alias BoundedAuthorityProtocol.V1.TrustedIssuer
   alias BoundedAuthorityProtocol.V1.Uri
   alias BoundedAuthorityProtocol.V2, as: V2Facade
+  alias BoundedAuthorityProtocol.V3, as: V3Facade
+  alias BoundedAuthorityProtocol.V3.EcJwk
 
   # Surfaces whose implementations are major-neutral shared modules: a v2 corpus case
   # executes the identical function the v1 corpus certifies, so v2 dispatches to the same
@@ -55,6 +57,16 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     "jwk.thumbprint",
     "jwk.thumbprint_raw",
     "jwk.public_key_thumbprint_raw",
+    "bounds.new"
+  ]
+
+  # The v3 suite's JWK surface is the EC codec, not the shared Ed25519 one, so v3
+  # shares only the encoding-algebra primitives.
+  @v3_shared_surfaces [
+    "json.decode",
+    "base64url.decode",
+    "uri.normalize",
+    "jcs.encode",
     "bounds.new"
   ]
 
@@ -645,6 +657,256 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end
   end
 
+  defp dispatch(3, surface, input, raws) when surface in @v3_shared_surfaces,
+    do: dispatch(1, surface, input, raws)
+
+  defp dispatch(3, "jwk.encode_public", input, _raws) do
+    with {:ok, public_key} <- input_public_key(input) do
+      case EcJwk.encode_public(public_key, Bounds.maximum()) do
+        {:ok, encoded} -> {:ok, %{"encoded" => encoded}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "jwk.decode_public", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws) do
+      case EcJwk.decode_public(bytes, Bounds.maximum()) do
+        {:ok, public_key} -> {:ok, %{"public_key" => public_key}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "jwk.thumbprint_preimage", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws) do
+      case EcJwk.thumbprint_preimage(bytes, Bounds.maximum()) do
+        {:ok, preimage} -> {:ok, %{"preimage" => preimage}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "jwk.thumbprint", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws) do
+      case EcJwk.thumbprint(bytes, Bounds.maximum()) do
+        {:ok, thumbprint} -> {:ok, %{"thumbprint" => thumbprint}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "jwk.thumbprint_raw", input, raws) do
+    with {:ok, bytes} <- input_bytes(input, raws) do
+      case EcJwk.thumbprint_raw(bytes, Bounds.maximum()) do
+        {:ok, raw} -> {:ok, %{"thumbprint_raw" => raw}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "jwk.public_key_thumbprint_raw", input, _raws) do
+    with {:ok, public_key} <- input_public_key(input) do
+      case EcJwk.public_key_thumbprint_raw(public_key, Bounds.maximum()) do
+        {:ok, raw} -> {:ok, %{"thumbprint_raw" => raw}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "untrusted_key_locator", input, _raws) do
+    with {:ok, compact} <- fetch_binary(input, "compact") do
+      case V3Facade.untrusted_key_locator(compact, %{}) do
+        {:ok, locator} -> {:ok, %{"kid" => locator.kid}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "grant_signing_input", input, _raws) do
+    with {:ok, grant} <- build_grant(input, 3) do
+      case V3Facade.grant_signing_input(grant, bounds(input)) do
+        {:ok, si} ->
+          {:ok,
+           %{
+             "protected_segment" => si.protected_segment,
+             "payload_segment" => si.payload_segment,
+             "message" => si.message
+           }}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp dispatch(3, "proof_signing_input", input, _raws) do
+    with {:ok, proof} <- build_proof(input, 3) do
+      case V3Facade.proof_signing_input(proof, bounds(input)) do
+        {:ok, si} ->
+          {:ok,
+           %{
+             "protected_segment" => si.protected_segment,
+             "payload_segment" => si.payload_segment,
+             "message" => si.message
+           }}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp dispatch(3, "encode_consumption_entry", input, _raws) do
+    with {:ok, entry} <- build_consumption_entry(input) do
+      case V3Facade.encode_consumption_entry(entry, bounds(input)) do
+        {:ok, encoded} -> {:ok, %{"bytes" => encoded.bytes, "hash" => encoded.hash}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "check_chain", input, _raws) do
+    with {:ok, chain_input, expected_chain} <- build_chain(input, raws_for(input)) do
+      case V3Facade.check_chain(chain_input, expected_chain) do
+        {:ok, facts} -> {:ok, chain_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "boundary_anchor_signing_input", input, _raws) do
+    with {:ok, anchor} <- build_anchor(input) do
+      case V3Facade.boundary_anchor_signing_input(anchor, bounds(input)) do
+        {:ok, si} ->
+          {:ok,
+           %{
+             "protected_segment" => si.protected_segment,
+             "payload_segment" => si.payload_segment,
+             "message" => si.message
+           }}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp dispatch(3, "key_transition_signing_input", input, _raws) do
+    with {:ok, transition} <- build_transition(input) do
+      case V3Facade.key_transition_signing_input(transition, bounds(input)) do
+        {:ok, si} ->
+          {:ok,
+           %{
+             "protected_segment" => si.protected_segment,
+             "payload_segment" => si.payload_segment,
+             "message" => si.message
+           }}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp dispatch(3, "encode_anchored_export", input, _raws) do
+    with {:ok, export_input, expected} <- build_anchored_export(input, raws_for(input)) do
+      case V3Facade.encode_anchored_export(export_input, expected) do
+        {:ok, encoded} ->
+          {:ok,
+           %{
+             "chunks" => encoded.chunks,
+             "digest" => encoded.digest,
+             "byte_count" => encoded.byte_count
+           }}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp dispatch(3, "assemble_compact", input, _raws) do
+    with {:ok, signing_input, signature} <- build_assemble_input(input) do
+      case V3Facade.assemble_compact(signing_input, signature) do
+        {:ok, compact} -> {:ok, %{"compact" => compact}}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "decode_grant", input, _raws) do
+    with {:ok, compact} <- fetch_binary(input, "compact") do
+      case V3Facade.decode_grant(compact, bounds(input)) do
+        {:ok, decoded} -> {:ok, decoded_grant_map(decoded)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "decode_proof", input, _raws) do
+    with {:ok, compact} <- fetch_binary(input, "compact") do
+      case V3Facade.decode_proof(compact, bounds(input)) do
+        {:ok, decoded} -> {:ok, decoded_proof_map(decoded)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "verify_grant", input, _raws) do
+    with {:ok, compact, trusted, expected} <- build_verify_grant(input) do
+      case V3Facade.verify_grant(compact, trusted, expected) do
+        {:ok, facts} -> {:ok, grant_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "verify_historical_anchor", input, _raws) do
+    with {:ok, compact, key, expected} <- build_verify_anchor(input) do
+      case V3Facade.verify_historical_anchor(compact, key, expected) do
+        {:ok, facts} -> {:ok, anchor_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "verify_key_transition", input, _raws) do
+    with {:ok, compact, current_key, next_key, expected} <- build_verify_transition(input) do
+      case V3Facade.verify_key_transition(compact, current_key, next_key, expected) do
+        {:ok, facts} -> {:ok, transition_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "verify_anchored_export", input, _raws) do
+    with {:ok, archived, key_chain, expected} <- build_verify_export(input, raws_for(input)) do
+      case V3Facade.verify_anchored_export(archived, key_chain, expected) do
+        {:ok, facts} -> {:ok, export_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "check_envelope", input, _raws) do
+    with {:ok, credentials, expected_request} <- build_envelope(input) do
+      case V3Facade.check_envelope(credentials, expected_request) do
+        {:ok, facts} -> {:ok, envelope_facts_map(facts)}
+        error -> error
+      end
+    end
+  end
+
+  defp dispatch(3, "request_digest", input, _raws) do
+    with {:ok, operation, cast_args} <- build_request_digest(input) do
+      case V3Facade.request_digest(operation, cast_args, bounds(input)) do
+        {:ok, digest} -> {:ok, %{"digest" => digest}}
+        error -> error
+      end
+    end
+  end
+
   # JSON case input carries override keys as strings; Bounds.new expects the atom
   # keys of the @maximum map. Convert each known key via the compile-time @bounds_keys
   # map; Bounds.new independently rejects any value that fails its tightening rules.
@@ -795,6 +1057,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
 
   defp grant_module(1), do: Grant
   defp grant_module(2), do: BoundedAuthorityProtocol.V2.Grant
+  defp grant_module(3), do: BoundedAuthorityProtocol.V3.Grant
 
   defp build_proof(input, major) do
     with {:ok, holder_public_key} <- b64_field(input, "holder_public_key"),
@@ -824,6 +1087,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
 
   defp proof_module(1), do: Proof
   defp proof_module(2), do: BoundedAuthorityProtocol.V2.Proof
+  defp proof_module(3), do: BoundedAuthorityProtocol.V3.Proof
 
   defp proof_nonce(input) do
     case Map.get(input, "nonce") do
@@ -861,6 +1125,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
 
   defp operation_module(1), do: Operation
   defp operation_module(2), do: BoundedAuthorityProtocol.V2.Operation
+  defp operation_module(3), do: BoundedAuthorityProtocol.V3.Operation
 
   defp build_selectors(selectors, major) do
     reduce_build(selectors, &build_selector(&1, major))
@@ -878,15 +1143,16 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     {:ok, {:one_of, path, Enum.map(values, &to_tagged/1)}}
   end
 
-  # The inclusive range kinds exist only in the v2 selector algebra (ADR 0028); the
-  # v1 builder admits no reserved-kind tuple.
-  defp build_selector(%{"kind" => "lte", "path" => path, "value" => value}, 2)
-       when is_list(path) do
+  # The inclusive range kinds exist in the v2-and-later selector algebra (ADR 0028; the
+  # v3 profile inherits the five-kind set per ADR 0035); the v1 builder admits no
+  # reserved-kind tuple.
+  defp build_selector(%{"kind" => "lte", "path" => path, "value" => value}, major)
+       when major in [2, 3] and is_list(path) do
     {:ok, {:lte, path, to_tagged(value)}}
   end
 
-  defp build_selector(%{"kind" => "gte", "path" => path, "value" => value}, 2)
-       when is_list(path) do
+  defp build_selector(%{"kind" => "gte", "path" => path, "value" => value}, major)
+       when major in [2, 3] and is_list(path) do
     {:ok, {:gte, path, to_tagged(value)}}
   end
 

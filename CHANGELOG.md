@@ -4,6 +4,32 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — ES256 contract-major activation: the `BAP3-ES256-SHA256` suite (ADR 0035)
+
+- `BoundedAuthorityProtocol.V3` — the complete contract-major 3 closed profile: ECDSA over
+  NIST P-256 with SHA-256 (`alg: "ES256"`), RFC 7518 §3.4 raw `r || s` signatures with the
+  REQUIRED low-S canonicality rule and `0 < r < n` range checks, EC JWK holder keys
+  (`{crv,kty,x,y}`) with RFC 7638 thumbprints, 65-byte uncompressed-SEC1 raw keys,
+  `BAP3-*` domain separators, payload `v: 3`, and the five-kind selector algebra inherited
+  from v2. Each major verifies under its own complete closed profile; v1 and v2 reject v3
+  bytes and v3 rejects v1 and v2 bytes ([ADR 0035](docs/adr/0035-es256-contract-major-activation.md)).
+- `spec/bap-v3.md` — the normative v3 profile; the certified v3 corpus
+  (`priv/conformance/v3/corpus`, 292 cases across 28 surfaces, revision 1) verifies 292/292
+  through the CLI with its index SHA-256 pinned in the major-keyed certified map. The
+  signature-canonicality matrix (high-S, tampered r/s, zero r/s, r/s ≥ n), the EC JWK
+  closed set, the thumbprint member set, and the cross-major rejections (v1 and v2 bytes on
+  every artifact family) are corpus-certified. Six verdict-provable mutation-battery
+  entries executed RED; two battery adjudications are disclosed in the requirement map § v3
+  (the r < n check is backend-coincident for out-of-range scalars — unit-level proof; v3
+  cross-major rejection is pinned at both the alg and the v claim).
+- Registries: `BAP3-ES256-SHA256` active; the `lte`/`gte` rows name the v3 closed profile
+  alongside v2's; the ML-DSA anticipated index advances to the next successor major. ADR
+  0026 carries a dated reconciliation note for its stale `BAP2-*` family index.
+- The in-repo SDKs (Python, Rust, Go) gain v3 namespaces, runners, and permissiveness
+  mutation gates; the TypeScript cohort (graduated verifier repository snapshot-bump,
+  signer suite adoption, kiosk-demo refresh) and the A2A `BA-Grant`/`BA-Proof` drill land
+  with this activation per ADR 0035 §8.
+
 ### Added — UCP riding-point decision (ADR 0034) and A2A venue extension draft (no wire or API change)
 
 - `docs/adr/0034-ucp-riding-point-scoping.md` (owner-directed resolution of the open question

@@ -46,6 +46,12 @@ const REQUEST_DIGEST_PREFIX: &[u8] = b"BAP1-REQUEST\0";
 /// a request-binding domain.
 const SUCCESSOR_REQUEST_DIGEST_PREFIX: &[u8] = b"BAP2-REQUEST\0";
 
+/// The v3 domain-separation prefix (the `BAP3-ES256-SHA256` suite,
+/// spec/bap-v3.md §2 `REQ3-SIGNING-digest-prefix`): the same 13-byte shape
+/// with the major digit advanced to 3. Identical discipline — no two majors
+/// share a request-binding domain.
+const ECDSA_REQUEST_DIGEST_PREFIX: &[u8] = b"BAP3-REQUEST\0";
+
 /// Compute the v1 request digest.
 ///
 /// Returns `base64url(SHA-256("BAP1-REQUEST\0" || JCS([operation,
@@ -71,6 +77,23 @@ pub(crate) fn request_digest_successor(
 ) -> Result<Vec<u8>> {
     request_digest_with(
         SUCCESSOR_REQUEST_DIGEST_PREFIX,
+        operation,
+        cast_arguments,
+        bounds,
+    )
+}
+
+/// Compute the v3 request digest — the identical typed projection and JCS
+/// preimage, hashed under `BAP3-REQUEST\0` (the v3 façade's binding primitive;
+/// `REQ3-SIGNING-digest-prefix`). The v1/v2 functions above are byte-identical
+/// to their pre-v3 forms.
+pub(crate) fn request_digest_v3(
+    operation: &str,
+    cast_arguments: &JsonValue,
+    bounds: &Bounds,
+) -> Result<Vec<u8>> {
+    request_digest_with(
+        ECDSA_REQUEST_DIGEST_PREFIX,
         operation,
         cast_arguments,
         bounds,

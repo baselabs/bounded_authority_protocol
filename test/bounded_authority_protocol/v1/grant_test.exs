@@ -150,23 +150,27 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
     # payload `v: 2`; the closed v1 decode (`{:integer, 1}` check) is the sole rejector on
     # an otherwise-identical payload, mirroring the BAP-20 reserved-kind tripwire above.
     # v1 stays byte-frozen — this pins the frozen behavior against the new major's existence.
+    # BAP-22 / ADR 0035 extends the tripwire to the v3 successor major the same way: `v: 3`
+    # on an otherwise-v1 payload is rejected by the same sole check.
     fixture = fixture!()
     compact = fixture["grant"]["compact"]
 
-    v2_payload =
-      compact
-      |> String.split(".")
-      |> Enum.at(1)
-      |> Base.url_decode64!(padding: false)
-      |> then(&String.replace(&1, ~S("v":1), ~S("v":2)))
+    for successor <- [~S("v":2), ~S("v":3)] do
+      successor_payload =
+        compact
+        |> String.split(".")
+        |> Enum.at(1)
+        |> Base.url_decode64!(padding: false)
+        |> then(&String.replace(&1, ~S("v":1), successor))
 
-    v2_compact =
-      compact
-      |> String.split(".")
-      |> List.replace_at(1, Base.url_encode64(v2_payload, padding: false))
-      |> Enum.join(".")
+      successor_compact =
+        compact
+        |> String.split(".")
+        |> List.replace_at(1, Base.url_encode64(successor_payload, padding: false))
+        |> Enum.join(".")
 
-    assert {:error, :invalid} = V1.decode_grant(v2_compact, %{})
+      assert {:error, :invalid} = V1.decode_grant(successor_compact, %{})
+    end
   end
 
   test "issuer, key, audience, and every caller time boundary fail closed" do

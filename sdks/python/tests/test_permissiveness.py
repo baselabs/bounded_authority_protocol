@@ -44,10 +44,13 @@ import base64
 import struct
 
 import pytest
+from cryptography.hazmat.primitives import hashes as _ec_hashes
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec as _ecdsa
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
-from bounded_authority_verifier import v2
+from bounded_authority_verifier import v2, v3
 from bounded_authority_verifier.bounds import Bounds, bounds_new
 from bounded_authority_verifier.ed25519 import reset_census, sha256
 from bounded_authority_verifier.error import InvalidError
@@ -2607,5 +2610,358 @@ def test_facades_reject_each_others_major_bytes():
     assert not v2.decode_grant(v1_compact).is_ok, "v1 bytes (v:1) must reject under the v2 façade"
     assert not decode_grant(v2_compact).is_ok, "v2 bytes (v:2) must reject under the v1 façade"
     # The v1 closed kind set is unchanged: lte rejects under the shared (v1) selector parse.
+    with pytest.raises(InvalidError):
+        parse_selector(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))
+
+
+# ---------------------------------------------------------------------------
+# The v3 profile (contract-major 3, BAP3-ES256-SHA256) — permissiveness mutation
+# battery for the ES256 closure classes (spec/bap-v3.md §3; ADR 0035). Mirrors
+# the defect-injection discipline of the v1/v2 batteries above: each leg names
+# its closure, the mutation, and the red observation recorded when the mutation
+# was executed (mutation applied → pytest run → observed red → reverted).
+# All six mutations were executed at authoring (2026-09-21):
+#   v3-1. LOW-S (REQ3-SIGNING-low-s): the `if s > _LOW_S_MAX: fail(...)` gate in
+#         v3.es256_verify removed → test_es256_low_s_enforced goes RED (the high-S
+#         re-spelling of a genuinely valid ECDSA signature wrongly verifies).
+#         Observed: 1 failed (the high-S assertion); the backend ACCEPTS the
+#         high-S form, so only the profile gate rejects it.
+#   v3-2. r/s RANGE (REQ3-SIGNING-range): the zero/range arms in
+#         v3.es256_verify removed → test_es256_rs_range_checked_before_backend goes
+#         RED on the work pins (each crafted signature reaches the backend: the
+#         call count goes 0 → 1). VERDICT-subsumed by the backend (it also
+#         rejects r=0/s=0/r≥n/s≥n), so the red-capable form is the WORK pin —
+#         the same discipline as the round-12..14 legs above.
+#   v3-3. EC JWK CLOSED MEMBER SET (REQ3-HEADER-proof-jwk /
+#         REQ3-HEADER-no-private-jwk): the `_require_object_exact(obj,
+#         ["crv","kty","x","y"], ...)` gate in v3._ec_public_from_tagged
+#         removed → test_es256_ec_jwk_member_set_closed goes RED (the extra-`d`
+#         member wrongly parses). The crv/kty literal arms of the same test go
+#         red under their own break (corrupt the `_require_string_lit` literal).
+#   v3-4. COORDINATE WIDTH (REQ3-BOUNDS-fixed-widths): the
+#         `len(raw_x) != COORDINATE_BYTES or len(raw_y) != COORDINATE_BYTES`
+#         gate in v3._ec_public_from_tagged removed →
+#         test_es256_coordinate_width_and_canonicality goes RED (the 33-byte
+#         same-integer coordinate — a leading zero byte, still on-curve —
+#         wrongly parses; only the width gate rejects it).
+#   v3-5. ON-CURVE (REQ3-KEY-point-on-curve): the `_point_on_curve` gate in
+#         v3._ec_public_from_tagged removed → test_es256_off_curve_point_rejected
+#         goes RED (a proof compact carrying an off-curve JWK decodes Ok).
+#   v3-6. CROSS-MAJOR VERSION WIDENING (REQ3-CORE-cross-major-reject): the
+#         `v != VERSION` grant gate in v3._validate_grant_payload widened to
+#         `not in (1, 2, VERSION)` → test_es256_rejects_prior_major_bytes goes
+#         RED on the ES256-header/v:{1,2}-payload arms (the EdDSA compacts
+#         reject at the alg gate first, so the version-gate closure needs the
+#         mixed-spelling arms to be independently red-capable).
+# ---------------------------------------------------------------------------
+
+
+def _fresh_ec_key() -> tuple[bytes, _ecdsa.EllipticCurvePrivateKey]:
+    """A throwaway P-256 key: (raw 65-byte uncompressed SEC1 public key, private key)."""
+    priv = _ecdsa.generate_private_key(_ecdsa.SECP256R1())
+    pub = priv.public_key().public_bytes(
+        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
+    )
+    return pub, priv
+
+
+def _ec_sign_low_s(priv: _ecdsa.EllipticCurvePrivateKey, message: bytes) -> bytes:
+    """Sign with ES256 and return the RFC 7518 §3.4 RAW r||s form (64 bytes), normalized
+    low-S (the producer-side rule: one conditional subtraction when high)."""
+    der = priv.sign(message, _ecdsa.ECDSA(_ec_hashes.SHA256()))
+    r, s = decode_dss_signature(der)
+    if s > v3._LOW_S_MAX:
+        s = v3.P256_N - s
+    return r.to_bytes(32, "big") + s.to_bytes(32, "big")
+
+
+def _resign_compact(compact: bytes, raw_signature: bytes) -> bytes:
+    """Replace the third (signature) segment of a compact with raw 64-byte r||s bytes."""
+    parts = compact.split(b".")
+    assert len(parts) == 3
+    parts[2] = _b64e(raw_signature)
+    return b".".join(parts)
+
+
+def _es256_signed_grant() -> dict[str, object]:
+    """A real ES256-signed v3 grant (ephemeral keys). Returns the compact + issuer material."""
+    issuer_pub, issuer_priv = _fresh_ec_key()
+    holder_pub, _ = _fresh_ec_key()
+    holder_fp = v3.public_key_thumbprint_raw(holder_pub)
+    grant = v3.GrantProducer(
+        key_id="issuer", issuer="https://issuer.example.test", grant_id="urn:example:grant:v3-p",
+        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000,
+        expires_at=2000, holder_thumbprint=_b64url(holder_fp),
+        operations=(v3.OperationInput(name="read", selectors=("all",)),),
+    )
+    si = v3.grant_signing_input(grant)
+    assert si.is_ok, "v3 grant signing input failed"
+    message = si.value.protected_segment + b"." + si.value.payload_segment
+    compact = _must_assemble(si.value, _ec_sign_low_s(issuer_priv, message))
+    return {
+        "compact": compact,
+        "issuer": v3.TrustedIssuer(key_id="issuer", public_key=issuer_pub),
+        "signature": compact.split(b".")[2],
+    }
+
+
+_V3_EXPECTED_GRANT = v3.ExpectedGrant(
+    issuer="https://issuer.example.test", audience="https://resource.example.test",
+    evaluation_time=1500, clock_skew=60,
+)
+
+
+def test_es256_low_s_enforced():
+    """REQ3-SIGNING-low-s: only the low-S half of each ECDSA signature pair is valid. For a
+    genuine (r, s) the re-spelling (r, n-s) also satisfies the verification equation, so a
+    verifier without the gate would accept a second, differently-hashing encoding of the same
+    signature (malleability). The control (low-S) verifies; the high-S re-spelling of the SAME
+    signature must reject. Defect: remove the `s > _LOW_S_MAX` gate in v3.es256_verify → the
+    high-S assertion goes RED (the backend accepts it)."""
+    reset_census()
+    g = _es256_signed_grant()
+    assert v3.verify_grant(g["compact"], g["issuer"], _V3_EXPECTED_GRANT).is_ok, \
+        "control: the low-S signed grant must verify"
+    raw = base64.urlsafe_b64decode(g["signature"] + b"=" * (-len(g["signature"]) % 4))
+    assert len(raw) == 64
+    s = int.from_bytes(raw[32:], "big")
+    assert 0 < s <= v3._LOW_S_MAX, "control: the helper signs low-S"
+    high = raw[:32] + (v3.P256_N - s).to_bytes(32, "big")
+    high_compact = _resign_compact(g["compact"], high)
+    r = v3.verify_grant(high_compact, g["issuer"], _V3_EXPECTED_GRANT)
+    assert not r.is_ok, "the high-S re-spelling of a valid signature must reject (low-S required)"
+
+
+def test_es256_rs_range_checked_before_backend(monkeypatch):
+    """REQ3-SIGNING-range: r=0, s=0, r≥n, s≥n are invalid ENCODINGS rejected BEFORE any backend
+    call. The verdict is subsumed by the backend (it rejects these too), so the red-capable pin
+    is the WORK form (the round-12..14 discipline): each crafted signature must reject with
+    ZERO crossings of the DER-encode step — the last pure step immediately preceding the
+    cryptography verify call (the backend's verify method lives on a Rust-overriding subclass,
+    not reliably patchable, so the module-level encode_dss_signature boundary is the
+    observable). Defect: remove the zero/range arms in v3.es256_verify → each crafted case
+    crosses the DER boundary (count 0 → 1) and the count assertions go RED."""
+    calls: list[int] = []
+    real = v3.encode_dss_signature
+
+    def counting(r: int, s: int) -> bytes:
+        calls.append(1)
+        return real(r, s)
+
+    monkeypatch.setattr(v3, "encode_dss_signature", counting)
+    reset_census()
+    g = _es256_signed_grant()
+    # Control: the valid signature crosses the DER boundary exactly once and verifies.
+    calls.clear()
+    assert v3.verify_grant(g["compact"], g["issuer"], _V3_EXPECTED_GRANT).is_ok
+    assert calls == [1], "control: the valid path reaches the DER-encode step exactly once"
+    sig = base64.urlsafe_b64decode(g["signature"] + b"=" * (-len(g["signature"]) % 4))
+    r_bytes, s_bytes = sig[:32], sig[32:]
+    n = v3.P256_N
+    crafted = {
+        "r=0": bytes(32) + s_bytes,
+        "s=0": r_bytes + bytes(32),
+        "r=n": n.to_bytes(32, "big") + s_bytes,
+        "s=n": r_bytes + n.to_bytes(32, "big"),
+    }
+    for label, raw in crafted.items():
+        calls.clear()
+        result = v3.verify_grant(_resign_compact(g["compact"], raw), g["issuer"], _V3_EXPECTED_GRANT)
+        assert not result.is_ok, f"{label}: must reject"
+        assert calls == [], f"{label}: rejected only AFTER the DER-encode/backend boundary — the range gate is missing"
+
+
+def test_es256_ec_jwk_member_set_closed():
+    """REQ3-HEADER-proof-jwk / REQ3-HEADER-no-private-jwk: the EC JWK is EXACTLY
+    {crv:"P-256", kty:"EC", x, y}. Wrong crv/kty, any extra member (incl. private d), or a
+    missing coordinate rejects. Defect: remove the closed-member gate in
+    v3._ec_public_from_tagged → the extra-`d` arm goes RED; corrupt the crv/kty literal →
+    those arms go RED."""
+    pub, _ = _fresh_ec_key()
+    x = _b64e(pub[1:33])
+    y = _b64e(pub[33:65])
+
+    def jwk_json(crv: str, kty: str, extra: str = "", drop_y: bool = False) -> bytes:
+        members = f'"crv":"{crv}","kty":"{kty}","x":"{x.decode()}"'
+        if not drop_y:
+            members += f',"y":"{y.decode()}"'
+        if extra:
+            members += f',{extra}'
+        return ("{" + members + "}").encode("ascii")
+
+    # Control: the exact four-member set parses.
+    assert isinstance(v3.jwk_from_json(jwk_json("P-256", "EC")), v3.EcPublic)
+    # Wrong crv / kty literals.
+    with pytest.raises(InvalidError):
+        v3.jwk_from_json(jwk_json("P-384", "EC"))
+    with pytest.raises(InvalidError):
+        v3.jwk_from_json(jwk_json("Ed25519", "EC"))
+    with pytest.raises(InvalidError):
+        v3.jwk_from_json(jwk_json("P-256", "OKP"))
+    # Extra members — including the private d.
+    with pytest.raises(InvalidError):
+        v3.jwk_from_json(jwk_json("P-256", "EC", extra='"d":"AAAA"'))
+    with pytest.raises(InvalidError):
+        v3.jwk_from_json(jwk_json("P-256", "EC", extra='"kid":"k1"'))
+    # Missing y.
+    with pytest.raises(InvalidError):
+        v3.jwk_from_json(jwk_json("P-256", "EC", drop_y=True))
+
+
+def _ec_key_with_leading_zero_coordinate() -> bytes:
+    """A deterministic P-256 public key whose x or y coordinate starts with a zero byte (so the
+    same integer also spells as 31 raw bytes — only the fixed-width gate can reject that
+    spelling). Derived, not generated, so the fixture is reproducible."""
+    for d in range(1, 100000):
+        priv = _ecdsa.derive_private_key(d, _ecdsa.SECP256R1())
+        pub = priv.public_key().public_bytes(
+            serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
+        )
+        if pub[1] == 0 or pub[33] == 0:
+            return pub
+    raise AssertionError("no leading-zero coordinate found in 100000 scalars (impossible)")
+
+
+def test_es256_coordinate_width_and_canonicality():
+    """REQ3-BOUNDS-fixed-widths: each coordinate is canonical unpadded base64url of EXACTLY 32
+    bytes — the RFC 7518 §6.2.1 fixed-width big-endian spelling. A 33-byte spelling (leading
+    zero byte prepended) carries the SAME integer (so the on-curve and <p checks pass) and only
+    the width gate rejects it; likewise a 31-byte spelling of a leading-zero coordinate.
+    Padded base64url ('=') rejects at the shared canonical-decode gate. Defect: remove the
+    coordinate-width gate in v3._ec_public_from_tagged → the 33-byte and 31-byte arms go RED."""
+    pub, _ = _fresh_ec_key()
+    x, y = pub[1:33], pub[33:65]
+    valid = ('{"crv":"P-256","kty":"EC","x":"' + _b64e(x).decode()
+             + '","y":"' + _b64e(y).decode() + '"}').encode("ascii")
+    assert isinstance(v3.jwk_from_json(valid), v3.EcPublic), "control: the 32-byte coordinates parse"
+    # 33-byte x (leading zero byte, same integer — on-curve): only the width gate rejects.
+    wide = ('{"crv":"P-256","kty":"EC","x":"' + _b64e(b"\x00" + x).decode()
+            + '","y":"' + _b64e(y).decode() + '"}').encode("ascii")
+    with pytest.raises(InvalidError):
+        v3.jwk_from_json(wide)
+    # 31-byte spelling of a leading-zero coordinate (same integer).
+    lz = _ec_key_with_leading_zero_coordinate()
+    if lz[1] == 0:
+        short_coord, other = lz[1:33], lz[33:65]
+        which = "x"
+    else:
+        short_coord, other = lz[33:65], lz[1:33]
+        which = "y"
+    assert short_coord[0] == 0
+    short_b64 = _b64e(short_coord[1:])
+    other_b64 = _b64e(other)
+    if which == "x":
+        short = ('{"crv":"P-256","kty":"EC","x":"' + short_b64.decode()
+                 + '","y":"' + other_b64.decode() + '"}').encode("ascii")
+    else:
+        short = ('{"crv":"P-256","kty":"EC","x":"' + other_b64.decode()
+                 + '","y":"' + short_b64.decode() + '"}').encode("ascii")
+    with pytest.raises(InvalidError):
+        v3.jwk_from_json(short)
+    # Padded base64url coordinate: the shared canonical-decode gate (REQ1-B64-no-padding).
+    padded = ('{"crv":"P-256","kty":"EC","x":"' + _b64e(x).decode() + '="'
+              + ',"y":"' + _b64e(y).decode() + '"}').encode("ascii")
+    with pytest.raises(InvalidError):
+        v3.jwk_from_json(padded)
+
+
+def test_es256_off_curve_point_rejected():
+    """REQ3-KEY-point-on-curve: decoded JWK coordinates must form a point on y^2 = x^3 - 3x + b
+    (mod p) — pure arithmetic preceding the backend. The leg drives the decode path (no
+    signature verification), so the on-curve gate is the ONLY rejection: with it removed the
+    compact decodes Ok. Defect: remove the `_point_on_curve` gate in
+    v3._ec_public_from_tagged → this test goes RED."""
+    holder_pub, holder_priv = _fresh_ec_key()
+    proof = v3.ProofProducer(
+        holder_public_key=holder_pub,
+        proof_id="urn:example:proof:v3-p", method="POST",
+        target_uri="https://resource.example.test/invoke", issued_at=1400,
+        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
+        grant_compact=b"aaa.bbb.ccc", cast_arguments=_NULL_ARGS,
+    )
+    si = v3.proof_signing_input(proof)
+    assert si.is_ok, "v3 proof signing input failed"
+    message = si.value.protected_segment + b"." + si.value.payload_segment
+    compact = _must_assemble(si.value, _ec_sign_low_s(holder_priv, message))
+    assert v3.decode_proof(compact).is_ok, "control: the on-curve proof decodes"
+    # Rebuild the protected header with an off-curve y (same width, still < p).
+    x, y = holder_pub[1:33], holder_pub[33:65]
+    yi = int.from_bytes(y, "big")
+    bad_y = yi + 1 if yi + 1 < v3.P256_P else yi - 1
+    assert not v3._point_on_curve(int.from_bytes(x, "big"), bad_y), "self-check: the crafted point is off-curve"
+    bad_b64 = _b64e(bad_y.to_bytes(32, "big"))
+    bad_header = (b'{"alg":"ES256","jwk":{"crv":"P-256","kty":"EC","x":"'
+                  + _b64e(x) + b'","y":"' + bad_b64 + b'"},"typ":"dpop+jwt"}')
+    parts = compact.split(b".")
+    bad_compact = b".".join([_b64e(bad_header), parts[1], parts[2]])
+    assert not v3.decode_proof(bad_compact).is_ok, "an off-curve proof JWK must reject at decode"
+
+
+def test_es256_rejects_prior_major_bytes():
+    """REQ3-CORE-cross-major-reject: the v3 façade rejects v1 and v2 bytes, and both prior
+    façades reject v3 bytes — an in-major decode of another major's grant is Err on the version
+    claim alone (plus the alg gate: an EdDSA grant never passes the ES256 header check, and an
+    ES256 grant never passes theirs). Defect: widen v3's `v != VERSION` grant gate to
+    `not in (1, 2, VERSION)` → both v3-façade assertions go RED."""
+    issuer_pub65, issuer_priv_ec = _fresh_ec_key()
+    holder_fp_ec = v3.public_key_thumbprint_raw(_fresh_ec_key()[0])
+    v3_kwargs: dict = {
+        "key_id": "issuer", "issuer": "https://issuer.example.test",
+        "grant_id": "urn:example:grant:v3-p",
+        "audiences": ("https://resource.example.test",), "issued_at": 1000,
+        "not_before": 1000, "expires_at": 2000,
+        "holder_thumbprint": _b64url(holder_fp_ec),
+        "operations": (v3.OperationInput(name="read", selectors=("all",)),),
+    }
+    v3_si = v3.grant_signing_input(v3.GrantProducer(**v3_kwargs))
+    assert v3_si.is_ok
+    v3_compact = _must_assemble(
+        v3_si.value,
+        _ec_sign_low_s(issuer_priv_ec, v3_si.value.protected_segment + b"." + v3_si.value.payload_segment),
+    )
+    # The v1/v2 grants (Ed25519 keys, per-major structs).
+    issuer_pub32, issuer_priv_ed = _fresh_key()
+    holder_fp_ed = public_key_thumbprint_raw(_fresh_key()[0])
+    ed_kwargs: dict = {
+        "key_id": "issuer", "issuer": "https://issuer.example.test",
+        "grant_id": "urn:example:grant:x-3",
+        "audiences": ("https://resource.example.test",), "issued_at": 1000,
+        "not_before": 1000, "expires_at": 2000,
+        "holder_thumbprint": _b64url(holder_fp_ed),
+        "operations": (OperationInput(name="read", selectors=("all",)),),
+    }
+    v1_si = grant_signing_input(GrantProducer(**ed_kwargs))
+    assert v1_si.is_ok
+    v1_compact = _must_assemble(
+        v1_si.value, issuer_priv_ed.sign(v1_si.value.protected_segment + b"." + v1_si.value.payload_segment))
+    v2_si = v2.grant_signing_input(v2.GrantProducer(**{**ed_kwargs, "operations": (
+        v2.OperationInput(name="read", selectors=("all",)),)}))
+    assert v2_si.is_ok
+    v2_compact = _must_assemble(
+        v2_si.value, issuer_priv_ed.sign(v2_si.value.protected_segment + b"." + v2_si.value.payload_segment))
+    # Controls: each major decodes under its own façade.
+    assert v3.decode_grant(v3_compact).is_ok, "control: the v3 grant decodes under v3"
+    assert decode_grant(v1_compact).is_ok, "control: the v1 grant decodes under v1"
+    assert v2.decode_grant(v2_compact).is_ok, "control: the v2 grant decodes under v2"
+    # Cross-major rejections, all six directions.
+    assert not v3.decode_grant(v1_compact).is_ok, "v1 bytes (v:1, EdDSA) must reject under the v3 façade"
+    assert not v3.decode_grant(v2_compact).is_ok, "v2 bytes (v:2, EdDSA) must reject under the v3 façade"
+    assert not decode_grant(v3_compact).is_ok, "v3 bytes (v:3, ES256) must reject under the v1 façade"
+    assert not v2.decode_grant(v3_compact).is_ok, "v3 bytes (v:3, ES256) must reject under the v2 façade"
+    # The VERSION gate is load-bearing independent of the alg gate: an ES256-header grant whose
+    # payload carries v:1 / v:2 (hand-spelled; decode does not verify signatures) rejects on the
+    # version claim alone.
+    parts = v3_compact.split(b".")
+    payload = base64.urlsafe_b64decode(parts[1] + b"=" * (-len(parts[1]) % 4))
+    assert payload.endswith(b'"v":3}'), "self-check: the canonical payload carries v last"
+    for prior_major in (b"1", b"2"):
+        mixed = b".".join([parts[0], _b64e(payload[: -len(b'"v":3}')] + b'"v":' + prior_major + b"}"), parts[2]])
+        assert not v3.decode_grant(mixed).is_ok, \
+            f"an ES256 grant carrying v:{prior_major.decode()} must reject under the v3 façade (version gate)"
+    # The five-kind selector algebra is v3's too: lte parses under the v3 façade and the v1
+    # closed kind set still rejects it.
+    assert isinstance(
+        v3.parse_selector(json_decode(b'{"kind":"lte","path":["a"],"value":1}')), v3.SelLte
+    )
     with pytest.raises(InvalidError):
         parse_selector(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))

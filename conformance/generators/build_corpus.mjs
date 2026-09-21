@@ -46,6 +46,13 @@ const FORMATS_BY_MAJOR = {
     cases: "bounded-authority-protocol-v2-conformance-cases",
     revision: "bounded-authority-protocol-v2-conformance-corpus-revision",
   },
+  3: {
+    corpus: join(REPO_ROOT, "priv", "conformance/v3/corpus"),
+    curated: join(import.meta.dirname, "curated-inputs-v3.json"),
+    index: "bounded-authority-protocol-v3-conformance-corpus-index",
+    cases: "bounded-authority-protocol-v3-conformance-cases",
+    revision: "bounded-authority-protocol-v3-conformance-corpus-revision",
+  },
 };
 
 const REVISION_PATH = "revision.json";
@@ -111,7 +118,7 @@ function parseArgs(argv) {
     else if (a === "--note") args.note = argv[++i];
     else fail(`unknown argument ${a}`);
   }
-  if (![1, 2].includes(args.major)) fail("--major must be 1 or 2");
+  if (![1, 2, 3].includes(args.major)) fail("--major must be 1, 2, or 3");
   if (!args.corpus) args.corpus = FORMATS_BY_MAJOR[args.major].corpus;
   if (!args.mode) fail("one of --verify | --rebuild-index | --bump-revision is required");
   if (args.mode === "bump" && !args.note) fail("--bump-revision requires --note");
