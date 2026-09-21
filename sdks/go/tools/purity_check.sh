@@ -23,7 +23,7 @@ lib_dir=$(cd "$(dirname "$0")/.." && pwd)
 patterns='os\.|io\.|net\.|time\.|math/rand|crypto/rand|os/exec|unsafe\.|syscall\.|runtime\.GC|flag\.|log\.|context\.|sync\.'
 
 # Import allowlist: the pure stdlib packages the library consumes.
-allowed_imports='^\t"crypto/ed25519"$|^\t"crypto/sha256"$|^\t"encoding/binary"$|^\t"errors"$|^\t"math"$|^\t"math/big"$|^\t"sort"$|^\t"strconv"$|^\t"strings"$|^\t"unicode/utf16"$|^\t"unicode/utf8"$|^import \($|^\)$'
+allowed_imports='^\t"crypto/ecdsa"$|^\t"crypto/ed25519"$|^\t"crypto/elliptic"$|^\t"crypto/sha256"$|^\t"encoding/binary"$|^\t"errors"$|^\t"math"$|^\t"math/big"$|^\t"sort"$|^\t"strconv"$|^\t"strings"$|^\t"unicode/utf16"$|^\t"unicode/utf8"$|^import \($|^\)$'
 
 status=0
 for f in "$lib_dir"/*.go; do
@@ -42,7 +42,7 @@ for f in "$lib_dir"/*.go; do
   # extract the import block plus single imports, then filter quoted paths
   imp_block=$(awk '/^import \(/ {flag=1} flag {print} /^\)/ {if (flag) flag=0}' "$f" 2>/dev/null || true)
   imp_single=$(grep -E '^import ' "$f" 2>/dev/null || true)
-  bad_imports=$(printf '%s\n%s\n' "$imp_block" "$imp_single" | grep -oE '"[^"]+"' | grep -vE '^"(crypto/ed25519|crypto/sha256|crypto/subtle|encoding/binary|errors|fmt|math|math/big|sort|strconv|strings|unicode/utf16|unicode/utf8)"$' || true)
+  bad_imports=$(printf '%s\n%s\n' "$imp_block" "$imp_single" | grep -oE '"[^"]+"' | grep -vE '^"(crypto/ecdsa|crypto/ed25519|crypto/elliptic|crypto/sha256|crypto/subtle|encoding/binary|errors|fmt|math|math/big|sort|strconv|strings|unicode/utf16|unicode/utf8)"$' || true)
   if [ -n "$bad_imports" ]; then
     echo "purity_check: FAIL — non-allowlisted import in ${f##*/}:" >&2
     printf '%s\n' "$bad_imports" >&2
