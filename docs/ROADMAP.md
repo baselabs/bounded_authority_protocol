@@ -1,5 +1,7 @@
 # bounded_authority_protocol roadmap
 
+> **Beamline deprecation — September 21, 2026.** Beamline names and test counts in the closeout evidence below refer to a retired private consumer. They remain historical receipts, not current integration requirements or proof of its successor. Public protocol semantics and package independence are unchanged; the package acquires no host-runtime dependency.
+
 **Status authority:** this file
 **Architecture authority:** `docs/adr/0001-public-protocol-verifier-boundary.md` and
 `docs/design/`
