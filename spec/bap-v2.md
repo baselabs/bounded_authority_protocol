@@ -18,6 +18,7 @@ full, including the selector algebra with the two range kinds.
 
 ## 1. Suite identity and major detection {#suite}
 
+<!-- facts:suite-identity -->
 The v2 profile's suite is `BAP2-Ed25519-SHA256`: EdDSA over Ed25519, SHA-256 digests, RFC 8785
 JCS canonical bytes, and the `BAP2-*` domain separators — the same closed posture and algorithms
 as `BAP1-Ed25519-SHA256` under the major-bound naming scheme `BAP<contract-major>-<signature>-<digest>`.
@@ -36,6 +37,7 @@ credentials are invalid by construction (`REQ2-EVO-mixed-major-invalid`).
 
 ## 2. Substitutions incorporated from v1 {#substitutions}
 
+<!-- facts:domain-separators -->
 For every v1 section not restated below, the normative v2 text is the v1 text with exactly
 these substitutions (`REQ2-CORE-v1-incorporation`):
 

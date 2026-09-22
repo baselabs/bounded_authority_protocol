@@ -4,6 +4,20 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — spec-facts extraction baselines for v2 and v3 (ADR 0030/0035 deferral closed; no wire or API change)
+
+- The spec-facts drift gate is major-keyed: `spec/bap-v2.md` and `spec/bap-v3.md` now carry
+  closed facts-anchor sets (suite identity, domain separators, selector kinds; v3 adds the
+  protected-header members, the §3 suite rules — curve, EC JWK member set, 32/65/64-byte
+  fixed widths, raw `r || s`, the low-S rule, the rejected-encoding list — and the §5
+  fixed-width constants), extracted deterministically and frozen byte-for-byte in
+  `spec/facts/baseline-v2.json` / `baseline-v3.json`. Rule 1b reds on any silent
+  successor-major normative edit exactly as for v1; the v1 baseline bytes, ten-anchor set,
+  and extraction output are unchanged. The spec-facts mutation battery grows from seven to
+  sixteen legs, each observed RED on the real tree before wiring — including the literal-NUL
+  separator class of the requirement-map incident (a NUL byte where the two-character `\0`
+  text belongs is not matched and reds).
+
 ### Added — ES256 contract-major activation: the `BAP3-ES256-SHA256` suite (ADR 0035)
 
 - `BoundedAuthorityProtocol.V3` — the complete contract-major 3 closed profile: ECDSA over

@@ -302,6 +302,8 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "spec/bap-local-loopback-http-v1.md",
                     "spec/cddl/bap-v1.cddl",
                     "spec/facts/baseline-v1.json",
+                    "spec/facts/baseline-v2.json",
+                    "spec/facts/baseline-v3.json",
                     "spec/formal/FINDINGS.md",
                     "spec/formal/README.md",
                     "spec/formal/attacker-model.md",

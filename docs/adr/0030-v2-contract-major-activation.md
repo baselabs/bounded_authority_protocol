@@ -154,7 +154,9 @@ still follows the governance policy stated above.
 - The durable-contract-identity scanner enumerates the accepted v2 families (namespace, paths,
   wire fields, domains, suite, `REQ2-*`); the next unaccepted major (V3/`BAP3-*`/`REQ3-*`)
   remains rejected exactly as V2 was before this ADR.
-- Named follow-ups: v2 corpus depth growth; the `spec.facts` v2 baseline; ADR 0029
+- Named follow-ups: v2 corpus depth growth; the `spec.facts` v2 baseline (closed 2026-09-21 —
+  the extractor is major-keyed and the v2/v3 baselines are frozen; see ADR 0035's 2026-09-21
+  post-acceptance note); ADR 0029
   `ba+budget-window` (posture consolidated, attestation-shape design explicitly deferred); the remaining charter successor-major scope (delegation, offline claims,
   suite succession) as separately activated majors; SDK publication and any v2 Hex release are
   owner decisions outside this landing.

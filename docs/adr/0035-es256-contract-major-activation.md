@@ -405,9 +405,10 @@ loopback functions.
   reconciliation note for its stale `BAP2-*` family index; the PQ posture is otherwise
   unchanged.
 - Named follow-ups (not blocking): v3 corpus depth growth beyond the v1-populated cells; the
-  `spec.facts` v2 AND v3 extraction baselines (the v2 deferral is still open from ADR 0030; v3
-  rides the same corpus-integrity + certified-pin + SDK-census machinery until a combined
-  extraction lands); the A2A projection/`htu` conformance vectors (A4 residual R2) remain
+  `spec.facts` v2 AND v3 extraction baselines (closed 2026-09-21 — the extractor is
+  major-keyed and both successor baselines are frozen; see the 2026-09-21 post-acceptance
+  note below; the v2 deferral had been open from ADR 0030); the A2A projection/`htu`
+  conformance vectors (A4 residual R2) remain
   routed to their owning slice; the report adapter's key-type
   discriminator (B2) follows this suite; SDK publications and any v3-bearing Hex release are owner
   decisions outside this landing.
@@ -450,3 +451,20 @@ deliverables are complete without it — the in-repo SDKs, the TypeScript verifi
 signer adoptions, and the A2A drill all landed; no public surface (gate, corpus, spec,
 registry, publication) depends on the demo. If a successor demo is ever built, the
 signer's v3 public API is the producing surface to build it on.
+
+## Post-acceptance note (2026-09-21): spec-facts v2/v3 extraction baselines landed
+
+The named follow-up "the `spec.facts` v2 AND v3 extraction baselines" is closed above, and
+with it ADR 0030's v2 deferral. The extractor (`spec/tools/extract_facts.exs`) is
+major-keyed: each contract-major's closed profile extracts from its own spec under its own
+closed anchor set — v2 (suite identity, domain separators, the five-kind selector table)
+and v3 (those plus the protected-header members, the §3 suite rules — curve, EC JWK member
+set, 32/65/64-byte fixed widths, raw `r || s`, the low-S rule, the rejected-encoding list —
+and the §5 fixed-width constants). The extractions are frozen byte-for-byte in
+`spec/facts/baseline-v2.json` and `baseline-v3.json` and gated by rule 1b per major,
+exactly as v1's swap certification is; the v1 baseline bytes and ten-anchor set are
+unchanged. The spec-facts mutation battery grows from seven to sixteen legs, each observed
+RED on the real tree before wiring, including the cd42445 incident class (a literal NUL
+byte where the two-character `\0` text belongs). No wire byte, bound, or verdict changed;
+the corpus-integrity + certified-pin + SDK-census machinery this ADR named as v3's interim
+drift protection is now complemented by the frozen extraction baselines.

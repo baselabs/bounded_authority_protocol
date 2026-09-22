@@ -5,6 +5,12 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
   # check that should go red stays green. Baseline non-vacuity: the UNMUTATED command must run
   # green in a clean scratch first, so a deleted target cannot score as "caught".
   #
+  # The v2/v3 legs (2026-09-21) prove the successor-major baselines load-bearing: each was
+  # first applied to the real tree, observed RED naming `rule 1b (v2|v3)`, reverted, and
+  # observed green before being wired here (the working-loop red proofs; this battery is the
+  # repeatable form). `v3-separator-nul-byte` pins the cd42445 incident class — a literal NUL
+  # byte where the two-character \0 text belongs.
+  #
   # Calibration self-proof (the inverted-assertion leg, documented per doctrine): the entry
   # `bounds-implementation-digit` targets test/spec_facts_test.exs's rule-1 assertion
   # (`value == bounds[field]`). In a throwaway scratch copy that assertion was NEUTERED once
@@ -86,6 +92,86 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
       path: "spec/facts/coverage-v1.json",
       from: "{\"member\":\"one_of\"",
       to: "{\"member\":\"one_of_renamed\"",
+      command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
+    },
+    %{
+      # v2 baseline legs (rule 1b, major 2). Softening the lte interpretation (inclusive ->
+      # exclusive) diverges the selector-kinds facts from the frozen baseline-v2.json.
+      name: "v2-selector-lte-softening",
+      path: "spec/bap-v2.md",
+      from: "same-tag numeric and numerically ≤ `bound` (inclusive)",
+      to: "same-tag numeric and numerically < `bound` (inclusive)",
+      command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
+    },
+    %{
+      # A drifted v2 domain separator no longer matches the BAP2-<NAME>\0 extraction and the
+      # chain separator vanishes from the facts.
+      name: "v2-domain-separator-drift",
+      path: "spec/bap-v2.md",
+      from: "| chain-row domain `BAP1-CHAIN\\0` | `BAP2-CHAIN\\0` |",
+      to: "| chain-row domain `BAP1-CHAIN\\0` | `BAP2-CHAI2\\0` |",
+      command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
+    },
+    %{
+      # Deleting a v2 anchor breaks the major's closed anchor set (extraction fails, anchor
+      # named).
+      name: "v2-deleted-anchor",
+      path: "spec/bap-v2.md",
+      from: "<!-- facts:selector-kinds -->\n",
+      to: "\n",
+      command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
+    },
+    %{
+      # v3 baseline legs (rule 1b, major 3). A changed fixed-width constant digit (the raw
+      # uncompressed-SEC1 key width) diverges the suite-constants facts.
+      name: "v3-suite-constant-digit",
+      path: "spec/bap-v3.md",
+      from: "| raw public key (uncompressed SEC1) | 65 |",
+      to: "| raw public key (uncompressed SEC1) | 66 |",
+      command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
+    },
+    %{
+      # Softening the low-S rule (> to >=) changes both the low-s fact and the rejected-
+      # encoding list — the exact non-malleability drift the baseline exists to catch.
+      name: "v3-low-s-softening",
+      path: "spec/bap-v3.md",
+      from: "`s > n/2` — the HIGH-S half",
+      to: "`s ≥ n/2` — the HIGH-S half",
+      command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
+    },
+    %{
+      # A drifted proof-header member (jwk -> jwk2) diverges the v3 header-members facts.
+      name: "v3-header-member-drift",
+      path: "spec/bap-v3.md",
+      from: "`jwk: public_EC_JWK`",
+      to: "`jwk2: public_EC_JWK`",
+      command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
+    },
+    %{
+      # Deleting a v3 anchor breaks the major's closed anchor set.
+      name: "v3-deleted-anchor",
+      path: "spec/bap-v3.md",
+      from: "<!-- facts:suite-constants -->\n",
+      to: "\n",
+      command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
+    },
+    %{
+      # The cd42445 incident class, pinned: a literal NUL byte where the wire spelling must
+      # carry the two-character \0 text. The separator regex does not match the NUL spelling,
+      # so the request separator vanishes from the facts and rule 1b (v3) reds. The
+      # replacement byte is built with <<0>> — no escape for tooling to re-interpret.
+      name: "v3-separator-nul-byte",
+      path: "spec/bap-v3.md",
+      from: "`BAP3-REQUEST\\0` (`REQ3-SIGNING-digest-prefix`)",
+      to: "`BAP3-REQUEST" <> <<0>> <> "` (`REQ3-SIGNING-digest-prefix`)",
+      command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
+    },
+    %{
+      # A drifted closed alg value (the ES256 row of suite-identity) diverges baseline-v3.
+      name: "v3-suite-alg-drift",
+      path: "spec/bap-v3.md",
+      from: "`alg` header is exactly `ES256`",
+      to: "`alg` header is exactly `ES256K`",
       command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
     }
   ]

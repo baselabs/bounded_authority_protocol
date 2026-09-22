@@ -867,7 +867,8 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   four vendored snapshots; `spec.facts`/`spec.examples`/`spec.render` green; the digest-pin
   rotation script covers both majors' twelve pins (six per major).
 - **Known follow-ups (named, not blocking):** v2 corpus depth growth beyond the v1-populated
-  cells; the `spec.facts` v2 extraction baseline; ADR 0029 `ba+budget-window` (written 2026-09-19
+  cells; the `spec.facts` v2 extraction baseline (closed 2026-09-21 together with the v3
+  baseline — the extractor is major-keyed and both successor baselines are frozen); ADR 0029 `ba+budget-window` (written 2026-09-19
   as the posture consolidation with the attestation-shape design explicitly deferred —
   [ADR 0029](adr/0029-budget-window-posture.md)); the remaining
   charter successor-major scope (delegation, offline claims, suite succession) as separately
@@ -916,9 +917,11 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   the change, and the CHANGELOG cohort sentence was corrected).
 - **Known follow-ups (named, not blocking):** v3 corpus depth growth beyond the v1-populated
   cells; the `spec.facts` v2 and v3 extraction baselines (open from ADR 0030, re-named in
-  ADR 0035 §9); the A2A projection/`htu` conformance vectors (A4 residual R2) routed to their
-  owning slice; the report adapter key-type discriminator (B2) in its own repo; npm
-  publications and any v3-bearing Hex release are owner decisions outside this landing.
+  ADR 0035 §9; closed 2026-09-21 — major-keyed extraction with frozen `baseline-v2/v3.json`
+  and a 16-leg mutation battery); the A2A projection/`htu` conformance vectors (A4 residual
+  R2) routed to their owning slice; the report adapter key-type discriminator (B2) in its own
+  repo; npm publications and any v3-bearing Hex release are owner decisions outside this
+  landing.
 
 ## Next action
 

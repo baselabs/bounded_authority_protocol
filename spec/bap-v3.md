@@ -18,6 +18,7 @@ v3-specific normative rules in full, including the ES256 signature suite.
 
 ## 1. Suite identity and major detection {#suite}
 
+<!-- facts:suite-identity -->
 The v3 profile's suite is `BAP3-ES256-SHA256`: ECDSA over the NIST P-256 curve with SHA-256
 (`ES256`, RFC 7518 §3.4), SHA-256 digests, RFC 8785 JCS canonical bytes, and the `BAP3-*`
 domain separators — under the major-bound naming scheme `BAP<contract-major>-<signature>-<digest>`
@@ -39,6 +40,7 @@ the reserved `ba+suite-attestation` mechanism of ADR 0009; this profile activate
 
 ## 2. Substitutions incorporated from v1 {#substitutions}
 
+<!-- facts:domain-separators -->
 For every v1 section not restated below, the normative v3 text is the v1 text with exactly
 these substitutions (`REQ3-CORE-v1-incorporation`):
 
@@ -64,6 +66,7 @@ functions.
 
 ## 3. The ES256 signature suite {#suite-rules}
 
+<!-- facts:suite-rules -->
 ### 3.1 Keys and the proof JWK
 
 The suite's keys are NIST P-256 (`secp256r1`, `prime256v1`) key pairs. The wire form of a
@@ -145,6 +148,7 @@ unchanged.
 
 ## 5. Hard maxima {#maxima}
 
+<!-- facts:suite-constants -->
 Every v1 bound carries over (`REQ3-BOUNDS-inherited`) except the suite fixed widths, restated
 for this suite as immutable cryptographic constants (`REQ3-BOUNDS-fixed-widths`):
 

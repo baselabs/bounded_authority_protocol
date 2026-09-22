@@ -43,10 +43,12 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   def run do
     started = System.monotonic_time(:millisecond)
 
-    with {:ok, facts} <- ExtractFacts.extract(),
+    with {:ok, v1_facts} <- ExtractFacts.extract(),
+         {:ok, v2_facts} <- ExtractFacts.extract_major(2),
+         {:ok, v3_facts} <- ExtractFacts.extract_major(3),
          problems <-
-           rule_1_baseline_equality(facts) ++
-             rule_2_closed_sets(facts) ++
+           rule_1_baseline_equality(%{1 => v1_facts, 2 => v2_facts, 3 => v3_facts}) ++
+             rule_2_closed_sets(v1_facts) ++
              rule_3_requirement_ids() ++
              rule_4_statement_hashes() ++
              rule_5_cited_counts() ++
@@ -55,13 +57,13 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
              rule_8_companion_revisions() ++
              rule_11_keyword_census() ++
              rule_9_vendor_neutrality() ++
-             rule_10_anchor_completeness(facts) ++
-             rule_12_framing_oracle(facts),
+             rule_10_anchor_completeness(v1_facts) ++
+             rule_12_framing_oracle(v1_facts),
          [] <- problems do
       elapsed = System.monotonic_time(:millisecond) - started
 
       IO.puts(
-        "spec facts gate: ok rules=[1b,2,3,4,5,6,7,8,9,10,11,framing-oracle] in #{elapsed}ms"
+        "spec facts gate: ok rules=[1b(v1,v2,v3),2,3,4,5,6,7,8,9,10,11,framing-oracle] in #{elapsed}ms"
       )
     else
       problems when is_list(problems) ->
@@ -81,27 +83,38 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   # a bounds digit, a claim row, a construction byte — reds here until the baseline is
   # deliberately re-frozen. This is also the L3 certification mechanism: after the authority
   # swap, extract(new spec) == baseline-v1.json must hold with an empty delta.
+  #
+  # The rule is MAJOR-KEYED: majors 2 and 3 (the successor closed profiles) carry their own
+  # frozen baselines (spec/facts/baseline-v2.json, baseline-v3.json) over their delta fact
+  # sets — suite identity, domain separators, selector kinds, and the v3 suite rules/constants —
+  # so a silent edit of any successor-major normative constant reds exactly as a v1 edit does
+  # (ADR 0030's and ADR 0035 §9's named deferral, closed).
 
-  defp rule_1_baseline_equality(facts) do
-    path = Path.join(@root, "#{@baseline_dir}/baseline-v1.json")
+  @baseline_majors [1, 2, 3]
 
-    case File.read(path) do
-      {:ok, bytes} ->
-        live = ExtractFacts.canonical(facts) <> "\n"
+  defp rule_1_baseline_equality(major_facts) do
+    Enum.flat_map(@baseline_majors, fn major ->
+      path = Path.join(@root, "#{@baseline_dir}/baseline-v#{major}.json")
+      facts = Map.fetch!(major_facts, major)
 
-        if bytes == live do
-          []
-        else
+      case File.read(path) do
+        {:ok, bytes} ->
+          live = ExtractFacts.canonical(facts) <> "\n"
+
+          if bytes == live do
+            []
+          else
+            [
+              "rule 1b (v#{major}): the extracted facts diverge from spec/facts/baseline-v#{major}.json — re-freeze deliberately (a silent facts change is exactly what this gate exists to catch)"
+            ]
+          end
+
+        _ ->
           [
-            "rule 1b: the extracted facts diverge from spec/facts/baseline-v1.json — re-freeze deliberately (a silent facts change is exactly what this gate exists to catch)"
+            "rule 1b (v#{major}): spec/facts/baseline-v#{major}.json is missing — the frozen extraction is gone"
           ]
-        end
-
-      _ ->
-        [
-          "rule 1b: spec/facts/baseline-v1.json is missing — the frozen pre-swap extraction is gone"
-        ]
-    end
+      end
+    end)
   end
 
   # --- rule 2: closed sets ⊇ corpus valid-case unions ------------------------
