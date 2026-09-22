@@ -920,8 +920,9 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   ADR 0035 §9; closed 2026-09-21 — major-keyed extraction with frozen `baseline-v2/v3.json`
   and a 16-leg mutation battery); the A2A projection/`htu` conformance vectors (A4 residual
   R2) routed to their owning slice; the report adapter key-type discriminator (B2) in its own
-  repo; npm publications and any v3-bearing Hex release are owner decisions outside this
-  landing.
+  repo; npm publications are owner decisions outside this landing; the v3-bearing Hex
+  release landed 2026-09-22 as 0.5.0 (registry checksum `8ef219f8…874`, read back against
+  the tagged-tree build and a fresh `~> 0.5.0` consumer; hexdocs live).
 
 ## Next action
 
@@ -929,7 +930,8 @@ BAP-00 through BAP-11, BAP-13 through BAP-19, BAP-21, and BAP-22 are complete. B
 open for the IANA filing and is gated on the BAP-08 external-submission preconditions. BAP-21
 activated contract-major 2 and shipped the 0.4.0 source and Hex release; BAP-22 activated
 contract-major 3 — the `BAP3-ES256-SHA256` ES256 suite with its certified 292-case corpus (see
-the BAP-22 closeout evidence above; any v3-bearing Hex release is an owner decision). BAP-09
+the BAP-22 closeout evidence above; the v3-bearing Hex release is 0.5.0, published
+2026-09-22 with its registry checksum read back). BAP-09
 shipped the first two cross-language verifier SDKs: TypeScript and Python. TypeScript has since graduated to
 [`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript)
 and is published to npm as `@bounded-authority-protocol/verifier`; Python remains under `sdks/`.

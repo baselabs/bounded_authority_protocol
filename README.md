@@ -40,8 +40,10 @@ The package has **zero production dependencies**, no application callback, and n
 (`BoundedAuthorityProtocol.V3`, [ADR 0035](docs/adr/0035-es256-contract-major-activation.md)) and
 ships the spec-facts v2/v3 extraction baselines in the package; `v0.4.0` identified the v2
 activation; `v0.4.1` was the toolchain-and-platforms release (ADR 0031/0032); `v0.4.2` was a
-documentation-truth patch. The immutable package identity is the published Hex release (registry
-checksum read back and pinned in the post-publish docs-currency commit), not the Git tag. Depend on
+documentation-truth patch. The immutable package identity is the published Hex release (registry checksum
+`8ef219f854fbb8e7448e449ca571f13d4a2df58986c245f0facb588f0ba48474`, read back from the
+registry against the tagged-tree build and pinned by a fresh `~> 0.5.0` consumer), not the
+Git tag. Depend on
 the package identity — never a tag or a mutable checkout.
 
 ## Holder-side signer: the report adapter
