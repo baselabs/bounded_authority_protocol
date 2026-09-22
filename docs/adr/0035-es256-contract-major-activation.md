@@ -311,10 +311,15 @@ loopback functions.
   raw `r || s` form; the JWK export is exactly `{crv, kty, x, y}` with 32-byte coordinates; the
   SEC1 raw form is `0x04 || x || y` concatenation; Node's OpenSSL, like OTP's, emits high-`s`
   about half the time — so the signer's normalization is load-bearing, not decorative.
-- **Kiosk demo** ("Agent at the Kiosk", private runtime evidence tree): refresh pass joins this
+- **Kiosk demo** ("Agent at the Kiosk", private runtime evidence tree): refresh pass joined this
   sweep per the 2026-09-20 decision — the demo moves its slip/request signing onto the signer's
   v3 public API (retiring the verifier-producer workaround recorded in project memory) and
-  re-runs its self-test.
+  re-runs its self-test. **Withdrawn (owner decision, 2026-09-22):** the demo tree no longer
+  exists (the private repository's evidence trees were pruned before this activation; the owner
+  confirmed the loss is permanent), so the refresh has no subject. Nothing in this activation
+  depends on it — no public gate, corpus, spec, or publication surface references the demo;
+  the signer-side capability it would have demonstrated is delivered and tested in the signer
+  repository's own suite.
 - **A2A drill (A4 residual R3)**: the sweep is the first real-substrate A2A binding evidence —
   an actual A2A server receiving `BA-Grant`/`BA-Proof` carriage per
   [a2a-capability-binding-profile.md](../../docs/design/a2a-capability-binding-profile.md) §5
@@ -433,3 +438,15 @@ as ADR 0029 records it; no reserved purpose is realized, designed, or promised h
   [0019](0019-corpus-artifact-distribution.md) — the SDK contracts the cohort work satisfies.
 - [successor-major charter](../../docs/design/successor-major-charter.md) — the activation
   checklist.
+
+---
+
+## Post-acceptance note (2026-09-22): kiosk-refresh bullet withdrawn
+
+The §8 kiosk-demo bullet above is withdrawn by owner decision: the demo tree (a private
+runtime evidence tree, since pruned) no longer exists, and the owner confirmed the loss
+is permanent. The cohort sweep's
+deliverables are complete without it — the in-repo SDKs, the TypeScript verifier and
+signer adoptions, and the A2A drill all landed; no public surface (gate, corpus, spec,
+registry, publication) depends on the demo. If a successor demo is ever built, the
+signer's v3 public API is the producing surface to build it on.

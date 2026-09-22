@@ -27,8 +27,10 @@ All notable changes to `bounded_authority_protocol` are documented here.
   0026 carries a dated reconciliation note for its stale `BAP2-*` family index.
 - The in-repo SDKs (Python, Rust, Go) gain v3 namespaces, runners, and permissiveness
   mutation gates; the TypeScript cohort (graduated verifier repository snapshot-bump,
-  signer suite adoption, kiosk-demo refresh) and the A2A `BA-Grant`/`BA-Proof` drill land
-  with this activation per ADR 0035 §8.
+  signer suite adoption) and the A2A `BA-Grant`/`BA-Proof` drill land with this
+  activation per ADR 0035 §8. The §8 kiosk-demo refresh named in the 2026-09-20 cohort
+  decision is withdrawn — its demo tree no longer exists (owner decision, 2026-09-22;
+  see ADR 0035's post-acceptance note).
 
 ### Added — UCP riding-point decision (ADR 0034) and A2A venue extension draft (no wire or API change)
 
