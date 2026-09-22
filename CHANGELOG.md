@@ -4,6 +4,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-22
+
 ### Added — spec-facts extraction baselines for v2 and v3 (ADR 0030/0035 deferral closed; no wire or API change)
 
 - The spec-facts drift gate is major-keyed: `spec/bap-v2.md` and `spec/bap-v3.md` now carry

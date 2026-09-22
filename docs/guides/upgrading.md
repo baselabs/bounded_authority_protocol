@@ -5,6 +5,17 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
+## 0.4.2 to 0.5.0
+
+Additive contract-major release: `0.5.0` activates the ES256 suite as contract-major 3 under
+`BoundedAuthorityProtocol.V3` (`BAP3-ES256-SHA256` — ECDSA P-256/SHA-256, RFC 7518 §3.4 raw
+`r || s` signatures with low-S canonicality, EC JWK holder keys, 65-byte uncompressed-SEC1 raw
+keys; [ADR 0035](../adr/0035-es256-contract-major-activation.md)) with its certified 292-case
+corpus, and ships the spec-facts v2/v3 extraction baselines inside the package. v1 and v2 are
+byte-frozen: wire bytes, bounds, public APIs, verdicts, and certified pins are unchanged, so
+v1/v2 consumers need only bump the requirement pin. The new namespace is opt-in — nothing that
+does not reference `BoundedAuthorityProtocol.V3` changes.
+
 ## 0.4.1 to 0.4.2
 
 Documentation-truth patch: the corrected AP2 mandate-mapping note and the capability extension's
