@@ -4,8 +4,8 @@
 - Date: 2026-09-21
 - Track: T2
 - Activates: the AP2 interop profile §3 signature-suite bridge
-  ([ap2-interop-profile.md](../design/ap2-interop-profile.md)) under the
-  [successor-major charter](../../docs/design/successor-major-charter.md) activation checklist
+  ([ap2-interop-profile.md](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/ap2-interop-profile.md)) under the
+  [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md) activation checklist
 - Implements: roadmap row BAP-22 (the ES256 suite slice)
 - Owner decisions binding here: ES256 suite is NOT disclosure-gated (2026-09-19); the TypeScript
   signer ADOPTS the suite and its encodings must stay implementable on the TS producing side
@@ -322,7 +322,7 @@ loopback functions.
   repository's own suite.
 - **A2A drill (A4 residual R3)**: the sweep is the first real-substrate A2A binding evidence —
   an actual A2A server receiving `BA-Grant`/`BA-Proof` carriage per
-  [a2a-capability-binding-profile.md](../../docs/design/a2a-capability-binding-profile.md) §5
+  [a2a-capability-binding-profile.md](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/a2a-capability-binding-profile.md) §5
   and verifying a v3 proof against the profile's binding rules (§6 `htm`/`htu`, §7 `ba_op`, §8
   projection), run against the pinned A2A source's own SDK/server surface (A2A at commit
   `afda8316`). No mock peer; no self-round-trip interop claim —
@@ -424,7 +424,7 @@ as ADR 0029 records it; no reserved purpose is realized, designed, or promised h
 
 ## See also
 
-- [AP2 interop profile](../../docs/design/ap2-interop-profile.md) §3 — the bridge contract this
+- [AP2 interop profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/ap2-interop-profile.md) §3 — the bridge contract this
   suite realizes.
 - [ADR 0009](0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) — suite
   succession and the naming scheme.
@@ -437,7 +437,7 @@ as ADR 0029 records it; no reserved purpose is realized, designed, or promised h
 - [ADR 0014](0014-cross-language-verifier-sdks.md)/[0015](0015-sdk-graduation-and-publish-topology.md)/
   [0017](0017-inter-sdk-behavioral-contract.md)/[0018](0018-sdk-bounds-contract.md)/
   [0019](0019-corpus-artifact-distribution.md) — the SDK contracts the cohort work satisfies.
-- [successor-major charter](../../docs/design/successor-major-charter.md) — the activation
+- [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md) — the activation
   checklist.
 
 ---

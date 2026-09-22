@@ -13,16 +13,16 @@ normative profile; this guide is operational.
 
 ## Installation
 
-The package is published on Hex (release 0.5.0, published 2026-09-22):
+The package is published on Hex (release 0.5.1, published 2026-09-22):
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 0.5.0"}
+  [{:bounded_authority_protocol, "~> 0.5.1"}
 end
 ```
 
-`v0.5.0` is the reviewable source release for the ES256 contract-major 3 activation and ships
-the spec-facts v2/v3 baselines; `v0.4.0` was the v2 source release; `v0.4.1` was the toolchain
+`v0.5.0` was the ES256 contract-major 3 activation source release (spec-facts v2/v3
+baselines shipped); `v0.5.1` is a docs-maintenance patch; `v0.4.0` was the v2 source release; `v0.4.1` was the toolchain
 release; `v0.4.2` was a documentation-truth patch. The immutable
 package identity is the published Hex release, whose
 registry checksum was read back against the tagged-tree build. Depend on the package identity —

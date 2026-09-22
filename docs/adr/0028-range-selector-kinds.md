@@ -239,5 +239,5 @@ review of §4.
 - [ADR 0029](0029-budget-window-posture.md) — the companion mechanism carrying charter §5's
   cumulative half; written 2026-09-19 as the posture consolidation, with the `ba+budget-window`
   attestation-shape design explicitly deferred.
-- [successor-major charter](../design/successor-major-charter.md) §5 — the owner decision this
+- [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md) §5 — the owner decision this
   ADR mechanizes; [registries](../design/registries.md) — the selector-kind reservations.

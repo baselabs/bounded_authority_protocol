@@ -5,6 +5,14 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
+## 0.5.0 to 0.5.1
+
+Documentation-truth patch with **no code, wire-format, bound, or public-API change**: the
+published doc set is trimmed to implementer-facing content (the IANA pre-filing drafts, the
+AP2/A2A interop design profiles, the successor-major activation checklist, and the superseded
+0.1.0 release-candidate contract leave the package and hexdocs while remaining tracked in the
+repository). Consumers on 0.5.0 need not upgrade; the pin bump is optional.
+
 ## 0.4.2 to 0.5.0
 
 Additive contract-major release: `0.5.0` activates the ES256 suite as contract-major 3 under

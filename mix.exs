@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.MixProject do
   use Mix.Project
 
-  @version "0.5.0"
+  @version "0.5.1"
   @source_url "https://github.com/baselabs/bounded_authority_protocol"
 
   def project do
@@ -134,7 +134,6 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0034-ucp-riding-point-scoping.md",
         "docs/adr/0035-es256-contract-major-activation.md",
         "docs/protocol-v1.md",
-        "docs/release-candidate-contract.md",
         "docs/errata.md",
         "docs/governance.md",
         "docs/guides/README.md",
@@ -146,16 +145,11 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/deployment/python-sdk.md",
         "docs/deployment/rust-sdk.md",
         "docs/deployment/typescript-sdk.md",
-        "docs/design/a2a-capability-binding-profile.md",
-        "docs/design/ap2-interop-profile.md",
         "docs/design/conformance-contract.md",
-        "docs/design/iana",
         "docs/design/interoperability-report.md",
-        "docs/design/offline-authorization-requirements.md",
         "docs/design/protocol-charter.md",
         "docs/design/registries.md",
         "docs/design/requirement-map.md",
-        "docs/design/successor-major-charter.md",
         "docs/design/local-loopback-http-requirement-map.md",
         "docs/design/standards-track.md",
         "docs/design/threat-model.md"
@@ -196,7 +190,6 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "spec/bap-v3.md",
         "spec/bap-local-loopback-http-v1.md",
         "docs/protocol-v1.md",
-        "docs/release-candidate-contract.md",
         "docs/adr/0001-public-protocol-verifier-boundary.md",
         "docs/adr/0002-normative-v1-parsing-profile.md",
         "docs/adr/0003-standard-jws-and-verified-grant-results.md",
@@ -230,19 +223,13 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0035-es256-contract-major-activation.md",
         "docs/errata.md",
         "docs/governance.md",
-        "docs/design/a2a-capability-binding-profile.md",
-        "docs/design/ap2-interop-profile.md",
         "docs/design/conformance-contract.md",
-        "docs/design/iana/jwt-claims.md",
-        "docs/design/iana/media-types.md",
         "docs/design/interoperability-report.md",
-        "docs/design/offline-authorization-requirements.md",
         "docs/design/protocol-charter.md",
         "docs/design/registries.md",
         "docs/design/requirement-map.md",
         "docs/design/local-loopback-http-requirement-map.md",
         "docs/design/standards-track.md",
-        "docs/design/successor-major-charter.md",
         "docs/design/threat-model.md"
       ]
     ]

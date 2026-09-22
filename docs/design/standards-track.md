@@ -198,7 +198,7 @@ guidance with normative force at submission time:
   consumption and surfaces over-consumption as a first-class event. The closed claim shape, the
   non-authorizing facts contract, the `ba_dlg` attenuation composition, and the successor-major
   activation are specified in [ADR 0016](../adr/0016-offline-eligible-grant-claims.md); the
-  requirements are [R-BAP-1..6](offline-authorization-requirements.md). The closed v1 profile
+  requirements are R-BAP-1..6 (the requirements input was relocated out of the published set on 2026-09-22; ADR 0016 is the mechanism of record). The closed v1 profile
   rejects the reserved name today; activation arrives with a successor contract-major.
 
 ## Principal binding

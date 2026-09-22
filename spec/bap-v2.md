@@ -3,7 +3,7 @@
 Document revision: rev 1 (2026-09-13). Status: normative. Contract-major 2, suite
 `BAP2-Ed25519-SHA256`. This profile is activated by
 [ADR 0030](../docs/adr/0030-v2-contract-major-activation.md) under the
-[successor-major charter](../docs/design/successor-major-charter.md); the selector
+[successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md); the selector
 mechanism it activates is specified by [ADR 0028](../docs/adr/0028-range-selector-kinds.md).
 
 The v2 profile is a complete closed wire profile parallel to the frozen v1 profile

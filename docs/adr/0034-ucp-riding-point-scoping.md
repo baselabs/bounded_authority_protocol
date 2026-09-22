@@ -4,8 +4,8 @@
 - Date: 2026-09-21
 - Track: T2
 - Closes: the UCP open question recorded by the [A2A capability-binding
-  profile](../design/a2a-capability-binding-profile.md) §12 and the [AP2 interop
-  profile](../design/ap2-interop-profile.md) §6 (owner direction 2026-09-21: resolve, do not
+  profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/a2a-capability-binding-profile.md) §12 and the [AP2 interop
+  profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/ap2-interop-profile.md) §6 (owner direction 2026-09-21: resolve, do not
   park).
 
 ## Context
@@ -57,11 +57,11 @@ What UCP is (facts load-bearing for the decision):
 
 **The UCP riding point is transport-composed; UCP introduces no new BAP layer, wire mechanism,
 or binding fork.** The composition decision taken for A2A (recorded by the [A2A
-capability-binding profile](../design/a2a-capability-binding-profile.md) §3) applies per UCP
+capability-binding profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/a2a-capability-binding-profile.md) §3) applies per UCP
 transport:
 
 1. **UCP over the A2A transport is covered, as-is, by the [A2A capability-binding
-   profile](../design/a2a-capability-binding-profile.md) — for a deployment speaking A2A
+   profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/a2a-capability-binding-profile.md) — for a deployment speaking A2A
    1.0.** A UCP business's agent endpoint is an A2A endpoint: the extension declaration,
    `BA-Grant` / `BA-Proof` carriage, the `ba_op` spelling, and the bounded per-operation
    projection all apply unchanged, and UCP checkout content inside `DataPart`s is bound by the

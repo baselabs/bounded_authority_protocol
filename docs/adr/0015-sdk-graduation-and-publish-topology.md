@@ -27,7 +27,7 @@ detail of ADR 0014:
    resolving against the old repository and goes silently stale. On a cryptographic verification library, staleness is
    a security property, not a convenience one.
 2. **Published provenance is part of the contract.** [ADR 0008](0008-release-candidate-contract.md) and
-   [`release-candidate-contract.md`](../release-candidate-contract.md) bind verifiability to a specific repository +
+   [`release-candidate-contract.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/release-candidate-contract.md) bind verifiability to a specific repository +
    workflow via `gh attestation verify --repo ... --signer-workflow ...`. Move the repository and the attestation
    source changes: old versions attest under repository A, new under repository B. For a library whose pitch is
    "you can independently verify this," a broken provenance chain is not cosmetic.

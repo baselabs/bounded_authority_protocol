@@ -23,20 +23,21 @@ cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for
 
 ## Installation
 
-The package is published on Hex (release 0.5.0, published 2026-09-22; the registry checksum is
+The package is published on Hex (release 0.5.1, published 2026-09-22; the registry checksum is
 read back against the tagged-tree build in the post-publish docs-currency commit). Registry
 consumers use the minor-bounded requirement:
 
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.5.0"}
+    {:bounded_authority_protocol, "~> 0.5.1"}
   ]
 end
 ```
 
 The package has **zero production dependencies**, no application callback, and no supervision tree.
-`v0.5.0` identifies the reviewable source release for the ES256 contract-major 3 activation
+`v0.5.1` is a docs-maintenance patch over `v0.5.0`, which identified the reviewable source
+release for the ES256 contract-major 3 activation
 (`BoundedAuthorityProtocol.V3`, [ADR 0035](docs/adr/0035-es256-contract-major-activation.md)) and
 ships the spec-facts v2/v3 extraction baselines in the package; `v0.4.0` identified the v2
 activation; `v0.4.1` was the toolchain-and-platforms release (ADR 0031/0032); `v0.4.2` was a

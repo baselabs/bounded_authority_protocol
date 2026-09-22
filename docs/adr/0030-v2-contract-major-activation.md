@@ -4,7 +4,7 @@
 - Date: 2026-09-13
 - Track: T2
 - Activates: [ADR 0028](0028-range-selector-kinds.md) per the
-  [successor-major charter](../design/successor-major-charter.md) activation checklist
+  [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md) activation checklist
 - Implements: roadmap row BAP-21
 
 ## Context
@@ -167,6 +167,6 @@ still follows the governance policy stated above.
 - [ADR 0007](0007-normative-requirement-identifiers.md) — the `REQ2-*` range.
 - [ADR 0022](0022-durable-contract-identities.md) — the identity scanner this activation
   enumerates v2 into.
-- [successor-major charter](../design/successor-major-charter.md) — the activation checklist.
+- [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md) — the activation checklist.
 - [governance](../governance.md) — change classes and the deprecation policy §7 cites.
 - [`spec/bap-v2.md`](../../spec/bap-v2.md) — the normative v2 profile.

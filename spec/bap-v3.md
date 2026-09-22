@@ -3,8 +3,8 @@
 Document revision: rev 1 (2026-09-21). Status: normative. Contract-major 3, suite
 `BAP3-ES256-SHA256`. This profile is activated by
 [ADR 0035](../docs/adr/0035-es256-contract-major-activation.md) under the
-[successor-major charter](../docs/design/successor-major-charter.md); the signature-suite bridge
-it realizes is specified by the [AP2 interop profile](../docs/design/ap2-interop-profile.md) §3.
+[successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md); the signature-suite bridge
+it realizes is specified by the [AP2 interop profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/ap2-interop-profile.md) §3.
 
 The v3 profile is a complete closed wire profile parallel to the frozen v1
 ([bap-v1.md](bap-v1.md)) and v2 ([bap-v2.md](bap-v2.md)) profiles. Conformance language, the

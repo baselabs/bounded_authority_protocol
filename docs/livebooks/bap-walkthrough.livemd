@@ -6,11 +6,11 @@ livebook:{"persist_outputs":true}
 
 ```elixir
 Mix.install([
-  {:bounded_authority_protocol, "~> 0.5.0"}
+  {:bounded_authority_protocol, "~> 0.5.1"}
 ])
 ```
 
-Hex 0.5.0 is published (2026-09-22), so the `Mix.install` above resolves from the public
+Hex 0.5.1 is published (2026-09-22), so the `Mix.install` above resolves from the public
 registry. The immutable package identity is the published Hex release; the source tag is
 reviewable release evidence, not a substitute for it.
 

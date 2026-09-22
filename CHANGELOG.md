@@ -4,6 +4,22 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-22
+
+### Docs maintenance — the published doc set trimmed to implementer-facing content
+
+- The Hex package and hexdocs now carry the implementer-facing set only: the four specs, the
+  ADR decision records, the guides/deployment/livebook docs, the normative contracts
+  (registries, requirement map, standards track, governance, threat model, errata,
+  interoperability report, protocol charter, conformance contract), and the package
+  essentials. Removed from the published set while remaining tracked in the repository: the
+  IANA pre-filing registration drafts (`docs/design/iana/`), the AP2 and A2A interop design
+  profiles, the successor-major activation checklist, and the superseded 0.1.0
+  release-candidate contract. The BAP-17 offline requirements input moved out of the tracked
+  tree into local untracked storage (ADR 0016 remains the mechanism of record). No code,
+  wire, bound, or verdict change; the package census and the published-surface hygiene
+  roots are re-pinned to the trimmed set.
+
 ## [0.5.0] - 2026-09-22
 
 ### Added — spec-facts extraction baselines for v2 and v3 (ADR 0030/0035 deferral closed; no wire or API change)
@@ -1084,7 +1100,7 @@ several note findings, all in surfaces this program touched. All fixed:
   grant-payload claim name in the [registries](docs/design/registries.md) (issuer-set offline
   floor limits: maximum value with explicit currency, maximum offline use count, offline-window
   expiry — a closed nested object; absence means online-only, per
-  [R-BAP-1](docs/design/offline-authorization-requirements.md)). [ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)
+  [R-BAP-1](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/offline-authorization-requirements.md)). [ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)
   carries the activating-major mechanism to spec quality: the closed `{cnt, cur, max, win}` object,
   the non-authorizing facts contract (an `offline_eligible` flag + `win` only — magnitudes are read
   from the decoded grant, not redacted facts), malformed⇒`:invalid` (online-only is the *absent*
@@ -1447,7 +1463,7 @@ several note findings, all in surfaces this program touched. All fixed:
   node/byte bounds are inline-expressible and now tested; only compact-carried whole-payload
   `total_nodes` and an inline 65-member `object_members` remain enforced-without-a-red-case.
 - Close BAP-06: lock the 0.1.0 release-candidate public API surface (enumerated in the
-  [release-candidate contract](docs/release-candidate-contract.md) and enforced by the
+  [release-candidate contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/release-candidate-contract.md) and enforced by the
   `@compiled_export_allowances` architecture-gate pin;
   [ADR 0008](docs/adr/0008-release-candidate-contract.md)),
   add the `release.candidate` reproducibility gate (two cache-isolated builds, byte-equal SHA-256,

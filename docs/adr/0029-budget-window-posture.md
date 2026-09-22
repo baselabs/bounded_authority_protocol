@@ -8,7 +8,7 @@
 
 ## Context
 
-The [successor-major charter](../design/successor-major-charter.md) settled the selector-scope
+The [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md) settled the selector-scope
 split for payment-shaped authority (§ Selector expressiveness, owner decision 2026-08-26):
 
 - **Per-request range constraints** are pure inequality selector kinds and belong in the selector
