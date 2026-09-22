@@ -21,7 +21,7 @@ grant operational authority by itself.
 
 ## Current state
 
-Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, and `BAP-21`
+Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, `BAP-21`, and `BAP-22`
 (`BAP-17` is design-only). Open: `BAP-12` (IANA filing, gated on the BAP-08 external
 submission preconditions). Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence
 blocks are the status authority.

@@ -37,7 +37,7 @@ compatibility.
 | BAP-18 | **Bounds-aware assembly and issuer-mediated reauthorization posture** — Expose caller bounds on compact assembly and define the current-major boundary between ordinary issuer-signed child grants and successor-major portable delegation, slug:bap-18 | `assemble_compact/3` delegates to the existing bounded runtime primitive; `/2` remains the byte-identical profile-maximum default; all four signing kinds enforce tightened segment/final-compact bounds; the facade export lock and unpacked consumer exercise both arities; `ba_dlg` and `ba+cap-delegated` remain rejected | BAP-06, BAP-14, BAP-15 | [ADR 0020](adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md), [ADR 0010](adr/0010-delegation-with-attenuation.md), and [ADR 0018](adr/0018-sdk-bounds-contract.md) |
 | BAP-19 | **Byte-distinct local-loopback HTTP application proof** — Add an explicit application-proof profile for direct literal-loopback development listeners without changing standard `dpop+jwt` bytes or verdicts, slug:bap-19-local-loopback-http | Accepted ADR + normative profile; separate five-surface APIs in Elixir and all four SDKs; certified secret-free language-neutral corpus with cross-profile and meaningful-byte rejects; real `127.0.0.1` and `::1` HTTP exchanges with ephemeral in-memory keys; full legacy corpus remains unchanged; fresh blocking reviews close; exact source/corpus identity is published before any adopter consumes it | BAP-18 | [ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md), [local-loopback profile](../spec/bap-local-loopback-http-v1.md), and [profile requirement map](design/local-loopback-http-requirement-map.md) |
 | BAP-21 | **v2 contract-major activation — `lte`/`gte` range selector kinds** — Execute the ADR 0028 activating-major obligations under the successor-major charter checklist: the complete v2 closed profile, its certified corpus, REQ2-* traceability, the four-SDK re-verification, and the registries flip, slug:bap-21 | `BoundedAuthorityProtocol.V2` namespace + [`spec/bap-v2.md`](../spec/bap-v2.md) + [ADR 0030](adr/0030-v2-contract-major-activation.md) land together; the v2 corpus (268 cases, 28 surfaces, certified index `6de6289b…f13d0`) verifies 268/268 through the CLI and all four SDKs with the digest pinned; six new mutation-battery entries executed RED with proofs recorded in the [requirement map](design/requirement-map.md) § v2; `lte`/`gte` active in registries; v1 byte-frozen with its certified pin unchanged | — | [ADR 0028](adr/0028-range-selector-kinds.md), [ADR 0030](adr/0030-v2-contract-major-activation.md), and the [successor-major charter](design/successor-major-charter.md) |
-| BAP-22 | **ES256 contract-major activation — the `BAP3-ES256-SHA256` suite** — Execute the ADR 0035 activating-major obligations under the successor-major charter checklist: the complete v3 closed profile (ECDSA P-256/SHA-256, RFC 7518 §3.4 raw `r\|\|s` signatures with low-S canonicality, EC JWKs and RFC 7638 thumbprints, uncompressed-SEC1 raw keys), its certified corpus, REQ3-* traceability, the SDK cohort, and the registries flip, slug:bap-22 | `BoundedAuthorityProtocol.V3` namespace + [`spec/bap-v3.md`](../spec/bap-v3.md) + [ADR 0035](adr/0035-es256-contract-major-activation.md) land together; the v3 corpus (292 cases, 28 surfaces, certified index `yJYhMsro…a4u2` — full value pinned in the CLI's major-keyed map) verifies 292/292 through the CLI with the digest pinned; six verdict-provable mutation-battery entries executed RED with two battery adjudications disclosed in the [requirement map](design/requirement-map.md) § v3 (range-check backend-coincidence; cross-major composite); the in-repo SDKs gain v3 namespaces and the TS cohort adopts the suite; `BAP3-ES256-SHA256` active in registries with the `lte`/`gte` scope extended and the ML-DSA anticipated index advanced; v1 and v2 byte-frozen with their certified pins unchanged | BAP-21 | [ADR 0035](adr/0035-es256-contract-major-activation.md), [ADR 0009](adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md), and the [successor-major charter](design/successor-major-charter.md) |
+| BAP-22 | **ES256 contract-major activation — the `BAP3-ES256-SHA256` suite** — Execute the ADR 0035 activating-major obligations under the successor-major charter checklist: the complete v3 closed profile (ECDSA P-256/SHA-256, RFC 7518 §3.4 raw `r\|\|s` signatures with low-S canonicality, EC JWKs and RFC 7638 thumbprints, uncompressed-SEC1 raw keys), its certified corpus, REQ3-* traceability, the SDK cohort, and the registries flip, slug:bap-22 | `BoundedAuthorityProtocol.V3` namespace + [`spec/bap-v3.md`](../spec/bap-v3.md) + [ADR 0035](adr/0035-es256-contract-major-activation.md) land together; the v3 corpus (292 cases, 28 surfaces, revision 1, certified index `pcgHXnU0…mQzw` — the repaired-and-re-certified pin after the coverage-gate certification repair; full value pinned in the CLI's major-keyed map) verifies 292/292 through the CLI with the digest pinned; six verdict-provable mutation-battery entries executed RED with two battery adjudications disclosed in the [requirement map](design/requirement-map.md) § v3 (range-check backend-coincidence; cross-major composite); the in-repo SDKs gain v3 namespaces and the TS cohort adopts the suite; `BAP3-ES256-SHA256` active in registries with the `lte`/`gte` scope extended and the ML-DSA anticipated index advanced; v1 and v2 byte-frozen with their certified pins unchanged; the kiosk-demo refresh item withdrawn (owner decision 2026-09-22; ADR 0035 post-acceptance note) | BAP-21 | [ADR 0035](adr/0035-es256-contract-major-activation.md), [ADR 0009](adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md), and the [successor-major charter](design/successor-major-charter.md) |
 
 ## BAP-00 closeout evidence
 
@@ -874,12 +874,60 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   activated majors; SDK publication and any v2 Hex release are owner decisions (both happened on
   2026-09-14: the 0.4.0 Hex release carries v2, and the TypeScript verifier was published to npm).
 
+## BAP-22 closeout evidence (2026-09-22)
+
+- **Profile:** `BoundedAuthorityProtocol.V3` — suite `BAP3-ES256-SHA256`, payload `v: 3`,
+  `BAP3-*` domain separators — in [`spec/bap-v3.md`](../spec/bap-v3.md) (complete closed
+  profile: ECDSA P-256/SHA-256, RFC 7518 §3.4 raw `r || s` signatures with low-S canonicality,
+  EC JWK holder keys with RFC 7638 thumbprints, uncompressed-SEC1 65-byte raw keys), with
+  cross-major rejection of v1 and v2 bytes and `REQ3-*` traceability in the
+  [requirement map](design/requirement-map.md) § v3.
+  [ADR 0035](adr/0035-es256-contract-major-activation.md) is the activation decision.
+- **Corpus:** `priv/conformance/v3/corpus` — 292 cases, 28 surfaces, revision 1. Final
+  certified index pin `pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw` (hex
+  `a5c8075e7534345c3bb6611d0b40292904bcfa3af0702e07ae014fa66926433c`), pinned in the CLI's
+  major-keyed map. The initial certification was repaired and re-certified before landing: the
+  coverage bar (`mix test --cover --seed 42`) exposed that the four signing-input case files
+  carried v2-shaped 32-byte Ed25519 keys the v3 producers reject — the valid-class cases had
+  been minted with `invalid` expectations, a vacuous agreement the corpus-agreement loop could
+  not see. The inputs were re-keyed to v3 EC shapes, expectations re-derived through the real
+  producers, and corpus/index/pins/snapshots rotated (census 11 keys — the repair removed a
+  stale Ed25519 key). The v1 (283) and v2 (268) corpora and their certified pins are unchanged.
+- **Red proofs:** six verdict-provable mutation-battery entries executed RED, with two battery
+  adjudications disclosed in the [requirement map](design/requirement-map.md) § v3 (range-check
+  backend-coincidence; cross-major composite).
+- **Landing commits (protocol repo):** `0730ca0` (activation, 173 files), `5f92cf4` (Go purity
+  allowlist gains the stdlib ECDSA packages — the SDK-conformance lane had failed exactly on
+  the unallowlisted `crypto/ecdsa`/`crypto/elliptic` imports), `db45627` (secret-scan allowlist
+  gains the v3 corpus path group and its sensitivity probes), `cd42445` (requirement-map fix:
+  the four BAP3 domain separators had been embedded as literal NUL bytes instead of the
+  two-character `\0` text), `63bfd5d` (ADR 0035 kiosk-withdrawal post-acceptance note). TS
+  cohort (unpublished owner decisions): verifier `f7b8cda` + `1624243` (repaired-corpus
+  rotation, pins `pcgHXnU0…`/`a5c8075e…`), signer `2f95357` (ES256 producing profile, low-S
+  normalization).
+- **Gates:** `mix quality` EXIT=0 on the final source — 547 tests at the 100% coverage bar
+  (`mix test --cover --seed 42` exit 0), all four mutation gates green (47/72/7 + loopback),
+  all three corpora agreeing with their certified pins, reproducibility/SBOM/package boundaries
+  green. CI green on `cd42445` and `63bfd5d` (CI, Supply chain, SDK publish guard all success);
+  the path-filtered SDK-conformance lane green at `5f92cf4` (the final Go purity state; its
+  `0730ca0` run had failed on the pre-allowlist imports).
+- **Withdrawn:** the kiosk-demo refresh item is withdrawn, not parked (owner decision
+  2026-09-22 — the demo tree is gone for good; ADR 0035's dated post-acceptance note carries
+  the change, and the CHANGELOG cohort sentence was corrected).
+- **Known follow-ups (named, not blocking):** v3 corpus depth growth beyond the v1-populated
+  cells; the `spec.facts` v2 and v3 extraction baselines (open from ADR 0030, re-named in
+  ADR 0035 §9); the A2A projection/`htu` conformance vectors (A4 residual R2) routed to their
+  owning slice; the report adapter key-type discriminator (B2) in its own repo; npm
+  publications and any v3-bearing Hex release are owner decisions outside this landing.
+
 ## Next action
 
-BAP-00 through BAP-11, BAP-13 through BAP-19, and BAP-21 are complete. BAP-12 remains
+BAP-00 through BAP-11, BAP-13 through BAP-19, BAP-21, and BAP-22 are complete. BAP-12 remains
 open for the IANA filing and is gated on the BAP-08 external-submission preconditions. BAP-21
-activated contract-major 2 and shipped the 0.4.0 source and Hex release. BAP-09 shipped the first
-two cross-language verifier SDKs: TypeScript and Python. TypeScript has since graduated to
+activated contract-major 2 and shipped the 0.4.0 source and Hex release; BAP-22 activated
+contract-major 3 — the `BAP3-ES256-SHA256` ES256 suite with its certified 292-case corpus (see
+the BAP-22 closeout evidence above; any v3-bearing Hex release is an owner decision). BAP-09
+shipped the first two cross-language verifier SDKs: TypeScript and Python. TypeScript has since graduated to
 [`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript)
 and is published to npm as `@bounded-authority-protocol/verifier`; Python remains under `sdks/`.
 Both pass the certified v1 and v2 corpora and carry per-language permissiveness mutation gates
