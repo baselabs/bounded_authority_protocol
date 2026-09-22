@@ -5,14 +5,6 @@
 [extend]
 useDefault = true
 
-
-[[allowlists]]
-description = "v3 ES256 corpus public compact JWS fixtures (machine-minted, certified, no private material - the corpus loader's private-material sweep and the certified mint prove it; path-scoped because enumerating a generated corpus's compacts is unmaintainable)"
-targetRules = ["jwt", "generic-api-key"]
-paths = [
-  '''^priv/conformance/v3/corpus/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
-  '''^sdks/(?:go|rust)/conformance/corpus-v3/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
-]
 [[allowlists]]
 description = "Current public fingerprint and public-key fixture matches"
 condition = "AND"
@@ -488,4 +480,11 @@ regexes = [
   '''^eyJhbGciOiJub25lIiwia2lkIjoiaXNzdWVyIiwidHlwIjoiYmErY2FwIn0\.eyJhdWQiOlsiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QiXSwiY25mIjp7ImprdCI6ImQ0dWNFWnd2SlRmd3hYQ040ZjJ4bUlFNVpCRm9INWk1bWx6ZVdaYUIzeUkifSwiZXhwIjoyMDAwLCJpYXQiOjEwMDAsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUudGVzdCIsImp0aSI6InVybjpleGFtcGxlOmdyYW50OjEiLCJuYmYiOjEwMDAsIm9wZXJhdGlvbnMiOlt7Im5hbWUiOiJyZWFkIiwic2VsZWN0b3JzIjpbeyJraW5kIjoiYWxsIn1dfV0sInYiOjF9\.NaCpUf3ebKldiRpjHtKcJuvCjSVLSsmgZVWXa3Sz6Zvas3TeTEm3LqVDsUL8yc1VuakYOvFmsYxqQw8PV23uDA"$''',
   '''^eyJhbGciOiJub25lIiwiandrIjp7ImNydiI6IkVkMjU1MTkiLCJrdHkiOiJPS1AiLCJ4IjoiMkhZdmRIdXU5cGJKZXJZWnBZUTdZQ1pZXzBsblBDZzhuSHpsQ3VTeEJXdyJ9LCJ0eXAiOiJkcG9wK2p3dCJ9\.eyJhdGgiOiJpLTM3ZG9rcHpseC1OTmxJbVhYNFVtdUcwSDdSb2xIZ010ZFN5TUtZZFVRIiwiYmFfaW52IjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwiYmFfb3AiOiJ0cmFuc2ZlciIsImJhX3JlcSI6Il9WZkdrSl9WbFNZOGtlMUlTZGY4NVJBbWZna2tnTkhQbWZ4dTBZTE42blEiLCJodG0iOiJQT1NUIiwiaHR1IjoiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QvaW52b2tlIiwiaWF0IjoxMTAwLCJqdGkiOiJ1cm46ZXhhbXBsZTpwcm9vZjp2Mi0xIiwidiI6Mn0\.bs0RXyhLiXONilmslelAFWfVY2SX0mf36OgFHF2C2yM6TnelMHzhHonxZfyt8bWmD1kW407ujoCBVuCaao3MBg"$''',
   '''^eyJhbGciOiJub25lIiwiandrIjp7ImNydiI6IkVkMjU1MTkiLCJrdHkiOiJPS1AiLCJ4IjoiVzFzN3lFOWZHRE1CYm1kcHFZVndRMWhEQ1h0ek9lUFVEM2ZJZjF0N0ZEayJ9LCJ0eXAiOiJkcG9wK2p3dCJ9\.eyJhdGgiOiJzVjhkZ1ZLcFExTHZpa1lrNmVvOEd2RGZhYkpyMWd0VlhrdkRnazdxLVpZIiwiYmFfaW52IjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwiYmFfb3AiOiJyZWFkIiwiYmFfcmVxIjoidXYyMFBpQzh0UlFvT3k5LWVSbEJGUFFuZ3RpRFhrd19TQ2JiZ3p4akMyZyIsImh0bSI6IlBPU1QiLCJodHUiOiJodHRwczovL3Jlc291cmNlLmV4YW1wbGUudGVzdC9pbnZva2UiLCJpYXQiOjExMDAsImp0aSI6InVybjpleGFtcGxlOnByb29mOjEiLCJ2IjoxfQ\.BUONibEL8cesx2D905h2CwHhL8sdtZ33sABKd7jRl27UdBOo0jpQX9UGl8VLlpEVxSFiZlhBGwNg85VBakhwAw"$''',
+]
+[[allowlists]]
+description = "v3 ES256 corpus public compact JWS fixtures (machine-minted, certified, no private material - the corpus loader's private-material sweep and the certified mint prove it; path-scoped because enumerating a generated corpus's compacts is unmaintainable)"
+targetRules = ["jwt", "generic-api-key"]
+paths = [
+  '''^priv/conformance/v3/corpus/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
+  '''^sdks/(?:go|rust)/conformance/corpus-v3/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
 ]

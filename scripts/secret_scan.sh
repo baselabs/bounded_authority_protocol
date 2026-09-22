@@ -322,6 +322,8 @@ sdks/rust/src/ed25519.rs
 sdks/typescript/conformance/corpus-v2/cases/anchored-export/probe.json
 sdks/typescript/conformance/corpus-v2/cases/grant-verify/probe.json
 sdks/typescript/test/facade.test.ts
+priv/conformance/v3/corpus/cases/anchored-export/probe.json
+sdks/go/conformance/corpus-v3/cases/signing-input/probe.json
 lib/non_fixture_probe.ex'
   canary_file="$check_dir/root-canaries.txt"
   : > "$canary_file"
