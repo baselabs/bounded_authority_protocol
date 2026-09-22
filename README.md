@@ -42,8 +42,8 @@ release for the ES256 contract-major 3 activation
 ships the spec-facts v2/v3 extraction baselines in the package; `v0.4.0` identified the v2
 activation; `v0.4.1` was the toolchain-and-platforms release (ADR 0031/0032); `v0.4.2` was a
 documentation-truth patch. The immutable package identity is the published Hex release (registry checksum
-`8ef219f854fbb8e7448e449ca571f13d4a2df58986c245f0facb588f0ba48474`, read back from the
-registry against the tagged-tree build and pinned by a fresh `~> 0.5.0` consumer), not the
+`60a8cd6e361938c5adfde1afcbbdc12426787a3d46b46c3437ef2d68a5808af0`, read back from the
+registry against the tagged-tree build and pinned by a fresh `~> 0.5.1` consumer), not the
 Git tag. Depend on
 the package identity — never a tag or a mutable checkout.
 
