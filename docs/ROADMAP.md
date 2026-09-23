@@ -925,13 +925,43 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   release landed 2026-09-22 as 0.5.0 (registry checksum `8ef219f8…874`, read back against
   the tagged-tree build and a fresh `~> 0.5.0` consumer; hexdocs live).
 
+## BAP-23 TS-verifier release evidence (2026-09-23)
+
+- The graduated TypeScript verifier — the release precondition ADR 0036 Decision 9 names for
+  the profile — adopted `bap-role-attestation/1` and released it as npm
+  `@bounded-authority-protocol/verifier@0.4.0` (tag `v0.4.0`, commit `00e4a55`), the first
+  `0.x.0` bearing the profile per ADR 0036 Decision 1.8. Owner release decision given
+  2026-09-23.
+- The adoption (commit `97576c2`, the ADR-0035 snapshot-bump pattern) re-derived the surface
+  from the spec and certified corpus alone: the four §4 surfaces under the `roleAttestation`
+  namespace, the vendored corpus (40 cases, revision 1, index SHA-256 `be5275c6…d62a` pinned
+  at load), 40/40 decode+verify agreement with cross-profile rejection both directions, and a
+  14-closure red-proven permissiveness battery (two honest injection adjudications: the `v`
+  integer tag is canonical-subsumed; float `nbf`/`exp` endpoints are canonical and carry
+  their own closure). A follow-up owner-directed sweep (`d428b76`) closed the malformed
+  caller-context Result-contract classes across the v1/v2/v3 façades. Two cross-vendor review
+  passes (claude family; the codex lens was quota-skipped) with all findings repaired and
+  verified — receipts in that repository's `.kimosabe/reviews/`.
+- Publish evidence: two-stage trusted publishing (CI full gate green on the runner — 130 unit,
+  81 permissiveness, 283/268/292/40 conformance; tag/manifest match enforced); staged with a
+  signed provenance statement (sigstore staging log index 2918897713), owner-approved under
+  2FA, and read back live (`dist-tags.latest = 0.4.0`, publish attestation served, approval
+  log index 2919096849). Fresh-consumer smoke from the published tarball: the
+  `roleAttestation` namespace verifies the certified issuer-valid compact with anchor-posture
+  facts (no authorization marker), rejects `now == exp`, and the v1 surface rejects
+  attestation bytes.
+- The authority-runtime issuance and companion-signer consumption receipts (the row's other
+  two named preconditions) remain recorded in their own private repositories; the protocol
+  Hex release bearing the profile remains the owner's future decision.
+
 ## Next action
 
 BAP-00 through BAP-11, BAP-13 through BAP-19, and BAP-21 through BAP-23 are complete. BAP-12 remains
 open for the IANA filing and is gated on the BAP-08 external-submission preconditions. BAP-23 landed
-the role-attestation sibling profile (ADR 0036) — unreleased until the owner's next release decision;
-its TS-verifier, authority-runtime issuance, and companion-signer consumption receipts are named
-release preconditions. BAP-21
+the role-attestation sibling profile (ADR 0036); the owner's 2026-09-23 release decision shipped it
+as npm `@bounded-authority-protocol/verifier@0.4.0` (see the BAP-23 TS-verifier release evidence
+above), with the authority-runtime issuance and companion-signer consumption receipts recorded in
+their own private repositories — the protocol Hex release bearing the profile remains unreleased. BAP-21
 activated contract-major 2 and shipped the 0.4.0 source and Hex release; BAP-22 activated
 contract-major 3 — the `BAP3-ES256-SHA256` ES256 suite with its certified 292-case corpus (see
 the BAP-22 closeout evidence above; the v3-bearing Hex release is 0.5.0, published
