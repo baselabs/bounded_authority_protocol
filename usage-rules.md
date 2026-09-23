@@ -20,7 +20,7 @@
 11. Treat chain consistency as consistency only. It cannot by itself prove that a validly
     shortened or relinked history omitted nothing.
 12. Keep commitment preimages private. The public row carries only a fixed-width commitment.
-13. Consume the published Hex release (`{:bounded_authority_protocol, "~> 0.6.0"}`) only after the
+13. Consume the published Hex release (`{:bounded_authority_protocol, "~> 0.6.1"}`) only after the
     registry exposes that immutable archive. A Git tag or mutable checkout is not a package
     identity. The standard v1 verification surface stays byte- and verdict-identical; the
     local-loopback application profile is selected only through its separately named API.

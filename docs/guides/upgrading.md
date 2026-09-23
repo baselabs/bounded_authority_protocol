@@ -5,6 +5,17 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
+## 0.6.0 to 0.6.1
+
+Repair patch: the second independent review family's pass over the role-attestation
+landing range confirmed eight
+findings (three blocking) in the role-attestation surface — caller-tightened bound
+enforcement, producer/decoder limit agreement, closed-error shapes for malformed caller
+input, and in-repo SDK alignment. No corpus, pin, or ADR change; no verdict moves on
+legal input. Consumers on 0.6.0 holding caller-tightened bounds should upgrade — the
+0.6.0 codec ignored a tightened `anchor_bytes` for standalone attestations (the blocking
+finding). `~> 0.6.0` picks 0.6.1 up on the next `mix deps.update`.
+
 ## 0.5.1 to 0.6.0
 
 Additive sibling-profile release: `0.6.0` ships the first package bearing

@@ -26,7 +26,7 @@ Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, and `BAP-21` throu
 submission preconditions). Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence
 blocks are the status authority.
 
-The current source and Hex release are 0.6.0, tagged `v0.6.0` (the role-attestation release over
+The current source and Hex release are 0.6.1, tagged `v0.6.1` (the cross-vendor repair patch over
 the 0.5.0 ES256 contract-major 3 activation — the published doc set is trimmed to
 implementer-facing content; no wire or public-API change). The
 package retains zero production

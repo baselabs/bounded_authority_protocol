@@ -30,13 +30,14 @@ consumers use the minor-bounded requirement:
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.6.0"}
+    {:bounded_authority_protocol, "~> 0.6.1"}
   ]
 end
 ```
 
 The package has **zero production dependencies**, no application callback, and no supervision tree.
-`v0.6.0` is the role-attestation release — the first release bearing the
+`v0.6.1` is the cross-vendor repair patch (eight confirmed findings fixed, three blocking —
+see CHANGELOG); `v0.6.0` is the role-attestation release — the first release bearing the
 `bap-role-attestation/1` sibling profile
 ([ADR 0036](docs/adr/0036-role-attestation-profile.md)): the
 `BoundedAuthorityProtocol.RoleAttestation.V1` namespace (`verify_attestation/2` and its three

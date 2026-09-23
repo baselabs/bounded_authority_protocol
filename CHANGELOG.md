@@ -4,6 +4,31 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-09-23
+
+The cross-vendor repair patch over 0.6.0: the second independent review family's pass
+over the role-attestation landing range (e5cd033..d470814, executed 2026-09-23 after the
+account-quota window reset) confirmed eight product findings — three blocking — all fixed
+in `05c24a8` with RED→GREEN evidence and the full quality gate green (584 tests, 100%
+coverage). The certified corpus bytes, index digests, and ADR 0036 are unchanged; verdicts
+on legal input do not move. The full adjudication with severities and repair evidence is
+retained in the repository's local review records.
+
+Why each fix, in one line each: (1) the Python codec joined member sets with a comma —
+an exact-set comparison closes a `KeyError` collision; (2) trailing-newline identifiers
+and URIs were accepted by Python and rejected by the reference — full-string checks at
+all three positions; (3) the standalone attestation ignored the caller-tightened
+`anchor_bytes` ceiling on all four surfaces (upgrading the review's original
+source-inference to OBSERVED — the earlier "verdict-neutral" characterization is
+REFUTED by a caller-tightened runtime counterexample); (4) producers now validate their
+emitted JSON under decoder limits and project final compact/segment sizes; (5) the
+in-repo SDKs' StringOrUri handling diverged from the reference on IP literals, ports,
+and escapes — profile-local helpers align them; (6) Python caller-input validation
+returned raw exceptions instead of the closed error; (7) Elixir raised `KeyError` on
+incomplete caller structs instead of `{:error, :invalid}`; (8) the Rust parser decoded
+segments before checking limits — encoded-size and projected-decoded-size checks now
+precede base64 decoding (Go and Python preflight all three segments equivalently).
+
 ### Fixed — role-attestation validation
 
 - Role-attestation signing-input production applies the same caller-tightened parser

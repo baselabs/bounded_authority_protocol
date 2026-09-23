@@ -18,7 +18,7 @@ reports release 0.6.0 published on September 23, 2026:
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 0.6.0"}]
+  [{:bounded_authority_protocol, "~> 0.6.1"}]
 end
 ```
 

@@ -6,7 +6,7 @@ livebook:{"persist_outputs":true}
 
 ```elixir
 Mix.install([
-  {:bounded_authority_protocol, "~> 0.6.0"}
+  {:bounded_authority_protocol, "~> 0.6.1"}
 ])
 ```
 
