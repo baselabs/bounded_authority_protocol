@@ -255,6 +255,86 @@ func TestCertifiedRoleAttestationCorpusDrivesGoVerdicts(t *testing.T) {
 	}
 }
 
+// Cross-vendor review leg (2026-09-22, claude peer over 639d74e..e5cd033): the attestor
+// context's window endpoints are magnitude-bounded caller input — the same
+// HistoricalPublicKey gates the Elixir reference (ContextValidation.historical_key) and the
+// Rust leg apply. A context with ValidFrom below or ValidBefore above the integer magnitude
+// ceiling must fail closed here too: containment alone is trivially satisfied by those
+// windows, so nothing downstream rejects them.
+func TestRoleAttestationAttestorWindowMagnitude(t *testing.T) {
+	t.Parallel()
+	attestorPublic, attestorPrivate, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var attestorKey [32]byte
+	copy(attestorKey[:], attestorPublic)
+	subjectPublic, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var subjectKey [32]byte
+	copy(subjectKey[:], subjectPublic)
+	att := Attestation{
+		AttestorKeyID: "attestor-magnitude-1",
+		Jti:           "urn:example:attestation:magnitude-1",
+		KeyID:         "subject-magnitude-1",
+		PublicKey:     subjectKey,
+		Role:          "issuer",
+		Nbf:           1000,
+		Exp:           2000,
+	}
+	input, err := AttestationSigningInput(att, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signature := ed25519.Sign(attestorPrivate, signingInputMessage(input))
+	assembled, err := AssembleAttestationCompact(input, signature, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := ExpectedAttestation{
+		Attestor: TrustedAttestor{
+			KeyID:       "attestor-magnitude-1",
+			PublicKey:   attestorKey,
+			ValidFrom:   1000,
+			ValidBefore: 2000,
+		},
+		SubjectKeyID:     "subject-magnitude-1",
+		SubjectPublicKey: subjectKey,
+		Now:              1500,
+	}
+	if _, err := VerifyAttestation(assembled, expected); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1<<60 sits far beyond the 2^53-1 integer magnitude ceiling shared by the bounds.
+	const beyond = int64(1) << 60
+	// The two directions nothing downstream closes (containment is trivially true):
+	belowFrom := expected
+	belowFrom.Attestor.ValidFrom = -beyond
+	if _, err := VerifyAttestation(assembled, belowFrom); err == nil {
+		t.Fatal("verifier accepted an attestor valid_from below the integer magnitude ceiling")
+	}
+	aboveBefore := expected
+	aboveBefore.Attestor.ValidBefore = beyond
+	if _, err := VerifyAttestation(assembled, aboveBefore); err == nil {
+		t.Fatal("verifier accepted an attestor valid_before above the integer magnitude ceiling")
+	}
+	// The mirrored directions are containment-closed everywhere (nbf >= valid_from and
+	// exp <= valid_before cannot hold); pinned so the asymmetry stays deliberate.
+	aboveFrom := expected
+	aboveFrom.Attestor.ValidFrom = beyond
+	if _, err := VerifyAttestation(assembled, aboveFrom); err == nil {
+		t.Fatal("verifier accepted an attestor valid_from above the integer magnitude ceiling")
+	}
+	belowBefore := expected
+	belowBefore.Attestor.ValidBefore = -beyond
+	if _, err := VerifyAttestation(assembled, belowBefore); err == nil {
+		t.Fatal("verifier accepted an attestor valid_before below the integer magnitude ceiling")
+	}
+}
+
 func overrideRoleAttestationKey(t *testing.T, id string, value any, into *[32]byte) {
 	t.Helper()
 	encoded, ok := value.(string)

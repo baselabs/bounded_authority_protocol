@@ -1,9 +1,16 @@
 # Role-attestation profile check (BAP-23): certified-corpus verification receipt.
 #
-# Verifies the profile corpus exactly as the ExUnit suite does — index digest, per-file
-# digests, profile identity/revision/counts, every case's decode/verify verdict, the v1
-# cross-rejection direction, and the v2/v3 rejection of attestation bytes — then emits a
-# secret-free receipt with source identity. Run via `mix role_attestation.verify`.
+# Verifies the profile corpus exactly as the ExUnit suite does — the pinned certified index
+# digest, per-file digests, profile identity/revision/counts, every case's decode/verify
+# verdict, the v1 cross-rejection direction, and the v2/v3 rejection of attestation bytes —
+# then emits a secret-free receipt with source identity. Run via `mix role_attestation.verify`.
+
+# REQ-RA1-CONFORMANCE-certified-pin: every corpus consumer pins the certified digest
+# independently; a regenerated, self-consistent corpus must not verify green (the pin is the
+# only comparison that distinguishes the certified corpus from a fresh mint).
+# @certified_index_sha256 matches test/bounded_authority_protocol/role_attestation/v1_test.exs
+# and spec/bap-role-attestation-v1.md §6 (rev 1, 40 cases).
+certified_index_sha256 = "be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a"
 
 alias BoundedAuthorityProtocol.RoleAttestation.V1
 alias BoundedAuthorityProtocol.RoleAttestation.V1.ExpectedAttestation
@@ -22,6 +29,12 @@ source_head_sha = String.trim(source_head_sha)
 index_bytes = root |> Path.join("index.json") |> File.read!()
 
 index_sha = Base.encode16(:crypto.hash(:sha256, index_bytes), case: :lower)
+
+unless index_sha == certified_index_sha256,
+  do:
+    raise(
+      "role-attestation certified index digest mismatch: got #{index_sha}, want #{certified_index_sha256}"
+    )
 
 index = :json.decode(index_bytes)
 

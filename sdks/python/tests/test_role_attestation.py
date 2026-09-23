@@ -176,7 +176,7 @@ def test_role_attestation_producer_assembles_and_stays_profile_distinct() -> Non
     assert decoded.value.attestor_key_id == profile["attestor"]["key_id"]
     assert decoded.value.jti == jti
     assert decoded.value.subject_key_id == profile["subject"]["key_id"]
-    assert decoded.value.subject_thumbprint == public_key_thumbprint_raw(subject_public)
+    assert decoded.value.public_key == subject_public
     assert decoded.value.verification == "not_evaluated"
 
     result = verify_attestation(compact.value, expected)
@@ -296,4 +296,64 @@ def test_attestation_assembly_revalidates() -> None:
             payload_segment=base64url_encode(non_canonical_payload),
         ),
         signature,
+    ).is_ok
+
+
+def test_attestation_verify_bounds_attestor_window_magnitudes() -> None:
+    # Cross-vendor review leg (2026-09-22, claude peer over 639d74e..e5cd033): the attestor
+    # context's window endpoints are magnitude-bounded caller input — the same
+    # HistoricalPublicKey gates the Elixir reference (ContextValidation.historical_key) and the
+    # Rust leg (role_attestation.rs) apply. A context with valid_from below or valid_before
+    # above the integer magnitude ceiling must fail closed here too: containment alone is
+    # trivially satisfied by those windows, so nothing downstream rejects them.
+    subject_public, _ = _keypair()
+    attestor_public, attestor_private = _keypair()
+    producer = AttestationProducer(
+        attestor_key_id="attestor-magnitude-1",
+        jti="urn:example:attestation:magnitude-1",
+        key_id="subject-magnitude-1",
+        public_key=subject_public,
+        role="issuer",
+        nbf=1000,
+        exp=2000,
+    )
+    signing_input = attestation_signing_input(producer)
+    assert signing_input.is_ok
+    compact = assemble_attestation_compact(
+        signing_input.value, attestor_private.sign(_signing_message(signing_input.value))
+    )
+    assert compact.is_ok
+    expected = ExpectedAttestation(
+        attestor=TrustedAttestor(
+            key_id="attestor-magnitude-1",
+            public_key=attestor_public,
+            valid_from=1000,
+            valid_before=2000,
+        ),
+        subject_key_id="subject-magnitude-1",
+        subject_public_key=subject_public,
+        now=1500,
+    )
+    assert verify_attestation(compact.value, expected).is_ok
+
+    # 2**60 sits far beyond the 2**53-1 integer magnitude ceiling shared by the bounds.
+    beyond = 2**60
+    # The two directions nothing downstream closes (containment is trivially true):
+    assert not verify_attestation(
+        compact.value,
+        replace(expected, attestor=replace(expected.attestor, valid_from=-beyond)),
+    ).is_ok
+    assert not verify_attestation(
+        compact.value,
+        replace(expected, attestor=replace(expected.attestor, valid_before=beyond)),
+    ).is_ok
+    # The mirrored directions are containment-closed everywhere (nbf >= valid_from and
+    # exp <= valid_before cannot hold); pinned so the asymmetry stays deliberate.
+    assert not verify_attestation(
+        compact.value,
+        replace(expected, attestor=replace(expected.attestor, valid_from=beyond)),
+    ).is_ok
+    assert not verify_attestation(
+        compact.value,
+        replace(expected, attestor=replace(expected.attestor, valid_before=-beyond)),
     ).is_ok

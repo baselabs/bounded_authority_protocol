@@ -363,6 +363,17 @@ func VerifyAttestation(compact string, expected ExpectedAttestation) (f Attestat
 	if expected.Now > int64(b.IntegerMagnitude) || expected.Now < -int64(b.IntegerMagnitude) {
 		return AttestationFacts{}, ErrInvalid
 	}
+	// Attestor-window endpoints are magnitude-bounded caller input — the same
+	// HistoricalPublicKey gates the Elixir reference and the Rust leg apply.
+	// Containment alone is trivially satisfied by an out-of-magnitude window,
+	// so nothing downstream rejects it (cross-vendor review 2026-09-22).
+	if expected.Attestor.ValidFrom > int64(b.IntegerMagnitude) || expected.Attestor.ValidFrom < -int64(b.IntegerMagnitude) {
+		return AttestationFacts{}, ErrInvalid
+	}
+	if !expected.Attestor.ValidBeforeUnbounded &&
+		(expected.Attestor.ValidBefore > int64(b.IntegerMagnitude) || expected.Attestor.ValidBefore < -int64(b.IntegerMagnitude)) {
+		return AttestationFacts{}, ErrInvalid
+	}
 	parts, err := splitCompact(compact, b)
 	if err != nil {
 		return AttestationFacts{}, ErrInvalid

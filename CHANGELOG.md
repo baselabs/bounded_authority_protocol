@@ -37,6 +37,23 @@ All notable changes to `bounded_authority_protocol` are documented here.
   pinned RED-first by `test/bounded_authority_protocol/signature_width_error_shape_test.exs`. No
   accept/reject verdict changes; the v1/v2/v3 corpora and their certified pins are unchanged.
 
+### Fixed — cross-vendor review legs (2026-09-22, over the BAP-23 range)
+
+- The Python and Go SDKs now magnitude-bound the attestor context's window endpoints in
+  `verify_attestation` (parity with the Elixir reference's `ContextValidation.historical_key`
+  and the Rust gate): a caller context with `valid_from` below or `valid_before` above the
+  integer magnitude ceiling returned `ok` where the reference returns `{:error, :invalid}` —
+  containment alone is trivially satisfied by an out-of-magnitude window, so nothing
+  downstream rejected it. Pinned RED-first in both SDKs' attestation suites; corpus verdicts
+  and the certified index are unchanged (all corpus contexts are in-magnitude).
+- `scripts/check_role_attestation.exs` (`mix role_attestation.verify`) now compares the
+  computed corpus index digest against the certified pin
+  (`REQ-RA1-CONFORMANCE-certified-pin`) instead of only echoing it — a regenerated,
+  self-consistent corpus previously verified green. Red-proven by a bogus-pin probe.
+- The Python SDK's decode surface carries the raw 32-byte subject `public_key` (the member
+  shape the Elixir/Go/Rust decode surfaces all expose) instead of a derived thumbprint — an
+  unpublished-surface alignment so the four bindings decode portably.
+
 ## [0.5.1] - 2026-09-22
 
 ### Docs maintenance — the published doc set trimmed to implementer-facing content

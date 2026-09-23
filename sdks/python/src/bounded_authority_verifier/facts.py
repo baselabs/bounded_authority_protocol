@@ -174,13 +174,16 @@ class KeyLocator:
 class AttestationDecoded:
     """Decode surface — structural role-attestation facts (verification=not_evaluated).
 
-    Carries the RFC 7638 subject thumbprint (a derived digest), never the raw subject key bytes.
+    ``public_key`` is the raw 32-byte subject public key exactly as it rides the payload claim —
+    the member shape the Elixir ``DecodedAttestation``, Go ``AttestationDecoded``, and Rust
+    ``AttestationDecoded`` decode surfaces all carry (cross-vendor review 2026-09-22 alignment;
+    derived digests belong to the facts surface, not decode).
     """
 
     attestor_key_id: str
     jti: str
     subject_key_id: str
-    subject_thumbprint: bytes  # raw 32
+    public_key: bytes  # raw 32
     role: str
     nbf: int
     exp: int

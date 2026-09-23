@@ -551,12 +551,11 @@ def _decode_attestation_body(compact: bytes, bounds: Bounds | None) -> Attestati
     role = _require_role(p.v.get("role"))
     nbf = _require_int(p.v.get("nbf"), "nbf")
     exp = _require_int(p.v.get("exp"), "exp")
-    subject_thumbprint = thumbprint_raw(jwk_from_public_key(subject_key))
     return AttestationDecoded(
         attestor_key_id=kid,
         jti=jti,
         subject_key_id=key_id,
-        subject_thumbprint=subject_thumbprint,
+        public_key=subject_key,
         role=role,
         nbf=nbf,
         exp=exp,
@@ -572,6 +571,8 @@ def verify_attestation(compact: bytes, expected: ExpectedAttestation) -> Result[
 
 def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> AttestationFacts:
     attestor = expected.attestor
+    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    magnitude = bounds_resolve(b, "integer_magnitude")
     # Fail-closed shallow context checks (a malformed context struct is a closed Invalid, never an
     # AttributeError past the Result contract — mirrors the v1 verify_grant pattern).
     if not isinstance(getattr(attestor, "public_key", None), bytes) or len(attestor.public_key) != 32:
@@ -583,6 +584,14 @@ def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> A
     valid_before = getattr(attestor, "valid_before", None)
     if valid_before is not None and not _is_int(valid_before):
         fail("verify_attestation: attestor valid_before")
+    # Attestor-window endpoints are magnitude-bounded caller input — the HistoricalPublicKey
+    # gates the Elixir reference (ContextValidation.historical_key) and the Rust leg apply.
+    # Containment alone is trivially satisfied by an out-of-magnitude window, so nothing
+    # downstream rejects it (cross-vendor review 2026-09-22).
+    if abs(attestor.valid_from) > magnitude:
+        fail("verify_attestation: attestor valid_from magnitude")
+    if valid_before is not None and abs(valid_before) > magnitude:
+        fail("verify_attestation: attestor valid_before magnitude")
     if not isinstance(getattr(expected, "subject_key_id", None), str):
         fail("verify_attestation: subject key id")
     if not isinstance(getattr(expected, "subject_public_key", None), bytes) or len(
@@ -591,7 +600,6 @@ def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> A
         fail("verify_attestation: subject key width")
     if not _is_int(getattr(expected, "now", None)):
         fail("verify_attestation: integer now")
-    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     # 1. the closed header and payload sets and canonical bytes of §2 (REQ-RA1-VERIFY-closed-sets).
     seg = parse_compact(compact, b)
     kid = _parse_attestation_header(seg, b)
