@@ -1003,12 +1003,17 @@ anywhere without its poles reconciled now reds `mix quality` by name.
 
 BAP-00 through BAP-11, BAP-13 through BAP-19, and BAP-21 through BAP-23 are complete. BAP-12 remains
 open for the IANA filing and is gated on the BAP-08 external-submission preconditions. BAP-23 landed
-the role-attestation sibling profile (ADR 0036); the owner's 2026-09-23 release decision shipped it
-as npm `@bounded-authority-protocol/verifier@0.4.0` (see the BAP-23 TS-verifier release evidence
-above); the protocol Hex release bearing the profile shipped 2026-09-23 as `0.6.0` (registry
-checksum read back and pinned), with the authority-runtime issuance and companion-signer
-consumption receipts recorded in their own private repositories. The subsequent Codex review
-and unreleased source repairs are recorded above. BAP-21
+the role-attestation sibling profile (ADR 0036) and is now CLOSED END-TO-END: the owner's
+2026-09-23 release decisions shipped it as npm `@bounded-authority-protocol/verifier@0.4.0`
+(and the `0.4.1` finding-transfer patch, staged provenance-bound) plus the protocol Hex
+releases `0.6.0` and the cross-vendor repair patch `0.6.1` (checksums read back and
+pinned); the authority-runtime issuance leg landed in BA's repository (commit `04822c8` +
+follow-ups through `daccf53`: BAP 0.6.0 adoption receipt at
+`priv/release_receipts/bounded_authority_protocol-0.6.0.json`, attestor epochs, issuer-key
+attestation issuance, readiness gates) and the companion-signer consumption leg landed as
+BARA RA11 (Hex `0.8.1`, `sign_grant/3`'s BA-attested role gate) — both receipts recorded in
+their own repositories. The subsequent Codex review (eight findings fixed, three blocking)
+and the `0.6.1`/npm-`0.4.1` repair patches are recorded above. BAP-21
 activated contract-major 2 and shipped the 0.4.0 source and Hex release; BAP-22 activated
 contract-major 3 — the `BAP3-ES256-SHA256` ES256 suite with its certified 292-case corpus (see
 the BAP-22 closeout evidence above; the v3-bearing Hex release is 0.5.0, published
