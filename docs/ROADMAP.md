@@ -950,8 +950,14 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   `roleAttestation` namespace verifies the certified issuer-valid compact with anchor-posture
   facts (no authorization marker), rejects `now == exp`, and the v1 surface rejects
   attestation bytes.
-- **The protocol Hex release bearing the profile: `0.6.0`, published 2026-09-23** (tag
-  `v0.6.0`, commit `04f873c`) under the same owner decision: additive sibling-profile
+- **The protocol Hex releases bearing the profile: `0.6.0` and the repair patch `0.6.1`,
+  both published 2026-09-23** (`0.6.0` at tag `v0.6.0` / commit `04f873c`; `0.6.1` at tag
+  `v0.6.1` / commit `f5fb547`, registry checksum
+  `81a58e84a6626e35ae1781c681d9fd6f28cb45c040d0c036a77f63b8ef1020d4` byte-identical to
+  the tagged-tree candidate, read back with a fresh `~> 0.6.1` consumer smoke proving the
+  blocking finding fixed on the served package — caller-tightened anchor bounds reject,
+  incomplete structs return the closed error, the certified corpus still verifies) under
+  the same owner decision: additive sibling-profile
   release with the v1/v2 closed-error-shape fix, no contract-major byte or verdict changes.
   `mix quality` exit 0 on the release source; release-candidate two-build reproducibility
   passed (archive SHA-256 `1187d579…9e17`); `mix hex.publish` with the project key; registry

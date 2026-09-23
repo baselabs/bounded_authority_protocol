@@ -23,9 +23,11 @@ cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for
 
 ## Installation
 
-The package is published on Hex (release 0.6.0, published 2026-09-23; the registry checksum is
-read back against the tagged-tree build in the post-publish docs-currency commit). Registry
-consumers use the minor-bounded requirement:
+The package is published on Hex (release 0.6.1, published 2026-09-23 — the cross-vendor
+repair patch; registry checksum
+`81a58e84a6626e35ae1781c681d9fd6f28cb45c040d0c036a77f63b8ef1020d4`, read back from the
+registry API and identical to the tagged-tree two-build candidate). Registry consumers use
+the minor-bounded requirement:
 
 ```elixir
 def deps do
