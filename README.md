@@ -40,8 +40,10 @@ The package has **zero production dependencies**, no application callback, and n
 `bap-role-attestation/1` sibling profile
 ([ADR 0036](docs/adr/0036-role-attestation-profile.md)): the
 `BoundedAuthorityProtocol.RoleAttestation.V1` namespace (`verify_attestation/2` and its three
-producer/decoder siblings) plus the certified 40-case profile corpus. `v0.5.1` was a
-docs-maintenance patch (registry checksum
+producer/decoder siblings) plus the certified 40-case profile corpus (registry checksum
+`1187d57928fbc893cccce893c38862450735ff24f25fb6466475f3bb239a9e17`, byte-identical to the
+tagged-tree two-build candidate, read back and pinned by a fresh `~> 0.6.0` consumer);
+`v0.5.1` was a docs-maintenance patch (registry checksum
 `60a8cd6e361938c5adfde1afcbbdc12426787a3d46b46c3437ef2d68a5808af0`, read back and pinned);
 `v0.5.0` identified the reviewable source release for the ES256 contract-major 3 activation
 (`BoundedAuthorityProtocol.V3`, [ADR 0035](docs/adr/0035-es256-contract-major-activation.md));

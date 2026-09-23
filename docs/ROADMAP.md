@@ -950,9 +950,19 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   `roleAttestation` namespace verifies the certified issuer-valid compact with anchor-posture
   facts (no authorization marker), rejects `now == exp`, and the v1 surface rejects
   attestation bytes.
+- **The protocol Hex release bearing the profile: `0.6.0`, published 2026-09-23** (tag
+  `v0.6.0`, commit `04f873c`) under the same owner decision: additive sibling-profile
+  release with the v1/v2 closed-error-shape fix, no contract-major byte or verdict changes.
+  `mix quality` exit 0 on the release source; release-candidate two-build reproducibility
+  passed (archive SHA-256 `1187d579…9e17`); `mix hex.publish` with the project key; registry
+  read-back checksum byte-identical to the candidate (insert 2026-09-23T12:41:39Z, has_docs
+  true); fresh `~> 0.6.0` consumer smoke green from the served package (the certified
+  issuer-valid attestation verifies through `RoleAttestation.V1` with anchor-posture facts,
+  `now == exp` rejects, the v1 surface rejects attestation bytes). Docs swept for the new
+  semver (README pin + lineage, AGENTS current state, upgrading-guide section) and the
+  bap-walkthrough livebook gained the role-attestation sections.
 - The authority-runtime issuance and companion-signer consumption receipts (the row's other
-  two named preconditions) remain recorded in their own private repositories; the protocol
-  Hex release bearing the profile remains the owner's future decision.
+  two named preconditions) remain recorded in their own private repositories.
 
 ## Next action
 
@@ -960,8 +970,9 @@ BAP-00 through BAP-11, BAP-13 through BAP-19, and BAP-21 through BAP-23 are comp
 open for the IANA filing and is gated on the BAP-08 external-submission preconditions. BAP-23 landed
 the role-attestation sibling profile (ADR 0036); the owner's 2026-09-23 release decision shipped it
 as npm `@bounded-authority-protocol/verifier@0.4.0` (see the BAP-23 TS-verifier release evidence
-above), with the authority-runtime issuance and companion-signer consumption receipts recorded in
-their own private repositories — the protocol Hex release bearing the profile remains unreleased. BAP-21
+above); the protocol Hex release bearing the profile shipped 2026-09-23 as `0.6.0` (registry
+checksum read back and pinned), with the authority-runtime issuance and companion-signer
+consumption receipts recorded in their own private repositories. BAP-21
 activated contract-major 2 and shipped the 0.4.0 source and Hex release; BAP-22 activated
 contract-major 3 — the `BAP3-ES256-SHA256` ES256 suite with its certified 292-case corpus (see
 the BAP-22 closeout evidence above; the v3-bearing Hex release is 0.5.0, published
