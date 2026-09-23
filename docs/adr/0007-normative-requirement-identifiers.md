@@ -2,6 +2,9 @@
 
 - Status: accepted
 - Date: 2026-08-05
+- Amended by: [ADR 0036](0036-role-attestation-profile.md) Decision 11 (profile-scoped requirement
+  ranges `REQ-<PROFILE>-<SURFACE>-<short-tag>` for sibling profiles, disjoint from the major ranges;
+  the loopback profile's existing `REQ-LLH1-*` range is regularized retroactively)
 - Refines: [ADR 0006](0006-standards-evolution-suite-identity-and-delegation-posture.md) §3
   (Requirement-to-corpus traceability)
 - Implemented by: roadmap row BAP-10

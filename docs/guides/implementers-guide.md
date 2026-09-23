@@ -146,3 +146,25 @@ two-file set and per-file hashes, execute all 36 URI and 8 proof cases, then pro
 of cross-profile rejection. The repository's real-socket drill additionally exercises IPv4 and
 IPv6 listeners plus a verifier-bypass mutation; self-round-trip corpus agreement alone is not
 transport evidence.
+
+## 10. Implementing the role-attestation sibling profile
+
+The standard corpora remain unchanged. The role attestation is the protocol's first sibling
+attestation profile (ADR 0036): a standalone, grant-unbound compact defined by
+`spec/bap-role-attestation-v1.md` and certified under
+`priv/conformance/attestation-profiles/role-attestation/v1`.
+
+A conforming implementation exposes four separately named surfaces: attestation signing-input
+production, compact assembly, attestation decode, and attestation verification. The protected
+header is exactly `{alg: "EdDSA", kid, typ: "ba+role-attestation"}`; the payload is exactly
+`{v: 1, jti, key_id, public_key, role, nbf, exp}` with `role ∈ {"issuer", "holder"}` and
+canonical JCS bytes. Verification takes the caller-supplied attestor key (with its own validity
+window), the expected subject binding, and `now`; it enforces the attestor-kid binding, the
+subject binding, structural self-attestation rejection, window containment (the attestation
+window inside the attestor key window), and the half-open `[nbf, exp)` now-window, returning
+redacted facts with `trust: :not_evaluated` and no authorization marker. Pin the exact profile
+index SHA-256 (`be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a`), verify the
+declared two-file set and per-file hashes, execute all 40 cases, and prove cross-profile
+rejection in both directions. Derive every fingerprint with the RFC 7638 Ed25519 thumbprint
+preimage — never a hash of raw key bytes.
+

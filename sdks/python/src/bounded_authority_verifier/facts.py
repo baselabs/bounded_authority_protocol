@@ -168,3 +168,39 @@ class KeyLocator:
 
     key_id: str
     trust: str = "not_evaluated"
+
+
+@dataclass(frozen=True)
+class AttestationDecoded:
+    """Decode surface — structural role-attestation facts (verification=not_evaluated).
+
+    Carries the RFC 7638 subject thumbprint (a derived digest), never the raw subject key bytes.
+    """
+
+    attestor_key_id: str
+    jti: str
+    subject_key_id: str
+    subject_thumbprint: bytes  # raw 32
+    role: str
+    nbf: int
+    exp: int
+    verification: str = "not_evaluated"
+
+
+@dataclass(frozen=True)
+class AttestationFacts:
+    """AttestationFacts (spec/bap-role-attestation-v1.md §3): value-bearing, redacted,
+    non-authorizing. Fingerprints are RFC 7638 Ed25519 thumbprints (raw 32) — never a hash of
+    raw key bytes. No raw key material, no signature, no decision (REQ-RA1-VERIFY-facts,
+    REQ-RA1-VERIFY-facts-non-authorizing)."""
+
+    attestor_key_id: str
+    attestor_key_fingerprint: bytes  # raw 32
+    subject_key_id: str
+    subject_key_fingerprint: bytes  # raw 32
+    role: str
+    jti: str
+    nbf: int
+    exp: int
+    verification: str = "signature_and_window"
+    trust: str = "not_evaluated"

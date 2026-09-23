@@ -22,6 +22,7 @@ pub mod facts;
 pub mod jcs;
 pub mod json;
 pub mod jwk;
+pub mod role_attestation;
 pub mod types;
 pub mod uri;
 pub mod v1;
@@ -65,6 +66,9 @@ pub(crate) mod selector;
 // same-named functions with byte-distinct contracts, so a root-level
 // re-export set would collide; the module path IS the major namespace.
 pub use digest::request_digest;
+pub use role_attestation::{
+    assemble_attestation_compact, attestation_signing_input, decode_attestation, verify_attestation,
+};
 pub use v1::assemble_compact;
 pub use v1::{
     assemble_local_loopback_http_compact, boundary_anchor_signing_input, check_chain,

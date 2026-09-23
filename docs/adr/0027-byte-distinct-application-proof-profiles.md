@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-08-30
+- Amended by: [ADR 0036](0036-role-attestation-profile.md) (a second sibling class — attestation
+  profiles — was added beside this proof class; nothing in this ADR's text changes meaning)
 
 ## Context
 

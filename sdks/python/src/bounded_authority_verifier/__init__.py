@@ -21,6 +21,8 @@ from .error import Err, InvalidError, Ok, Result, err, fail, ok, require
 from .facts import (
     AnchoredExportFacts,
     AnchorFacts,
+    AttestationDecoded,
+    AttestationFacts,
     ChainFacts,
     EnvelopeFacts,
     GrantDecoded,
@@ -52,6 +54,16 @@ from .jwk import (
     thumbprint,
     thumbprint_preimage,
     thumbprint_raw,
+)
+from .role_attestation import (
+    ATTESTATION_TYP,
+    AttestationProducer,
+    ExpectedAttestation,
+    TrustedAttestor,
+    assemble_attestation_compact,
+    attestation_signing_input,
+    decode_attestation,
+    verify_attestation,
 )
 from .selector import Selector, parse_selector, selector_matches, semantic_identity
 from .uri import local_loopback_http_uri_normalize, uri_normalize
@@ -155,6 +167,12 @@ __all__ = [
     # above stay the package's default surface.
     "v2", "VERSION_2", "REQUEST_PREFIX_V2", "ROW_PREFIX_V2", "ARCHIVE_PREFIX_V2",
     "request_digest_v2",
+    # role-attestation sibling profile (``bap-role-attestation/1``, ADR 0036) — the four surfaces
+    # (REQ-RA1-API-complete) + dispatch structs + facts. Grant-unbound and standalone: contract-major
+    # façades reject its ``ba+role-attestation`` bytes and it rejects every contract-major ``typ``.
+    "attestation_signing_input", "assemble_attestation_compact", "decode_attestation",
+    "verify_attestation", "AttestationProducer", "TrustedAttestor", "ExpectedAttestation",
+    "AttestationDecoded", "AttestationFacts", "ATTESTATION_TYP",
     # error + result
     "InvalidError", "Ok", "Err", "Result", "ok", "err", "fail", "require",
     # tagged algebra types

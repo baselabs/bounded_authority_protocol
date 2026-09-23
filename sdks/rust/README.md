@@ -14,6 +14,12 @@ The crate also exposes the byte-distinct local-development profile through
 `check_local_loopback_http_envelope`. It accepts only literal `127.0.0.1`/`[::1]` HTTP targets and
 a mandatory nonce; standard `dpop+jwt` APIs reject its bytes.
 
+It also implements the standalone sibling role-attestation profile
+([`spec/bap-role-attestation-v1.md`](../../spec/bap-role-attestation-v1.md)) through
+`attestation_signing_input`, `assemble_attestation_compact`, `decode_attestation`, and
+`verify_attestation`; contract-major APIs reject `ba+role-attestation` bytes and this profile
+rejects every contract-major `typ`.
+
 ## Status
 
 Not yet published to crates.io. Per the [SDK graduation model](../../docs/adr/0015-sdk-graduation-and-publish-topology.md),

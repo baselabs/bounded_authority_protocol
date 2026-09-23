@@ -21,7 +21,7 @@ grant operational authority by itself.
 
 ## Current state
 
-Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, `BAP-21`, and `BAP-22`
+Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, and `BAP-21` through `BAP-23`
 (`BAP-17` is design-only). Open: `BAP-12` (IANA filing, gated on the BAP-08 external
 submission preconditions). Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence
 blocks are the status authority.
@@ -37,10 +37,18 @@ cross-major rejection; contract-major 3 is active under `BoundedAuthorityProtoco
 `BAP3-ES256-SHA256` suite (ECDSA P-256/SHA-256, RFC 7518 §3.4 raw `r || s` signatures with
 low-S canonicality, EC JWK holder keys, `BAP3-*` separators) with its own normative profile,
 certified 292-case corpus, `REQ3-*` traceability, and cross-major rejection of v1 and v2 bytes.
-The v1 corpus remains 283 cases across 28 surfaces. See
+The v1 corpus remains 283 cases across 28 surfaces. The protocol also carries two byte-distinct
+sibling profiles parsed by no contract-major: the loopback proof profile
+(`bap-application-proof/local-loopback-http/1`, ADR 0027) and the role-attestation profile
+(`bap-role-attestation/1`, ADR 0036 — a standalone, grant-unbound BA-signed role binding with
+`BoundedAuthorityProtocol.RoleAttestation.V1.verify_attestation/2`, its certified 40-case corpus,
+`REQ-RA1-*` ids, and the sibling-attestation governance class; the BARA RA11 prerequisite,
+unreleased until the owner's release call). See
 [ADR 0030](docs/adr/0030-v2-contract-major-activation.md),
-[ADR 0035](docs/adr/0035-es256-contract-major-activation.md), [`spec/bap-v1.md`](spec/bap-v1.md),
-[`spec/bap-v2.md`](spec/bap-v2.md), and [`spec/bap-v3.md`](spec/bap-v3.md).
+[ADR 0035](docs/adr/0035-es256-contract-major-activation.md),
+[ADR 0036](docs/adr/0036-role-attestation-profile.md), [`spec/bap-v1.md`](spec/bap-v1.md),
+[`spec/bap-v2.md`](spec/bap-v2.md), [`spec/bap-v3.md`](spec/bap-v3.md), and
+[`spec/bap-role-attestation-v1.md`](spec/bap-role-attestation-v1.md).
 
 Unpublished cross-language verifier SDKs are authored under [`sdks/`](sdks/)
 ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)): Python
@@ -85,9 +93,10 @@ immutable-package adoption is tracked in the private runtime.
    caller-supplied bytes satisfy caller-supplied trusted inputs and expected context. It never
    selects trusted keys, reserves replay, checks live revocation, grants execution, or overrides a
    host policy. Public verified results are `GrantFacts`, `EnvelopeFacts`, `ChainFacts`,
-   `AnchorFacts`, `KeyTransitionFacts`, and `AnchoredExportFacts`. Only `GrantFacts`,
-   `EnvelopeFacts`, and `AnchoredExportFacts` carry `authorization: :not_evaluated`; the diagnostic
-   chain, anchor, and transition facts carry only `trust: :not_evaluated`. There is no `allowed?`,
+   `AnchorFacts`, `KeyTransitionFacts`, `AnchoredExportFacts`, and `AttestationFacts`. Only
+   `GrantFacts`, `EnvelopeFacts`, and `AnchoredExportFacts` carry `authorization: :not_evaluated`;
+   the diagnostic chain, anchor, transition, and attestation facts carry only
+   `trust: :not_evaluated`. There is no `allowed?`,
    `authorized?`, `decision`, or receipt. Facts are value-bearing and redacted, never execution
    credentials.
 2. **Pure and deterministic.** Runtime code has no database, filesystem, network, environment,

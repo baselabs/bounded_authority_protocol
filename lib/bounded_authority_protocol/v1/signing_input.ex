@@ -10,7 +10,8 @@ defmodule BoundedAuthorityProtocol.V1.SigningInput do
             | :proof
             | :local_loopback_http_proof
             | :boundary_anchor
-            | :key_transition,
+            | :key_transition
+            | :role_attestation,
           protected_segment: binary(),
           payload_segment: binary(),
           message: binary()

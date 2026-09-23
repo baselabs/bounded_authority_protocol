@@ -15,6 +15,13 @@ The module also exposes the byte-distinct local-development profile through
 `CheckLocalLoopbackHTTPEnvelope`. It accepts only literal `127.0.0.1`/`[::1]` HTTP targets and a
 mandatory nonce; standard `dpop+jwt` APIs reject its bytes.
 
+The module also exposes the standalone role-attestation sibling profile `bap-role-attestation/1`
+([`spec/bap-role-attestation-v1.md`](../../spec/bap-role-attestation-v1.md)) through
+`AttestationSigningInput`, `AssembleAttestationCompact`, `DecodeAttestation`, and `VerifyAttestation`:
+an attestor key binds a subject key to an `issuer`/`holder` role for a window contained in the attestor
+key's own validity window, both segments are canonical-bytes-only, and every contract-major API rejects
+its `ba+role-attestation` typ while it rejects every contract-major typ.
+
 ## Status
 
 Not yet published to a Go module proxy. Per the [SDK graduation model](../../docs/adr/0015-sdk-graduation-and-publish-topology.md),

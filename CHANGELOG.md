@@ -4,6 +4,39 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added — the role-attestation sibling profile `bap-role-attestation/1` (ADR 0036; the BARA RA11 prerequisite)
+
+- `BoundedAuthorityProtocol.RoleAttestation.V1` — the protocol's first sibling attestation
+  profile: a standalone, grant-unbound compact JWS (protected `typ: "ba+role-attestation"`)
+  binding a subject key to `issuer` or `holder` for a bounded window. Four surfaces:
+  `attestation_signing_input/2`, `assemble_compact/{2,3}`, `decode_attestation/2`, and
+  `verify_attestation/2` (the citation symbol the companion signer's RA11 row names). Facts are
+  the anchor posture (`trust: :not_evaluated`, no authorization marker, RFC 7638 fingerprints,
+  Inspect-redacted); verification enforces attestor-kid binding, subject binding, structural
+  self-attestation rejection, attestation-window containment in the attestor key window, and the
+  half-open `[nbf, exp)` now-window. Normative profile `spec/bap-role-attestation-v1.md` with
+  `REQ-RA1-*` ids and a per-profile requirement map; profile corpus (40 cases, revision 1,
+  certified index pinned in the ExUnit suite, the map, the spec, and every SDK) at
+  `priv/conformance/attestation-profiles/role-attestation/v1/`, verified end-to-end by
+  `mix role_attestation.verify`; ten red-capable mutation-battery entries; registries gain the
+  `ba+role-attestation` typ and the attestation-profiles family; governance, the standards-track
+  evolution contract, and ADR 0007 carry the labeled ADR-0036 class amendments (ADR 0029's
+  budget-window posture unchanged). The in-repo Python/Rust/Go SDKs implement the four surfaces
+  with the in-repo corpus and its digest asserted at test load.
+- Release preconditions for any `0.x.0` bearing this profile (release itself remains the owner's
+  decision): the graduated TypeScript verifier surface coordinated at corpus freeze, the
+  authority-runtime issuance receipt, and the companion-signer consumption receipt in their own
+  repositories.
+
+### Fixed — v1/v2 closed error shape under wrong-width signatures
+
+- `V1/V2.decode_grant/2`, `decode_proof/2`, and the verify paths behind them returned a bare
+  `false` (a `with` guard leak) instead of `{:error, :invalid}` for compacts whose signature
+  segment decodes to a byte length other than the suite width — found by the profile corpus's
+  ES256 confusion case (a raw ECDSA `r||s` signature), fixed V3-style (parse normalization),
+  pinned RED-first by `test/bounded_authority_protocol/signature_width_error_shape_test.exs`. No
+  accept/reject verdict changes; the v1/v2/v3 corpora and their certified pins are unchanged.
+
 ## [0.5.1] - 2026-09-22
 
 ### Docs maintenance — the published doc set trimmed to implementer-facing content

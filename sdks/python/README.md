@@ -16,6 +16,11 @@ The SDK also exposes the byte-distinct local-development profile through
 `check_local_loopback_http_envelope`. It accepts only literal `127.0.0.1`/`[::1]` HTTP targets and
 a mandatory nonce; standard `dpop+jwt` APIs reject its bytes.
 
+The sibling role-attestation profile (`bap-role-attestation/1`) is exposed through
+`attestation_signing_input`, `assemble_attestation_compact`, `decode_attestation`, and
+`verify_attestation`; it binds a subject key to an `issuer`/`holder` role for a bounded window, and
+contract-major profiles reject its `ba+role-attestation` bytes as it rejects theirs.
+
 [adr14]: https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0014-cross-language-verifier-sdks.md
 [adr15]: https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0015-sdk-graduation-and-publish-topology.md
 [spec]: https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v1.md

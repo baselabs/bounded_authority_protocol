@@ -944,6 +944,114 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       target:
         {"test/conformance/corpus_independent_test.exs",
          "independent runner agrees on every shipped corpus case (repo mode)"}
+    },
+    # --- Role-attestation sibling profile (BAP-23 / ADR 0036) ------------------
+    %{
+      # Self-attestation material check removed: the attestor thumbprint equaling the subject
+      # thumbprint no longer rejects, so the self-attestation-same-material corpus case verifies.
+      name: "role-attestation-self-material-removed",
+      path: "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+      from:
+        "         true <- not FixedBytes.equal?(attestor_fingerprint, subject_fingerprint),\n",
+      to: "         true <- true,\n",
+      target:
+        {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
+         "the certified language-neutral corpus drives decode and verify verdicts"}
+    },
+    %{
+      # Self-attestation key-id check removed: the same-key-id corpus case verifies.
+      name: "role-attestation-self-kid-removed",
+      path: "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+      from: "         true <- parsed.key_id != attestor.key_id,\n",
+      to: "         true <- true,\n",
+      target:
+        {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
+         "the certified language-neutral corpus drives decode and verify verdicts"}
+    },
+    %{
+      # Window containment upper bound removed: an exp beyond the attestor key's valid_before
+      # (the retired-key backdating attack) verifies.
+      name: "role-attestation-containment-exp-removed",
+      path: "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+      from:
+        "         true <-\n           attestor.valid_before == :unbounded or\n             parsed.exp <= attestor.valid_before,\n",
+      to: "         true <- true,\n",
+      target:
+        {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
+         "the certified language-neutral corpus drives decode and verify verdicts"}
+    },
+    %{
+      # Window containment lower bound removed: an nbf before the attestor window opens verifies.
+      name: "role-attestation-containment-nbf-removed",
+      path: "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+      from: "         true <- parsed.nbf >= attestor.valid_from,\n",
+      to: "         true <- true,\n",
+      target:
+        {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
+         "the certified language-neutral corpus drives decode and verify verdicts"}
+    },
+    %{
+      # now-window check removed: now == exp (and now < nbf) no longer reject.
+      name: "role-attestation-now-window-removed",
+      path: "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+      from: "         true <- parsed.nbf <= expected.now and expected.now < parsed.exp,\n",
+      to: "         true <- true,\n",
+      target:
+        {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
+         "the certified language-neutral corpus drives decode and verify verdicts"}
+    },
+    %{
+      # Attestor kid binding removed: a header kid naming another attestor verifies.
+      name: "role-attestation-kid-binding-removed",
+      path: "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+      from: "         true <- parsed.attestor_key_id == attestor.key_id,\n",
+      to: "         true <- true,\n",
+      target:
+        {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
+         "the certified language-neutral corpus drives decode and verify verdicts"}
+    },
+    %{
+      # Subject binding removed: subject key_id and raw public_key equality no longer checked.
+      name: "role-attestation-subject-binding-removed",
+      path: "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+      from:
+        "         true <- parsed.key_id == expected.subject_key_id,\n         true <- FixedBytes.equal?(parsed.public_key, expected.subject_public_key),\n",
+      to: "         true <- true,\n         true <- true,\n",
+      target:
+        {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
+         "the certified language-neutral corpus drives decode and verify verdicts"}
+    },
+    %{
+      # Closed role set widened: any binary role decodes and verifies.
+      name: "role-attestation-role-closed-set-widened",
+      path: "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+      from: "         true <- role in @roles,\n",
+      to: "         true <- is_binary(role),\n",
+      target:
+        {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
+         "the certified language-neutral corpus drives decode and verify verdicts"}
+    },
+    %{
+      # Payload canonical-byte equality removed: non-canonical member order, duplicate members,
+      # and the float v lexeme all decode.
+      name: "role-attestation-canonical-bytes-removed",
+      path: "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+      from: "         true <- payload_bytes == canonical_payload do\n",
+      to: "         true <- true do\n",
+      target:
+        {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
+         "the certified language-neutral corpus drives decode and verify verdicts"}
+    },
+    %{
+      # Signature verification removed: any 64-byte signature verifies.
+      name: "role-attestation-signature-removed",
+      path: "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+      from:
+        "         true <- verify_signature(parsed.message, parsed.signature, attestor.public_key) do\n",
+      to: "         true <- true do\n",
+      target:
+        {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
+         "the certified language-neutral corpus drives decode and verify verdicts"}
     }
   ]
 

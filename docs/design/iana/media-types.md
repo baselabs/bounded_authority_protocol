@@ -58,6 +58,24 @@ Filing is externally gated.
 - **Change controller:** Bounded Authority Protocol maintainers
 - **Wire `typ`:** `ba+chain-anchor`
 
+## application/ba-role-attestation+jwt (active)
+
+- **Type name:** application
+- **Subtype name:** ba-role-attestation+jwt
+- **Required parameters:** None
+- **Optional parameters:** None
+- **Encoding considerations:** Compact JWS (RFC 7515) serialization of a closed JSON object; UTF-8; base64url segments; binary-safe
+- **Security considerations:** See the Security and Host Obligations of the BAP Role Attestation Profile 1
+- **Interoperability considerations:** The payload is a closed profile; unknown members are non-conforming; the profile binds a subject key to a role for a bounded window and grants no authority
+- **Published specification:** spec/bap-role-attestation-v1.md (BAP Role Attestation Profile 1)
+- **Applications that use this media type:** Signed role bindings for bounded proof-of-possession authority key provisioning
+- **Fragment identifier considerations:** N/A
+- **Intended usage:** LIMITED USE
+- **Restrictions on usage:** Attestation is evidence of a binding, not an authorization; trust selection and replay reservation are caller obligations
+- **Author:** Bounded Authority Protocol maintainers
+- **Change controller:** Bounded Authority Protocol maintainers
+- **Wire `typ`:** `ba+role-attestation`
+
 ## application/ba-key-transition+jwt (active)
 
 - **Type name:** application

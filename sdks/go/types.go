@@ -13,6 +13,7 @@ const (
 	KindLocalLoopbackHTTPProof Kind = "local_loopback_http_proof"
 	KindBoundaryAnchor         Kind = "boundary_anchor"
 	KindKeyTransition          Kind = "key_transition"
+	KindRoleAttestation        Kind = "role_attestation"
 )
 
 // SigningInput is a canonical JWS signing-input pair: the exact canonical

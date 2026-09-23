@@ -33,10 +33,12 @@ departure 2).
 
 Editorial (errata; never verdict-changing) · clarifying (minor version; additive docs/cases only) ·
 byte-distinct sibling proof profile (breaking pre-1.0 package release, public ADR, independent
-normative/corpus/API identity) · existing-profile wire or verification behavior (contract-major
-only, with a public ADR).
+normative/corpus/API identity) · byte-distinct sibling attestation profile (same release/ADR/identity
+shape, under its own class conditions) · existing-profile wire or verification behavior
+(contract-major only, with a public ADR).
 ([standards-track.md](design/standards-track.md) § Governance; amended by
-[ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md).)
+[ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md) and
+[ADR 0036](adr/0036-role-attestation-profile.md).)
 
 ## Byte-distinct sibling proof profiles
 
@@ -54,16 +56,35 @@ public ADR and closed corpus. Any change to an existing profile's accepted bytes
 bounds, suite, or verdicts remains contract-major work. The complete decision and rejection tests
 are in [ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md).
 
+## Byte-distinct sibling attestation profiles
+
+A sibling attestation profile is the second sibling class
+([ADR 0036](adr/0036-role-attestation-profile.md)), permitted only when its artifact carries a new
+signed protected `typ`, is standalone and grant-unbound (parsed by no existing profile's verification
+path, verified only through its own named API), cross-rejects every existing profile by corpus leg in
+both directions, and changes no byte, bound, or verdict anywhere. It has its own public namespace,
+normative specification, profile-scoped requirement range, conformance corpus identity, and registry
+entry; it single-sources the shared primitives of the contract-major it binds; every shipped SDK
+implements its verification surface before any release bearing it; its first publication is a
+breaking pre-1.0 package release (`0.x.0`) with immutable source, package, corpus, and the
+ADR-0036 release-evidence conditions. No runtime registry, negotiation, inference, fallback, or
+plugin mechanism exists. The charter's reserve-and-activate-in-a-major discipline for attestation
+shapes governs verifier-integration-bound artifacts; a consumer-gated artifact no major verifier
+ingests takes this class. The complete decision, the class conditions, and the rejection tests are
+in [ADR 0036](adr/0036-role-attestation-profile.md).
+
 ## Change control
 
 Every product-shaping decision lands as a numbered public ADR. Once at least two independent
-external implementations pass the conformance corpus, contract-major ADRs gain a published comment
-window of no fewer than thirty days and a change-control group with implementer representation. The
+external implementations pass the conformance corpus, contract-major ADRs and sibling-profile ADRs
+gain a published comment window of no fewer than thirty days and a change-control group with
+implementer representation. The
 hand-off criterion to a formal standards body is adoption, not ceremony: when a venue (see the
 charter § [Venue strategy](design/standards-track.md#venue-strategy)) accepts the work, that venue's
 process supersedes this one.
 ([standards-track.md](design/standards-track.md):204-208, verbatim except for departure 1 — the
-charter's "see below" is resolved to an explicit link to the charter § Venue strategy.)
+charter's "see below" is resolved to an explicit link to the charter § Venue strategy; the
+sibling-profile extension is [ADR 0036](adr/0036-role-attestation-profile.md) Decision 1.)
 
 ## Errata channel
 

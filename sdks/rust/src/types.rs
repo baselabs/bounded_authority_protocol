@@ -49,6 +49,9 @@ pub enum SigningKind {
     Proof,
     /// A byte-distinct literal-loopback HTTP proof (`typ: "ba+loopback-proof"`).
     LocalLoopbackHttpProof,
+    /// A role attestation (`typ: "ba+role-attestation"`) — the standalone
+    /// sibling attestation profile, parsed by no contract-major façade.
+    RoleAttestation,
     /// A signed consumption-chain boundary anchor.
     ChainAnchor,
     /// A signed historical-key transition.
@@ -74,6 +77,7 @@ impl SigningKind {
             "grant" => Self::Grant,
             "proof" => Self::Proof,
             "local_loopback_http_proof" => Self::LocalLoopbackHttpProof,
+            "role_attestation" => Self::RoleAttestation,
             "chain_anchor" => Self::ChainAnchor,
             "key_transition" => Self::KeyTransition,
             _ => return Err(Invalid),
@@ -754,6 +758,118 @@ pub struct LocalLoopbackHttpProofInput {
     pub holder_public_key: [u8; 32],
     pub issued_at: i64,
     pub nonce: String,
+}
+
+// ============================================================================
+// Role attestation (the standalone sibling attestation profile)
+// ============================================================================
+
+/// The attested role: exactly `"issuer"` or `"holder"` on the wire
+/// (`REQ-RA1-CLAIM-role-closed-set`).
+///
+/// The Rust spelling of the reference's role binary — a two-value closed set,
+/// so every other string is structurally unrepresentable at the producer
+/// boundary and rejected at the decode boundary. A `holder` attestation is
+/// admission control and defense-in-depth only; per-grant holder standing
+/// remains each grant's `cnf.jkt` binding (`REQ-RA1-SECURITY-holder-semantics`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Role {
+    /// The subject key may issue under the attestor's scope of trust.
+    Issuer,
+    /// The subject key is admitted as a holder.
+    Holder,
+}
+
+impl Role {
+    /// The exact wire string (`"issuer"` / `"holder"`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Issuer => "issuer",
+            Self::Holder => "holder",
+        }
+    }
+}
+
+/// Producer input for the role-attestation signing input
+/// (`bap-role-attestation/1` §2).
+///
+/// A role attestation is a compact JWS in which an attestor key binds a
+/// subject key to a role for a bounded window: the protected header is
+/// `{alg:"EdDSA", kid:attestor_key_id, typ:"ba+role-attestation"}` and the
+/// payload is `{v:1, jti, key_id, public_key, role, nbf, exp}` with
+/// `nbf < exp` (`REQ-RA1-CLAIM-window`). The artifact is standalone and
+/// grant-unbound: it binds no grant, names no issuer identity, audience, or
+/// scope, and carries no authorization (`REQ-RA1-CORE-profile-identity`).
+/// `attestor_key_id` is the header `kid` — a hint, never a trust selector;
+/// `key_id`/`public_key` are the attested subject binding.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AttestationInput {
+    /// The attestor key id (the protected-header `kid`, BAP1 `kid` rules).
+    pub attestor_key_id: String,
+    /// The `jti` — the audit and revocation-reference handle (non-empty
+    /// bounded StringOrURI under the BAP1 grant `jti` rules).
+    pub jti: String,
+    /// The attested subject key id (BAP1 `kid` rules).
+    pub key_id: String,
+    /// Raw 32-byte Ed25519 subject public key (`public_key` source).
+    pub public_key: [u8; 32],
+    /// The attested role.
+    pub role: Role,
+    /// The window lower bound `nbf` (integral NumericDate).
+    pub nbf: i64,
+    /// The window upper bound `exp` (integral NumericDate; `nbf < exp`).
+    pub exp: i64,
+}
+
+/// Caller-expected context for role-attestation verification
+/// (`bap-role-attestation/1` §3, `REQ-RA1-VERIFY-caller-supplied`).
+///
+/// Carries the trusted attestor key (a [`HistoricalPublicKey`] — key id, raw
+/// 32-byte public key, and its own `[valid_from, valid_before)` validity
+/// window, `valid_before` possibly unbounded), the expected subject binding
+/// (subject key id + raw 32-byte subject public key), the caller's `now`, and
+/// the bounds. Which attestor to trust, which role a consumer requires, and
+/// replay reservation are caller obligations (`REQ-RA1-VERIFY-policy-caller-side`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpectedAttestation {
+    /// The trusted attestor key with its validity window.
+    pub attestor: HistoricalPublicKey,
+    /// The expected subject key id (`payload.key_id` exact match).
+    pub subject_key_id: String,
+    /// Raw 32-byte expected subject public key (raw byte-equality).
+    pub subject_public_key: [u8; 32],
+    /// The caller's integral `now` (NumericDate seconds).
+    pub now: i64,
+    /// Tightening bounds (defaults to [`Bounds::maximum()`]).
+    pub bounds: Bounds,
+}
+
+/// Decoded (but NOT signature-verified) role-attestation claims.
+///
+/// `decode_attestation` parses and structurally validates the compact against
+/// the closed header/payload sets of §2 without verifying the Ed25519
+/// signature, so the result carries `verification: NotEvaluated`
+/// (`REQ-RA1-VERIFY-facts` is the verified shape; this is the redacted parse
+/// view). The header `kid` is surfaced as the attestor key id hint.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AttestationDecoded {
+    /// The protected-header `kid` (the attestor key id hint, NOT a trust
+    /// selector).
+    pub attestor_key_id: String,
+    /// The `jti`.
+    pub jti: String,
+    /// The attested subject key id.
+    pub key_id: String,
+    /// Raw 32-byte attested subject public key.
+    pub public_key: [u8; 32],
+    /// The attested role.
+    pub role: Role,
+    /// The `nbf` (integral NumericDate).
+    pub nbf: i64,
+    /// The `exp` (integral NumericDate).
+    pub exp: i64,
+    /// Signature verification was not performed.
+    pub verification: NotEvaluated,
 }
 
 #[cfg(test)]

@@ -292,6 +292,25 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:load_json_file, 3} => %{variable_call: 2},
       {:tamper_verbatim_matches?, 5} => %{variable_call: 2},
       {:verify_hashes, 2} => %{variable_call: 2}
+    },
+    "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.ExpectedAttestation.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.RoleAttestation.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.Codec.beam" => %{
+      {:assemble, 3} => %{variable_call: 3},
+      {:decode, 2} => %{variable_call: 2},
+      {:parse, 2} => %{variable_call: 32},
+      {:signing_input, 2} => %{variable_call: 4},
+      {:verify, 2} => %{variable_call: 16}
     }
   }
 
@@ -596,7 +615,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "lib/bounded_authority_protocol/v3/chain_facts.ex",
     "lib/bounded_authority_protocol/v3/envelope_facts.ex",
     "lib/bounded_authority_protocol/v3/grant_facts.ex",
-    "lib/bounded_authority_protocol/v3/key_transition_facts.ex"
+    "lib/bounded_authority_protocol/v3/key_transition_facts.ex",
+    "lib/bounded_authority_protocol/role_attestation/v1/attestation_facts.ex"
   ]
 
   @chain_codec_source_paths [
@@ -702,13 +722,13 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   }
 
   @approved_local_aliases ~w(AnchorFacts AnchoredExportCodec AnchoredExportFacts SharedSelector SharedValidation V1Facade V2Facade V3Facade EcJwk Es256
-    AnchoredExportInput ArchivedObject Base64Url BoundaryAnchor BoundaryAnchorCodec Bounds
-    ChainFacts ChainInput CompactJws ConsumptionChain ConsumptionEntry Container ContextValidation Credentials
-    Corpus DecodedGrant DecodedProof EncodedAnchoredExport EncodedConsumptionEntry EnvelopeFacts
-    ExpectedAnchor ExpectedAnchoredExport ExpectedChain ExpectedExport ExpectedGrant
+    AnchoredExportInput ArchivedObject AttestationFacts Base64Url BoundaryAnchor BoundaryAnchorCodec Bounds
+    ChainFacts ChainInput Codec CompactJws ConsumptionChain ConsumptionEntry Container ContextValidation Credentials
+    Corpus DecodedAttestation DecodedGrant DecodedProof EncodedAnchoredExport EncodedConsumptionEntry EnvelopeFacts
+    ExpectedAnchor ExpectedAnchoredExport ExpectedAttestation ExpectedChain ExpectedExport ExpectedGrant
     ExpectedKeyTransition ExpectedRequest FixedBytes Grant GrantFacts HistoricalKeyChain
     HistoricalPublicKey Jcs Json JsonValue Jwk KeyLocator KeyTransition KeyTransitionCodec
-    KeyTransitionFacts Operation Proof Report RequestDigest Root Runner Runtime Selector SigningInput
+    KeyTransitionFacts Operation Proof Report RequestDigest RoleAttestation Root Runner Runtime Selector SigningInput
     TrustedIssuer Uri Violation)
   @approved_struct_fields ~w(array_items compact_bytes count decoded_segment_bytes depth
     encoded_segment_bytes float_magnitude integer_magnitude json_bytes key_bytes kid_bytes kind
@@ -729,7 +749,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     transition_count object_version version chain header start_anchor_parsed end_anchor_parsed
     transition_parsed index index_bytes cases raws case_ids id surface class input expected
     bound_profile tamper verdict agree agreed disagreed agreement exit_status total kid
-    issuer_key_fingerprint matched_audience major)a
+    issuer_key_fingerprint matched_audience major attestor attestor_key_id
+    attestor_key_fingerprint subject_key_id subject_key_fingerprint subject_public_key role jti
+    nbf exp now)a
 
   def check(root, opts \\ []) do
     root = Path.expand(root)
@@ -1648,6 +1670,11 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/corpus.ex"),
     do: ~w(Access Bitwise Enum List Map MapSet String)
 
+  # The role-attestation sibling profile (ADR 0036): the codec mirrors the chain codecs'
+  # module set.
+  defp approved_source_modules("lib/bounded_authority_protocol/role_attestation/v1/codec.ex"),
+    do: ~w(Access Enum Map String StringOrUri)
+
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/runner.ex"),
     do: ~w(Enum Map String)
 
@@ -1955,6 +1982,22 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
        when path in @fact_source_paths,
        do: true
 
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+         module,
+         function
+       ) do
+    function == :get or
+      {module, function} in [
+        {"Access", :get},
+        {"Enum", :map},
+        {"Enum", :sort},
+        {"Map", :new},
+        {"String", :valid?},
+        {"StringOrUri", :valid?}
+      ]
+  end
+
   # CLI I/O carve-out (C1): exact-path + exact-function allowances. cli.ex may use File.read/1,
   # File.ls/1, File.write/2, File.dir?/1, IO.binwrite/2, and Path.join/2 (the only filesystem/io
   # calls in the verification tool's loader/output path). No halt here.
@@ -2260,7 +2303,11 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          "Elixir.BoundedAuthorityProtocol.V3.Proof.beam",
          "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
          "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",
-         "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam"
+         "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam",
+         "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts.beam",
+         "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation.beam",
+         "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.ExpectedAttestation.beam",
+         "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.RoleAttestation.beam"
        ],
        do: nil,
        else: :dynamic_dispatch
@@ -2321,6 +2368,17 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {String, :contains?},
           {String, :valid?},
           {URI, :new}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.Codec.beam" ->
+        [
+          {Access, :get},
+          {Enum, :__in__},
+          {Enum, :map},
+          {Enum, :sort},
+          {Map, :new},
+          {Range, :new},
+          {String, :valid?}
         ]
 
       "Elixir.BoundedAuthorityProtocol.V2.AnchoredExportCodec.beam" ->
@@ -2795,6 +2853,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            "Elixir.BoundedAuthorityProtocol.V1.Uri.beam",
            "Elixir.BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.Uri.beam",
            "Elixir.BoundedAuthorityProtocol.UriPath.beam",
+           "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.Codec.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam",

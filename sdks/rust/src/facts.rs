@@ -8,7 +8,9 @@
 //! explicit `NotEvaluated` marker so a successful result can never be read as a
 //! decision, receipt, or execution credential
 //! (`REQ1-VERIFY-facts-redacted`, `REQ1-VERIFY-facts-not-credentials`,
-//! `REQ1-CHAIN-facts-not-evaluated`).
+//! `REQ1-CHAIN-facts-not-evaluated`). The sibling role-attestation profile
+//! (`bap-role-attestation/1`) adds a seventh — [`AttestationFacts`] — under
+//! the same redaction contract.
 //!
 //! # Redaction contract (load-bearing)
 //!
@@ -35,6 +37,8 @@
 //! surfaces carries only `verdict`, so the contract is the authority for the
 //! fact shapes).
 
+use crate::types::Role;
+
 /// The single not-evaluated marker carried by every facts struct.
 ///
 /// A unit struct used as the type of both the `authorization` and `trust`
@@ -51,6 +55,22 @@
 /// be mistaken for a positive decision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NotEvaluated;
+
+/// The signature-and-window marker carried by the sibling role-attestation
+/// profile's facts (`verification: :signature_and_window`,
+/// `bap-role-attestation/1` §3 `REQ-RA1-VERIFY-facts`).
+///
+/// The positive-but-bounded spelling of what a role-attestation verification
+/// proved: the Ed25519 signature under the attestor key and the window
+/// containment — nothing more. It is deliberately NOT an authorization: trust
+/// scope, the required role, replay, and revocation stay caller-side
+/// (`REQ-RA1-VERIFY-policy-caller-side`, `REQ-RA1-SECURITY-not-authority`).
+///
+/// Derives [`Debug`], [`Clone`], [`Copy`], [`PartialEq`], [`Eq`] only — it
+/// renders as the bare token `SignatureAndWindow` and carries no value, so it
+/// cannot be mistaken for a decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SignatureAndWindow;
 
 // ============================================================================
 // Grant / envelope facts (authorization: NotEvaluated)
@@ -266,6 +286,47 @@ pub struct AnchoredExportFacts {
     /// Authorization was not evaluated — even a fully authenticated export is
     /// not an execution decision.
     pub authorization: NotEvaluated,
+}
+
+// ============================================================================
+// Role-attestation facts (the standalone sibling attestation profile)
+// ============================================================================
+
+/// Redacted facts returned by role-attestation verification
+/// (`verify_attestation`, `bap-role-attestation/1` §3 `REQ-RA1-VERIFY-facts`).
+///
+/// Carries the attestor key id and RFC 7638 thumbprint, the subject key id and
+/// thumbprint, the role, the `jti`, the window, `verification:
+/// SignatureAndWindow` (the signature + window containment that were proved),
+/// and `trust: NotEvaluated`. A role attestation is evidence of a binding, not
+/// an authorization: facts carry no raw key material, no signature, and no
+/// decision (`REQ-RA1-VERIFY-facts-non-authorizing`,
+/// `REQ-RA1-SECURITY-not-authority`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct AttestationFacts {
+    /// The attestor key id (the protected-header `kid`, matched to the
+    /// caller's trusted attestor key id).
+    pub attestor_key_id: String,
+    /// Raw 32-byte RFC 7638 thumbprint of the caller's trusted attestor
+    /// public key (a digest, not a raw key).
+    pub attestor_key_fingerprint: [u8; 32],
+    /// The attested subject key id.
+    pub subject_key_id: String,
+    /// Raw 32-byte RFC 7638 thumbprint of the attested subject public key.
+    pub subject_key_fingerprint: [u8; 32],
+    /// The attested role.
+    pub role: Role,
+    /// The `jti` (the audit and revocation-reference handle).
+    pub jti: String,
+    /// The `nbf` (integral NumericDate).
+    pub nbf: i64,
+    /// The `exp` (integral NumericDate).
+    pub exp: i64,
+    /// The signature and the window containment were verified — and nothing
+    /// else.
+    pub verification: SignatureAndWindow,
+    /// Trust was not evaluated.
+    pub trust: NotEvaluated,
 }
 
 #[cfg(test)]

@@ -56,7 +56,8 @@ The holder-side companion is
 ([GitHub](https://github.com/baselabs/bounded_authority_report_adapter)): it takes a local
 key handle (`{module(), term()}` — your HSM, KMS, or in-process test key; the private key never
 enters the library) and a protocol signing input, and produces the signed compact form for
-holder proofs, local-loopback application proofs, boundary anchors, and key transitions.
+holder proofs, local-loopback application proofs, boundary anchors, key transitions, and role
+attestations.
 The dependency is one-directional: verifiers depend only on this protocol package; the adapter
 depends on this package; this package never depends on the adapter.
 
@@ -98,6 +99,17 @@ Application proof profiles are explicit sibling namespaces. The local-developmen
 assembly, proof decode, and envelope verification. Standard `dpop+jwt` functions reject these
 bytes and the loopback functions reject `dpop+jwt`; callers must select one profile and never retry
 another after failure. Loopback HTTP is not TLS and is not process isolation.
+
+Sibling attestation profiles are the same posture for standalone signed artifacts. The role
+attestation profile `BoundedAuthorityProtocol.RoleAttestation.V1` (ADR 0036) carries signed
+`typ: "ba+role-attestation"`: an attestor key binds a subject key to `issuer` or `holder` for a
+bounded window. `verify_attestation/2` takes the caller-supplied attestor key (with its own
+validity window), the expected subject binding, and `now`; it proves the Ed25519 signature, the
+subject binding, structural self-attestation rejection, that the attestation window is contained
+in the attestor key window, and that `now` lies in the half-open `[nbf, exp)` — and returns
+redacted, non-authorizing `AttestationFacts` (`trust: :not_evaluated`). Which attestor to trust,
+which role a consumer requires, and replay reservation stay with the caller. Every contract-major
+profile rejects these bytes, and the profile rejects theirs.
 
 All verification inputs are explicit: the already-trusted public key, expected audience and
 instance, server-derived method, normalized URI, invocation id, operation, cast arguments,
@@ -146,6 +158,16 @@ real IPv4 and IPv6 listeners, uses fresh in-memory keys, and prints a secret-fre
 mix local_loopback_http.verify
 ```
 
+The role-attestation profile's certified corpus (40 cases, revision 1) lives under
+`priv/conformance/attestation-profiles/role-attestation/v1`, minted with ephemeral in-memory
+keys and pinned by the Elixir suite, the requirement map, the spec, and every SDK consumer.
+Its end-to-end check verifies index and file digests, every case's decode/verify verdict, and
+cross-profile rejection in both directions, printing a secret-free receipt:
+
+```bash
+mix role_attestation.verify
+```
+
 ## Cross-language verifier SDKs
 
 Alongside the Elixir package, the repository authors typed **verifier** SDKs of the frozen profiles
@@ -190,6 +212,7 @@ Reference set:
 
 - `spec/bap-v1.md` — the normative v1 wire profile (docs/protocol-v1.md is its generated view).
 - `spec/bap-local-loopback-http-v1.md` — the normative literal-loopback HTTP application profile.
+- `spec/bap-role-attestation-v1.md` — the normative role-attestation sibling profile.
 - `docs/design/protocol-charter.md` — what the verifier does and the verification chain.
 - `docs/design/conformance-contract.md` — how conformance is proven.
 - `docs/design/interoperability-report.md` — exact standard and application-profile

@@ -280,6 +280,13 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
   end
 
   defp parse_grant(compact, limits) do
+    case parse_grant_validated(compact, limits) do
+      {:ok, parsed} -> {:ok, parsed}
+      _failure -> {:error, :invalid}
+    end
+  end
+
+  defp parse_grant_validated(compact, limits) do
     with {:ok, bounds} <- Bounds.coerce(limits),
          {:ok, {protected_segment, payload_segment, signature_segment}} <-
            CompactJws.scan(compact, bounds),
@@ -302,6 +309,13 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
   end
 
   defp parse_proof(compact, limits, profile) do
+    case parse_proof_validated(compact, limits, profile) do
+      {:ok, parsed} -> {:ok, parsed}
+      _failure -> {:error, :invalid}
+    end
+  end
+
+  defp parse_proof_validated(compact, limits, profile) do
     with {:ok, bounds} <- Bounds.coerce(limits),
          {:ok, {protected_segment, payload_segment, signature_segment}} <-
            CompactJws.scan(compact, bounds),

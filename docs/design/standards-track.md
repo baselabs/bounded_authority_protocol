@@ -53,7 +53,11 @@ the profile of any artifact from its bytes alone. Negotiation is therefore disco
   best-effort parsing (`REQ1-EVO-no-downgrade`).
 - Acceptance of a byte-distinct sibling proof profile is an explicit deployment choice through its
   separately named API. A deployment never infers it from URI or request metadata and never retries
-  another profile after failure (ADR 0027).
+  another profile after failure (ADR 0027). The same posture governs byte-distinct sibling
+  attestation profiles (ADR 0036): standalone, grant-unbound artifacts parsed by no major's
+  verification path, verified only through their own named API — the consumer-gated branch of the
+  evolution contract, distinct from the verifier-integration-bound attestation shapes that activate
+  inside a successor contract-major (labeled departure from this charter text: ADR 0036 Decision 1).
 
 ### Parallel-version support and deprecation
 
@@ -81,7 +85,9 @@ governed by [registries](registries.md) rather than by code. The registries also
 claim names, `typ` values, application-proof profiles, and cryptographic suite identifiers.
 Reservation is cheap and immediate. Reserved shared claims, selector kinds, and suite semantics
 activate only with a contract-major. A byte-distinct sibling proof `typ` may activate under ADR 0027
-because it creates a new closed profile and every existing profile continues to reject it. Names are
+because it creates a new closed profile and every existing profile continues to reject it; a
+byte-distinct sibling attestation `typ` may activate under ADR 0036 on the same rejection basis
+(labeled departure from this charter text: ADR 0036 Decision 1). Names are
 coordinated so independent implementers never collide while no accepted byte changes meaning.
 
 ## Cryptographic suite identity

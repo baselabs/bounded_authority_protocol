@@ -923,6 +923,12 @@ pub fn assemble_compact(
         SigningKind::LocalLoopbackHttpProof => {
             return Err(Invalid);
         }
+        // The v3 profile parses no role-attestation typ: the standalone
+        // sibling profile's bytes stay closed out of this façade
+        // (`REQ-RA1-CORE-cross-profile-reject`).
+        SigningKind::RoleAttestation => {
+            return Err(Invalid);
+        }
         SigningKind::ChainAnchor => {
             decode_anchor_parts(&compact, &bounds)?;
         }

@@ -11,12 +11,14 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        "scripts/check_chain_archive_performance.exs",
                        "scripts/check_verification_performance.exs",
                        "scripts/check_local_loopback_http.exs",
+                       "scripts/check_role_attestation.exs",
                        "scripts/check_spec_facts.exs",
                        "spec/tools/build_examples.exs",
                        "test/architecture/purity_test.exs",
                        "test/docs_guides_test.exs",
                        "test/bap_walkthrough_test.exs",
                        "test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",
+                       "test/bounded_authority_protocol/signature_width_error_shape_test.exs",
                        "test/docs_currency_test.exs",
                        "test/spec_facts_test.exs"
                      ])
@@ -27,6 +29,20 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                                   "priv/conformance/application-profiles/local-loopback-http/v1/profile.json",
                                   "priv/conformance/application-profiles/local-loopback-http/v1/proof-cases.json"
                                 ])
+  # The accepted role-attestation sibling-profile family (ADR 0036): the profile namespace,
+  # the attestation corpus, and the profile test.
+  @role_attestation_profile_paths MapSet.new([
+                                    "lib/bounded_authority_protocol/role_attestation/v1.ex",
+                                    "lib/bounded_authority_protocol/role_attestation/v1/attestation_facts.ex",
+                                    "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
+                                    "lib/bounded_authority_protocol/role_attestation/v1/decoded_attestation.ex",
+                                    "lib/bounded_authority_protocol/role_attestation/v1/expected_attestation.ex",
+                                    "lib/bounded_authority_protocol/role_attestation/v1/role_attestation.ex",
+                                    "priv/conformance/attestation-profiles/role-attestation/v1/attestation-cases.json",
+                                    "priv/conformance/attestation-profiles/role-attestation/v1/index.json",
+                                    "priv/conformance/attestation-profiles/role-attestation/v1/profile.json",
+                                    "test/bounded_authority_protocol/role_attestation/v1_test.exs"
+                                  ])
   @requirement_ids "test/fixtures/durable_identifier_requirements.txt"
                    |> File.read!()
                    |> String.split()
@@ -208,6 +224,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
          name,
          "BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1"
        ) and local_loopback_profile_source_path?(path)) or
+      (String.starts_with?(name, "BoundedAuthorityProtocol.RoleAttestation.V1") and
+         MapSet.member?(@role_attestation_profile_paths, path)) or
       (name == "BoundedAuthorityProtocol.Conformance.V1SchemaTest" and
          path == "test/conformance/v1_schema_test.exs")
   end
@@ -245,7 +263,9 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
   defp contract_identity?(_path, _kind, _name), do: false
 
   defp current_major_path?(path, "v1"),
-    do: current_major_source_path?(path) or MapSet.member?(@local_loopback_profile_paths, path)
+    do:
+      current_major_source_path?(path) or MapSet.member?(@local_loopback_profile_paths, path) or
+        MapSet.member?(@role_attestation_profile_paths, path)
 
   defp current_major_path?(path, "v2"), do: successor_major_source_path?(path)
 
@@ -289,7 +309,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
        "0021-v1-all-selector-recognized-shapes-erratum"},
       {"test/conformance/v1_schema_test.exs", "v1_schema_test"},
       {"test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",
-       "v1_test"}
+       "v1_test"},
+      {"test/bounded_authority_protocol/role_attestation/v1_test.exs", "v1_test"}
     ]
   end
 
@@ -460,6 +481,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
       String.starts_with?(path, "test/conformance/") or
       current_major_source_path?(path) or
       MapSet.member?(@local_loopback_profile_paths, path) or
+      MapSet.member?(@role_attestation_profile_paths, path) or
       MapSet.member?(@external_v1_paths, path) or
       path == "scripts/check_package.exs" or
       String.starts_with?(path, "test/conformance/") or
