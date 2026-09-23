@@ -13,16 +13,18 @@ normative profile; this guide is operational.
 
 ## Installation
 
-The package is published on Hex (release 0.5.1, published 2026-09-22):
+OBSERVED September 23, 2026: the [Hex release API](https://hex.pm/api/packages/bounded_authority_protocol/releases/0.6.0)
+reports release 0.6.0 published on September 23, 2026:
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 0.5.1"}
+  [{:bounded_authority_protocol, "~> 0.6.0"}]
 end
 ```
 
-`v0.5.0` was the ES256 contract-major 3 activation source release (spec-facts v2/v3
-baselines shipped); `v0.5.1` is a docs-maintenance patch; `v0.4.0` was the v2 source release; `v0.4.1` was the toolchain
+`v0.6.0` adds the role-attestation sibling profile. `v0.5.0` was the ES256 contract-major 3
+activation source release (spec-facts v2/v3 baselines shipped); `v0.5.1` was a docs-maintenance
+patch; `v0.4.0` was the v2 source release; `v0.4.1` was the toolchain
 release; `v0.4.2` was a documentation-truth patch. The immutable
 package identity is the published Hex release, whose
 registry checksum was read back against the tagged-tree build. Depend on the package identity —

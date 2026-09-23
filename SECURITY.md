@@ -2,11 +2,11 @@
 
 ## Supported versions
 
-The `0.5.x` source release line is supported. `v0.5.1` is the current tagged source release
-and contains contract-majors 1, 2, and 3; the public API surface is locked. Registry consumers
-use the published Hex archive.
-OBSERVED September 15, 2026 UTC: the Hex release API reports `0.4.0` published on September 14,
-2026. See the [registry release](https://hex.pm/packages/bounded_authority_protocol/0.4.0).
+The `0.6.x` source release line is supported. `v0.6.0` is the current tagged source release
+and contains contract-majors 1, 2, and 3 plus the role-attestation sibling profile;
+the public API surface is locked. Registry consumers use the published Hex archive.
+OBSERVED September 23, 2026 UTC: the Hex release API reports `0.6.0` published on September 23,
+2026. See the [registry release](https://hex.pm/packages/bounded_authority_protocol/0.6.0).
 
 The verifier returns redacted, non-authorizing facts: trust and authorization, where a result
 carries them, are explicitly not evaluated. The package does not select trust, hold keys, reserve
