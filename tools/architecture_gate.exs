@@ -309,7 +309,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:assemble, 3} => %{variable_call: 3},
       {:decode, 2} => %{variable_call: 2},
       {:parse, 2} => %{variable_call: 32},
-      {:signing_input, 2} => %{variable_call: 4},
+      # Each producer validation step calls the compiler's shared `with` failure continuation.
+      {:signing_input, 2} => %{variable_call: 8},
       {:verify, 2} => %{variable_call: 16}
     }
   }

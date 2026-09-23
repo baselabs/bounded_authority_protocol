@@ -42,7 +42,6 @@
 
 use crate::base64url::{base64url_decode, base64url_encode};
 use crate::bounds::Bounds;
-use crate::compact;
 use crate::ed25519;
 use crate::error::{Invalid, Result};
 use crate::facts::{AttestationFacts, NotEvaluated, SignatureAndWindow};
@@ -60,6 +59,7 @@ use crate::types::{
 
 const ALG_EDDSA: &str = "EdDSA";
 const TYP_ROLE_ATTESTATION: &str = "ba+role-attestation";
+const ED25519_SIGNATURE_SEGMENT_BYTES: usize = 86;
 
 // ============================================================================
 // attestation_signing_input — signing-input production (§4 surface 1)
@@ -138,10 +138,11 @@ pub fn attestation_signing_input(
 /// 64-byte external signature, then revalidate the composed compact under
 /// THIS profile.
 ///
-/// Wraps [`compact::compose_compact`] (composition + segment
-/// well-formedness) with the per-kind content revalidation
-/// `REQ-RA1-API-assembly-revalidate` mandates: the composed bytes are
-/// re-parsed through the same decoder [`decode_attestation`] uses — closed
+/// Composes the protected, payload, and encoded signature segments only after
+/// their projected compact length passes the caller's ceilings, then applies
+/// the per-kind content revalidation `REQ-RA1-API-assembly-revalidate`
+/// mandates. The composed bytes are parsed through the same bounded decoder
+/// [`decode_attestation`] uses — closed
 /// header/payload sets, member rules, JCS canonical byte equality on both
 /// segments (`REQ-RA1-CLAIM-canonical`), segment bounds, and the 64-byte
 /// signature width. A caller-supplied segment set that composes to anything
@@ -159,10 +160,19 @@ pub fn assemble_attestation_compact(
     let bounds = resolve_bounds(bounds);
     if input.protected_segment.len() as u64 > bounds.encoded_segment_bytes()
         || input.payload_segment.len() as u64 > bounds.encoded_segment_bytes()
+        || ED25519_SIGNATURE_SEGMENT_BYTES as u64 > bounds.encoded_segment_bytes()
     {
         return Err(Invalid);
     }
-    let compact = compact::compose_compact(input, signature)?;
+    let compact_len =
+        projected_compact_len(input.protected_segment.len(), input.payload_segment.len())?;
+    validate_compact_size(compact_len, &bounds)?;
+    let mut compact = Vec::with_capacity(compact_len);
+    compact.extend_from_slice(&input.protected_segment);
+    compact.push(b'.');
+    compact.extend_from_slice(&input.payload_segment);
+    compact.push(b'.');
+    compact.extend_from_slice(&base64url_encode(signature));
     // REQ-RA1-API-assembly-revalidate + REQ-RA1-API-symmetry: the same
     // profile semantics as decode/verify gate the composed bytes.
     decode_attestation_parts(&compact, &bounds)?;
@@ -353,18 +363,15 @@ fn decode_attestation_parts<'a>(
     compact: &'a [u8],
     bounds: &Bounds,
 ) -> Result<DecodedAttestation<'a>> {
-    // REQ1-BOUNDS-ordering: the whole-input compact_bytes ceiling precedes
-    // any structural work.
-    if compact.len() as u64 > bounds.compact_bytes() {
-        return Err(Invalid);
-    }
-    let (protected_seg, payload_seg, signature_seg) = compact::parse_compact(compact)?;
+    // REQ1-BOUNDS-ordering: both whole-input ceilings precede structural work.
+    validate_compact_size(compact.len(), bounds)?;
+    let (protected_seg, payload_seg, signature_seg) = split_compact_bounded(compact, bounds)?;
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
     // Fixed widths: the decoded signature is exactly 64 bytes
     // (REQ1-BOUNDS-fixed-widths — a wrong-width signature segment is
     // structurally invalid, not merely unverifiable).
-    let sig_raw = base64url_decode(signature_seg)?;
+    let sig_raw = decode_segment(signature_seg, bounds)?;
     if sig_raw.len() != 64 {
         return Err(Invalid);
     }
@@ -509,11 +516,31 @@ fn decode_segment(segment: &[u8], bounds: &Bounds) -> Result<Vec<u8>> {
     if segment.len() as u64 > bounds.encoded_segment_bytes() {
         return Err(Invalid);
     }
+    let projected_len = projected_base64url_decoded_len(segment.len())?;
+    if projected_len as u64 > bounds.decoded_segment_bytes() {
+        return Err(Invalid);
+    }
     let decoded = base64url_decode(segment)?;
-    if decoded.len() as u64 > bounds.decoded_segment_bytes() {
+    if decoded.len() != projected_len {
         return Err(Invalid);
     }
     Ok(decoded)
+}
+
+/// Exact decoded-byte projection for canonical unpadded base64url. A remainder
+/// of one is structurally invalid because it cannot encode a whole byte.
+fn projected_base64url_decoded_len(encoded_len: usize) -> Result<usize> {
+    let complete_groups = encoded_len / 4;
+    let trailing_bytes = match encoded_len % 4 {
+        0 => 0,
+        2 => 1,
+        3 => 2,
+        _ => return Err(Invalid),
+    };
+    complete_groups
+        .checked_mul(3)
+        .and_then(|bytes| bytes.checked_add(trailing_bytes))
+        .ok_or(Invalid)
 }
 
 /// Assembles the RFC 7515 two-segment signing input
@@ -536,8 +563,20 @@ fn build_produced(
 ) -> Result<ProducedSigningInput> {
     let header_jcs = jcs_encode(header, bounds)?;
     let payload_jcs = jcs_encode(payload, bounds)?;
+    validate_produced_json(&header_jcs, bounds)?;
+    validate_produced_json(&payload_jcs, bounds)?;
     let protected_segment = base64url_encode(&header_jcs);
     let payload_segment = base64url_encode(&payload_jcs);
+    if protected_segment.len() as u64 > bounds.encoded_segment_bytes()
+        || payload_segment.len() as u64 > bounds.encoded_segment_bytes()
+        || ED25519_SIGNATURE_SEGMENT_BYTES as u64 > bounds.encoded_segment_bytes()
+    {
+        return Err(Invalid);
+    }
+    validate_compact_size(
+        projected_compact_len(protected_segment.len(), payload_segment.len())?,
+        bounds,
+    )?;
     let mut message = Vec::with_capacity(protected_segment.len() + 1 + payload_segment.len());
     message.extend_from_slice(&protected_segment);
     message.push(b'.');
@@ -547,6 +586,59 @@ fn build_produced(
         payload_segment,
         message,
     })
+}
+
+/// Enforces the decoded-segment ceiling before parsing generated JSON, then
+/// runs the same bounded decoder used by imported compacts. The decoder owns
+/// `json_bytes`, raw `number_lexeme_bytes`, and the remaining JSON ceilings.
+fn validate_produced_json(bytes: &[u8], bounds: &Bounds) -> Result<()> {
+    if bytes.len() as u64 > bounds.decoded_segment_bytes() {
+        return Err(Invalid);
+    }
+    json_decode(bytes, bounds)?;
+    Ok(())
+}
+
+/// The final signature segment for a 64-byte Ed25519 signature is always 86
+/// base64url bytes. Project the complete compact before allocating it.
+fn projected_compact_len(protected_len: usize, payload_len: usize) -> Result<usize> {
+    protected_len
+        .checked_add(payload_len)
+        .and_then(|n| n.checked_add(ED25519_SIGNATURE_SEGMENT_BYTES + 2))
+        .ok_or(Invalid)
+}
+
+/// Role attestations use both the generic compact ceiling and the profile's
+/// standalone signed-artifact (`anchor_bytes`) ceiling.
+fn validate_compact_size(compact_len: usize, bounds: &Bounds) -> Result<()> {
+    let compact_len = u64::try_from(compact_len).map_err(|_| Invalid)?;
+    if compact_len > bounds.compact_bytes() || compact_len > bounds.anchor_bytes() {
+        return Err(Invalid);
+    }
+    Ok(())
+}
+
+/// Splits without decoding or allocating, checks every encoded-segment ceiling,
+/// and only then lets the caller decode each segment exactly once.
+fn split_compact_bounded<'a>(
+    compact: &'a [u8],
+    bounds: &Bounds,
+) -> Result<(&'a [u8], &'a [u8], &'a [u8])> {
+    let mut segments = compact.split(|byte| *byte == b'.');
+    let protected = segments.next().unwrap_or(&[]);
+    let payload = segments.next().ok_or(Invalid)?;
+    let signature = segments.next().ok_or(Invalid)?;
+    if segments.next().is_some()
+        || protected.is_empty()
+        || payload.is_empty()
+        || signature.is_empty()
+        || [protected, payload, signature]
+            .iter()
+            .any(|segment| segment.len() as u64 > bounds.encoded_segment_bytes())
+    {
+        return Err(Invalid);
+    }
+    Ok((protected, payload, signature))
 }
 
 /// Resolves the caller's nested bounds: `None` = the profile maximum
@@ -660,6 +752,9 @@ fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
         Some(colon) => {
             validate_scheme(&s[..colon])?;
             validate_uri_bytes(s.as_bytes())?;
+            if s.bytes().filter(|byte| *byte == b'#').count() > 1 {
+                return Err(Invalid);
+            }
             validate_authority_port(s)?;
             Ok(())
         }
@@ -670,20 +765,66 @@ fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
 /// (`://authority`), a `:` in the authority outside an IP-literal bracket
 /// MUST introduce an all-digit port.
 fn validate_authority_port(value: &str) -> Result<()> {
-    let after_scheme_host = match value.find("://") {
-        Some(i) => &value[i + 3..],
-        None => return Ok(()), // no authority (e.g. `urn:…`)
+    let scheme_end = value.find(':').ok_or(Invalid)?;
+    let after_scheme = &value[scheme_end + 1..];
+    let after_scheme_host = match after_scheme.strip_prefix("//") {
+        Some(rest) => rest,
+        None => {
+            // `URI.new/1` rejects square brackets outside an authority's
+            // IP-literal host; every other opaque/path-rootless shape has no
+            // host or port structure to validate here.
+            if after_scheme.contains(['[', ']']) {
+                return Err(Invalid);
+            }
+            return Ok(());
+        }
     };
     let auth_end = after_scheme_host
         .find(['/', '?', '#'])
         .unwrap_or(after_scheme_host.len());
     let authority = &after_scheme_host[..auth_end];
-    if authority.starts_with('[') {
-        return Ok(()); // IP literal — colons inside […] are not a port.
+    if after_scheme_host[auth_end..].contains(['[', ']']) {
+        return Err(Invalid);
     }
-    if let Some(c) = authority.rfind(':') {
-        let port = &authority[c + 1..];
-        if port.is_empty() || !port.bytes().all(|b| b.is_ascii_digit()) {
+    // RFC 3986 authority permits one userinfo prefix. Its colon is not a port
+    // separator, so strip it before validating the host and optional port.
+    let host_port = match authority.find('@') {
+        None => authority,
+        Some(at) => {
+            if authority[..at].contains(['[', ']']) {
+                return Err(Invalid);
+            }
+            let remainder = &authority[at + 1..];
+            if remainder.contains('@') {
+                return Err(Invalid);
+            }
+            remainder
+        }
+    };
+
+    if host_port.starts_with('[') {
+        let close = host_port.find(']').ok_or(Invalid)?;
+        let literal = &host_port[1..close];
+        literal
+            .parse::<core::net::Ipv6Addr>()
+            .map_err(|_| Invalid)?;
+        let suffix = &host_port[close + 1..];
+        if suffix.is_empty() {
+            return Ok(());
+        }
+        let port = suffix.strip_prefix(':').ok_or(Invalid)?;
+        if !port.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(Invalid);
+        }
+        return Ok(());
+    }
+
+    if host_port.contains(['[', ']']) || host_port.matches(':').count() > 1 {
+        return Err(Invalid);
+    }
+    if let Some(c) = host_port.rfind(':') {
+        let port = &host_port[c + 1..];
+        if !port.bytes().all(|byte| byte.is_ascii_digit()) {
             return Err(Invalid);
         }
     }
@@ -724,4 +865,19 @@ fn validate_scheme(scheme: &str) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod projection_tests {
+    use super::*;
+
+    #[test]
+    fn base64url_decoded_size_projection_is_exact() {
+        for (encoded, decoded) in [(0, 0), (2, 1), (3, 2), (4, 3), (6, 4), (7, 5), (8, 6)] {
+            assert_eq!(projected_base64url_decoded_len(encoded), Ok(decoded));
+        }
+        for invalid in [1, 5, 9] {
+            assert_eq!(projected_base64url_decoded_len(invalid), Err(Invalid));
+        }
+    }
 }

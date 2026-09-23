@@ -4,6 +4,18 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Fixed — role-attestation validation
+
+- Role-attestation signing-input production applies the same caller-tightened parser
+  limits as assembly, decoding, and verification. The Python, Rust, and Go SDKs also
+  enforce the standalone attestation's `anchor_bytes` ceiling.
+- Python rejects ambiguous member names, newline-bearing identifiers, invalid URI
+  literals, malformed Unicode, and unknown bounds through the closed error result.
+  Go and Rust align role-attestation URI validation with the profile's StringOrUri rules.
+- Elixir returns `{:error, :invalid}` for incomplete caller-supplied attestation,
+  signing-input, expected-context, and attestor-key structs. The Python, Rust, and Go
+  SDKs check segment limits before base64 decoding.
+
 ## [0.6.0] — 2026-09-23
 
 The role-attestation release (ADR 0036 Decision 1.8: the first `0.x.0` bearing the

@@ -29,7 +29,7 @@ from dataclasses import dataclass, is_dataclass
 from typing import Any, TypeVar, Union, get_args, get_origin, get_type_hints
 
 from .base64url import base64url_decode, base64url_encode
-from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
+from .bounds import MAXIMA, MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .compact import CompactSegments, SigningInput, assemble_segments, parse_compact
 from .ed25519 import ed25519_verify, import_public_key
 from .error import InvalidError, Ok, Result, err, fail
@@ -49,6 +49,7 @@ from .json_alg import (
     utf8_str,
 )
 from .jwk import jwk_from_public_key, thumbprint_raw
+from .uri import _valid_ipv6_literal
 
 # --- constants (the closed role-attestation profile header/claim literals) ---
 
@@ -59,7 +60,10 @@ VERSION = 1
 # REQ-RA1-CLAIM-role-closed-set: the attested role is exactly one of these two.
 ROLES: tuple[str, ...] = ("issuer", "holder")
 
-_KID_CHARSET = re.compile(r"^[A-Za-z0-9._~-]+$")
+_KID_CHARSET = re.compile(r"[A-Za-z0-9._~-]+")
+_URI_BYTES = re.compile(r"(?:%[0-9A-Fa-f]{2}|[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=])*")
+_SIGNATURE_BYTES = 64
+_SIGNATURE_SEGMENT_BYTES = len(base64url_encode(bytes(_SIGNATURE_BYTES)))
 
 
 def _is_int(value: object) -> bool:
@@ -125,7 +129,7 @@ def _require_kid_value(v: Tagged | None, key: str, ctx: str, bounds: Bounds) -> 
     if not (1 <= len(b) <= bounds_resolve(bounds, "kid_bytes")):
         fail(f"{ctx}: {key} bytes")
     s = utf8_str(b)
-    if _KID_CHARSET.match(s) is None:
+    if _KID_CHARSET.fullmatch(s) is None:
         fail(f"{ctx}: {key} charset")
     return s
 
@@ -134,9 +138,7 @@ def _require_object_exact(v: Tagged, keys: list[str], ctx: str) -> JObject:
     """Validate that ``v`` is a JObject with exactly ``keys`` members; return it narrowed."""
     if not isinstance(v, JObject):
         fail(f"{ctx}: object")
-    got = ",".join(sorted(v.v.keys()))
-    want = ",".join(sorted(keys))
-    if got != want:
+    if set(v.v) != set(keys):
         fail(f"{ctx}: closed members")
     return v
 
@@ -156,20 +158,32 @@ def _is_string_or_uri(s: str) -> bool:
     if colon == -1:
         return True  # bare string: always a StringOrURI
     scheme = s[:colon]
-    if re.match(r"^[A-Za-z][A-Za-z0-9+\-.]*$", scheme) is None:
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9+\-.]*", scheme) is None:
         return False
-    if re.match(r"^(?:%[0-9A-Fa-f]{2}|[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=])*$", s) is None:
+    if _URI_BYTES.fullmatch(s) is None:
+        return False
+    if s.count("#") > 1:
         return False
     rest = s[colon + 1:]
     if not rest.startswith("//"):
-        return True  # opaque / path-rootless: no authority to validate.
-    return _valid_uri_authority(rest[2:].split("/", 1)[0].split("?", 1)[0].split("#", 1)[0])
+        # Elixir URI.new reserves raw brackets for an IP-literal authority host. Percent-encoded
+        # brackets remain ordinary URI bytes, and colon-free plain strings use the branch above.
+        return "[" not in rest and "]" not in rest
+    hierarchical = rest[2:]
+    delimiters = [position for token in "/?#" if (position := hierarchical.find(token)) >= 0]
+    authority_end = min(delimiters, default=len(hierarchical))
+    authority = hierarchical[:authority_end]
+    remainder = hierarchical[authority_end:]
+    if "[" in remainder or "]" in remainder:
+        return False
+    return _valid_uri_authority(authority)
 
 
 def _valid_uri_authority(authority: str) -> bool:
     at = authority.find("@")
+    userinfo = "" if at == -1 else authority[:at]
     hostport = authority if at == -1 else authority[at + 1:]
-    if "@" in hostport:
+    if "@" in hostport or "[" in userinfo or "]" in userinfo:
         return False  # a second @ lands in the host — invalid.
     if hostport.startswith("["):
         close = hostport.find("]")
@@ -178,17 +192,17 @@ def _valid_uri_authority(authority: str) -> bool:
         if not _is_ipv6(hostport[1:close]):
             return False
         suffix = hostport[close + 1:]
-        return suffix == "" or re.match(r"^:\d*$", suffix) is not None
+        return suffix == "" or re.fullmatch(r":\d*", suffix) is not None
     if "[" in hostport or "]" in hostport:
         return False  # stray bracket in host.
     if hostport.count(":") > 1:
         return False  # host/port ambiguity.
     sep = hostport.rfind(":")
-    return sep == -1 or re.match(r"^\d*$", hostport[sep + 1:]) is not None
+    return sep == -1 or re.fullmatch(r"\d*", hostport[sep + 1:]) is not None
 
 
 def _is_ipv6(literal: str) -> bool:
-    return re.match(r"^[0-9A-Fa-f:.]+$", literal) is not None
+    return _valid_ipv6_literal(str_utf8(literal))
 
 
 def _is_well_formed(s: str) -> bool:
@@ -294,6 +308,42 @@ def _trying(fn: Callable[[], _T]) -> Result[_T]:
         return Ok(fn())
     except InvalidError:
         return err()
+
+
+def _coerce_attestation_bounds(bounds: Bounds | None) -> Bounds:
+    """Validate profile-entry bounds, including unknown keys that shared Bounds cannot resolve."""
+    b = bounds if bounds is not None else MAXIMUM_BOUNDS
+    if any(key not in MAXIMA for key in b.overrides):
+        fail("role_attestation: unknown bound")
+    b = coerce_bounds(b)
+    if bounds_resolve(b, "decoded_segment_bytes") < _SIGNATURE_BYTES:
+        fail("role_attestation: signature decoded segment bound")
+    if bounds_resolve(b, "encoded_segment_bytes") < _SIGNATURE_SEGMENT_BYTES:
+        fail("role_attestation: signature encoded segment bound")
+    return b
+
+
+def _project_base64url_decoded_size(encoded_size: int) -> int:
+    """Exact decoded byte count implied by a valid unpadded base64url segment length."""
+    return encoded_size * 3 // 4
+
+
+def _preflight_attestation_compact(compact: bytes, bounds: Bounds) -> None:
+    """Bound all compact segments before shared parsing performs any base64url decode."""
+    if len(compact) > bounds_resolve(bounds, "anchor_bytes"):
+        fail("role_attestation: anchor_bytes")
+    if len(compact) > bounds_resolve(bounds, "compact_bytes"):
+        fail("role_attestation: compact_bytes")
+    segments = compact.split(b".")
+    if len(segments) != 3 or any(len(segment) == 0 for segment in segments):
+        fail("role_attestation: three non-empty segments")
+    encoded_limit = bounds_resolve(bounds, "encoded_segment_bytes")
+    decoded_limit = bounds_resolve(bounds, "decoded_segment_bytes")
+    for segment in segments:
+        if len(segment) > encoded_limit:
+            fail("role_attestation: encoded segment bound")
+        if _project_base64url_decoded_size(len(segment)) > decoded_limit:
+            fail("role_attestation: decoded segment bound")
 
 
 # --- the closed-Result shape gate (ADR 0017 clauses 1-2) ---
@@ -454,21 +504,25 @@ def attestation_signing_input(
 def _attestation_signing_input_body(
     attestation: AttestationProducer, bounds: Bounds | None
 ) -> SigningInput:
-    b = bounds if bounds is not None else MAXIMUM_BOUNDS
+    b = _coerce_attestation_bounds(bounds)
+    if not _is_well_formed(attestation.attestor_key_id):
+        fail("attestation_signing_input: attestor_key_id Unicode")
     kid_bytes = str_utf8(attestation.attestor_key_id)
     if not (1 <= len(kid_bytes) <= bounds_resolve(b, "kid_bytes")):
         fail("attestation_signing_input: attestor_key_id bytes")
-    if _KID_CHARSET.match(attestation.attestor_key_id) is None:
+    if _KID_CHARSET.fullmatch(attestation.attestor_key_id) is None:
         fail("attestation_signing_input: attestor_key_id charset")
     if not _is_string_or_uri(attestation.jti):
         fail("attestation_signing_input: jti")
     jti_bytes = str_utf8(attestation.jti)
     if not (1 <= len(jti_bytes) <= bounds_resolve(b, "identifier_bytes")):
         fail("attestation_signing_input: jti bytes")
+    if not _is_well_formed(attestation.key_id):
+        fail("attestation_signing_input: key_id Unicode")
     subject_kid_bytes = str_utf8(attestation.key_id)
     if not (1 <= len(subject_kid_bytes) <= bounds_resolve(b, "kid_bytes")):
         fail("attestation_signing_input: key_id bytes")
-    if _KID_CHARSET.match(attestation.key_id) is None:
+    if _KID_CHARSET.fullmatch(attestation.key_id) is None:
         fail("attestation_signing_input: key_id charset")
     if len(attestation.public_key) != 32:
         fail("attestation_signing_input: public key width")
@@ -492,10 +546,33 @@ def _attestation_signing_input_body(
         "role": JString(str_utf8(attestation.role)),
         "v": JInt(VERSION),
     }
+    protected_bytes = jcs_encode(JObject(header), b)
+    payload_bytes = jcs_encode(JObject(payload), b)
+    if len(protected_bytes) > bounds_resolve(b, "decoded_segment_bytes") or len(
+        payload_bytes
+    ) > bounds_resolve(b, "decoded_segment_bytes"):
+        fail("attestation_signing_input: decoded segment bound")
+    # Re-parse the exact bytes the producer emits so json_bytes and number_lexeme_bytes constrain
+    # production exactly as they constrain assembly, decode, and verification.
+    json_decode(protected_bytes, b)
+    json_decode(payload_bytes, b)
+    protected_segment = base64url_encode(protected_bytes)
+    payload_segment = base64url_encode(payload_bytes)
+    if len(protected_segment) > bounds_resolve(b, "encoded_segment_bytes") or len(
+        payload_segment
+    ) > bounds_resolve(b, "encoded_segment_bytes"):
+        fail("attestation_signing_input: encoded segment bound")
+    compact_size = (
+        len(protected_segment) + 1 + len(payload_segment) + 1 + _SIGNATURE_SEGMENT_BYTES
+    )
+    if compact_size > bounds_resolve(b, "compact_bytes"):
+        fail("attestation_signing_input: compact_bytes")
+    if compact_size > bounds_resolve(b, "anchor_bytes"):
+        fail("attestation_signing_input: anchor_bytes")
     return SigningInput(
         kind="role_attestation",
-        protected_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(JObject(header), b)))),
-        payload_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(JObject(payload), b)))),
+        protected_segment=protected_segment,
+        payload_segment=payload_segment,
     )
 
 
@@ -507,7 +584,7 @@ def assemble_attestation_compact(
     input_: SigningInput, signature: bytes, bounds: Bounds | None = None
 ) -> Result[bytes]:
     def body() -> bytes:
-        b = coerce_bounds(bounds if bounds is not None else MAXIMUM_BOUNDS)
+        b = _coerce_attestation_bounds(bounds)
         if input_.kind != "role_attestation":
             fail("assemble_attestation_compact: kind")
         if len(input_.protected_segment) > bounds_resolve(b, "encoded_segment_bytes") or len(
@@ -518,8 +595,7 @@ def assemble_attestation_compact(
         if not isinstance(assembled, Ok):
             fail("assemble_attestation_compact: signing input")
         compact = assembled.value
-        if len(compact) > bounds_resolve(b, "compact_bytes"):
-            fail("assemble_attestation_compact: compact_bytes")
+        _preflight_attestation_compact(compact, b)
         # Full attestation re-parse (validate_assembled_compact → decode_attestation: closed sets,
         # member rules, canonical segments, segment + signature width) — the assembler must not
         # mint bytes its own consumer (verify) would reject (REQ-RA1-API-symmetry).
@@ -538,7 +614,8 @@ def decode_attestation(compact: bytes, bounds: Bounds | None = None) -> Result[A
 
 
 def _decode_attestation_body(compact: bytes, bounds: Bounds | None) -> AttestationDecoded:
-    b = bounds if bounds is not None else MAXIMUM_BOUNDS
+    b = _coerce_attestation_bounds(bounds)
+    _preflight_attestation_compact(compact, b)
     seg = parse_compact(compact, b)
     kid = _parse_attestation_header(seg, b)
     p = json_decode(seg.payload_bytes, b)
@@ -571,7 +648,7 @@ def verify_attestation(compact: bytes, expected: ExpectedAttestation) -> Result[
 
 def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> AttestationFacts:
     attestor = expected.attestor
-    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    b = _coerce_attestation_bounds(expected.bounds)
     magnitude = bounds_resolve(b, "integer_magnitude")
     # Fail-closed shallow context checks (a malformed context struct is a closed Invalid, never an
     # AttributeError past the Result contract — mirrors the v1 verify_grant pattern).
@@ -601,6 +678,7 @@ def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> A
     if not _is_int(getattr(expected, "now", None)):
         fail("verify_attestation: integer now")
     # 1. the closed header and payload sets and canonical bytes of §2 (REQ-RA1-VERIFY-closed-sets).
+    _preflight_attestation_compact(compact, b)
     seg = parse_compact(compact, b)
     kid = _parse_attestation_header(seg, b)
     p = json_decode(seg.payload_bytes, b)

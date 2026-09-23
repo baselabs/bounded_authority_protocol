@@ -9,10 +9,309 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 )
 
 const certifiedRoleAttestationIndexSHA256 = "be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a"
+
+func TestRoleAttestationDecodedSizeProjection(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		encoded int
+		decoded int
+		valid   bool
+	}{
+		{2, 1, true},
+		{3, 2, true},
+		{4, 3, true},
+		{32768, 24576, true},
+		{32767, 24575, true},
+		{1, 0, false},
+	} {
+		decoded, valid := roleAttestationDecodedSegmentLength(c.encoded)
+		if decoded != c.decoded || valid != c.valid {
+			t.Errorf("encoded=%d: decoded=%d valid=%t, want decoded=%d valid=%t", c.encoded, decoded, valid, c.decoded, c.valid)
+		}
+	}
+}
+
+func TestRoleAttestationTightenedSizeBounds(t *testing.T) {
+	t.Parallel()
+	root := filepath.Join("..", "..", "priv", "conformance", "attestation-profiles", "role-attestation", "v1")
+	read := func(name string, target any) {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(data, target); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var cases []struct {
+		ID      string `json:"id"`
+		Compact string `json:"compact"`
+	}
+	read("attestation-cases.json", &cases)
+	var compact string
+	for _, c := range cases {
+		if c.ID == "issuer-valid" {
+			compact = c.Compact
+		}
+	}
+	decoded, err := DecodeAttestation(compact, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var profile struct {
+		Attestor struct {
+			KeyID       string `json:"key_id"`
+			PublicKey   string `json:"public_key"`
+			ValidFrom   int64  `json:"valid_from"`
+			ValidBefore int64  `json:"valid_before"`
+		} `json:"attestor"`
+		Now int64 `json:"now"`
+	}
+	read("profile.json", &profile)
+	key, err := Base64urlDecode(profile.Attestor.PublicKey)
+	if err != nil || len(key) != 32 {
+		t.Fatal("invalid corpus attestor key")
+	}
+	expected := ExpectedAttestation{
+		Attestor:     TrustedAttestor{KeyID: profile.Attestor.KeyID, ValidFrom: profile.Attestor.ValidFrom, ValidBefore: profile.Attestor.ValidBefore},
+		SubjectKeyID: decoded.KeyID, SubjectPublicKey: decoded.PublicKey, Now: profile.Now,
+	}
+	copy(expected.Attestor.PublicKey[:], key)
+	producer := Attestation{AttestorKeyID: decoded.AttestorKeyID, Jti: decoded.Jti, KeyID: decoded.KeyID, PublicKey: decoded.PublicKey, Role: decoded.Role, Nbf: decoded.Nbf, Exp: decoded.Exp}
+	si, err := AttestationSigningInput(producer, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	segments := strings.Split(compact, ".")
+	if string(signingInputMessage(si)) != segments[0]+"."+segments[1] {
+		t.Fatal("producer differs from certified signing input")
+	}
+	signature, err := Base64urlDecode(segments[2])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ceiling := range []string{"anchor_bytes", "compact_bytes", "encoded_segment_bytes"} {
+		size := len(compact)
+		if ceiling == "encoded_segment_bytes" {
+			size = max(len(segments[0]), len(segments[1]), len(segments[2]))
+		}
+		for _, limit := range []int{size, size - 1, 1} {
+			t.Run(ceiling+"/"+strconv.Itoa(limit), func(t *testing.T) {
+				bounds, err := BoundsNew(map[string]int{ceiling: limit})
+				if err != nil {
+					t.Fatal(err)
+				}
+				context := expected
+				context.Bounds = &bounds
+				_, produceErr := AttestationSigningInput(producer, &bounds)
+				_, assembleErr := AssembleAttestationCompact(si, signature, &bounds)
+				_, decodeErr := DecodeAttestation(compact, &bounds)
+				_, verifyErr := VerifyAttestation(compact, context)
+				for surface, err := range map[string]error{"produce": produceErr, "assemble": assembleErr, "decode": decodeErr, "verify": verifyErr} {
+					if (err == nil) != (limit == size) {
+						t.Errorf("%s accepted=%t, want=%t", surface, err == nil, limit == size)
+					}
+					if err != nil && err != ErrInvalid {
+						t.Errorf("%s returned nonclosed error: %v", surface, err)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestRoleAttestationTightenedDecoderBounds(t *testing.T) {
+	t.Parallel()
+	root := filepath.Join("..", "..", "priv", "conformance", "attestation-profiles", "role-attestation", "v1")
+	data, err := os.ReadFile(filepath.Join(root, "attestation-cases.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		ID      string `json:"id"`
+		Compact string `json:"compact"`
+	}
+	if err := json.Unmarshal(data, &cases); err != nil {
+		t.Fatal(err)
+	}
+	var compact string
+	for _, c := range cases {
+		if c.ID == "issuer-valid" {
+			compact = c.Compact
+		}
+	}
+	decoded, err := DecodeAttestation(compact, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	producer := Attestation{
+		AttestorKeyID: decoded.AttestorKeyID,
+		Jti:           decoded.Jti,
+		KeyID:         decoded.KeyID,
+		PublicKey:     decoded.PublicKey,
+		Role:          decoded.Role,
+		Nbf:           decoded.Nbf,
+		Exp:           decoded.Exp,
+	}
+	si, err := AttestationSigningInput(producer, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	segments := strings.Split(compact, ".")
+	signature, err := Base64urlDecode(segments[2])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var profile struct {
+		Attestor struct {
+			KeyID       string `json:"key_id"`
+			PublicKey   string `json:"public_key"`
+			ValidFrom   int64  `json:"valid_from"`
+			ValidBefore int64  `json:"valid_before"`
+		} `json:"attestor"`
+		Now int64 `json:"now"`
+	}
+	data, err = os.ReadFile(filepath.Join(root, "profile.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &profile); err != nil {
+		t.Fatal(err)
+	}
+	key, err := Base64urlDecode(profile.Attestor.PublicKey)
+	if err != nil || len(key) != 32 {
+		t.Fatal("invalid corpus attestor key")
+	}
+	expected := ExpectedAttestation{
+		Attestor:     TrustedAttestor{KeyID: profile.Attestor.KeyID, ValidFrom: profile.Attestor.ValidFrom, ValidBefore: profile.Attestor.ValidBefore},
+		SubjectKeyID: decoded.KeyID, SubjectPublicKey: decoded.PublicKey, Now: profile.Now,
+	}
+	copy(expected.Attestor.PublicKey[:], key)
+	for _, c := range []struct {
+		ceiling string
+		size    int
+	}{
+		{"decoded_segment_bytes", max(len(si.Protected), len(si.Payload))},
+		{"json_bytes", max(len(si.Protected), len(si.Payload))},
+		{"number_lexeme_bytes", max(len(strconv.FormatInt(decoded.Nbf, 10)), len(strconv.FormatInt(decoded.Exp, 10)))},
+	} {
+		for _, limit := range []int{c.size, c.size - 1, 1} {
+			t.Run(c.ceiling+"/"+strconv.Itoa(limit), func(t *testing.T) {
+				bounds, err := BoundsNew(map[string]int{c.ceiling: limit})
+				if err != nil {
+					t.Fatal(err)
+				}
+				context := expected
+				context.Bounds = &bounds
+				_, produceErr := AttestationSigningInput(producer, &bounds)
+				_, assembleErr := AssembleAttestationCompact(si, signature, &bounds)
+				_, decodeErr := DecodeAttestation(compact, &bounds)
+				_, verifyErr := VerifyAttestation(compact, context)
+				for surface, err := range map[string]error{"produce": produceErr, "assemble": assembleErr, "decode": decodeErr, "verify": verifyErr} {
+					if (err == nil) != (limit == c.size) {
+						t.Errorf("%s accepted=%t, want=%t", surface, err == nil, limit == c.size)
+					}
+					if err != nil && err != ErrInvalid {
+						t.Errorf("%s returned nonclosed error: %v", surface, err)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestRoleAttestationStringOrURIProfile(t *testing.T) {
+	t.Parallel()
+	attestorPublic, attestorPrivate, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var attestorKey [32]byte
+	copy(attestorKey[:], attestorPublic)
+	subjectPublic, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var subjectKey [32]byte
+	copy(subjectKey[:], subjectPublic)
+	protected := []byte(`{"alg":"EdDSA","kid":"attestor-uri-1","typ":"ba+role-attestation"}`)
+	expected := ExpectedAttestation{
+		Attestor: TrustedAttestor{
+			KeyID:       "attestor-uri-1",
+			PublicKey:   attestorKey,
+			ValidFrom:   1000,
+			ValidBefore: 2000,
+		},
+		SubjectKeyID:     "subject-uri-1",
+		SubjectPublicKey: subjectKey,
+		Now:              1500,
+	}
+	for _, c := range []struct {
+		name string
+		jti  string
+		want bool
+	}{
+		{"opaque URI", "urn:example:attestation:uri-1", true},
+		{"userinfo", "https://user:pass@example.com/path", true},
+		{"multiple userinfo delimiters", "https://a@b@example.com/path", false},
+		{"IPv6 literal and numeric port", "https://[::1]:443/path", true},
+		{"empty port allowed by StringOrUri", "https://example.com:", true},
+		{"out-of-range numeric port allowed by StringOrUri", "https://example.com:65536/path", true},
+		{"file URI with empty authority", "file:///tmp", true},
+		{"empty host with port", "https://:80", true},
+		{"userinfo with empty host", "https://user@", true},
+		{"opaque URI containing slashes", "urn:example://host", true},
+		{"repeated query delimiter", "https://host/?a?b", true},
+		{"colon in path", "https://host/a:b", true},
+		{"percent-encoded brackets", "https://example.com/%5Bbad%5D", true},
+		{"colon-free plain brackets", "plain[bad]", true},
+		{"malformed percent escape", "urn:example:%", false},
+		{"malformed IP literal", "https://[bad]", false},
+		{"alphabetic port", "https://[::1]:abc", false},
+		{"unbalanced bracket", "https://example.com]", false},
+		{"bracket in opaque URI", "urn:example://[bad]", false},
+		{"bracket in path", "https://example.com/[bad]", false},
+		{"bracket in query", "https://example.com/?q=[bad]", false},
+		{"bracket in fragment", "https://example.com/#[bad]", false},
+		{"bracket in userinfo", "https://[user]@example.com", false},
+		{"repeated fragment delimiter", "https://host/#a#b", false},
+		{"repeated opaque fragment delimiter", "urn:a#b#c", false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			attestation := Attestation{
+				AttestorKeyID: "attestor-uri-1",
+				Jti:           c.jti,
+				KeyID:         "subject-uri-1",
+				PublicKey:     subjectKey,
+				Role:          "issuer",
+				Nbf:           1000,
+				Exp:           2000,
+			}
+			_, produceErr := AttestationSigningInput(attestation, nil)
+			payload := []byte(`{"exp":2000,"jti":` + strconv.Quote(c.jti) + `,"key_id":"subject-uri-1","nbf":1000,"public_key":"` + Base64urlEncode(subjectKey[:]) + `","role":"issuer","v":1}`)
+			si := SigningInput{Kind: KindRoleAttestation, Protected: protected, Payload: payload}
+			signature := ed25519.Sign(attestorPrivate, signingInputMessage(si))
+			_, assembleErr := AssembleAttestationCompact(si, signature, nil)
+			compact := Base64urlEncode(protected) + "." + Base64urlEncode(payload) + "." + Base64urlEncode(signature)
+			_, decodeErr := DecodeAttestation(compact, nil)
+			_, verifyErr := VerifyAttestation(compact, expected)
+			for surface, err := range map[string]error{"produce": produceErr, "assemble": assembleErr, "decode": decodeErr, "verify": verifyErr} {
+				if (err == nil) != c.want {
+					t.Errorf("%s accepted=%t, want=%t", surface, err == nil, c.want)
+				}
+				if err != nil && err != ErrInvalid {
+					t.Errorf("%s returned nonclosed error: %v", surface, err)
+				}
+			}
+		})
+	}
+}
 
 func TestCertifiedRoleAttestationCorpusDrivesGoVerdicts(t *testing.T) {
 	t.Parallel()

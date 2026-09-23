@@ -12,6 +12,68 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1Test do
 
   @certified_index_sha256 "be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a"
 
+  describe "closed caller structures" do
+    for field <- V1.RoleAttestation.__struct__() |> Map.from_struct() |> Map.keys() do
+      test "producer rejects missing #{field}" do
+        context = attestation_context()
+
+        assert {:error, :invalid} =
+                 V1.attestation_signing_input(
+                   Map.delete(context.attestation, unquote(field)),
+                   %{}
+                 )
+      end
+    end
+
+    for field <- V1.ExpectedAttestation.__struct__() |> Map.from_struct() |> Map.keys() do
+      test "verification rejects missing expected #{field}" do
+        context = attestation_context()
+
+        assert {:error, :invalid} =
+                 V1.verify_attestation(
+                   context.compact,
+                   Map.delete(context.expected, unquote(field))
+                 )
+      end
+    end
+
+    for field <- HistoricalPublicKey.__struct__() |> Map.from_struct() |> Map.keys() do
+      test "verification rejects missing attestor #{field}" do
+        context = attestation_context()
+        attestor = Map.delete(context.attestor, unquote(field))
+
+        assert {:error, :invalid} =
+                 V1.verify_attestation(context.compact, %{context.expected | attestor: attestor})
+      end
+    end
+
+    for field <- SigningInput.__struct__() |> Map.from_struct() |> Map.keys() do
+      test "assembly rejects missing signing input #{field}" do
+        context = attestation_context()
+        {:ok, input} = V1.attestation_signing_input(context.attestation, %{})
+
+        assert {:error, :invalid} =
+                 V1.assemble_compact(Map.delete(input, unquote(field)), context.signature, %{})
+      end
+    end
+  end
+
+  for ceiling <- [:decoded_segment_bytes, :json_bytes, :number_lexeme_bytes] do
+    test "producer honors parser #{ceiling} bound" do
+      context = attestation_context()
+      {:ok, input} = V1.attestation_signing_input(context.attestation, %{})
+      limits = %{unquote(ceiling) => 1}
+
+      assert {:error, :invalid} = V1.assemble_compact(input, context.signature, limits)
+      assert {:error, :invalid} = V1.decode_attestation(context.compact, limits)
+
+      assert {:error, :invalid} =
+               V1.verify_attestation(context.compact, %{context.expected | bounds: limits})
+
+      assert {:error, :invalid} = V1.attestation_signing_input(context.attestation, limits)
+    end
+  end
+
   describe "attestation_signing_input/2 and assemble_compact/{2,3}" do
     test "produces the exact closed profile bytes" do
       context = attestation_context()

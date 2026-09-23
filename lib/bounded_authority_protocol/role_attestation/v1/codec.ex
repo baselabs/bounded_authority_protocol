@@ -10,6 +10,7 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
   alias BoundedAuthorityProtocol.V1.CompactJws
   alias BoundedAuthorityProtocol.V1.ContextValidation
   alias BoundedAuthorityProtocol.V1.FixedBytes
+  alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
   alias BoundedAuthorityProtocol.V1.Jcs
   alias BoundedAuthorityProtocol.V1.Json
   alias BoundedAuthorityProtocol.V1.Jwk
@@ -24,11 +25,26 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
 
   @spec signing_input(RoleAttestation.t(), Bounds.t() | map()) ::
           {:ok, SigningInput.t()} | {:error, :invalid}
-  def signing_input(%RoleAttestation{} = attestation, limits) do
+  def signing_input(
+        %RoleAttestation{
+          attestor_key_id: _,
+          jti: _,
+          key_id: _,
+          public_key: _,
+          role: _,
+          nbf: _,
+          exp: _
+        } = attestation,
+        limits
+      ) do
     with {:ok, bounds} <- Bounds.coerce(limits),
          :ok <- validate_attestation(attestation, bounds),
          {:ok, protected} <- Jcs.encode(header_json(attestation.attestor_key_id), bounds),
-         {:ok, payload} <- Jcs.encode(payload_json(attestation), bounds) do
+         {:ok, payload} <- Jcs.encode(payload_json(attestation), bounds),
+         true <- byte_size(protected) <= bounds.decoded_segment_bytes,
+         true <- byte_size(payload) <= bounds.decoded_segment_bytes,
+         {:ok, _header} <- Json.decode(protected, bounds),
+         {:ok, _claims} <- Json.decode(payload, bounds) do
       build_signing_input(protected, payload, bounds)
     else
       _failure -> {:error, :invalid}
@@ -39,7 +55,16 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
 
   @spec assemble(SigningInput.t(), binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
-  def assemble(%SigningInput{kind: :role_attestation} = signing_input, signature, limits) do
+  def assemble(
+        %SigningInput{
+          kind: :role_attestation,
+          protected_segment: _,
+          payload_segment: _,
+          message: _
+        } = signing_input,
+        signature,
+        limits
+      ) do
     with {:ok, compact} <- CompactJws.assemble(signing_input, signature, limits),
          {:ok, bounds} <- Bounds.coerce(limits),
          {:ok, _parsed} <- parse(compact, bounds) do
@@ -77,7 +102,17 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
 
   @spec verify(binary(), ExpectedAttestation.t()) ::
           {:ok, AttestationFacts.t()} | {:error, :invalid}
-  def verify(compact, %ExpectedAttestation{} = expected) when is_binary(compact) do
+  def verify(
+        compact,
+        %ExpectedAttestation{
+          attestor: _,
+          subject_key_id: _,
+          subject_public_key: _,
+          now: _,
+          bounds: _
+        } = expected
+      )
+      when is_binary(compact) do
     attestor = expected.attestor
 
     with {:ok, bounds} <- Bounds.coerce(expected.bounds),
@@ -211,7 +246,13 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
     end
   end
 
-  defp validate_historical_key(key, bounds), do: ContextValidation.historical_key(key, bounds)
+  defp validate_historical_key(
+         %HistoricalPublicKey{key_id: _, public_key: _, valid_from: _, valid_before: _} = key,
+         bounds
+       ),
+       do: ContextValidation.historical_key(key, bounds)
+
+  defp validate_historical_key(_key, _bounds), do: {:error, :invalid}
 
   defp validate_subject(key_id, public_key, bounds) do
     if valid_key_id?(key_id, bounds) and valid_public_key?(public_key, bounds) do

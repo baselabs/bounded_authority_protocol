@@ -73,6 +73,223 @@ fn base_expected() -> (ExpectedAttestation, [u8; 32]) {
 }
 
 #[test]
+fn tightened_size_bounds_cover_every_attestation_surface() {
+    use bounded_authority_protocol::json::JsonValue;
+
+    let cases = read_json("attestation-cases.json");
+    let compact = cases
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["id"] == "issuer-valid")
+        .unwrap()["compact"]
+        .as_str()
+        .unwrap()
+        .as_bytes();
+    let segments: Vec<&[u8]> = compact.split(|byte| *byte == b'.').collect();
+    let claims: Value = serde_json::from_slice(&base64url_decode(segments[1]).unwrap()).unwrap();
+    let (mut expected, public_key) = base_expected();
+    let producer = AttestationInput {
+        attestor_key_id: expected.attestor.key_id.clone(),
+        jti: claims["jti"].as_str().unwrap().to_string(),
+        key_id: expected.subject_key_id.clone(),
+        public_key,
+        role: Role::Issuer,
+        nbf: claims["nbf"].as_i64().unwrap(),
+        exp: claims["exp"].as_i64().unwrap(),
+    };
+    let signing_input = SigningInput {
+        kind: SigningKind::RoleAttestation,
+        protected_segment: segments[0].to_vec(),
+        payload_segment: segments[1].to_vec(),
+    };
+    let signature: [u8; 64] = base64url_decode(segments[2]).unwrap().try_into().unwrap();
+    let produced = attestation_signing_input(&producer, &Bounds::maximum()).unwrap();
+    assert_eq!(produced.protected_segment, segments[0]);
+    assert_eq!(produced.payload_segment, segments[1]);
+    let mut failures = Vec::new();
+    let decoded_segments = [
+        base64url_decode(segments[0]).unwrap(),
+        base64url_decode(segments[1]).unwrap(),
+    ];
+    let largest_decoded_segment = decoded_segments.iter().map(Vec::len).max().unwrap();
+    let largest_number_lexeme = ["exp", "nbf", "v"]
+        .iter()
+        .map(|name| claims[name].as_i64().unwrap().to_string().len())
+        .max()
+        .unwrap();
+    for (ceiling, size) in [
+        ("anchor_bytes", compact.len()),
+        ("compact_bytes", compact.len()),
+        (
+            "encoded_segment_bytes",
+            segments.iter().map(|segment| segment.len()).max().unwrap(),
+        ),
+        ("decoded_segment_bytes", largest_decoded_segment),
+        ("json_bytes", largest_decoded_segment),
+        ("number_lexeme_bytes", largest_number_lexeme),
+    ] {
+        for (limit, accepted) in [(size, true), (size - 1, false), (1, false)] {
+            let bounds = Bounds::new(Some(&JsonValue::Object(vec![(
+                ceiling.to_string(),
+                JsonValue::Int(limit as i64),
+            )])))
+            .unwrap();
+            expected.bounds = bounds;
+            for (surface, actual) in [
+                (
+                    "produce",
+                    attestation_signing_input(&producer, &bounds).is_ok(),
+                ),
+                (
+                    "assemble",
+                    assemble_attestation_compact(&signing_input, &signature, Some(&bounds)).is_ok(),
+                ),
+                ("decode", decode_attestation(compact, &bounds).is_ok()),
+                ("verify", verify_attestation(compact, &expected).is_ok()),
+            ] {
+                if actual != accepted {
+                    failures.push(format!(
+                        "{surface} {ceiling}={limit}: accepted={actual}, want={accepted}"
+                    ));
+                }
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn string_or_uri_rules_are_symmetric_across_every_attestation_surface() {
+    let profile = read_json("profile.json");
+    let bounds = Bounds::maximum();
+    let subject_public_key = to_arr_32(
+        base64url_decode(
+            profile["subject"]["public_key"]
+                .as_str()
+                .unwrap()
+                .as_bytes(),
+        )
+        .unwrap(),
+    );
+    let signing_key = SigningKey::from_bytes(&[0x5A; 32]);
+    let attestor_public_key = signing_key.verifying_key().to_bytes();
+    let attestor_key_id = profile["attestor"]["key_id"].as_str().unwrap();
+    let subject_key_id = profile["subject"]["key_id"].as_str().unwrap();
+    let subject_x = profile["subject"]["public_key"].as_str().unwrap();
+    let expected = ExpectedAttestation {
+        attestor: HistoricalPublicKey {
+            key_id: attestor_key_id.to_string(),
+            public_key: attestor_public_key,
+            valid_from: profile["attestor"]["valid_from"].as_i64().unwrap(),
+            valid_before: ValidityUpperBound::Bounded(
+                profile["attestor"]["valid_before"].as_i64().unwrap(),
+            ),
+        },
+        subject_key_id: subject_key_id.to_string(),
+        subject_public_key,
+        now: profile["now"].as_i64().unwrap(),
+        bounds,
+    };
+
+    let mut failures = Vec::new();
+    for (label, jti, accepted) in [
+        ("userinfo", "https://user:pass@example.com", true),
+        ("empty authority", "file:///tmp", true),
+        ("empty host with port", "https://:80", true),
+        ("empty host after userinfo", "https://user@", true),
+        (
+            "opaque later slash pair with colon",
+            "urn:example://foo:abc",
+            true,
+        ),
+        ("IPv6 with numeric port", "https://[::1]:443", true),
+        ("malformed IPv6", "https://[bad]", false),
+        ("IPv6 with nonnumeric port", "https://[::1]:abc", false),
+        ("unterminated IPv6", "https://[::1", false),
+        ("stray closing bracket", "https://example.com]", false),
+        (
+            "bracket in userinfo",
+            "https://user[bad]@example.com",
+            false,
+        ),
+        (
+            "bracket in authority path",
+            "https://user:pass@example.com/[bad]",
+            false,
+        ),
+        ("bracket in query", "https://example.com/path?[bad]", false),
+        (
+            "bracket in fragment",
+            "https://example.com/path#[bad]",
+            false,
+        ),
+        (
+            "percent-encoded brackets",
+            "https://example.com/%5Bbad%5D",
+            true,
+        ),
+        ("plain brackets", "plain[bad]", true),
+        ("multiple fragment delimiters", "https://host/#a#b", false),
+        ("opaque multiple fragments", "urn:a#b#c", false),
+        ("multiple query delimiters", "https://host/?a?b", true),
+        ("opaque malformed percent escape", "urn:example:%", false),
+        ("opaque percent escape", "urn:example:%20", true),
+    ] {
+        let input = AttestationInput {
+            attestor_key_id: attestor_key_id.to_string(),
+            jti: jti.to_string(),
+            key_id: subject_key_id.to_string(),
+            public_key: subject_public_key,
+            role: Role::Issuer,
+            nbf: 1735689600,
+            exp: 1735693200,
+        };
+        let header = format!(
+            "{{\"alg\":\"EdDSA\",\"kid\":\"{attestor_key_id}\",\"typ\":\"ba+role-attestation\"}}"
+        );
+        let payload = format!(
+            "{{\"exp\":1735693200,\"jti\":\"{jti}\",\"key_id\":\"{subject_key_id}\",\
+             \"nbf\":1735689600,\"public_key\":\"{subject_x}\",\"role\":\"issuer\",\"v\":1}}"
+        );
+        let protected_segment = base64url_encode(header.as_bytes());
+        let payload_segment = base64url_encode(payload.as_bytes());
+        let mut message = protected_segment.clone();
+        message.push(b'.');
+        message.extend_from_slice(&payload_segment);
+        let signature = signing_key.sign(&message).to_bytes();
+        let signing_input = SigningInput {
+            kind: SigningKind::RoleAttestation,
+            protected_segment,
+            payload_segment,
+        };
+        let mut compact = message;
+        compact.push(b'.');
+        compact.extend_from_slice(&base64url_encode(&signature));
+
+        for (surface, actual) in [
+            (
+                "produce",
+                attestation_signing_input(&input, &bounds).is_ok(),
+            ),
+            (
+                "assemble",
+                assemble_attestation_compact(&signing_input, &signature, Some(&bounds)).is_ok(),
+            ),
+            ("decode", decode_attestation(&compact, &bounds).is_ok()),
+            ("verify", verify_attestation(&compact, &expected).is_ok()),
+        ] {
+            if actual != accepted {
+                failures.push(format!(
+                    "{label} {surface}: accepted={actual}, want={accepted}"
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
 fn certified_role_attestation_corpus_drives_rust_verdicts() {
     let root = corpus_root();
     let read_file = |name: &str| fs::read(root.join(name)).unwrap();

@@ -1,5 +1,10 @@
 package verifier
 
+import (
+	"strings"
+	"unicode/utf8"
+)
+
 // The standalone role-attestation sibling profile `bap-role-attestation/1`
 // (spec/bap-role-attestation-v1.md, ADR 0036): a compact JWS in which an
 // attestor key binds a subject key to a role for a bounded window. It
@@ -105,6 +110,163 @@ type attestationClaimsData struct {
 	Exp       int64
 }
 
+// validRoleAttestationStringOrURI applies the settled BAP1 StringOrUri rules
+// without changing the legacy contract-major helper. Plain strings are valid
+// when nonempty and bounded. A colon-bearing value must have a valid scheme,
+// valid URI punctuation and percent escapes. Hierarchical authority syntax
+// closes malformed IP literals, brackets, and alphabetic ports while
+// retaining valid userinfo and the generic StringOrUri port forms.
+func validRoleAttestationStringOrURI(s string, byteCeiling int) bool {
+	if len(s) == 0 || len(s) > byteCeiling || !utf8.ValidString(s) {
+		return false
+	}
+	colon := strings.IndexByte(s, ':')
+	if colon < 0 {
+		return true
+	}
+	if !validScheme(s[:colon]) || !validRoleAttestationURIBytes(s) {
+		return false
+	}
+	rest := s[colon+1:]
+	if strings.Count(rest, "#") > 1 {
+		return false
+	}
+	if strings.HasPrefix(rest, "//") {
+		authority := rest[2:]
+		tail := ""
+		if end := strings.IndexAny(authority, "/?#"); end >= 0 {
+			tail = authority[end:]
+			authority = authority[:end]
+		}
+		return !strings.ContainsAny(tail, "[]") && validRoleAttestationAuthority(authority)
+	}
+	return !strings.ContainsAny(rest, "[]")
+}
+
+func validRoleAttestationAuthority(authority string) bool {
+	if strings.Count(authority, "@") > 1 {
+		return false
+	}
+	if at := strings.LastIndexByte(authority, '@'); at >= 0 {
+		if strings.ContainsAny(authority[:at], "[]") {
+			return false
+		}
+		authority = authority[at+1:]
+	}
+	if strings.HasPrefix(authority, "[") {
+		close := strings.IndexByte(authority, ']')
+		if close < 0 || strings.ContainsAny(authority[close+1:], "[]") {
+			return false
+		}
+		if _, err := normalizeIPv6(authority[1:close]); err != nil {
+			return false
+		}
+		suffix := authority[close+1:]
+		if suffix == "" {
+			return true
+		}
+		if !strings.HasPrefix(suffix, ":") {
+			return false
+		}
+		return decimalPortOrEmpty(suffix[1:])
+	}
+	if strings.ContainsAny(authority, "[]") || strings.Count(authority, ":") > 1 {
+		return false
+	}
+	if colon := strings.LastIndexByte(authority, ':'); colon >= 0 {
+		return decimalPortOrEmpty(authority[colon+1:])
+	}
+	return true
+}
+
+func decimalPortOrEmpty(port string) bool {
+	for i := 0; i < len(port); i++ {
+		if port[i] < '0' || port[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func validRoleAttestationURIBytes(s string) bool {
+	const punctuation = "-._~:/?#[]@!$&'()*+,;="
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9':
+		case c == '%':
+			if i+2 >= len(s) || !isHexDigit(s[i+1]) || !isHexDigit(s[i+2]) {
+				return false
+			}
+			i += 2
+		case strings.IndexByte(punctuation, c) >= 0:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func isHexDigit(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'A' && c <= 'F' || c >= 'a' && c <= 'f'
+}
+
+func splitRoleAttestationCompact(compact string, b Bounds) (compactParts, error) {
+	if len(compact) == 0 || len(compact) > b.AnchorBytes {
+		return compactParts{}, ErrInvalid
+	}
+	if err := scanCompact(compact, b); err != nil {
+		return compactParts{}, ErrInvalid
+	}
+	first := strings.IndexByte(compact, '.')
+	last := strings.LastIndexByte(compact, '.')
+	for _, encodedBytes := range []int{first, last - first - 1, len(compact) - last - 1} {
+		decodedBytes, valid := roleAttestationDecodedSegmentLength(encodedBytes)
+		if !valid || decodedBytes > b.DecodedSegmentBytes {
+			return compactParts{}, ErrInvalid
+		}
+	}
+	return splitCompact(compact, b)
+}
+
+func roleAttestationDecodedSegmentLength(encodedBytes int) (int, bool) {
+	if encodedBytes < 0 || encodedBytes%4 == 1 {
+		return 0, false
+	}
+	decodedBytes := encodedBytes / 4 * 3
+	switch encodedBytes % 4 {
+	case 2:
+		decodedBytes++
+	case 3:
+		decodedBytes += 2
+	}
+	return decodedBytes, true
+}
+
+func validateProducedAttestation(protected, payload []byte, b Bounds) error {
+	if len(protected) > b.DecodedSegmentBytes || len(payload) > b.DecodedSegmentBytes || b.SignatureBytes > b.DecodedSegmentBytes {
+		return ErrInvalid
+	}
+	parts := compactParts{Protected: protected, Payload: payload}
+	if _, err := decodeAttestationHeader(parts, b); err != nil {
+		return ErrInvalid
+	}
+	if _, err := decodeAttestationPayload(parts, b); err != nil {
+		return ErrInvalid
+	}
+	protectedSeg := Base64urlEncode(protected)
+	payloadSeg := Base64urlEncode(payload)
+	signatureSeg := Base64urlEncode(make([]byte, b.SignatureBytes))
+	if len(protectedSeg) > b.EncodedSegmentBytes || len(payloadSeg) > b.EncodedSegmentBytes || len(signatureSeg) > b.EncodedSegmentBytes {
+		return ErrInvalid
+	}
+	compactBytes := len(protectedSeg) + len(payloadSeg) + len(signatureSeg) + 2
+	if compactBytes > b.CompactBytes || compactBytes > b.AnchorBytes {
+		return ErrInvalid
+	}
+	return nil
+}
+
 // decodeAttestationHeader validates the exact protected header
 // {alg:"EdDSA", kid, typ:"ba+role-attestation"} — every unlisted member or
 // value is invalid — and its canonical bytes, returning the attestor kid
@@ -207,7 +369,7 @@ func decodeAttestationPayload(p compactParts, b Bounds) (attestationClaimsData, 
 			return out, ErrInvalid // unlisted claim
 		}
 	}
-	if !validStringOrURI(out.Jti, b.IdentifierBytes) {
+	if !validRoleAttestationStringOrURI(out.Jti, b.IdentifierBytes) {
 		return out, ErrInvalid // REQ-RA1-CLAIM-jti
 	}
 	if !validKid(out.KeyID, b.KidBytes) {
@@ -234,7 +396,7 @@ func AttestationSigningInput(a Attestation, bounds *Bounds) (si SigningInput, er
 	if !validKid(a.AttestorKeyID, b.KidBytes) || !validKid(a.KeyID, b.KidBytes) {
 		return SigningInput{}, ErrInvalid // header kid / REQ-RA1-CLAIM-key-id rules
 	}
-	if !validStringOrURI(a.Jti, b.IdentifierBytes) {
+	if !validRoleAttestationStringOrURI(a.Jti, b.IdentifierBytes) {
 		return SigningInput{}, ErrInvalid // REQ-RA1-CLAIM-jti
 	}
 	if a.Role != "issuer" && a.Role != "holder" {
@@ -261,6 +423,9 @@ func AttestationSigningInput(a Attestation, bounds *Bounds) (si SigningInput, er
 		{Key: "v", Val: Int(1)},
 	}, &b)
 	if err != nil {
+		return SigningInput{}, ErrInvalid
+	}
+	if err := validateProducedAttestation(protected, payload, b); err != nil {
 		return SigningInput{}, ErrInvalid
 	}
 	return SigningInput{Kind: KindRoleAttestation, Protected: protected, Payload: payload}, nil
@@ -291,10 +456,10 @@ func AssembleAttestationCompact(si SigningInput, signature []byte, bounds *Bound
 		return "", ErrInvalid
 	}
 	compact = protectedSeg + "." + payloadSeg + "." + Base64urlEncode(signature)
-	if len(compact) > b.CompactBytes {
+	if len(compact) > b.CompactBytes || len(compact) > b.AnchorBytes {
 		return "", ErrInvalid
 	}
-	parts, err := splitCompact(compact, b)
+	parts, err := splitRoleAttestationCompact(compact, b)
 	if err != nil {
 		return "", ErrInvalid
 	}
@@ -316,7 +481,7 @@ func DecodeAttestation(compact string, bounds *Bounds) (d AttestationDecoded, er
 	if err != nil {
 		return AttestationDecoded{}, ErrInvalid
 	}
-	parts, err := splitCompact(compact, b)
+	parts, err := splitRoleAttestationCompact(compact, b)
 	if err != nil {
 		return AttestationDecoded{}, ErrInvalid
 	}
@@ -374,7 +539,7 @@ func VerifyAttestation(compact string, expected ExpectedAttestation) (f Attestat
 		(expected.Attestor.ValidBefore > int64(b.IntegerMagnitude) || expected.Attestor.ValidBefore < -int64(b.IntegerMagnitude)) {
 		return AttestationFacts{}, ErrInvalid
 	}
-	parts, err := splitCompact(compact, b)
+	parts, err := splitRoleAttestationCompact(compact, b)
 	if err != nil {
 		return AttestationFacts{}, ErrInvalid
 	}

@@ -4,6 +4,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -22,6 +23,9 @@ from bounded_authority_verifier import (
     public_key_thumbprint_raw,
     verify_attestation,
 )
+from bounded_authority_verifier import role_attestation as role_attestation_module
+from bounded_authority_verifier.bounds import Bounds, bounds_new
+from bounded_authority_verifier.error import InvalidError
 
 _CERTIFIED_INDEX_SHA256 = "be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a"
 
@@ -30,6 +34,82 @@ _CERTIFIED_INDEX_SHA256 = "be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0
 # reviewed, not silently applied.
 _SINGLE_OVERRIDES = {"now", "subject_public_key", "subject_key_id", "attestor_public_key"}
 _PAIR_OVERRIDE = {"subject_key_id", "subject_public_key"}
+
+
+@pytest.mark.parametrize("surface", ["produce", "assemble", "decode", "verify"])
+@pytest.mark.parametrize(
+    "ceiling",
+    [
+        "anchor_bytes",
+        "compact_bytes",
+        "encoded_segment_bytes",
+        "decoded_segment_bytes",
+        "json_bytes",
+        "number_lexeme_bytes",
+    ],
+)
+def test_attestation_tightened_size_bounds(surface: str, ceiling: str) -> None:
+    root = _corpus_root()
+    profile = json.loads((root / "profile.json").read_text())
+    case = next(
+        case for case in json.loads((root / "attestation-cases.json").read_text())
+        if case["id"] == "issuer-valid"
+    )
+    compact = case["compact"].encode()
+    protected, payload, signature = compact.split(b".")
+    claims = json.loads(_b64url(payload.decode()))
+    producer = AttestationProducer(
+        attestor_key_id=profile["attestor"]["key_id"],
+        jti=claims["jti"],
+        key_id=claims["key_id"],
+        public_key=_b64url(claims["public_key"]),
+        role=claims["role"],
+        nbf=claims["nbf"],
+        exp=claims["exp"],
+    )
+    expected = ExpectedAttestation(
+        attestor=TrustedAttestor(
+            key_id=profile["attestor"]["key_id"],
+            public_key=_b64url(profile["attestor"]["public_key"]),
+            valid_from=profile["attestor"]["valid_from"],
+            valid_before=profile["attestor"]["valid_before"],
+        ),
+        subject_key_id=claims["key_id"],
+        subject_public_key=producer.public_key,
+        now=profile["now"],
+    )
+    signing_input = attestation_signing_input(producer).value
+    assert _signing_message(signing_input) == protected + b"." + payload
+    if ceiling in ("anchor_bytes", "compact_bytes"):
+        size = len(compact)
+    elif ceiling == "encoded_segment_bytes":
+        size = max(map(len, (protected, payload, signature)))
+    elif ceiling == "decoded_segment_bytes":
+        size = max(
+            map(
+                len,
+                (
+                    _b64url(protected.decode()),
+                    _b64url(payload.decode()),
+                    _b64url(signature.decode()),
+                ),
+            )
+        )
+    elif ceiling == "json_bytes":
+        size = max(map(len, (_b64url(protected.decode()), _b64url(payload.decode()))))
+    else:
+        size = max(len(str(claims[key])) for key in ("v", "nbf", "exp"))
+    for limit, accepted in ((size, True), (size - 1, False), (1, False)):
+        bounds = bounds_new({ceiling: limit})
+        if surface == "produce":
+            result = attestation_signing_input(producer, bounds)
+        elif surface == "assemble":
+            result = assemble_attestation_compact(signing_input, _b64url(signature.decode()), bounds)
+        elif surface == "decode":
+            result = decode_attestation(compact, bounds)
+        else:
+            result = verify_attestation(compact, replace(expected, bounds=bounds))
+        assert result.is_ok == accepted, (surface, ceiling, limit)
 
 
 def _corpus_root() -> Path:
@@ -53,6 +133,64 @@ def _keypair() -> tuple[bytes, Ed25519PrivateKey]:
 
 def _signing_message(signing_input: SigningInput) -> bytes:
     return signing_input.protected_segment + b"." + signing_input.payload_segment
+
+
+def _signed_attestation(
+    *,
+    attestor_key_id: str = "attestor-1",
+    jti: str = "urn:example:attestation:ra-1",
+    subject_key_id: str = "subject-1",
+    payload_overrides: dict[str, object] | None = None,
+    payload_remove: tuple[str, ...] = (),
+) -> tuple[AttestationProducer, SigningInput, bytes, bytes, ExpectedAttestation]:
+    subject_public, _ = _keypair()
+    attestor_public, attestor_private = _keypair()
+    producer = AttestationProducer(
+        attestor_key_id=attestor_key_id,
+        jti=jti,
+        key_id=subject_key_id,
+        public_key=subject_public,
+        role="issuer",
+        nbf=1000,
+        exp=2000,
+    )
+    header = {"alg": "EdDSA", "kid": attestor_key_id, "typ": "ba+role-attestation"}
+    payload: dict[str, object] = {
+        "exp": 2000,
+        "jti": jti,
+        "key_id": subject_key_id,
+        "nbf": 1000,
+        "public_key": base64url_encode(subject_public).decode(),
+        "role": "issuer",
+        "v": 1,
+    }
+    for key in payload_remove:
+        del payload[key]
+    if payload_overrides is not None:
+        payload.update(payload_overrides)
+    signing_input = SigningInput(
+        kind="role_attestation",
+        protected_segment=base64url_encode(
+            json.dumps(header, separators=(",", ":"), sort_keys=True).encode()
+        ),
+        payload_segment=base64url_encode(
+            json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+        ),
+    )
+    signature = attestor_private.sign(_signing_message(signing_input))
+    compact = _signing_message(signing_input) + b"." + base64url_encode(signature)
+    expected = ExpectedAttestation(
+        attestor=TrustedAttestor(
+            key_id=attestor_key_id,
+            public_key=attestor_public,
+            valid_from=1000,
+            valid_before=2000,
+        ),
+        subject_key_id=subject_key_id,
+        subject_public_key=subject_public,
+        now=1500,
+    )
+    return producer, signing_input, signature, compact, expected
 
 
 def _apply_overrides(
@@ -297,6 +435,133 @@ def test_attestation_assembly_revalidates() -> None:
         ),
         signature,
     ).is_ok
+
+
+def test_attestation_payload_member_set_rejects_comma_join_collision() -> None:
+    _, signing_input, signature, compact, expected = _signed_attestation(
+        payload_overrides={"role,v": "issuer"},
+        payload_remove=("role", "v"),
+    )
+
+    assert not assemble_attestation_compact(signing_input, signature).is_ok
+    assert not decode_attestation(compact).is_ok
+    assert not verify_attestation(compact, expected).is_ok
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("attestor_key_id", "attestor-1\n"),
+        ("key_id", "subject-1\n"),
+        ("jti", "urn:example:attestation:ra-1\n"),
+    ],
+)
+def test_attestation_identifiers_reject_trailing_newline(field: str, value: str) -> None:
+    kwargs = {
+        "attestor_key_id": "attestor-1",
+        "jti": "urn:example:attestation:ra-1",
+        "subject_key_id": "subject-1",
+    }
+    kwargs["subject_key_id" if field == "key_id" else field] = value
+    producer, _, _, compact, expected = _signed_attestation(**kwargs)
+
+    assert not attestation_signing_input(producer).is_ok
+    assert not decode_attestation(compact).is_ok
+    assert not verify_attestation(compact, expected).is_ok
+
+
+@pytest.mark.parametrize(
+    "jti",
+    [
+        "https://[bad]",
+        "https://[::1]:abc",
+        "https://[::1",
+        "https://[1::2::3]",
+        "urn:example:%",
+        "urn:example://[bad]",
+        "https://example.com/[bad]",
+        "https://example.com/?q=[bad]",
+        "https://example.com/#[bad]",
+        "https://[user]@example.com",
+        "https://host/#a#b",
+        "urn:a#b#c",
+    ],
+)
+def test_attestation_jti_rejects_malformed_uri(jti: str) -> None:
+    producer, _, _, compact, expected = _signed_attestation(jti=jti)
+
+    assert not attestation_signing_input(producer).is_ok
+    assert not decode_attestation(compact).is_ok
+    assert not verify_attestation(compact, expected).is_ok
+
+
+@pytest.mark.parametrize(
+    "jti",
+    [
+        "https://user:pass@example.com",
+        "file:///tmp",
+        "https://:80",
+        "https://user@",
+        "urn:example://host",
+        "https://host/?a?b",
+        "https://host/a:b",
+        "https://example.com/%5Bbad%5D",
+        "plain[bad]",
+    ],
+)
+def test_attestation_jti_accepts_reference_uri(jti: str) -> None:
+    producer, signing_input, signature, compact, expected = _signed_attestation(jti=jti)
+
+    produced = attestation_signing_input(producer)
+    assert produced.is_ok
+    assert produced.value == signing_input
+    assembled = assemble_attestation_compact(produced.value, signature)
+    assert assembled.is_ok
+    assert assembled.value == compact
+    assert decode_attestation(compact).is_ok
+    assert verify_attestation(compact, expected).is_ok
+
+
+@pytest.mark.parametrize("field", ["attestor_key_id", "jti", "key_id"])
+def test_attestation_producer_rejects_unicode_surrogate(field: str) -> None:
+    producer, _, _, _, _ = _signed_attestation()
+    assert not attestation_signing_input(replace(producer, **{field: "\ud800"})).is_ok
+
+
+def test_attestation_unknown_bound_fails_closed_across_all_surfaces() -> None:
+    producer, signing_input, signature, compact, expected = _signed_attestation()
+    malformed_bounds = Bounds({"unknown": 1})
+
+    assert not attestation_signing_input(producer, malformed_bounds).is_ok
+    assert not assemble_attestation_compact(signing_input, signature, malformed_bounds).is_ok
+    assert not decode_attestation(compact, malformed_bounds).is_ok
+    assert not verify_attestation(
+        compact, replace(expected, bounds=malformed_bounds)
+    ).is_ok
+
+
+def test_attestation_base64url_decoded_size_projection() -> None:
+    projection = role_attestation_module._project_base64url_decoded_size
+    assert [(size, projection(size)) for size in (0, 2, 3, 4, 86, 268)] == [
+        (0, 0),
+        (2, 1),
+        (3, 2),
+        (4, 3),
+        (86, 64),
+        (268, 201),
+    ]
+
+
+def test_attestation_preflights_overlong_signature_before_decode() -> None:
+    _, _, _, compact, expected = _signed_attestation()
+    protected, payload, _signature = compact.split(b".")
+    hostile = protected + b"." + payload + b"." + base64url_encode(bytes(201))
+    bounds = bounds_new({"decoded_segment_bytes": 200})
+
+    with pytest.raises(InvalidError):
+        role_attestation_module._preflight_attestation_compact(hostile, bounds)
+    assert not decode_attestation(hostile, bounds).is_ok
+    assert not verify_attestation(hostile, replace(expected, bounds=bounds)).is_ok
 
 
 def test_attestation_verify_bounds_attestor_window_magnitudes() -> None:
