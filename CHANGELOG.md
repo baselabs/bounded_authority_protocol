@@ -4,6 +4,14 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-09-23
+
+The role-attestation release (ADR 0036 Decision 1.8: the first `0.x.0` bearing the
+`bap-role-attestation/1` profile). Additive public surface — the
+`BoundedAuthorityProtocol.RoleAttestation.V1` namespace and the certified profile corpus —
+with zero verdict changes on existing input; also carries the v1/v2 closed-error-shape fix
+found by the profile corpus's ES256 confusion case.
+
 ### Added — the role-attestation sibling profile `bap-role-attestation/1` (ADR 0036; the BARA RA11 prerequisite)
 
 - `BoundedAuthorityProtocol.RoleAttestation.V1` — the protocol's first sibling attestation

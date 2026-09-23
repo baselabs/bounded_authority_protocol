@@ -23,29 +23,32 @@ cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for
 
 ## Installation
 
-The package is published on Hex (release 0.5.1, published 2026-09-22; the registry checksum is
+The package is published on Hex (release 0.6.0, published 2026-09-23; the registry checksum is
 read back against the tagged-tree build in the post-publish docs-currency commit). Registry
 consumers use the minor-bounded requirement:
 
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.5.1"}
+    {:bounded_authority_protocol, "~> 0.6.0"}
   ]
 end
 ```
 
 The package has **zero production dependencies**, no application callback, and no supervision tree.
-`v0.5.1` is a docs-maintenance patch over `v0.5.0`, which identified the reviewable source
-release for the ES256 contract-major 3 activation
-(`BoundedAuthorityProtocol.V3`, [ADR 0035](docs/adr/0035-es256-contract-major-activation.md)) and
-ships the spec-facts v2/v3 extraction baselines in the package; `v0.4.0` identified the v2
-activation; `v0.4.1` was the toolchain-and-platforms release (ADR 0031/0032); `v0.4.2` was a
-documentation-truth patch. The immutable package identity is the published Hex release (registry checksum
-`60a8cd6e361938c5adfde1afcbbdc12426787a3d46b46c3437ef2d68a5808af0`, read back from the
-registry against the tagged-tree build and pinned by a fresh `~> 0.5.1` consumer), not the
-Git tag. Depend on
-the package identity — never a tag or a mutable checkout.
+`v0.6.0` is the role-attestation release — the first release bearing the
+`bap-role-attestation/1` sibling profile
+([ADR 0036](docs/adr/0036-role-attestation-profile.md)): the
+`BoundedAuthorityProtocol.RoleAttestation.V1` namespace (`verify_attestation/2` and its three
+producer/decoder siblings) plus the certified 40-case profile corpus. `v0.5.1` was a
+docs-maintenance patch (registry checksum
+`60a8cd6e361938c5adfde1afcbbdc12426787a3d46b46c3437ef2d68a5808af0`, read back and pinned);
+`v0.5.0` identified the reviewable source release for the ES256 contract-major 3 activation
+(`BoundedAuthorityProtocol.V3`, [ADR 0035](docs/adr/0035-es256-contract-major-activation.md));
+`v0.4.0` identified the v2 activation; `v0.4.1` was the toolchain-and-platforms release
+(ADR 0031/0032); `v0.4.2` was a documentation-truth patch. The immutable package identity is
+the published Hex release, not the Git tag. Depend on the package identity — never a tag or a
+mutable checkout.
 
 ## Holder-side signer: the report adapter
 

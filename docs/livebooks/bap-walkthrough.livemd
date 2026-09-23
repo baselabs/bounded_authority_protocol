@@ -6,11 +6,11 @@ livebook:{"persist_outputs":true}
 
 ```elixir
 Mix.install([
-  {:bounded_authority_protocol, "~> 0.5.1"}
+  {:bounded_authority_protocol, "~> 0.6.0"}
 ])
 ```
 
-Hex 0.5.1 is published (2026-09-22), so the `Mix.install` above resolves from the public
+Hex 0.6.0 is published (2026-09-23), so the `Mix.install` above resolves from the public
 registry. The immutable package identity is the published Hex release; the source tag is
 reviewable release evidence, not a substitute for it.
 
@@ -286,6 +286,110 @@ This notebook exercises the pure profile APIs. The repository's
 `mix local_loopback_http.verify` gate separately opens real IPv4 and IPv6 listeners and proves a
 verifier-bypass mutation RED. Loopback HTTP is not TLS and does not isolate another local process.
 
+## 9. Produce and verify a role attestation
+
+The role-attestation profile (ADR 0036) is the protocol's first sibling ATTESTATION profile: a
+standalone, grant-unbound compact JWS (`typ: "ba+role-attestation"`) in which an attestor key
+binds a subject key to the `issuer` or `holder` role for a window contained in the attestor
+key's own validity. Like every sibling profile, selection is explicit — no contract-major
+parses these bytes and the profile parses none of theirs.
+
+```elixir
+alias BoundedAuthorityProtocol.RoleAttestation.V1, as: RoleAttestationV1
+alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
+
+{attestor_public, attestor_private} = :crypto.generate_key(:eddsa, :ed25519)
+{subject_public, _subject_private} = :crypto.generate_key(:eddsa, :ed25519)
+
+attestation = %RoleAttestationV1.RoleAttestation{
+  attestor_key_id: "authority-attestor-1",
+  jti: "urn:example:attestation:2026-001",
+  key_id: "holder-key-1",
+  public_key: subject_public,
+  role: "issuer",
+  nbf: now,
+  exp: now + 3_600
+}
+
+{:ok, attestation_input} = RoleAttestationV1.attestation_signing_input(attestation, %{})
+
+attestation_signature =
+  :crypto.sign(:eddsa, :none, attestation_input.message, [attestor_private, :ed25519])
+
+{:ok, attestation_compact} =
+  RoleAttestationV1.assemble_compact(attestation_input, attestation_signature)
+
+expected_attestation = %RoleAttestationV1.ExpectedAttestation{
+  attestor: %HistoricalPublicKey{
+    key_id: "authority-attestor-1",
+    public_key: attestor_public,
+    valid_from: now - 600,
+    valid_before: now + 7_200
+  },
+  subject_key_id: "holder-key-1",
+  subject_public_key: subject_public,
+  now: now + 60,
+  bounds: %{}
+}
+
+{:ok, attestation_facts} =
+  RoleAttestationV1.verify_attestation(attestation_compact, expected_attestation)
+
+# Anchor-posture facts — trust is explicitly not evaluated and there is no
+# authorization marker at all:
+Map.from_struct(attestation_facts)
+|> Map.take([:attestor_key_id, :subject_key_id, :role, :trust])
+```
+
+## 10. Role-attestation attacks fail closed
+
+```elixir
+# A true self-attestation: the wire itself binds the attestor's own key id AND key material,
+# and the expected subject binding matches it — so every binding gate passes and only the
+# structural self-attestation rejection can fire:
+self_attestation = %{
+  attestation
+  | key_id: "authority-attestor-1",
+    public_key: attestor_public
+}
+
+{:ok, self_input} = RoleAttestationV1.attestation_signing_input(self_attestation, %{})
+
+self_signature =
+  :crypto.sign(:eddsa, :none, self_input.message, [attestor_private, :ed25519])
+
+{:ok, self_compact} = RoleAttestationV1.assemble_compact(self_input, self_signature)
+
+role_attestation_rejections = %{
+  self_attested:
+    RoleAttestationV1.verify_attestation(self_compact, %{
+      expected_attestation
+      | subject_key_id: "authority-attestor-1",
+        subject_public_key: attestor_public
+    }),
+  # now == exp — the acceptance window is the half-open [nbf, exp):
+  now_at_exp:
+    RoleAttestationV1.verify_attestation(attestation_compact, %{
+      expected_attestation
+      | now: now + 3_600
+    }),
+  # The attestation outlives the attestor key's own validity window:
+  outliving_window:
+    RoleAttestationV1.verify_attestation(attestation_compact, %{
+      expected_attestation
+      | attestor: %{expected_attestation.attestor | valid_before: now + 1_800}
+    }),
+  # Cross-profile, both directions:
+  attestation_through_v1: BoundedAuthorityProtocol.V1.decode_grant(attestation_compact, %{}),
+  grant_through_attestation: RoleAttestationV1.decode_attestation(grant_compact, %{})
+}
+
+Enum.map(role_attestation_rejections, fn {k, v} -> {k, v == {:error, :invalid}} end)
+```
+
+A role attestation is evidence of a binding, not an authorization: which attestor to trust,
+which role a consumer requires, and replay reservation stay with the caller
+(`spec/bap-role-attestation-v1.md` §5).
 
 
 ## What you just saw
@@ -298,6 +402,9 @@ verifier-bypass mutation RED. Loopback HTTP is not TLS and does not isolate anot
   with the single error value.
 - The local-loopback profile produced and verified byte-distinct proof bytes with a required nonce;
   the wrong nonce, the standard verifier, and a hostname target each failed closed.
+- The role-attestation profile bound a subject key to a role inside the attestor key's own
+  window and returned anchor-posture facts; a true self-attestation, `now == exp`, an
+  outliving window, and cross-profile bytes in both directions each failed closed.
 
 What this notebook did NOT do: select trusted keys, reserve replay, check revocation, or make
 an authorization decision — those belong to a stateful authority runtime. See the

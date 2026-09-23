@@ -5,6 +5,18 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
+## 0.5.1 to 0.6.0
+
+Additive sibling-profile release: `0.6.0` ships the first package bearing
+`bap-role-attestation/1` (ADR 0036) — the `BoundedAuthorityProtocol.RoleAttestation.V1`
+namespace (`attestation_signing_input/2`, `assemble_compact/2,3`, `decode_attestation/2`,
+`verify_attestation/2`) and its certified corpus. No contract-major byte or verdict changes:
+the v1/v2/v3 profiles, corpora, and certified pins are unchanged, and the only v1/v2-tree
+behavior change is a closed-error-shape fix (wrong-width signatures now return exactly
+`{:error, :invalid}` instead of a bare `false` — no accept/reject verdict moves). Consumers on
+`0.5.x` who never touch the new namespace need no changes; the minor-bounded `~> 0.6.0`
+requirement picks it up on the next `mix deps.update`.
+
 ## 0.5.0 to 0.5.1
 
 Documentation-truth patch with **no code, wire-format, bound, or public-API change**: the
