@@ -24,7 +24,9 @@ cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for
 ## Installation
 
 The package is published on Hex (release 0.6.2, published 2026-09-24 — the cross-Elixir
-compilation and scan-sensitivity repair patch; no wire or public-API change). Registry
+compilation and scan-sensitivity repair patch; no wire or public-API change; registry checksum
+`62d111bbef0d2fabcb6956e9770cb4bb730bceb1671f57831de372424509060c`, read back from the
+registry API and identical to the tagged-tree two-build candidate). Registry
 consumers use the minor-bounded requirement:
 
 ```elixir
