@@ -184,10 +184,12 @@ Alongside the Elixir package, the repository authors typed **verifier** SDKs of 
 alone, with no code-level derivation from the reference implementation. The TypeScript SDK
 graduated on first publication (ADR 0015) and now lives at
 [`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript),
-published to npm as [`@bounded-authority-protocol/verifier`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier). Each passes all 283 conformance vectors
-recomputed from scratch, asserts the corpus digest at startup, and proves every parser-layer
-closure red-capable via a per-language mutation gate. Each SDK graduates to its own repository on
-first publication.
+published to npm as [`@bounded-authority-protocol/verifier`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier). Every SDK passes the certified v1 (283), v2 (268), and v3 (292)
+conformance corpora recomputed from scratch, asserts each corpus index digest at load, and proves
+every parser-layer closure red-capable via a per-language mutation gate; the profile corpora
+(local-loopback 36 URI + 8 proof, role-attestation 40) run in the Elixir suite and the three
+in-repo SDKs, and the graduated TypeScript repository also runs the role-attestation corpus. Each
+SDK graduates to its own repository on first publication.
 
 ## Standards posture
 

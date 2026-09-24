@@ -1,18 +1,21 @@
 # Go verifier SDK — deployment guide
 
 The Go verifier SDK (`sdks/go/`, module `github.com/baselabs/bounded_authority_protocol_go`)
-is a pure, deterministic, fail-closed reimplementation of the BAP v1 profile. It is a
+is a pure, deterministic, fail-closed reimplementation of the frozen BAP profiles —
+contract-majors 1, 2, and 3 plus the local-loopback and role-attestation sibling profiles. It is a
 **verifier**: it returns redacted, value-bearing facts or a single rejection, never an
 authorization decision.
 
-See `spec/bap-v1.md` (the normative authority; `docs/protocol-v1.md` is its generated view)
+See `spec/bap-v1.md`, `spec/bap-v2.md`, and `spec/bap-v3.md` (the normative authorities;
+`docs/protocol-v1.md` is the standard profile's generated view)
 and [ADR 0014](../adr/0014-cross-language-verifier-sdks.md) for the packaging and
 derivation-hygiene decisions.
 
 ## Runtime posture
 
-- Go 1.25 floor; ZERO runtime dependencies — the standard library's `crypto/ed25519` and
-  `crypto/sha256` are the entire cryptographic closure.
+- Go 1.25 floor; ZERO runtime dependencies — the standard library's `crypto/ed25519`,
+  `crypto/elliptic` (P-256 for the contract-major 3 ES256 suite), and `crypto/sha256` are the
+  entire cryptographic closure.
 - Pure functions only: no clock, network, filesystem, or randomness in the verify path. Time,
   trusted keys, and expected context are explicit inputs.
 - `go vet` clean, `gofmt` clean, and a purity vet backed by a test that rejects forbidden
@@ -22,7 +25,7 @@ derivation-hygiene decisions.
 
 | Target | Notes |
 |---|---|
-| Any Go service | `go get` the module; the standard 17-function façade, five local-profile functions, and versioned primitives are the whole surface |
+| Any Go service | `go get` the module; the versioned verification surfaces (v1/v2/v3), the local-profile and role-attestation functions, and the evidence/archive surfaces are the whole surface |
 | Static binaries / distroless containers | Zero-dependency closure means `CGO_ENABLED=0` builds with no tag set |
 | AWS Lambda (provided.al2023 custom runtime) | Build the bootstrap binary statically; cold start is the binary load |
 

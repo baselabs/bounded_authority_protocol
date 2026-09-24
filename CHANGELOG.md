@@ -4,6 +4,22 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Documentation
+
+- Standards-review docs sweep: SECURITY.md, the getting-started guide, and the Livebook
+  walkthrough cite the 0.6.1 registry release (checksum read back from the Hex release API on
+  2026-09-24); AGENTS.md's accepted-ADR range is corrected to 0001–0036 and its current-state
+  paragraph records the 0.6.0 role-attestation release and the public holder-side signer
+  companion; the SDK README and the four SDK deployment guides stop describing the graduated
+  TypeScript SDK as in-tree (npm scope corrected to `@bounded-authority-protocol/verifier`) and
+  state the certified corpora each SDK actually runs (v1 283 / v2 268 / v3 292 plus the
+  loopback and role-attestation profile corpora), with the Rust supply-chain table gaining the
+  `p256`/`zeroize` ES256 backend rows; the interoperability report's TypeScript row and
+  publication-status claims are corrected to the graduated repository; the guides index carries
+  the role-attestation spec as a normative authority; and the docs-currency test now pins the
+  graduated SDK posture — three in-repo SDKs plus the graduated npm scope and repository,
+  rejecting the retired `@bounded-authority/verifier` scope and any in-tree `typescript/` link.
+
 ## [0.6.1] — 2026-09-23
 
 The cross-vendor repair patch over 0.6.0: the second independent review family's pass

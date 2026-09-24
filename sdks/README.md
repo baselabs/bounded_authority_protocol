@@ -1,10 +1,12 @@
 # Bounded Authority Protocol — Cross-language verifier SDKs
 
-Typed, provider-neutral verifier libraries that reimplement the BAP v1 verification profile from the
-published spec ([`spec/bap-v1.md`](../spec/bap-v1.md)) and consume the published conformance
-corpus ([`priv/conformance/v1/corpus/`](../priv/conformance/v1/corpus/)). They are **distribution
+Typed, provider-neutral verifier libraries that reimplement the frozen BAP verification
+profiles — contract-majors 1, 2, and 3 plus the local-loopback and role-attestation sibling
+profiles — from the published specs ([v1](../spec/bap-v1.md), [v2](../spec/bap-v2.md),
+[v3](../spec/bap-v3.md)) and the published conformance corpora
+([`priv/conformance/`](../priv/conformance/)). They are **distribution
 surfaces** — typed client libraries for third-party verifiers, not additional normativity — and
-**none is published to a registry yet**: per
+**none of the three authored here is published to a registry yet**: per
 [ADR 0015](../docs/adr/0015-sdk-graduation-and-publish-topology.md), each graduates to its own
 per-SDK repository on first publication, never from this monorepo (the `sdk-publish-guard`
 pre-commit hook and CI job reject registry-publish infrastructure here). BAP-05 already closed the
@@ -15,17 +17,21 @@ against the same published corpus.
 
 ## What is here
 
-- **[`typescript/`](typescript/)** — `@bounded-authority/verifier` (npm). Node >= 22, `node:crypto` (zero
-  non-stdlib deps by default).
 - **[`python/`](python/)** — `bounded-authority-verifier` (PyPI). Python >= 3.10, `cryptography` for
-  Ed25519.
+  Ed25519 and ECDSA P-256.
 - **[`rust/`](rust/)** — `bounded-authority-protocol` (crates.io). Rust MSRV 1.81, `ed25519-dalek`
   (serial backend) + `sha2` + `ryu-js`. See its [README](rust/README.md) and the
   [deployment guide](../docs/deployment/rust-sdk.md) (AWS Lambda `provided.al2023` + PostgreSQL `plrust`
   posture).
 - **[`go/`](go/)** — `bounded_authority_protocol_go`. Go 1.25 floor, zero runtime dependencies
-  (stdlib `crypto/ed25519` + `crypto/sha256` only). See its [README](go/README.md) and the
-  [deployment guide](../docs/deployment/go-sdk.md).
+  (stdlib `crypto/ed25519` + `crypto/elliptic` + `crypto/sha256` only). See its
+  [README](go/README.md) and the [deployment guide](../docs/deployment/go-sdk.md).
+
+The TypeScript SDK was the first to graduate (2026-09-14): it is published to npm as
+[`@bounded-authority-protocol/verifier`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier)
+from its own repository,
+[`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript)
+— its source and conformance runners no longer live in this monorepo.
 
 All four are **pure verification libraries** (no I/O, clock, RNG, or network in the verify path). They return
 value-bearing redacted facts or `Invalid` — never an authorization decision. See
@@ -35,24 +41,34 @@ derivation-hygiene decisions.
 Each SDK also implements the separately named local-loopback HTTP application profile: five public
 surfaces, protected `typ: "ba+loopback-proof"`, mandatory nonce, literal `127.0.0.1`/`[::1]`
 targets only, and mutual rejection with standard `dpop+jwt`. The shared profile corpus lives under
-`priv/conformance/application-profiles/local-loopback-http/v1`; all four SDKs pin its exact index
-SHA-256 and execute the same 36 URI plus 8 proof cases.
+`priv/conformance/application-profiles/local-loopback-http/v1`; the three SDKs authored here pin
+its exact index SHA-256 and execute the same 36 URI plus 8 proof cases. Each also implements the
+role-attestation sibling profile
+([ADR 0036](../docs/adr/0036-role-attestation-profile.md)): the four attestation surfaces, with
+the certified 40-case profile corpus pinned the same way.
 
 ## Conformance
 
-Each SDK passes every one of the 283 published conformance vectors (valid + invalid), recomputing each
-verdict from scratch using only its language's primitives. The conformance is independently verifiable:
+Each SDK passes every certified vector (valid + invalid) — the 283 v1, 268 v2, and 292 v3
+contract-major corpora plus the loopback and role-attestation profile corpora — recomputing each
+verdict from scratch using only its language's primitives. The conformance is independently
+verifiable:
 
 ```bash
-# TypeScript
-pnpm --filter @bounded-authority/verifier conformance
+# Python (from sdks/python) — one runner per certified corpus
+python tests/conformance/run.py
+python tests/conformance/run_v2.py
+python tests/conformance/run_v3.py
 
-# Python
-uv run --project sdks/python conformance
+# Rust (from sdks/rust) — the conformance runners run inside the test suite
+cargo test --locked
 
-# Rust
-cargo test --test conformance --manifest-path sdks/rust/Cargo.toml
+# Go (from sdks/go) — the conformance runners run inside the test suite
+go test ./...
 ```
+
+The graduated TypeScript SDK runs its vendored corpora in its own repository (`pnpm conformance`,
+`conformance:v2`, `conformance:v3`, `conformance:role-attestation`).
 
 Beyond the frozen corpus, each SDK ships a **per-language permissiveness mutation-gate** — for every
 host-runtime closure (duplicate-rejecting decoder, null-prototype containers, raw-lexeme scan,

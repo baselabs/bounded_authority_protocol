@@ -11,7 +11,6 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
 
   @version Mix.Project.config() |> Keyword.fetch!(:version)
 
-  @sdk_count 4
   @case_count 283
   @spec_revision 1
 
@@ -63,13 +62,24 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
   test "the sdks README names all four SDKs" do
     readme = File.read!("sdks/README.md")
 
-    for sdk <- ["typescript/", "python/", "rust/", "go/"] do
+    # Three SDKs are authored in this repository; the fourth (TypeScript) graduated to its own
+    # repository on first publication (ADR 0015) and is named by its published identity.
+    for sdk <- ["python/", "rust/", "go/"] do
       assert readme =~ "[`#{sdk}`]",
              "sdks/README.md must list the #{sdk} SDK"
     end
 
-    refute readme =~ ~r/all three/i,
-           "sdks/README.md still says 'all three' — there are #{@sdk_count} SDKs"
+    assert readme =~ "@bounded-authority-protocol/verifier",
+           "sdks/README.md must name the graduated TypeScript SDK's published npm scope"
+
+    assert readme =~ "baselabs/bounded_authority_protocol_typescript",
+           "sdks/README.md must point at the graduated TypeScript repository"
+
+    refute readme =~ "[`typescript/`]",
+           "sdks/README.md must not link a typescript/ directory — the SDK graduated (ADR 0015)"
+
+    refute readme =~ "@bounded-authority/verifier",
+           "sdks/README.md must not cite the retired npm scope"
   end
 
   test "consumer-facing counts match the certified corpus" do

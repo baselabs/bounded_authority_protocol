@@ -27,7 +27,8 @@ submission preconditions). Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its clo
 blocks are the status authority.
 
 The current source and Hex release are 0.6.1, tagged `v0.6.1` (the cross-vendor repair patch over
-the 0.5.0 ES256 contract-major 3 activation — the published doc set is trimmed to
+the 0.6.0 role-attestation release and the 0.5.0 ES256 contract-major 3 activation — the
+published doc set is trimmed to
 implementer-facing content; no wire or public-API change). The
 package retains zero production
 dependencies, no application callback, and no supervision tree. Contract-major 1 remains frozen;
@@ -43,7 +44,7 @@ sibling profiles parsed by no contract-major: the loopback proof profile
 (`bap-role-attestation/1`, ADR 0036 — a standalone, grant-unbound BA-signed role binding with
 `BoundedAuthorityProtocol.RoleAttestation.V1.verify_attestation/2`, its certified 40-case corpus,
 `REQ-RA1-*` ids, and the sibling-attestation governance class; the BARA RA11 prerequisite,
-unreleased until the owner's release call). See
+released in 0.6.0 with both consumption receipts recorded). See
 [ADR 0030](docs/adr/0030-v2-contract-major-activation.md),
 [ADR 0035](docs/adr/0035-es256-contract-major-activation.md),
 [ADR 0036](docs/adr/0036-role-attestation-profile.md), [`spec/bap-v1.md`](spec/bap-v1.md),
@@ -54,8 +55,9 @@ Unpublished cross-language verifier SDKs are authored under [`sdks/`](sdks/)
 ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)): Python
 (`bounded-authority-verifier`), Rust
 (`bounded-authority-protocol`, BAP-15), and Go (`bounded_authority_protocol_go`, BAP-16) — each
-reimplements the frozen profiles from the specs and corpora alone, passes the certified v1 and v2
-vectors with the corpus index SHA-256 asserted at load, and ships a red-capable per-language
+reimplements the frozen profiles from the specs and corpora alone, passes the certified v1, v2,
+and v3 vectors plus the loopback and role-attestation profile corpora with every corpus index
+SHA-256 asserted at load, and ships a red-capable per-language
 permissiveness mutation gate. None of these three is published to a registry. Per
 [ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md), each graduates to its own per-SDK
 repository on first publication, and the `sdk-publish-guard` pre-commit hook and CI job reject
@@ -81,7 +83,8 @@ recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK boun
 ADR 0019 (corpus-artifact distribution), ADR 0020 (bounds-aware assembly and issuer-mediated
 reauthorization posture), ADR 0021 (the v1 `all` selector recognized-shapes erratum), ADR 0022
 (durable contract identities), and ADR 0027 (byte-distinct application-proof profiles). Accepted
-ADRs are 0001–0035 (ADR 0035 activates the ES256 contract-major 3 suite; ADR 0029 records the cumulative-budget posture and explicitly defers the
+ADRs are 0001–0036 (ADR 0035 activates the ES256 contract-major 3 suite; ADR 0036 adds the
+role-attestation sibling profile; ADR 0029 records the cumulative-budget posture and explicitly defers the
 `ba+budget-window` attestation-shape design; ADR 0034 decides the UCP riding point as
 transport-composed) under [`docs/adr/`](docs/adr/). BAP-19's source identity is fixed by
 `v0.3.0`; the registry publication and checksum read-back closed 2026-08-31, and downstream
@@ -126,6 +129,10 @@ immutable-package adoption is tracked in the private runtime.
 ## Repository relationships
 
 - Public protocol: [`baselabs/bounded_authority_protocol`](https://github.com/baselabs/bounded_authority_protocol)
+- Holder-side signer companion:
+  [`baselabs/bounded_authority_report_adapter`](https://github.com/baselabs/bounded_authority_report_adapter)
+  (public Hex package `bounded_authority_report_adapter`; one-directional — it depends on this
+  package, which never depends on it)
 - Private runtime consumer: `baselabs/bounded_authority` (a private commercial application; it
   must never be published as a public Hex package, and any private-Hex release requires
   a paid subscription plus fresh owner approval
@@ -137,6 +144,7 @@ immutable-package adoption is tracked in the private runtime.
 ```text
 private authority runtime  -> bounded_authority_protocol + runtime dependencies
 private product consumers  -> private authority runtime
+holder report adapter      -> bounded_authority_protocol (holder-side signing; never the reverse)
 bounded_authority_protocol -> pure protocol/crypto dependencies only
 qorpay                     -> no authority dependency
 ```

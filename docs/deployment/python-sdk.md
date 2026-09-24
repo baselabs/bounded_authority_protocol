@@ -1,16 +1,18 @@
 # Python verifier SDK — deployment guide
 
 The Python verifier SDK (`sdks/python/`, package `bounded-authority-verifier`) is a pure,
-deterministic, fail-closed reimplementation of the BAP v1 profile. It is a **verifier**: it
+deterministic, fail-closed reimplementation of the frozen BAP profiles — contract-majors 1, 2,
+and 3 plus the local-loopback and role-attestation sibling profiles. It is a **verifier**: it
 returns redacted, value-bearing facts or a single rejection, never an authorization decision.
 
-See `spec/bap-v1.md` (the normative authority; `docs/protocol-v1.md` is its generated view)
+See `spec/bap-v1.md`, `spec/bap-v2.md`, and `spec/bap-v3.md` (the normative authorities;
+`docs/protocol-v1.md` is the standard profile's generated view)
 and [ADR 0014](../adr/0014-cross-language-verifier-sdks.md) for the packaging and
 derivation-hygiene decisions.
 
 ## Runtime posture
 
-- Python >= 3.10; `cryptography` for Ed25519 (the single runtime dependency).
+- Python >= 3.10; `cryptography` for Ed25519 and ECDSA P-256 (the single runtime dependency).
 - Pure functions only: no clock, network, filesystem, or randomness in the verify path. Time,
   trusted keys, and expected context are explicit inputs.
 - Type-annotated throughout (`mypy`-clean under the repo's SDK config); facts results are

@@ -5,8 +5,9 @@
 The `0.6.x` source release line is supported. `v0.6.1` is the current tagged source release
 and contains contract-majors 1, 2, and 3 plus the role-attestation sibling profile;
 the public API surface is locked. Registry consumers use the published Hex archive.
-OBSERVED September 23, 2026 UTC: the Hex release API reports `0.6.0` published on September 23,
-2026. See the [registry release](https://hex.pm/packages/bounded_authority_protocol/0.6.0).
+OBSERVED September 24, 2026 UTC: the Hex release API reports `0.6.1` published on September 23,
+2026 (registry checksum `81a58e84a6626e35ae1781c681d9fd6f28cb45c040d0c036a77f63b8ef1020d4`). See
+the [registry release](https://hex.pm/packages/bounded_authority_protocol/0.6.1).
 
 The verifier returns redacted, non-authorizing facts: trust and authorization, where a result
 carries them, are explicitly not evaluated. The package does not select trust, hold keys, reserve

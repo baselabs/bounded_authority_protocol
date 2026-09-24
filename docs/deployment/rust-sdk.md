@@ -1,12 +1,14 @@
 # Rust verifier SDK — deployment guide
 
 The Rust verifier SDK (`sdks/rust/`, crate `bounded-authority-protocol`) is a pure, deterministic,
-fail-closed reimplementation of the BAP v1 profile. It is a **verifier**: it returns redacted, value-bearing
+fail-closed reimplementation of the frozen BAP profiles — contract-majors 1, 2, and 3 plus the
+local-loopback and role-attestation sibling profiles. It is a **verifier**: it returns redacted, value-bearing
 facts or `Invalid`, never an authorization decision. This guide covers the two serverless/edge deployment
 targets named in the BAP-15 acceptance bar: AWS Lambda (`provided.al2023`) and PostgreSQL (`plrust`).
 
-See `spec/bap-v1.md` (the normative authority; `docs/protocol-v1.md` is its generated view) for the verification contract and
-[`../adr/0014-cross-language-verifier-sdks.md`](../adr/0014-cross-language-verifier-sdks.md) for the
+See `spec/bap-v1.md`, `spec/bap-v2.md`, and `spec/bap-v3.md` (the normative authorities;
+`docs/protocol-v1.md` is the standard profile's generated view) for the verification contract and
+[ADR 0014](../adr/0014-cross-language-verifier-sdks.md) for the
 packaging and derivation-hygiene decisions.
 
 ## Local-loopback application profile
@@ -25,9 +27,11 @@ Runtime dependencies (the consumer-facing closure, audited by `sdks/rust/tools/l
 |---|---|---|
 | `ed25519-dalek` 2.2 (default-features = false) | BSD-3-Clause | Ed25519 verify (serial backend) |
 | `curve25519-dalek` 4.1 (transitive) | BSD-3-Clause | curve arithmetic |
+| `p256` 0.13 (default-features = false, `ecdsa`) | Apache-2.0 OR MIT | ECDSA P-256 verify — the contract-major 3 ES256 backend |
+| `zeroize` =1.8.1 (transitive of `p256`; exact-pinned for the 1.81 toolchain) | Apache-2.0 OR MIT | scrubbing plumbing |
 | `sha2` 0.10 | MIT OR Apache-2.0 | SHA-256 |
 | `ryu-js` 1.0 | Apache-2.0 OR BSL-1.0 | ECMAScript float formatting (JCS) |
-| `subtle`, `digest`, `generic-array`, `typenum`, … | MIT / BSD-3-Clause | transitive crypto/plumbing |
+| `subtle`, `digest`, `generic-array`, `typenum`, `elliptic-curve`, … | MIT / BSD-3-Clause | transitive crypto/plumbing |
 
 Every runtime dependency is permissively licensed. `default-features = false` on `ed25519-dalek` selects the
 serial verify backend (no SIMD/assembly). The crate carries `#![forbid(unsafe_code)]` over **its own**
@@ -56,7 +60,8 @@ evaluation time, bounds) explicit — the SDK never discovers trust.
 
 [`plrust`](https://plrust.io/) is a trusted-language extension that runs Rust inside PostgreSQL under a
 sandboxed, allowlisted toolchain (the plrust trusted build). **ed25519-dalek-based verification is NOT
-plrust-trusted-mode-compatible as built**: `curve25519-dalek`'s static initialization, plus `generic-array`,
+plrust-trusted-mode-compatible as built**: `curve25519-dalek`'s static initialization, the
+`p256`/`elliptic-curve` tree (the contract-major 3 backend), plus `generic-array`,
 `cpufeatures`, `libc`, and `ryu-js`, compile `unsafe` regardless of this crate's
 `default-features = false` / `#![forbid(unsafe_code)]` (those govern only OUR source, not the transitive
 backend). plrust's trusted-mode allowlist rejects crates that compile `unsafe`.

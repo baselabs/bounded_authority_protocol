@@ -35,7 +35,7 @@ carries its own per-language permissiveness mutation-gate proving its closures r
 
 | SDK | Language surface | Corpus binding | Result |
 |---|---|---|---|
-| `@bounded-authority/verifier` | TypeScript, Node >= 22, `node:crypto` only | in-place monorepo corpus, startup digest assertion | **283/283 agreed + census (11 keys)** |
+| `@bounded-authority-protocol/verifier` | TypeScript, Node >= 22, `node:crypto` only | graduated repository ([baselabs/bounded_authority_protocol_typescript](https://github.com/baselabs/bounded_authority_protocol_typescript)), vendored snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** (registry-distributed since 2026-09-14) |
 | `bounded-authority-verifier` | Python >= 3.10, `cryptography` | in-place monorepo corpus, startup digest assertion | **283/283 agreed + census (11 keys)** |
 | `bounded-authority-protocol` | Rust, MSRV 1.81, `ed25519-dalek`+`sha2` | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 | `bounded_authority_protocol_go` | Go 1.25, stdlib only | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
@@ -51,7 +51,9 @@ The Elixir reference plus the TypeScript, Python, Rust, and Go implementations e
 **36/36 URI cases** and **8/8 proof cases**, including signed IPv4 and IPv6 artifacts, exact
 producer/assembly bytes, trust and invocation binding, mandatory nonce, meaningful-byte tamper,
 and mutual standard/local profile rejection. Each implementation pins the same index and per-file
-hashes. This is repository-executed cross-validation; the four SDK packages are still unpublished.
+hashes. This is repository-executed cross-validation: the TypeScript result was certified in this
+repository at its graduation (2026-09-14) and its suite now lives in the graduated repository;
+the Python, Rust, and Go SDKs remain unpublished.
 
 ### Independent Node second-implementation runners
 
@@ -87,13 +89,19 @@ Any implementation can reproduce this report: obtain the corpus (it ships in the
 the repository), verify the certified digest above, run all 283 cases, and check the census.
 The repository's `mix quality` runs the reference CLI, all three independent Node runners,
 the corpus-identity gates, and the real IPv4/IPv6 local-profile transport drill on every change.
-The four SDK suites execute the same application-profile corpus through their native APIs.
+The Elixir suite and the three in-repo SDKs execute the same application-profile corpus through
+their native APIs; the TypeScript suite's equivalent runs live in its graduated repository.
 
 ## Current limitations (stated, not hidden)
 
-- The SDKs are not published to registries (ADR 0015: graduation on first publication); the
-  cross-validation above is repository-executed, not registry-distributed.
-- The report covers the frozen standard v1 profile and the local-loopback HTTP application
-  profile only; successor-majors carry their own corpus and report sections when they activate.
+- Three of the four SDKs — Python, Rust, and Go — are not published to registries (ADR 0015:
+  graduation on first publication); their cross-validation above is repository-executed, not
+  registry-distributed. The TypeScript SDK graduated on first publication (2026-09-14) and is
+  published from its own repository.
+- The per-implementation tables cover the frozen standard v1 profile and the local-loopback HTTP
+  application profile; the activated contract-major 2 (268-case) and 3 (292-case) corpora are
+  certified in the [requirement map](requirement-map.md) and executed by every SDK's CI
+  conformance runners (`.github/workflows/sdks.yml`), and join this report as their own sections
+  at its next regeneration against those gates.
 - The local-profile real-socket drill is implemented in the Elixir release gate. The other SDK
   results certify bytes and verdicts against the shared corpus, not live transport composition.
