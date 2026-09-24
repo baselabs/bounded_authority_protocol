@@ -5,6 +5,15 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
+## 0.6.1 to 0.6.2
+
+Repair patch with **no verdict, wire-format, or public-API change**: the role-attestation codec's
+closed-role membership and bounded-size checks now compile to version-stable Erlang on every
+supported Elixir (expression-position `in` compiled to `:lists.member`/`Enum.member?` imports on
+1.18/1.19, which the compiled purity and package gates reject), and the secret-scan sensitivity
+battery regained its role-attestation corpus fixture. Consumers need no changes; `~> 0.6.1`
+picks 0.6.2 up on the next `mix deps.update`.
+
 ## 0.6.0 to 0.6.1
 
 Repair patch: the second independent review family's pass over the role-attestation

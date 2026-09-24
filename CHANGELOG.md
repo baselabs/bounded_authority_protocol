@@ -2,13 +2,37 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
-## [Unreleased]
+## [0.6.2] — 2026-09-24
+
+The cross-Elixir compilation and scan-sensitivity repair patch over 0.6.1: no verdict,
+wire-format, or public-API change — the certified corpora, index digests, ADR set, and
+governance documents are unchanged.
+
+### Fixed — cross-toolchain compilation and gates
+
+- The role-attestation codec's closed-role membership and bounded-size checks compile to
+  version-stable Erlang on every supported Elixir. On Elixir 1.18/1.19, expression-position `in`
+  over a literal list compiled to a `:lists.member/2` import and runtime-bounded ranges compiled
+  to `Enum.member?/2` + `Function.identity/1` imports — findings the compiled purity and package
+  gates correctly rejected, turning the 1.18/1.19 CI lanes red (RED observed locally on
+  1.18.4-otp-28: three failures; GREEN after the rewrite on 1.18.4-otp-28 and a fresh
+  1.19.5-otp-28 build). The membership and bounds are explicit comparisons, verdict-identical on
+  every input for every bound the public API can reach — `Bounds` coercion admits positive
+  integers only, and for n >= 1 the predicates agree on every input (the unreachable n <= 0
+  forms differed only in dead code); the gates are unchanged and no allowances were added.
+- The secret-scan sensitivity battery plants a JWT fixture at the role-attestation corpus path:
+  the BAP-23 allowlist path group for
+  `priv/conformance/attestation-profiles/role-attestation/v1/` had no sensitivity fixture, so
+  the scan gate's allowlist path-sensitivity self-check failed ("missing 1 path group");
+  observed RED then GREEN locally under the pinned Gitleaks 8.30.1.
+- The role closed-set conformance mutation follows the codec's rewritten membership anchor.
 
 ### Documentation
 
 - Standards-review docs sweep: SECURITY.md, the getting-started guide, and the Livebook
-  walkthrough cite the 0.6.1 registry release (checksum read back from the Hex release API on
-  2026-09-24); AGENTS.md's accepted-ADR range is corrected to 0001–0036 and its current-state
+  walkthrough cite the then-current 0.6.1 registry release (checksum read back from the Hex
+  release API on 2026-09-24; this release's own version surfaces carry 0.6.2); AGENTS.md's
+  accepted-ADR range is corrected to 0001–0036 and its current-state
   paragraph records the 0.6.0 role-attestation release and the public holder-side signer
   companion; the SDK README and the four SDK deployment guides stop describing the graduated
   TypeScript SDK as in-tree (npm scope corrected to `@bounded-authority-protocol/verifier`) and

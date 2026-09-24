@@ -18,11 +18,12 @@ reports release 0.6.1 published on September 23, 2026:
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 0.6.1"}]
+  [{:bounded_authority_protocol, "~> 0.6.2"}]
 end
 ```
 
-`v0.6.1` is the cross-vendor repair patch; `v0.6.0` adds the role-attestation sibling profile.
+`v0.6.2` is the cross-Elixir compilation and scan-sensitivity repair patch; `v0.6.1` is the
+cross-vendor repair patch; `v0.6.0` adds the role-attestation sibling profile.
 `v0.5.0` was the ES256 contract-major 3
 activation source release (spec-facts v2/v3 baselines shipped); `v0.5.1` was a docs-maintenance
 patch; `v0.4.0` was the v2 source release; `v0.4.1` was the toolchain

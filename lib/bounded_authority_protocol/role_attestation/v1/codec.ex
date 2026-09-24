@@ -19,7 +19,6 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
 
   @header_keys ~w(alg kid typ)
   @payload_keys ~w(exp jti key_id nbf public_key role v)
-  @roles ~w(issuer holder)
   @typ "ba+role-attestation"
   @public_key_bytes 32
 
@@ -185,7 +184,7 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
          {:ok, public_key} <- Base64Url.decode(public_key_encoded, bounds),
          true <- byte_size(public_key) == @public_key_bytes,
          {:string, role} <- payload["role"],
-         true <- role in @roles,
+         true <- valid_role?(role),
          {:integer, nbf} <- payload["nbf"],
          true <- valid_time?(nbf, bounds),
          {:integer, exp} <- payload["exp"],
@@ -305,7 +304,7 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
       is_binary(public_key) and byte_size(public_key) == @public_key_bytes and
         byte_size(public_key) <= bounds.public_key_bytes
 
-  defp valid_role?(role), do: is_binary(role) and role in @roles
+  defp valid_role?(role), do: is_binary(role) and (role == "issuer" or role == "holder")
 
   defp valid_time?(value, bounds),
     do:
@@ -314,7 +313,7 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
 
   defp valid_key_id?(value, bounds),
     do:
-      is_binary(value) and byte_size(value) in 1..bounds.kid_bytes and
+      is_binary(value) and byte_size(value) > 0 and byte_size(value) <= bounds.kid_bytes and
         ascii_key_id?(value)
 
   defp ascii_key_id?(<<>>), do: true
@@ -326,7 +325,7 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
   defp ascii_key_id?(_value), do: false
 
   defp valid_identifier?(value, bounds) do
-    is_binary(value) and byte_size(value) in 1..bounds.identifier_bytes and String.valid?(value) and
-      StringOrUri.valid?(value)
+    is_binary(value) and byte_size(value) > 0 and byte_size(value) <= bounds.identifier_bytes and
+      String.valid?(value) and StringOrUri.valid?(value)
   end
 end

@@ -23,23 +23,27 @@ cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for
 
 ## Installation
 
-The package is published on Hex (release 0.6.1, published 2026-09-23 — the cross-vendor
-repair patch; registry checksum
-`81a58e84a6626e35ae1781c681d9fd6f28cb45c040d0c036a77f63b8ef1020d4`, read back from the
-registry API and identical to the tagged-tree two-build candidate). Registry consumers use
-the minor-bounded requirement:
+The package is published on Hex (release 0.6.2, published 2026-09-24 — the cross-Elixir
+compilation and scan-sensitivity repair patch; no wire or public-API change). Registry
+consumers use the minor-bounded requirement:
 
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.6.1"}
+    {:bounded_authority_protocol, "~> 0.6.2"}
   ]
 end
 ```
 
 The package has **zero production dependencies**, no application callback, and no supervision tree.
-`v0.6.1` is the cross-vendor repair patch (eight confirmed findings fixed, three blocking —
-see CHANGELOG); `v0.6.0` is the role-attestation release — the first release bearing the
+`v0.6.2` repairs cross-toolchain compilation (the role-attestation codec now compiles
+version-stable Erlang on Elixir 1.18–1.20, restoring the compiled purity gates on the 1.18/1.19
+lanes) and the secret-scan sensitivity battery (the role-attestation corpus path regained its
+fixture) — no verdict moves on any input; `v0.6.1` is the cross-vendor repair patch (eight
+confirmed findings fixed, three blocking — see CHANGELOG; registry checksum
+`81a58e84a6626e35ae1781c681d9fd6f28cb45c040d0c036a77f63b8ef1020d4`, read back from the registry
+API and identical to the tagged-tree two-build candidate); `v0.6.0` is the role-attestation
+release — the first release bearing the
 `bap-role-attestation/1` sibling profile
 ([ADR 0036](docs/adr/0036-role-attestation-profile.md)): the
 `BoundedAuthorityProtocol.RoleAttestation.V1` namespace (`verify_attestation/2` and its three

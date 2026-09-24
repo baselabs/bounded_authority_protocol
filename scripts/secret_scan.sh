@@ -312,6 +312,7 @@ run_check() {
   fixture_paths='docs/protocol-v1.md
 spec/bap-v1.md
 priv/conformance/application-profiles/local-loopback-http/v1/profile.json
+priv/conformance/attestation-profiles/role-attestation/v1/attestation-cases.json
 priv/conformance/v2/corpus/cases/anchored-export/probe.json
 priv/conformance/v1/vectors/consumption-chain-archive.json
 sdks/go/conformance/corpus-v2/cases/signing-input/probe.json
@@ -428,6 +429,7 @@ EOF
   cat > "$jwt_paths_file" <<'EOF'
 docs/protocol-v1.md
 priv/conformance/application-profiles/local-loopback-http/v1/profile.json
+priv/conformance/attestation-profiles/role-attestation/v1/attestation-cases.json
 priv/conformance/v2/corpus/cases/envelope/probe.json
 priv/conformance/v1/vectors/grant-holder-proof.json
 sdks/go/conformance/corpus-v2/cases/grant-verify/probe.json

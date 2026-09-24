@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The `0.6.x` source release line is supported. `v0.6.1` is the current tagged source release
+The `0.6.x` source release line is supported. `v0.6.2` is the current tagged source release
 and contains contract-majors 1, 2, and 3 plus the role-attestation sibling profile;
 the public API surface is locked. Registry consumers use the published Hex archive.
 OBSERVED September 24, 2026 UTC: the Hex release API reports `0.6.1` published on September 23,

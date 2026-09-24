@@ -1025,7 +1025,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # Closed role set widened: any binary role decodes and verifies.
       name: "role-attestation-role-closed-set-widened",
       path: "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
-      from: "         true <- role in @roles,\n",
+      from: "         true <- valid_role?(role),\n",
       to: "         true <- is_binary(role),\n",
       target:
         {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
