@@ -23,8 +23,10 @@ The declared Elixir range is `~> 1.18` (1.18/1.19/1.20) and the supported Erlang
 package, so consumers enforce their own. The mix.exs range, the config set, `.tool-versions`, and
 the CI lanes move together in one commit
 ([ADR 0031](docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md)). The clone →
-`deps.get` → compile → test contract must hold on macOS, Linux, and Windows; the full quality
-battery is POSIX-only tooling (run it through CI or WSL on Windows). Focused boundary commands are
+`deps.get` → compile → test contract must hold on macOS, Linux, and Windows as a developer-setup
+property, proven on a developer machine; CI runs on Linux only
+([ADR 0033](docs/adr/0033-developer-portability-ci-scope.md)). The full quality battery is
+POSIX-only tooling (run it through Linux CI or WSL on Windows). Focused boundary commands are
 `mix architecture`, `mix audit`, `mix package.check`, `mix deps.currency`, and
 `mix sbom.generate`. The architecture and archive allowlists must be expanded only with a reviewed
 public protocol requirement and matching red-capable tests.

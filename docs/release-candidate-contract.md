@@ -70,9 +70,11 @@ version bumps with a [CHANGELOG](../CHANGELOG.md) entry, never silently.
 
 ## Candidate verification
 
-Every trusted-main CI build produces an unpublished Hex archive, a SHA-256 checksum, release and
-tooling CycloneDX documents, and separate GitHub build-provenance and SBOM attestations. A reviewer
-verifies a candidate against the CI-attested record with:
+The supply-chain workflow runs on every push to `main` that changes `mix.exs`, `mix.lock`, or a
+package manifest (a version bump always does), weekly, and on manual dispatch from `main`. Each run
+produces an unpublished Hex archive, a SHA-256 checksum, release and tooling CycloneDX documents,
+and separate GitHub build-provenance and SBOM attestations. A reviewer verifies a candidate against
+the CI-attested record with:
 
 ```bash
 sha256sum --check SHA256SUMS

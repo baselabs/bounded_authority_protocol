@@ -31,9 +31,10 @@ silent verdict change).
 
 ## Supply-chain verification
 
-Every trusted-main CI build produces the package archive, a SHA-256 checksum, release and tooling
-CycloneDX SBOM documents, and separate build-provenance and SBOM attestations. A downloaded archive
-can be verified with:
+The supply-chain workflow runs on every push to `main` that changes `mix.exs`, `mix.lock`, or a
+package manifest (a version bump always does), weekly, and on manual dispatch from `main`. Each run
+produces the package archive, a SHA-256 checksum, release and tooling CycloneDX SBOM documents, and
+separate build-provenance and SBOM attestations. A downloaded archive can be verified with:
 
 ```bash
 sha256sum --check SHA256SUMS

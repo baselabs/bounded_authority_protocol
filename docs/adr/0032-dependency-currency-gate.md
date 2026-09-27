@@ -18,10 +18,11 @@ rendered table pads rows with trailing whitespace, so a status match anchored on
 hard end-of-line fails open on the padded rows.
 
 The family precedent (the sibling `bounded_authority_report_adapter`) landed its
-gate as a shell script inside its battery. The tri-platform build bar
-([ADR 0031](0031-self-enforcing-toolchain-and-tri-platform-build-bar.md)) rejects a
-POSIX shell inside a declared gate — `mix cmd scripts/*.sh` cannot execute on
-Windows — so this gate is Elixir.
+gate as a shell script inside its battery. The developer-portability contract
+([ADR 0031](0031-self-enforcing-toolchain-and-tri-platform-build-bar.md); CI scope
+corrected by [ADR 0033](0033-developer-portability-ci-scope.md)) rejects a POSIX
+shell inside a declared gate: a Windows developer's `mix cmd scripts/*.sh` cannot
+execute it, so this gate is written in Elixir.
 
 ## Decision
 

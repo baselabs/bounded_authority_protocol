@@ -1,5 +1,10 @@
 # ADR 0031: Self-enforcing toolchain and the tri-platform build bar
 
+**Amended September 26, 2026:** the macOS and Windows CI legs this ADR required are
+withdrawn by owner rule; CI runs on Linux only. Developer portability across macOS,
+Linux and Windows stays a requirement of the developer setup, proven on a developer
+machine.
+
 - Status: accepted (the per-push Windows CI lane element is superseded by
   [ADR 0033](0033-developer-portability-ci-scope.md); the toolchain and pinning elements stand)
 - Date: 2026-09-16
@@ -58,9 +63,11 @@ injection).
    use `System.tmp_dir!()`, and the two mechanisms with no Windows equivalent
    (chmod-based unreadability, the POSIX-shell publish guard) carry compile-time
    carve-outs naming the POSIX lanes that still cover them. A `windows-2025` CI
-   lane proves the contract continuously. The full `mix quality` battery remains
-   POSIX-only tooling (shell gates, Gitleaks, ProVerif, kramdown) and runs on the
-   Linux lanes or WSL.
+   lane proved the contract continuously through 2026-09-20; per
+   [ADR 0033](0033-developer-portability-ci-scope.md) that per-push lane is withdrawn
+   and the contract is proven on a developer machine instead. The full `mix quality`
+   battery remains POSIX-only tooling (shell gates, Gitleaks, ProVerif, kramdown) and
+   runs on the Linux lanes or WSL.
 
 ## Consequences
 
@@ -70,13 +77,15 @@ injection).
   load with the assert message (`supports Erlang/OTP 27/28/29; running 26` / `25`);
   Elixir 1.18.4/OTP 27 compiles green under `MIX_ENV=test`. The dev lane
   (`.tool-versions`, Elixir 1.20.2-otp-29 / Erlang 29.0.3) compiles green.
-- The Windows surface is gated and observed green: the `windows-2025` lane proved
-  checkout, `deps.get`, `compile --warnings-as-errors`, and `mix test` (445/445) on
-  its first completed run (2026-09-17) and re-proves it on every push. The checkout-bytes claim is
-  enforced by the eol policy (a default `core.autocrlf` clone would otherwise
-  CRLF-convert the digest-pinned corpora); the POSIX-only test mechanisms (chmod-based
-  unreadability, symlink-privilege cases, Win32-unrepresentable path components, the
-  POSIX-shell publish guard) are carved out with the POSIX lanes named as their
-  coverage at each site.
+- The Windows surface was gated and observed green while the lane ran: the
+  `windows-2025` lane proved checkout, `deps.get`, `compile --warnings-as-errors`,
+  and `mix test` (445/445) on its first completed run (2026-09-17) and re-proved it
+  on every push through 2026-09-20, when
+  [ADR 0033](0033-developer-portability-ci-scope.md) withdrew the per-push lane. The
+  checkout-bytes claim is enforced by the eol policy (a default `core.autocrlf`
+  clone would otherwise CRLF-convert the digest-pinned corpora); the POSIX-only test
+  mechanisms (chmod-based unreadability, symlink-privilege cases,
+  Win32-unrepresentable path components, the POSIX-shell publish guard) are carved
+  out with the POSIX lanes named as their coverage at each site.
 - Hex consumers see no new behavior: the assert never ships, and published-package
   bytes do not change.
