@@ -22,7 +22,7 @@ p256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
 # edition2024 Cargo feature (Rust >= 1.85); this crate's toolchain is pinned
 # 1.81 (rust-toolchain.toml). The =1.8.1 pin keeps the resolver on the line
 # that builds under 1.81. No other dependency changes.
-zeroize = "=1.8.1"
+zeroize = "=1.9.0"
 sha2 = "0.10"
 ryu-js = "1.0"
 
