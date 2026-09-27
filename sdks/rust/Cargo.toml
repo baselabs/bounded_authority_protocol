@@ -17,7 +17,7 @@ ed25519-dalek = { version = "2.2", default-features = false }
 # pulls the arithmetic + digest machinery `es256.rs` uses (VerifyingKey,
 # Signature, verify_prehash, AffinePoint). It reuses the tree's existing
 # sha2 0.10 / digest / subtle versions.
-p256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
+p256 = { version = "0.14", default-features = false, features = ["ecdsa"] }
 # Exact pin: zeroize is a transitive dep of p256 whose 1.9.x line requires the
 # edition2024 Cargo feature (Rust >= 1.85); this crate's toolchain is pinned
 # 1.81 (rust-toolchain.toml). The =1.8.1 pin keeps the resolver on the line
