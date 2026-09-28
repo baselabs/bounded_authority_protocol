@@ -72,7 +72,10 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     assert scan(repo) != []
     git!(repo, ["update-index", "--force-remove", ".kimosabe"])
 
-    blob = git!(repo, ["hash-object", "-w", "--stdin"], "public-target") |> String.trim()
+    target = Path.join(repo, "link-target")
+    File.write!(target, "public-target")
+    blob = git!(repo, ["hash-object", "-w", "--", target]) |> String.trim()
+    File.rm!(target)
     git!(repo, ["update-index", "--add", "--cacheinfo", "120000,#{blob},.kimosabe"])
     assert scan(repo) != []
   end
@@ -199,38 +202,16 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
 
   defp commit!(repo), do: git!(repo, ["commit", "-m", "public path probe"])
 
-  defp git!(repo, args, input \\ nil) do
-    options = [
-      stderr_to_stdout: true,
-      env: [
-        {"GIT_GRAFT_FILE", "/dev/null"},
-        {"GIT_CONFIG_COUNT", "1"},
-        {"GIT_CONFIG_KEY_0", "advice.graftFileDeprecated"},
-        {"GIT_CONFIG_VALUE_0", "false"}
-      ]
-    ]
-
-    result =
-      if input do
-        stdin_path =
-          Path.join(System.tmp_dir!(), "bap-path-guard-in-#{System.unique_integer([:positive])}")
-
-        File.write!(stdin_path, input)
-
-        try do
-          System.cmd(
-            "sh",
-            ["-c", ~s(git --no-replace-objects -C "$1" "${@:2}" < "$0"), stdin_path, repo | args],
-            options
-          )
-        after
-          File.rm(stdin_path)
-        end
-      else
-        System.cmd("git", ["--no-replace-objects", "-C", repo | args], options)
-      end
-
-    case result do
+  defp git!(repo, args) do
+    case System.cmd("git", ["--no-replace-objects", "-C", repo | args],
+           stderr_to_stdout: true,
+           env: [
+             {"GIT_GRAFT_FILE", "/dev/null"},
+             {"GIT_CONFIG_COUNT", "1"},
+             {"GIT_CONFIG_KEY_0", "advice.graftFileDeprecated"},
+             {"GIT_CONFIG_VALUE_0", "false"}
+           ]
+         ) do
       {output, 0} -> output
       {_output, status} -> raise "Git failed with exit #{status}"
     end
