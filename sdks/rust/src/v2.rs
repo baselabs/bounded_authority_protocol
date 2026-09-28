@@ -588,6 +588,9 @@ pub fn assemble_compact(
         SigningKind::RoleAttestation => {
             return Err(Invalid);
         }
+        SigningKind::ContentAssertion => {
+            return Err(Invalid);
+        }
         SigningKind::ChainAnchor => {
             decode_anchor_parts(&compact, &bounds)?;
         }

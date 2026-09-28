@@ -302,6 +302,24 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "spec/bap-v2.md",
                     "spec/bap-local-loopback-http-v1.md",
                     "spec/bap-role-attestation-v1.md",
+                    "docs/adr/0037-content-assertion-profile.md",
+                    "docs/design/content-assertion-requirement-map.md",
+                    "lib/bounded_authority_protocol/content_assertion/v1.ex",
+                    "lib/bounded_authority_protocol/content_assertion/v1/codec.ex",
+                    "lib/bounded_authority_protocol/content_assertion/v1/content_assertion.ex",
+                    "lib/bounded_authority_protocol/content_assertion/v1/content_assertion_facts.ex",
+                    "lib/bounded_authority_protocol/content_assertion/v1/decoded_content_assertion.ex",
+                    "lib/bounded_authority_protocol/content_assertion/v1/expected_content_assertion.ex",
+                    "priv/conformance/attestation-profiles/content-assertion/v1/assertion-structure-cases.json",
+                    "priv/conformance/attestation-profiles/content-assertion/v1/assertion-verification-cases.json",
+                    "priv/conformance/attestation-profiles/content-assertion/v1/content-base.raw",
+                    "priv/conformance/attestation-profiles/content-assertion/v1/content-maximum.raw",
+                    "priv/conformance/attestation-profiles/content-assertion/v1/content-over-limit.raw",
+                    "priv/conformance/attestation-profiles/content-assertion/v1/digest-cases.json",
+                    "priv/conformance/attestation-profiles/content-assertion/v1/index.json",
+                    "priv/conformance/attestation-profiles/content-assertion/v1/profile.json",
+                    "priv/conformance/attestation-profiles/content-assertion/v1/successor-cases.json",
+                    "spec/bap-content-assertion-v1.md",
                     "spec/cddl/bap-v1.cddl",
                     "spec/facts/baseline-v1.json",
                     "spec/facts/baseline-v2.json",
@@ -554,6 +572,32 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                }},
               BoundedAuthorityProtocol.V1.untrusted_key_locator(header <> "..")
             )
+        end
+
+        def content_assertion_contract? do
+          root = Path.join(:code.priv_dir(:bounded_authority_protocol), "conformance/attestation-profiles/content-assertion/v1")
+          profile = root |> Path.join("profile.json") |> File.read!() |> :json.decode()
+          cases = root |> Path.join("assertion-structure-cases.json") |> File.read!() |> :json.decode()
+          compact = Enum.find(cases, &(&1["id"] == "valid-genesis"))["compact"]
+          key = profile["attestors"]["primary"]
+          values = profile["expected"]
+          expected = struct!(BoundedAuthorityProtocol.ContentAssertion.V1.ExpectedContentAssertion,
+            issuer: values["issuer"], audience: values["audience"], subject: values["subject"],
+            profile: values["profile"], profile_digest: b64!(values["profile_digest"]),
+            content_digest: b64!(values["content_digest"]), now: values["now"], bounds: %{},
+            attestor: struct!(BoundedAuthorityProtocol.V1.HistoricalPublicKey,
+              key_id: key["key_id"], public_key: b64!(key["public_key"]),
+              valid_from: key["valid_from"], valid_before: key["valid_before"])
+          )
+          content = File.read!(Path.join(root, profile["content"]["path"]))
+          with {:ok, digest} <- BoundedAuthorityProtocol.ContentAssertion.V1.content_digest(content, %{}),
+               true <- digest == expected.content_digest,
+               {:ok, facts} <- BoundedAuthorityProtocol.ContentAssertion.V1.verify_assertion(compact, expected),
+               {:error, :invalid} <- BoundedAuthorityProtocol.ContentAssertion.V1.verify_assertion(compact, %{expected | content_digest: <<0::256>>}) do
+            facts.verification == :signature_and_window and facts.trust == :not_evaluated
+          else
+            _ -> false
+          end
         end
 
         def decoder_contract? do
@@ -831,6 +875,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     check_code =
       "unless BoundedAuthorityProtocolConsumer.package_contract?() and " <>
         "BoundedAuthorityProtocolConsumer.decoder_contract?() and " <>
+        "BoundedAuthorityProtocolConsumer.content_assertion_contract?() and " <>
         "BoundedAuthorityProtocolConsumer.grant_proof_contract?() and " <>
         "BoundedAuthorityProtocolConsumer.chain_archive_contract?() do " <>
         "System.halt(1) end"

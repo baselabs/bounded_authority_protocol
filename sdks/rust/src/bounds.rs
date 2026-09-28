@@ -75,6 +75,7 @@ pub struct Bounds {
     archive_chunks: u64,
     archive_bytes: u64,
     object_version_bytes: u64,
+    content_bytes: u64,
 }
 
 impl Bounds {
@@ -117,6 +118,7 @@ impl Bounds {
     const MAX_ARCHIVE_CHUNKS: u64 = 65796;
     const MAX_ARCHIVE_BYTES: u64 = 270_820_384;
     const MAX_OBJECT_VERSION_BYTES: u64 = 512;
+    const MAX_CONTENT_BYTES: u64 = 65_536;
 
     // ------------------------------------------------------------------------
     // Fixed cryptographic widths — REQ1-BOUNDS-fixed-widths.
@@ -174,6 +176,7 @@ impl Bounds {
             archive_chunks: Self::MAX_ARCHIVE_CHUNKS,
             archive_bytes: Self::MAX_ARCHIVE_BYTES,
             object_version_bytes: Self::MAX_OBJECT_VERSION_BYTES,
+            content_bytes: Self::MAX_CONTENT_BYTES,
         }
     }
 
@@ -293,6 +296,7 @@ impl Bounds {
                 Self::MAX_OBJECT_VERSION_BYTES,
                 value,
             ),
+            "content_bytes" => tighten(&mut self.content_bytes, Self::MAX_CONTENT_BYTES, value),
             // --- Fixed cryptographic widths (REQ1-BOUNDS-fixed-widths) ---
             "digest_bytes" => fixed(Self::FIXED_DIGEST_BYTES, value),
             "public_key_bytes" => fixed(Self::FIXED_PUBLIC_KEY_BYTES, value),
@@ -445,6 +449,10 @@ impl Bounds {
     /// Object-store version bytes ceiling.
     pub fn object_version_bytes(&self) -> u64 {
         self.object_version_bytes
+    }
+    /// Exact external content bytes accepted by the content-digest profile.
+    pub fn content_bytes(&self) -> u64 {
+        self.content_bytes
     }
 }
 

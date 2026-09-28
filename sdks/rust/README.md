@@ -20,6 +20,16 @@ It also implements the standalone sibling role-attestation profile
 `verify_attestation`; contract-major APIs reject `ba+role-attestation` bytes and this profile
 rejects every contract-major `typ`.
 
+The crate also implements the standalone content-assertion profile
+`bap-content-assertion/1`
+([`spec/bap-content-assertion-v1.md`](../../spec/bap-content-assertion-v1.md)).
+`assertion_signing_input`, `assemble_content_assertion_compact`,
+`decode_content_assertion`, `verify_content_assertion`, `content_digest`,
+`assertion_digest`, and `verify_content_assertion_successor` bind exact external
+bytes to caller-supplied identity, digest, key-window, time, and predecessor
+context. Every existing profile rejects its `ba+content-assertion` bytes, and
+the content profile rejects every existing profile.
+
 ## Status
 
 Not yet published to crates.io. Per the [SDK graduation model](../../docs/adr/0015-sdk-graduation-and-publish-topology.md),
@@ -42,6 +52,16 @@ than drifting silently. The two-boundary key census is asserted per-run (observe
 
 ```bash
 cargo test --test conformance   # agreed=283 disagreed=0 + census
+```
+
+The content-assertion test target reads the shared profile corpus directly,
+verifies all indexed file hashes, and pins index SHA-256
+`14b7436ccf7cc91fece52a1578c3760df6720a93494d147ee5ab523e2ce21876`.
+It covers 131 assertion cases, including 38 decode-valid exact
+producer/assembly vectors, 9 exact-content digest cases, and 14 successor cases.
+
+```bash
+cargo test --test content_assertion
 ```
 
 Beyond the frozen corpus, the crate ships a **per-language permissiveness mutation-gate battery**
@@ -71,10 +91,14 @@ verification contract) plus the versioned primitives:
   `check_chain`, `verify_anchored_export`.
 - **Versioned primitives**: `json_decode`, `jcs_encode`, `base64url_decode`/`base64url_encode`, `uri_normalize`,
   the `jwk_*` thumbprint family, `Bounds`.
+- **Content assertion**: `assertion_signing_input`,
+  `assemble_content_assertion_compact`, `decode_content_assertion`,
+  `verify_content_assertion`, `content_digest`, `assertion_digest`, and
+  `verify_content_assertion_successor`.
 
 Every function returns `Result<T>` (`Ok<T>` | `Err(Invalid)`) — exactly one value-free error shape. The
 facts structs (`GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`, `KeyTransitionFacts`,
-`AnchoredExportFacts`) are value-bearing, redacted by construction, derive `Debug` only (no `Serialize`/
+`AnchoredExportFacts`, `ContentAssertionFacts`) are value-bearing, redacted by construction, derive `Debug` only (no `Serialize`/
 `Display` — they cannot be serialized into a credential), and carry `authorization: NotEvaluated` (or
 `trust: NotEvaluated` for the chain/anchor/transition/export facts).
 

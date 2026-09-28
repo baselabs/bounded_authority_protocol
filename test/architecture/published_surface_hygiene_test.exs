@@ -36,6 +36,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "priv/conformance/v3/corpus",
     "priv/conformance/application-profiles/local-loopback-http/v1",
     "priv/conformance/attestation-profiles/role-attestation/v1",
+    "priv/conformance/attestation-profiles/content-assertion/v1",
     ".formatter.exs",
     "mix.exs",
     "README.md",
@@ -78,6 +79,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "docs/adr/0034-ucp-riding-point-scoping.md",
     "docs/adr/0035-es256-contract-major-activation.md",
     "docs/adr/0036-role-attestation-profile.md",
+    "docs/adr/0037-content-assertion-profile.md",
     "docs/protocol-v1.md",
     "docs/errata.md",
     "docs/governance.md",
@@ -97,6 +99,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "docs/design/requirement-map.md",
     "docs/design/local-loopback-http-requirement-map.md",
     "docs/design/role-attestation-requirement-map.md",
+    "docs/design/content-assertion-requirement-map.md",
     "docs/design/standards-track.md",
     "docs/design/threat-model.md"
   ]

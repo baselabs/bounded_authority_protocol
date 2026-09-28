@@ -1,5 +1,14 @@
 # bounded_authority_protocol roadmap
 
+## Content-assertion contract work
+
+[ADR 0037](adr/0037-content-assertion-profile.md) defines the independently judged
+standalone signed-content sibling. Completion requires the closed reference API,
+all independent SDK surfaces, a certified corpus and mutation evidence, real companion
+signing plus independent consumption, package qualification, and separate release
+approval. Current implementation and validation evidence is retained in the private
+outcome record; this row does not claim release or downstream adoption.
+
 > **Beamline deprecation — September 21, 2026.** Beamline names and test counts in the closeout evidence below refer to a retired private consumer. They remain historical receipts, not current integration requirements or proof of its successor. Public protocol semantics and package independence are unchanged; the package acquires no host-runtime dependency.
 
 **Status authority:** this file

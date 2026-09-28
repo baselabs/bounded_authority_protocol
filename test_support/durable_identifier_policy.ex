@@ -3,7 +3,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
 
   @owned_roots ["lib", "priv", "scripts", "sdks", "test", "test_support", "docs"]
   @requirement_surfaces ~w(B64 BOUNDS CHAIN CLAIM CORE CORPUS DIGEST EVO EXPORT HEADER JSON KEY LOCATOR SCHEMA SELECTOR SIGNING URI VERIFY)
-  @wire_domains ~w(BAP1-ARCHIVE BAP1-CHAIN BAP1-GRANT BAP1-PROOF BAP1-REQUEST BAP2-ARCHIVE BAP2-CHAIN BAP2-REQUEST BAP3-ARCHIVE BAP3-CHAIN BAP3-REQUEST)
+  @wire_domains ~w(BAP1-CONTENT BAP1-ARCHIVE BAP1-CHAIN BAP1-GRANT BAP1-PROOF BAP1-REQUEST BAP2-ARCHIVE BAP2-CHAIN BAP2-REQUEST BAP3-ARCHIVE BAP3-CHAIN BAP3-REQUEST)
   @external_v1_paths MapSet.new([
                        "lib/bounded_authority_protocol/conformance/corpus.ex",
                        "lib/bounded_authority_protocol/conformance/report.ex",
@@ -12,6 +12,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        "scripts/check_verification_performance.exs",
                        "scripts/check_local_loopback_http.exs",
                        "scripts/check_role_attestation.exs",
+                       "scripts/check_content_assertion.exs",
                        "scripts/check_spec_facts.exs",
                        "spec/tools/build_examples.exs",
                        "test/architecture/purity_test.exs",
@@ -43,6 +44,25 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                                     "priv/conformance/attestation-profiles/role-attestation/v1/profile.json",
                                     "test/bounded_authority_protocol/role_attestation/v1_test.exs"
                                   ])
+  @content_assertion_profile_paths MapSet.new([
+                                     "lib/bounded_authority_protocol/content_assertion/v1.ex",
+                                     "lib/bounded_authority_protocol/content_assertion/v1/codec.ex",
+                                     "lib/bounded_authority_protocol/content_assertion/v1/content_assertion.ex",
+                                     "lib/bounded_authority_protocol/content_assertion/v1/content_assertion_facts.ex",
+                                     "lib/bounded_authority_protocol/content_assertion/v1/decoded_content_assertion.ex",
+                                     "lib/bounded_authority_protocol/content_assertion/v1/expected_content_assertion.ex",
+                                     "test/bounded_authority_protocol/content_assertion/v1_test.exs",
+                                     "test/bounded_authority_protocol/content_assertion/corpus_test.exs",
+                                     "priv/conformance/attestation-profiles/content-assertion/v1/index.json",
+                                     "priv/conformance/attestation-profiles/content-assertion/v1/profile.json",
+                                     "priv/conformance/attestation-profiles/content-assertion/v1/digest-cases.json",
+                                     "priv/conformance/attestation-profiles/content-assertion/v1/assertion-structure-cases.json",
+                                     "priv/conformance/attestation-profiles/content-assertion/v1/assertion-verification-cases.json",
+                                     "priv/conformance/attestation-profiles/content-assertion/v1/content-base.raw",
+                                     "priv/conformance/attestation-profiles/content-assertion/v1/content-maximum.raw",
+                                     "priv/conformance/attestation-profiles/content-assertion/v1/content-over-limit.raw",
+                                     "priv/conformance/attestation-profiles/content-assertion/v1/successor-cases.json"
+                                   ])
   @requirement_ids "test/fixtures/durable_identifier_requirements.txt"
                    |> File.read!()
                    |> String.split()
@@ -224,6 +244,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
          name,
          "BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1"
        ) and local_loopback_profile_source_path?(path)) or
+      (String.starts_with?(name, "BoundedAuthorityProtocol.ContentAssertion.V1") and
+         MapSet.member?(@content_assertion_profile_paths, path)) or
       (String.starts_with?(name, "BoundedAuthorityProtocol.RoleAttestation.V1") and
          MapSet.member?(@role_attestation_profile_paths, path)) or
       (name == "BoundedAuthorityProtocol.Conformance.V1SchemaTest" and
@@ -265,7 +287,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
   defp current_major_path?(path, "v1"),
     do:
       current_major_source_path?(path) or MapSet.member?(@local_loopback_profile_paths, path) or
-        MapSet.member?(@role_attestation_profile_paths, path)
+        MapSet.member?(@role_attestation_profile_paths, path) or
+        MapSet.member?(@content_assertion_profile_paths, path)
 
   defp current_major_path?(path, "v2"), do: successor_major_source_path?(path)
 
@@ -310,7 +333,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
       {"test/conformance/v1_schema_test.exs", "v1_schema_test"},
       {"test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",
        "v1_test"},
-      {"test/bounded_authority_protocol/role_attestation/v1_test.exs", "v1_test"}
+      {"test/bounded_authority_protocol/role_attestation/v1_test.exs", "v1_test"},
+      {"test/bounded_authority_protocol/content_assertion/v1_test.exs", "v1_test"}
     ]
   end
 
@@ -482,6 +506,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
       current_major_source_path?(path) or
       MapSet.member?(@local_loopback_profile_paths, path) or
       MapSet.member?(@role_attestation_profile_paths, path) or
+      MapSet.member?(@content_assertion_profile_paths, path) or
       MapSet.member?(@external_v1_paths, path) or
       path == "scripts/check_package.exs" or
       String.starts_with?(path, "test/conformance/") or

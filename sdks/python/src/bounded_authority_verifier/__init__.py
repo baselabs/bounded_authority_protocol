@@ -15,6 +15,19 @@ from . import v2
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMA, MAXIMUM_BOUNDS, Bounds, bounds_maximum, bounds_new, coerce_bounds
 from .compact import SigningInput
+from .content_assertion import (
+    CONTENT_ASSERTION_PROFILE,
+    CONTENT_ASSERTION_TYP,
+    ContentAssertion,
+    ExpectedContentAssertion,
+    assemble_content_assertion_compact,
+    assertion_digest,
+    assertion_signing_input,
+    content_digest,
+    decode_assertion,
+    verify_assertion,
+    verify_successor,
+)
 from .digest import REQUEST_PREFIX, REQUEST_PREFIX_V2, request_digest_v2, typed_project
 from .ed25519 import sha256
 from .error import Err, InvalidError, Ok, Result, err, fail, ok, require
@@ -24,6 +37,8 @@ from .facts import (
     AttestationDecoded,
     AttestationFacts,
     ChainFacts,
+    ContentAssertionDecoded,
+    ContentAssertionFacts,
     EnvelopeFacts,
     GrantDecoded,
     GrantFacts,
@@ -173,6 +188,11 @@ __all__ = [
     "attestation_signing_input", "assemble_attestation_compact", "decode_attestation",
     "verify_attestation", "AttestationProducer", "TrustedAttestor", "ExpectedAttestation",
     "AttestationDecoded", "AttestationFacts", "ATTESTATION_TYP",
+    # content-assertion sibling profile (``bap-content-assertion/1``)
+    "assertion_signing_input", "assemble_content_assertion_compact", "decode_assertion",
+    "verify_assertion", "content_digest", "assertion_digest", "verify_successor",
+    "ContentAssertion", "ExpectedContentAssertion", "ContentAssertionDecoded",
+    "ContentAssertionFacts", "CONTENT_ASSERTION_TYP", "CONTENT_ASSERTION_PROFILE",
     # error + result
     "InvalidError", "Ok", "Err", "Result", "ok", "err", "fail", "require",
     # tagged algebra types

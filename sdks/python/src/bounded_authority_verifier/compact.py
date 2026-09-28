@@ -103,7 +103,7 @@ def scan_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
 
 @dataclass(frozen=True)
 class SigningInput:
-    kind: str  # "grant" | "proof" | "local_loopback_http_proof" | "boundary_anchor" | "key_transition" | "role_attestation"
+    kind: str  # Closed profile-specific kind; see _KINDS.
     protected_segment: bytes  # base64url text
     payload_segment: bytes    # base64url text
 
@@ -115,6 +115,7 @@ _KINDS = (
     "boundary_anchor",
     "key_transition",
     "role_attestation",
+    "content_assertion",
 )
 
 

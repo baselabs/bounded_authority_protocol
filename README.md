@@ -1,5 +1,12 @@
 # bounded_authority_protocol
 
+The unreleased content-assertion profile is defined by
+[ADR 0037](docs/adr/0037-content-assertion-profile.md) and the
+[normative contract](spec/bap-content-assertion-v1.md). It binds exact content bytes
+through a required expected digest and explicit context. Content interpretation,
+trust selection, and durable admission remain caller responsibilities. Source work
+and local checks do not establish a published package or consumer acceptance.
+
 Deterministic, dependency-free verification for cryptographically bounded, argument-level
 proof-of-possession authority — the open wire profile, verifier, and conformance suite for the
 Bounded Authority Protocol (contract-majors 1, 2, and 3).

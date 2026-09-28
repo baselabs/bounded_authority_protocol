@@ -50,6 +50,7 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 | `ba+loopback-proof` | active | `application/ba-loopback-proof+jwt` | Literal-loopback HTTP holder proof under `bap-application-proof/local-loopback-http/1` ([ADR 0027](../adr/0027-byte-distinct-application-proof-profiles.md)) |
 | `ba+chain-anchor` | active | `application/ba-chain-anchor+jwt` | Signed consumption-chain boundary anchor |
 | `ba+role-attestation` | active | `application/ba-role-attestation+jwt` | Signed role attestation binding a subject key to a role under `bap-role-attestation/1` ([ADR 0036](../adr/0036-role-attestation-profile.md)) |
+| `ba+content-assertion` | active | `application/ba-content-assertion+jwt` | Standalone exact-content assertion under `bap-content-assertion/1` ([ADR 0037](../adr/0037-content-assertion-profile.md)); unreleased |
 | `ba+key-transition` | active | `application/ba-key-transition+jwt` | Authenticated historical-key transition |
 | `ba+cap-delegated` | reserved | `application/ba-cap-delegated+jwt` | Delegated attenuated grant — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md) |
 | `ba+suite-attestation` | reserved | `application/ba-suite-attestation+jwt` | Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
@@ -68,6 +69,7 @@ grant-unbound signed artifacts verified only through their own named API.
 | Identity | Status | Protected `typ` | Definition |
 |---|---|---|---|
 | `bap-role-attestation/1` | active | `ba+role-attestation` | Role attestation binding a subject key to `issuer` or `holder` for a bounded window, in [`spec/bap-role-attestation-v1.md`](../../spec/bap-role-attestation-v1.md); every contract-major profile rejects these bytes |
+| `bap-content-assertion/1` | active | `ba+content-assertion` | Digest-bound context, validity and successor assertions in [`spec/bap-content-assertion-v1.md`](../../spec/bap-content-assertion-v1.md); unreleased, with certification and release prerequisites retained |
 
 ## Selector kinds
 

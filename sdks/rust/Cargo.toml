@@ -61,3 +61,7 @@ path = "conformance/run_v2.rs"
 [[test]]
 name = "conformance_v3"
 path = "conformance/run_v3.rs"
+
+[[test]]
+name = "content_assertion"
+path = "tests/content_assertion.rs"

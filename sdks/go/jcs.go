@@ -115,7 +115,7 @@ func (e *jcsEncoder) encode(v Value, depth int) ([]byte, error) {
 			if i > 0 {
 				out = append(out, ',')
 			}
-			key, err := encodeJcsString(m.Key, objectNameBytes)
+			key, err := encodeJcsString(m.Key, e.b.KeyBytes)
 			if err != nil {
 				return nil, err
 			}

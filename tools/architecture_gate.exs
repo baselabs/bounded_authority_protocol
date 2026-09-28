@@ -293,6 +293,29 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:tamper_verbatim_matches?, 5} => %{variable_call: 2},
       {:verify_hashes, 2} => %{variable_call: 2}
     },
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertion.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.ExpectedContentAssertion.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.Codec.beam" => %{
+      {:assemble, 3} => %{variable_call: 4},
+      {:assertion_digest, 2} => %{variable_call: 2},
+      {:canonical_object, 3} => %{variable_call: 4},
+      {:content_digest, 2} => %{variable_call: 2},
+      {:decode, 2} => %{variable_call: 2},
+      {:parse, 2} => %{variable_call: 13},
+      {:signing_input, 2} => %{variable_call: 9},
+      {:verify, 2} => %{variable_call: 10},
+      {:verify_successor, 3} => %{variable_call: 8}
+    },
     "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
     },
@@ -346,6 +369,19 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   @compiled_export_allowances Map.merge(
                                 %{
+                                  "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.beam" => [
+                                    __info__: 1,
+                                    assertion_signing_input: 2,
+                                    assemble_compact: 2,
+                                    assemble_compact: 3,
+                                    decode_assertion: 2,
+                                    verify_assertion: 2,
+                                    content_digest: 2,
+                                    assertion_digest: 2,
+                                    verify_successor: 3,
+                                    module_info: 0,
+                                    module_info: 1
+                                  ],
                                   "Elixir.BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.beam" =>
                                     [
                                       __info__: 1,
@@ -617,7 +653,11 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "lib/bounded_authority_protocol/v3/envelope_facts.ex",
     "lib/bounded_authority_protocol/v3/grant_facts.ex",
     "lib/bounded_authority_protocol/v3/key_transition_facts.ex",
-    "lib/bounded_authority_protocol/role_attestation/v1/attestation_facts.ex"
+    "lib/bounded_authority_protocol/role_attestation/v1/attestation_facts.ex",
+    "lib/bounded_authority_protocol/content_assertion/v1/content_assertion.ex",
+    "lib/bounded_authority_protocol/content_assertion/v1/content_assertion_facts.ex",
+    "lib/bounded_authority_protocol/content_assertion/v1/decoded_content_assertion.ex",
+    "lib/bounded_authority_protocol/content_assertion/v1/expected_content_assertion.ex"
   ]
 
   @chain_codec_source_paths [
@@ -725,6 +765,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   @approved_local_aliases ~w(AnchorFacts AnchoredExportCodec AnchoredExportFacts SharedSelector SharedValidation V1Facade V2Facade V3Facade EcJwk Es256
     AnchoredExportInput ArchivedObject AttestationFacts Base64Url BoundaryAnchor BoundaryAnchorCodec Bounds
     ChainFacts ChainInput Codec CompactJws ConsumptionChain ConsumptionEntry Container ContextValidation Credentials
+    ContentAssertion ContentAssertionFacts DecodedContentAssertion ExpectedContentAssertion
     Corpus DecodedAttestation DecodedGrant DecodedProof EncodedAnchoredExport EncodedConsumptionEntry EnvelopeFacts
     ExpectedAnchor ExpectedAnchoredExport ExpectedAttestation ExpectedChain ExpectedExport ExpectedGrant
     ExpectedKeyTransition ExpectedRequest FixedBytes Grant GrantFacts HistoricalKeyChain
@@ -752,7 +793,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     bound_profile tamper verdict agree agreed disagreed agreement exit_status total kid
     issuer_key_fingerprint matched_audience major attestor attestor_key_id
     attestor_key_fingerprint subject_key_id subject_key_fingerprint subject_public_key role jti
-    nbf exp now)a
+    nbf exp now content_bytes iss aud sub profile profile_digest content_digest gen prev iat subject)a
 
   def check(root, opts \\ []) do
     root = Path.expand(root)
@@ -1673,6 +1714,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   # The role-attestation sibling profile (ADR 0036): the codec mirrors the chain codecs'
   # module set.
+  defp approved_source_modules("lib/bounded_authority_protocol/content_assertion/v1/codec.ex"),
+    do: ~w(Access Atom Enum Map String StringOrUri)
+
   defp approved_source_modules("lib/bounded_authority_protocol/role_attestation/v1/codec.ex"),
     do: ~w(Access Enum Map String StringOrUri)
 
@@ -1999,6 +2043,30 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       ]
   end
 
+  # Fixed-shape content codec: only pure helpers and compile-time-selected struct fields.
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/content_assertion/v1/codec.ex",
+         module,
+         function
+       ) do
+    function == :get or
+      {module, function} in [
+        {"Access", :get},
+        {"Atom", :to_string},
+        {"Enum", :all?},
+        {"Enum", :map},
+        {"Enum", :reduce_while},
+        {"Enum", :sort},
+        {"Map", :fetch!},
+        {"Map", :get},
+        {"Map", :keys},
+        {"Map", :new},
+        {"Map", :take},
+        {"String", :valid?},
+        {"StringOrUri", :valid?}
+      ]
+  end
+
   # CLI I/O carve-out (C1): exact-path + exact-function allowances. cli.ex may use File.read/1,
   # File.ls/1, File.write/2, File.dir?/1, IO.binwrite/2, and Path.join/2 (the only filesystem/io
   # calls in the verification tool's loader/output path). No halt here.
@@ -2305,6 +2373,10 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
          "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",
          "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam",
+         "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertion.beam",
+         "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts.beam",
+         "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion.beam",
+         "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.ExpectedContentAssertion.beam",
          "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts.beam",
          "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation.beam",
          "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.ExpectedAttestation.beam",
@@ -2369,6 +2441,20 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {String, :contains?},
           {String, :valid?},
           {URI, :new}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.Codec.beam" ->
+        [
+          {Access, :get},
+          {Enum, :all?},
+          {Enum, :map},
+          {Enum, :reduce_while},
+          {Enum, :sort},
+          {Map, :get},
+          {Map, :new},
+          {Map, :take},
+          {:maps, :keys},
+          {:erlang, :atom_to_binary}
         ]
 
       "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.Codec.beam" ->
@@ -2854,6 +2940,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            "Elixir.BoundedAuthorityProtocol.V1.Uri.beam",
            "Elixir.BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.Uri.beam",
            "Elixir.BoundedAuthorityProtocol.UriPath.beam",
+           "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.Codec.beam",
            "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.Codec.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",

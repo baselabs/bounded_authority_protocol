@@ -51,6 +51,7 @@ type Bounds struct {
 	ArchiveChunks       int
 	ArchiveBytes        int
 	ObjectVersionBytes  int
+	ContentBytes        int
 }
 
 // BoundsMaximum returns the immutable profile maxima.
@@ -94,6 +95,7 @@ func BoundsMaximum() Bounds {
 		ArchiveChunks:       65796,
 		ArchiveBytes:        270820384,
 		ObjectVersionBytes:  512,
+		ContentBytes:        65536,
 	}
 }
 
@@ -219,6 +221,8 @@ func boundsField(b *Bounds, key string) (*int, int, bool) {
 		return &b.ArchiveBytes, max.ArchiveBytes, true
 	case "object_version_bytes":
 		return &b.ObjectVersionBytes, max.ObjectVersionBytes, true
+	case "content_bytes":
+		return &b.ContentBytes, max.ContentBytes, true
 	}
 	return nil, 0, false
 }
@@ -269,6 +273,6 @@ func boundsKeys() []string {
 		"signature_bytes", "digest_bytes", "clock_skew", "proof_max_age",
 		"chain_row_bytes", "chain_rows", "anchor_bytes",
 		"archive_header_bytes", "key_transitions", "archive_chunks",
-		"archive_bytes", "object_version_bytes",
+		"archive_bytes", "object_version_bytes", "content_bytes",
 	}
 }

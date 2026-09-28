@@ -95,7 +95,8 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
       :local_loopback_http_proof,
       :boundary_anchor,
       :key_transition,
-      :role_attestation
+      :role_attestation,
+      :content_assertion
     ] and
       is_binary(input.protected_segment) and
       is_binary(input.payload_segment) and is_binary(input.message) and
@@ -196,6 +197,20 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
         "alg" => {:string, "EdDSA"},
         "kid" => {:string, kid},
         "typ" => {:string, ^expected_type}
+      } ->
+        byte_size(kid) > 0 and byte_size(kid) <= bounds.kid_bytes
+
+      _invalid ->
+        false
+    end
+  end
+
+  defp exact_signing_header?(:content_assertion, members, bounds) when length(members) == 3 do
+    case Map.new(members) do
+      %{
+        "alg" => {:string, "EdDSA"},
+        "kid" => {:string, kid},
+        "typ" => {:string, "ba+content-assertion"}
       } ->
         byte_size(kid) > 0 and byte_size(kid) <= bounds.kid_bytes
 

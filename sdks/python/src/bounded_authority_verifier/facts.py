@@ -207,3 +207,52 @@ class AttestationFacts:
     exp: int
     verification: str = "signature_and_window"
     trust: str = "not_evaluated"
+
+
+@dataclass(frozen=True)
+class ContentAssertionDecoded:
+    """Structurally decoded content assertion; no signature or trust evaluation."""
+
+    version: int
+    attestor_key_id: str
+    jti: str
+    iss: str
+    aud: str
+    sub: str
+    profile: str
+    profile_digest: bytes
+    content_digest: bytes
+    gen: int
+    prev: bytes
+    iat: int
+    nbf: int
+    exp: int
+    verification: str = "not_evaluated"
+
+
+@dataclass(frozen=True)
+class ContentAssertionFacts:
+    """Verified, value-bearing, redacted content-assertion facts.
+
+    This value remains non-authorizing and caller-provenanced. It contains no raw public key,
+    signature, decision, or authorization marker.
+    """
+
+    version: int
+    attestor_key_id: str
+    attestor_key_fingerprint: bytes
+    jti: str
+    iss: str
+    aud: str
+    sub: str
+    profile: str
+    profile_digest: bytes
+    content_digest: bytes
+    gen: int
+    prev: bytes
+    iat: int
+    nbf: int
+    exp: int
+    digest: bytes
+    verification: str = "signature_and_window"
+    trust: str = "not_evaluated"

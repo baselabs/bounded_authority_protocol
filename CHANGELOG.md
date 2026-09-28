@@ -2,6 +2,17 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
+## [Unreleased]
+
+### Added
+
+- A standalone `bap-content-assertion/1` profile with explicit expected content and
+  context binding, bounded byte-domain content hashing, and pairwise successor checks.
+  The profile carries no content semantics or authorization decision. ADR 0037 defines
+  its independent SDK, certified corpus, and release qualification requirements.
+- A tightenable `content_bytes` ceiling of 65,536 bytes. Existing wire profiles and
+  certified corpora retain their meanings.
+
 ## [0.6.2] — 2026-09-24
 
 The cross-Elixir compilation and scan-sensitivity repair patch over 0.6.1: no verdict,

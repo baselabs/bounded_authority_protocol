@@ -421,7 +421,7 @@ func (EcdsaProfile) validateSelector(v Value, bounds *Bounds) error {
 	}
 	for _, seg := range path {
 		s, ok := seg.(Str)
-		if !ok || len(s) == 0 || len(s) > objectNameBytes {
+		if !ok || len(s) == 0 || len(s) > b.KeyBytes {
 			return ErrInvalid
 		}
 	}

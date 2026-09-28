@@ -17,6 +17,7 @@
 
 pub mod base64url;
 pub mod bounds;
+pub mod content_assertion;
 pub mod error;
 pub mod facts;
 pub mod jcs;
@@ -65,6 +66,12 @@ pub(crate) mod selector;
 // (`v2::verify_grant`, `v3::verify_grant`, etc.): the majors expose
 // same-named functions with byte-distinct contracts, so a root-level
 // re-export set would collide; the module path IS the major namespace.
+pub use content_assertion::{
+    assemble_content_assertion_compact, assertion_digest, assertion_signing_input, content_digest,
+    decode_content_assertion, verify_content_assertion, verify_content_assertion_successor,
+    ContentAssertionFacts, ContentAssertionInput, DecodedContentAssertion,
+    ExpectedContentAssertion,
+};
 pub use digest::request_digest;
 pub use role_attestation::{
     assemble_attestation_compact, attestation_signing_input, decode_attestation, verify_attestation,

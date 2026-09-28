@@ -1,4 +1,4 @@
-"""The fixed v1 profile maxima — the 38-row Hard maxima table (spec/bap-v1.md).
+"""The fixed BAP1 maxima plus the content-assertion byte ceiling.
 
 Pinned by the corpus ``bounds.new`` cases so any mistyped constant fails. Fixed-width keys
 (REQ1-BOUNDS-fixed-widths, L395): ``digest_bytes``, ``public_key_bytes``, ``signature_bytes`` are the
@@ -11,7 +11,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from types import MappingProxyType
 
-# The 38-row Hard maxima table (spec/bap-v1.md). Derived from the spec, NOT from lib/*.ex.
+# The original 38-row table comes from spec/bap-v1.md. ``content_bytes`` is the ADR 0018
+# amendment defined by spec/bap-content-assertion-v1.md; existing profile meanings are unchanged.
 MAXIMA: Mapping[str, int] = {
     "compact_bytes": 65536,
     "encoded_segment_bytes": 32768,
@@ -51,6 +52,7 @@ MAXIMA: Mapping[str, int] = {
     "archive_bytes": 270820384,
     "object_version_bytes": 512,
     "key_transitions": 256,
+    "content_bytes": 65536,
 }
 
 MaximaKey = str

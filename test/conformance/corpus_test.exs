@@ -1357,6 +1357,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   # --- shipped corpus: official-side agreement gate (Task 2 deliverable) ---
 
   @shipped_corpus "priv/conformance/v1/corpus"
+  @content_assertion_corpus "priv/conformance/attestation-profiles/content-assertion/v1"
 
   test "the shipped corpus loads and the official side agrees on every case (exit 0)" do
     map = shipped_corpus_map()
@@ -1602,21 +1603,30 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert MapSet.member?(dup_inputs, "{\"alg\":\"EdDSA\",\"alg\":\"none\"}")
   end
 
-  # bounds.new constant-pinning (Q31): every maxima-table key has a tighten-to-exact-max (valid)
-  # pin; every key EXCEPT integer_magnitude/float_magnitude has a tighten-to-max-plus-one (invalid)
-  # pin. The two-key exception is mechanically forced (the max+1 literal exceeds the decoder's own
-  # magnitude ceiling and cannot appear in a corpus JSON file) — recorded in ADR 0005.
-  test "bounds.new pins every maxima key (exact_bound + maximum_plus_one), modulo the two-key exception" do
+  # bounds.new constant-pinning (Q31): every legacy maxima-table key has a
+  # tighten-to-exact-max (valid) pin; every key EXCEPT
+  # integer_magnitude/float_magnitude has a tighten-to-max-plus-one (invalid)
+  # pin. The independently versioned content-assertion corpus owns the later
+  # content_bytes maximum and pins its exact and maximum-plus-one byte cases.
+  test "bounds.new pins legacy maxima and the content profile pins content_bytes" do
     map = shipped_corpus_map()
     {:ok, corpus} = Corpus.load(map)
+
+    maximum = Bounds.maximum()
+
+    legacy_bound_keys =
+      maximum
+      |> Map.from_struct()
+      |> Map.keys()
+      |> List.delete(:content_bytes)
 
     bounds_cases =
       corpus.cases
       |> Enum.flat_map(&elem(&1, 1))
       |> Enum.filter(&(&1["surface"] == "bounds.new"))
 
-    # Every key of Bounds.maximum/0 carries an exact_bound (valid) pin.
-    for key <- Map.from_struct(Bounds.maximum()) |> Map.keys() do
+    # Every legacy key of Bounds.maximum/0 carries an exact_bound (valid) pin.
+    for key <- legacy_bound_keys do
       key_str = Atom.to_string(key)
 
       assert Enum.any?(
@@ -1639,7 +1649,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
       :signature_bytes
     ]
 
-    for key <- Map.from_struct(Bounds.maximum()) |> Map.keys(),
+    for key <- legacy_bound_keys,
         key not in no_max_plus_one do
       key_str = Atom.to_string(key)
 
@@ -1668,6 +1678,47 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
              corpus.cases |> Enum.flat_map(&elem(&1, 1)),
              &(&1["surface"] == "json.decode" and &1["class"] == "maximum_plus_one")
            )
+
+    # content_bytes was added by the content-assertion profile after the
+    # legacy corpus was frozen. Pin the Bounds contract and both byte-boundary
+    # cases in that profile's independently indexed corpus.
+    content_bytes = maximum.content_bytes
+
+    assert {:ok, %Bounds{content_bytes: ^content_bytes}} =
+             Bounds.new(%{content_bytes: content_bytes})
+
+    assert {:error, :invalid} = Bounds.new(%{content_bytes: content_bytes + 1})
+
+    content_cases =
+      @content_assertion_corpus
+      |> Path.join("digest-cases.json")
+      |> File.read!()
+      |> Jason.decode!()
+      |> Map.new(&{&1["id"], &1})
+
+    exact = Map.fetch!(content_cases, "content-maximum")
+    assert exact["expected"]["verdict"] == "valid"
+    assert exact["input"]["content_file"] == "content-maximum.raw"
+
+    assert @content_assertion_corpus
+           |> Path.join(exact["input"]["content_file"])
+           |> File.stat!()
+           |> Map.fetch!(:size) == content_bytes
+
+    plus_one = Map.fetch!(content_cases, "content-over-limit")
+    assert plus_one["class"] == "maximum_plus_one"
+    assert plus_one["expected"]["verdict"] == "invalid"
+    assert plus_one["input"]["content_file"] == "content-over-limit.raw"
+
+    assert @content_assertion_corpus
+           |> Path.join(plus_one["input"]["content_file"])
+           |> File.stat!()
+           |> Map.fetch!(:size) == content_bytes + 1
+
+    widening = Map.fetch!(content_cases, "content-bound-widening")
+    assert widening["class"] == "invalid_bounds"
+    assert widening["input"]["bounds"]["content_bytes"] == content_bytes + 1
+    assert widening["expected"]["verdict"] == "invalid"
   end
 
   test "bounds.new fixed-width keys carry change-rejection (invalid_limit) cases" do

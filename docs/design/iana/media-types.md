@@ -76,6 +76,24 @@ Filing is externally gated.
 - **Change controller:** Bounded Authority Protocol maintainers
 - **Wire `typ`:** `ba+role-attestation`
 
+## application/ba-content-assertion+jwt (active)
+
+- **Type name:** application
+- **Subtype name:** ba-content-assertion+jwt
+- **Required parameters:** None
+- **Optional parameters:** None
+- **Encoding considerations:** Compact JWS (RFC 7515) serialization of a closed JSON object; UTF-8; base64url segments; binary-safe
+- **Security considerations:** See the Security and Host Obligations of the BAP Content Assertion Profile 1
+- **Interoperability considerations:** The payload is a closed profile; unknown members are non-conforming; the profile binds exact content and schema digests to explicit context, validity and successor fields and grants no authority
+- **Published specification:** spec/bap-content-assertion-v1.md (BAP Content Assertion Profile 1)
+- **Applications that use this media type:** Standalone signed assertions about exact external content bytes
+- **Fragment identifier considerations:** N/A
+- **Intended usage:** LIMITED USE
+- **Restrictions on usage:** Verification is evidence of a binding, not an authorization; trusted-key selection, content interpretation and durable successor selection are caller obligations
+- **Author:** Bounded Authority Protocol maintainers
+- **Change controller:** Bounded Authority Protocol maintainers
+- **Wire `typ`:** `ba+content-assertion`
+
 ## application/ba-key-transition+jwt (active)
 
 - **Type name:** application

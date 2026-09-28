@@ -14,6 +14,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsTest do
   # Extracted table label → Bounds field. The widths row carries both cryptographic constants.
   @label_to_field %{
     "compact input bytes" => :compact_bytes,
+    "content assertion bytes" => :content_bytes,
     "encoded segment bytes" => :encoded_segment_bytes,
     "decoded segment bytes" => :decoded_segment_bytes,
     "raw JSON bytes" => :json_bytes,
@@ -110,7 +111,15 @@ defmodule BoundedAuthorityProtocol.SpecFactsTest do
     bytes = File.read!(@baseline)
     {:ok, tagged} = Json.decode(bytes, Bounds.maximum())
     facts = plain(tagged)
-    facts["bounds"]
+    # The sibling owns this additive ceiling; the frozen contract-major baseline stays unchanged.
+    profile = File.read!("spec/bap-content-assertion-v1.md")
+    [_, ceiling] = Regex.run(~r/^\| `content_bytes` \| ([0-9,]+) \|$/m, profile)
+
+    Map.put(
+      facts["bounds"],
+      "content assertion bytes",
+      ceiling |> String.replace(",", "") |> String.to_integer()
+    )
   end
 
   defp plain({:object, members}),

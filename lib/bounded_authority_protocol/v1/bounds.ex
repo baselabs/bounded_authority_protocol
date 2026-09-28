@@ -7,6 +7,7 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
 
   @enforce_keys [
     :compact_bytes,
+    :content_bytes,
     :encoded_segment_bytes,
     :decoded_segment_bytes,
     :json_bytes,
@@ -49,6 +50,7 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
 
   @type t :: %__MODULE__{
           compact_bytes: pos_integer(),
+          content_bytes: pos_integer(),
           encoded_segment_bytes: pos_integer(),
           decoded_segment_bytes: pos_integer(),
           json_bytes: pos_integer(),
@@ -90,6 +92,7 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
 
   @maximum %{
     compact_bytes: 65_536,
+    content_bytes: 65_536,
     encoded_segment_bytes: 32_768,
     decoded_segment_bytes: 24_576,
     json_bytes: 65_536,

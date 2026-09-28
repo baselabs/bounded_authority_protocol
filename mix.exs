@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.MixProject do
   use Mix.Project
 
-  @version "0.6.2"
+  @version "0.7.0"
   @source_url "https://github.com/baselabs/bounded_authority_protocol"
 
   def project do
@@ -93,6 +93,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "priv/conformance/v3/corpus",
         "priv/conformance/application-profiles/local-loopback-http/v1",
         "priv/conformance/attestation-profiles/role-attestation/v1",
+        "priv/conformance/attestation-profiles/content-assertion/v1",
         ".formatter.exs",
         "mix.exs",
         "README.md",
@@ -135,6 +136,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0034-ucp-riding-point-scoping.md",
         "docs/adr/0035-es256-contract-major-activation.md",
         "docs/adr/0036-role-attestation-profile.md",
+        "docs/adr/0037-content-assertion-profile.md",
         "docs/protocol-v1.md",
         "docs/errata.md",
         "docs/governance.md",
@@ -154,6 +156,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/design/requirement-map.md",
         "docs/design/local-loopback-http-requirement-map.md",
         "docs/design/role-attestation-requirement-map.md",
+        "docs/design/content-assertion-requirement-map.md",
         "docs/design/standards-track.md",
         "docs/design/threat-model.md"
       ],
@@ -193,6 +196,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "spec/bap-v3.md",
         "spec/bap-local-loopback-http-v1.md",
         "spec/bap-role-attestation-v1.md",
+        "spec/bap-content-assertion-v1.md",
         "docs/protocol-v1.md",
         "docs/adr/0001-public-protocol-verifier-boundary.md",
         "docs/adr/0002-normative-v1-parsing-profile.md",
@@ -226,6 +230,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0034-ucp-riding-point-scoping.md",
         "docs/adr/0035-es256-contract-major-activation.md",
         "docs/adr/0036-role-attestation-profile.md",
+        "docs/adr/0037-content-assertion-profile.md",
         "docs/errata.md",
         "docs/governance.md",
         "docs/design/conformance-contract.md",
@@ -235,6 +240,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/design/requirement-map.md",
         "docs/design/local-loopback-http-requirement-map.md",
         "docs/design/role-attestation-requirement-map.md",
+        "docs/design/content-assertion-requirement-map.md",
         "docs/design/standards-track.md",
         "docs/design/threat-model.md"
       ]
@@ -278,6 +284,10 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "run scripts/check_local_loopback_http.exs",
         "run --no-start scripts/check_local_loopback_http_mutations.exs"
       ],
+      "content_assertion.mutations": [
+        "run --no-start scripts/check_content_assertion_mutations.exs"
+      ],
+      "content_assertion.verify": ["run --no-start scripts/check_content_assertion.exs"],
       "role_attestation.verify": ["run scripts/check_role_attestation.exs"],
       "corpus.digests": ["run --no-start scripts/regen_corpus_digests.exs"],
       "corpus.sync": ["run --no-start scripts/check_corpus_sync.exs"],
@@ -329,6 +339,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "conformance.verify",
         "local_loopback_http.verify",
         "role_attestation.verify",
+        "content_assertion.verify",
+        "content_assertion.mutations",
         "spec_facts.mutations"
       ]
     ]

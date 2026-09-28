@@ -721,7 +721,7 @@ fn take_integral_date(value: Option<&JsonValue>) -> Result<i64> {
 
 /// Validates a `kid`: 1–`kid_bytes`, each byte an ASCII letter, digit, or one
 /// of `-`, `.`, `_`, `~` (`REQ1-HEADER-kid-bytes`).
-fn validate_kid(s: &str, bounds: &Bounds) -> Result<()> {
+pub(crate) fn validate_kid(s: &str, bounds: &Bounds) -> Result<()> {
     if s.is_empty() || s.len() as u64 > bounds.kid_bytes() {
         return Err(Invalid);
     }
@@ -743,7 +743,7 @@ fn is_kid_byte(b: u8) -> bool {
 /// guarantees it); a colon-bearing value is a URI whose scheme is valid, every
 /// byte is alnum / URI-punctuation / a well-formed `%HH` escape, and (for a
 /// `://` authority) the port is all-digit.
-fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
+pub(crate) fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
     if s.is_empty() || s.len() as u64 > bounds.identifier_bytes() {
         return Err(Invalid);
     }

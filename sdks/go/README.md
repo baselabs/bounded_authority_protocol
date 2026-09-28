@@ -22,6 +22,14 @@ an attestor key binds a subject key to an `issuer`/`holder` role for a window co
 key's own validity window, both segments are canonical-bytes-only, and every contract-major API rejects
 its `ba+role-attestation` typ while it rejects every contract-major typ.
 
+It also implements the standalone content-assertion profile `bap-content-assertion/1`
+([`spec/bap-content-assertion-v1.md`](../../spec/bap-content-assertion-v1.md)).
+`AssertionSigningInput`, `AssembleContentAssertionCompact`, `DecodeContentAssertion`,
+`VerifyContentAssertion`, `ContentDigest`, `AssertionDigest`, and
+`VerifyContentAssertionSuccessor` bind exact external bytes to caller-supplied identity,
+digest, key-window, time, and predecessor context. Every existing profile rejects its
+`ba+content-assertion` bytes, and the content profile rejects every existing profile.
+
 ## Status
 
 Not yet published to a Go module proxy. Per the [SDK graduation model](../../docs/adr/0015-sdk-graduation-and-publish-topology.md),
@@ -45,6 +53,16 @@ the two-boundary key census is asserted per run (observed import-boundary thumbp
 
 ```bash
 go test ./conformance/   # agreed=283 disagreed=0 + census
+```
+
+The content-assertion runner reads the shared profile corpus directly, verifies all indexed
+file hashes, and pins index SHA-256
+`14b7436ccf7cc91fece52a1578c3760df6720a93494d147ee5ab523e2ce21876`.
+It covers 131 assertion cases, including 38 decode-valid exact producer/assembly vectors,
+9 exact-content digest cases, and 14 successor cases.
+
+```bash
+go test -run ContentAssertion .
 ```
 
 ## Successor-major profile (contract-major 2)
@@ -87,10 +105,13 @@ versioned primitives, translated to Go idioms:
   `VerifyAnchoredExport`.
 - **Versioned primitives**: `JsonDecode` / `JcsEncode` (the tagged JSON algebra), `Base64urlDecode` /
   `Base64urlEncode`, `UriNormalize`, the `Jwk*` thumbprint family, `BoundsMaximum` / `BoundsNew`.
+- **Content assertion**: `AssertionSigningInput`, `AssembleContentAssertionCompact`,
+  `DecodeContentAssertion`, `VerifyContentAssertion`, `ContentDigest`, `AssertionDigest`, and
+  `VerifyContentAssertionSuccessor`.
 
 Every fallible function returns `(T, error)` where the error is either `nil` or exactly `ErrInvalid`;
 infallible constructors and encoders return their value directly. The facts structs (`GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`,
-`KeyTransitionFacts`, `AnchoredExportFacts`) are value-bearing and redacted by construction: they contain only
+`KeyTransitionFacts`, `AnchoredExportFacts`, `ContentAssertionFacts`) are value-bearing and redacted by construction: they contain only
 their documented fields and carry `AuthorizationNotEvaluated` / `TrustNotEvaluated`. There is no
 `Authorized`/`Allowed`/decision surface.
 

@@ -26,7 +26,7 @@ Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, and `BAP-21` throu
 submission preconditions). Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence
 blocks are the status authority.
 
-The current source and Hex release are 0.6.2, tagged `v0.6.2` (the cross-Elixir compilation and
+The source candidate is 0.7.0 (unreleased). The latest recorded Hex release is 0.6.2, tagged `v0.6.2` (the cross-Elixir compilation and
 scan-sensitivity repair patch over the 0.6.1 cross-vendor repair patch, the 0.6.0
 role-attestation release, and the 0.5.0 ES256 contract-major 3 activation — the published doc set
 is trimmed to
@@ -84,12 +84,16 @@ recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK boun
 ADR 0019 (corpus-artifact distribution), ADR 0020 (bounds-aware assembly and issuer-mediated
 reauthorization posture), ADR 0021 (the v1 `all` selector recognized-shapes erratum), ADR 0022
 (durable contract identities), and ADR 0027 (byte-distinct application-proof profiles). Accepted
-ADRs are 0001–0036 (ADR 0035 activates the ES256 contract-major 3 suite; ADR 0036 adds the
+ADRs are 0001–0037 (ADR 0035 activates the ES256 contract-major 3 suite; ADR 0036 adds the
 role-attestation sibling profile; ADR 0029 records the cumulative-budget posture and explicitly defers the
 `ba+budget-window` attestation-shape design; ADR 0034 decides the UCP riding point as
 transport-composed) under [`docs/adr/`](docs/adr/). BAP-19's source identity is fixed by
 `v0.3.0`; the registry publication and checksum read-back closed 2026-08-31, and downstream
 immutable-package adoption is tracked in the private runtime.
+
+The unreleased content-assertion sibling is specified by [ADR 0037](docs/adr/0037-content-assertion-profile.md)
+and [`spec/bap-content-assertion-v1.md`](spec/bap-content-assertion-v1.md). Its source work does not
+establish package publication or consumer acceptance.
 
 ## Critical rules
 
@@ -97,7 +101,8 @@ immutable-package adoption is tracked in the private runtime.
    caller-supplied bytes satisfy caller-supplied trusted inputs and expected context. It never
    selects trusted keys, reserves replay, checks live revocation, grants execution, or overrides a
    host policy. Public verified results are `GrantFacts`, `EnvelopeFacts`, `ChainFacts`,
-   `AnchorFacts`, `KeyTransitionFacts`, `AnchoredExportFacts`, and `AttestationFacts`. Only
+   `AnchorFacts`, `KeyTransitionFacts`, `AnchoredExportFacts`, `AttestationFacts`, and
+   `ContentAssertionFacts`. Only
    `GrantFacts`, `EnvelopeFacts`, and `AnchoredExportFacts` carry `authorization: :not_evaluated`;
    the diagnostic chain, anchor, transition, and attestation facts carry only
    `trust: :not_evaluated`. There is no `allowed?`,

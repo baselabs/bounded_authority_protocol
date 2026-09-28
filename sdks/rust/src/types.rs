@@ -52,6 +52,8 @@ pub enum SigningKind {
     /// A role attestation (`typ: "ba+role-attestation"`) — the standalone
     /// sibling attestation profile, parsed by no contract-major façade.
     RoleAttestation,
+    /// A content assertion (`typ: "ba+content-assertion"`).
+    ContentAssertion,
     /// A signed consumption-chain boundary anchor.
     ChainAnchor,
     /// A signed historical-key transition.
@@ -78,6 +80,7 @@ impl SigningKind {
             "proof" => Self::Proof,
             "local_loopback_http_proof" => Self::LocalLoopbackHttpProof,
             "role_attestation" => Self::RoleAttestation,
+            "content_assertion" => Self::ContentAssertion,
             "chain_anchor" => Self::ChainAnchor,
             "key_transition" => Self::KeyTransition,
             _ => return Err(Invalid),

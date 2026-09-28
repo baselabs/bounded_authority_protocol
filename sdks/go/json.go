@@ -57,11 +57,6 @@ func (Str) isValue()   {}
 func (Arr) isValue()   {}
 func (Obj) isValue()   {}
 
-// objectNameBytes is the fixed member-name UTF-8 byte ceiling. It is a
-// profile constant, not a caller-tightenable bound (it is absent from the
-// bounds surface).
-const objectNameBytes = 128
-
 type jsonDecoder struct {
 	data  []byte
 	pos   int
@@ -207,7 +202,7 @@ func (d *jsonDecoder) parseObject() (Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		if len(key) > objectNameBytes {
+		if len(key) > d.b.KeyBytes {
 			return nil, ErrInvalid
 		}
 		if _, dup := seen[key]; dup {
