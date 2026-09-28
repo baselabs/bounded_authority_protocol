@@ -23,12 +23,6 @@ cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for
 
 ## Installation
 
-The package is published on Hex (release 0.7.0, published 2026-09-28 UTC: the
-content-assertion release; registry checksum
-`777c606660727781ba03b742e7a7785f2655814048fe365f415b3a0c7253e0a8`, read back from the
-registry API and identical to the pre-publish build of the tagged tree). Registry consumers use
-the minor-bounded requirement:
-
 ```elixir
 def deps do
   [
@@ -37,38 +31,10 @@ def deps do
 end
 ```
 
-The package has **zero production dependencies**, no application callback, and no supervision tree.
-`v0.7.0` is the content-assertion release, the first release bearing the
-`bap-content-assertion/1` sibling profile
-([ADR 0037](docs/adr/0037-content-assertion-profile.md)): the
-`BoundedAuthorityProtocol.ContentAssertion.V1` namespace (`verify_assertion/2`,
-`verify_successor/3`, `content_digest/2`, `assertion_digest/2`, and the producer, assembler,
-and decoder), the tightenable `content_bytes` bound, and the certified content-assertion corpus
-(131 assertion, 9 digest, and 14 successor cases). Existing profiles, corpora, and verdicts are
-unchanged. `v0.6.2` repairs cross-toolchain compilation (the role-attestation codec now compiles
-version-stable Erlang on Elixir 1.18–1.20, restoring the compiled purity gates on the 1.18/1.19
-lanes) and the secret-scan sensitivity battery (the role-attestation corpus path regained its
-fixture) — no verdict moves on any input; registry checksum
-`62d111bbef0d2fabcb6956e9770cb4bb730bceb1671f57831de372424509060c`, read back from the registry
-API and identical to the tagged-tree two-build candidate; `v0.6.1` is the cross-vendor repair patch (eight
-confirmed findings fixed, three blocking — see CHANGELOG; registry checksum
-`81a58e84a6626e35ae1781c681d9fd6f28cb45c040d0c036a77f63b8ef1020d4`, read back from the registry
-API and identical to the tagged-tree two-build candidate); `v0.6.0` is the role-attestation
-release — the first release bearing the
-`bap-role-attestation/1` sibling profile
-([ADR 0036](docs/adr/0036-role-attestation-profile.md)): the
-`BoundedAuthorityProtocol.RoleAttestation.V1` namespace (`verify_attestation/2` and its three
-producer/decoder siblings) plus the certified 40-case profile corpus (registry checksum
-`1187d57928fbc893cccce893c38862450735ff24f25fb6466475f3bb239a9e17`, byte-identical to the
-tagged-tree two-build candidate, read back and pinned by a fresh `~> 0.6.0` consumer);
-`v0.5.1` was a docs-maintenance patch (registry checksum
-`60a8cd6e361938c5adfde1afcbbdc12426787a3d46b46c3437ef2d68a5808af0`, read back and pinned);
-`v0.5.0` identified the reviewable source release for the ES256 contract-major 3 activation
-(`BoundedAuthorityProtocol.V3`, [ADR 0035](docs/adr/0035-es256-contract-major-activation.md));
-`v0.4.0` identified the v2 activation; `v0.4.1` was the toolchain-and-platforms release
-(ADR 0031/0032); `v0.4.2` was a documentation-truth patch. The immutable package identity is
-the published Hex release, not the Git tag. Depend on the package identity — never a tag or a
-mutable checkout.
+The package has **zero production dependencies**, no application callback, and no supervision
+tree. It requires Elixir 1.18, 1.19 or 1.20 on Erlang/OTP 27 through 29. Depend on the
+published Hex release, never a Git tag or a checkout. Release notes are in the
+[changelog](CHANGELOG.md), and migration notes in [Upgrading](docs/guides/upgrading.md).
 
 ## Holder-side signer: the report adapter
 
