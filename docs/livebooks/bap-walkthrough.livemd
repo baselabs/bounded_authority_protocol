@@ -10,7 +10,7 @@ Mix.install([
 ])
 ```
 
-Hex 0.7.0 is published (2026-09-27), so the `Mix.install` above resolves from the public
+Hex 0.7.0 is published (2026-09-28 UTC), so the `Mix.install` above resolves from the public
 registry. The immutable package identity is the published Hex release; the source tag is
 reviewable release evidence, not a substitute for it.
 
@@ -169,7 +169,7 @@ tampered =
   |> String.split(".")
   |> List.update_at(2, fn segment ->
     i = div(String.length(segment), 2)
-    <<head::binary-size(i), byte, tail::binary>> = segment
+    <<head::binary-size(^i), byte, tail::binary>> = segment
     head <> <<Bitwise.bxor(byte, 1)>> <> tail
   end)
   |> Enum.join(".")

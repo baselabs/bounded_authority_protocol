@@ -151,10 +151,11 @@ immutable candidate. Complete registry, changelog, roadmap, documentation, and
 package-identity work. An exact package/release authorization is still required.
 Neither this decision nor source qualification publishes any package.
 
-Release status (September 27, 2026): the revision-1 corpus is frozen and its index is
+Release status (September 28, 2026): the revision-1 corpus is frozen and its index is
 pinned in the specification and requirement map. Reference and SDK conformance and the
 full package gate passed; the requirement map records the mutation evidence and its one
 static-type exception. A real companion-signer issuance and an independent Python
 consumption, including content-digest equality, were run against the built 0.7.0 package
-before publication. The owner authorized the exact 0.7.0 release, published to Hex.
+before publication; the registry checksum read back afterward
+(`777c606660727781ba03b742e7a7785f2655814048fe365f415b3a0c7253e0a8`) equals that build. The owner authorized the exact 0.7.0 release, published to Hex.
 Companion-signer dependency admission and consumer acceptance remain with their owners.

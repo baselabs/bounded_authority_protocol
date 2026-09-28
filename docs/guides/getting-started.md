@@ -13,8 +13,8 @@ normative profile; this guide is operational.
 
 ## Installation
 
-OBSERVED September 24, 2026: the [Hex release API](https://hex.pm/api/packages/bounded_authority_protocol/releases/0.6.2)
-reports release 0.6.2 published on September 24, 2026:
+OBSERVED September 28, 2026: the [Hex release API](https://hex.pm/api/packages/bounded_authority_protocol/releases/0.7.0)
+reports release 0.7.0 published on September 28, 2026 UTC:
 
 ```elixir
 defp deps do

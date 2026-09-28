@@ -2,7 +2,7 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
-## [0.7.0] — 2026-09-27
+## [0.7.0] — 2026-09-28
 
 The content-assertion release: the second sibling attestation profile. No contract-major,
 loopback, or role-attestation byte, verdict, or certified pin changes.

@@ -9,7 +9,7 @@ signing plus independent consumption, package qualification, and separate releas
 approval. Current implementation and validation evidence is retained in the private
 outcome record; this row does not claim release or downstream adoption.
 
-Status (September 27, 2026): released in Hex 0.7.0. The reference API, the Python, Go,
+Status (September 28, 2026): released in Hex 0.7.0. The reference API, the Python, Go,
 and Rust SDK surfaces, and the frozen revision-1 corpus pass conformance and the full
 package gate; mutation evidence, including one Rust survivor covered by static type
 evidence, is recorded in the [requirement map](design/content-assertion-requirement-map.md).

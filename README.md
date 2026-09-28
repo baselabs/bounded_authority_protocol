@@ -23,8 +23,11 @@ cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for
 
 ## Installation
 
-The package is published on Hex (release 0.7.0, published 2026-09-27: the content-assertion
-release). Registry consumers use the minor-bounded requirement:
+The package is published on Hex (release 0.7.0, published 2026-09-28 UTC: the
+content-assertion release; registry checksum
+`777c606660727781ba03b742e7a7785f2655814048fe365f415b3a0c7253e0a8`, read back from the
+registry API and identical to the pre-publish build of the tagged tree). Registry consumers use
+the minor-bounded requirement:
 
 ```elixir
 def deps do

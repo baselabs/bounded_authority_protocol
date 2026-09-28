@@ -6,9 +6,9 @@ The `0.7.x` source release line is supported. `v0.7.0` is the current tagged sou
 and contains contract-majors 1, 2, and 3 plus the role-attestation and content-assertion sibling
 profiles;
 the public API surface is locked. Registry consumers use the published Hex archive.
-OBSERVED September 24, 2026 UTC: the Hex release API reports `0.6.2` published on September 24,
-2026 (registry checksum `62d111bbef0d2fabcb6956e9770cb4bb730bceb1671f57831de372424509060c`). See
-the [registry release](https://hex.pm/packages/bounded_authority_protocol/0.6.2).
+OBSERVED September 28, 2026 UTC: the Hex release API reports `0.7.0` published on September 28,
+2026 (registry checksum `777c606660727781ba03b742e7a7785f2655814048fe365f415b3a0c7253e0a8`). See
+the [registry release](https://hex.pm/packages/bounded_authority_protocol/0.7.0).
 
 The verifier returns redacted, non-authorizing facts: trust and authorization, where a result
 carries them, are explicitly not evaluated. The package does not select trust, hold keys, reserve
