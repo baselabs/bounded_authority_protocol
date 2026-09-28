@@ -75,7 +75,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       # its validator changes against the certified corpus schema gates.
       {:jsonschex, "~> 0.10.0", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
-      {:sbom, "~> 0.10.0", only: [:dev, :test], runtime: false},
+      {:sbom, "~> 0.11.0", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.1", only: [:dev, :test], runtime: false}
     ]
   end
