@@ -425,8 +425,8 @@ found by the profile corpus's ES256 confusion case.
   reworded to neutral engineering vocabulary. The unreleased correction above records two
   phrases that remained in the 0.4.0 documentation.
   A new red-capable published-surface hygiene gate scans the package-files boundary for the
-  vocabulary class (word-bounded; the deliberately unshipped ROADMAP excluded; the legacy
-  local-harness path form banned while "forge" the cryptographic verb stays legal).
+  vocabulary class (word-bounded; the deliberately unshipped ROADMAP excluded; legacy
+  local-tooling paths banned while ordinary cryptographic vocabulary stays legal).
 
 ### Added — v2 contract-major: `lte`/`gte` range selector kinds activated (BAP-21, ADR 0030)
 
@@ -1266,7 +1266,7 @@ several note findings, all in surfaces this program touched. All fixed:
   grant-payload claim name in the [registries](docs/design/registries.md) (issuer-set offline
   floor limits: maximum value with explicit currency, maximum offline use count, offline-window
   expiry — a closed nested object; absence means online-only, per
-  [R-BAP-1](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/offline-authorization-requirements.md)). [ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)
+  R-BAP-1). [ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)
   carries the activating-major mechanism to spec quality: the closed `{cnt, cur, max, win}` object,
   the non-authorizing facts contract (an `offline_eligible` flag + `win` only — magnitudes are read
   from the decoded grant, not redacted facts), malformed⇒`:invalid` (online-only is the *absent*
@@ -1456,7 +1456,7 @@ several note findings, all in surfaces this program touched. All fixed:
 - Enforce raw numeric-lexeme bytes and exact decimal magnitude before OTP conversion; validate the
   companion Draft 2020-12 schemas with an independent validator and distinguish their structural
   code-point limits from the normative UTF-8 byte contract.
-- Align the tracked roadmap with Forge's authored-row contract while preserving BAP-00 through
+- Align the tracked roadmap with its authored-row contract while preserving BAP-00 through
   BAP-07 identities and exact dependency labels.
 - Document the exact public `BoundedAuthorityProtocol.V1.Json.decode/2` and
   `BoundedAuthorityProtocol.V1.Base64Url.decode/2` surfaces, tightening-only positive-integer

@@ -1,4 +1,4 @@
-# Interoperability report — BAP v1 conformance cross-validation
+# Interoperability report — BAP conformance cross-validation
 
 **Status:** current for corpus revision 1, certified index digest
 `TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs` (base64url SHA-256 of `index.json`;
@@ -8,6 +8,11 @@ from the corpus identity gates that run in `mix quality`; the case counts come f
 certified index; the per-implementation verdicts come from each implementation's own runner
 executed against the identical corpus. This document is regenerated-against-gates, not
 hand-maintained — a stale figure here fails the docs-currency surface.
+
+Last regenerated September 28, 2026 against protocol commit
+`cd3cec91c04ee4c3fae6746c511db9f04ebfef45` (Hex release 0.7.0) and the TypeScript verifier at
+`0813a4c5f9710d324a2f2807e2307c23a4a555e4` (npm release 0.5.0). Every result below was
+re-executed at those identities; the Go results used Go 1.25.14, the module's declared floor.
 
 ## Framing: test vectors + independent cross-validation
 
@@ -55,6 +60,62 @@ hashes. This is repository-executed cross-validation: the TypeScript result was 
 repository at its graduation (2026-09-14) and its suite now lives in the graduated repository;
 the Python, Rust, and Go SDKs remain unpublished.
 
+### Contract-majors 2 and 3
+
+The activated contract-majors are certified by their own revision-1 corpora, each bound by its
+index SHA-256: v2 (`priv/conformance/v2/corpus`, 268 cases, index
+`6de6289b7f47b0e0a78ea4610e7844a0f1d5247d8eace02ec9cf9841308f13d0`) and v3
+(`priv/conformance/v3/corpus`, 292 cases, index
+`a5c8075e7534345c3bb6611d0b40292904bcfa3af0702e07ae014fa66926433c`).
+
+| Implementation | v2 result | v3 result |
+|---|---|---|
+| Elixir reference CLI | **268/268 agreed**, 0 disagreed | **292/292 agreed**, 0 disagreed |
+| TypeScript (`@bounded-authority-protocol/verifier` 0.5.0) | **268/268 agreed**, census two-way (17 keys) | **292/292 agreed**, census two-way (11 keys) |
+| Python (`bounded-authority-verifier`) | **268/268 agreed**, census two-way (17 keys) | **292/292 agreed**, census two-way (11 keys) |
+| Rust (`bounded-authority-protocol`) | **268/268 agreed**, census 17/17 | **292/292 agreed**, census 11/11 |
+| Go (`bounded_authority_protocol_go`) | **268/268 agreed**, discovered keys within the 17 declared | **292/292 agreed**, discovered keys within the 11 declared |
+
+The v2 and v3 census contract compares the curated key inputs with the index fingerprints in both
+directions and requires every discovered key to be declared; the Go runner reports the discovered
+subset and the declared total separately. Each runner asserts its corpus index digest before
+executing any case.
+
+### Role-attestation sibling profile
+
+The byte-distinct `bap-role-attestation/1` profile (ADR 0036) is certified by its revision-1
+corpus at `priv/conformance/attestation-profiles/role-attestation/v1`, index SHA-256
+`be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a`, binding exactly
+`profile.json` and `attestation-cases.json`.
+
+| Implementation | Result |
+|---|---|
+| Elixir reference (`mix role_attestation.verify`) | **40/40 decode and 40/40 verify agreed**, cross-profile rejection against v1, v2, and v3 |
+| TypeScript 0.5.0 | **40/40 decode and 40/40 verify agreed**, producer and assembly bytes equal the certified compact, cross-profile rejection in both directions |
+| Python | certified-corpus test passes; asserts 40 cases against the pinned index |
+| Rust | certified-corpus test passes; asserts 40 cases against the pinned index |
+| Go | certified-corpus test passes; asserts 40 cases against the pinned index |
+
+### Content-assertion sibling profile
+
+The byte-distinct `bap-content-assertion/1` profile (ADR 0037, first released in 0.7.0) is
+certified by its revision-1 corpus at `priv/conformance/attestation-profiles/content-assertion/v1`,
+index SHA-256 `14b7436ccf7cc91fece52a1578c3760df6720a93494d147ee5ab523e2ce21876`, binding eight
+files: 131 assertion cases, 9 content-digest cases, and 14 successor cases.
+
+| Implementation | Result |
+|---|---|
+| Elixir reference (`mix content_assertion.verify`) | corpus consumer passes on the pinned index, 0 failures |
+| TypeScript 0.5.0 | **131 assertions, 9 digests, 14 successors agreed**; 38 producer and assembly byte checks |
+| Python | certified-corpus tests pass; assert 131, 9, and 14 cases and the 38 producer vectors |
+| Rust | certified-corpus and successor tests pass; case counts equal the pinned index |
+| Go | certified-corpus and successor tests pass; asserts 131, 9, and 14 cases |
+
+Before the 0.7.0 publication, the holder-side companion signer produced a content assertion
+against the built package, and the independent Python verifier accepted it with exact
+content-digest equality; changed content, a wrong key, and `now == exp` were refused. The
+published registry checksum equals that build.
+
 ### Independent Node second-implementation runners
 
 Three runner-authored-from-the-corpus Node implementations (node:* only; the corpus is the
@@ -79,9 +140,9 @@ normative oracle for their verdicts):
 4. Every implementation additionally ships a permissiveness mutation battery: the guard
    families that keep it from being MORE permissive than the reference are each proven
    red-capable (construct the defect, watch the test go green, fix).
-5. The application-profile corpus is separate from the standard corpus. Each implementation
-   verifies the exact two-file set and counts, then executes all URI and proof cases through its
-   separately named local-profile surfaces; no implementation infers or retries a profile.
+5. Each application-profile and attestation-profile corpus is separate from the standard corpora.
+   Each implementation verifies the exact declared file set and counts, then executes every case
+   through the profile's separately named surfaces; no implementation infers or retries a profile.
 
 ## Reproducing
 
@@ -98,10 +159,8 @@ their native APIs; the TypeScript suite's equivalent runs live in its graduated 
   graduation on first publication); their cross-validation above is repository-executed, not
   registry-distributed. The TypeScript SDK graduated on first publication (2026-09-14) and is
   published from its own repository.
-- The per-implementation tables cover the frozen standard v1 profile and the local-loopback HTTP
-  application profile; the activated contract-major 2 (268-case) and 3 (292-case) corpora are
-  certified in the [requirement map](requirement-map.md) and executed by every SDK's CI
-  conformance runners (`.github/workflows/sdks.yml`), and join this report as their own sections
-  at its next regeneration against those gates.
+- For the Python, Rust, and Go SDKs the attestation-profile rows report their certified-corpus
+  tests (which assert the pinned index and the exact case counts), not a separate agreement
+  printout. The Elixir and TypeScript rows report their runners' printed agreement figures.
 - The local-profile real-socket drill is implemented in the Elixir release gate. The other SDK
   results certify bytes and verdicts against the shared corpus, not live transport composition.

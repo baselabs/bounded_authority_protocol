@@ -11,14 +11,9 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
   # four ADRs shipped naming local harness paths and AI-vendor review peers — and was
   # neutralized before the next release; this gate makes the class red-capable instead of a
   # one-time sweep. The scanned set mirrors the mix.exs package `files` boundary (ROADMAP is outside that
-  # boundary and is asserted absent from the scan). "forge" as a WORD is legitimate cryptographic vocabulary
-  # (spec/formal/attacker-model.md: an attacker "forges" messages). The legacy path form
-  # and explicit authoring-tool phrases are banned.
+  # boundary and is asserted absent from the scan). Explicit authoring-tool names are banned.
   @banned [
     ~r/\bkimosabe\b/i,
-    ~r/\.forge\//i,
-    ~r/\bforge-era\b/i,
-    ~r/\bforge (?:whitelist|skill)\b/i,
     ~r/\bcodex\b/i,
     ~r/\bclaude\b/i,
     ~r/\bglm\b/i,
@@ -121,10 +116,6 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
   test "the banned set is red-capable (a planted term is caught on every pattern)" do
     planted = [
       "a kimosabe note",
-      "see .forge/critical-surfaces",
-      "a forge-era artifact",
-      "per the forge whitelist",
-      "the forge skill rules",
       "codex reviewed",
       "claude reviewed",
       "glm lens",

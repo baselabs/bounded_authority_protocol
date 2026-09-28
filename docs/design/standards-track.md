@@ -144,8 +144,8 @@ missing corpus case, and the mapping exposes which.
 
 ## Registrations
 
-The protocol's claim names (`ba_inv`, `ba_op`, `ba_req`) and `typ` values (`ba+cap`,
-`ba+loopback-proof`, `ba+chain-anchor`, `ba+key-transition`) are currently unregistered. For the standards track they
+The protocol's claim names (`ba_inv`, `ba_op`, `ba_req`) and `typ` values (`ba+cap`, `ba+loopback-proof`, `ba+chain-anchor`,
+`ba+key-transition`, `ba+role-attestation`, `ba+content-assertion`) are currently unregistered. For the standards track they
 are registered with IANA — the JWT Claims registry and the media-type suffix conventions
 respectively — both for collision safety and because registration is the visible signal of a
 standards posture rather than a vendor format. Registration templates are prepared as their own

@@ -88,10 +88,8 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         )
         self.write_manifest(*self.patterns)
         self.initialize(len(self.patterns))
-        critical_surfaces = self.repo / ".kimosabe" / "critical-surfaces"
-        critical_surfaces.write_text("public fixture\n", encoding="utf-8")
         (self.repo / "baseline.txt").write_text("clean\n", encoding="utf-8")
-        git(self.repo, "add", "baseline.txt", ".kimosabe/critical-surfaces")
+        git(self.repo, "add", "baseline.txt")
         git(self.repo, "commit", "-qm", "baseline")
 
     def tearDown(self) -> None:
@@ -778,7 +776,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         (self.repo / ".kimosabe" / "private-identifiers").unlink()
         shutil.rmtree(self.repo / ".kimosabe" / "evidence")
         git(self.repo, "config", "--local", "--unset-all", ACTIVATION_CONFIG_KEY)
-        self.assertTrue((self.repo / ".kimosabe" / "critical-surfaces").is_file())
+        self.assertEqual(git(self.repo, "ls-files", ".kimosabe").strip(), "")
         self.copy_hook_sources()
         subdirectory = self.repo / "subdirectory"
         subdirectory.mkdir()

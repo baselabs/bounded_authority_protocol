@@ -23,4 +23,5 @@
 # FROM the lockfile, so it is tracked.
 /sdks/python/uv.lock
 .kimosabe/
-/.forge/
+# Bytecode from running scripts/test_private_identifier_guard.py.
+/scripts/__pycache__/

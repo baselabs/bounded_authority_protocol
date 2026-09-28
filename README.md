@@ -79,8 +79,10 @@ The holder-side companion is
 ([GitHub](https://github.com/baselabs/bounded_authority_report_adapter)): it takes a local
 key handle (`{module(), term()}` — your HSM, KMS, or in-process test key; the private key never
 enters the library) and a protocol signing input, and produces the signed compact form for
-holder proofs, local-loopback application proofs, boundary anchors, key transitions, and role
-attestations.
+holder proofs, local-loopback application proofs, grants, boundary anchors, and key transitions
+under contract-majors 1 and 3. Its grant signing can require an authority-signed role
+attestation, which it verifies through this package before signing. Content-assertion signing
+is not yet in a released adapter version.
 The dependency is one-directional: verifiers depend only on this protocol package; the adapter
 depends on this package; this package never depends on the adapter.
 

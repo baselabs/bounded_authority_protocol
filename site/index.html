@@ -116,7 +116,7 @@
       <h3><svg class="ic"><use href="#i-doc"/></svg> The protocol <small>· this repository</small></h3>
       <p>The wire specs, the ADR library (thirty-plus recorded decisions), the certified
       conformance corpora, and the threat model. Everything else implements this.</p>
-      <div class="links"><a href="https://github.com/baselabs/bounded_authority_protocol">repository</a><a href="#specs">specs</a><a href="#adrs">ADRs</a></div>
+      <div class="links"><a href="https://hex.pm/packages/bounded_authority_protocol">hex.pm</a><a href="https://github.com/baselabs/bounded_authority_protocol">repository</a><a href="#specs">specs</a><a href="#adrs">ADRs</a></div>
     </article>
     <article class="famcard">
       <h3><svg class="ic"><use href="#i-seal"/></svg> The signer <small>· TypeScript</small></h3>
@@ -126,14 +126,15 @@
     </article>
     <article class="famcard">
       <h3><svg class="ic"><use href="#i-shield"/></svg> The verifier <small>· TypeScript</small></h3>
-      <p>The deterministic verify side: checkEnvelope, decode, and the historical surfaces —
-      closed results, pure verify path, conformance-proven against the certified corpora.</p>
+      <p>The deterministic verify side for all three contract-majors plus the role-attestation and
+      content-assertion profiles: checkEnvelope, decode, and the historical surfaces — closed
+      results, pure verify path, conformance-proven against the certified corpora.</p>
       <div class="links"><a href="https://baselabs.github.io/bounded_authority_protocol_typescript/">the bench</a><a href="https://www.npmjs.com/package/@bounded-authority-protocol/verifier">npm</a><a href="https://github.com/baselabs/bounded_authority_protocol_typescript">repository</a></div>
     </article>
     <article class="famcard">
       <h3><svg class="ic"><use href="#i-key"/></svg> The Elixir reference <small>· bounded_authority_report_adapter</small></h3>
-      <p>The reference holder-side implementation the TypeScript signer ports — plus the Elixir
-      verifier package this monorepo ships. Same wire bytes, both ecosystems.</p>
+      <p>The reference holder-side implementation the TypeScript signer ports, alongside the
+      Elixir verifier package this repository publishes. Same wire bytes, both ecosystems.</p>
       <div class="links"><a href="https://hex.pm/packages/bounded_authority_report_adapter">hex.pm</a><a href="https://github.com/baselabs/bounded_authority_report_adapter">repository</a><a href="https://baselabs.github.io/bounded_authority_signer_typescript/">playground</a></div>
     </article>
   </div>
@@ -145,20 +146,23 @@
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v1.md">bap-v1</a><br><small>the frozen v1 wire format — grants, proofs, compacts</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-local-loopback-http-v1.md">bap-local-loopback-http-v1</a><br><small>the byte-distinct development-listener profile</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v2.md">bap-v2</a><br><small>the v2 contract-major, beside the byte-frozen v1</small></div>
-    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/cddl">cddl</a><br><small>machine-readable structure definitions</small></div>
-    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/facts">facts</a><br><small>the verification fact definitions</small></div>
-    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/formal">formal</a><br><small>formal treatments</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v3.md">bap-v3</a><br><small>the v3 contract-major: the ES256 suite</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-role-attestation-v1.md">bap-role-attestation-v1</a><br><small>a signed binding of a subject key to a role</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-content-assertion-v1.md">bap-content-assertion-v1</a><br><small>a signed binding of exact content to its context and lineage</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/tree/main/spec/cddl">cddl</a><br><small>machine-readable structure definitions</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/tree/main/spec/facts">facts</a><br><small>the verification fact definitions</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/tree/main/spec/formal">formal</a><br><small>formal treatments</small></div>
   </div>
 </section>
 
 <section id="adrs" class="wrap">
   <div class="sec-head"><h2>Decisions, recorded</h2>
   <p>Every load-bearing choice in the protocol has an ADR — from the public verifier boundary and
-  the normative parsing profile to the tri-platform build bar and dependency-currency discipline.</p></div>
+  the normative parsing profile to the developer-portability contract and dependency-currency discipline.</p></div>
   <div class="libgrid">
-    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/tree/main/doc">the full ADR library</a><br><small>0001 through today, each with context and consequences</small></div>
-    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/doc/threat-model.md">the threat model</a><br><small>trust boundaries and the named misuses</small></div>
-    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/doc/typescript-sdk.md">the TypeScript SDK note</a><br><small>how the npm packages track this spec</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/tree/main/docs/adr">the full ADR library</a><br><small>0001 through today, each with context and consequences</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/threat-model.md">the threat model</a><br><small>trust boundaries and the named misuses</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/typescript-sdk.md">the TypeScript SDK note</a><br><small>how the npm packages track this spec</small></div>
   </div>
 </section>
 </main>

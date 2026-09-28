@@ -30,7 +30,6 @@ trusted-key discovery, issuance, live revocation state, replay reservation, exec
 evidence writes, archive removal, network client, OTP server, host-product vocabulary, or QorPay
 compatibility.
 
-<!-- forge-roadmap-schema: 1 -->
 | ID | What | Acceptance | Depends | Why |
 |---|---|---|---|---|
 | BAP-00 | **Public authority boundary** — Public repository, Apache-2.0 license, public/private boundary, tracked architecture, and cold-start authority, slug:bap-00 | Evidence recorded below | — | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) |

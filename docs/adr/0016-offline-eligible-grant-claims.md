@@ -10,8 +10,8 @@ The offline-authorization surface — endpoints that must answer during a connec
 (kiosk / EV-charging / vending fleets) — needs the issuer to price an offline risk acceptance
 into a grant, EMV-style: explicit floor limits the endpoint honors at its own risk within an
 offline window, with deferred consumption reconciled later. The requirements are settled on
-both sides: the protocol-side
-[offline requirements](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/offline-authorization-requirements.md) (R-BAP-1..6) and the
+both sides: the protocol-side offline requirements input (R-BAP-1..6; withdrawn from the
+published tree in 0.5.1, with this ADR as the mechanism of record) and the
 private runtime's ADR 0014 of the private `bounded_authority` runtime (offline authorization surface)
 + R-BA-1..7 (the offline DECISION is endpoint-side; the runtime's role is issuance +
 reconciliation + distinguishability + freshness).
@@ -267,5 +267,5 @@ compares an amount to `max`).
   `ba_sut` reserve-and-activate precedent.
 - [ADR 0010](0010-delegation-with-attenuation.md) — the closest precedent (`ba_dlg`) and the
   composition surface §6 extends.
-- [offline requirements](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/offline-authorization-requirements.md) (R-BAP-1..6); the private
+- The offline requirements input (R-BAP-1..6), withdrawn from the published tree in 0.5.1; the private
   runtime's ADR 0014 (R-BA-1..7).

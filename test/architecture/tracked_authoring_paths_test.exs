@@ -6,78 +6,50 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
 
   alias BoundedAuthorityProtocol.TestSupport.Portable
 
-  @manifest """
-  lib/bounded_authority_protocol.ex
-  lib/bounded_authority_protocol/**
-  priv/conformance/**
-  test/conformance/**
-  docs/protocol-v1.md
-  docs/governance.md
-  docs/design/protocol-charter.md
-  docs/design/conformance-contract.md
-  docs/design/standards-track.md
-  docs/design/threat-model.md
-  usage-rules.md
-  docs/adr/**
-  SECURITY.md
-  sdks/**
-  """
-  @exception ".kimosabe/critical-surfaces"
-  # Owner-directed handoff adoption (2026-09-19, commit 47297b8) tracks exactly one handoff
-  # record in this repository. The exception admits that one path at exactly its committed
-  # blob: any other content at the path, any other mode or stage, and any other handoff path
-  # remain findings. A future adoption pins its own path and blob here, in its own commit.
-  @handoff ".kimosabe/handoffs/2026-09-19-ap2-interop-and-ecdsa-suite.md"
-  @handoff_blob "0fe6f3dc484badd574c2c35e741e57e2d2feffe4"
+  # The local .kimosabe directory is never tracked. Two paths were tracked by earlier commits
+  # and untracked on 2026-09-28; they remain in HEAD ancestry until that history is rewritten,
+  # so the history scan admits exactly these two paths and nothing else. The index admits none.
+  @historical [
+    ".kimosabe/critical-surfaces",
+    ".kimosabe/handoffs/2026-09-19-ap2-interop-and-ecdsa-suite.md"
+  ]
 
   test "real index and HEAD ancestry exclude local authoring directories" do
     entries = git!(".", ["ls-files", "-z"]) |> String.split(<<0>>, trim: true)
 
-    for positive <- [".gitleaks.toml", ".formatter.exs", @exception, @handoff] do
+    for positive <- [".gitleaks.toml", ".formatter.exs"] do
       assert positive in entries
+    end
+
+    for historical <- @historical do
+      refute historical in entries
     end
 
     assert scan(".") == []
   end
 
-  test "the handoff exception admits exactly the pinned path, blob, and mode" do
-    repo = repo!()
-    real_bytes = File.read!(@handoff)
-
-    # Wrong bytes at the pinned path stay a finding.
-    put!(repo, @handoff, "tampered handoff\n")
-    assert scan(repo) != []
-
-    # A different handoff path stays a finding even carrying the pinned bytes.
-    put!(repo, ".kimosabe/handoffs/2026-09-19-other.md", real_bytes)
-    assert scan(repo) != []
-
-    git!(repo, ["rm", "-f", "--", @handoff, ".kimosabe/handoffs/2026-09-19-other.md"])
-
-    # Wrong mode, and a gitlink, stay findings even with the pinned blob.
-    for mode <- ["100755", "120000", "160000"] do
-      git!(repo, ["update-index", "--add", "--cacheinfo", "#{mode},#{@handoff_blob},#{@handoff}"])
-      assert scan(repo) != []
+  test "a formerly tracked path is a finding when tracked again" do
+    for historical <- @historical do
+      repo = repo!()
+      put!(repo, historical, "public canary\n")
+      assert scan(repo) != [], historical
     end
-
-    # The pinned combination alone passes.
-    git!(repo, ["update-index", "--add", "--cacheinfo", "100644,#{@handoff_blob},#{@handoff}"])
-    assert scan(repo) == []
   end
 
-  test "exact regular manifest passes; every path component is checked" do
+  test "every path component is checked" do
     repo = repo!()
     assert scan(repo) == []
 
     # Win32 cannot represent the trailing-dot/space names, and its case-insensitive
     # filesystem collapses ".KIMOSABE" onto ".kimosabe"; those components stay
     # covered on every POSIX lane.
-    win32_unrepresentable = [".KIMOSABE/x", ".kimosabe./x", ".forge /x"]
+    win32_unrepresentable = [".KIMOSABE/x", ".kimosabe./x", ".kimosabe /x"]
 
     paths =
       [
+        ".kimosabe/x",
         "lib/.kimosabe/x",
-        ".forge",
+        ".kimosabe",
         ".kimosabe/critical-surfaces.bak",
         "sub/.kimosabe/critical-surfaces"
       ] ++
@@ -91,54 +63,26 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
       assert scan(repo) != [], path
       git!(repo, ["rm", "-f", "--", path])
     end
-
-    git!(repo, ["rm", "-f", "--", @exception])
-    put!(repo, @exception <> "/x", "public canary\n")
-    assert scan(repo) != []
   end
 
-  test "the exception pins bytes and modes without following links" do
+  test "a directory gitlink or symlink entry is a finding" do
     repo = repo!()
-
-    for content <- [
-          @manifest <> "x",
-          String.replace(@manifest, "\n", "\r\n"),
-          <<239, 187, 191>> <> @manifest
-        ] do
-      put!(repo, @exception, content)
-      assert scan(repo) != []
-    end
-
-    put!(repo, @exception, @manifest)
-    blob = git!(repo, ["rev-parse", ":" <> @exception]) |> String.trim()
     commit = git!(repo, ["rev-parse", "HEAD"]) |> String.trim()
-
-    for {mode, object} <- [{"120000", blob}, {"100755", blob}, {"160000", commit}] do
-      git!(repo, ["update-index", "--cacheinfo", "#{mode},#{object},#{@exception}"])
-      assert scan(repo) != []
-    end
-
-    git!(repo, ["update-index", "--cacheinfo", "100644,#{blob},#{@exception}"])
-    File.rm!(Path.join(repo, @exception))
-
-    unless Portable.windows?() do
-      # Symlink creation needs SeCreateSymbolicLinkPrivilege on Windows; the
-      # linked-exception rejection stays covered on every POSIX lane.
-      File.ln_s!("/nonexistent-public-probe", Path.join(repo, @exception))
-      assert scan(repo) != []
-    end
-
-    git!(repo, ["update-index", "--force-remove", @exception])
     git!(repo, ["update-index", "--add", "--cacheinfo", "160000,#{commit},.kimosabe"])
+    assert scan(repo) != []
+    git!(repo, ["update-index", "--force-remove", ".kimosabe"])
+
+    blob = git!(repo, ["hash-object", "-w", "--stdin"], "public-target") |> String.trim()
+    git!(repo, ["update-index", "--add", "--cacheinfo", "120000,#{blob},.kimosabe"])
     assert scan(repo) != []
   end
 
   test "deleted side-branch paths and renames remain visible after merge" do
     repo = repo!()
     git!(repo, ["switch", "-c", "side"])
-    put!(repo, ".forge/removed.txt", "public canary\n")
+    put!(repo, ".kimosabe/removed.txt", "public canary\n")
     commit!(repo)
-    git!(repo, ["mv", ".forge/removed.txt", "renamed.txt"])
+    git!(repo, ["mv", ".kimosabe/removed.txt", "renamed.txt"])
     commit!(repo)
     git!(repo, ["switch", "main"])
     put!(repo, "main.txt", "main\n")
@@ -156,11 +100,20 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     put!(repo, "main.txt", "main\n")
     commit!(repo)
     git!(repo, ["merge", "--no-commit", "side"])
-    put!(repo, ".forge/merge.txt", "public canary\n")
+    put!(repo, ".kimosabe/merge.txt", "public canary\n")
     commit!(repo)
-    git!(repo, ["rm", ".forge/merge.txt"])
+    git!(repo, ["rm", ".kimosabe/merge.txt"])
     commit!(repo)
     git!(repo, ["config", "log.diffMerges", "off"])
+    assert scan(repo) != []
+  end
+
+  test "a history path outside the two historical paths is a finding" do
+    repo = repo!()
+    put!(repo, ".kimosabe/handoffs/2026-09-19-other.md", "public canary\n")
+    commit!(repo)
+    git!(repo, ["rm", "-f", "--", ".kimosabe/handoffs/2026-09-19-other.md"])
+    commit!(repo)
     assert scan(repo) != []
   end
 
@@ -178,38 +131,18 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     end
   end
 
-  test "unreadable working manifest fails closed and a linked parent is rejected" do
-    repo = repo!()
-    manifest = Path.join(repo, @exception)
-    File.rm!(manifest)
-    assert_raise File.Error, fn -> scan(repo) end
-    File.write!(manifest, @manifest)
-
-    unless Portable.windows?() do
-      # Windows file modes never carry execute bits (the 0o755/0o644 discrimination
-      # cannot hold there) and symlink creation needs privilege; both stay covered on
-      # every POSIX lane.
-      File.chmod!(manifest, 0o755)
-      assert scan(repo) != []
-      File.chmod!(manifest, 0o644)
-      assert scan(repo) == []
-      File.rename!(Path.dirname(manifest), Path.join(repo, "public-target"))
-      File.ln_s!("public-target", Path.dirname(manifest))
-      assert scan(repo) != []
-    end
-  end
-
-  # Read the index and its blobs, never the contents of a tracked symlink. History is
-  # HEAD ancestry, including both parents of merges; unrelated refs are an owner audit.
+  # Read the index, never the contents of a tracked file. History is HEAD ancestry,
+  # including both parents of merges; unrelated refs are an owner audit.
   def scan(repo) do
     unless String.trim(git!(repo, ["rev-parse", "--is-shallow-repository"])) == "false" do
       raise "full history is required"
     end
 
     tip =
-      git!(repo, ["ls-files", "-s", "-z"])
+      git!(repo, ["ls-files", "-z"])
       |> String.split(<<0>>, trim: true)
-      |> Enum.flat_map(&index_findings(repo, &1))
+      |> Enum.filter(&forbidden_path?/1)
+      |> Enum.map(fn _path -> :tracked_path end)
 
     history =
       git!(repo, [
@@ -223,56 +156,17 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
       ])
       |> String.split(<<0>>, trim: true)
       |> Enum.map(&String.trim_leading(&1, "\n"))
-      |> Enum.filter(&(&1 != @exception and &1 != @handoff and forbidden_path?(&1)))
+      |> Enum.filter(&(&1 not in @historical and forbidden_path?(&1)))
       |> Enum.map(fn _path -> :historical_path end)
 
     tip ++ history
-  end
-
-  defp index_findings(repo, entry) do
-    [metadata, path] = String.split(entry, "\t", parts: 2)
-    [mode, blob, stage] = String.split(metadata, " ")
-
-    cond do
-      path == @exception -> manifest_finding(repo, {mode, blob, stage}, path)
-      path == @handoff -> handoff_finding({mode, blob, stage})
-      forbidden_path?(path) -> [:tracked_path]
-      true -> []
-    end
-  end
-
-  defp manifest_finding(repo, {mode, blob, stage}, path) do
-    if mode == "100644" and stage == "0" and
-         git!(repo, ["cat-file", "blob", blob]) == @manifest and
-         regular_manifest?(Path.join(repo, path)) do
-      []
-    else
-      [:manifest]
-    end
-  end
-
-  defp handoff_finding({mode, blob, stage}) do
-    if mode == "100644" and stage == "0" and blob == @handoff_blob do
-      []
-    else
-      [:handoff_pin]
-    end
-  end
-
-  defp regular_manifest?(path) do
-    with %{type: :directory} <- File.lstat!(Path.dirname(path)),
-         %{type: :regular, mode: mode} <- File.lstat!(path) do
-      Bitwise.band(mode, 0o111) == 0 and File.read!(path) == @manifest
-    else
-      _ -> false
-    end
   end
 
   defp forbidden_path?(path) do
     path
     |> String.split("/")
     |> Enum.any?(fn component ->
-      Regex.replace(~r/[. ]+$/, ascii_lowercase(component), "") in [".forge", ".kimosabe"]
+      Regex.replace(~r/[. ]+$/, ascii_lowercase(component), "") == ".kimosabe"
     end)
   end
 
@@ -292,7 +186,7 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     git!(repo, ["config", "core.hooksPath", "/dev/null"])
     git!(repo, ["config", "core.excludesFile", "/dev/null"])
     git!(repo, ["config", "core.ignoreCase", "false"])
-    put!(repo, @exception, @manifest)
+    put!(repo, "README.md", "public\n")
     commit!(repo)
     repo
   end
@@ -305,16 +199,38 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
 
   defp commit!(repo), do: git!(repo, ["commit", "-m", "public path probe"])
 
-  defp git!(repo, args) do
-    case System.cmd("git", ["--no-replace-objects", "-C", repo | args],
-           stderr_to_stdout: true,
-           env: [
-             {"GIT_GRAFT_FILE", "/dev/null"},
-             {"GIT_CONFIG_COUNT", "1"},
-             {"GIT_CONFIG_KEY_0", "advice.graftFileDeprecated"},
-             {"GIT_CONFIG_VALUE_0", "false"}
-           ]
-         ) do
+  defp git!(repo, args, input \\ nil) do
+    options = [
+      stderr_to_stdout: true,
+      env: [
+        {"GIT_GRAFT_FILE", "/dev/null"},
+        {"GIT_CONFIG_COUNT", "1"},
+        {"GIT_CONFIG_KEY_0", "advice.graftFileDeprecated"},
+        {"GIT_CONFIG_VALUE_0", "false"}
+      ]
+    ]
+
+    result =
+      if input do
+        stdin_path =
+          Path.join(System.tmp_dir!(), "bap-path-guard-in-#{System.unique_integer([:positive])}")
+
+        File.write!(stdin_path, input)
+
+        try do
+          System.cmd(
+            "sh",
+            ["-c", ~s(git --no-replace-objects -C "$1" "${@:2}" < "$0"), stdin_path, repo | args],
+            options
+          )
+        after
+          File.rm(stdin_path)
+        end
+      else
+        System.cmd("git", ["--no-replace-objects", "-C", repo | args], options)
+      end
+
+    case result do
       {output, 0} -> output
       {_output, status} -> raise "Git failed with exit #{status}"
     end
