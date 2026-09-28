@@ -96,8 +96,8 @@ transport-composed) under [`docs/adr/`](docs/adr/). BAP-19's source identity is 
 `v0.3.0`; the registry publication and checksum read-back closed 2026-08-31, and downstream
 immutable-package adoption is tracked in the private runtime.
 
-The content-assertion release does not establish companion-signer dependency admission or any
-consumer's acceptance; those are tracked by their owners.
+The companion signer `bounded_authority_report_adapter` 0.9.0 signs this profile over 0.7.0
+(`sign_content_assertion/3`). Each consumer's acceptance is tracked by that consumer.
 
 ## Critical rules
 

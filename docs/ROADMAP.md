@@ -14,8 +14,9 @@ and Rust SDK surfaces, and the frozen revision-1 corpus pass conformance and the
 package gate; mutation evidence, including one Rust survivor covered by static type
 evidence, is recorded in the [requirement map](design/content-assertion-requirement-map.md).
 The graduated TypeScript verifier implements the surface in its own repository and
-releases through its own publishing workflow. Open outside this package: the companion
-signer's dependency admission and release, and consumer acceptance.
+releases through its own publishing workflow. The companion signer
+`bounded_authority_report_adapter` 0.9.0 signs the profile over 0.7.0. Open outside this
+package: consumer acceptance.
 
 > **Beamline deprecation — September 21, 2026.** Beamline names and test counts in the closeout evidence below refer to a retired private consumer. They remain historical receipts, not current integration requirements or proof of its successor. Public protocol semantics and package independence are unchanged; the package acquires no host-runtime dependency.
 

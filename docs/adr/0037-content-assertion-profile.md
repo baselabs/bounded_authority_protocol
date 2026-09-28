@@ -1,7 +1,7 @@
 # ADR 0037: The content-assertion sibling profile (`bap-content-assertion/1`)
 
-- Status: accepted; released in 0.7.0; companion-signer dependency admission and
-  consumer acceptance remain with their owners
+- Status: accepted; released in 0.7.0; the companion signer supports it from
+  `bounded_authority_report_adapter` 0.9.0; consumer acceptance remains with consumers
 - Date: September 27, 2026
 - Track: T2
 - Governing class: [ADR 0036](0036-role-attestation-profile.md), sibling attestation profiles
@@ -157,5 +157,8 @@ full package gate passed; the requirement map records the mutation evidence and 
 static-type exception. A real companion-signer issuance and an independent Python
 consumption, including content-digest equality, were run against the built 0.7.0 package
 before publication; the registry checksum read back afterward
-(`777c606660727781ba03b742e7a7785f2655814048fe365f415b3a0c7253e0a8`) equals that build. The owner authorized the exact 0.7.0 release, published to Hex.
-Companion-signer dependency admission and consumer acceptance remain with their owners.
+(`777c606660727781ba03b742e7a7785f2655814048fe365f415b3a0c7253e0a8`) equals that build.
+The owner authorized the exact 0.7.0 release, published to Hex. The companion signer
+`bounded_authority_report_adapter` 0.9.0 pins 0.7.0 and signs this profile; its output from
+a fresh registry install verified through the independent Python verifier. Consumer
+acceptance remains with consumers.

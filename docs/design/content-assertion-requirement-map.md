@@ -30,7 +30,9 @@ and each SDK's content-assertion tests and corpus runner. These observations pro
 local source behavior. The complete package gate (`mix quality`) passed on the release
 source. A real companion-signer issuance and an independent Python consumption,
 including content-digest equality, ran against the built 0.7.0 package before
-publication. Companion-signer dependency admission follows that package's own policy.
+publication. The companion signer `bounded_authority_report_adapter` 0.9.0 pins the
+published 0.7.0 package and signs this profile; its registry-installed output verified through
+the independent Python verifier.
 
 | Requirements (`REQ-CA1-` prefix) | Required evidence | Status |
 |---|---|---|
