@@ -5,9 +5,9 @@ docname: bap-content-assertion-v1
 
 # BAP Content Assertion Profile 1
 
-Document status: normative design for `bap-content-assertion/1`, revision 1;
-implemented in the source candidate; package publication and connected companion
-acceptance remain pending. Governing decision:
+Document status: normative contract for `bap-content-assertion/1`, revision 1;
+first released in package 0.7.0. Companion-signer dependency admission is governed
+by that package's own policy. Governing decision:
 [ADR 0037](../docs/adr/0037-content-assertion-profile.md).
 
 The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, and **MAY** are

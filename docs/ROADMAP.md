@@ -9,6 +9,14 @@ signing plus independent consumption, package qualification, and separate releas
 approval. Current implementation and validation evidence is retained in the private
 outcome record; this row does not claim release or downstream adoption.
 
+Status (September 27, 2026): released in Hex 0.7.0. The reference API, the Python, Go,
+and Rust SDK surfaces, and the frozen revision-1 corpus pass conformance and the full
+package gate; mutation evidence, including one Rust survivor covered by static type
+evidence, is recorded in the [requirement map](design/content-assertion-requirement-map.md).
+The graduated TypeScript verifier implements the surface in its own repository and
+releases through its own publishing workflow. Open outside this package: the companion
+signer's dependency admission and release, and consumer acceptance.
+
 > **Beamline deprecation — September 21, 2026.** Beamline names and test counts in the closeout evidence below refer to a retired private consumer. They remain historical receipts, not current integration requirements or proof of its successor. Public protocol semantics and package independence are unchanged; the package acquires no host-runtime dependency.
 
 **Status authority:** this file

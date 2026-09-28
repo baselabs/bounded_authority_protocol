@@ -20,7 +20,7 @@
 11. Treat chain consistency as consistency only. It cannot by itself prove that a validly
     shortened or relinked history omitted nothing.
 12. Keep commitment preimages private. The public row carries only a fixed-width commitment.
-13. Consume the published Hex release (`{:bounded_authority_protocol, "~> 0.6.2"}`) only after the
+13. Consume the published Hex release (`{:bounded_authority_protocol, "~> 0.7.0"}`) only after the
     registry exposes that immutable archive. A Git tag or mutable checkout is not a package
     identity. The standard v1 verification surface stays byte- and verdict-identical; the
     local-loopback application profile is selected only through its separately named API.
@@ -30,3 +30,8 @@
 15. For local-loopback HTTP, admit only literal `127.0.0.1` or `[::1]`, require the server nonce,
     derive the exact target from the direct listener, and reject proxy/forwarding-header authority.
     Never retry the standard profile after a local-profile rejection or vice versa.
+16. For content assertions, hash the exact retained content bytes with `content_digest/2` and
+    pass that digest, the pinned profile digest, every expected identifier, one caller-selected
+    attestor key and window, and `now` to `verify_assertion/2`. Verified facts prove signature,
+    context, and window only. Keep durable per-subject generation and digest state to refuse
+    replay, regression, and forks; `verify_successor/3` compares two facts values and nothing more.

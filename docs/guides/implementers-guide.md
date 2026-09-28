@@ -168,3 +168,32 @@ declared two-file set and per-file hashes, execute all 40 cases, and prove cross
 rejection in both directions. Derive every fingerprint with the RFC 7638 Ed25519 thumbprint
 preimage — never a hash of raw key bytes.
 
+## 11. Implementing the content-assertion sibling profile
+
+The content assertion is the second sibling attestation profile (ADR 0037): a standalone,
+grant-unbound compact defined by `spec/bap-content-assertion-v1.md` and certified under
+`priv/conformance/attestation-profiles/content-assertion/v1`.
+
+The protected header is exactly `{alg: "EdDSA", kid, typ: "ba+content-assertion"}`. The payload
+is exactly the thirteen members `v`, `jti`, `iss`, `aud`, `sub`, `profile`, `profile_digest`,
+`content_digest`, `gen`, `prev`, `iat`, `nbf`, and `exp`, in canonical JCS bytes. The three
+digests are canonical unpadded base64url of exactly 32 bytes; `gen == 1` exactly when `prev` is
+32 zero bytes; structural time is `iat <= nbf < exp`.
+
+`content_digest` is SHA-256 over `UTF8("BAP1-CONTENT") || 0x00 || content`, for 1 through
+`content_bytes` (65,536) bytes, and never parses the content. `assertion_digest` validates the
+compact as this profile and hashes its exact bytes with unprefixed SHA-256; it is the value a
+successor names in `prev`. Verification takes one caller-selected attestor key and window, the
+expected issuer, audience, subject, profile, profile digest, content digest, and `now`. It checks
+the kid binding, every expected value, key-window containment (`exp` may equal a finite
+`valid_before`), the half-open `[nbf, exp)` window, and the Ed25519 signature, returning redacted
+facts with `trust: :not_evaluated` and no authorization marker. Pairwise successor verification
+accepts only complete facts values and requires equal context, `gen + 1`, `prev` equal to the
+predecessor's digest, nondecreasing `iat`, and a different `jti`.
+
+Pin the exact profile index SHA-256
+(`14b7436ccf7cc91fece52a1578c3760df6720a93494d147ee5ab523e2ce21876`), verify the declared
+eight-file set and per-file hashes, execute all 131 assertion, 9 digest, and 14 successor cases,
+compare producer and assembly bytes where the corpus supplies them, and prove cross-profile
+rejection in both directions.
+

@@ -1,12 +1,5 @@
 # bounded_authority_protocol
 
-The unreleased content-assertion profile is defined by
-[ADR 0037](docs/adr/0037-content-assertion-profile.md) and the
-[normative contract](spec/bap-content-assertion-v1.md). It binds exact content bytes
-through a required expected digest and explicit context. Content interpretation,
-trust selection, and durable admission remain caller responsibilities. Source work
-and local checks do not establish a published package or consumer acceptance.
-
 Deterministic, dependency-free verification for cryptographically bounded, argument-level
 proof-of-possession authority — the open wire profile, verifier, and conformance suite for the
 Bounded Authority Protocol (contract-majors 1, 2, and 3).
@@ -30,25 +23,31 @@ cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for
 
 ## Installation
 
-The package is published on Hex (release 0.6.2, published 2026-09-24 — the cross-Elixir
-compilation and scan-sensitivity repair patch; no wire or public-API change; registry checksum
-`62d111bbef0d2fabcb6956e9770cb4bb730bceb1671f57831de372424509060c`, read back from the
-registry API and identical to the tagged-tree two-build candidate). Registry
-consumers use the minor-bounded requirement:
+The package is published on Hex (release 0.7.0, published 2026-09-27: the content-assertion
+release). Registry consumers use the minor-bounded requirement:
 
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.6.2"}
+    {:bounded_authority_protocol, "~> 0.7.0"}
   ]
 end
 ```
 
 The package has **zero production dependencies**, no application callback, and no supervision tree.
-`v0.6.2` repairs cross-toolchain compilation (the role-attestation codec now compiles
+`v0.7.0` is the content-assertion release, the first release bearing the
+`bap-content-assertion/1` sibling profile
+([ADR 0037](docs/adr/0037-content-assertion-profile.md)): the
+`BoundedAuthorityProtocol.ContentAssertion.V1` namespace (`verify_assertion/2`,
+`verify_successor/3`, `content_digest/2`, `assertion_digest/2`, and the producer, assembler,
+and decoder), the tightenable `content_bytes` bound, and the certified content-assertion corpus
+(131 assertion, 9 digest, and 14 successor cases). Existing profiles, corpora, and verdicts are
+unchanged. `v0.6.2` repairs cross-toolchain compilation (the role-attestation codec now compiles
 version-stable Erlang on Elixir 1.18–1.20, restoring the compiled purity gates on the 1.18/1.19
 lanes) and the secret-scan sensitivity battery (the role-attestation corpus path regained its
-fixture) — no verdict moves on any input; `v0.6.1` is the cross-vendor repair patch (eight
+fixture) — no verdict moves on any input; registry checksum
+`62d111bbef0d2fabcb6956e9770cb4bb730bceb1671f57831de372424509060c`, read back from the registry
+API and identical to the tagged-tree two-build candidate; `v0.6.1` is the cross-vendor repair patch (eight
 confirmed findings fixed, three blocking — see CHANGELOG; registry checksum
 `81a58e84a6626e35ae1781c681d9fd6f28cb45c040d0c036a77f63b8ef1020d4`, read back from the registry
 API and identical to the tagged-tree two-build candidate); `v0.6.0` is the role-attestation
@@ -132,6 +131,16 @@ redacted, non-authorizing `AttestationFacts` (`trust: :not_evaluated`). Which at
 which role a consumer requires, and replay reservation stay with the caller. Every contract-major
 profile rejects these bytes, and the profile rejects theirs.
 
+The content-assertion profile `BoundedAuthorityProtocol.ContentAssertion.V1` (ADR 0037) carries
+signed `typ: "ba+content-assertion"`: an attestor key binds the digest of exact external content
+bytes to an issuer, audience, lineage subject, semantic profile, validity window, and
+predecessor. `content_digest/2` hashes the bytes without parsing them. `verify_assertion/2`
+requires the caller-supplied attestor key and window, every expected identifier, the expected
+profile and content digests, and `now`; it returns redacted `ContentAssertionFacts`
+(`trust: :not_evaluated`). `verify_successor/3` checks one generation step between two facts
+values. Content meaning, trusted keys, durable lineage state, and replay stay with the caller.
+Every other profile rejects these bytes, and this profile rejects theirs.
+
 All verification inputs are explicit: the already-trusted public key, expected audience and
 instance, server-derived method, normalized URI, invocation id, operation, cast arguments,
 evaluation time, and limits. A successful result means only that the supplied bytes satisfy those
@@ -189,6 +198,17 @@ cross-profile rejection in both directions, printing a secret-free receipt:
 mix role_attestation.verify
 ```
 
+The content-assertion profile's certified corpus (revision 1: 131 assertion, 9 content-digest,
+and 14 successor cases; index SHA-256
+`14b7436ccf7cc91fece52a1578c3760df6720a93494d147ee5ab523e2ce21876`) lives under
+`priv/conformance/attestation-profiles/content-assertion/v1`. Its check verifies the index and
+file digests, every verdict, independent producer and assembly bytes, and cross-profile
+rejection:
+
+```bash
+mix content_assertion.verify
+```
+
 ## Cross-language verifier SDKs
 
 Alongside the Elixir package, the repository authors typed **verifier** SDKs of the frozen profiles
@@ -200,8 +220,9 @@ graduated on first publication (ADR 0015) and now lives at
 published to npm as [`@bounded-authority-protocol/verifier`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier). Every SDK passes the certified v1 (283), v2 (268), and v3 (292)
 conformance corpora recomputed from scratch, asserts each corpus index digest at load, and proves
 every parser-layer closure red-capable via a per-language mutation gate; the profile corpora
-(local-loopback 36 URI + 8 proof, role-attestation 40) run in the Elixir suite and the three
-in-repo SDKs, and the graduated TypeScript repository also runs the role-attestation corpus. Each
+(local-loopback 36 URI + 8 proof, role-attestation 40, content-assertion 131 + 9 + 14) run in
+the Elixir suite and the three in-repo SDKs, and the graduated TypeScript repository also runs the
+role-attestation and content-assertion corpora. Each
 SDK graduates to its own repository on first publication.
 
 ## Standards posture
@@ -228,14 +249,15 @@ Guides, in curated reading order:
    verifier in any language.
 3. [Upgrading](docs/guides/upgrading.md) — the published compatibility contract.
 4. [Runnable Livebook walkthrough](docs/livebooks/bap-walkthrough.livemd) — standard HTTPS and
-   literal-loopback HTTP proof production, verification, and fail-closed rejection with ephemeral
-   keys.
+   literal-loopback HTTP proofs, role attestations, and content assertions: production,
+   verification, and fail-closed rejection with ephemeral keys.
 
 Reference set:
 
 - `spec/bap-v1.md` — the normative v1 wire profile (docs/protocol-v1.md is its generated view).
 - `spec/bap-local-loopback-http-v1.md` — the normative literal-loopback HTTP application profile.
 - `spec/bap-role-attestation-v1.md` — the normative role-attestation sibling profile.
+- `spec/bap-content-assertion-v1.md` — the normative content-assertion sibling profile.
 - `docs/design/protocol-charter.md` — what the verifier does and the verification chain.
 - `docs/design/conformance-contract.md` — how conformance is proven.
 - `docs/design/interoperability-report.md` — exact standard and application-profile

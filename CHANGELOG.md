@@ -2,16 +2,36 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
-## [Unreleased]
+## [0.7.0] — 2026-09-27
+
+The content-assertion release: the second sibling attestation profile. No contract-major,
+loopback, or role-attestation byte, verdict, or certified pin changes.
 
 ### Added
 
 - A standalone `bap-content-assertion/1` profile with explicit expected content and
-  context binding, bounded byte-domain content hashing, and pairwise successor checks.
-  The profile carries no content semantics or authorization decision. ADR 0037 defines
-  its independent SDK, certified corpus, and release qualification requirements.
+  context binding, bounded byte-domain content hashing, and pairwise successor checks
+  (`BoundedAuthorityProtocol.ContentAssertion.V1`). The profile carries no content
+  semantics or authorization decision. ADR 0037 records the design and its release
+  requirements; `spec/bap-content-assertion-v1.md` is the normative contract.
+- The certified content-assertion corpus, revision 1 (131 assertion, 9 content-digest, and
+  14 successor cases; index SHA-256
+  `14b7436ccf7cc91fece52a1578c3760df6720a93494d147ee5ab523e2ce21876`), the
+  `mix content_assertion.verify` check, and its red-capable mutation gate. The Python, Rust,
+  and Go SDKs and the graduated TypeScript verifier implement the profile against it.
 - A tightenable `content_bytes` ceiling of 65,536 bytes. Existing wire profiles and
   certified corpora retain their meanings.
+- A runnable content-assertion section in the Livebook walkthrough.
+
+### Changed
+
+- `%BoundedAuthorityProtocol.V1.Bounds{}` enforces the new `content_bytes` key. Code that
+  builds the struct literally must add it; `Bounds.new/1`, `Bounds.maximum/0`, and override
+  maps are unaffected.
+- `V1.SigningInput` admits the `:content_assertion` kind, whose exact protected header is
+  accepted only through the new namespace.
+- CI runs on Linux only (ADR 0033); developer portability across macOS, Linux, and Windows
+  is unchanged. The supply-chain workflow runs on manifest changes, weekly, and on demand.
 
 ## [0.6.2] — 2026-09-24
 

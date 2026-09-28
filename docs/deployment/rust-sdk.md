@@ -2,7 +2,8 @@
 
 The Rust verifier SDK (`sdks/rust/`, crate `bounded-authority-protocol`) is a pure, deterministic,
 fail-closed reimplementation of the frozen BAP profiles — contract-majors 1, 2, and 3 plus the
-local-loopback and role-attestation sibling profiles. It is a **verifier**: it returns redacted, value-bearing
+local-loopback, role-attestation, and content-assertion sibling profiles. It is a **verifier**: it
+returns redacted, value-bearing
 facts or `Invalid`, never an authorization decision. This guide covers the two serverless/edge deployment
 targets named in the BAP-15 acceptance bar: AWS Lambda (`provided.al2023`) and PostgreSQL (`plrust`).
 

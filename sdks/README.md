@@ -1,8 +1,8 @@
 # Bounded Authority Protocol — Cross-language verifier SDKs
 
 Typed, provider-neutral verifier libraries that reimplement the frozen BAP verification
-profiles — contract-majors 1, 2, and 3 plus the local-loopback and role-attestation sibling
-profiles — from the published specs ([v1](../spec/bap-v1.md), [v2](../spec/bap-v2.md),
+profiles — contract-majors 1, 2, and 3 plus the local-loopback, role-attestation, and
+content-assertion sibling profiles — from the published specs ([v1](../spec/bap-v1.md), [v2](../spec/bap-v2.md),
 [v3](../spec/bap-v3.md)) and the published conformance corpora
 ([`priv/conformance/`](../priv/conformance/)). They are **distribution
 surfaces** — typed client libraries for third-party verifiers, not additional normativity — and
@@ -45,12 +45,16 @@ targets only, and mutual rejection with standard `dpop+jwt`. The shared profile 
 its exact index SHA-256 and execute the same 36 URI plus 8 proof cases. Each also implements the
 role-attestation sibling profile
 ([ADR 0036](../docs/adr/0036-role-attestation-profile.md)): the four attestation surfaces, with
-the certified 40-case profile corpus pinned the same way.
+the certified 40-case profile corpus pinned the same way, and the content-assertion sibling
+profile ([ADR 0037](../docs/adr/0037-content-assertion-profile.md)): verification, both digest
+functions, pairwise successor checks, producer and assembly, with the certified 131 assertion,
+9 digest, and 14 successor cases pinned by the index SHA-256.
 
 ## Conformance
 
 Each SDK passes every certified vector (valid + invalid) — the 283 v1, 268 v2, and 292 v3
-contract-major corpora plus the loopback and role-attestation profile corpora — recomputing each
+contract-major corpora plus the loopback, role-attestation, and content-assertion profile
+corpora — recomputing each
 verdict from scratch using only its language's primitives. The conformance is independently
 verifiable:
 
@@ -68,7 +72,8 @@ go test ./...
 ```
 
 The graduated TypeScript SDK runs its vendored corpora in its own repository (`pnpm conformance`,
-`conformance:v2`, `conformance:v3`, `conformance:role-attestation`).
+`conformance:v2`, `conformance:v3`, `conformance:role-attestation`,
+`conformance:content-assertion`).
 
 Beyond the frozen corpus, each SDK ships a **per-language permissiveness mutation-gate** — for every
 host-runtime closure (duplicate-rejecting decoder, null-prototype containers, raw-lexeme scan,

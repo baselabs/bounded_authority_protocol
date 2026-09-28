@@ -1,6 +1,7 @@
 # ADR 0037: The content-assertion sibling profile (`bap-content-assertion/1`)
 
-- Status: accepted design; implementation and release qualification pending
+- Status: accepted; released in 0.7.0; companion-signer dependency admission and
+  consumer acceptance remain with their owners
 - Date: September 27, 2026
 - Track: T2
 - Governing class: [ADR 0036](0036-role-attestation-profile.md), sibling attestation profiles
@@ -149,3 +150,11 @@ consumption receipt, including exact content-digest equality, against the same
 immutable candidate. Complete registry, changelog, roadmap, documentation, and
 package-identity work. An exact package/release authorization is still required.
 Neither this decision nor source qualification publishes any package.
+
+Release status (September 27, 2026): the revision-1 corpus is frozen and its index is
+pinned in the specification and requirement map. Reference and SDK conformance and the
+full package gate passed; the requirement map records the mutation evidence and its one
+static-type exception. A real companion-signer issuance and an independent Python
+consumption, including content-digest equality, were run against the built 0.7.0 package
+before publication. The owner authorized the exact 0.7.0 release, published to Hex.
+Companion-signer dependency admission and consumer acceptance remain with their owners.

@@ -2,7 +2,8 @@
 
 The Go verifier SDK (`sdks/go/`, module `github.com/baselabs/bounded_authority_protocol_go`)
 is a pure, deterministic, fail-closed reimplementation of the frozen BAP profiles —
-contract-majors 1, 2, and 3 plus the local-loopback and role-attestation sibling profiles. It is a
+contract-majors 1, 2, and 3 plus the local-loopback, role-attestation, and content-assertion
+sibling profiles. It is a
 **verifier**: it returns redacted, value-bearing facts or a single rejection, never an
 authorization decision.
 
@@ -25,7 +26,7 @@ derivation-hygiene decisions.
 
 | Target | Notes |
 |---|---|
-| Any Go service | `go get` the module; the versioned verification surfaces (v1/v2/v3), the local-profile and role-attestation functions, and the evidence/archive surfaces are the whole surface |
+| Any Go service | `go get` the module; the versioned verification surfaces (v1/v2/v3), the local-profile, role-attestation, and content-assertion functions, and the evidence/archive surfaces are the whole surface |
 | Static binaries / distroless containers | Zero-dependency closure means `CGO_ENABLED=0` builds with no tag set |
 | AWS Lambda (provided.al2023 custom runtime) | Build the bootstrap binary statically; cold start is the binary load |
 

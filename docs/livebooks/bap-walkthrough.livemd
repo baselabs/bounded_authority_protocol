@@ -6,11 +6,11 @@ livebook:{"persist_outputs":true}
 
 ```elixir
 Mix.install([
-  {:bounded_authority_protocol, "~> 0.6.2"}
+  {:bounded_authority_protocol, "~> 0.7.0"}
 ])
 ```
 
-Hex 0.6.2 is published (2026-09-24), so the `Mix.install` above resolves from the public
+Hex 0.7.0 is published (2026-09-27), so the `Mix.install` above resolves from the public
 registry. The immutable package identity is the published Hex release; the source tag is
 reviewable release evidence, not a substitute for it.
 
@@ -110,7 +110,7 @@ The verifier holds no state and reads no clock — we supply the trusted key, th
 context, and the evaluation time.
 
 ```elixir
-alias BoundedAuthorityProtocol.V1.{TrustedIssuer, ExpectedGrant, Bounds}
+alias BoundedAuthorityProtocol.V1.{TrustedIssuer, ExpectedGrant}
 
 trusted = %TrustedIssuer{key_id: "issuer-1", public_key: issuer_public}
 
@@ -391,6 +391,131 @@ A role attestation is evidence of a binding, not an authorization: which attesto
 which role a consumer requires, and replay reservation stay with the caller
 (`spec/bap-role-attestation-v1.md` §5).
 
+## 11. Produce and verify a content assertion
+
+The content-assertion profile (ADR 0037) is a second sibling attestation profile: a
+standalone, grant-unbound compact JWS (`typ: "ba+content-assertion"`) that binds the digest
+of exact external content bytes to an issuer, audience, lineage subject, semantic profile,
+validity window, and predecessor. The package hashes the bytes you pass and never parses them;
+what the content means stays with you.
+
+```elixir
+alias BoundedAuthorityProtocol.ContentAssertion.V1, as: ContentAssertionV1
+
+{content_attestor_public, content_attestor_private} = :crypto.generate_key(:eddsa, :ed25519)
+
+content_bytes = ~s({"document":"example","revision":1})
+{:ok, content_digest} = ContentAssertionV1.content_digest(content_bytes, %{})
+
+# The semantic profile's identity is a caller-pinned opaque 32-byte digest:
+profile_digest = :crypto.hash(:sha256, "urn:example:profile:document/1 schema bytes")
+
+assertion = %ContentAssertionV1.ContentAssertion{
+  attestor_key_id: "content-attestor-1",
+  jti: "urn:example:assertion:2026-001",
+  iss: "urn:example:issuer",
+  aud: "urn:example:audience",
+  sub: "urn:example:lineage:document-1",
+  profile: "urn:example:profile:document/1",
+  profile_digest: profile_digest,
+  content_digest: content_digest,
+  gen: 1,
+  prev: <<0::256>>,
+  iat: now,
+  nbf: now,
+  exp: now + 3_600
+}
+
+{:ok, assertion_input} = ContentAssertionV1.assertion_signing_input(assertion, %{})
+
+assertion_signature =
+  :crypto.sign(:eddsa, :none, assertion_input.message, [content_attestor_private, :ed25519])
+
+{:ok, assertion_compact} =
+  ContentAssertionV1.assemble_compact(assertion_input, assertion_signature)
+
+expected_assertion = %ContentAssertionV1.ExpectedContentAssertion{
+  attestor: %HistoricalPublicKey{
+    key_id: "content-attestor-1",
+    public_key: content_attestor_public,
+    valid_from: now - 600,
+    valid_before: now + 7_200
+  },
+  issuer: "urn:example:issuer",
+  audience: "urn:example:audience",
+  subject: "urn:example:lineage:document-1",
+  profile: "urn:example:profile:document/1",
+  profile_digest: profile_digest,
+  content_digest: content_digest,
+  now: now + 60,
+  bounds: %{}
+}
+
+{:ok, assertion_facts} =
+  ContentAssertionV1.verify_assertion(assertion_compact, expected_assertion)
+
+Map.from_struct(assertion_facts)
+|> Map.take([:attestor_key_id, :sub, :gen, :verification, :trust])
+```
+
+Generation 2 names generation 1 by the SHA-256 of its exact compact bytes. The pairwise check
+compares two verified facts values; it keeps no history of its own.
+
+```elixir
+successor = %{
+  assertion
+  | jti: "urn:example:assertion:2026-002",
+    gen: 2,
+    prev: assertion_facts.digest,
+    iat: now + 120,
+    nbf: now + 120
+}
+
+{:ok, successor_input} = ContentAssertionV1.assertion_signing_input(successor, %{})
+
+successor_signature =
+  :crypto.sign(:eddsa, :none, successor_input.message, [content_attestor_private, :ed25519])
+
+{:ok, successor_compact} =
+  ContentAssertionV1.assemble_compact(successor_input, successor_signature)
+
+{:ok, successor_facts} =
+  ContentAssertionV1.verify_assertion(successor_compact, %{expected_assertion | now: now + 180})
+
+ContentAssertionV1.verify_successor(assertion_facts, successor_facts, %{})
+```
+
+## 12. Content-assertion attacks fail closed
+
+```elixir
+{:ok, changed_digest} = ContentAssertionV1.content_digest(content_bytes <> " ", %{})
+
+content_assertion_rejections = %{
+  # One changed content byte changes the digest the verifier requires:
+  changed_content:
+    ContentAssertionV1.verify_assertion(assertion_compact, %{
+      expected_assertion
+      | content_digest: changed_digest
+    }),
+  # now == exp: the acceptance window is the half-open [nbf, exp):
+  now_at_exp:
+    ContentAssertionV1.verify_assertion(assertion_compact, %{expected_assertion | now: now + 3_600}),
+  # Lineage runs forward only:
+  reversed_lineage: ContentAssertionV1.verify_successor(successor_facts, assertion_facts, %{}),
+  # Cross-profile, both directions:
+  assertion_through_role: RoleAttestationV1.decode_attestation(assertion_compact, %{}),
+  role_through_assertion: ContentAssertionV1.decode_assertion(attestation_compact, %{}),
+  assertion_through_v1: BoundedAuthorityProtocol.V1.decode_grant(assertion_compact, %{})
+}
+
+Enum.map(content_assertion_rejections, fn {k, v} -> {k, v == {:error, :invalid}} end)
+```
+
+A content assertion proves that a trusted-by-you key signed this exact digest and context.
+It does not prove the content is true, that the key is still trusted, or that you hold the
+latest generation. Trusted keys, durable lineage state, and replay handling stay with the
+caller (`spec/bap-content-assertion-v1.md` §7).
+
 
 ## What you just saw
 
@@ -405,6 +530,9 @@ which role a consumer requires, and replay reservation stay with the caller
 - The role-attestation profile bound a subject key to a role inside the attestor key's own
   window and returned anchor-posture facts; a true self-attestation, `now == exp`, an
   outliving window, and cross-profile bytes in both directions each failed closed.
+- The content-assertion profile bound an exact content digest and context, linked a successor
+  to its predecessor's compact digest, and returned non-authorizing facts; changed content,
+  `now == exp`, a reversed lineage, and cross-profile bytes each failed closed.
 
 What this notebook did NOT do: select trusted keys, reserve replay, check revocation, or make
 an authorization decision — those belong to a stateful authority runtime. See the

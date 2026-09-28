@@ -26,11 +26,9 @@ Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, and `BAP-21` throu
 submission preconditions). Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence
 blocks are the status authority.
 
-The source candidate is 0.7.0 (unreleased). The latest recorded Hex release is 0.6.2, tagged `v0.6.2` (the cross-Elixir compilation and
-scan-sensitivity repair patch over the 0.6.1 cross-vendor repair patch, the 0.6.0
-role-attestation release, and the 0.5.0 ES256 contract-major 3 activation — the published doc set
-is trimmed to
-implementer-facing content; no wire or public-API change). The
+The current source and Hex release are 0.7.0, tagged `v0.7.0` (the content-assertion release,
+adding the `bap-content-assertion/1` sibling profile over the 0.6.2 cross-Elixir repair patch,
+the 0.6.0 role-attestation release, and the 0.5.0 ES256 contract-major 3 activation). The
 package retains zero production
 dependencies, no application callback, and no supervision tree. Contract-major 1 remains frozen;
 contract-major 2 is active under `BoundedAuthorityProtocol.V2` with the `lte` and `gte` selector
@@ -39,25 +37,32 @@ cross-major rejection; contract-major 3 is active under `BoundedAuthorityProtoco
 `BAP3-ES256-SHA256` suite (ECDSA P-256/SHA-256, RFC 7518 §3.4 raw `r || s` signatures with
 low-S canonicality, EC JWK holder keys, `BAP3-*` separators) with its own normative profile,
 certified 292-case corpus, `REQ3-*` traceability, and cross-major rejection of v1 and v2 bytes.
-The v1 corpus remains 283 cases across 28 surfaces. The protocol also carries two byte-distinct
+The v1 corpus remains 283 cases across 28 surfaces. The protocol also carries three byte-distinct
 sibling profiles parsed by no contract-major: the loopback proof profile
 (`bap-application-proof/local-loopback-http/1`, ADR 0027) and the role-attestation profile
 (`bap-role-attestation/1`, ADR 0036 — a standalone, grant-unbound BA-signed role binding with
 `BoundedAuthorityProtocol.RoleAttestation.V1.verify_attestation/2`, its certified 40-case corpus,
 `REQ-RA1-*` ids, and the sibling-attestation governance class; the BARA RA11 prerequisite,
-released in 0.6.0 with both consumption receipts recorded). See
+released in 0.6.0 with both consumption receipts recorded), and the content-assertion profile
+(`bap-content-assertion/1`, ADR 0037, released in 0.7.0: a standalone, grant-unbound signed
+binding of an exact content digest to issuer, audience, lineage subject, semantic profile,
+window, and predecessor, with `BoundedAuthorityProtocol.ContentAssertion.V1`, its certified
+131/9/14-case corpus, and `REQ-CA1-*` ids). See
 [ADR 0030](docs/adr/0030-v2-contract-major-activation.md),
 [ADR 0035](docs/adr/0035-es256-contract-major-activation.md),
-[ADR 0036](docs/adr/0036-role-attestation-profile.md), [`spec/bap-v1.md`](spec/bap-v1.md),
-[`spec/bap-v2.md`](spec/bap-v2.md), [`spec/bap-v3.md`](spec/bap-v3.md), and
-[`spec/bap-role-attestation-v1.md`](spec/bap-role-attestation-v1.md).
+[ADR 0036](docs/adr/0036-role-attestation-profile.md),
+[ADR 0037](docs/adr/0037-content-assertion-profile.md), [`spec/bap-v1.md`](spec/bap-v1.md),
+[`spec/bap-v2.md`](spec/bap-v2.md), [`spec/bap-v3.md`](spec/bap-v3.md),
+[`spec/bap-role-attestation-v1.md`](spec/bap-role-attestation-v1.md), and
+[`spec/bap-content-assertion-v1.md`](spec/bap-content-assertion-v1.md).
 
 Unpublished cross-language verifier SDKs are authored under [`sdks/`](sdks/)
 ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)): Python
 (`bounded-authority-verifier`), Rust
 (`bounded-authority-protocol`, BAP-15), and Go (`bounded_authority_protocol_go`, BAP-16) — each
 reimplements the frozen profiles from the specs and corpora alone, passes the certified v1, v2,
-and v3 vectors plus the loopback and role-attestation profile corpora with every corpus index
+and v3 vectors plus the loopback, role-attestation, and content-assertion profile corpora with
+every corpus index
 SHA-256 asserted at load, and ships a red-capable per-language
 permissiveness mutation gate. None of these three is published to a registry. Per
 [ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md), each graduates to its own per-SDK
@@ -85,15 +90,14 @@ ADR 0019 (corpus-artifact distribution), ADR 0020 (bounds-aware assembly and iss
 reauthorization posture), ADR 0021 (the v1 `all` selector recognized-shapes erratum), ADR 0022
 (durable contract identities), and ADR 0027 (byte-distinct application-proof profiles). Accepted
 ADRs are 0001–0037 (ADR 0035 activates the ES256 contract-major 3 suite; ADR 0036 adds the
-role-attestation sibling profile; ADR 0029 records the cumulative-budget posture and explicitly defers the
+role-attestation sibling profile; ADR 0037 adds the content-assertion sibling profile; ADR 0029 records the cumulative-budget posture and explicitly defers the
 `ba+budget-window` attestation-shape design; ADR 0034 decides the UCP riding point as
 transport-composed) under [`docs/adr/`](docs/adr/). BAP-19's source identity is fixed by
 `v0.3.0`; the registry publication and checksum read-back closed 2026-08-31, and downstream
 immutable-package adoption is tracked in the private runtime.
 
-The unreleased content-assertion sibling is specified by [ADR 0037](docs/adr/0037-content-assertion-profile.md)
-and [`spec/bap-content-assertion-v1.md`](spec/bap-content-assertion-v1.md). Its source work does not
-establish package publication or consumer acceptance.
+The content-assertion release does not establish companion-signer dependency admission or any
+consumer's acceptance; those are tracked by their owners.
 
 ## Critical rules
 

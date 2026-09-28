@@ -284,6 +284,129 @@ defmodule BoundedAuthorityProtocol.WalkthroughTest do
              )
   end
 
+  test "the notebook carries a runnable content-assertion walkthrough" do
+    notebook = File.read!(Path.expand("../docs/livebooks/bap-walkthrough.livemd", __DIR__))
+
+    for marker <- [
+          "ContentAssertionV1.content_digest(content_bytes, %{})",
+          "ContentAssertionV1.assertion_signing_input(assertion, %{})",
+          "ContentAssertionV1.assemble_compact(assertion_input, assertion_signature)",
+          "ContentAssertionV1.verify_assertion(assertion_compact, expected_assertion)",
+          "ContentAssertionV1.verify_successor(assertion_facts, successor_facts, %{})",
+          "changed_content:",
+          "assertion_through_role: RoleAttestationV1.decode_attestation(assertion_compact, %{})"
+        ] do
+      assert notebook =~ marker,
+             "the walkthrough notebook lost its content-assertion code shape (#{inspect(marker)})"
+    end
+
+    alias BoundedAuthorityProtocol.ContentAssertion.V1, as: ContentAssertionV1
+    alias BoundedAuthorityProtocol.RoleAttestation.V1, as: RoleAttestationV1
+    alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
+
+    now = 1_800_020_000
+    {attestor_public, attestor_private} = :crypto.generate_key(:eddsa, :ed25519)
+
+    content_bytes = ~s({"document":"example","revision":1})
+    {:ok, content_digest} = ContentAssertionV1.content_digest(content_bytes, %{})
+    profile_digest = :crypto.hash(:sha256, "urn:example:profile:document/1 schema bytes")
+
+    assertion = %ContentAssertionV1.ContentAssertion{
+      attestor_key_id: "content-attestor-1",
+      jti: "urn:example:assertion:2026-001",
+      iss: "urn:example:issuer",
+      aud: "urn:example:audience",
+      sub: "urn:example:lineage:document-1",
+      profile: "urn:example:profile:document/1",
+      profile_digest: profile_digest,
+      content_digest: content_digest,
+      gen: 1,
+      prev: <<0::256>>,
+      iat: now,
+      nbf: now,
+      exp: now + 3_600
+    }
+
+    {:ok, assertion_input} = ContentAssertionV1.assertion_signing_input(assertion, %{})
+
+    assertion_signature =
+      :crypto.sign(:eddsa, :none, assertion_input.message, [attestor_private, :ed25519])
+
+    {:ok, assertion_compact} =
+      ContentAssertionV1.assemble_compact(assertion_input, assertion_signature)
+
+    expected_assertion = %ContentAssertionV1.ExpectedContentAssertion{
+      attestor: %HistoricalPublicKey{
+        key_id: "content-attestor-1",
+        public_key: attestor_public,
+        valid_from: now - 600,
+        valid_before: now + 7_200
+      },
+      issuer: "urn:example:issuer",
+      audience: "urn:example:audience",
+      subject: "urn:example:lineage:document-1",
+      profile: "urn:example:profile:document/1",
+      profile_digest: profile_digest,
+      content_digest: content_digest,
+      now: now + 60,
+      bounds: %{}
+    }
+
+    assert {:ok, assertion_facts} =
+             ContentAssertionV1.verify_assertion(assertion_compact, expected_assertion)
+
+    assert assertion_facts.trust == :not_evaluated
+    refute Map.has_key?(assertion_facts, :authorization)
+
+    assert {:ok, assertion_facts.digest} ==
+             ContentAssertionV1.assertion_digest(assertion_compact, %{})
+
+    successor = %{
+      assertion
+      | jti: "urn:example:assertion:2026-002",
+        gen: 2,
+        prev: assertion_facts.digest,
+        iat: now + 120,
+        nbf: now + 120
+    }
+
+    {:ok, successor_input} = ContentAssertionV1.assertion_signing_input(successor, %{})
+
+    successor_signature =
+      :crypto.sign(:eddsa, :none, successor_input.message, [attestor_private, :ed25519])
+
+    {:ok, successor_compact} =
+      ContentAssertionV1.assemble_compact(successor_input, successor_signature)
+
+    {:ok, successor_facts} =
+      ContentAssertionV1.verify_assertion(successor_compact, %{
+        expected_assertion
+        | now: now + 180
+      })
+
+    assert :ok = ContentAssertionV1.verify_successor(assertion_facts, successor_facts, %{})
+
+    assert {:error, :invalid} =
+             ContentAssertionV1.verify_successor(successor_facts, assertion_facts, %{})
+
+    {:ok, changed_digest} = ContentAssertionV1.content_digest(content_bytes <> " ", %{})
+
+    assert {:error, :invalid} =
+             ContentAssertionV1.verify_assertion(assertion_compact, %{
+               expected_assertion
+               | content_digest: changed_digest
+             })
+
+    assert {:error, :invalid} =
+             ContentAssertionV1.verify_assertion(assertion_compact, %{
+               expected_assertion
+               | now: now + 3_600
+             })
+
+    assert {:error, :invalid} = RoleAttestationV1.decode_attestation(assertion_compact, %{})
+    assert {:error, :invalid} = BoundedAuthorityProtocol.V1.decode_grant(assertion_compact, %{})
+  end
+
   defp flip(segment) do
     index = div(String.length(segment), 2)
     <<head::binary-size(^index), byte, tail::binary>> = segment

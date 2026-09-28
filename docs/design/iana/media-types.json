@@ -93,7 +93,7 @@
    "restrictions_on_usage": "Verification is evidence of a binding, not an authorization; trusted-key selection, content interpretation and durable successor selection are caller obligations",
    "author": "Bounded Authority Protocol maintainers",
    "change_controller": "Bounded Authority Protocol maintainers",
-   "spec_purpose": "Standalone exact-content assertion under `bap-content-assertion/1` ([ADR 0037](../adr/0037-content-assertion-profile.md)); unreleased",
+   "spec_purpose": "Standalone exact-content assertion under `bap-content-assertion/1` ([ADR 0037](../adr/0037-content-assertion-profile.md))",
    "wire_typ": "ba+content-assertion"
   },
   {

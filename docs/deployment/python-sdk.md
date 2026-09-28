@@ -2,7 +2,8 @@
 
 The Python verifier SDK (`sdks/python/`, package `bounded-authority-verifier`) is a pure,
 deterministic, fail-closed reimplementation of the frozen BAP profiles — contract-majors 1, 2,
-and 3 plus the local-loopback and role-attestation sibling profiles. It is a **verifier**: it
+and 3 plus the local-loopback, role-attestation, and content-assertion sibling profiles. It is a
+**verifier**: it
 returns redacted, value-bearing facts or a single rejection, never an authorization decision.
 
 See `spec/bap-v1.md`, `spec/bap-v2.md`, and `spec/bap-v3.md` (the normative authorities;

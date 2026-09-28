@@ -5,6 +5,22 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
+## 0.6.2 to 0.7.0
+
+Additive sibling-profile minor: `0.7.0` ships the first package bearing
+`bap-content-assertion/1` (ADR 0037), the `BoundedAuthorityProtocol.ContentAssertion.V1`
+namespace (`assertion_signing_input/2`, `assemble_compact/2,3`, `decode_assertion/2`,
+`verify_assertion/2`, `content_digest/2`, `assertion_digest/2`, `verify_successor/3`) and its
+certified corpus. The bounds contract gains one tightenable ceiling, `content_bytes` (maximum
+65,536), used only by `content_digest/2`; every existing bound keeps its value.
+`%BoundedAuthorityProtocol.V1.Bounds{}` now enforces that key, so code that builds the struct
+literally must add it; `Bounds.new/1`, `Bounds.maximum/0`, and plain override maps are
+unaffected. `V1.SigningInput` gains the `:content_assertion` kind, admitted with the protected
+`typ` `ba+content-assertion` only through the new namespace. No contract-major, loopback, or
+role-attestation byte or verdict changes. The requirement `~> 0.6.2` does not select 0.7.0;
+move to `~> 0.7.0` to adopt it. Consumers that never call the new namespace and never build
+`Bounds` literally need no code changes.
+
 ## 0.6.1 to 0.6.2
 
 Repair patch with **no verdict, wire-format, or public-API change**: the role-attestation codec's
