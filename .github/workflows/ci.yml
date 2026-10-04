@@ -12,6 +12,14 @@ on:
       - ".github/ISSUE_TEMPLATE/**"
   workflow_dispatch:
 
+  # Nightly currency meter (ADR-0032 latest-first): paths-ignore applies only
+  # to push/pull_request events, so a scheduled run executes the full workflow
+  # regardless of what last touched the tree. Upstream drift reddens the badge
+  # AT the drift within a day, not at the next innocent push. 08:23 UTC daily
+  # (~04:23 US Eastern), off the :00 high-delay minute.
+  schedule:
+    - cron: "23 8 * * *"
+
 permissions:
   contents: read
 
