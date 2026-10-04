@@ -1,0 +1,19 @@
+# nextest configuration for the plimsoll evidence dogfood (plimsoll ADR 0018 / ADR 0019):
+# this SDK suite is the second live target of plimsoll's `plimsoll.nextest` evidence
+# producer, which ingests the JUnit dialect this profile emits into its ledger.
+#
+# The pinned runner for evidence receipts is cargo-nextest 0.9.146 (commit 8af696ddc);
+# the dialect is version-specific, so evidence runs use exactly that version
+# (see plimsoll's test/fixtures/nextest/README.md for the regeneration contract).
+#
+# CI still runs `cargo test --locked` (sdks.yml); this profile is the local evidence
+# path, not a delivery-gate change.
+
+[profile.plimsoll.junit]
+path = "junit.xml"
+# Include ignored/skipped tests as <skipped> elements (0.9.143+).
+report-skipped = "all"
+# Keep output-capture defaults: failures carry system-out/err; the plimsoll ingester
+# drops them from the fingerprinted payload and the XML retains them for re-derivation.
+store-success-output = false
+store-failure-output = true
