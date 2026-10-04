@@ -1,9 +1,5 @@
-Code.require_file("../../test_support/portable.ex", __DIR__)
-
 defmodule BoundedAuthorityProtocol.Architecture.PackageTest do
   use ExUnit.Case, async: false
-
-  alias BoundedAuthorityProtocol.TestSupport.Portable
 
   @moduletag timeout: 600_000
 
@@ -11,7 +7,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PackageTest do
 
   test "the exact packed artifact compiles and loads in a fresh external consumer" do
     {output, status} =
-      Portable.cmd("mix", ["run", "--no-start", Path.join(@root, "scripts/check_package.exs")],
+      System.cmd("mix", ["run", "--no-start", Path.join(@root, "scripts/check_package.exs")],
         cd: @root,
         stderr_to_stdout: true
       )
@@ -29,7 +25,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PackageTest do
     on_exit(fn -> File.rm(scratch) end)
 
     {generation_output, 0} =
-      Portable.cmd(
+      System.cmd(
         "mix",
         [
           "sbom.cyclonedx",
@@ -49,9 +45,6 @@ defmodule BoundedAuthorityProtocol.Architecture.PackageTest do
         stderr_to_stdout: true
       )
 
-    # The tool prints the scratch path with forward slashes and a lowercased drive on
-    # Windows ("c:/Users/..."), while scratch carries native separators — match the
-    # stable basename instead of the full path string.
     assert generation_output =~ "creating "
     assert generation_output =~ Path.basename(scratch)
     document = scratch |> File.read!() |> :json.decode()
@@ -64,7 +57,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PackageTest do
     File.write!(scratch, :json.encode(tampered))
 
     {output, status} =
-      Portable.cmd(
+      System.cmd(
         "elixir",
         [Path.join(@root, "scripts/check_dependency_licenses.exs"), scratch],
         cd: @root,

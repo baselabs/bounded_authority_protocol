@@ -1,10 +1,6 @@
-Code.require_file("../../test_support/portable.ex", __DIR__)
-
 defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
   @moduledoc false
   use ExUnit.Case, async: true
-
-  alias BoundedAuthorityProtocol.TestSupport.Portable
 
   # The local .kimosabe directory is never tracked. Two paths were tracked by earlier commits
   # and untracked on 2026-09-28; they remain in HEAD ancestry until that history is rewritten,
@@ -40,23 +36,16 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     repo = repo!()
     assert scan(repo) == []
 
-    # Win32 cannot represent the trailing-dot/space names, and its case-insensitive
-    # filesystem collapses ".KIMOSABE" onto ".kimosabe"; those components stay
-    # covered on every POSIX lane.
-    win32_unrepresentable = [".KIMOSABE/x", ".kimosabe./x", ".kimosabe /x"]
-
-    paths =
-      [
-        ".kimosabe/x",
-        "lib/.kimosabe/x",
-        ".kimosabe",
-        ".kimosabe/critical-surfaces.bak",
-        "sub/.kimosabe/critical-surfaces"
-      ] ++
-        if(Portable.windows?(),
-          do: [],
-          else: win32_unrepresentable
-        )
+    paths = [
+      ".kimosabe/x",
+      "lib/.kimosabe/x",
+      ".kimosabe",
+      ".kimosabe/critical-surfaces.bak",
+      "sub/.kimosabe/critical-surfaces",
+      ".KIMOSABE/x",
+      ".kimosabe./x",
+      ".kimosabe /x"
+    ]
 
     for path <- paths do
       put!(repo, path, "public canary\n")

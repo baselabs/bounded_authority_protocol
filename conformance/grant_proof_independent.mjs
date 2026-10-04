@@ -537,8 +537,8 @@ async function verifyManifest(manifest, additionalScanPath) {
   const declared = new Set();
   for (const relativeRoot of requiredDiscoveryRoots) {
     const path = resolve(root, relativeRoot);
-    // Platform containment: path.resolve joins with the native separator (\ on Windows),
-    // so the child test must use path.sep — a literal "/" prefix never matches there.
+    // Child containment: the prefix carries the separator, so a sibling directory
+    // sharing the root's name prefix never matches.
     assert(path === root || path.startsWith(root + sep), "discovery root escape");
     await discoverPublicKeys(path, declared);
   }

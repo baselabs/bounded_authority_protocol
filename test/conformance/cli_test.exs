@@ -82,7 +82,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     map =
       dir
       |> Portable.ls_r()
-      |> Map.new(fn p -> {p |> Path.relative_to(dir) |> Portable.to_posix(), File.read!(p)} end)
+      |> Map.new(fn p -> {Path.relative_to(p, dir), File.read!(p)} end)
 
     assert {:ok, corpus} = Corpus.load(map)
 
@@ -140,7 +140,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     map =
       dst
       |> Portable.ls_r()
-      |> Map.new(fn p -> {p |> Path.relative_to(dst) |> Portable.to_posix(), File.read!(p)} end)
+      |> Map.new(fn p -> {Path.relative_to(p, dst), File.read!(p)} end)
 
     assert {:ok, corpus} = Corpus.load(map)
     assert corpus.major == 2
@@ -158,7 +158,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     map =
       dst
       |> Portable.ls_r()
-      |> Map.new(fn p -> {p |> Path.relative_to(dst) |> Portable.to_posix(), File.read!(p)} end)
+      |> Map.new(fn p -> {Path.relative_to(p, dst), File.read!(p)} end)
 
     assert {:ok, corpus} = Corpus.load(map)
     assert corpus.major == 3
@@ -212,21 +212,17 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     refute File.exists?(unwritable)
   end
 
-  # chmod-based unreadability has no Windows equivalent (File.chmod there only toggles the
-  # read-only bit and does not fail File.read); the error arm stays covered on every POSIX lane.
-  unless Portable.windows?() do
-    test "exit 1 when a corpus file is unreadable (File.read error arm)" do
-      # A corpus copy with one file chmod'd 0000 -> File.read fails -> exit 1 (closed). chmod is
-      # the only reliable way to make File.read fail on an existing path inside a copy we own.
-      corpus = tampered_corpus_copy(&make_one_file_unreadable/1)
+  test "exit 1 when a corpus file is unreadable (File.read error arm)" do
+    # A corpus copy with one file chmod'd 0000 -> File.read fails -> exit 1 (closed). chmod is
+    # the only reliable way to make File.read fail on an existing path inside a copy we own.
+    corpus = tampered_corpus_copy(&make_one_file_unreadable/1)
 
-      on_exit(fn ->
-        restore_readability(corpus)
-        File.rm_rf!(corpus)
-      end)
+    on_exit(fn ->
+      restore_readability(corpus)
+      File.rm_rf!(corpus)
+    end)
 
-      assert Cli.run(["--corpus", corpus]) == 1
-    end
+    assert Cli.run(["--corpus", corpus]) == 1
   end
 
   # --- escript integration tests (end-to-end exit contract) -----------------
@@ -236,16 +232,12 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     build_escript!()
 
     {out0, 0} =
-      Portable.cmd("escript", [@escript_path, "--corpus", @shipped_corpus],
-        stderr_to_stdout: true
-      )
+      System.cmd("escript", [@escript_path, "--corpus", @shipped_corpus], stderr_to_stdout: true)
 
     assert out0 =~ ~s("agreement":true)
 
     {out1, 0} =
-      Portable.cmd("escript", [@escript_path, "--corpus", @shipped_corpus],
-        stderr_to_stdout: true
-      )
+      System.cmd("escript", [@escript_path, "--corpus", @shipped_corpus], stderr_to_stdout: true)
 
     assert out1 == out0
   end
@@ -253,7 +245,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   @tag :escript
   test "escript exit 2 on missing --corpus" do
     build_escript!()
-    {out, 2} = Portable.cmd("escript", [@escript_path], stderr_to_stdout: true)
+    {out, 2} = System.cmd("escript", [@escript_path], stderr_to_stdout: true)
     assert out =~ "usage"
     refute out =~ ~s("agreement")
   end
@@ -265,19 +257,15 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     clean_dir(corpus)
 
     {_out, 1} =
-      Portable.cmd("escript", [@escript_path, "--corpus", corpus], stderr_to_stdout: true)
+      System.cmd("escript", [@escript_path, "--corpus", corpus], stderr_to_stdout: true)
   end
 
-  # Direct executability of the BUILT artifact (shebang + exec bit) is a POSIX property;
-  # on Windows the escript runs via the escript command (Portable.cmd above).
-  unless Portable.windows?() do
-    @tag :escript
-    test "the built escript is directly executable (POSIX exec of the shebang file)" do
-      build_escript!()
+  @tag :escript
+  test "the built escript is directly executable (POSIX exec of the shebang file)" do
+    build_escript!()
 
-      {out, 0} = System.cmd(@escript_path, ["--corpus", @shipped_corpus], stderr_to_stdout: true)
-      assert out =~ ~s("agreement":true)
-    end
+    {out, 0} = System.cmd(@escript_path, ["--corpus", @shipped_corpus], stderr_to_stdout: true)
+    assert out =~ ~s("agreement":true)
   end
 
   # --- helpers --------------------------------------------------------------
@@ -327,28 +315,26 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     File.write!(case_file, tampered)
   end
 
-  unless Portable.windows?() do
-    defp make_one_file_unreadable(dir) do
-      case_file =
-        Portable.ls_r(dir)
-        |> Enum.filter(&String.ends_with?(&1, ".json"))
-        |> Enum.sort()
-        |> List.first()
-
-      File.chmod!(case_file, 0o000)
-    end
-
-    defp restore_readability(dir) do
+  defp make_one_file_unreadable(dir) do
+    case_file =
       Portable.ls_r(dir)
       |> Enum.filter(&String.ends_with?(&1, ".json"))
-      |> Enum.each(fn f ->
-        try do
-          File.chmod!(f, 0o644)
-        rescue
-          File.Error -> :ok
-        end
-      end)
-    end
+      |> Enum.sort()
+      |> List.first()
+
+    File.chmod!(case_file, 0o000)
+  end
+
+  defp restore_readability(dir) do
+    Portable.ls_r(dir)
+    |> Enum.filter(&String.ends_with?(&1, ".json"))
+    |> Enum.each(fn f ->
+      try do
+        File.chmod!(f, 0o644)
+      rescue
+        File.Error -> :ok
+      end
+    end)
   end
 
   defp drop_one_case_file(dir) do

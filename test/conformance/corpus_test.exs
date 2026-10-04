@@ -1774,7 +1774,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     Portable.ls_r(@shipped_corpus)
     |> Enum.filter(&File.regular?/1)
     |> Enum.map(fn path ->
-      {path |> Path.relative_to(@shipped_corpus) |> Portable.to_posix(), File.read!(path)}
+      {Path.relative_to(path, @shipped_corpus), File.read!(path)}
     end)
     |> Map.new()
   end

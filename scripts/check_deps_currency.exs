@@ -1,9 +1,7 @@
 # Dependency currency check — the latest-first policy gate (ADR 0032).
 #
-# Elixir, not shell, on purpose: this gate runs inside `mix quality`, and a declared
-# gate must hold the tri-platform build bar (a POSIX script inside a gate is dead on
-# Windows). `mix` is spawned as a subprocess — through `cmd /c` on Windows, where
-# mix.bat cannot be executed by System.cmd directly.
+# Elixir, not shell: this gate runs inside `mix quality`. `mix` is spawned as a
+# subprocess.
 #
 # Classification is on the RENDERED table, never on the exit code (mix hex.outdated
 # exits nonzero BOTH on drift and on lookup failure):
@@ -98,13 +96,7 @@ defmodule BoundedAuthorityProtocol.CheckDepsCurrency do
     out
   end
 
-  defp spawn_mix(args) do
-    if match?({:win32, _}, :os.type()) do
-      System.cmd("cmd", ["/s", "/c", "mix" | args], stderr_to_stdout: true)
-    else
-      System.cmd("mix", args, stderr_to_stdout: true)
-    end
-  end
+  defp spawn_mix(args), do: System.cmd("mix", args, stderr_to_stdout: true)
 end
 
 BoundedAuthorityProtocol.CheckDepsCurrency.run!()

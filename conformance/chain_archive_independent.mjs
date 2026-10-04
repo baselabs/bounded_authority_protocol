@@ -1377,8 +1377,8 @@ function verifyManifest(manifest, fixture, fixturePath, additionalScanPath) {
   for (const relativeRoot of manifest.discovery_roots) {
     const absolute = resolve(repositoryRoot, relativeRoot);
     assert(
-      // Native-separator containment (see grant_proof_independent.mjs): a literal "/"
-      // prefix never matches Windows backslash-joined paths.
+      // Child containment: the prefix carries the separator, so a sibling directory
+      // sharing the root's name prefix never matches.
       absolute === repositoryRoot || absolute.startsWith(repositoryRoot + sep),
       "manifest discovery root escape",
     );

@@ -283,7 +283,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       """)
 
     assert {_output, 0} =
-             Portable.cmd("mix", ["compile"],
+             System.cmd("mix", ["compile"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -346,7 +346,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       """)
 
     assert {_output, 0} =
-             Portable.cmd("mix", ["compile"],
+             System.cmd("mix", ["compile"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -367,7 +367,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     root = copy_actual_project!()
 
     assert {_output, 0} =
-             Portable.cmd("mix", ["compile"],
+             System.cmd("mix", ["compile"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -394,7 +394,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     File.write!(path, mutated)
 
     assert {_output, 0} =
-             Portable.cmd("mix", ["compile", "--force"],
+             System.cmd("mix", ["compile", "--force"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -419,7 +419,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
            end)
 
     assert {_output, 0} =
-             Portable.cmd("mix", ["compile", "--force"],
+             System.cmd("mix", ["compile", "--force"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -491,7 +491,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     root = copy_actual_project!()
 
     assert {_output, 0} =
-             Portable.cmd("mix", ["compile"],
+             System.cmd("mix", ["compile"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -517,7 +517,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     File.write!(path, mutated)
 
     assert {_output, 0} =
-             Portable.cmd("mix", ["compile", "--force"],
+             System.cmd("mix", ["compile", "--force"],
                cd: root,
                env: [{"MIX_ENV", "prod"}],
                stderr_to_stdout: true
@@ -573,7 +573,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     script = Path.join(@root, "scripts/check_architecture.exs")
 
     assert {green_output, 0} =
-             Portable.cmd("elixir", [script, "--root", root, "--skip-compiled"],
+             System.cmd("elixir", [script, "--root", root, "--skip-compiled"],
                stderr_to_stdout: true
              )
 
@@ -593,7 +593,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     File.write!(mix_path, mutated)
 
     assert {red_output, status} =
-             Portable.cmd("elixir", [script, "--root", root, "--skip-compiled"],
+             System.cmd("elixir", [script, "--root", root, "--skip-compiled"],
                stderr_to_stdout: true
              )
 
@@ -603,7 +603,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     File.write!(mix_path, original)
 
     assert {_restored_output, 0} =
-             Portable.cmd("elixir", [script, "--root", root, "--skip-compiled"],
+             System.cmd("elixir", [script, "--root", root, "--skip-compiled"],
                stderr_to_stdout: true
              )
   end

@@ -899,10 +899,9 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     escript_path = Path.join(package_root, "bounded_authority_conformance")
     packaged_corpus = Path.join(package_root, "priv/conformance/v1/corpus")
 
-    # Run through the `escript` command (not direct exec of the shebang file), via the
-    # portable run helper — the direct form cannot execute on Windows.
+    # Run through the `escript` command (not direct exec of the shebang file).
     {output, 0} =
-      portable_cmd("escript", [escript_path, "--corpus", packaged_corpus], stderr_to_stdout: true)
+      System.cmd("escript", [escript_path, "--corpus", packaged_corpus], stderr_to_stdout: true)
 
     unless output =~ ~s("agreement":true) do
       fail!("packaged escript did not agree on the packaged corpus:\n#{output}")
@@ -959,7 +958,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       stderr_to_stdout: true
     ]
 
-    case portable_cmd(command, arguments, options) do
+    case System.cmd(command, arguments, options) do
       {_output, 0} -> :ok
       {_output, status} -> fail!("#{command} exited with status #{status}")
     end
@@ -979,16 +978,6 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       full = Path.join(path, name)
       if File.dir?(full), do: ls_r(full), else: [full]
     end)
-  end
-
-  # On Windows, mix/elixir/escript are .bat/.cmd shims that System.cmd (CreateProcess)
-  # cannot execute; route through cmd /c there (tri-platform bar, ADR 0031).
-  defp portable_cmd(command, arguments, options) do
-    if match?({:win32, _}, :os.type()) do
-      System.cmd("cmd", ["/s", "/c", command | arguments], options)
-    else
-      System.cmd(command, arguments, options)
-    end
   end
 
   # The package version derived from mix.exs (works under `elixir script` invocation where
