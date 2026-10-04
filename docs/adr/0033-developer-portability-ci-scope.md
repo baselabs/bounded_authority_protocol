@@ -44,3 +44,11 @@ minutes against a contract the owner did not intend to prove on every push.
   suspicion covers the diagnostic need.
 - **Drop the in-repo portability machinery as well.** Rejected: that machinery IS the owner's
   directive — any-OS contributors — and it costs no runner minutes.
+
+## Amendment (October 4, 2026): Windows developers use WSL2
+
+Owner direction, "no more windows only builds must use WSL": the required developer platforms are
+macOS and Linux. A Windows developer works in WSL2 with the clone inside the WSL filesystem, which
+is the Linux path; no native-Windows developer path is maintained. Where this record requires or
+describes Windows developer portability, read macOS and Linux. CI stays Linux only; the rest of the
+decision is unchanged.
