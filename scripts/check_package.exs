@@ -868,10 +868,9 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     run!("mix", ["deps.get"], consumer_root, environment)
 
     # ONE compile+check pass (mix do), not separate compile and run invocations: a later
-    # mix pass can decide the path dep is stale and recompile it, which removes the
-    # _build priv symlink — a removal Windows rejects ("not owner"), killing the gate.
-    # Inside one `mix do` the run rides the same VM and no second sync happens. The
-    # check code is deliberately comma-free (mix do splits tasks on commas).
+    # mix pass can decide the path dep is stale and recompile it, removing the _build priv
+    # symlink mid-gate. Inside one `mix do` the run rides the same VM and no second sync
+    # happens. Tasks are separated by `+` (the comma form is deprecated).
     check_code =
       "unless BoundedAuthorityProtocolConsumer.package_contract?() and " <>
         "BoundedAuthorityProtocolConsumer.decoder_contract?() and " <>
@@ -882,7 +881,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
 
     run!(
       "mix",
-      ["do", "compile", "--warnings-as-errors,", "run", "--no-start", "-e", check_code],
+      ["do", "compile", "--warnings-as-errors", "+", "run", "--no-start", "-e", check_code],
       consumer_root,
       environment
     )

@@ -75,6 +75,10 @@ defmodule BoundedAuthorityProtocol.MixProject do
       # its validator changes against the certified corpus schema gates.
       {:jsonschex, "~> 0.10.0", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
+      # Held below 0.11 (INFERRED from bounded_authority_report_adapter's verified pin, ADR-0020 there):
+      # sbom 0.11 pulls hex_core 0.19, whose .app starts :ssh, and GitHub's ubuntu-24.04 OTP images
+      # ship an incomplete ssh, so the supply-chain workflow's CycloneDX step would crash there.
+      # Lift when hex_core drops the ssh requirement or the runner images ship complete OTP.
       {:sbom, "~> 0.10.0", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.1", only: [:dev, :test], runtime: false}
     ]
