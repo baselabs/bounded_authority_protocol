@@ -79,7 +79,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       # sbom 0.11 pulls hex_core 0.19, whose .app starts :ssh, and GitHub's ubuntu-24.04 OTP images
       # ship an incomplete ssh, so the supply-chain workflow's CycloneDX step would crash there.
       # Lift when hex_core drops the ssh requirement or the runner images ship complete OTP.
-      {:sbom, "~> 0.10.0", only: [:dev, :test], runtime: false},
+      {:sbom, "~> 0.11.0", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.1", only: [:dev, :test], runtime: false}
     ]
   end
