@@ -28,7 +28,9 @@ defmodule BoundedAuthorityProtocol.Architecture.PackageTest do
       System.cmd(
         "mix",
         [
-          "sbom.cyclonedx",
+          "run",
+          "--no-start",
+          "scripts/generate_sbom.exs",
           "--exclude-system-dependencies",
           "--classification",
           "library",

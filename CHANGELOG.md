@@ -2,6 +2,17 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- Upgrade the development SBOM tool to sbom 0.11 and protobuf 0.17.1, which fixes
+  EEF-CVE-2026-104635 in protobuf JSON decoding. Generate release and tooling SBOMs
+  through `mix run --no-start` with explicit SBOM startup, keeping hex_core's
+  SSH-dependent application stopped. If the OS certificate store is unavailable,
+  reuse Hex's CA certificates for license metadata requests. The production
+  dependency boundary is unchanged.
+
 ## [0.7.0] — 2026-09-28
 
 The content-assertion release: the second sibling attestation profile. No contract-major,

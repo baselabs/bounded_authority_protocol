@@ -75,11 +75,10 @@ defmodule BoundedAuthorityProtocol.MixProject do
       # its validator changes against the certified corpus schema gates.
       {:jsonschex, "~> 0.10.0", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
-      # Held below 0.11 (INFERRED from bounded_authority_report_adapter's verified pin, ADR-0020 there):
-      # sbom 0.11 pulls hex_core 0.19, whose .app starts :ssh, and GitHub's ubuntu-24.04 OTP images
-      # ship an incomplete ssh, so the supply-chain workflow's CycloneDX step would crash there.
-      # Lift when hex_core drops the ssh requirement or the runner images ship complete OTP.
-      {:sbom, "~> 0.10.0", only: [:dev, :test], runtime: false},
+      # scripts/generate_sbom.exs runs through mix run --no-start and calls SBoM.CLI
+      # after explicit startup; hex_core stays code-only so its :ssh dependency
+      # is never started on the ubuntu-24.04 supply-chain runners.
+      {:sbom, "~> 0.11.0", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.1", only: [:dev, :test], runtime: false}
     ]
   end
@@ -309,9 +308,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
       "release.candidate": ["run --no-start scripts/check_release_candidate.exs"],
       "sbom.generate": [
         &prepare_artifacts/1,
-        "cmd mix sbom.cyclonedx --only prod --exclude-system-dependencies --classification library --schema 1.6 --format json --output artifacts/release.cdx.json --force",
+        "cmd mix run --no-start scripts/generate_sbom.exs --only prod --exclude-system-dependencies --classification library --schema 1.6 --format json --output artifacts/release.cdx.json --force",
         "cmd elixir scripts/prune_release_sbom.exs artifacts/release.cdx.json",
-        "cmd mix sbom.cyclonedx --exclude-system-dependencies --classification library --schema 1.6 --format json --output artifacts/tooling.cdx.json --force"
+        "cmd mix run --no-start scripts/generate_sbom.exs --exclude-system-dependencies --classification library --schema 1.6 --format json --output artifacts/tooling.cdx.json --force"
       ],
       "sbom.check": [
         "cmd elixir scripts/check_sbom.exs artifacts/release.cdx.json artifacts/tooling.cdx.json"
