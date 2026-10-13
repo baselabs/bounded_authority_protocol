@@ -369,6 +369,17 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   @compiled_export_allowances Map.merge(
                                 %{
+                                  # The public strict-Ed25519 module (rule S1): the single
+                                  # owner of the Ed25519 point and scalar rules.
+                                  "Elixir.BoundedAuthorityProtocol.Ed25519.beam" => [
+                                    __info__: 1,
+                                    acceptable_public_key?: 1,
+                                    module_info: 0,
+                                    module_info: 1,
+                                    strict_gate?: 2,
+                                    torsion_free?: 1,
+                                    verify_strict: 3
+                                  ],
                                   "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.beam" => [
                                     __info__: 1,
                                     assertion_signing_input: 2,

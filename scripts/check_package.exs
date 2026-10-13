@@ -72,6 +72,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "lib/bounded_authority_protocol/conformance/corpus.ex",
                     "lib/bounded_authority_protocol/conformance/report.ex",
                     "lib/bounded_authority_protocol/conformance/runner.ex",
+                    "lib/bounded_authority_protocol/ed25519.ex",
                     "lib/bounded_authority_protocol/application_profile/local_loopback_http/v1.ex",
                     "lib/bounded_authority_protocol/application_profile/local_loopback_http/v1/uri.ex",
                     "lib/bounded_authority_protocol/role_attestation/v1.ex",
