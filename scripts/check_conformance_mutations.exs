@@ -385,7 +385,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # the independent runner (strict mode, Node 22.23.1); the strict-mode test reds on disagreed > 0.
       name: "runner-s1-verify-site-ungated",
       path: "conformance/corpus_independent.mjs",
-      from: "  if (!s1Gate(raw, signature)) return false;\n  return verifySignature(null, message, publicKey, signature);",
+      from:
+        "  if (!s1Gate(raw, signature)) return false;\n  return verifySignature(null, message, publicKey, signature);",
       to: "  return verifySignature(null, message, publicKey, signature);",
       target:
         {"test/conformance/corpus_independent_test.exs",
@@ -418,7 +419,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # the independent runner (strict mode, Node 22.23.1); the strict-mode test reds on disagreed > 0.
       name: "runner-s1-torsion-free-removal",
       path: "conformance/corpus_independent.mjs",
-      from: "  return s1AcceptablePublicKey(publicKey) && s1IsIdentity(s1Multiply(S1_L, s1Decode(publicKey)));",
+      from:
+        "  return s1AcceptablePublicKey(publicKey) && s1IsIdentity(s1Multiply(S1_L, s1Decode(publicKey)));",
       to: "  return s1AcceptablePublicKey(publicKey);",
       target:
         {"test/conformance/corpus_independent_test.exs",

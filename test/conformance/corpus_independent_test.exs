@@ -103,7 +103,9 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
     # The runner implements contract-major 1: it decides every primitive, key-acceptance, JWK,
     # differential, taming and major-1 case, and counts the major-2 and sibling-profile cases as
     # not covered (never as agreement).
-    assert output =~ "corpus_independent: strict agreed=2006 disagreed=0 total=2391 not_covered=385"
+    assert output =~
+             "corpus_independent: strict agreed=2006 disagreed=0 total=2391 not_covered=385"
+
     assert output =~ "index_sha256=#{@strict_index_sha256}"
   end
 
@@ -139,6 +141,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
       end
 
     assert length(Enum.uniq(blocks)) == 1
+
     assert File.read!(Path.join(@root, "conformance/corpus_independent.mjs")) =~
              "if (!s1Gate(raw, signature)) return false;"
 
