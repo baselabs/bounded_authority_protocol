@@ -35,8 +35,8 @@ release; see the security advisory for affected versions and details.
   `-scalar-range`, and `-cofactorless`; `REQ1-KEY-ed25519-acceptable`;
   `REQ1-HOST-ed25519-torsion-free`; and the five matching `REQ2-*` ids, mapped in the
   requirement map.
-- A soundness-repair change class and a post-disclosure ratification window in the governance
-  policy, the charter, the errata registry, and `SECURITY.md`.
+- A soundness-repair change class in the governance policy, the charter, the errata registry, and
+  `SECURITY.md`.
 
 ### Changed
 

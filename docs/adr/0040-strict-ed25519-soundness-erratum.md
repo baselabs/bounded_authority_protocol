@@ -1,6 +1,6 @@
 # ADR 0040: Strict Ed25519 verification soundness erratum
 
-- Status: accepted, subject to the post-disclosure ratification window (Decision 10)
+- Status: accepted
 - Date: October 12, 2026
 - Erratum: 2
 - Track: T2
@@ -13,7 +13,7 @@
   - the [standards track charter](../design/standards-track.md) § Parallel-version support and
     deprecation (the errata bullet) and § Governance (the errata-channel and security-policy
     bullets);
-  - [governance.md](../governance.md) § Change classes, § Change control, § Errata channel,
+  - [governance.md](../governance.md) § Change classes, § Errata channel,
     § Security policy, and § Errata registry posture;
   - the [errata registry](../errata.md) header, and [SECURITY.md](../../SECURITY.md);
   - [ADR 0007](0007-normative-requirement-identifiers.md): the v1 surface vocabulary gains `KEY`
@@ -121,8 +121,7 @@ contract-major, only if all of the following hold:
 4. the new cases land in a new additive corpus with its own certified identity;
 5. every maintained SDK and the independent runners ship the repair in the same release window;
 6. disclosure follows the order: private advisory, then publication of the fixed releases, then
-   the public advisory;
-7. a post-disclosure ratification window opens (Decision 10).
+   the public advisory.
 
 A change that fails any condition remains contract-major work.
 
@@ -214,20 +213,7 @@ the reference test, and every SDK runner.
 - An anchored export whose historical key chain contains a key that fails key acceptance is
   unverifiable by design.
 
-### 10. Comment window and ratification
-
-The thirty-day comment window and change-control group take effect once at least two
-independent external implementations pass the conformance corpus
-([governance.md](../governance.md) § Change control). The project records no such state, so the
-trigger has not fired and no comment window applied to this decision; the owner confirms this at
-acceptance.
-
-For this ADR and every future embargoed soundness repair, a ratification window opens at public
-disclosure: at least thirty days of public comment, closed by a follow-up ADR that ratifies or
-supersedes the repair. A superseding rule lands only in a successor contract-major. A ratified
-repair is never rolled back to the forgeable verdict.
-
-### 11. Successors
+### 10. Successors
 
 Successor contract-majors and future sibling profiles on an Ed25519 suite inherit rule S1. A
 prime-order requirement on `A` or `R` at verification is reserved to a successor major's own

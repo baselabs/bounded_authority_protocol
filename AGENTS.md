@@ -33,8 +33,8 @@ point encodings, no small-order key or `R`, `S < L`, the cofactorless equation) 
 surface, owned by the public `BoundedAuthorityProtocol.Ed25519` (`verify_strict/3`,
 `acceptable_public_key?/1`, `torsion_free?/1`), with the additive certified strict-Ed25519 corpus
 (`priv/conformance/strict-ed25519`, `bap-strict-ed25519/1`, 2,410 cases) and the
-soundness-repair governance class. Its publication with the security advisory, the registry
-read-back, and the post-disclosure ratification window are open. The
+soundness-repair governance class. Its publication with the security advisory and the registry
+read-back are open. The
 latest Hex release is 0.7.0, tagged `v0.7.0` (the content-assertion release,
 adding the `bap-content-assertion/1` sibling profile over the 0.6.2 cross-Elixir repair patch,
 the 0.6.0 role-attestation release, and the 0.5.0 ES256 contract-major 3 activation). The

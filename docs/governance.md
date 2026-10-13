@@ -57,8 +57,7 @@ conforming. It is allowed only when all of the following hold:
 4. the new cases land in a new additive corpus with its own certified identity;
 5. every maintained SDK and the independent runners ship the repair in the same release window;
 6. disclosure follows the order: private advisory, then publication of the fixed releases, then
-   the public advisory;
-7. a post-disclosure ratification window opens (§ Change control).
+   the public advisory.
 
 A soundness repair is not a sunset: the major continues, and it keeps no overlap window during
 which the vulnerable verdict remains conforming. Releases before the repair are retired on the
@@ -112,12 +111,6 @@ process supersedes this one.
 charter's "see below" is resolved to an explicit link to the charter § Venue strategy; the
 sibling-profile extension is [ADR 0036](adr/0036-role-attestation-profile.md) Decision 1.)
 
-A fix developed under embargo cannot take public comment before disclosure. For every embargoed
-soundness repair, a ratification window opens at public disclosure: at least thirty days of public
-comment, closed by a follow-up ADR that ratifies or supersedes the repair. A superseding rule lands
-only in a successor contract-major; a ratified repair is never rolled back to the vulnerable
-verdict. ([ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) Decision 10.)
-
 ## Errata channel
 
 [docs/errata.md](errata.md) is the numbered errata registry; each entry names affected versions and
@@ -162,8 +155,7 @@ yet still a published, deployment-decided sunset, not a flag-day — never as a 
 bullet, verbatim except the deictic "above (§ The evolution contract)" resolved to a cross-doc link
 — departure 1.)
 A fix that meets every soundness-repair condition lands as an erratum with a security advisory,
-in the same release across every implementation, followed by the ratification window
-(§ Change control); [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) amends the charter
+in the same release across every implementation; [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) amends the charter
 bullet accordingly.
 [SECURITY.md](../SECURITY.md) cross-references this section instead of restating the rule, so the
 verdict-change rule lives in one place.

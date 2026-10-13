@@ -248,7 +248,7 @@ credibility step and the policy is what makes single-maintainer tolerable to ado
   deployment-decided sunset, not a flag-day — never as a silent verdict change. A fix that meets
   every soundness-repair condition ([ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)
   Decision 4) lands instead as an erratum with an advisory, in the same release across every
-  implementation, followed by a post-disclosure ratification window.
+  implementation.
 
 The governance policy's single normative home is [docs/governance.md](../governance.md);
 this charter cites it and carries no independent policy statements (the single-home

@@ -1036,11 +1036,11 @@ Status: source landing for release 0.8.0; the release is open until every item b
   index SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`; the CLI and
   `mix conformance.verify` run it; the v1, v2, v3, local-loopback, role-attestation, and
   content-assertion indexes are unchanged.
-- Open before release: the independent Node runners gated and pinned to an exact Node version;
-  the graduated TypeScript verifier and signer releases; the companion signer release; the
-  full `mix quality` gate on the exact tree; publication with the advisory; registry read-back;
-  retirement of releases 0.7.0 and earlier; and the owner's confirmation that the comment-window
-  trigger has not fired. The post-disclosure ratification window opens at publication.
+- Done before release: the independent Node runners are gated and pinned to an exact Node
+  version, and the full `mix quality` gate passed on the exact tree.
+- Open: the graduated TypeScript verifier and signer releases; the companion signer release;
+  publication with the advisory; registry read-back; and retirement of releases 0.7.0 and
+  earlier.
 
 ## Next action
 
