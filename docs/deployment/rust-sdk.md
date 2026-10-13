@@ -20,6 +20,15 @@ The crate also exposes `local_loopback_http_uri_normalize`,
 development listeners. Select them explicitly, admit only literal `127.0.0.1`/`[::1]` HTTP targets,
 require the server nonce, and never infer or retry the standard profile.
 
+## Strict Ed25519 verification
+
+Every Ed25519 verification in the SDK applies rule S1 of
+[ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md) at its single Ed25519 verification
+point: canonical point encodings, no small-order key or `R`, a scalar below the group order, and
+the cofactorless equation. Key import, JWK encode and decode, and thumbprint functions refuse a key
+that fails key acceptance. The SDK also exposes the host torsion-free check; call it at key
+enrollment, at trust install, and before any deny-list or revocation comparison. A vendored snapshot of the strict-Ed25519 corpus under `conformance/corpus-strict/` runs through `conformance/run_strict.rs` with its index SHA-256 pinned.
+
 ## Supply-chain posture
 
 Runtime dependencies (the consumer-facing closure, audited by `sdks/rust/tools/license_check.sh`):

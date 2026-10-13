@@ -6,7 +6,7 @@ docname: bap-local-loopback-http-v1
 # BAP Local Loopback HTTP Proof Profile 1
 
 Document status: normative for application proof profile
-`bap-application-proof/local-loopback-http/1`. Document revision: rev 1. This document composes with
+`bap-application-proof/local-loopback-http/1`. Document revision: rev 2 (erratum 2, ADR 0040). This document composes with
 the contract-major 1 grant and common proof mechanics in [BAP v1](bap-v1.md); it does not change that
 profile's `dpop+jwt` proof contract or verdicts.
 
@@ -20,6 +20,15 @@ This profile defines a holder proof for direct HTTP requests to exact literal lo
 It binds a contract-major 1 `ba+cap` grant and reuses the BAP1 proof claim names, bounds, Ed25519 JWS,
 holder-key thumbprint, grant digest, request digest, temporal checks, selector checks, and redacted
 facts contract (`REQ-LLH1-CORE-compose-v1`).
+
+Both Ed25519 signatures an envelope carries, the grant's and the holder proof's, MUST verify under
+the strict Ed25519 rule of [BAP v1 § 14.1](bap-v1.md#strict-ed25519)
+(`REQ1-SIGNING-ed25519-canonical-point`, `REQ1-SIGNING-ed25519-small-order-reject`,
+`REQ1-SIGNING-ed25519-scalar-range`, `REQ1-SIGNING-ed25519-cofactorless`). The holder JWK and the trusted issuer key MUST pass key
+acceptance (`REQ1-KEY-ed25519-acceptable`); a failure returns the single closed error. Revision 2
+adds this statement (erratum 2,
+[ADR 0040](../docs/adr/0040-strict-ed25519-soundness-erratum.md)); the profile corpus and its
+verdicts are unchanged, and the cases live in the additive strict-Ed25519 corpus.
 
 The profile identity is `bap-application-proof/local-loopback-http/1`. A conforming proof MUST carry
 protected `typ: "ba+loopback-proof"` (`REQ-LLH1-CORE-profile-identity`). A standard BAP1

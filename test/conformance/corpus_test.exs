@@ -2316,16 +2316,15 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
             collect_public_keys(Map.delete(map, "public_key"), acc)
         end
 
+      # The census names every 32-byte key, weak or not, through the unchecked digest: the
+      # checked thumbprint refuses a small-order or non-canonical key, and silently skipping
+      # such a key here would hide it from the census instead of failing the comparison.
       {:ok, pub} when byte_size(pub) == 32 ->
-        case Jwk.public_key_thumbprint_raw(pub, %{}) do
-          {:ok, raw} ->
-            collect_public_keys(Map.delete(map, "public_key"), [
-              Base.url_encode64(raw, padding: false) | acc
-            ])
+        {:ok, raw} = Jwk.thumbprint_digest_unchecked(pub)
 
-          _error ->
-            collect_public_keys(Map.delete(map, "public_key"), acc)
-        end
+        collect_public_keys(Map.delete(map, "public_key"), [
+          Base.url_encode64(raw, padding: false) | acc
+        ])
 
       _error ->
         collect_public_keys(Map.delete(map, "public_key"), acc)

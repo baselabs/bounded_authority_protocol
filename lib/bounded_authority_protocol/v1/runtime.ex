@@ -4,6 +4,8 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
   alias BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.Uri,
     as: LocalLoopbackUri
 
+  alias BoundedAuthorityProtocol.Ed25519
+
   alias BoundedAuthorityProtocol.V1.{
     AnchoredExportCodec,
     AnchoredExportInput,
@@ -573,7 +575,8 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
 
   defp validate_trusted_issuer(%TrustedIssuer{} = trusted, bounds) do
     if valid_key_id?(trusted.key_id, bounds) and is_binary(trusted.public_key) and
-         byte_size(trusted.public_key) == bounds.public_key_bytes do
+         byte_size(trusted.public_key) == bounds.public_key_bytes and
+         Ed25519.acceptable_public_key?(trusted.public_key) do
       :ok
     else
       {:error, :invalid}
@@ -972,11 +975,8 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
   defp nonce_matches?(nonce, {:required, expected}), do: secure_equal?(nonce, expected)
   defp nonce_matches?(_nonce, _expectation), do: false
 
-  defp verify_signature(message, signature, public_key) do
-    is_binary(message) and is_binary(signature) and byte_size(signature) == 64 and
-      is_binary(public_key) and byte_size(public_key) == 32 and
-      :crypto.verify(:eddsa, :none, message, signature, [public_key, :ed25519])
-  end
+  defp verify_signature(message, signature, public_key),
+    do: Ed25519.verify_strict(message, signature, public_key)
 
   defp secure_equal?(left, right)
        when is_binary(left) and is_binary(right) and byte_size(left) == byte_size(right),

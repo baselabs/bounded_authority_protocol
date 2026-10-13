@@ -18,6 +18,12 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
 
   Every failure returns the fixed value-free `{:error, :invalid}`. The loaded corpus carries
   decoded cases, sidecar bytes, and the index for the runner and report.
+
+  `load_strict_ed25519/1` loads the additive strict-Ed25519 corpus (profile
+  `bap-strict-ed25519/1`), whose index has its own closed shape: per-file lowercase-hex SHA-256,
+  per-file and per-family case counts, a profile and a revision sidecar, and no applicability
+  matrix. The loaded corpus carries `major: :strict_ed25519`; each case names its own surface
+  and, for v1/v2-shaped families, its own contract-major.
   """
 
   alias BoundedAuthorityProtocol.V1.Bounds
@@ -32,7 +38,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
           cases: [{binary(), [map()]}],
           raws: %{binary() => binary()},
           case_ids: term(),
-          major: 1 | 2
+          major: 1 | 2 | 3 | :strict_ed25519
         }
 
   # The index format string names the corpus's contract-major; the loader derives
@@ -84,6 +90,162 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   end
 
   def load(_map), do: {:error, :invalid}
+
+  # --- strict-Ed25519 corpus -----------------------------------------------
+
+  @strict_profile "bap-strict-ed25519/1"
+  @strict_index_format "bounded-authority-protocol-strict-ed25519-conformance-corpus-index"
+  @strict_case_format "bounded-authority-protocol-strict-ed25519-conformance-cases"
+  @strict_profile_format "bounded-authority-protocol-strict-ed25519-conformance-profile"
+  @strict_revision_format "bounded-authority-protocol-strict-ed25519-conformance-corpus-revision"
+  @strict_sidecars ["profile.json", "revision.json"]
+
+  @doc "Loads and integrity-verifies the `%{path => binary}` strict-Ed25519 corpus map."
+  @spec load_strict_ed25519(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
+  def load_strict_ed25519(map) when is_map(map) do
+    with {:ok, index_bytes} <- fetch_index(map),
+         {:ok, index} <- decode_index(index_bytes),
+         :ok <- verify_strict_structure(index),
+         {:ok, files} <- ordered_files(strict_file_entries(index["files"])),
+         :ok <- verify_file_set(files, map),
+         :ok <- verify_strict_hashes(files, map),
+         :ok <- verify_strict_sidecars(map, index["revision"]),
+         {:ok, cases} <- load_strict_case_files(files, map),
+         :ok <- verify_strict_counts(index, files, cases),
+         :ok <- verify_case_ids(cases) do
+      case_ids = cases |> Enum.flat_map(&elem(&1, 1)) |> Enum.map(& &1["id"]) |> MapSet.new()
+
+      {:ok,
+       %__MODULE__{
+         index: index,
+         index_bytes: index_bytes,
+         cases: cases,
+         raws: %{},
+         case_ids: case_ids,
+         major: :strict_ed25519
+       }}
+    end
+  end
+
+  def load_strict_ed25519(_map), do: {:error, :invalid}
+
+  defp verify_strict_structure(index) do
+    if index["format"] == @strict_index_format and index["profile"] == @strict_profile and
+         revision_integer?({:integer, index["revision"]}) and
+         index["private_material_tracked"] == false and is_list(index["files"]) and
+         is_integer(index["total_cases"]) and is_map(index["families"]),
+       do: :ok,
+       else: {:error, :invalid}
+  end
+
+  # The strict index names each file's digest as lowercase hex under "sha256"; mapping it onto
+  # the shared {path, hash, count} tuple reuses the ordered-file and file-set checks unchanged.
+  defp strict_file_entries(entries) when is_list(entries) do
+    %{
+      "files" =>
+        Enum.map(entries, fn
+          %{"path" => path, "sha256" => hash, "cases" => count} ->
+            %{"path" => path, "sha256_base64url" => hash, "cases" => count}
+
+          _invalid ->
+            :invalid
+        end)
+    }
+  end
+
+  defp verify_strict_hashes(files, map) do
+    if Enum.all?(files, fn {path, hash, _count} -> strict_hash_matches?(map, path, hash) end),
+      do: :ok,
+      else: {:error, :invalid}
+  end
+
+  defp strict_hash_matches?(map, path, hash) do
+    case fetch_path(map, path) do
+      {:ok, bytes} -> sha256_hex(bytes) == hash
+      _missing -> false
+    end
+  end
+
+  defp verify_strict_sidecars(map, revision) do
+    with {:ok, profile} <- decode_plain(map, "profile.json"),
+         {:ok, sidecar} <- decode_plain(map, "revision.json"),
+         true <- profile["format"] == @strict_profile_format,
+         true <- profile["profile"] == @strict_profile,
+         true <- profile["revision"] == revision,
+         true <- sidecar["format"] == @strict_revision_format,
+         true <- sidecar["revision"] == revision,
+         true <- generated_from_string?({:string, sidecar["generated_from"]}) do
+      :ok
+    else
+      _invalid -> {:error, :invalid}
+    end
+  end
+
+  # Every non-sidecar file is cases/<family>/<name>.json, carries the case format, names its
+  # own directory as its family, and holds a list of case objects that each name a surface.
+  defp load_strict_case_files(files, map) do
+    loaded =
+      files
+      |> Enum.reject(fn {path, _hash, _count} -> path in @strict_sidecars end)
+      |> Enum.map(fn {path, _hash, _count} -> {path, load_strict_case_file(path, map)} end)
+
+    if Enum.all?(loaded, &match?({_path, {:ok, _cases}}, &1)),
+      do: {:ok, Enum.map(loaded, fn {path, {:ok, cases}} -> {path, cases} end)},
+      else: {:error, :invalid}
+  end
+
+  defp load_strict_case_file(path, map) do
+    with ["cases", family, name] <- String.split(path, "/"),
+         true <- String.ends_with?(name, ".json"),
+         {:ok, file} <- decode_plain(map, path),
+         true <- file["format"] == @strict_case_format,
+         true <- file["family"] == family,
+         cases when is_list(cases) and cases != [] <- file["cases"],
+         true <- Enum.all?(cases, &strict_case?/1) do
+      {:ok, Enum.map(cases, &Map.put(&1, "family", family))}
+    else
+      _invalid -> :error
+    end
+  end
+
+  defp strict_case?(%{"id" => id, "surface" => surface})
+       when is_binary(id) and is_binary(surface),
+       do: true
+
+  defp strict_case?(_case_obj), do: false
+
+  defp verify_strict_counts(index, files, cases) do
+    per_file = Map.new(cases, fn {path, list} -> {path, length(list)} end)
+
+    files_agree? =
+      Enum.all?(files, fn {path, _hash, count} ->
+        if path in @strict_sidecars, do: count == 0, else: Map.get(per_file, path) == count
+      end)
+
+    per_family =
+      cases
+      |> Enum.flat_map(&elem(&1, 1))
+      |> Enum.reduce(%{}, fn case_obj, acc ->
+        Map.update(acc, case_obj["family"], 1, &(&1 + 1))
+      end)
+
+    total = Enum.reduce(cases, 0, fn {_path, list}, acc -> acc + length(list) end)
+
+    if files_agree? and per_family == index["families"] and total == index["total_cases"],
+      do: :ok,
+      else: {:error, :invalid}
+  end
+
+  defp decode_plain(map, path) do
+    with {:ok, bytes} <- fetch_path(map, path),
+         {:ok, {:object, _members} = value} <- Json.decode(bytes, Bounds.maximum()) do
+      {:ok, to_plain(value)}
+    else
+      _invalid -> {:error, :invalid}
+    end
+  end
+
+  defp sha256_hex(bytes), do: Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
 
   # --- index decoding ------------------------------------------------------
 

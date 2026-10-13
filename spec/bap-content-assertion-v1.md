@@ -5,7 +5,8 @@ docname: bap-content-assertion-v1
 
 # BAP Content Assertion Profile 1
 
-Document status: normative contract for `bap-content-assertion/1`, revision 1;
+Document status: normative contract for `bap-content-assertion/1`, revision 2 (erratum 2,
+ADR 0040);
 first released in package 0.7.0; the companion signer supports it from
 `bounded_authority_report_adapter` 0.9.0. Governing decision:
 [ADR 0037](../docs/adr/0037-content-assertion-profile.md).
@@ -126,6 +127,13 @@ finite key-window endpoints obey integer magnitude and `valid_from < valid_befor
 6. `nbf <= now < exp` (`REQ-CA1-VERIFY-now`). No implicit clock or skew is used.
 7. The exact JWS signing input's Ed25519 signature verifies against the supplied
    public key (`REQ-CA1-VERIFY-signature`).
+
+The signature check of item 7 MUST follow the strict Ed25519 rule of
+[BAP v1 § 14.1](bap-v1.md#strict-ed25519) (`REQ1-SIGNING-ed25519-canonical-point`, `REQ1-SIGNING-ed25519-small-order-reject`,
+`REQ1-SIGNING-ed25519-scalar-range`, `REQ1-SIGNING-ed25519-cofactorless`), and the attestor public key
+MUST pass key acceptance (`REQ1-KEY-ed25519-acceptable`). Revision 2 adds this statement
+(erratum 2, [ADR 0040](../docs/adr/0040-strict-ed25519-soundness-erratum.md)); the profile corpus
+and its verdicts are unchanged, and the cases live in the additive strict-Ed25519 corpus.
 
 Structural `iat <= nbf` and the current-window check imply `iat <= now`.
 No key selection, trust walk, revocation query, content schema evaluation, replay

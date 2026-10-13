@@ -38,6 +38,9 @@
 - a fixture producer whose implementation agrees only with itself or whose manifest omits a key;
 - an input sender using duplicate fields, alternate base64url, private JWK members, HTTP or
   ambiguous URIs, malformed Ed25519 points/signatures, or maximum-plus-one structures.
+- a forger presenting a small-order or non-canonical Ed25519 key with a signature made without
+  any private key, or one secret presenting several mixed-order variants of its key to evade a
+  deny list or a rotation check.
 - an archive controller supplying a validly signed shorter history, relinked omission, stale object
   generation, incomplete chunk stream, or forged historical-key path.
 - local malware or another same-host process attempting proof replay, alternate-host spelling,
@@ -52,6 +55,10 @@
   request digest, temporal, nonce, and semantic selector rules;
 - no trust discovery, private key, callback, live state, side effect, or implicit clock;
 - raw fixed-size hash/fingerprint comparisons and fixed value-free errors;
+- strict Ed25519 verification on every Ed25519 surface (canonical point encodings, small-order
+  rejection, `S < L`, and the cofactorless equation), key acceptance at every key-bearing input and
+  producer, and the host torsion-free check at enrollment, trust install, and deny-list comparison
+  ([ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md));
 - official and independent public-only vectors, exact two-way key-census equality, meaningful-byte
   tamper, duplicate/encoding, property/fuzz, timing/allocation, and source-isolated mutation-red
   gates;

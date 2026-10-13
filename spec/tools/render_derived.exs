@@ -12,7 +12,7 @@ defmodule BoundedAuthorityProtocol.RenderDerived do
   @root Path.expand("../..", __DIR__)
   @source "spec/bap-v1.md"
   @target "docs/protocol-v1.md"
-  @spec_revision 1
+  @spec_revision 2
 
   def run(argv) do
     rendered = render()

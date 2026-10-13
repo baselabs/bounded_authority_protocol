@@ -47,3 +47,8 @@ role-attestation and content-assertion profile corpora, runs them in CI (`pnpm c
 `conformance:content-assertion`), and asserts each `index.json` SHA-256 at
 load. When this monorepo rotates a corpus, the SDK repository takes a snapshot-bump commit —
 the startup assertion fails loudly on any drift.
+
+The strict-Ed25519 corpus (`bap-strict-ed25519/1`, ADR 0040) is additive: no existing snapshot
+rotates. The SDK adopts it as a new vendored snapshot together with rule S1 at its Ed25519
+verification point, in its own release; a Node runtime that already rejects small-order keys is
+not a substitute, because conformance must not depend on the runtime version.

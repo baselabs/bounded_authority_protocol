@@ -126,10 +126,92 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
     %{
       name: "transition-signature",
       path: "lib/bounded_authority_protocol/v1/key_transition_codec.ex",
-      from:
-        ":crypto.verify(\n             :eddsa,\n             :none,\n             parsed.message,\n             parsed.signature,\n             [current_key.public_key, :ed25519]\n           )",
+      from: "Ed25519.verify_strict(parsed.message, parsed.signature, current_key.public_key)",
       to: "is_binary(parsed.signature)",
       command: ["mix", "test", "test/bounded_authority_protocol/v1/key_transition_test.exs"]
+    },
+    # Strict-Ed25519 gate clauses as they reach the anchor, transition and export surfaces.
+    # The codecs call BoundedAuthorityProtocol.Ed25519.verify_strict/3; each mutant weakens the
+    # shared gate, and the strict corpus families for these surfaces must go red. Canonical A
+    # and small-order A are refused earlier here by key acceptance, and canonical R and S < L by
+    # the cofactorless backend, so those four are proven by the gate's own unit tests.
+    %{
+      name: "strict-gate-bypass",
+      path: "lib/bounded_authority_protocol/ed25519.ex",
+      from: "    strict_gate?(signature, public_key) and\n      :crypto.verify",
+      to: "    :crypto.verify",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/strict_ed25519_corpus_test.exs",
+        "--only",
+        "family:boundary-anchor",
+        "--only",
+        "family:key-transition",
+        "--only",
+        "family:anchored-export"
+      ]
+    },
+    %{
+      name: "strict-gate-small-order-r",
+      path: "lib/bounded_authority_protocol/ed25519.ex",
+      from:
+        "    canonical?(a) and canonical?(r) and not small_order?(a) and not small_order?(r) and s < @l",
+      to: "    canonical?(a) and canonical?(r) and not small_order?(a) and s < @l",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/strict_ed25519_corpus_test.exs",
+        "--only",
+        "family:boundary-anchor",
+        "--only",
+        "family:key-transition",
+        "--only",
+        "family:anchored-export"
+      ]
+    },
+    # Key acceptance: a historical key, and every key fingerprinted through the JWK, must be an
+    # acceptable Ed25519 key.
+    %{
+      name: "historical-key-acceptance",
+      path: "lib/bounded_authority_protocol/v1/context_validation.ex",
+      from: "         Ed25519.acceptable_public_key?(key.public_key) and\n",
+      to: "",
+      command: [
+        "mix",
+        "test",
+        "test/bounded_authority_protocol/v1/context_validation_test.exs"
+      ]
+    },
+    %{
+      name: "jwk-encode-acceptance",
+      path: "lib/bounded_authority_protocol/v1/jwk.ex",
+      from:
+        "             byte_size(public_key) <= bounds.public_key_bytes,\n         true <- Ed25519.acceptable_public_key?(public_key) do\n      {:ok, preimage(public_key)}",
+      to:
+        "             byte_size(public_key) <= bounds.public_key_bytes do\n      {:ok, preimage(public_key)}",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/strict_ed25519_corpus_test.exs",
+        "--only",
+        "family:jwk"
+      ]
+    },
+    %{
+      name: "jwk-decode-acceptance",
+      path: "lib/bounded_authority_protocol/v1/jwk.ex",
+      from:
+        "             byte_size(public_key) <= bounds.public_key_bytes,\n         true <- Ed25519.acceptable_public_key?(public_key) do\n      {:ok, public_key}",
+      to:
+        "             byte_size(public_key) <= bounds.public_key_bytes do\n      {:ok, public_key}",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/strict_ed25519_corpus_test.exs",
+        "--only",
+        "family:jwk"
+      ]
     },
     %{
       name: "transition-current-window",

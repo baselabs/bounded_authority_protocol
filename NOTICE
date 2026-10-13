@@ -2,3 +2,22 @@ bounded_authority_protocol
 Copyright 2026 BaseLabs
 
 This product includes software developed by BaseLabs.
+
+---
+
+Third-party test vectors
+
+The strict-Ed25519 conformance corpus file
+priv/conformance/strict-ed25519/cases/taming/speccheck.json contains 12 Ed25519
+test vectors imported byte for byte from ed25519-speccheck
+(https://github.com/novifinancial/ed25519-speccheck, commit
+65519336fda78a3d016e947df6d82848aca0c9da, file cases.json, SHA-256
+08e47a36d9aead288664930505584f353fff113ab854f2800db1e4f5b3540450), which
+accompanies "Taming the many EdDSAs" (Chalkias, Garillot, Nikolaenko,
+SSR 2020; IACR ePrint 2020/1244). Copyright (c) Facebook, Inc. and its
+affiliates. Licensed under the Apache License, Version 2.0; the upstream
+repository carries no NOTICE file at that commit. The vectors are reproduced
+unmodified; this project adds the base64url input encoding, expected verdicts,
+and provenance fields around them. The same vectors also appear in the Go and
+Rust SDK conformance snapshots under sdks/go/conformance/corpus-strict/ and
+sdks/rust/conformance/corpus-strict/.

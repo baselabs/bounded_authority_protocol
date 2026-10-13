@@ -182,12 +182,12 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
     assert {:error, :invalid} =
              V1.verify_grant(compact, %{issuer | key_id: "other"}, expected)
 
+    # A different real key, not an all-zero placeholder: the all-zero encoding is the
+    # order-4 point, which key acceptance refuses before the signature is ever checked.
+    {other_public, _other_private} = :crypto.generate_key(:eddsa, :ed25519)
+
     assert {:error, :invalid} =
-             V1.verify_grant(
-               compact,
-               %{issuer | public_key: :binary.copy(<<0>>, 32)},
-               expected
-             )
+             V1.verify_grant(compact, %{issuer | public_key: other_public}, expected)
 
     assert {:error, :invalid} =
              V1.verify_grant(compact, issuer, %{expected | issuer: "https://other.example"})

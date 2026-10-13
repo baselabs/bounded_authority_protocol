@@ -1,6 +1,6 @@
 (*************************************************************************)
 (* BAP v1 core — formal model of the stateless verification algebra.     *)
-(* Pinned to spec/bap-v1.md rev 1 (Doc-Revision; spec-facts rule 8).     *)
+(* Pinned to spec/bap-v1.md rev 2 (Doc-Revision; spec-facts rule 8).     *)
 (*                                                                       *)
 (* Properties (spec/formal/attacker-model.md):                           *)
 (*   P1 a proof binds exactly the ath-named grant                        *)

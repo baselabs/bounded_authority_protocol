@@ -9,6 +9,12 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   `%{"actual" => ..., "agree" => boolean}` for an invalid expectation (agreement = the facade
   returned `{:error, :invalid}` exactly). The runner never selects trust, reserves replay, or
   checks revocation — it exercises the pure facade only.
+
+  A strict-Ed25519 corpus (`major: :strict_ed25519`) runs each case on the surface it names:
+  v1/v2-shaped cases through the same dispatch as their own contract-major; `ed25519.*` cases
+  through `BoundedAuthorityProtocol.Ed25519`; and the loopback, role-attestation and
+  content-assertion cases through those profiles' facades, comparing every verdict the case
+  declares.
   """
 
   alias BoundedAuthorityProtocol.Conformance.Corpus
@@ -123,6 +129,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end)
   end
 
+  defp execute_case(case_obj, _raws, :strict_ed25519),
+    do: %{case_id: case_obj["id"], agree: strict_agrees?(case_obj)}
+
   defp execute_case(case_obj, raws, major) do
     surface = case_obj["surface"]
     input = Map.get(case_obj, "input", %{})
@@ -149,6 +158,199 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
       actual_value = project(key, actual)
       compare?(key, expected_value, actual_value)
     end)
+  end
+
+  # --- strict-Ed25519 corpus ----------------------------------------------
+
+  # v1/v2-shaped cases: the case's own contract-major and surface, the ordinary agreement rule.
+  defp strict_agrees?(
+         %{"major" => major, "surface" => surface, "expected" => expected} = case_obj
+       )
+       when major in [1, 2] do
+    actual = dispatch(major, surface, Map.get(case_obj, "input", %{}), %{})
+    agrees?(expected, actual)
+  end
+
+  defp strict_agrees?(%{"surface" => "ed25519." <> function} = case_obj) do
+    case {strict_primitive(function, Map.get(case_obj, "input", %{})), case_obj["expected"]} do
+      {{:ok, verdict}, %{"verdict" => "valid"}} -> verdict == true
+      {{:ok, verdict}, %{"verdict" => "invalid"}} -> verdict == false
+      _malformed -> false
+    end
+  end
+
+  defp strict_agrees?(%{"surface" => "local_loopback_http"} = case_obj) do
+    compact = case_obj["compact"]
+
+    with true <- is_binary(compact),
+         {:ok, expected} <- build_loopback_request(case_obj) do
+      local =
+        BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.decode_proof(
+          compact,
+          %{}
+        )
+
+      standard = BoundedAuthorityProtocol.V1.decode_proof(compact, %{})
+
+      envelope =
+        BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.check_envelope(
+          %Credentials{grant: case_obj["grant"], proof: compact},
+          expected
+        )
+
+      verdicts_agree?(case_obj, [
+        {"decode_local", local},
+        {"decode_standard", standard},
+        {"envelope_local", envelope}
+      ])
+    else
+      _malformed -> false
+    end
+  end
+
+  defp strict_agrees?(%{"surface" => "role_attestation"} = case_obj) do
+    compact = case_obj["compact"]
+
+    with true <- is_binary(compact),
+         {:ok, expected} <- build_expected_attestation(case_obj) do
+      verdicts_agree?(case_obj, [
+        {"decode", BoundedAuthorityProtocol.RoleAttestation.V1.decode_attestation(compact, %{})},
+        {"verify",
+         BoundedAuthorityProtocol.RoleAttestation.V1.verify_attestation(compact, expected)}
+      ])
+    else
+      _malformed -> false
+    end
+  end
+
+  defp strict_agrees?(%{"surface" => "content_assertion", "expected" => declared} = case_obj) do
+    compact = case_obj["compact"]
+
+    with true <- is_binary(compact),
+         {:ok, expected} <- build_expected_assertion(case_obj) do
+      decode = BoundedAuthorityProtocol.ContentAssertion.V1.decode_assertion(compact, %{})
+      verify = BoundedAuthorityProtocol.ContentAssertion.V1.verify_assertion(compact, expected)
+      declared == %{"decode" => verdict_name(decode), "verify" => verdict_name(verify)}
+    else
+      _malformed -> false
+    end
+  end
+
+  defp strict_agrees?(_case_obj), do: false
+
+  defp strict_primitive("verify_strict", input) do
+    with {:ok, message} <- b64_field(input, "message"),
+         {:ok, signature} <- b64_field(input, "signature"),
+         {:ok, public_key} <- b64_field(input, "public_key") do
+      {:ok, BoundedAuthorityProtocol.Ed25519.verify_strict(message, signature, public_key)}
+    end
+  end
+
+  defp strict_primitive("acceptable_public_key", input) do
+    with {:ok, public_key} <- b64_field(input, "public_key") do
+      {:ok, BoundedAuthorityProtocol.Ed25519.acceptable_public_key?(public_key)}
+    end
+  end
+
+  defp strict_primitive("torsion_free", input) do
+    with {:ok, public_key} <- b64_field(input, "public_key") do
+      {:ok, BoundedAuthorityProtocol.Ed25519.torsion_free?(public_key)}
+    end
+  end
+
+  defp strict_primitive(_function, _input), do: {:error, :invalid}
+
+  # Each named verdict is a boolean the case declares; a missing or non-boolean one disagrees.
+  defp verdicts_agree?(case_obj, results) do
+    Enum.all?(results, fn {key, result} ->
+      declared = Map.get(case_obj, key)
+      is_boolean(declared) and declared == match?({:ok, _value}, result)
+    end)
+  end
+
+  defp verdict_name({:ok, _value}), do: "valid"
+  defp verdict_name(_error), do: "invalid"
+
+  defp build_loopback_request(case_obj) do
+    issuer = Map.get(case_obj, "issuer", %{})
+    request = Map.get(case_obj, "request", %{})
+
+    with true <- is_binary(case_obj["grant"]),
+         {:ok, trusted} <- build_trusted_issuer(issuer),
+         {:ok, issuer_name} <- fetch_binary(issuer, "issuer"),
+         {:ok, audience} <- fetch_binary(issuer, "audience"),
+         {:ok, target_uri} <- fetch_binary(case_obj, "target_uri"),
+         {:ok, nonce} <- fetch_binary(case_obj, "nonce"),
+         {:ok, method} <- fetch_binary(request, "method"),
+         {:ok, invocation_id} <- fetch_binary(request, "invocation_id"),
+         {:ok, operation} <- fetch_binary(request, "operation"),
+         {:ok, cast_arguments} <- json_field(request, "cast_arguments"),
+         {:ok, evaluation_time} <- int_field(request, "evaluation_time"),
+         {:ok, clock_skew} <- int_field(request, "clock_skew"),
+         {:ok, proof_max_age} <- int_field(request, "proof_max_age") do
+      {:ok,
+       %ExpectedRequest{
+         trusted_issuer: trusted,
+         issuer: issuer_name,
+         audience: audience,
+         method: method,
+         target_uri: target_uri,
+         invocation_id: invocation_id,
+         operation: operation,
+         cast_arguments: cast_arguments,
+         evaluation_time: evaluation_time,
+         clock_skew: clock_skew,
+         proof_max_age: proof_max_age,
+         nonce: {:required, nonce},
+         bounds: %{}
+       }}
+    else
+      _malformed -> {:error, :invalid}
+    end
+  end
+
+  defp build_expected_attestation(case_obj) do
+    subject = Map.get(case_obj, "subject", %{})
+
+    with {:ok, attestor} <- build_historical_key(Map.get(case_obj, "attestor", %{})),
+         {:ok, subject_key_id} <- fetch_binary(subject, "key_id"),
+         {:ok, subject_public_key} <- b64_field(subject, "public_key"),
+         {:ok, now} <- int_field(case_obj, "now") do
+      {:ok,
+       %BoundedAuthorityProtocol.RoleAttestation.V1.ExpectedAttestation{
+         attestor: attestor,
+         subject_key_id: subject_key_id,
+         subject_public_key: subject_public_key,
+         now: now,
+         bounds: %{}
+       }}
+    end
+  end
+
+  defp build_expected_assertion(case_obj) do
+    context = Map.get(case_obj, "expected_context", %{})
+
+    with {:ok, attestor} <- build_historical_key(Map.get(case_obj, "attestor", %{})),
+         {:ok, issuer} <- fetch_binary(context, "issuer"),
+         {:ok, audience} <- fetch_binary(context, "audience"),
+         {:ok, subject} <- fetch_binary(context, "subject"),
+         {:ok, profile} <- fetch_binary(context, "profile"),
+         {:ok, profile_digest} <- b64_field(context, "profile_digest"),
+         {:ok, content_digest} <- b64_field(context, "content_digest"),
+         {:ok, now} <- int_field(context, "now") do
+      {:ok,
+       %BoundedAuthorityProtocol.ContentAssertion.V1.ExpectedContentAssertion{
+         attestor: attestor,
+         issuer: issuer,
+         audience: audience,
+         subject: subject,
+         profile: profile,
+         profile_digest: profile_digest,
+         content_digest: content_digest,
+         now: now,
+         bounds: %{}
+       }}
+    end
   end
 
   # --- dispatch table ------------------------------------------------------

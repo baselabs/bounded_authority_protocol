@@ -13,16 +13,19 @@ normative profile; this guide is operational.
 
 ## Installation
 
-OBSERVED September 28, 2026: the [Hex release API](https://hex.pm/api/packages/bounded_authority_protocol/releases/0.7.0)
-reports release 0.7.0 published on September 28, 2026 UTC:
+The 0.8.0 registry read-back (publication date and checksum) is recorded here after
+publication; the last OBSERVED read-back is release 0.7.0, which the
+[Hex release API](https://hex.pm/api/packages/bounded_authority_protocol/releases/0.7.0)
+reported published on September 28, 2026 UTC:
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 0.7.0"}]
+  [{:bounded_authority_protocol, "~> 0.8.0"}]
 end
 ```
 
-`v0.7.0` adds the content-assertion sibling profile; `v0.6.2` is the cross-Elixir compilation
+`v0.8.0` is the strict Ed25519 verification soundness repair (ADR 0040; upgrade from every
+earlier release); `v0.7.0` adds the content-assertion sibling profile; `v0.6.2` is the cross-Elixir compilation
 and scan-sensitivity repair patch; `v0.6.1` is the
 cross-vendor repair patch; `v0.6.0` adds the role-attestation sibling profile.
 `v0.5.0` was the ES256 contract-major 3

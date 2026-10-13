@@ -1,6 +1,6 @@
 # Bounded Authority Protocol v2 Wire Profile
 
-Document revision: rev 1 (2026-09-13). Status: normative. Contract-major 2, suite
+Document revision: rev 2 (2026-10-12; erratum 2, ADR 0040). Status: normative. Contract-major 2, suite
 `BAP2-Ed25519-SHA256`. This profile is activated by
 [ADR 0030](../docs/adr/0030-v2-contract-major-activation.md) under the
 [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md); the selector
@@ -14,7 +14,8 @@ maxima, the untrusted key locator, `typ` values, and security/privacy considerat
 INCORPORATED FROM v1 BY REFERENCE with the substitutions of §2 — every such section is normative
 for v2 exactly as for v1, with the named constants replaced. No section of the v1 profile is
 optional, open, or best-effort in v2. Sections 3–6 state the v2-specific normative rules in
-full, including the selector algebra with the two range kinds.
+full, including the selector algebra with the two range kinds. Section 7 states the strict
+Ed25519 verification rule that revision 2 adds for v2.
 
 ## 1. Suite identity and major detection {#suite}
 
@@ -147,3 +148,25 @@ into the v2 corpus byte-for-byte; the profile-bound surfaces carry v2-minted fix
 range-selector applicability classes, and cross-major rejection vectors. Signed fixtures were
 minted with ephemeral in-memory Ed25519 keys; no private material is tracked
 (`REQ2-CORPUS-certified-identity`).
+
+## 7. Strict Ed25519 verification {#strict-ed25519}
+
+Revision 2 incorporates erratum 2, the strict Ed25519 verification soundness repair
+([ADR 0040](../docs/adr/0040-strict-ed25519-soundness-erratum.md)). Every Ed25519 signature a v2
+verifier checks is verified under the strict rule of [bap-v1.md § 14.1](bap-v1.md#strict-ed25519),
+with these v2 requirement identifiers:
+
+- `A` and `R` MUST be canonical point encodings (`REQ2-SIGNING-ed25519-canonical-point`).
+- `A` and `R` MUST NOT be of small order (`REQ2-SIGNING-ed25519-small-order-reject`).
+- The scalar `S` MUST be less than the group order `L` (`REQ2-SIGNING-ed25519-scalar-range`).
+- The verification equation MUST be the cofactorless one, compared byte for byte
+  (`REQ2-SIGNING-ed25519-cofactorless`).
+- A public key entering any v2 verification input or producer MUST be 32 bytes, canonical, not of
+  small order, and on the curve (`REQ2-KEY-ed25519-acceptable`).
+
+The first three checks run before any backend call; any failure returns the single closed error.
+The host torsion-free requirement of [bap-v1.md § 14.1](bap-v1.md#strict-ed25519) applies to keys
+used with v2 artifacts unchanged. The cases live in the additive strict-Ed25519 corpus
+(`priv/conformance/strict-ed25519`, profile `bap-strict-ed25519/1`, revision 1, certified index
+SHA-256 `0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`), whose v2 cases carry
+`major: 2`. The v2 corpus above, its index, and its verdicts are unchanged.

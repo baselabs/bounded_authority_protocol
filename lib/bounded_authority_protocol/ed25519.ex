@@ -167,11 +167,14 @@ defmodule BoundedAuthorityProtocol.Ed25519 do
 
   # Extended twisted Edwards coordinates (X:Y:Z:T), a = -1 (RFC 8032 §5.1.4).
   defp add({x1, y1, z1, t1}, {x2, y2, z2, t2}) do
-    a = field((y1 - x1) * (y2 - x2))
-    b = field((y1 + x1) * (y2 + x2))
-    c = field(2 * @d * t1 * t2)
-    d = field(2 * z1 * z2)
-    {e, f, g, h} = {b - a, d - c, d + c, b + a}
+    y_minus_x = field((y1 - x1) * (y2 - x2))
+    y_plus_x = field((y1 + x1) * (y2 + x2))
+    t_term = field(2 * @d * t1 * t2)
+    z_term = field(2 * z1 * z2)
+    e = y_plus_x - y_minus_x
+    f = z_term - t_term
+    g = z_term + t_term
+    h = y_plus_x + y_minus_x
     {field(e * f), field(g * h), field(f * g), field(e * h)}
   end
 

@@ -6,11 +6,12 @@ docname: bap-v1
 
 # Bounded Authority Protocol v1 Wire Profile
 
-Document status: normative for contract-major 1. Document revision: rev 1. This document is the
+Document status: normative for contract-major 1. Document revision: rev 2. This document is the
 single normative authority for the v1 wire profile. It is authored to be verifiable in-repo: a
 machine extraction of its normative tables is frozen and drift-gated, and every requirement
 statement carries a stable requirement identifier mapped to conformance evidence. It makes no
-submission claim about any external venue.
+submission claim about any external venue. Revision 2 incorporates erratum 2, the strict Ed25519
+verification soundness repair of ADR 0040 ((#strict-ed25519)).
 
 A conforming implementation rejects every unlisted member, value, encoding, or extension with a
 single closed error value. Successful decode or verification is not a trust-selection or
@@ -91,7 +92,7 @@ evidence is published in the requirement map (Appendix C locates the companion a
 ## 5. Suite identity
 
 This profile constitutes the cryptographic suite `BAP1-Ed25519-SHA256`: EdDSA over Ed25519
-[@RFC8032] [@RFC8037], SHA-256 digests, RFC 8785 canonical bytes [@RFC8785], and the `BAP1-*`
+[@RFC8032] [@RFC8037] verified under the strict rule of (#strict-ed25519), SHA-256 digests, RFC 8785 canonical bytes [@RFC8785], and the `BAP1-*`
 domain separators, with the fixed widths listed in the bounds table (#maxima). Every artifact
 self-declares this identity through its `v` claim, `typ` header, `alg` value, and domain
 separators. Evolution happens above this profile, never inside it: successor contract-majors carry
@@ -157,9 +158,10 @@ segments; correctly signed closed JSON objects may use any member order (`REQ1-S
 Producers emit one deterministic JCS representation (`REQ1-SIGNING-deterministic-produce`).
 
 The verifier validates the fixed 32-byte public-key and 64-byte signature encodings, completes
-all bounded parsing and contextual checks, and then delegates Ed25519 verification to the
-underlying cryptographic backend. A backend rejection or exception returns exactly the profile's
-closed error value (`REQ1-SIGNING-backend-reject`).
+all bounded parsing and contextual checks, and then applies the strict Ed25519 rule of
+(#strict-ed25519), whose final step, the cofactorless verification equation, the underlying
+cryptographic backend computes. A backend rejection or exception after the strict gate returns
+exactly the profile's closed error value (`REQ1-SIGNING-backend-reject`).
 
 The request digest is:
 
@@ -344,6 +346,63 @@ authority/port syntax, control/non-ASCII bytes, and out-of-range ports are inval
 
 See (#datamodel) for the exact signing input, the request-digest construction, the typed
 projection, and the `BAP1-*` domain separators.
+
+### 14.1 Strict Ed25519 verification {#strict-ed25519}
+
+Every Ed25519 signature this profile verifies is checked under one strict rule: grants, proofs,
+boundary anchors, key transitions, the anchors and transitions inside an anchored export, and the
+artifacts of every sibling profile that uses this suite. In this section `A` is the 32-byte public
+key, `R || S` is the 64-byte signature split into the 32-byte point encoding `R` and the 32-byte
+little-endian scalar `S`, `M` is the exact signing input, `B` is the base point, `p` is
+`2^255 - 19`, `L` is the prime order of `B`, and `O` is the identity point.
+
+A point encoding is canonical when the integer `y` formed by its low 255 bits (little-endian)
+satisfies `y < p`, and when it is not one of the two encodings that set the sign bit for a point
+with `x = 0` (`y = 1` and `y = p - 1` with the high bit of the last byte set). Both `A` and `R`
+MUST be canonical (`REQ1-SIGNING-ed25519-canonical-point`); these are the two encoding conditions
+of the RFC 8032 §5.1.3 decoding, which §5.1.7 applies to both points.
+
+A point of small order is one of the eight points `P` with `[8]P = O`: the identity, one point of
+order 2, two of order 4, and four of order 8. `A` and `R` MUST NOT be of small order
+(`REQ1-SIGNING-ed25519-small-order-reject`); one table of the eight canonical encodings serves both
+checks, and the strict-Ed25519 conformance corpus lists them in its key-acceptance family.
+
+The scalar `S` MUST be less than `L` (`REQ1-SIGNING-ed25519-scalar-range`), as RFC 8032 §5.1.7
+requires.
+
+The verification equation MUST be the cofactorless one, compared byte for byte:
+`encode([S]B - [k]A) == R`, with `k = SHA-512(R || A || M) mod L`
+(`REQ1-SIGNING-ed25519-cofactorless`). A verifier that multiplies the equation by the cofactor 8
+accepts inputs this profile rejects and is non-conforming.
+
+The canonical, small-order, and scalar-range checks run before any backend call, and any failure
+returns the closed error value. Verification performs no subgroup check: a canonical key of
+neither small nor prime order, which carries a torsion component (a mixed-order key), is verified
+like any other key. Curve membership of `A` is left to the backend at verification, and every
+conforming backend rejects a key that is not on the curve.
+
+A public key entering any verification input or producer (a trusted issuer key, a holder JWK, a
+historical archive key, a key-transition key, and the key arguments of signing-input construction,
+JWK encoding and decoding, and thumbprint computation) MUST be 32 bytes, canonical, not of small
+order, and on the curve, which means the RFC 8032 §5.1.3 decoding succeeds
+(`REQ1-KEY-ed25519-acceptable`). A key that fails returns the closed error value.
+
+One secret can sign under up to eight distinct mixed-order encodings of its key, each with its own
+thumbprint, and anyone can sign under the mixed-order variants of a key whose secret is public.
+A host MUST therefore reject any key that is not torsion-free (`[L]A = O`, in addition to key
+acceptance) at key enrollment, at trust install, and before any deny-list or revocation comparison
+(`REQ1-HOST-ed25519-torsion-free`). A canonical, torsion-free key has exactly one encoding per
+secret, so key equality is identity equality. Full public-key validation of this kind is
+conforming at those host points and non-conforming at verification, where the cofactorless verdict
+governs.
+
+The rule changes verdicts only from accept to reject, and only on inputs no conforming producer
+emits: an RFC 8032 key has prime order and a canonical encoding, an honest `R` is the identity only
+with probability about `2^-252`, and an honest `S` is reduced modulo `L`. The additive
+strict-Ed25519 corpus (`priv/conformance/strict-ed25519`, profile `bap-strict-ed25519/1`,
+revision 1, 2,391 cases, certified index SHA-256
+`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`) carries the cases for these
+requirements. Every v1 corpus case and verdict is unchanged.
 
 ## 15. Consumption chain and anchored export {#chain}
 
@@ -629,7 +688,10 @@ authenticated, strictly time-increasing, cycle-free transitions
 (`REQ1-CORE-cross-major-reject` frames the suite identity; the transition controls are the
 archive-section closed-set requirements), and archive acceptance requires the complete scan,
 exact EOF, and exact caller boundaries so that validly signed truncations fail
-(`REQ1-EXPORT-complete-scan`, `REQ1-CHAIN-no-deletion-cert`).
+(`REQ1-EXPORT-complete-scan`, `REQ1-CHAIN-no-deletion-cert`). Ed25519 verification is strict, so a
+signature under a small-order or non-canonical key never verifies and every conforming
+implementation reaches the same verdict on the same bytes
+(`REQ1-SIGNING-ed25519-small-order-reject`, `REQ1-SIGNING-ed25519-cofactorless`).
 
 ### Verification is not authority (a security property, not a disclaimer)
 
@@ -665,8 +727,11 @@ proof's `iat` or a request header, or that accepts cast arguments from the prese
 deriving them from the request it serves, reopens the time and request substitution the profile
 otherwise closes. Archive completeness against a malicious
 controller requires the caller to retain or derive the intended boundaries
-(`REQ1-CHAIN-no-deletion-cert`). Implementation error is a standing residual risk; the
-conformance corpus and the mutation gates exist to make the common classes loud.
+(`REQ1-CHAIN-no-deletion-cert`). A mixed-order key passes verification, so one secret can present
+several distinct keys: a host that enrolls, trusts, or deny-lists keys without the torsion-free
+check can be evaded through those variants (`REQ1-HOST-ed25519-torsion-free`). Implementation
+error is a standing residual risk; the conformance corpus and the mutation gates exist to make the
+common classes loud.
 
 ## 22. Privacy considerations
 
@@ -880,8 +945,11 @@ The untrusted key locator returns exactly:
 
 The Elixir bindings map the tagged algebra as: `:null`, `{:boolean, b}`, `{:integer, n}`, `{:float, f}`,
 `{:string, s}`, `{:array, [value]}`, `{:object, [{name, value}]}`; the closed error value is
-`{:error, :invalid}`. Companion artifacts: the conformance corpus (283 cases over 28 surfaces,
-certified index digest and monotone revision integer in its `revision.json` sidecar), the
+`{:error, :invalid}`. The strict Ed25519 rule of (#strict-ed25519) is exposed as
+`BoundedAuthorityProtocol.Ed25519` (`verify_strict/3`, `acceptable_public_key?/1`, and
+`torsion_free?/1`). Companion artifacts: the conformance corpus (283 cases over 28 surfaces,
+certified index digest and monotone revision integer in its `revision.json` sidecar), the additive
+strict-Ed25519 corpus (2,391 cases, (#strict-ed25519)), the
 structural JSON Schemas (Draft 2020-12), the requirement-to-conformance map (REQ1-* to corpus
 cells), the registries document, and the standards-track charter. The corpus is the
 machine-checked oracle; requirement identifiers and their evidence cells are enumerated in

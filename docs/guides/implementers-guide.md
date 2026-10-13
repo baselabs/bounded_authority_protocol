@@ -197,3 +197,34 @@ eight-file set and per-file hashes, execute all 131 assertion, 9 digest, and 14 
 compare producer and assembly bytes where the corpus supplies them, and prove cross-profile
 rejection in both directions.
 
+## 12. Implementing strict Ed25519 verification
+
+Every Ed25519 surface uses one rule, specified in
+[`spec/bap-v1.md` § 14.1](../../spec/bap-v1.md#strict-ed25519) and decided in
+[ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md). Put it at your single Ed25519
+verification point, ahead of the backend call:
+
+1. Reject a non-canonical `A` or `R`: the low 255 bits read as `y >= p`, or one of the two
+   encodings that set the sign bit for a point with `x = 0`. This is a byte comparison, identical
+   in every language.
+2. Reject `A` or `R` equal to any of the eight small-order encodings. Keep one table for both
+   checks, and derive the expected set in your tests by arithmetic (the multiples of a point of
+   order 8) instead of copying it.
+3. Reject `S >= L`.
+4. Verify with the cofactorless equation. Many backends compute it; a cofactored verifier (one
+   that multiplies by 8, as ZIP 215 style verifiers do) is non-conforming.
+
+Key acceptance adds an on-curve check (the RFC 8032 §5.1.3 decoding succeeds) and applies to every
+key that enters a verification input or a producer, including JWK decode, encode, and thumbprint
+functions. Keep a separate hash-only thumbprint path for censuses and generators, and never use
+it on a verification path. Expose a torsion-free check (`[L]A = O`) for hosts; never run it on the
+verification path, since mixed-order keys verify by design.
+
+Run the strict-Ed25519 corpus (`priv/conformance/strict-ed25519`, `bap-strict-ed25519/1`) beside
+the existing corpora and pin its index SHA-256
+`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c` at load. Each case names its
+surface, the requirement it isolates (`rule`), and, for signed artifacts, the major it targets.
+The `primitive`, `key-acceptance`, and `differential` families exercise the rule directly; the
+other families carry the same inputs through every signed surface. The rule-S1 checks for
+canonical `R` and `S < L` are often duplicated by backends, so prove them with unit tests and
+permissiveness mutants, not only with corpus verdicts.

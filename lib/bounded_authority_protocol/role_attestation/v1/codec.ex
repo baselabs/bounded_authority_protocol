@@ -1,6 +1,7 @@
 defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
   @moduledoc false
 
+  alias BoundedAuthorityProtocol.Ed25519
   alias BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts
   alias BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation
   alias BoundedAuthorityProtocol.RoleAttestation.V1.ExpectedAttestation
@@ -182,7 +183,7 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
          true <- valid_key_id?(key_id, bounds),
          {:string, public_key_encoded} <- payload["public_key"],
          {:ok, public_key} <- Base64Url.decode(public_key_encoded, bounds),
-         true <- byte_size(public_key) == @public_key_bytes,
+         true <- valid_public_key?(public_key, bounds),
          {:string, role} <- payload["role"],
          true <- valid_role?(role),
          {:integer, nbf} <- payload["nbf"],
@@ -296,13 +297,14 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
   end
 
   defp verify_signature(message, signature, public_key) do
-    :crypto.verify(:eddsa, :none, message, signature, [public_key, :ed25519])
+    Ed25519.verify_strict(message, signature, public_key)
   end
 
   defp valid_public_key?(public_key, bounds),
     do:
       is_binary(public_key) and byte_size(public_key) == @public_key_bytes and
-        byte_size(public_key) <= bounds.public_key_bytes
+        byte_size(public_key) <= bounds.public_key_bytes and
+        Ed25519.acceptable_public_key?(public_key)
 
   defp valid_role?(role), do: is_binary(role) and (role == "issuer" or role == "holder")
 

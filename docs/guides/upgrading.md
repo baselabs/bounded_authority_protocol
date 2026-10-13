@@ -5,6 +5,34 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
+## 0.7.0 to 0.8.0
+
+Soundness-repair minor (erratum 2, [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)):
+every release before 0.8.0 accepts Ed25519 signatures under small-order and non-canonical keys,
+so every consumer should upgrade; see the security advisory. The requirement `~> 0.7.0` does not
+select 0.8.0; move to `~> 0.8.0`.
+
+- Every Ed25519 verification applies rule S1: canonical point encodings, no small-order key or
+  `R`, a scalar below the group order, and the cofactorless equation. Signatures from conforming
+  RFC 8032 signers keep verifying; only inputs no conforming producer emits change from accept to
+  reject.
+- Producers and key functions return `{:error, :invalid}` for a public key that fails key
+  acceptance (wrong width, non-canonical, small order, or off the curve): proof, boundary-anchor,
+  key-transition, and role-attestation signing-input construction, `V1.Jwk.encode_public/2`,
+  `V1.Jwk.decode_public/2`, and the JWK thumbprint functions. Code that used an all-zero or
+  otherwise synthetic 32-byte key as a placeholder must generate a real key.
+- New public module `BoundedAuthorityProtocol.Ed25519` with `verify_strict/3`,
+  `acceptable_public_key?/1`, and `torsion_free?/1`.
+- New host obligation: call `torsion_free?/1` at key enrollment, at trust install, and before any
+  deny-list or revocation comparison (`REQ1-HOST-ed25519-torsion-free`).
+- Before upgrading, run `acceptable_public_key?/1` and `torsion_free?/1` over every stored
+  trusted key, enrolled holder key, role-attestation subject and attestor key, and every key in
+  the historical key chain of each retained anchored export. Treat a failure as a compromise:
+  revoke the key, re-issue what it signed, and re-anchor the affected archives. After the upgrade,
+  an archive whose key chain contains a key that fails key acceptance no longer verifies.
+- Every existing certified corpus, its index digest, and its verdicts are unchanged; the new
+  strict-Ed25519 corpus is additive.
+
 ## 0.6.2 to 0.7.0
 
 Additive sibling-profile minor: `0.7.0` ships the first package bearing

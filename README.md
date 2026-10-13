@@ -26,7 +26,7 @@ cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.7.0"}
+    {:bounded_authority_protocol, "~> 0.8.0"}
   ]
 end
 ```
@@ -76,6 +76,16 @@ caller-supplied signature; it never accepts private key material or a signer):
 - `grant_signing_input/2`, `proof_signing_input/2`, `boundary_anchor_signing_input/2`,
   `key_transition_signing_input/2`, `assemble_compact/2,3`, `encode_consumption_entry/2`,
   `encode_anchored_export/2`, `request_digest/3`.
+
+Strict Ed25519 (`BoundedAuthorityProtocol.Ed25519`, [ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md)):
+
+- `verify_strict/3` — the one Ed25519 verification rule every surface uses: canonical point
+  encodings, no small-order key or `R`, a scalar below the group order, and the cofactorless
+  equation. A signature under a small-order or non-canonical key never verifies.
+- `acceptable_public_key?/1` — key acceptance (32 bytes, canonical, not small-order, on the
+  curve); producers and JWK functions refuse a key that fails it.
+- `torsion_free?/1` — the host check for key enrollment, trust install, and deny-list or
+  revocation comparison. It is not on the verification path; call it yourself at those points.
 
 Decoding:
 
@@ -180,6 +190,17 @@ rejection:
 mix content_assertion.verify
 ```
 
+The strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1: 2,391 cases in 14 families; index
+SHA-256 `0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`) lives under
+`priv/conformance/strict-ed25519`. It is additive: it carries the cases of the strict Ed25519
+rule (ADR 0040) for every Ed25519 surface, a 1,024-case cross-language differential set, and the
+12 published "Taming the many EdDSAs" vectors, while every existing corpus and verdict above stays
+unchanged. The same CLI verifies it:
+
+```bash
+./bounded_authority_conformance --corpus priv/conformance/strict-ed25519
+```
+
 ## Cross-language verifier SDKs
 
 Alongside the Elixir package, the repository authors typed **verifier** SDKs of the frozen profiles
@@ -193,7 +214,9 @@ conformance corpora recomputed from scratch, asserts each corpus index digest at
 every parser-layer closure red-capable via a per-language mutation gate; the profile corpora
 (local-loopback 36 URI + 8 proof, role-attestation 40, content-assertion 131 + 9 + 14) run in
 the Elixir suite and the three in-repo SDKs, and the graduated TypeScript repository also runs the
-role-attestation and content-assertion corpora. Each
+role-attestation and content-assertion corpora. The strict-Ed25519 corpus (2,391 cases) runs in
+the Elixir suite and the three in-repo SDKs, each of which implements the strict rule at its
+single Ed25519 verification point. Each
 SDK graduates to its own repository on first publication.
 
 ## Standards posture

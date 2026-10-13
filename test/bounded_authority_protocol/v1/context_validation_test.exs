@@ -46,9 +46,13 @@ defmodule BoundedAuthorityProtocol.V1.ContextValidationTest do
       bounds: bounds
     }
 
+    # A real generated key: an all-zero placeholder is the order-4 point, which the key
+    # acceptance rule refuses, so it would test the key rule instead of this guard.
+    {public_key, _private_key} = :crypto.generate_key(:eddsa, :ed25519)
+
     key = %HistoricalPublicKey{
       key_id: "key-a",
-      public_key: <<0::256>>,
+      public_key: public_key,
       valid_from: 0,
       valid_before: :unbounded
     }
@@ -82,6 +86,17 @@ defmodule BoundedAuthorityProtocol.V1.ContextValidationTest do
 
     assert {:error, :invalid} =
              ContextValidation.historical_key(%{key | valid_before: 0}, bounds)
+
+    # The same key record refuses each small-order or non-canonical key encoding, while the
+    # generated key above stays accepted (the positive control for this branch).
+    for weak <- [
+          <<0::256>>,
+          <<1, 0::248>>,
+          Base.decode16!("EE" <> String.duplicate("FF", 30) <> "7F")
+        ] do
+      assert {:error, :invalid} =
+               ContextValidation.historical_key(%{key | public_key: weak}, bounds)
+    end
 
     assert {:error, :invalid} = ContextValidation.expected_chain(%{}, bounds)
     assert {:error, :invalid} = ContextValidation.expected_anchor(%{}, bounds)

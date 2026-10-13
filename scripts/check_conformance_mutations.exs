@@ -346,6 +346,84 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         {"test/conformance/corpus_independent_test.exs",
          "independent runner agrees on every shipped corpus case (repo mode)"}
     },
+    # --- independent runner strict Ed25519 gate (ADR 0040) ---------------------
+    %{
+      # Deleting the A small-order clause of the runner's S1 gate lets strict-corpus vectors the rule rejects agree as valid in
+      # the independent runner (strict mode, Node 22.23.1); the strict-mode test reds on disagreed > 0.
+      name: "runner-s1-a-small-order-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  if (a !== null && s1SmallOrder(a)) return false;\n",
+      to: "",
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on the strict-Ed25519 corpus (strict mode)"}
+    },
+    %{
+      # Deleting the R small-order clause of the runner's S1 gate lets strict-corpus vectors the rule rejects agree as valid in
+      # the independent runner (strict mode, Node 22.23.1); the strict-mode test reds on disagreed > 0.
+      name: "runner-s1-r-small-order-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  if (rPoint !== null && s1SmallOrder(rPoint)) return false;\n",
+      to: "",
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on the strict-Ed25519 corpus (strict mode)"}
+    },
+    %{
+      # Deleting the canonical-encoding clause of the runner's S1 gate lets strict-corpus vectors the rule rejects agree as valid in
+      # the independent runner (strict mode, Node 22.23.1); the strict-mode test reds on disagreed > 0.
+      name: "runner-s1-canonical-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  if (!s1Canonical(publicKey) || !s1Canonical(r)) return false;\n",
+      to: "",
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on the strict-Ed25519 corpus (strict mode)"}
+    },
+    %{
+      # Deleting the S1 gate call at the runner's Ed25519 verify site lets strict-corpus vectors the rule rejects agree as valid in
+      # the independent runner (strict mode, Node 22.23.1); the strict-mode test reds on disagreed > 0.
+      name: "runner-s1-verify-site-ungated",
+      path: "conformance/corpus_independent.mjs",
+      from: "  if (!s1Gate(raw, signature)) return false;\n  return verifySignature(null, message, publicKey, signature);",
+      to: "  return verifySignature(null, message, publicKey, signature);",
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on the strict-Ed25519 corpus (strict mode)"}
+    },
+    %{
+      # Deleting key acceptance on historical (archive, transition, export) keys lets strict-corpus vectors the rule rejects agree as valid in
+      # the independent runner (strict mode, Node 22.23.1); the strict-mode test reds on disagreed > 0.
+      name: "runner-s1-historical-key-acceptance-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  assert(s1AcceptablePublicKey(publicKey), `${context}: key acceptance`);\n",
+      to: "",
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on the strict-Ed25519 corpus (strict mode)"}
+    },
+    %{
+      # Deleting key acceptance on decoded JWKs (holder keys and the JWK surfaces) lets strict-corpus vectors the rule rejects agree as valid in
+      # the independent runner (strict mode, Node 22.23.1); the strict-mode test reds on disagreed > 0.
+      name: "runner-s1-jwk-acceptance-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  assert(s1AcceptablePublicKey(x), `${context}: key acceptance`);\n",
+      to: "",
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on the strict-Ed25519 corpus (strict mode)"}
+    },
+    %{
+      # Deleting the [L]A = O test of the runner's torsion_free lets strict-corpus vectors the rule rejects agree as valid in
+      # the independent runner (strict mode, Node 22.23.1); the strict-mode test reds on disagreed > 0.
+      name: "runner-s1-torsion-free-removal",
+      path: "conformance/corpus_independent.mjs",
+      from: "  return s1AcceptablePublicKey(publicKey) && s1IsIdentity(s1Multiply(S1_L, s1Decode(publicKey)));",
+      to: "  return s1AcceptablePublicKey(publicKey);",
+      target:
+        {"test/conformance/corpus_independent_test.exs",
+         "independent runner agrees on the strict-Ed25519 corpus (strict mode)"}
+    },
     # --- runner reject-vs-error typing (InvalidError whitelist) ---------------
     %{
       # A runner BUG (a non-InvalidError throw) on an INVALID-only path must ABORT the run, never be

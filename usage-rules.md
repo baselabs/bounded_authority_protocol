@@ -20,7 +20,7 @@
 11. Treat chain consistency as consistency only. It cannot by itself prove that a validly
     shortened or relinked history omitted nothing.
 12. Keep commitment preimages private. The public row carries only a fixed-width commitment.
-13. Consume the published Hex release (`{:bounded_authority_protocol, "~> 0.7.0"}`) only after the
+13. Consume the published Hex release (`{:bounded_authority_protocol, "~> 0.8.0"}`) only after the
     registry exposes that immutable archive. A Git tag or mutable checkout is not a package
     identity. The standard v1 verification surface stays byte- and verdict-identical; the
     local-loopback application profile is selected only through its separately named API.
@@ -35,3 +35,9 @@
     attestor key and window, and `now` to `verify_assertion/2`. Verified facts prove signature,
     context, and window only. Keep durable per-subject generation and digest state to refuse
     replay, regression, and forks; `verify_successor/3` compares two facts values and nothing more.
+17. Call `BoundedAuthorityProtocol.Ed25519.torsion_free?/1` on every Ed25519 key at enrollment, at
+    trust install, and before any deny-list or revocation comparison, and reject a key that fails
+    it. Verification applies the strict rule itself and accepts mixed-order keys by design; the
+    torsion-free check is what makes one secret map to exactly one key and thumbprint. Before
+    upgrading to 0.8.x, scan stored keys and archived key chains with `acceptable_public_key?/1`
+    and `torsion_free?/1` and treat any failure as a compromise (ADR 0040).

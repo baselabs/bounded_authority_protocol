@@ -1,6 +1,6 @@
 # BAP v1 formal attacker model
 
-Pinned to: `spec/bap-v1.md` rev 1 (Doc-Revision). This file is a companion of the specification
+Pinned to: `spec/bap-v1.md` rev 2 (Doc-Revision). This file is a companion of the specification
 at exactly that revision; the spec-facts gate (rule 8) reds if either side drifts alone.
 
 ## Scope
@@ -25,7 +25,10 @@ Symbolic assumptions, recorded: perfect cryptography; Ed25519/SHA-256 as symboli
 time abstracted to an order with a bounded skew window (no dense-time reasoning); JSON
 canonicalization taken as an injective encoding (the typed projection makes this sound — the
 tagged algebra is a free term algebra, which is exactly what the typed-projection table buys
-the model).
+the model). Revision 2 adds the strict Ed25519 rule (spec § 14.1, ADR 0040). The model already
+treats Ed25519 as an ideal signature, so it is unchanged; the strict rule is what makes
+implementations meet that assumption for small-order and non-canonical keys, which an ideal
+signature never accepts.
 
 ## Properties
 

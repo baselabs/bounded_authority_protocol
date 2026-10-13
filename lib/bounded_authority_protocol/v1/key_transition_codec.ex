@@ -1,6 +1,7 @@
 defmodule BoundedAuthorityProtocol.V1.KeyTransitionCodec do
   @moduledoc false
 
+  alias BoundedAuthorityProtocol.Ed25519
   alias BoundedAuthorityProtocol.V1.Base64Url
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.CompactJws
@@ -82,13 +83,7 @@ defmodule BoundedAuthorityProtocol.V1.KeyTransitionCodec do
          true <- inside_window?(parsed.effective_at, current_key),
          true <- inside_window?(parsed.effective_at, next_key),
          true <-
-           :crypto.verify(
-             :eddsa,
-             :none,
-             parsed.message,
-             parsed.signature,
-             [current_key.public_key, :ed25519]
-           ) do
+           Ed25519.verify_strict(parsed.message, parsed.signature, current_key.public_key) do
       {:ok,
        %KeyTransitionFacts{
          version: 1,

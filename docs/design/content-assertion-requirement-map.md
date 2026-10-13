@@ -10,6 +10,17 @@ Corpus: `priv/conformance/attestation-profiles/content-assertion/v1`, revision 1
 131 assertion cases, 9 digest cases, and 14 successor cases. Frozen index SHA-256:
 `14b7436ccf7cc91fece52a1578c3760df6720a93494d147ee5ab523e2ce21876`.
 
+Strict Ed25519 verification (erratum 2, [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)):
+the profile's signature and key checks follow the strict rule of
+[`spec/bap-v1.md` § 14.1](../../spec/bap-v1.md#strict-ed25519). Its requirements keep their
+contract-major ids (`REQ1-SIGNING-ed25519-canonical-point`,
+`REQ1-SIGNING-ed25519-small-order-reject`, `REQ1-SIGNING-ed25519-scalar-range`,
+`REQ1-SIGNING-ed25519-cofactorless`, `REQ1-KEY-ed25519-acceptable`) and are traced in the
+[requirement map](requirement-map.md). Their cases for this profile are the 31 cases of the
+`ca1` family in the additive strict-Ed25519 corpus (`priv/conformance/strict-ed25519`, index
+SHA-256 `0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`). This profile's own
+corpus, index, and verdicts are unchanged.
+
 OBSERVED local checks against this corpus: the Elixir corpus consumer, Python
 `tests/test_content_assertion.py`, Go content-assertion tests, Rust
 `cargo test --test content_assertion`, and TypeScript

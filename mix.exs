@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.MixProject do
   use Mix.Project
 
-  @version "0.7.0"
+  @version "0.8.0"
   @source_url "https://github.com/baselabs/bounded_authority_protocol"
 
   def project do
@@ -103,6 +103,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "priv/conformance/application-profiles/local-loopback-http/v1",
         "priv/conformance/attestation-profiles/role-attestation/v1",
         "priv/conformance/attestation-profiles/content-assertion/v1",
+        "priv/conformance/strict-ed25519",
         ".formatter.exs",
         "mix.exs",
         "README.md",
@@ -146,6 +147,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0035-es256-contract-major-activation.md",
         "docs/adr/0036-role-attestation-profile.md",
         "docs/adr/0037-content-assertion-profile.md",
+        "docs/adr/0040-strict-ed25519-soundness-erratum.md",
         "docs/protocol-v1.md",
         "docs/errata.md",
         "docs/governance.md",
@@ -240,6 +242,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0035-es256-contract-major-activation.md",
         "docs/adr/0036-role-attestation-profile.md",
         "docs/adr/0037-content-assertion-profile.md",
+        "docs/adr/0040-strict-ed25519-soundness-erratum.md",
         "docs/errata.md",
         "docs/governance.md",
         "docs/design/conformance-contract.md",
@@ -287,7 +290,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "escript.build",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/v1/corpus",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/v2/corpus",
-        "cmd ./bounded_authority_conformance --corpus priv/conformance/v3/corpus"
+        "cmd ./bounded_authority_conformance --corpus priv/conformance/v3/corpus",
+        "cmd ./bounded_authority_conformance --corpus priv/conformance/strict-ed25519"
       ],
       "local_loopback_http.verify": [
         "run scripts/check_local_loopback_http.exs",

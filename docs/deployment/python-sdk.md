@@ -35,6 +35,15 @@ Local development listeners select `local_loopback_http_uri_normalize`,
 direct literal `127.0.0.1`/`[::1]` HTTP targets and require the server nonce. Never derive the target
 from `Forwarded`/`X-Forwarded-*`, accept `localhost`, or retry standard `dpop+jwt` after rejection.
 
+## Strict Ed25519 verification
+
+Every Ed25519 verification in the SDK applies rule S1 of
+[ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md) at its single Ed25519 verification
+point: canonical point encodings, no small-order key or `R`, a scalar below the group order, and
+the cofactorless equation. Key import, JWK encode and decode, and thumbprint functions refuse a key
+that fails key acceptance. The SDK also exposes the host torsion-free check; call it at key
+enrollment, at trust install, and before any deny-list or revocation comparison. The strict-Ed25519 corpus (`priv/conformance/strict-ed25519`) runs through `tests/conformance/run_strict.py` with its index SHA-256 pinned.
+
 ## Supply-chain posture
 
 One runtime dependency (`cryptography`, BSD-3-Clause/Apache-2.0 dual). Consumers SHOULD pin

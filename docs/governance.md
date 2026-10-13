@@ -31,14 +31,40 @@ departure 2).
 
 ## Change classes
 
-Editorial (errata; never verdict-changing) · clarifying (minor version; additive docs/cases only) ·
+Editorial (errata; never verdict-changing) · soundness repair (an erratum that changes verdicts
+only from accept to reject on producer-impossible inputs, under every condition of
+[ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) Decision 4) · clarifying (minor version;
+additive docs/cases only) ·
 byte-distinct sibling proof profile (breaking pre-1.0 package release, public ADR, independent
 normative/corpus/API identity) · byte-distinct sibling attestation profile (same release/ADR/identity
 shape, under its own class conditions) · existing-profile wire or verification behavior
 (contract-major only, with a public ADR).
 ([standards-track.md](design/standards-track.md) § Governance; amended by
-[ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md) and
-[ADR 0036](adr/0036-role-attestation-profile.md).)
+[ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md),
+[ADR 0036](adr/0036-role-attestation-profile.md), and
+[ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md).)
+
+## Soundness repairs
+
+A soundness repair corrects an existing profile's verdicts on inputs that no conforming producer
+emits, where keeping the old verdict would leave a forgery or an equivalent soundness failure
+conforming. It is allowed only when all of the following hold:
+
+1. every changed verdict goes from accept to reject;
+2. the newly rejected inputs are proven producer-impossible;
+3. no verdict of any existing certified corpus changes, proven by running the reference and the
+   independent runners over every existing corpus;
+4. the new cases land in a new additive corpus with its own certified identity;
+5. every maintained SDK and the independent runners ship the repair in the same release window;
+6. disclosure follows the order: private advisory, then publication of the fixed releases, then
+   the public advisory;
+7. a post-disclosure ratification window opens (§ Change control).
+
+A soundness repair is not a sunset: the major continues, and it keeps no overlap window during
+which the vulnerable verdict remains conforming. Releases before the repair are retired on the
+package registry. A change that fails any condition remains contract-major work. The decision,
+its split justification, and the first instance are in
+[ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md).
 
 ## Byte-distinct sibling proof profiles
 
@@ -86,14 +112,22 @@ process supersedes this one.
 charter's "see below" is resolved to an explicit link to the charter § Venue strategy; the
 sibling-profile extension is [ADR 0036](adr/0036-role-attestation-profile.md) Decision 1.)
 
+A fix developed under embargo cannot take public comment before disclosure. For every embargoed
+soundness repair, a ratification window opens at public disclosure: at least thirty days of public
+comment, closed by a follow-up ADR that ratifies or supersedes the repair. A superseding rule lands
+only in a successor contract-major; a ratified repair is never rolled back to the vulnerable
+verdict. ([ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) Decision 10.)
+
 ## Errata channel
 
 [docs/errata.md](errata.md) is the numbered errata registry; each entry names affected versions and
 its corpus impact, and the no-verdict-flip invariant is checked at review
 ([standards-track.md](design/standards-track.md):209-211, the charter § Governance errata bullet,
-verbatim). **No erratum may flip an existing profile's corpus verdict** — any change that would
-alter such an accept/reject outcome is by definition a contract-major change and follows the
-evolution contract, never this registry. A sibling proof profile is not an erratum and cannot
+verbatim). **No erratum may flip a verdict of an existing certified corpus** — any change that
+would alter such an accept/reject outcome is by definition a contract-major change and follows the
+evolution contract, never this registry. The one exception is a soundness repair
+(§ Soundness repairs), which adds its cases in a new corpus, flips no existing corpus verdict, and
+is recorded in this registry with its corpus impact. A sibling proof profile is not an erratum and cannot
 reclassify an existing case (the no-verdict-flip invariant, stated in the evolution contract as
 `REQ1-EVO-no-verdict-flip`, [standards-track.md](design/standards-track.md):66-69).
 *(This section is a composite — departure 3: the charter splits the errata fact across § Governance
@@ -119,14 +153,19 @@ authoritative one" for deprecation ([standards-track.md](design/standards-track.
 ## Security policy
 
 [SECURITY.md](../SECURITY.md) governs vulnerability intake; a vulnerability whose fix would change a
-verdict is handled as a contract-major security release with an accelerated overlap window —
+verdict and that does not meet every soundness-repair condition (§ Soundness repairs) is handled
+as a contract-major security release with an accelerated overlap window —
 published at announcement and set proportional to the vulnerability's severity, exempt from the
 twelve-month deprecation minimum (charter § [The evolution contract](design/standards-track.md#the-evolution-contract)),
 yet still a published, deployment-decided sunset, not a flag-day — never as a silent verdict change.
 ([standards-track.md](design/standards-track.md):214-218, the charter § Governance security-policy
 bullet, verbatim except the deictic "above (§ The evolution contract)" resolved to a cross-doc link
 — departure 1.)
-[SECURITY.md](../SECURITY.md) cross-references this section (rather than restating the rule) so the
+A fix that meets every soundness-repair condition lands as an erratum with a security advisory,
+in the same release across every implementation, followed by the ratification window
+(§ Change control); [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) amends the charter
+bullet accordingly.
+[SECURITY.md](../SECURITY.md) cross-references this section instead of restating the rule, so the
 verdict-change rule lives in one place.
 
 ## Errata registry posture
@@ -134,6 +173,6 @@ verdict-change rule lives in one place.
 The errata registry at [docs/errata.md](errata.md) is **live** — it is the operational
 no-verdict-flip governance instrument, with a numbered entry and per-entry corpus impact. It
 currently carries Erratum 1, the correction for the v1 `all` selector's three recognized member
-sets (ADR 0021). New errata follow the § Errata channel no-verdict-flip process above. *(This
+sets (ADR 0021), and Erratum 2, the strict Ed25519 verification soundness repair (ADR 0040). New errata follow the § Errata channel no-verdict-flip process above. *(This
 statement is this document's own framing of the registry's operational posture, not a charter
 extract — labeled as such.)*

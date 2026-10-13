@@ -627,3 +627,21 @@ paths = [
   '''^priv/conformance/v3/corpus/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
   '''^sdks/(?:go|rust)/conformance/corpus-v3/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
 ]
+[[allowlists]]
+description = "Strict-Ed25519 corpus public key, signature, and compact JWS fixtures (machine-minted from public test keys, certified, no private material - the generator writes public keys, signatures and messages only and the corpus declares private_material_tracked false; path-scoped because enumerating a generated corpus's values is unmaintainable)"
+targetRules = ["jwt", "generic-api-key"]
+paths = [
+  '''^priv/conformance/strict-ed25519/(?:profile\.json|cases/(?:anchored-export|boundary-anchor|ca1|envelope|grant-verify|jcs-utf8|jwk|key-acceptance|key-transition|loopback|primitive|ra1)/[^/]+\.json)$''',
+  '''^sdks/(?:go|rust)/conformance/corpus-strict/(?:profile\.json|cases/(?:anchored-export|boundary-anchor|ca1|envelope|grant-verify|jcs-utf8|jwk|key-acceptance|key-transition|loopback|primitive|ra1)/[^/]+\.json)$''',
+]
+[[allowlists]]
+description = "Requirement-statement baseline: a SHA-256 statement digest keyed by a requirement id that contains KEY (not a credential)"
+condition = "AND"
+targetRules = ["generic-api-key"]
+regexTarget = "match"
+paths = [
+  '''^spec/facts/requirement-statements-v1\.json$''',
+]
+regexes = [
+  '''^REQ1\-KEY\-ed25519\-acceptable":"6d0d4d9f08e4ddbe5587119e76b2a4efb3589eea2339f1f54ed5f5cffa1e51fa"$''',
+]

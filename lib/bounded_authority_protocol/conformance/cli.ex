@@ -1,6 +1,7 @@
 defmodule BoundedAuthorityProtocol.Conformance.Cli do
   @moduledoc """
-  Deterministic offline verifier CLI for the v1 conformance corpus.
+  Deterministic offline verifier CLI for the conformance corpora: the v1, v2 and v3 corpora and
+  the additive strict-Ed25519 corpus (`priv/conformance/strict-ed25519`).
 
   This is the package's I/O carve-out: argv parsing, `File.read`/`File.ls` to load a corpus
   directory, and report output (`IO.binwrite`/`File.write`). Every judgment — corpus integrity,
@@ -36,7 +37,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   @certified_index_sha256 %{
     1 => "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs",
     2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A",
-    3 => "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw"
+    3 => "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw",
+    :strict_ed25519 => "DPrmBwY4fIQ2c1_QKCw7e-0nAQX27FfmVM8czzyAGAw"
   }
 
   @doc """
@@ -85,7 +87,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
 
   defp load_and_run(corpus_dir, report_path) do
     with {:ok, map} <- read_corpus_dir(corpus_dir),
-         {:ok, corpus} <- Corpus.load(map),
+         {:ok, corpus} <- load_corpus(map),
          :ok <- assert_certified_corpus(corpus),
          results <- Runner.run(corpus),
          {:ok, bytes} <- Report.to_bytes(corpus, results),
@@ -98,6 +100,15 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
       # report on disk — a quiet failure of the evidence artifact in the tool built to eliminate
       # quiet failure.
       _ -> 1
+    end
+  end
+
+  # A directory is either a contract-major corpus or the strict-Ed25519 corpus; each loader
+  # accepts only its own index format, so at most one can succeed and both fail closed.
+  defp load_corpus(map) do
+    case Corpus.load(map) do
+      {:ok, corpus} -> {:ok, corpus}
+      {:error, :invalid} -> Corpus.load_strict_ed25519(map)
     end
   end
 

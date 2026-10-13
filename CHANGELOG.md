@@ -2,7 +2,56 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
-## [Unreleased]
+## [0.8.0] — release date set at disclosure
+
+The strict Ed25519 verification release: a soundness repair (erratum 2,
+[ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md)). Upgrade from every earlier
+release; see the security advisory for affected versions and details.
+
+### Security
+
+- Ed25519 verification accepted signatures under small-order and non-canonical public-key and
+  point encodings, which can verify without any private key. Every Ed25519 surface now applies
+  strict verification before the backend: point encodings must be canonical, small-order keys
+  and `R` values are rejected, the scalar must be below the group order, and the cofactorless
+  equation is mandatory. This covers grants, holder proofs, boundary anchors, key transitions,
+  anchored exports, local-loopback proofs, role attestations, and content assertions under
+  contract-majors 1 and 2. Contract-major 3 (ES256) is unaffected.
+
+### Added
+
+- `BoundedAuthorityProtocol.Ed25519`, the single public owner of the rule:
+  `verify_strict/3`, `acceptable_public_key?/1`, and `torsion_free?/1`. Hosts must call
+  `torsion_free?/1` at key enrollment, at trust install, and before any deny-list or revocation
+  comparison (`REQ1-HOST-ed25519-torsion-free`).
+- The additive strict-Ed25519 conformance corpus `bap-strict-ed25519/1`, revision 1, at
+  `priv/conformance/strict-ed25519` (2,391 cases in 14 families; index SHA-256
+  `0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`). Its verdicts come from an
+  independent arithmetic generator. It includes the 12 published "Taming the many EdDSAs" test
+  vectors (Apache-2.0, attributed in `NOTICE`), named small-order-key vectors for both contract
+  majors, and a JCS UTF-8 boundary family. The verifier CLI
+  and `mix conformance.verify` run it beside the existing corpora.
+- Requirement ids `REQ1-SIGNING-ed25519-canonical-point`, `-small-order-reject`,
+  `-scalar-range`, and `-cofactorless`; `REQ1-KEY-ed25519-acceptable`;
+  `REQ1-HOST-ed25519-torsion-free`; and the five matching `REQ2-*` ids, mapped in the
+  requirement map.
+- A soundness-repair change class and a post-disclosure ratification window in the governance
+  policy, the charter, the errata registry, and `SECURITY.md`.
+
+### Changed
+
+- Producers and key functions refuse a public key that fails key acceptance (wrong width,
+  non-canonical, small order, or off the curve) with `{:error, :invalid}`: proof, boundary-anchor,
+  key-transition, and role-attestation signing-input construction, `V1.Jwk.encode_public/2`,
+  `V1.Jwk.decode_public/2`, and the JWK thumbprint functions. Honest RFC 8032 keys are unaffected.
+- `spec/bap-v1.md` and `spec/bap-v2.md` move to revision 2, and the local-loopback,
+  role-attestation, and content-assertion specifications state the rule. ADR 0012 and ADR 0007
+  carry amended-by notes.
+- Every existing certified corpus (v1, v2, v3, local loopback, role attestation, and content
+  assertion), its index digest, and its verdicts are unchanged.
+- The three independent Node conformance runners apply the strict rule at their Ed25519
+  verification and key-acceptance points, and `conformance/corpus_independent.mjs --strict` runs
+  the strict-Ed25519 corpus. CI pins the runners' Node release exactly (22.23.1).
 
 ### Fixed
 

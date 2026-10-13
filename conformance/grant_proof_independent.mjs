@@ -12,6 +12,122 @@ import {extname, join, resolve, sep} from "node:path";
 import {isIP} from "node:net";
 import {fileURLToPath} from "node:url";
 
+// --- strict Ed25519 rule S1 (spec/bap-v1.md § 14.1), written from the spec text --------------
+//
+// Independent of every other implementation in this repository (node:* and BigInt only; no table
+// copied from elsewhere): small order is the arithmetic test [8]P = O on the RFC 8032 §5.1.3
+// decoding, with the RFC 8032 §5.1.4 point formulas. The canonical, small-order and scalar-range
+// checks run before node:crypto, whose verify is the cofactorless equation.
+
+const S1_P = 2n ** 255n - 19n;
+const S1_L = 2n ** 252n + 27742317777372353535851937790883648493n;
+const s1Mod = (x) => ((x % S1_P) + S1_P) % S1_P;
+
+function s1Pow(base, exponent) {
+  let result = 1n;
+  let b = s1Mod(base);
+  let e = exponent;
+  while (e > 0n) {
+    if (e & 1n) result = (result * b) % S1_P;
+    b = (b * b) % S1_P;
+    e >>= 1n;
+  }
+  return result;
+}
+
+const S1_D = s1Mod(-121665n * s1Pow(121666n, S1_P - 2n));
+const S1_SQRT_M1 = s1Pow(2n, (S1_P - 1n) / 4n);
+
+function s1LittleEndian(bytes) {
+  let value = 0n;
+  for (let i = bytes.length - 1; i >= 0; i -= 1) value = (value << 8n) | BigInt(bytes[i]);
+  return value;
+}
+
+// Canonical: the low 255 bits give y < p, and the sign bit is not set on y = 1 or y = p - 1
+// (the two points with x = 0).
+function s1Canonical(bytes) {
+  const value = s1LittleEndian(bytes);
+  const y = value & ((1n << 255n) - 1n);
+  const sign = value >> 255n;
+  return y < S1_P && !(sign === 1n && (y === 1n || y === S1_P - 1n));
+}
+
+// RFC 8032 §5.1.3 decoding of a canonical encoding; null when the point is not on the curve.
+function s1Decode(bytes) {
+  const value = s1LittleEndian(bytes);
+  const y = value & ((1n << 255n) - 1n);
+  const sign = value >> 255n;
+  const u = s1Mod(y * y - 1n);
+  const v = s1Mod(S1_D * y * y + 1n);
+  let x = s1Mod(u * s1Pow(v, 3n) * s1Pow(u * s1Pow(v, 7n), (S1_P - 5n) / 8n));
+  const vx2 = s1Mod(v * x * x);
+  if (vx2 === s1Mod(-u)) x = s1Mod(x * S1_SQRT_M1);
+  else if (vx2 !== u) return null;
+  if (x === 0n && sign === 1n) return null;
+  if ((x & 1n) !== sign) x = S1_P - x;
+  return [x, y, 1n, s1Mod(x * y)];
+}
+
+function s1Add([x1, y1, z1, t1], [x2, y2, z2, t2]) {
+  const a = s1Mod((y1 - x1) * (y2 - x2));
+  const b = s1Mod((y1 + x1) * (y2 + x2));
+  const c = s1Mod(t1 * 2n * S1_D * t2);
+  const d = s1Mod(z1 * 2n * z2);
+  const e = b - a;
+  const f = d - c;
+  const g = d + c;
+  const h = b + a;
+  return [s1Mod(e * f), s1Mod(g * h), s1Mod(f * g), s1Mod(e * h)];
+}
+
+function s1Double([x1, y1, z1]) {
+  const a = s1Mod(x1 * x1);
+  const b = s1Mod(y1 * y1);
+  const c = s1Mod(2n * z1 * z1);
+  const h = s1Mod(a + b);
+  const e = s1Mod(h - (x1 + y1) * (x1 + y1));
+  const g = s1Mod(a - b);
+  const f = s1Mod(c + g);
+  return [s1Mod(e * f), s1Mod(g * h), s1Mod(f * g), s1Mod(e * h)];
+}
+
+function s1Multiply(scalar, point) {
+  let result = [0n, 1n, 1n, 0n];
+  for (let i = BigInt(scalar.toString(2).length) - 1n; i >= 0n; i -= 1n) {
+    result = s1Double(result);
+    if ((scalar >> i) & 1n) result = s1Add(result, point);
+  }
+  return result;
+}
+
+function s1IsIdentity([x, y, z]) {
+  return x === 0n && s1Mod(y - z) === 0n;
+}
+
+function s1SmallOrder(point) {
+  return s1IsIdentity(s1Double(s1Double(s1Double(point))));
+}
+
+// The verify-time gate: canonical A and R, neither of small order, S < L.
+function s1Gate(publicKey, signature) {
+  if (publicKey.length !== 32 || signature.length !== 64) return false;
+  const r = signature.subarray(0, 32);
+  if (!s1Canonical(publicKey) || !s1Canonical(r)) return false;
+  const a = s1Decode(publicKey);
+  if (a !== null && s1SmallOrder(a)) return false;
+  const rPoint = s1Decode(r);
+  if (rPoint !== null && s1SmallOrder(rPoint)) return false;
+  return s1LittleEndian(signature.subarray(32)) < S1_L;
+}
+
+// Key acceptance: 32 bytes, canonical, on the curve, not of small order.
+function s1AcceptablePublicKey(publicKey) {
+  if (publicKey.length !== 32 || !s1Canonical(publicKey)) return false;
+  const point = s1Decode(publicKey);
+  return point !== null && !s1SmallOrder(point);
+}
+
 const scriptPath = fileURLToPath(import.meta.url);
 const root = resolve(scriptPath, "../..");
 const vectorsDir = join(root, "priv/conformance/v1/vectors");
@@ -954,6 +1070,8 @@ function jwkThumbprint(jwk) {
 function verifyEd25519(jwk, message, signature) {
   if (signature.length !== 64) return false;
   observedPublicKeyFingerprints.add(jwkThumbprint(exactPublicJwk(jwk)));
+  const raw = decodeBase64Url(exactPublicJwk(jwk).x);
+  if (!s1AcceptablePublicKey(raw) || !s1Gate(raw, signature)) return false;
   return verify(
     null,
     message,

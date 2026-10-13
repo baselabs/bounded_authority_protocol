@@ -2,7 +2,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
   @moduledoc false
 
   @owned_roots ["lib", "priv", "scripts", "sdks", "test", "test_support", "docs"]
-  @requirement_surfaces ~w(B64 BOUNDS CHAIN CLAIM CORE CORPUS DIGEST EVO EXPORT HEADER JSON KEY LOCATOR SCHEMA SELECTOR SIGNING URI VERIFY)
+  @requirement_surfaces ~w(B64 BOUNDS CHAIN CLAIM CORE CORPUS DIGEST EVO EXPORT HEADER HOST JSON KEY LOCATOR SCHEMA SELECTOR SIGNING URI VERIFY)
   @wire_domains ~w(BAP1-CONTENT BAP1-ARCHIVE BAP1-CHAIN BAP1-GRANT BAP1-PROOF BAP1-REQUEST BAP2-ARCHIVE BAP2-CHAIN BAP2-REQUEST BAP3-ARCHIVE BAP3-CHAIN BAP3-REQUEST)
   @external_v1_paths MapSet.new([
                        "lib/bounded_authority_protocol/conformance/corpus.ex",

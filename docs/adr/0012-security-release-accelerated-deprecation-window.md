@@ -3,6 +3,9 @@
 - Status: accepted
 - Date: 2026-08-06
 - Track: T2
+- Amended by: [ADR 0040](0040-strict-ed25519-soundness-erratum.md) Decision 5 (a soundness
+  repair keeps no overlap window for the vulnerable verdict; the accelerated window below still
+  governs a security contract-major)
 - Refines: [ADR 0006](0006-standards-evolution-suite-identity-and-delegation-posture.md) §1
   (deprecation overlap window) and the [standards track charter](../design/standards-track.md)
   § The evolution contract

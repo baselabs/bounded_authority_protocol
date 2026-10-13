@@ -2,13 +2,14 @@
 
 ## Supported versions
 
-The `0.7.x` source release line is supported. `v0.7.0` is the current tagged source release
-and contains contract-majors 1, 2, and 3 plus the role-attestation and content-assertion sibling
-profiles;
-the public API surface is locked. Registry consumers use the published Hex archive.
-OBSERVED September 28, 2026 UTC: the Hex release API reports `0.7.0` published on September 28,
-2026 (registry checksum `777c606660727781ba03b742e7a7785f2655814048fe365f415b3a0c7253e0a8`). See
-the [registry release](https://hex.pm/packages/bounded_authority_protocol/0.7.0).
+The `0.8.x` source release line is supported. `v0.8.0` is the current tagged source release
+and contains contract-majors 1, 2, and 3, the role-attestation and content-assertion sibling
+profiles, and the strict Ed25519 verification soundness repair
+([ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md), erratum 2). The public API
+surface is locked. Registry consumers use the published Hex archive. Releases `0.7.0` and
+earlier accept Ed25519 signatures that the strict rule rejects and are not supported; upgrade to
+`0.8.x` and run the pre-upgrade key scan in ADR 0040. See the security advisory for the affected
+versions and details.
 
 The verifier returns redacted, non-authorizing facts: trust and authorization, where a result
 carries them, are explicitly not evaluated. The package does not select trust, hold keys, reserve
@@ -27,8 +28,10 @@ and coordinate disclosure through the private advisory.
 
 For a vulnerability whose fix would change a verification verdict, see the
 [governance policy § Security policy](docs/governance.md#security-policy) for the verdict-change
-handling rule (an accelerated, published, deployment-decided contract-major overlap — never a
-silent verdict change).
+handling rule: a soundness repair (an erratum with an advisory, shipped by every implementation
+in the same release, followed by a public ratification window) when every condition of
+[§ Soundness repairs](docs/governance.md#soundness-repairs) holds, and otherwise an accelerated,
+published, deployment-decided contract-major overlap. A verdict never changes silently.
 
 ## Supply-chain verification
 

@@ -45,12 +45,14 @@ REQ1-HEADER-kid-not-selector
 REQ1-HEADER-no-private-jwk
 REQ1-HEADER-proof-jwk
 REQ1-HEADER-thumbprint
+REQ1-HOST-ed25519-torsion-free
 REQ1-JSON-jcs-exact
 REQ1-JSON-no-duplicate
 REQ1-JSON-no-normalization
 REQ1-JSON-number-bounds
 REQ1-JSON-raw-lexeme
 REQ1-JSON-single-value
+REQ1-KEY-ed25519-acceptable
 REQ1-LOCATOR-no-value-leak
 REQ1-LOCATOR-not-authority
 REQ1-LOCATOR-opaque-payload
@@ -66,6 +68,10 @@ REQ1-SIGNING-any-order
 REQ1-SIGNING-backend-reject
 REQ1-SIGNING-deterministic-produce
 REQ1-SIGNING-digest-prefix
+REQ1-SIGNING-ed25519-canonical-point
+REQ1-SIGNING-ed25519-cofactorless
+REQ1-SIGNING-ed25519-scalar-range
+REQ1-SIGNING-ed25519-small-order-reject
 REQ1-SIGNING-exact-input
 REQ1-SIGNING-retired-prefixes
 REQ1-URI-no-network
@@ -92,6 +98,7 @@ REQ2-CORE-v1-incorporation
 REQ2-CORPUS-certified-identity
 REQ2-EVO-mixed-major-invalid
 REQ2-EVO-proof-major-equals-grant
+REQ2-KEY-ed25519-acceptable
 REQ2-SELECTOR-attenuation-unchanged
 REQ2-SELECTOR-closed-set
 REQ2-SELECTOR-count
@@ -106,6 +113,10 @@ REQ2-SELECTOR-range-same-tag
 REQ2-SELECTOR-range-signed-zero
 REQ2-SELECTOR-verdict-internal
 REQ2-SIGNING-digest-prefix
+REQ2-SIGNING-ed25519-canonical-point
+REQ2-SIGNING-ed25519-cofactorless
+REQ2-SIGNING-ed25519-scalar-range
+REQ2-SIGNING-ed25519-small-order-reject
 REQ3-BOUNDS-fixed-widths
 REQ3-BOUNDS-inherited
 REQ3-BOUNDS-ordering

@@ -1,6 +1,7 @@
 defmodule BoundedAuthorityProtocol.V2.BoundaryAnchorCodec do
   @moduledoc false
 
+  alias BoundedAuthorityProtocol.Ed25519
   alias BoundedAuthorityProtocol.V1.Base64Url
   alias BoundedAuthorityProtocol.V1.BoundaryAnchor
   alias BoundedAuthorityProtocol.V1.Bounds
@@ -231,7 +232,7 @@ defmodule BoundedAuthorityProtocol.V2.BoundaryAnchorCodec do
   end
 
   defp verify_signature(message, signature, public_key) do
-    :crypto.verify(:eddsa, :none, message, signature, [public_key, :ed25519])
+    Ed25519.verify_strict(message, signature, public_key)
   end
 
   defp fixed_digest?(value, bounds),

@@ -278,7 +278,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:verify_transitions, 7} => %{variable_call: 2}
     },
     "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam" => %{
-      {:reduce_build, 2} => %{variable_call: 1}
+      {:build_loopback_request, 1} => %{variable_call: 13},
+      {:reduce_build, 2} => %{variable_call: 1},
+      {:strict_agrees?, 1} => %{variable_call: 6}
     },
     "Elixir.BoundedAuthorityProtocol.Conformance.Cli.beam" => %{
       {:load_and_run, 2} => %{variable_call: 5},
@@ -291,10 +293,14 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:check_one_tamper, 2} => %{variable_call: 2},
       {:check_raw_binding, 3} => %{variable_call: 2},
       {:decode_case_file, 2} => %{variable_call: 4},
+      {:decode_plain, 2} => %{variable_call: 2},
       {:indexed_target_bytes, 2} => %{variable_call: 2},
       {:load_json_file, 3} => %{variable_call: 2},
+      {:load_strict_case_file, 2} => %{variable_call: 7},
       {:tamper_verbatim_matches?, 5} => %{variable_call: 2},
-      {:verify_hashes, 2} => %{variable_call: 2}
+      {:verify_hashes, 2} => %{variable_call: 2},
+      {:verify_strict_counts, 3} => %{enum_reduce: 2},
+      {:verify_strict_sidecars, 2} => %{variable_call: 8}
     },
     "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertion.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
@@ -780,7 +786,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     AnchoredExportInput ArchivedObject AttestationFacts Base64Url BoundaryAnchor BoundaryAnchorCodec Bounds
     ChainFacts ChainInput Codec CompactJws ConsumptionChain ConsumptionEntry Container ContextValidation Credentials
     ContentAssertion ContentAssertionFacts DecodedContentAssertion ExpectedContentAssertion
-    Corpus DecodedAttestation DecodedGrant DecodedProof EncodedAnchoredExport EncodedConsumptionEntry EnvelopeFacts
+    Corpus DecodedAttestation DecodedGrant DecodedProof Ed25519 EncodedAnchoredExport EncodedConsumptionEntry
+    EnvelopeFacts
     ExpectedAnchor ExpectedAnchoredExport ExpectedAttestation ExpectedChain ExpectedExport ExpectedGrant
     ExpectedKeyTransition ExpectedRequest FixedBytes Grant GrantFacts HistoricalKeyChain
     HistoricalPublicKey Jcs Json JsonValue Jwk KeyLocator KeyTransition KeyTransitionCodec
@@ -2123,6 +2130,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
        ),
        do:
          {module, function} in [
+           {"Base", :encode16},
            {"Bitwise", :bxor},
            {"Enum", :all?},
            {"Enum", :flat_map},
@@ -2141,7 +2149,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            {"MapSet", :equal?},
            {"MapSet", :new},
            {"MapSet", :size},
-           {"String", :ends_with?}
+           {"String", :ends_with?},
+           {"String", :split}
          ] or function == :get
 
   defp approved_source_call?(
@@ -2754,6 +2763,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {:maps, :remove},
           {:maps, :to_list},
           {Access, :get},
+          {Base, :encode16},
           {Bitwise, :bxor},
           {Enum, :all?},
           {Enum, :flat_map},
@@ -2773,7 +2783,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {MapSet, :equal?},
           {MapSet, :new},
           {MapSet, :size},
-          {String, :ends_with?}
+          {String, :ends_with?},
+          {String, :split}
         ]
 
       "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam" ->

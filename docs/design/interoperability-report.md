@@ -116,6 +116,23 @@ against the built package, and the independent Python verifier accepted it with 
 content-digest equality; changed content, a wrong key, and `now == exp` were refused. The
 published registry checksum equals that build.
 
+### Strict-Ed25519 corpus
+
+The additive `bap-strict-ed25519/1` corpus (ADR 0040, erratum 2; release 0.8.0) is certified by
+its revision-1 index at `priv/conformance/strict-ed25519`, SHA-256
+`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`: 2,391 cases in 14 families,
+with expected verdicts from an independent arithmetic generator and the 12 published
+"Taming the many EdDSAs" vectors. Every figure above this section is unchanged by it.
+
+| Implementation | Result |
+|---|---|
+| Elixir reference (`bounded_authority_conformance --corpus priv/conformance/strict-ed25519`) | **agreed=2391 disagreed=0** (October 13, 2026, source tree for 0.8.0) |
+| Python (`tests/conformance/run_strict.py`, reads the corpus in place) | **2391/2391 cases agree** (October 13, 2026) |
+| Go (`go test ./...`, vendored `conformance/corpus-strict`) | **pass** (October 13, 2026) |
+| Rust 1.81 (`cargo test --locked`, vendored `conformance/corpus-strict`) | **pass** (October 13, 2026) |
+| Independent Node runner (`node conformance/corpus_independent.mjs --strict priv/conformance/strict-ed25519`, Node 22.23.1) | **agreed=2006 disagreed=0**; it implements contract-major 1, so the 385 major-2 and sibling-profile cases are reported as not covered (October 13, 2026) |
+| TypeScript | adopts the corpus in its graduated repository; result recorded at its release |
+
 ### Independent Node second-implementation runners
 
 Three runner-authored-from-the-corpus Node implementations (node:* only; the corpus is the
@@ -162,5 +179,7 @@ their native APIs; the TypeScript suite's equivalent runs live in its graduated 
 - For the Python, Rust, and Go SDKs the attestation-profile rows report their certified-corpus
   tests (which assert the pinned index and the exact case counts), not a separate agreement
   printout. The Elixir and TypeScript rows report their runners' printed agreement figures.
+- The strict-Ed25519 corpus rows other than the Elixir reference are pending regeneration for the
+  0.8.0 release, and the independent Node runners do not yet execute that corpus.
 - The local-profile real-socket drill is implemented in the Elixir release gate. The other SDK
   results certify bytes and verdicts against the shared corpus, not live transport composition.

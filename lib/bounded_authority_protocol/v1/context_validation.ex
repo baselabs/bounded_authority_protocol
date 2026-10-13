@@ -1,6 +1,7 @@
 defmodule BoundedAuthorityProtocol.V1.ContextValidation do
   @moduledoc false
 
+  alias BoundedAuthorityProtocol.Ed25519
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.ExpectedAnchor
   alias BoundedAuthorityProtocol.V1.ExpectedChain
@@ -74,6 +75,7 @@ defmodule BoundedAuthorityProtocol.V1.ContextValidation do
   def historical_key(%HistoricalPublicKey{} = key, bounds) do
     if valid_key_id?(key.key_id, bounds) and is_binary(key.public_key) and
          byte_size(key.public_key) == bounds.public_key_bytes and
+         Ed25519.acceptable_public_key?(key.public_key) and
          valid_time?(key.valid_from, bounds) and
          valid_before?(key.valid_before, key.valid_from, bounds) do
       :ok

@@ -3,7 +3,7 @@
 source = File.read!("lib/bounded_authority_protocol/content_assertion/v1/codec.ex")
 
 mutations = [
-  {"signature", ":crypto.verify(:eddsa", "true or :crypto.verify(:eddsa"},
+  {"signature", "Ed25519.verify_strict(", "true or Ed25519.verify_strict("},
   {"successor-context", "[:iss, :aud, :sub, :profile]", "[]"},
   {"facts-completeness", "shape?(f, @facts_fields, ContentAssertionFacts)", "true"},
   {"content-byte-bound", "byte_size(bytes) <= bounds.content_bytes", "true"},
@@ -88,4 +88,58 @@ run.(
   42
 )
 
-IO.puts("content assertion mutations: #{length(mutations) + 1}/#{length(mutations) + 1} killed")
+# Strict-Ed25519 gate clauses as they reach the CA1 surface. The codec calls
+# BoundedAuthorityProtocol.Ed25519.verify_strict/3; each mutant below weakens that shared gate,
+# and the CA1 family of the strict corpus plus the CA1 end-to-end forgery tests must go red.
+# The A-side clauses (canonical A, small-order A) are refused earlier at CA1 by key acceptance,
+# and canonical R and S < L are refused by the cofactorless backend, so those four are proven by
+# the gate's own unit tests (test/bounded_authority_protocol/ed25519_test.exs), not here.
+gate_source = File.read!("lib/bounded_authority_protocol/ed25519.ex")
+
+gate_clause =
+  "    canonical?(a) and canonical?(r) and not small_order?(a) and not small_order?(r) and s < @l"
+
+gate_mutations = [
+  {"gate-bypass", "    strict_gate?(signature, public_key) and\n      :crypto.verify",
+   "    :crypto.verify"},
+  {"gate-small-order-r", gate_clause,
+   "    canonical?(a) and canonical?(r) and not small_order?(a) and s < @l"}
+]
+
+run_strict = fn changed, label, expected_exit ->
+  code = """
+  Code.compiler_options(ignore_module_conflict: true)
+  Code.compile_string(#{inspect(changed, limit: :infinity, printable_limit: :infinity)})
+  ExUnit.start(autorun: false, seed: 42)
+  ExUnit.configure(exclude: [:test], include: [family: "ca1", surface: "ca1-attestor"])
+  Code.require_file("test/conformance/strict_ed25519_corpus_test.exs")
+  Code.require_file("test/conformance/strict_ed25519_surfaces_test.exs")
+  result = ExUnit.run()
+  ran = result.total - result.excluded
+  IO.puts("CONTENT_GATE_RESULT ran=" <> Integer.to_string(ran) <> " failures=" <> Integer.to_string(result.failures))
+  System.halt(if ran == 4 and result.failures > 0, do: 42, else: if(ran == 4 and result.failures == 0, do: 0, else: 1))
+  """
+
+  {output, status} = System.cmd("elixir", args ++ ["-e", code], stderr_to_stdout: true)
+
+  unless status == expected_exit and
+           String.contains?(output, "CONTENT_GATE_RESULT ran=4 failures=") do
+    IO.puts(output)
+
+    raise "content assertion gate mutation #{label} did not produce expected test verdict: #{status}"
+  end
+
+  IO.puts("#{label}: #{if status == 0, do: "control passed", else: "mutation killed"}")
+end
+
+run_strict.(gate_source, "gate-unmodified", 0)
+
+Enum.each(gate_mutations, fn {label, old, replacement} ->
+  unless length(:binary.matches(gate_source, old)) == 1,
+    do: raise("gate mutation #{label} does not have exactly one target")
+
+  run_strict.(String.replace(gate_source, old, replacement, global: false), label, 42)
+end)
+
+killed = length(mutations) + 1 + length(gate_mutations)
+IO.puts("content assertion mutations: #{killed}/#{killed} killed")

@@ -8,6 +8,8 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
     ExpectedContentAssertion
   }
 
+  alias BoundedAuthorityProtocol.Ed25519
+
   alias BoundedAuthorityProtocol.V1.{
     Base64Url,
     Bounds,
@@ -89,11 +91,7 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
          true <- expected_matches?(parsed, expected),
          true <- contained?(parsed, expected.attestor),
          true <- parsed.nbf <= expected.now and expected.now < parsed.exp,
-         true <-
-           :crypto.verify(:eddsa, :none, parsed.message, parsed.signature, [
-             attestor.public_key,
-             :ed25519
-           ]),
+         true <- Ed25519.verify_strict(parsed.message, parsed.signature, attestor.public_key),
          {:ok, fingerprint} <- Jwk.public_key_thumbprint_raw(attestor.public_key, bounds) do
       {:ok,
        struct!(

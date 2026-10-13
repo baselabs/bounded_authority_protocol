@@ -73,10 +73,15 @@ Successor contract-majors overlap rather than flag-day:
   (`REQ1-EVO-parallel-support-during-window`).
 - Sunset of a major is a deployment decision after the published window, never a silent library
   change (`REQ1-EVO-sunset-is-deployment-decision`).
-- Errata never change verification behavior. An erratum may clarify prose, correct non-normative
-  text, or add conformance cases; **no erratum may flip a corpus verdict**
-  (`REQ1-EVO-no-verdict-flip`). Any change that would alter an accept/reject outcome is by
-  definition a contract-major change. The errata registry lives at [docs/errata.md](../errata.md).
+- Errata never change verification behavior, with one exception: a soundness repair. An erratum may
+  clarify prose, correct non-normative text, or add conformance cases; **no erratum may flip a
+  verdict of an existing certified corpus** (`REQ1-EVO-no-verdict-flip`). Any other change that
+  would alter an accept/reject outcome is by definition a contract-major change. A soundness repair
+  ([ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md) Decision 4) changes verdicts only
+  from accept to reject, only on inputs proven producer-impossible, with its cases in a new
+  additive corpus and every existing corpus verdict unchanged; it is not a sunset, so it keeps no
+  overlap window for the vulnerable verdict. The errata registry lives at
+  [docs/errata.md](../errata.md).
 
 ### Registries
 
@@ -232,14 +237,18 @@ credibility step and the policy is what makes single-maintainer tolerable to ado
   when a venue (see below) accepts the work, that venue's process supersedes this one.
 - **Errata channel.** [docs/errata.md](../errata.md) is the numbered errata registry; each entry
   names affected versions and its corpus impact, and the no-verdict-flip invariant is checked at
-  review.
+  review. A soundness repair is recorded there too, under the conditions of
+  [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md) Decision 4.
 - **Deprecation policy.** As defined in the evolution contract above; the policy text there is the
   authoritative one.
 - **Security policy.** SECURITY.md governs vulnerability intake; a vulnerability whose fix would
   change a verdict is handled as a contract-major security release with an accelerated overlap
   window — published at announcement and set proportional to the vulnerability's severity, exempt
   from the twelve-month deprecation minimum above (§ The evolution contract), yet still a published,
-  deployment-decided sunset, not a flag-day — never as a silent verdict change.
+  deployment-decided sunset, not a flag-day — never as a silent verdict change. A fix that meets
+  every soundness-repair condition ([ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)
+  Decision 4) lands instead as an erratum with an advisory, in the same release across every
+  implementation, followed by a post-disclosure ratification window.
 
 The governance policy's single normative home is [docs/governance.md](../governance.md);
 this charter cites it and carries no independent policy statements (the single-home

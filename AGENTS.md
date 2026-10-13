@@ -23,10 +23,19 @@ grant operational authority by itself.
 
 Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, and `BAP-21` through `BAP-23`
 (`BAP-17` is design-only). Open: `BAP-12` (IANA filing, gated on the BAP-08 external
-submission preconditions). Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence
+submission preconditions) and `BAP-24` (the strict Ed25519 soundness erratum, landing for
+0.8.0). Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence
 blocks are the status authority.
 
-The current source and Hex release are 0.7.0, tagged `v0.7.0` (the content-assertion release,
+The source version is 0.8.0, the strict Ed25519 verification soundness repair
+([ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md), erratum 2): rule S1 (canonical
+point encodings, no small-order key or `R`, `S < L`, the cofactorless equation) on every Ed25519
+surface, owned by the public `BoundedAuthorityProtocol.Ed25519` (`verify_strict/3`,
+`acceptable_public_key?/1`, `torsion_free?/1`), with the additive certified strict-Ed25519 corpus
+(`priv/conformance/strict-ed25519`, `bap-strict-ed25519/1`, 2,391 cases) and the
+soundness-repair governance class. Its publication with the security advisory, the registry
+read-back, and the post-disclosure ratification window are open. The
+latest Hex release is 0.7.0, tagged `v0.7.0` (the content-assertion release,
 adding the `bap-content-assertion/1` sibling profile over the 0.6.2 cross-Elixir repair patch,
 the 0.6.0 role-attestation release, and the 0.5.0 ES256 contract-major 3 activation). The
 package retains zero production
@@ -89,7 +98,8 @@ recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK boun
 ADR 0019 (corpus-artifact distribution), ADR 0020 (bounds-aware assembly and issuer-mediated
 reauthorization posture), ADR 0021 (the v1 `all` selector recognized-shapes erratum), ADR 0022
 (durable contract identities), and ADR 0027 (byte-distinct application-proof profiles). Accepted
-ADRs are 0001–0037 (ADR 0035 activates the ES256 contract-major 3 suite; ADR 0036 adds the
+ADRs are 0001–0037 and 0040 (ADR 0040 is the strict Ed25519 soundness erratum; 0038 and 0039
+are reserved for designs not yet accepted; ADR 0035 activates the ES256 contract-major 3 suite; ADR 0036 adds the
 role-attestation sibling profile; ADR 0037 adds the content-assertion sibling profile; ADR 0029 records the cumulative-budget posture and explicitly defers the
 `ba+budget-window` attestation-shape design; ADR 0034 decides the UCP riding point as
 transport-composed) under [`docs/adr/`](docs/adr/). BAP-19's source identity is fixed by

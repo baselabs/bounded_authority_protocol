@@ -376,6 +376,7 @@ function discoverCaseKeys(value) {
 
 function nodePublicKey(raw, context) {
   assert(Buffer.isBuffer(raw) && raw.length === 32, `${context}: Ed25519 public-key width`);
+  assert(s1AcceptablePublicKey(raw), `${context}: Ed25519 key acceptance`);
   const fp = fingerprint(raw).toString("base64url");
   importedPublicKeyFingerprints.add(fp);
   verificationImportedFingerprints.add(fp);
@@ -816,6 +817,126 @@ function encodeParsedArchive(parsed) {
   ]);
 }
 
+// --- strict Ed25519 rule S1 (spec/bap-v1.md § 14.1), written from the spec text --------------
+//
+// Independent of every other implementation in this repository (node:* and BigInt only; no table
+// copied from elsewhere): small order is the arithmetic test [8]P = O on the RFC 8032 §5.1.3
+// decoding, with the RFC 8032 §5.1.4 point formulas. The canonical, small-order and scalar-range
+// checks run before node:crypto, whose verify is the cofactorless equation.
+
+const S1_P = 2n ** 255n - 19n;
+const S1_L = 2n ** 252n + 27742317777372353535851937790883648493n;
+const s1Mod = (x) => ((x % S1_P) + S1_P) % S1_P;
+
+function s1Pow(base, exponent) {
+  let result = 1n;
+  let b = s1Mod(base);
+  let e = exponent;
+  while (e > 0n) {
+    if (e & 1n) result = (result * b) % S1_P;
+    b = (b * b) % S1_P;
+    e >>= 1n;
+  }
+  return result;
+}
+
+const S1_D = s1Mod(-121665n * s1Pow(121666n, S1_P - 2n));
+const S1_SQRT_M1 = s1Pow(2n, (S1_P - 1n) / 4n);
+
+function s1LittleEndian(bytes) {
+  let value = 0n;
+  for (let i = bytes.length - 1; i >= 0; i -= 1) value = (value << 8n) | BigInt(bytes[i]);
+  return value;
+}
+
+// Canonical: the low 255 bits give y < p, and the sign bit is not set on y = 1 or y = p - 1
+// (the two points with x = 0).
+function s1Canonical(bytes) {
+  const value = s1LittleEndian(bytes);
+  const y = value & ((1n << 255n) - 1n);
+  const sign = value >> 255n;
+  return y < S1_P && !(sign === 1n && (y === 1n || y === S1_P - 1n));
+}
+
+// RFC 8032 §5.1.3 decoding of a canonical encoding; null when the point is not on the curve.
+function s1Decode(bytes) {
+  const value = s1LittleEndian(bytes);
+  const y = value & ((1n << 255n) - 1n);
+  const sign = value >> 255n;
+  const u = s1Mod(y * y - 1n);
+  const v = s1Mod(S1_D * y * y + 1n);
+  let x = s1Mod(u * s1Pow(v, 3n) * s1Pow(u * s1Pow(v, 7n), (S1_P - 5n) / 8n));
+  const vx2 = s1Mod(v * x * x);
+  if (vx2 === s1Mod(-u)) x = s1Mod(x * S1_SQRT_M1);
+  else if (vx2 !== u) return null;
+  if (x === 0n && sign === 1n) return null;
+  if ((x & 1n) !== sign) x = S1_P - x;
+  return [x, y, 1n, s1Mod(x * y)];
+}
+
+function s1Add([x1, y1, z1, t1], [x2, y2, z2, t2]) {
+  const a = s1Mod((y1 - x1) * (y2 - x2));
+  const b = s1Mod((y1 + x1) * (y2 + x2));
+  const c = s1Mod(t1 * 2n * S1_D * t2);
+  const d = s1Mod(z1 * 2n * z2);
+  const e = b - a;
+  const f = d - c;
+  const g = d + c;
+  const h = b + a;
+  return [s1Mod(e * f), s1Mod(g * h), s1Mod(f * g), s1Mod(e * h)];
+}
+
+function s1Double([x1, y1, z1]) {
+  const a = s1Mod(x1 * x1);
+  const b = s1Mod(y1 * y1);
+  const c = s1Mod(2n * z1 * z1);
+  const h = s1Mod(a + b);
+  const e = s1Mod(h - (x1 + y1) * (x1 + y1));
+  const g = s1Mod(a - b);
+  const f = s1Mod(c + g);
+  return [s1Mod(e * f), s1Mod(g * h), s1Mod(f * g), s1Mod(e * h)];
+}
+
+function s1Multiply(scalar, point) {
+  let result = [0n, 1n, 1n, 0n];
+  for (let i = BigInt(scalar.toString(2).length) - 1n; i >= 0n; i -= 1n) {
+    result = s1Double(result);
+    if ((scalar >> i) & 1n) result = s1Add(result, point);
+  }
+  return result;
+}
+
+function s1IsIdentity([x, y, z]) {
+  return x === 0n && s1Mod(y - z) === 0n;
+}
+
+function s1SmallOrder(point) {
+  return s1IsIdentity(s1Double(s1Double(s1Double(point))));
+}
+
+// The verify-time gate: canonical A and R, neither of small order, S < L.
+function s1Gate(publicKey, signature) {
+  if (publicKey.length !== 32 || signature.length !== 64) return false;
+  const r = signature.subarray(0, 32);
+  if (!s1Canonical(publicKey) || !s1Canonical(r)) return false;
+  const a = s1Decode(publicKey);
+  if (a !== null && s1SmallOrder(a)) return false;
+  const rPoint = s1Decode(r);
+  if (rPoint !== null && s1SmallOrder(rPoint)) return false;
+  return s1LittleEndian(signature.subarray(32)) < S1_L;
+}
+
+// Key acceptance: 32 bytes, canonical, on the curve, not of small order.
+function s1AcceptablePublicKey(publicKey) {
+  if (publicKey.length !== 32 || !s1Canonical(publicKey)) return false;
+  const point = s1Decode(publicKey);
+  return point !== null && !s1SmallOrder(point);
+}
+
+function s1TorsionFree(publicKey) {
+  return s1AcceptablePublicKey(publicKey) && s1IsIdentity(s1Multiply(S1_L, s1Decode(publicKey)));
+}
+
 // --- compact JWS parse + verify (protected.payload.signature) ---------------
 
 function parseCompactJws(compact, context) {
@@ -834,6 +955,8 @@ function parseCompactJws(compact, context) {
 }
 
 function verifyEd25519(publicKey, message, signature) {
+  const raw = Buffer.from(publicKey.export({ format: "jwk" }).x, "base64url");
+  if (!s1Gate(raw, signature)) return false;
   return verifySignature(null, message, publicKey, signature);
 }
 
@@ -1369,10 +1492,12 @@ function exactPublicJwk(value, context) {
   assert(value.crv === "Ed25519", `${context}: curve`);
   assert(value.kty === "OKP", `${context}: type`);
   const x = strictB64(value.x, 32);
+  assert(s1AcceptablePublicKey(x), `${context}: key acceptance`);
   return { crv: value.crv, kty: value.kty, x: value.x, raw: x };
 }
 
 function jwkFromPublicKey(raw) {
+  assert(s1AcceptablePublicKey(raw), "Ed25519 producer key acceptance");
   return { crv: "Ed25519", kty: "OKP", x: raw.toString("base64url") };
 }
 
@@ -1387,6 +1512,7 @@ function jwkThumbprint(jwk) {
 function dispatchJwkEncodePublic(input) {
   const raw = inputPublicKey(input, "jwk.encode_public");
   assert(raw.length === 32, "jwk.encode_public: public key width");
+  assert(s1AcceptablePublicKey(raw), "jwk.encode_public: key acceptance");
   const jwk = jwkFromPublicKey(raw);
   return { encoded: canonical(jwk) };
 }
@@ -1423,6 +1549,7 @@ function dispatchJwkThumbprintRaw(input, raws) {
 function dispatchJwkPublicKeyThumbprintRaw(input) {
   const raw = inputPublicKey(input, "jwk.public_key_thumbprint_raw");
   assert(raw.length === 32, "jwk.public_key_thumbprint_raw: public key width");
+  assert(s1AcceptablePublicKey(raw), "jwk.public_key_thumbprint_raw: key acceptance");
   const jwk = jwkFromPublicKey(raw);
   return { thumbprint_raw: sha256(Buffer.from(jwkThumbprintPreimage(jwk), "utf8")) };
 }
@@ -2181,6 +2308,7 @@ function buildHistoricalKey(keyMap, context) {
   const keyId = fetchBinary(keyMap, "key_id", context);
   const publicKey = b64Field(keyMap, "public_key", context);
   assert(publicKey.length === 32, `${context}: key width`);
+  assert(s1AcceptablePublicKey(publicKey), `${context}: key acceptance`);
   const validFrom = intField(keyMap, "valid_from", context);
   const validBefore = keyMap.valid_before;
   return {
@@ -2698,6 +2826,7 @@ function parseArguments(argv) {
   const positional = [];
   let manifestPath = null;
   let scanPath = null;
+  let strict = false;
   let i = 0;
   while (i < argv.length) {
     const arg = argv[i];
@@ -2705,6 +2834,9 @@ function parseArguments(argv) {
       if (i + 1 >= argv.length) throw new Error("usage");
       manifestPath = argv[i + 1];
       i += 2;
+    } else if (arg === "--strict") {
+      strict = true;
+      i += 1;
     } else if (arg === "--scan") {
       if (i + 1 >= argv.length) throw new Error("usage");
       scanPath = argv[i + 1];
@@ -2717,12 +2849,118 @@ function parseArguments(argv) {
     }
   }
   if (positional.length !== 1) throw new Error("usage");
-  return { corpusDir: positional[0], manifestPath, scanPath };
+  return { corpusDir: positional[0], manifestPath, scanPath, strict };
+}
+
+// ===========================================================================
+// Strict-Ed25519 corpus mode (--strict): profile bap-strict-ed25519/1
+// ===========================================================================
+//
+// Integrity (per-file SHA-256 hex, exact file set both directions, per-file, per-family and total
+// counts, case-id uniqueness), then an independent verdict for every case this runner implements:
+// the primitive surfaces through S1 above and node:crypto, key acceptance and torsion freedom
+// through the arithmetic above, and every contract-major-1 case shaped like the v1 corpus through
+// the v1 dispatch (whose key entry points and verify site carry S1). This runner implements
+// contract-major 1 only, so major-2 cases and the loopback, role-attestation and content-assertion
+// profile cases are counted as not covered, by family, and never as agreement.
+
+function loadStrictCorpus(corpusDir) {
+  const indexBytes = readFileSync(join(corpusDir, "index.json"));
+  const index = parseJsonNoDuplicates(indexBytes.toString("utf8"), "strict index");
+  assert(index.format === "bounded-authority-protocol-strict-ed25519-conformance-corpus-index", "strict index format");
+  assert(index.profile === "bap-strict-ed25519/1" && Number.isInteger(index.revision), "strict index identity");
+  assert(index.private_material_tracked === false, "strict index private material");
+  const declared = new Set(index.files.map((f) => f.path));
+  const onDisk = listCorpusFiles(corpusDir)
+    .map((full) => relative(corpusDir, full).split("\\").join("/"))
+    .filter((rel) => rel !== "index.json");
+  assert(onDisk.length === declared.size && onDisk.every((rel) => declared.has(rel)), "strict file set");
+  const cases = [];
+  const ids = new Set();
+  const families = {};
+  for (const file of index.files) {
+    const bytes = readFileSync(join(corpusDir, file.path));
+    assert(createHash("sha256").update(bytes).digest("hex") === file.sha256, `${file.path}: sha256`);
+    if (!file.path.startsWith("cases/")) {
+      assert(file.cases === 0, `${file.path}: case count`);
+      continue;
+    }
+    const doc = parseJsonNoDuplicates(bytes.toString("utf8"), file.path);
+    assert(doc.format === "bounded-authority-protocol-strict-ed25519-conformance-cases", `${file.path}: format`);
+    assert(doc.provenance?.private_material_tracked === false, `${file.path}: private material`);
+    assert(doc.cases.length === file.cases, `${file.path}: case count`);
+    for (const c of doc.cases) {
+      assert(!ids.has(c.id), `${c.id}: duplicate id`);
+      ids.add(c.id);
+      cases.push({ family: doc.family, caseObj: c });
+    }
+    families[doc.family] = (families[doc.family] ?? 0) + doc.cases.length;
+  }
+  assert(canonical(families) === canonical(index.families), "strict family counts");
+  assert(cases.length === index.total_cases, "strict total");
+  return { indexSha256: createHash("sha256").update(indexBytes).digest("hex"), cases };
+}
+
+function strictPrimitive(surface, input) {
+  const publicKey = Buffer.from(input.public_key, "base64url");
+  if (surface === "ed25519.acceptable_public_key") return s1AcceptablePublicKey(publicKey);
+  if (surface === "ed25519.torsion_free") return s1TorsionFree(publicKey);
+  assert(surface === "ed25519.verify_strict", `unknown strict surface ${surface}`);
+  const signature = Buffer.from(input.signature, "base64url");
+  const message = Buffer.from(input.message, "base64url");
+  if (!s1Gate(publicKey, signature)) return false;
+  try {
+    const key = createPublicKey({ key: Buffer.concat([SPKI_ED25519_PREFIX, publicKey]), format: "der", type: "spki" });
+    return verifySignature(null, message, key, signature);
+  } catch {
+    return false;
+  }
+}
+
+function runStrict(corpusDir) {
+  const { indexSha256, cases } = loadStrictCorpus(corpusDir);
+  let agreed = 0;
+  let disagreed = 0;
+  const disagreements = [];
+  const notCovered = {};
+  for (const { family, caseObj } of cases) {
+    let ok;
+    if (caseObj.surface.startsWith("ed25519.")) {
+      ok = strictPrimitive(caseObj.surface, caseObj.input) === (caseObj.expected.verdict === "valid");
+    } else if (caseObj.major === 1 && caseObj.input !== undefined && caseObj.expected?.verdict !== undefined) {
+      let actual;
+      try {
+        actual = dispatch(caseObj.surface, caseObj.input, {});
+      } catch (error) {
+        if (!(error instanceof InvalidError)) throw error;
+        actual = INVALID;
+      }
+      ok = agree(caseObj.expected, actual);
+    } else {
+      notCovered[family] = (notCovered[family] ?? 0) + 1;
+      continue;
+    }
+    if (ok) agreed += 1;
+    else {
+      disagreed += 1;
+      disagreements.push(caseObj.id);
+    }
+  }
+  const skipped = Object.values(notCovered).reduce((a, b) => a + b, 0);
+  process.stdout.write(
+    `corpus_independent: strict agreed=${agreed} disagreed=${disagreed} total=${cases.length} ` +
+      `not_covered=${skipped} ${canonical(notCovered)} index_sha256=${indexSha256}\n`,
+  );
+  if (disagreed > 0) {
+    process.stderr.write(`corpus_independent: disagreements: ${disagreements.join(", ")}\n`);
+    process.exitCode = 1;
+  }
 }
 
 function main() {
   const args = parseArguments(process.argv.slice(2));
   const corpusDir = resolve(args.corpusDir);
+  if (args.strict) return runStrict(corpusDir);
 
   const { index, cases, raws } = loadCorpus(corpusDir);
 

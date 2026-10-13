@@ -87,6 +87,68 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
     assert output =~ "tamper verbatim != derived"
   end
 
+  # --- strict-Ed25519 corpus (ADR 0040) -------------------------------------
+
+  @strict_corpus Path.join(@root, "priv/conformance/strict-ed25519")
+  @strict_index_sha256 "0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c"
+  @independent_runners [
+    "conformance/corpus_independent.mjs",
+    "conformance/grant_proof_independent.mjs",
+    "conformance/chain_archive_independent.mjs"
+  ]
+
+  test "independent runner agrees on the strict-Ed25519 corpus (strict mode)" do
+    {output, 0} = run_node(["--strict", @strict_corpus])
+
+    # The runner implements contract-major 1: it decides every primitive, key-acceptance, JWK,
+    # differential, taming and major-1 case, and counts the major-2 and sibling-profile cases as
+    # not covered (never as agreement).
+    assert output =~ "corpus_independent: strict agreed=2006 disagreed=0 total=2391 not_covered=385"
+    assert output =~ "index_sha256=#{@strict_index_sha256}"
+  end
+
+  test "a strict-corpus case byte flip is rejected by the strict loader" do
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "bap-strict-ind-#{System.unique_integer([:positive, :monotonic])}"
+      )
+
+    File.cp_r!(@strict_corpus, dir)
+    path = Path.join(dir, "cases/taming/speccheck.json")
+    bytes = File.read!(path)
+    [{offset, _}] = :binary.matches(bytes, ~s("taming-speccheck-00"))
+    <<head::binary-size(offset + 1), byte, rest::binary>> = bytes
+    File.write!(path, <<head::binary, Bitwise.bxor(byte, 1), rest::binary>>)
+
+    {output, 1} = run_node(["--strict", dir])
+    assert output =~ "speccheck.json: sha256"
+  end
+
+  test "every independent runner carries the same S1 block and gates its verify site" do
+    blocks =
+      for path <- @independent_runners do
+        source = File.read!(Path.join(@root, path))
+
+        [_, rest] = String.split(source, "// --- strict Ed25519 rule S1 ", parts: 2)
+        [block, _] = String.split(rest, "\nfunction s1AcceptablePublicKey", parts: 2)
+
+        assert source =~ "s1Gate("
+        assert source =~ "s1AcceptablePublicKey("
+        block
+      end
+
+    assert length(Enum.uniq(blocks)) == 1
+    assert File.read!(Path.join(@root, "conformance/corpus_independent.mjs")) =~
+             "if (!s1Gate(raw, signature)) return false;"
+
+    assert File.read!(Path.join(@root, "conformance/grant_proof_independent.mjs")) =~
+             "if (!s1AcceptablePublicKey(raw) || !s1Gate(raw, signature)) return false;"
+
+    assert File.read!(Path.join(@root, "conformance/chain_archive_independent.mjs")) =~
+             "s1Gate(publicKey, signature) && verifySignature(null, message, nodePublicKey(publicKey), signature)"
+  end
+
   test "independent runner imports no project code (node:* only)" do
     source = File.read!(@script)
 

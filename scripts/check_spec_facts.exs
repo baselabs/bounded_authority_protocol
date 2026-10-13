@@ -456,17 +456,27 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   defp statement_baseline do
     path = Path.join(@root, "#{@baseline_dir}/requirement-statements-v1.json")
 
-    case File.read(path) do
-      {:ok, bytes} ->
-        case Json.decode(bytes, Bounds.maximum()) do
-          {:ok, tagged} -> plain(tagged)
-          _ -> %{}
-        end
-
-      _ ->
-        %{}
+    # The baseline is a flat id-to-hash object with one member per map row. Since the
+    # strict-Ed25519 erratum (ADR 0040) it holds more rows than the protocol's 64-member object
+    # ceiling, so it is read with the OTP JSON decoder (gate tooling, not a protocol input). A
+    # value that is not a lowercase-hex SHA-256 string still reds as a missing baseline.
+    with {:ok, bytes} <- File.read(path),
+         {:ok, %{} = decoded} <- safe_json_decode(bytes),
+         true <- Enum.all?(decoded, &statement_entry?/1) do
+      decoded
+    else
+      _ -> %{}
     end
   end
+
+  defp safe_json_decode(bytes) do
+    {:ok, :json.decode(bytes)}
+  rescue
+    _ -> :error
+  end
+
+  defp statement_entry?({id, hash}),
+    do: is_binary(id) and is_binary(hash) and Regex.match?(~r/\A[0-9a-f]{64}\z/, hash)
 
   # --- rule 5: cited counts re-derive from index.json --------------------------
 
