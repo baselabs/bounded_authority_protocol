@@ -48,6 +48,20 @@ uv pip install -e .
 python tests/conformance/run.py   # 283/283 + two-boundary key census
 ```
 
+### Strict Ed25519 (rule S1)
+
+Every signature check goes through one choke point (`bounded_authority_verifier.ed25519`), which applies
+rule S1 before the `cryptography` backend: exact widths; `A` and `R` canonical encodings; neither `A`
+nor `R` a small-order encoding (one table serves both); `S < L`; then the cofactorless equation. The
+public mirrors are `verify_strict(message, signature, public_key)`, `acceptable_public_key(raw)` (canonical,
+not small-order, on the curve) and `torsion_free(raw)` (additionally `[L]A = O`; a host check at key
+enrollment, trust install and deny-list comparison, never on the verify path). Key acceptance is part of
+JWK encode and decode, `jwk_from_public_key`, `public_key_thumbprint_raw`, `thumbprint`,
+`thumbprint_raw` and `thumbprint_preimage`: each returns the closed invalid value for a key that fails it.
+The additive strict corpus (`priv/conformance/strict-ed25519/`, index SHA-256
+`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`, 2391 cases) is run with
+`python tests/conformance/run_strict.py`.
+
 Permissiveness is invisible to corpus agreement by construction, so each parser-layer closure is
 additionally proven **red-capable** by a per-language mutation-gate
 (`python -m pytest tests/test_permissiveness.py`) — the ADR 0005 discipline applied per-language:

@@ -1,6 +1,8 @@
 package verifier
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/json"
 	"os"
 	"strings"
@@ -228,9 +230,16 @@ func TestReviewVersionUTF8AndChunkBounds(t *testing.T) {
 
 // F13 (should-fix, claude): the proof producer can emit the nonce claim.
 func TestReviewProofProducerNonce(t *testing.T) {
+	// A real generated holder key: the all-zero placeholder this test used is a small-order point, which
+	// strict key acceptance now refuses at the producer, so a placeholder would stop exercising the
+	// nonce path and fail for the wrong reason.
+	holderKey, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
 	proof := Proof{
 		ProofID:         "urn:example:proof:nonce-regression",
-		HolderPublicKey: make([]byte, 32),
+		HolderPublicKey: holderKey,
 		InvocationID:    "550e8400-e29b-41d4-a716-446655440000",
 		Operation:       "read",
 		Method:          "POST",
@@ -255,6 +264,13 @@ func TestReviewProofProducerNonce(t *testing.T) {
 	}
 	if !decoded.HasNonce || decoded.Nonce != proof.Nonce {
 		t.Fatalf("produced nonce lost: has_nonce=%v nonce=%q", decoded.HasNonce, decoded.Nonce)
+	}
+
+	// The placeholder key is refused at the producer (the contrast that shows the key was the only
+	// thing the real key above changed).
+	proof.HolderPublicKey = make([]byte, 32)
+	if _, err := ProofSigningInput(proof, nil); err == nil {
+		t.Fatal("an all-zero (small-order) holder key must be refused by the producer")
 	}
 }
 

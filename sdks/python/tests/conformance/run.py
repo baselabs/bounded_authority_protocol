@@ -52,7 +52,11 @@ from bounded_authority_verifier.json_alg import (  # noqa: E402
     str_utf8,
     utf8_str,
 )
-from bounded_authority_verifier.jwk import jwk_from_public_key, thumbprint_preimage  # noqa: E402
+from bounded_authority_verifier.jwk import (  # noqa: E402
+    jwk_from_public_key,
+    thumbprint_digest_unchecked,
+    thumbprint_preimage,
+)
 from bounded_authority_verifier.uri import uri_normalize  # noqa: E402
 
 CORPUS_DIR = _REPO_ROOT / "priv" / "conformance" / "v1" / "corpus"
@@ -755,7 +759,9 @@ def _collect_case_keys(value: Any, target: set[str]) -> None:
         if _is_census_key_label(key):
             raw = _decode_census_raw_key(child)
             if raw is not None:
-                target.add(_b64e(sha256(thumbprint_preimage(jwk_from_public_key(raw)))))
+                # The census must hash every key the corpus names, weak ones included, so it uses the
+                # raw hash-only path (finding 10a), never the checked thumbprint.
+                target.add(_b64e(thumbprint_digest_unchecked(raw)))
         _collect_case_keys(child, target)
 
 

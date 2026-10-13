@@ -107,6 +107,10 @@ pub fn attestation_signing_input(
     // segment). `public_key` is base64url of exactly the 32 raw key bytes
     // (REQ-RA1-CLAIM-public-key); `role` is exactly "issuer"/"holder"
     // (REQ-RA1-CLAIM-role-closed-set).
+    // Key acceptance (rule S1): a weak subject key is never attested.
+    if !crate::ed25519::acceptable_public_key(&attestation.public_key) {
+        return Err(Invalid);
+    }
     let public_key = b64url_to_string(&base64url_encode(&attestation.public_key))?;
     let payload = JsonValue::Object(vec![
         ("exp".to_string(), JsonValue::Int(attestation.exp)),
@@ -290,8 +294,8 @@ pub fn verify_attestation(
     // REQ-RA1-VERIFY-no-self-attestation: the attestor thumbprint MUST NOT
     // equal the subject thumbprint AND the attestor key id MUST NOT equal the
     // subject key id (either equality alone is self-attestation).
-    let attestor_thumbprint = public_key_thumbprint_raw(&expected.attestor.public_key);
-    let subject_thumbprint = thumbprint_raw(&a.payload.public_key);
+    let attestor_thumbprint = public_key_thumbprint_raw(&expected.attestor.public_key)?;
+    let subject_thumbprint = thumbprint_raw(&a.payload.public_key)?;
     if attestor_thumbprint == subject_thumbprint {
         return Err(Invalid);
     }
@@ -691,8 +695,8 @@ fn take_public_key(value: Option<&JsonValue>, bounds: &Bounds) -> Result<[u8; 32
         return Err(Invalid);
     }
     let raw = base64url_decode(s.as_bytes())?;
-    if raw.len() != 32 {
-        return Err(Invalid);
+    if raw.len() != 32 || !crate::ed25519::acceptable_public_key(&raw) {
+        return Err(Invalid); // width, and key acceptance (rule S1)
     }
     let mut arr = [0u8; 32];
     arr.copy_from_slice(&raw);

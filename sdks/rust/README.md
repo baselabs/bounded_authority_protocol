@@ -78,6 +78,21 @@ imposes nowhere).
 cargo test --test permissiveness   # 67 tests: closures + decode-path + exclusion pins + encode-parity + bounds-parity legs, each red-capable
 ```
 
+## Strict Ed25519 (rule S1)
+
+Every signature check goes through one choke point (`ed25519::verify`), which applies rule S1 before the
+`ed25519-dalek` backend: exact widths; `A` and `R` canonical encodings; neither `A` nor `R` a small-order
+encoding (one table serves both); `S < L`; then the cofactorless equation (dalek `verify`, not
+`verify_strict`). The public mirrors are `verify_strict(message, signature, public_key)`,
+`acceptable_public_key(key)` (canonical, not small-order, on the curve) and `torsion_free(key)` (additionally
+`[L]A = O`, via the existing dalek arithmetic; a host check at key enrollment, trust install and deny-list
+comparison, never on the verify path). `jwk_encode_public`, `thumbprint_preimage`, `thumbprint`,
+`thumbprint_raw` and `public_key_thumbprint_raw` are now fallible (`Result`), and every key function plus
+`jwk_decode_public` returns `Err(Invalid)` for a key that fails acceptance. The additive strict corpus is
+vendored byte-identically at `conformance/corpus-strict/` (index SHA-256
+`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`, 2391 cases) and runs with
+`cargo test --test conformance_strict`.
+
 ## The public façade
 
 The 17-function v1 verification contract (see [`spec/bap-v1.md`](../../spec/bap-v1.md) § Public

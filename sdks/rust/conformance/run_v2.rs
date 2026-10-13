@@ -91,11 +91,15 @@ impl KeyCensus {
     /// Records a 32-byte public key by computing its RFC 7638 thumbprint via the
     /// crate's own `thumbprint` function (the crate is the thumbprint authority).
     fn observe(&mut self, public_key: &[u8; 32]) {
-        let tp = bap::thumbprint(public_key);
-        // `thumbprint` returns base64url ASCII bytes; the index fingerprints are
-        // base64url strings.
+        // The census must record every key the corpus names, weak ones included, so it uses
+        // the plain hash of the RFC 7638 preimage and NOT the checked (fallible)
+        // `thumbprint` (finding 10a); the base64url index fingerprints are compared as strings.
+        let mut preimage = br#"{"crv":"Ed25519","kty":"OKP","x":""#.to_vec();
+        preimage.extend_from_slice(&bap::base64url_encode(public_key));
+        preimage.extend_from_slice(b"\"}");
+        let digest = Sha256::digest(&preimage);
         self.observed
-            .insert(String::from_utf8(tp).expect("thumbprint is base64url ASCII"));
+            .insert(String::from_utf8(bap::base64url_encode(&digest)).expect("base64url ASCII"));
     }
 
     /// Records a key at its import ATTEMPT. A right-width key goes through
@@ -1009,7 +1013,8 @@ fn d_jwk(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
             census.observe_attempted(&case["input"]["public_key"]);
             match (key, expected_verdict) {
                 (Some(key), "valid") => {
-                    let encoded = bap::jwk_encode_public(&key);
+                    let encoded =
+                        bap::jwk_encode_public(&key).expect("an honest corpus key encodes");
                     String::from_utf8(encoded).unwrap()
                         == case["expected"]["encoded"].as_str().unwrap()
                 }
@@ -1035,7 +1040,7 @@ fn d_jwk(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
                 Ok(key) => match expected_verdict {
                     "valid" => {
                         census.observe(&key);
-                        String::from_utf8(bap::thumbprint(&key)).unwrap()
+                        String::from_utf8(bap::thumbprint(&key).unwrap()).unwrap()
                             == case["expected"]["thumbprint"].as_str().unwrap()
                     }
                     _ => false,
@@ -1048,7 +1053,7 @@ fn d_jwk(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
                 Ok(key) => match expected_verdict {
                     "valid" => {
                         census.observe(&key);
-                        String::from_utf8(bap::thumbprint_preimage(&key)).unwrap()
+                        String::from_utf8(bap::thumbprint_preimage(&key).unwrap()).unwrap()
                             == case["expected"]["preimage"].as_str().unwrap()
                     }
                     _ => false,

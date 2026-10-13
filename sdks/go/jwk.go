@@ -11,6 +11,11 @@ import "crypto/sha256"
 // APIs here carry the RAW 32-byte digest (REQ1-HEADER-digest-width).
 // Issuer-key fingerprinting uses the same construction over the caller's raw
 // 32-byte public key (REQ1-HEADER-issuer-fingerprint).
+//
+// Key acceptance (rule S1): JwkDecodePublic, JwkEncodePublic,
+// JwkThumbprintPreimage, JwkThumbprint, JwkThumbprintRaw and PublicKeyThumbprintRaw return ErrInvalid
+// for a key that fails AcceptablePublicKey. jwkThumbprintOfKey (v1.go) is the one raw hash-only
+// path; a test pins its callers.
 
 // JwkDecodePublic decodes a public Ed25519 OKP JWK (JSON bytes) under the
 // closed member set and returns the raw 32-byte public key.
@@ -29,7 +34,7 @@ func JwkEncodePublic(key []byte, bounds *Bounds) ([]byte, error) {
 	if err != nil {
 		return nil, ErrInvalid
 	}
-	if len(key) != b.PublicKeyBytes {
+	if len(key) != b.PublicKeyBytes || !AcceptablePublicKey(key) {
 		return nil, ErrInvalid
 	}
 	out := []byte(`{"crv":"Ed25519","kty":"OKP","x":"`)
@@ -75,7 +80,7 @@ func PublicKeyThumbprintRaw(key []byte, bounds *Bounds) ([32]byte, error) {
 	if err != nil {
 		return [32]byte{}, ErrInvalid
 	}
-	if len(key) != b.PublicKeyBytes {
+	if len(key) != b.PublicKeyBytes || !AcceptablePublicKey(key) {
 		return [32]byte{}, ErrInvalid
 	}
 	pre := []byte(`{"crv":"Ed25519","kty":"OKP","x":"` + Base64urlEncode(key) + `"}`)
@@ -126,7 +131,7 @@ func decodePublicJwk(data []byte, bounds *Bounds) ([]byte, error) {
 		return nil, ErrInvalid
 	}
 	raw, err := Base64urlDecode(string(*x))
-	if err != nil || len(raw) != b.PublicKeyBytes {
+	if err != nil || len(raw) != b.PublicKeyBytes || !AcceptablePublicKey(raw) {
 		return nil, ErrInvalid
 	}
 	return raw, nil

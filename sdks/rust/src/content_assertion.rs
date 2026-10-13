@@ -275,7 +275,7 @@ pub fn verify_content_assertion(
     Ok(ContentAssertionFacts {
         version: 1,
         attestor_key_id: decoded.key_id,
-        attestor_key_fingerprint: public_key_thumbprint_raw(&expected.attestor.public_key),
+        attestor_key_fingerprint: public_key_thumbprint_raw(&expected.attestor.public_key)?,
         jti: claims.jti,
         iss: claims.iss,
         aud: claims.aud,

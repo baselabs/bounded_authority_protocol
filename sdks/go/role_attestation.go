@@ -343,8 +343,8 @@ func decodeAttestationPayload(p compactParts, b Bounds) (attestationClaimsData, 
 				return out, ErrInvalid
 			}
 			raw, err := Base64urlDecode(string(s))
-			if err != nil || len(raw) != b.PublicKeyBytes {
-				return out, ErrInvalid // REQ-RA1-CLAIM-public-key
+			if err != nil || len(raw) != b.PublicKeyBytes || !AcceptablePublicKey(raw) {
+				return out, ErrInvalid // REQ-RA1-CLAIM-public-key (and key acceptance, rule S1)
 			}
 			copy(out.PublicKey[:], raw)
 		case "role":

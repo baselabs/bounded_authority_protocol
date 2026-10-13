@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE--2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,3 +20,21 @@ dependencies: it consumes only the Go standard library (BSD-3-Clause),
 including the crypto/ed25519 and crypto/sha256 packages. The vendored
 conformance corpus snapshot under conformance/corpus/ is protocol test
 data authored in this repository.
+
+---
+
+Third-party test vectors
+
+The strict-Ed25519 conformance snapshot file
+conformance/corpus-strict/cases/taming/speccheck.json contains 12 Ed25519 test vectors
+imported byte for byte from ed25519-speccheck
+(https://github.com/novifinancial/ed25519-speccheck, commit
+65519336fda78a3d016e947df6d82848aca0c9da, file cases.json, SHA-256
+08e47a36d9aead288664930505584f353fff113ab854f2800db1e4f5b3540450), which
+accompanies "Taming the many EdDSAs" (Chalkias, Garillot, Nikolaenko,
+SSR 2020; IACR ePrint 2020/1244). Copyright (c) Facebook, Inc. and its
+affiliates. Licensed under the Apache License, Version 2.0; the upstream
+repository carries no NOTICE file at that commit. The vectors are reproduced
+unmodified; the snapshot adds the base64url input encoding, expected verdicts,
+and provenance fields around them. The snapshot is a byte-identical copy of
+the repository's priv/conformance/strict-ed25519/ corpus.

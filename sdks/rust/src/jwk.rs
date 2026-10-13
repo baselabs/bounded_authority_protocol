@@ -16,6 +16,15 @@
 //! Issuer-key fingerprinting uses the SAME construction over the caller's raw
 //! 32-byte public key; `kid` is excluded (`REQ1-HEADER-issuer-fingerprint`).
 //!
+//! # Key acceptance (rule S1)
+//!
+//! [`jwk_encode_public`], [`jwk_decode_public`], [`thumbprint_preimage`],
+//! [`thumbprint`], [`thumbprint_raw`] and [`public_key_thumbprint_raw`] return
+//! `Err(Invalid)` for a key that fails `acceptable_public_key` (canonical, not
+//! small-order, on the curve). `thumbprint_digest_unchecked` is the one raw
+//! hash-only path; it is private to this module and is reached only after the
+//! acceptance check.
+//!
 //! # Thumbprint preimage byte-exactness
 //!
 //! RFC 7638 §3.1 constructs the preimage by serializing the JWK with ONLY the
@@ -29,6 +38,7 @@
 
 use crate::base64url::{base64url_decode, base64url_encode};
 use crate::bounds::Bounds;
+use crate::ed25519::acceptable_public_key;
 use crate::error::{Invalid, Result};
 use crate::json::{json_decode, JsonValue};
 use sha2::{Digest, Sha256};
@@ -52,10 +62,17 @@ const PUBLIC_KEY_WIDTH: usize = 32;
 ///
 /// The `x` coordinate is the canonical unpadded base64url of the 32 raw key
 /// bytes. The output is byte-identical to the RFC 7638 thumbprint preimage
-/// (see [`thumbprint_preimage`]). Infallible: the 32-byte width is fixed by
-/// the parameter type, so no width check is possible or needed at this
-/// boundary (`REQ1-HEADER-proof-jwk`).
-pub fn jwk_encode_public(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Vec<u8> {
+/// (see [`thumbprint_preimage`]). The 32-byte width is fixed by the parameter
+/// type; a key that fails key acceptance (rule S1) is `Err(Invalid)`
+/// (`REQ1-HEADER-proof-jwk`).
+pub fn jwk_encode_public(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Result<Vec<u8>> {
+    if !acceptable_public_key(public_key) {
+        return Err(Invalid);
+    }
+    Ok(encode_unchecked(public_key))
+}
+
+fn encode_unchecked(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Vec<u8> {
     let x = base64url_encode(public_key);
     // Exact bytes: no whitespace, crv<kty<x order (the RFC 7638 preimage order).
     let mut out = Vec::with_capacity(34 + x.len() + 2);
@@ -80,7 +97,8 @@ pub fn jwk_encode_public(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Vec<u8> {
 ///   including the private `d`, is rejected (`REQ1-HEADER-no-private-jwk`);
 /// - `crv` other than `"Ed25519"` or `kty` other than `"OKP"`;
 /// - a non-string or wrong-valued `crv` / `kty` / `x`;
-/// - an `x` that is not canonical unpadded base64url of exactly 32 bytes.
+/// - an `x` that is not canonical unpadded base64url of exactly 32 bytes;
+/// - an `x` that fails key acceptance (rule S1).
 pub fn jwk_decode_public(text: &[u8]) -> Result<[u8; PUBLIC_KEY_WIDTH]> {
     // Parse under profile maxima (the JWK is a tiny fixed-shape object well
     // within every ceiling; no caller tightening applies at this primitive).
@@ -125,6 +143,9 @@ pub fn jwk_decode_public(text: &[u8]) -> Result<[u8; PUBLIC_KEY_WIDTH]> {
     if x_bytes.len() != PUBLIC_KEY_WIDTH {
         return Err(Invalid);
     }
+    if !acceptable_public_key(&x_bytes) {
+        return Err(Invalid);
+    }
     let mut arr = [0u8; PUBLIC_KEY_WIDTH];
     arr.copy_from_slice(&x_bytes);
     Ok(arr)
@@ -136,23 +157,35 @@ pub fn jwk_decode_public(text: &[u8]) -> Result<[u8; PUBLIC_KEY_WIDTH]> {
 /// `{"crv":"Ed25519","kty":"OKP","x":"<canonical-x>"}` — the three required
 /// members in lexicographic order, no whitespace (`REQ1-HEADER-thumbprint`).
 /// This is byte-identical to [`jwk_encode_public`]: for an Ed25519 OKP key the
-/// RFC 7638 preimage IS the canonical sorted JWK.
-pub fn thumbprint_preimage(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Vec<u8> {
+/// RFC 7638 preimage IS the canonical sorted JWK. A key that fails key
+/// acceptance is `Err(Invalid)`.
+pub fn thumbprint_preimage(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Result<Vec<u8>> {
     jwk_encode_public(public_key)
 }
 
 /// The RFC 7638 thumbprint: unpadded base64url SHA-256 of the preimage bytes.
 ///
 /// `REQ1-HEADER-thumbprint`: thumbprint = base64url(SHA-256(preimage UTF-8)).
-pub fn thumbprint(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Vec<u8> {
-    base64url_encode(&thumbprint_raw(public_key))
+/// A key that fails key acceptance is `Err(Invalid)`.
+pub fn thumbprint(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Result<Vec<u8>> {
+    Ok(base64url_encode(&thumbprint_raw(public_key)?))
 }
 
 /// The raw 32-byte SHA-256 digest of the thumbprint preimage.
 ///
-/// `REQ1-HEADER-digest-width`: verified facts carry the raw 32-byte digest.
-pub fn thumbprint_raw(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> [u8; PUBLIC_KEY_WIDTH] {
-    let preimage = thumbprint_preimage(public_key);
+/// `REQ1-HEADER-digest-width`: verified facts carry the raw 32-byte digest. A
+/// key that fails key acceptance is `Err(Invalid)`.
+pub fn thumbprint_raw(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Result<[u8; PUBLIC_KEY_WIDTH]> {
+    if !acceptable_public_key(public_key) {
+        return Err(Invalid);
+    }
+    Ok(thumbprint_digest_unchecked(public_key))
+}
+
+/// The raw hash-only thumbprint: SHA-256 of the preimage with NO key acceptance.
+/// Private to this module; the checked [`thumbprint_raw`] is its only caller.
+fn thumbprint_digest_unchecked(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> [u8; PUBLIC_KEY_WIDTH] {
+    let preimage = encode_unchecked(public_key);
     let mut hasher = Sha256::new();
     hasher.update(&preimage);
     let output = hasher.finalize();
@@ -167,8 +200,11 @@ pub fn thumbprint_raw(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> [u8; PUBLIC_KEY_WI
 /// `REQ1-HEADER-issuer-fingerprint`: the issuer fingerprint uses exactly the
 /// same `{crv, kty, x}` preimage + SHA-256 as the holder thumbprint — the only
 /// difference is naming (the input is the caller's raw trusted key, not a
-/// decoded proof JWK). `kid` never enters the preimage.
-pub fn public_key_thumbprint_raw(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> [u8; PUBLIC_KEY_WIDTH] {
+/// decoded proof JWK). `kid` never enters the preimage. A key that fails key
+/// acceptance is `Err(Invalid)`.
+pub fn public_key_thumbprint_raw(
+    public_key: &[u8; PUBLIC_KEY_WIDTH],
+) -> Result<[u8; PUBLIC_KEY_WIDTH]> {
     thumbprint_raw(public_key)
 }
 
@@ -195,7 +231,7 @@ mod tests {
     #[test]
     fn encode_public_emits_exact_canonical_bytes() {
         let key = corpus_key();
-        let encoded = jwk_encode_public(&key);
+        let encoded = jwk_encode_public(&key).unwrap();
         let expected = concat!(
             r#"{"crv":"Ed25519","kty":"OKP","x":""#,
             "W1s7yE9fGDMBbmdpqYVwQ1hDCXtzOePUD3fIf1t7FDk",
@@ -207,7 +243,7 @@ mod tests {
     #[test]
     fn encode_public_has_no_whitespace_and_three_members() {
         let key = corpus_key();
-        let encoded_bytes = jwk_encode_public(&key);
+        let encoded_bytes = jwk_encode_public(&key).unwrap();
         let encoded = std::str::from_utf8(&encoded_bytes).unwrap();
         assert!(!encoded.contains(' '), "no spaces");
         assert!(!encoded.contains('\n'), "no newlines");
@@ -219,7 +255,7 @@ mod tests {
     #[test]
     fn encode_public_round_trips_through_decode() {
         let key = corpus_key();
-        let encoded = jwk_encode_public(&key);
+        let encoded = jwk_encode_public(&key).unwrap();
         let decoded = jwk_decode_public(&encoded).expect("round-trip decodes");
         assert_eq!(decoded, key);
     }
@@ -433,7 +469,7 @@ mod tests {
     #[test]
     fn thumbprint_preimage_is_exact_sorted_json() {
         let key = corpus_key();
-        let preimage = thumbprint_preimage(&key);
+        let preimage = thumbprint_preimage(&key).unwrap();
         let expected = concat!(
             r#"{"crv":"Ed25519","kty":"OKP","x":""#,
             "W1s7yE9fGDMBbmdpqYVwQ1hDCXtzOePUD3fIf1t7FDk",
@@ -447,7 +483,10 @@ mod tests {
         // RFC 7638: the preimage IS the canonical sorted JWK. For Ed25519 OKP
         // these must be byte-identical.
         let key = corpus_key();
-        assert_eq!(thumbprint_preimage(&key), jwk_encode_public(&key));
+        assert_eq!(
+            thumbprint_preimage(&key).unwrap(),
+            jwk_encode_public(&key).unwrap()
+        );
     }
 
     #[test]
@@ -456,7 +495,7 @@ mod tests {
         // encoder emitted insertion order or any other order, the corpus
         // thumbprint would mismatch. Assert the exact member sequence.
         let key = corpus_key();
-        let preimage_bytes = thumbprint_preimage(&key);
+        let preimage_bytes = thumbprint_preimage(&key).unwrap();
         let preimage = std::str::from_utf8(&preimage_bytes).unwrap();
         let crv_pos = preimage.find("\"crv\"").unwrap();
         let kty_pos = preimage.find("\"kty\"").unwrap();
@@ -469,7 +508,7 @@ mod tests {
     fn thumbprint_matches_corpus_pinned_value() {
         // The corpus jwk-thumbprint-valid case pins this exact base64url.
         let key = corpus_key();
-        let tp = thumbprint(&key);
+        let tp = thumbprint(&key).unwrap();
         assert_eq!(
             String::from_utf8(tp).unwrap(),
             "d4ucEZwvJTfwxXCN4f2xmIE5ZBFoH5i5mlzeWZaB3yI"
@@ -480,8 +519,8 @@ mod tests {
     fn thumbprint_raw_base64url_equals_thumbprint() {
         // Internal consistency: base64url(thumbprint_raw) == thumbprint.
         let key = corpus_key();
-        let raw_b64 = base64url_encode(&thumbprint_raw(&key));
-        assert_eq!(raw_b64, thumbprint(&key));
+        let raw_b64 = base64url_encode(&thumbprint_raw(&key).unwrap());
+        assert_eq!(raw_b64, thumbprint(&key).unwrap());
     }
 
     #[test]
@@ -490,7 +529,10 @@ mod tests {
         // construction as the holder thumbprint; for the same key they are
         // identical (the only difference is naming / input source).
         let key = corpus_key();
-        assert_eq!(public_key_thumbprint_raw(&key), thumbprint_raw(&key));
+        assert_eq!(
+            public_key_thumbprint_raw(&key).unwrap(),
+            thumbprint_raw(&key).unwrap()
+        );
     }
 
     #[test]
@@ -500,8 +542,11 @@ mod tests {
         let key = corpus_key();
         let mut other = key;
         other[0] ^= 0xff;
-        assert_ne!(thumbprint_raw(&key), thumbprint_raw(&other));
-        assert_ne!(thumbprint(&key), thumbprint(&other));
+        assert_ne!(
+            thumbprint_raw(&key).unwrap(),
+            thumbprint_raw(&other).unwrap()
+        );
+        assert_ne!(thumbprint(&key).unwrap(), thumbprint(&other).unwrap());
     }
 
     // ==========================================================================
@@ -570,7 +615,7 @@ mod tests {
                     let key = public_key_input(&case["input"]["public_key"]);
                     match (key, expected_verdict) {
                         (Some(key), "valid") => {
-                            let encoded = jwk_encode_public(&key);
+                            let encoded = jwk_encode_public(&key).unwrap();
                             let expected_encoded =
                                 case["expected"]["encoded"].as_str().unwrap_or_else(|| {
                                     panic!("valid case {id} missing expected.encoded")
@@ -606,7 +651,7 @@ mod tests {
                         .as_bytes(),
                 ) {
                     Ok(key) if expected_verdict == "valid" => {
-                        let tp = thumbprint(&key);
+                        let tp = thumbprint(&key).unwrap();
                         let expected_tp =
                             case["expected"]["thumbprint"].as_str().unwrap_or_else(|| {
                                 panic!("valid case {id} missing expected.thumbprint")
@@ -623,7 +668,7 @@ mod tests {
                         .as_bytes(),
                 ) {
                     Ok(key) if expected_verdict == "valid" => {
-                        let preimage = thumbprint_preimage(&key);
+                        let preimage = thumbprint_preimage(&key).unwrap();
                         let expected_preimage = case["expected"]["preimage"]
                             .as_str()
                             .unwrap_or_else(|| panic!("valid case {id} missing expected.preimage"));
@@ -649,7 +694,7 @@ mod tests {
                     match (key, expected_verdict) {
                         (Some(key), "valid") => {
                             // Verdict-only pin: the call must succeed.
-                            let _ = public_key_thumbprint_raw(&key);
+                            let _ = public_key_thumbprint_raw(&key).unwrap();
                             true
                         }
                         (None, "invalid") => true, // wrong-width key -> invalid_key

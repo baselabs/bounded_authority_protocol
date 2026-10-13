@@ -29,7 +29,7 @@ from .content_assertion import (
     verify_successor,
 )
 from .digest import REQUEST_PREFIX, REQUEST_PREFIX_V2, request_digest_v2, typed_project
-from .ed25519 import sha256
+from .ed25519 import acceptable_public_key, sha256, torsion_free, verify_strict
 from .error import Err, InvalidError, Ok, Result, err, fail, ok, require
 from .facts import (
     AnchoredExportFacts,
@@ -168,6 +168,8 @@ __all__ = [
     "GrantProducer", "ProofProducer", "BoundaryAnchorProducer", "KeyTransitionProducer",
     "AnchoredExportInput", "ExpectedExport", "ArchivedObject", "HistoricalKeyChain",
     "EncodedConsumptionEntry", "EncodedAnchoredExport", "SigningInput", "Selector",
+    # strict Ed25519 (rule S1): verify, key acceptance, and the host-side torsion-free check
+    "verify_strict", "acceptable_public_key", "torsion_free",
     # primitives
     "jwk_encode_public", "jwk_decode_public", "thumbprint", "thumbprint_raw",
     "thumbprint_preimage", "public_key_thumbprint_raw", "jwk_from_public_key",

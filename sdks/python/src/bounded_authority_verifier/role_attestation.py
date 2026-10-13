@@ -31,7 +31,7 @@ from typing import Any, TypeVar, Union, get_args, get_origin, get_type_hints
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMA, MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .compact import CompactSegments, SigningInput, assemble_segments, parse_compact
-from .ed25519 import ed25519_verify, import_public_key
+from .ed25519 import acceptable_public_key, ed25519_verify, import_public_key
 from .error import InvalidError, Ok, Result, err, fail
 from .facts import AttestationDecoded, AttestationFacts
 from .jcs import jcs_encode
@@ -288,7 +288,8 @@ def _validate_attestation_payload(p: Tagged, payload_bytes: bytes, bounds: Bound
         fail("attestation: v=1")
     _require_string_or_uri(p.v.get("jti"), "jti", bounds)
     _require_kid_value(p.v.get("key_id"), "key_id", "attestation payload", bounds)
-    _require_b64url_n(p.v.get("public_key"), "public_key", 32)
+    if not acceptable_public_key(_require_b64url_n(p.v.get("public_key"), "public_key", 32)):
+        fail("attestation: subject public key not acceptable")
     _require_role(p.v.get("role"))
     nbf = _require_int(p.v.get("nbf"), "nbf")
     exp = _require_int(p.v.get("exp"), "exp")
@@ -526,6 +527,8 @@ def _attestation_signing_input_body(
         fail("attestation_signing_input: key_id charset")
     if len(attestation.public_key) != 32:
         fail("attestation_signing_input: public key width")
+    if not acceptable_public_key(attestation.public_key):
+        fail("attestation_signing_input: public key not acceptable")
     if attestation.role not in ROLES:
         fail("attestation_signing_input: role closed set")
     if not (_is_int(attestation.nbf) and _is_int(attestation.exp)):
@@ -675,6 +678,8 @@ def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> A
         expected.subject_public_key
     ) != 32:
         fail("verify_attestation: subject key width")
+    if not acceptable_public_key(expected.subject_public_key):
+        fail("verify_attestation: subject key not acceptable")
     if not _is_int(getattr(expected, "now", None)):
         fail("verify_attestation: integer now")
     # 1. the closed header and payload sets and canonical bytes of §2 (REQ-RA1-VERIFY-closed-sets).

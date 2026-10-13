@@ -57,11 +57,18 @@ func censusKey(b64 string) {
 	if err != nil {
 		return // never imported at the boundary
 	}
-	tp, err := v.PublicKeyThumbprintRaw(raw, nil)
-	if err != nil {
+	if len(raw) != 32 {
 		return // rejected before the crypto boundary (e.g. short key)
 	}
+	tp := rawThumbprint(raw)
 	census[v.Base64urlEncode(tp[:])] = true
+}
+
+// rawThumbprint is the RFC 7638 thumbprint of a raw 32-byte key by plain hashing, with NO key
+// acceptance: the census must record every key the corpus names, weak ones included, so it cannot
+// use the checked (fallible) PublicKeyThumbprintRaw (finding 10a).
+func rawThumbprint(raw []byte) [32]byte {
+	return sha256.Sum256([]byte(`{"crv":"Ed25519","kty":"OKP","x":"` + v.Base64urlEncode(raw) + `"}`))
 }
 
 func rawString(t *testing.T, m map[string]json.RawMessage, key string) string {
@@ -322,9 +329,8 @@ func collectCaseKeys(t *testing.T, m map[string]json.RawMessage, target map[stri
 			if err := json.Unmarshal(raw, &s); err == nil && censusRawKey.MatchString(s) {
 				keyBytes, err := v.Base64urlDecode(s)
 				if err == nil && len(keyBytes) == 32 {
-					if tp, err := v.PublicKeyThumbprintRaw(keyBytes, nil); err == nil {
-						target[v.Base64urlEncode(tp[:])] = true
-					}
+					tp := rawThumbprint(keyBytes)
+					target[v.Base64urlEncode(tp[:])] = true
 				}
 			}
 		}

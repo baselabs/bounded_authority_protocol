@@ -50,6 +50,17 @@ profile ([ADR 0037](../docs/adr/0037-content-assertion-profile.md)): verificatio
 functions, pairwise successor checks, producer and assembly, with the certified 131 assertion,
 9 digest, and 14 successor cases pinned by the index SHA-256.
 
+Each SDK also implements the strict-Ed25519 rule S1
+([ADR 0040](../docs/adr/0040-strict-ed25519-soundness-erratum.md)) at its single Ed25519 choke
+point, with the three helpers `verify_strict`, `acceptable_public_key` and `torsion_free` in the
+language's idiom, and runs the additive strict-Ed25519 corpus (`bap-strict-ed25519/1`,
+[`priv/conformance/strict-ed25519`](../priv/conformance/strict-ed25519/), 2,391 cases in 14 families,
+index SHA-256 `0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`). Python reads it
+in place; Go and Rust carry byte-identical snapshots under `conformance/corpus-strict/`. Its 12
+"Taming the many EdDSAs" vectors come from
+[ed25519-speccheck](https://github.com/novifinancial/ed25519-speccheck) (Apache-2.0), attributed in
+the root and per-SDK `NOTICE` files.
+
 ## Conformance
 
 Each SDK passes every certified vector (valid + invalid) — the 283 v1, 268 v2, and 292 v3
@@ -63,6 +74,7 @@ verifiable:
 python tests/conformance/run.py
 python tests/conformance/run_v2.py
 python tests/conformance/run_v3.py
+python tests/conformance/run_strict.py
 
 # Rust (from sdks/rust) — the conformance runners run inside the test suite
 cargo test --locked

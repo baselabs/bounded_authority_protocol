@@ -532,9 +532,9 @@ fn producer_and_assembly_round_trip_both_roles_from_profile_material() {
             facts,
             AttestationFacts {
                 attestor_key_id: attestor_key_id.clone(),
-                attestor_key_fingerprint: public_key_thumbprint_raw(&attestor_public_key),
+                attestor_key_fingerprint: public_key_thumbprint_raw(&attestor_public_key).unwrap(),
                 subject_key_id: input.key_id.clone(),
-                subject_key_fingerprint: thumbprint_raw(&subject_public_key),
+                subject_key_fingerprint: thumbprint_raw(&subject_public_key).unwrap(),
                 role,
                 jti: input.jti.clone(),
                 nbf: 1735689600,

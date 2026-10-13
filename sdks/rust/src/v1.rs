@@ -192,7 +192,7 @@ fn decode_proof_for(
     profile: ProofProfile,
 ) -> Result<ProofDecoded> {
     let p = decode_proof_parts_for(compact, bounds, profile)?;
-    let holder_thumbprint = thumbprint_raw(&p.holder_public_key);
+    let holder_thumbprint = thumbprint_raw(&p.holder_public_key)?;
     Ok(ProofDecoded {
         // The proof header carries a JWK, not a kid; the field is empty.
         key_id: String::new(),
@@ -297,7 +297,7 @@ pub fn verify_grant(
         return Err(Invalid);
     }
 
-    let issuer_key_fingerprint = public_key_thumbprint_raw(&issuer.public_key);
+    let issuer_key_fingerprint = public_key_thumbprint_raw(&issuer.public_key)?;
     Ok(GrantFacts {
         version: g.payload.version,
         issuer: g.payload.issuer,
@@ -405,7 +405,7 @@ fn check_envelope_for(
     // Holder thumbprint binding: the proof header JWK RFC 7638 thumbprint MUST
     // equal the grant's cnf.jkt (REQ1-VERIFY-envelope-binding). This binds the
     // proof's holder key to the grant's confirmation.
-    let holder_thumb = thumbprint_raw(&proof.holder_public_key);
+    let holder_thumb = thumbprint_raw(&proof.holder_public_key)?;
     if holder_thumb != grant_facts.holder_thumbprint {
         return Err(Invalid);
     }
@@ -831,6 +831,10 @@ fn proof_signing_input_for(
 
     // Build header: {alg, jwk:{crv,kty,x}, typ}. JCS sorts: alg < jwk < typ;
     // nested jwk: crv < kty < x (matches the RFC 7638 preimage order).
+    // Key acceptance (rule S1): a weak holder key is never embedded in a proof header.
+    if !crate::ed25519::acceptable_public_key(&proof.holder_public_key) {
+        return Err(Invalid);
+    }
     let x = b64url_to_string(&base64url_encode(&proof.holder_public_key))?;
     let jwk = JsonValue::Object(vec![
         (
@@ -924,7 +928,7 @@ pub fn boundary_anchor_signing_input(
     // payload_segment: anchor_id, anchored_at, chain_hash, chain_id,
     // key_fingerprint, sequence, v.
     let chain_hash_str = b64url_to_string(&base64url_encode(&anchor.chain_hash))?;
-    let fingerprint = public_key_thumbprint_raw(&anchor.public_key);
+    let fingerprint = public_key_thumbprint_raw(&anchor.public_key)?;
     let fingerprint_str = b64url_to_string(&base64url_encode(&fingerprint))?;
     let payload = JsonValue::Object(vec![
         (
@@ -993,8 +997,8 @@ pub fn key_transition_signing_input(
     // Payload members derived first-hand from the corpus's transition
     // payload_segment: chain_id, effective_at, from_key_fingerprint,
     // to_key_fingerprint, to_key_id, transition_id, v.
-    let from_fp = public_key_thumbprint_raw(&transition.current_public_key);
-    let to_fp = public_key_thumbprint_raw(&transition.next_public_key);
+    let from_fp = public_key_thumbprint_raw(&transition.current_public_key)?;
+    let to_fp = public_key_thumbprint_raw(&transition.next_public_key)?;
     let from_str = b64url_to_string(&base64url_encode(&from_fp))?;
     let to_str = b64url_to_string(&base64url_encode(&to_fp))?;
     let payload = JsonValue::Object(vec![
@@ -1381,7 +1385,7 @@ pub fn verify_historical_anchor(
     }
 
     // Derived fingerprint == signed key_fingerprint == expected.key_fingerprint.
-    let derived = public_key_thumbprint_raw(&key.public_key);
+    let derived = public_key_thumbprint_raw(&key.public_key)?;
     if a.payload.key_fingerprint != derived || a.payload.key_fingerprint != expected.key_fingerprint
     {
         return Err(Invalid);
@@ -1477,8 +1481,8 @@ pub fn verify_key_transition(
         return Err(Invalid);
     }
 
-    let current_derived = public_key_thumbprint_raw(&current.public_key);
-    let next_derived = public_key_thumbprint_raw(&next.public_key);
+    let current_derived = public_key_thumbprint_raw(&current.public_key)?;
+    let next_derived = public_key_thumbprint_raw(&next.public_key)?;
 
     // from_fingerprint == derived(current) == expected.current_key_fingerprint.
     if t.payload.from_fingerprint != current_derived
@@ -2788,7 +2792,7 @@ fn check_export_chronology(
     // Fingerprints cannot cycle: no key fingerprint may recur.
     let mut seen: Vec<[u8; 32]> = Vec::with_capacity(keys.len());
     for k in keys {
-        let fp = public_key_thumbprint_raw(&k.public_key);
+        let fp = public_key_thumbprint_raw(&k.public_key)?;
         if seen.iter().any(|s| *s == fp) {
             return Err(Invalid);
         }
@@ -5240,7 +5244,7 @@ mod tests {
         // issuer_key_fingerprint is the raw 32-byte thumbprint of the trusted key.
         assert_eq!(
             facts.issuer_key_fingerprint,
-            public_key_thumbprint_raw(&issuer.public_key)
+            public_key_thumbprint_raw(&issuer.public_key).unwrap()
         );
     }
 

@@ -422,7 +422,7 @@ fn anchor_fixture() -> BoundaryAnchor {
         chain_hash: Z32,
         chain_id: "chain-x".to_string(),
         key_id: "anchor-a".to_string(),
-        public_key: [7u8; 32],
+        public_key: KEY_A,
         sequence: 0,
     }
 }
@@ -431,10 +431,10 @@ fn transition_fixture() -> KeyTransition {
     KeyTransition {
         chain_id: "chain-x".to_string(),
         current_key_id: "anchor-a".to_string(),
-        current_public_key: [7u8; 32],
+        current_public_key: KEY_A,
         effective_at: 1500,
         next_key_id: "anchor-b".to_string(),
-        next_public_key: [8u8; 32],
+        next_public_key: KEY_B,
         transition_id: "transition-1".to_string(),
     }
 }
@@ -752,8 +752,31 @@ use bounded_authority_protocol::jwk::public_key_thumbprint_raw;
 use bounded_authority_protocol::types::{ChainInput, ConsumptionEntry, ExpectedKeyTransition};
 use bounded_authority_protocol::{check_chain, encode_consumption_entry};
 
-const KEY_A: [u8; 32] = [7u8; 32];
-const KEY_B: [u8; 32] = [8u8; 32];
+// Real curve points (public RFC 8032 section 7.1 TEST 1 and TEST 2 keys, plus the strict corpus's
+// honest issuer key). These fixtures used to be the filler patterns 0x07.., 0x08.. and 0x03.., which
+// are not curve points; strict key acceptance now refuses filler bytes at the producers and the
+// thumbprint functions, so a filler key would reject at the key and silently stop testing the guard
+// under test.
+const KEY_A: [u8; 32] = hex_key("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
+const KEY_B: [u8; 32] = hex_key("3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c");
+const KEY_C: [u8; 32] = hex_key("4b6e3832991108ba83b2b5a1d6df6a969214ae5af8d17fa85e56496b75791334");
+
+const fn hex_key(s: &str) -> [u8; 32] {
+    const fn nibble(c: u8) -> u8 {
+        match c {
+            b'0'..=b'9' => c - b'0',
+            _ => c - b'a' + 10,
+        }
+    }
+    let b = s.as_bytes();
+    let mut out = [0u8; 32];
+    let mut i = 0;
+    while i < 32 {
+        out[i] = (nibble(b[2 * i]) << 4) | nibble(b[2 * i + 1]);
+        i += 1;
+    }
+    out
+}
 
 /// A fully conformant export: 1 genesis row, start anchor (seq 0, key A), one
 /// transition (A→B), end anchor (seq 1, key B). Every value ties to `expected`.
@@ -836,7 +859,7 @@ fn expected_start_anchor(chain_hash: [u8; 32]) -> ExpectedAnchor {
         anchored_at: 1000,
         chain_hash,
         chain_id: "chain-x".to_string(),
-        key_fingerprint: public_key_thumbprint_raw(&KEY_A),
+        key_fingerprint: public_key_thumbprint_raw(&KEY_A).unwrap(),
         key_id: "anchor-a".to_string(),
         sequence: 0,
         bounds: None,
@@ -854,7 +877,7 @@ fn expected_end_anchor(
         anchored_at,
         chain_hash,
         chain_id: "chain-x".to_string(),
-        key_fingerprint: public_key_thumbprint_raw(&public_key),
+        key_fingerprint: public_key_thumbprint_raw(&public_key).unwrap(),
         key_id: key_id.to_string(),
         sequence: 1,
         bounds: None,
@@ -891,10 +914,10 @@ fn conformant_export() -> ConformantExport {
         end_anchor: expected_end_anchor(head_hash, "anchor-b", KEY_B, 1600),
         transitions: vec![ExpectedKeyTransition {
             chain_id: "chain-x".to_string(),
-            current_key_fingerprint: public_key_thumbprint_raw(&KEY_A),
+            current_key_fingerprint: public_key_thumbprint_raw(&KEY_A).unwrap(),
             current_key_id: "anchor-a".to_string(),
             effective_at: 1500,
-            next_key_fingerprint: public_key_thumbprint_raw(&KEY_B),
+            next_key_fingerprint: public_key_thumbprint_raw(&KEY_B).unwrap(),
             next_key_id: "anchor-b".to_string(),
             transition_id: "transition-1".to_string(),
             bounds: None,
@@ -1182,10 +1205,10 @@ fn encode_key_path_end_time_equality_accepted() {
         end_anchor: expected_end_anchor(head_hash, "anchor-b", KEY_B, 1600),
         transitions: vec![ExpectedKeyTransition {
             chain_id: "chain-x".to_string(),
-            current_key_fingerprint: public_key_thumbprint_raw(&KEY_A),
+            current_key_fingerprint: public_key_thumbprint_raw(&KEY_A).unwrap(),
             current_key_id: "anchor-a".to_string(),
             effective_at: 1600,
-            next_key_fingerprint: public_key_thumbprint_raw(&KEY_B),
+            next_key_fingerprint: public_key_thumbprint_raw(&KEY_B).unwrap(),
             next_key_id: "anchor-b".to_string(),
             transition_id: "transition-1".to_string(),
             bounds: None,
@@ -1435,7 +1458,7 @@ fn encode_key_path_self_loop_rejected() {
     // consistently WITHOUT the cycle guard; the seen-list is the sole rejector
     // (left on KEY_B, the end-binding clause would backstop under the mutation).
     let mut expected = f.expected.clone();
-    expected.transitions[0].next_key_fingerprint = public_key_thumbprint_raw(&KEY_A);
+    expected.transitions[0].next_key_fingerprint = public_key_thumbprint_raw(&KEY_A).unwrap();
     expected.transitions[0].next_key_id = "anchor-a".to_string();
     expected.end_anchor = expected_end_anchor(expected.chain.head_hash, "anchor-a", KEY_A, 1600);
     input.end_anchor = build_end_anchor(expected.chain.head_hash, "anchor-a", KEY_A, 1600);
@@ -1470,7 +1493,7 @@ fn encode_key_path_wrong_current_key_rejected() {
         &[0u8; 64],
     );
     f.expected.transitions[0].current_key_id = "anchor-c".to_string();
-    f.expected.transitions[0].current_key_fingerprint = public_key_thumbprint_raw(&[3u8; 32]);
+    f.expected.transitions[0].current_key_fingerprint = public_key_thumbprint_raw(&KEY_C).unwrap();
     assert!(
         encode_anchored_export(&f.input, &f.expected).is_err(),
         "wrong current key at transition 1 must reject"
@@ -1503,7 +1526,7 @@ fn encode_key_path_end_key_mismatch_rejected() {
         &[0u8; 64],
     );
     f.expected.end_anchor.key_id = "anchor-c".to_string();
-    f.expected.end_anchor.key_fingerprint = public_key_thumbprint_raw(&[3u8; 32]);
+    f.expected.end_anchor.key_fingerprint = public_key_thumbprint_raw(&KEY_C).unwrap();
     assert!(
         encode_anchored_export(&f.input, &f.expected).is_err(),
         "end anchor on a non-final key must reject"
@@ -2032,20 +2055,20 @@ fn two_transition_export() -> ConformantExport {
         transitions: vec![
             ExpectedKeyTransition {
                 chain_id: "chain-x".to_string(),
-                current_key_fingerprint: public_key_thumbprint_raw(&KEY_A),
+                current_key_fingerprint: public_key_thumbprint_raw(&KEY_A).unwrap(),
                 current_key_id: "anchor-a".to_string(),
                 effective_at: 1500,
-                next_key_fingerprint: public_key_thumbprint_raw(&KEY_B),
+                next_key_fingerprint: public_key_thumbprint_raw(&KEY_B).unwrap(),
                 next_key_id: "anchor-b".to_string(),
                 transition_id: "transition-1".to_string(),
                 bounds: None,
             },
             ExpectedKeyTransition {
                 chain_id: "chain-x".to_string(),
-                current_key_fingerprint: public_key_thumbprint_raw(&KEY_B),
+                current_key_fingerprint: public_key_thumbprint_raw(&KEY_B).unwrap(),
                 current_key_id: "anchor-b".to_string(),
                 effective_at: 1550,
-                next_key_fingerprint: public_key_thumbprint_raw(&key_c),
+                next_key_fingerprint: public_key_thumbprint_raw(&key_c).unwrap(),
                 next_key_id: "anchor-c".to_string(),
                 transition_id: "transition-2".to_string(),
                 bounds: None,

@@ -41,6 +41,7 @@ Closures (design § Invariant conformance — Python-specific):
 from __future__ import annotations
 
 import base64
+import hashlib
 import struct
 
 import pytest
@@ -437,34 +438,61 @@ def test_check_envelope_rejects_null_trusted_issuer_fail_closed():
     assert not r.is_ok
 
 
+def _valid_envelope():
+    """A real, validly signed grant + proof pair (real generated keys) that verifies under
+    ``_envelope_expectation``. Placeholder all-zero keys used to stand in here; strict key acceptance
+    rejects an all-zero key (a small-order point) at the key, so a placeholder would stop exercising the
+    guard under test and fail for the wrong reason."""
+    issuer_pub, issuer_priv = _fresh_key()
+    holder_pub, holder_priv = _fresh_key()
+    grant = GrantProducer(
+        key_id="issuer-123456", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        holder_thumbprint=_b64url(public_key_thumbprint_raw(holder_pub)),
+        operations=(OperationInput(name="read", selectors=("all",)),),
+    )
+    gsi = grant_signing_input(grant)
+    assert gsi.is_ok
+    gmsg = f"{gsi.value.protected_segment.decode('ascii')}.{gsi.value.payload_segment.decode('ascii')}".encode("ascii")
+    grant_compact = _must_assemble(gsi.value, issuer_priv.sign(gmsg))
+    return grant_compact, _signed_proof(grant_compact, holder_pub, holder_priv), issuer_pub
+
+
+def _envelope_expectation(issuer_pub: bytes, **overrides):
+    base = {
+        "issuer": "https://issuer.example.test", "audience": "https://resource.example.test",
+        "method": "POST", "target_uri": "https://resource.example.test/invoke",
+        "invocation_id": "550e8400-e29b-41d4-a716-446655440000", "operation": "read",
+        "cast_arguments": _NULL_ARGS, "evaluation_time": 1500, "clock_skew": 60,
+        "proof_max_age": 300, "nonce": NonceNotRequired(),
+    }
+    return ExpectedRequest(
+        trusted_issuer=TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
+        **{**base, **overrides},
+    )
+
+
 def test_check_envelope_rejects_fractional_and_zero_temporal_context():
     """Cross-vendor #19: the reference requires is_integer(evaluation_time), is_integer(clock_skew),
     and proof_max_age > 0 (strictly positive). A range-only `< 0` check accepts fractional times and
-    proof_max_age=0. These guards fire BEFORE grant parsing, so a junk compact suffices. Defect:
-    revert the isinstance/`<= 0` guards → fractional/zero values pass the guard and the junk compact
-    fails later at grant parse (so the guard's rejection is indistinguishable — but the integer
-    boundary is the contract, and a valid grant under a fractional eval time would wrongly verify).
-    """
-    from bounded_authority_verifier.v1 import ExpectedRequest, TrustedIssuer, check_envelope
+    proof_max_age=0. These guards fire before grant parsing. Defect: revert the isinstance/`<= 0`
+    guards -> a valid grant under a fractional eval time would wrongly verify.
 
-    junk = b"aaa.bbb.ccc"
-    issuer = TrustedIssuer(key_id=b"k", public_key=b"\x00" * 32)
-    base = {
-        "issuer": "x", "audience": "x", "method": "GET", "target_uri": "https://x.example/",
-        "invocation_id": "550e8400-e29b-41d4-a716-446655440000", "operation": "read",
-        "cast_arguments": {"t": "null", "v": None}, "nonce": ("not_required",),
-    }
+    The envelope here is REAL (real generated keys, honestly signed), and the integer-context control
+    must verify, so every rejection below can only come from the temporal guard under test."""
+    grant, proof, issuer_pub = _valid_envelope()
+    # Positive control: the same envelope with an all-integer, positive context verifies.
+    assert check_envelope(grant, proof, _envelope_expectation(issuer_pub)).is_ok
 
     def call(**overrides):
-        return check_envelope(junk, junk, ExpectedRequest(trusted_issuer=issuer, **{**base, **overrides}))
+        return check_envelope(grant, proof, _envelope_expectation(issuer_pub, **overrides))
 
-    # All of these must return Err (the guard rejects). A valid-integer context also returns Err
-    # here only because the junk compact fails at grant parse — so the test's load-bearing assertion
-    # is that the fractional/zero cases do NOT raise and DO return Err, matching the integer control.
-    assert not call(evaluation_time=150.5, clock_skew=0, proof_max_age=300).is_ok
-    assert not call(evaluation_time=150, clock_skew=10.5, proof_max_age=300).is_ok
-    assert not call(evaluation_time=150, clock_skew=0, proof_max_age=0).is_ok
-    assert not call(evaluation_time=150, clock_skew=0, proof_max_age=300).is_ok
+    assert not call(evaluation_time=1500.5).is_ok
+    assert not call(clock_skew=10.5).is_ok
+    assert not call(proof_max_age=0).is_ok
+    # The guards also fire when the compacts are junk (they run before parsing).
+    junk = b"aaa.bbb.ccc"
+    assert not check_envelope(junk, junk, _envelope_expectation(issuer_pub, evaluation_time=150.5)).is_ok
 
 
 # === BAP-09 #2/#3/#15/#16/#17/#18 cross-vendor remediation — chain/archive verify + encode paths ===
@@ -1081,27 +1109,23 @@ def test_check_envelope_rejects_bool_temporal_context():
     """Cross-vendor re-review F4: Python's isinstance(True, int) is True, so a bool-typed
     evaluation_time/clock_skew/proof_max_age passed the isinstance(x, int) check. The reference
     requires is_integer; booleans are not integers. Defect: revert _is_int to isinstance(x, int) ->
-    bool values pass the guard."""
-    from bounded_authority_verifier.v1 import ExpectedRequest, TrustedIssuer, check_envelope
+    bool values pass the guard.
 
-    junk = b"aaa.bbb.ccc"
-    issuer = TrustedIssuer(key_id=b"k", public_key=b"\x00" * 32)
-    base = {
-        "issuer": "x", "audience": "x", "method": "GET", "target_uri": "https://x.example/",
-        "invocation_id": "550e8400-e29b-41d4-a716-446655440000", "operation": "read",
-        "cast_arguments": {"t": "null", "v": None}, "nonce": ("not_required",),
-    }
+    Real envelope with a passing integer control (see ``_valid_envelope``): a bool 1 would otherwise
+    be indistinguishable from the integer 1, so the control uses values that verify as integers."""
+    grant, proof, issuer_pub = _valid_envelope()
+    assert check_envelope(grant, proof, _envelope_expectation(issuer_pub)).is_ok
 
     def call(**overrides):
-        return check_envelope(junk, junk, ExpectedRequest(trusted_issuer=issuer, **{**base, **overrides}))
+        return check_envelope(grant, proof, _envelope_expectation(issuer_pub, **overrides))
 
     # bool evaluation_time -> reject (isinstance(True, int) is True in Python, but bool is not int).
-    assert not call(evaluation_time=True, clock_skew=0, proof_max_age=300).is_ok
-    assert not call(evaluation_time=False, clock_skew=0, proof_max_age=300).is_ok
+    assert not call(evaluation_time=True).is_ok
+    assert not call(evaluation_time=False).is_ok
     # bool clock_skew -> reject.
-    assert not call(evaluation_time=150, clock_skew=True, proof_max_age=300).is_ok
+    assert not call(clock_skew=True).is_ok
     # bool proof_max_age -> reject.
-    assert not call(evaluation_time=150, clock_skew=0, proof_max_age=True).is_ok
+    assert not call(proof_max_age=True).is_ok
 
 
 def test_forged_widening_bounds_rejected_at_entry_points():
@@ -1379,8 +1403,19 @@ def test_decode_grant_rejects_wrong_signature_width():
 # by neutralizing the encode wiring — the pre-parity state — in the task log).
 # ============================================================================
 
-_KEY_A = bytes([7]) * 32
-_KEY_B = bytes([8]) * 32
+def _seeded_public_key(label: bytes) -> bytes:
+    """A real Ed25519 public key derived from a fixed seed. The fixtures below used to be the filler
+    patterns 0x07.. and 0x08.. (not curve points); strict key acceptance now refuses filler bytes at the
+    producers, so a filler key would reject at the key and silently stop testing the guard under test."""
+    return (
+        Ed25519PrivateKey.from_private_bytes(hashlib.sha256(b"permissiveness-fixture-" + label).digest())
+        .public_key()
+        .public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    )
+
+
+_KEY_A = _seeded_public_key(b"a")
+_KEY_B = _seeded_public_key(b"b")
 _Z32P = bytes(32)
 _SIG64 = bytes(64)
 _SIG32 = bytes(32)

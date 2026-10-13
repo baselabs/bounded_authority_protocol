@@ -73,6 +73,7 @@ pub use content_assertion::{
     ExpectedContentAssertion,
 };
 pub use digest::request_digest;
+pub use ed25519::{acceptable_public_key, torsion_free, verify_strict};
 pub use role_attestation::{
     assemble_attestation_compact, attestation_signing_input, decode_attestation, verify_attestation,
 };

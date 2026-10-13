@@ -65,6 +65,21 @@ It covers 131 assertion cases, including 38 decode-valid exact producer/assembly
 go test -run ContentAssertion .
 ```
 
+## Strict Ed25519 (rule S1)
+
+Every signature check goes through one choke point (`verifyEd25519` in `ed25519.go`), which applies rule S1
+before the standard-library backend: exact widths; `A` and `R` canonical encodings; neither `A` nor `R` a
+small-order encoding (one table serves both); `S < L`; then the cofactorless equation. The public mirrors are
+`VerifyStrict(message, signature, publicKey)`, `AcceptablePublicKey(key)` (canonical, not small-order, on the
+curve) and `TorsionFree(key)` (additionally `[L]A = O`; a host check at key enrollment, trust install and
+deny-list comparison, never on the verify path; pure `math/big` in `ed25519_point.go`, so `go.mod` stays
+dependency-free). `JwkDecodePublic`, `JwkEncodePublic`, `JwkThumbprintPreimage`, `JwkThumbprint`,
+`JwkThumbprintRaw` and `PublicKeyThumbprintRaw` return `ErrInvalid` for a key that fails acceptance.
+The additive strict corpus is vendored byte-identically at `conformance/corpus-strict/` (index SHA-256
+`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`, 2391 cases) and runs with
+`go test ./conformance/ -run TestStrictEd25519Corpus`; `FuzzEd25519Gate` fuzzes the byte-level gate against an
+arithmetic reference.
+
 ## Successor-major profile (contract-major 2)
 
 [`v2.go`](v2.go) adds the successor contract-major profile behind the namespace type `Profile`
