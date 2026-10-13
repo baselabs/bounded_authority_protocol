@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+      # kimosabe-land's CI-before-main landing branch.
+      - "kci/**"
     paths-ignore:
       - "**/*.md"
       - "docs/**"

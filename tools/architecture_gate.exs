@@ -8,6 +8,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     jsonschex: {"~> 0.10.0", [:dev, :test]},
     mix_audit: {"~> 2.1", [:dev, :test]},
     sbom: {"~> 0.11.0", [:dev, :test]},
+    # sbom 0.11.0 still requires hex_core ~> 0.19.0; the dev/test override takes 0.20.0
+    # for EEF-CVE-2026-103502 until an sbom release accepts it.
+    hex_core: {"~> 0.20.0", [:dev, :test]},
     stream_data: {"~> 1.1", [:dev, :test]}
   }
 
