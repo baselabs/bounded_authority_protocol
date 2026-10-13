@@ -8,8 +8,9 @@ profiles, and the strict Ed25519 verification soundness repair
 ([ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md), erratum 2). The public API
 surface is locked. Registry consumers use the published Hex archive. Releases `0.7.0` and
 earlier accept Ed25519 signatures that the strict rule rejects and are not supported; upgrade to
-`0.8.x` and run the pre-upgrade key scan in ADR 0040. See the security advisory for the affected
-versions and details.
+`0.8.x` and run the pre-upgrade key scan in ADR 0040. See the security advisory
+[GHSA-jwvm-w9r9-qqf8](https://github.com/baselabs/bounded_authority_protocol/security/advisories/GHSA-jwvm-w9r9-qqf8)
+for the affected versions and details.
 
 The verifier returns redacted, non-authorizing facts: trust and authorization, where a result
 carries them, are explicitly not evaluated. The package does not select trust, hold keys, reserve

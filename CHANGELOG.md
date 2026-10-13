@@ -2,7 +2,7 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
-## [0.8.0] — release date set at disclosure
+## [0.8.0] — 2026-10-13
 
 The strict Ed25519 verification release: a soundness repair (erratum 2,
 [ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md)). Upgrade from every earlier
