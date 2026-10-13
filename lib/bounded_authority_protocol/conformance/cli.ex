@@ -34,11 +34,13 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   # (e.g. a regenerated index over a shrunken case set — which passes integrity + agreement, so
   # nothing else here would catch it). To rotate either corpus, bump its constant AND every SDK
   # runner's certified pin for that major in the same change (scripts/regen_corpus_digests.exs).
+  # The major-3 pin stays the closing entry: scripts/regen_corpus_digests.exs locates each
+  # contract-major pin by its exact single-line shape.
   @certified_index_sha256 %{
+    :strict_ed25519 => "DPrmBwY4fIQ2c1_QKCw7e-0nAQX27FfmVM8czzyAGAw",
     1 => "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs",
     2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A",
-    3 => "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw",
-    :strict_ed25519 => "DPrmBwY4fIQ2c1_QKCw7e-0nAQX27FfmVM8czzyAGAw"
+    3 => "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw"
   }
 
   @doc """
