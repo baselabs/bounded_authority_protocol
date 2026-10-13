@@ -16,6 +16,9 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        "scripts/check_spec_facts.exs",
                        "spec/tools/build_examples.exs",
                        "test/architecture/purity_test.exs",
+                       # Asserts from compiled code which modules call :crypto.verify/5, so it
+                       # names the ES256 suite module and a v1 module as known positives.
+                       "test/architecture/ed25519_owner_test.exs",
                        "test/docs_guides_test.exs",
                        "test/bap_walkthrough_test.exs",
                        "test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",

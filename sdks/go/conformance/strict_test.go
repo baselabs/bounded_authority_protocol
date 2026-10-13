@@ -24,12 +24,12 @@ import (
 
 // strictCertifiedIndexSHA256 is the SHA-256 (hex) of the certified strict corpus index.json. A
 // vendored corpus that hashes to anything else fails closed here — silent drift is impossible.
-const strictCertifiedIndexSHA256 = "0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c"
+const strictCertifiedIndexSHA256 = "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
 
 const (
 	strictCorpusDir  = "corpus-strict"
 	strictProfile    = "bap-strict-ed25519/1"
-	strictTotalCases = 2391
+	strictTotalCases = 2410
 )
 
 type strictIndex struct {

@@ -89,8 +89,8 @@ revocation, and effects.
 
 The strict Ed25519 rule ([ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md),
 `spec/bap-v1.md` § 14.1, `spec/bap-v2.md` § 7) has its own additive certified corpus under
-`priv/conformance/strict-ed25519`: profile `bap-strict-ed25519/1`, revision 1, 2,391 cases in 14
-families, index SHA-256 `0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`. Its
+`priv/conformance/strict-ed25519`: profile `bap-strict-ed25519/1`, revision 1, 2,410 cases in 14
+families, index SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`. Its
 index has its own closed format (per-file lowercase-hex SHA-256, family counts, and the
 `profile.json` and `revision.json` sidecars). It is not a wire profile and creates no new protocol
 identity; it certifies one verification rule across every Ed25519 surface.

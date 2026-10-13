@@ -222,7 +222,7 @@ verification path, since mixed-order keys verify by design.
 
 Run the strict-Ed25519 corpus (`priv/conformance/strict-ed25519`, `bap-strict-ed25519/1`) beside
 the existing corpora and pin its index SHA-256
-`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c` at load. Each case names its
+`732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9` at load. Each case names its
 surface, the requirement it isolates (`rule`), and, for signed artifacts, the major it targets.
 The `primitive`, `key-acceptance`, and `differential` families exercise the rule directly; the
 other families carry the same inputs through every signed surface. The rule-S1 checks for

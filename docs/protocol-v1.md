@@ -397,8 +397,8 @@ The rule changes verdicts only from accept to reject, and only on inputs no conf
 emits: an RFC 8032 key has prime order and a canonical encoding, an honest `R` is the identity only
 with probability about `2^-252`, and an honest `S` is reduced modulo `L`. The additive
 strict-Ed25519 corpus (`priv/conformance/strict-ed25519`, profile `bap-strict-ed25519/1`,
-revision 1, 2,391 cases, certified index SHA-256
-`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`) carries the cases for these
+revision 1, 2,410 cases, certified index SHA-256
+`732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`) carries the cases for these
 requirements. Every v1 corpus case and verdict is unchanged.
 
 ## 15. Consumption chain and anchored export {#chain}
@@ -946,7 +946,7 @@ The Elixir bindings map the tagged algebra as: `:null`, `{:boolean, b}`, `{:inte
 `BoundedAuthorityProtocol.Ed25519` (`verify_strict/3`, `acceptable_public_key?/1`, and
 `torsion_free?/1`). Companion artifacts: the conformance corpus (283 cases over 28 surfaces,
 certified index digest and monotone revision integer in its `revision.json` sidecar), the additive
-strict-Ed25519 corpus (2,391 cases, (#strict-ed25519)), the
+strict-Ed25519 corpus (2,410 cases, (#strict-ed25519)), the
 structural JSON Schemas (Draft 2020-12), the requirement-to-conformance map (REQ1-* to corpus
 cells), the registries document, and the standards-track charter. The corpus is the
 machine-checked oracle; requirement identifiers and their evidence cells are enumerated in

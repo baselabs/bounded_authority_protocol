@@ -54,8 +54,8 @@ Each SDK also implements the strict-Ed25519 rule S1
 ([ADR 0040](../docs/adr/0040-strict-ed25519-soundness-erratum.md)) at its single Ed25519 choke
 point, with the three helpers `verify_strict`, `acceptable_public_key` and `torsion_free` in the
 language's idiom, and runs the additive strict-Ed25519 corpus (`bap-strict-ed25519/1`,
-[`priv/conformance/strict-ed25519`](../priv/conformance/strict-ed25519/), 2,391 cases in 14 families,
-index SHA-256 `0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`). Python reads it
+[`priv/conformance/strict-ed25519`](../priv/conformance/strict-ed25519/), 2,410 cases in 14 families,
+index SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`). Python reads it
 in place; Go and Rust carry byte-identical snapshots under `conformance/corpus-strict/`. Its 12
 "Taming the many EdDSAs" vectors come from
 [ed25519-speccheck](https://github.com/novifinancial/ed25519-speccheck) (Apache-2.0), attributed in

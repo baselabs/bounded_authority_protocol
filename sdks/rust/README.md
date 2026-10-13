@@ -90,7 +90,7 @@ comparison, never on the verify path). `jwk_encode_public`, `thumbprint_preimage
 `thumbprint_raw` and `public_key_thumbprint_raw` are now fallible (`Result`), and every key function plus
 `jwk_decode_public` returns `Err(Invalid)` for a key that fails acceptance. The additive strict corpus is
 vendored byte-identically at `conformance/corpus-strict/` (index SHA-256
-`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`, 2391 cases) and runs with
+`732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`, 2410 cases) and runs with
 `cargo test --test conformance_strict`.
 
 ## The public façade

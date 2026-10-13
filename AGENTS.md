@@ -32,7 +32,7 @@ The source version is 0.8.0, the strict Ed25519 verification soundness repair
 point encodings, no small-order key or `R`, `S < L`, the cofactorless equation) on every Ed25519
 surface, owned by the public `BoundedAuthorityProtocol.Ed25519` (`verify_strict/3`,
 `acceptable_public_key?/1`, `torsion_free?/1`), with the additive certified strict-Ed25519 corpus
-(`priv/conformance/strict-ed25519`, `bap-strict-ed25519/1`, 2,391 cases) and the
+(`priv/conformance/strict-ed25519`, `bap-strict-ed25519/1`, 2,410 cases) and the
 soundness-repair governance class. Its publication with the security advisory, the registry
 read-back, and the post-disclosure ratification window are open. The
 latest Hex release is 0.7.0, tagged `v0.7.0` (the content-assertion release,
@@ -106,7 +106,7 @@ transport-composed) under [`docs/adr/`](docs/adr/). BAP-19's source identity is 
 `v0.3.0`; the registry publication and checksum read-back closed 2026-08-31, and downstream
 immutable-package adoption is tracked in the private runtime.
 
-The companion signer `bounded_authority_report_adapter` 0.9.0 signs this profile over 0.7.0
+The companion signer `bounded_authority_report_adapter` 0.10.0 signs this profile over BAP 0.8.0
 (`sign_content_assertion/3`). Each consumer's acceptance is tracked by that consumer.
 
 ## Critical rules

@@ -55,4 +55,15 @@ defmodule BoundedAuthorityProtocol.V1.JwkTest do
                %{}
              )
   end
+
+  test "the unchecked thumbprint digest refuses anything but 32 bytes" do
+    # Positive control: the 32-byte RFC 8032 key digests to the RFC 7638 thumbprint.
+    {:ok, public_key} = Jwk.decode_public(@jwk, %{})
+    assert {:ok, digest} = Jwk.thumbprint_digest_unchecked(public_key)
+    assert Base.url_encode64(digest, padding: false) == @thumbprint
+
+    for input <- [<<>>, :binary.copy(<<1>>, 31), :binary.copy(<<1>>, 33), nil, 32] do
+      assert {:error, :invalid} = Jwk.thumbprint_digest_unchecked(input)
+    end
+  end
 end

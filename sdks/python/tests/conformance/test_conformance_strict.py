@@ -24,4 +24,4 @@ def test_strict_ed25519_corpus_all_cases_agree():
     assert result["fail"] == 0, (
         f"{result['fail']}/{result['total']} strict cases disagreed: {result['failures'][:10]}"
     )
-    assert result["pass"] == result["total"] == run.TOTAL_CASES == 2391
+    assert result["pass"] == result["total"] == run.TOTAL_CASES == 2410

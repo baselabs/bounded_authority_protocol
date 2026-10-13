@@ -168,5 +168,5 @@ The first three checks run before any backend call; any failure returns the sing
 The host torsion-free requirement of [bap-v1.md § 14.1](bap-v1.md#strict-ed25519) applies to keys
 used with v2 artifacts unchanged. The cases live in the additive strict-Ed25519 corpus
 (`priv/conformance/strict-ed25519`, profile `bap-strict-ed25519/1`, revision 1, certified index
-SHA-256 `0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`), whose v2 cases carry
+SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`), whose v2 cases carry
 `major: 2`. The v2 corpus above, its index, and its verdicts are unchanged.

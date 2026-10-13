@@ -37,7 +37,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   # The major-3 pin stays the closing entry: scripts/regen_corpus_digests.exs locates each
   # contract-major pin by its exact single-line shape.
   @certified_index_sha256 %{
-    :strict_ed25519 => "DPrmBwY4fIQ2c1_QKCw7e-0nAQX27FfmVM8czzyAGAw",
+    :strict_ed25519 => "cyEX3-GIG1U5mBJqlSSpW_sRcSV-OI1UMKCgmfIofLk",
     1 => "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs",
     2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A",
     3 => "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw"

@@ -25,8 +25,8 @@ release; see the security advisory for affected versions and details.
   `torsion_free?/1` at key enrollment, at trust install, and before any deny-list or revocation
   comparison (`REQ1-HOST-ed25519-torsion-free`).
 - The additive strict-Ed25519 conformance corpus `bap-strict-ed25519/1`, revision 1, at
-  `priv/conformance/strict-ed25519` (2,391 cases in 14 families; index SHA-256
-  `0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`). Its verdicts come from an
+  `priv/conformance/strict-ed25519` (2,410 cases in 14 families; index SHA-256
+  `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`). Its verdicts come from an
   independent arithmetic generator. It includes the 12 published "Taming the many EdDSAs" test
   vectors (Apache-2.0, attributed in `NOTICE`), named small-order-key vectors for both contract
   majors, and a JCS UTF-8 boundary family. The verifier CLI

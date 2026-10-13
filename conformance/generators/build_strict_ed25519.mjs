@@ -693,13 +693,13 @@ function v1Class(verdict) {
   return verdict.reason.startsWith("a-") || verdict.kind === "key" ? "invalid_key" : "invalid_encoding";
 }
 
-function v1Case({ id, family, major, surface, input, verdict, validExpected, construction, note }) {
+function v1Case({ id, family, major, surface, input, verdict, validExpected, construction, note, caseClass }) {
   const c = {
     id,
     rule: verdict.rule,
     major,
     surface,
-    class: v1Class(verdict),
+    class: caseClass ?? v1Class(verdict),
     input,
     expected: verdict.valid ? { ...validExpected, verdict: "valid" } : { verdict: "invalid" },
     construction,
@@ -757,7 +757,69 @@ function familyGrant(major) {
       note: scenario.note,
     });
   }
+  for (const c of bomGrantCases(major)) cases.push(c);
   return cases;
+}
+
+// ---- BOM parity (independent review finding F1) -------------------------------------------------
+// A leading U+FEFF inside a JSON string value or member name is ordinary string content: no
+// conforming decoder strips it (REQ1-JSON-no-normalization). These grants are honestly signed (the
+// generator asserts the Ed25519 layer accepts them), so their only defect is the BOM-prefixed
+// value or name; a decoder that strips a leading U+FEFF would accept them.
+
+const BOM = "\uFEFF";
+const NO_NORMALIZATION_RULE = "REQ1-JSON-no-normalization";
+
+const BOM_GRANT_VARIANTS = [
+  ["header-alg", (h) => ({ ...h, alg: BOM + h.alg }), (p) => p, "invalid_algorithm"],
+  ["header-typ", (h) => ({ ...h, typ: BOM + h.typ }), (p) => p, "invalid_claim"],
+  ["header-kid", (h) => ({ ...h, kid: BOM + h.kid }), (p) => p, "invalid_claim"],
+  ["payload-iss", (h) => h, (p) => ({ ...p, iss: BOM + p.iss }), "invalid_claim"],
+  ["payload-jti", (h) => h, (p) => ({ ...p, jti: BOM + p.jti }), "invalid_claim"],
+  [
+    "payload-operation-name",
+    (h) => h,
+    (p) => ({ ...p, operations: [{ ...p.operations[0], name: BOM + p.operations[0].name }, ...p.operations.slice(1)] }),
+    "invalid_claim",
+  ],
+  [
+    "member-name-v",
+    (h) => h,
+    (p) => {
+      const { v, ...rest } = p;
+      return { ...rest, [BOM + "v"]: v };
+    },
+    "invalid_claim",
+  ],
+];
+
+function bomGrantCases(major) {
+  const t = templateCase(...TEMPLATES.grant[major]);
+  const { header, payload } = splitCompact(t.input.compact, `grant v${major}`);
+  const issuer = honestSigner(honestKey("issuer"));
+  return BOM_GRANT_VARIANTS.map(([label, mapHeader, mapPayload, caseClass]) => {
+    const ctx = `grant-verify v${major} bom ${label}`;
+    const record = newRecord();
+    record.keys.push({ role: "issuer", publicKey: issuer.publicKey });
+    const h = mapHeader(header);
+    const p = mapPayload(payload);
+    if (!(canonical(h) + canonical(p)).includes(BOM)) fail(`${ctx}: no BOM placed`);
+    const compact = signJws(record, "issuer", h, p, issuer);
+    if (!evaluate(record, major, ctx).valid) fail(`${ctx}: the Ed25519 layer must accept the honest signature`);
+    const c = [];
+    v1Case({
+      id: `grant-verify-v${major}-bom-${label}`,
+      family: c,
+      major,
+      surface: "verify_grant",
+      input: { ...t.input, compact, public_key: b64u(issuer.publicKey) },
+      verdict: { valid: false, rule: NO_NORMALIZATION_RULE, reason: "bom", kind: "json" },
+      validExpected: {},
+      construction: construction("issuer", issuer.keyLabel, `honest/leading-u+feff-${label}`),
+      caseClass,
+    });
+    return c[0];
+  });
 }
 
 // ---- e2e: envelope (issuer key and holder JWK) -------------------------------------------------
@@ -1551,7 +1613,7 @@ const JCS_INVALID = [
 ];
 
 function familyJcs() {
-  const out = { encode: [], digest: [], envelope: [], invalid: [] };
+  const out = { encode: [], digest: [], envelope: [], invalid: [], bom: [] };
   const builders = { 1: envelopeBuilder(1), 2: envelopeBuilder(2) };
   const cp = (n) => `u${n.toString(16).toUpperCase().padStart(4, "0")}`;
   const valid = () => ({ valid: true, rule: jcsRule(), reason: "valid" });
@@ -1585,6 +1647,33 @@ function familyJcs() {
         verdict: valid(),
         validExpected: r.validExpected,
         construction: { key: "honest:issuer/honest:holder", position: "cast_arguments", signature: "honest" },
+      });
+    }
+  }
+  // A leading U+FEFF in a string value and in a member name is preserved byte for byte.
+  {
+    const preserved = () => ({ valid: true, rule: NO_NORMALIZATION_RULE, reason: "valid" });
+    const meta = { key: "none", position: "string", signature: "none" };
+    const valueText = canonical({ value: BOM + "value" });
+    const nameText = canonical({ [BOM + "name"]: "value" });
+    const bothValue = { [BOM + "name"]: BOM + "value" };
+    const bothText = canonical(bothValue);
+    for (const text of [valueText, nameText, bothText]) {
+      if (!Buffer.from(text, "utf8").includes(Buffer.from([0xef, 0xbb, 0xbf]))) fail("bom: EF BB BF missing");
+    }
+    v1Case({ id: "jcs-utf8-bom-encode-string-value", family: out.bom, major: 1, surface: "jcs.encode", input: { text: valueText }, verdict: preserved(), validExpected: { encoded: valueText }, construction: meta });
+    v1Case({ id: "jcs-utf8-bom-encode-member-name", family: out.bom, major: 1, surface: "jcs.encode", input: { text: nameText }, verdict: preserved(), validExpected: { encoded: nameText }, construction: meta });
+    v1Case({ id: "jcs-utf8-bom-decode-member-name-and-value", family: out.bom, major: 1, surface: "json.decode", input: { text: bothText }, verdict: preserved(), validExpected: { value: bothValue }, construction: meta });
+    for (const major of [1, 2]) {
+      v1Case({
+        id: `jcs-utf8-bom-request-digest-v${major}`,
+        family: out.bom,
+        major,
+        surface: "request_digest",
+        input: { cast_arguments: bothValue, operation: "read" },
+        verdict: preserved(),
+        validExpected: { digest: requestDigest(major, "read", bothValue) },
+        construction: { key: "none", position: "cast_arguments", signature: "none" },
       });
     }
   }
@@ -1737,7 +1826,7 @@ function profileDoc(ruleIds) {
       role_attestation: "role_attestation: compact, decode, verify, attestor, subject, now (the profile.json fields inlined per case)",
       content_assertion: "content_assertion: class, compact, expected {decode, verify}, attestor, expected_context (the profile.json expected block)",
     },
-    class_mapping: "v1-shaped cases: A-side and key-acceptance rejects are invalid_key; R, S and equation rejects are invalid_encoding; UTF-8 rejects are invalid_encoding",
+    class_mapping: "v1-shaped cases: A-side and key-acceptance rejects are invalid_key; R, S and equation rejects are invalid_encoding; UTF-8 rejects are invalid_encoding; grants with a leading U+FEFF are invalid_algorithm (in alg) or invalid_claim (any other header value, payload value or member name)",
     families: ["anchored-export", "boundary-anchor", "ca1", "differential", "envelope", "grant-verify", "jcs-utf8", "jwk", "key-acceptance", "key-transition", "loopback", "primitive", "ra1", "taming"],
     format: "bounded-authority-protocol-strict-ed25519-conformance-profile",
     profile: PROFILE,
@@ -1775,6 +1864,7 @@ function buildCorpus() {
   emit(files, "jcs-utf8", "request-digest", jcs.digest);
   emit(files, "jcs-utf8", "envelope", jcs.envelope);
   emit(files, "jcs-utf8", "invalid-sequences", jcs.invalid);
+  emit(files, "jcs-utf8", "bom-preservation", jcs.bom);
   emit(files, "differential", "differential", familyDifferential());
   const ka = familyKeyAcceptance();
   emit(files, "key-acceptance", "acceptable-public-key", ka.acceptable);

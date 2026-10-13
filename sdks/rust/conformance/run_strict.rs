@@ -27,9 +27,9 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const CERTIFIED_INDEX_SHA: &str =
-    "0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c";
+    "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9";
 const PROFILE: &str = "bap-strict-ed25519/1";
-const TOTAL_CASES: usize = 2391;
+const TOTAL_CASES: usize = 2410;
 
 fn corpus_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

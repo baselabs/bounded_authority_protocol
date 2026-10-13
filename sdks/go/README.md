@@ -76,7 +76,7 @@ deny-list comparison, never on the verify path; pure `math/big` in `ed25519_poin
 dependency-free). `JwkDecodePublic`, `JwkEncodePublic`, `JwkThumbprintPreimage`, `JwkThumbprint`,
 `JwkThumbprintRaw` and `PublicKeyThumbprintRaw` return `ErrInvalid` for a key that fails acceptance.
 The additive strict corpus is vendored byte-identically at `conformance/corpus-strict/` (index SHA-256
-`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`, 2391 cases) and runs with
+`732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`, 2410 cases) and runs with
 `go test ./conformance/ -run TestStrictEd25519Corpus`; `FuzzEd25519Gate` fuzzes the byte-level gate against an
 arithmetic reference.
 

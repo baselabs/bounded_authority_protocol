@@ -59,7 +59,7 @@ enrollment, trust install and deny-list comparison, never on the verify path). K
 JWK encode and decode, `jwk_from_public_key`, `public_key_thumbprint_raw`, `thumbprint`,
 `thumbprint_raw` and `thumbprint_preimage`: each returns the closed invalid value for a key that fails it.
 The additive strict corpus (`priv/conformance/strict-ed25519/`, index SHA-256
-`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`, 2391 cases) is run with
+`732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`, 2410 cases) is run with
 `python tests/conformance/run_strict.py`.
 
 Permissiveness is invisible to corpus agreement by construction, so each parser-layer closure is

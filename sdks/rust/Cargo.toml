@@ -63,7 +63,7 @@ name = "conformance_v3"
 path = "conformance/run_v3.rs"
 
 # The strict-Ed25519 conformance runner: the acceptance gate over the vendored additive
-# 2391-case corpus-strict snapshot (profile bap-strict-ed25519/1; same SHA-bind discipline as the
+# 2410-case corpus-strict snapshot (profile bap-strict-ed25519/1; same SHA-bind discipline as the
 # v1/v2/v3 runners, against the public façades, the strict helpers and the JWK family).
 [[test]]
 name = "conformance_strict"

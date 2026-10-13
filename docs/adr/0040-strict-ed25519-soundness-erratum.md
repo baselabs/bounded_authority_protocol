@@ -193,12 +193,12 @@ generators use a separate hash-only path that never feeds verification.
 ### 9. Corpus
 
 The new cases live in a new additive corpus, profile `bap-strict-ed25519/1`, revision 1, at
-`priv/conformance/strict-ed25519`: 2,391 cases in 14 families (primitive, key acceptance, grant
+`priv/conformance/strict-ed25519`: 2,410 cases in 14 families (primitive, key acceptance, grant
 verification, envelope, loopback, boundary anchor, key transition, anchored export, JWK,
 role attestation, content assertion, a 1,024-case cross-language differential set, the 12
 published vectors of the "Taming the many EdDSAs" test suite, and a JCS UTF-8 boundary family).
 Its certified index SHA-256 is
-`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`, pinned in the verifier CLI,
+`732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`, pinned in the verifier CLI,
 the reference test, and every SDK runner.
 
 - Expected verdicts come from pure arithmetic in an independent generator (strict decoding, an

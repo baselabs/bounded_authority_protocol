@@ -18,7 +18,7 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519CorpusTest do
   @moduletag timeout: 300_000
 
   @root Path.expand("../../priv/conformance/strict-ed25519", __DIR__)
-  @index_sha256 "0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c"
+  @index_sha256 "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
 
   @families %{
     "anchored-export" => 16,
@@ -26,8 +26,8 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519CorpusTest do
     "ca1" => 31,
     "differential" => 1024,
     "envelope" => 122,
-    "grant-verify" => 62,
-    "jcs-utf8" => 82,
+    "grant-verify" => 76,
+    "jcs-utf8" => 87,
     "jwk" => 360,
     "key-acceptance" => 158,
     "key-transition" => 164,
@@ -78,9 +78,9 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519CorpusTest do
   } do
     assert corpus.major == :strict_ed25519
     assert sha256(corpus.index_bytes) == @index_sha256
-    assert corpus.index["total_cases"] == 2391
+    assert corpus.index["total_cases"] == 2410
     assert corpus.index["families"] == @families
-    assert length(results) == 2391
+    assert length(results) == 2410
 
     observed = Enum.frequencies_by(results, & &1.family)
     assert observed == @families
@@ -101,7 +101,7 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519CorpusTest do
   test "the report agrees on every case", %{corpus: corpus} do
     results = Runner.run(corpus)
     report = Report.build(corpus, results)
-    assert %Report{agreement: true, exit_status: 0, total: 2391, disagreed: 0} = report
+    assert %Report{agreement: true, exit_status: 0, total: 2410, disagreed: 0} = report
 
     assert {:ok, bytes} = Report.to_bytes(corpus, results)
     assert bytes =~ ~s("format":"bounded-authority-protocol-strict-ed25519-conformance-report")
@@ -140,7 +140,7 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519CorpusTest do
     drifted =
       String.replace(
         Map.fetch!(map, "index.json"),
-        ~s("total_cases":2391),
+        ~s("total_cases":2410),
         ~s("total_cases":2300)
       )
 
@@ -162,7 +162,7 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519CorpusTest do
 
     results = Runner.run(%{corpus | cases: flipped})
     all = Enum.flat_map(results, &elem(&1, 1))
-    assert length(all) == 2391
+    assert length(all) == 2410
     assert Enum.all?(all, &(&1.agree == false))
   end
 

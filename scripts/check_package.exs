@@ -341,6 +341,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "priv/conformance/strict-ed25519/cases/envelope/envelope-04.json",
                     "priv/conformance/strict-ed25519/cases/grant-verify/grant-verify-01.json",
                     "priv/conformance/strict-ed25519/cases/grant-verify/grant-verify-02.json",
+                    "priv/conformance/strict-ed25519/cases/jcs-utf8/bom-preservation.json",
                     "priv/conformance/strict-ed25519/cases/jcs-utf8/envelope.json",
                     "priv/conformance/strict-ed25519/cases/jcs-utf8/invalid-sequences.json",
                     "priv/conformance/strict-ed25519/cases/jcs-utf8/jcs-encode.json",

@@ -18,7 +18,7 @@ contract-major ids (`REQ1-SIGNING-ed25519-canonical-point`,
 `REQ1-SIGNING-ed25519-cofactorless`, `REQ1-KEY-ed25519-acceptable`) and are traced in the
 [requirement map](requirement-map.md). Their cases for this profile are the 31 cases of the
 `ca1` family in the additive strict-Ed25519 corpus (`priv/conformance/strict-ed25519`, index
-SHA-256 `0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`). This profile's own
+SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`). This profile's own
 corpus, index, and verdicts are unchanged.
 
 OBSERVED local checks against this corpus: the Elixir corpus consumer, Python

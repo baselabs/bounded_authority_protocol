@@ -190,8 +190,8 @@ rejection:
 mix content_assertion.verify
 ```
 
-The strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1: 2,391 cases in 14 families; index
-SHA-256 `0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c`) lives under
+The strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1: 2,410 cases in 14 families; index
+SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`) lives under
 `priv/conformance/strict-ed25519`. It is additive: it carries the cases of the strict Ed25519
 rule (ADR 0040) for every Ed25519 surface, a 1,024-case cross-language differential set, and the
 12 published "Taming the many EdDSAs" vectors, while every existing corpus and verdict above stays
@@ -214,7 +214,7 @@ conformance corpora recomputed from scratch, asserts each corpus index digest at
 every parser-layer closure red-capable via a per-language mutation gate; the profile corpora
 (local-loopback 36 URI + 8 proof, role-attestation 40, content-assertion 131 + 9 + 14) run in
 the Elixir suite and the three in-repo SDKs, and the graduated TypeScript repository also runs the
-role-attestation and content-assertion corpora. The strict-Ed25519 corpus (2,391 cases) runs in
+role-attestation and content-assertion corpora. The strict-Ed25519 corpus (2,410 cases) runs in
 the Elixir suite and the three in-repo SDKs, each of which implements the strict rule at its
 single Ed25519 verification point. Each
 SDK graduates to its own repository on first publication.

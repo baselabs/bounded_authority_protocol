@@ -90,7 +90,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
   # --- strict-Ed25519 corpus (ADR 0040) -------------------------------------
 
   @strict_corpus Path.join(@root, "priv/conformance/strict-ed25519")
-  @strict_index_sha256 "0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c"
+  @strict_index_sha256 "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
   @independent_runners [
     "conformance/corpus_independent.mjs",
     "conformance/grant_proof_independent.mjs",
@@ -104,7 +104,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
     # differential, taming and major-1 case, and counts the major-2 and sibling-profile cases as
     # not covered (never as agreement).
     assert output =~
-             "corpus_independent: strict agreed=2006 disagreed=0 total=2391 not_covered=385"
+             "corpus_independent: strict agreed=2017 disagreed=0 total=2410 not_covered=393"
 
     assert output =~ "index_sha256=#{@strict_index_sha256}"
   end
@@ -120,7 +120,11 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
     path = Path.join(dir, "cases/taming/speccheck.json")
     bytes = File.read!(path)
     [{offset, _}] = :binary.matches(bytes, ~s("taming-speccheck-00"))
-    <<head::binary-size(offset + 1), byte, rest::binary>> = bytes
+    # Flip one bit of the first byte of the case id (just past its opening quote).
+    index = offset + 1
+    head = binary_part(bytes, 0, index)
+    byte = :binary.at(bytes, index)
+    rest = binary_part(bytes, index + 1, byte_size(bytes) - index - 1)
     File.write!(path, <<head::binary, Bitwise.bxor(byte, 1), rest::binary>>)
 
     {output, 1} = run_node(["--strict", dir])

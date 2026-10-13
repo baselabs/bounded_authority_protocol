@@ -113,7 +113,7 @@ could detect nothing — the sidecar's monotone integer replaced it). See § Mai
 ## KEY — Ed25519 public-key acceptance (`ed25519.acceptable_public_key`, jwk surfaces, producers)
 
 The strict-Ed25519 rows above and below cite the additive strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1), certified index SHA-256
-`0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c` (2,391 cases;
+`732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9` (2,410 cases;
 [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)). In these rows `populated` means at
 least one executed case in that corpus; the v1 corpus and its cells are unchanged.
 

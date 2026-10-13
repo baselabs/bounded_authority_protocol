@@ -49,9 +49,9 @@ from bounded_authority_verifier.json_alg import str_utf8  # noqa: E402
 
 CORPUS_DIR = _REPO_ROOT / "priv" / "conformance" / "strict-ed25519"
 # The certified index.json SHA-256 (ADR 0014 D4). A mismatched corpus fails closed.
-CERTIFIED_INDEX_SHA = "0cfae60706387c8436735fd0282c3b7bed270105f6ec57e654cf1ccf3c80180c"
+CERTIFIED_INDEX_SHA = "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
 PROFILE = "bap-strict-ed25519/1"
-TOTAL_CASES = 2391
+TOTAL_CASES = 2410
 
 
 def abort(msg: str) -> NoReturn:
