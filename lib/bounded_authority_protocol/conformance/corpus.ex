@@ -100,6 +100,14 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   @strict_revision_format "bounded-authority-protocol-strict-ed25519-conformance-corpus-revision"
   @strict_sidecars ["profile.json", "revision.json"]
 
+  # One clause per sidecar: `in` over a list of binaries compiles to :lists.member/2 on
+  # Elixir before 1.20, which the compiled-purity gate does not admit.
+  for sidecar <- @strict_sidecars do
+    defp strict_sidecar?(unquote(sidecar)), do: true
+  end
+
+  defp strict_sidecar?(_path), do: false
+
   @doc "Loads and integrity-verifies the `%{path => binary}` strict-Ed25519 corpus map."
   @spec load_strict_ed25519(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
   def load_strict_ed25519(map) when is_map(map) do
@@ -186,7 +194,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   defp load_strict_case_files(files, map) do
     loaded =
       files
-      |> Enum.reject(fn {path, _hash, _count} -> path in @strict_sidecars end)
+      |> Enum.reject(fn {path, _hash, _count} -> strict_sidecar?(path) end)
       |> Enum.map(fn {path, _hash, _count} -> {path, load_strict_case_file(path, map)} end)
 
     if Enum.all?(loaded, &match?({_path, {:ok, _cases}}, &1)),
@@ -219,7 +227,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
 
     files_agree? =
       Enum.all?(files, fn {path, _hash, count} ->
-        if path in @strict_sidecars, do: count == 0, else: Map.get(per_file, path) == count
+        if strict_sidecar?(path), do: count == 0, else: Map.get(per_file, path) == count
       end)
 
     per_family =

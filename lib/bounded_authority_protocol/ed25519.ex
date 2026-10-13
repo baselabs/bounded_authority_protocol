@@ -132,7 +132,13 @@ defmodule BoundedAuthorityProtocol.Ed25519 do
   defp nonzero_x?(@p_minus_one), do: false
   defp nonzero_x?(_y), do: true
 
-  defp small_order?(encoding), do: encoding in @small_order
+  # One clause per encoding: `in` over a list of binaries compiles to :lists.member/2 on
+  # Elixir before 1.20, which the compiled-purity gate does not admit.
+  for encoding <- @small_order do
+    defp small_order?(unquote(encoding)), do: true
+  end
+
+  defp small_order?(_encoding), do: false
 
   defp prime_order_point?({:ok, point}), do: identity?(multiply(@l, point))
   defp prime_order_point?(:error), do: false
