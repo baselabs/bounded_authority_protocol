@@ -21,6 +21,12 @@ any existing certified corpus changes.
 - `spec/bap-v1.md` § 14.1 (and its `docs/protocol-v1.md` view) counted "up to eight distinct
   mixed-order encodings" of one key. The eight encodings are the prime-order key and up to seven
   mixed-order variants. Erratum 4, editorial; no requirement, verdict, or corpus changes.
+- The contract-major specifications wrote section anchors as kramdown `{#id}` heading attributes,
+  which HexDocs and GitHub print literally, so links such as `spec/bap-v1.md#strict-ed25519`
+  went nowhere. Each anchor is now an explicit `<a id>` element with the same id, and the
+  `spec/bap-v1.md` cross-references are Markdown links. Erratum 5, editorial; no heading wording,
+  requirement, verdict, or corpus changes. `mix quality` now checks every local link and anchor
+  in the built HexDocs (`mix docs.links`).
 
 ### Added
 

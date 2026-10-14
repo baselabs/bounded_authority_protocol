@@ -17,7 +17,9 @@ optional, open, or best-effort in v2. Sections 3–6 state the v2-specific norma
 full, including the selector algebra with the two range kinds. Section 7 states the strict
 Ed25519 verification rule that revision 2 adds for v2.
 
-## 1. Suite identity and major detection {#suite}
+<a id="suite"></a>
+
+## 1. Suite identity and major detection
 
 <!-- facts:suite-identity -->
 The v2 profile's suite is `BAP2-Ed25519-SHA256`: EdDSA over Ed25519, SHA-256 digests, RFC 8785
@@ -36,7 +38,9 @@ best-effort parsing in either direction. A holder presents artifacts of one majo
 v2 proof MUST pair with a v2 grant (`REQ2-EVO-proof-major-equals-grant`); mixed-major
 credentials are invalid by construction (`REQ2-EVO-mixed-major-invalid`).
 
-## 2. Substitutions incorporated from v1 {#substitutions}
+<a id="substitutions"></a>
+
+## 2. Substitutions incorporated from v1
 
 <!-- facts:domain-separators -->
 For every v1 section not restated below, the normative v2 text is the v1 text with exactly
@@ -58,14 +62,18 @@ shared verification semantics are unchanged. The local-loopback application proo
 (`bap-application-proof/local-loopback-http/v1`) is bound to contract-major 1; it pairs with no
 v2 grant, and the v2 façade exposes no loopback functions.
 
-## 3. Hard maxima {#maxima}
+<a id="maxima"></a>
+
+## 3. Hard maxima
 
 The v2 profile inherits every v1 bound unchanged (`REQ2-BOUNDS-inherited`): the ADR 0028 §4
 review found that a range comparison consumes two decoder-bounded numbers and produces a boolean
 — it derives no new magnitude, so no new `Bounds` member is required. The complete bound set is
 the v1 §17 table, including the selector maxima restated in §5 below.
 
-## 4. Selector algebra {#selectors}
+<a id="selectors"></a>
+
+## 4. Selector algebra
 
 Selectors are closed ordered objects with exactly one of three recognized member sets:
 `{kind}`, `{kind,path,value}`, or `{kind,path,values}` … the member-set discipline is v1 §12
@@ -149,7 +157,9 @@ range-selector applicability classes, and cross-major rejection vectors. Signed 
 minted with ephemeral in-memory Ed25519 keys; no private material is tracked
 (`REQ2-CORPUS-certified-identity`).
 
-## 7. Strict Ed25519 verification {#strict-ed25519}
+<a id="strict-ed25519"></a>
+
+## 7. Strict Ed25519 verification
 
 Revision 2 incorporates erratum 2, the strict Ed25519 verification soundness repair
 ([ADR 0040](../docs/adr/0040-strict-ed25519-soundness-erratum.md)). Every Ed25519 signature a v2

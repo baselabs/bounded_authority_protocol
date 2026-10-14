@@ -166,7 +166,8 @@ The errata registry at [docs/errata.md](errata.md) is **live** — it is the ope
 no-verdict-flip governance instrument, with a numbered entry and per-entry corpus impact. It
 currently carries Erratum 1, the correction for the v1 `all` selector's three recognized member
 sets (ADR 0021); Erratum 2, the strict Ed25519 verification soundness repair (ADR 0040); Erratum 3,
-producer-surface signature canonicality; and Erratum 4, an editorial correction of the torsion
-encoding count in `spec/bap-v1.md` § 14.1. New errata follow the § Errata channel no-verdict-flip process above. *(This
+producer-surface signature canonicality; Erratum 4, an editorial correction of the torsion
+encoding count in `spec/bap-v1.md` § 14.1; and Erratum 5, editorial heading anchors and
+cross-reference links in the contract-major specifications. New errata follow the § Errata channel no-verdict-flip process above. *(This
 statement is this document's own framing of the registry's operational posture, not a charter
 extract — labeled as such.)*

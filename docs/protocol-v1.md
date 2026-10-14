@@ -8,11 +8,11 @@ single normative authority for the v1 wire profile. It is authored to be verifia
 machine extraction of its normative tables is frozen and drift-gated, and every requirement
 statement carries a stable requirement identifier mapped to conformance evidence. It makes no
 submission claim about any external venue. Revision 2 incorporates erratum 2, the strict Ed25519
-verification soundness repair of ADR 0040 ((#strict-ed25519)).
+verification soundness repair of ADR 0040 ([§ 14.1](#strict-ed25519)).
 
 A conforming implementation rejects every unlisted member, value, encoding, or extension with a
 single closed error value. Successful decode or verification is not a trust-selection or
-authorization decision: verification produces facts, never authority (see (#verification)).
+authorization decision: verification produces facts, never authority (see [§ 16](#verification)).
 
 ## 1. Introduction
 
@@ -49,7 +49,7 @@ compact value:
 : The RFC 7515 compact JWS serialization `BASE64URL(protected) "." BASE64URL(payload) "." BASE64URL(signature)`.
 
 tagged algebra:
-: The profile's abstract JSON data model (see (#datamodel)), which preserves scalar-type
+: The profile's abstract JSON data model (see [§ 7](#datamodel)), which preserves scalar-type
   distinctions that raw JSON text does not.
 
 contract-major:
@@ -89,8 +89,8 @@ evidence is published in the requirement map (Appendix C locates the companion a
 ## 5. Suite identity
 
 This profile constitutes the cryptographic suite `BAP1-Ed25519-SHA256`: EdDSA over Ed25519
-[RFC8032] [RFC8037] verified under the strict rule of (#strict-ed25519), SHA-256 digests, RFC 8785 canonical bytes [RFC8785], and the `BAP1-*`
-domain separators, with the fixed widths listed in the bounds table (#maxima). Every artifact
+[RFC8032] [RFC8037] verified under the strict rule of [§ 14.1](#strict-ed25519), SHA-256 digests, RFC 8785 canonical bytes [RFC8785], and the `BAP1-*`
+domain separators, with the fixed widths listed in the bounds table [§ 17](#maxima). Every artifact
 self-declares this identity through its `v` claim, `typ` header, `alg` value, and domain
 separators. Evolution happens above this profile, never inside it: successor contract-majors carry
 their own complete closed profiles and suites, while an ADR 0027 sibling application proof profile
@@ -119,7 +119,9 @@ an artifact of any other major, suite, or proof profile fails closed here
 These references supply generic encodings. The closed fields, values, digest prefixes, and
 bounds in the sections below are this profile's choices.
 
-## 7. Abstract data model {#datamodel}
+<a id="datamodel"></a>
+
+## 7. Abstract data model
 
 The profile's data model is a tagged JSON algebra: a closed set of typed values that preserves
 the distinctions raw JSON text does not (an integer versus an integral float; source member
@@ -156,7 +158,7 @@ Producers emit one deterministic JCS representation (`REQ1-SIGNING-deterministic
 
 The verifier validates the fixed 32-byte public-key and 64-byte signature encodings, completes
 all bounded parsing and contextual checks, and then applies the strict Ed25519 rule of
-(#strict-ed25519), whose final step, the cofactorless verification equation, the underlying
+[§ 14.1](#strict-ed25519), whose final step, the cofactorless verification equation, the underlying
 cryptographic backend computes. A backend rejection or exception after the strict gate returns
 exactly the profile's closed error value (`REQ1-SIGNING-backend-reject`).
 
@@ -186,13 +188,13 @@ payloads with the same JSON number bytes. `cast_arguments` may be any tagged JSO
 The `BAP1-*` domain separators below are the suite-identity markers of `BAP1-Ed25519-SHA256`
 (a successor suite binds its own `BAP<contract-major>-*` separators under its own major).
 `BAP1-CHAIN\0` and `BAP1-ARCHIVE\0` remain reserved for the chain and archive constructions
-of (#chain) and (#archive). The retired `BAP1-GRANT\0` and `BAP1-PROOF\0` strings are invalid
+of [§ 15](#chain) and [the anchored export framing](#archive). The retired `BAP1-GRANT\0` and `BAP1-PROOF\0` strings are invalid
 signing prefixes (`REQ1-SIGNING-retired-prefixes`).
 
 ## 8. JSON decoding and canonical serialization
 
-A conforming decoder produces the tagged algebra of (#datamodel) under the resource limits of
-(#maxima): raw and decoded sizes precede decoding; structure and scalar limits apply while
+A conforming decoder produces the tagged algebra of [§ 7](#datamodel) under the resource limits of
+[§ 17](#maxima): raw and decoded sizes precede decoding; structure and scalar limits apply while
 decoding; all precede cryptography (`REQ1-BOUNDS-ordering`).
 
 Canonical serialization emits RFC 8785 bytes from the tagged algebra only. String escaping
@@ -341,10 +343,12 @@ authority/port syntax, control/non-ASCII bytes, and out-of-range ports are inval
 
 ## 14. Signing and digest inputs
 
-See (#datamodel) for the exact signing input, the request-digest construction, the typed
+See [§ 7](#datamodel) for the exact signing input, the request-digest construction, the typed
 projection, and the `BAP1-*` domain separators.
 
-### 14.1 Strict Ed25519 verification {#strict-ed25519}
+<a id="strict-ed25519"></a>
+
+### 14.1 Strict Ed25519 verification
 
 Every Ed25519 signature this profile verifies is checked under one strict rule: grants, proofs,
 boundary anchors, key transitions, the anchors and transitions inside an anchored export, and the
@@ -402,7 +406,9 @@ revision 1, 2,410 cases, certified index SHA-256
 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`) carries the cases for these
 requirements. Every v1 corpus case and verdict is unchanged.
 
-## 15. Consumption chain and anchored export {#chain}
+<a id="chain"></a>
+
+## 15. Consumption chain and anchored export
 
 <!-- facts:archive-framing -->
 ### Consumption rows
@@ -443,7 +449,9 @@ Transition times strictly increase, fingerprints cannot cycle, the start anchor 
 transition, and the end anchor is at or after the last transition, including exactly at its
 effective time. Equal start/end times are permitted only for the no-transition same-key case.
 
-### Anchored export framing {#archive}
+<a id="archive"></a>
+
+### Anchored export framing
 
 The archive is the exact binary concatenation:
 
@@ -474,7 +482,9 @@ The archive-byte ceiling is exactly:
 20 + 8,196 + 2 × 8,196 + 256 × 8,196 + 65,536 × 4,100
 ```
 
-## 16. Public verification contract {#verification}
+<a id="verification"></a>
+
+## 16. Public verification contract
 
 The verification surfaces are: the untrusted key locator; grant and proof signing-input
 construction; compact assembly; grant and proof decode; grant verification; combined
@@ -552,7 +562,9 @@ field part of their exact public shape (`REQ1-CHAIN-facts-shape`).
 Language bindings, the frozen reference API surface, and the companion artifact locations are
 informative (Appendix C).
 
-## 17. Hard maxima {#maxima}
+<a id="maxima"></a>
+
+## 17. Hard maxima
 
 <!-- facts:bounds -->
 | Resource | Maximum |
@@ -895,7 +907,9 @@ Corpus case `check-envelope-invalid-nonce-required` (surface `check_envelope`, c
 
 
 
-# Appendix B. CDDL representation (informative) {#cddl}
+<a id="cddl"></a>
+
+# Appendix B. CDDL representation (informative)
 
 An informative CDDL summary of the wire objects is published alongside this specification. It
 is NOT a machine-checked authority: the structural authority is the set of JSON Schemas and
@@ -905,7 +919,7 @@ the conformance corpus (Appendix C). CDDL cannot express several closed-profile 
 # Appendix C. Reference mappings (informative)
 
 The tagged algebra binds to the reference implementation's values as follows (the same
-tagged-value notation the typed projection in (#datamodel) uses):
+tagged-value notation the typed projection in [§ 7](#datamodel) uses):
 
 | JSON | Elixir value |
 |---|---|
@@ -952,11 +966,11 @@ The untrusted key locator returns exactly:
 
 The Elixir bindings map the tagged algebra as: `:null`, `{:boolean, b}`, `{:integer, n}`, `{:float, f}`,
 `{:string, s}`, `{:array, [value]}`, `{:object, [{name, value}]}`; the closed error value is
-`{:error, :invalid}`. The strict Ed25519 rule of (#strict-ed25519) is exposed as
+`{:error, :invalid}`. The strict Ed25519 rule of [§ 14.1](#strict-ed25519) is exposed as
 `BoundedAuthorityProtocol.Ed25519` (`verify_strict/3`, `acceptable_public_key?/1`, and
 `torsion_free?/1`). Companion artifacts: the conformance corpus (283 cases over 28 surfaces,
 certified index digest and monotone revision integer in its `revision.json` sidecar), the additive
-strict-Ed25519 corpus (2,410 cases, (#strict-ed25519)), the
+strict-Ed25519 corpus (2,410 cases, [§ 14.1](#strict-ed25519)), the
 structural JSON Schemas (Draft 2020-12), the requirement-to-conformance map (REQ1-* to corpus
 cells), the registries document, and the standards-track charter. The corpus is the
 machine-checked oracle; requirement identifiers and their evidence cells are enumerated in

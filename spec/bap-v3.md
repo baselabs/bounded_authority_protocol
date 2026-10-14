@@ -16,7 +16,9 @@ security/privacy considerations are INCORPORATED FROM v1 BY REFERENCE with the s
 incorporated profile is optional, open, or best-effort in v3. Sections 3–7 state the
 v3-specific normative rules in full, including the ES256 signature suite.
 
-## 1. Suite identity and major detection {#suite}
+<a id="suite"></a>
+
+## 1. Suite identity and major detection
 
 <!-- facts:suite-identity -->
 The v3 profile's suite is `BAP3-ES256-SHA256`: ECDSA over the NIST P-256 curve with SHA-256
@@ -38,7 +40,9 @@ presents artifacts of one major end-to-end: a v3 proof MUST pair with a v3 grant
 (`REQ3-EVO-mixed-major-invalid`). Cross-suite evidence rules for prior-major artifacts remain
 the reserved `ba+suite-attestation` mechanism of ADR 0009; this profile activates none of it.
 
-## 2. Substitutions incorporated from v1 {#substitutions}
+<a id="substitutions"></a>
+
+## 2. Substitutions incorporated from v1
 
 <!-- facts:domain-separators -->
 For every v1 section not restated below, the normative v3 text is the v1 text with exactly
@@ -64,7 +68,9 @@ local-loopback application proof profile (`bap-application-proof/local-loopback-
 bound to contract-major 1; it pairs with no v3 grant, and the v3 façade exposes no loopback
 functions.
 
-## 3. The ES256 signature suite {#suite-rules}
+<a id="suite-rules"></a>
+
+## 3. The ES256 signature suite
 
 <!-- facts:suite-rules -->
 ### 3.1 Keys and the proof JWK
@@ -144,7 +150,9 @@ The protected headers bind the suite via `alg: "ES256"`; the member sets are v1'
 (`REQ1-HEADER-kid-bytes` incorporated) and remains an untrusted hint. The boundary-anchor and
 key-transition headers substitute `alg: "ES256"` into the v1 forms verbatim.
 
-## 4. Selector algebra {#selectors}
+<a id="selectors"></a>
+
+## 4. Selector algebra
 
 The v3 selector algebra is the v2 algebra unchanged: the closed member-set discipline with the
 FIVE kinds — the three v1 kinds `all`, `equals`, `one_of` plus the two range kinds `lte`, `gte`
@@ -154,7 +162,9 @@ interval conjunction, and the v2 path/count/verdict-internal rules
 [bap-v2.md](bap-v2.md) §4. Attenuation posture and the no-strict-kinds exclusion carry over
 unchanged.
 
-## 5. Hard maxima {#maxima}
+<a id="maxima"></a>
+
+## 5. Hard maxima
 
 <!-- facts:suite-constants -->
 Every v1 bound carries over (`REQ3-BOUNDS-inherited`) except the suite fixed widths, restated
