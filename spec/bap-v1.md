@@ -387,8 +387,9 @@ JWK encoding and decoding, and thumbprint computation) MUST be 32 bytes, canonic
 order, and on the curve, which means the RFC 8032 §5.1.3 decoding succeeds
 (`REQ1-KEY-ed25519-acceptable`). A key that fails returns the closed error value.
 
-One secret can sign under up to eight distinct mixed-order encodings of its key, each with its own
-thumbprint, and anyone can sign under the mixed-order variants of a key whose secret is public.
+One secret can sign under up to eight distinct encodings of its key, the prime-order key and up to
+seven mixed-order variants, each with its own thumbprint, and anyone can sign under the
+mixed-order variants of a key whose secret is public.
 A host MUST therefore reject any key that is not torsion-free (`[L]A = O`, in addition to key
 acceptance) at key enrollment, at trust install, and before any deny-list or revocation comparison
 (`REQ1-HOST-ed25519-torsion-free`). A canonical, torsion-free key has exactly one encoding per

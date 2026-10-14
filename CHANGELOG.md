@@ -18,6 +18,9 @@ any existing certified corpus changes.
   a high-S ES256 signature. Signers must normalize to low-S before assembly (`spec/bap-v3.md`
   § 3.2). The adapter and the TypeScript signer already do. Erratum 3. No verdict of any existing
   certified corpus changes, and the new cases are in `bap-producer-canonicality/1`.
+- `spec/bap-v1.md` § 14.1 (and its `docs/protocol-v1.md` view) counted "up to eight distinct
+  mixed-order encodings" of one key. The eight encodings are the prime-order key and up to seven
+  mixed-order variants. Erratum 4, editorial; no requirement, verdict, or corpus changes.
 
 ### Added
 
