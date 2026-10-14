@@ -3,11 +3,11 @@ defmodule BoundedAuthorityProtocol.WalkthroughTest do
   Pins the runnable code shape of the Livebook walkthrough
   (docs/livebooks/bap-walkthrough.livemd): ephemeral runtime keys, produce → assemble →
   verify → reject. The first test below evaluates every code cell of the notebook itself, in
-  order, against this package (only the `Mix.install` cell is skipped) and asserts each
-  section's result — if the notebook's code stops running or a verdict changes, this test
-  fails (a non-running livebook is worse than none). The remaining tests restate the earliest
-  sections as plain code, so a code-shape break (renamed function, changed struct field,
-  changed verdict) also reds here.
+  order, against this package (only the `Mix.install` cell is skipped) and asserts the value of
+  every cell in every numbered section, 1 through 16. If the notebook's code stops running or a
+  verdict changes, this test fails (a non-running livebook is worse than none). The remaining
+  tests restate sections 1 to 8, 11 and 12 as plain code, so a code-shape break (renamed
+  function, changed struct field, changed verdict) also reds here.
   """
 
   use ExUnit.Case, async: true
@@ -28,11 +28,83 @@ defmodule BoundedAuthorityProtocol.WalkthroughTest do
     sections = results |> Enum.map(&elem(&1, 0)) |> Enum.uniq()
     assert sections == Enum.map(1..16, &Integer.to_string/1)
 
-    # Sections 6, 8, 10 and 12 end with [{attack, rejected?}]; every attack is rejected.
-    for section <- ["6", "8", "10", "12"] do
+    # Sections 1 to 3: ephemeral keys, then the grant and proof compact values.
+    assert [%{issuer_public: <<_::binary-size(32)>>, holder_thumbprint_raw: thumbprint}] =
+             cell_values(results, "1")
+
+    assert byte_size(thumbprint) == 32
+    assert [grant_compact] = cell_values(results, "2")
+    assert [proof_compact] = cell_values(results, "3")
+    assert grant_compact == binding[:grant_compact]
+    assert proof_compact == binding[:proof_compact]
+    assert length(String.split(grant_compact, ".")) == 3
+    assert length(String.split(proof_compact, ".")) == 3
+
+    # Sections 4, 5, 7, 9 and 11: the redacted facts each section displays.
+    assert cell_values(results, "4") == [
+             %{
+               issuer: "https://issuer.example",
+               grant_id: "grant-2026-001",
+               authorization: :not_evaluated
+             }
+           ]
+
+    assert cell_values(results, "5") == [
+             %{operation: "read_record", authorization: :not_evaluated}
+           ]
+
+    assert cell_values(results, "7") == [
+             %{
+               target_uri: "http://127.0.0.1:4000/invoke",
+               operation: "read_record",
+               authorization: :not_evaluated
+             }
+           ]
+
+    assert cell_values(results, "9") == [
+             %{
+               attestor_key_id: "authority-attestor-1",
+               subject_key_id: "holder-key-1",
+               role: "issuer",
+               trust: :not_evaluated
+             }
+           ]
+
+    assert cell_values(results, "11") == [
+             %{
+               attestor_key_id: "content-attestor-1",
+               sub: "urn:example:lineage:document-1",
+               gen: 1,
+               verification: :signature_and_window,
+               trust: :not_evaluated
+             },
+             :ok
+           ]
+
+    # Sections 6, 8, 10 and 12 end with [{attack, rejected?}]; every named attack is rejected.
+    for {section, attacks} <- [
+          {"6", [:tampered_grant, :selector_disallowed, :stale_proof]},
+          {"8", [:hostname, :wrong_nonce, :standard_profile]},
+          {"10",
+           [
+             :self_attested,
+             :now_at_exp,
+             :outliving_window,
+             :attestation_through_major_one,
+             :grant_through_attestation
+           ]},
+          {"12",
+           [
+             :now_at_exp,
+             :changed_content,
+             :reversed_lineage,
+             :assertion_through_role,
+             :role_through_assertion,
+             :assertion_through_major_one
+           ]}
+        ] do
       [verdicts] = cell_values(results, section)
-      assert verdicts != []
-      assert Enum.all?(verdicts, fn {_attack, rejected?} -> rejected? == true end), section
+      assert Enum.sort(verdicts) == attacks |> Enum.map(&{&1, true}) |> Enum.sort(), section
     end
 
     # Section 13: the honest key and signature pass all three strict-Ed25519 checks.
@@ -44,6 +116,10 @@ defmodule BoundedAuthorityProtocol.WalkthroughTest do
     [forgeries, corpus_grants] = cell_values(results, "14")
 
     assert forgeries == %{
+             backend: %{
+               accepts_key_only_forgery: %{small_order_key: true, noncanonical_key: true},
+               accepts_s_plus_l: false
+             },
              primitives: %{
                small_order_key_acceptable?: false,
                noncanonical_key_acceptable?: false,
@@ -92,6 +168,11 @@ defmodule BoundedAuthorityProtocol.WalkthroughTest do
     assert binding[:noncanonical_key] == noncanonical_case.public_key
     assert noncanonical_case.signature == identity_case.signature
 
+    # The keyless part of rule S1 refuses the forgery under both keys before any backend call.
+    for key <- [binding[:small_order_key], binding[:noncanonical_key]] do
+      refute BoundedAuthorityProtocol.Ed25519.strict_gate?(binding[:key_only_forgery], key)
+    end
+
     verify_cases = primitive_cases("verify-strict.json")
     <<r::binary-size(32), honest_s::little-size(256)>> = verify_cases["honest"].signature
     <<^r::binary-size(32), shifted_s::little-size(256)>> = verify_cases["s-plus-l"].signature
@@ -109,12 +190,20 @@ defmodule BoundedAuthorityProtocol.WalkthroughTest do
     assert cell_values(results, "16") == [
              %{
                backend_accepts_high_s_twin: true,
+               same_major_decodes: %{
+                 major_one_grant: true,
+                 major_one_proof: true,
+                 major_three_grant: true,
+                 major_three_proof: true
+               },
                rejections: %{
                  high_s: @invalid,
-                 major_one_envelope_through_major_three: @invalid,
                  major_one_grant_through_major_three: @invalid,
-                 major_three_envelope_through_major_one: @invalid,
-                 major_three_envelope_through_major_two: @invalid,
+                 major_one_proof_through_major_three: @invalid,
+                 major_three_grant_through_major_one: @invalid,
+                 major_three_proof_through_major_one: @invalid,
+                 major_three_grant_through_major_two: @invalid,
+                 major_three_proof_through_major_two: @invalid,
                  wrong_holder_key: @invalid
                }
              }

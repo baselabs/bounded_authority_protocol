@@ -384,7 +384,8 @@ role_attestation_rejections = %{
       | attestor: %{expected_attestation.attestor | valid_before: now + 1_800}
     }),
   # Cross-profile, both directions:
-  attestation_through_v1: BoundedAuthorityProtocol.V1.decode_grant(attestation_compact, %{}),
+  attestation_through_major_one:
+    BoundedAuthorityProtocol.V1.decode_grant(attestation_compact, %{}),
   grant_through_attestation: RoleAttestationV1.decode_attestation(grant_compact, %{})
 }
 
@@ -509,7 +510,7 @@ content_assertion_rejections = %{
   # Cross-profile, both directions:
   assertion_through_role: RoleAttestationV1.decode_attestation(assertion_compact, %{}),
   role_through_assertion: ContentAssertionV1.decode_assertion(attestation_compact, %{}),
-  assertion_through_v1: BoundedAuthorityProtocol.V1.decode_grant(assertion_compact, %{})
+  assertion_through_major_one: BoundedAuthorityProtocol.V1.decode_grant(assertion_compact, %{})
 }
 
 Enum.map(content_assertion_rejections, fn {k, v} -> {k, v == {:error, :invalid}} end)
@@ -525,9 +526,9 @@ caller (`spec/bap-content-assertion-v1.md` §7).
 Since release 0.8.0, every Ed25519 signature the protocol verifies is checked under one strict
 rule, rule S1 (ADR 0040, `spec/bap-v1.md` §14.1). Before any backend call, the public key `A`
 and the signature's point `R` must be canonical encodings (the encoded `y` is below
-`p = 2^255 - 19`) and must not be one of the eight points of small order, and the scalar `S`
-must be below `L`, the prime order of the base point `B`. Only then does the cofactorless
-equation `encode([S]B - [k]A) == R` run, compared byte for byte.
+`p = 2^255 - 19`, and the sign bit is clear when `x = 0`) and must not be one of the eight points
+of small order, and the scalar `S` must be below `L`, the prime order of the base point `B`.
+Only then does the cofactorless equation `encode([S]B - [k]A) == R` run, compared byte for byte.
 
 `BoundedAuthorityProtocol.Ed25519` owns the rule:
 
@@ -551,23 +552,27 @@ alias BoundedAuthorityProtocol.Ed25519
 ## 14. Forged Ed25519 keys and signatures fail closed
 
 The byte values below come from the certified strict-Ed25519 corpus that ships inside the
-package (`priv/conformance/strict-ed25519`, profile `bap-strict-ed25519/1`). Corpus case
-`key-only-v1-identity-a-basepoint-r-s1` is a forgery that needs no secret: `R` is the base point
-`B` and `S = 1`. Under a key that encodes the identity point, `[k]A` is the identity, so
+package (`priv/conformance/strict-ed25519`, profile `bap-strict-ed25519/1`). Corpus cases
+`key-only-v1-identity-a-basepoint-r-s1-*` carry a forgery that needs no secret: `R` is the base
+point `B` and `S = 1`. Under a key that encodes the identity point, `[k]A` is the identity, so
 `[1]B - [k]A = B = R` for every message, and the corpus records that the bare cofactorless
 equation accepts it. We attach that signature to our own grant from section 2 and trust two
 encodings of the identity point: the canonical one, which is of small order, and `y = p + 1`,
-which is not canonical (corpus case `key-only-v1-y-p-plus-1-prime-r`).
+which is not canonical (corpus cases `key-only-v1-y-p-plus-1-prime-r-*`, same signature). The
+`:crypto` backend alone accepts the forgery under both keys. `verify_grant` refuses both keys at
+trusted-issuer validation, before it looks at the signature, because neither passes
+`acceptable_public_key?/1`; `verify_strict/3` refuses the signature under each key too.
 
 The third attack adds `L` to the `S` of the honest holder signature from section 3 (corpus
-construction `s-plus-l`). Both scalars give the same point, `[S + L]B = [S]B`, so only the range
-check tells them apart.
+construction `s-plus-l`). Both scalars give the same point, `[S + L]B = [S]B`, so only a range
+check tells them apart. The backend enforces `S < L` as well (RFC 8032 §5.1.7), so this one is
+refused twice: by rule S1 before the backend call, and by the backend.
 
 ```elixir
 # The prime order of the base point (spec/bap-v1.md §14.1, RFC 8032):
 l = 2 ** 252 + 27_742_317_777_372_353_535_851_937_790_883_648_493
 
-# Corpus case key-only-v1-identity-a-basepoint-r-s1: R = B, then S = 1 (little-endian).
+# Corpus case key-only-v1-identity-a-basepoint-r-s1-0: R = B, then S = 1 (little-endian).
 key_only_forgery =
   Base.decode16!(
     "5866666666666666666666666666666666666666666666666666666666666666" <>
@@ -581,7 +586,8 @@ small_order_key =
     case: :lower
   )
 
-# Corpus key y-p-plus-1: y = p + 1, a non-canonical encoding of the same identity point.
+# Corpus key y-p-plus-1 (case key-only-v1-y-p-plus-1-prime-r-0): y = p + 1, a non-canonical
+# encoding of the same identity point.
 noncanonical_key =
   Base.decode16!("eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
     case: :lower
@@ -598,7 +604,18 @@ s_plus_l_proof =
 
 trusting = fn public_key -> %TrustedIssuer{key_id: "issuer-1", public_key: public_key} end
 
+backend_verify = fn message, signature, public_key ->
+  :crypto.verify(:eddsa, :none, message, signature, [public_key, :ed25519])
+end
+
 %{
+  backend: %{
+    accepts_key_only_forgery: %{
+      small_order_key: backend_verify.(signing_input.message, key_only_forgery, small_order_key),
+      noncanonical_key: backend_verify.(signing_input.message, key_only_forgery, noncanonical_key)
+    },
+    accepts_s_plus_l: backend_verify.(proof_input.message, s_plus_l_signature, holder_public)
+  },
   primitives: %{
     small_order_key_acceptable?: Ed25519.acceptable_public_key?(small_order_key),
     noncanonical_key_acceptable?: Ed25519.acceptable_public_key?(noncanonical_key),
@@ -683,24 +700,24 @@ Every forgery returns the single closed error, `{:error, :invalid}`. The last ca
 rule S1 accepts on purpose. Its key is an honest key plus a small torsion component: canonical,
 not of small order, and on the curve, so it is acceptable, and its signature satisfies the
 cofactorless equation. Verification performs no subgroup check (`spec/bap-v1.md` §14.1). One
-secret can sign under up to eight such encodings of its key, each with its own thumbprint, so a
-host calls `torsion_free?/1` once per key, at enrollment, at trust install, and before any
-deny-list or revocation comparison, and refuses the key there.
+secret can sign under its honest key and up to seven torsioned variants of it, each with its own
+thumbprint. A host therefore calls `torsion_free?/1` on a key at enrollment, at trust install, and
+before any deny-list or revocation comparison, and refuses the key at each of those points.
 
 ## 15. Contract-major 3: ES256 grants and proofs
 
 Contract-major 3 (`BoundedAuthorityProtocol.V3`, released in 0.5.0, ADR 0035,
 `spec/bap-v3.md`) is the `BAP3-ES256-SHA256` suite: ECDSA over P-256 with SHA-256. Grants and
 proofs carry `v: 3` and `alg: "ES256"`, the holder key travels as an EC JWK, and a signature is
-the raw 64-byte `r || s` form of RFC 7518 §3.4 with `s` in the low half (`s <= n/2`). The v3
-producers are its own; the trusted-issuer, expected-context, and credentials structs are the
-same ones the earlier sections used.
+the raw 64-byte `r || s` form of RFC 7518 §3.4 with `s` in the low half (`s <= n/2`).
+`BoundedAuthorityProtocol.V3` has its own grant and proof producers; the trusted-issuer,
+expected-context, and credentials structs are the same ones the earlier sections used.
 
 `:crypto` returns ECDSA signatures in DER and may return either `s`, so the signer converts the
 signature to `r || s` and normalizes `s` to the low half before assembly. Release 0.9.0 adds
-`BoundedAuthorityProtocol.Es256`, the public owner of the ES256 rules, with
-`der_to_raw/1` and `normalize_low_s/1` for this step; the cell below does it by hand, so it also
-runs on releases before 0.9.0.
+`BoundedAuthorityProtocol.Es256`, a public module with the ES256 checks, including `der_to_raw/1`
+and `normalize_low_s/1` for this step; the cell below does it by hand, so it also runs on
+releases before 0.9.0.
 
 ```elixir
 alias BoundedAuthorityProtocol.V3
@@ -800,9 +817,14 @@ es_expected = %ExpectedRequest{
 
 ECDSA signatures are malleable: if `(r, s)` verifies, so does `(r, n - s)`. The v3 profile
 accepts only the low-`s` member of each pair (`REQ3-SIGNING-low-s`). Below, the backend alone
-accepts the high-S twin of the holder signature, and `check_envelope` refuses it. The other attempts
-present the v1 envelope from section 5 to the v3 verifier, the v3 envelope to the v1 and v2
-verifiers, and the v3 grant with a proof signed by a key the grant does not name.
+accepts the high-S twin of the holder signature, and `check_envelope` refuses it.
+
+Each contract-major parses only its own bytes (`REQ3-CORE-cross-major-reject`). Decoding takes no
+key, so the cross-major attempts below use `decode_grant` and `decode_proof`: the v3 decoders
+refuse the grant and proof of the v1 envelope from section 5, and the v1 and v2 decoders refuse
+the v3 grant and proof. The `same_major_decodes` entries show each set of bytes decoding under
+its own major, so the refusals come from the major check alone. The last attempt presents the v3
+grant with a proof signed by a key the grant does not name.
 
 ```elixir
 <<es_r::256, es_s::256>> = es_proof_signature
@@ -826,17 +848,29 @@ backend_accepts_high_s_twin =
 {:ok, other_proof} =
   V3.assemble_compact(other_input, es256_sign.(other_input.message, other_private))
 
+decodes? = &match?({:ok, _decoded}, &1)
+
 %{
   backend_accepts_high_s_twin: backend_accepts_high_s_twin,
+  same_major_decodes: %{
+    major_one_grant: decodes?.(BoundedAuthorityProtocol.V1.decode_grant(grant_compact, %{})),
+    major_one_proof: decodes?.(BoundedAuthorityProtocol.V1.decode_proof(proof_compact, %{})),
+    major_three_grant: decodes?.(V3.decode_grant(es_grant_compact, %{})),
+    major_three_proof: decodes?.(V3.decode_proof(es_proof_compact, %{}))
+  },
   rejections: %{
     high_s:
       V3.check_envelope(%Credentials{grant: es_grant_compact, proof: high_s_proof}, es_expected),
-    major_one_envelope_through_major_three: V3.check_envelope(credentials, expected_request),
     major_one_grant_through_major_three: V3.decode_grant(grant_compact, %{}),
-    major_three_envelope_through_major_one:
-      BoundedAuthorityProtocol.V1.check_envelope(es_credentials, es_expected),
-    major_three_envelope_through_major_two:
-      BoundedAuthorityProtocol.V2.check_envelope(es_credentials, es_expected),
+    major_one_proof_through_major_three: V3.decode_proof(proof_compact, %{}),
+    major_three_grant_through_major_one:
+      BoundedAuthorityProtocol.V1.decode_grant(es_grant_compact, %{}),
+    major_three_proof_through_major_one:
+      BoundedAuthorityProtocol.V1.decode_proof(es_proof_compact, %{}),
+    major_three_grant_through_major_two:
+      BoundedAuthorityProtocol.V2.decode_grant(es_grant_compact, %{}),
+    major_three_proof_through_major_two:
+      BoundedAuthorityProtocol.V2.decode_proof(es_proof_compact, %{}),
     wrong_holder_key:
       V3.check_envelope(%Credentials{grant: es_grant_compact, proof: other_proof}, es_expected)
   }
@@ -863,13 +897,16 @@ conforming signer never emits it.
   to its predecessor's compact digest, and returned non-authorizing facts; changed content,
   `now == exp`, a reversed lineage, and cross-profile bytes each failed closed.
 - `BoundedAuthorityProtocol.Ed25519` accepted the honest key and signature under rule S1. A
-  key-only forgery under a small-order key and under a non-canonical key, an `S + L` signature,
-  and the corpus grants for an order-8 key, `y = p`, and an identity `R` each failed closed. The
+  key-only forgery that the backend alone accepts, under a small-order key and under a
+  non-canonical key, an `S + L` signature, and the corpus grants for an order-8 key, `y = p`, and
+  an identity `R` each failed closed. The
   torsioned corpus key verified, as the rule specifies, and `torsion_free?/1` refused it for the
   host to act on at enrollment.
 - Contract-major 3 produced and verified an ES256 grant and holder proof from ephemeral P-256
-  keys and EC JWK holder binding; the high-S twin of a valid signature, v1 bytes under v3, v3
-  bytes under v1 and v2, and a proof from a key the grant does not name each failed closed.
+  keys and EC JWK holder binding. The high-S twin of a valid signature and a proof from a key
+  the grant does not name failed `check_envelope`; the v3 decoders refused the v1 grant and
+  proof, and the v1 and v2 decoders refused the v3 grant and proof, while each decoded under its
+  own major.
 
 What this notebook did NOT do: select trusted keys, reserve replay, check revocation, or make
 an authorization decision — those belong to a stateful authority runtime. See the
