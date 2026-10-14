@@ -17,9 +17,10 @@ limitations under the License.
 
 This module vendors no third-party source and has zero runtime
 dependencies: it consumes only the Go standard library (BSD-3-Clause),
-including the crypto/ed25519 and crypto/sha256 packages. The vendored
-conformance corpus snapshot under conformance/corpus/ is protocol test
-data authored in this repository.
+including the crypto/ed25519, crypto/ecdsa, crypto/elliptic,
+crypto/sha256, crypto/subtle, and math/big packages. The vendored
+conformance corpus snapshots under conformance/ are protocol test data
+authored in this repository, except the third-party vectors below.
 
 ---
 

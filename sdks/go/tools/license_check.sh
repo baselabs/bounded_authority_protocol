@@ -3,7 +3,8 @@
 #
 # AGENTS rule 10 + ADR 0014 D8: every dependency a CONSUMER inherits must
 # carry a permissive license. This module pins ZERO runtime dependencies by
-# design (stdlib crypto/ed25519 + crypto/sha256 only, BAP-16 acceptance row),
+# design (standard library only: crypto/ed25519, crypto/ecdsa, crypto/elliptic,
+# crypto/sha256, crypto/subtle, math/big, and pure parsing packages),
 # so the gate asserts the dependency closure is exactly empty — with a
 # fail-closed floor: a degraded or unparseable `go list` output can never
 # satisfy the gate, and any require line (module dependency) fails it.

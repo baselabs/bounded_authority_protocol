@@ -45,7 +45,7 @@ use crate::json::JsonValue;
 pub enum SigningKind {
     /// A grant compact (`typ: "ba+cap"`).
     Grant,
-    /// A proof compact (`typ: "ba+cap-proof"`).
+    /// A proof compact (`typ: "dpop+jwt"`).
     Proof,
     /// A byte-distinct literal-loopback HTTP proof (`typ: "ba+loopback-proof"`).
     LocalLoopbackHttpProof,

@@ -1,106 +1,119 @@
-# Rust verifier SDK — deployment guide
+# Rust verifier SDK: deployment notes
 
-The Rust verifier SDK (`sdks/rust/`, crate `bounded-authority-protocol`) is a pure, deterministic,
-fail-closed reimplementation of the frozen BAP profiles — contract-majors 1, 2, and 3 plus the
-local-loopback, role-attestation, and content-assertion sibling profiles. It is a **verifier**: it
-returns redacted, value-bearing
-facts or `Invalid`, never an authorization decision. This guide covers the two serverless/edge deployment
-targets named in the BAP-15 acceptance bar: AWS Lambda (`provided.al2023`) and PostgreSQL (`plrust`).
+The Rust verifier SDK (`sdks/rust/`, crate `bounded-authority-protocol`) is a pure,
+deterministic implementation of the BAP verification profiles: contract-majors 1, 2, and 3 plus
+the local-loopback, role-attestation, and content-assertion sibling profiles. It is a
+**verifier**: it returns redacted facts or `Invalid`, never an authorization decision. The
+[SDK README](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/rust/README.md)
+has the quickstart and the full API list.
 
-See `spec/bap-v1.md`, `spec/bap-v2.md`, and `spec/bap-v3.md` (the normative authorities;
-`docs/protocol-v1.md` is the standard profile's generated view) for the verification contract and
-[ADR 0014](../adr/0014-cross-language-verifier-sdks.md) for the
-packaging and derivation-hygiene decisions.
+## Not published yet
+
+The crate is not on crates.io. It moves to its own repository when it is first published
+([ADR 0015](../adr/0015-sdk-graduation-and-publish-topology.md)). Until then, depend on this
+repository by path or by Git commit:
+
+```toml
+[dependencies]
+bounded-authority-protocol = { path = "../bounded_authority_protocol/sdks/rust" }
+# or
+bounded-authority-protocol = { git = "https://github.com/baselabs/bounded_authority_protocol", rev = "<commit>" }
+```
+
+Pin a commit: without a published version, the commit is the identity of what you deployed.
+
+Erratum 3 (producer canonicality) is not implemented in this crate yet: its compact assembly and
+anchored-export encoding do not refuse a non-canonical signature. Verification is unaffected.
+See the SDK README.
 
 ## Local-loopback application profile
 
-The crate also exposes `local_loopback_http_uri_normalize`,
+The crate exposes `local_loopback_http_uri_normalize`,
 `local_loopback_http_proof_signing_input`, `assemble_local_loopback_http_compact`,
 `decode_local_loopback_http_proof`, and `check_local_loopback_http_envelope` for direct local
-development listeners. Select them explicitly, admit only literal `127.0.0.1`/`[::1]` HTTP targets,
-require the server nonce, and never infer or retry the standard profile.
+development listeners. Select them explicitly, admit only literal `127.0.0.1`/`[::1]` HTTP
+targets, require the server nonce, and never infer or retry the standard profile.
 
 ## Strict Ed25519 verification
 
 Every Ed25519 verification in the SDK applies rule S1 of
 [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md) at its single Ed25519 verification
 point: canonical point encodings, no small-order key or `R`, a scalar below the group order, and
-the cofactorless equation. Key import, JWK encode and decode, and thumbprint functions refuse a key
-that fails key acceptance. The SDK also exposes the host torsion-free check; call it at key
-enrollment, at trust install, and before any deny-list or revocation comparison. A vendored snapshot of the strict-Ed25519 corpus under `conformance/corpus-strict/` runs through `conformance/run_strict.rs` with its index SHA-256 pinned.
+the cofactorless equation. Key import, JWK encode and decode, and thumbprint functions refuse a
+key that fails key acceptance. Call `torsion_free` at key enrollment, at trust install, and
+before any deny-list or revocation comparison. A vendored snapshot of the strict-Ed25519 corpus
+under `conformance/corpus-strict/` runs through `conformance/run_strict.rs` with its index
+SHA-256 pinned.
 
-## Supply-chain posture
+## Supply chain
 
-Runtime dependencies (the consumer-facing closure, audited by `sdks/rust/tools/license_check.sh`):
+Runtime dependencies (`sdks/rust/tools/license_check.sh` checks the license of every crate in the runtime tree):
 
-| crate | license | role |
+| Crate | License | Role |
 |---|---|---|
-| `ed25519-dalek` 2.2 (default-features = false) | BSD-3-Clause | Ed25519 verify (serial backend) |
+| `ed25519-dalek` 2.2 (default features off) | BSD-3-Clause | Ed25519 verification |
 | `curve25519-dalek` 4.1 (transitive) | BSD-3-Clause | curve arithmetic |
-| `p256` 0.13 (default-features = false, `ecdsa`) | Apache-2.0 OR MIT | ECDSA P-256 verify — the contract-major 3 ES256 backend |
-| `zeroize` =1.8.1 (transitive of `p256`; exact-pinned for the 1.81 toolchain) | Apache-2.0 OR MIT | scrubbing plumbing |
+| `p256` 0.13 (default features off, `ecdsa`) | Apache-2.0 OR MIT | ECDSA P-256 verification for contract-major 3 |
+| `zeroize` =1.8.1 (transitive of `p256`, pinned exactly because later 1.x releases need Rust 1.85) | Apache-2.0 OR MIT | memory zeroing |
 | `sha2` 0.10 | MIT OR Apache-2.0 | SHA-256 |
 | `ryu-js` 1.0 | Apache-2.0 OR BSL-1.0 | ECMAScript float formatting (JCS) |
-| `subtle`, `digest`, `generic-array`, `typenum`, `elliptic-curve`, … | MIT / BSD-3-Clause | transitive crypto/plumbing |
+| `subtle`, `digest`, `generic-array`, `typenum`, `elliptic-curve`, `crypto-bigint`, and others | MIT, Apache-2.0, or BSD-3-Clause | transitive cryptographic support |
 
-Every runtime dependency is permissively licensed. `default-features = false` on `ed25519-dalek` selects the
-serial verify backend (no SIMD/assembly). The crate carries `#![forbid(unsafe_code)]` over **its own**
-source; the crypto backend (`curve25519-dalek`, `cpufeatures`, `libc`, `generic-array`) compiles `unsafe`
-transitively — that is the documented, reviewed trade for a vetted Ed25519 implementation.
+**Backend selection.** `default-features = false` on `ed25519-dalek` does not choose the
+`curve25519-dalek` backend. `curve25519-dalek` picks it in its build script: on 64-bit
+`x86_64` it compiles in the `simd` backend and uses AVX2 when the CPU has it, falling back to
+`serial` at run time (its AVX-512 code needs a nightly compiler); on other targets, such as
+`aarch64`, it builds only the portable `serial` backend. To compile only `serial` on `x86_64`,
+build with `RUSTFLAGS='--cfg curve25519_dalek_backend="serial"'`.
 
-## AWS Lambda — `provided.al2023`
+**Unsafe code.** `#![forbid(unsafe_code)]` covers this crate's own source only. A source scan
+of the locked dependency versions (October 14, 2026) finds `unsafe` blocks, functions, or
+impls in `curve25519-dalek`, `sha2`, `generic-array`, `cpufeatures`, `libc` (pulled in by
+`cpufeatures` on some targets), `crypto-bigint`, `subtle`, `zeroize`, `block-buffer`,
+`base16ct`, `rand_core`, and `ryu-js`. `p256`, `ecdsa`, `elliptic-curve`, `primeorder`, `sec1`,
+`der`, `ff`, `ed25519`, and `ed25519-dalek` declare `#![forbid(unsafe_code)]`. Using vetted
+cryptographic implementations is the reason for that trade.
 
-Lambda's `provided.al2023` runtime executes a static `bootstrap` binary directly. There is no
-trusted-language sandbox, so the transitive `unsafe` in the crypto backend is unproblematic here — it is
-normal native code on a normal Linux runtime.
+## AWS Lambda (`provided.al2023`)
 
-Build a fully static binary against the `musl` target and ship it as `bootstrap`:
+Lambda's `provided.al2023` runtime runs a `bootstrap` executable directly, so the transitive
+`unsafe` above is ordinary native code there. The crate is a library: build your own binary
+crate (the Lambda handler) that depends on it, then build that binary for a static `musl`
+target and ship it as `bootstrap`:
 
 ```bash
 rustup target add aarch64-unknown-linux-musl   # or x86_64-unknown-linux-musl
-cargo build --release --target aarch64-unknown-linux-musl
-# zip the renamed binary as `bootstrap` and upload as a Lambda function (arch: arm64)
+cargo build --release --target aarch64-unknown-linux-musl   # in your handler crate
+# rename the binary to `bootstrap`, zip it, and deploy it as an arm64 function
 ```
 
-A minimal handler wraps a verifier call behind whatever wire format your platform uses (the SDK itself does
-no I/O). Keep the caller-supplied trusted inputs (already-trusted public key, expected audience/instance,
-evaluation time, bounds) explicit — the SDK never discovers trust.
+This repository does not build or test a `musl` target or a Lambda handler; verify the build in
+your own pipeline. The handler wraps a verifier call in your request format (the SDK does no
+I/O) and keeps the trusted inputs explicit: the trusted public key, the expected audience, the
+evaluation time, and the bounds.
 
-## PostgreSQL — `plrust`
+## PostgreSQL (`plrust`)
 
-[`plrust`](https://plrust.io/) is a trusted-language extension that runs Rust inside PostgreSQL under a
-sandboxed, allowlisted toolchain (the plrust trusted build). **ed25519-dalek-based verification is NOT
-plrust-trusted-mode-compatible as built**: `curve25519-dalek`'s static initialization, the
-`p256`/`elliptic-curve` tree (the contract-major 3 backend), plus `generic-array`,
-`cpufeatures`, `libc`, and `ryu-js`, compile `unsafe` regardless of this crate's
-`default-features = false` / `#![forbid(unsafe_code)]` (those govern only OUR source, not the transitive
-backend). plrust's trusted-mode allowlist rejects crates that compile `unsafe`.
+[`plrust`](https://plrust.io/) runs Rust functions inside PostgreSQL. Its trusted mode restricts
+what a function's code and dependencies may do, and the transitive `unsafe` listed above may
+keep this crate from building there. This repository does not test a `plrust` build, so check
+against the documentation and dependency policy of the `plrust` version you run before relying
+on it. Two postures avoid the question:
 
-Three viable postures (choose per your PostgreSQL operator policy):
-
-1. **Verify against your plrust version's allowlist.** plrust's trusted toolchain pins an allowlist of
-   permitted crates; check whether the pinned `curve25519-dalek`/`ed25519-dalek` versions are admitted before
-   attempting a trusted build. The version matrix moves with plrust releases.
-2. **Run verification in a sidecar.** Keep PostgreSQL for storage and perform verification in a Lambda,
-   a small service, or a worker — the same static binary described above — returning the redacted facts to
-   the database layer. This keeps the crypto stack off the database host entirely.
-3. **Use plrust *untrusted* mode.** plrust can run functions in an untrusted mode with a broader crate
-   surface; verify the security implications against your database's threat model first (untrusted-mode
-   plrust is not the hardened posture trusted mode is).
-
-The SDK's purity (`#![forbid(unsafe_code)]` + the `tools/purity_check.sh` lib-path gate) is necessary but
-NOT sufficient for plrust trusted mode — the transitive backend `unsafe` is the blocker, not this crate's
-own code. The Lambda path is unaffected.
+1. **Verify outside the database.** Keep PostgreSQL for storage and verify in a service, a
+   worker, or a Lambda function (the binary above), then store the redacted facts.
+2. **Use an untrusted language mode**, if your database operator allows it. It runs the code
+   without the trusted-mode restrictions, so weigh that against your database's threat model.
 
 ## What to deploy, and what to leave to the host
 
-The SDK verifies caller-supplied bytes against caller-supplied trusted inputs and returns redacted facts.
-Deployment must keep the **private-runtime responsibilities** out of the verifier:
+The SDK verifies caller-supplied bytes against caller-supplied trusted inputs and returns
+redacted facts. Keep these out of the verifier:
 
 - trusted-key discovery and custody,
 - replay reservation and live revocation state,
 - the operational authorization decision,
-- evidence/consumption writes and archive removal.
+- evidence and consumption writes, and archive removal.
 
-A verifier result is one input to that decision; it is never the decision itself
-([`docs/design/protocol-charter.md`](../design/protocol-charter.md), AGENTS rule 1).
+A verifier result is one input to that decision, never the decision itself
+([protocol charter](../design/protocol-charter.md)).

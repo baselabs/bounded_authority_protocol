@@ -1,99 +1,108 @@
-# Bounded Authority Protocol — Cross-language verifier SDKs
+# Bounded Authority Protocol verifier SDKs
 
-Typed, provider-neutral verifier libraries that reimplement the frozen BAP verification
-profiles — contract-majors 1, 2, and 3 plus the local-loopback, role-attestation, and
-content-assertion sibling profiles — from the published specs ([v1](../spec/bap-v1.md), [v2](../spec/bap-v2.md),
-[v3](../spec/bap-v3.md)) and the published conformance corpora
-([`priv/conformance/`](../priv/conformance/)). They are **distribution
-surfaces** — typed client libraries for third-party verifiers, not additional normativity — and
-**none of the three authored here is published to a registry yet**: per
-[ADR 0015](../docs/adr/0015-sdk-graduation-and-publish-topology.md), each graduates to its own
-per-SDK repository on first publication, never from this monorepo (the `sdk-publish-guard`
-pre-commit hook and CI job reject registry-publish infrastructure here). BAP-05 already closed the
-corpus's normativity question via the independent Node runner
-([`conformance/corpus_independent.mjs`](../conformance/corpus_independent.mjs)); these SDKs let third-party
-verifiers consume the frozen v1 profile in their own language, with conformance independently verifiable
-against the same published corpus.
+Typed, provider-neutral verifier libraries for the Bounded Authority Protocol in Python, Rust,
+and Go. Each implements contract-majors 1, 2, and 3 and the local-loopback, role-attestation,
+and content-assertion sibling profiles, from the specifications ([v1](../spec/bap-v1.md),
+[v2](../spec/bap-v2.md), [v3](../spec/bap-v3.md), and the profile specifications under
+[`spec/`](../spec/)) and the certified conformance corpora under
+[`priv/conformance/`](../priv/conformance/). They are distribution surfaces for third-party
+verifiers, not additional normative text.
+
+**None of the three is published to a registry yet.** Install them from this repository by
+local path or Git commit; each README shows how. Each SDK moves to its own repository when it is
+first published, never publishing from this one
+([ADR 0015](../docs/adr/0015-sdk-graduation-and-publish-topology.md)); a pre-commit hook and a
+CI job reject registry-publish setup here.
 
 ## What is here
 
-- **[`python/`](python/)** — `bounded-authority-verifier` (PyPI). Python >= 3.10, `cryptography` for
+- **[`python/`](python/)**: `bounded-authority-verifier` (planned PyPI name; import
+  `bounded_authority_verifier`). Python 3.10 or later; one dependency, `cryptography`, for
   Ed25519 and ECDSA P-256.
-- **[`rust/`](rust/)** — `bounded-authority-protocol` (crates.io). Rust MSRV 1.81, `ed25519-dalek`
-  (serial backend) + `sha2` + `ryu-js`. See its [README](rust/README.md) and the
-  [deployment guide](../docs/deployment/rust-sdk.md) (AWS Lambda `provided.al2023` + PostgreSQL `plrust`
-  posture).
-- **[`go/`](go/)** — `bounded_authority_protocol_go`. Go 1.25 floor, zero runtime dependencies
-  (stdlib `crypto/ed25519` + `crypto/elliptic` + `crypto/sha256` only). See its
-  [README](go/README.md) and the [deployment guide](../docs/deployment/go-sdk.md).
+- **[`rust/`](rust/)**: `bounded-authority-protocol` (planned crates.io name). Rust 1.81 or
+  later; `ed25519-dalek`, `p256`, `sha2`, `ryu-js`, and an exact `zeroize` pin. See the
+  [deployment notes](../docs/deployment/rust-sdk.md) for AWS Lambda and PostgreSQL.
+- **[`go/`](go/)**: module path `github.com/baselabs/bounded_authority_protocol_go`. Go 1.25 or
+  later; standard library only (`crypto/ed25519`, `crypto/ecdsa`, `crypto/elliptic`,
+  `crypto/sha256`, `crypto/subtle`, `math/big`). See the
+  [deployment notes](../docs/deployment/go-sdk.md).
 
-The TypeScript SDK was the first to graduate (2026-09-14): it is published to npm as
+The TypeScript verifier was the first to move (September 14, 2026). It is published to npm as
 [`@bounded-authority-protocol/verifier`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier)
-from its own repository,
-[`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript)
-— its source and conformance runners no longer live in this monorepo.
+from [`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript);
+its source and conformance runners no longer live here.
 
-All four are **pure verification libraries** (no I/O, clock, RNG, or network in the verify path). They return
-value-bearing redacted facts or `Invalid` — never an authorization decision. See
-[ADR 0014](../docs/adr/0014-cross-language-verifier-sdks.md) for the packaging, support-surface, and
-derivation-hygiene decisions.
+All four are pure verification libraries (no I/O, clock, randomness, or network in the library).
+They return redacted facts or a single value-free rejection, never an authorization decision.
+Their behavior is defined by the specifications and the corpora; the in-repository SDKs' source
+comments cross-reference the Elixir reference implementation for traceability.
+[ADR 0014](../docs/adr/0014-cross-language-verifier-sdks.md) records the packaging and support
+decisions.
 
-Each SDK also implements the separately named local-loopback HTTP application profile: five public
-surfaces, protected `typ: "ba+loopback-proof"`, mandatory nonce, literal `127.0.0.1`/`[::1]`
-targets only, and mutual rejection with standard `dpop+jwt`. The shared profile corpus lives under
-`priv/conformance/application-profiles/local-loopback-http/v1`; the three SDKs authored here pin
-its exact index SHA-256 and execute the same 36 URI plus 8 proof cases. Each also implements the
-role-attestation sibling profile
-([ADR 0036](../docs/adr/0036-role-attestation-profile.md)): the four attestation surfaces, with
-the certified 40-case profile corpus pinned the same way, and the content-assertion sibling
-profile ([ADR 0037](../docs/adr/0037-content-assertion-profile.md)): verification, both digest
-functions, pairwise successor checks, producer and assembly, with the certified 131 assertion,
-9 digest, and 14 successor cases pinned by the index SHA-256.
+## Known gaps
 
-Each SDK also implements the strict-Ed25519 rule S1
-([ADR 0040](../docs/adr/0040-strict-ed25519-soundness-erratum.md)) at its single Ed25519 choke
-point, with the three helpers `verify_strict`, `acceptable_public_key` and `torsion_free` in the
-language's idiom, and runs the additive strict-Ed25519 corpus (`bap-strict-ed25519/1`,
-[`priv/conformance/strict-ed25519`](../priv/conformance/strict-ed25519/), 2,410 cases in 14 families,
-index SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`). Python reads it
-in place; Go and Rust carry byte-identical snapshots under `conformance/corpus-strict/`. Its 12
-"Taming the many EdDSAs" vectors come from
-[ed25519-speccheck](https://github.com/novifinancial/ed25519-speccheck) (Apache-2.0), attributed in
-the root and per-SDK `NOTICE` files.
+- **Erratum 3 (producer canonicality) is not implemented in any of the three.** Their compact
+  assembly and anchored-export encoding check the signature width but not its value, so they can
+  assemble an Ed25519 signature with `S >= L` or a non-canonical or small-order `R`, or an ES256
+  signature that is out of range or high-S. Every verifier rejects such a credential. None of
+  them runs the `bap-producer-canonicality/1` corpus yet. The published TypeScript verifier
+  (0.7.0) does not implement erratum 3 either.
+- **Facts rendering.** The specification requires facts to have a fixed redacted rendering.
+  The Python `repr`, the Rust derived `Debug`, and Go's `fmt` formatting print every field.
+  Facts never hold secrets, but log the fields you need by name.
+- **Python `v3` export.** `bounded_authority_verifier.v3` is not listed in the package's
+  `__all__`; import it explicitly.
+
+## Profiles each SDK implements
+
+- **Local-loopback HTTP proofs**: five surfaces, protected `typ: "ba+loopback-proof"`, a
+  mandatory nonce, literal `127.0.0.1`/`[::1]` targets only, and mutual rejection with standard
+  `dpop+jwt`. Each SDK pins the profile corpus index SHA-256 and runs its 36 URI and 8 proof
+  cases.
+- **Role attestations** ([ADR 0036](../docs/adr/0036-role-attestation-profile.md)): the four
+  attestation surfaces and the 40-case corpus.
+- **Content assertions** ([ADR 0037](../docs/adr/0037-content-assertion-profile.md)):
+  verification, both digest functions, pairwise successor checks, the producer, and assembly,
+  with the 131 assertion, 9 digest, and 14 successor cases.
+- **Strict Ed25519** ([ADR 0040](../docs/adr/0040-strict-ed25519-soundness-erratum.md)): rule S1
+  at each SDK's single Ed25519 verification point, the `verify_strict`, `acceptable_public_key`,
+  and `torsion_free` helpers in the language's naming, and the strict-Ed25519 corpus
+  (`bap-strict-ed25519/1`, [`priv/conformance/strict-ed25519`](../priv/conformance/strict-ed25519/),
+  2,410 cases in 14 families, index SHA-256
+  `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`). Python reads it in place;
+  Go and Rust carry byte-identical snapshots under `conformance/corpus-strict/`. Its 12 "Taming
+  the many EdDSAs" vectors come from
+  [ed25519-speccheck](https://github.com/novifinancial/ed25519-speccheck) (Apache-2.0),
+  attributed in the root and per-SDK `NOTICE` files.
 
 ## Conformance
 
-Each SDK passes every certified vector (valid + invalid) — the 283 v1, 268 v2, and 292 v3
-contract-major corpora plus the loopback, role-attestation, and content-assertion profile
-corpora — recomputing each
-verdict from scratch using only its language's primitives. The conformance is independently
-verifiable:
+Each SDK passes every case of the 283-case v1, 268-case v2, and 292-case v3 corpora and the
+profile corpora above, recomputing each verdict with its own language's primitives. Each pins
+the SHA-256 of every corpus `index.json` it was certified against and fails at load on a
+mismatch. To check:
 
 ```bash
-# Python (from sdks/python) — one runner per certified corpus
+# Python (from sdks/python): one runner each for v1, v2, v3, and strict Ed25519; pytest runs the
+# profile corpora and the quickstart
 python tests/conformance/run.py
 python tests/conformance/run_v2.py
 python tests/conformance/run_v3.py
 python tests/conformance/run_strict.py
+python -m pytest tests/
 
-# Rust (from sdks/rust) — the conformance runners run inside the test suite
+# Rust (from sdks/rust): every corpus and the README quickstart run inside the test suite
 cargo test --locked
 
-# Go (from sdks/go) — the conformance runners run inside the test suite
+# Go (from sdks/go): every corpus and the quickstart example run inside the test suite
 go test ./...
 ```
 
-The graduated TypeScript SDK runs its vendored corpora in its own repository (`pnpm conformance`,
-`conformance:v2`, `conformance:v3`, `conformance:role-attestation`,
-`conformance:content-assertion`).
+The TypeScript verifier runs its vendored corpora in its own repository.
 
-Beyond the frozen corpus, each SDK ships a **per-language permissiveness mutation-gate** — for every
-host-runtime closure (duplicate-rejecting decoder, null-prototype containers, raw-lexeme scan,
-single-value, int/float tag distinction), a red-capable test that constructs the host-specific defect the
-closure defeats and proves it goes RED when the closure is removed. This is the
-[ADR 0005 § Independent-runner permissiveness](../docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md)
-"prove each mirror with a case that goes red when the mirror is removed" discipline applied per-language,
-closing the permissiveness class the frozen corpus has no cases for.
-
-A SDK pins the corpus it was certified against by the SHA-256 of `index.json`; the runner asserts the
-loaded corpus matches at startup (fails closed on mismatch).
+Beyond the corpora, each SDK has a permissiveness battery: for every parser closure that guards
+against a host-language trap (duplicate-rejecting decoding, raw numeric-lexeme limits, a single
+value with no trailing content, the integer and float distinction), a test builds the defect
+the closure exists to reject and proves the closure catches it. This applies the
+[ADR 0005](../docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md) independent-runner
+discipline per language, covering a class the corpus has no cases for.

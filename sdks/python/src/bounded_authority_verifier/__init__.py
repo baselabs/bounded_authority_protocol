@@ -1,12 +1,15 @@
-"""``bounded_authority_verifier`` — provider-neutral, deterministic verifier SDK for bounded
-proof-of-possession authority (the BAP v1 verification profile, reimplemented in Python).
+"""``bounded_authority_verifier``: provider-neutral, deterministic verifier SDK for bounded
+proof-of-possession authority.
 
-The public surface re-exports the 17-function façade + the versioned primitives the public contract
-names (spec/bap-v1.md § Public verification contract, L266-309).
+The package root is contract-major 1 (spec/bap-v1.md) plus the local-loopback HTTP proof profile,
+the role-attestation and content-assertion profiles, the strict Ed25519 helpers, and the shared
+primitives. Contract-major 2 is the ``v2`` module and contract-major 3 (ES256) the ``v3`` module;
+import ``v3`` explicitly (``from bounded_authority_verifier import v3``).
 
-No ``authorized`` / ``decision`` surface (AGENTS rule 1); every function returns ``Result[T] =
-Ok | Err``, mirroring ``{:ok, value} | {:error, :invalid}``. Facts are value-bearing, redacted, and
-non-authorizing.
+There is no ``authorized`` or decision surface. Verification, decode, and producer functions return
+``Result[T] = Ok | Err``, mirroring ``{:ok, value} | {:error, :invalid}``; the lower-level
+primitives (JSON, JCS, base64url, bounds, and the JWK key functions) raise ``InvalidError``. Facts
+are value-bearing and non-authorizing.
 """
 
 from __future__ import annotations
@@ -139,7 +142,7 @@ from .v2 import ROW_PREFIX as ROW_PREFIX_V2
 from .v2 import VERSION as VERSION_2
 
 __all__ = [
-    # 17 façade functions
+    # contract-major 1 façade and the local-loopback proof functions
     "untrusted_key_locator",
     "decode_grant",
     "decode_proof",

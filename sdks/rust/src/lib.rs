@@ -1,17 +1,21 @@
-//! Bounded proof-of-possession authority verification — frozen v1 profile and
-//! contract-major v2 profile.
+//! Bounded proof-of-possession authority verification: contract-majors 1 and 2
+//! (Ed25519), contract-major 3 (ES256), the local-loopback HTTP proof profile,
+//! and the role-attestation and content-assertion profiles.
 //!
-//! Pure, deterministic, fail-closed reimplementation of the v1 profile from
-//! `spec/bap-v1.md` and the v2 profile (`BAP2-Ed25519-SHA256`) from the same
-//! requirement table carried at major 2, governed by the ADRs and the
-//! per-major conformance corpora. **Verification is not authority**: a
-//! successful result proves only that caller-supplied bytes satisfy
-//! caller-supplied trusted inputs and expected context. It never selects
-//! keys, reserves replay, grants execution, or overrides a host policy.
+//! Pure, deterministic, fail-closed implementation of `spec/bap-v1.md`,
+//! `spec/bap-v2.md`, `spec/bap-v3.md`, and the sibling profile specifications,
+//! checked against the certified conformance corpora. Contract-major 1 is
+//! re-exported at the crate root; [`v2`] and [`v3`] hold the other majors.
+//! **Verification is not authority**: a successful result proves only that
+//! caller-supplied bytes satisfy caller-supplied trusted inputs and expected
+//! context. It never selects keys, reserves replay, grants execution, or
+//! overrides a host policy.
 //!
-//! Every public function returns [`Result<T>`](crate::Result), the Rust
-//! spelling of `{:ok, value}` / `{:error, :invalid}`. There is exactly one
-//! error shape ([`Invalid`]) — the protocol forbids variants.
+//! Every fallible public function returns [`Result<T>`](crate::Result), the
+//! Rust spelling of `{:ok, value}` / `{:error, :invalid}`. There is exactly one
+//! error shape ([`Invalid`]); the protocol forbids variants. A few functions
+//! cannot fail and return plain values (`verify_strict`, `acceptable_public_key`,
+//! and `torsion_free` return `bool`; `base64url_encode` returns bytes).
 
 #![forbid(unsafe_code)]
 
@@ -98,3 +102,8 @@ pub use jwk::{
 };
 pub use uri::{local_loopback_http_uri_normalize, uri_normalize};
 pub use v1::{require_bounds_equal, resolve_bounds};
+
+/// Runs the README's Rust blocks as doctests, so its quickstart cannot drift from the API.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;

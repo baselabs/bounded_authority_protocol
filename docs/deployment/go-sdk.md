@@ -1,34 +1,51 @@
-# Go verifier SDK — deployment guide
+# Go verifier SDK: deployment notes
 
-The Go verifier SDK (`sdks/go/`, module `github.com/baselabs/bounded_authority_protocol_go`)
-is a pure, deterministic, fail-closed reimplementation of the frozen BAP profiles —
-contract-majors 1, 2, and 3 plus the local-loopback, role-attestation, and content-assertion
-sibling profiles. It is a
-**verifier**: it returns redacted, value-bearing facts or a single rejection, never an
-authorization decision.
+The Go verifier SDK (`sdks/go/`, module path `github.com/baselabs/bounded_authority_protocol_go`)
+is a pure, deterministic implementation of the BAP verification profiles: contract-majors 1, 2,
+and 3 plus the local-loopback, role-attestation, and content-assertion sibling profiles. It is a
+**verifier**: it returns redacted facts or the single error `ErrInvalid`, never an authorization
+decision. The [SDK README](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/go/README.md)
+has the quickstart and the full API list.
 
-See `spec/bap-v1.md`, `spec/bap-v2.md`, and `spec/bap-v3.md` (the normative authorities;
-`docs/protocol-v1.md` is the standard profile's generated view)
-and [ADR 0014](../adr/0014-cross-language-verifier-sdks.md) for the packaging and
-derivation-hygiene decisions.
+## Not published yet
+
+The module has no tagged version and the Go module proxy does not serve it, so `go get` fails.
+It moves to its own repository when it is first published
+([ADR 0015](../adr/0015-sdk-graduation-and-publish-topology.md)). Until then, build against a
+checkout of this repository:
+
+```bash
+git clone https://github.com/baselabs/bounded_authority_protocol.git
+go mod edit \
+  -require=github.com/baselabs/bounded_authority_protocol_go@v0.0.0 \
+  -replace=github.com/baselabs/bounded_authority_protocol_go=../bounded_authority_protocol/sdks/go
+```
+
+Record the commit you build from: without a published version, the commit is the identity of
+what you deployed.
+
+Erratum 3 (producer canonicality) is not implemented in this SDK yet: its compact assembly and
+anchored-export encoding do not refuse a non-canonical signature. Verification is unaffected.
+See the SDK README.
 
 ## Runtime posture
 
-- Go 1.25 floor; ZERO runtime dependencies — the standard library's `crypto/ed25519`,
-  `crypto/elliptic` (P-256 for the contract-major 3 ES256 suite), and `crypto/sha256` are the
-  entire cryptographic closure.
-- Pure functions only: no clock, network, filesystem, or randomness in the verify path. Time,
+- Go 1.25 or later. No third-party dependencies: the standard library's `crypto/ed25519`,
+  `crypto/ecdsa`, `crypto/elliptic` (P-256 for contract-major 3), `crypto/sha256`,
+  `crypto/subtle`, and `math/big` are the whole cryptographic closure.
+- Pure functions only: no clock, network, filesystem, or randomness in the library. Time,
   trusted keys, and expected context are explicit inputs.
-- `go vet` clean, `gofmt` clean, and a purity vet backed by a test that rejects forbidden
-  import additions.
+- `gofmt` and `go vet` clean. `tools/purity_check.sh` scans every non-test source file for
+  forbidden APIs and allowlists its imports; it is a shell check, not a Go test.
+- 64-bit platforms only.
 
 ## Deployment targets
 
 | Target | Notes |
 |---|---|
-| Any Go service | `go get` the module; the versioned verification surfaces (v1/v2/v3), the local-profile, role-attestation, and content-assertion functions, and the evidence/archive surfaces are the whole surface |
-| Static binaries / distroless containers | Zero-dependency closure means `CGO_ENABLED=0` builds with no tag set |
-| AWS Lambda (provided.al2023 custom runtime) | Build the bootstrap binary statically; cold start is the binary load |
+| Any Go service | Verify at the request boundary and pass the raw compact strings, never pre-decoded values |
+| Static binaries and distroless containers | With no dependencies, `CGO_ENABLED=0` builds need no build tags |
+| AWS Lambda (`provided.al2023` custom runtime) | Build the `bootstrap` binary statically; cold start is the binary load |
 
 ## Local-loopback application profile
 
@@ -43,18 +60,20 @@ literal `127.0.0.1`/`[::1]` HTTP targets and require the server nonce. Never der
 Every Ed25519 verification in the SDK applies rule S1 of
 [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md) at its single Ed25519 verification
 point: canonical point encodings, no small-order key or `R`, a scalar below the group order, and
-the cofactorless equation. Key import, JWK encode and decode, and thumbprint functions refuse a key
-that fails key acceptance. The SDK also exposes the host torsion-free check; call it at key
-enrollment, at trust install, and before any deny-list or revocation comparison. A vendored snapshot of the strict-Ed25519 corpus under `conformance/corpus-strict/` runs in `conformance/strict_test.go` with its index SHA-256 pinned.
+the cofactorless equation. Key import, JWK encode and decode, and thumbprint functions refuse a
+key that fails key acceptance. Call `TorsionFree` at key enrollment, at trust install, and before
+any deny-list or revocation comparison. A vendored snapshot of the strict-Ed25519 corpus under
+`conformance/corpus-strict/` runs in `conformance/strict_test.go` with its index SHA-256 pinned.
 
-## Supply-chain posture
+## Supply chain
 
-Zero runtime dependencies; `go mod graph` shows the module alone. Consumers SHOULD pin the
-exact version (`go get module@vX.Y.Z`) and enable `go mod verify`. The SDK's conformance runner
-and mutation battery live under `go test` and add nothing to the consumer closure.
+No third-party modules: `go list -m all` prints only this module, and `tools/license_check.sh`
+fails if any other module appears. The conformance runners and the permissiveness battery run
+under `go test` and add nothing to a consumer's build.
 
 ## Verification is not authority
 
-A green verification proves byte-level properties against the inputs the CALLER supplied.
-Trust selection, replay reservation, and revocation belong to a stateful authority runtime;
-see the specification's verification-contract section for the boundary in normative terms.
+A successful verification proves byte-level properties against the inputs the caller supplied.
+Trust selection, replay reservation, and revocation belong to your service or a stateful
+authority runtime; the specification's verification-contract section states the boundary in
+normative terms.

@@ -1,192 +1,262 @@
-# `bounded-authority-protocol-go`
+# Bounded Authority Protocol verifier for Go
 
-Typed, provider-neutral **verifier** library that reimplements the BAP v1 verification profile from the
-published spec ([`spec/bap-v1.md`](../../spec/bap-v1.md)), the governing ADRs, and the published
-conformance corpus ([`priv/conformance/v1/corpus/`](../../priv/conformance/v1/corpus/)) — authored from spec +
-corpus **alone** with no code-level derivation from the Elixir reference or the sibling SDKs
-([ADR 0014](../../docs/adr/0014-cross-language-verifier-sdks.md) D5).
+A pure, deterministic Go implementation of the Bounded Authority Protocol (BAP) verification
+profiles: contract-majors 1 and 2 (Ed25519) and 3 (ES256), the local-loopback HTTP proof
+profile, and the role-attestation and content-assertion profiles, with strict Ed25519
+verification on every Ed25519 surface.
 
-This is a **verifier, not an authority runtime**: a successful result proves only that caller-supplied bytes
-satisfy caller-supplied trusted inputs. It never selects keys, reserves replay, or grants execution.
+It checks the exact bytes of a grant, a holder proof, or an evidence object against public keys
+and expected context that you supply, and returns redacted facts or the single error
+`ErrInvalid`. It is a **verifier, not an authority**: it never selects trusted keys, reserves
+replay, checks revocation, or decides whether a request may run. Those stay in your service.
 
-The module also exposes the byte-distinct local-development profile through
-`LocalLoopbackHTTPUriNormalize`, `LocalLoopbackHTTPProofSigningInput`,
-`AssembleLocalLoopbackHTTPCompact`, `DecodeLocalLoopbackHTTPProof`, and
-`CheckLocalLoopbackHTTPEnvelope`. It accepts only literal `127.0.0.1`/`[::1]` HTTP targets and a
-mandatory nonce; standard `dpop+jwt` APIs reject its bytes.
-
-The module also exposes the standalone role-attestation sibling profile `bap-role-attestation/1`
-([`spec/bap-role-attestation-v1.md`](../../spec/bap-role-attestation-v1.md)) through
-`AttestationSigningInput`, `AssembleAttestationCompact`, `DecodeAttestation`, and `VerifyAttestation`:
-an attestor key binds a subject key to an `issuer`/`holder` role for a window contained in the attestor
-key's own validity window, both segments are canonical-bytes-only, and every contract-major API rejects
-its `ba+role-attestation` typ while it rejects every contract-major typ.
-
-It also implements the standalone content-assertion profile `bap-content-assertion/1`
-([`spec/bap-content-assertion-v1.md`](../../spec/bap-content-assertion-v1.md)).
-`AssertionSigningInput`, `AssembleContentAssertionCompact`, `DecodeContentAssertion`,
-`VerifyContentAssertion`, `ContentDigest`, `AssertionDigest`, and
-`VerifyContentAssertionSuccessor` bind exact external bytes to caller-supplied identity,
-digest, key-window, time, and predecessor context. Every existing profile rejects its
-`ba+content-assertion` bytes, and the content profile rejects every existing profile.
+Its behavior is defined by the specifications ([v1](../../spec/bap-v1.md),
+[v2](../../spec/bap-v2.md), [v3](../../spec/bap-v3.md), and the sibling profiles under
+[`spec/`](../../spec/)) and the certified conformance corpora; source comments cross-reference
+the Elixir reference implementation for traceability.
 
 ## Status
 
-Not yet published to a Go module proxy. Per the [SDK graduation model](../../docs/adr/0015-sdk-graduation-and-publish-topology.md),
-this SDK graduates to its own repository (`bounded_authority_protocol_go`) on first publication — never from
-this monorepo. The module path `github.com/baselabs/bounded_authority_protocol_go` is the reserved identifier
-recorded for the graduated publish.
+**Not published.** There is no tagged module version and the Go module proxy does not serve
+this module, so `go get github.com/baselabs/bounded_authority_protocol_go` fails. The module
+moves to its own repository when it is first published
+([ADR 0015](../../docs/adr/0015-sdk-graduation-and-publish-topology.md)). Until then, use it
+from a checkout of this repository.
 
-- Go floor: **1.25** (`go.mod`); the CI job installs exactly 1.25 so the floor is the tested floor.
-- Runtime dependencies: **zero** — stdlib only (`crypto/ed25519`, `crypto/sha256`, and pure stdlib
-  parsing/formatting packages). Verified by [`tools/license_check.sh`](tools/license_check.sh).
-- Platform floor: **64-bit** — the bounds fields hold 9,007,199,254,740,991 as `int` (compile-time
-  overflow on 32-bit targets; fail-closed, but unsupported).
+- Go **1.25** or later (`go.mod`); CI tests the latest 1.25 patch release.
+- **No third-party dependencies**: only the standard library (`crypto/ed25519`, `crypto/ecdsa`,
+  `crypto/elliptic`, `crypto/sha256`, `crypto/subtle`, `math/big`, and pure parsing and
+  formatting packages). `tools/license_check.sh` asserts the module graph stays empty.
+- **64-bit platforms only**: the bounds hold 9,007,199,254,740,991 in an `int`.
+- **Erratum 3 (producer canonicality) is not yet implemented.** `AssembleCompact` and
+  `EncodeAnchoredExport` (and their `Profile` and `EcdsaProfile` forms) check the signature
+  width but not its value, so they can assemble an Ed25519 signature with `S >= L` or a
+  non-canonical or small-order `R`, or an ES256 signature that is out of range or high-S.
+  Every verifier, this one included, rejects such a credential. Until this SDK implements
+  erratum 3, check a signature from an external signer before assembly (for ES256, normalize
+  to low S).
+
+## Install from a checkout
+
+Clone this repository next to your module, then point your `go.mod` at the SDK directory:
+
+```bash
+git clone https://github.com/baselabs/bounded_authority_protocol.git
+go mod edit \
+  -require=github.com/baselabs/bounded_authority_protocol_go@v0.0.0 \
+  -replace=github.com/baselabs/bounded_authority_protocol_go=../bounded_authority_protocol/sdks/go
+```
+
+Then import it as `verifier "github.com/baselabs/bounded_authority_protocol_go"`.
+
+## Quickstart
+
+This is [`example_test.go`](example_test.go): `go test` runs it and checks its output, and a
+test keeps this copy identical to the file.
+
+```go
+package verifier_test
+
+import (
+	"crypto/ed25519"
+	"fmt"
+
+	verifier "github.com/baselabs/bounded_authority_protocol_go"
+)
+
+// Example issues a grant, signs a holder proof for one request, and verifies both, then shows
+// that the same proof fails for other arguments. The keys come from fixed seeds so the output is
+// stable; in production the private keys stay with the issuer and the holder, and the verifier
+// receives only public keys.
+func Example() {
+	issuerKey := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
+	holderSeed := make([]byte, ed25519.SeedSize)
+	holderSeed[0] = 1
+	holderKey := ed25519.NewKeyFromSeed(holderSeed)
+	issuerPublic := issuerKey.Public().(ed25519.PublicKey)
+	holderPublic := holderKey.Public().(ed25519.PublicKey)
+
+	// The bytes to sign: ASCII(base64url(protected) || "." || base64url(payload)).
+	message := func(si verifier.SigningInput) []byte {
+		return []byte(verifier.Base64urlEncode(si.Protected) + "." + verifier.Base64urlEncode(si.Payload))
+	}
+	mustJSON := func(text string) verifier.Value {
+		value, err := verifier.JsonDecode([]byte(text), nil)
+		if err != nil {
+			panic(err)
+		}
+		return value
+	}
+
+	// The issuer grants one operation, restricted to one argument value.
+	holderThumbprint, err := verifier.PublicKeyThumbprintRaw(holderPublic, nil)
+	if err != nil {
+		panic(err)
+	}
+	grantInput, err := verifier.GrantSigningInput(verifier.Grant{
+		KeyID:            "issuer-1",
+		Issuer:           "https://issuer.example",
+		GrantID:          "grant-001",
+		Audiences:        []string{"https://docs.example"},
+		IssuedAt:         1800000000,
+		NotBefore:        1800000000,
+		ExpiresAt:        1800003600,
+		HolderThumbprint: verifier.Base64urlEncode(holderThumbprint[:]),
+		Operations: []verifier.OperationDef{{
+			Name:      "publish_article",
+			Selectors: []verifier.Value{mustJSON(`{"kind":"equals","path":["section"],"value":"science"}`)},
+		}},
+	}, nil)
+	if err != nil {
+		panic(err)
+	}
+	grant, err := verifier.AssembleCompact(grantInput, ed25519.Sign(issuerKey, message(grantInput)), nil)
+	if err != nil {
+		panic(err)
+	}
+
+	// The holder binds one request to the grant.
+	arguments := mustJSON(`{"section":"science","title":"Tides"}`)
+	proofInput, err := verifier.ProofSigningInput(verifier.Proof{
+		ProofID:         "proof-001",
+		HolderPublicKey: holderPublic,
+		InvocationID:    "9b2f1c3e-7a51-4d0e-8f6a-2c4b5d6e7f80",
+		Operation:       "publish_article",
+		Method:          "POST",
+		TargetURI:       "https://docs.example/articles",
+		IssuedAt:        1800000100,
+		GrantCompact:    grant,
+		CastArguments:   arguments,
+	}, nil)
+	if err != nil {
+		panic(err)
+	}
+	proof, err := verifier.AssembleCompact(proofInput, ed25519.Sign(holderKey, message(proofInput)), nil)
+	if err != nil {
+		panic(err)
+	}
+
+	// The service verifies the raw bytes against what it derived from the request.
+	expected := verifier.ExpectedRequest{
+		TrustedIssuer:  verifier.TrustedIssuer{KeyID: "issuer-1", PublicKey: issuerPublic},
+		Issuer:         "https://issuer.example",
+		Audience:       "https://docs.example",
+		EvaluationTime: 1800000100,
+		ClockSkew:      60,
+		Method:         "POST",
+		TargetURI:      "https://docs.example/articles",
+		InvocationID:   "9b2f1c3e-7a51-4d0e-8f6a-2c4b5d6e7f80",
+		Operation:      "publish_article",
+		CastArguments:  arguments,
+		ProofMaxAge:    300,
+		Nonce:          verifier.NonceNotRequired(),
+	}
+	credentials := verifier.Credentials{Grant: grant, Proof: proof}
+
+	facts, err := verifier.CheckEnvelope(credentials, expected)
+	fmt.Println(facts.Operation, facts.GrantID, facts.Authorization == verifier.AuthorizationNotEvaluated, err)
+
+	// The same proof against other arguments fails closed, with no detail.
+	expected.CastArguments = mustJSON(`{"section":"sports","title":"Tides"}`)
+	_, err = verifier.CheckEnvelope(credentials, expected)
+	fmt.Println(err == verifier.ErrInvalid)
+
+	// Output:
+	// publish_article grant-001 true <nil>
+	// true
+}
+```
+
+The bytes to sign are always `base64url(protected) + "." + base64url(payload)` of the
+`SigningInput` a producer returns. The SDK never sees a private key.
+
+## API
+
+Contract-major 1 functions are package-level. Contract-major 2 and 3 are stateless namespace
+types whose methods have the same names and shapes: `verifier.Profile{}` (v2, adds the `lte`
+and `gte` range selectors) and `verifier.EcdsaProfile{}` (v3, ES256 with 65-byte uncompressed
+SEC1 keys and 64-byte raw `r || s` signatures). Each major rejects the others' bytes.
+
+| Group | Functions |
+|---|---|
+| Producers | `GrantSigningInput`, `ProofSigningInput`, `BoundaryAnchorSigningInput`, `KeyTransitionSigningInput`, `AssembleCompact`, `EncodeConsumptionEntry`, `EncodeAnchoredExport`, `RequestDigest` |
+| Decoders (no signature check) | `DecodeGrant`, `DecodeProof`, `UntrustedKeyLocator` |
+| Verifiers | `VerifyGrant`, `CheckEnvelope`, `CheckChain`, `VerifyHistoricalAnchor`, `VerifyKeyTransition`, `VerifyAnchoredExport` |
+| Local-loopback HTTP proofs | `LocalLoopbackHTTPUriNormalize`, `LocalLoopbackHTTPProofSigningInput`, `AssembleLocalLoopbackHTTPCompact`, `DecodeLocalLoopbackHTTPProof`, `CheckLocalLoopbackHTTPEnvelope` |
+| Role attestations | `AttestationSigningInput`, `AssembleAttestationCompact`, `DecodeAttestation`, `VerifyAttestation` |
+| Content assertions | `AssertionSigningInput`, `AssembleContentAssertionCompact`, `DecodeContentAssertion`, `VerifyContentAssertion`, `ContentDigest`, `AssertionDigest`, `VerifyContentAssertionSuccessor` |
+| Strict Ed25519 | `VerifyStrict`, `AcceptablePublicKey`, `TorsionFree` |
+| Primitives | `JsonDecode`, `JcsEncode`, `Base64urlDecode`, `Base64urlEncode`, `UriNormalize`, `JwkDecodePublic`, `JwkEncodePublic`, `JwkThumbprintPreimage`, `JwkThumbprint`, `JwkThumbprintRaw`, `PublicKeyThumbprintRaw`, `BoundsMaximum`, `BoundsNew`, `NonceNotRequired`, `NonceRequired` |
+
+`EcdsaProfile` also carries its own EC JWK and thumbprint methods. The loopback, attestation,
+and content-assertion functions exist only at package level (they are Ed25519 profiles).
+
+**Errors.** Every fallible function returns `(T, error)`, and the error is `nil` or exactly
+`ErrInvalid`; it carries no reason, and no function panics on bad input. `VerifyStrict`,
+`AcceptablePublicKey`, and `TorsionFree` return `bool`; `Base64urlEncode` and `BoundsMaximum`
+cannot fail. A `nil` `*Bounds` means the profile maxima; build tighter limits with `BoundsNew`.
+
+**Facts.** `GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`, `KeyTransitionFacts`,
+`AnchoredExportFacts`, `AttestationFacts`, and `ContentAssertionFacts` hold identifiers,
+digests, times, and counts, never raw signatures, keys, nonces, or arguments. `GrantFacts`,
+`EnvelopeFacts`, and `AnchoredExportFacts` carry `Authorization: AuthorizationNotEvaluated`; the
+chain, anchor, transition, export, attestation, and content-assertion facts carry
+`Trust: TrustNotEvaluated`. There is no `Authorized` or decision field. The facts types have no
+redacted `String` method yet, so `fmt` prints their fields; log the fields you need by name.
+
+## Strict Ed25519
+
+Every Ed25519 signature check goes through one function (`verifyEd25519` in `ed25519.go`) that
+applies rule S1 of [ADR 0040](../../docs/adr/0040-strict-ed25519-soundness-erratum.md) before
+the standard-library backend: exact widths, canonical `A` and `R`, neither of small order,
+`S < L`, then the cofactorless equation. `AcceptablePublicKey` is the key-entry check (canonical,
+not small order, on the curve), and every JWK and thumbprint function returns `ErrInvalid` for a
+key that fails it. `TorsionFree` adds `[L]A = O` in pure `math/big` arithmetic; call it at key
+enrollment, at trust install, and before any deny-list or revocation comparison, never on the
+verification path.
 
 ## Conformance
 
-Passes all **283** published conformance vectors, recomputed from scratch, and SHA-binds the vendored corpus
-`index.json` at startup (`TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs`) — a mismatched vendored corpus fails
-closed rather than drifting silently. Every case file is verified against the index's per-file SHA-256, and
-the two-boundary key census is asserted per run (observed import-boundary thumbprints ==
-`index.json` `public_key_fingerprints`, both directions; at authoring: `agreed=283 disagreed=0 census=11`).
+`go test ./...` runs everything:
+
+- the root package: unit tests, the quickstart example, the local-loopback (36 URI and 8 proof
+  cases), role-attestation (40), and content-assertion (131 assertion, 9 digest, 14 successor)
+  corpora read from `priv/conformance/`, and the strict-Ed25519 unit and fuzz-seed tests;
+- `conformance/`: the vendored v1 (283 cases), v2 (268), v3 (292), and strict-Ed25519 (2,410)
+  snapshots, each with its `index.json` SHA-256 asserted at load, every case file checked
+  against the index, and a key census comparing the keys the runner imported with the index's
+  `public_key_fingerprints`;
+- `tests/`: the permissiveness battery, which builds each defect a parser closure exists to
+  reject and proves the closure catches it.
 
 ```bash
-go test ./conformance/   # agreed=283 disagreed=0 + census
+go test ./...
+go test -v ./conformance/ | grep agreed
+# agreed=283 disagreed=0 census=11
+# strict corpus: agreed=2410/2410
+# agreed=268 disagreed=0 census=22 declared=17
+# agreed=292 disagreed=0 census=8 declared=11
 ```
 
-The content-assertion runner reads the shared profile corpus directly, verifies all indexed
-file hashes, and pins index SHA-256
-`14b7436ccf7cc91fece52a1578c3760df6720a93494d147ee5ab523e2ce21876`.
-It covers 131 assertion cases, including 38 decode-valid exact producer/assembly vectors,
-9 exact-content digest cases, and 14 successor cases.
+The producer-canonicality corpus (erratum 3) is not run yet; see Status.
 
-```bash
-go test -run ContentAssertion .
-```
+## What this SDK does not do
 
-## Strict Ed25519 (rule S1)
-
-Every signature check goes through one choke point (`verifyEd25519` in `ed25519.go`), which applies rule S1
-before the standard-library backend: exact widths; `A` and `R` canonical encodings; neither `A` nor `R` a
-small-order encoding (one table serves both); `S < L`; then the cofactorless equation. The public mirrors are
-`VerifyStrict(message, signature, publicKey)`, `AcceptablePublicKey(key)` (canonical, not small-order, on the
-curve) and `TorsionFree(key)` (additionally `[L]A = O`; a host check at key enrollment, trust install and
-deny-list comparison, never on the verify path; pure `math/big` in `ed25519_point.go`, so `go.mod` stays
-dependency-free). `JwkDecodePublic`, `JwkEncodePublic`, `JwkThumbprintPreimage`, `JwkThumbprint`,
-`JwkThumbprintRaw` and `PublicKeyThumbprintRaw` return `ErrInvalid` for a key that fails acceptance.
-The additive strict corpus is vendored byte-identically at `conformance/corpus-strict/` (index SHA-256
-`732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`, 2410 cases) and runs with
-`go test ./conformance/ -run TestStrictEd25519Corpus`; `FuzzEd25519Gate` fuzzes the byte-level gate against an
-arithmetic reference.
-
-## Successor-major profile (contract-major 2)
-
-[`v2.go`](v2.go) adds the successor contract-major profile behind the namespace type `Profile`
-(the file carries the major, so the method set mirrors the v1 entry names exactly — the Go
-analogue of the sibling SDKs' versioned modules). It is byte-honest with the frozen v1 surface
-except: `"v":2` payloads with cross-major rejection in both directions, the `BAP2-REQUEST\0` /
-`BAP2-CHAIN\0` / `BAP2-ARCHIVE\0EXPORT\0` domain separators (the v1 constants are untouched),
-and the two inclusive one-sided range selector kinds `lte`/`gte` on the existing
-`{kind, path, value}` member set — same-tag numeric operands only, comparison by numeric value
-(IEEE 754, `−0.0 = 0.0`), cross-tag never matches, and a non-numeric bound is rejected at decode
-([ADR 0028](../../docs/adr/0028-range-selector-kinds.md) §1-§4). The encode-side export contract
-carries no digest/object-version expected context (the producer derives its own digest; same
-shape as the reference's encode path).
-
-The vendored successor corpus lives at [`conformance/corpus-v2/`](conformance/corpus-v2/) and is
-executed by [`conformance/v2_test.go`](conformance/v2_test.go) (an external test package, so both
-majors' runners coexist): **268/268** vectors, index pin
-`beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A`, and the successor census semantics — curated ==
-index two-way (`conformance/generators/curated-inputs-v2.json`), the case-byte discovery as the
-fail-closed subset leg (one curated key emits no case: 16 of 17 by design), and the verify-import
-leg (at authoring: `agreed=268 disagreed=0 census=16 declared=17`).
-
-```bash
-go test ./conformance/   # both majors: 283 + 268 + censuses
-```
-
-## The public façade
-
-The 17-function v1 verification contract (see `spec/bap-v1.md` § Public verification contract) plus the
-versioned primitives, translated to Go idioms:
-
-- **Producers**: `GrantSigningInput`, `ProofSigningInput`, `BoundaryAnchorSigningInput`,
-  `KeyTransitionSigningInput`, `AssembleCompact` (nil bounds = profile maximum; a `*Bounds` threads the
-  caller's tightening-only limits through the assemble gates — [ADR 0018](../../docs/adr/0018-sdk-bounds-contract.md) D4),
-  `EncodeConsumptionEntry`, `EncodeAnchoredExport`, `RequestDigest`.
-- **Decoders / locator**: `DecodeGrant`, `DecodeProof`, `UntrustedKeyLocator`.
-- **Verifiers**: `VerifyGrant`, `CheckEnvelope`, `VerifyHistoricalAnchor`, `VerifyKeyTransition`, `CheckChain`,
-  `VerifyAnchoredExport`.
-- **Versioned primitives**: `JsonDecode` / `JcsEncode` (the tagged JSON algebra), `Base64urlDecode` /
-  `Base64urlEncode`, `UriNormalize`, the `Jwk*` thumbprint family, `BoundsMaximum` / `BoundsNew`.
-- **Content assertion**: `AssertionSigningInput`, `AssembleContentAssertionCompact`,
-  `DecodeContentAssertion`, `VerifyContentAssertion`, `ContentDigest`, `AssertionDigest`, and
-  `VerifyContentAssertionSuccessor`.
-
-Every fallible function returns `(T, error)` where the error is either `nil` or exactly `ErrInvalid`;
-infallible constructors and encoders return their value directly. The facts structs (`GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`,
-`KeyTransitionFacts`, `AnchoredExportFacts`, `ContentAssertionFacts`) are value-bearing and redacted by construction: they contain only
-their documented fields and carry `AuthorizationNotEvaluated` / `TrustNotEvaluated`. There is no
-`Authorized`/`Allowed`/decision surface.
-
-## Permissiveness battery (no F1 debt)
-
-Beyond the corpus, the SDK ships a per-clause red-capable battery
-([`tests/permissiveness_test.go`](tests/permissiveness_test.go) + the white-box legs in
-[`permissiveness_internal_test.go`](permissiveness_internal_test.go)). Every closure and gate is pinned by a
-leg that goes **RED when the gate is mechanically removed** — all proven at authoring, unlike the shipped-SDK
-round-12..17 pin debt ([ADR 0017](../../docs/adr/0017-inter-sdk-behavioral-contract.md) honest limit, which
-BAP-16 was required not to repeat):
-
-- duplicate-rejecting decoder (any depth), raw-lexeme 64-byte ceiling, single-value + trailing rejection,
-  int/float tag distinction, source-order preservation, base64url canonicality (pad bits);
-- per-node JCS encode-bounds closure (depth/nodes/members/items/string/name bytes, magnitude, duplicate keys);
-- ADR 0017 clause 1 — closed Result surface: no panic escapes any façade (recover guard + panic-through leg
-  through the public `VerifyAnchoredExport`);
-- ADR 0017 clause 3 — pre-digest expected-context hoist with a **zero-hash work pin** (Go's work-observation
-  channel is the internal `archiveDigest` seam — the Python-monkeypatch equivalent without monkeypatching);
-- ADR 0017 clause 4 — signature width gated at decode; canonical byte-equality for anchor/transition
-  segments. The canonical gate's macro-path verdict is **subsumed** (verify: by Ed25519; encode: by the
-  archive digest) — the ADR 0017 subsumption pattern — so its red-capable pin is the unit-level
-  `TestCanonicalGateUnit`;
-- ADR 0017 clause 5 — role-bounded frame reads (`anchor_bytes`, `chain_row_bytes`);
-- skew / proof-max-age ceilings (a misconfigured caller is rejected, never silently widened);
-- overflow fail-closure on extreme sequence values;
-- ADR 0018 bounds threading at every ceiling (chain, anchor, assemble, json, archive) and the D2
-  nested-pins identity semantics on the export expected struct.
-
-The successor-major range-selector legs (`TestPermissiveSuccessorRangeInclusive`,
-`...RangeSameTag`, `...RangeDispatch`, `...MajorIsolation`, plus the white-box
-`TestSuccessorRangeMatcherTag`) were mutation-proven at authoring over the vendored corpus-v2:
-
-- inclusive `<=`/`>=` mutated to strict `<`/`>` in `rangeMatch` → every boundary-equal corpus
-  case and `RangeInclusive` RED;
-- the same-tag check removed (numeric-value comparison across tags) → the cross-tag corpus
-  cases, `RangeSameTag`, and the white-box matcher leg RED;
-- the lte/gte comparator dispatch swapped → `lte-exceeded` / `gte-unmet` and `RangeDispatch` RED;
-- the successor payload `v`-check widened to accept `v:1` → the cross-major corpus family
-  (envelope, grant decode, grant verify) and `MajorIsolation` RED.
-
-All four mutations were reverted byte-identical (`git diff` clean over the probes).
-
-## What this SDK does NOT do
-
-No I/O, filesystem, clock, RNG, network, environment, or process-spawn in the library path
-([`tools/purity_check.sh`](tools/purity_check.sh) enforces it, import allowlist included). No trust discovery,
-key custody, signing, replay reservation, revocation state, issuance, or business authorization — those belong
-to the host. No registry-publish infrastructure (ADR 0015; the `sdk-publish-guard` hook and CI job reject it).
+No I/O, filesystem, clock, randomness, network, environment, or process access in the library
+(`tools/purity_check.sh` scans every non-test file and allowlists its imports). No trust
+discovery, key custody, signing, replay reservation, revocation state, issuance, or
+authorization decisions. No registry-publish setup: a pre-commit hook and a CI job reject it
+here (ADR 0015).
 
 ## Development
 
 ```bash
 gofmt -l . && go vet ./...
-go test ./...                            # library + battery + conformance (283 + census)
+go test ./...
 sh tools/purity_check.sh && sh tools/license_check.sh
 ```
 
-The library path is built from `spec/bap-v1.md` + the ADRs + RFCs + the conformance corpus **only**
-(ADR 0014 D5: no derivation from the Elixir reference or a sibling SDK).
+Deployment notes: [`docs/deployment/go-sdk.md`](../../docs/deployment/go-sdk.md).
 
 ## License
 
