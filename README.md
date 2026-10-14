@@ -23,6 +23,12 @@ cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for
 
 ## Installation
 
+The package is published on Hex (release 0.8.0, published 2026-10-13 UTC: the strict Ed25519
+soundness repair; registry checksum
+`b5598cc5ba25f6ff4a2b55dab619bc2419b1d90cce9be3b1d4330d55a6da0bdb`, read back from the
+registry API and identical to the release-candidate archive of the tagged tree). Releases 0.7.0
+and earlier are retired. Registry consumers use the minor-bounded requirement:
+
 ```elixir
 def deps do
   [
@@ -48,7 +54,8 @@ enters the library) and a protocol signing input, and produces the signed compac
 holder proofs, local-loopback application proofs, grants, boundary anchors, and key transitions
 under contract-majors 1 and 3. Its grant signing can require an authority-signed role
 attestation, which it verifies through this package before signing. From adapter 0.9.0 it
-also signs content assertions (`sign_content_assertion/3`) over this package's 0.7.0 profile.
+also signs content assertions (`sign_content_assertion/3`); adapter 0.10.0 signs over this
+package's 0.8.0 release.
 The dependency is one-directional: verifiers depend only on this protocol package; the adapter
 depends on this package; this package never depends on the adapter.
 

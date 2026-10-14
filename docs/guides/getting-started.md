@@ -13,10 +13,9 @@ normative profile; this guide is operational.
 
 ## Installation
 
-The 0.8.0 registry read-back (publication date and checksum) is recorded here after
-publication; the last OBSERVED read-back is release 0.7.0, which the
-[Hex release API](https://hex.pm/api/packages/bounded_authority_protocol/releases/0.7.0)
-reported published on September 28, 2026 UTC:
+OBSERVED October 13, 2026: the [Hex release API](https://hex.pm/api/packages/bounded_authority_protocol/releases/0.8.0)
+reports release 0.8.0 published on October 13, 2026 UTC (registry checksum
+`b5598cc5ba25f6ff4a2b55dab619bc2419b1d90cce9be3b1d4330d55a6da0bdb`):
 
 ```elixir
 defp deps do

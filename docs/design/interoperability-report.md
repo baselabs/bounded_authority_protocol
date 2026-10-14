@@ -131,7 +131,7 @@ with expected verdicts from an independent arithmetic generator and the 12 publi
 | Go (`go test ./...`, vendored `conformance/corpus-strict`) | **pass** (October 13, 2026) |
 | Rust 1.81 (`cargo test --locked`, vendored `conformance/corpus-strict`) | **pass** (October 13, 2026) |
 | Independent Node runner (`node conformance/corpus_independent.mjs --strict priv/conformance/strict-ed25519`, Node 22.23.1) | **agreed=2017 disagreed=0**; it implements contract-major 1, so the 393 major-2 and sibling-profile cases are reported as not covered (October 13, 2026) |
-| TypeScript | adopts the corpus in its graduated repository; result recorded at its release |
+| TypeScript | adopted in its graduated repository and released as npm verifier 0.6.0, then 0.7.0 (October 13, 2026); the run is recorded in that repository |
 
 ### Independent Node second-implementation runners
 
@@ -179,7 +179,8 @@ their native APIs; the TypeScript suite's equivalent runs live in its graduated 
 - For the Python, Rust, and Go SDKs the attestation-profile rows report their certified-corpus
   tests (which assert the pinned index and the exact case counts), not a separate agreement
   printout. The Elixir and TypeScript rows report their runners' printed agreement figures.
-- The strict-Ed25519 corpus rows other than the Elixir reference are pending regeneration for the
-  0.8.0 release, and the independent Node runners do not yet execute that corpus.
+- The independent Node runner implements contract-major 1 only, so it reports the strict-Ed25519
+  corpus's major-2 and sibling-profile cases as not covered; the three in-repo SDKs run all of
+  them.
 - The local-profile real-socket drill is implemented in the Elixir release gate. The other SDK
   results certify bytes and verdicts against the shared corpus, not live transport composition.

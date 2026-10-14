@@ -56,7 +56,8 @@ compatibility.
 | BAP-21 | **v2 contract-major activation — `lte`/`gte` range selector kinds** — Execute the ADR 0028 activating-major obligations under the successor-major charter checklist: the complete v2 closed profile, its certified corpus, REQ2-* traceability, the four-SDK re-verification, and the registries flip, slug:bap-21 | `BoundedAuthorityProtocol.V2` namespace + [`spec/bap-v2.md`](../spec/bap-v2.md) + [ADR 0030](adr/0030-v2-contract-major-activation.md) land together; the v2 corpus (268 cases, 28 surfaces, certified index `6de6289b…f13d0`) verifies 268/268 through the CLI and all four SDKs with the digest pinned; six new mutation-battery entries executed RED with proofs recorded in the [requirement map](design/requirement-map.md) § v2; `lte`/`gte` active in registries; v1 byte-frozen with its certified pin unchanged | — | [ADR 0028](adr/0028-range-selector-kinds.md), [ADR 0030](adr/0030-v2-contract-major-activation.md), and the [successor-major charter](design/successor-major-charter.md) |
 | BAP-22 | **ES256 contract-major activation — the `BAP3-ES256-SHA256` suite** — Execute the ADR 0035 activating-major obligations under the successor-major charter checklist: the complete v3 closed profile (ECDSA P-256/SHA-256, RFC 7518 §3.4 raw `r\|\|s` signatures with low-S canonicality, EC JWKs and RFC 7638 thumbprints, uncompressed-SEC1 raw keys), its certified corpus, REQ3-* traceability, the SDK cohort, and the registries flip, slug:bap-22 | `BoundedAuthorityProtocol.V3` namespace + [`spec/bap-v3.md`](../spec/bap-v3.md) + [ADR 0035](adr/0035-es256-contract-major-activation.md) land together; the v3 corpus (292 cases, 28 surfaces, revision 1, certified index `pcgHXnU0…mQzw` — the repaired-and-re-certified pin after the coverage-gate certification repair; full value pinned in the CLI's major-keyed map) verifies 292/292 through the CLI with the digest pinned; six verdict-provable mutation-battery entries executed RED with two battery adjudications disclosed in the [requirement map](design/requirement-map.md) § v3 (range-check backend-coincidence; cross-major composite); the in-repo SDKs gain v3 namespaces and the TS cohort adopts the suite; `BAP3-ES256-SHA256` active in registries with the `lte`/`gte` scope extended and the ML-DSA anticipated index advanced; v1 and v2 byte-frozen with their certified pins unchanged; the kiosk-demo refresh item withdrawn (owner decision 2026-09-22; ADR 0035 post-acceptance note) | BAP-21 | [ADR 0035](adr/0035-es256-contract-major-activation.md), [ADR 0009](adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md), and the [successor-major charter](design/successor-major-charter.md) |
 | BAP-23 | **Role-attestation sibling profile — `bap-role-attestation/1`** — The BA-signed role attestation as the protocol's first sibling attestation profile (ADR 0036): a standalone, grant-unbound compact binding a subject key to `issuer`/`holder` for a bounded window, verified by `BoundedAuthorityProtocol.RoleAttestation.V1.verify_attestation/2` — the BARA RA11 prerequisite crossing the dependency wall as data, slug:bap-23-role-attestation | [ADR 0036](adr/0036-role-attestation-profile.md) + [`spec/bap-role-attestation-v1.md`](../spec/bap-role-attestation-v1.md) + [role-attestation requirement map](design/role-attestation-requirement-map.md) land together; the profile corpus (40 cases, revision 1, certified index `be5275c6…d62a`, pinned in the ExUnit suite, the requirement map, the spec, and every SDK) verifies 40/40 decode+verify with v1/v2/v3 cross-rejection both directions through `mix role_attestation.verify`; ten mutation-battery entries (self-attestation ×2, containment ×2, now-window, kid binding, subject binding, role closed set, canonical bytes, signature) redden the corpus test one-match each; `ba+role-attestation` active in registries with the attestation-profiles family; the governance class, the standards-track evolution contract, and ADR 0007's requirement ranges carry the labeled ADR-0036 amendments; the v1/v2 `parse` closed-error-shape defect (bare `false` on wrong-width signatures, found by the profile's ES256 corpus case) is fixed RED-first with `signature_width_error_shape_test.exs`; the in-repo Python/Rust/Go SDKs implement the four surfaces; v1/v2/v3 corpora and certified pins unchanged (labeled `SigningInput`/`CompactJws` kind touches only); **release preconditions** (any `0.x.0` bearing this): the TS verifier surface coordinated at corpus freeze, the authority-runtime issuance receipt, and the companion-signer consumption receipt in their own repositories — release itself is the owner's decision; **cross-vendor review** executed 2026-09-22 over the full landing range (639d74e..e5cd033): the claude-family lens reviewed with receipts (4 findings, no blockers — all adjudicated, the two should-fix defects and a decode-surface alignment fixed in-repo: attestor-window magnitude parity in the Python/Go SDKs and the certified index pin in the `role_attestation.verify` script; corpus and certified pins unchanged), the codex-family lens completed September 23, 2026 over the inclusive landing and parity-fix range (`639d74e..d470814`), confirming eight product findings (three blocking, five should-fix) and one harness note; the product findings have RED-first repairs in Elixir and the three in-repo SDKs, with the harness note recorded separately; the terminal repair review confirms all eight fixes, and final `mix quality` completed with exit 0 (584 passed, 100% coverage); dated receipts and adjudications live under `.kimosabe/reviews/`; see the Codex review evidence below | BAP-22 | [ADR 0036](adr/0036-role-attestation-profile.md), [ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md), [ADR 0029](adr/0029-budget-window-posture.md), and the [successor-major charter](design/successor-major-charter.md) |
-| BAP-24 | **Strict Ed25519 verification soundness erratum** — Close the Ed25519 small-order and non-canonical acceptance defect class on every Ed25519 surface (contract-majors 1 and 2, local loopback, role attestation, content assertion) through rule S1, the public `BoundedAuthorityProtocol.Ed25519` owner, an additive certified corpus, and the soundness-repair governance class (erratum 2), slug:bap-24-strict-ed25519 | [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) + rule S1 in [`spec/bap-v1.md`](../spec/bap-v1.md) § 14.1 (rev 2) and [`spec/bap-v2.md`](../spec/bap-v2.md) § 7 (rev 2) + the sibling-spec statements + the governance, charter, errata, and SECURITY amendments land together; the strict-Ed25519 corpus (`bap-strict-ed25519/1`, 2,410 cases, revision 1, certified index `732117df…287cb9`) verifies 2410/2410 through the CLI and in the Elixir suite and the three in-repo SDKs; every existing corpus index byte-identical; 11 new requirement ids traced in the [requirement map](design/requirement-map.md); the independent Node runners, the graduated TypeScript verifier and signer, the companion signer, and the registry publication complete the release (see the closeout evidence below) | BAP-23 | [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md), [ADR 0012](adr/0012-security-release-accelerated-deprecation-window.md), and [governance](governance.md) |
+| BAP-24 | **Strict Ed25519 verification soundness erratum** — Close the Ed25519 small-order and non-canonical acceptance defect class on every Ed25519 surface (contract-majors 1 and 2, local loopback, role attestation, content assertion) through rule S1, the public `BoundedAuthorityProtocol.Ed25519` owner, an additive certified corpus, and the soundness-repair governance class (erratum 2), slug:bap-24-strict-ed25519 | [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) + rule S1 in [`spec/bap-v1.md`](../spec/bap-v1.md) § 14.1 (rev 2) and [`spec/bap-v2.md`](../spec/bap-v2.md) § 7 (rev 2) + the sibling-spec statements + the governance, charter, errata, and SECURITY amendments land together; the strict-Ed25519 corpus (`bap-strict-ed25519/1`, 2,410 cases, revision 1, certified index `732117df…287cb9`) verifies 2410/2410 through the CLI and in the Elixir suite and the three in-repo SDKs; every existing corpus index byte-identical; 11 new requirement ids traced in the [requirement map](design/requirement-map.md); the independent Node runners, the graduated TypeScript verifier and signer, the companion signer, and the registry publication completed the release (closed October 14, 2026; see the closeout evidence below) | BAP-23 | [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md), [ADR 0012](adr/0012-security-release-accelerated-deprecation-window.md), and [governance](governance.md) |
+| CANDIDATE | **Candidate: offline OpenTimestamps proof verification.** Verify a .ots proof and caller-supplied block headers against a digest; pure, no network. | Not scoped; a design and an ADR precede any acceptance criteria | — | — |
 
 ## BAP-00 closeout evidence
 
@@ -1017,9 +1018,10 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   documentation; those now match the independently checked 0.6.0 registry release. These
   source fixes are unreleased and do not change that published archive or its checksum.
 
-## BAP-24 strict Ed25519 soundness erratum (October 12, 2026)
+## BAP-24 closeout evidence (October 14, 2026)
 
-Status: source landing for release 0.8.0; the release is open until every item below is closed.
+Status: CLOSED. Release 0.8.0 is published, read back, and adopted; every item that the source
+landing left open is closed below.
 
 - Decision: [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) (erratum 2), the
   soundness-repair class in [governance](governance.md) § Soundness repairs, the charter errata and
@@ -1036,16 +1038,52 @@ Status: source landing for release 0.8.0; the release is open until every item b
   index SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`; the CLI and
   `mix conformance.verify` run it; the v1, v2, v3, local-loopback, role-attestation, and
   content-assertion indexes are unchanged.
-- Done before release: the independent Node runners are gated and pinned to an exact Node
+- Gates before release: the independent Node runners are gated and pinned to an exact Node
   version, and the full `mix quality` gate passed on the exact tree.
-- Open: the graduated TypeScript verifier and signer releases; the companion signer release;
-  publication with the advisory; registry read-back; and retirement of releases 0.7.0 and
-  earlier.
+- **Hex publication (OBSERVED, registry read-back):** `bounded_authority_protocol` 0.8.0, tag
+  `v0.8.0` = `108a2de`, registry checksum
+  `b5598cc5ba25f6ff4a2b55dab619bc2419b1d90cce9be3b1d4330d55a6da0bdb` (equal to the
+  release-candidate archive SHA-256), inserted 2026-10-13T16:46:51Z, docs published.
+- **Companion signer (OBSERVED):** `bounded_authority_report_adapter` 0.10.0, tag `v0.10.0` =
+  `20b91eb`, registry checksum
+  `a2a4637630e492f0eca152b4c0dc0919166a17980aff96832da389d0b1890c5d`, inserted
+  2026-10-13T16:50:13Z, docs published; its `mix ci` passed 335/335.
+- **Graduated TypeScript packages (OBSERVED on the npm registry, each with provenance):**
+  - `@bounded-authority-protocol/verifier` 0.6.0 (tag `v0.6.0` = `fcf6119`, integrity
+    `sha512-mnD0HyjDJOFfM/ZNYcinIv1exyVpGmPfcJ056k5Vi2nl7ZlTF7YiYeCDW3r8/469EQHt+4/gMslf1Z6vKhGC5w==`),
+    then 0.7.0, the browser-safe release and current `latest` (tag `v0.7.0` = `fbfd628`,
+    integrity
+    `sha512-k2OovyQf8CoCtFZg9RNYSs7jszRVxHJLHCFLuhxYSAg5uwKFSzw48F5+4kGgvnUdQ0jZSnS08rXIo/0svpYtog==`;
+    its release CI ran Chromium, Firefox, WebKit, Deno, Bun, and the tarball checks before
+    staging).
+  - `@bounded-authority-protocol/signer` 0.4.0 (tag `v0.4.0` = `71ca7d8`, integrity
+    `sha512-AQAK+k6PweL2ngz3TpfKTHuT7284T0WgaO6aRT6SrqKAwTvkPEgEEOblmAtxMiOYy5mhbqdw1hmg8LvizDjPLg==`),
+    then 0.5.0, current `latest`, depending on verifier `^0.7.0` (tag `v0.5.0` = `6b80a82`,
+    integrity
+    `sha512-yN8wRqgMcpvZoHGsQuschtSvQJ2fPjsWtL3WGsmGUBli709Djvuno8EGoB/GQ34lo1T2n2fUw87fhgQw6lRWvg==`).
+  - Before push, local Chromium 153, Firefox 157, and WebKit 27.2 runs passed in both
+    repositories.
+- **Security advisories (OBSERVED, published October 13, 2026 UTC):** GHSA-jwvm-w9r9-qqf8
+  (16:46:59Z), GHSA-q9hh-mwwh-6cg6 (16:50:19Z), GHSA-prrq-qm8j-7j67 (17:01:42Z), and
+  GHSA-wxxg-7cx6-m8qj (17:16:42Z). The CVE requests were still pending at GitHub at read-back.
+- **Retirements (OBSERVED on Hex, reason `security`, checked per release):**
+  `bounded_authority_protocol` 0.1.0 through 0.7.0 (14 of 14 releases) and
+  `bounded_authority_report_adapter` 0.2.0 through 0.9.1 (15 of 15).
+- **Deprecations (OBSERVED on npm):** verifier 0.2.0 through 0.5.0 (7 of 7 versions) and signer
+  0.1.0 through 0.3.1 (7 of 7).
+- **Private-consumer adoption (OBSERVED and reported by the consumer's owner, October 13, 2026):**
+  a private authority runtime consumes 0.8.0 (`~> 0.8.0`) with the companion signer 0.10.0 as a
+  test-only dependency. Its declared gate passed on the exact tree and its CI passed. The deployed
+  build's readiness endpoint reports the adopted revision, and a live probe with an identity-point
+  key and a small-order key was refused with the stored credential count unchanged. An interim
+  mitigation was deployed there before disclosure. Repository and revision identities stay in
+  that consumer's records ([ADR 0023](adr/0023-public-history-privacy-boundary.md)).
 
 ## Next action
 
-BAP-00 through BAP-11, BAP-13 through BAP-19, and BAP-21 through BAP-23 are complete. BAP-24, the
-strict Ed25519 soundness erratum (ADR 0040), is landing for release 0.8.0 (see its section above). BAP-12 remains
+BAP-00 through BAP-11, BAP-13 through BAP-19, and BAP-21 through BAP-24 are complete. BAP-24, the
+strict Ed25519 soundness erratum (ADR 0040), closed with the 0.8.0 release (see its closeout evidence
+above). BAP-12 remains
 open for the IANA filing and is gated on the BAP-08 external-submission preconditions. BAP-23 landed
 the role-attestation sibling profile (ADR 0036) and is now CLOSED END-TO-END: the owner's
 2026-09-23 release decisions shipped it as npm `@bounded-authority-protocol/verifier@0.4.0`

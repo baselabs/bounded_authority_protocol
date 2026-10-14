@@ -21,23 +21,24 @@ grant operational authority by itself.
 
 ## Current state
 
-Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, and `BAP-21` through `BAP-23`
-(`BAP-17` is design-only). Open: `BAP-12` (IANA filing, gated on the BAP-08 external
-submission preconditions) and `BAP-24` (the strict Ed25519 soundness erratum, landing for
-0.8.0). Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence
+Closed: `BAP-00` through `BAP-11`, `BAP-13` through `BAP-19`, and `BAP-21` through `BAP-24`
+(`BAP-17` is design-only; `BAP-24`, the strict Ed25519 soundness erratum, closed with the 0.8.0
+release). Open: `BAP-12` (IANA filing, gated on the BAP-08 external submission preconditions).
+Consult [`docs/ROADMAP.md`](docs/ROADMAP.md); its closeout-evidence
 blocks are the status authority.
 
-The source version is 0.8.0, the strict Ed25519 verification soundness repair
+The source version is 0.8.0 (released), the strict Ed25519 verification soundness repair
 ([ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md), erratum 2): rule S1 (canonical
 point encodings, no small-order key or `R`, `S < L`, the cofactorless equation) on every Ed25519
 surface, owned by the public `BoundedAuthorityProtocol.Ed25519` (`verify_strict/3`,
 `acceptable_public_key?/1`, `torsion_free?/1`), with the additive certified strict-Ed25519 corpus
 (`priv/conformance/strict-ed25519`, `bap-strict-ed25519/1`, 2,410 cases) and the
-soundness-repair governance class. Its publication with the security advisory and the registry
-read-back are open. The
-latest Hex release is 0.7.0, tagged `v0.7.0` (the content-assertion release,
-adding the `bap-content-assertion/1` sibling profile over the 0.6.2 cross-Elixir repair patch,
-the 0.6.0 role-attestation release, and the 0.5.0 ES256 contract-major 3 activation). The
+soundness-repair governance class. The latest Hex release is 0.8.0, tagged `v0.8.0` (published
+October 13, 2026 with its security advisory and read back from the registry; releases 0.1.0
+through 0.7.0 are retired), over the 0.7.0 content-assertion release, the 0.6.2 cross-Elixir
+repair patch, the 0.6.0 role-attestation release, and the 0.5.0 ES256 contract-major 3
+activation. The graduated TypeScript packages are at npm verifier 0.7.0 (browser-safe) and
+signer 0.5.0. The
 package retains zero production
 dependencies, no application callback, and no supervision tree. Contract-major 1 remains frozen;
 contract-major 2 is active under `BoundedAuthorityProtocol.V2` with the `lte` and `gte` selector
