@@ -180,10 +180,20 @@ PY
 }
 
 run_check() {
+  # The scratch repositories below never run git's automatic maintenance. From
+  # git 2.54 the default maintenance strategy is "geometric", and a commit or
+  # merge starts `git maintenance run --auto --detach`: a repack that keeps
+  # writing into .git after the command returns and races the rm -rf of
+  # $check_dir. These two settings reach every git command in the self-check.
   GIT_CONFIG_GLOBAL=/dev/null
   GIT_CONFIG_NOSYSTEM=1
-  GIT_CONFIG_COUNT=0
+  GIT_CONFIG_COUNT=2
+  GIT_CONFIG_KEY_0=maintenance.auto
+  GIT_CONFIG_VALUE_0=false
+  GIT_CONFIG_KEY_1=gc.auto
+  GIT_CONFIG_VALUE_1=0
   export GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM GIT_CONFIG_COUNT
+  export GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1
 
   if require_version '0.0.0' > /dev/null 2>&1; then
     echo "wrong-version self-check did not fail" >&2

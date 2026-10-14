@@ -27,6 +27,13 @@ any existing certified corpus changes.
   `spec/bap-v1.md` cross-references are Markdown links. Erratum 5, editorial; no heading wording,
   requirement, verdict, or corpus changes. `mix quality` now checks every local link and anchor
   in the built HexDocs (`mix docs.links`).
+- The scratch repositories of the private-identifier guard tests, the secret-scan self-check, and
+  the two history-privacy architecture tests turn off git's automatic maintenance
+  (`maintenance.auto` false, `gc.auto` 0). From git 2.54, `git commit`, `merge`, `fetch`, and a
+  push into a local bare remote start a detached repack that keeps writing into `.git` after the
+  command returns; on hosted CI (git 2.55) it can race the scratch cleanup and fail with
+  "directory not empty". A new architecture test requires every script or test that runs such a
+  git command to set both values. Test and tooling only; no package, wire, or verdict change.
 
 ### Added
 

@@ -66,6 +66,19 @@ def git(repo: Path, *args: str, input_text: str | None = None) -> str:
     return result.stdout.strip()
 
 
+# Every throwaway repository turns off git's automatic maintenance before any
+# command that would start it. From git 2.54 the default maintenance strategy
+# is "geometric", and commit, fetch, and a push into a local bare remote (its
+# receive-pack) start `git maintenance run --auto --detach`: a repack that
+# keeps writing packs into .git after the command returns. shutil.rmtree in
+# tearDown then races it and fails intermittently with "directory not empty"
+# (hosted CI runs git 2.55). With these two settings git starts no such process.
+def init_scratch_repo(repo: Path, *init_args: str) -> None:
+    git(repo, "init", *init_args)
+    git(repo, "config", "maintenance.auto", "false")
+    git(repo, "config", "gc.auto", "0")
+
+
 class PrivateIdentifierGuardTest(unittest.TestCase):
     maxDiff = 1600
 
@@ -73,7 +86,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.scratch = Path(tempfile.mkdtemp(prefix="bap-local-guard-test."))
         self.repo = self.scratch / "repo"
         self.repo.mkdir()
-        git(self.repo, "init", "-q")
+        init_scratch_repo(self.repo, "-q")
         git(self.repo, "config", "user.email", "guard@example.invalid")
         git(self.repo, "config", "user.name", "Guard Test")
         self.pattern = "public-synthetic-orchid"
@@ -285,7 +298,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
     def make_remote(self) -> tuple[Path, str]:
         remote = self.scratch / "remote.git"
         remote.mkdir()
-        git(remote, "init", "--bare", "-q")
+        init_scratch_repo(remote, "--bare", "-q")
         git(self.repo, "remote", "add", "origin", str(remote))
         head = git(self.repo, "rev-parse", "HEAD")
         result = self.guard(
@@ -545,7 +558,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         graft_file.write_text(head + "\n", encoding="ascii")
         remote = self.scratch / "environment-remote.git"
         remote.mkdir()
-        git(remote, "init", "--bare", "-q")
+        init_scratch_repo(remote, "--bare", "-q")
         result = self.guard(
             "pre-push",
             "environment-origin",
@@ -603,7 +616,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
 
         remote = self.scratch / "command-remote.git"
         remote.mkdir()
-        git(remote, "init", "--bare", "-q")
+        init_scratch_repo(remote, "--bare", "-q")
         git(self.repo, "remote", "add", "command-origin", str(remote))
         result = run(
             "git",

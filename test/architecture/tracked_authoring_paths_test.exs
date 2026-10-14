@@ -173,6 +173,12 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     File.mkdir_p!(repo)
     on_exit(fn -> File.rm_rf!(repo) end)
     git!(repo, ["init", "--initial-branch=main"])
+    # The throwaway repository never runs git's automatic maintenance. From git
+    # 2.54 the default maintenance strategy is "geometric", and a commit or merge
+    # starts `git maintenance run --auto --detach`: a repack that keeps writing
+    # into .git after the command returns and races the on_exit File.rm_rf!.
+    git!(repo, ["config", "maintenance.auto", "false"])
+    git!(repo, ["config", "gc.auto", "0"])
     git!(repo, ["config", "user.email", "path-guard@example.invalid"])
     git!(repo, ["config", "user.name", "Path Guard"])
     git!(repo, ["config", "core.hooksPath", "/dev/null"])
