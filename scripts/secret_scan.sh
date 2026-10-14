@@ -443,6 +443,7 @@ priv/conformance/v1/vectors/grant-holder-proof.json
 sdks/go/conformance/corpus-v2/cases/grant-verify/probe.json
 sdks/go/permissiveness_internal_test.go
 sdks/typescript/conformance/corpus-v2/cases/grant-verify/probe.json
+priv/conformance/producer-canonicality/cases/es256-export-encode/probe.json
 EOF
   python3 - "$config" "$generic_paths_file" "$jwt_paths_file" <<'PY'
 import re
