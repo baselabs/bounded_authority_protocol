@@ -9,16 +9,13 @@ defmodule BoundedAuthorityProtocol.V3.EcJwk do
   call, so the closed rejection is deterministic across backends.
   """
 
+  alias BoundedAuthorityProtocol.Es256
   alias BoundedAuthorityProtocol.V1.Base64Url
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Json
 
   @public_key_bytes 65
   @coordinate_bytes 32
-
-  # NIST P-256 (secp256r1) domain parameters.
-  @p 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
-  @b 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B
 
   @doc "Encodes one raw 65-byte uncompressed SEC1 public key as the canonical public EC JWK."
   @spec encode_public(binary(), Bounds.t() | map()) :: {:ok, binary()} | {:error, :invalid}
@@ -27,8 +24,7 @@ defmodule BoundedAuthorityProtocol.V3.EcJwk do
          true <- byte_size(public_key) == @public_key_bytes,
          <<4>> <> rest <- public_key,
          <<x::binary-@coordinate_bytes, y::binary-@coordinate_bytes>> <- rest,
-         true <- field_element?(x) and field_element?(y),
-         true <- on_curve?(x, y) do
+         true <- Es256.acceptable_public_key?(public_key) do
       {:ok, jwk_preimage(x, y)}
     else
       _failure -> {:error, :invalid}
@@ -105,26 +101,10 @@ defmodule BoundedAuthorityProtocol.V3.EcJwk do
          {:ok, x} <- Base64Url.decode(x_encoded, bounds),
          {:ok, y} <- Base64Url.decode(y_encoded, bounds),
          true <- byte_size(x) == @coordinate_bytes and byte_size(y) == @coordinate_bytes,
-         true <- field_element?(x) and field_element?(y),
-         true <- on_curve?(x, y) do
+         true <- Es256.acceptable_public_key?(<<4>> <> x <> y) do
       {:ok, x, y}
     else
       _failure -> {:error, :invalid}
     end
-  end
-
-  defp field_element?(coordinate) do
-    :binary.decode_unsigned(coordinate) < @p
-  end
-
-  # Short-Weierstrass on-curve check y^2 = x^3 - 3x + b (mod p): pure
-  # arbitrary-precision arithmetic, no backend dependency.
-  defp on_curve?(x, y) do
-    xi = :binary.decode_unsigned(x)
-    yi = :binary.decode_unsigned(y)
-
-    lhs = Integer.mod(yi * yi, @p)
-    rhs = Integer.mod(xi * xi * xi - 3 * xi + @b, @p)
-    lhs == rhs
   end
 end

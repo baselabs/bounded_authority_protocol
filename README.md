@@ -94,6 +94,16 @@ Strict Ed25519 (`BoundedAuthorityProtocol.Ed25519`, [ADR 0040](docs/adr/0040-str
 - `torsion_free?/1` — the host check for key enrollment, trust install, and deny-list or
   revocation comparison. It is not on the verification path; call it yourself at those points.
 
+ES256 (`BoundedAuthorityProtocol.Es256`, unreleased; planned for 0.9.0):
+
+- `canonical_signature?/1` — the one ES256 signature rule (`0 < r < n`, `0 < s <= n/2`) that
+  verification and the producer surfaces share.
+- `acceptable_public_key?/1` and `verify_strict/3` — uncompressed SEC1 key acceptance (coordinates
+  below `p`, on the curve) and strict verification.
+- `der_to_raw/1` and `normalize_low_s/1` — signer-side utilities: convert a strict DER
+  signature from an HSM, KMS, or secret store to the raw `r || s` form, then normalize it to
+  low-S before assembly. Assembly itself never normalizes; it refuses (erratum 3).
+
 Decoding:
 
 - `BoundedAuthorityProtocol.V1.Json.decode/2` — the closed tagged-JSON algebra with recursive
@@ -206,6 +216,18 @@ unchanged. The same CLI verifies it:
 
 ```bash
 ./bounded_authority_conformance --corpus priv/conformance/strict-ed25519
+```
+
+The producer-canonicality corpus (`bap-producer-canonicality/1`, revision 1, erratum 3: 75 cases
+in 4 families; index SHA-256
+`99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601`) lives under
+`priv/conformance/producer-canonicality`. It certifies that compact assembly and anchored-export
+encoding refuse a signature no conforming signer emits (ES256 out of range or high-S; Ed25519
+`S >= L` or a non-canonical or small-order `R`) and emit accepted bytes unchanged. It is
+unreleased (planned for 0.9.0) and changes no existing verdict:
+
+```bash
+./bounded_authority_conformance --corpus priv/conformance/producer-canonicality
 ```
 
 ## Cross-language verifier SDKs

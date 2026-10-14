@@ -852,19 +852,27 @@ defmodule BoundedAuthorityProtocol.V3.AnchoredExportTest do
     compact
   end
 
-  defp legacy_sign_anchor(anchor, private_key) do
+  defp legacy_sign_anchor(anchor, _private_key) do
     {:ok, input} = V1.boundary_anchor_signing_input(anchor, %{})
-    signature = sign_es256(input.message, private_key)
+    # The v1 producer surfaces refuse a signature that fails the keyless Ed25519 rule
+    # (erratum 3), so the legacy archive carries Ed25519-shaped signatures; v3 verification
+    # refuses it at the archive prefix before any signature is examined.
+    signature = :crypto.sign(:eddsa, :none, input.message, [legacy_ed25519_seed(), :ed25519])
     {:ok, compact} = V1.assemble_compact(input, signature)
     compact
   end
 
-  defp legacy_sign_transition(transition, private_key) do
+  defp legacy_sign_transition(transition, _private_key) do
     {:ok, input} = V1.key_transition_signing_input(transition, %{})
-    signature = sign_es256(input.message, private_key)
+    # The v1 producer surfaces refuse a signature that fails the keyless Ed25519 rule
+    # (erratum 3), so the legacy archive carries Ed25519-shaped signatures; v3 verification
+    # refuses it at the archive prefix before any signature is examined.
+    signature = :crypto.sign(:eddsa, :none, input.message, [legacy_ed25519_seed(), :ed25519])
     {:ok, compact} = V1.assemble_compact(input, signature)
     compact
   end
+
+  defp legacy_ed25519_seed, do: :crypto.hash(:sha256, "v3 anchored export legacy-major seed")
 
   defp one_byte_chunks(bytes), do: one_byte_chunks(bytes, [])
   defp one_byte_chunks([], accumulator), do: Enum.reverse(accumulator)

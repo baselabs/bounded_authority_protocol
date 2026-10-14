@@ -228,3 +228,30 @@ The `primitive`, `key-acceptance`, and `differential` families exercise the rule
 other families carry the same inputs through every signed surface. The rule-S1 checks for
 canonical `R` and `S < L` are often duplicated by backends, so prove them with unit tests and
 permissiveness mutants, not only with corpus verdicts.
+
+## 13. Producer surfaces: assembly and export encoding
+
+Compact assembly and anchored-export encoding are producer surfaces (erratum 3). They hold no key
+and verify no signature, but they refuse a signature that no conforming signer emits and they
+never rewrite the bytes they accept:
+
+- Under contract-major 3, refuse any framed signature outside `0 < r < n`, `0 < s <= floor(n/2)`
+  with the closed error. Call the same predicate your verifier runs; do not keep a second copy of
+  `n` or `floor(n/2)`.
+- Under Ed25519 (contract-majors 1 and 2 and the three sibling profiles), refuse a signature whose
+  `R` is non-canonical or of small order, or whose `S >= L`. This is the keyless part of rule S1:
+  factor it out of your verification gate so one function owns it, and do not decode `R` at
+  assembly.
+- Never normalize at these surfaces. Normalization (`s <- n - s` when high) is the signer's duty:
+  the party that receives the signature from an HSM or KMS converts DER to the raw form and
+  normalizes before assembly. In Elixir, `BoundedAuthorityProtocol.Es256.der_to_raw/1` and
+  `normalize_low_s/1` do exactly that, and `BoundedAuthorityProtocol.Es256.canonical_signature?/1`
+  is the shared predicate.
+- Decode stays untouched: a decoded compact is not a verified one.
+
+Run the producer-canonicality corpus (`priv/conformance/producer-canonicality`,
+`bap-producer-canonicality/1`) beside the existing corpora and pin its index SHA-256
+`99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601` at load. Its 15 accepted
+cases sit exactly at the rule's bound and must emit the signing input plus the signature
+unchanged; their signatures are not verifiable. Add a permissiveness mutant that deletes your
+assembly check and watch the 60 refused cases go red.

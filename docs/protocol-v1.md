@@ -490,6 +490,15 @@ revocation, grants execution, or overrides a host policy. Compact assembly accep
 signing input and a 64-byte signature — never a key, signer, or callback
 (`REQ1-VERIFY-no-signer-callback`).
 
+Compact assembly and anchored-export encoding are producer surfaces listed here because they are
+public; they verify no signature (erratum 3). Each MUST refuse a signature that fails the keyless
+part of rule S1 (`R` canonical and not of small order, `S < L`) with the closed error value, and
+MUST emit accepted signature bytes unchanged (`REQ1-SIGNING-ed25519-producer-canonical`). They
+do not decode `R`, so they accept exactly the signatures whose signature clauses the verification
+gate accepts. Decode does not apply these clauses: a decoded compact is not a verified one. The
+cases are in the additive `bap-producer-canonicality/1` corpus
+(`priv/conformance/producer-canonicality`).
+
 <!-- facts:error-shape -->
 Every function returns `{:ok, value}` or exactly `{:error, :invalid}` (`REQ1-VERIFY-return-shape`).
 

@@ -5,6 +5,23 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
+## 0.8.0 to 0.9.0 (unreleased)
+
+Clarifying minor (erratum 3). No verification verdict changes. The requirement `~> 0.8.0` does
+not select 0.9.0; move to `~> 0.9.0` when it is published.
+
+- `assemble_compact` and `encode_anchored_export` refuse a signature that no conforming signer
+  emits, with `{:error, :invalid}`, and never rewrite accepted bytes. Under contract-major 3 that
+  is `r` or `s` out of range or high-S; under Ed25519 it is `S ≥ L` or an `R` that is
+  non-canonical or of small order. Every verifier already rejected these signatures, so a
+  credential that assembled and verified before still does.
+- If you sign through an HSM, KMS, or secret store and assemble yourself, convert and normalize
+  before assembly: `BoundedAuthorityProtocol.Es256.der_to_raw/1`, then
+  `BoundedAuthorityProtocol.Es256.normalize_low_s/1`. The companion signers already normalize.
+- Decode is unchanged: `decode_grant/2` and `decode_proof/2` still decode a high-S compact,
+  because a decoded compact is not a verified one.
+- New public module `BoundedAuthorityProtocol.Es256`.
+
 ## 0.7.0 to 0.8.0
 
 Soundness-repair minor (erratum 2, [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)):

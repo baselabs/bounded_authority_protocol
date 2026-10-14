@@ -133,6 +133,20 @@ with expected verdicts from an independent arithmetic generator and the 12 publi
 | Independent Node runner (`node conformance/corpus_independent.mjs --strict priv/conformance/strict-ed25519`, Node 22.23.1) | **agreed=2017 disagreed=0**; it implements contract-major 1, so the 393 major-2 and sibling-profile cases are reported as not covered (October 13, 2026) |
 | TypeScript | adopted in its graduated repository and released as npm verifier 0.6.0, then 0.7.0 (October 13, 2026); the run is recorded in that repository |
 
+### Producer-canonicality corpus
+
+The additive `bap-producer-canonicality/1` corpus (erratum 3; unreleased, planned for 0.9.0) is
+certified by its revision-1 index at `priv/conformance/producer-canonicality`, SHA-256
+`99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601`: 75 cases in 4 families (60
+refused, 15 accepted at the rule's bound), generated keylessly from certified signatures. Every
+figure above this section is unchanged by it.
+
+| Implementation | Result |
+|---|---|
+| Elixir reference (`bounded_authority_conformance --corpus priv/conformance/producer-canonicality`) | **agreed=75 disagreed=0** (October 14, 2026, source tree for 0.9.0) |
+| Python, Go, Rust, TypeScript | not yet run; each adopts the corpus in its erratum 3 unit |
+| Independent Node runner | not yet run; its major-1 cases are its share |
+
 ### Independent Node second-implementation runners
 
 Three runner-authored-from-the-corpus Node implementations (node:* only; the corpus is the

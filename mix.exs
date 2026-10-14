@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.MixProject do
   use Mix.Project
 
-  @version "0.8.0"
+  @version "0.9.0"
   @source_url "https://github.com/baselabs/bounded_authority_protocol"
 
   def project do
@@ -104,6 +104,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "priv/conformance/attestation-profiles/role-attestation/v1",
         "priv/conformance/attestation-profiles/content-assertion/v1",
         "priv/conformance/strict-ed25519",
+        "priv/conformance/producer-canonicality",
         ".formatter.exs",
         "mix.exs",
         "README.md",
@@ -291,7 +292,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "cmd ./bounded_authority_conformance --corpus priv/conformance/v1/corpus",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/v2/corpus",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/v3/corpus",
-        "cmd ./bounded_authority_conformance --corpus priv/conformance/strict-ed25519"
+        "cmd ./bounded_authority_conformance --corpus priv/conformance/strict-ed25519",
+        "cmd ./bounded_authority_conformance --corpus priv/conformance/producer-canonicality"
       ],
       "local_loopback_http.verify": [
         "run scripts/check_local_loopback_http.exs",

@@ -1,6 +1,7 @@
 defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
   @moduledoc false
 
+  alias BoundedAuthorityProtocol.Ed25519
   alias BoundedAuthorityProtocol.V1.AnchoredExportFacts
   alias BoundedAuthorityProtocol.V1.AnchoredExportInput
   alias BoundedAuthorityProtocol.V1.ArchivedObject
@@ -49,6 +50,7 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
              0,
              []
            ),
+         :ok <- canonical_signatures([start_parsed, end_parsed | transition_parsed]),
          :ok <-
            validate_expected_key_path(
              expected.start_anchor,
@@ -80,6 +82,17 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportCodec do
   end
 
   def encode(_input, _expected), do: {:error, :invalid}
+
+  # Encoding is a producer surface (erratum 3): it frames signatures and verifies none, and it
+  # refuses any framed signature that fails the keyless part of rule S1, never rewriting its
+  # bytes.
+  defp canonical_signatures([]), do: :ok
+
+  defp canonical_signatures([%{signature: signature} | rest]) do
+    if Ed25519.signature_gate?(signature),
+      do: canonical_signatures(rest),
+      else: {:error, :invalid}
+  end
 
   @spec verify(ArchivedObject.t(), HistoricalKeyChain.t(), ExpectedAnchoredExport.t()) ::
           {:ok, AnchoredExportFacts.t()} | {:error, :invalid}

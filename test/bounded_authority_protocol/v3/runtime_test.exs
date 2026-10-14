@@ -404,7 +404,9 @@ defmodule BoundedAuthorityProtocol.V3.RuntimeTest do
       message: input.protected_segment <> "." <> bad_grant_payload
     }
 
-    assert {:error, :invalid} = V3.assemble_compact(forged_grant, <<0::512>>, %{})
+    # A canonical signature (r = s = 1), so assembly reaches the revalidation step (erratum 3
+    # refuses a non-canonical one before it).
+    assert {:error, :invalid} = V3.assemble_compact(forged_grant, <<1::256, 1::256>>, %{})
 
     # The proof-kind arm needs a real proof header (typ dpop+jwt) so assembly reaches
     # the revalidation step, with a payload that fails the proof decode.
@@ -433,7 +435,9 @@ defmodule BoundedAuthorityProtocol.V3.RuntimeTest do
       message: proof_input.protected_segment <> "." <> bad_proof_payload
     }
 
-    assert {:error, :invalid} = V3.assemble_compact(forged_proof, <<0::512>>, %{})
+    # A canonical signature (r = s = 1), so assembly reaches the revalidation step (erratum 3
+    # refuses a non-canonical one before it).
+    assert {:error, :invalid} = V3.assemble_compact(forged_proof, <<1::256, 1::256>>, %{})
   end
 
   test "a mixed-kind grant decodes its one_of selector through the v2 parse path" do
@@ -553,8 +557,9 @@ defmodule BoundedAuthorityProtocol.V3.RuntimeTest do
 
     {:ok, input} = V1.grant_signing_input(grant, %{})
     signature = sign_es256(input.message, issuer_private())
-    {:ok, compact} = V1.assemble_compact(input, signature)
-    compact
+    # An ES256 signature over v1 bytes is not one a conforming v1 producer emits, so the v1
+    # assembler refuses it (erratum 3); the cross-major bytes are framed directly.
+    input.message <> "." <> Base.url_encode64(signature, padding: false)
   end
 
   defp legacy_major_key, do: issuer_public()

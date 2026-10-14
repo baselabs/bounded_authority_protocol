@@ -16,6 +16,15 @@ contract-major ids (`REQ1-SIGNING-ed25519-canonical-point`,
 SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`). This profile's own
 corpus, index, and verdicts are unchanged.
 
+Producer canonicality (erratum 3): this profile's assembler refuses a signature that fails the
+keyless part of rule S1 (`R` canonical and not of small order, `S < L`) and emits accepted bytes
+unchanged, through the one Ed25519 assembly call site every assembler shares. Its cases are the
+4 `assemble-loopback-*` cases of the `ed25519-assemble` family in the additive
+producer-canonicality corpus (`priv/conformance/producer-canonicality`, index SHA-256
+`99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601`): `S = L`, identity `R`, and `R` with `y = p` refused, `S = L - 1` emitted byte for byte.
+RED PROOF: mutation `ed25519-assembly-gate-removed` reddens the family test. This profile's own
+corpus, index, and verdicts are unchanged.
+
 | Requirements | Evidence | Status |
 |---|---|---|
 | `CORE-compose-v1`, `CORE-profile-identity`, `HEADER-closed-set`, `HEADER-signed-identity` | `proof-cases.json`; five SDK corpus consumers; exact producer/assembly bytes | populated |

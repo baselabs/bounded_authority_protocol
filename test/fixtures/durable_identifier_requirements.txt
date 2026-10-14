@@ -70,6 +70,7 @@ REQ1-SIGNING-deterministic-produce
 REQ1-SIGNING-digest-prefix
 REQ1-SIGNING-ed25519-canonical-point
 REQ1-SIGNING-ed25519-cofactorless
+REQ1-SIGNING-ed25519-producer-canonical
 REQ1-SIGNING-ed25519-scalar-range
 REQ1-SIGNING-ed25519-small-order-reject
 REQ1-SIGNING-exact-input
@@ -115,6 +116,7 @@ REQ2-SELECTOR-verdict-internal
 REQ2-SIGNING-digest-prefix
 REQ2-SIGNING-ed25519-canonical-point
 REQ2-SIGNING-ed25519-cofactorless
+REQ2-SIGNING-ed25519-producer-canonical
 REQ2-SIGNING-ed25519-scalar-range
 REQ2-SIGNING-ed25519-small-order-reject
 REQ3-BOUNDS-fixed-widths
@@ -138,5 +140,6 @@ REQ3-KEY-uncompressed-sec1
 REQ3-SIGNING-backend-reject
 REQ3-SIGNING-digest-prefix
 REQ3-SIGNING-low-s
+REQ3-SIGNING-producer-canonical
 REQ3-SIGNING-range
 REQ3-SIGNING-raw-rs

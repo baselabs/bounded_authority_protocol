@@ -2,6 +2,52 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
+## [Unreleased]
+
+Planned as 0.9.0, a clarifying minor release (erratum 3). No verification verdict and no verdict of
+any existing certified corpus changes.
+
+### Fixed
+
+- Compact assembly and anchored-export encoding now refuse a signature that no conforming signer
+  emits, and they never rewrite accepted signature bytes. Under contract-major 3 (ES256) the
+  refusal covers `r` or `s` equal to zero or at least `n`, and high-S (`s > ⌊n/2⌋`). Under
+  contract-majors 1 and 2 and the local-loopback, role-attestation and content-assertion profiles
+  (Ed25519), it covers `S ≥ L` and an `R` that is non-canonical or of small order. Every BAP
+  verifier already rejected these signatures. Only generic JOSE consumers outside BAP would accept
+  a high-S ES256 signature. Signers must normalize to low-S before assembly (`spec/bap-v3.md`
+  § 3.2). The adapter and the TypeScript signer already do. Erratum 3. No verdict of any existing
+  certified corpus changes, and the new cases are in `bap-producer-canonicality/1`.
+
+### Added
+
+- `BoundedAuthorityProtocol.Es256`, the single public owner of the ES256 rules, mirroring
+  `BoundedAuthorityProtocol.Ed25519`: `canonical_signature?/1` (the shared `0 < r < n`,
+  `0 < s ≤ ⌊n/2⌋` predicate that verification and the producer surfaces both call),
+  `acceptable_public_key?/1` (uncompressed SEC1, coordinates below `p`, on the curve),
+  `verify_strict/3`, and the producer utilities `normalize_low_s/1` (pure `s → n − s` when high,
+  refusing out-of-range scalars, idempotent; never applied by assembly) and `der_to_raw/1`
+  (strict DER `ECDSA-Sig-Value` to raw `r || s`, refusing non-minimal or negative INTEGERs,
+  long-form or mismatched lengths, trailing bytes, and out-of-range scalars; the output is not
+  normalized). The internal v3 suite module and the EC JWK codec delegate to it.
+- The additive producer-canonicality conformance corpus `bap-producer-canonicality/1`, revision 1,
+  at `priv/conformance/producer-canonicality` (75 cases in 4 families; 60 refused, 15 accepted at
+  the rule's bound; index SHA-256
+  `99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601`), generated keylessly by
+  `conformance/generators/build_producer_canonicality.mjs`. The verifier CLI and
+  `mix conformance.verify` run it.
+- Requirement ids `REQ1-SIGNING-ed25519-producer-canonical`,
+  `REQ2-SIGNING-ed25519-producer-canonical`, and `REQ3-SIGNING-producer-canonical`; the
+  local-loopback, role-attestation, and content-assertion assembly requirements carry the same
+  clause.
+
+### Changed
+
+- The keyless part of Ed25519 rule S1 (`R` canonical and not of small order, `S < L`) is factored
+  out of the verification gate, so the gate and every Ed25519 producer surface share one owner.
+- The `REQ3-SIGNING-range` red-proof disclosure (ADR 0035) is withdrawn: the producer surfaces
+  isolate each range clause, and the matching mutation-battery entries run red.
+
 ## [0.8.0] — 2026-10-13
 
 The strict Ed25519 verification release: a soundness repair (erratum 2,

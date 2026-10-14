@@ -24,6 +24,10 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   per-file and per-family case counts, a profile and a revision sidecar, and no applicability
   matrix. The loaded corpus carries `major: :strict_ed25519`; each case names its own surface
   and, for v1/v2-shaped families, its own contract-major.
+
+  `load_producer_canonicality/1` loads the additive producer-canonicality corpus (profile
+  `bap-producer-canonicality/1`, erratum 3) through the same closed index shape; it carries
+  `major: :producer_canonicality`.
   """
 
   alias BoundedAuthorityProtocol.V1.Bounds
@@ -38,7 +42,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
           cases: [{binary(), [map()]}],
           raws: %{binary() => binary()},
           case_ids: term(),
-          major: 1 | 2 | 3 | :strict_ed25519
+          major: 1 | 2 | 3 | :strict_ed25519 | :producer_canonicality
         }
 
   # The index format string names the corpus's contract-major; the loader derives
@@ -91,35 +95,66 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
 
   def load(_map), do: {:error, :invalid}
 
-  # --- strict-Ed25519 corpus -----------------------------------------------
+  # --- additive corpora (strict-Ed25519, producer-canonicality) -------------
 
-  @strict_profile "bap-strict-ed25519/1"
-  @strict_index_format "bounded-authority-protocol-strict-ed25519-conformance-corpus-index"
-  @strict_case_format "bounded-authority-protocol-strict-ed25519-conformance-cases"
-  @strict_profile_format "bounded-authority-protocol-strict-ed25519-conformance-profile"
-  @strict_revision_format "bounded-authority-protocol-strict-ed25519-conformance-corpus-revision"
-  @strict_sidecars ["profile.json", "revision.json"]
+  # The two additive corpora share one closed index shape: per-file lowercase-hex SHA-256,
+  # per-file and per-family case counts, a profile and a revision sidecar, and no applicability
+  # matrix. Each carries its own profile and format strings, so a loader accepts only its own.
+  @strict_ed25519 %{
+    major: :strict_ed25519,
+    profile: "bap-strict-ed25519/1",
+    index_format: "bounded-authority-protocol-strict-ed25519-conformance-corpus-index",
+    case_format: "bounded-authority-protocol-strict-ed25519-conformance-cases",
+    profile_format: "bounded-authority-protocol-strict-ed25519-conformance-profile",
+    revision_format: "bounded-authority-protocol-strict-ed25519-conformance-corpus-revision"
+  }
+
+  @producer_canonicality %{
+    major: :producer_canonicality,
+    profile: "bap-producer-canonicality/1",
+    index_format: "bounded-authority-protocol-producer-canonicality-conformance-corpus-index",
+    case_format: "bounded-authority-protocol-producer-canonicality-conformance-cases",
+    profile_format: "bounded-authority-protocol-producer-canonicality-conformance-profile",
+    revision_format:
+      "bounded-authority-protocol-producer-canonicality-conformance-corpus-revision"
+  }
+
+  @additive_sidecars ["profile.json", "revision.json"]
 
   # One clause per sidecar: `in` over a list of binaries compiles to :lists.member/2 on
   # Elixir before 1.20, which the compiled-purity gate does not admit.
-  for sidecar <- @strict_sidecars do
-    defp strict_sidecar?(unquote(sidecar)), do: true
+  for sidecar <- @additive_sidecars do
+    defp additive_sidecar?(unquote(sidecar)), do: true
   end
 
-  defp strict_sidecar?(_path), do: false
+  defp additive_sidecar?(_path), do: false
 
   @doc "Loads and integrity-verifies the `%{path => binary}` strict-Ed25519 corpus map."
   @spec load_strict_ed25519(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
-  def load_strict_ed25519(map) when is_map(map) do
+  def load_strict_ed25519(map) when is_map(map), do: load_additive(map, @strict_ed25519)
+  def load_strict_ed25519(_map), do: {:error, :invalid}
+
+  @doc """
+  Loads and integrity-verifies the `%{path => binary}` producer-canonicality corpus map (profile
+  `bap-producer-canonicality/1`, erratum 3). The loaded corpus carries
+  `major: :producer_canonicality`; each case names its own contract-major or sibling profile.
+  """
+  @spec load_producer_canonicality(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
+  def load_producer_canonicality(map) when is_map(map),
+    do: load_additive(map, @producer_canonicality)
+
+  def load_producer_canonicality(_map), do: {:error, :invalid}
+
+  defp load_additive(map, %{major: major} = spec) do
     with {:ok, index_bytes} <- fetch_index(map),
          {:ok, index} <- decode_index(index_bytes),
-         :ok <- verify_strict_structure(index),
-         {:ok, files} <- ordered_files(strict_file_entries(index["files"])),
+         :ok <- verify_additive_structure(index, spec),
+         {:ok, files} <- ordered_files(additive_file_entries(index["files"])),
          :ok <- verify_file_set(files, map),
-         :ok <- verify_strict_hashes(files, map),
-         :ok <- verify_strict_sidecars(map, index["revision"]),
-         {:ok, cases} <- load_strict_case_files(files, map),
-         :ok <- verify_strict_counts(index, files, cases),
+         :ok <- verify_additive_hashes(files, map),
+         :ok <- verify_additive_sidecars(map, index["revision"], spec),
+         {:ok, cases} <- load_additive_case_files(files, map, spec),
+         :ok <- verify_additive_counts(index, files, cases),
          :ok <- verify_case_ids(cases) do
       case_ids = cases |> Enum.flat_map(&elem(&1, 1)) |> Enum.map(& &1["id"]) |> MapSet.new()
 
@@ -130,15 +165,13 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
          cases: cases,
          raws: %{},
          case_ids: case_ids,
-         major: :strict_ed25519
+         major: major
        }}
     end
   end
 
-  def load_strict_ed25519(_map), do: {:error, :invalid}
-
-  defp verify_strict_structure(index) do
-    if index["format"] == @strict_index_format and index["profile"] == @strict_profile and
+  defp verify_additive_structure(index, %{index_format: index_format, profile: profile}) do
+    if index["format"] == index_format and index["profile"] == profile and
          revision_integer?({:integer, index["revision"]}) and
          index["private_material_tracked"] == false and is_list(index["files"]) and
          is_integer(index["total_cases"]) and is_map(index["families"]),
@@ -146,9 +179,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
        else: {:error, :invalid}
   end
 
-  # The strict index names each file's digest as lowercase hex under "sha256"; mapping it onto
+  # The additive index names each file's digest as lowercase hex under "sha256"; mapping it onto
   # the shared {path, hash, count} tuple reuses the ordered-file and file-set checks unchanged.
-  defp strict_file_entries(entries) when is_list(entries) do
+  defp additive_file_entries(entries) when is_list(entries) do
     %{
       "files" =>
         Enum.map(entries, fn
@@ -161,26 +194,30 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     }
   end
 
-  defp verify_strict_hashes(files, map) do
-    if Enum.all?(files, fn {path, hash, _count} -> strict_hash_matches?(map, path, hash) end),
+  defp verify_additive_hashes(files, map) do
+    if Enum.all?(files, fn {path, hash, _count} -> additive_hash_matches?(map, path, hash) end),
       do: :ok,
       else: {:error, :invalid}
   end
 
-  defp strict_hash_matches?(map, path, hash) do
+  defp additive_hash_matches?(map, path, hash) do
     case fetch_path(map, path) do
       {:ok, bytes} -> sha256_hex(bytes) == hash
       _missing -> false
     end
   end
 
-  defp verify_strict_sidecars(map, revision) do
+  defp verify_additive_sidecars(map, revision, %{
+         profile: profile_name,
+         profile_format: profile_format,
+         revision_format: revision_format
+       }) do
     with {:ok, profile} <- decode_plain(map, "profile.json"),
          {:ok, sidecar} <- decode_plain(map, "revision.json"),
-         true <- profile["format"] == @strict_profile_format,
-         true <- profile["profile"] == @strict_profile,
+         true <- profile["format"] == profile_format,
+         true <- profile["profile"] == profile_name,
          true <- profile["revision"] == revision,
-         true <- sidecar["format"] == @strict_revision_format,
+         true <- sidecar["format"] == revision_format,
          true <- sidecar["revision"] == revision,
          true <- generated_from_string?({:string, sidecar["generated_from"]}) do
       :ok
@@ -191,43 +228,45 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
 
   # Every non-sidecar file is cases/<family>/<name>.json, carries the case format, names its
   # own directory as its family, and holds a list of case objects that each name a surface.
-  defp load_strict_case_files(files, map) do
+  defp load_additive_case_files(files, map, spec) do
     loaded =
       files
-      |> Enum.reject(fn {path, _hash, _count} -> strict_sidecar?(path) end)
-      |> Enum.map(fn {path, _hash, _count} -> {path, load_strict_case_file(path, map)} end)
+      |> Enum.reject(fn {path, _hash, _count} -> additive_sidecar?(path) end)
+      |> Enum.map(fn {path, _hash, _count} ->
+        {path, load_additive_case_file(path, map, spec)}
+      end)
 
     if Enum.all?(loaded, &match?({_path, {:ok, _cases}}, &1)),
       do: {:ok, Enum.map(loaded, fn {path, {:ok, cases}} -> {path, cases} end)},
       else: {:error, :invalid}
   end
 
-  defp load_strict_case_file(path, map) do
+  defp load_additive_case_file(path, map, %{case_format: case_format}) do
     with ["cases", family, name] <- String.split(path, "/"),
          true <- String.ends_with?(name, ".json"),
          {:ok, file} <- decode_plain(map, path),
-         true <- file["format"] == @strict_case_format,
+         true <- file["format"] == case_format,
          true <- file["family"] == family,
          cases when is_list(cases) and cases != [] <- file["cases"],
-         true <- Enum.all?(cases, &strict_case?/1) do
+         true <- Enum.all?(cases, &additive_case?/1) do
       {:ok, Enum.map(cases, &Map.put(&1, "family", family))}
     else
       _invalid -> :error
     end
   end
 
-  defp strict_case?(%{"id" => id, "surface" => surface})
+  defp additive_case?(%{"id" => id, "surface" => surface})
        when is_binary(id) and is_binary(surface),
        do: true
 
-  defp strict_case?(_case_obj), do: false
+  defp additive_case?(_case_obj), do: false
 
-  defp verify_strict_counts(index, files, cases) do
+  defp verify_additive_counts(index, files, cases) do
     per_file = Map.new(cases, fn {path, list} -> {path, length(list)} end)
 
     files_agree? =
       Enum.all?(files, fn {path, _hash, count} ->
-        if strict_sidecar?(path), do: count == 0, else: Map.get(per_file, path) == count
+        if additive_sidecar?(path), do: count == 0, else: Map.get(per_file, path) == count
       end)
 
     per_family =

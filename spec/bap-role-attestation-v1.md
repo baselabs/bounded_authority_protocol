@@ -125,9 +125,11 @@ shape (`REQ-RA1-API-return-shape`). The package owns no signer and accepts no pr
 signing callback (`REQ-RA1-API-no-signer`).
 
 Compact assembly MUST revalidate the protected header, payload, member rules, segment bounds,
-and signature width under this profile before returning a compact artifact
-(`REQ-RA1-API-assembly-revalidate`). Signing-input production, assembly, decoding, and
-verification MUST use the same profile semantics (`REQ-RA1-API-symmetry`).
+signature width, and the keyless signature rule of BAP1 rule S1 (`R` canonical and not of small
+order, `S < L`; erratum 3) under this profile before returning a compact artifact, and MUST emit
+accepted signature bytes unchanged (`REQ-RA1-API-assembly-revalidate`). Signing-input
+production, assembly, decoding, and verification MUST use the same profile semantics, and the
+assembler and the verifier apply the same keyless signature rule (`REQ-RA1-API-symmetry`).
 
 ## 5. Security and host obligations
 

@@ -16,6 +16,11 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519SurfacesTest do
   honest signature verifies, so a rejection here is the key or signature rule and not a broken
   fixture.
 
+  Compact assembly and anchored-export encoding refuse a signature that fails the keyless part
+  of rule S1 (erratum 3), and the forgery's `R` is the identity, so the signed artifacts here are
+  framed directly: a compact is `protected.payload.signature`, and an archive is the honest
+  encoder's output with each anchor signature replaced and the digest recomputed.
+
   The producers and the JWK functions refuse every weak key encoding (the 8 small-order
   points, the 40 non-canonical encodings and a canonical off-curve encoding, all derived by
   arithmetic in `test_support/ed25519_reference.ex`), and accept an honest key and its
@@ -252,7 +257,7 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519SurfacesTest do
     {holder_public, _holder_private} = :crypto.generate_key(:eddsa, :ed25519)
     grant = grant(grant_module, operation_module, "issuer-x", raw_thumbprint(holder_public))
     {:ok, input} = facade.grant_signing_input(grant, %{})
-    {:ok, compact} = facade.assemble_compact(input, signer.(input.message))
+    compact = framed(input, signer)
 
     facade.verify_grant(
       compact,
@@ -447,13 +452,18 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519SurfacesTest do
     start_expected = expected_anchor(start_anchor, fingerprint)
     end_expected = expected_anchor(end_anchor, fingerprint)
 
+    # Encode under a placeholder honest signature, then frame the signer's output in its place.
+    start_message = anchor_message(facade, start_anchor, archive_key)
+    end_message = anchor_message(facade, end_anchor, archive_key)
+    placeholder = placeholder_signature()
+
     {:ok, encoded} =
       facade.encode_anchored_export(
         %V1.AnchoredExportInput{
           rows: [row.bytes],
-          start_anchor: forged_anchor(facade, start_anchor, archive_key, signer),
+          start_anchor: compact(start_message, placeholder),
           transitions: [],
-          end_anchor: forged_anchor(facade, end_anchor, archive_key, signer)
+          end_anchor: compact(end_message, placeholder)
         },
         %ExpectedExport{
           chain: chain,
@@ -464,15 +474,28 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519SurfacesTest do
         }
       )
 
+    chunks =
+      Enum.map(encoded.chunks, fn chunk ->
+        chunk
+        |> String.replace(
+          compact(start_message, placeholder),
+          compact(start_message, signer.(start_message))
+        )
+        |> String.replace(
+          compact(end_message, placeholder),
+          compact(end_message, signer.(end_message))
+        )
+      end)
+
     facade.verify_anchored_export(
-      %ArchivedObject{chunks: encoded.chunks, version: "object-version-1"},
+      %ArchivedObject{chunks: chunks, version: "object-version-1"},
       %HistoricalKeyChain{keys: [historical_key("archive-key-a", archive_key)]},
       %ExpectedAnchoredExport{
         chain: chain,
         start_anchor: start_expected,
         transitions: [],
         end_anchor: end_expected,
-        digest: encoded.digest,
+        digest: :crypto.hash(:sha256, chunks),
         object_version: "object-version-1",
         bounds: %{}
       }
@@ -482,7 +505,7 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519SurfacesTest do
   defp ra1_attestor_surface(attestor_key, signer) do
     {subject_public, _subject_private} = :crypto.generate_key(:eddsa, :ed25519)
     {:ok, input} = RA.attestation_signing_input(attestation(subject_public), %{})
-    {:ok, compact} = RA.assemble_compact(input, signer.(input.message), %{})
+    compact = framed(input, signer)
     RA.verify_attestation(compact, expected_attestation(attestor_key, subject_public))
   end
 
@@ -517,7 +540,7 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519SurfacesTest do
       )
 
     {:ok, input} = CA.assertion_signing_input(assertion, %{})
-    {:ok, compact} = CA.assemble_compact(input, signer.(input.message))
+    compact = framed(input, signer)
 
     CA.verify_assertion(
       compact,
@@ -571,16 +594,27 @@ defmodule BoundedAuthorityProtocol.Conformance.StrictEd25519SurfacesTest do
   # Produces the anchor under a carrier key, then swaps the archive key's fingerprint into
   # the payload before signing.
   defp forged_anchor(facade, anchor, archive_key, signer) do
+    message = anchor_message(facade, anchor, archive_key)
+    compact(message, signer.(message))
+  end
+
+  defp anchor_message(facade, anchor, archive_key) do
     {carrier_public, _carrier_private} = :crypto.generate_key(:eddsa, :ed25519)
 
     {:ok, input} =
       facade.boundary_anchor_signing_input(%{anchor | public_key: carrier_public}, %{})
 
-    message =
-      swap(input.message, b64(raw_thumbprint(carrier_public)), b64(raw_thumbprint(archive_key)))
-
-    compact(message, signer.(message))
+    swap(input.message, b64(raw_thumbprint(carrier_public)), b64(raw_thumbprint(archive_key)))
   end
+
+  # An honest signature over a fixed message: canonical R of prime order and S < L, so the
+  # producer surfaces accept it as a placeholder.
+  defp placeholder_signature do
+    {_public, private} = :crypto.generate_key(:eddsa, :ed25519)
+    :crypto.sign(:eddsa, :none, "placeholder", [private, :ed25519])
+  end
+
+  defp framed(input, signer), do: compact(input.message, signer.(input.message))
 
   defp expected_anchor(anchor, fingerprint) do
     %ExpectedAnchor{

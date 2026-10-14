@@ -443,7 +443,10 @@ defmodule BoundedAuthorityProtocol.V2.RuntimeTest do
       message: input.protected_segment <> "." <> bad_grant_payload
     }
 
-    assert {:error, :invalid} = V2.assemble_compact(forged_grant, <<0::512>>, %{})
+    # A signature that passes the keyless Ed25519 rule, so assembly reaches the revalidation
+    # step (erratum 3 refuses a small-order R, such as all zeros, before it).
+    assert {:error, :invalid} =
+             V2.assemble_compact(forged_grant, gate_passing_signature(forged_grant), %{})
 
     # The proof-kind arm needs a real proof header (typ dpop+jwt) so assembly reaches
     # the revalidation step, with a payload that fails the proof decode.
@@ -472,7 +475,10 @@ defmodule BoundedAuthorityProtocol.V2.RuntimeTest do
       message: proof_input.protected_segment <> "." <> bad_proof_payload
     }
 
-    assert {:error, :invalid} = V2.assemble_compact(forged_proof, <<0::512>>, %{})
+    # A signature that passes the keyless Ed25519 rule, so assembly reaches the revalidation
+    # step (erratum 3 refuses a small-order R, such as all zeros, before it).
+    assert {:error, :invalid} =
+             V2.assemble_compact(forged_proof, gate_passing_signature(forged_proof), %{})
   end
 
   test "a mixed-kind grant decodes its one_of selector through the v2 parse path" do
@@ -812,4 +818,7 @@ defmodule BoundedAuthorityProtocol.V2.RuntimeTest do
     replacement = if first == ?A, do: ?B, else: ?A
     List.replace_at(segments, index, <<replacement, rest::binary>>) |> Enum.join(".")
   end
+
+  defp gate_passing_signature(%{message: message}),
+    do: :crypto.sign(:eddsa, :none, message, [:crypto.hash(:sha256, "gate passing"), :ed25519])
 end

@@ -206,7 +206,9 @@ and `verification: :not_evaluated`. It MUST NOT masquerade as verified facts
 (`REQ-CA1-API-decoded`).
 
 Assembly MUST admit only this profile's signing-input kind and revalidate all
-header/payload structure and bounds before returning bytes. It MUST NOT infer the
+header/payload structure and bounds, and refuse a signature that fails the keyless signature
+rule of BAP1 rule S1 (`R` canonical and not of small order, `S < L`; erratum 3), before
+returning bytes; it emits accepted signature bytes unchanged. It MUST NOT infer the
 profile from a failed generic assembler (`REQ-CA1-API-assembly`). Signature input
 is standard ASCII `base64url(protected) || "." || base64url(payload)`.
 

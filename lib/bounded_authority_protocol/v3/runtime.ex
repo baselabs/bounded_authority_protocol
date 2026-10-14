@@ -155,6 +155,7 @@ defmodule BoundedAuthorityProtocol.V3.Runtime do
       with {:ok, bounds} <- Bounds.coerce(limits),
            :ok <- validate_standard_signing_kind(input.kind),
            {:ok, compact} <- CompactJws.assemble(input, signature, bounds),
+           :ok <- Es256.canonical_signature(signature),
            :ok <- validate_assembled_compact(input.kind, compact, bounds) do
         {:ok, compact}
       end

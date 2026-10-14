@@ -1,7 +1,8 @@
 defmodule BoundedAuthorityProtocol.Conformance.Cli do
   @moduledoc """
   Deterministic offline verifier CLI for the conformance corpora: the v1, v2 and v3 corpora and
-  the additive strict-Ed25519 corpus (`priv/conformance/strict-ed25519`).
+  the additive strict-Ed25519 (`priv/conformance/strict-ed25519`) and producer-canonicality
+  (`priv/conformance/producer-canonicality`) corpora.
 
   This is the package's I/O carve-out: argv parsing, `File.read`/`File.ls` to load a corpus
   directory, and report output (`IO.binwrite`/`File.write`). Every judgment — corpus integrity,
@@ -38,6 +39,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   # contract-major pin by its exact single-line shape.
   @certified_index_sha256 %{
     :strict_ed25519 => "cyEX3-GIG1U5mBJqlSSpW_sRcSV-OI1UMKCgmfIofLk",
+    :producer_canonicality => "me5vu_MnWLA9RjBkf3IdjU40nwYo2GBJPWZ_5udixgE",
     1 => "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs",
     2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A",
     3 => "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw"
@@ -105,12 +107,13 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
     end
   end
 
-  # A directory is either a contract-major corpus or the strict-Ed25519 corpus; each loader
-  # accepts only its own index format, so at most one can succeed and both fail closed.
+  # A directory is a contract-major corpus, the strict-Ed25519 corpus or the
+  # producer-canonicality corpus; each loader accepts only its own index format, so at most one
+  # can succeed and all fail closed.
   defp load_corpus(map) do
-    case Corpus.load(map) do
-      {:ok, corpus} -> {:ok, corpus}
-      {:error, :invalid} -> Corpus.load_strict_ed25519(map)
+    with {:error, :invalid} <- Corpus.load(map),
+         {:error, :invalid} <- Corpus.load_strict_ed25519(map) do
+      Corpus.load_producer_canonicality(map)
     end
   end
 

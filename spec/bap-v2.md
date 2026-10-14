@@ -170,3 +170,10 @@ used with v2 artifacts unchanged. The cases live in the additive strict-Ed25519 
 (`priv/conformance/strict-ed25519`, profile `bap-strict-ed25519/1`, revision 1, certified index
 SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`), whose v2 cases carry
 `major: 2`. The v2 corpus above, its index, and its verdicts are unchanged.
+
+Erratum 3 binds the producer-surface rule of [bap-v1.md § 16](bap-v1.md#verification), which
+this profile incorporates through §2: v2 compact assembly and anchored-export encoding MUST refuse
+a signature that fails the keyless part of rule S1 (`R` canonical and not of small order,
+`S < L`) with the closed error value, and MUST emit accepted signature bytes unchanged
+(`REQ2-SIGNING-ed25519-producer-canonical`). The v2 cases carry `major: 2` in the additive
+`bap-producer-canonicality/1` corpus (`priv/conformance/producer-canonicality`).

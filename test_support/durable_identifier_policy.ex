@@ -19,6 +19,9 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        # Asserts from compiled code which modules call :crypto.verify/5, so it
                        # names the ES256 suite module and a v1 module as known positives.
                        "test/architecture/ed25519_owner_test.exs",
+                       # Names the v1, v2 and v3 modules whose decode paths must not reach a
+                       # producer canonicality check (erratum 3).
+                       "test/architecture/producer_canonicality_scope_test.exs",
                        "test/docs_guides_test.exs",
                        "test/bap_walkthrough_test.exs",
                        "test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",

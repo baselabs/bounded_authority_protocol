@@ -154,10 +154,281 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # pass precheck and verify, so verify-grant-v3-invalid-signature-high-s agrees as
       # valid, disagreeing with the corpus.
       name: "v3-signature-low-s-removed",
-      path: "lib/bounded_authority_protocol/v3/es256.ex",
+      path: "lib/bounded_authority_protocol/es256.ex",
       from: "    ri > 0 and ri < @n and si > 0 and si <= @half_n\n",
       to: "    ri > 0 and ri < @n and si > 0\n",
       target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v3 corpus (in-VM)"}
+    },
+    # --- producer-surface canonicality (erratum 3) and the public ES256 owner --------
+    %{
+      # Deleting the v3 assembly refusal lets every non-canonical ES256 signature assemble, so
+      # the 20 es256-assemble invalid cases disagree.
+      name: "v3-assembly-canonicality-removed",
+      path: "lib/bounded_authority_protocol/v3/runtime.ex",
+      from: "           :ok <- Es256.canonical_signature(signature),\n",
+      to: "",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:es256-assemble"
+      ]
+    },
+    %{
+      # Deleting the v3 export-encode refusal frames a high-S anchor or transition, so the three
+      # es256-export-encode cases disagree.
+      name: "v3-export-encode-canonicality-removed",
+      path: "lib/bounded_authority_protocol/v3/anchored_export_codec.ex",
+      from:
+        "         :ok <- canonical_signatures([start_parsed, end_parsed | transition_parsed]),\n",
+      to: "",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:es256-export-encode"
+      ]
+    },
+    %{
+      # Normalizing instead of refusing (s <- n - s before assembly) rewrites the caller's bytes:
+      # the high-S cases assemble and disagree with their expected refusal.
+      name: "v3-assembly-normalizes",
+      path: "lib/bounded_authority_protocol/v3/runtime.ex",
+      from:
+        "           {:ok, compact} <- CompactJws.assemble(input, signature, bounds),\n           :ok <- Es256.canonical_signature(signature),\n",
+      to:
+        "           {:ok, signature} <- BoundedAuthorityProtocol.Es256.normalize_low_s(signature),\n           {:ok, compact} <- CompactJws.assemble(input, signature, bounds),\n",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:es256-assemble"
+      ]
+    },
+    %{
+      # Dropping r < n admits r = n at assembly (assemble-v3-*-r-equals-n disagree): the
+      # REQ3-SIGNING-range clause that the backend coincidence hid at verify.
+      name: "v3-signature-range-removed",
+      path: "lib/bounded_authority_protocol/es256.ex",
+      from: "    ri > 0 and ri < @n and si > 0 and si <= @half_n\n",
+      to: "    ri > 0 and si > 0 and si <= @half_n\n",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:es256-assemble"
+      ]
+    },
+    %{
+      # Dropping r > 0 admits r = 0 at assembly (assemble-v3-*-r-zero disagree).
+      name: "v3-signature-r-positive-removed",
+      path: "lib/bounded_authority_protocol/es256.ex",
+      from: "    ri > 0 and ri < @n and si > 0 and si <= @half_n\n",
+      to: "    ri < @n and si > 0 and si <= @half_n\n",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:es256-assemble"
+      ]
+    },
+    %{
+      # Dropping s > 0 admits s = 0 at assembly (assemble-v3-*-s-zero disagree).
+      name: "v3-signature-s-positive-removed",
+      path: "lib/bounded_authority_protocol/es256.ex",
+      from: "    ri > 0 and ri < @n and si > 0 and si <= @half_n\n",
+      to: "    ri > 0 and ri < @n and si <= @half_n\n",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:es256-assemble"
+      ]
+    },
+    %{
+      # Calling a producer canonicality check from a v3 decode path reddens the decode-scope
+      # architecture test (decode verdicts on the contract-majors stay untouched).
+      name: "v3-decode-canonicality-added",
+      path: "lib/bounded_authority_protocol/v3/runtime.ex",
+      from:
+        "  defp parse_grant(compact, limits) do\n    case parse_grant_validated(compact, limits) do\n",
+      to:
+        "  defp parse_grant(compact, limits) do\n    _ = Es256.canonical_signature(compact)\n\n    case parse_grant_validated(compact, limits) do\n",
+      target:
+        {"test/architecture/producer_canonicality_scope_test.exs",
+         "no contract-major decode or parse function reaches a producer canonicality check"}
+    },
+    %{
+      # Deleting the Ed25519 assembly gate call (one call site serves v1, v2, loopback, RA1 and
+      # CA1) lets the 33 ed25519-assemble invalid cases assemble.
+      name: "ed25519-assembly-gate-removed",
+      path: "lib/bounded_authority_protocol/v1/compact_jws.ex",
+      from: "         true <- Ed25519.signature_gate?(signature),\n",
+      to: "",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:ed25519-assemble"
+      ]
+    },
+    %{
+      # Deleting the v1 export-encode gate frames an S = L anchor and a small-order-R transition.
+      name: "ed25519-export-encode-gate-removed",
+      path: "lib/bounded_authority_protocol/v1/anchored_export_codec.ex",
+      from:
+        "         :ok <- canonical_signatures([start_parsed, end_parsed | transition_parsed]),\n",
+      to: "",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:ed25519-export-encode"
+      ]
+    },
+    %{
+      # The v2 mirror of the export-encode gate deletion.
+      name: "ed25519-export-encode-gate-removed-major-two",
+      path: "lib/bounded_authority_protocol/v2/anchored_export_codec.ex",
+      from:
+        "         :ok <- canonical_signatures([start_parsed, end_parsed | transition_parsed]),\n",
+      to: "",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:ed25519-export-encode"
+      ]
+    },
+    %{
+      # Keyless clause S < L removed: the S = L assembly cases disagree. At verify the cofactorless
+      # backend hides this clause; at assembly the corpus proves it.
+      name: "ed25519-signature-gate-scalar-range-removed",
+      path: "lib/bounded_authority_protocol/ed25519.ex",
+      from: "    canonical?(r) and not small_order?(r) and s < @l\n",
+      to: "    canonical?(r) and not small_order?(r)\n",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:ed25519-assemble"
+      ]
+    },
+    %{
+      # Keyless clause canonical R removed: the y = p assembly cases disagree.
+      name: "ed25519-signature-gate-canonical-r-removed",
+      path: "lib/bounded_authority_protocol/ed25519.ex",
+      from: "    canonical?(r) and not small_order?(r) and s < @l\n",
+      to: "    not small_order?(r) and s < @l\n",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:ed25519-assemble"
+      ]
+    },
+    %{
+      # Keyless clause small-order R removed: the identity-R assembly cases disagree.
+      name: "ed25519-signature-gate-small-order-r-removed",
+      path: "lib/bounded_authority_protocol/ed25519.ex",
+      from: "    canonical?(r) and not small_order?(r) and s < @l\n",
+      to: "    canonical?(r) and s < @l\n",
+      command: [
+        "mix",
+        "test",
+        "test/conformance/producer_canonicality_corpus_test.exs",
+        "--only",
+        "family:ed25519-assemble"
+      ]
+    },
+    %{
+      # Public ES256 key acceptance: dropping x < p admits an x + p alias of an on-curve point.
+      name: "es256-key-field-x-removed",
+      path: "lib/bounded_authority_protocol/es256.ex",
+      from: "    x < @p and y < @p and Integer.mod",
+      to: "    y < @p and Integer.mod",
+      target:
+        {"test/bounded_authority_protocol/es256_test.exs",
+         "an x at or above p is refused even when its residue is on the curve"}
+    },
+    %{
+      # Public ES256 key acceptance: dropping the curve equation admits an off-curve key.
+      name: "es256-key-on-curve-removed",
+      path: "lib/bounded_authority_protocol/es256.ex",
+      from:
+        "    x < @p and y < @p and Integer.mod(y * y, @p) == Integer.mod(x * x * x - 3 * x + @b, @p)\n",
+      to: "    x < @p and y < @p\n",
+      target:
+        {"test/bounded_authority_protocol/es256_test.exs",
+         "off-curve, out-of-field, compressed and wrong-width keys are refused"}
+    },
+    %{
+      # Strict verification without the canonical-signature clause accepts the RFC 6979 high-S
+      # signature over 'sample', which the backend verifies.
+      name: "es256-verify-canonical-removed",
+      path: "lib/bounded_authority_protocol/es256.ex",
+      from: "    canonical_signature?(signature) and acceptable_public_key?(public_key) and\n",
+      to: "    acceptable_public_key?(public_key) and\n",
+      target:
+        {"test/bounded_authority_protocol/es256_test.exs",
+         "the low-S vector verifies strictly; the high-S vector only after normalization"}
+    },
+    %{
+      # normalize_low_s without its range guard accepts r = 0 and s = n.
+      name: "es256-normalize-range-removed",
+      path: "lib/bounded_authority_protocol/es256.ex",
+      from: "      when r > 0 and r < @n and s > 0 and s < @n do\n",
+      to: "      when true do\n",
+      target: {"test/bounded_authority_protocol/es256_test.exs", "the boundaries"}
+    },
+    %{
+      # normalize_low_s that never maps s to n - s leaves a high s in place.
+      name: "es256-normalize-identity",
+      path: "lib/bounded_authority_protocol/es256.ex",
+      from: "    low_s = if s > @half_n, do: @n - s, else: s\n",
+      to: "    low_s = s\n",
+      target: {"test/bounded_authority_protocol/es256_test.exs", "the boundaries"}
+    },
+    %{
+      # der_to_raw without the minimal-encoding check accepts padded and negative INTEGERs.
+      name: "es256-der-minimal-removed",
+      path: "lib/bounded_authority_protocol/es256.ex",
+      from: "    if minimal_non_negative?(value),\n",
+      to: "    if true,\n",
+      target:
+        {"test/bounded_authority_protocol/es256_test.exs",
+         "malleable and malformed encodings are refused"}
+    },
+    %{
+      # der_to_raw that ignores bytes after s accepts trailing content inside the SEQUENCE.
+      name: "es256-der-trailing-accepted",
+      path: "lib/bounded_authority_protocol/es256.ex",
+      from: "         {:ok, s, <<>>} <- der_integer(rest),\n",
+      to: "         {:ok, s, _trailing} <- der_integer(rest),\n",
+      target:
+        {"test/bounded_authority_protocol/es256_test.exs",
+         "malleable and malformed encodings are refused"}
+    },
+    %{
+      # der_to_raw without the scalar range check accepts r = 0 and s = n.
+      name: "es256-der-range-removed",
+      path: "lib/bounded_authority_protocol/es256.ex",
+      from: "         true <- r > 0 and r < @n and s > 0 and s < @n do\n",
+      to: "         true <- true do\n",
+      target:
+        {"test/bounded_authority_protocol/es256_test.exs",
+         "malleable and malformed encodings are refused"}
     },
     %{
       # Same-tag domain removed (the v2 mirror under v3's selector module): the

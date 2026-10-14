@@ -155,9 +155,8 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
     %{
       name: "strict-gate-small-order-r",
       path: "lib/bounded_authority_protocol/ed25519.ex",
-      from:
-        "    canonical?(a) and canonical?(r) and not small_order?(a) and not small_order?(r) and s < @l",
-      to: "    canonical?(a) and canonical?(r) and not small_order?(a) and s < @l",
+      from: "    canonical?(r) and not small_order?(r) and s < @l",
+      to: "    canonical?(r) and s < @l",
       command: [
         "mix",
         "test",

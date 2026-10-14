@@ -97,13 +97,12 @@ run.(
 gate_source = File.read!("lib/bounded_authority_protocol/ed25519.ex")
 
 gate_clause =
-  "    canonical?(a) and canonical?(r) and not small_order?(a) and not small_order?(r) and s < @l"
+  "    canonical?(r) and not small_order?(r) and s < @l"
 
 gate_mutations = [
   {"gate-bypass", "    strict_gate?(signature, public_key) and\n      :crypto.verify",
    "    :crypto.verify"},
-  {"gate-small-order-r", gate_clause,
-   "    canonical?(a) and canonical?(r) and not small_order?(a) and s < @l"}
+  {"gate-small-order-r", gate_clause, "    canonical?(r) and s < @l"}
 ]
 
 run_strict = fn changed, label, expected_exit ->

@@ -34,7 +34,7 @@ defmodule BoundedAuthorityProtocol.Ed25519OwnerTest do
   # The only modules whose compiled code may call :crypto.verify/5.
   @crypto_verify_callers MapSet.new([
                            BoundedAuthorityProtocol.Ed25519,
-                           BoundedAuthorityProtocol.V3.Es256
+                           BoundedAuthorityProtocol.Es256
                          ])
 
   test "compiled code: only the Ed25519 owner and the ES256 suite call :crypto.verify/5" do

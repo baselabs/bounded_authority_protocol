@@ -109,6 +109,29 @@ identity; it certifies one verification rule across every Ed25519 surface.
 - The existing corpora run unchanged beside it; no existing index, case, or verdict changes. The
   verifier CLI accepts the directory with `--corpus` and binds the same deterministic report.
 
+## Producer-canonicality corpus
+
+Erratum 3 certifies the producer surfaces: compact assembly and anchored-export encoding frame a
+signature and verify none, so each refuses a signature that no conforming signer emits and emits
+every accepted signature's bytes unchanged (`spec/bap-v3.md` § 3.2, `spec/bap-v1.md` § 16). The
+additive corpus lives under `priv/conformance/producer-canonicality`: profile
+`bap-producer-canonicality/1`, revision 1, 75 cases in 4 families (`es256-assemble` 24,
+`es256-export-encode` 3, `ed25519-assemble` 44, `ed25519-export-encode` 4; 60 refused, 15
+accepted), index SHA-256 `99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601`. Its
+index uses the strict-Ed25519 corpus's closed format.
+
+- A case with `major` (1, 2 or 3) runs that contract-major's `assemble_compact` or
+  `encode_anchored_export` with exactly that major corpus's input and expected shapes; a case with
+  `profile` runs that sibling profile's assembler.
+- The generator (`conformance/generators/build_producer_canonicality.mjs`) is keyless: it derives
+  every signature from a certified signature by integer arithmetic. Verdicts come from the rule
+  text in BigInt arithmetic and are cross-checked at generation by byte-level comparisons and the
+  literal small-order table; any disagreement fails generation. Each natural high-S counterpart is
+  shown to verify under raw ECDSA, so only the low-S rule refuses it.
+- The `exact_bound` cases (`s = ⌊n/2⌋`, `S = L - 1`) pin the predicate's boundary and the
+  emit-unchanged rule; they are not verifiable signatures.
+- Every existing corpus, including the strict-Ed25519 corpus, runs unchanged beside it.
+
 BAP-04's public-only chain/archive corpus includes genesis, continuation, same-key boundaries,
 one-step rollover, multi-step rollover, same-ID/equal-time rollover, and separately valid
 shortened, relinked-omission, signed cross-chain, signed reverse-time, and signed

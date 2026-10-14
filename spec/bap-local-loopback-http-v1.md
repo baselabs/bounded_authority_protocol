@@ -135,9 +135,11 @@ shape (`REQ-LLH1-API-return-shape`). It owns no signer and accepts no private ke
 (`REQ-LLH1-API-no-signer`).
 
 Compact assembly MUST revalidate the protected header, payload, target URI, nonce, segment bounds,
-and signature width under this profile before returning a compact artifact
-(`REQ-LLH1-API-assembly-revalidate`). Producer, assembler, decoder, and envelope verifier MUST use
-the same profile semantics (`REQ-LLH1-API-symmetry`).
+signature width, and the keyless signature rule of BAP1 rule S1 (`R` canonical and not of small
+order, `S < L`; erratum 3) under this profile before returning a compact artifact, and MUST emit
+accepted signature bytes unchanged (`REQ-LLH1-API-assembly-revalidate`). Producer, assembler,
+decoder, and envelope verifier MUST use the same profile semantics, and the assembler and the
+verifier apply the same keyless signature rule (`REQ-LLH1-API-symmetry`).
 
 Verification facts remain the BAP1 redacted, value-bearing, non-authorizing facts. No transport
 decision, raw credential, signature, nonce, private key, or application authorization result is

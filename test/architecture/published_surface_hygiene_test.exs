@@ -33,6 +33,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "priv/conformance/attestation-profiles/role-attestation/v1",
     "priv/conformance/attestation-profiles/content-assertion/v1",
     "priv/conformance/strict-ed25519",
+    "priv/conformance/producer-canonicality",
     ".formatter.exs",
     "mix.exs",
     "README.md",

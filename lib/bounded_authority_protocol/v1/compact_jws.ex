@@ -1,6 +1,7 @@
 defmodule BoundedAuthorityProtocol.V1.CompactJws do
   @moduledoc false
 
+  alias BoundedAuthorityProtocol.Ed25519
   alias BoundedAuthorityProtocol.V1.Base64Url
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Jcs
@@ -28,7 +29,14 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
 
   def scan(_compact, _limits), do: {:error, :invalid}
 
-  @doc "Assembles a validated signing input and exact 64-byte signature."
+  @doc """
+  Assembles a validated signing input and exact 64-byte signature.
+
+  Assembly is a producer surface (erratum 3): it verifies no signature, and it refuses one that
+  fails the keyless part of rule S1 (`BoundedAuthorityProtocol.Ed25519`), emitting accepted
+  signature bytes unchanged. Every Ed25519 assembler (contract-majors 1 and 2, local loopback,
+  role attestation, content assertion) assembles through this function.
+  """
   @spec assemble(SigningInput.t(), binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
   def assemble(%SigningInput{} = input, signature, limits) when is_binary(signature) do
@@ -37,6 +45,7 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
          true <-
            byte_size(signature) == @signature_bytes and
              byte_size(signature) <= bounds.signature_bytes,
+         true <- Ed25519.signature_gate?(signature),
          signature_segment = Base.url_encode64(signature, padding: false),
          compact =
            input.protected_segment <> "." <> input.payload_segment <> "." <> signature_segment,

@@ -112,7 +112,15 @@ valid signature could otherwise re-spell it into a second, differently-hashing, 
 encoding; only the low-S rule admits one of the two. ECDSA signs with a per-signature nonce, so
 the same key and message admit many independently generated valid low-S signatures — the rule
 selects one encoding per signature, not one signature per message. Producers MUST normalize
-(`s ← n − s` when high) — one conditional subtraction. A backend rejection OR exception (an off-curve point, a backend that raises)
+(`s ← n − s` when high), one conditional subtraction, before the signature leaves the signer.
+Normalization is the signer's duty: the party that receives the signature from the external
+signer (HSM or KMS) applies it. The profile's producer surfaces do not normalize; they refuse.
+Compact assembly (`assemble_compact`) and anchored-export encoding (`encode_anchored_export`)
+MUST return exactly the profile's closed error value when any signature they frame fails the
+range or low-S rule above, and MUST emit every accepted signature's bytes unchanged
+(`REQ3-SIGNING-producer-canonical`; erratum 3). These surfaces hold no key and verify no
+signature, so a signature they accept can still fail verification. Decode does not apply the
+range or low-S rule: a decoded compact is not a verified one. A backend rejection OR exception (an off-curve point, a backend that raises)
 returns exactly the profile's closed error value (`REQ3-SIGNING-backend-reject`, incorporated
 from `REQ1-SIGNING-backend-reject`).
 
@@ -186,3 +194,8 @@ coordinates, extra JWK member, off-curve point; thumbprint over the wrong member
 cross-major rejections (v1 and v2 artifact bytes under v3 verification). Signed fixtures were
 minted with ephemeral in-memory P-256 keys; no private material is tracked
 (`REQ3-CORPUS-certified-identity`).
+
+Producer-surface signature canonicality is certified by the additive `bap-producer-canonicality/1`
+corpus (`priv/conformance/producer-canonicality`, revision 1, erratum 3), whose index SHA-256
+`99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601` is pinned beside this
+corpus's. No verdict of this corpus changes.

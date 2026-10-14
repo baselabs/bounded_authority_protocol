@@ -468,3 +468,15 @@ RED on the real tree before wiring, including the cd42445 incident class (a lite
 byte where the two-character `\0` text belongs). No wire byte, bound, or verdict changed;
 the corpus-integrity + certified-pin + SDK-census machinery this ADR named as v3's interim
 drift protection is now complemented by the frozen extraction baselines.
+
+## Post-acceptance note (October 14, 2026): the range-check disclosure is withdrawn
+
+Erratum 3 ([errata registry](../errata.md), entry 3) makes compact assembly and anchored-export
+encoding refuse a non-canonical ES256 signature with the same predicate the verifier runs, now
+owned by the public `BoundedAuthorityProtocol.Es256.canonical_signature?/1`. Assembly calls no
+backend, so the additive `bap-producer-canonicality/1` corpus isolates each clause the backend
+hid at verification. The battery entries `v3-signature-range-removed` (`r < n` dropped),
+`v3-signature-r-positive-removed` (`r > 0` dropped), and `v3-signature-s-positive-removed`
+(`s > 0` dropped) were each observed red against that corpus's `es256-assemble` family, so the
+range-check adjudication above is withdrawn and the requirement map § v3 `REQ3-SIGNING-range`
+row records the receipts. No wire byte, bound, or verification verdict changed.

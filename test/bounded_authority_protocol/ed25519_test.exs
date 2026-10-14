@@ -502,4 +502,12 @@ defmodule BoundedAuthorityProtocol.Ed25519Test do
   defp scalar(:plus_l, _r, s, _random), do: s + @l
   defp scalar(:max, _r, _s, _random), do: (1 <<< 256) - 1
   defp scalar(:random, _r, _s, <<random::little-size(256)>>), do: random
+
+  test "signature_gate?/1 is the keyless part of rule S1 and refuses non-64-byte input" do
+    refute Ed25519.signature_gate?(:binary.copy(<<1>>, 63))
+    refute Ed25519.signature_gate?(:not_binary)
+    {_public, private} = :crypto.generate_key(:eddsa, :ed25519)
+    honest = :crypto.sign(:eddsa, :none, "m", [private, :ed25519])
+    assert Ed25519.signature_gate?(honest)
+  end
 end

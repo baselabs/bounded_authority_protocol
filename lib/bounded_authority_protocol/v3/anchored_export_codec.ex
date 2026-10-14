@@ -24,6 +24,7 @@ defmodule BoundedAuthorityProtocol.V3.AnchoredExportCodec do
   alias BoundedAuthorityProtocol.V3.ConsumptionChain
   alias BoundedAuthorityProtocol.V3.ContextValidation
   alias BoundedAuthorityProtocol.V3.EcJwk
+  alias BoundedAuthorityProtocol.V3.Es256
   alias BoundedAuthorityProtocol.V3.KeyTransitionCodec
 
   @prefix "BAP3-ARCHIVE\0EXPORT\0"
@@ -51,6 +52,7 @@ defmodule BoundedAuthorityProtocol.V3.AnchoredExportCodec do
              0,
              []
            ),
+         :ok <- canonical_signatures([start_parsed, end_parsed | transition_parsed]),
          :ok <-
            validate_expected_key_path(
              expected.start_anchor,
@@ -82,6 +84,14 @@ defmodule BoundedAuthorityProtocol.V3.AnchoredExportCodec do
   end
 
   def encode(_input, _expected), do: {:error, :invalid}
+
+  # Encoding is a producer surface (erratum 3): it frames signatures and verifies none, and it
+  # refuses any framed signature that no conforming signer emits, never rewriting its bytes.
+  defp canonical_signatures([]), do: :ok
+
+  defp canonical_signatures([%{signature: signature} | rest]) do
+    with :ok <- Es256.canonical_signature(signature), do: canonical_signatures(rest)
+  end
 
   @spec verify(ArchivedObject.t(), HistoricalKeyChain.t(), ExpectedAnchoredExport.t()) ::
           {:ok, AnchoredExportFacts.t()} | {:error, :invalid}

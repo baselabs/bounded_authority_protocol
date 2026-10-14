@@ -132,6 +132,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   defp execute_case(case_obj, _raws, :strict_ed25519),
     do: %{case_id: case_obj["id"], agree: strict_agrees?(case_obj)}
 
+  defp execute_case(case_obj, _raws, :producer_canonicality),
+    do: %{case_id: case_obj["id"], agree: producer_agrees?(case_obj)}
+
   defp execute_case(case_obj, raws, major) do
     surface = case_obj["surface"]
     input = Map.get(case_obj, "input", %{})
@@ -237,6 +240,58 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   end
 
   defp strict_agrees?(_case_obj), do: false
+
+  # --- producer-canonicality corpus ----------------------------------------
+
+  # Contract-major cases run that major's own producer surface with its own corpus shapes; the
+  # sibling-profile cases run that profile's assembler, the signing-input kind implied by it.
+  defp producer_agrees?(
+         %{"major" => major, "surface" => surface, "expected" => expected} = case_obj
+       )
+       when major in [1, 2, 3] do
+    agrees?(expected, dispatch(major, surface, Map.get(case_obj, "input", %{}), %{}))
+  end
+
+  defp producer_agrees?(%{
+         "profile" => profile,
+         "surface" => "assemble_compact",
+         "input" => input,
+         "expected" => expected
+       }) do
+    actual =
+      with {:ok, kind} <- profile_signing_kind(profile),
+           {:ok, signing_input, signature} <-
+             build_assemble_input(Map.put(input, "kind", kind)) do
+        case profile_assemble(profile, signing_input, signature) do
+          {:ok, compact} -> {:ok, %{"compact" => compact}}
+          error -> error
+        end
+      end
+
+    agrees?(expected, actual)
+  end
+
+  defp producer_agrees?(_case_obj), do: false
+
+  defp profile_signing_kind("bap-application-proof/local-loopback-http/1"),
+    do: {:ok, "local_loopback_http_proof"}
+
+  defp profile_signing_kind("bap-role-attestation/1"), do: {:ok, "role_attestation"}
+  defp profile_signing_kind("bap-content-assertion/1"), do: {:ok, "content_assertion"}
+  defp profile_signing_kind(_profile), do: {:error, :invalid}
+
+  defp profile_assemble("bap-application-proof/local-loopback-http/1", input, signature),
+    do:
+      BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.assemble_compact(
+        input,
+        signature
+      )
+
+  defp profile_assemble("bap-role-attestation/1", input, signature),
+    do: BoundedAuthorityProtocol.RoleAttestation.V1.assemble_compact(input, signature)
+
+  defp profile_assemble("bap-content-assertion/1", input, signature),
+    do: BoundedAuthorityProtocol.ContentAssertion.V1.assemble_compact(input, signature)
 
   defp strict_primitive("verify_strict", input) do
     with {:ok, message} <- b64_field(input, "message"),
@@ -1478,6 +1533,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   defp signing_input_kind("proof"), do: :proof
   defp signing_input_kind("boundary_anchor"), do: :boundary_anchor
   defp signing_input_kind("key_transition"), do: :key_transition
+  defp signing_input_kind("local_loopback_http_proof"), do: :local_loopback_http_proof
+  defp signing_input_kind("role_attestation"), do: :role_attestation
+  defp signing_input_kind("content_assertion"), do: :content_assertion
   defp signing_input_kind(_), do: :invalid
 
   defp build_verify_grant(input) do

@@ -116,11 +116,24 @@ defmodule BoundedAuthorityProtocol.Ed25519 do
   # and S >= L, so only a direct test of the gate can show those two clauses are present.
   @doc false
   @spec strict_gate?(binary(), binary()) :: boolean()
-  def strict_gate?(<<r::binary-size(32), s::little-size(256)>>, <<_::binary-size(32)>> = a) do
-    canonical?(a) and canonical?(r) and not small_order?(a) and not small_order?(r) and s < @l
+  def strict_gate?(<<_::binary-size(64)>> = signature, <<_::binary-size(32)>> = a) do
+    canonical?(a) and not small_order?(a) and signature_gate?(signature)
   end
 
   def strict_gate?(_signature, _public_key), do: false
+
+  # The keyless part of rule S1, the signature clauses alone: R canonical, R not of small order,
+  # and S < L. The verify gate above calls it, and every Ed25519 producer surface (compact
+  # assembly and anchored-export encoding, erratum 3) refuses a signature that fails it, so one
+  # function owns the clauses. It does not decode R, so the producer surfaces accept exactly the
+  # signatures whose clauses the verify gate accepts.
+  @doc false
+  @spec signature_gate?(binary()) :: boolean()
+  def signature_gate?(<<r::binary-size(32), s::little-size(256)>>) do
+    canonical?(r) and not small_order?(r) and s < @l
+  end
+
+  def signature_gate?(_signature), do: false
 
   # Canonical: y < p, and the sign bit is clear on the two x = 0 points (y = 1 and y = p - 1).
   defp canonical?(<<v::little-size(256)>>) do

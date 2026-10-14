@@ -32,7 +32,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:__struct__, 1} => %{enum_reduce: 1}
     },
     "Elixir.BoundedAuthorityProtocol.V1.AnchoredExportCodec.beam" => %{
-      {:encode, 2} => %{variable_call: 13},
+      {:encode, 2} => %{variable_call: 14},
       {:parse_archive, 2} => %{variable_call: 10},
       {:parse_expected_transitions, 5} => %{variable_call: 2},
       {:parse_header, 2} => %{variable_call: 18},
@@ -205,7 +205,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:verify, 4} => %{variable_call: 21}
     },
     "Elixir.BoundedAuthorityProtocol.V2.AnchoredExportCodec.beam" => %{
-      {:encode, 2} => %{variable_call: 13},
+      {:encode, 2} => %{variable_call: 14},
       {:parse_archive, 2} => %{variable_call: 10},
       {:parse_expected_transitions, 5} => %{variable_call: 2},
       {:parse_header, 2} => %{variable_call: 18},
@@ -264,7 +264,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:verify, 4} => %{variable_call: 21}
     },
     "Elixir.BoundedAuthorityProtocol.V3.AnchoredExportCodec.beam" => %{
-      {:encode, 2} => %{variable_call: 13},
+      {:encode, 2} => %{variable_call: 14},
       {:parse_archive, 2} => %{variable_call: 10},
       {:parse_expected_transitions, 5} => %{variable_call: 2},
       {:parse_header, 2} => %{variable_call: 18},
@@ -296,11 +296,11 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:decode_plain, 2} => %{variable_call: 2},
       {:indexed_target_bytes, 2} => %{variable_call: 2},
       {:load_json_file, 3} => %{variable_call: 2},
-      {:load_strict_case_file, 2} => %{variable_call: 7},
+      {:load_additive_case_file, 3} => %{variable_call: 7},
       {:tamper_verbatim_matches?, 5} => %{variable_call: 2},
       {:verify_hashes, 2} => %{variable_call: 2},
-      {:verify_strict_counts, 3} => %{enum_reduce: 2},
-      {:verify_strict_sidecars, 2} => %{variable_call: 8}
+      {:verify_additive_counts, 3} => %{enum_reduce: 2},
+      {:verify_additive_sidecars, 3} => %{variable_call: 8}
     },
     "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertion.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
@@ -385,6 +385,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
                                     acceptable_public_key?: 1,
                                     module_info: 0,
                                     module_info: 1,
+                                    signature_gate?: 1,
                                     strict_gate?: 2,
                                     torsion_free?: 1,
                                     verify_strict: 3
@@ -1688,6 +1689,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     do: ~w(String StringOrUri)
 
   defp approved_source_modules("lib/bounded_authority_protocol/v3/ec_jwk.ex"),
+    do: ~w(Es256)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/es256.ex"),
     do: ~w(Integer)
 
   defp approved_source_modules("lib/bounded_authority_protocol/v3/compact_jws.ex"),
@@ -1770,19 +1774,14 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
        do: {module, function} in [{:binary, :match}, {"Map", :new}]
 
   defp approved_source_call?("lib/bounded_authority_protocol/v3/ec_jwk.ex", module, function),
-    do:
-      {module, function} in [
-        {:binary, :decode_unsigned},
-        {"Integer", :mod},
-        {"Map", :new}
-      ]
+    do: {module, function} in [{"Map", :new}]
 
-  defp approved_source_call?("lib/bounded_authority_protocol/v3/es256.ex", module, function),
+  defp approved_source_call?("lib/bounded_authority_protocol/es256.ex", module, function),
     do:
       {module, function} in [
         {:binary, :decode_unsigned},
-        {:binary, :encode_unsigned},
-        {:binary, :first}
+        {:binary, :first},
+        {"Integer", :mod}
       ]
 
   defp approved_source_call?("lib/bounded_authority_protocol/v3/runtime.ex", _module, :get),
@@ -2595,13 +2594,18 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         [{Map, :new}, {:binary, :match}]
 
       "Elixir.BoundedAuthorityProtocol.V3.EcJwk.beam" ->
-        [{Map, :new}, {:binary, :decode_unsigned}, {Integer, :mod}]
+        [{Map, :new}]
 
       "Elixir.BoundedAuthorityProtocol.V3.Es256.beam" ->
+        []
+
+      # The public ES256 owner (erratum 3): the scalar and point rules, strict verification,
+      # and the producer utilities.
+      "Elixir.BoundedAuthorityProtocol.Es256.beam" ->
         [
           {:binary, :decode_unsigned},
-          {:binary, :encode_unsigned},
-          {:binary, :first}
+          {:binary, :first},
+          {Integer, :mod}
         ]
 
       "Elixir.BoundedAuthorityProtocol.V3.RequestDigest.beam" ->
@@ -2944,6 +2948,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            "Elixir.BoundedAuthorityProtocol.V3.ConsumptionChain.beam",
            "Elixir.BoundedAuthorityProtocol.V3.EcJwk.beam",
            "Elixir.BoundedAuthorityProtocol.V3.Es256.beam",
+           "Elixir.BoundedAuthorityProtocol.Es256.beam",
            "Elixir.BoundedAuthorityProtocol.V3.KeyTransitionCodec.beam",
            "Elixir.BoundedAuthorityProtocol.V3.RequestDigest.beam",
            "Elixir.BoundedAuthorityProtocol.V3.Runtime.beam",
