@@ -55,23 +55,26 @@ defmodule BoundedAuthorityProtocol.ScratchGitMaintenanceTest do
     {listing, 0} =
       System.cmd("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"])
 
+    # Each file is read once. Another async test may create and remove a
+    # transient file in the tree between the listing and the read; a file
+    # that is gone by then is skipped rather than failing the scan.
     drivers =
       for path <- String.split(listing, <<0>>, trim: true),
           Path.extname(path) in [".ex", ".exs", ".py", ".sh"],
           path != @self,
-          File.regular?(path),
-          content = File.read!(path),
+          {:ok, content} <- [File.read(path)],
           Enum.any?(@maintenance_invocations, &(content =~ &1)),
-          do: path
+          do: {path, content}
 
-    assert Enum.sort(@known_drivers -- drivers) == [],
-           "the scan no longer sees the known git drivers #{inspect(@known_drivers -- drivers)}"
+    paths = Enum.map(drivers, &elem(&1, 0))
+
+    assert Enum.sort(@known_drivers -- paths) == [],
+           "the scan no longer sees the known git drivers #{inspect(@known_drivers -- paths)}"
 
     offenders =
-      Enum.reject(drivers, fn path ->
-        content = File.read!(path)
-        content =~ @maintenance_off and content =~ @gc_off
-      end)
+      for {path, content} <- drivers,
+          not (content =~ @maintenance_off and content =~ @gc_off),
+          do: path
 
     assert offenders == [],
            "these files run git commands that start detached background maintenance " <>
