@@ -157,8 +157,10 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
     surfaces =
       listing
       |> String.split("\n", trim: true)
-      |> Enum.reject(&(&1 in ["CHANGELOG.md", "docs/ROADMAP.md", "AGENTS.md"]))
-      |> Enum.reject(&String.starts_with?(&1, "docs/adr/"))
+      |> Enum.reject(
+        &(&1 in ["CHANGELOG.md", "docs/ROADMAP.md", "AGENTS.md"] or
+            String.starts_with?(&1, "docs/adr/"))
+      )
 
     stray =
       for path <- surfaces,
