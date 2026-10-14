@@ -119,19 +119,19 @@ def bounds_new(tightening: Mapping[str, int] | None = None) -> Bounds:
     overrides: dict[str, int] = {}
     for key, value in tightening.items():
         if key not in MAXIMA:
-            fail(f"bounds.new: unknown limit {key}")
+            fail("bounds.new: unknown limit")
         if not isinstance(value, int) or isinstance(value, bool):
-            fail(f"bounds.new: non-integer limit {key}")
+            fail("bounds.new: non-integer limit")
         if key in FIXED_WIDTH_KEYS:
             # REQ1-BOUNDS-fixed-widths: fixed-width keys cannot be tightened or widened, but setting
             # to the exact maximum is an identity no-op (valid). Any other value rejects.
             if value != MAXIMA[key]:
-                fail(f"bounds.new: fixed-width key {key} must equal maximum")
+                fail("bounds.new: fixed-width limit must equal maximum")
         else:
             if value <= 0:
-                fail(f"bounds.new: non-positive limit {key}")
+                fail("bounds.new: non-positive limit")
             if value > MAXIMA[key]:
-                fail(f"bounds.new: widening limit {key}")
+                fail("bounds.new: widening limit")
         overrides[key] = value
     return Bounds(overrides)
 
@@ -149,14 +149,16 @@ def coerce_bounds(b: Bounds) -> Bounds:
     from .error import fail
 
     for key, value in b.overrides.items():
+        if key not in MAXIMA:
+            fail("bounds.coerce: unknown limit")
         if not isinstance(value, int) or isinstance(value, bool):
-            fail(f"bounds.coerce: non-integer limit {key}")
+            fail("bounds.coerce: non-integer limit")
         if key in FIXED_WIDTH_KEYS:
             if value != MAXIMA[key]:
-                fail(f"bounds.coerce: fixed-width key {key} must equal maximum")
+                fail("bounds.coerce: fixed-width limit must equal maximum")
         else:
             if value <= 0:
-                fail(f"bounds.coerce: non-positive limit {key}")
+                fail("bounds.coerce: non-positive limit")
             if value > MAXIMA[key]:
-                fail(f"bounds.coerce: widening limit {key}")
+                fail("bounds.coerce: widening limit")
     return b
