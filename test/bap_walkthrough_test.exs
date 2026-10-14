@@ -2,13 +2,124 @@ defmodule BoundedAuthorityProtocol.WalkthroughTest do
   @moduledoc """
   Pins the runnable code shape of the Livebook walkthrough
   (docs/livebooks/bap-walkthrough.livemd): ephemeral runtime keys, produce → assemble →
-  verify → reject. The notebook's cells are re-executed here against the real package — if
-  the notebook's code stops running, this test fails (a non-running livebook is worse than
-  none). A code-shape break (renamed function, changed struct field, changed verdict) reds
-  this test before the notebook can rot.
+  verify → reject. The first test below evaluates every code cell of the notebook itself, in
+  order, against this package (only the `Mix.install` cell is skipped) and asserts each
+  section's result — if the notebook's code stops running or a verdict changes, this test
+  fails (a non-running livebook is worse than none). The remaining tests restate the earliest
+  sections as plain code, so a code-shape break (renamed function, changed struct field,
+  changed verdict) also reds here.
   """
 
   use ExUnit.Case, async: true
+
+  @notebook Path.expand("../docs/livebooks/bap-walkthrough.livemd", __DIR__)
+  @strict_ed25519 Path.expand("../priv/conformance/strict-ed25519/cases", __DIR__)
+  @invalid {:error, :invalid}
+
+  test "every notebook cell runs, in order, with the verdicts the prose states" do
+    {cells, skipped} = notebook_cells()
+
+    # Exactly one cell is not evaluated here: the Mix.install cell (this test runs against the
+    # package source instead of the registry).
+    assert [install] = skipped
+    assert install =~ "Mix.install("
+
+    {results, binding} = evaluate(cells)
+    sections = results |> Enum.map(&elem(&1, 0)) |> Enum.uniq()
+    assert sections == Enum.map(1..16, &Integer.to_string/1)
+
+    # Sections 6, 8, 10 and 12 end with [{attack, rejected?}]; every attack is rejected.
+    for section <- ["6", "8", "10", "12"] do
+      [verdicts] = cell_values(results, section)
+      assert verdicts != []
+      assert Enum.all?(verdicts, fn {_attack, rejected?} -> rejected? == true end), section
+    end
+
+    # Section 13: the honest key and signature pass all three strict-Ed25519 checks.
+    assert cell_values(results, "13") == [
+             %{verify_strict: true, acceptable_public_key?: true, torsion_free?: true}
+           ]
+
+    # Section 14, first cell: forgeries grafted onto the notebook's own grant and proof.
+    [forgeries, corpus_grants] = cell_values(results, "14")
+
+    assert forgeries == %{
+             primitives: %{
+               small_order_key_acceptable?: false,
+               noncanonical_key_acceptable?: false,
+               forgery_under_small_order_key: false,
+               forgery_under_noncanonical_key: false,
+               s_plus_l: false
+             },
+             verification: %{
+               small_order_key: @invalid,
+               noncanonical_key: @invalid,
+               s_plus_l: @invalid
+             }
+           }
+
+    # Section 14, second cell: the certified corpus grants, read from the installed package.
+    assert corpus_grants == [
+             {"grant-verify-v1-issuer-honest",
+              %{
+                verify_grant: {:ok, "urn:example:grant:1"},
+                acceptable_public_key?: true,
+                torsion_free?: true
+              }},
+             {"grant-verify-v1-issuer-iso-small-order-a-1",
+              %{verify_grant: @invalid, acceptable_public_key?: false, torsion_free?: false}},
+             {"grant-verify-v1-issuer-iso-noncanonical-a-y-p-plus-0",
+              %{verify_grant: @invalid, acceptable_public_key?: false, torsion_free?: false}},
+             {"grant-verify-v1-issuer-honest-a-identity-r",
+              %{verify_grant: @invalid, acceptable_public_key?: true, torsion_free?: true}},
+             {"grant-verify-v1-issuer-s-plus-l",
+              %{verify_grant: @invalid, acceptable_public_key?: true, torsion_free?: true}},
+             {"grant-verify-v1-issuer-mixed-a-mixed-r-both",
+              %{
+                verify_grant: {:ok, "urn:example:grant:1"},
+                acceptable_public_key?: true,
+                torsion_free?: false
+              }}
+           ]
+
+    # The notebook's inline byte values are the corpus values it cites, and its L is the
+    # difference between the corpus's honest and s-plus-l signatures.
+    forgeries_file = primitive_cases("key-only-forgeries.json")
+    identity_case = Map.fetch!(forgeries_file, "key-only-v1-identity-a-basepoint-r-s1-0")
+    noncanonical_case = Map.fetch!(forgeries_file, "key-only-v1-y-p-plus-1-prime-r-0")
+    assert binding[:key_only_forgery] == identity_case.signature
+    assert binding[:small_order_key] == identity_case.public_key
+    assert binding[:noncanonical_key] == noncanonical_case.public_key
+    assert noncanonical_case.signature == identity_case.signature
+
+    verify_cases = primitive_cases("verify-strict.json")
+    <<r::binary-size(32), honest_s::little-size(256)>> = verify_cases["honest"].signature
+    <<^r::binary-size(32), shifted_s::little-size(256)>> = verify_cases["s-plus-l"].signature
+    assert binding[:l] == shifted_s - honest_s
+
+    # Section 15: the v3 grant and envelope verify and carry the v3 facts.
+    assert cell_values(results, "15") == [
+             %{
+               grant: %{version: 3, grant_id: "grant-2026-es-001", authorization: :not_evaluated},
+               envelope: %{operation: "start_job", authorization: :not_evaluated}
+             }
+           ]
+
+    # Section 16: the backend accepts the high-S twin; every v3 attack is refused.
+    assert cell_values(results, "16") == [
+             %{
+               backend_accepts_high_s_twin: true,
+               rejections: %{
+                 high_s: @invalid,
+                 v1_envelope_through_v3: @invalid,
+                 v1_grant_through_v3: @invalid,
+                 v3_envelope_through_v1: @invalid,
+                 v3_envelope_through_v2: @invalid,
+                 wrong_holder_key: @invalid
+               }
+             }
+           ]
+  end
 
   alias BoundedAuthorityProtocol.V1.{
     Credentials,
@@ -405,6 +516,76 @@ defmodule BoundedAuthorityProtocol.WalkthroughTest do
 
     assert {:error, :invalid} = RoleAttestationV1.decode_attestation(assertion_compact, %{})
     assert {:error, :invalid} = BoundedAuthorityProtocol.V1.decode_grant(assertion_compact, %{})
+  end
+
+  # Splits the notebook into its ```elixir cells. Each evaluated cell is
+  # {section_number, code, first_code_line}; the Mix.install cell is returned separately.
+  defp notebook_cells do
+    {cells, _section, _open} =
+      @notebook
+      |> File.read!()
+      |> String.split("\n")
+      |> Enum.with_index(1)
+      |> Enum.reduce({[], nil, nil}, fn {line, number}, {cells, section, open} ->
+        cond do
+          open != nil and line == "```" ->
+            {start, lines} = open
+            {[{section, lines |> Enum.reverse() |> Enum.join("\n"), start} | cells], section, nil}
+
+          open != nil ->
+            {start, lines} = open
+            {cells, section, {start, [line | lines]}}
+
+          line == "```elixir" ->
+            {cells, section, {number + 1, []}}
+
+          match = Regex.run(~r/^## (\d+)\. /, line) ->
+            {cells, Enum.at(match, 1), nil}
+
+          String.starts_with?(line, "## ") ->
+            {cells, nil, nil}
+
+          true ->
+            {cells, section, open}
+        end
+      end)
+
+    {skipped, evaluated} =
+      cells |> Enum.reverse() |> Enum.split_with(fn {_s, code, _l} -> code =~ "Mix.install(" end)
+
+    {evaluated, Enum.map(skipped, &elem(&1, 1))}
+  end
+
+  # Evaluates the cells in order with one shared binding and environment, as Livebook does.
+  defp evaluate(cells) do
+    {results, binding, _env} =
+      Enum.reduce(cells, {[], [], Code.env_for_eval(file: @notebook)}, fn {section, code, line},
+                                                                          {results, binding, env} ->
+        assert section != nil, "a notebook cell at line #{line} sits outside a numbered section"
+        quoted = Code.string_to_quoted!(code, file: @notebook, line: line)
+        {value, binding, env} = Code.eval_quoted_with_env(quoted, binding, env)
+        {[{section, value} | results], binding, env}
+      end)
+
+    {Enum.reverse(results), binding}
+  end
+
+  defp cell_values(results, section),
+    do: for({^section, value} <- results, do: value)
+
+  defp primitive_cases(file) do
+    [@strict_ed25519, "primitive", file]
+    |> Path.join()
+    |> File.read!()
+    |> JSON.decode!()
+    |> Map.fetch!("cases")
+    |> Map.new(fn %{"id" => id, "input" => input} ->
+      {id,
+       %{
+         public_key: Base.url_decode64!(input["public_key"], padding: false),
+         signature: Base.url_decode64!(input["signature"], padding: false)
+       }}
+    end)
   end
 
   defp flip(segment) do

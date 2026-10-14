@@ -40,6 +40,9 @@ any existing certified corpus changes.
   `REQ2-SIGNING-ed25519-producer-canonical`, and `REQ3-SIGNING-producer-canonical`; the
   local-loopback, role-attestation, and content-assertion assembly requirements carry the same
   clause.
+- Livebook walkthrough sections for strict Ed25519 verification (rule S1), with forged keys and
+  signatures from the certified strict-Ed25519 corpus, and for contract-major 3 (ES256) with
+  ephemeral P-256 keys. The walkthrough test now evaluates every notebook cell in order.
 
 ### Changed
 
