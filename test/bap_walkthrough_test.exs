@@ -111,10 +111,10 @@ defmodule BoundedAuthorityProtocol.WalkthroughTest do
                backend_accepts_high_s_twin: true,
                rejections: %{
                  high_s: @invalid,
-                 v1_envelope_through_v3: @invalid,
-                 v1_grant_through_v3: @invalid,
-                 v3_envelope_through_v1: @invalid,
-                 v3_envelope_through_v2: @invalid,
+                 major_one_envelope_through_major_three: @invalid,
+                 major_one_grant_through_major_three: @invalid,
+                 major_three_envelope_through_major_one: @invalid,
+                 major_three_envelope_through_major_two: @invalid,
                  wrong_holder_key: @invalid
                }
              }

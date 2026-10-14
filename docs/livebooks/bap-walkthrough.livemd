@@ -831,10 +831,12 @@ backend_accepts_high_s_twin =
   rejections: %{
     high_s:
       V3.check_envelope(%Credentials{grant: es_grant_compact, proof: high_s_proof}, es_expected),
-    v1_envelope_through_v3: V3.check_envelope(credentials, expected_request),
-    v1_grant_through_v3: V3.decode_grant(grant_compact, %{}),
-    v3_envelope_through_v1: BoundedAuthorityProtocol.V1.check_envelope(es_credentials, es_expected),
-    v3_envelope_through_v2: BoundedAuthorityProtocol.V2.check_envelope(es_credentials, es_expected),
+    major_one_envelope_through_major_three: V3.check_envelope(credentials, expected_request),
+    major_one_grant_through_major_three: V3.decode_grant(grant_compact, %{}),
+    major_three_envelope_through_major_one:
+      BoundedAuthorityProtocol.V1.check_envelope(es_credentials, es_expected),
+    major_three_envelope_through_major_two:
+      BoundedAuthorityProtocol.V2.check_envelope(es_credentials, es_expected),
     wrong_holder_key:
       V3.check_envelope(%Credentials{grant: es_grant_compact, proof: other_proof}, es_expected)
   }
