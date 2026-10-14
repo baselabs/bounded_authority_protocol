@@ -173,7 +173,9 @@ It prints `publish_article grant-001 not_evaluated`, then `True`.
 Contract-major 1 is the package root. Contract-major 2 is `bounded_authority_verifier.v2` (adds
 the `lte` and `gte` range selectors) and contract-major 3 is `bounded_authority_verifier.v3`
 (ES256 with 65-byte uncompressed SEC1 keys, 64-byte raw `r || s` signatures, and its own EC JWK
-and thumbprint functions). Both modules use the root's function names. Import `v3` explicitly
+and thumbprint functions). Both modules use the root's function names for the contract-major
+functions; the local-loopback, role-attestation, and content-assertion functions exist only at the
+root, because those profiles bind contract-major 1 or stand alone. Import `v3` explicitly
 (`from bounded_authority_verifier import v3`); unlike `v2`, it is not listed in the package's
 `__all__`. Each major rejects the others' bytes.
 

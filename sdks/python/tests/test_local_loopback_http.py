@@ -313,3 +313,78 @@ def test_certified_local_loopback_corpus_drives_python_verdicts() -> None:
             check_local_loopback_http_envelope(grant, compact, case_expected).is_ok
             == proof_case["envelope_local"]
         ), proof_case["id"]
+
+
+def test_loopback_profile_binds_only_contract_major_one_grants() -> None:
+    # spec/bap-local-loopback-http-v1.md § 1: the profile binds a contract-major 1 grant. The
+    # contract-major 2 module exposes no loopback surface, and the loopback envelope check
+    # rejects a contract-major 2 grant.
+    from bounded_authority_verifier import v2
+
+    for name in [
+        "local_loopback_http_proof_signing_input",
+        "assemble_local_loopback_http_compact",
+        "decode_local_loopback_http_proof",
+        "check_local_loopback_http_envelope",
+    ]:
+        assert not hasattr(v2, name), f"bounded_authority_verifier.v2 must not expose {name}"
+
+    issuer_public, issuer_private = _keypair()
+    holder_public, holder_private = _keypair()
+    holder_thumbprint = public_key_thumbprint_raw(holder_public)
+    successor_grant = v2.grant_signing_input(
+        v2.GrantProducer(
+            key_id="issuer-1",
+            issuer="https://issuer.example.test",
+            grant_id="urn:example:grant:1",
+            audiences=("https://resource.example.test",),
+            issued_at=1000,
+            not_before=1000,
+            expires_at=2000,
+            holder_thumbprint=base64.urlsafe_b64encode(holder_thumbprint).rstrip(b"=").decode(),
+            operations=(v2.OperationInput(name="read", selectors=("all",)),),
+        )
+    )
+    assert successor_grant.is_ok
+    grant_compact = v2.assemble_compact(
+        successor_grant.value, issuer_private.sign(_signing_message(successor_grant.value))
+    )
+    assert grant_compact.is_ok
+
+    proof_si = local_loopback_http_proof_signing_input(
+        ProofProducer(
+            holder_public_key=holder_public,
+            proof_id="urn:example:proof:loopback:1",
+            method="POST",
+            target_uri="http://127.0.0.1:4000/invoke",
+            issued_at=1400,
+            invocation_id="550e8400-e29b-41d4-a716-446655440000",
+            operation="read",
+            grant_compact=grant_compact.value,
+            cast_arguments=JNull(),
+            nonce="nonce-1",
+        )
+    )
+    assert proof_si.is_ok
+    proof_compact = assemble_local_loopback_http_compact(
+        proof_si.value, holder_private.sign(_signing_message(proof_si.value))
+    )
+    assert proof_compact.is_ok
+
+    expected = ExpectedRequest(
+        trusted_issuer=TrustedIssuer(key_id="issuer-1", public_key=issuer_public),
+        issuer="https://issuer.example.test",
+        audience="https://resource.example.test",
+        method="POST",
+        target_uri="http://127.0.0.1:4000/invoke",
+        invocation_id="550e8400-e29b-41d4-a716-446655440000",
+        operation="read",
+        cast_arguments=JNull(),
+        evaluation_time=1400,
+        clock_skew=0,
+        proof_max_age=300,
+        nonce=NonceRequired("nonce-1"),
+    )
+    assert not check_local_loopback_http_envelope(
+        grant_compact.value, proof_compact.value, expected
+    ).is_ok

@@ -5,6 +5,8 @@ payload carries ``v: 2``, the domain separators are ``BAP2-REQUEST\\0`` / ``BAP2
 ``BAP2-ARCHIVE\\0EXPORT\\0``, and the selector algebra admits the two inclusive range kinds
 ``lte``/``gte`` (same-tag numeric operands only, ADR 0028 §2). This façade rejects v1 bytes, and the
 v1 façade rejects v2 bytes — each major verifies under its own complete closed profile.
+The local-loopback proof profile binds contract-major 1 grants only, so this façade has no loopback
+functions.
 
 17 public functions, each returning ``Result[T] = Ok | Err`` (the ``{:ok, value} | {:error, :invalid}``
 mirror). No ``authorized`` / ``decision`` surface (AGENTS rule 1). All claims revalidated at every
@@ -1082,13 +1084,6 @@ def decode_proof(compact: bytes, bounds: Bounds | None = None) -> Result[ProofDe
     return _trying(lambda: _decode_proof_body(compact, bounds, "standard"))
 
 
-@_closed_shape
-def decode_local_loopback_http_proof(
-    compact: bytes, bounds: Bounds | None = None
-) -> Result[ProofDecoded]:
-    return _trying(lambda: _decode_proof_body(compact, bounds, "local_loopback_http"))
-
-
 def _decode_proof_body(
     compact: bytes, bounds: Bounds | None, profile: ProofProfile
 ) -> ProofDecoded:
@@ -1176,17 +1171,6 @@ def _verify_grant_body(compact: bytes, trusted: TrustedIssuer, expected: Expecte
 @_closed_shape
 def check_envelope(grant_compact: bytes, proof_compact: bytes, expected: ExpectedRequest) -> Result[EnvelopeFacts]:
     return _trying(lambda: _check_envelope_body(grant_compact, proof_compact, expected, "standard"))
-
-
-@_closed_shape
-def check_local_loopback_http_envelope(
-    grant_compact: bytes, proof_compact: bytes, expected: ExpectedRequest
-) -> Result[EnvelopeFacts]:
-    return _trying(
-        lambda: _check_envelope_body(
-            grant_compact, proof_compact, expected, "local_loopback_http"
-        )
-    )
 
 
 def _check_envelope_body(
@@ -1675,15 +1659,6 @@ def proof_signing_input(proof: ProofProducer, bounds: Bounds | None = None) -> R
     return _trying(lambda: _proof_signing_input_body(proof, bounds, "standard"))
 
 
-@_closed_shape
-def local_loopback_http_proof_signing_input(
-    proof: ProofProducer, bounds: Bounds | None = None
-) -> Result[SigningInput]:
-    return _trying(
-        lambda: _proof_signing_input_body(proof, bounds, "local_loopback_http")
-    )
-
-
 def _proof_signing_input_body(
     proof: ProofProducer, bounds: Bounds | None, profile: ProofProfile
 ) -> SigningInput:
@@ -1775,13 +1750,6 @@ def _jwk_to_tagged(jwk: OkpPublic) -> Tagged:
 @_closed_shape
 def assemble_compact(input_: SigningInput, signature: bytes, bounds: Bounds | None = None) -> Result[bytes]:
     return _assemble_compact_for(input_, signature, bounds, "standard")
-
-
-@_closed_shape
-def assemble_local_loopback_http_compact(
-    input_: SigningInput, signature: bytes, bounds: Bounds | None = None
-) -> Result[bytes]:
-    return _assemble_compact_for(input_, signature, bounds, "local_loopback_http")
 
 
 def _assemble_compact_for(
