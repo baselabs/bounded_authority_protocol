@@ -12,10 +12,12 @@ has the quickstart and the full API list.
 The module has no tagged version and the Go module proxy does not serve it, so `go get` fails.
 It moves to its own repository when it is first published
 ([ADR 0015](../adr/0015-sdk-graduation-and-publish-topology.md)). Until then, build against a
-checkout of this repository:
+checkout of this repository. From an empty directory:
 
 ```bash
 git clone https://github.com/baselabs/bounded_authority_protocol.git
+mkdir myapp && cd myapp
+go mod init example.com/myapp
 go mod edit \
   -require=github.com/baselabs/bounded_authority_protocol_go@v0.0.0 \
   -replace=github.com/baselabs/bounded_authority_protocol_go=../bounded_authority_protocol/sdks/go
@@ -24,9 +26,11 @@ go mod edit \
 Record the commit you build from: without a published version, the commit is the identity of
 what you deployed.
 
-Erratum 3 (producer canonicality) is not implemented in this SDK yet: its compact assembly and
-anchored-export encoding do not refuse a non-canonical signature. Verification is unaffected.
-See the SDK README.
+Erratum 3 (producer canonicality) is not implemented in this SDK yet: `AssembleCompact`,
+`EncodeAnchoredExport` (and their `Profile` and `EcdsaProfile` methods),
+`AssembleLocalLoopbackHTTPCompact`, `AssembleAttestationCompact`, and
+`AssembleContentAssertionCompact` do not refuse a non-canonical signature. Verification is
+unaffected. See the SDK README.
 
 ## Runtime posture
 

@@ -1,6 +1,7 @@
 """The v1 verification façade (spec/bap-v1.md § Public verification contract, L270-290).
 
-17 public functions, each returning ``Result[T] = Ok | Err`` (the ``{:ok, value} | {:error, :invalid}``
+21 public functions (the 17-function contract-major façade plus the four local-loopback proof
+functions), each returning ``Result[T] = Ok | Err`` (the ``{:ok, value} | {:error, :invalid}``
 mirror). No ``authorized`` / ``decision`` surface (AGENTS rule 1). All claims revalidated at every
 public entry (REQ1-VERIFY-revalidate). Wire formats derived from ``spec/bap-v1.md`` + ADR 0004 +
 the corpus; the corpus is the byte-level arbiter.
@@ -710,7 +711,7 @@ def _bytes_equal(a: bytes, b: bytes) -> bool:
 _T = TypeVar("_T")
 
 
-# --- the 17 façade functions ---
+# --- the 17 façade functions and the four local-loopback proof functions ---
 
 
 def _trying(fn: Callable[[], _T]) -> Result[_T]:
@@ -848,7 +849,7 @@ def _shape_ok(value: object, annotation: object) -> bool:
 def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
     """Façade decorator: validate caller arguments against their declared shapes before the
     body runs; a wrong-typed argument returns the closed Err directly (never raises, never
-    coerces). Applied to all 17 public functions. Hints resolve lazily on the first call —
+    coerces). Applied to all 21 public functions. Hints resolve lazily on the first call —
     façade signatures forward-reference structs defined later in this module (ExpectedExport);
     an unsupported annotation form therefore fails on first call (the family sweep exercises
     every façade, so it fails in CI, just not at import)."""

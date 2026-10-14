@@ -16,7 +16,13 @@ def test_quickstart_prints_the_verified_and_rejected_outcomes(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     runpy.run_path(str(EXAMPLE), run_name="__main__")
-    assert capsys.readouterr().out == "publish_article grant-001 not_evaluated\nTrue\n"
+    output = capsys.readouterr().out
+    assert output == "publish_article grant-001 not_evaluated\nTrue\n"
+
+    # The README's sentence about the output states exactly what the script printed.
+    first, second = output.splitlines()
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"It prints `{first}`, then `{second}`." in readme
 
 
 def test_readme_quickstart_is_the_example_file() -> None:

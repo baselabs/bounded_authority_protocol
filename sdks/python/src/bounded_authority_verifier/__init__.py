@@ -7,9 +7,10 @@ primitives. Contract-major 2 is the ``v2`` module and contract-major 3 (ES256) t
 import ``v3`` explicitly (``from bounded_authority_verifier import v3``).
 
 There is no ``authorized`` or decision surface. Verification, decode, and producer functions return
-``Result[T] = Ok | Err``, mirroring ``{:ok, value} | {:error, :invalid}``; the lower-level
-primitives (JSON, JCS, base64url, bounds, and the JWK key functions) raise ``InvalidError``. Facts
-are value-bearing and non-authorizing.
+``Result[T] = Ok | Err``, mirroring ``{:ok, value} | {:error, :invalid}``, and so do
+``uri_normalize`` and ``jwk_decode_public``. The other primitives (JSON decoding, JCS, base64url
+decoding, bounds construction, JWK encoding, and the thumbprint functions) raise ``InvalidError``.
+Facts are value-bearing and non-authorizing.
 """
 
 from __future__ import annotations

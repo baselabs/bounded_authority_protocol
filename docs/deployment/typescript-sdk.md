@@ -49,5 +49,6 @@ each `index.json` SHA-256 at load. When this repository rotates a corpus, the SD
 takes a snapshot-bump commit, and the load-time check fails on any drift.
 
 Erratum 3 (producer canonicality) is not implemented in release 0.7.0: its compact assembly
-does not yet refuse a non-canonical signature, and it does not yet run the
-`bap-producer-canonicality/1` corpus. Verification is unaffected.
+and anchored-export encoding (for every profile it implements) do not yet refuse a
+non-canonical signature, and it does not yet run the `bap-producer-canonicality/1` corpus.
+Verification is unaffected.

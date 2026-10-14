@@ -29,21 +29,33 @@ a checkout of this repository.
   dependency of `p256`; later 1.x releases need Rust 1.85). See the
   [deployment notes](../../docs/deployment/rust-sdk.md) for the full tree and its `unsafe` use.
 - `#![forbid(unsafe_code)]` covers this crate's own source.
-- **Erratum 3 (producer canonicality) is not yet implemented.** `assemble_compact` and
-  `encode_anchored_export` (and their `v2` and `v3` forms) check the signature width but not its
-  value, so they can assemble an Ed25519 signature with `S >= L` or a non-canonical or
-  small-order `R`, or an ES256 signature that is out of range or high-S. Every verifier, this
+- **Erratum 3 (producer canonicality) is not yet implemented.** The producers that frame a
+  signature check its width but not its value: `assemble_compact` and `encode_anchored_export`
+  (and their `v2` and `v3` forms), `assemble_local_loopback_http_compact`,
+  `assemble_attestation_compact`, and `assemble_content_assertion_compact`. So they can
+  assemble an Ed25519 signature with `S >= L` or a non-canonical or small-order `R`, or an
+  ES256 signature that is out of range or high-S. Every verifier, this
   one included, rejects such a credential. Until this crate implements erratum 3, check a
   signature from an external signer before assembly (for ES256, normalize to low S).
 
 ## Install from a checkout
+
+Clone this repository next to your crate, so the two directories are siblings:
+
+```text
+parent/
+  bounded_authority_protocol/   (git clone https://github.com/baselabs/bounded_authority_protocol.git)
+  myapp/                        (your crate)
+```
+
+Then, in `myapp/Cargo.toml`:
 
 ```toml
 [dependencies]
 bounded-authority-protocol = { path = "../bounded_authority_protocol/sdks/rust" }
 ```
 
-or pin a commit of the repository:
+or pin a commit of the repository instead of cloning it:
 
 ```toml
 [dependencies]
@@ -54,7 +66,14 @@ bounded-authority-protocol = { git = "https://github.com/baselabs/bounded_author
 
 `cargo test` runs this block as a doctest. It signs with `ed25519-dalek` keys from fixed seeds;
 in production the private keys stay with the issuer and the holder, and the verifier receives
-only public keys.
+only public keys. To run it as your own program, put it in `src/main.rs` and add the signer to
+your dependencies (it builds on Rust 1.81):
+
+```toml
+[dependencies]
+bounded-authority-protocol = { path = "../bounded_authority_protocol/sdks/rust" }
+ed25519-dalek = { version = "2.2", default-features = false }
+```
 
 ```rust
 use bounded_authority_protocol::types::{
@@ -157,7 +176,8 @@ fn main() -> Result<(), Invalid> {
 
 ## API
 
-Contract-major 1 functions are re-exported at the crate root (they also live in `v1`).
+Contract-major 1 functions are re-exported at the crate root from the `v1` module, except
+`request_digest`, which the root re-exports from an internal module.
 Contract-major 2 and 3 functions live in the `v2` and `v3` modules under the same names, because
 each major has its own byte-distinct contract: `v2` adds the `lte` and `gte` range selectors,
 and `v3` uses ES256 with 65-byte uncompressed SEC1 keys and 64-byte raw `r || s` signatures (it
@@ -174,7 +194,9 @@ also has its own EC JWK and thumbprint functions). Each major rejects the others
 | Strict Ed25519 | `verify_strict`, `acceptable_public_key`, `torsion_free` |
 | Primitives | `json_decode`, `jcs_encode`, `base64url_decode`, `base64url_encode`, `uri_normalize`, `jwk_decode_public`, `jwk_encode_public`, `thumbprint_preimage`, `thumbprint`, `thumbprint_raw`, `public_key_thumbprint_raw`, `Bounds::maximum`, `Bounds::new`, `resolve_bounds`, `require_bounds_equal` |
 
-The argument and result structs are in `types` and `facts`.
+The argument structs are in `types`, the facts in `facts`, and the content-assertion structs
+(`ContentAssertionInput`, `ExpectedContentAssertion`, `DecodedContentAssertion`,
+`ContentAssertionFacts`) in `content_assertion`, also re-exported at the root.
 
 **Errors.** Fallible functions return `Result<T>`, which is `std::result::Result<T, Invalid>`;
 `Invalid` carries no reason. Some functions cannot fail and return plain values:
@@ -208,14 +230,17 @@ revocation comparison, never on the verification path.
 
 `cargo test --locked` runs everything: the unit tests, this README's quickstart, the
 vendored v1 (283 cases), v2 (268), v3 (292), and strict-Ed25519 (2,410) corpus snapshots with
-their `index.json` SHA-256 asserted at load and a key census per run, the local-loopback,
+their `index.json` SHA-256 asserted at load (the three contract-major runners also check a key
+census), the local-loopback,
 role-attestation, and content-assertion corpora read from `priv/conformance/`, and the
 permissiveness battery (`tests/permissiveness.rs`, 83 tests), which builds each defect a parser
 closure exists to reject and proves the closure catches it.
 
 ```bash
 cargo test --locked
-cargo test --locked --test conformance          # v1: agreed=283 disagreed=0 + census
+# A runner's summary line is visible only with --nocapture:
+cargo test --locked --test conformance -- --nocapture
+# conformance: agreed=283 disagreed=0 total=283 surfaces=28 census=11/11
 cargo test --locked --test conformance_strict   # 2,410 strict-Ed25519 cases
 cargo test --locked --test content_assertion    # 131 + 9 + 14 cases
 ```

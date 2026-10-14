@@ -21,9 +21,10 @@ pip install "bounded-authority-verifier @ git+https://github.com/baselabs/bounde
 or from a local checkout with `pip install ./bounded_authority_protocol/sdks/python`. Without a
 published version, the commit is the identity of what you deployed.
 
-Erratum 3 (producer canonicality) is not implemented in this package yet: its compact assembly
-and anchored-export encoding do not refuse a non-canonical signature. Verification is
-unaffected. See the SDK README.
+Erratum 3 (producer canonicality) is not implemented in this package yet: `assemble_compact`,
+`encode_anchored_export` (and their `v2` and `v3` forms), `assemble_local_loopback_http_compact`,
+`assemble_attestation_compact`, and `assemble_content_assertion_compact` do not refuse a
+non-canonical signature. Verification is unaffected. See the SDK README.
 
 ## Runtime posture
 

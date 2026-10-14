@@ -20,11 +20,13 @@ bounded-authority-protocol = { path = "../bounded_authority_protocol/sdks/rust" 
 bounded-authority-protocol = { git = "https://github.com/baselabs/bounded_authority_protocol", rev = "<commit>" }
 ```
 
-Pin a commit: without a published version, the commit is the identity of what you deployed.
+The path form expects this repository cloned next to your crate. Pin a commit: without a
+published version, the commit is the identity of what you deployed.
 
-Erratum 3 (producer canonicality) is not implemented in this crate yet: its compact assembly and
-anchored-export encoding do not refuse a non-canonical signature. Verification is unaffected.
-See the SDK README.
+Erratum 3 (producer canonicality) is not implemented in this crate yet: `assemble_compact`,
+`encode_anchored_export` (and their `v2` and `v3` forms), `assemble_local_loopback_http_compact`,
+`assemble_attestation_compact`, and `assemble_content_assertion_compact` do not refuse a
+non-canonical signature. Verification is unaffected. See the SDK README.
 
 ## Local-loopback application profile
 

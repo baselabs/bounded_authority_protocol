@@ -77,7 +77,7 @@ jobs:
         working-directory: sdks/python
 
       - name: Python — lint
-        run: ruff check src/ tests/ tools/
+        run: ruff check src/ tests/ tools/ examples/
         working-directory: sdks/python
 
       - name: Python — purity check

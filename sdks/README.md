@@ -42,7 +42,9 @@ decisions.
 ## Known gaps
 
 - **Erratum 3 (producer canonicality) is not implemented in any of the three.** Their compact
-  assembly and anchored-export encoding check the signature width but not its value, so they can
+  assembly for every profile (contract-majors 1, 2, and 3, local-loopback proofs, role
+  attestations, and content assertions) and their anchored-export encoding check the signature
+  width but not its value, so they can
   assemble an Ed25519 signature with `S >= L` or a non-canonical or small-order `R`, or an ES256
   signature that is out of range or high-S. Every verifier rejects such a credential. None of
   them runs the `bap-producer-canonicality/1` corpus yet. The published TypeScript verifier

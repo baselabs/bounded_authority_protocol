@@ -1,21 +1,19 @@
-//! Public input structs for the v1 verification façade.
+//! Public input structs for the verification façades.
 //!
-//! This module is the data-model home for the typed structs the public façade
-//! (Tasks 10–13) consumes. Task 8 landed the compact-signing kind enum and the
-//! [`SigningInput`] struct that [`crate::compact::assemble_compact`] takes;
-//! Task 9 EXTENDS this file with the remaining trusted-issuer, expected-grant,
-//! expected-request, consumption-chain, boundary-anchor, key-transition, and
-//! anchored-export input structs the façade and conformance runner (Task 14)
-//! consume. No struct in this module derives `serde` (see F3 below).
+//! This module holds the typed structs the public façades take: the
+//! compact-signing kind enum and [`SigningInput`], and the trusted-issuer,
+//! expected-grant, expected-request, consumption-chain, boundary-anchor,
+//! key-transition, anchored-export, and role-attestation input structs. No
+//! struct in this module derives `serde` (see below).
 //!
-//! # F3 — no serde on any `src/` struct
+//! # No serde on any `src/` struct
 //!
 //! `serde` is a `[dev-dependencies]` entry only (invisible to the lib build);
 //! every struct here is a plain Rust struct with `pub` fields that the
 //! conformance runner assembles field-by-field from `serde_json::Value`. There
 //! is deliberately NO `#[derive(serde::Serialize)]` or `Deserialize` anywhere
 //! in `src/` — the lib build must not depend on serde, and planting such a
-//! derive is a compile error (the T9 tripwire proves this). The fixed
+//! derive is a compile error (a test proves this). The fixed
 //! cryptographic widths (`[u8; 32]` / `[u8; 64]`) are enforced as array types,
 //! not stored in [`Bounds`] (`REQ1-BOUNDS-fixed-widths`).
 //!
@@ -32,10 +30,8 @@ use crate::json::JsonValue;
 
 /// The compact-JWS signing-input kind.
 ///
-/// Tags which compact form a [`SigningInput`] belongs to. Only [`Grant`] is
-/// corpus-exercised at Task 8; [`Proof`], [`ChainAnchor`], and [`KeyTransition`]
-/// are the kinds the Task 10–13 producers / decoders of proof / anchor /
-/// transition compacts consume (the protected-header `typ` check keys on this).
+/// Tags which compact form a [`SigningInput`] belongs to; the protected-header
+/// `typ` check of each producer and decoder keys on it.
 ///
 /// [`Grant`]: SigningKind::Grant
 /// [`Proof`]: SigningKind::Proof
@@ -63,14 +59,11 @@ pub enum SigningKind {
 impl SigningKind {
     /// Decodes the lowercase corpus kind string to a [`SigningKind`].
     ///
-    /// `"grant"` is corpus-pinned (the `assemble-compact` corpus). `"proof"`,
-    /// `"chain_anchor"`, and `"key_transition"` are the snake-case forms the
-    /// Task 10–13 proof / anchor / transition corpora finalize; only `"grant"`
-    /// is exercised at Task 8. Any unknown kind string is `Invalid` — the set
-    /// is closed (there is no generic / future-proof kind).
+    /// `"grant"`, `"proof"`, `"chain_anchor"`, and `"key_transition"` are the
+    /// snake-case corpus forms. Any unknown kind string is `Invalid`: the set
+    /// is closed (there is no generic or future-proof kind).
     //
-    // `pub(crate)` but, until the v1 façade wires it (Task 10), the only caller
-    // is this module's corpus test. `pub(crate)` does not suppress dead-code the
+    // `pub(crate)`, and its only caller is this module's corpus test. `pub(crate)` does not suppress dead-code the
     // way `pub` does, so the per-item allow keeps the lint clean. Remove once
     // the façade decodes kinds through this.
     #[allow(dead_code)]
@@ -92,7 +85,7 @@ impl SigningKind {
 ///
 /// Carries the two segments that form the exact RFC 7515 signing input
 /// `ASCII(base64url(protected) || "." || base64url(payload))`
-/// (`REQ1-SIGNING-exact-input`) plus the [`SigningKind`] the Task 10 façade
+/// (`REQ1-SIGNING-exact-input`) plus the [`SigningKind`] the façade
 /// uses to validate the protected-header `typ`. The segments are
 /// already-canonical base64url ASCII bytes;
 /// [`crate::compact::assemble_compact`] passes them through VERBATIM and
@@ -215,9 +208,9 @@ pub struct ExpectedRequest {
 /// The raw holder credentials `check_envelope` binds.
 ///
 /// Mirrors the `envelope/check.json` corpus `input.{grant, proof}` pair: the
-/// received grant compact and proof compact bytes. Not in the T9 plan's
-/// explicit name list, but required by the `check_envelope(Credentials,
-/// ExpectedRequest)` façade signature (`spec/bap-v1.md` line 303).
+/// received grant compact and proof compact bytes, as the
+/// `check_envelope(Credentials, ExpectedRequest)` façade signature requires
+/// (`spec/bap-v1.md` line 303).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Credentials {
     /// The received grant compact bytes (ASCII).
@@ -646,7 +639,7 @@ pub struct AnchoredExportEncoded {
 }
 
 // ============================================================================
-// Signing-input producers (Façade A — Task 10)
+// Signing-input producers
 // ============================================================================
 
 /// The deterministic JCS producer result: the two canonical base64url segments
@@ -890,8 +883,7 @@ mod tests {
 
     #[test]
     fn decode_proof() {
-        // Not corpus-exercised at Task 8; the snake-case form is the T10
-        // proof-corpus convention to finalize.
+        // The snake-case corpus form of the proof kind.
         assert_eq!(SigningKind::decode("proof"), Ok(SigningKind::Proof));
     }
 
@@ -936,9 +928,9 @@ mod tests {
     }
 
     // ==========================================================================
-    // Task 9 — input-struct structural sanity (Debug renders, Clone works,
-    // the fixed crypto widths are the array types). These are smoke tests; the
-    // real exercise of every field lands in Tasks 10–14.
+    // Input-struct structural sanity (Debug renders, Clone works, the fixed
+    // crypto widths are the array types). These are smoke tests; the façade
+    // and conformance tests exercise every field.
     // ==========================================================================
 
     fn zero32() -> [u8; 32] {

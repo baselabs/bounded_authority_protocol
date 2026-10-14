@@ -29,10 +29,12 @@ install it from this repository.
 - One runtime dependency, [`cryptography`](https://pypi.org/project/cryptography/) `>= 44.0.0`,
   for Ed25519 and ECDSA P-256 (CI pins 50.0.0). SHA-256 comes from `hashlib`; base64url, JSON
   decoding, and JCS canonicalization are implemented in the package.
-- **Erratum 3 (producer canonicality) is not yet implemented.** `assemble_compact` and
-  `encode_anchored_export` (and their `v2` and `v3` forms) check the signature width but not its
-  value, so they can assemble an Ed25519 signature with `S >= L` or a non-canonical or
-  small-order `R`, or an ES256 signature that is out of range or high-S. Every verifier, this
+- **Erratum 3 (producer canonicality) is not yet implemented.** The producers that frame a
+  signature check its width but not its value: `assemble_compact` and `encode_anchored_export`
+  (and their `v2` and `v3` forms), `assemble_local_loopback_http_compact`,
+  `assemble_attestation_compact`, and `assemble_content_assertion_compact`. So they can
+  assemble an Ed25519 signature with `S >= L` or a non-canonical or small-order `R`, or an
+  ES256 signature that is out of range or high-S. Every verifier, this
   one included, rejects such a credential. Until this package implements erratum 3, check a
   signature from an external signer before assembly (for ES256, normalize to low S).
 
@@ -53,7 +55,9 @@ Pin a commit: without a published version, the commit is the identity of what yo
 ## Quickstart
 
 This is [`examples/quickstart.py`](examples/quickstart.py). The test suite runs it, checks its
-output, and keeps this copy identical to the file.
+output, and keeps this copy identical to the file. To run it yourself, install the package
+(above) into a virtual environment and run `python examples/quickstart.py` from `sdks/python`
+in a checkout, or save the block as `quickstart.py` anywhere and run `python quickstart.py`.
 
 ```python
 """Issue a grant, sign a holder proof for one request, verify both, then show that the same

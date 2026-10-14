@@ -23,31 +23,40 @@ moves to its own repository when it is first published
 ([ADR 0015](../../docs/adr/0015-sdk-graduation-and-publish-topology.md)). Until then, use it
 from a checkout of this repository.
 
-- Go **1.25** or later (`go.mod`); CI tests the latest 1.25 patch release.
+- Go **1.25** or later (`go.mod`). CI installs Go with `actions/setup-go` and
+  `go-version: "1.25"`, which selects a 1.25.x release (the runner's cached one when present).
+  Development here uses Go 1.25.14.
 - **No third-party dependencies**: only the standard library (`crypto/ed25519`, `crypto/ecdsa`,
   `crypto/elliptic`, `crypto/sha256`, `crypto/subtle`, `math/big`, and pure parsing and
   formatting packages). `tools/license_check.sh` asserts the module graph stays empty.
 - **64-bit platforms only**: the bounds hold 9,007,199,254,740,991 in an `int`.
-- **Erratum 3 (producer canonicality) is not yet implemented.** `AssembleCompact` and
-  `EncodeAnchoredExport` (and their `Profile` and `EcdsaProfile` forms) check the signature
-  width but not its value, so they can assemble an Ed25519 signature with `S >= L` or a
-  non-canonical or small-order `R`, or an ES256 signature that is out of range or high-S.
+- **Erratum 3 (producer canonicality) is not yet implemented.** The producers that frame a
+  signature check its width but not its value: `AssembleCompact` and `EncodeAnchoredExport`
+  (and their `Profile` and `EcdsaProfile` methods), `AssembleLocalLoopbackHTTPCompact`,
+  `AssembleAttestationCompact`, and `AssembleContentAssertionCompact`. So they can assemble an
+  Ed25519 signature with `S >= L` or a non-canonical or small-order `R`, or an ES256 signature
+  that is out of range or high-S.
   Every verifier, this one included, rejects such a credential. Until this SDK implements
   erratum 3, check a signature from an external signer before assembly (for ES256, normalize
   to low S).
 
 ## Install from a checkout
 
-Clone this repository next to your module, then point your `go.mod` at the SDK directory:
+From an empty directory, clone this repository, create your module next to it, point the
+module at the SDK directory, and run the quickstart below as a test:
 
 ```bash
 git clone https://github.com/baselabs/bounded_authority_protocol.git
+mkdir myapp && cd myapp
+go mod init example.com/myapp
 go mod edit \
   -require=github.com/baselabs/bounded_authority_protocol_go@v0.0.0 \
   -replace=github.com/baselabs/bounded_authority_protocol_go=../bounded_authority_protocol/sdks/go
+cp ../bounded_authority_protocol/sdks/go/example_test.go .
+go test -run Example .
 ```
 
-Then import it as `verifier "github.com/baselabs/bounded_authority_protocol_go"`.
+In your own code, import it as `verifier "github.com/baselabs/bounded_authority_protocol_go"`.
 
 ## Quickstart
 
@@ -192,7 +201,9 @@ SEC1 keys and 64-byte raw `r || s` signatures). Each major rejects the others' b
 and content-assertion functions exist only at package level (they are Ed25519 profiles).
 
 **Errors.** Every fallible function returns `(T, error)`, and the error is `nil` or exactly
-`ErrInvalid`; it carries no reason, and no function panics on bad input. `VerifyStrict`,
+`ErrInvalid`; it carries no reason, and no function panics on bad input.
+`VerifyContentAssertionSuccessor` returns only an `error` (`nil` when the successor step holds).
+`VerifyStrict`,
 `AcceptablePublicKey`, and `TorsionFree` return `bool`; `Base64urlEncode` and `BoundsMaximum`
 cannot fail. A `nil` `*Bounds` means the profile maxima; build tighter limits with `BoundsNew`.
 
@@ -251,7 +262,7 @@ here (ADR 0015).
 ## Development
 
 ```bash
-gofmt -l . && go vet ./...
+test -z "$(gofmt -l .)" && go vet ./...
 go test ./...
 sh tools/purity_check.sh && sh tools/license_check.sh
 ```

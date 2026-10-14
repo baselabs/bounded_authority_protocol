@@ -3,6 +3,9 @@ name = "bounded-authority-protocol"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.81"
+# Never published from this repository (ADR 0015): the crate moves to its own repository
+# when it is first published.
+publish = false
 license = "Apache-2.0"
 description = "Provider-neutral, deterministic, pure verification library for bounded proof-of-possession authority (contract-majors 1, 2, and 3 and the sibling profiles)."
 repository = "https://github.com/baselabs/bounded_authority_protocol"
