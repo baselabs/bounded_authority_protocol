@@ -79,8 +79,8 @@ cleanup, stage the removal with `git rm -- path` and use an explicit clean messa
 
 The public CI checks
 directory classes and generic secret signatures; it cannot attest to confidential-term coverage.
-Inventory-owner confirmation remains necessary, including for patent terms. Other hosts, web
-edits, provider merge actions, and bypassed hooks remain outside local enforcement.
+Inventory-owner confirmation remains necessary, including for confidential terms. Other hosts,
+web edits, provider merge actions, and bypassed hooks remain outside local enforcement.
 
 Do not submit secrets, production credentials, private key fixtures, customer data, or proprietary
 consumer code. Runtime code, public APIs, wire formats, and conformance artifacts must remain

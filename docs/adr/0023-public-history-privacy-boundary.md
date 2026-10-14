@@ -44,7 +44,7 @@ stateful application.
 8. CI secret detection uses a pinned, checksum-verified Gitleaks binary in a separate job. Public
    fixture exceptions are restricted by detector, path, and observed fixture form; exceptions for
    removed fixtures are also restricted to their historical commits. These checks cover generic
-   secret signatures and directory classes, not confidential or patent terms.
+   secret signatures and directory classes, not confidential terms.
 9. Exact confidential-term enforcement belongs to the owner-host local guard. Its manifest and
    integrity policy and activation marker remain ignored local state; activation is also recorded
    in local Git configuration so removing ignored files cannot silently disable the guard.
@@ -56,9 +56,9 @@ stateful application.
    local automatic commits that skip commit hooks and scans full ancestry for new remote refs.
    This does not cover web edits, provider merge actions, automated
    dependency commits, fork pull-request contents, issue or pull-request text, other hosts, or
-   bypassed local hooks. Patent-term coverage requires an inventory-owner receipt. CI workflow
-   and scanner edits remain subject to review and required-check configuration; job isolation
-   does not prevent a pull-request author from proposing changes to those checks.
+   bypassed local hooks. Confidential-term coverage requires an inventory-owner receipt. CI
+   workflow and scanner edits remain subject to review and required-check configuration; job
+   isolation does not prevent a pull-request author from proposing changes to those checks.
 
 ## Consequences
 
