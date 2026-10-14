@@ -714,10 +714,11 @@ the raw 64-byte `r || s` form of RFC 7518 §3.4 with `s` in the low half (`s <= 
 expected-context, and credentials structs are the same ones the earlier sections used.
 
 `:crypto` returns ECDSA signatures in DER and may return either `s`, so the signer converts the
-signature to `r || s` and normalizes `s` to the low half before assembly. Release 0.9.0 adds
-`BoundedAuthorityProtocol.Es256`, a public module with the ES256 checks, including `der_to_raw/1`
-and `normalize_low_s/1` for this step; the cell below does it by hand, so it also runs on
-releases before 0.9.0.
+signature to `r || s` and normalizes `s` to the low half before assembly. Release 0.9.0
+(unreleased, planned for 0.9.0) adds `BoundedAuthorityProtocol.Es256`, a public module with the
+ES256 checks, including `der_to_raw/1` and `normalize_low_s/1` for this step. The cell below
+does the conversion by hand, so it runs on every release, including the ones without that
+module.
 
 ```elixir
 alias BoundedAuthorityProtocol.V3

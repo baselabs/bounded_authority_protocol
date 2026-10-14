@@ -23,7 +23,14 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1 do
   @spec assemble_compact(SigningInput.t(), binary()) :: {:ok, binary()} | {:error, :invalid}
   def assemble_compact(input, signature), do: assemble_compact(input, signature, %{})
 
-  @doc "Assembles and revalidates this profile under tightened bounds."
+  @doc """
+  Assembles and revalidates this profile under tightened bounds.
+
+  Since 0.9.0 (unreleased, planned for 0.9.0), assembly also refuses, with `{:error, :invalid}`, a
+  signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
+  order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
+  signature bytes it accepts.
+  """
   @spec assemble_compact(SigningInput.t(), binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
   defdelegate assemble_compact(input, signature, limits), to: Codec, as: :assemble

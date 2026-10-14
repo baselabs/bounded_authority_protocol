@@ -76,6 +76,17 @@ any existing certified corpus changes.
   "Report a vulnerability").
 - Usage rule 18: hand assembly only a canonical signature (convert DER and normalize to low S
   first for ES256).
+- The consumer conformance path is one that works from a project: `mix run -e
+  'BoundedAuthorityProtocol.Conformance.Cli.Main.main(["--corpus", ...])'` or
+  `mix escript.install hex bounded_authority_protocol 0.8.0` (README, getting started, usage
+  rule 14, upgrading). The docs-currency test pins the escript version to the latest release.
+- Every assembler and anchored-export encoder documents its 0.9.0 refusal of a non-canonical
+  signature; the upgrading guide names every affected function.
+- The docs-samples test also checks each sentence that states a block's value, and the
+  release-time marker is required on every surface that describes an unreleased addition,
+  including the API docs in `lib/`.
+- HexDocs titles: README shows as "Overview", the generated v1 view and ADR 0001 have readable
+  titles. The Elixir and OTP requirement says what Mix enforces and what CI tests.
 - The Python, Rust, and Go SDK READMEs and deployment notes are rewritten: they state that the
   SDKs are unpublished and give a working install from a checkout, list the full API of each
   (contract-majors 1, 2, and 3 and the sibling profiles), and state the open gaps (erratum 3 is
@@ -373,7 +384,7 @@ found by the profile corpus's ES256 confusion case.
 
 ### Added — UCP riding-point decision (ADR 0034) and A2A venue extension draft (no wire or API change)
 
-- `docs/adr/0034-ucp-riding-point-scoping.md` (owner-directed resolution of the open question
+- `docs/adr/0034-ucp-riding-point-scoping.md` (resolution of the open question
   both interop profiles recorded; UCP read first-hand at pinned `d3ccb55`): the riding point is
   transport-composed — UCP's A2A transport is covered as-is by the A2A binding profile for
   deployments speaking A2A 1.0 (UCP's published A2A binding is at 0.3-era shapes —
@@ -438,12 +449,11 @@ found by the profile corpus's ES256 confusion case.
 
 ### Changed — documentation truth: AP2 mapping note, selector-scope paragraph, ADR 0029
 
-- The `tracked-authoring-paths` gate gained an owner-directed exception (decided 2026-09-20,
-  per-file pin): the handoff record adopted at commit `47297b8` is admitted at exactly its
-  committed blob, mode, and stage 0. Any other content at that path, any other handoff path,
-  and every other authoring-directory path in the index or HEAD history remain findings; the
-  red-capability self-test covers tampered bytes, a sibling handoff path, wrong modes, and a
-  gitlink. The pinned path and blob live in the gate test itself.
+- The `tracked-authoring-paths` gate admits one previously committed file (from commit
+  `47297b8`) at exactly its committed blob, mode, and stage 0. Any other content at that path
+  and every other local authoring path in the index or HEAD history remain findings; the
+  red-capability self-test covers tampered bytes, a sibling path, wrong modes, and a gitlink.
+  The pinned path and blob live in the gate test itself.
 - `docs/extensions/ap2-mandate-mapping.md` corrected against first-hand reads of AP2 v0.2
   (pinned `e1ea56d`) and the published specs (OBSERVED: every cited line opened in both trees).
   The grant's analog is now the **open** mandate (issuer-signed, constraint-bearing,
@@ -1434,11 +1444,11 @@ several note findings, all in surfaces this program touched. All fixed:
   lib-path purity invariant (no I/O/clock/RNG/network/env in `src/`; `#![forbid(unsafe_code)]` is the
   compile-time `unsafe` half) and the runtime dependency-license allowlist (15 runtime deps, all
   permissive; dev-deps excluded as non-consumer-facing) — both shellcheck-clean and red-capable. The
-  `rust-conformance` CI job (`.github/workflows/sdks.yml`) runs fmt + clippy + the full `cargo test`
+  `rust-conformance` CI job ([`.github/workflows/sdks.yml`](https://github.com/baselabs/bounded_authority_protocol/blob/main/.github/workflows/sdks.yml)) runs fmt + clippy + the full `cargo test`
   (unit + permissiveness + 283-vector conformance + census) + purity + license on the MSRV 1.81
   toolchain. The publish guard now scans `sdks/*/Cargo.toml` and blocks `cargo publish` /
   `cargo release publish` / `cargo-release publish` / `crate-ci/cargo-release` (ADR 0015). New docs:
-  [`sdks/rust/README.md`](sdks/rust/README.md) and the deployment guide
+  [`sdks/rust/README.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/rust/README.md) and the deployment guide
   (`docs/deployment/rust-sdk.md`) (AWS Lambda `provided.al2023`; PostgreSQL
   `plrust` — ed25519-dalek-based verification is NOT plrust-trusted-mode-compatible as built). The three
   signed anchored-export rows in [`docs/design/conformance-contract.md`](docs/design/conformance-contract.md)
@@ -1494,7 +1504,7 @@ several note findings, all in surfaces this program touched. All fixed:
 - Ship the ADR 0015 enforcement layer: a tracked pre-commit hook
   (`scripts/hooks/pre-commit`, single pattern source `scripts/check_sdk_publish_infra.sh`, installed
   via `scripts/install-hooks.sh`) and the `sdk-publish-guard` CI job
-  ([`.github/workflows/sdk-publish-guard.yml`](.github/workflows/sdk-publish-guard.yml)) that together
+  ([`.github/workflows/sdk-publish-guard.yml`](https://github.com/baselabs/bounded_authority_protocol/blob/main/.github/workflows/sdk-publish-guard.yml)) that together
   reject SDK registry-publish infrastructure committed to the monorepo. Honesty limit: catches
   committed publish infrastructure, not a literal ad-hoc publish run against a working tree; CI on
   main is the non-bypassable backstop, the local hook is honor-system. Bypass:
@@ -1510,7 +1520,7 @@ several note findings, all in surfaces this program touched. All fixed:
   permissiveness closure red-capable via a per-language mutation-gate. They are verifiers, not
   authority runtimes (no key selection, replay reservation, or execution grant). NOT in the Hex
   package `files:` (they are not Elixir). The `sdks-conformance` CI job
-  ([`.github/workflows/sdks.yml`](.github/workflows/sdks.yml)) gates every `sdks/**` /
+  ([`.github/workflows/sdks.yml`](https://github.com/baselabs/bounded_authority_protocol/blob/main/.github/workflows/sdks.yml)) gates every `sdks/**` /
   `priv/conformance/**` change. Zero wire byte, bound, or verdict change to the Elixir package.
 - Draft the capability-authorization extension as a pre-submission package for the MCP
   experimental-extension track (`docs/extensions/` — a draft `.mdx`, a draft

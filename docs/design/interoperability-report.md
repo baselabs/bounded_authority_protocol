@@ -41,7 +41,7 @@ permissiveness mutation-gate proving its closures red-capable.
 
 | SDK | Language surface | Corpus binding | Result |
 |---|---|---|---|
-| `@bounded-authority-protocol/verifier` | TypeScript, Node >= 22, `node:crypto` only | graduated repository ([baselabs/bounded_authority_protocol_typescript](https://github.com/baselabs/bounded_authority_protocol_typescript)), vendored snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** (registry-distributed since 2026-09-14) |
+| `@bounded-authority-protocol/verifier` | TypeScript, Node >= 22, `node:crypto` only | graduated repository ([baselabs/bounded_authority_protocol_typescript](https://github.com/baselabs/bounded_authority_protocol_typescript)), vendored snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** (registry-distributed since September 14, 2026) |
 | `bounded-authority-verifier` | Python >= 3.10, `cryptography` | in-place monorepo corpus, startup digest assertion | **283/283 agreed + census (11 keys)** |
 | `bounded-authority-protocol` | Rust, MSRV 1.81, `ed25519-dalek`+`p256`+`sha2` | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 | `bounded_authority_protocol_go` | Go 1.25, stdlib only | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
@@ -58,7 +58,7 @@ The Elixir reference plus the TypeScript, Python, Rust, and Go implementations e
 producer/assembly bytes, trust and invocation binding, mandatory nonce, meaningful-byte tamper,
 and mutual standard/local profile rejection. Each implementation pins the same index and per-file
 hashes. This is repository-executed cross-validation: the TypeScript result was certified in this
-repository at its graduation (2026-09-14) and its suite now lives in the graduated repository;
+repository at its graduation (September 14, 2026) and its suite now lives in the graduated repository;
 the Python, Rust, and Go SDKs remain unpublished.
 
 ### Contract-majors 2 and 3
@@ -189,7 +189,7 @@ their native APIs; the TypeScript suite's equivalent runs live in its graduated 
 
 - Three of the four SDKs — Python, Rust, and Go — are not published to registries (ADR 0015:
   graduation on first publication); their cross-validation above is repository-executed, not
-  registry-distributed. The TypeScript SDK graduated on first publication (2026-09-14) and is
+  registry-distributed. The TypeScript SDK graduated on first publication (September 14, 2026) and is
   published from its own repository.
 - For the Python, Rust, and Go SDKs the attestation-profile rows report their certified-corpus
   tests (which assert the pinned index and the exact case counts), not a separate agreement

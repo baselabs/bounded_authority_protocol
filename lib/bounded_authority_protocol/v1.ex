@@ -139,6 +139,11 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   Returns `{:ok, %BoundedAuthorityProtocol.V1.EncodedAnchoredExport{chunks: chunks, digest: digest,
   byte_count: count}}` or `{:error, :invalid}`.
+
+  Since 0.9.0 (unreleased, planned for 0.9.0), encoding also refuses, with `{:error, :invalid}`, a
+  signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
+  order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
+  signature bytes it accepts.
   """
   defdelegate encode_anchored_export(input, expected), to: Runtime
 
@@ -160,6 +165,11 @@ defmodule BoundedAuthorityProtocol.V1 do
   verification happens in `verify_grant/3`, `check_envelope/2`, and the evidence verifiers.
   Returns `{:error, :invalid}` for a wrong signature width, a signing input that does not
   re-parse, or an over-limit result.
+
+  Since 0.9.0 (unreleased, planned for 0.9.0), assembly also refuses, with `{:error, :invalid}`, a
+  signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
+  order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
+  signature bytes it accepts.
   """
   @spec assemble_compact(SigningInput.t(), binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}

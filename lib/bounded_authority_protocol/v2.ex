@@ -55,7 +55,14 @@ defmodule BoundedAuthorityProtocol.V2 do
   @doc "Builds the deterministic standard-JWS historical-key-transition signing input."
   defdelegate key_transition_signing_input(transition, limits), to: Runtime
 
-  @doc "Frames an exact deterministic anchored export after semantic validation."
+  @doc """
+  Frames an exact deterministic anchored export after semantic validation.
+
+  Since 0.9.0 (unreleased, planned for 0.9.0), encoding also refuses, with `{:error, :invalid}`, a
+  signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
+  order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
+  signature bytes it accepts.
+  """
   defdelegate encode_anchored_export(input, expected), to: Runtime
 
   @doc "Assembles a validated signing input and raw Ed25519 signature at profile maxima."
@@ -64,7 +71,14 @@ defmodule BoundedAuthorityProtocol.V2 do
   def assemble_compact(signing_input, signature),
     do: assemble_compact(signing_input, signature, %{})
 
-  @doc "Assembles a validated signing input and raw Ed25519 signature under caller bounds."
+  @doc """
+  Assembles a validated signing input and raw Ed25519 signature under caller bounds.
+
+  Since 0.9.0 (unreleased, planned for 0.9.0), assembly also refuses, with `{:error, :invalid}`, a
+  signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
+  order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
+  signature bytes it accepts.
+  """
   @spec assemble_compact(SigningInput.t(), binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
   def assemble_compact(signing_input, signature, limits),

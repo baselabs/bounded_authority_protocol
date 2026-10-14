@@ -10,8 +10,11 @@ of the frozen API surface; THIS document is the living contract consumers read.
 Clarifying minor (erratum 3). No verification verdict changes. The requirement `~> 0.8.0` does
 not select 0.9.0; move to `~> 0.9.0`.
 
-- `assemble_compact` and `encode_anchored_export` refuse a signature that no conforming signer
-  emits, with `{:error, :invalid}`, and never rewrite accepted bytes. Under contract-major 3 that
+- Every producer that frames a signature refuses one that no conforming signer emits, with
+  `{:error, :invalid}`, and never rewrites accepted bytes: `assemble_compact/2,3` and
+  `encode_anchored_export/2` in `BoundedAuthorityProtocol.V1`, `V2`, and `V3`, and
+  `assemble_compact/2,3` in `BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1`,
+  `BoundedAuthorityProtocol.RoleAttestation.V1`, and `BoundedAuthorityProtocol.ContentAssertion.V1`. Under contract-major 3 that
   is `r` or `s` out of range or high-S; under Ed25519 it is `S ≥ L` or an `R` that is
   non-canonical or of small order. Every verifier already rejected these signatures, so a
   credential that assembled and verified before still does.
@@ -174,11 +177,19 @@ verify its registry checksum before changing a package dependency.
 ## How to check you are unaffected
 
 1. Use the minor-bounded requirement (`~> 0.8.0`) and keep `mix.lock` committed so the exact
-   version is recorded; the conformance corpus ships inside the package.
-2. Run the packaged verifier CLI against the packaged corpus (exit 0 = your build still
-   agrees with the certified corpus).
-3. For corpus-consuming minors: rotate the certified digest pins with the shipped script and
-   re-run your suite.
+   version is recorded; the conformance corpora ship inside the package.
+2. Run the verifier CLI against the packaged corpora from your project (exit 0 means the
+   installed release agrees with each certified corpus):
+
+   ```sh
+   mix run -e 'BoundedAuthorityProtocol.Conformance.Cli.Main.main(["--corpus", "deps/bounded_authority_protocol/priv/conformance/v1/corpus"])'
+   ```
+
+   Repeat with `v2/corpus`, `v3/corpus`, and `strict-ed25519`. The CLI pins each certified
+   index digest itself.
+3. If your own tests pin a corpus index digest, update that pin in the same change as the
+   upgrade (the new value is the SHA-256 of the installed corpus's exact `index.json` bytes),
+   then re-run your suite.
 4. For a sibling application profile: select its named API explicitly, pin its separate corpus
    index digest, and prove the standard profile still rejects its artifacts (and vice versa).
 

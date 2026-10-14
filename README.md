@@ -40,7 +40,9 @@ end
 ```
 
 The package has **zero production dependencies**, no application callback, and no supervision
-tree. It requires Elixir 1.18, 1.19 or 1.20 on Erlang/OTP 27 through 29. Depend on the
+tree. It declares `elixir: "~> 1.18"`, which Mix enforces when it compiles the dependency, and
+it needs Erlang/OTP 27 or later for the standard-library `:json` module; nothing checks the OTP
+version for you. CI tests Elixir 1.18 on OTP 27, 1.19 on OTP 28, and 1.20 on OTP 29. Depend on the
 published Hex release, never a Git tag or a checkout. Release notes are in the
 [changelog](CHANGELOG.md), and migration notes in [Upgrading](docs/guides/upgrading.md).
 
@@ -267,15 +269,27 @@ reference implementation is not normative until the independent runner agrees. E
 is constructed one defect away from a passing case, so a verifier that skips the named check
 accepts it.
 
+From a project that depends on the package, run the CLI through Mix against the packaged
+corpus:
+
 ```bash
-mix escript.build
-./bounded_authority_conformance --corpus priv/conformance/v1/corpus
+mix run -e 'BoundedAuthorityProtocol.Conformance.Cli.Main.main(["--corpus", "deps/bounded_authority_protocol/priv/conformance/v1/corpus"])'
 ```
+
+or install it as a command once and run it from the project:
+
+```bash
+mix escript.install hex bounded_authority_protocol 0.8.0
+bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus
+```
+
+(`mix escript.install` puts the command in `~/.mix/escripts`; add that directory to your
+`PATH`.) In a checkout of this repository, build it with `mix escript.build` and run
+`./bounded_authority_conformance --corpus priv/conformance/v1/corpus`.
 
 `--corpus DIR` is required (no default — a wrong-corpus run that exits 0 would be a quiet
 misverification path in the tool built to eliminate quiet misverification). It exits `0` only on
-complete agreement, `1` on any integrity or verdict failure, `2` on usage error. From a consumer
-dependency, point `--corpus` at the packaged path under `deps/bounded_authority_protocol/`. The
+complete agreement, `1` on any integrity or verdict failure, `2` on usage error. The
 oracle vectors used by holder-side consumers to verify their own production live under
 `priv/conformance/v1/vectors`.
 
@@ -315,7 +329,7 @@ SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`) live
 `priv/conformance/strict-ed25519`. It is additive: it carries the cases of the strict Ed25519
 rule (ADR 0040) for every Ed25519 surface, a 1,024-case cross-language differential set, and the
 12 published "Taming the many EdDSAs" vectors, while every existing corpus and verdict above stays
-unchanged. The same CLI verifies it:
+unchanged. The same CLI verifies it (shown from a checkout of this repository):
 
 ```bash
 ./bounded_authority_conformance --corpus priv/conformance/strict-ed25519
@@ -396,7 +410,8 @@ Guides:
 Reference:
 
 - The module documentation on HexDocs: `BoundedAuthorityProtocol.V1`, `V2`, and `V3`, the
-  sibling profile namespaces, and `BoundedAuthorityProtocol.Ed25519`.
+  sibling profile namespaces, `BoundedAuthorityProtocol.Ed25519`, and
+  `BoundedAuthorityProtocol.Es256` (unreleased, planned for 0.9.0).
 - [Protocol charter](docs/design/protocol-charter.md): what the verifier does and the
   verification chain.
 - [Threat model](docs/design/threat-model.md), [conformance contract](docs/design/conformance-contract.md),

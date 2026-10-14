@@ -46,17 +46,10 @@ defmodule BoundedAuthorityProtocol.CheckDocLinks do
     ids = Map.new(pages, fn {name, html} -> {name, ids(html)} end)
 
     {links, problems} =
-      Enum.reduce(Enum.sort(pages), {0, []}, fn {name, html}, acc ->
-        html
-        |> hrefs()
-        |> Enum.reduce(acc, fn href, {count, problems} ->
-          case resolve(name, href, ids) do
-            :skip -> {count, problems}
-            :ok -> {count + 1, problems}
-            {:error, reason} -> {count + 1, ["#{name}: #{href} (#{reason})" | problems]}
-          end
-        end)
-      end)
+      pages
+      |> Enum.sort()
+      |> Enum.flat_map(fn {name, html} -> Enum.map(hrefs(html), &{name, &1}) end)
+      |> Enum.reduce({0, []}, fn {name, href}, acc -> tally(acc, name, href, ids) end)
 
     {map_size(pages), links, problems |> Enum.uniq() |> Enum.sort()}
   end
@@ -74,30 +67,33 @@ defmodule BoundedAuthorityProtocol.CheckDocLinks do
     |> MapSet.new()
   end
 
+  defp tally({count, problems}, name, href, ids) do
+    case resolve(name, href, ids) do
+      :skip -> {count, problems}
+      :ok -> {count + 1, problems}
+      {:error, reason} -> {count + 1, ["#{name}: #{href} (#{reason})" | problems]}
+    end
+  end
+
   defp resolve(page, href, ids) do
     cond do
-      href == "" or String.starts_with?(href, ["http://", "https://", "mailto:", "//"]) ->
-        :skip
+      external?(href) -> :skip
+      String.starts_with?(href, "#") -> anchor(page, String.trim_leading(href, "#"), ids)
+      true -> resolve_page(href, ids)
+    end
+  end
 
-      String.starts_with?(href, "#") ->
-        anchor(page, String.trim_leading(href, "#"), ids)
+  defp external?(href),
+    do: href == "" or String.starts_with?(href, ["http://", "https://", "mailto:", "//"])
 
-      true ->
-        [target | fragment] = String.split(href, "#", parts: 2)
+  defp resolve_page(href, ids) do
+    [target | fragment] = String.split(href, "#", parts: 2)
 
-        cond do
-          not String.ends_with?(target, ".html") ->
-            :skip
-
-          not Map.has_key?(ids, target) ->
-            {:error, "missing page"}
-
-          fragment == [] or fragment == [""] ->
-            :ok
-
-          true ->
-            anchor(target, hd(fragment), ids)
-        end
+    cond do
+      not String.ends_with?(target, ".html") -> :skip
+      not Map.has_key?(ids, target) -> {:error, "missing page"}
+      fragment in [[], [""]] -> :ok
+      true -> anchor(target, hd(fragment), ids)
     end
   end
 

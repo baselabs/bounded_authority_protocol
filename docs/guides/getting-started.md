@@ -24,7 +24,9 @@ end
 Release 0.8.0 is the current Hex release (published October 13, 2026). Every earlier release is
 retired for a security fix; the [changelog](../../CHANGELOG.md) and [Upgrading](upgrading.md)
 describe each release. Depend on the Hex package, never on a Git tag or checkout. The package
-has no runtime dependencies and needs Elixir 1.18 through 1.20 on Erlang/OTP 27 through 29.
+has no runtime dependencies. Mix enforces its `elixir: "~> 1.18"` requirement; it also needs
+Erlang/OTP 27 or later (the standard-library `:json` module), which nothing checks for you. CI
+tests Elixir 1.18 on OTP 27, 1.19 on OTP 28, and 1.20 on OTP 29.
 
 The verifier never signs. To produce signed grants and proofs with keys held in an HSM, a KMS,
 or a local key store, use the holder-side companion
@@ -57,6 +59,8 @@ alias BoundedAuthorityProtocol.V1.{
 
 byte_size(holder_thumbprint)
 ```
+
+The value is `32`: the thumbprint is a raw 32-byte SHA-256 digest.
 
 ### 2. The grant
 
@@ -92,9 +96,13 @@ grant_signature = :crypto.sign(:eddsa, :none, grant_input.message, [issuer_priva
 length(String.split(grant_compact, "."))
 ```
 
+The value is `3`: a compact JWS has three dot-separated parts.
+
 `grant_signing_input/2` returns the exact bytes to sign (`grant_input.message`);
 `assemble_compact/2` checks the signature width and the encoded parts and returns the compact
-JWS. Neither function sees a private key.
+JWS. Since 0.9.0 (unreleased, planned for 0.9.0), it also refuses a signature that no
+conforming signer emits (for Ed25519, `S` not below the group order or a non-canonical or
+small-order `R`) and never rewrites the bytes it accepts. Neither function sees a private key.
 
 ### 3. The proof
 
@@ -126,6 +134,8 @@ proof_signature = :crypto.sign(:eddsa, :none, proof_input.message, [holder_priva
 
 length(String.split(proof_compact, "."))
 ```
+
+The value is `3` again.
 
 Arguments use the package's tagged JSON form (`{:object, members}`, `{:string, s}`,
 `{:integer, i}`, and so on), so an integer and a float never compare equal by accident. Your
@@ -182,6 +192,8 @@ expected_grant = %ExpectedGrant{
 {grant_facts.grant_id, grant_facts.authorization}
 ```
 
+The value is `{"grant-restart-001", :not_evaluated}`.
+
 ### 5. Decide
 
 Verification is one input to your decision. Before you act, your service still has to reserve
@@ -213,6 +225,8 @@ never for a decision:
 {:ok, decoded} = V1.decode_grant(grant_compact, %{})
 {decoded.issuer, decoded.audiences, decoded.expires_at}
 ```
+
+The value is `{"https://issuer.example", ["https://deploy.example"], 1_800_003_600}`.
 
 ## Rotate issuer keys
 
@@ -248,6 +262,9 @@ end
 {old.grant_id, new.grant_id}
 ```
 
+The value is `{"grant-restart-001", "grant-restart-002"}`: both grants verify while both keys are
+trusted.
+
 To retire the old key, remove it from `trusted_keys`; its grants then fail. Before you trust a
 new Ed25519 key, check it with `BoundedAuthorityProtocol.Ed25519.acceptable_public_key?/1` and
 `BoundedAuthorityProtocol.Ed25519.torsion_free?/1` (usage rule 17):
@@ -256,6 +273,8 @@ new Ed25519 key, check it with `BoundedAuthorityProtocol.Ed25519.acceptable_publ
 {BoundedAuthorityProtocol.Ed25519.acceptable_public_key?(next_public),
  BoundedAuthorityProtocol.Ed25519.torsion_free?(next_public)}
 ```
+
+The value is `{true, true}`.
 
 Signed rotation evidence for archives (boundary anchors, key transitions, and anchored exports)
 has its own functions: `verify_historical_anchor/3`, `verify_key_transition/4`, and
@@ -266,17 +285,18 @@ has its own functions: `verify_historical_anchor/3`, `verify_key_transition/4`, 
 
 The package ships its certified conformance corpora and a verifier CLI that checks every case
 and exits `0` only on full agreement (`1` on any disagreement or integrity failure, `2` on a
-usage error). In this repository:
+usage error). From your project, after `mix deps.get`:
 
 ```sh
-mix escript.build
-./bounded_authority_conformance --corpus priv/conformance/v1/corpus
+mix run -e 'BoundedAuthorityProtocol.Conformance.Cli.Main.main(["--corpus", "deps/bounded_authority_protocol/priv/conformance/v1/corpus"])'
 ```
 
-From a project that depends on the package, point `--corpus` at the copy under
-`deps/bounded_authority_protocol/priv/conformance/` (`v1/corpus`, `v2/corpus`, `v3/corpus`, or
-`strict-ed25519`). The repository's quality gate runs these same commands. Exit `0` is
-conformance evidence, not an authorization.
+Repeat with `v2/corpus`, `v3/corpus`, or `strict-ed25519` in place of `v1/corpus`. To install
+the CLI as a command instead, run `mix escript.install hex bounded_authority_protocol 0.8.0`
+(it lands in `~/.mix/escripts`) and then
+`bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus`.
+In a checkout of this repository, `mix escript.build` builds the same CLI, and the repository's
+quality gate runs it over every corpus. Exit `0` is conformance evidence, not an authorization.
 
 For your own service, test the rejection paths, not only the happy path: a changed byte, a wrong
 audience, an expired grant, an argument outside the selectors, and a replayed invocation id

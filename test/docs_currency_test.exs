@@ -118,7 +118,13 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
       {"security current", "SECURITY.md",
        "`v#{released_version}` is the current tagged source release"},
       {"usage rules install", "usage-rules.md",
-       "{:bounded_authority_protocol, \"#{requirement}\"}"}
+       "{:bounded_authority_protocol, \"#{requirement}\"}"},
+      {"README CLI install", "README.md",
+       "mix escript.install hex bounded_authority_protocol #{released_version}"},
+      {"getting-started CLI install", "docs/guides/getting-started.md",
+       "mix escript.install hex bounded_authority_protocol #{released_version}"},
+      {"usage rules CLI install", "usage-rules.md",
+       "mix escript.install hex bounded_authority_protocol #{released_version}"}
     ]
 
     mismatches =
@@ -131,9 +137,22 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
   end
 
   # Unreleased additions are marked with one literal phrase, so the release edit is a single
-  # search-and-delete of that phrase. While the source is ahead of the latest release, the README
-  # must carry the marker for the source version; once the version is released, no marker may
-  # remain, and a marker never names any version other than the unreleased source version.
+  # search-and-delete of that phrase across the docs and the API docs in lib/. While the source is
+  # ahead of the latest release, every surface that describes an unreleased addition must carry
+  # the marker for the source version; once the version is released, no marker may remain, and a
+  # marker never names any version other than the unreleased source version.
+  @marked_surfaces [
+    "README.md",
+    "usage-rules.md",
+    "docs/guides/getting-started.md",
+    "docs/guides/upgrading.md",
+    "docs/guides/implementers-guide.md",
+    "docs/design/interoperability-report.md",
+    "docs/livebooks/bap-walkthrough.livemd",
+    "lib/bounded_authority_protocol/v1.ex",
+    "lib/bounded_authority_protocol/v3.ex"
+  ]
+
   test "unreleased additions carry the one release-time marker, and only while unreleased" do
     changelog = File.read!("CHANGELOG.md")
     {released_version, []} = release_state(changelog, @version)
@@ -141,22 +160,31 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
 
     assert unreleased_marker_errors(@version, ahead?, &File.read!/1) == []
 
-    # Red-capable: the same check fails for a released source that still carries markers, and
-    # for an unreleased source whose README lost its marker.
-    assert unreleased_marker_errors(@version, false, fn _path ->
-             "x (unreleased, planned for #{@version})"
-           end) != []
+    # Red-capable: the same check fails for a released source that still carries markers, for an
+    # unreleased source where one marked surface lost its marker, and for a stale version.
+    marker = "x (unreleased, planned for #{@version})"
+    assert unreleased_marker_errors(@version, false, fn _path -> marker end) != []
 
-    assert unreleased_marker_errors(@version, true, fn _path -> "no marker" end) != []
+    for dropped <- @marked_surfaces do
+      read = fn path -> if path == dropped, do: "no marker", else: marker end
+      assert [error] = unreleased_marker_errors(@version, true, read)
+      assert error =~ dropped
+    end
+
+    assert unreleased_marker_errors(@version, true, fn _path ->
+             marker <> " (unreleased, planned for 0.0.1)"
+           end) != []
   end
 
   defp unreleased_marker_errors(version, ahead?, read) do
     marker = "(unreleased, planned for #{version})"
-    {listing, 0} = System.cmd("git", ["ls-files", "--", "*.md", "*.livemd"])
+    {listing, 0} = System.cmd("git", ["ls-files", "--", "*.md", "*.livemd", "lib/*.ex"])
 
     surfaces =
       listing
       |> String.split("\n", trim: true)
+      |> Enum.concat(@marked_surfaces)
+      |> Enum.uniq()
       |> Enum.reject(
         &(&1 in ["CHANGELOG.md", "docs/ROADMAP.md", "AGENTS.md"] or
             String.starts_with?(&1, "docs/adr/"))
@@ -170,9 +198,10 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
           do: "#{path} carries #{inspect(found)}; delete it at the release (source #{version})"
 
     missing =
-      if ahead? and not String.contains?(read.("README.md"), marker),
-        do: ["README.md must mark the unreleased additions with #{inspect(marker)}"],
-        else: []
+      for path <- @marked_surfaces,
+          ahead?,
+          not String.contains?(read.(path), marker),
+          do: "#{path} must mark its unreleased additions with #{inspect(marker)}"
 
     stray ++ missing
   end

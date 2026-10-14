@@ -1,4 +1,4 @@
-# BAP-10 requirement-to-conformance map
+# Requirement-to-conformance map (contract-major 1)
 
 This is the BAP-10 acceptance artifact: the traceability map from every normative requirement
 identifier (per [ADR 0007](../adr/0007-normative-requirement-identifiers.md), `REQ1-<SURFACE>-<tag>`

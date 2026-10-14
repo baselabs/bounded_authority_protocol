@@ -24,9 +24,13 @@
     registry exposes that immutable archive. A Git tag or mutable checkout is not a package
     identity. The standard v1 verification surface stays byte- and verdict-identical; the
     local-loopback application profile is selected only through its separately named API.
-14. Run the verifier CLI with an explicit `--corpus DIR` pointing at the packaged corpus
-    (`deps/bounded_authority_protocol/priv/conformance/v1/corpus` from a consumer). Never rely on
-    a default corpus path. Treat exit 0 as conformance evidence only — it does not authorize.
+14. Run the verifier CLI with an explicit `--corpus DIR` pointing at the packaged corpus. From a
+    consumer project, run
+    `mix run -e 'BoundedAuthorityProtocol.Conformance.Cli.Main.main(["--corpus", "deps/bounded_authority_protocol/priv/conformance/v1/corpus"])'`,
+    or install the CLI with `mix escript.install hex bounded_authority_protocol 0.8.0` and run
+    `bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus`.
+    Never rely on a default corpus path. Treat exit 0 as conformance evidence only — it does not
+    authorize.
 15. For local-loopback HTTP, admit only literal `127.0.0.1` or `[::1]`, require the server nonce,
     derive the exact target from the direct listener, and reject proxy/forwarding-header authority.
     Never retry the standard profile after a local-profile rejection or vice versa.

@@ -51,14 +51,14 @@ on first publication; see [ADR 0015](docs/adr/0015-sdk-graduation-and-publish-to
 local pre-commit hook (`sh scripts/install-hooks.sh`) and a CI job on `main` reject SDK publish
 infrastructure (registry-publish steps, `prepublishOnly`/`prepack` scripts, `publishConfig`)
 committed to this repository. Contributor hook installation works without a confidential-term
-inventory; owner-host checks activate through the local policy described below. The deliberate-admin bypass is `git commit --no-verify`, documented
+inventory; maintainer checks activate through the local policy described below. The deliberate-admin bypass is `git commit --no-verify`, documented
 here as the sanctioned escape hatch. Neither layer catches a literal ad-hoc publish command run
 against a working tree — that is a runtime act no commit gate sees; CI on `main` is the hard gate
 for committed infrastructure.
 
-## Owner-host confidential-term checks
+## Maintainer checks
 
-Owner-host confidential-term checks require an ignored identifier inventory, integrity policy,
+Maintainer checks for confidential terms require an ignored identifier inventory, integrity policy,
 and activation marker, plus activation recorded in local Git configuration. The inventory owner
 prepares the inventory locally, then initializes its policy with
 `python3 scripts/private_identifier_guard.py --repo "$PWD" initialize --expected-count COUNT`,
