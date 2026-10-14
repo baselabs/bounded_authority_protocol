@@ -1099,7 +1099,7 @@ Status: Elixir source landing for release 0.9.0; open until every item below is 
   existing corpus index is unchanged.
 - Open: the Python, Go, Rust, and TypeScript verifier units; the independent Node runner's
   major-1 producer cases; the TypeScript signer and the companion signer follow-on releases; the
-  patent screen of the changed-file list; the full `mix quality` gate; publication and read-back.
+  full `mix quality` gate; publication and read-back.
 
 ## Next action
 
