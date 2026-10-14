@@ -1,5 +1,45 @@
 defmodule BoundedAuthorityProtocol.V1 do
-  @moduledoc "Explicit entry point for the immutable v1 wire profile."
+  @moduledoc """
+  Explicit entry point for the immutable v1 wire profile (contract-major 1, suite
+  `BAP1-Ed25519-SHA256`, normative in `spec/bap-v1.md`).
+
+  The functions fall into three groups:
+
+    * **Producers** build the exact bytes a signer signs and assemble the compact form from a
+      signature the caller made elsewhere: `grant_signing_input/2`, `proof_signing_input/2`,
+      `boundary_anchor_signing_input/2`, `key_transition_signing_input/2`,
+      `assemble_compact/2` and `assemble_compact/3`, `encode_consumption_entry/2`,
+      `encode_anchored_export/2`, and `request_digest/3`. None of them takes a private key.
+    * **Decoders** read a compact value without checking any signature, for diagnosis only:
+      `decode_grant/2`, `decode_proof/2`, and `untrusted_key_locator/2`.
+    * **Verifiers** check raw bytes against caller-supplied trusted public keys, expected
+      context, time, and limits: `verify_grant/3`, `check_envelope/2`, `check_chain/2`,
+      `verify_historical_anchor/3`, `verify_key_transition/4`, and `verify_anchored_export/3`.
+
+  ## Return values
+
+  Every function returns `{:ok, value}` or exactly `{:error, :invalid}`. The error carries no
+  reason, on purpose: a wrong key, a changed byte, an expired window, a mismatched expectation,
+  and an over-limit input all look the same. Functions never raise on bad input.
+
+  Verified results are facts structs (`GrantFacts`, `EnvelopeFacts`, `ChainFacts`,
+  `AnchorFacts`, `KeyTransitionFacts`, `AnchoredExportFacts`). They hold identifiers, digests,
+  and times, never raw signatures, keys, nonces, or arguments, and they render as
+  `#Module<redacted>`. `GrantFacts`, `EnvelopeFacts`, and `AnchoredExportFacts` carry
+  `authorization: :not_evaluated`; `ChainFacts`, `AnchorFacts`, `KeyTransitionFacts`, and
+  `AnchoredExportFacts` carry `trust: :not_evaluated`. A facts value is
+  never an authorization decision.
+
+  ## Limits
+
+  `limits` is a map of tightening overrides (or a `BoundedAuthorityProtocol.V1.Bounds`
+  struct); `%{}` means the profile maxima. See `BoundedAuthorityProtocol.V1.Bounds.coerce/1`.
+
+  ## Example
+
+  The getting-started guide and the README quickstart build a grant and a proof with these
+  producers and verify them with `check_envelope/2`; the repository's test suite runs both.
+  """
 
   alias BoundedAuthorityProtocol.V1.Base64Url
   alias BoundedAuthorityProtocol.V1.Bounds
@@ -36,61 +76,181 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   def untrusted_key_locator(_compact, _limits), do: {:error, :invalid}
 
-  @doc "Builds the deterministic standard-JWS grant signing input."
+  @doc """
+  Builds the deterministic grant signing input from a `BoundedAuthorityProtocol.V1.Grant`.
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.SigningInput{}}`; sign its `message` with the
+  issuer key, then call `assemble_compact/2`. Returns `{:error, :invalid}` when a field is out
+  of profile (for example an empty audience list, an expiry not after the start, or a selector
+  outside the closed set) or over `limits`.
+  """
   defdelegate grant_signing_input(grant, limits), to: Runtime
 
-  @doc "Builds the deterministic standard-JWS holder-proof signing input."
+  @doc """
+  Builds the deterministic holder-proof signing input from a `BoundedAuthorityProtocol.V1.Proof`.
+
+  The input binds the grant (by the digest of its exact compact bytes), the method, the
+  normalized target URI, the invocation id, the operation, the request digest of the typed
+  `cast_arguments`, the issue time, and the optional nonce. Returns
+  `{:ok, %BoundedAuthorityProtocol.V1.SigningInput{}}` or `{:error, :invalid}`; the holder
+  public key must pass `BoundedAuthorityProtocol.Ed25519.acceptable_public_key?/1`.
+  """
   defdelegate proof_signing_input(proof, limits), to: Runtime
 
-  @doc "Encodes one exact canonical consumption-chain row."
+  @doc """
+  Encodes one consumption-chain row from a `BoundedAuthorityProtocol.V1.ConsumptionEntry`.
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.EncodedConsumptionEntry{bytes: row, hash: hash}}`
+  with the exact canonical row bytes and their domain-separated hash, or `{:error, :invalid}`.
+  """
   defdelegate encode_consumption_entry(entry, limits), to: Runtime
 
-  @doc "Checks a raw nonempty consumption-chain range against mandatory caller boundaries."
+  @doc """
+  Checks a nonempty range of raw consumption-chain rows (`BoundedAuthorityProtocol.V1.ChainInput`)
+  against the caller's predecessor, head, and chain identity
+  (`BoundedAuthorityProtocol.V1.ExpectedChain`).
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.ChainFacts{}}` or `{:error, :invalid}`. A
+  consistent chain proves consistency only; it cannot show that a validly shortened history
+  omitted nothing (usage rule 11).
+  """
   defdelegate check_chain(input, expected), to: Runtime
 
-  @doc "Builds the deterministic standard-JWS boundary-anchor signing input."
+  @doc """
+  Builds the deterministic boundary-anchor signing input from a
+  `BoundedAuthorityProtocol.V1.BoundaryAnchor`.
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.SigningInput{}}` or `{:error, :invalid}`.
+  """
   defdelegate boundary_anchor_signing_input(anchor, limits), to: Runtime
 
-  @doc "Builds the deterministic standard-JWS historical-key-transition signing input."
+  @doc """
+  Builds the deterministic historical-key-transition signing input from a
+  `BoundedAuthorityProtocol.V1.KeyTransition`.
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.SigningInput{}}` or `{:error, :invalid}`; both
+  keys must pass `BoundedAuthorityProtocol.Ed25519.acceptable_public_key?/1`.
+  """
   defdelegate key_transition_signing_input(transition, limits), to: Runtime
 
-  @doc "Frames an exact deterministic anchored export after semantic validation."
+  @doc """
+  Frames an anchored export from a `BoundedAuthorityProtocol.V1.AnchoredExportInput` after
+  checking it against the caller's `BoundedAuthorityProtocol.V1.ExpectedExport`.
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.EncodedAnchoredExport{chunks: chunks, digest: digest,
+  byte_count: count}}` or `{:error, :invalid}`.
+  """
   defdelegate encode_anchored_export(input, expected), to: Runtime
 
-  @doc "Assembles a validated signing input and raw Ed25519 signature at profile maxima."
+  @doc """
+  Assembles the compact JWS from a signing input and a raw 64-byte Ed25519 signature, at the
+  profile maxima. Same as `assemble_compact/3` with `%{}` limits.
+  """
   @spec assemble_compact(SigningInput.t(), binary()) ::
           {:ok, binary()} | {:error, :invalid}
   def assemble_compact(signing_input, signature),
     do: assemble_compact(signing_input, signature, %{})
 
-  @doc "Assembles a validated signing input and raw Ed25519 signature under caller bounds."
+  @doc """
+  Assembles the compact JWS from a `BoundedAuthorityProtocol.V1.SigningInput` and a raw
+  64-byte Ed25519 signature under caller `limits`.
+
+  The assembled value is re-parsed as its kind (grant, proof, boundary anchor, or key
+  transition) before it is returned as `{:ok, compact}`. The signature is not verified here:
+  verification happens in `verify_grant/3`, `check_envelope/2`, and the evidence verifiers.
+  Returns `{:error, :invalid}` for a wrong signature width, a signing input that does not
+  re-parse, or an over-limit result.
+  """
   @spec assemble_compact(SigningInput.t(), binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
   def assemble_compact(signing_input, signature, limits),
     do: Runtime.assemble_compact(signing_input, signature, limits)
 
-  @doc "Boundedly decodes a raw compact grant without evaluating trust."
+  @doc """
+  Decodes a raw compact grant within `limits` without checking its signature.
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.DecodedGrant{verification: :not_evaluated}}` or
+  `{:error, :invalid}`. Use it to diagnose a rejection, never to make a decision.
+  """
   defdelegate decode_grant(compact, limits), to: Runtime
 
-  @doc "Boundedly decodes a raw compact proof without evaluating trust."
+  @doc """
+  Decodes a raw compact holder proof within `limits` without checking its signature.
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.DecodedProof{verification: :not_evaluated}}` or
+  `{:error, :invalid}`. Use it to diagnose a rejection, never to make a decision.
+  """
   defdelegate decode_proof(compact, limits), to: Runtime
 
-  @doc "Verifies one raw compact grant against caller-supplied trust and expected context."
+  @doc """
+  Verifies one raw compact grant.
+
+  `trusted_issuer` is a `BoundedAuthorityProtocol.V1.TrustedIssuer` with the exact `kid` and
+  the raw 32-byte public key your service already trusts. `expected_grant` is a
+  `BoundedAuthorityProtocol.V1.ExpectedGrant` with the issuer, the audience, the evaluation
+  time, the clock skew (at most 60 seconds), and the limits.
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.GrantFacts{authorization: :not_evaluated}}` or
+  `{:error, :invalid}`.
+  """
   defdelegate verify_grant(compact, trusted_issuer, expected_grant), to: Runtime
 
-  @doc "Verifies one raw compact boundary anchor against one exact historical public key."
+  @doc """
+  Verifies one raw compact boundary anchor against one exact
+  `BoundedAuthorityProtocol.V1.HistoricalPublicKey` and the caller's
+  `BoundedAuthorityProtocol.V1.ExpectedAnchor`.
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.AnchorFacts{trust: :not_evaluated}}` or
+  `{:error, :invalid}`.
+  """
   defdelegate verify_historical_anchor(compact, key, expected_anchor), to: Runtime
 
-  @doc "Verifies one raw compact authenticated historical-key transition."
+  @doc """
+  Verifies one raw compact historical-key transition, signed by `current_key`, that
+  authenticates `next_key` (both `BoundedAuthorityProtocol.V1.HistoricalPublicKey`), against
+  the caller's `BoundedAuthorityProtocol.V1.ExpectedKeyTransition`.
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.KeyTransitionFacts{trust: :not_evaluated}}` or
+  `{:error, :invalid}`.
+  """
   defdelegate verify_key_transition(compact, current_key, next_key, expected), to: Runtime
 
-  @doc "Atomically verifies one raw anchored export against caller boundaries and key history."
+  @doc """
+  Verifies one anchored export as a whole: the `BoundedAuthorityProtocol.V1.ArchivedObject`
+  bytes and object version, its chunks to exact end of file, its digest, its boundary anchors,
+  and the complete ordered `BoundedAuthorityProtocol.V1.HistoricalKeyChain`, against the
+  caller's `BoundedAuthorityProtocol.V1.ExpectedAnchoredExport`.
+
+  Returns `{:ok, %BoundedAuthorityProtocol.V1.AnchoredExportFacts{authorization: :not_evaluated}}`
+  or `{:error, :invalid}`. Supply the expectations from your own records, never from the
+  archive being verified (usage rule 10).
+  """
   defdelegate verify_anchored_export(archived, key_chain, expected), to: Runtime
 
-  @doc "Verifies a raw grant-and-proof envelope against server-derived expected context."
+  @doc """
+  Verifies a raw grant and holder proof together.
+
+  `credentials` is a `BoundedAuthorityProtocol.V1.Credentials` with the exact grant and proof
+  compact values as received. `expected_request` is a `BoundedAuthorityProtocol.V1.ExpectedRequest`
+  with the trusted issuer, the expected issuer and audience, and the values your service
+  derived from the request: method, normalized target URI, invocation id, operation, typed
+  cast arguments, evaluation time, clock skew, proof maximum age (at most 300 seconds), and the
+  nonce mode (`:not_required` or `{:required, nonce}`).
+
+  The grant is re-verified, the proof signature is checked under the holder key the grant
+  names, every binding is compared, and the arguments must satisfy every selector of the
+  operation. Returns `{:ok, %BoundedAuthorityProtocol.V1.EnvelopeFacts{authorization: :not_evaluated}}`
+  or `{:error, :invalid}`. Replay reservation of the invocation id stays with the caller.
+  """
   defdelegate check_envelope(credentials, expected_request), to: Runtime
 
-  @doc "Returns the canonical type-preserving request digest."
+  @doc """
+  Returns `{:ok, digest}`, the base64url SHA-256 request digest over the operation and the
+  typed `cast_arguments` (`BAP1-REQUEST` domain), or `{:error, :invalid}`.
+
+  Integer and float arguments stay distinct: `{:integer, 1}` and `{:float, 1.0}` digest
+  differently.
+  """
   def request_digest(operation, cast_arguments, limits),
     do: RequestDigest.digest(operation, cast_arguments, limits)
 

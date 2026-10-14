@@ -18,12 +18,14 @@ replay, evidence) and holder-side signer SDKs build on top of it; this package d
 contains neither, holds no keys, performs no I/O, and runs no service.
 
 Built on IETF primitives: compact JWS (RFC 7515), DPoP proof-of-possession (RFC 9449), JCS
-canonicalization (RFC 8785), JWK thumbprints (RFC 7638), and EdDSA over Ed25519 (RFC 8032). The
-cryptographic suites are `BAP1-Ed25519-SHA256` for v1, `BAP2-Ed25519-SHA256` for v2, and `BAP3-ES256-SHA256` for v3 (ECDSA P-256 with RFC 7518 §3.4 raw signatures and low-S canonicality).
+canonicalization (RFC 8785), JWK thumbprints (RFC 7638), EdDSA over Ed25519 (RFC 8032), and
+ES256 (RFC 7518). The cryptographic suites are `BAP1-Ed25519-SHA256` for v1,
+`BAP2-Ed25519-SHA256` for v2, and `BAP3-ES256-SHA256` for v3 (ECDSA P-256 with RFC 7518 §3.4 raw
+signatures and low-S canonicality).
 
 ## Installation
 
-The package is published on Hex (release 0.8.0, published 2026-10-13 UTC: the strict Ed25519
+The package is published on Hex (release 0.8.0, published October 13, 2026: the strict Ed25519
 soundness repair; registry checksum
 `b5598cc5ba25f6ff4a2b55dab619bc2419b1d90cce9be3b1d4330d55a6da0bdb`, read back from the
 registry API and identical to the release-candidate archive of the tagged tree). Releases 0.7.0
@@ -41,6 +43,102 @@ The package has **zero production dependencies**, no application callback, and n
 tree. It requires Elixir 1.18, 1.19 or 1.20 on Erlang/OTP 27 through 29. Depend on the
 published Hex release, never a Git tag or a checkout. Release notes are in the
 [changelog](CHANGELOG.md), and migration notes in [Upgrading](docs/guides/upgrading.md).
+
+## Quickstart
+
+The whole loop in one script: an issuer signs a grant, a holder signs a proof for one request, and
+the service verifies both against what it derived from the request. Paste it into `iex -S mix` in
+a project that depends on the package. The repository's test suite runs this exact block.
+
+```elixir
+alias BoundedAuthorityProtocol.V1
+
+alias BoundedAuthorityProtocol.V1.{
+  Credentials,
+  ExpectedRequest,
+  Grant,
+  Operation,
+  Proof,
+  TrustedIssuer
+}
+
+# Demo keys. In production the issuer's private key stays in its KMS or HSM, the holder's in its
+# own key store, and the verifier only ever receives public keys.
+{issuer_public, issuer_private} = :crypto.generate_key(:eddsa, :ed25519)
+{holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
+{:ok, holder_thumbprint} = V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
+
+# The issuer grants one operation, restricted to one argument value.
+grant = %Grant{
+  key_id: "issuer-1",
+  issuer: "https://issuer.example",
+  grant_id: "grant-001",
+  audiences: ["https://docs.example"],
+  issued_at: 1_800_000_000,
+  not_before: 1_800_000_000,
+  expires_at: 1_800_003_600,
+  holder_thumbprint: holder_thumbprint,
+  operations: [
+    %Operation{name: "publish_article", selectors: [{:equals, ["section"], {:string, "science"}}]}
+  ]
+}
+
+{:ok, grant_input} = V1.grant_signing_input(grant, %{})
+grant_signature = :crypto.sign(:eddsa, :none, grant_input.message, [issuer_private, :ed25519])
+{:ok, grant_compact} = V1.assemble_compact(grant_input, grant_signature)
+
+# The holder binds one request to the grant with a proof of possession.
+now = 1_800_000_100
+arguments = {:object, [{"section", {:string, "science"}}, {"title", {:string, "Tides"}}]}
+
+proof = %Proof{
+  holder_public_key: holder_public,
+  proof_id: "proof-001",
+  method: "POST",
+  target_uri: "https://docs.example/articles",
+  issued_at: now,
+  nonce: nil,
+  invocation_id: "9b2f1c3e-7a51-4d0e-8f6a-2c4b5d6e7f80",
+  operation: "publish_article",
+  grant_compact: grant_compact,
+  cast_arguments: arguments
+}
+
+{:ok, proof_input} = V1.proof_signing_input(proof, %{})
+proof_signature = :crypto.sign(:eddsa, :none, proof_input.message, [holder_private, :ed25519])
+{:ok, proof_compact} = V1.assemble_compact(proof_input, proof_signature)
+
+# The service verifies the raw bytes against what IT derived from the request.
+expected = %ExpectedRequest{
+  trusted_issuer: %TrustedIssuer{key_id: "issuer-1", public_key: issuer_public},
+  issuer: "https://issuer.example",
+  audience: "https://docs.example",
+  method: "POST",
+  target_uri: "https://docs.example/articles",
+  invocation_id: "9b2f1c3e-7a51-4d0e-8f6a-2c4b5d6e7f80",
+  operation: "publish_article",
+  cast_arguments: arguments,
+  evaluation_time: now,
+  clock_skew: 60,
+  proof_max_age: 300,
+  nonce: :not_required,
+  bounds: %{}
+}
+
+credentials = %Credentials{grant: grant_compact, proof: proof_compact}
+{:ok, facts} = V1.check_envelope(credentials, expected)
+
+# The same proof replayed against other arguments fails closed, with no detail.
+other_section = {:object, [{"section", {:string, "sports"}}, {"title", {:string, "Tides"}}]}
+{:error, :invalid} = V1.check_envelope(credentials, %{expected | cast_arguments: other_section})
+
+{facts.operation, facts.authorization}
+```
+
+The final value is `{"publish_article", :not_evaluated}`: the bytes verified, and the
+authorization decision is still yours to make. [Getting started](docs/guides/getting-started.md)
+walks through the same flow step by step, then covers rejection handling, issuer-key rotation,
+and testing your integration.
 
 ## Holder-side signer: the report adapter
 
@@ -61,8 +159,13 @@ depends on this package; this package never depends on the adapter.
 
 ## What it provides
 
-Verification (all results are redacted and non-authorizing — they carry
-`authorization: :not_evaluated`):
+Each contract-major has its own namespace, `BoundedAuthorityProtocol.V1`, `V2`, and `V3`, with
+the same function names; the list below names the `V1` functions. Every function returns
+`{:ok, value}` or exactly `{:error, :invalid}`.
+
+Verification (results are redacted and non-authorizing: `GrantFacts`, `EnvelopeFacts`, and
+`AnchoredExportFacts` carry `authorization: :not_evaluated`, and the evidence facts carry
+`trust: :not_evaluated`):
 
 - `verify_grant/3` — verifies a raw compact grant against an exact public key, issuer, audience,
   time, and bounds; returns `GrantFacts`.
@@ -94,7 +197,7 @@ Strict Ed25519 (`BoundedAuthorityProtocol.Ed25519`, [ADR 0040](docs/adr/0040-str
 - `torsion_free?/1` — the host check for key enrollment, trust install, and deny-list or
   revocation comparison. It is not on the verification path; call it yourself at those points.
 
-ES256 (`BoundedAuthorityProtocol.Es256`, unreleased; planned for 0.9.0):
+ES256 (`BoundedAuthorityProtocol.Es256`, since 0.9.0) (unreleased, planned for 0.9.0):
 
 - `canonical_signature?/1` — the one ES256 signature rule (`0 < r < n`, `0 < s <= n/2`) that
   verification and the producer surfaces share.
@@ -223,8 +326,8 @@ in 4 families; index SHA-256
 `99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601`) lives under
 `priv/conformance/producer-canonicality`. It certifies that compact assembly and anchored-export
 encoding refuse a signature no conforming signer emits (ES256 out of range or high-S; Ed25519
-`S >= L` or a non-canonical or small-order `R`) and emit accepted bytes unchanged. It is
-unreleased (planned for 0.9.0) and changes no existing verdict:
+`S >= L` or a non-canonical or small-order `R`) and emit accepted bytes unchanged. It ships in
+0.9.0 and changes no existing verdict (unreleased, planned for 0.9.0):
 
 ```bash
 ./bounded_authority_conformance --corpus priv/conformance/producer-canonicality
@@ -232,21 +335,29 @@ unreleased (planned for 0.9.0) and changes no existing verdict:
 
 ## Cross-language verifier SDKs
 
-Alongside the Elixir package, the repository authors typed **verifier** SDKs of the frozen profiles
-— Python (single dependency), Rust
-(`#![forbid(unsafe_code)]`), and Go (stdlib-only) — each written from the specification and corpus
-alone, with no code-level derivation from the reference implementation. The TypeScript SDK
-graduated on first publication (ADR 0015) and now lives at
-[`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript),
-published to npm as [`@bounded-authority-protocol/verifier`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier). Every SDK passes the certified v1 (283), v2 (268), and v3 (292)
-conformance corpora recomputed from scratch, asserts each corpus index digest at load, and proves
-every parser-layer closure red-capable via a per-language mutation gate; the profile corpora
-(local-loopback 36 URI + 8 proof, role-attestation 40, content-assertion 131 + 9 + 14) run in
-the Elixir suite and the three in-repo SDKs, and the graduated TypeScript repository also runs the
-role-attestation and content-assertion corpora. The strict-Ed25519 corpus (2,410 cases) runs in
-the Elixir suite and the three in-repo SDKs, each of which implements the strict rule at its
-single Ed25519 verification point. Each
-SDK graduates to its own repository on first publication.
+The repository also carries typed **verifier** SDKs for Python (one dependency, `cryptography`),
+Rust (`#![forbid(unsafe_code)]` in the crate itself), and Go (standard library only) under
+[`sdks/`](https://github.com/baselabs/bounded_authority_protocol/tree/main/sdks). They are **not published to any registry yet**: install them from a checkout
+of this repository by local path, as each SDK's README shows. Each SDK moves to its own
+repository when it is first published (ADR 0015). Their behavior is defined by the
+specifications and the certified corpora, not by this package's code; source comments
+cross-reference the Elixir implementation for traceability.
+
+The TypeScript verifier has already moved: it lives at
+[`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript)
+and is published to npm as
+[`@bounded-authority-protocol/verifier`](https://www.npmjs.com/package/@bounded-authority-protocol/verifier).
+
+Every SDK passes the certified v1 (283), v2 (268), and v3 (292) corpora, recomputing each
+verdict, asserts each corpus index digest at load, and proves each parser-layer closure
+red-capable with a per-language mutation test. The three in-repository SDKs also run the
+local-loopback (36 URI + 8 proof), role-attestation (40), content-assertion (131 + 9 + 14), and
+strict-Ed25519 (2,410) corpora; the TypeScript repository runs the same profile corpora.
+
+Erratum 3 (producer canonicality, above) is not yet implemented in any SDK: their compact
+assembly and anchored-export encoding check only the signature width, so they can assemble a
+signature that every verifier rejects. Validate or normalize a signature before assembling it
+with an SDK until that SDK's release notes say otherwise. See the [SDK index](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/README.md).
 
 ## Standards posture
 
@@ -264,29 +375,45 @@ for the A2A venue.
 
 ## Documentation
 
-Guides, in curated reading order:
+Start here:
 
-1. [Getting started](docs/guides/getting-started.md) — zero to a verified envelope, and the
-   three rules that surprise newcomers.
-2. [The implementer's guide](docs/guides/implementers-guide.md) — building a conforming
-   verifier in any language.
-3. [Upgrading](docs/guides/upgrading.md) — the published compatibility contract.
-4. [Runnable Livebook walkthrough](docs/livebooks/bap-walkthrough.livemd) — standard HTTPS and
-   literal-loopback HTTP proofs, role attestations, and content assertions: production,
-   verification, and fail-closed rejection with ephemeral keys.
+1. [Getting started](docs/guides/getting-started.md): from zero to a verified request, then
+   rejection handling, issuer-key rotation, and testing your integration.
+2. [Livebook walkthrough](docs/livebooks/bap-walkthrough.livemd): every profile end to end with
+   ephemeral keys, including the attacks each one rejects.
 
-Reference set:
+Guides:
 
-- `spec/bap-v1.md` — the normative v1 wire profile (docs/protocol-v1.md is its generated view).
-- `spec/bap-local-loopback-http-v1.md` — the normative literal-loopback HTTP application profile.
-- `spec/bap-role-attestation-v1.md` — the normative role-attestation sibling profile.
-- `spec/bap-content-assertion-v1.md` — the normative content-assertion sibling profile.
-- `docs/design/protocol-charter.md` — what the verifier does and the verification chain.
-- `docs/design/conformance-contract.md` — how conformance is proven.
-- `docs/design/interoperability-report.md` — exact standard and application-profile
-  cross-validation identities and results.
-- `docs/design/standards-track.md` — evolution, suite succession, governance, and venue strategy.
-- `docs/governance.md` — change classes, errata, deprecation, and security-release policy.
+- [The implementer's guide](docs/guides/implementers-guide.md): building a conforming verifier
+  in another language from the specifications and the corpora.
+- [Upgrading](docs/guides/upgrading.md): what each release changes and the compatibility
+  contract.
+- [Usage rules](usage-rules.md): the rules a consuming host follows.
+- SDK deployment notes: [TypeScript](docs/deployment/typescript-sdk.md),
+  [Python](docs/deployment/python-sdk.md), [Rust](docs/deployment/rust-sdk.md), and
+  [Go](docs/deployment/go-sdk.md).
+
+Reference:
+
+- The module documentation on HexDocs: `BoundedAuthorityProtocol.V1`, `V2`, and `V3`, the
+  sibling profile namespaces, and `BoundedAuthorityProtocol.Ed25519`.
+- [Protocol charter](docs/design/protocol-charter.md): what the verifier does and the
+  verification chain.
+- [Threat model](docs/design/threat-model.md), [conformance contract](docs/design/conformance-contract.md),
+  [requirement map](docs/design/requirement-map.md), and
+  [interoperability report](docs/design/interoperability-report.md).
+- [Governance](docs/governance.md) and the [errata registry](docs/errata.md).
+- [Changelog](CHANGELOG.md).
+
+Specifications (normative):
+
+- [`spec/bap-v1.md`](spec/bap-v1.md), [`spec/bap-v2.md`](spec/bap-v2.md), and
+  [`spec/bap-v3.md`](spec/bap-v3.md): contract-majors 1, 2, and 3
+  ([`docs/protocol-v1.md`](docs/protocol-v1.md) is the generated view of v1).
+- [`spec/bap-local-loopback-http-v1.md`](spec/bap-local-loopback-http-v1.md),
+  [`spec/bap-role-attestation-v1.md`](spec/bap-role-attestation-v1.md), and
+  [`spec/bap-content-assertion-v1.md`](spec/bap-content-assertion-v1.md): the sibling profiles.
+- [Architecture decision records](https://github.com/baselabs/bounded_authority_protocol/tree/main/docs/adr) record why each rule is the way it is.
 
 ## When NOT to use this
 
@@ -334,7 +461,7 @@ the LF-forcing `.gitattributes`, no POSIX shell inside declared gates); CI itsel
 only, one lane per supported major plus the complete-quality lane
 ([ADR 0033](docs/adr/0033-developer-portability-ci-scope.md)). Windows developers use WSL2 (clone
 inside the WSL filesystem, not under `/mnt/c`), which is the Linux path; no native-Windows developer
-path is maintained (owner direction, October 4, 2026). The full `mix quality` battery is
+path is maintained. The full `mix quality` battery is
 POSIX-only tooling (shell gates, Gitleaks, ProVerif, kramdown).
 
 ```bash
@@ -349,7 +476,9 @@ test.
 
 ## Security
 
-See [`SECURITY.md`](SECURITY.md) for the vulnerability-reporting process.
+Report a vulnerability privately through the repository's
+[Security tab](https://github.com/baselabs/bounded_authority_protocol/security) ("Report a
+vulnerability"). [`SECURITY.md`](SECURITY.md) has the supported versions and the process.
 
 ## License
 

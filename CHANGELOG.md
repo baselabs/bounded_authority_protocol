@@ -54,6 +54,29 @@ any existing certified corpus changes.
 - The `REQ3-SIGNING-range` red-proof disclosure (ADR 0035) is withdrawn: the producer surfaces
   isolate each range clause, and the matching mutation-battery entries run red.
 
+### Documentation
+
+- README quickstart and a rewritten getting-started guide (issue, prove, and verify a request,
+  handle a rejection, rotate issuer keys, test an integration). Their Elixir blocks run in the
+  test suite (`test/docs_samples_test.exs`).
+- HexDocs is organized as Start here, Guides, Reference, Specifications, and Decision records,
+  with the modules grouped by contract-major, signature suite, sibling profile, and conformance.
+  The `BoundedAuthorityProtocol.V1` functions document their arguments, results, and errors;
+  `Bounds.coerce/1` is documented; `Ed25519` and `Es256` carry their first release.
+- Unreleased additions are marked with one phrase, `(unreleased, planned for 0.9.0)`, and a
+  docs-currency test requires it while the source is ahead of the release and forbids it after:
+  the release edit is deleting that phrase.
+- `SECURITY.md` points reporters to GitHub private vulnerability reporting (the Security tab,
+  "Report a vulnerability").
+- Usage rule 18: hand assembly only a canonical signature (convert DER and normalize to low S
+  first for ES256).
+- The Python, Rust, and Go SDK READMEs and deployment notes are rewritten: they state that the
+  SDKs are unpublished and give a working install from a checkout, list the full API of each
+  (contract-majors 1, 2, and 3 and the sibling profiles), and state the open gaps (erratum 3 is
+  not implemented in any SDK; facts rendering is not redacted). Each SDK's quickstart runs in
+  its own test suite (Go `Example`, Rust doctest, Python pytest). The TypeScript deployment
+  notes describe the published 0.7.0 package.
+
 ## [0.8.0] — 2026-10-13
 
 The strict Ed25519 verification release: a soundness repair (erratum 2,

@@ -34,15 +34,16 @@ in-place binding named above.
 
 ### Cross-language verifier SDKs (independent reimplementations)
 
-Each SDK was authored from the specification, the ADRs, and the conformance corpus ALONE
-(ADR 0014's derivation-hygiene rule: no code-level derivation from the reference), and each
-carries its own per-language permissiveness mutation-gate proving its closures red-capable.
+Each SDK's behavior is defined by the specification, the ADRs, and the conformance corpus
+(ADR 0014); the Python, Rust, and Go sources also carry comments that cross-reference the
+Elixir reference implementation by file for traceability. Each carries its own per-language
+permissiveness mutation-gate proving its closures red-capable.
 
 | SDK | Language surface | Corpus binding | Result |
 |---|---|---|---|
 | `@bounded-authority-protocol/verifier` | TypeScript, Node >= 22, `node:crypto` only | graduated repository ([baselabs/bounded_authority_protocol_typescript](https://github.com/baselabs/bounded_authority_protocol_typescript)), vendored snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** (registry-distributed since 2026-09-14) |
 | `bounded-authority-verifier` | Python >= 3.10, `cryptography` | in-place monorepo corpus, startup digest assertion | **283/283 agreed + census (11 keys)** |
-| `bounded-authority-protocol` | Rust, MSRV 1.81, `ed25519-dalek`+`sha2` | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
+| `bounded-authority-protocol` | Rust, MSRV 1.81, `ed25519-dalek`+`p256`+`sha2` | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 | `bounded_authority_protocol_go` | Go 1.25, stdlib only | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 
 ### Local-loopback HTTP application-profile implementations
@@ -135,7 +136,7 @@ with expected verdicts from an independent arithmetic generator and the 12 publi
 
 ### Producer-canonicality corpus
 
-The additive `bap-producer-canonicality/1` corpus (erratum 3; unreleased, planned for 0.9.0) is
+The additive `bap-producer-canonicality/1` corpus (erratum 3, release 0.9.0) (unreleased, planned for 0.9.0) is
 certified by its revision-1 index at `priv/conformance/producer-canonicality`, SHA-256
 `99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601`: 75 cases in 4 families (60
 refused, 15 accepted at the rule's bound), generated keylessly from certified signatures. Every
@@ -144,7 +145,7 @@ figure above this section is unchanged by it.
 | Implementation | Result |
 |---|---|
 | Elixir reference (`bounded_authority_conformance --corpus priv/conformance/producer-canonicality`) | **agreed=75 disagreed=0** (October 14, 2026, source tree for 0.9.0) |
-| Python, Go, Rust, TypeScript | not yet run; each adopts the corpus in its erratum 3 unit |
+| Python, Go, Rust, TypeScript | not yet run; each SDK adopts the corpus when it implements erratum 3 |
 | Independent Node runner | not yet run; its major-1 cases are its share |
 
 ### Independent Node second-implementation runners

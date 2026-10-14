@@ -5,10 +5,10 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
-## 0.8.0 to 0.9.0 (unreleased)
+## 0.8.0 to 0.9.0 (unreleased, planned for 0.9.0)
 
 Clarifying minor (erratum 3). No verification verdict changes. The requirement `~> 0.8.0` does
-not select 0.9.0; move to `~> 0.9.0` when it is published.
+not select 0.9.0; move to `~> 0.9.0`.
 
 - `assemble_compact` and `encode_anchored_export` refuse a signature that no conforming signer
   emits, with `{:error, :invalid}`, and never rewrite accepted bytes. Under contract-major 3 that
@@ -77,14 +77,12 @@ picks 0.6.2 up on the next `mix deps.update`.
 
 ## 0.6.0 to 0.6.1
 
-Repair patch: the second independent review family's pass over the role-attestation
-landing range confirmed eight
-findings (three blocking) in the role-attestation surface — caller-tightened bound
-enforcement, producer/decoder limit agreement, closed-error shapes for malformed caller
-input, and in-repo SDK alignment. No corpus, pin, or ADR change; no verdict moves on
-legal input. Consumers on 0.6.0 holding caller-tightened bounds should upgrade — the
-0.6.0 codec ignored a tightened `anchor_bytes` for standalone attestations (the blocking
-finding). `~> 0.6.0` picks 0.6.1 up on the next `mix deps.update`.
+Repair patch for the role-attestation surface: caller-tightened bound enforcement,
+producer/decoder limit agreement, closed-error shapes for malformed caller input, and in-repo
+SDK alignment. No corpus, pin, or ADR change; no verdict moves on legal input. Consumers on 0.6.0
+holding caller-tightened bounds should upgrade: the 0.6.0 codec ignored a tightened
+`anchor_bytes` for standalone attestations. `~> 0.6.0` picks 0.6.1 up on the next
+`mix deps.update`.
 
 ## 0.5.1 to 0.6.0
 
@@ -121,9 +119,8 @@ does not reference `BoundedAuthorityProtocol.V3` changes.
 
 Documentation-truth patch: the corrected AP2 mandate-mapping note and the capability extension's
 selector-scope paragraph, [ADR 0029](../adr/0029-budget-window-posture.md) (the cumulative-budget
-posture; the `ba+budget-window` attestation-shape design explicitly deferred), the owner-directed
-tracked-authoring-paths exception for the adopted handoff record, and a batched dependency
-sweep. **No wire-format or public-API change**; no consumer action.
+posture; the `ba+budget-window` attestation-shape design explicitly deferred), and a batched
+dependency sweep. **No wire-format or public-API change**; no consumer action.
 
 ## 0.4.0 to 0.4.1
 
@@ -167,17 +164,19 @@ verify its registry checksum before changing a package dependency.
 ## What a minor release may do
 
 - Add public functions, add corpus cases (corpus revision bump — cited documents update in
-  the same change), tighten documentation, and add gates. Consumers who pin the corpus digest
-  must rotate the six certified-index-SHA pins in the same change as a corpus-consumer
-  upgrade (the repository ships the one-command regeneration script).
+  the same change), tighten documentation, and add gates. A consumer that pins a corpus index
+  digest rotates that pin in the same change as the upgrade. This repository moves its own pins
+  (five per contract-major corpus: the CLI, its test, and the Go, Python, and Rust runners) with
+  `elixir scripts/regen_corpus_digests.exs --write`.
 - A new byte-distinct application profile is a breaking pre-1.0 release (`0.x.0`), never a patch.
   Consumers opt into its separately named API and independently pin its certified corpus index.
 
 ## How to check you are unaffected
 
-1. Pin the exact package version; the conformance corpus ships inside the package.
+1. Use the minor-bounded requirement (`~> 0.8.0`) and keep `mix.lock` committed so the exact
+   version is recorded; the conformance corpus ships inside the package.
 2. Run the packaged verifier CLI against the packaged corpus (exit 0 = your build still
-  agrees with the certified corpus).
+   agrees with the certified corpus).
 3. For corpus-consuming minors: rotate the certified digest pins with the shipped script and
    re-run your suite.
 4. For a sibling application profile: select its named API explicitly, pin its separate corpus

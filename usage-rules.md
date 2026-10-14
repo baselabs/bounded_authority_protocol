@@ -41,3 +41,8 @@
     torsion-free check is what makes one secret map to exactly one key and thumbprint. Before
     upgrading to 0.8.x, scan stored keys and archived key chains with `acceptable_public_key?/1`
     and `torsion_free?/1` and treat any failure as a compromise (ADR 0040).
+18. Hand compact assembly only a signature a conforming signer emits. For ES256 that is the raw
+    64-byte `r || s` with low S: convert a DER signature from an HSM, KMS, or secret store and
+    normalize it before assembly, with `BoundedAuthorityProtocol.Es256.der_to_raw/1` and
+    `normalize_low_s/1` (unreleased, planned for 0.9.0). Release 0.8.0 assembles a high-S or
+    out-of-range signature that every verifier then rejects; from 0.9.0, assembly refuses it.

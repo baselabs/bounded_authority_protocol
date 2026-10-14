@@ -1,21 +1,19 @@
 # Getting started
 
-This guide walks a new consumer from zero to a verified grant envelope, using only the public
-package and public keys.
+This guide takes you from an empty project to a verified request in five steps, then covers the
+jobs that come next: handling a rejection, rotating issuer keys, and testing your integration.
+Every Elixir block below runs, in order, in the repository's test suite.
 
 ## What you are holding
 
-`bounded_authority_protocol` is a pure, deterministic verification library: it proves that
-caller-supplied bytes satisfy caller-supplied trusted inputs and expected context. It never
-selects trusted keys, reserves replay, checks revocation, or grants execution — those belong to
-a stateful authority runtime. Read the [standard specification](../../spec/bap-v1.md) for the
-normative profile; this guide is operational.
+`bounded_authority_protocol` is a pure, deterministic verification library. It proves that the
+bytes a caller supplies satisfy the trusted keys and expected context the caller also supplies.
+It never selects trusted keys, reserves replay, checks revocation, or grants execution: those
+belong to your service or to a stateful authority runtime. The
+[standard specification](../../spec/bap-v1.md) is the normative profile; this guide is
+operational.
 
-## Installation
-
-OBSERVED October 13, 2026: the [Hex release API](https://hex.pm/api/packages/bounded_authority_protocol/releases/0.8.0)
-reports release 0.8.0 published on October 13, 2026 UTC (registry checksum
-`b5598cc5ba25f6ff4a2b55dab619bc2419b1d90cce9be3b1d4330d55a6da0bdb`):
+## Install
 
 ```elixir
 defp deps do
@@ -23,80 +21,302 @@ defp deps do
 end
 ```
 
-`v0.8.0` is the strict Ed25519 verification soundness repair (ADR 0040; upgrade from every
-earlier release); `v0.7.0` adds the content-assertion sibling profile; `v0.6.2` is the cross-Elixir compilation
-and scan-sensitivity repair patch; `v0.6.1` is the
-cross-vendor repair patch; `v0.6.0` adds the role-attestation sibling profile.
-`v0.5.0` was the ES256 contract-major 3
-activation source release (spec-facts v2/v3 baselines shipped); `v0.5.1` was a docs-maintenance
-patch; `v0.4.0` was the v2 source release; `v0.4.1` was the toolchain
-release; `v0.4.2` was a documentation-truth patch. The immutable
-package identity is the published Hex release, whose
-registry checksum was read back against the tagged-tree build. Depend on the package identity —
-never a tag or a mutable checkout. To produce (rather than verify) signed envelopes, see the
-holder-side companion package
+Release 0.8.0 is the current Hex release (published October 13, 2026). Every earlier release is
+retired for a security fix; the [changelog](../../CHANGELOG.md) and [Upgrading](upgrading.md)
+describe each release. Depend on the Hex package, never on a Git tag or checkout. The package
+has no runtime dependencies and needs Elixir 1.18 through 1.20 on Erlang/OTP 27 through 29.
+
+The verifier never signs. To produce signed grants and proofs with keys held in an HSM, a KMS,
+or a local key store, use the holder-side companion
 [`bounded_authority_report_adapter`](https://hex.pm/packages/bounded_authority_report_adapter).
+The examples below sign with `:crypto` and throwaway keys so they run anywhere.
 
-Zero runtime dependencies. The verification surfaces live under `BoundedAuthorityProtocol.V1`.
+## Verify your first request
 
-## First verification
+### 1. Keys
+
+The issuer signs grants; the holder signs one proof per request. The verifier receives only
+public keys. A grant names its holder by the RFC 7638 thumbprint of the holder's public key.
 
 ```elixir
-# The caller supplies EVERYTHING: raw bytes, trusted keys, expected context, limits.
-{:ok, facts} =
-  BoundedAuthorityProtocol.V1.check_envelope(credentials, expected_request)
+alias BoundedAuthorityProtocol.V1
 
-# facts is value-bearing and redacted: identifiers, digests, times, and
-# authorization: :not_evaluated. It is not a decision and not a credential.
+alias BoundedAuthorityProtocol.V1.{
+  Credentials,
+  ExpectedGrant,
+  ExpectedRequest,
+  Grant,
+  Operation,
+  Proof,
+  TrustedIssuer
+}
+
+{issuer_public, issuer_private} = :crypto.generate_key(:eddsa, :ed25519)
+{holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
+{:ok, holder_thumbprint} = V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
+
+byte_size(holder_thumbprint)
 ```
 
-`credentials` carries the exact grant and proof compact values as received; `expected_request`
-carries the method, normalized URI, invocation id, operation, cast arguments, proof age, and
-nonce mode. Every mismatch — wrong key, wrong audience, expired, tampered byte, disallowed
-selector, wrong nonce mode — returns exactly `{:error, :invalid}`.
+### 2. The grant
 
-## The three rules that surprise newcomers
+A grant lists the operations the holder may invoke and, for each, selectors over the
+arguments. Selectors apply together: here the holder may restart a service only in the `staging`
+environment, and only one of two named services.
 
-1. **Facts are not authority.** A green verification proves byte-level properties against the
-   inputs YOU supplied. An operational decision needs a stateful runtime that owns trust
-   selection, replay reservation, and revocation.
-2. **Everything is closed.** Unknown members, alternate encodings, duplicate names, and
-   over-limit structures are rejected — there is no permissive mode.
-3. **Time is an input.** The verifier reads no clock; you pass the evaluation time, skew, and
-   proof maximum age explicitly.
+```elixir
+grant = %Grant{
+  key_id: "issuer-2026-10",
+  issuer: "https://issuer.example",
+  grant_id: "grant-restart-001",
+  audiences: ["https://deploy.example"],
+  issued_at: 1_800_000_000,
+  not_before: 1_800_000_000,
+  expires_at: 1_800_003_600,
+  holder_thumbprint: holder_thumbprint,
+  operations: [
+    %Operation{
+      name: "restart_service",
+      selectors: [
+        {:equals, ["environment"], {:string, "staging"}},
+        {:one_of, ["service"], [{:string, "search"}, {:string, "indexer"}]}
+      ]
+    }
+  ]
+}
 
-## Verifying your implementation
+{:ok, grant_input} = V1.grant_signing_input(grant, %{})
+grant_signature = :crypto.sign(:eddsa, :none, grant_input.message, [issuer_private, :ed25519])
+{:ok, grant_compact} = V1.assemble_compact(grant_input, grant_signature)
 
-The package ships the 283-case conformance corpus. Run the deterministic verifier CLI against
-it:
+length(String.split(grant_compact, "."))
+```
+
+`grant_signing_input/2` returns the exact bytes to sign (`grant_input.message`);
+`assemble_compact/2` checks the signature width and the encoded parts and returns the compact
+JWS. Neither function sees a private key.
+
+### 3. The proof
+
+For each request the holder signs a proof that binds the grant (by its digest), the HTTP method
+and URI, a fresh invocation id, the operation, and a digest of the typed arguments.
+
+```elixir
+now = 1_800_000_100
+
+arguments =
+  {:object, [{"environment", {:string, "staging"}}, {"service", {:string, "search"}}]}
+
+proof = %Proof{
+  holder_public_key: holder_public,
+  proof_id: "proof-restart-001",
+  method: "POST",
+  target_uri: "https://deploy.example/services/restart",
+  issued_at: now,
+  nonce: nil,
+  invocation_id: "3f0c2a9e-1b7d-4c55-9e21-6a8b0d4f7c13",
+  operation: "restart_service",
+  grant_compact: grant_compact,
+  cast_arguments: arguments
+}
+
+{:ok, proof_input} = V1.proof_signing_input(proof, %{})
+proof_signature = :crypto.sign(:eddsa, :none, proof_input.message, [holder_private, :ed25519])
+{:ok, proof_compact} = V1.assemble_compact(proof_input, proof_signature)
+
+length(String.split(proof_compact, "."))
+```
+
+Arguments use the package's tagged JSON form (`{:object, members}`, `{:string, s}`,
+`{:integer, i}`, and so on), so an integer and a float never compare equal by accident. Your
+service builds this value from the request it parsed; `BoundedAuthorityProtocol.V1.Json.decode/2`
+produces it from raw JSON bytes.
+
+### 4. Verify
+
+The service supplies everything: the trusted issuer key, the expected issuer and audience, the
+values it derived from the incoming request, the evaluation time, and the limits.
+
+```elixir
+trusted = %TrustedIssuer{key_id: "issuer-2026-10", public_key: issuer_public}
+
+expected = %ExpectedRequest{
+  trusted_issuer: trusted,
+  issuer: "https://issuer.example",
+  audience: "https://deploy.example",
+  method: "POST",
+  target_uri: "https://deploy.example/services/restart",
+  invocation_id: "3f0c2a9e-1b7d-4c55-9e21-6a8b0d4f7c13",
+  operation: "restart_service",
+  cast_arguments: arguments,
+  evaluation_time: now,
+  clock_skew: 60,
+  proof_max_age: 300,
+  nonce: :not_required,
+  bounds: %{}
+}
+
+credentials = %Credentials{grant: grant_compact, proof: proof_compact}
+{:ok, facts} = V1.check_envelope(credentials, expected)
+
+{facts.operation, facts.grant_id, facts.authorization}
+```
+
+The result is `{"restart_service", "grant-restart-001", :not_evaluated}`. `EnvelopeFacts`
+carries identifiers, digests, and times, never the raw signature, key, nonce, or arguments, and
+its `authorization` field is always `:not_evaluated`.
+
+To check a grant on its own (for example when the holder registers it), use
+`verify_grant/3`:
+
+```elixir
+expected_grant = %ExpectedGrant{
+  issuer: "https://issuer.example",
+  audience: "https://deploy.example",
+  evaluation_time: now,
+  clock_skew: 60,
+  bounds: %{}
+}
+
+{:ok, grant_facts} = V1.verify_grant(grant_compact, trusted, expected_grant)
+{grant_facts.grant_id, grant_facts.authorization}
+```
+
+### 5. Decide
+
+Verification is one input to your decision. Before you act, your service still has to reserve
+the invocation id against replay, check that the grant is not revoked, and apply its own policy.
+See [usage rules](../../usage-rules.md).
+
+## Handle a rejection
+
+Every failure is the same value: `{:error, :invalid}`. A wrong key, another audience, an expired
+grant, a changed byte, an argument outside the selectors, or a stale proof all look identical,
+so the error leaks nothing an attacker could use.
+
+```elixir
+production = %{expected | cast_arguments: {:object, [{"environment", {:string, "production"}}, {"service", {:string, "search"}}]}}
+late = %{expected | evaluation_time: now + 400}
+other_audience = %{expected | audience: "https://billing.example"}
+
+for request <- [production, late, other_audience] do
+  V1.check_envelope(credentials, request)
+end
+```
+
+Each entry is `{:error, :invalid}`. To find out why a credential you produced is rejected,
+compare your expected values with what the credential carries. `decode_grant/2` and
+`decode_proof/2` read the claims without checking any signature, so use them for diagnosis only,
+never for a decision:
+
+```elixir
+{:ok, decoded} = V1.decode_grant(grant_compact, %{})
+{decoded.issuer, decoded.audiences, decoded.expires_at}
+```
+
+## Rotate issuer keys
+
+An issuer rotates keys by signing new grants under a new `kid` while old grants keep the old
+one. Keep every currently trusted issuer key in your own key set, read the grant's `kid` with
+`untrusted_key_locator/2`, and look it up there. The `kid` is only a hint: an unknown `kid`
+must fail, and a known `kid` still has to verify under the key you selected.
+
+```elixir
+{next_public, next_private} = :crypto.generate_key(:eddsa, :ed25519)
+
+trusted_keys = %{
+  "issuer-2026-10" => issuer_public,
+  "issuer-2027-01" => next_public
+}
+
+next_grant = %{grant | key_id: "issuer-2027-01", grant_id: "grant-restart-002"}
+{:ok, next_input} = V1.grant_signing_input(next_grant, %{})
+next_signature = :crypto.sign(:eddsa, :none, next_input.message, [next_private, :ed25519])
+{:ok, next_compact} = V1.assemble_compact(next_input, next_signature)
+
+verify_with_trusted_keys = fn compact ->
+  with {:ok, locator} <- V1.untrusted_key_locator(compact, %{}),
+       {:ok, public_key} <- Map.fetch(trusted_keys, locator.kid) do
+    V1.verify_grant(compact, %TrustedIssuer{key_id: locator.kid, public_key: public_key}, expected_grant)
+  else
+    _ -> {:error, :invalid}
+  end
+end
+
+{:ok, old} = verify_with_trusted_keys.(grant_compact)
+{:ok, new} = verify_with_trusted_keys.(next_compact)
+{old.grant_id, new.grant_id}
+```
+
+To retire the old key, remove it from `trusted_keys`; its grants then fail. Before you trust a
+new Ed25519 key, check it with `BoundedAuthorityProtocol.Ed25519.acceptable_public_key?/1` and
+`BoundedAuthorityProtocol.Ed25519.torsion_free?/1` (usage rule 17):
+
+```elixir
+{BoundedAuthorityProtocol.Ed25519.acceptable_public_key?(next_public),
+ BoundedAuthorityProtocol.Ed25519.torsion_free?(next_public)}
+```
+
+Signed rotation evidence for archives (boundary anchors, key transitions, and anchored exports)
+has its own functions: `verify_historical_anchor/3`, `verify_key_transition/4`, and
+`verify_anchored_export/3`. Their inputs and rules are in
+[`spec/bap-v1.md` § 15](../../spec/bap-v1.md#chain).
+
+## Test your integration
+
+The package ships its certified conformance corpora and a verifier CLI that checks every case
+and exits `0` only on full agreement (`1` on any disagreement or integrity failure, `2` on a
+usage error). In this repository:
 
 ```sh
 mix escript.build
 ./bounded_authority_conformance --corpus priv/conformance/v1/corpus
 ```
 
-Exit 0 is complete agreement (283/283) with the certified corpus digest pinned.
+From a project that depends on the package, point `--corpus` at the copy under
+`deps/bounded_authority_protocol/priv/conformance/` (`v1/corpus`, `v2/corpus`, `v3/corpus`, or
+`strict-ed25519`). The repository's quality gate runs these same commands. Exit `0` is
+conformance evidence, not an authorization.
 
-## Local-loopback HTTP development
+For your own service, test the rejection paths, not only the happy path: a changed byte, a wrong
+audience, an expired grant, an argument outside the selectors, and a replayed invocation id
+(your replay store, not this package, must catch that one).
 
-Version 0.3.0 adds a byte-distinct application proof for a direct local development listener.
-Select `BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1` explicitly; its five
-surfaces normalize the target, produce the proof signing input, assemble the compact proof, decode
-it, and verify the envelope. It accepts only canonical `http://127.0.0.1` or `http://[::1]`
-targets and requires a server nonce. `localhost`, alternate numeric loopback spellings, query or
-fragment components, userinfo, forwarding-derived authority, and every non-loopback host fail
-closed.
+## The three rules that surprise newcomers
 
-Standard `BoundedAuthorityProtocol.V1` functions reject local-profile proof bytes, and the
-local-profile functions reject standard `dpop+jwt` bytes. Do not infer a profile from input bytes
-or retry another profile after rejection. Loopback HTTP is not TLS and does not isolate another
-local process; the host still owns listener configuration, replay reservation, and authorization.
-The [Livebook](../livebooks/bap-walkthrough.livemd) runs both profiles with ephemeral keys.
+1. **Facts are not authority.** A successful verification proves byte-level properties against
+   the inputs you supplied. A decision also needs trust selection, replay reservation, and
+   revocation, which live outside this package.
+2. **Everything is closed.** Unknown members, alternate encodings, duplicate names, and
+   over-limit structures are rejected. There is no permissive mode.
+3. **Time is an input.** The verifier reads no clock. You pass the evaluation time, the skew
+   (at most 60 seconds), and the proof maximum age (at most 300 seconds).
+
+## Other profiles
+
+The same steps apply to the other namespaces, each with its own specification and corpus:
+
+- `BoundedAuthorityProtocol.V2` (contract-major 2) adds the range selectors `lte` and `gte`
+  ([spec](../../spec/bap-v2.md)).
+- `BoundedAuthorityProtocol.V3` (contract-major 3) uses ES256 (ECDSA P-256) keys and signatures
+  ([spec](../../spec/bap-v3.md)).
+- `BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1` is a byte-distinct proof
+  for a local development listener on literal `127.0.0.1` or `[::1]` HTTP, with a mandatory
+  server nonce ([spec](../../spec/bap-local-loopback-http-v1.md)). Loopback HTTP is not TLS and
+  does not isolate local processes.
+- `BoundedAuthorityProtocol.RoleAttestation.V1` binds a key to the `issuer` or `holder` role
+  ([spec](../../spec/bap-role-attestation-v1.md)).
+- `BoundedAuthorityProtocol.ContentAssertion.V1` binds the digest of exact content bytes to an
+  issuer, audience, lineage subject, and window ([spec](../../spec/bap-content-assertion-v1.md)).
+
+Each namespace rejects the others' bytes. Select one explicitly; never infer a profile from the
+input or retry another after a rejection. The
+[Livebook walkthrough](../livebooks/bap-walkthrough.livemd) runs every one of them.
 
 ## Where to go next
 
-- The [standard specification](../../spec/bap-v1.md) — the standard profile authority.
-- The [local-loopback profile](../../spec/bap-local-loopback-http-v1.md) — the byte-distinct
-  application profile authority.
-- [Upgrading](upgrading.md) — the published compatibility contract.
-- The [implementer's guide](implementers-guide.md) — building a verifier in any language.
+- The [Livebook walkthrough](../livebooks/bap-walkthrough.livemd): every profile, with the
+  attacks each one rejects.
+- [Usage rules](../../usage-rules.md): what a consuming host must do.
+- [Upgrading](upgrading.md): what each release changes.
+- The [implementer's guide](implementers-guide.md): building a verifier in another language.

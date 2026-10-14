@@ -37,6 +37,7 @@ defmodule BoundedAuthorityProtocol.Ed25519 do
   A `true` result proves only that the bytes satisfy the rule. It never selects trusted keys or
   grants authority.
   """
+  @moduledoc since: "0.8.0"
 
   # The field prime p = 2^255 - 19; the base-point order
   # L = 2^252 + 27742317777372353535851937790883648493; the curve constant

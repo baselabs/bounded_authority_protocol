@@ -10,6 +10,14 @@ defmodule BoundedAuthorityProtocol.V3 do
   ([ADR 0035](../docs/adr/0035-es256-contract-major-activation.md)). Each major
   verifies under its own complete closed profile; the v1 and v2 façades reject
   v3 bytes and this façade rejects v1 and v2 bytes.
+
+  Every function here has the contract documented on its `BoundedAuthorityProtocol.V1`
+  namespace counterpart (same arguments, same `{:ok, value}` or exactly `{:error, :invalid}`
+  results, same redacted facts), applied to this profile, with 65-byte uncompressed SEC1 public
+  keys and 64-byte raw signatures. `BoundedAuthorityProtocol.V3.EcJwk` handles the EC JWK, and
+  `BoundedAuthorityProtocol.Es256` owns the signature and key rules. The struct types are
+  shared, except `Grant`, `Operation`, `Proof`, `Selector`, `DecodedGrant`, `DecodedProof`, and
+  the facts, which have their own modules under this namespace.
   """
 
   alias BoundedAuthorityProtocol.V1.Base64Url

@@ -151,6 +151,12 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
 
   def new(_overrides), do: {:error, :invalid}
 
+  @doc """
+  Validates caller limits given either as a `Bounds` struct or as a map of tightening
+  overrides, returning the complete struct. Every key must name a known bound, every value must
+  be a positive integer no larger than its profile maximum, and the fixed widths cannot change;
+  anything else returns `{:error, :invalid}`.
+  """
   @spec coerce(t() | map()) :: {:ok, t()} | {:error, :invalid}
   def coerce(%__MODULE__{} = bounds) do
     bounds

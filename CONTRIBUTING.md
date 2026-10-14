@@ -4,6 +4,9 @@ Contributions must preserve the pure deterministic verifier boundary, closed ver
 fixed value-free errors, and independent conformance requirements in the
 [protocol charter](docs/design/protocol-charter.md) and [governance policy](docs/governance.md).
 
+Report security vulnerabilities privately, never in an issue or pull request: see
+[SECURITY.md](SECURITY.md).
+
 Before a pull request:
 
 1. open a design discussion before protocol, cryptography, canonicalization, or conformance changes;
@@ -13,7 +16,8 @@ Before a pull request:
 5. update the changelog and every affected contract document.
 
 Application-profile changes also update their normative specification, certified corpus and digest,
-all five implementations, README/guides/Livebook, and the cross-profile rejection proofs. Run
+every implementation (Elixir, the three SDKs here, and the TypeScript verifier in its own
+repository), README/guides/Livebook, and the cross-profile rejection proofs. Run
 `mix local_loopback_http.verify` to exercise real IPv4 and IPv6 listeners with ephemeral keys; a
 self-round-trip or canned HTTP response is not interoperability or transport evidence.
 
@@ -27,7 +31,7 @@ the CI lanes move together in one commit
 property, proven on a developer machine; CI runs on Linux only
 ([ADR 0033](docs/adr/0033-developer-portability-ci-scope.md)). Windows developers use WSL2 (clone
 inside the WSL filesystem, not under `/mnt/c`), which is the Linux path; no native-Windows developer
-path is maintained (owner direction, October 4, 2026). The full quality battery is
+path is maintained. The full quality battery is
 POSIX-only tooling. Focused boundary commands are
 `mix architecture`, `mix audit`, `mix package.check`, `mix deps.currency`, and
 `mix sbom.generate`. The architecture and archive allowlists must be expanded only with a reviewed

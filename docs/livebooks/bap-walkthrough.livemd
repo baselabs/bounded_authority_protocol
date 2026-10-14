@@ -10,7 +10,7 @@ Mix.install([
 ])
 ```
 
-Hex 0.8.0 is published (2026-10-13 UTC), so the `Mix.install` above resolves from the public
+Hex 0.8.0 is published (October 13, 2026), so the `Mix.install` above resolves from the public
 registry. The immutable package identity is the published Hex release; the source tag is
 reviewable release evidence, not a substitute for it.
 

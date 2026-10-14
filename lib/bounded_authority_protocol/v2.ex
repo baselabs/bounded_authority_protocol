@@ -8,6 +8,12 @@ defmodule BoundedAuthorityProtocol.V2 do
   inclusive range kinds `lte`/`gte` ([ADR 0028](../docs/adr/0028-range-selector-kinds.md)).
   Each major verifies under its own complete closed profile; the v1 façade
   rejects v2 bytes and this façade rejects v1 bytes.
+
+  Every function here has the contract documented on its `BoundedAuthorityProtocol.V1`
+  namespace counterpart (same arguments, same `{:ok, value}` or exactly `{:error, :invalid}`
+  results, same redacted facts), applied to this profile. The struct types are shared, except
+  `Grant`, `Operation`, `Proof`, `Selector`, `DecodedGrant`, `DecodedProof`, and the facts,
+  which have their own modules under this namespace.
   """
 
   alias BoundedAuthorityProtocol.V1, as: V1Facade

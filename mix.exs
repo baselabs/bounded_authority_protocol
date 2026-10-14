@@ -181,6 +181,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
     ]
   end
 
+  # HexDocs reading path: start here, then guides, then reference, then the normative specs.
+  # The extras order is the sidebar order inside each group.
   defp docs do
     [
       main: "readme",
@@ -188,28 +190,36 @@ defmodule BoundedAuthorityProtocol.MixProject do
       source_url: @source_url,
       extras: [
         "README.md",
-        "CODE_OF_CONDUCT.md",
-        "CONTRIBUTING.md",
         "docs/guides/getting-started.md",
-        "docs/guides/implementers-guide.md",
-        "docs/guides/upgrading.md",
         "docs/livebooks/bap-walkthrough.livemd",
+        "usage-rules.md",
+        "docs/guides/upgrading.md",
+        "docs/guides/implementers-guide.md",
         "docs/deployment/typescript-sdk.md",
         "docs/deployment/python-sdk.md",
         "docs/deployment/rust-sdk.md",
         "docs/deployment/go-sdk.md",
         "CHANGELOG.md",
-        "LICENSE",
-        "NOTICE",
+        "docs/design/protocol-charter.md",
+        "docs/design/threat-model.md",
+        "docs/design/conformance-contract.md",
+        "docs/design/requirement-map.md",
+        "docs/design/local-loopback-http-requirement-map.md",
+        "docs/design/role-attestation-requirement-map.md",
+        "docs/design/content-assertion-requirement-map.md",
+        "docs/design/interoperability-report.md",
+        "docs/design/registries.md",
+        "docs/design/standards-track.md",
+        "docs/governance.md",
+        "docs/errata.md",
         "SECURITY.md",
-        "usage-rules.md",
         "spec/bap-v1.md",
+        "docs/protocol-v1.md",
         "spec/bap-v2.md",
         "spec/bap-v3.md",
         "spec/bap-local-loopback-http-v1.md",
         "spec/bap-role-attestation-v1.md",
         "spec/bap-content-assertion-v1.md",
-        "docs/protocol-v1.md",
         "docs/adr/0001-public-protocol-verifier-boundary.md",
         "docs/adr/0002-normative-v1-parsing-profile.md",
         "docs/adr/0003-standard-jws-and-verified-grant-results.md",
@@ -244,18 +254,45 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/adr/0036-role-attestation-profile.md",
         "docs/adr/0037-content-assertion-profile.md",
         "docs/adr/0040-strict-ed25519-soundness-erratum.md",
-        "docs/errata.md",
-        "docs/governance.md",
-        "docs/design/conformance-contract.md",
-        "docs/design/interoperability-report.md",
-        "docs/design/protocol-charter.md",
-        "docs/design/registries.md",
-        "docs/design/requirement-map.md",
-        "docs/design/local-loopback-http-requirement-map.md",
-        "docs/design/role-attestation-requirement-map.md",
-        "docs/design/content-assertion-requirement-map.md",
-        "docs/design/standards-track.md",
-        "docs/design/threat-model.md"
+        "CONTRIBUTING.md",
+        "CODE_OF_CONDUCT.md",
+        "LICENSE",
+        "NOTICE"
+      ],
+      groups_for_extras: [
+        "Start here": [
+          "README.md",
+          "docs/guides/getting-started.md",
+          "docs/livebooks/bap-walkthrough.livemd"
+        ],
+        Guides: [
+          "usage-rules.md",
+          "docs/guides/upgrading.md",
+          "docs/guides/implementers-guide.md",
+          ~r"^docs/deployment/"
+        ],
+        Reference: [
+          "CHANGELOG.md",
+          ~r"^docs/design/",
+          "docs/governance.md",
+          "docs/errata.md",
+          "SECURITY.md"
+        ],
+        Specifications: [~r"^spec/", "docs/protocol-v1.md"],
+        "Decision records": ~r"^docs/adr/",
+        Project: ["CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "LICENSE", "NOTICE"]
+      ],
+      groups_for_modules: [
+        "Contract-major 1": ~r"^BoundedAuthorityProtocol\.V1(\.|$)",
+        "Contract-major 2": ~r"^BoundedAuthorityProtocol\.V2(\.|$)",
+        "Contract-major 3": ~r"^BoundedAuthorityProtocol\.V3(\.|$)",
+        "Signature suites": [BoundedAuthorityProtocol.Ed25519, BoundedAuthorityProtocol.Es256],
+        "Sibling profiles": [
+          ~r"^BoundedAuthorityProtocol\.ApplicationProfile\.",
+          ~r"^BoundedAuthorityProtocol\.RoleAttestation\.",
+          ~r"^BoundedAuthorityProtocol\.ContentAssertion\."
+        ],
+        Conformance: ~r"^BoundedAuthorityProtocol\.Conformance\."
       ]
     ]
   end

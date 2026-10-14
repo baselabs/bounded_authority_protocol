@@ -3,11 +3,11 @@
 ## Supported versions
 
 The `0.8.x` source release line is supported. `v0.8.0` is the current tagged source release
-and contains contract-majors 1, 2, and 3, the role-attestation and content-assertion sibling
-profiles, and the strict Ed25519 verification soundness repair
-([ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md), erratum 2). The public API
-surface is locked. Registry consumers use the published Hex archive. OBSERVED October 13, 2026
-UTC: the Hex release API reports `0.8.0` published on October 13, 2026 (registry checksum
+and contains contract-majors 1, 2, and 3, the local-loopback application profile, the
+role-attestation and content-assertion sibling profiles, and the strict Ed25519 verification
+soundness repair ([ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md), erratum 2).
+The public API surface is locked. Registry consumers use the published Hex archive: the Hex
+release API reports `0.8.0` published on October 13, 2026 (registry checksum
 `b5598cc5ba25f6ff4a2b55dab619bc2419b1d90cce9be3b1d4330d55a6da0bdb`). See the
 [registry release](https://hex.pm/packages/bounded_authority_protocol/0.8.0). Releases `0.7.0` and
 earlier accept Ed25519 signatures that the strict rule rejects and are not supported; upgrade to
@@ -23,13 +23,21 @@ effect — those are the responsibility of a stateful authority runtime and the 
 
 ## Reporting a vulnerability
 
-Use GitHub's private vulnerability-reporting / security-advisory flow for
-`baselabs/bounded_authority_protocol`. Do not open a public issue containing an exploit,
-credential, private key, production data, or unreleased vulnerability detail.
+Report privately through GitHub: open the repository's
+[Security tab](https://github.com/baselabs/bounded_authority_protocol/security) and choose
+**Report a vulnerability** (or go straight to the
+[private report form](https://github.com/baselabs/bounded_authority_protocol/security/advisories/new)).
+Private vulnerability reporting is enabled for this repository; only the maintainers see the
+report. Do not open a public issue or pull request containing an exploit, credential, private
+key, production data, or undisclosed vulnerability detail.
 
 A report should identify the affected version or commit, the violated protocol property, a minimal
-value-free reproduction, and the expected security outcome. We will acknowledge, triage, remediate,
-and coordinate disclosure through the private advisory.
+value-free reproduction, and the expected security outcome. We acknowledge, triage, fix, and
+coordinate disclosure in the private advisory.
+
+The same channel covers the verifier SDKs under `sdks/`. Report a vulnerability in the
+TypeScript verifier through the Security tab of its own repository,
+[`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript/security).
 
 For a vulnerability whose fix would change a verification verdict, see the
 [governance policy § Security policy](docs/governance.md#security-policy) for the verdict-change

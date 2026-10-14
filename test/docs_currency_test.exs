@@ -130,6 +130,51 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
     assert mismatches == [], Enum.join(mismatches, "\n")
   end
 
+  # Unreleased additions are marked with one literal phrase, so the release edit is a single
+  # search-and-delete of that phrase. While the source is ahead of the latest release, the README
+  # must carry the marker for the source version; once the version is released, no marker may
+  # remain, and a marker never names any version other than the unreleased source version.
+  test "unreleased additions carry the one release-time marker, and only while unreleased" do
+    changelog = File.read!("CHANGELOG.md")
+    {released_version, []} = release_state(changelog, @version)
+    ahead? = Version.compare(@version, released_version) == :gt
+
+    assert unreleased_marker_errors(@version, ahead?, &File.read!/1) == []
+
+    # Red-capable: the same check fails for a released source that still carries markers, and
+    # for an unreleased source whose README lost its marker.
+    assert unreleased_marker_errors(@version, false, fn _path ->
+             "x (unreleased, planned for #{@version})"
+           end) != []
+
+    assert unreleased_marker_errors(@version, true, fn _path -> "no marker" end) != []
+  end
+
+  defp unreleased_marker_errors(version, ahead?, read) do
+    marker = "(unreleased, planned for #{version})"
+    {listing, 0} = System.cmd("git", ["ls-files", "--", "*.md", "*.livemd"])
+
+    surfaces =
+      listing
+      |> String.split("\n", trim: true)
+      |> Enum.reject(&(&1 in ["CHANGELOG.md", "docs/ROADMAP.md", "AGENTS.md"]))
+      |> Enum.reject(&String.starts_with?(&1, "docs/adr/"))
+
+    stray =
+      for path <- surfaces,
+          [found] <- Regex.scan(~r/\(unreleased, planned for [^)]*\)/, read.(path)),
+          found != marker or not ahead?,
+          uniq: true,
+          do: "#{path} carries #{inspect(found)}; delete it at the release (source #{version})"
+
+    missing =
+      if ahead? and not String.contains?(read.("README.md"), marker),
+        do: ["README.md must mark the unreleased additions with #{inspect(marker)}"],
+        else: []
+
+    stray ++ missing
+  end
+
   test "release docs do not present the source tag as an immutable package identity" do
     changelog = File.read!("CHANGELOG.md")
     {released_version, []} = release_state(changelog, @version)

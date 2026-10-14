@@ -8,8 +8,10 @@ recipe.
 ## 1. Read in this order
 
 1. The specification — sections 4 (conformance language), 7 (abstract data model), 8-9
-   (decoding, base64url), 10-14 (wire objects, signing/digest inputs), 15-18 (chain and
-   archive), 16 (verification contract), 17 (bounds).
+   (JSON decoding, base64url), 10-14 (protected headers, claims, selectors, URI normalization,
+   signing and digest inputs, including 14.1 strict Ed25519), 15 (consumption chain and anchored
+   export), 16 (public verification contract), 17 (hard maxima), and 18 (untrusted key
+   locator).
 2. The requirement map (`docs/design/requirement-map.md`) — every `REQ1-*` id to its
    conformance evidence cells.
 3. This guide, then the corpus.
@@ -231,9 +233,11 @@ permissiveness mutants, not only with corpus verdicts.
 
 ## 13. Producer surfaces: assembly and export encoding
 
-Compact assembly and anchored-export encoding are producer surfaces (erratum 3). They hold no key
-and verify no signature, but they refuse a signature that no conforming signer emits and they
-never rewrite the bytes they accept:
+Compact assembly and anchored-export encoding are producer surfaces, governed by erratum 3 in
+the [errata registry](../errata.md). The Elixir implementation and the corpus below are part of
+release 0.9.0 (unreleased, planned for 0.9.0). These surfaces hold no key and verify no
+signature, but they refuse a signature that no conforming signer emits and they never rewrite
+the bytes they accept:
 
 - Under contract-major 3, refuse any framed signature outside `0 < r < n`, `0 < s <= floor(n/2)`
   with the closed error. Call the same predicate your verifier runs; do not keep a second copy of

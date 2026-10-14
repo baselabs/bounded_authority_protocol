@@ -31,6 +31,7 @@ defmodule BoundedAuthorityProtocol.Es256 do
   A `true` result proves only that the bytes satisfy the rule. It never selects trusted keys or
   grants authority.
   """
+  @moduledoc since: "0.9.0"
 
   # NIST P-256 (secp256r1): the group order n, the field prime p, and the curve constant b of
   # y^2 = x^3 - 3x + b (mod p).
