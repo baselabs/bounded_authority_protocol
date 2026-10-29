@@ -37,7 +37,7 @@ from .compact import (  # noqa: F401
     scan_compact,
 )
 from .digest import request_digest as compute_request_digest
-from .ed25519 import ed25519_verify, import_public_key, sha256
+from .ed25519 import ed25519_verify, import_public_key, sha256, signature_gate
 from .error import InvalidError, Ok, Result, err, fail, invalid_error, require
 from .facts import (
     AnchoredExportFacts,
@@ -1838,11 +1838,18 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     # Gated parses + full signed-field matches (anchored_export_codec.ex:40-52): the
     # start anchor, the end anchor, and every transition go through the width+canonical
     # gated decode and match their expected values field-by-field.
-    _parse_and_match_anchor(input_.start_anchor, expected.start_anchor, "start", b)
-    _parse_and_match_anchor(input_.end_anchor, expected.end_anchor, "end", b)
+    framed_signatures = [
+        _parse_and_match_anchor(input_.start_anchor, expected.start_anchor, "start", b),
+        _parse_and_match_anchor(input_.end_anchor, expected.end_anchor, "end", b),
+    ]
     # strict: the count equality is already enforced above; strict zip is defense-in-depth.
     for i, (compact, exp) in enumerate(zip(input_.transitions, expected.transitions, strict=True)):
-        _parse_and_match_transition(compact, exp, i, b)
+        framed_signatures.append(_parse_and_match_transition(compact, exp, i, b))
+    # Erratum 3: encoding is a producer surface — it frames these signatures and verifies
+    # none — so it refuses any framed signature no conforming signer emits, never rewriting
+    # its bytes.
+    for _signature in framed_signatures:
+        require(signature_gate(_signature), "encode_anchored_export: signature canonicality")
     header_bytes = _build_archive_header(input_, expected.chain, b)
     parts = [ARCHIVE_PREFIX, _frame(header_bytes), _frame(input_.start_anchor)]
     parts.extend(_frame(t) for t in input_.transitions)
@@ -1886,7 +1893,9 @@ def _require_ok(result: Result[Any], ctx: str) -> Any:
     return result.value  # type: ignore[union-attr]  # is_ok implies Ok
 
 
-def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str, b: Bounds) -> None:
+def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str, b: Bounds) -> bytes:
+    # Returns the decoded signature: encode_anchored_export gates every framed signature's
+    # canonicality after the matches (erratum 3).
     """Gated parse + full 7-field match of an anchor compact against its expected
     values (reference BoundaryAnchorCodec.parse + anchor_matches?,
     anchored_export_codec.ex:40-42/:485-492). Encode never verifies a signature
@@ -1922,9 +1931,12 @@ def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str
         fail(f"encode_anchored_export: {which} chain_hash")
     if not _bytes_equal(_require_b64url_n(p.v.get("key_fingerprint"), "key_fingerprint", 32), expected.key_fingerprint):
         fail(f"encode_anchored_export: {which} key_fingerprint")
+    return seg.signature
 
 
-def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition, i: int, b: Bounds) -> None:
+def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition, i: int, b: Bounds) -> bytes:
+    # Returns the decoded signature: encode_anchored_export gates every framed signature's
+    # canonicality after the matches (erratum 3).
     """Gated parse + full 7-field match of a transition compact (reference
     KeyTransitionCodec.parse + transition_matches?, anchored_export_codec.ex:443-504)."""
     # Same anchor_bytes ceiling the reference enforces on transitions
@@ -1954,6 +1966,7 @@ def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition,
     to_key_id = p.v.get("to_key_id")
     if not isinstance(to_key_id, JString) or utf8_str(to_key_id.v) != expected.next_key_id:
         fail(f"encode_anchored_export: transition {i} to_key_id")
+    return seg.signature
 
 
 def _validate_export_inputs(input_: AnchoredExportInput, expected: ExpectedExport, b: Bounds) -> None:

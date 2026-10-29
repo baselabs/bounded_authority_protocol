@@ -41,14 +41,10 @@ decisions.
 
 ## Known gaps
 
-- **Erratum 3 (producer canonicality) is not implemented in any of the three.** Their compact
-  assembly for every profile (contract-majors 1, 2, and 3, local-loopback proofs, role
-  attestations, and content assertions) and their anchored-export encoding check the signature
-  width but not its value, so they can
-  assemble an Ed25519 signature with `S >= L` or a non-canonical or small-order `R`, or an ES256
-  signature that is out of range or high-S. Every verifier rejects such a credential. None of
-  them runs the `bap-producer-canonicality/1` corpus yet. The published TypeScript verifier
-  (0.7.0) does not implement erratum 3 either.
+- **Erratum 3 (producer canonicality) is implemented in all three** (compact assembly for every
+  profile and anchored-export encoding refuse a signature no conforming signer emits, and each
+  SDK runs the certified `bap-producer-canonicality/1` corpus — 75 cases). The npm verifier
+  implemented it in 0.8.0.
 - **Facts rendering.** The specification requires facts to have a fixed redacted rendering.
   The Python `repr`, the Rust derived `Debug`, and Go's `fmt` formatting print every field.
   Facts never hold secrets, but log the fields you need by name.

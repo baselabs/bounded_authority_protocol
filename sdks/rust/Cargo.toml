@@ -49,6 +49,10 @@ serde_json = { version = "1", features = ["float_roundtrip"] }
 name = "conformance"
 path = "conformance/run.rs"
 
+[[test]]
+name = "conformance_producer_canonicality"
+path = "conformance/run_producer_canonicality.rs"
+
 # The v2 conformance runner: the contract-major 2 acceptance gate over the
 # vendored 268-case corpus-v2 snapshot (same SHA-bind + two-boundary census
 # discipline as the v1 runner, against the `v2` façade and the shared

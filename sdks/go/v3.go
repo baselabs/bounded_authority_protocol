@@ -1508,6 +1508,12 @@ func (EcdsaProfile) AssembleCompact(si SigningInput, signature []byte, bounds *B
 	if len(signature) != b.SignatureBytes {
 		return "", ErrInvalid
 	}
+	// Erratum 3 (REQ3-SIGNING-producer-canonical): assembly is a producer surface — it frames
+	// a signature and verifies none — so it refuses a raw r||s outside 0 < r < n,
+	// 0 < s <= floor(n/2) (validateRawRS owns the rule) and emits accepted bytes unchanged.
+	if validateRawRS(signature) != nil {
+		return "", ErrInvalid
+	}
 	protectedSeg := Base64urlEncode(si.Protected)
 	payloadSeg := Base64urlEncode(si.Payload)
 	if len(protectedSeg) > b.EncodedSegmentBytes || len(payloadSeg) > b.EncodedSegmentBytes {
@@ -2691,6 +2697,11 @@ func (EcdsaProfile) parseAnchorCompactGated(compact string, b Bounds) (anchorCla
 	if err != nil {
 		return anchorClaims{}, ErrInvalid
 	}
+	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
+	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	if validateRawRS(parts.Signature) != nil {
+		return anchorClaims{}, ErrInvalid
+	}
 	if _, err := decodeAnchorHeaderES(parts.Protected, b); err != nil {
 		return anchorClaims{}, ErrInvalid
 	}
@@ -2726,6 +2737,11 @@ func (EcdsaProfile) parseTransitionCompactGated(compact string, b Bounds) (trans
 	}
 	parts, err := splitCompact(compact, b)
 	if err != nil {
+		return transitionClaims{}, ErrInvalid
+	}
+	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
+	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	if validateRawRS(parts.Signature) != nil {
 		return transitionClaims{}, ErrInvalid
 	}
 	if _, err := decodeTransitionHeaderES(parts.Protected, b); err != nil {

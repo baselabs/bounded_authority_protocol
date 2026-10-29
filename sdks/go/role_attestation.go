@@ -450,6 +450,10 @@ func AssembleAttestationCompact(si SigningInput, signature []byte, bounds *Bound
 	if len(signature) != b.SignatureBytes {
 		return "", ErrInvalid
 	}
+	// Erratum 3: assembly refuses a signature that fails the keyless part of rule S1.
+	if !signatureGate(signature) {
+		return "", ErrInvalid
+	}
 	protectedSeg := Base64urlEncode(si.Protected)
 	payloadSeg := Base64urlEncode(si.Payload)
 	if len(protectedSeg) > b.EncodedSegmentBytes || len(payloadSeg) > b.EncodedSegmentBytes {

@@ -87,17 +87,22 @@ def strict_gate(signature: bytes, public_key: bytes) -> bool:
     """The byte-level part of rule S1 (clauses 1 to 4), separate from the backend so each clause stays
     testable on its own: a cofactorless backend already refuses a non-canonical R and S >= L, so only a
     direct test of the gate can show those two clauses are present."""
-    if len(public_key) != 32 or len(signature) != 64:
+    if len(public_key) != 32:
+        return False
+    return _canonical(public_key) and public_key not in _SMALL_ORDER and signature_gate(signature)
+
+
+def signature_gate(signature: bytes) -> bool:
+    """The keyless part of rule S1, the signature clauses alone: R canonical, R not of small order,
+    and S < L. The verify gate above calls it, and every Ed25519 producer surface (compact
+    assembly and anchored-export encoding, erratum 3) refuses a signature that fails it, so one
+    function owns the clauses. It does not decode R, so the producer surfaces accept exactly the
+    signatures whose clauses the verify gate accepts."""
+    if len(signature) != 64:
         return False
     r = signature[:32]
     s = int.from_bytes(signature[32:], "little")
-    return (
-        _canonical(public_key)
-        and _canonical(r)
-        and public_key not in _SMALL_ORDER
-        and r not in _SMALL_ORDER
-        and s < _L
-    )
+    return _canonical(r) and r not in _SMALL_ORDER and s < _L
 
 
 def _decode_point(encoding: bytes) -> _Extended | None:

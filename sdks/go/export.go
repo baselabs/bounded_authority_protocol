@@ -588,6 +588,11 @@ func parseAnchorCompactGated(compact string, b Bounds) (anchorClaims, error) {
 	if err != nil {
 		return anchorClaims{}, ErrInvalid
 	}
+	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
+	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	if !signatureGate(parts.Signature) {
+		return anchorClaims{}, ErrInvalid
+	}
 	if _, err := decodeAnchorHeader(parts.Protected, b); err != nil {
 		return anchorClaims{}, ErrInvalid
 	}
@@ -622,6 +627,11 @@ func parseTransitionCompactGated(compact string, b Bounds) (transitionClaims, er
 	}
 	parts, err := splitCompact(compact, b)
 	if err != nil {
+		return transitionClaims{}, ErrInvalid
+	}
+	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
+	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	if !signatureGate(parts.Signature) {
 		return transitionClaims{}, ErrInvalid
 	}
 	if _, err := decodeTransitionHeader(parts.Protected, b); err != nil {

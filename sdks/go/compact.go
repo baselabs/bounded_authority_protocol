@@ -382,6 +382,12 @@ func assembleCompactFor(si SigningInput, signature []byte, bounds *Bounds, profi
 	if len(signature) != b.SignatureBytes {
 		return "", ErrInvalid
 	}
+	// Erratum 3 (REQ1/REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer
+	// surface — it frames a signature and verifies none — so it refuses a signature that
+	// fails the keyless part of rule S1 and emits accepted bytes unchanged.
+	if !signatureGate(signature) {
+		return "", ErrInvalid
+	}
 	protectedSeg := Base64urlEncode(si.Protected)
 	payloadSeg := Base64urlEncode(si.Payload)
 	if len(protectedSeg) > b.EncodedSegmentBytes || len(payloadSeg) > b.EncodedSegmentBytes {

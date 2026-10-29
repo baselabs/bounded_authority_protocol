@@ -197,6 +197,12 @@ pub fn assemble_content_assertion_compact(
     {
         return Err(Invalid);
     }
+    // Erratum 3 (REQ1/REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer
+    // surface — it frames a signature and verifies none — so it refuses a signature that
+    // fails the keyless part of rule S1 and emits accepted bytes unchanged.
+    if !ed25519::signature_gate(signature) {
+        return Err(Invalid);
+    }
     let mut compact = Vec::with_capacity(projected_compact_len(
         input.protected_segment.len(),
         input.payload_segment.len(),

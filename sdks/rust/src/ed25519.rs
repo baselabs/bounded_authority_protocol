@@ -133,13 +133,19 @@ fn scalar_below_group_order(s: &[u8]) -> bool {
 /// a non-canonical `R` and `S >= L`, so only a direct test of the gate can show
 /// those two clauses are present.
 pub(crate) fn strict_gate(signature: &[u8; 64], public_key: &[u8; 32]) -> bool {
+    canonical(public_key) && !is_small_order(public_key) && signature_gate(signature)
+}
+
+/// The keyless part of rule S1, the signature clauses alone: `R` canonical, `R`
+/// not of small order, and `S < L`. The verify gate above calls it, and every
+/// Ed25519 producer surface (compact assembly and anchored-export encoding,
+/// erratum 3) refuses a signature that fails it, so one function owns the
+/// clauses. It does not decode `R`, so the producer surfaces accept exactly the
+/// signatures whose clauses the verify gate accepts.
+pub(crate) fn signature_gate(signature: &[u8; 64]) -> bool {
     let mut r = [0u8; 32];
     r.copy_from_slice(&signature[..32]);
-    canonical(public_key)
-        && canonical(&r)
-        && !is_small_order(public_key)
-        && !is_small_order(&r)
-        && scalar_below_group_order(&signature[32..])
+    canonical(&r) && !is_small_order(&r) && scalar_below_group_order(&signature[32..])
 }
 
 /// Verify an Ed25519 signature of `message` against a 32-byte public key under

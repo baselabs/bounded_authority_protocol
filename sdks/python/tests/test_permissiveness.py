@@ -111,6 +111,7 @@ from bounded_authority_verifier.v1 import (
     verify_anchored_export,
     verify_grant,
 )
+from bounded_authority_verifier.compact import assemble_segments_es256
 
 dec = json_decode
 
@@ -513,11 +514,19 @@ def _fresh_key() -> tuple[bytes, Ed25519PrivateKey]:
     return pub, priv
 
 
-def _must_assemble(si: SigningInput, sig: bytes) -> bytes:
+# Erratum 3: the producers refuse an all-zero signature (small-order R, S = 0), so fixtures that
+# frame a placeholder signature use gate-passing bytes instead: R the little-endian encoding of
+# y = 2 (canonical, not small order) and S = L - 1.
+_GATE_PASSING_SIG = bytearray(64)
+_GATE_PASSING_SIG[1] = 2
+_GATE_PASSING_SIG[32:] = (0x1000000000000000000000000000000014DEF9DEA2F79CD65812631A5CF5D3ED - 1).to_bytes(32, "little")
+_GATE_PASSING_SIG = bytes(_GATE_PASSING_SIG)
+
+def _must_assemble(si: SigningInput, sig: bytes, es256: bool = False) -> bytes:
     """Unwrap the low-level assembler's Result in test helpers (failure is a test-setup bug). Uses
     assemble_segments (not the validating façade) so permissiveness cases can build compacts freely
     and then prove the VERIFY path (or the façade) rejects them."""
-    c = assemble_segments(si, sig)
+    c = assemble_segments_es256(si, sig) if es256 else assemble_segments(si, sig)
     assert c.is_ok, "assemble_segments failed in test helper"
     return c.value
 
@@ -1082,7 +1091,7 @@ def test_assemble_segments_and_request_digest_return_result_contract():
     # assemble_segments: bad kind -> Err (not raise).
     bad = assemble_segments(
         SigningInput(kind="bogus", protected_segment=b"a", payload_segment=b"b"),  # type: ignore[arg-type]
-        b"\x00" * 64,
+        _GATE_PASSING_SIG,
     )
     assert not bad.is_ok, "bad kind must return Err"
     # assemble_segments: short signature -> Err.
@@ -1094,7 +1103,7 @@ def test_assemble_segments_and_request_digest_return_result_contract():
     # assemble_segments: minimal well-shaped input -> Ok (content is NOT validated here).
     valid = assemble_segments(
         SigningInput(kind="grant", protected_segment=b"a", payload_segment=b"b"),
-        b"\x00" * 64,
+        _GATE_PASSING_SIG,
     )
     assert valid.is_ok and isinstance(valid.value, bytes)
     # request_digest: valid -> Ok (raw 32 bytes).
@@ -1284,7 +1293,7 @@ def test_assemble_compact_facade_rejects_invalid_signing_input():
     """#11: the public assemble_compact façade MUST validate the signing input (kind↔typ, segment
     bounds, base64url payload) and re-parse the composed compact per kind (runtime.ex:151
     validate_assembled_compact). It must NOT assemble a mislabeled or malformed compact."""
-    sig = b"\x00" * 64
+    sig = _GATE_PASSING_SIG
     # kind/typ mismatch: grant kind but a proof (dpop+jwt) protected header.
     r = assemble_compact(SigningInput(kind="grant", protected_segment=_DERISK_PROOF_PROTECTED, payload_segment=b"e30"), sig)
     assert not r.is_ok, "kind/typ mismatch must reject"
@@ -1311,7 +1320,7 @@ def test_assemble_compact_facade_rejects_numeric_iss():
     payload_segment = base64.urlsafe_b64encode(json_payload).rstrip(b"=")
     r = assemble_compact(
         SigningInput(kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=payload_segment),
-        b"\x00" * 64,
+        _GATE_PASSING_SIG,
     )
     assert not r.is_ok, "numeric iss must reject (field re-parse)"
 
@@ -1338,7 +1347,7 @@ def test_assemble_compact_facade_rejects_noncanonical_anchor():
     ))
     assert si.is_ok, "anchor signing input failed"
     canon_header, canon_payload = si.value.protected_segment, si.value.payload_segment
-    sig = b"\x00" * 64
+    sig = _GATE_PASSING_SIG
     # Non-canonical protected header, canonical payload → reject (header canonical check).
     r = assemble_compact(
         SigningInput(kind="boundary_anchor", protected_segment=_reorder(canon_header), payload_segment=canon_payload), sig)
@@ -1372,7 +1381,7 @@ def test_assemble_compact_facade_rejects_noncanonical_transition():
     ))
     assert si.is_ok, "transition signing input failed"
     canon_header, canon_payload = si.value.protected_segment, si.value.payload_segment
-    sig = b"\x00" * 64
+    sig = _GATE_PASSING_SIG
     # Non-canonical protected header, canonical payload → reject (header canonical check).
     r = assemble_compact(
         SigningInput(kind="key_transition", protected_segment=_reorder(canon_header), payload_segment=canon_payload), sig)
@@ -1417,7 +1426,7 @@ def _seeded_public_key(label: bytes) -> bytes:
 _KEY_A = _seeded_public_key(b"a")
 _KEY_B = _seeded_public_key(b"b")
 _Z32P = bytes(32)
-_SIG64 = bytes(64)
+_SIG64 = _GATE_PASSING_SIG
 _SIG32 = bytes(32)
 
 
@@ -2732,7 +2741,7 @@ def _es256_signed_grant() -> dict[str, object]:
     si = v3.grant_signing_input(grant)
     assert si.is_ok, "v3 grant signing input failed"
     message = si.value.protected_segment + b"." + si.value.payload_segment
-    compact = _must_assemble(si.value, _ec_sign_low_s(issuer_priv, message))
+    compact = _must_assemble(si.value, _ec_sign_low_s(issuer_priv, message), es256=True)
     return {
         "compact": compact,
         "issuer": v3.TrustedIssuer(key_id="issuer", public_key=issuer_pub),
@@ -2917,7 +2926,7 @@ def test_es256_off_curve_point_rejected():
     si = v3.proof_signing_input(proof)
     assert si.is_ok, "v3 proof signing input failed"
     message = si.value.protected_segment + b"." + si.value.payload_segment
-    compact = _must_assemble(si.value, _ec_sign_low_s(holder_priv, message))
+    compact = _must_assemble(si.value, _ec_sign_low_s(holder_priv, message), es256=True)
     assert v3.decode_proof(compact).is_ok, "control: the on-curve proof decodes"
     # Rebuild the protected header with an off-curve y (same width, still < p).
     x, y = holder_pub[1:33], holder_pub[33:65]
@@ -2953,6 +2962,7 @@ def test_es256_rejects_prior_major_bytes():
     v3_compact = _must_assemble(
         v3_si.value,
         _ec_sign_low_s(issuer_priv_ec, v3_si.value.protected_segment + b"." + v3_si.value.payload_segment),
+        es256=True,
     )
     # The v1/v2 grants (Ed25519 keys, per-major structs).
     issuer_pub32, issuer_priv_ed = _fresh_key()

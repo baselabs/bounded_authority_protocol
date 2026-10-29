@@ -610,7 +610,28 @@ fn producer_matrix_and_assembly_defects_fail_closed() {
     // --- Assembly/decode defect matrix: every crafted payload segment (or
     // signature width) fails BOTH the assembly revalidation and the decode. ---
     let produced = attestation_signing_input(&valid, &bounds).unwrap();
-    let signature = [0u8; 64];
+    // Erratum 3: the assembler refuses an all-zero signature, so this fixture frames
+    // gate-passing bytes (R = LE(y = 2), S = L - 1).
+    let mut signature = [0u8; 64];
+    signature[1] = 2;
+    signature[32] = 0xec;
+    signature[33] = 0xd3;
+    signature[34] = 0xf5;
+    signature[35] = 0x5c;
+    signature[36] = 0x1a;
+    signature[37] = 0x63;
+    signature[38] = 0x12;
+    signature[39] = 0x58;
+    signature[40] = 0xd6;
+    signature[41] = 0x9c;
+    signature[42] = 0xf7;
+    signature[43] = 0xa2;
+    signature[44] = 0xde;
+    signature[45] = 0xf9;
+    signature[46] = 0xde;
+    signature[47] = 0x14;
+    signature[63] = 0x10;
+
     let base_payload = format!(
         "{{\"exp\":1735693200,\"jti\":\"urn:example:attestation:ra-1\",\
          \"key_id\":\"{subject_key_id}\",\"nbf\":1735689600,\"public_key\":\"{subject_x}\",\

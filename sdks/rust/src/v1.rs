@@ -624,6 +624,12 @@ fn assemble_compact_for(
     }
     // (signature_bytes needs no gate: it is a FIXED-WIDTH key rejected at Bounds
     // construction unless 64 — the reference's assemble-time check is subsumed.)
+    // Erratum 3 (REQ1/REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer
+    // surface — it frames a signature and verifies none — so it refuses a signature that
+    // fails the keyless part of rule S1 and emits accepted bytes unchanged.
+    if !ed25519::signature_gate(signature) {
+        return Err(Invalid);
+    }
     let compact = compact::compose_compact(input, signature)?;
     if compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
@@ -1663,6 +1669,16 @@ pub fn encode_anchored_export(
         },
     )?;
 
+    // Erratum 3: encoding is a producer surface — it frames these signatures and verifies
+    // none — so it refuses any framed anchor or transition signature no conforming signer
+    // emits, never rewriting its bytes.
+    for framed in [&input.start_anchor, &input.end_anchor].into_iter().chain(input.transitions.iter()) {
+        let (_, _, signature_seg) = compact::parse_compact(framed)?;
+        let signature: [u8; 64] = base64url_decode(signature_seg)?.try_into().map_err(|_| Invalid)?;
+        if !ed25519::signature_gate(&signature) {
+            return Err(Invalid);
+        }
+    }
     // Start-anchor binding: parse through the width+canonical-gated decoder,
     // then match ALL signed fields against the expected anchor (reference
     // anchor_matches?, anchored_export_codec.ex:485-492).
@@ -4445,9 +4461,30 @@ mod tests {
                 .collect(),
         };
         let produced = grant_signing_input(&grant, &max()).expect("produce");
-        // assemble_compact (the re-exported crate-root fn) appends a signature.
-        let sig = [0xaa; 64];
-        let signing_input = crate::types::SigningInput {
+        // assemble_compact (the re-exported crate-root fn) appends a signature. Erratum 3: the
+        // assembler refuses a non-canonical signature, so the round-trip frames gate-passing
+        // bytes (R the little-endian encoding of y = 2, S = L - 1) instead of 0xaa filler.
+        let mut sig = [0u8; 64];
+        sig[1] = 2;
+        // S = L - 1, little-endian: L = 2^252 + 27742317777372353535851937790883648493.
+        sig[32] = 0xec;
+        sig[33] = 0xd3;
+        sig[34] = 0xf5;
+        sig[35] = 0x5c;
+        sig[36] = 0x1a;
+        sig[37] = 0x63;
+        sig[38] = 0x12;
+        sig[39] = 0x58;
+        sig[40] = 0xd6;
+        sig[41] = 0x9c;
+        sig[42] = 0xf7;
+        sig[43] = 0xa2;
+        sig[44] = 0xde;
+        sig[45] = 0xf9;
+        sig[46] = 0xde;
+        sig[47] = 0x14;
+        sig[63] = 0x10;
+let signing_input = crate::types::SigningInput {
             kind: crate::types::SigningKind::Grant,
             protected_segment: produced.protected_segment.clone(),
             payload_segment: produced.payload_segment.clone(),

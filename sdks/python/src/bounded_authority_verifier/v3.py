@@ -49,6 +49,7 @@ from .bounds import (  # noqa: F401
     coerce_bounds,
 )
 from .compact import (  # noqa: F401
+    assemble_segments_es256,
     CompactSegments,
     SigningInput,
     assemble_segments,
@@ -148,6 +149,18 @@ P256_N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
 """The P-256 group order n."""
 _LOW_S_MAX = (P256_N - 1) // 2
 """The largest low-S value: n is odd, so s <= n/2 (rationally) is s <= (n-1)/2 exactly."""
+
+
+def canonical_signature(signature: bytes) -> bool:
+    """The suite's canonical-signature rule (spec/bap-v3.md § 3.2): a raw 64-byte r || s has
+    0 < r < n and 0 < s <= floor(n / 2). Every producer surface (compact assembly,
+    anchored-export encoding, erratum 3) refuses a signature that fails it; the producer never
+    normalizes — low-S is the signer's duty."""
+    if not isinstance(signature, bytes) or len(signature) != 64:
+        return False
+    r = int.from_bytes(signature[:32], "big")
+    s = int.from_bytes(signature[32:], "big")
+    return 0 < r < P256_N and 0 < s <= _LOW_S_MAX
 
 # Suite fixed widths (REQ3-BOUNDS-fixed-widths, spec/bap-v3.md §5): coordinate 32, raw public key
 # (uncompressed SEC1) 65, signature (r || s) 64, SHA-256 digest 32. Immutable cryptographic
@@ -2027,9 +2040,14 @@ def _assemble_compact_body(input_: SigningInput, signature: bytes, bounds: Bound
         fail("assemble_compact: segment bound")
     # (signature_bytes needs no gate here: it is a FIXED-WIDTH constant rejected at the
     # assembler unless exactly 64.)
-    assembled = assemble_segments(input_, signature)
+    assembled = assemble_segments_es256(input_, signature)
     if not isinstance(assembled, Ok):
         fail("assemble_compact: signing input")
+    # Erratum 3 (REQ3-SIGNING-producer-canonical), as the reference runtime orders it: assembly
+    # is a producer surface — it frames a signature and verifies none — so it refuses a raw
+    # r || s outside 0 < r < n, 0 < s <= floor(n/2) (no conforming signer emits one; the high-S
+    # twin of a valid signature verifies under raw ECDSA) and never normalizes.
+    require(canonical_signature(signature), "assemble_compact: signature canonicality")
     compact = assembled.value
     if len(compact) > bounds_resolve(b, "compact_bytes"):
         fail("assemble_compact: compact_bytes")
@@ -2201,11 +2219,18 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     # Gated parses + full signed-field matches: the start anchor, the end anchor, and every
     # transition go through the width+canonical gated decode and match their expected values
     # field-by-field.
-    _parse_and_match_anchor(input_.start_anchor, expected.start_anchor, "start", b)
-    _parse_and_match_anchor(input_.end_anchor, expected.end_anchor, "end", b)
+    framed_signatures = [
+        _parse_and_match_anchor(input_.start_anchor, expected.start_anchor, "start", b),
+        _parse_and_match_anchor(input_.end_anchor, expected.end_anchor, "end", b),
+    ]
     # strict: the count equality is already enforced above; strict zip is defense-in-depth.
     for i, (compact, exp) in enumerate(zip(input_.transitions, expected.transitions, strict=True)):
-        _parse_and_match_transition(compact, exp, i, b)
+        framed_signatures.append(_parse_and_match_transition(compact, exp, i, b))
+    # Erratum 3: encoding is a producer surface — it frames these signatures and verifies
+    # none — so it refuses any framed signature no conforming signer emits, never rewriting
+    # its bytes.
+    for _signature in framed_signatures:
+        require(canonical_signature(_signature), "encode_anchored_export: signature canonicality")
     header_bytes = _build_archive_header(input_, expected.chain, b)
     parts = [ARCHIVE_PREFIX, _frame(header_bytes), _frame(input_.start_anchor)]
     parts.extend(_frame(t) for t in input_.transitions)
@@ -2248,7 +2273,9 @@ def _require_ok(result: Result[Any], ctx: str) -> Any:
     return result.value  # type: ignore[union-attr]  # is_ok implies Ok
 
 
-def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str, b: Bounds) -> None:
+def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str, b: Bounds) -> bytes:
+    # Returns the decoded signature: encode_anchored_export gates every framed signature's
+    # canonicality after the matches (erratum 3).
     """Gated parse + full 7-field match of an anchor compact against its expected
     values (the incorporated anchor_matches? discipline). Encode never verifies a signature
     (a producer, not an authority) — it mirrors the structural gates (width, canonical form)
@@ -2281,9 +2308,12 @@ def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str
         fail(f"encode_anchored_export: {which} chain_hash")
     if not _bytes_equal(_require_b64url_n(p.v.get("key_fingerprint"), "key_fingerprint", 32), expected.key_fingerprint):
         fail(f"encode_anchored_export: {which} key_fingerprint")
+    return seg.signature
 
 
-def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition, i: int, b: Bounds) -> None:
+def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition, i: int, b: Bounds) -> bytes:
+    # Returns the decoded signature: encode_anchored_export gates every framed signature's
+    # canonicality after the matches (erratum 3).
     """Gated parse + full 7-field match of a transition compact (the incorporated
     transition_matches? discipline)."""
     # Same anchor_bytes ceiling the encode path enforces on transitions.
@@ -2312,6 +2342,7 @@ def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition,
     to_key_id = p.v.get("to_key_id")
     if not isinstance(to_key_id, JString) or utf8_str(to_key_id.v) != expected.next_key_id:
         fail(f"encode_anchored_export: transition {i} to_key_id")
+    return seg.signature
 
 
 def _validate_export_inputs(input_: AnchoredExportInput, expected: ExpectedExport, b: Bounds) -> None:

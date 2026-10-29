@@ -114,15 +114,23 @@ func scalarBelowL(s []byte) bool {
 // clause stays testable on its own: a cofactorless backend already refuses a non-canonical R and
 // S >= L, so only a direct test of the gate can show those two clauses are present.
 func strictGate(signature, publicKey []byte) bool {
-	if len(publicKey) != 32 || len(signature) != 64 {
+	if len(publicKey) != 32 {
+		return false
+	}
+	return canonicalEncoding(publicKey) && !isSmallOrder(publicKey) && signatureGate(signature)
+}
+
+// signatureGate is the keyless part of rule S1, the signature clauses alone: R canonical, R not
+// of small order, and S < L. The verify gate above calls it, and every Ed25519 producer surface
+// (compact assembly and anchored-export encoding, erratum 3) refuses a signature that fails it,
+// so one function owns the clauses. It does not decode R, so the producer surfaces accept exactly
+// the signatures whose clauses the verify gate accepts.
+func signatureGate(signature []byte) bool {
+	if len(signature) != 64 {
 		return false
 	}
 	r, s := signature[:32], signature[32:]
-	return canonicalEncoding(publicKey) &&
-		canonicalEncoding(r) &&
-		!isSmallOrder(publicKey) &&
-		!isSmallOrder(r) &&
-		scalarBelowL(s)
+	return canonicalEncoding(r) && !isSmallOrder(r) && scalarBelowL(s)
 }
 
 // verifyEd25519 verifies over the exact received signing input under rule S1. Width gates are the

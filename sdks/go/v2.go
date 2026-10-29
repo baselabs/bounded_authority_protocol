@@ -1099,6 +1099,12 @@ func (Profile) AssembleCompact(si SigningInput, signature []byte, bounds *Bounds
 	if len(signature) != b.SignatureBytes {
 		return "", ErrInvalid
 	}
+	// Erratum 3 (REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer surface — it
+	// frames a signature and verifies none — so it refuses a signature that fails the keyless
+	// part of rule S1 and emits accepted bytes unchanged.
+	if !signatureGate(signature) {
+		return "", ErrInvalid
+	}
 	protectedSeg := Base64urlEncode(si.Protected)
 	payloadSeg := Base64urlEncode(si.Payload)
 	if len(protectedSeg) > b.EncodedSegmentBytes || len(payloadSeg) > b.EncodedSegmentBytes {
@@ -2164,6 +2170,11 @@ func (Profile) parseAnchorCompactGated(compact string, b Bounds) (anchorClaims, 
 	if err != nil {
 		return anchorClaims{}, ErrInvalid
 	}
+	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
+	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	if !signatureGate(parts.Signature) {
+		return anchorClaims{}, ErrInvalid
+	}
 	if _, err := decodeAnchorHeader(parts.Protected, b); err != nil {
 		return anchorClaims{}, ErrInvalid
 	}
@@ -2199,6 +2210,11 @@ func (Profile) parseTransitionCompactGated(compact string, b Bounds) (transition
 	}
 	parts, err := splitCompact(compact, b)
 	if err != nil {
+		return transitionClaims{}, ErrInvalid
+	}
+	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
+	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	if !signatureGate(parts.Signature) {
 		return transitionClaims{}, ErrInvalid
 	}
 	if _, err := decodeTransitionHeader(parts.Protected, b); err != nil {

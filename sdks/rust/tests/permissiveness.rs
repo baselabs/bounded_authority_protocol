@@ -23,6 +23,31 @@
 //! removing each per-node check from `jcs_encode`, watching the corresponding
 //! test flip RED, and restoring it; the quoted runs ride the T15 commit body.
 
+/// Erratum 3: the producers refuse an all-zero signature (small-order R, S = 0), so fixtures
+/// that frame a placeholder signature use gate-passing bytes instead: R the little-endian
+/// encoding of y = 2 (canonical, not small order) and S = L - 1.
+fn gate_passing_sig() -> [u8; 64] {
+    let mut sig = [0u8; 64];
+    sig[1] = 2;
+    sig[32] = 0xec;
+    sig[33] = 0xd3;
+    sig[34] = 0xf5;
+    sig[35] = 0x5c;
+    sig[36] = 0x1a;
+    sig[37] = 0x63;
+    sig[38] = 0x12;
+    sig[39] = 0x58;
+    sig[40] = 0xd6;
+    sig[41] = 0x9c;
+    sig[42] = 0xf7;
+    sig[43] = 0xa2;
+    sig[44] = 0xde;
+    sig[45] = 0xf9;
+    sig[46] = 0xde;
+    sig[47] = 0x14;
+    sig[63] = 0x10;
+    sig
+}
 use bounded_authority_protocol::{
     base64url_decode, jcs_encode, json_decode, request_digest, Bounds, JsonValue,
 };
@@ -460,7 +485,7 @@ fn canonical_form_anchor_header_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64],
+        &gate_passing_sig(),
         None,
     );
     assert!(canonical.is_ok(), "canonical anchor must assemble");
@@ -471,7 +496,7 @@ fn canonical_form_anchor_header_rejected() {
             protected_segment: reversed_segment(&produced.protected_segment),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64],
+        &gate_passing_sig(),
         None,
     );
     assert!(r.is_err(), "non-canonical anchor header must reject");
@@ -488,7 +513,7 @@ fn canonical_form_anchor_payload_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: reversed_segment(&produced.payload_segment),
         },
-        &[0u8; 64],
+        &gate_passing_sig(),
         None,
     );
     assert!(r.is_err(), "non-canonical anchor payload must reject");
@@ -505,7 +530,7 @@ fn canonical_form_transition_header_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64],
+        &gate_passing_sig(),
         None,
     );
     assert!(canonical.is_ok(), "canonical transition must assemble");
@@ -516,7 +541,7 @@ fn canonical_form_transition_header_rejected() {
             protected_segment: reversed_segment(&produced.protected_segment),
             payload_segment: produced.payload_segment.clone(),
         },
-        &[0u8; 64],
+        &gate_passing_sig(),
         None,
     );
     assert!(r.is_err(), "non-canonical transition header must reject");
@@ -533,7 +558,7 @@ fn canonical_form_transition_payload_rejected() {
             protected_segment: produced.protected_segment.clone(),
             payload_segment: reversed_segment(&produced.payload_segment),
         },
-        &[0u8; 64],
+        &gate_passing_sig(),
         None,
     );
     assert!(r.is_err(), "non-canonical transition payload must reject");
@@ -564,7 +589,7 @@ fn signature_width_grant_decode_rejected() {
         &compact_with_signature(
             &produced.protected_segment,
             &produced.payload_segment,
-            &[0u8; 64],
+            &gate_passing_sig(),
         ),
         &max(),
     );
@@ -606,7 +631,7 @@ fn signature_width_proof_decode_rejected() {
         &compact_with_signature(
             &produced.protected_segment,
             &produced.payload_segment,
-            &[0u8; 64],
+            &gate_passing_sig(),
         ),
         &max(),
     );
@@ -695,7 +720,7 @@ fn canonical_exclusion_grant_reorder_still_decodes() {
         &compact_with_signature(
             &reversed_segment(&produced.protected_segment),
             &reversed_segment(&produced.payload_segment),
-            &[0u8; 64],
+            &gate_passing_sig(),
         ),
         &max(),
     );
@@ -727,7 +752,7 @@ fn canonical_exclusion_proof_reorder_still_decodes() {
         &compact_with_signature(
             &reversed_segment(&produced.protected_segment),
             &reversed_segment(&produced.payload_segment),
-            &[0u8; 64],
+            &gate_passing_sig(),
         ),
         &max(),
     );
@@ -802,7 +827,7 @@ fn build_start_anchor(chain_hash: [u8; 32]) -> Vec<u8> {
     compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     )
 }
 
@@ -828,7 +853,7 @@ fn build_end_anchor(
     compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     )
 }
 
@@ -849,7 +874,7 @@ fn build_transition(effective_at: i64) -> Vec<u8> {
     compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     )
 }
 
@@ -968,7 +993,7 @@ fn encode_expected_chain_id_drift_rejected() {
     f.input.transitions[0] = compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     );
     assert!(
         encode_anchored_export(&f.input, &f.expected).is_err(),
@@ -1047,7 +1072,7 @@ fn encode_expected_end_sequence_binding_rejected() {
     f.input.end_anchor = compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     );
     f.expected.end_anchor.sequence = 7;
     assert!(
@@ -1081,7 +1106,7 @@ fn encode_expected_anchor_chain_id_binding_rejected() {
     f.input.end_anchor = compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     );
     f.expected.end_anchor.chain_id = "chain-OTHER".to_string();
     assert!(
@@ -1113,7 +1138,7 @@ fn encode_expected_end_hash_binding_rejected() {
     f.input.end_anchor = compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     );
     f.expected.end_anchor.chain_hash = wrong;
     assert!(
@@ -1146,7 +1171,7 @@ fn encode_key_path_end_before_last_time_rejected() {
     f.input.end_anchor = compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     );
     f.expected.end_anchor.anchored_at = 1400;
     assert!(
@@ -1187,7 +1212,7 @@ fn encode_key_path_end_time_equality_accepted() {
         compact_with_signature(
             &produced.protected_segment,
             &produced.payload_segment,
-            &[0u8; 64],
+            &gate_passing_sig(),
         )
     };
     let expected = ExpectedExport {
@@ -1262,7 +1287,7 @@ fn encode_start_anchor_full_match_rejected() {
     f.input.start_anchor = compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     );
     assert!(
         encode_anchored_export(&f.input, &f.expected).is_err(),
@@ -1293,7 +1318,7 @@ fn encode_end_anchor_full_match_rejected() {
     f.input.end_anchor = compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     );
     assert!(
         encode_anchored_export(&f.input, &f.expected).is_err(),
@@ -1366,7 +1391,7 @@ fn encode_transition_full_match_rejected() {
     f.input.transitions[0] = compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     );
     assert!(
         encode_anchored_export(&f.input, &f.expected).is_err(),
@@ -1490,7 +1515,7 @@ fn encode_key_path_wrong_current_key_rejected() {
     f.input.transitions[0] = compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     );
     f.expected.transitions[0].current_key_id = "anchor-c".to_string();
     f.expected.transitions[0].current_key_fingerprint = public_key_thumbprint_raw(&KEY_C).unwrap();
@@ -1523,7 +1548,7 @@ fn encode_key_path_end_key_mismatch_rejected() {
     f.input.end_anchor = compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     );
     f.expected.end_anchor.key_id = "anchor-c".to_string();
     f.expected.end_anchor.key_fingerprint = public_key_thumbprint_raw(&KEY_C).unwrap();
@@ -1555,7 +1580,7 @@ fn encode_key_path_non_chronology_rejected() {
     f.input.transitions[0] = compact_with_signature(
         &produced.protected_segment,
         &produced.payload_segment,
-        &[0u8; 64],
+        &gate_passing_sig(),
     );
     f.expected.transitions[0].effective_at = 999;
     assert!(
@@ -2001,7 +2026,7 @@ fn two_transition_export() -> ConformantExport {
             &max(),
         )
         .expect("t1");
-        compact_with_signature(&p.protected_segment, &p.payload_segment, &[0u8; 64])
+        compact_with_signature(&p.protected_segment, &p.payload_segment, &gate_passing_sig())
     };
     let t2 = {
         let p = key_transition_signing_input(
@@ -2017,7 +2042,7 @@ fn two_transition_export() -> ConformantExport {
             &max(),
         )
         .expect("t2");
-        compact_with_signature(&p.protected_segment, &p.payload_segment, &[0u8; 64])
+        compact_with_signature(&p.protected_segment, &p.payload_segment, &gate_passing_sig())
     };
     let end = {
         let p = boundary_anchor_signing_input(
@@ -2033,7 +2058,7 @@ fn two_transition_export() -> ConformantExport {
             &max(),
         )
         .expect("end anchor (seq 2)");
-        compact_with_signature(&p.protected_segment, &p.payload_segment, &[0u8; 64])
+        compact_with_signature(&p.protected_segment, &p.payload_segment, &gate_passing_sig())
     };
     let expected = ExpectedExport {
         chain: ExpectedChain {
@@ -3009,7 +3034,7 @@ fn compact_with_dummy_signature(
     out.push(b'.');
     out.extend_from_slice(&produced.payload_segment);
     out.push(b'.');
-    out.extend_from_slice(&base64url_encode(&[0u8; 64]));
+    out.extend_from_slice(&base64url_encode(&gate_passing_sig()));
     out
 }
 
@@ -3618,7 +3643,7 @@ fn es256_rejects_prior_major_bytes_both_directions() {
         "{}.{}.{}",
         String::from_utf8(produced.protected_segment.clone()).unwrap(),
         String::from_utf8(produced.payload_segment.clone()).unwrap(),
-        String::from_utf8(bounded_authority_protocol::base64url_encode(&[0u8; 64])).unwrap(),
+        String::from_utf8(bounded_authority_protocol::base64url_encode(&gate_passing_sig())).unwrap(),
     );
     assert!(v3::decode_grant(compact.as_bytes(), &max()).is_ok());
     assert_eq!(

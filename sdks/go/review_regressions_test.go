@@ -233,7 +233,7 @@ func TestReviewProofProducerNonce(t *testing.T) {
 	// A real generated holder key: the all-zero placeholder this test used is a small-order point, which
 	// strict key acceptance now refuses at the producer, so a placeholder would stop exercising the
 	// nonce path and fail for the wrong reason.
-	holderKey, _, err := ed25519.GenerateKey(rand.Reader)
+	holderKey, holderPriv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +254,9 @@ func TestReviewProofProducerNonce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proof signing input with nonce rejected: %v", err)
 	}
-	compact, err := AssembleCompact(si, make([]byte, 64), nil)
+	// Erratum 3: the assembler refuses an all-zero (small-order R, S = 0) signature, so the
+	// nonce regression signs for real.
+	compact, err := AssembleCompact(si, ed25519.Sign(holderPriv, signingInputMessage(si)), nil)
 	if err != nil {
 		t.Fatalf("assemble proof with nonce: %v", err)
 	}

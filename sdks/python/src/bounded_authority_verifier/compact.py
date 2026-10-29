@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
+from .ed25519 import signature_gate
 from .error import InvalidError, Ok, Result, err, fail, require
 
 _DOT = 0x2E
@@ -132,6 +133,36 @@ def assemble_segments(signing_input: SigningInput, signature: bytes) -> Result[b
     """
     try:
         if signing_input.kind not in _KINDS:
+            fail("assemble_segments: kind closed set")
+        require(len(signature) == 64, "assemble_segments: signature width 64")
+        # Erratum 3 (REQ1/REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer
+        # surface — it frames a signature and verifies none — so it refuses a signature that
+        # fails the keyless part of rule S1 and emits accepted bytes unchanged. Every Ed25519
+        # assembler (contract-majors 1 and 2, local loopback, role attestation, content
+        # assertion) assembles through this function.
+        require(signature_gate(signature), "assemble_segments: signature canonicality")
+        sig_b64 = base64url_encode(signature)
+        return Ok(
+            signing_input.protected_segment
+            + bytes([_DOT])
+            + signing_input.payload_segment
+            + bytes([_DOT])
+            + sig_b64
+        )
+    except InvalidError:
+        return err()
+
+
+def assemble_segments_es256(signing_input: SigningInput, signature: bytes) -> Result[bytes]:
+    """The ES256 counterpart of ``assemble_segments`` (mirrors the reference's separate
+    V3.CompactJws assembler: the standard kind closed set + 64-byte width, then the same byte
+    assembly). The canonical-signature gate is the v3 façade's, as it is the reference
+    runtime's: a raw r || s is big-endian and low-S, never little-endian R || S.
+
+    REQ1-VERIFY-no-signer-callback: takes a signature, never a key.
+    """
+    try:
+        if signing_input.kind not in ("grant", "proof", "boundary_anchor", "key_transition"):
             fail("assemble_segments: kind closed set")
         require(len(signature) == 64, "assemble_segments: signature width 64")
         sig_b64 = base64url_encode(signature)

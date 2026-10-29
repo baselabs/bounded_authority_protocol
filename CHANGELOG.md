@@ -2,6 +2,21 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- The three in-repo verifier SDKs (`sdks/python`, `sdks/rust`, `sdks/go`) implement erratum 3's
+  producer-canonicality refusal on their assembly and anchored-export-encoding surfaces, with the
+  same clauses as the Elixir reference and the graduated TypeScript verifier: Ed25519
+  (`signature_gate` — R canonical, R not of small order, S < L) at every Ed25519 assembler
+  (contract-majors 1 and 2, local loopback, role attestation, content assertion) and at every
+  major's export encoding; ES256 (the canonical-signature rule `0 < r < n`, `0 < s ≤ ⌊n/2⌋`) at
+  the v3 assembler and export encoding. Each SDK vendors and runs the certified
+  `bap-producer-canonicality/1` corpus (75 cases, index SHA-256 `99ee6fbb…`, red-first before the
+  gates, each gate defect-injected red after them). No verification verdict changes anywhere;
+  every existing corpus agrees at unchanged counts in all three SDK suites.
+
 ## [0.9.0] — 2026-10-29
 
 A clarifying minor release (erratum 3). No verification verdict and no verdict of any existing

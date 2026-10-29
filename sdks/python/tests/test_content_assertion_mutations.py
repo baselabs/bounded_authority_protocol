@@ -131,6 +131,17 @@ def _probe_signature(module: types.ModuleType) -> bool:
     return not module.verify_assertion(tampered, expected).is_ok
 
 
+def _gate_passing_signature() -> bytes:
+    # Erratum 3: the assembler refuses an all-zero signature (small-order R, S = 0), so this
+    # probe frames gate-passing bytes instead — R the little-endian encoding of y = 2 (canonical,
+    # not small order) and S = L - 1. The kind gate under mutation stays the only rejection.
+    sig = bytearray(64)
+    sig[1] = 2
+    order = 0x1000000000000000000000000000000014DEF9DEA2F79CD65812631A5CF5D3ED
+    sig[32:] = (order - 1).to_bytes(32, "little")
+    return bytes(sig)
+
+
 def _probe_assembly_kind(module: types.ModuleType) -> bool:
     signing = module.assertion_signing_input(_producer(module))
     assert signing.is_ok
@@ -139,7 +150,7 @@ def _probe_assembly_kind(module: types.ModuleType) -> bool:
         protected_segment=signing.value.protected_segment,
         payload_segment=signing.value.payload_segment,
     )
-    return not module.assemble_content_assertion_compact(wrong_kind, bytes(64)).is_ok
+    return not module.assemble_content_assertion_compact(wrong_kind, _gate_passing_signature()).is_ok
 
 
 def _probe_decoded_segment(module: types.ModuleType) -> bool:

@@ -203,10 +203,9 @@ func TestStrictEndToEndContentAssertionRejectsIdentityAttestorForgery(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	forged, err := AssembleContentAssertionCompact(si, forgedSignature, expected.Bounds)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Frame the forgery directly: its signature (R = identity, S = 0) is exactly what a producer
+	// surface refuses to frame since erratum 3; the verifier-rejection claim below is unchanged.
+	forged := e2eCompact(si.Protected, si.Payload, forgedSignature)
 	expected.Attestor.PublicKey = identityKey
 	if _, err := VerifyContentAssertion(forged, expected); err == nil {
 		t.Fatal("assertion forged under the identity attestor key accepted")
@@ -242,10 +241,8 @@ func TestStrictEndToEndRoleAttestationRejectsIdentityAttestorForgery(t *testing.
 	if _, err := VerifyAttestation(honest, expected); err != nil {
 		t.Fatalf("positive control: %v", err)
 	}
-	forged, err := AssembleAttestationCompact(si, forgedSignature, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Frame the forgery directly (erratum 3: the assembler refuses such bytes).
+	forged := e2eCompact(si.Protected, si.Payload, forgedSignature)
 	copy(expected.Attestor.PublicKey[:], identityKey)
 	if _, err := VerifyAttestation(forged, expected); err == nil {
 		t.Fatal("attestation forged under the identity attestor key accepted")

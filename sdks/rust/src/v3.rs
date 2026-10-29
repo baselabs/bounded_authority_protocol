@@ -905,6 +905,10 @@ pub fn assemble_compact(
     // (signature_bytes needs no gate: it is a FIXED-WIDTH key rejected at
     // Bounds construction unless 64 — the reference's assemble-time check is
     // subsumed; the v3 raw r||s spelling is the same 64-byte width.)
+    // Erratum 3 (REQ3-SIGNING-producer-canonical): assembly is a producer surface — it frames
+    // a signature and verifies none — so it refuses a raw r||s outside 0 < r < n,
+    // 0 < s <= floor(n/2) (validate_rs_range owns the rule) and emits accepted bytes unchanged.
+    es256::validate_rs_range(signature)?;
     let compact = compact::compose_compact(input, signature)?;
     if compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
@@ -1912,6 +1916,14 @@ pub fn encode_anchored_export(
         },
     )?;
 
+    // Erratum 3: encoding is a producer surface — it frames these signatures and verifies
+    // none — so it refuses any framed anchor or transition signature no conforming signer
+    // emits, never rewriting its bytes.
+    for framed in [&input.start_anchor, &input.end_anchor].into_iter().chain(input.transitions.iter()) {
+        let (_, _, signature_seg) = compact::parse_compact(framed)?;
+        let signature: [u8; 64] = base64url_decode(signature_seg)?.try_into().map_err(|_| Invalid)?;
+        es256::validate_rs_range(&signature)?;
+    }
     // Start-anchor binding: parse through the width+canonical-gated decoder,
     // then match ALL signed fields against the expected anchor.
     let start_parts = decode_anchor_parts(&input.start_anchor, &bounds)?;
