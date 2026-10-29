@@ -25,7 +25,10 @@ signatures and low-S canonicality).
 
 ## Installation
 
-The package is published on Hex (release 0.9.0, a clarifying minor release).
+The package is published on Hex (release 0.9.0, published October 29, 2026: a clarifying minor
+release, erratum 3; registry checksum
+`9a861f42ba4152e37620e2708cfa9689676671850108bb82de0ea56913626bca`, read back from the
+registry API and identical to the release-candidate archive of the tagged tree).
 Releases 0.7.0 and earlier are retired. Registry consumers use the minor-bounded requirement:
 
 ```elixir

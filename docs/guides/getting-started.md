@@ -21,7 +21,7 @@ defp deps do
 end
 ```
 
-Release 0.9.0 is the current Hex release. Releases 0.7.0 and earlier are retired for a security
+Release 0.9.0 is the current Hex release (published October 29, 2026). Releases 0.7.0 and earlier are retired for a security
 fix; the [changelog](../../CHANGELOG.md) and [Upgrading](upgrading.md)
 describe each release. Depend on the Hex package, never on a Git tag or checkout. The package
 has no runtime dependencies. Mix enforces its `elixir: "~> 1.18"` requirement; it also needs

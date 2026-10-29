@@ -7,7 +7,11 @@ and contains contract-majors 1, 2, and 3, the local-loopback application profile
 role-attestation and content-assertion sibling profiles, the strict Ed25519 verification
 soundness repair ([ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md), erratum 2),
 and the producer-canonicality signature refusal (erratum 3).
-The public API surface is locked. Registry consumers use the published Hex archive. Releases `0.7.0` and
+The public API surface is locked. Registry consumers use the published Hex archive. OBSERVED
+October 29, 2026: the Hex
+release API reports `0.9.0` published on October 29, 2026 (registry checksum
+`9a861f42ba4152e37620e2708cfa9689676671850108bb82de0ea56913626bca`). See the
+[registry release](https://hex.pm/packages/bounded_authority_protocol/0.9.0). Releases `0.7.0` and
 earlier accept Ed25519 signatures that the strict rule rejects and are not supported; upgrade to
 `0.9.x` and run the pre-upgrade key scan in ADR 0040. Releases `0.1.0` through `0.7.0` are
 retired on Hex for security. See the security advisory

@@ -1097,16 +1097,24 @@ Status: Elixir source landing for release 0.9.0; open until every item below is 
 - Corpus: `priv/conformance/producer-canonicality`, `bap-producer-canonicality/1`, revision 1, 75
   cases, index SHA-256 `99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601`; every
   existing corpus index is unchanged.
+- Closed October 29, 2026: the full `mix quality` gate green on the release tree (coverage
+  100%, dialyzer clean, every corpus in total agreement — v1 283, v2 268, v3 292,
+  strict-ed25519 2410, producer-canonicality 75 — 110 mutations caught, the release candidate
+  built twice byte-identically); release 0.9.0 published and read back (registry checksum
+  `9a861f42ba4152e37620e2708cfa9689676671850108bb82de0ea56913626bca`, equal to the local
+  archive; hexdocs renders the 0.9.0 README and extras).
 - Open: the Python, Go, Rust, and TypeScript verifier units; the independent Node runner's
-  major-1 producer cases; the TypeScript signer and the companion signer follow-on releases; the
-  full `mix quality` gate; publication and read-back.
+  major-1 producer cases; the TypeScript signer and the companion signer follow-on releases
+  (the companion signer's 0.11.0, published October 29, 2026, still locks 0.8.0 by its own
+  pin discipline).
 
 ## Next action
 
 BAP-00 through BAP-11, BAP-13 through BAP-19, and BAP-21 through BAP-24 are complete. BAP-24, the
 strict Ed25519 soundness erratum (ADR 0040), closed with the 0.8.0 release (see its closeout evidence
-above). BAP-25, producer-surface signature canonicality (erratum 3), is landing for release 0.9.0
-(see its section above). BAP-12 remains
+above). BAP-25, producer-surface signature canonicality (erratum 3), released as 0.9.0 on
+October 29, 2026; its remaining open items are the SDK and follow-on signer releases (see its
+section above). BAP-12 remains
 open for the IANA filing and is gated on the BAP-08 external-submission preconditions. BAP-23 landed
 the role-attestation sibling profile (ADR 0036) and is now CLOSED END-TO-END: the owner's
 2026-09-23 release decisions shipped it as npm `@bounded-authority-protocol/verifier@0.4.0`
