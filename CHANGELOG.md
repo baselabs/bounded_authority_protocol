@@ -34,6 +34,12 @@ any existing certified corpus changes.
   command returns; on hosted CI (git 2.55) it can race the scratch cleanup and fail with
   "directory not empty". A new architecture test requires every script or test that runs such a
   git command to set both values. Test and tooling only; no package, wire, or verdict change.
+- The development tooling lock moves hex_core 0.20.0 → 0.20.1, clearing EEF-CVE-2026-96596
+  (MEDIUM: `erl_tar:extract/2` loops forever on a GNU sparse member with a trailing hole;
+  fixed in 0.20.1). hex_core arrives dev/test-only through the `sbom` tool under the existing
+  `~> 0.20.0` override, whose rationale is unchanged (sbom 0.11.0 still requires `~> 0.19.0`);
+  the shipped package has no hex_core dependency. `mix hex.audit` and `mix deps.audit` are
+  both clean.
 
 ### Added
 
