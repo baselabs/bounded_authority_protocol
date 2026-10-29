@@ -40,6 +40,9 @@ certified corpus changes.
   `~> 0.20.0` override, whose rationale is unchanged (sbom 0.11.0 still requires `~> 0.19.0`);
   the shipped package has no hex_core dependency. `mix hex.audit` and `mix deps.audit` are
   both clean.
+- Latest-first tooling currency bump: `ex_json_pointer` 0.8.0 → 0.9.0 in the dev/test lock
+  (transitive through the documentation tooling; not shipped). The currency gate found the
+  drift before the release battery did.
 
 ### Added
 
