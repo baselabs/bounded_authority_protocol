@@ -1103,10 +1103,21 @@ Status: Elixir source landing for release 0.9.0; open until every item below is 
   built twice byte-identically); release 0.9.0 published and read back (registry checksum
   `9a861f42ba4152e37620e2708cfa9689676671850108bb82de0ea56913626bca`, equal to the local
   archive; hexdocs renders the 0.9.0 README and extras).
-- Open: the Python, Go, Rust, and TypeScript verifier units; the independent Node runner's
-  major-1 producer cases; the TypeScript signer and the companion signer follow-on releases
-  (the companion signer's 0.11.0, published October 29, 2026, still locks 0.8.0 by its own
-  pin discipline).
+- Closed October 29, 2026 (npm): the TypeScript verifier unit. `@bounded-authority-protocol/verifier`
+  0.8.0 publishes erratum 3 (tag `v0.8.0`; one WebKit bench-demo timeout was a load flake — the
+  same lane green on main and on the re-run): the keyless Ed25519 signature clauses gate the
+  shared assembler (majors 1 and 2, local loopback, role attestation, content assertion) and the
+  canonical-signature rule gates v3 assembly, every major's anchored-export encoding gates each
+  framed anchor and transition signature, the vendored corpus runs in every lane
+  (`conformance:producer-canonicality`, 75/75, verdict digest `c67c3e26…` pinned and equal on the
+  portable backend, Deno, Bun and the browsers), every gate observed red before the fix and
+  defect-injected red after it, one cross-vendor review round fixed, and no verification verdict
+  changed (all eight corpora at their recorded digests). Published through the trusted-publisher
+  flow with provenance and read back from the registry: `npm view` resolves 0.8.0 and `latest`
+  points at it.
+- Open: the Python, Go, Rust verifier units; the independent Node runner's major-1 producer
+  cases; the TypeScript signer and the companion signer follow-on releases (the companion
+  signer's 0.11.0, published October 29, 2026, still locks 0.8.0 by its own pin discipline).
 
 ## Next action
 
