@@ -235,7 +235,7 @@ permissiveness mutants, not only with corpus verdicts.
 
 Compact assembly and anchored-export encoding are producer surfaces, governed by erratum 3 in
 the [errata registry](../errata.md). The Elixir implementation and the corpus below are part of
-release 0.9.0 (unreleased, planned for 0.9.0). These surfaces hold no key and verify no
+release 0.9.0. These surfaces hold no key and verify no
 signature, but they refuse a signature that no conforming signer emits and they never rewrite
 the bytes they accept:
 

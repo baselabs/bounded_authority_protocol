@@ -58,7 +58,7 @@ defmodule BoundedAuthorityProtocol.V2 do
   @doc """
   Frames an exact deterministic anchored export after semantic validation.
 
-  Since 0.9.0 (unreleased, planned for 0.9.0), encoding also refuses, with `{:error, :invalid}`, a
+  Since 0.9.0, encoding also refuses, with `{:error, :invalid}`, a
   signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
   order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
   signature bytes it accepts.
@@ -74,7 +74,7 @@ defmodule BoundedAuthorityProtocol.V2 do
   @doc """
   Assembles a validated signing input and raw Ed25519 signature under caller bounds.
 
-  Since 0.9.0 (unreleased, planned for 0.9.0), assembly also refuses, with `{:error, :invalid}`, a
+  Since 0.9.0, assembly also refuses, with `{:error, :invalid}`, a
   signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
   order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
   signature bytes it accepts.

@@ -5,7 +5,7 @@ release kind changes. The locked 0.1.0 release-candidate contract
 ([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
-## 0.8.0 to 0.9.0 (unreleased, planned for 0.9.0)
+## 0.8.0 to 0.9.0
 
 Clarifying minor (erratum 3). No verification verdict changes. The requirement `~> 0.8.0` does
 not select 0.9.0; move to `~> 0.9.0`.

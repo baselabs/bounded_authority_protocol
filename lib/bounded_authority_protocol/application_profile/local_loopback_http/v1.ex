@@ -22,7 +22,7 @@ defmodule BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1 do
   @doc """
   Assembles a local-loopback proof under caller bounds.
 
-  Since 0.9.0 (unreleased, planned for 0.9.0), assembly also refuses, with `{:error, :invalid}`, a
+  Since 0.9.0, assembly also refuses, with `{:error, :invalid}`, a
   signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
   order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
   signature bytes it accepts.

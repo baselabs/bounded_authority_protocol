@@ -6,12 +6,12 @@ livebook:{"persist_outputs":true}
 
 ```elixir
 Mix.install([
-  {:bounded_authority_protocol, "~> 0.8.0"}
+  {:bounded_authority_protocol, "~> 0.9.0"}
 ])
 ```
 
-Hex 0.8.0 is published (October 13, 2026), so the `Mix.install` above resolves from the public
-registry. The immutable package identity is the published Hex release; the source tag is
+The `Mix.install` above resolves from the public Hex registry once 0.9.0 is published (the
+publication date is recorded here at release). The immutable package identity is the published Hex release; the source tag is
 reviewable release evidence, not a substitute for it.
 
 ## What this notebook covers
@@ -714,11 +714,10 @@ the raw 64-byte `r || s` form of RFC 7518 §3.4 with `s` in the low half (`s <= 
 expected-context, and credentials structs are the same ones the earlier sections used.
 
 `:crypto` returns ECDSA signatures in DER and may return either `s`, so the signer converts the
-signature to `r || s` and normalizes `s` to the low half before assembly. Release 0.9.0
-(unreleased, planned for 0.9.0) adds `BoundedAuthorityProtocol.Es256`, a public module with the
-ES256 checks, including `der_to_raw/1` and `normalize_low_s/1` for this step. The cell below
-does the conversion by hand, so it runs on every release, including the ones without that
-module.
+signature to `r || s` and normalizes `s` to the low half before assembly. Release 0.9.0 adds
+`BoundedAuthorityProtocol.Es256`, a public module with the ES256 checks, including `der_to_raw/1`
+and `normalize_low_s/1` for this step. The cell below does the conversion by hand, so it runs on
+every release, including the ones without that module.
 
 ```elixir
 alias BoundedAuthorityProtocol.V3

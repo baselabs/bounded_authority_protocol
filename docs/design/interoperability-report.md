@@ -136,7 +136,7 @@ with expected verdicts from an independent arithmetic generator and the 12 publi
 
 ### Producer-canonicality corpus
 
-The additive `bap-producer-canonicality/1` corpus (erratum 3, release 0.9.0) (unreleased, planned for 0.9.0) is
+The additive `bap-producer-canonicality/1` corpus (erratum 3, release 0.9.0) is
 certified by its revision-1 index at `priv/conformance/producer-canonicality`, SHA-256
 `99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601`: 75 cases in 4 families (60
 refused, 15 accepted at the rule's bound), generated keylessly from certified signatures. Every

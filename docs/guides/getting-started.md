@@ -17,12 +17,12 @@ operational.
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 0.8.0"}]
+  [{:bounded_authority_protocol, "~> 0.9.0"}]
 end
 ```
 
-Release 0.8.0 is the current Hex release (published October 13, 2026). Every earlier release is
-retired for a security fix; the [changelog](../../CHANGELOG.md) and [Upgrading](upgrading.md)
+Release 0.9.0 is the current Hex release. Releases 0.7.0 and earlier are retired for a security
+fix; the [changelog](../../CHANGELOG.md) and [Upgrading](upgrading.md)
 describe each release. Depend on the Hex package, never on a Git tag or checkout. The package
 has no runtime dependencies. Mix enforces its `elixir: "~> 1.18"` requirement; it also needs
 Erlang/OTP 27 or later (the standard-library `:json` module), which nothing checks for you. CI
@@ -100,7 +100,7 @@ The value is `3`: a compact JWS has three dot-separated parts.
 
 `grant_signing_input/2` returns the exact bytes to sign (`grant_input.message`);
 `assemble_compact/2` checks the signature width and the encoded parts and returns the compact
-JWS. Since 0.9.0 (unreleased, planned for 0.9.0), it also refuses a signature that no
+JWS. Since 0.9.0, it also refuses a signature that no
 conforming signer emits (for Ed25519, `S` not below the group order or a non-canonical or
 small-order `R`) and never rewrites the bytes it accepts. Neither function sees a private key.
 
@@ -292,7 +292,7 @@ mix run -e 'BoundedAuthorityProtocol.Conformance.Cli.Main.main(["--corpus", "dep
 ```
 
 Repeat with `v2/corpus`, `v3/corpus`, or `strict-ed25519` in place of `v1/corpus`. To install
-the CLI as a command instead, run `mix escript.install hex bounded_authority_protocol 0.8.0`
+the CLI as a command instead, run `mix escript.install hex bounded_authority_protocol 0.9.0`
 (it lands in `~/.mix/escripts`) and then
 `bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus`.
 In a checkout of this repository, `mix escript.build` builds the same CLI, and the repository's

@@ -25,16 +25,13 @@ signatures and low-S canonicality).
 
 ## Installation
 
-The package is published on Hex (release 0.8.0, published October 13, 2026: the strict Ed25519
-soundness repair; registry checksum
-`b5598cc5ba25f6ff4a2b55dab619bc2419b1d90cce9be3b1d4330d55a6da0bdb`, read back from the
-registry API and identical to the release-candidate archive of the tagged tree). Releases 0.7.0
-and earlier are retired. Registry consumers use the minor-bounded requirement:
+The package is published on Hex (release 0.9.0, a clarifying minor release).
+Releases 0.7.0 and earlier are retired. Registry consumers use the minor-bounded requirement:
 
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.8.0"}
+    {:bounded_authority_protocol, "~> 0.9.0"}
   ]
 end
 ```
@@ -199,7 +196,7 @@ Strict Ed25519 (`BoundedAuthorityProtocol.Ed25519`, [ADR 0040](docs/adr/0040-str
 - `torsion_free?/1` — the host check for key enrollment, trust install, and deny-list or
   revocation comparison. It is not on the verification path; call it yourself at those points.
 
-ES256 (`BoundedAuthorityProtocol.Es256`, since 0.9.0) (unreleased, planned for 0.9.0):
+ES256 (`BoundedAuthorityProtocol.Es256`, since 0.9.0):
 
 - `canonical_signature?/1` — the one ES256 signature rule (`0 < r < n`, `0 < s <= n/2`) that
   verification and the producer surfaces share.
@@ -279,7 +276,7 @@ mix run -e 'BoundedAuthorityProtocol.Conformance.Cli.Main.main(["--corpus", "dep
 or install it as a command once and run it from the project:
 
 ```bash
-mix escript.install hex bounded_authority_protocol 0.8.0
+mix escript.install hex bounded_authority_protocol 0.9.0
 bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus
 ```
 
@@ -341,7 +338,7 @@ in 4 families; index SHA-256
 `priv/conformance/producer-canonicality`. It certifies that compact assembly and anchored-export
 encoding refuse a signature no conforming signer emits (ES256 out of range or high-S; Ed25519
 `S >= L` or a non-canonical or small-order `R`) and emit accepted bytes unchanged. It ships in
-0.9.0 and changes no existing verdict (unreleased, planned for 0.9.0):
+0.9.0 and changes no existing verdict:
 
 ```bash
 ./bounded_authority_conformance --corpus priv/conformance/producer-canonicality
@@ -411,7 +408,7 @@ Reference:
 
 - The module documentation on HexDocs: `BoundedAuthorityProtocol.V1`, `V2`, and `V3`, the
   sibling profile namespaces, `BoundedAuthorityProtocol.Ed25519`, and
-  `BoundedAuthorityProtocol.Es256` (unreleased, planned for 0.9.0).
+  `BoundedAuthorityProtocol.Es256`.
 - [Protocol charter](docs/design/protocol-charter.md): what the verifier does and the
   verification chain.
 - [Threat model](docs/design/threat-model.md), [conformance contract](docs/design/conformance-contract.md),

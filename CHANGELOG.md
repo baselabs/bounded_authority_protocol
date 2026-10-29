@@ -2,10 +2,10 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
-## [Unreleased]
+## [0.9.0] — 2026-10-29
 
-Planned as 0.9.0, a clarifying minor release (erratum 3). No verification verdict and no verdict of
-any existing certified corpus changes.
+A clarifying minor release (erratum 3). No verification verdict and no verdict of any existing
+certified corpus changes.
 
 ### Fixed
 
