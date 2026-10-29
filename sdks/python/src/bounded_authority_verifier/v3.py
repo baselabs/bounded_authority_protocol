@@ -52,7 +52,6 @@ from .compact import (  # noqa: F401
     assemble_segments_es256,
     CompactSegments,
     SigningInput,
-    assemble_segments,
     parse_compact,
     scan_compact,
 )

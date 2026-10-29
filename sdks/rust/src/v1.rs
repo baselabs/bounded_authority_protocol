@@ -1673,6 +1673,12 @@ pub fn encode_anchored_export(
     // none — so it refuses any framed anchor or transition signature no conforming signer
     // emits, never rewriting its bytes.
     for framed in [&input.start_anchor, &input.end_anchor].into_iter().chain(input.transitions.iter()) {
+        // The same ceilings the gated parses enforce, BEFORE any decoding: an oversized framed
+        // compact rejects without the parse allocation (review round: the loop must not become
+        // the unbounded path).
+        if framed.len() as u64 > bounds.compact_bytes() || framed.len() as u64 > bounds.anchor_bytes() {
+            return Err(Invalid);
+        }
         let (_, _, signature_seg) = compact::parse_compact(framed)?;
         let signature: [u8; 64] = base64url_decode(signature_seg)?.try_into().map_err(|_| Invalid)?;
         if !ed25519::signature_gate(&signature) {
