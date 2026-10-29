@@ -641,6 +641,8 @@ targetRules = ["jwt"]
 regexTarget = "match"
 paths = [
   '''^priv/conformance/producer-canonicality/cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json$''',
+  '''^sdks/go/conformance/corpus-producer-canonicality/cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json$''',
+  '''^sdks/rust/conformance/corpus-producer-canonicality/cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json$''',
 ]
 regexes = [
   '''^eyJhbGciOiJFUzI1NiIsImp3ayI6eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImZQSjdHSTBEVDM2S1VqZ0RCTFVhdzhDSmFlSjM4aHMxcGd0SV9FZG1tWGciLCJ5IjoiQjNkVkVOdU8wRUFwUFpyR24zUXcyN3A5cmVZODZZSXBuZ1MzblNKNGM5RSJ9LCJ0eXAiOiJkcG9wK2p3dCJ9\.eyJhdGgiOiI0V3JQcWRJbkpOWGpORGlralExaTU2Mk1rRWJGaWhkYi15UGZRbWVNOU0wIiwiYmFfaW52IjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwiYmFfb3AiOiJ0cmFuc2ZlciIsImJhX3JlcSI6ImJ3VWFXVTh3S0R2MjhrSnVnQm51anFBUy1iS1VSbllJVmJib0hyZ29CWVkiLCJodG0iOiJQT1NUIiwiaHR1IjoiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QvaW52b2tlIiwiaWF0IjoxMTAwLCJqdGkiOiJ1cm46ZXhhbXBsZTpwcm9vZjp2My0xIiwidiI6M30\.bQBqJVCb3pbMjb44DdsOoQiALU\-5NrZ9_5Vv9VYhsxR_____gAAAAH__________3nN9VtOLz0J53OVhfjGSqA"$''',
@@ -714,4 +716,12 @@ paths = [
 ]
 regexes = [
   '''^REQ1\-KEY\-ed25519\-acceptable":"6d0d4d9f08e4ddbe5587119e76b2a4efb3589eea2339f1f54ed5f5cffa1e51fa"$''',
+]
+
+[[allowlists]]
+description = "Producer-canonicality corpus fixtures, the SDKs' vendored copies (machine-minted, certified, no private material - byte-identical to priv/conformance/producer-canonicality whose jwt matches the exact-regex block above, and the corpus declares private_material_tracked false; path-scoped because enumerating a generated corpus's values is unmaintainable)"
+targetRules = ["jwt", "generic-api-key"]
+paths = [
+  '''^sdks/go/conformance/corpus-producer-canonicality/(?:profile\.json|revision\.json|cases/[^/]+/[^/]+\.json)$''',
+  '''^sdks/rust/conformance/corpus-producer-canonicality/(?:profile\.json|revision\.json|cases/[^/]+/[^/]+\.json)$''',
 ]
