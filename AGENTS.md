@@ -2,14 +2,11 @@
 
 ## Where to read, by area
 
-- Status: [`docs/ROADMAP.md`](docs/ROADMAP.md) (its closeout-evidence blocks are the status
-  authority) and [`CHANGELOG.md`](CHANGELOG.md).
+- Status: [`docs/ROADMAP.md`](docs/ROADMAP.md) and [`CHANGELOG.md`](CHANGELOG.md).
 - Wire formats and verification: the normative specs under [`spec/`](spec/), the protocol
   charter, threat model and conformance contract under [`docs/design/`](docs/design/), and the
   ADR for the surface under [`docs/adr/`](docs/adr/).
 - Verifier SDKs: [`sdks/README.md`](sdks/README.md), ADR 0014 and ADR 0015.
-- The tracked roadmap, ADRs, charter, threat model and conformance contract must always be
-  sufficient to regenerate a reviewed plan; local process artifacts are aids only.
 - Earlier state narratives and superseded instructions:
   [`docs/reference/agent-history.md`](docs/reference/agent-history.md).
 
@@ -95,30 +92,19 @@ A production consumer obtains an operational decision from a stateful authority 
 not treat a direct public-verifier result as execution authority or call this package directly.
 The runtime accepts raw credentials at its public boundary, not a caller-provided `EnvelopeFacts`.
 
-## Workflow (owner ruling, October 28, 2026)
+## Workflow
 
-Process is sized to the risk of the specific change, never the repository. Each check, gate,
-record or review names the failure it prevents.
+Make the change, run the tests that cover it, commit with named paths, and push to `main`. CI
+runs once on `main`; if it goes red, fix forward.
 
-- **Heavy** when the diff touches `lib/`, `spec/`, `priv/conformance/`, `test/conformance/` or
-  `sdks/` (wire formats, canonicalization, signature verification, conformance vectors). Write
-  the failing test first, get one independent review and do one fix round, and run the declared
-  local gate once before pushing. Heavy pushes need the owner's approval.
-- **Light** for everything else: focused checks on the changed behavior, then push; hosted CI
-  is the gate. No outcome record, gauge or review; the commit message is the record. A light
-  change the owner asked for lands without a separate push approval.
-- Publishing, deploying and pushes to mirrors always need the owner's approval for that action.
+- CI runs `mix quality` (package, purity, documentation, advisory, license, SBOM and
+  unpacked-consumer checks). Run the parts that cover your change.
+- Publishing, deploying and pushes to mirrors need the owner's approval for that action.
 - A test that fails on every run is a defect: fix it, or quarantine it with a reason, in the
   change that finds it.
 - Update the CHANGELOG when behavior, a dependency or a contract changes; other docs only when
   a contract changes.
-
-Repository specifics:
-
-- The declared local gate is `mix quality` (package, purity, documentation, advisory, license,
-  SBOM and unpacked-consumer checks).
-- A new security gate shows allow, deny, malformed-input and mutation-red evidence.
 - A changed public contract updates its vectors, spec or ADR and consumer documentation in the
-  same landing.
+  same commit.
 - Do not claim interoperability from self-round-trips. Normative vectors require an independent
   implementation and exact-byte comparison.
