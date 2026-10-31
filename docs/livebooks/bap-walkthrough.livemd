@@ -8,10 +8,10 @@ Mix.install([
 ])
 ```
 
-The `Mix.install` above resolves release 0.9.1 from public Hex. The immutable package identity is the published Hex release; the source tag is
-reviewable release evidence, not a substitute for it.
-
 ## What this notebook covers
+
+The setup cell installs release 0.9.1 from public Hex. The immutable package identity is the
+published Hex release; the source tag provides reviewable release evidence.
 
 The full produce → assemble → verify → reject loop with the verifier package alone. We mint
 our OWN ephemeral Ed25519 and P-256 keys at runtime (nothing tracked, nothing persisted — the
