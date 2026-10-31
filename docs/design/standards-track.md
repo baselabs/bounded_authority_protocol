@@ -19,7 +19,7 @@ defines how all three survive time.
 Normative keywords in this charter (MUST, MUST NOT, MAY) carry the meanings defined in BCP 14
 [RFC2119] [RFC8174] when, and only when, they appear in all capitals, as carried by the
 `normative profile`. Evolution-contract requirements use the stable identifier
-scheme of [ADR 0007](../adr/0007-normative-requirement-identifiers.md) under the `REQ1-EVO-*`
+scheme of ADR 0007 under the `REQ1-EVO-*`
 prefix and are traced to conformance cells in the requirement map
 [requirement map](requirement-map.md).
 
@@ -30,7 +30,7 @@ or extension. That posture is permanent (`REQ1-EVO-closed-format-permanent`). It
 structurally kills the `alg:"none"`, `crit`-confusion, and permissive-compatibility class that
 destroyed the security reputation of prior token formats, and no evolution need weakens it.
 Evolution therefore happens through complete parallel contract-majors or the byte-distinct sibling
-proof-profile class defined by [ADR 0027](../adr/0027-byte-distinct-application-proof-profiles.md),
+proof-profile class defined by ADR 0027,
 never by widening an existing profile in place (`REQ1-EVO-evolution-above-wire`). A sibling profile
 has a new signed `typ`, separate normative/corpus/API identity, and is rejected by every existing
 profile; it is not an erratum or alternate interpretation of existing bytes.
@@ -77,7 +77,7 @@ Successor contract-majors overlap rather than flag-day:
   clarify prose, correct non-normative text, or add conformance cases; **no erratum may flip a
   verdict of an existing certified corpus** (`REQ1-EVO-no-verdict-flip`). Any other change that
   would alter an accept/reject outcome is by definition a contract-major change. A soundness repair
-  ([ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md) Decision 4) changes verdicts only
+  (ADR 0040 Decision 4) changes verdicts only
   from accept to reject, only on inputs proven producer-impossible, with its cases in a new
   additive corpus and every existing corpus verdict unchanged; it is not a sunset, so it keeps no
   overlap window for the vulnerable verdict. The errata registry lives at
@@ -111,7 +111,7 @@ succession unchanged.
 The successor candidate family is the `BAP2-*` ML-DSA family (FIPS 204, JOSE mapping per
 RFC 9964), with a hybrid Ed25519+ML-DSA composite posture reserved per
 draft-ietf-jose-pq-composite-sigs — the concrete names, parameter sets, quantum-readiness
-statement, and revisit triggers are recorded in `docs/adr/0026-pq-successor-suite.md`.
+statement, and revisit triggers are recorded in ADR 0026.
 Post-quantum migration is a decade-scale industry program already underway; this charter's
 commitment is that the migration is a suite succession, not a redesign.
 
@@ -121,7 +121,7 @@ BAP-04 anchored exports and historical-key rollover exist so evidence verifies y
 Long-retention evidence under a frozen signature algorithm means the evidence's trustworthiness
 would expire before its retention period — a design problem, not a hypothetical. The committed
 design direction, specified now and activated in a successor contract-major (carried to ADR
-quality in [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md)):
+quality in ADR 0009):
 
 - **Cross-suite content-covering countersignature.** A boundary anchor of a current suite
   countersigns an archive whose rows and anchors were produced under an earlier suite, attesting
@@ -184,7 +184,7 @@ The names this design needs (`ba_dlg`, a delegated-capability `typ`) are reserve
 registries now. The full mechanism — the `ba_dlg` claim schema, the `ba+cap-delegated` typ with
 its parent-holder key binding, the depth-bounded chain-verification algorithm, and the attenuation
 subset rules proven decidable against the existing selector algebra — is specified in
-[ADR 0010](../adr/0010-delegation-with-attenuation.md).
+ADR 0010.
 
 ## Revocation and freshness
 
@@ -208,7 +208,7 @@ guidance with normative force at submission time:
   risk within the window; the runtime (in the private `bounded_authority`) reconciles deferred
   consumption and surfaces over-consumption as a first-class event. The closed claim shape, the
   non-authorizing facts contract, the `ba_dlg` attenuation composition, and the successor-major
-  activation are specified in [ADR 0016](../adr/0016-offline-eligible-grant-claims.md); the
+  activation are specified in ADR 0016; the
   requirements are R-BAP-1..6 (the requirements input was relocated out of the published set on 2026-09-22; ADR 0016 is the mechanism of record). The closed v1 profile
   rejects the reserved name today; activation arrives with a successor contract-major.
 
@@ -238,7 +238,7 @@ credibility step and the policy is what makes single-maintainer tolerable to ado
 - **Errata channel.** [docs/errata.md](../errata.md) is the numbered errata registry; each entry
   names affected versions and its corpus impact, and the no-verdict-flip invariant is checked at
   review. A soundness repair is recorded there too, under the conditions of
-  [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md) Decision 4.
+  ADR 0040 Decision 4.
 - **Deprecation policy.** As defined in the evolution contract above; the policy text there is the
   authoritative one.
 - **Security policy.** SECURITY.md governs vulnerability intake; a vulnerability whose fix would
@@ -246,7 +246,7 @@ credibility step and the policy is what makes single-maintainer tolerable to ado
   window — published at announcement and set proportional to the vulnerability's severity, exempt
   from the twelve-month deprecation minimum above (§ The evolution contract), yet still a published,
   deployment-decided sunset, not a flag-day — never as a silent verdict change. A fix that meets
-  every soundness-repair condition ([ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)
+  every soundness-repair condition (ADR 0040
   Decision 4) lands instead as an erratum with an advisory, in the same release across every
   implementation.
 

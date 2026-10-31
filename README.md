@@ -189,7 +189,7 @@ caller-supplied signature; it never accepts private key material or a signer):
   `key_transition_signing_input/2`, `assemble_compact/2,3`, `encode_consumption_entry/2`,
   `encode_anchored_export/2`, `request_digest/3`.
 
-Strict Ed25519 (`BoundedAuthorityProtocol.Ed25519`, [ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md)):
+Strict Ed25519 (`BoundedAuthorityProtocol.Ed25519`, ADR 0040):
 
 - `verify_strict/3` — the one Ed25519 verification rule every surface uses: canonical point
   encodings, no small-order key or `R`, a scalar below the group order, and the cofactorless
@@ -428,7 +428,6 @@ Specifications (normative):
 - [`spec/bap-local-loopback-http-v1.md`](spec/bap-local-loopback-http-v1.md),
   [`spec/bap-role-attestation-v1.md`](spec/bap-role-attestation-v1.md), and
   [`spec/bap-content-assertion-v1.md`](spec/bap-content-assertion-v1.md): the sibling profiles.
-- [Architecture decision records](https://github.com/baselabs/bounded_authority_protocol/tree/main/docs/adr) record why each rule is the way it is.
 
 ## When NOT to use this
 
@@ -469,12 +468,12 @@ presenting client asserts.
 
 Declared Elixir range: `~> 1.18` (1.18/1.19/1.20). Supported Erlang/OTP majors: **27, 28, 29** —
 enforced by the repository itself at config load, before anything compiles
-([ADR 0031](docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md)). The
+(ADR 0031). The
 platform contract is **developer portability** — a contributor on macOS or Linux can
 clone, `deps.get`, compile, and test this repository — enforced in-repo (portable test support,
 the LF-forcing `.gitattributes`, no POSIX shell inside declared gates); CI itself runs on Linux
 only, one lane per supported major plus the complete-quality lane
-([ADR 0033](docs/adr/0033-developer-portability-ci-scope.md)). Windows developers use WSL2 (clone
+(ADR 0033). Windows developers use WSL2 (clone
 inside the WSL filesystem, not under `/mnt/c`), which is the Linux path; no native-Windows developer
 path is maintained. The full `mix quality` battery is
 POSIX-only tooling (shell gates, Gitleaks, ProVerif, kramdown).

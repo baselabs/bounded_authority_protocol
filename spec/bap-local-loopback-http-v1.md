@@ -27,7 +27,7 @@ the strict Ed25519 rule of [BAP v1 § 14.1](bap-v1.md#strict-ed25519)
 `REQ1-SIGNING-ed25519-scalar-range`, `REQ1-SIGNING-ed25519-cofactorless`). The holder JWK and the trusted issuer key MUST pass key
 acceptance (`REQ1-KEY-ed25519-acceptable`); a failure returns the single closed error. Revision 2
 adds this statement (erratum 2,
-[ADR 0040](../docs/adr/0040-strict-ed25519-soundness-erratum.md)); the profile corpus and its
+ADR 0040); the profile corpus and its
 verdicts are unchanged, and the cases live in the additive strict-Ed25519 corpus.
 
 The profile identity is `bap-application-proof/local-loopback-http/1`. A conforming proof MUST carry

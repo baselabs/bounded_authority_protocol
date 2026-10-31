@@ -11,7 +11,7 @@ verifiers, not additional normative text.
 **None of the three is published to a registry yet.** Install them from this repository by
 local path or Git commit; each README shows how. Each SDK moves to its own repository when it is
 first published, never publishing from this one
-([ADR 0015](../docs/adr/0015-sdk-graduation-and-publish-topology.md)); a pre-commit hook and a
+(ADR 0015); a pre-commit hook and a
 CI job reject registry-publish setup here.
 
 ## What is here
@@ -36,7 +36,7 @@ All four are pure verification libraries (no I/O, clock, randomness, or network 
 They return redacted facts or a single value-free rejection, never an authorization decision.
 Their behavior is defined by the specifications and the corpora; the in-repository SDKs' source
 comments cross-reference the Elixir reference implementation for traceability.
-[ADR 0014](../docs/adr/0014-cross-language-verifier-sdks.md) records the packaging and support
+ADR 0014 records the packaging and support
 decisions.
 
 ## Known gaps
@@ -61,12 +61,12 @@ decisions.
   mandatory nonce, literal `127.0.0.1`/`[::1]` targets only, and mutual rejection with standard
   `dpop+jwt`. Each SDK pins the profile corpus index SHA-256 and runs its 36 URI and 8 proof
   cases.
-- **Role attestations** ([ADR 0036](../docs/adr/0036-role-attestation-profile.md)): the four
+- **Role attestations** (ADR 0036): the four
   attestation surfaces and the 40-case corpus.
-- **Content assertions** ([ADR 0037](../docs/adr/0037-content-assertion-profile.md)):
+- **Content assertions** (ADR 0037):
   verification, both digest functions, pairwise successor checks, the producer, and assembly,
   with the 131 assertion, 9 digest, and 14 successor cases.
-- **Strict Ed25519** ([ADR 0040](../docs/adr/0040-strict-ed25519-soundness-erratum.md)): rule S1
+- **Strict Ed25519** (ADR 0040): rule S1
   at each SDK's single Ed25519 verification point, the `verify_strict`, `acceptable_public_key`,
   and `torsion_free` helpers in the language's naming, and the strict-Ed25519 corpus
   (`bap-strict-ed25519/1`, [`priv/conformance/strict-ed25519`](../priv/conformance/strict-ed25519/),
@@ -106,5 +106,5 @@ Beyond the corpora, each SDK has a permissiveness battery: for every parser clos
 against a host-language trap (duplicate-rejecting decoding, raw numeric-lexeme limits, a single
 value with no trailing content, the integer and float distinction), a test builds the defect
 the closure exists to reject and proves the closure catches it. This applies the
-[ADR 0005](../docs/adr/0005-portable-conformance-corpus-and-verifier-cli.md) independent-runner
+ADR 0005 independent-runner
 discipline per language, covering a class the corpus has no cases for.

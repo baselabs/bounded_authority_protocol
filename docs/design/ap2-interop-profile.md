@@ -51,7 +51,7 @@ registry rows and the published charter text (§10).
   `sdjwt/kb_sd_jwt.py`, `constraints.py`, `payment_mandate_chain.py`,
   `checkout_mandate_chain.py`, `receipt_wrapper.py`, `utils.py`). All OBSERVED.
 - This repository at `3994b4f`: `spec/bap-v1.md`, `spec/bap-v2.md`,
-  `docs/design/successor-major-charter.md`, `docs/adr/0029-budget-window-posture.md`,
+  `docs/design/successor-major-charter.md`, ADR 0029,
   `docs/extensions/ap2-mandate-mapping.md`. All OBSERVED.
 - RFC 9901 §4.3/§4.3.1 (`sd_hash`), fetched from datatracker 2026-09-20. OBSERVED. RFCs 7515,
   7518 §3.4, 7638, 8785, 9449 are cited for their published constructions; none was re-derived
@@ -302,7 +302,7 @@ What this profile can state structurally (all OBSERVED or cited-to-published):
 plus the binding-surface separation above as the constraint any answer must respect. Nothing
 here settles that question. Both have since been settled: the A2A binding by the [A2A
 capability-binding profile](a2a-capability-binding-profile.md), and BAP's UCP riding point by
-[ADR 0034](../adr/0034-ucp-riding-point-scoping.md) (transport-composed; this profile's §6
+ADR 0034 (transport-composed; this profile's §6
 separation is the constraint both respected).
 
 ## 7. Element 5 — Receipt correspondence

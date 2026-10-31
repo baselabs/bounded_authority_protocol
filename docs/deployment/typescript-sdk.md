@@ -5,7 +5,7 @@ The TypeScript verifier is **published to npm as
 and developed in its own repository,
 [`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript).
 SDKs are authored in this repository while unpublished and move to their own repository on first
-publication ([ADR 0015](../adr/0015-sdk-graduation-and-publish-topology.md)); these notes stay
+publication (ADR 0015); these notes stay
 here because this package remains the normative entry point. That repository's README is the
 reference for its API.
 
@@ -14,7 +14,7 @@ local-loopback HTTP proof profile, and the role-attestation and content-assertio
 profiles, with strict Ed25519 verification. It is a **verifier**: it returns redacted facts or a
 single `Invalid` outcome, never an authorization decision. The normative authorities are
 `spec/bap-v1.md`, `spec/bap-v2.md`, `spec/bap-v3.md`, and the profile specifications;
-[ADR 0014](../adr/0014-cross-language-verifier-sdks.md) records the packaging decisions.
+ADR 0014 records the packaging decisions.
 
 ## Install
 

@@ -8,8 +8,7 @@ governs. Links inside the moved text are written relative to the repository root
 
 ## Read first
 
-Before work, read this file, [`README.md`](README.md), [`docs/ROADMAP.md`](docs/ROADMAP.md), the accepted ADRs under
-[`docs/adr/`](docs/adr/), and the stable contracts under [`docs/design/`](docs/design/).
+Before work, read this file, [`README.md`](README.md), [`docs/ROADMAP.md`](docs/ROADMAP.md), the accepted decision records, and the stable contracts under [`docs/design/`](docs/design/).
 
 When local process artifacts exist, they are implementation aids, not the remote cold-start
 authority. The tracked roadmap, ADR, protocol charter, threat model, and conformance contract
@@ -33,7 +32,7 @@ additive certified `bap-producer-canonicality/1` corpus (`priv/conformance/produ
 `der_to_raw/1`). The Python, Go, Rust, and TypeScript units of erratum 3 are open.
 
 Release 0.8.0 is the strict Ed25519 verification soundness repair
-([ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md), erratum 2): rule S1 (canonical
+(ADR 0040, erratum 2): rule S1 (canonical
 point encodings, no small-order key or `R`, `S < L`, the cofactorless equation) on every Ed25519
 surface, owned by the public `BoundedAuthorityProtocol.Ed25519` (`verify_strict/3`,
 `acceptable_public_key?/1`, `torsion_free?/1`), with the additive certified strict-Ed25519 corpus
@@ -63,16 +62,16 @@ released in 0.6.0 with both consumption receipts recorded), and the content-asse
 binding of an exact content digest to issuer, audience, lineage subject, semantic profile,
 window, and predecessor, with `BoundedAuthorityProtocol.ContentAssertion.V1`, its certified
 131/9/14-case corpus, and `REQ-CA1-*` ids). See
-[ADR 0030](docs/adr/0030-v2-contract-major-activation.md),
-[ADR 0035](docs/adr/0035-es256-contract-major-activation.md),
-[ADR 0036](docs/adr/0036-role-attestation-profile.md),
-[ADR 0037](docs/adr/0037-content-assertion-profile.md), [`spec/bap-v1.md`](spec/bap-v1.md),
+ADR 0030,
+ADR 0035,
+ADR 0036,
+ADR 0037, [`spec/bap-v1.md`](spec/bap-v1.md),
 [`spec/bap-v2.md`](spec/bap-v2.md), [`spec/bap-v3.md`](spec/bap-v3.md),
 [`spec/bap-role-attestation-v1.md`](spec/bap-role-attestation-v1.md), and
 [`spec/bap-content-assertion-v1.md`](spec/bap-content-assertion-v1.md).
 
 Unpublished cross-language verifier SDKs are authored under [`sdks/`](sdks/)
-([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)): Python
+(ADR 0014): Python
 (`bounded-authority-verifier`), Rust
 (`bounded-authority-protocol`, BAP-15), and Go (`bounded_authority_protocol_go`, BAP-16) — each
 reimplements the frozen profiles from the specs and corpora alone, passes the certified v1, v2,
@@ -80,7 +79,7 @@ and v3 vectors plus the loopback, role-attestation, and content-assertion profil
 every corpus index
 SHA-256 asserted at load, and ships a red-capable per-language
 permissiveness mutation gate. None of these three is published to a registry. Per
-[ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md), each graduates to its own per-SDK
+ADR 0015, each graduates to its own per-SDK
 repository on first publication, and the `sdk-publish-guard` pre-commit hook and CI job reject
 registry-publish infrastructure in this monorepo. The TypeScript SDK was the first to graduate
 (2026-09-14): it is published to npm as
@@ -92,14 +91,14 @@ this monorepo; a corpus rotation is a snapshot-bump commit in that repository.
 
 Design-carrying slices (all zero wire-behavior change on the closed v1 profile): BAP-11
 (cryptographic-suite succession and cross-suite evidence longevity,
-[ADR 0009](docs/adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md)),
+ADR 0009),
 BAP-14 (delegation with attenuation,
-[ADR 0010](docs/adr/0010-delegation-with-attenuation.md)), BAP-08 (the MCP capability-authorization
+ADR 0010), BAP-08 (the MCP capability-authorization
 extension drafts under `docs/extensions/`,
-[ADR 0013](docs/adr/0013-capability-authorization-extension.md)), BAP-13 (published governance,
+ADR 0013), BAP-13 (published governance,
 [docs/governance.md](docs/governance.md)), and BAP-17 (the reserved `ba_offline` floor-limit claim
 and its activating-major mechanism,
-[ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)). The BAP-15 hardening-arc contracts are
+ADR 0016). The BAP-15 hardening-arc contracts are
 recorded in ADR 0017 (the inter-SDK behavioral contract), ADR 0018 (the SDK bounds contract), and
 ADR 0019 (corpus-artifact distribution), ADR 0020 (bounds-aware assembly and issuer-mediated
 reauthorization posture), ADR 0021 (the v1 `all` selector recognized-shapes erratum), ADR 0022
@@ -108,7 +107,7 @@ ADRs are 0001–0037 and 0040 (ADR 0040 is the strict Ed25519 soundness erratum;
 are reserved for designs not yet accepted; ADR 0035 activates the ES256 contract-major 3 suite; ADR 0036 adds the
 role-attestation sibling profile; ADR 0037 adds the content-assertion sibling profile; ADR 0029 records the cumulative-budget posture and explicitly defers the
 `ba+budget-window` attestation-shape design; ADR 0034 decides the UCP riding point as
-transport-composed) under [`docs/adr/`](docs/adr/). BAP-19's source identity is fixed by
+transport-composed). BAP-19's source identity is fixed by
 `v0.3.0`; the registry publication and checksum read-back closed 2026-08-31, and downstream
 immutable-package adoption is tracked in the private runtime.
 

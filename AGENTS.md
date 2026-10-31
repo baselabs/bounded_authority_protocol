@@ -5,7 +5,7 @@
 - Status: [`docs/ROADMAP.md`](docs/ROADMAP.md) and [`CHANGELOG.md`](CHANGELOG.md).
 - Wire formats and verification: the normative specs under [`spec/`](spec/), the protocol
   charter, threat model and conformance contract under [`docs/design/`](docs/design/), and the
-  ADR for the surface under [`docs/adr/`](docs/adr/).
+  local decision records under `.kimosabe/adr/` (gitignored; never packaged or published).
 - Verifier SDKs: [`sdks/README.md`](sdks/README.md), ADR 0014 and ADR 0015.
 - Earlier state narratives and superseded instructions:
   [`docs/reference/agent-history.md`](docs/reference/agent-history.md).

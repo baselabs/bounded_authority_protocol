@@ -5,7 +5,7 @@ defmodule BoundedAuthorityProtocol.V2 do
 
   The v2 profile is byte-distinct from v1: grant and proof payloads carry `v: 2`,
   domain separators are `BAP2-*`, and the selector algebra admits the two
-  inclusive range kinds `lte`/`gte` ([ADR 0028](../docs/adr/0028-range-selector-kinds.md)).
+  inclusive range kinds `lte`/`gte` (ADR 0028).
   Each major verifies under its own complete closed profile; the v1 façade
   rejects v2 bytes and this façade rejects v1 bytes.
 

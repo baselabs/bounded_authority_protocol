@@ -58,7 +58,7 @@
 - strict Ed25519 verification on every Ed25519 surface (canonical point encodings, small-order
   rejection, `S < L`, and the cofactorless equation), key acceptance at every key-bearing input and
   producer, and the host torsion-free check at enrollment, trust install, and deny-list comparison
-  ([ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md));
+  (ADR 0040);
 - official and independent public-only vectors, exact two-way key-census equality, meaningful-byte
   tamper, duplicate/encoding, property/fuzz, timing/allocation, and source-isolated mutation-red
   gates;

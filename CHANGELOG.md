@@ -113,7 +113,7 @@ certified corpus changes.
 ## [0.8.0] — 2026-10-13
 
 The strict Ed25519 verification release: a soundness repair (erratum 2,
-[ADR 0040](docs/adr/0040-strict-ed25519-soundness-erratum.md)). Upgrade from every earlier
+ADR 0040). Upgrade from every earlier
 release; see the security advisory for affected versions and details.
 
 ### Security
@@ -378,7 +378,7 @@ found by the profile corpus's ES256 confusion case.
   (`{crv,kty,x,y}`) with RFC 7638 thumbprints, 65-byte uncompressed-SEC1 raw keys,
   `BAP3-*` domain separators, payload `v: 3`, and the five-kind selector algebra inherited
   from v2. Each major verifies under its own complete closed profile; v1 and v2 reject v3
-  bytes and v3 rejects v1 and v2 bytes ([ADR 0035](docs/adr/0035-es256-contract-major-activation.md)).
+  bytes and v3 rejects v1 and v2 bytes (ADR 0035).
 - `spec/bap-v3.md` — the normative v3 profile; the certified v3 corpus
   (`priv/conformance/v3/corpus`, 292 cases across 28 surfaces, revision 1) verifies 292/292
   through the CLI with its index SHA-256 pinned in the major-keyed certified map. The
@@ -400,7 +400,7 @@ found by the profile corpus's ES256 confusion case.
 
 ### Added — UCP riding-point decision (ADR 0034) and A2A venue extension draft (no wire or API change)
 
-- `docs/adr/0034-ucp-riding-point-scoping.md` (resolution of the open question
+- ADR 0034 (resolution of the open question
   both interop profiles recorded; UCP read first-hand at pinned `d3ccb55`): the riding point is
   transport-composed — UCP's A2A transport is covered as-is by the A2A binding profile for
   deployments speaking A2A 1.0 (UCP's published A2A binding is at 0.3-era shapes —
@@ -483,7 +483,7 @@ found by the profile corpus's ES256 confusion case.
 - `docs/extensions/capability-authorization.mdx` § 5: the selector-expressiveness paragraph is
   scoped to contract-major 1 (this draft binds `v` exactly `1`) and points at the contract-major
   2 range kinds; the budget-routing sentence now cites ADR 0029.
-- ADR 0029 added (`docs/adr/0029-budget-window-posture.md`): the cumulative-budget posture is
+- ADR 0029 added (ADR 0029): the cumulative-budget posture is
   consolidated as citable law — no cumulative selector kind in any major; enforcement routes to
   issuer attestation or runtime accounting — and the `ba+budget-window` attestation-shape design
   is explicitly deferred (no wire name reserved, no shape specified, no code change). The
@@ -501,7 +501,7 @@ found by the profile corpus's ES256 confusion case.
   docker tags). The assert is not shipped in the Hex package (`files:` excludes `config/`), so
   consumers enforce their own. OBSERVED: Elixir 1.19.6/OTP 26 and 1.18.4/OTP 25 refuse with the
   assert message in throwaway docker copies; Elixir 1.17.3/OTP 27 refuses with Mix's declared-range
-  error; 1.18.4/OTP 27 compiles green under `MIX_ENV=test` ([ADR 0031](docs/adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md)).
+  error; 1.18.4/OTP 27 compiles green under `MIX_ENV=test` (ADR 0031).
 - Lockstep rule recorded in mix.exs: the declared Elixir range (`~> 1.18`, unchanged), the config
   supported-OTP set, `.tool-versions`, and the CI compatibility lanes move together in one commit.
 - `.tool-versions` now declares the test battery's Node dependency (`nodejs 22.23.1`, matching the
@@ -525,7 +525,7 @@ found by the profile corpus's ES256 confusion case.
   fails the gate naming the packages; resolver-rejected updates are reported with requirement
   chains; no rendered table is an unverified state and fails. OBSERVED: green on the current lock;
   a fabricated dialyxir revert in a scratch copy exits 1 naming dialyxir; the no-table path exits 1
-  ([ADR 0032](docs/adr/0032-dependency-currency-gate.md)).
+  (ADR 0032).
 - Lock updated to the resolvable latest: dialyxir 1.4.8, ex_doc 0.40.4, ex_json_pointer 0.8.0.
   `jsonschex` stays `~> 0.9.2` with an inline reason (0.10 is a major jump pending review against
   the certified corpus schema gates).
@@ -598,7 +598,7 @@ found by the profile corpus's ES256 confusion case.
 ### Added — v2 contract-major: `lte`/`gte` range selector kinds activated (BAP-21, ADR 0030)
 
 - Add the successor contract-major 2 profile per the successor-major charter activation
-  checklist and [ADR 0028](docs/adr/0028-range-selector-kinds.md): payload `v: 2`, the
+  checklist and ADR 0028: payload `v: 2`, the
   `BAP2-Ed25519-SHA256` suite under the major-bound naming scheme, `BAP2-REQUEST\0` /
   `BAP2-CHAIN\0` / `BAP2-ARCHIVE\0EXPORT\0` domain separators, and the two inclusive
   one-sided selector kinds `lte`/`gte` (same-tag numeric operands, inclusive comparison on
@@ -628,7 +628,7 @@ found by the profile corpus's ES256 confusion case.
   `v2-request-digest-prefix-downgraded`).
 - Registries: `lte`/`gte` flip reserved → active (v2); the suite table gains
   `BAP2-Ed25519-SHA256`; the anticipated ML-DSA family's index moves to the next successor
-  major. [ADR 0030](docs/adr/0030-v2-contract-major-activation.md) records the activation,
+  major. ADR 0030 records the activation,
   the inherited-bounds review, and the named follow-ups.
 
 ### Closed — 0.4.0 publication record
@@ -1301,18 +1301,18 @@ several note findings, all in surfaces this program touched. All fixed:
   primitive; `/2` remains exactly `/3` with profile maxima. Native tests cover byte equality for
   grant, proof, boundary-anchor, and key-transition compacts; tightened encoded-segment and final-
   compact rejection; and continued rejection of `ba_dlg` / `ba+cap-delegated` in current v1.
-  [ADR 0020](docs/adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md) records that
+  ADR 0020 records that
   a private authority may issue an independently valid, narrower current-v1 grant to a new holder,
   while lineage remains runtime-only and portable holder-signed delegation remains successor-major.
 
 - **The SDK contract ADRs (BAP-15 documentation slice).** Three new accepted ADRs record contracts
-  that had shipped as code + ROADMAP evidence amendments only: [ADR 0017](docs/adr/0017-inter-sdk-behavioral-contract.md)
+  that had shipped as code + ROADMAP evidence amendments only: ADR 0017
   (the inter-SDK behavioral contract the 17-round cross-vendor hardening arc converged on — closed
   Result surface, type strictness, pre-hash validation, canonical-form byte equality +
-  signature-width gates, role-bounded frame reads), [ADR 0018](docs/adr/0018-sdk-bounds-contract.md)
+  signature-width gates, role-bounded frame reads), ADR 0018
   (the caller-tightenable bounds contract through the expected structs, including the
   nested-pins identity semantics and the named `assemble_compact` maximum-bounds divergence), and
-  [ADR 0019](docs/adr/0019-corpus-artifact-distribution.md) (ADR 0015 Decision 6's deferred
+  ADR 0019 (ADR 0015 Decision 6's deferred
   corpus-artifact question settled: per-SDK binding until the first SDK graduation, on the traced
   two-SDK bump-amplitude evidence). Fact corrections in the same landing: ADR 0014's Node floor
   corrected to >= 22 (raised at `d9df0bf` on Node 20 EOL) and its `@noble/curves` "optional
@@ -1433,7 +1433,7 @@ several note findings, all in surfaces this program touched. All fixed:
   grant-payload claim name in the [registries](docs/design/registries.md) (issuer-set offline
   floor limits: maximum value with explicit currency, maximum offline use count, offline-window
   expiry — a closed nested object; absence means online-only, per
-  R-BAP-1). [ADR 0016](docs/adr/0016-offline-eligible-grant-claims.md)
+  R-BAP-1). ADR 0016
   carries the activating-major mechanism to spec quality: the closed `{cnt, cur, max, win}` object,
   the non-authorizing facts contract (an `offline_eligible` flag + `win` only — magnitudes are read
   from the decoded grant, not redacted facts), malformed⇒`:invalid` (online-only is the *absent*
@@ -1512,10 +1512,10 @@ several note findings, all in surfaces this program touched. All fixed:
   TypeScript base64url) rebind to the new `index.json`; the vector manifest's canonical fingerprint
   set grows 19→22 and the corpus partition 8→11.
 - Record the SDK graduation and publish-topology decision: cross-language verifier SDKs are
-  authored under `sdks/` (per [ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)) but each
+  authored under `sdks/` (per ADR 0014) but each
   graduates to its own per-SDK repository (`bounded_authority_protocol_<lang>`) on first
   publication; the decision boundary is publication irreversibility, not SDK count
-  ([ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md)). Zero wire byte, bound, or
+  (ADR 0015). Zero wire byte, bound, or
   verdict change.
 - Ship the ADR 0015 enforcement layer: a tracked pre-commit hook
   (`scripts/hooks/pre-commit`, single pattern source `scripts/check_sdk_publish_infra.sh`, installed
@@ -1527,11 +1527,11 @@ several note findings, all in surfaces this program touched. All fixed:
   `git commit --no-verify`.
 - Add ROADMAP rows BAP-15 (Rust verifier SDK) and BAP-16 (Go verifier SDK) — typed reimplementations
   of the frozen v1 profile from spec + corpus alone, authored under `sdks/` and graduating per
-  [ADR 0015](docs/adr/0015-sdk-graduation-and-publish-topology.md). Post-1.0 rows; no code shipped.
+  ADR 0015. Post-1.0 rows; no code shipped.
 - Ship cross-language verifier SDKs (TypeScript `@bounded-authority/verifier` + Python
   `bounded-authority-verifier`) under `sdks/` — typed reimplementations of the frozen v1 profile from
   the spec + corpus alone, with no code-level derivation from the Elixir reference
-  ([ADR 0014](docs/adr/0014-cross-language-verifier-sdks.md)). Each passes all 283 conformance vectors
+  (ADR 0014). Each passes all 283 conformance vectors
   (recomputed from scratch), asserts the corpus `index.json` SHA at startup, and proves every
   permissiveness closure red-capable via a per-language mutation-gate. They are verifiers, not
   authority runtimes (no key selection, replay reservation, or execution grant). NOT in the Hex
@@ -1541,7 +1541,7 @@ several note findings, all in surfaces this program touched. All fixed:
 - Draft the capability-authorization extension as a pre-submission package for the MCP
   experimental-extension track (`docs/extensions/` — a draft `.mdx`, a draft
   Extensions-Track SEP, and an Agent Payments Protocol (AP2) mandate-mapping note;
-  [ADR 0013](docs/adr/0013-capability-authorization-extension.md)), documenting the already-normative
+  ADR 0013), documenting the already-normative
   v1 protocol. Identifier `io.bounded-authority/capability-authorization`. Partial conformance to the
   MCP official-submission bar (SEP-2133); official submission is gated on external preconditions
   (a reference implementation in an official MCP SDK, a working group + Extension Maintainers +
@@ -1551,7 +1551,7 @@ several note findings, all in surfaces this program touched. All fixed:
   change.
 - Publish the governance policy (change classes, change-control triggers, errata no-verdict-flip
   prohibition, deprecation windows, security-release handling) as a standalone normative project
-  document ([docs/governance.md](docs/governance.md); [ADR 0011](docs/adr/0011-published-governance.md))
+  document ([docs/governance.md](docs/governance.md); ADR 0011)
   — a companion republication of the charter § Governance, which remains the authoritative source.
   [SECURITY.md](SECURITY.md) cross-references the verdict-change rule; the
   [errata registry](docs/errata.md) header retargets to governance.md as the published policy home;
@@ -1562,7 +1562,7 @@ several note findings, all in surfaces this program touched. All fixed:
   minimum (`REQ1-EVO-deprecation-window-minimum`) is scoped to planned deprecations, and a security
   contract-major (one remediating a verdict-changing vulnerability) is exempt — its accelerated
   overlap window is published at announcement, proportional to severity, and a deployment-decided
-  sunset, never a silent change ([ADR 0012](docs/adr/0012-security-release-accelerated-deprecation-window.md);
+  sunset, never a silent change (ADR 0012;
   charter § The evolution contract + § Governance; [governance.md](docs/governance.md) re-synced).
   Deployment-policy refinement only — zero wire byte, bound, or verdict change.
 
@@ -1798,7 +1798,7 @@ several note findings, all in surfaces this program touched. All fixed:
 - Close BAP-06: lock the 0.1.0 release-candidate public API surface (enumerated in the
   [release-candidate contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/release-candidate-contract.md) and enforced by the
   `@compiled_export_allowances` architecture-gate pin;
-  [ADR 0008](docs/adr/0008-release-candidate-contract.md)),
+  ADR 0008),
   add the `release.candidate` reproducibility gate (two cache-isolated builds, byte-equal SHA-256,
   wired into `mix quality`), and author the candidate-facing docs (release-candidate-contract.md,
   SECURITY.md, CHANGELOG `[0.1.0]`, README). Zero wire byte, bound, or verdict change. Published

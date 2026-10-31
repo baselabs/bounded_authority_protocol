@@ -203,7 +203,7 @@ rejection in both directions.
 
 Every Ed25519 surface uses one rule, specified in
 [`spec/bap-v1.md` § 14.1](../../spec/bap-v1.md#strict-ed25519) and decided in
-[ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md). Put it at your single Ed25519
+ADR 0040. Put it at your single Ed25519
 verification point, ahead of the backend call:
 
 1. Reject a non-canonical `A` or `R`: the low 255 bits read as `y >= p`, or one of the two

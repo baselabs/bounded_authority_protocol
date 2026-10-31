@@ -19,7 +19,7 @@ the Elixir reference implementation for traceability.
 
 **Not published.** The crate is not on crates.io; the name `bounded-authority-protocol` is the
 one it will use. It moves to its own repository when it is first published
-([ADR 0015](../../docs/adr/0015-sdk-graduation-and-publish-topology.md)). Until then, depend on
+(ADR 0015). Until then, depend on
 a checkout of this repository.
 
 - Rust **1.81** or later (`rust-version` in `Cargo.toml`; `rust-toolchain.toml` pins 1.81 for
@@ -218,7 +218,7 @@ you need by name.
 ## Strict Ed25519
 
 Every Ed25519 signature check goes through one function (`ed25519::verify`, internal) that
-applies rule S1 of [ADR 0040](../../docs/adr/0040-strict-ed25519-soundness-erratum.md) before
+applies rule S1 of ADR 0040 before
 the `ed25519-dalek` backend: exact widths, canonical `A` and `R`, neither of small order,
 `S < L`, then the cofactorless equation (dalek's `verify`, not its `verify_strict`).
 `acceptable_public_key` is the key-entry check (canonical, not small order, on the curve), and

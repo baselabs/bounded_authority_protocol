@@ -7,7 +7,7 @@ defmodule BoundedAuthorityProtocol.V3 do
   `v: 3`, protected headers carry `alg: "ES256"`, the proof key is the EC P-256
   JWK, domain separators are `BAP3-*`, and signatures are the RFC 7518 §3.4 raw
   `r || s` form with the low-S canonicality rule
-  ([ADR 0035](../docs/adr/0035-es256-contract-major-activation.md)). Each major
+  (ADR 0035). Each major
   verifies under its own complete closed profile; the v1 and v2 façades reject
   v3 bytes and this façade rejects v1 and v2 bytes.
 

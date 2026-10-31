@@ -5,7 +5,7 @@ This map traces every normative `REQ-LLH1-*` requirement in
 evidence or an explicit downstream/release gate. The certified profile corpus is revision 1 at
 `priv/conformance/application-profiles/local-loopback-http/v1`.
 
-Strict Ed25519 verification (erratum 2, [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)):
+Strict Ed25519 verification (erratum 2, ADR 0040):
 the profile's signature and key checks follow the strict rule of
 [`spec/bap-v1.md` § 14.1](../../spec/bap-v1.md#strict-ed25519). Its requirements keep their
 contract-major ids (`REQ1-SIGNING-ed25519-canonical-point`,

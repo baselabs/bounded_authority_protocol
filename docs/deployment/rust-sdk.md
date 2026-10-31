@@ -10,7 +10,7 @@ has the quickstart and the full API list.
 ## Not published yet
 
 The crate is not on crates.io. It moves to its own repository when it is first published
-([ADR 0015](../adr/0015-sdk-graduation-and-publish-topology.md)). Until then, depend on this
+(ADR 0015). Until then, depend on this
 repository by path or by Git commit:
 
 ```toml
@@ -39,7 +39,7 @@ targets, require the server nonce, and never infer or retry the standard profile
 ## Strict Ed25519 verification
 
 Every Ed25519 verification in the SDK applies rule S1 of
-[ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md) at its single Ed25519 verification
+ADR 0040 at its single Ed25519 verification
 point: canonical point encodings, no small-order key or `R`, a scalar below the group order, and
 the cofactorless equation. Key import, JWK encode and decode, and thumbprint functions refuse a
 key that fails key acceptance. Call `torsion_free` at key enrollment, at trust install, and

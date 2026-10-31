@@ -2,7 +2,7 @@
 
 ## Content-assertion contract work
 
-[ADR 0037](adr/0037-content-assertion-profile.md) defines the independently judged
+ADR 0037 defines the independently judged
 standalone signed-content sibling. Completion requires the closed reference API,
 all independent SDK surfaces, a certified corpus and mutation evidence, real companion
 signing plus independent consumption, package qualification, and separate release
@@ -21,7 +21,7 @@ package: consumer acceptance.
 > **Beamline deprecation — September 21, 2026.** Beamline names and test counts in the closeout evidence below refer to a retired private consumer. They remain historical receipts, not current integration requirements or proof of its successor. Public protocol semantics and package independence are unchanged; the package acquires no host-runtime dependency.
 
 **Status authority:** this file
-**Architecture authority:** `docs/adr/0001-public-protocol-verifier-boundary.md` and
+**Architecture authority:** ADR 0001 and
 `docs/design/`
 **Implementation authority:** `spec/`, `lib/`, `priv/conformance/`, and `test/`, interpreted under
 the accepted ADRs and stable design contracts
@@ -33,31 +33,31 @@ compatibility.
 
 | ID | What | Acceptance | Depends | Why |
 |---|---|---|---|---|
-| BAP-00 | **Public authority boundary** — Public repository, Apache-2.0 license, public/private boundary, tracked architecture, and cold-start authority, slug:bap-00 | Evidence recorded below | — | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) |
-| BAP-01 | **Pure Mix package** — Mix package scaffold, pure-library architecture test, quality aliases, public CI, and package inspection, slug:bap-01 | Evidence recorded below | BAP-00 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) |
-| BAP-02 | **Normative bounded parsing** — Normative v1 tables, bounded ordered decoder, strict base64url, and untrusted key locator, slug:bap-02 | Evidence recorded below | BAP-01 | [ADR 0002](adr/0002-normative-v1-parsing-profile.md) |
-| BAP-03 | **Grant and holder-proof verification** — Standard compact EdDSA grant and RFC 9449 DPoP production, bounded decode, standalone raw-grant verification, and combined raw-envelope verification, slug:bap-03 | Official and independently verified public-only vectors; exact key census; meaningful-byte tamper matrix; timing/allocation bounds; value-bearing redacted non-authorizing facts; no trust-selection or forgeable-intermediate path | BAP-02 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md), [ADR 0003](adr/0003-standard-jws-and-verified-grant-results.md), and the [normative v1 profile](protocol-v1.md) |
-| BAP-04 | **Chain and historical-key verification** — Consumption-chain, anchor, archive, and historical public-key verification, slug:bap-04 | Rollover, truncation, reorder, omission, archive-coverage, and tamper vectors pass independently | BAP-03 | [ADR 0004](adr/0004-consumption-chain-rollover-and-anchored-export-verification.md) and the [normative v1 profile](protocol-v1.md) |
-| BAP-05 | **Portable conformance** — Language-neutral conformance corpus, verifier CLI, and property, fuzz, and mutation gates, slug:bap-05 | A second implementation consumes only published artifacts and agrees on every valid and invalid vector | BAP-04 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
-| BAP-06 | **Release-candidate contract** — Stable public API, guides, security policy, documentation, immutable release-candidate archive, and automation, slug:bap-06 | SemVer/API review; docs; reproducible candidate archive; unpacked consumer; checksum/SBOM/provenance gates; not yet published | BAP-05 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
-| BAP-07 | **Connected verification and release** — Connected verification and first public release, slug:bap-07 | Exact candidate passes the private-runtime PostgreSQL 18 gate (the private runtime's ADR 0010 retired the 16/17/18 matrix) and private-consumer connected gates; full public quality/conformance; fresh correctness, security, gate-integrity, and independent reviews; publish that exact archive with zero open findings | BAP-06, BAP-10, BAP-11, private BA-14 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md), [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md), and the [conformance contract](design/conformance-contract.md) |
-| BAP-08 | **Capability-authorization extension proposal** — Draft capability-authorization extension for the MCP `modelcontextprotocol/ext-auth` extensions repository plus an AP2 mandate-mapping note, documenting the already-normative v1 protocol (no wire-format, limit, or verification-rule change), slug:bap-08 | Extension document conforms to the ext-auth repository's submission requirements (closed on **partial** conformance — every in-repo-reachable requirement met; full official-track conformance gated on external preconditions [reference SDK, WG + Extension Maintainers + sponsor, SEP acceptance, IANA registration]; see [ADR 0013](adr/0013-capability-authorization-extension.md) and the BAP-08 closeout evidence below); every referenced mechanism cites the [normative v1 profile](protocol-v1.md) (nothing normative is introduced outside it); the AP2 note maps mandate↔grant correspondences without claiming compatibility not yet verified; its own ADR lands before any external submission | BAP-04 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) |
-| BAP-09 | **Cross-language verifier SDKs** — Thin TypeScript and Python verifier SDKs consuming only the published spec, vectors, and conformance corpus (client libraries of the extension; independent second implementations by design), slug:bap-09 | Each SDK passes every valid and invalid published vector; spec + vectors are the only inputs (no code-level derivation from the Elixir implementation); its own ADR at authoring covers packaging and support surface | BAP-05 | [ADR 0001](adr/0001-public-protocol-verifier-boundary.md) and the [conformance contract](design/conformance-contract.md) |
-| BAP-10 | **Evolution contract and normative conformance language** — RFC 2119/8174 rewrite of the normative profile with stable requirement identifiers, plus the evolution-contract sections (self-declaration, parallel-major support, deprecation windows) and registry reconciliation, slug:bap-10 | Every MUST maps to at least one conformance applicability cell (surface × class) or a named falsifiable gap, with the mapping published; no wire byte, bound, or verdict changes; [standards-track.md](design/standards-track.md) and [registries.md](design/registries.md) reconciled against the rewritten profile | BAP-05 | [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) and the [standards track charter](design/standards-track.md) |
-| BAP-11 | **Cryptographic suite identity and evidence longevity** — Suite naming made explicit throughout the docs, the ML-DSA successor-suite path outlined, and the cross-suite countersignature design for aged evidence carried to ADR quality, slug:bap-11 | Suite identity stated in the normative profile and registries with zero wire change; the countersignature design specifies verification of archives whose original suite is no longer trusted, reusing the authenticated key-transition mechanism; reviewed as a design, not implemented | BAP-04 | [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) and the [standards track charter](design/standards-track.md) |
-| BAP-12 | **IANA registration templates** — Registration templates for the `ba_*` JWT claims and `ba+*` media-type values, ready to file at first external submission, slug:bap-12 | Templates conform to the target registries' submission formats; claims/values match [registries.md](design/registries.md) exactly, including reserved entries marked as such; filing itself is coordinated with the BAP-08 submission | BAP-08 | [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) |
-| BAP-13 | **Published governance** — Change-control, errata, deprecation, and security-release policy published as normative project documents, slug:bap-13 | Change classes, comment-window and change-control-group triggers, the errata verdict-flip prohibition, and the deprecation windows are published verbatim from the charter; SECURITY.md cross-references them; the errata registry is live | BAP-05 | [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) and the [standards track charter](design/standards-track.md) |
-| BAP-14 | **Delegation-with-attenuation contract design** — The chained attenuated-grant design (parent-hash binding via reserved `ba_dlg`, attenuation-only subset rules over the existing conjunctive selector algebra, no caveat DSL) carried to a full successor-contract specification, slug:bap-14 | Complete claim schema, chain-verification algorithm with depth bounds, and subset-decision rules specified; attenuation proven decidable against the existing selector algebra; explicitly no change to the current contract-major's bytes or verdicts; its ADR supersedes nothing and activates nothing | BAP-10 | [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) and the [standards track charter](design/standards-track.md) |
-| BAP-15 | **Rust verifier SDK** — A typed Rust verifier SDK reimplementing the frozen v1 profile from spec + corpus alone (no code-level derivation from the Elixir reference), authored under `sdks/rust/` and graduating to a per-SDK repository on first publication ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)), slug:bap-15-rust-sdk | Passes all 283 conformance vectors from a vendored corpus snapshot with startup SHA-256 assertion; per-language permissiveness mutation-gate (duplicate-reject, null-prototype-equivalent, raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction) each proven red-capable; purity lint (no I/O/clock/RNG/network in the library path); dependency-license gate; a deployment guide covering AWS Lambda (`provided.al2023`) and PostgreSQL `plrust` binding; NOT in the Hex `files:` list | BAP-05, BAP-09 | [ADR 0014](adr/0014-cross-language-verifier-sdks.md) and [ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md) |
-| BAP-16 | **Go verifier SDK** — A typed Go verifier SDK reimplementing the frozen v1 profile from spec + corpus alone (stdlib `crypto/ed25519` + `crypto/sha256`, zero crypto dependencies), authored under `sdks/go/` and graduating to a per-SDK repository on first publication ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)), slug:bap-16-go-sdk | Passes all 283 conformance vectors from a vendored corpus snapshot with startup SHA-256 assertion; per-language permissiveness mutation-gate (duplicate-reject, raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction) each proven red-capable; purity vet (no I/O/clock/RNG/network in the library path); dependency-license gate; NOT in the Hex `files:` list | BAP-05, BAP-09 | [ADR 0014](adr/0014-cross-language-verifier-sdks.md) and [ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md) |
-| BAP-17 | **Offline-eligible grant claims (reserve + specify)** — Reserve the `ba_offline` floor-limit claim name and carry the activating-major mechanism to ADR quality (the closed v1 profile rejects the name today; activation is a successor contract-major), slug:bap-17 | `ba_offline` reserved in [registries](design/registries.md); [ADR 0016](adr/0016-offline-eligible-grant-claims.md) specifies the closed `{cnt, cur, max, win}` object, the facts contract (flag + `win` only; magnitudes from the decoded grant), malformed⇒`:invalid`, the `max × cnt` wire-layer ceiling, the `ba_dlg` attenuation composition, and the freshness scoping; the R-BAP-2 legacy-rejection tripwire is red-capable; **zero wire-behavior change** — `git diff <base>..HEAD -- lib/ docs/protocol-v1.md priv/conformance/` is empty (mirror BAP-11/BAP-14; the cross-implementation corpus vector is deferred to the activating major per ADR 0010:286-289) | BAP-10 | [ADR 0016](adr/0016-offline-eligible-grant-claims.md), [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md), and the offline requirements input (relocated out of the tracked tree 2026-09-22; ADR 0016 is the mechanism of record) |
-| BAP-18 | **Bounds-aware assembly and issuer-mediated reauthorization posture** — Expose caller bounds on compact assembly and define the current-major boundary between ordinary issuer-signed child grants and successor-major portable delegation, slug:bap-18 | `assemble_compact/3` delegates to the existing bounded runtime primitive; `/2` remains the byte-identical profile-maximum default; all four signing kinds enforce tightened segment/final-compact bounds; the facade export lock and unpacked consumer exercise both arities; `ba_dlg` and `ba+cap-delegated` remain rejected | BAP-06, BAP-14, BAP-15 | [ADR 0020](adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md), [ADR 0010](adr/0010-delegation-with-attenuation.md), and [ADR 0018](adr/0018-sdk-bounds-contract.md) |
-| BAP-19 | **Byte-distinct local-loopback HTTP application proof** — Add an explicit application-proof profile for direct literal-loopback development listeners without changing standard `dpop+jwt` bytes or verdicts, slug:bap-19-local-loopback-http | Accepted ADR + normative profile; separate five-surface APIs in Elixir and all four SDKs; certified secret-free language-neutral corpus with cross-profile and meaningful-byte rejects; real `127.0.0.1` and `::1` HTTP exchanges with ephemeral in-memory keys; full legacy corpus remains unchanged; fresh blocking reviews close; exact source/corpus identity is published before any adopter consumes it | BAP-18 | [ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md), [local-loopback profile](../spec/bap-local-loopback-http-v1.md), and [profile requirement map](design/local-loopback-http-requirement-map.md) |
-| BAP-21 | **v2 contract-major activation — `lte`/`gte` range selector kinds** — Execute the ADR 0028 activating-major obligations under the successor-major charter checklist: the complete v2 closed profile, its certified corpus, REQ2-* traceability, the four-SDK re-verification, and the registries flip, slug:bap-21 | `BoundedAuthorityProtocol.V2` namespace + [`spec/bap-v2.md`](../spec/bap-v2.md) + [ADR 0030](adr/0030-v2-contract-major-activation.md) land together; the v2 corpus (268 cases, 28 surfaces, certified index `6de6289b…f13d0`) verifies 268/268 through the CLI and all four SDKs with the digest pinned; six new mutation-battery entries executed RED with proofs recorded in the [requirement map](design/requirement-map.md) § v2; `lte`/`gte` active in registries; v1 byte-frozen with its certified pin unchanged | — | [ADR 0028](adr/0028-range-selector-kinds.md), [ADR 0030](adr/0030-v2-contract-major-activation.md), and the [successor-major charter](design/successor-major-charter.md) |
-| BAP-22 | **ES256 contract-major activation — the `BAP3-ES256-SHA256` suite** — Execute the ADR 0035 activating-major obligations under the successor-major charter checklist: the complete v3 closed profile (ECDSA P-256/SHA-256, RFC 7518 §3.4 raw `r\|\|s` signatures with low-S canonicality, EC JWKs and RFC 7638 thumbprints, uncompressed-SEC1 raw keys), its certified corpus, REQ3-* traceability, the SDK cohort, and the registries flip, slug:bap-22 | `BoundedAuthorityProtocol.V3` namespace + [`spec/bap-v3.md`](../spec/bap-v3.md) + [ADR 0035](adr/0035-es256-contract-major-activation.md) land together; the v3 corpus (292 cases, 28 surfaces, revision 1, certified index `pcgHXnU0…mQzw` — the repaired-and-re-certified pin after the coverage-gate certification repair; full value pinned in the CLI's major-keyed map) verifies 292/292 through the CLI with the digest pinned; six verdict-provable mutation-battery entries executed RED with two battery adjudications disclosed in the [requirement map](design/requirement-map.md) § v3 (range-check backend-coincidence; cross-major composite); the in-repo SDKs gain v3 namespaces and the TS cohort adopts the suite; `BAP3-ES256-SHA256` active in registries with the `lte`/`gte` scope extended and the ML-DSA anticipated index advanced; v1 and v2 byte-frozen with their certified pins unchanged; the kiosk-demo refresh item withdrawn (owner decision 2026-09-22; ADR 0035 post-acceptance note) | BAP-21 | [ADR 0035](adr/0035-es256-contract-major-activation.md), [ADR 0009](adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md), and the [successor-major charter](design/successor-major-charter.md) |
-| BAP-23 | **Role-attestation sibling profile — `bap-role-attestation/1`** — The BA-signed role attestation as the protocol's first sibling attestation profile (ADR 0036): a standalone, grant-unbound compact binding a subject key to `issuer`/`holder` for a bounded window, verified by `BoundedAuthorityProtocol.RoleAttestation.V1.verify_attestation/2` — the BARA RA11 prerequisite crossing the dependency wall as data, slug:bap-23-role-attestation | [ADR 0036](adr/0036-role-attestation-profile.md) + [`spec/bap-role-attestation-v1.md`](../spec/bap-role-attestation-v1.md) + [role-attestation requirement map](design/role-attestation-requirement-map.md) land together; the profile corpus (40 cases, revision 1, certified index `be5275c6…d62a`, pinned in the ExUnit suite, the requirement map, the spec, and every SDK) verifies 40/40 decode+verify with v1/v2/v3 cross-rejection both directions through `mix role_attestation.verify`; ten mutation-battery entries (self-attestation ×2, containment ×2, now-window, kid binding, subject binding, role closed set, canonical bytes, signature) redden the corpus test one-match each; `ba+role-attestation` active in registries with the attestation-profiles family; the governance class, the standards-track evolution contract, and ADR 0007's requirement ranges carry the labeled ADR-0036 amendments; the v1/v2 `parse` closed-error-shape defect (bare `false` on wrong-width signatures, found by the profile's ES256 corpus case) is fixed RED-first with `signature_width_error_shape_test.exs`; the in-repo Python/Rust/Go SDKs implement the four surfaces; v1/v2/v3 corpora and certified pins unchanged (labeled `SigningInput`/`CompactJws` kind touches only); **release preconditions** (any `0.x.0` bearing this): the TS verifier surface coordinated at corpus freeze, the authority-runtime issuance receipt, and the companion-signer consumption receipt in their own repositories — release itself is the owner's decision; **cross-vendor review** executed 2026-09-22 over the full landing range (639d74e..e5cd033): the claude-family lens reviewed with receipts (4 findings, no blockers — all adjudicated, the two should-fix defects and a decode-surface alignment fixed in-repo: attestor-window magnitude parity in the Python/Go SDKs and the certified index pin in the `role_attestation.verify` script; corpus and certified pins unchanged), the codex-family lens completed September 23, 2026 over the inclusive landing and parity-fix range (`639d74e..d470814`), confirming eight product findings (three blocking, five should-fix) and one harness note; the product findings have RED-first repairs in Elixir and the three in-repo SDKs, with the harness note recorded separately; the terminal repair review confirms all eight fixes, and final `mix quality` completed with exit 0 (584 passed, 100% coverage); dated receipts and adjudications live under `.kimosabe/reviews/`; see the Codex review evidence below | BAP-22 | [ADR 0036](adr/0036-role-attestation-profile.md), [ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md), [ADR 0029](adr/0029-budget-window-posture.md), and the [successor-major charter](design/successor-major-charter.md) |
-| BAP-24 | **Strict Ed25519 verification soundness erratum** — Close the Ed25519 small-order and non-canonical acceptance defect class on every Ed25519 surface (contract-majors 1 and 2, local loopback, role attestation, content assertion) through rule S1, the public `BoundedAuthorityProtocol.Ed25519` owner, an additive certified corpus, and the soundness-repair governance class (erratum 2), slug:bap-24-strict-ed25519 | [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) + rule S1 in [`spec/bap-v1.md`](../spec/bap-v1.md) § 14.1 (rev 2) and [`spec/bap-v2.md`](../spec/bap-v2.md) § 7 (rev 2) + the sibling-spec statements + the governance, charter, errata, and SECURITY amendments land together; the strict-Ed25519 corpus (`bap-strict-ed25519/1`, 2,410 cases, revision 1, certified index `732117df…287cb9`) verifies 2410/2410 through the CLI and in the Elixir suite and the three in-repo SDKs; every existing corpus index byte-identical; 11 new requirement ids traced in the [requirement map](design/requirement-map.md); the independent Node runners, the graduated TypeScript verifier and signer, the companion signer, and the registry publication completed the release (closed October 14, 2026; see the closeout evidence below) | BAP-23 | [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md), [ADR 0012](adr/0012-security-release-accelerated-deprecation-window.md), and [governance](governance.md) |
-| BAP-25 | **Producer-surface signature canonicality (erratum 3)** — Compact assembly and anchored-export encoding refuse a signature no conforming signer emits (ES256 out of range or high-S; Ed25519 `S >= L` or a non-canonical or small-order `R`) and never rewrite accepted bytes, on every contract-major and sibling profile; the public `BoundedAuthorityProtocol.Es256` owns the ES256 rules, slug:bap-25-producer-canonicality | Erratum 3 in the [errata registry](errata.md) under the existing errata rules; `REQ1/REQ2-SIGNING-ed25519-producer-canonical` and `REQ3-SIGNING-producer-canonical` traced in the [requirement map](design/requirement-map.md); the additive `bap-producer-canonicality/1` corpus (75 cases) verifies through the CLI, the Elixir suite, the three in-repo SDKs, and the graduated TypeScript verifier with its index pinned; every existing corpus index byte-identical; each named mutation-battery entry observed red; release 0.9.0 with npm verifier 0.8.0 and follow-on signer releases | BAP-24 | [ADR 0035](adr/0035-es256-contract-major-activation.md) and [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) |
+| BAP-00 | **Public authority boundary** — Public repository, Apache-2.0 license, public/private boundary, tracked architecture, and cold-start authority, slug:bap-00 | Evidence recorded below | — | ADR 0001 |
+| BAP-01 | **Pure Mix package** — Mix package scaffold, pure-library architecture test, quality aliases, public CI, and package inspection, slug:bap-01 | Evidence recorded below | BAP-00 | ADR 0001 |
+| BAP-02 | **Normative bounded parsing** — Normative v1 tables, bounded ordered decoder, strict base64url, and untrusted key locator, slug:bap-02 | Evidence recorded below | BAP-01 | ADR 0002 |
+| BAP-03 | **Grant and holder-proof verification** — Standard compact EdDSA grant and RFC 9449 DPoP production, bounded decode, standalone raw-grant verification, and combined raw-envelope verification, slug:bap-03 | Official and independently verified public-only vectors; exact key census; meaningful-byte tamper matrix; timing/allocation bounds; value-bearing redacted non-authorizing facts; no trust-selection or forgeable-intermediate path | BAP-02 | ADR 0001, ADR 0003, and the [normative v1 profile](protocol-v1.md) |
+| BAP-04 | **Chain and historical-key verification** — Consumption-chain, anchor, archive, and historical public-key verification, slug:bap-04 | Rollover, truncation, reorder, omission, archive-coverage, and tamper vectors pass independently | BAP-03 | ADR 0004 and the [normative v1 profile](protocol-v1.md) |
+| BAP-05 | **Portable conformance** — Language-neutral conformance corpus, verifier CLI, and property, fuzz, and mutation gates, slug:bap-05 | A second implementation consumes only published artifacts and agrees on every valid and invalid vector | BAP-04 | ADR 0001 and the [conformance contract](design/conformance-contract.md) |
+| BAP-06 | **Release-candidate contract** — Stable public API, guides, security policy, documentation, immutable release-candidate archive, and automation, slug:bap-06 | SemVer/API review; docs; reproducible candidate archive; unpacked consumer; checksum/SBOM/provenance gates; not yet published | BAP-05 | ADR 0001 and the [conformance contract](design/conformance-contract.md) |
+| BAP-07 | **Connected verification and release** — Connected verification and first public release, slug:bap-07 | Exact candidate passes the private-runtime PostgreSQL 18 gate (the private runtime's ADR 0010 retired the 16/17/18 matrix) and private-consumer connected gates; full public quality/conformance; fresh correctness, security, gate-integrity, and independent reviews; publish that exact archive with zero open findings | BAP-06, BAP-10, BAP-11, private BA-14 | ADR 0001, ADR 0006, and the [conformance contract](design/conformance-contract.md) |
+| BAP-08 | **Capability-authorization extension proposal** — Draft capability-authorization extension for the MCP `modelcontextprotocol/ext-auth` extensions repository plus an AP2 mandate-mapping note, documenting the already-normative v1 protocol (no wire-format, limit, or verification-rule change), slug:bap-08 | Extension document conforms to the ext-auth repository's submission requirements (closed on **partial** conformance — every in-repo-reachable requirement met; full official-track conformance gated on external preconditions [reference SDK, WG + Extension Maintainers + sponsor, SEP acceptance, IANA registration]; see ADR 0013 and the BAP-08 closeout evidence below); every referenced mechanism cites the [normative v1 profile](protocol-v1.md) (nothing normative is introduced outside it); the AP2 note maps mandate↔grant correspondences without claiming compatibility not yet verified; its own ADR lands before any external submission | BAP-04 | ADR 0001 |
+| BAP-09 | **Cross-language verifier SDKs** — Thin TypeScript and Python verifier SDKs consuming only the published spec, vectors, and conformance corpus (client libraries of the extension; independent second implementations by design), slug:bap-09 | Each SDK passes every valid and invalid published vector; spec + vectors are the only inputs (no code-level derivation from the Elixir implementation); its own ADR at authoring covers packaging and support surface | BAP-05 | ADR 0001 and the [conformance contract](design/conformance-contract.md) |
+| BAP-10 | **Evolution contract and normative conformance language** — RFC 2119/8174 rewrite of the normative profile with stable requirement identifiers, plus the evolution-contract sections (self-declaration, parallel-major support, deprecation windows) and registry reconciliation, slug:bap-10 | Every MUST maps to at least one conformance applicability cell (surface × class) or a named falsifiable gap, with the mapping published; no wire byte, bound, or verdict changes; [standards-track.md](design/standards-track.md) and [registries.md](design/registries.md) reconciled against the rewritten profile | BAP-05 | ADR 0006 and the [standards track charter](design/standards-track.md) |
+| BAP-11 | **Cryptographic suite identity and evidence longevity** — Suite naming made explicit throughout the docs, the ML-DSA successor-suite path outlined, and the cross-suite countersignature design for aged evidence carried to ADR quality, slug:bap-11 | Suite identity stated in the normative profile and registries with zero wire change; the countersignature design specifies verification of archives whose original suite is no longer trusted, reusing the authenticated key-transition mechanism; reviewed as a design, not implemented | BAP-04 | ADR 0006 and the [standards track charter](design/standards-track.md) |
+| BAP-12 | **IANA registration templates** — Registration templates for the `ba_*` JWT claims and `ba+*` media-type values, ready to file at first external submission, slug:bap-12 | Templates conform to the target registries' submission formats; claims/values match [registries.md](design/registries.md) exactly, including reserved entries marked as such; filing itself is coordinated with the BAP-08 submission | BAP-08 | ADR 0006 |
+| BAP-13 | **Published governance** — Change-control, errata, deprecation, and security-release policy published as normative project documents, slug:bap-13 | Change classes, comment-window and change-control-group triggers, the errata verdict-flip prohibition, and the deprecation windows are published verbatim from the charter; SECURITY.md cross-references them; the errata registry is live | BAP-05 | ADR 0006 and the [standards track charter](design/standards-track.md) |
+| BAP-14 | **Delegation-with-attenuation contract design** — The chained attenuated-grant design (parent-hash binding via reserved `ba_dlg`, attenuation-only subset rules over the existing conjunctive selector algebra, no caveat DSL) carried to a full successor-contract specification, slug:bap-14 | Complete claim schema, chain-verification algorithm with depth bounds, and subset-decision rules specified; attenuation proven decidable against the existing selector algebra; explicitly no change to the current contract-major's bytes or verdicts; its ADR supersedes nothing and activates nothing | BAP-10 | ADR 0006 and the [standards track charter](design/standards-track.md) |
+| BAP-15 | **Rust verifier SDK** — A typed Rust verifier SDK reimplementing the frozen v1 profile from spec + corpus alone (no code-level derivation from the Elixir reference), authored under `sdks/rust/` and graduating to a per-SDK repository on first publication (ADR 0015), slug:bap-15-rust-sdk | Passes all 283 conformance vectors from a vendored corpus snapshot with startup SHA-256 assertion; per-language permissiveness mutation-gate (duplicate-reject, null-prototype-equivalent, raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction) each proven red-capable; purity lint (no I/O/clock/RNG/network in the library path); dependency-license gate; a deployment guide covering AWS Lambda (`provided.al2023`) and PostgreSQL `plrust` binding; NOT in the Hex `files:` list | BAP-05, BAP-09 | ADR 0014 and ADR 0015 |
+| BAP-16 | **Go verifier SDK** — A typed Go verifier SDK reimplementing the frozen v1 profile from spec + corpus alone (stdlib `crypto/ed25519` + `crypto/sha256`, zero crypto dependencies), authored under `sdks/go/` and graduating to a per-SDK repository on first publication (ADR 0015), slug:bap-16-go-sdk | Passes all 283 conformance vectors from a vendored corpus snapshot with startup SHA-256 assertion; per-language permissiveness mutation-gate (duplicate-reject, raw-lexeme 64-byte ceiling, single-value/trailing, int/float tag distinction) each proven red-capable; purity vet (no I/O/clock/RNG/network in the library path); dependency-license gate; NOT in the Hex `files:` list | BAP-05, BAP-09 | ADR 0014 and ADR 0015 |
+| BAP-17 | **Offline-eligible grant claims (reserve + specify)** — Reserve the `ba_offline` floor-limit claim name and carry the activating-major mechanism to ADR quality (the closed v1 profile rejects the name today; activation is a successor contract-major), slug:bap-17 | `ba_offline` reserved in [registries](design/registries.md); ADR 0016 specifies the closed `{cnt, cur, max, win}` object, the facts contract (flag + `win` only; magnitudes from the decoded grant), malformed⇒`:invalid`, the `max × cnt` wire-layer ceiling, the `ba_dlg` attenuation composition, and the freshness scoping; the R-BAP-2 legacy-rejection tripwire is red-capable; **zero wire-behavior change** — `git diff <base>..HEAD -- lib/ docs/protocol-v1.md priv/conformance/` is empty (mirror BAP-11/BAP-14; the cross-implementation corpus vector is deferred to the activating major per ADR 0010:286-289) | BAP-10 | ADR 0016, ADR 0006, and the offline requirements input (relocated out of the tracked tree 2026-09-22; ADR 0016 is the mechanism of record) |
+| BAP-18 | **Bounds-aware assembly and issuer-mediated reauthorization posture** — Expose caller bounds on compact assembly and define the current-major boundary between ordinary issuer-signed child grants and successor-major portable delegation, slug:bap-18 | `assemble_compact/3` delegates to the existing bounded runtime primitive; `/2` remains the byte-identical profile-maximum default; all four signing kinds enforce tightened segment/final-compact bounds; the facade export lock and unpacked consumer exercise both arities; `ba_dlg` and `ba+cap-delegated` remain rejected | BAP-06, BAP-14, BAP-15 | ADR 0020, ADR 0010, and ADR 0018 |
+| BAP-19 | **Byte-distinct local-loopback HTTP application proof** — Add an explicit application-proof profile for direct literal-loopback development listeners without changing standard `dpop+jwt` bytes or verdicts, slug:bap-19-local-loopback-http | Accepted ADR + normative profile; separate five-surface APIs in Elixir and all four SDKs; certified secret-free language-neutral corpus with cross-profile and meaningful-byte rejects; real `127.0.0.1` and `::1` HTTP exchanges with ephemeral in-memory keys; full legacy corpus remains unchanged; fresh blocking reviews close; exact source/corpus identity is published before any adopter consumes it | BAP-18 | ADR 0027, [local-loopback profile](../spec/bap-local-loopback-http-v1.md), and [profile requirement map](design/local-loopback-http-requirement-map.md) |
+| BAP-21 | **v2 contract-major activation — `lte`/`gte` range selector kinds** — Execute the ADR 0028 activating-major obligations under the successor-major charter checklist: the complete v2 closed profile, its certified corpus, REQ2-* traceability, the four-SDK re-verification, and the registries flip, slug:bap-21 | `BoundedAuthorityProtocol.V2` namespace + [`spec/bap-v2.md`](../spec/bap-v2.md) + ADR 0030 land together; the v2 corpus (268 cases, 28 surfaces, certified index `6de6289b…f13d0`) verifies 268/268 through the CLI and all four SDKs with the digest pinned; six new mutation-battery entries executed RED with proofs recorded in the [requirement map](design/requirement-map.md) § v2; `lte`/`gte` active in registries; v1 byte-frozen with its certified pin unchanged | — | ADR 0028, ADR 0030, and the [successor-major charter](design/successor-major-charter.md) |
+| BAP-22 | **ES256 contract-major activation — the `BAP3-ES256-SHA256` suite** — Execute the ADR 0035 activating-major obligations under the successor-major charter checklist: the complete v3 closed profile (ECDSA P-256/SHA-256, RFC 7518 §3.4 raw `r\|\|s` signatures with low-S canonicality, EC JWKs and RFC 7638 thumbprints, uncompressed-SEC1 raw keys), its certified corpus, REQ3-* traceability, the SDK cohort, and the registries flip, slug:bap-22 | `BoundedAuthorityProtocol.V3` namespace + [`spec/bap-v3.md`](../spec/bap-v3.md) + ADR 0035 land together; the v3 corpus (292 cases, 28 surfaces, revision 1, certified index `pcgHXnU0…mQzw` — the repaired-and-re-certified pin after the coverage-gate certification repair; full value pinned in the CLI's major-keyed map) verifies 292/292 through the CLI with the digest pinned; six verdict-provable mutation-battery entries executed RED with two battery adjudications disclosed in the [requirement map](design/requirement-map.md) § v3 (range-check backend-coincidence; cross-major composite); the in-repo SDKs gain v3 namespaces and the TS cohort adopts the suite; `BAP3-ES256-SHA256` active in registries with the `lte`/`gte` scope extended and the ML-DSA anticipated index advanced; v1 and v2 byte-frozen with their certified pins unchanged; the kiosk-demo refresh item withdrawn (owner decision 2026-09-22; ADR 0035 post-acceptance note) | BAP-21 | ADR 0035, ADR 0009, and the [successor-major charter](design/successor-major-charter.md) |
+| BAP-23 | **Role-attestation sibling profile — `bap-role-attestation/1`** — The BA-signed role attestation as the protocol's first sibling attestation profile (ADR 0036): a standalone, grant-unbound compact binding a subject key to `issuer`/`holder` for a bounded window, verified by `BoundedAuthorityProtocol.RoleAttestation.V1.verify_attestation/2` — the BARA RA11 prerequisite crossing the dependency wall as data, slug:bap-23-role-attestation | ADR 0036 + [`spec/bap-role-attestation-v1.md`](../spec/bap-role-attestation-v1.md) + [role-attestation requirement map](design/role-attestation-requirement-map.md) land together; the profile corpus (40 cases, revision 1, certified index `be5275c6…d62a`, pinned in the ExUnit suite, the requirement map, the spec, and every SDK) verifies 40/40 decode+verify with v1/v2/v3 cross-rejection both directions through `mix role_attestation.verify`; ten mutation-battery entries (self-attestation ×2, containment ×2, now-window, kid binding, subject binding, role closed set, canonical bytes, signature) redden the corpus test one-match each; `ba+role-attestation` active in registries with the attestation-profiles family; the governance class, the standards-track evolution contract, and ADR 0007's requirement ranges carry the labeled ADR-0036 amendments; the v1/v2 `parse` closed-error-shape defect (bare `false` on wrong-width signatures, found by the profile's ES256 corpus case) is fixed RED-first with `signature_width_error_shape_test.exs`; the in-repo Python/Rust/Go SDKs implement the four surfaces; v1/v2/v3 corpora and certified pins unchanged (labeled `SigningInput`/`CompactJws` kind touches only); **release preconditions** (any `0.x.0` bearing this): the TS verifier surface coordinated at corpus freeze, the authority-runtime issuance receipt, and the companion-signer consumption receipt in their own repositories — release itself is the owner's decision; **cross-vendor review** executed 2026-09-22 over the full landing range (639d74e..e5cd033): the claude-family lens reviewed with receipts (4 findings, no blockers — all adjudicated, the two should-fix defects and a decode-surface alignment fixed in-repo: attestor-window magnitude parity in the Python/Go SDKs and the certified index pin in the `role_attestation.verify` script; corpus and certified pins unchanged), the codex-family lens completed September 23, 2026 over the inclusive landing and parity-fix range (`639d74e..d470814`), confirming eight product findings (three blocking, five should-fix) and one harness note; the product findings have RED-first repairs in Elixir and the three in-repo SDKs, with the harness note recorded separately; the terminal repair review confirms all eight fixes, and final `mix quality` completed with exit 0 (584 passed, 100% coverage); dated receipts and adjudications live under `.kimosabe/reviews/`; see the Codex review evidence below | BAP-22 | ADR 0036, ADR 0027, ADR 0029, and the [successor-major charter](design/successor-major-charter.md) |
+| BAP-24 | **Strict Ed25519 verification soundness erratum** — Close the Ed25519 small-order and non-canonical acceptance defect class on every Ed25519 surface (contract-majors 1 and 2, local loopback, role attestation, content assertion) through rule S1, the public `BoundedAuthorityProtocol.Ed25519` owner, an additive certified corpus, and the soundness-repair governance class (erratum 2), slug:bap-24-strict-ed25519 | ADR 0040 + rule S1 in [`spec/bap-v1.md`](../spec/bap-v1.md) § 14.1 (rev 2) and [`spec/bap-v2.md`](../spec/bap-v2.md) § 7 (rev 2) + the sibling-spec statements + the governance, charter, errata, and SECURITY amendments land together; the strict-Ed25519 corpus (`bap-strict-ed25519/1`, 2,410 cases, revision 1, certified index `732117df…287cb9`) verifies 2410/2410 through the CLI and in the Elixir suite and the three in-repo SDKs; every existing corpus index byte-identical; 11 new requirement ids traced in the [requirement map](design/requirement-map.md); the independent Node runners, the graduated TypeScript verifier and signer, the companion signer, and the registry publication completed the release (closed October 14, 2026; see the closeout evidence below) | BAP-23 | ADR 0040, ADR 0012, and [governance](governance.md) |
+| BAP-25 | **Producer-surface signature canonicality (erratum 3)** — Compact assembly and anchored-export encoding refuse a signature no conforming signer emits (ES256 out of range or high-S; Ed25519 `S >= L` or a non-canonical or small-order `R`) and never rewrite accepted bytes, on every contract-major and sibling profile; the public `BoundedAuthorityProtocol.Es256` owns the ES256 rules, slug:bap-25-producer-canonicality | Erratum 3 in the [errata registry](errata.md) under the existing errata rules; `REQ1/REQ2-SIGNING-ed25519-producer-canonical` and `REQ3-SIGNING-producer-canonical` traced in the [requirement map](design/requirement-map.md); the additive `bap-producer-canonicality/1` corpus (75 cases) verifies through the CLI, the Elixir suite, the three in-repo SDKs, and the graduated TypeScript verifier with its index pinned; every existing corpus index byte-identical; each named mutation-battery entry observed red; release 0.9.0 with npm verifier 0.8.0 and follow-on signer releases | BAP-24 | ADR 0035 and ADR 0040 |
 | CANDIDATE | **Candidate: offline OpenTimestamps proof verification.** Verify a .ots proof and caller-supplied block headers against a digest; pure, no network. | Not scoped; a design and an ADR precede any acceptance criteria | — | — |
 
 ## BAP-00 closeout evidence
@@ -221,7 +221,7 @@ compatibility.
   carve-out), the independent Node second-implementation runner (node:* only — the corpus is
   normative), a three-partition public-key census (hard two-way), stream_data property and
   deterministic-PRNG fuzz gates, and a source-isolated mutation battery wired into `mix quality`
-  ([ADR 0005](adr/0005-portable-conformance-corpus-and-verifier-cli.md)). The corpus ships in the
+  (ADR 0005). The corpus ships in the
   published package and the fresh-consumer check runs the packaged escript against the packaged
   corpus.
 - The corpus and runner were hardened across multiple bounded deltas after their first closeout
@@ -248,17 +248,17 @@ compatibility.
   - `docs/protocol-v1.md` carries the BCP 14 boilerplate (verbatim RFC 8174 §2 NEW sentence, all 11
     keywords incl. NOT RECOMMENDED, the "when, and only when, they appear in all capitals" clause)
     and **76 stable requirement identifiers** (`REQ1-<SURFACE>-<tag>`, per
-    [ADR 0007](adr/0007-normative-requirement-identifiers.md)) across 13 surfaces.
+    ADR 0007) across 13 surfaces.
   - `docs/design/standards-track.md` evolution-contract sections carry **10 `REQ1-EVO-*` ids** and a
     BCP 14 reference note.
-  - `docs/design/requirement-map.md` (the [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md)
+  - `docs/design/requirement-map.md` (the ADR 0006
     §3 acceptance artifact) maps all 86 requirement ids to conformance cells: 45 distinct populated
     `(surface, class)` cells (all mechanically verified to resolve to integer≥1 values in
     `index.json`), and 9 `gap` rows each carrying a falsifiable input-algebra reason (the
-    [ADR 0005](adr/0005-portable-conformance-corpus-and-verifier-cli.md) n_a criterion applied as the
+    ADR 0005 n_a criterion applied as the
     gap gate). The closed-rejection profile invariant (`REQ1-CORE-reject-unlisted`) is the one
     profile-level gap — proven by the union of the per-surface closed-set cells it rationalizes.
-  - [ADR 0007](adr/0007-normative-requirement-identifiers.md) records the requirement-ID format
+  - ADR 0007 records the requirement-ID format
     decision: `REQ<contract-major>-<SURFACE>-<tag>`, major-namespaced to mirror the existing suite
     scheme (`BAP<contract-major>-<sig>-<digest>`) and resolve the parallel-majors ambiguity. Refines
     ADR 0006 §3 (does not supersede the RFC 2119/8174 + stable-id + MUST-to-cell bar).
@@ -282,7 +282,7 @@ compatibility.
 - The slice spans `7f4cdd1` (Task 1, the reproducibility gate) through this closeout block. It
   delivers the 0.1.0 release-candidate contract: the locked public API surface, the reproducibility
   gate, and the candidate-facing docs.
-  - [ADR 0008](adr/0008-release-candidate-contract.md) records the API-lock + reproducibility-gate
+  - ADR 0008 records the API-lock + reproducibility-gate
     decision: the locked surface is enforced mechanically by the existing
     `@compiled_export_allowances` pin in `tools/architecture_gate.exs` (lines 188-207 pin every
     `V1` façade export, including the corrected `verify_key_transition/4` arity and the five producer
@@ -321,11 +321,11 @@ compatibility.
   passes with 295 tests and 13 properties (0 failures); the conformance runner reports
   `agreed=259, agreement=true, disagreed=0` (unchanged — the reserved names are rejected by the
   current closed profile).
-  - [ADR 0009](adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) carries
+  - ADR 0009 carries
     the cryptographic-suite succession and cross-suite evidence-longevity mechanism to ADR quality.
     The headline decision: the cross-suite primitive is a **content-covering countersignature**
     (`ba+suite-attestation` typ, `ba_sut` claim) — a current-suite key signs the archive's CONTENT
-    DIGEST (the SHA-256 over every raw byte that [ADR 0004](adr/0004-consumption-chain-rollover-and-anchored-export-verification.md)
+    DIGEST (the SHA-256 over every raw byte that ADR 0004
     already computes), so trust freshness comes from the current key's content signature, NOT from
     the original signature surviving cryptanalysis. The design-adversarial pass (Challenge 1, blocking)
     defeated the original draft — a `ba+suite-transition` chaining key/suite identity — because it
@@ -348,7 +348,7 @@ compatibility.
   passes with 295 tests and 13 properties (0 failure); the conformance runner reports
   `agreed=259, agreement=true, disagreed=0` (unchanged — the reserved names `ba_dlg` and
   `ba+cap-delegated` are rejected by the current closed profile).
-  - [ADR 0010](adr/0010-delegation-with-attenuation.md) specifies the mechanism: the `ba_dlg`
+  - ADR 0010 specifies the mechanism: the `ba_dlg`
     parent-grant-hash claim (compared raw-to-raw via the `CompactJws.hash/2` raw-digest variant,
     mirroring `ath`); the `ba+cap-delegated` typ with its parent-holder key carried in the
     protected-header `jwk` (the current grant carries `cnf.jkt` as a thumbprint digest only, so
@@ -372,7 +372,7 @@ compatibility.
   - [registries.md](design/registries.md) `ba_dlg` and `ba+cap-delegated` rows forward-ref
     ADR 0010 (status stays `reserved` — no new reservation; the names were reserved in ADR 0006
     §4). [standards-track.md](design/standards-track.md) § Delegation and
-    [ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) §5
+    ADR 0006 §5
     forward-ref ADR 0010. [protocol-v1.md](protocol-v1.md) names ADR 0010 in its deferral
     sentence (prose only; no value, bound, or table change).
 
@@ -391,7 +391,7 @@ compatibility.
     `REQ1-EVO-*` identifiers stay cross-referenced to the evolution contract). The charter §
     Governance stays authoritative (its preamble names itself the standing authority and enumerates
     governance); governance.md names the charter as its source.
-  - [ADR 0011](adr/0011-published-governance.md) records the publication decision: the
+  - ADR 0011 records the publication decision: the
     companion-republication shape + charter-authoritative discipline, the controlled-dual-copy
     principle for the general policy sections + the post-publication sync mechanism (fidelity check
     re-run on charter § Governance edits), and the `SECURITY.md` + `docs/governance.md` +
@@ -423,7 +423,7 @@ compatibility.
     security policy self-contradictory: `REQ1-EVO-deprecation-window-minimum`'s absolute twelve-month
     floor plus `REQ1-EVO-parallel-support-during-window` forced up to a year of accepting a
     vulnerable major, against the § Governance security bullet's "accelerated overlap window."
-    [ADR 0012](adr/0012-security-release-accelerated-deprecation-window.md) resolves it — the floor is
+    ADR 0012 resolves it — the floor is
     scoped to planned deprecations and a security contract-major is exempt (its accelerated window is
     still published, severity-proportional, and deployment-sunset). Charter § The evolution contract
     + § Governance amended; [governance.md](governance.md) and the requirement map re-synced.
@@ -455,10 +455,10 @@ compatibility.
   — composition of A2A-extension negotiation (empty `params`) with transport-layer proof binding
   (unchanged `dpop+jwt` bytes, `BA-Grant`/`BA-Proof` carriage, bounded per-operation projection);
   zero wire, API, or verifier change; delegation-shaped requirements routed to the
-  successor-major program and UCP riding decided by [ADR 0034](adr/0034-ucp-riding-point-scoping.md)
+  successor-major program and UCP riding decided by ADR 0034
   (transport-composed; the A2A profile covers UCP's A2A transport). A pre-submission venue-facing
   restatement of the binding lives under `docs/extensions/` beside the MCP drafts.
-  - [ADR 0013](adr/0013-capability-authorization-extension.md) records the decisions: the
+  - ADR 0013 records the decisions: the
     experimental-track target; the owned-domain identifier (the project owns `bounded-authority.io`);
     the partial-conformance framing; and the official-submission gates (reference implementation in
     an official MCP SDK negotiated with the `modelcontextprotocol` SDK maintainers, working group +
@@ -491,7 +491,7 @@ compatibility.
   (`sdks/python/`, `bounded-authority-verifier`, Python `>= 3.10`, single runtime
   dependency `cryptography`). Both are typed reimplementations of the frozen v1
   profile authored from the spec + corpus alone with no code-level derivation from
-  the Elixir reference ([ADR 0014](adr/0014-cross-language-verifier-sdks.md)).
+  the Elixir reference (ADR 0014).
 - Each SDK passes all **283** published conformance vectors, recomputed from
   scratch (not cached verdicts), and asserts the corpus `index.json` SHA-256
   (`4cb5072ab40ffd4b111659e6d4ab20209202380505f1f8424b96d22e533cb91b`) at startup
@@ -634,13 +634,13 @@ the evidence amendment is this repo's docs-currency rule, not the sibling's patt
 
 **2026-08-14 amendment #2 — Rust encode-path validation parity (`8de07dd`; the bounds contract this
 amendment's parity landing closed is the contract of record in
-[ADR 0018](adr/0018-sdk-bounds-contract.md)).** The routed
+ADR 0018).** The routed
 residual of amendment #1 is CLOSED for Rust: `encode_anchored_export` now mirrors the
 reference producer's full contract (expected-side consistency, row chain re-check, gated
 parses + 7-field matches for both anchors and every transition, the key-path walk with
 NON-STRICT end-anchor chronology). 19 mutation-proven battery legs (permissiveness 38 — incl. the closeout lenses' chronology-equality pin), each
 verified against the Elixir reference oracle (20/20). The durable bounds contract is
-[ADR 0018](adr/0018-sdk-bounds-contract.md), with executable evidence in the SDK test suites. The TS/Python sibling permissiveness
+ADR 0018, with executable evidence in the SDK test suites. The TS/Python sibling permissiveness
 closed in the immediately-following commit (same contract, 15 legs each at closeout,
 proven red-capable — the five pin legs each isolated under their named mutation, the
 threading leg joint-by-construction per the settled diff-review record). **The SDK-wide
@@ -657,7 +657,7 @@ The Go SDK (BAP-16) picks the whole contract up at authoring.
 
 **2026-08-14 amendment #3 — the independent-review hardening arc + the terminal range state
 (`a4deac2..06c9f82`; the shared semantics this arc converged on are the contract of record in
-[ADR 0017](adr/0017-inter-sdk-behavioral-contract.md)).** The bounds-parity landing was followed by **17 dispatched independent-review
+ADR 0017).** The bounds-parity landing was followed by **17 dispatched independent-review
 rounds plus delta-reviews between fix clusters**.
 Every named BLOCKING finding was fixed in-slice — the arc's user-facing fixes are the CHANGELOG
 rows above: nested-bounds pins + identity semantics (rounds 2-5), compact-bytes ceilings +
@@ -891,7 +891,7 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   cells; the `spec.facts` v2 extraction baseline (closed 2026-09-21 together with the v3
   baseline — the extractor is major-keyed and both successor baselines are frozen); ADR 0029 `ba+budget-window` (written 2026-09-19
   as the posture consolidation with the attestation-shape design explicitly deferred —
-  [ADR 0029](adr/0029-budget-window-posture.md)); the remaining
+  ADR 0029); the remaining
   charter successor-major scope (delegation, offline claims, suite succession) as separately
   activated majors; SDK publication and any v2 Hex release are owner decisions (both happened on
   2026-09-14: the 0.4.0 Hex release carries v2, and the TypeScript verifier was published to npm).
@@ -904,7 +904,7 @@ anywhere without its poles reconciled now reds `mix quality` by name.
   EC JWK holder keys with RFC 7638 thumbprints, uncompressed-SEC1 65-byte raw keys), with
   cross-major rejection of v1 and v2 bytes and `REQ3-*` traceability in the
   [requirement map](design/requirement-map.md) § v3.
-  [ADR 0035](adr/0035-es256-contract-major-activation.md) is the activation decision.
+  ADR 0035 is the activation decision.
 - **Corpus:** `priv/conformance/v3/corpus` — 292 cases, 28 surfaces, revision 1. Final
   certified index pin `pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw` (hex
   `a5c8075e7534345c3bb6611d0b40292904bcfa3af0702e07ae014fa66926433c`), pinned in the CLI's
@@ -1024,7 +1024,7 @@ anywhere without its poles reconciled now reds `mix quality` by name.
 Status: CLOSED. Release 0.8.0 is published, read back, and adopted; every item that the source
 landing left open is closed below.
 
-- Decision: [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) (erratum 2), the
+- Decision: ADR 0040 (erratum 2), the
   soundness-repair class in [governance](governance.md) § Soundness repairs, the charter errata and
   security-policy bullets, the [errata registry](errata.md) entry, and
   [SECURITY.md](../SECURITY.md). ADR 0012 and ADR 0007 carry amended-by notes.
@@ -1078,7 +1078,7 @@ landing left open is closed below.
   build's readiness endpoint reports the adopted revision, and a live probe with an identity-point
   key and a small-order key was refused with the stored credential count unchanged. An interim
   mitigation was deployed there before disclosure. Repository and revision identities stay in
-  that consumer's records ([ADR 0023](adr/0023-public-history-privacy-boundary.md)).
+  that consumer's records (ADR 0023).
 
 ## BAP-25 producer-surface canonicality, erratum 3 (October 14, 2026)
 
@@ -1135,7 +1135,7 @@ shipped the first two cross-language verifier SDKs: TypeScript and Python. TypeS
 [`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript)
 and is published to npm as `@bounded-authority-protocol/verifier`; Python remains under `sdks/`.
 Both pass the certified v1 and v2 corpora and carry per-language permissiveness mutation gates
-([ADR 0014](adr/0014-cross-language-verifier-sdks.md)). BAP-05 shipped the portable v1 conformance
+(ADR 0014). BAP-05 shipped the portable v1 conformance
 corpus (283 cases across 28 surfaces, total applicability matrix), the deterministic verifier CLI
 (escript, `--corpus` required, exits 0/1/2) with an exact-path purity carve-out, the independent
 Node second-implementation runner (node:* only — the corpus is normative), a three-partition
@@ -1145,24 +1145,24 @@ published package and the fresh-consumer check runs the packaged escript against
 corpus. BAP-10 shipped the RFC 2119/8174 normative rewrite of the profile and evolution contract,
 the major-namespaced requirement-identifier scheme (ADR 0007), and the MUST-to-cell traceability
 map. BAP-06 froze the 0.1.0 release candidate: the locked public API surface
-([ADR 0008](adr/0008-release-candidate-contract.md)), the `release.candidate` reproducibility gate,
+(ADR 0008), the `release.candidate` reproducibility gate,
 and the candidate-facing docs. BAP-11 carried the cryptographic-suite succession and cross-suite
-evidence-longevity design to ADR quality ([ADR 0009](adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md)):
+evidence-longevity design to ADR quality (ADR 0009):
 a content-covering countersignature primitive, ML-DSA successor family named, reserved
 `ba+suite-attestation`/`ba_sut`, suite identity woven through the profile — design-only, zero wire
 change. BAP-14 carried the delegation-with-attenuation design to a full successor-contract
-specification ([ADR 0010](adr/0010-delegation-with-attenuation.md)): the `ba_dlg` parent-grant-hash
+specification (ADR 0010): the `ba_dlg` parent-grant-hash
 claim, the `ba+cap-delegated` typ with header-`jwk` parent-holder key binding, the four-part
 attenuation relation (set-containment-on-distinct-tuples selector narrowing proven decidable against the existing
 selector algebra), and the depth-bounded chain-verification algorithm — design-only, zero wire
 change, names stay reserved-and-rejected. BAP-17 reserved the `ba_offline` floor-limit claim name
 and carried its activating-major mechanism to ADR quality
-([ADR 0016](adr/0016-offline-eligible-grant-claims.md)) — design-only, zero wire-behavior change
+(ADR 0016) — design-only, zero wire-behavior change
 (see the BAP-17 closeout evidence above).
 
 BAP-18 adds the public bounds-aware `assemble_compact/3` facade while retaining `/2` as the
 profile-maximum default, and records the current-major issuer-mediated reauthorization boundary in
-[ADR 0020](adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md). The current v1
+ADR 0020. The current v1
 wire profile still rejects `ba_dlg` and `ba+cap-delegated`; portable holder-signed delegation stays
 successor-major under ADR 0010.
 
@@ -1179,9 +1179,9 @@ contract), BAP-06 (release candidate), BAP-11 (suite identity + evidence longevi
 (delegation-with-attenuation specification) all landed — every one of ADR 0006 §context's
 "capture-now-or-never" designs. BAP-13 (published governance) is complete: the governance policy is
 published as a standalone normative document ([governance.md](governance.md),
-[ADR 0011](adr/0011-published-governance.md)), a companion republication of the charter § Governance.
+ADR 0011), a companion republication of the charter § Governance.
 BAP-08 (capability-authorization extension proposal) is drafted as a pre-submission package for the
-MCP experimental-extension track (`docs/extensions/`, [ADR 0013](adr/0013-capability-authorization-extension.md))
+MCP experimental-extension track (`docs/extensions/`, ADR 0013)
 — partial conformance to the official-submission bar, with the reference-SDK / working-group / SEP-
 acceptance gates recorded as external preconditions. **BAP-07 (connected verification and first
 public release) executed 2026-08-20 by owner decision** — the exact candidate passed the private
@@ -1199,11 +1199,11 @@ closeout), export pins for the currently-unpinned beams, and broader sdk-publish
 coverage. BAP-12 (IANA templates)
 rides the BAP-08 external submission path, gated on the same official-submission preconditions.
 
-**SDK graduation and publish topology ([ADR 0015](adr/0015-sdk-graduation-and-publish-topology.md)).**
+**SDK graduation and publish topology (ADR 0015).**
 Cross-language verifier SDKs are authored under `sdks/` (ADR 0014) but each graduates to its own
 per-SDK repository (`bounded_authority_protocol_<lang>`) on first publication — the boundary is
 publication irreversibility, not SDK count. ADR 0015 Decision 6's deferred corpus-artifact question
-is settled by [ADR 0019](adr/0019-corpus-artifact-distribution.md): per-SDK binding stays until the
+is settled by ADR 0019: per-SDK binding stays until the
 first SDK graduation. No SDK publishes from this monorepo: a local pre-commit
 hook (`scripts/hooks/pre-commit`, installed via `scripts/install-hooks.sh`) and the CI
 `sdk-publish-guard` job ([`.github/workflows/sdk-publish-guard.yml`](../.github/workflows/sdk-publish-guard.yml))
@@ -1218,7 +1218,7 @@ three gaps where neither `protocol-v1.md` nor the corpus pinned behavior the TS/
 reached by reading the Elixir reference during independent review — ECMAScript float
 formatting (JCS §3.2.2.3, zero float-valued corpus cases), DEL (`U+007F`) raw-emit vs RFC 8785
 `\u007f`, and the byte-level independent-review findings (~25 falsifiers recorded by
-[ADR 0017](adr/0017-inter-sdk-behavioral-contract.md) and the SDK permissiveness suites). The no-key gap-closing change landed: `protocol-v1.md`
+ADR 0017 and the SDK permissiveness suites). The no-key gap-closing change landed: `protocol-v1.md`
 now transcribes the JCS string/number serialization rules (float thresholds, `-0`→`0`, raw DEL per
 RFC 8785 §3.2.2.2), the corpus grows **259 → 283 cases** pinning both float-threshold sides, the
 astral-codepoint raw emit, malformed UTF-8/IPv6/float-magnitude rejects, the key-locator

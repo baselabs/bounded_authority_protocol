@@ -1,17 +1,17 @@
 # Requirement-to-conformance map (contract-major 1)
 
 This is the BAP-10 acceptance artifact: the traceability map from every normative requirement
-identifier (per [ADR 0007](../adr/0007-normative-requirement-identifiers.md), `REQ1-<SURFACE>-<tag>`
+identifier (per ADR 0007, `REQ1-<SURFACE>-<tag>`
 for the `normative profile` and `REQ1-EVO-*` for the
 [evolution contract](standards-track.md)) to the conformance corpus cells that prove it.
 
-The BAP-10 acceptance bar ([ADR 0006](../adr/0006-standards-evolution-suite-identity-and-delegation-posture.md)
+The BAP-10 acceptance bar (ADR 0006
 §3; `docs/ROADMAP.md` BAP-10): *every MUST maps to at least one conformance applicability cell
 (surface × class) or a named falsifiable gap, with the mapping published.* A cell satisfies §3 only
 when it is **populated** (the `(surface, class)` pair has at least one executed case in
 `priv/conformance/v1/corpus/index.json`). `n/a` and `gap` rows do not satisfy §3 on their own; they
 are recorded with a falsifiable reason and are reviewed at closeout against the
-[ADR 0005](../adr/0005-portable-conformance-corpus-and-verifier-cli.md) n_a criterion (an input-algebra
+ADR 0005 n_a criterion (an input-algebra
 impossibility, not a process/deployment constraint — a process-constraint reason is the
 self-contradiction ADR 0005 warns about and is a blocking finding).
 
@@ -115,7 +115,7 @@ could detect nothing — the sidecar's monotone integer replaced it). See § Mai
 
 The strict-Ed25519 rows above and below cite the additive strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1), certified index SHA-256
 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9` (2,410 cases;
-[ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)). In these rows `populated` means at
+ADR 0040). In these rows `populated` means at
 least one executed case in that corpus; the v1 corpus and its cells are unchanged.
 
 | REQ-id | Requirement | Surface(s) | Cell class(es) | Cell-type | Evidence / reason |
@@ -186,16 +186,16 @@ qualifier + re-walk obligation (§ Maintenance) makes that the successor slice's
 | REQ1-EVO-mixed-major-invalid | Mixed-major envelopes invalid by construction | `populated` | check_envelope.invalid_request=3 (same cell family). |
 | REQ1-EVO-no-downgrade | No cross-major fallback/downgrade/best-effort parsing | `gap` | Input-algebra impossibility: "no fallback/downgrade path exists" is the absence of a code path, and a v1 corpus case is a single `(artifact, bounds)→verdict` pair that cannot express the non-existence of an alternative resolution path. The closed rejection any other major hits is exercised by `verify_grant.invalid_algorithm=1` (the mechanism no-downgrade relies on); the "no fallback path" governance invariant is over the codebase's structure, not a v1 input. |
 | REQ1-EVO-deprecation-prerequisites | Deprecation requires successor profile + corpus + 2 independent passing implementations | `gap` | Input-algebra impossibility: the v1 corpus input algebra is `(compact bytes, bounds)` and has no axis for "a successor contract-major exists, with a published corpus and two independent passing implementations." That is an industry-adoption state, not a v1 input→verdict pair, so no v1 corpus case can express it. |
-| REQ1-EVO-deprecation-window-minimum | Deprecation window never shorter than 12 months (a security contract-major is exempt — charter § Security policy, [ADR 0012](../adr/0012-security-release-accelerated-deprecation-window.md)) | `gap` | Input-algebra impossibility: the v1 corpus input algebra has no temporal/policy axis; a 12-month minimum duration cannot be expressed as a v1 `(compact bytes, bounds)` input (the v1 verifier has no wall-clock input to test a duration against). |
+| REQ1-EVO-deprecation-window-minimum | Deprecation window never shorter than 12 months (a security contract-major is exempt — charter § Security policy, ADR 0012) | `gap` | Input-algebra impossibility: the v1 corpus input algebra has no temporal/policy axis; a 12-month minimum duration cannot be expressed as a v1 `(compact bytes, bounds)` input (the v1 verifier has no wall-clock input to test a duration against). |
 | REQ1-EVO-parallel-support-during-window | Conforming deployments support both majors during the window | `gap` | Input-algebra impossibility: a v1 corpus case is a single `(artifact, bounds)→verdict` pair against the v1 closed profile; "a deployment accepts both v1 and a successor major in parallel" is a multi-artifact, multi-major deployment state with no successor major in scope to express. |
 | REQ1-EVO-sunset-is-deployment-decision | Sunset is a deployment decision after the window, never a silent library change; a soundness repair is not a sunset (ADR 0040) | `gap` | Input-algebra impossibility: "sunset is a deployment decision, never a silent library change" is a cross-release governance property over the library's version history; a v1 corpus case is a fixed `(compact bytes, bounds)→verdict` pair that cannot express a property spanning releases. |
 | REQ1-EVO-no-verdict-flip | No erratum may flip a verdict of an existing certified corpus; a soundness repair adds its cases in a new corpus and flips none (ADR 0040) | `gap` | Input-algebra impossibility: "no future erratum flips a corpus verdict" is a governance invariant over the errata process across releases; a v1 corpus case is a fixed `(compact bytes, bounds)→verdict` pair that cannot express a property over future errata. Verdict stability *within v1* is exercised by the mutation battery (conformance mutation gate, 55 mutations); the no-verdict-flip invariant is over the errata process, not a v1 input. |
 
 ## v2 — the contract-major 2 profile (`spec/bap-v2.md`, corpus `priv/conformance/v2/corpus`, revision 1)
 
-The v2 profile activates the `lte`/`gte` range selector kinds ([ADR 0028](../adr/0028-range-selector-kinds.md),
-[ADR 0030](../adr/0030-v2-contract-major-activation.md)). Its requirement ids carry the `REQ2-*`
-range ([ADR 0007](../adr/0007-normative-requirement-identifiers.md)); cells cite the v2 index
+The v2 profile activates the `lte`/`gte` range selector kinds (ADR 0028,
+ADR 0030). Its requirement ids carry the `REQ2-*`
+range (ADR 0007); cells cite the v2 index
 (`bounded-authority-protocol-v2-conformance-corpus-index`, 268 cases). The six new v2 gates'
 red proofs were executed against the mutation battery
 (`scripts/check_conformance_mutations.exs`, entries `v2-*`) on 2026-09-13 — each mutation was
@@ -228,11 +228,11 @@ observed failing, and the source restored byte-identical.
 
 ## v3 — the contract-major 3 ES256 suite (`spec/bap-v3.md`, corpus `priv/conformance/v3/corpus`, revision 1)
 
-The v3 profile activates the `BAP3-ES256-SHA256` suite ([ADR 0035](../adr/0035-es256-contract-major-activation.md)):
+The v3 profile activates the `BAP3-ES256-SHA256` suite (ADR 0035):
 `alg: "ES256"` over EC P-256, the RFC 7518 §3.4 raw `r || s` signature form with the low-S
 canonicality rule, EC JWKs and RFC 7638 EC thumbprints, uncompressed-SEC1 raw keys, and
 `BAP3-*` domain separators, under the five-kind selector algebra inherited from v2. Its
-requirement ids carry the `REQ3-*` range ([ADR 0007](../adr/0007-normative-requirement-identifiers.md));
+requirement ids carry the `REQ3-*` range (ADR 0007);
 cells cite the v3 index (`bounded-authority-protocol-v3-conformance-corpus-index`, 292 cases).
 The v3 mutation gates' red proofs were executed against the battery
 (`scripts/check_conformance_mutations.exs`, entries `v3-*`) on 2026-09-21 — each mutation was
@@ -302,7 +302,7 @@ never silently overstated as `populated`.
 
 - **93 requirement ids** total: 83 `REQ1-*` (spec/bap-v1.md) + 10 `REQ1-EVO-*` (standards-track.md).
   Six of the 83 (the four strict-Ed25519 `SIGNING` rows, `REQ1-KEY-ed25519-acceptable`, and
-  `REQ1-HOST-ed25519-torsion-free`) were added by erratum 2 ([ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md))
+  `REQ1-HOST-ed25519-torsion-free`) were added by erratum 2 (ADR 0040)
   and map to populated cells of the additive strict-Ed25519 corpus; one
   (`REQ1-SIGNING-ed25519-producer-canonical`) was added by erratum 3 and maps to populated cells of
   the additive producer-canonicality corpus.

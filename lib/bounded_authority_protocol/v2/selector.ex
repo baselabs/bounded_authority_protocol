@@ -3,7 +3,7 @@ defmodule BoundedAuthorityProtocol.V2.Selector do
   Closed selector type used by `BoundedAuthorityProtocol.V2.Operation`.
 
   The v2 profile admits the two inclusive range kinds `lte` and `gte`
-  ([ADR 0028](../../docs/adr/0028-range-selector-kinds.md)) alongside the v1
+  (ADR 0028) alongside the v1
   kinds. Both operands of a range comparison must carry the same numeric tag;
   comparison is by numeric value on the decoder-bounded finite binary64 domain.
   Selector enforcement is performed through the verification façade.
