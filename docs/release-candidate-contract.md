@@ -5,7 +5,7 @@ locked public API surface, the versioning posture, and the candidate-verificatio
 follows to compare a local candidate against a CI-attested candidate. It is **evidence a human
 reviewer compares**, not an authority shape — there is no decision, receipt, or authorization here
 (per `AGENTS.md` rule 1, "verification is not authority ... there is no `allowed?`, `authorized?`,
-`decision`, or receipt"). The decision record is [ADR 0008](adr/0008-release-candidate-contract.md).
+`decision`, or receipt"). The decision record is ADR 0008.
 
 ## Status
 
@@ -39,7 +39,7 @@ enumeration below lists primary arities.
 
 **Named submodules:** `BoundedAuthorityProtocol.V1.Json.decode/2`,
 `BoundedAuthorityProtocol.V1.Base64Url.decode/2` (the only decoder façade, per
-[ADR 0002](adr/0002-normative-v1-parsing-profile.md)), and
+ADR 0002), and
 `BoundedAuthorityProtocol.V1.Bounds.new/1` / `Bounds.maximum/0` (the tightening-only bounds
 constructor `assemble_compact/3` consumes).
 
@@ -51,7 +51,7 @@ consumer builds, and `BoundedAuthorityProtocol.V1.Bounds` (the tightening-only b
 Anything else in `lib/` is internal.
 
 `assemble_compact/3` is the additive bounds-aware form accepted on 2026-08-19 under
-[ADR 0020](adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md). `/2` remains the
+ADR 0020. `/2` remains the
 profile-maximum default and is byte-identical to `/3` with `%{}` or `Bounds.maximum()`.
 
 ## Versioning posture
@@ -104,5 +104,5 @@ mix release.candidate
 
 The gate's claim is "two independent builds agree," scoped as regression detection: it catches the
 moment a future change introduces a non-deterministic packaged input. It does not assert the build
-is reproducible from a shared-cache self-comparison. See [ADR 0008](adr/0008-release-candidate-contract.md)
+is reproducible from a shared-cache self-comparison. See ADR 0008
 for the scope and the rejected alternatives.

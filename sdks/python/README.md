@@ -15,13 +15,11 @@ Its behavior is defined by the [specifications][specs] and the certified conform
 source comments cross-reference the Elixir reference implementation for traceability.
 
 [specs]: https://github.com/baselabs/bounded_authority_protocol/tree/main/spec
-[adr15]: https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0015-sdk-graduation-and-publish-topology.md
-[adr40]: https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0040-strict-ed25519-soundness-erratum.md
 
 ## Status
 
 **Not published.** The package is not on PyPI; `bounded-authority-verifier` is the name it will
-use. It moves to its own repository when it is first published ([ADR 0015][adr15]). Until then,
+use. It moves to its own repository when it is first published (ADR 0015). Until then,
 install it from this repository.
 
 - Version `0.1.0`, pre-1.0: the API may change between minor versions.
@@ -219,7 +217,7 @@ so log the fields you need by name.
 ## Strict Ed25519
 
 Every Ed25519 signature check goes through one module (`bounded_authority_verifier.ed25519`)
-that applies rule S1 of [ADR 0040][adr40] before the `cryptography` backend: exact widths,
+that applies rule S1 of ADR 0040 before the `cryptography` backend: exact widths,
 canonical `A` and `R`, neither of small order, `S < L`, then the cofactorless equation.
 `acceptable_public_key` is the key-entry check (canonical, not small order, on the curve), and
 the JWK and thumbprint functions refuse a key that fails it. `torsion_free` adds `[L]A = O`; call

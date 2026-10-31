@@ -6,7 +6,7 @@
   authority) and [`CHANGELOG.md`](CHANGELOG.md).
 - Wire formats and verification: the normative specs under [`spec/`](spec/), the protocol
   charter, threat model and conformance contract under [`docs/design/`](docs/design/), and the
-  ADR for the surface under [`docs/adr/`](docs/adr/).
+  local decision records under `.kimosabe/adr/` (gitignored; never packaged or published).
 - Verifier SDKs: [`sdks/README.md`](sdks/README.md), ADR 0014 and ADR 0015.
 - The tracked roadmap, ADRs, charter, threat model and conformance contract must always be
   sufficient to regenerate a reviewed plan; local process artifacts are aids only.

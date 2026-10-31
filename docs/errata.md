@@ -7,7 +7,7 @@ correct non-normative text, or add conformance cases. **No erratum may change a 
 existing certified corpus**: any change that would alter such an accept/reject outcome is a
 contract-major change and follows the evolution contract, never this registry. The one exception
 is a soundness repair ([governance § Soundness repairs](governance.md#soundness-repairs),
-[ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md)): it changes verdicts only from accept to
+ADR 0040): it changes verdicts only from accept to
 reject on producer-impossible inputs, adds its cases in a new additive corpus, and leaves every
 existing corpus verdict unchanged.
 

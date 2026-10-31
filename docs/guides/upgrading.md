@@ -2,7 +2,7 @@
 
 What a consumer of `bounded_authority_protocol` may rely on across releases, and what each
 release kind changes. The locked 0.1.0 release-candidate contract
-([ADR 0008](../../docs/adr/0008-release-candidate-contract.md)) remains the HISTORICAL record
+(ADR 0008) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
 ## 0.8.0 to 0.9.0
@@ -27,7 +27,7 @@ not select 0.9.0; move to `~> 0.9.0`.
 
 ## 0.7.0 to 0.8.0
 
-Soundness-repair minor (erratum 2, [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)):
+Soundness-repair minor (erratum 2, ADR 0040):
 every release before 0.8.0 accepts Ed25519 signatures under small-order and non-canonical keys,
 so every consumer should upgrade; see the security advisory. The requirement `~> 0.7.0` does not
 select 0.8.0; move to `~> 0.8.0`.
@@ -112,7 +112,7 @@ repository). Consumers on 0.5.0 need not upgrade; the pin bump is optional.
 Additive contract-major release: `0.5.0` activates the ES256 suite as contract-major 3 under
 `BoundedAuthorityProtocol.V3` (`BAP3-ES256-SHA256` — ECDSA P-256/SHA-256, RFC 7518 §3.4 raw
 `r || s` signatures with low-S canonicality, EC JWK holder keys, 65-byte uncompressed-SEC1 raw
-keys; [ADR 0035](../adr/0035-es256-contract-major-activation.md)) with its certified 292-case
+keys; ADR 0035) with its certified 292-case
 corpus, and ships the spec-facts v2/v3 extraction baselines inside the package. v1 and v2 are
 byte-frozen: wire bytes, bounds, public APIs, verdicts, and certified pins are unchanged, so
 v1/v2 consumers need only bump the requirement pin. The new namespace is opt-in — nothing that
@@ -121,15 +121,15 @@ does not reference `BoundedAuthorityProtocol.V3` changes.
 ## 0.4.1 to 0.4.2
 
 Documentation-truth patch: the corrected AP2 mandate-mapping note and the capability extension's
-selector-scope paragraph, [ADR 0029](../adr/0029-budget-window-posture.md) (the cumulative-budget
+selector-scope paragraph, ADR 0029 (the cumulative-budget
 posture; the `ba+budget-window` attestation-shape design explicitly deferred), and a batched
 dependency sweep. **No wire-format or public-API change**; no consumer action.
 
 ## 0.4.0 to 0.4.1
 
 No wire-format or public-API change: 0.4.1 lands the self-enforcing toolchain and the
-tri-platform build bar ([ADR 0031](../adr/0031-self-enforcing-toolchain-and-tri-platform-build-bar.md))
-and the dependency-currency gate ([ADR 0032](../adr/0032-dependency-currency-gate.md)) inside the
+tri-platform build bar (ADR 0031)
+and the dependency-currency gate (ADR 0032) inside the
 repository — the OTP assert is not shipped in the package, so consumer builds are unaffected.
 Bump the requirement as convenient; nothing else changes for consumers.
 

@@ -20,7 +20,7 @@ the Elixir reference implementation for traceability.
 **Not published.** There is no tagged module version and the Go module proxy does not serve
 this module, so `go get github.com/baselabs/bounded_authority_protocol_go` fails. The module
 moves to its own repository when it is first published
-([ADR 0015](../../docs/adr/0015-sdk-graduation-and-publish-topology.md)). Until then, use it
+(ADR 0015). Until then, use it
 from a checkout of this repository.
 
 - Go **1.25** or later (`go.mod`). CI installs Go with `actions/setup-go` and
@@ -218,7 +218,7 @@ redacted `String` method yet, so `fmt` prints their fields; log the fields you n
 ## Strict Ed25519
 
 Every Ed25519 signature check goes through one function (`verifyEd25519` in `ed25519.go`) that
-applies rule S1 of [ADR 0040](../../docs/adr/0040-strict-ed25519-soundness-erratum.md) before
+applies rule S1 of ADR 0040 before
 the standard-library backend: exact widths, canonical `A` and `R`, neither of small order,
 `S < L`, then the cofactorless equation. `AcceptablePublicKey` is the key-entry check (canonical,
 not small order, on the curve), and every JWK and thumbprint function returns `ErrInvalid` for a

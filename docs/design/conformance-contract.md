@@ -87,7 +87,7 @@ revocation, and effects.
 
 ## Strict-Ed25519 corpus
 
-The strict Ed25519 rule ([ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md),
+The strict Ed25519 rule (ADR 0040,
 `spec/bap-v1.md` § 14.1, `spec/bap-v2.md` § 7) has its own additive certified corpus under
 `priv/conformance/strict-ed25519`: profile `bap-strict-ed25519/1`, revision 1, 2,410 cases in 14
 families, index SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`. Its

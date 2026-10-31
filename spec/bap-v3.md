@@ -2,7 +2,7 @@
 
 Document revision: rev 1 (2026-09-21). Status: normative. Contract-major 3, suite
 `BAP3-ES256-SHA256`. This profile is activated by
-[ADR 0035](../docs/adr/0035-es256-contract-major-activation.md) under the
+ADR 0035 under the
 [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md); the signature-suite bridge
 it realizes is specified by the [AP2 interop profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/ap2-interop-profile.md) §3.
 
@@ -184,7 +184,7 @@ ceilings exactly as in v1; the fixed widths cannot be tightened or widened.
 ## 6. Requirement identifiers
 
 The v3 profile carries its own `REQ3-*` range per
-[ADR 0007](../docs/adr/0007-normative-requirement-identifiers.md); `REQ1-*` and `REQ2-*` ids
+ADR 0007; `REQ1-*` and `REQ2-*` ids
 remain bound to the v1 and v2 profiles and never apply to v3 behavior. The v3 MUST-to-cell
 traceability lives in the [requirement map](../docs/design/requirement-map.md) § v3.
 

@@ -894,19 +894,12 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   defp rule_10_anchor_completeness(_facts) do
     protocol = Path.join(@root, "docs/protocol-v1.md") |> File.read!()
 
-    adr =
-      Path.join(
-        @root,
-        "docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md"
-      )
-      |> File.read!()
-
     registries = Path.join(@root, "docs/design/registries.md") |> File.read!()
 
-    # protocol-v1.md and ADR 0004: EVERY pipe-table row must sit inside an anchored region.
+    # Every protocol-v1.md pipe-table row must sit inside an anchored region.
     uncovered =
       Enum.flat_map(
-        [{"docs/protocol-v1.md", protocol}, {"docs/adr/0004", adr}],
+        [{"docs/protocol-v1.md", protocol}],
         fn {name, doc} ->
           anchor_lines = anchor_line_numbers(doc)
           algebra_rows = algebra_row_numbers(doc)

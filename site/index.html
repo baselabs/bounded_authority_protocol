@@ -114,9 +114,9 @@
   <div class="fammap">
     <article class="famcard here">
       <h3><svg class="ic"><use href="#i-doc"/></svg> The protocol <small>· this repository</small></h3>
-      <p>The wire specs, the ADR library (thirty-plus recorded decisions), the certified
+      <p>The wire specs, the protocol reference, the certified
       conformance corpora, and the threat model. Everything else implements this.</p>
-      <div class="links"><a href="https://hex.pm/packages/bounded_authority_protocol">hex.pm</a><a href="https://github.com/baselabs/bounded_authority_protocol">repository</a><a href="#specs">specs</a><a href="#adrs">ADRs</a></div>
+      <div class="links"><a href="https://hex.pm/packages/bounded_authority_protocol">hex.pm</a><a href="https://github.com/baselabs/bounded_authority_protocol">repository</a><a href="#specs">specs</a><a href="#reference">reference</a></div>
     </article>
     <article class="famcard">
       <h3><svg class="ic"><use href="#i-seal"/></svg> The signer <small>· TypeScript</small></h3>
@@ -155,12 +155,12 @@
   </div>
 </section>
 
-<section id="adrs" class="wrap">
-  <div class="sec-head"><h2>Decisions, recorded</h2>
-  <p>Every load-bearing choice in the protocol has an ADR — from the public verifier boundary and
-  the normative parsing profile to the developer-portability contract and dependency-currency discipline.</p></div>
+<section id="reference" class="wrap">
+  <div class="sec-head"><h2>Protocol reference</h2>
+  <p>The protocol charter, threat model, and SDK notes describe the verification boundary
+  and implementation responsibilities.</p></div>
   <div class="libgrid">
-    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/tree/main/docs/adr">the full ADR library</a><br><small>0001 through today, each with context and consequences</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/protocol-charter.md">the protocol charter</a><br><small>scope, verification boundaries, and evolution rules</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/threat-model.md">the threat model</a><br><small>trust boundaries and the named misuses</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/typescript-sdk.md">the TypeScript SDK note</a><br><small>how the npm packages track this spec</small></div>
   </div>

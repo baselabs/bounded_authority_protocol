@@ -3,9 +3,9 @@
 Authoritative name coordination for the Bounded Authority Protocol, per the
 [standards track charter](standards-track.md). Reservation is immediate and cheap. Shared claims,
 selector kinds, and suite semantics activate only with a contract-major; a byte-distinct sibling
-proof `typ` may activate under [ADR 0027](../adr/0027-byte-distinct-application-proof-profiles.md),
+proof `typ` may activate under ADR 0027,
 and a byte-distinct sibling attestation `typ` under
-[ADR 0036](../adr/0036-role-attestation-profile.md) (labeled departure: the evolution contract's
+ADR 0036 (labeled departure: the evolution contract's
 second sibling class).
 The closed-profile posture is unchanged: a conforming verifier rejects every unlisted or
 reserved-but-inactive name exactly as it rejects any other unlisted member.
@@ -20,10 +20,10 @@ Naming scheme: `BAP<contract-major>-<signature>-<digest>`.
 
 | Suite | Status | Definition |
 |---|---|---|
-| `BAP1-Ed25519-SHA256` | active | EdDSA/Ed25519, SHA-256, RFC 8785 JCS, `BAP1-*` domain separators, fixed 32-byte keys / 64-byte signatures, strict Ed25519 verification (rule S1, [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)) — the complete contract-major 1 `normative profile` |
-| `BAP2-Ed25519-SHA256` | active | Contract-major 2 ([ADR 0030](../adr/0030-v2-contract-major-activation.md)): the same EdDSA/Ed25519, SHA-256, RFC 8785 JCS algorithms under the major-bound naming scheme, `BAP2-*` domain separators, payload `v: 2`, and the `lte`/`gte` selector kinds ([ADR 0028](../adr/0028-range-selector-kinds.md)); strict Ed25519 verification as for major 1 |
-| `BAP3-ES256-SHA256` | active | Contract-major 3 ([ADR 0035](../adr/0035-es256-contract-major-activation.md)): ECDSA over NIST P-256 with SHA-256 (`alg: "ES256"`, RFC 7518 §3.4 raw `r \|\| s` signatures with the low-S canonicality rule), RFC 8785 JCS, EC JWK holder keys with RFC 7638 thumbprints, uncompressed-SEC1 raw keys, `BAP3-*` domain separators, payload `v: 3`, and the five-kind selector algebra inherited from v2 |
-| ML-DSA family (FIPS 204 / RFC 9964) | anticipated | The post-quantum successor candidate family per `docs/adr/0026-pq-successor-suite.md`: ML-DSA-65 (category 3) baseline, ML-DSA-87 (category 5) higher tier, JOSE mapping per RFC 9964, hybrid Ed25519+ML-DSA composite posture reserved per draft-ietf-jose-pq-composite-sigs (decided at successor definition time); quantum-readiness statement and revisit triggers recorded there; activation successor-major only (ADR 0009). The family binds to whichever contract-major activates it — with majors 2 (ADR 0030) and 3 (ADR 0035) taken, its anticipated index is the next successor major |
+| `BAP1-Ed25519-SHA256` | active | EdDSA/Ed25519, SHA-256, RFC 8785 JCS, `BAP1-*` domain separators, fixed 32-byte keys / 64-byte signatures, strict Ed25519 verification (rule S1, ADR 0040) — the complete contract-major 1 `normative profile` |
+| `BAP2-Ed25519-SHA256` | active | Contract-major 2 (ADR 0030): the same EdDSA/Ed25519, SHA-256, RFC 8785 JCS algorithms under the major-bound naming scheme, `BAP2-*` domain separators, payload `v: 2`, and the `lte`/`gte` selector kinds (ADR 0028); strict Ed25519 verification as for major 1 |
+| `BAP3-ES256-SHA256` | active | Contract-major 3 (ADR 0035): ECDSA over NIST P-256 with SHA-256 (`alg: "ES256"`, RFC 7518 §3.4 raw `r \|\| s` signatures with the low-S canonicality rule), RFC 8785 JCS, EC JWK holder keys with RFC 7638 thumbprints, uncompressed-SEC1 raw keys, `BAP3-*` domain separators, payload `v: 3`, and the five-kind selector algebra inherited from v2 |
+| ML-DSA family (FIPS 204 / RFC 9964) | anticipated | The post-quantum successor candidate family per ADR 0026: ML-DSA-65 (category 3) baseline, ML-DSA-87 (category 5) higher tier, JOSE mapping per RFC 9964, hybrid Ed25519+ML-DSA composite posture reserved per draft-ietf-jose-pq-composite-sigs (decided at successor definition time); quantum-readiness statement and revisit triggers recorded there; activation successor-major only (ADR 0009). The family binds to whichever contract-major activates it — with majors 2 (ADR 0030) and 3 (ADR 0035) taken, its anticipated index is the next successor major |
 
 ## Claim names
 
@@ -32,10 +32,10 @@ Naming scheme: `BAP<contract-major>-<signature>-<digest>`.
 | `ba_inv` | active | Invocation UUID bound into the holder proof |
 | `ba_op` | active | Operation name bound into the holder proof |
 | `ba_req` | active | Request digest (`BAP1-REQUEST\0` domain) over `[operation, typed(cast_arguments)]` |
-| `ba_dlg` | reserved | Parent-grant hash binding a delegated (attenuated) grant to its parent — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md) |
+| `ba_dlg` | reserved | Parent-grant hash binding a delegated (attenuated) grant to its parent — charter § Delegation with attenuation; full mechanism specified in ADR 0010 |
 | `ba_obo` | reserved | Issuer-asserted on-behalf-of principal identifier (StringOrURI) — charter § Principal binding |
-| `ba_offline` | reserved | Issuer-set offline floor limits (maximum value with explicit currency, maximum offline use count, and offline-window expiry) as a closed nested grant-payload object — charter § Revocation and freshness (the R-BAP-1 requirements input was relocated out of the published set on 2026-09-22; [ADR 0016](../adr/0016-offline-eligible-grant-claims.md) is the mechanism of record); absence means online-only. Full mechanism (the closed `{cnt, cur, max, win}` object, the facts contract, the `max × cnt` ceiling, the `ba_dlg` attenuation interaction) specified in [ADR 0016](../adr/0016-offline-eligible-grant-claims.md); activation is a successor contract-major (the closed v1 profile rejects the name today) |
-| `ba_sut` | reserved | Suite-attestation payload binding (chain identity, sequence range, archive content digest, original suite, attestation time, typed suite-parameterized key) — [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
+| `ba_offline` | reserved | Issuer-set offline floor limits (maximum value with explicit currency, maximum offline use count, and offline-window expiry) as a closed nested grant-payload object — charter § Revocation and freshness (the R-BAP-1 requirements input was relocated out of the published set on 2026-09-22; ADR 0016 is the mechanism of record); absence means online-only. Full mechanism (the closed `{cnt, cur, max, win}` object, the facts contract, the `max × cnt` ceiling, the `ba_dlg` attenuation interaction) specified in ADR 0016; activation is a successor contract-major (the closed v1 profile rejects the name today) |
+| `ba_sut` | reserved | Suite-attestation payload binding (chain identity, sequence range, archive content digest, original suite, attestation time, typed suite-parameterized key) — ADR 0009 § 3 |
 
 Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti`, `cnf`, `ath`,
 `htm`, `htu`, `nonce`) carry their RFC 7519 / RFC 7638 / RFC 9449 registered meanings.
@@ -47,13 +47,13 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 |---|---|---|---|
 | `ba+cap` | active | `application/ba-cap+jwt` | Capability grant (compact JWS) |
 | `dpop+jwt` | active | registered by RFC 9449 | Holder proof (RFC 9449) |
-| `ba+loopback-proof` | active | `application/ba-loopback-proof+jwt` | Literal-loopback HTTP holder proof under `bap-application-proof/local-loopback-http/1` ([ADR 0027](../adr/0027-byte-distinct-application-proof-profiles.md)) |
+| `ba+loopback-proof` | active | `application/ba-loopback-proof+jwt` | Literal-loopback HTTP holder proof under `bap-application-proof/local-loopback-http/1` (ADR 0027) |
 | `ba+chain-anchor` | active | `application/ba-chain-anchor+jwt` | Signed consumption-chain boundary anchor |
-| `ba+role-attestation` | active | `application/ba-role-attestation+jwt` | Signed role attestation binding a subject key to a role under `bap-role-attestation/1` ([ADR 0036](../adr/0036-role-attestation-profile.md)) |
-| `ba+content-assertion` | active | `application/ba-content-assertion+jwt` | Standalone exact-content assertion under `bap-content-assertion/1` ([ADR 0037](../adr/0037-content-assertion-profile.md)) |
+| `ba+role-attestation` | active | `application/ba-role-attestation+jwt` | Signed role attestation binding a subject key to a role under `bap-role-attestation/1` (ADR 0036) |
+| `ba+content-assertion` | active | `application/ba-content-assertion+jwt` | Standalone exact-content assertion under `bap-content-assertion/1` (ADR 0037) |
 | `ba+key-transition` | active | `application/ba-key-transition+jwt` | Authenticated historical-key transition |
-| `ba+cap-delegated` | reserved | `application/ba-cap-delegated+jwt` | Delegated attenuated grant — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md) |
-| `ba+suite-attestation` | reserved | `application/ba-suite-attestation+jwt` | Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3 |
+| `ba+cap-delegated` | reserved | `application/ba-cap-delegated+jwt` | Delegated attenuated grant — charter § Delegation with attenuation; full mechanism specified in ADR 0010 |
+| `ba+suite-attestation` | reserved | `application/ba-suite-attestation+jwt` | Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; ADR 0009 § 3 |
 
 ## Application proof profiles
 
@@ -63,7 +63,7 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 
 ## Attestation profiles
 
-The sibling attestation class of [ADR 0036](../adr/0036-role-attestation-profile.md): standalone,
+The sibling attestation class of ADR 0036: standalone,
 grant-unbound signed artifacts verified only through their own named API.
 
 | Identity | Status | Protected `typ` | Definition |
@@ -78,8 +78,8 @@ grant-unbound signed artifacts verified only through their own named API.
 | `all` | active | Matches any argument root |
 | `equals` | active | Non-empty object path must exist; tagged semantic identity with the given value |
 | `one_of` | active | Non-empty object path must exist; tagged semantic identity with any listed value |
-| `lte` | active | Inclusive upper bound — the value at the path must be same-tag numeric and numerically ≤ the bound (comparison on the closed decoder-bounded numeric domain; cross-tag does not match); full mechanism specified in [ADR 0028](../adr/0028-range-selector-kinds.md), activated in the contract-major 2 closed profile by [ADR 0030](../adr/0030-v2-contract-major-activation.md) and inherited unchanged by the contract-major 3 closed profile ([ADR 0035](../adr/0035-es256-contract-major-activation.md)) (the v1 profile rejects the kind) |
-| `gte` | active | Inclusive lower bound — the value at the path must be same-tag numeric and numerically ≥ the bound (comparison on the closed decoder-bounded numeric domain; cross-tag does not match); full mechanism specified in [ADR 0028](../adr/0028-range-selector-kinds.md), activated in the contract-major 2 closed profile by [ADR 0030](../adr/0030-v2-contract-major-activation.md) and inherited unchanged by the contract-major 3 closed profile ([ADR 0035](../adr/0035-es256-contract-major-activation.md)) (the v1 profile rejects the kind) |
+| `lte` | active | Inclusive upper bound — the value at the path must be same-tag numeric and numerically ≤ the bound (comparison on the closed decoder-bounded numeric domain; cross-tag does not match); full mechanism specified in ADR 0028, activated in the contract-major 2 closed profile by ADR 0030 and inherited unchanged by the contract-major 3 closed profile (ADR 0035) (the v1 profile rejects the kind) |
+| `gte` | active | Inclusive lower bound — the value at the path must be same-tag numeric and numerically ≥ the bound (comparison on the closed decoder-bounded numeric domain; cross-tag does not match); full mechanism specified in ADR 0028, activated in the contract-major 2 closed profile by ADR 0030 and inherited unchanged by the contract-major 3 closed profile (ADR 0035) (the v1 profile rejects the kind) |
 
 New selector kinds activate only with a contract-major; candidate kinds are reserved here first so
 independent implementations never collide. `lte`/`gte` flipped reserved→active with contract-major 2

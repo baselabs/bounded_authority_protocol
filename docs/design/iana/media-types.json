@@ -36,7 +36,7 @@
    "restrictions_on_usage": "Exact literal-loopback HTTP targets only",
    "author": "Bounded Authority Protocol maintainers",
    "change_controller": "Bounded Authority Protocol maintainers",
-   "spec_purpose": "Literal-loopback HTTP holder proof under `bap-application-proof/local-loopback-http/1` ([ADR 0027](../adr/0027-byte-distinct-application-proof-profiles.md))",
+   "spec_purpose": "Literal-loopback HTTP holder proof under `bap-application-proof/local-loopback-http/1` (ADR 0027)",
    "wire_typ": "ba+loopback-proof"
   },
   {
@@ -74,7 +74,7 @@
    "restrictions_on_usage": "Attestation is evidence of a binding, not an authorization; trust selection and replay reservation are caller obligations",
    "author": "Bounded Authority Protocol maintainers",
    "change_controller": "Bounded Authority Protocol maintainers",
-   "spec_purpose": "Signed role attestation binding a subject key to a role under `bap-role-attestation/1` ([ADR 0036](../adr/0036-role-attestation-profile.md))",
+   "spec_purpose": "Signed role attestation binding a subject key to a role under `bap-role-attestation/1` (ADR 0036)",
    "wire_typ": "ba+role-attestation"
   },
   {
@@ -93,7 +93,7 @@
    "restrictions_on_usage": "Verification is evidence of a binding, not an authorization; trusted-key selection, content interpretation and durable successor selection are caller obligations",
    "author": "Bounded Authority Protocol maintainers",
    "change_controller": "Bounded Authority Protocol maintainers",
-   "spec_purpose": "Standalone exact-content assertion under `bap-content-assertion/1` ([ADR 0037](../adr/0037-content-assertion-profile.md))",
+   "spec_purpose": "Standalone exact-content assertion under `bap-content-assertion/1` (ADR 0037)",
    "wire_typ": "ba+content-assertion"
   },
   {
@@ -131,7 +131,7 @@
    "restrictions_on_usage": "Reserved",
    "author": "Bounded Authority Protocol maintainers",
    "change_controller": "Bounded Authority Protocol maintainers",
-   "spec_purpose": "Delegated attenuated grant — charter § Delegation with attenuation; full mechanism specified in [ADR 0010](../adr/0010-delegation-with-attenuation.md)",
+   "spec_purpose": "Delegated attenuated grant — charter § Delegation with attenuation; full mechanism specified in ADR 0010",
    "wire_typ": "ba+cap-delegated"
   },
   {
@@ -150,7 +150,7 @@
    "restrictions_on_usage": "Reserved",
    "author": "Bounded Authority Protocol maintainers",
    "change_controller": "Bounded Authority Protocol maintainers",
-   "spec_purpose": "Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; [ADR 0009](../adr/0009-cryptographic-suite-succession-and-cross-suite-evidence-longevity.md) § 3",
+   "spec_purpose": "Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; ADR 0009 § 3",
    "wire_typ": "ba+suite-attestation"
   }
  ]

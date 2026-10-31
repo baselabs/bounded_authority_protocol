@@ -61,8 +61,8 @@ evaluation** — the verifier treats them as failing
 (`docs/ap2/agent_authorization.md` § Verification and Processing Rules). The Bounded Authority
 Protocol's selector algebra is a **closed kind set** — contract-major 1 recognizes `all`, `equals`,
 and `one_of`; contract-major 2 adds the per-request range kinds `lte` and `gte`
-([`spec/bap-v2.md`](../../spec/bap-v2.md); [ADR 0028](../adr/0028-range-selector-kinds.md); activated
-by [ADR 0030](../adr/0030-v2-contract-major-activation.md), released in 0.4.0) — and unknown kinds,
+([`spec/bap-v2.md`](../../spec/bap-v2.md); ADR 0028; activated
+by ADR 0030, released in 0.4.0) — and unknown kinds,
 members, and encodings fail closed. Both protocols fail closed on the unrecognized; they differ in
 who may extend the recognized set (anyone, via a new AP2 constraint type; only a new BAP
 contract-major).
@@ -82,7 +82,7 @@ For the Payment Mandate constraints specifically (`docs/ap2/payment_mandate.md`)
   cumulative bound from grant bytes and request context alone. Budget enforcement routes to the
   issuer-attestation / runtime-accounting posture
   ([successor-major charter](../design/successor-major-charter.md) § Selector expressiveness;
-  [ADR 0029](../adr/0029-budget-window-posture.md)). This is a real structural disagreement between
+  ADR 0029). This is a real structural disagreement between
   the two protocols, recorded on purpose rather than papered over.
 
 ## Other structural differences a reviewer will meet

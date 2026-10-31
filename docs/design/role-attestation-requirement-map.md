@@ -6,7 +6,7 @@ evidence or an explicit downstream/release gate. The certified profile corpus is
 (40 cases) at `priv/conformance/attestation-profiles/role-attestation/v1`, index SHA-256
 `be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a`.
 
-Strict Ed25519 verification (erratum 2, [ADR 0040](../adr/0040-strict-ed25519-soundness-erratum.md)):
+Strict Ed25519 verification (erratum 2, ADR 0040):
 the profile's signature and key checks follow the strict rule of
 [`spec/bap-v1.md` § 14.1](../../spec/bap-v1.md#strict-ed25519). Its requirements keep their
 contract-major ids (`REQ1-SIGNING-ed25519-canonical-point`,

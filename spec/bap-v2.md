@@ -2,9 +2,9 @@
 
 Document revision: rev 2 (2026-10-12; erratum 2, ADR 0040). Status: normative. Contract-major 2, suite
 `BAP2-Ed25519-SHA256`. This profile is activated by
-[ADR 0030](../docs/adr/0030-v2-contract-major-activation.md) under the
+ADR 0030 under the
 [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md); the selector
-mechanism it activates is specified by [ADR 0028](../docs/adr/0028-range-selector-kinds.md).
+mechanism it activates is specified by ADR 0028.
 
 The v2 profile is a complete closed wire profile parallel to the frozen v1 profile
 ([bap-v1.md](bap-v1.md)). Conformance language, the abstract data model, JSON decoding and
@@ -141,7 +141,7 @@ never a widening (`REQ2-SELECTOR-attenuation-unchanged`).
 ## 5. Requirement identifiers
 
 The v2 profile carries its own `REQ2-*` range per
-[ADR 0007](../docs/adr/0007-normative-requirement-identifiers.md); `REQ1-*` ids remain bound to
+ADR 0007; `REQ1-*` ids remain bound to
 the v1 profile and never apply to v2 behavior. The v2 MUST-to-cell traceability lives in the
 [requirement map](../docs/design/requirement-map.md) § v2.
 
@@ -162,7 +162,7 @@ minted with ephemeral in-memory Ed25519 keys; no private material is tracked
 ## 7. Strict Ed25519 verification
 
 Revision 2 incorporates erratum 2, the strict Ed25519 verification soundness repair
-([ADR 0040](../docs/adr/0040-strict-ed25519-soundness-erratum.md)). Every Ed25519 signature a v2
+(ADR 0040). Every Ed25519 signature a v2
 verifier checks is verified under the strict rule of [bap-v1.md § 14.1](bap-v1.md#strict-ed25519),
 with these v2 requirement identifiers:
 

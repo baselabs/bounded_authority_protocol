@@ -3,7 +3,7 @@
 This document publishes the governance policy whose authoritative source is the
 [standards track charter](design/standards-track.md) § Governance; in any conflict, the charter
 governs. It is a companion republication: the policy is settled (decided in
-[ADR 0006](adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) §7 and stated in
+ADR 0006 §7 and stated in
 the charter § Governance), published here as a standalone normative project document so adopters
 read it directly.
 
@@ -33,16 +33,16 @@ departure 2).
 
 Editorial (errata; never verdict-changing) · soundness repair (an erratum that changes verdicts
 only from accept to reject on producer-impossible inputs, under every condition of
-[ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) Decision 4) · clarifying (minor version;
+ADR 0040 Decision 4) · clarifying (minor version;
 additive docs/cases only) ·
 byte-distinct sibling proof profile (breaking pre-1.0 package release, public ADR, independent
 normative/corpus/API identity) · byte-distinct sibling attestation profile (same release/ADR/identity
 shape, under its own class conditions) · existing-profile wire or verification behavior
 (contract-major only, with a public ADR).
 ([standards-track.md](design/standards-track.md) § Governance; amended by
-[ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md),
-[ADR 0036](adr/0036-role-attestation-profile.md), and
-[ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md).)
+ADR 0027,
+ADR 0036, and
+ADR 0040.)
 
 ## Soundness repairs
 
@@ -63,7 +63,7 @@ A soundness repair is not a sunset: the major continues, and it keeps no overlap
 which the vulnerable verdict remains conforming. Releases before the repair are retired on the
 package registry. A change that fails any condition remains contract-major work. The decision,
 its split justification, and the first instance are in
-[ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md).
+ADR 0040.
 
 ## Byte-distinct sibling proof profiles
 
@@ -79,12 +79,12 @@ This class does not create an open extension mechanism: there is no runtime prof
 negotiation, inference, fallback, or best-effort parsing. Every future sibling is another numbered
 public ADR and closed corpus. Any change to an existing profile's accepted bytes, claims, algorithms,
 bounds, suite, or verdicts remains contract-major work. The complete decision and rejection tests
-are in [ADR 0027](adr/0027-byte-distinct-application-proof-profiles.md).
+are in ADR 0027.
 
 ## Byte-distinct sibling attestation profiles
 
 A sibling attestation profile is the second sibling class
-([ADR 0036](adr/0036-role-attestation-profile.md)), permitted only when its artifact carries a new
+(ADR 0036), permitted only when its artifact carries a new
 signed protected `typ`, is standalone and grant-unbound (parsed by no existing profile's verification
 path, verified only through its own named API), cross-rejects every existing profile by corpus leg in
 both directions, and changes no byte, bound, or verdict anywhere. It has its own public namespace,
@@ -96,7 +96,7 @@ ADR-0036 release-evidence conditions. No runtime registry, negotiation, inferenc
 plugin mechanism exists. The charter's reserve-and-activate-in-a-major discipline for attestation
 shapes governs verifier-integration-bound artifacts; a consumer-gated artifact no major verifier
 ingests takes this class. The complete decision, the class conditions, and the rejection tests are
-in [ADR 0036](adr/0036-role-attestation-profile.md).
+in ADR 0036.
 
 ## Change control
 
@@ -109,7 +109,7 @@ charter § [Venue strategy](design/standards-track.md#venue-strategy)) accepts t
 process supersedes this one.
 ([standards-track.md](design/standards-track.md):204-208, verbatim except for departure 1 — the
 charter's "see below" is resolved to an explicit link to the charter § Venue strategy; the
-sibling-profile extension is [ADR 0036](adr/0036-role-attestation-profile.md) Decision 1.)
+sibling-profile extension is ADR 0036 Decision 1.)
 
 ## Errata channel
 
@@ -155,7 +155,7 @@ yet still a published, deployment-decided sunset, not a flag-day — never as a 
 bullet, verbatim except the deictic "above (§ The evolution contract)" resolved to a cross-doc link
 — departure 1.)
 A fix that meets every soundness-repair condition lands as an erratum with a security advisory,
-in the same release across every implementation; [ADR 0040](adr/0040-strict-ed25519-soundness-erratum.md) amends the charter
+in the same release across every implementation; ADR 0040 amends the charter
 bullet accordingly.
 [SECURITY.md](../SECURITY.md) cross-references this section instead of restating the rule, so the
 verdict-change rule lives in one place.

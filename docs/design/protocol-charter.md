@@ -10,8 +10,8 @@ state remain outside it.
 
 The protocol is on a standards track governed by the
 [standards track charter](standards-track.md) and
-[ADR 0006](../adr/0006-standards-evolution-suite-identity-and-delegation-posture.md) and
-[ADR 0027](../adr/0027-byte-distinct-application-proof-profiles.md): each closed wire profile is
+ADR 0006 and
+ADR 0027: each closed wire profile is
 permanent and evolution happens above it through parallel contract-majors or byte-distinct sibling
 application proof profiles with their own protected type, API, media type, and corpus; the
 current profile is the named suite `BAP1-Ed25519-SHA256` with a specified post-quantum succession
@@ -60,8 +60,8 @@ A stateful authority may issue a separate, narrower current-v1 `ba+cap` to a new
 resulting compact is an ordinary issuer-signed grant and carries no parent proof. Parent comparison,
 lineage, ancestor revocation, and fan-out policy remain online runtime responsibilities. The
 current profile still rejects `ba_dlg` and `ba+cap-delegated`; portable holder-signed delegation
-remains the successor-major design in [ADR 0010](../adr/0010-delegation-with-attenuation.md), as
-clarified by [ADR 0020](../adr/0020-bounds-aware-assembly-and-issuer-reauthorization-posture.md).
+remains the successor-major design in ADR 0010, as
+clarified by ADR 0020.
 
 ## Holder proof
 

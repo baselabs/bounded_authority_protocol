@@ -203,11 +203,11 @@ v1-only deployment range bounds are the deployment's responsibility (e.g. a sepa
 the server applies after verification), not the capability algebra's. The protocol's contract-major
 2 adds the per-request range kinds `lte` and `gte` (same-tag numeric operands, inclusive comparison)
 ([v2 profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v2.md);
-[ADR 0030](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0030-v2-contract-major-activation.md));
+ADR 0030);
 a future revision of this extension may bind v2 grants — this draft does not. Cumulative budgets
 remain outside the selector algebra in both majors — a stateless verifier cannot check a cumulative
 bound — and route to the issuer-attestation / runtime-accounting posture
-([ADR 0029](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/adr/0029-budget-window-posture.md)).
+(ADR 0029).
 
 ## 6. Security considerations
 

@@ -67,8 +67,8 @@ the *configuration* of push notifications as request content, never the webhook 
   is `lf.a2a.v1`). OBSERVED.
 - This repository at `fb83133`: `spec/bap-v1.md` (§§7, 10–14, 16, 17), `spec/bap-v2.md` (§4),
   `docs/design/registries.md`, `docs/design/ap2-interop-profile.md` (§6 cited, not restated),
-  `docs/design/successor-major-charter.md`, `docs/adr/0010`, `docs/adr/0013`, `docs/adr/0027`,
-  `docs/adr/0029` (cited), `docs/extensions/capability-authorization.mdx` (the MCP binding
+  `docs/design/successor-major-charter.md`, ADR 0010, ADR 0013, ADR 0027,
+  ADR 0029 (cited), `docs/extensions/capability-authorization.mdx` (the MCP binding
   precedent). OBSERVED.
 - gRPC over HTTP/2 protocol specification
   (`https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md`): requests are
@@ -389,7 +389,7 @@ rule.
 - **UCP.** Outside this binding decision's scope; a separately-owned open
   question whose precondition is pinning and reading a UCP source first. Nothing in this
   profile designs a UCP riding point. That question is now closed by
-  [ADR 0034](../adr/0034-ucp-riding-point-scoping.md): the riding point is transport-composed,
+  ADR 0034: the riding point is transport-composed,
   and this profile covers UCP's A2A transport as-is for deployments speaking A2A 1.0.
 
 ## 13. Verification posture and vectors
