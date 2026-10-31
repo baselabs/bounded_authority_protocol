@@ -2,6 +2,15 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
+## [0.9.1] — 2026-10-31
+
+### Documentation
+
+- Architecture decision records are local, ignored files and are excluded from the public source,
+  Hex archive, and HexDocs. Historical references no longer link to removed records.
+- Installation examples, the Livebook, and security guidance point to this ADR-free release.
+- No runtime, public API, wire format, or verification verdict changes.
+
 ## [0.9.0] — 2026-10-29
 
 A clarifying minor release (erratum 3). No verification verdict and no verdict of any existing

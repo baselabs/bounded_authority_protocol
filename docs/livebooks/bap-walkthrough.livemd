@@ -1,17 +1,14 @@
-<!--
-livebook:{"persist_outputs":true}
--->
+<!-- livebook:{"persist_outputs":true} -->
 
 # Bounded Authority Protocol — end-to-end walkthrough
 
 ```elixir
 Mix.install([
-  {:bounded_authority_protocol, "~> 0.9.0"}
+  {:bounded_authority_protocol, "~> 0.9.1"}
 ])
 ```
 
-Hex 0.9.0 is published (October 29, 2026), so the `Mix.install` above resolves from the public
-registry. The immutable package identity is the published Hex release; the source tag is
+The `Mix.install` above resolves release 0.9.1 from public Hex. The immutable package identity is the published Hex release; the source tag is
 reviewable release evidence, not a substitute for it.
 
 ## What this notebook covers
