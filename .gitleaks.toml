@@ -684,6 +684,8 @@ targetRules = ["generic-api-key"]
 regexTarget = "match"
 paths = [
   '''^priv/conformance/producer-canonicality/(?:profile\.json|cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json)$''',
+  '''^sdks/go/conformance/corpus-producer-canonicality/(?:profile\.json|cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json)$''',
+  '''^sdks/rust/conformance/corpus-producer-canonicality/(?:profile\.json|cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json)$''',
 ]
 regexes = [
   '''^REQ\-RA1\-API\-assembly\-revalidate","REQ1\-SIGNING\-ed25519\-producer\-canonical"$''',
@@ -716,12 +718,4 @@ paths = [
 ]
 regexes = [
   '''^REQ1\-KEY\-ed25519\-acceptable":"6d0d4d9f08e4ddbe5587119e76b2a4efb3589eea2339f1f54ed5f5cffa1e51fa"$''',
-]
-
-[[allowlists]]
-description = "Producer-canonicality corpus fixtures, the SDKs' vendored copies (machine-minted, certified, no private material - byte-identical to priv/conformance/producer-canonicality whose jwt matches the exact-regex block above, and the corpus declares private_material_tracked false; path-scoped because enumerating a generated corpus's values is unmaintainable)"
-targetRules = ["jwt", "generic-api-key"]
-paths = [
-  '''^sdks/go/conformance/corpus-producer-canonicality/(?:profile\.json|revision\.json|cases/[^/]+/[^/]+\.json)$''',
-  '''^sdks/rust/conformance/corpus-producer-canonicality/(?:profile\.json|revision\.json|cases/[^/]+/[^/]+\.json)$''',
 ]

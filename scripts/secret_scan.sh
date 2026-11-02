@@ -339,6 +339,8 @@ sdks/go/conformance/corpus-v3/cases/signing-input/probe.json
 priv/conformance/strict-ed25519/cases/envelope/probe.json
 sdks/rust/conformance/corpus-strict/cases/key-transition/probe.json
 priv/conformance/producer-canonicality/cases/es256-assemble/probe.json
+sdks/go/conformance/corpus-producer-canonicality/cases/es256-assemble/probe.json
+sdks/rust/conformance/corpus-producer-canonicality/cases/ed25519-export-encode/probe.json
 spec/facts/requirement-statements-v1.json
 lib/non_fixture_probe.ex'
   canary_file="$check_dir/root-canaries.txt"
@@ -407,6 +409,8 @@ sdks/rust/src/ed25519.rs
 sdks/typescript/conformance/corpus-v2/cases/anchored-export/probe.json
 sdks/typescript/test/facade.test.ts
 priv/conformance/producer-canonicality/cases/ed25519-assemble/probe.json
+sdks/go/conformance/corpus-producer-canonicality/cases/ed25519-assemble/probe.json
+sdks/rust/conformance/corpus-producer-canonicality/cases/ed25519-assemble/probe.json
 spec/facts/requirement-statements-v1.json
 EOF
   generic_repo="$check_dir/generic-repo"
@@ -454,6 +458,8 @@ sdks/go/conformance/corpus-v2/cases/grant-verify/probe.json
 sdks/go/permissiveness_internal_test.go
 sdks/typescript/conformance/corpus-v2/cases/grant-verify/probe.json
 priv/conformance/producer-canonicality/cases/es256-export-encode/probe.json
+sdks/go/conformance/corpus-producer-canonicality/cases/es256-export-encode/probe.json
+sdks/rust/conformance/corpus-producer-canonicality/cases/es256-export-encode/probe.json
 EOF
   python3 - "$config" "$generic_paths_file" "$jwt_paths_file" <<'PY'
 import re
