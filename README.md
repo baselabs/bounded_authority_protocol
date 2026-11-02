@@ -25,16 +25,14 @@ signatures and low-S canonicality).
 
 ## Installation
 
-The package is published on Hex (release 0.9.0, published October 29, 2026: a clarifying minor
-release, erratum 3; registry checksum
-`9a861f42ba4152e37620e2708cfa9689676671850108bb82de0ea56913626bca`, read back from the
-registry API and identical to the release-candidate archive of the tagged tree).
+Install release 0.9.1 from public Hex. This documentation release removes architecture
+decision records from the package and its published documentation; verification behavior is unchanged.
 Releases 0.7.0 and earlier are retired. Registry consumers use the minor-bounded requirement:
 
 ```elixir
 def deps do
   [
-    {:bounded_authority_protocol, "~> 0.9.0"}
+    {:bounded_authority_protocol, "~> 0.9.1"}
   ]
 end
 ```
@@ -279,7 +277,7 @@ mix run -e 'BoundedAuthorityProtocol.Conformance.Cli.Main.main(["--corpus", "dep
 or install it as a command once and run it from the project:
 
 ```bash
-mix escript.install hex bounded_authority_protocol 0.9.0
+mix escript.install hex bounded_authority_protocol 0.9.1
 bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus
 ```
 

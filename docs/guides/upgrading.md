@@ -5,6 +5,12 @@ release kind changes. The locked 0.1.0 release-candidate contract
 (ADR 0008) remains the HISTORICAL record
 of the frozen API surface; THIS document is the living contract consumers read.
 
+## 0.9.0 to 0.9.1
+
+Documentation-only patch. Architecture decision records are no longer distributed in the public
+source, Hex package, or HexDocs. Existing `~> 0.9.0` requirements accept this release; run
+`mix deps.update bounded_authority_protocol`. There are no API, wire, or verification changes.
+
 ## 0.8.0 to 0.9.0
 
 Clarifying minor (erratum 3). No verification verdict changes. The requirement `~> 0.8.0` does

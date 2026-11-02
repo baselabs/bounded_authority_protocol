@@ -17,11 +17,11 @@ operational.
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 0.9.0"}]
+  [{:bounded_authority_protocol, "~> 0.9.1"}]
 end
 ```
 
-Release 0.9.0 is the current Hex release (published October 29, 2026). Releases 0.7.0 and earlier are retired for a security
+Release 0.9.1 is the current Hex release. Releases 0.7.0 and earlier are retired for a security
 fix; the [changelog](../../CHANGELOG.md) and [Upgrading](upgrading.md)
 describe each release. Depend on the Hex package, never on a Git tag or checkout. The package
 has no runtime dependencies. Mix enforces its `elixir: "~> 1.18"` requirement; it also needs
@@ -292,7 +292,7 @@ mix run -e 'BoundedAuthorityProtocol.Conformance.Cli.Main.main(["--corpus", "dep
 ```
 
 Repeat with `v2/corpus`, `v3/corpus`, or `strict-ed25519` in place of `v1/corpus`. To install
-the CLI as a command instead, run `mix escript.install hex bounded_authority_protocol 0.9.0`
+the CLI as a command instead, run `mix escript.install hex bounded_authority_protocol 0.9.1`
 (it lands in `~/.mix/escripts`) and then
 `bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus`.
 In a checkout of this repository, `mix escript.build` builds the same CLI, and the repository's

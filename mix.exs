@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.MixProject do
   use Mix.Project
 
-  @version "0.9.0"
+  @version "0.9.1"
   @source_url "https://github.com/baselabs/bounded_authority_protocol"
 
   def project do
@@ -157,7 +157,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       extras: [
         {"README.md", [title: "Overview"]},
         "docs/guides/getting-started.md",
-        "docs/livebooks/bap-walkthrough.livemd",
+        {"docs/livebooks/bap-walkthrough.livemd", [title: "Protocol Livebook"]},
         "usage-rules.md",
         "docs/guides/upgrading.md",
         "docs/guides/implementers-guide.md",
