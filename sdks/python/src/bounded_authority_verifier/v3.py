@@ -49,9 +49,9 @@ from .bounds import (  # noqa: F401
     coerce_bounds,
 )
 from .compact import (  # noqa: F401
-    assemble_segments_es256,
     CompactSegments,
     SigningInput,
+    assemble_segments_es256,
     parse_compact,
     scan_compact,
 )

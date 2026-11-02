@@ -19,7 +19,7 @@ source comments cross-reference the Elixir reference implementation for traceabi
 ## Status
 
 **Not published.** The package is not on PyPI; `bounded-authority-verifier` is the name it will
-use. It moves to its own repository when it is first published (ADR 0015). Until then,
+use, and any package of that name there is not ours until this page says otherwise. It moves to its own repository when it is first published (ADR 0015). Until then,
 install it from this repository.
 
 - Version `0.1.0`, pre-1.0: the API may change between minor versions.
@@ -27,14 +27,9 @@ install it from this repository.
 - One runtime dependency, [`cryptography`](https://pypi.org/project/cryptography/) `>= 44.0.0`,
   for Ed25519 and ECDSA P-256 (CI pins 50.0.0). SHA-256 comes from `hashlib`; base64url, JSON
   decoding, and JCS canonicalization are implemented in the package.
-- **Erratum 3 (producer canonicality) is not yet implemented.** The producers that frame a
-  signature check its width but not its value: `assemble_compact` and `encode_anchored_export`
-  (and their `v2` and `v3` forms), `assemble_local_loopback_http_compact`,
-  `assemble_attestation_compact`, and `assemble_content_assertion_compact`. So they can
-  assemble an Ed25519 signature with `S >= L` or a non-canonical or small-order `R`, or an
-  ES256 signature that is out of range or high-S. Every verifier, this
-  one included, rejects such a credential. Until this package implements erratum 3, check a
-  signature from an external signer before assembly (for ES256, normalize to low S).
+- **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
+  conforming signer emits, with the same clauses as the Elixir reference, and the certified
+  `bap-producer-canonicality/1` corpus (75 cases) runs with this SDK's conformance suite.
 
 ## Install from this repository
 
@@ -240,8 +235,8 @@ python tests/conformance/run_strict.py   # strict Ed25519: 2410/2410
 `python -m pytest tests/` runs the unit tests, this quickstart, the local-loopback,
 role-attestation, and content-assertion corpora, the permissiveness battery (which builds each
 defect a parser closure exists to reject and proves the closure catches it), and pytest
-wrappers for the v1 and strict-Ed25519 runners. The producer-canonicality corpus (erratum 3) is
-not run yet; see Status.
+wrappers for the v1 and strict-Ed25519 runners. The producer-canonicality corpus (erratum 3)
+runs too, through `tests/conformance/run_producer_canonicality.py`.
 
 ## What this SDK does not do
 

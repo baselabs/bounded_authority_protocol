@@ -53,6 +53,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
 from bounded_authority_verifier import v2, v3
 from bounded_authority_verifier.bounds import Bounds, bounds_new
+from bounded_authority_verifier.compact import assemble_segments_es256
 from bounded_authority_verifier.ed25519 import reset_census, sha256
 from bounded_authority_verifier.error import InvalidError
 from bounded_authority_verifier.json_alg import (
@@ -111,7 +112,6 @@ from bounded_authority_verifier.v1 import (
     verify_anchored_export,
     verify_grant,
 )
-from bounded_authority_verifier.compact import assemble_segments_es256
 
 dec = json_decode
 

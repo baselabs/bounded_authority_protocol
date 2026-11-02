@@ -16,8 +16,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from bounded_authority_verifier import role_attestation, content_assertion, v1, v2, v3
-from bounded_authority_verifier.base64url import base64url_decode, base64url_encode
+from bounded_authority_verifier import content_assertion, role_attestation, v1, v2, v3
+from bounded_authority_verifier.base64url import base64url_decode
 from bounded_authority_verifier.compact import SigningInput
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]

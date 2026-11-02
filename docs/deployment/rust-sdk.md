@@ -9,7 +9,8 @@ has the quickstart and the full API list.
 
 ## Not published yet
 
-The crate is not on crates.io. It moves to its own repository when it is first published
+The crate is not on crates.io, and any crate of this name there is not ours until this page
+says otherwise. It moves to its own repository when it is first published
 (ADR 0015). Until then, depend on this
 repository by path or by Git commit:
 
@@ -23,10 +24,10 @@ bounded-authority-protocol = { git = "https://github.com/baselabs/bounded_author
 The path form expects this repository cloned next to your crate. Pin a commit: without a
 published version, the commit is the identity of what you deployed.
 
-Erratum 3 (producer canonicality) is not implemented in this crate yet: `assemble_compact`,
+Erratum 3 (producer canonicality) is implemented: `assemble_compact`,
 `encode_anchored_export` (and their `v2` and `v3` forms), `assemble_local_loopback_http_compact`,
-`assemble_attestation_compact`, and `assemble_content_assertion_compact` do not refuse a
-non-canonical signature. Verification is unaffected. See the SDK README.
+`assemble_attestation_compact`, and `assemble_content_assertion_compact` refuse a non-canonical
+signature. No verification verdict changes. See the SDK README.
 
 ## Local-loopback application profile
 

@@ -30,15 +30,9 @@ from a checkout of this repository.
   `crypto/elliptic`, `crypto/sha256`, `crypto/subtle`, `math/big`, and pure parsing and
   formatting packages). `tools/license_check.sh` asserts the module graph stays empty.
 - **64-bit platforms only**: the bounds hold 9,007,199,254,740,991 in an `int`.
-- **Erratum 3 (producer canonicality) is not yet implemented.** The producers that frame a
-  signature check its width but not its value: `AssembleCompact` and `EncodeAnchoredExport`
-  (and their `Profile` and `EcdsaProfile` methods), `AssembleLocalLoopbackHTTPCompact`,
-  `AssembleAttestationCompact`, and `AssembleContentAssertionCompact`. So they can assemble an
-  Ed25519 signature with `S >= L` or a non-canonical or small-order `R`, or an ES256 signature
-  that is out of range or high-S.
-  Every verifier, this one included, rejects such a credential. Until this SDK implements
-  erratum 3, check a signature from an external signer before assembly (for ES256, normalize
-  to low S).
+- **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
+  conforming signer emits, with the same clauses as the Elixir reference, and the certified
+  `bap-producer-canonicality/1` corpus (75 cases) runs with this SDK's conformance suite.
 
 ## Install from a checkout
 
@@ -249,7 +243,8 @@ go test -v ./conformance/ | grep agreed
 # agreed=292 disagreed=0 census=8 declared=11
 ```
 
-The producer-canonicality corpus (erratum 3) is not run yet; see Status.
+The producer-canonicality corpus (erratum 3) runs too, in
+`conformance/producer_canonicality_test.go`.
 
 ## What this SDK does not do
 

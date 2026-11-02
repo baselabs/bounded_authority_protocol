@@ -38,7 +38,11 @@ fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     let out = hasher.finalize();
-    out.iter().map(|b| format!("{b:02x}")).collect()
+    out.iter().fold(String::new(), |mut acc, b| {
+        use std::fmt::Write;
+        write!(acc, "{b:02x}").unwrap();
+        acc
+    })
 }
 
 fn load_cases() -> Vec<Value> {
@@ -117,7 +121,9 @@ fn run_assemble(case: &Value) -> bool {
     let major = case.get("major").and_then(Value::as_u64);
     let profile = case["profile"].as_str();
     let kind = match (major, profile) {
-        (_, Some("bap-application-proof/local-loopback-http/1")) => SigningKind::LocalLoopbackHttpProof,
+        (_, Some("bap-application-proof/local-loopback-http/1")) => {
+            SigningKind::LocalLoopbackHttpProof
+        }
         (_, Some("bap-role-attestation/1")) => SigningKind::RoleAttestation,
         (_, Some("bap-content-assertion/1")) => SigningKind::ContentAssertion,
         (Some(1), _) | (None, _) => wire_kind(input["kind"].as_str().unwrap_or("grant")),
@@ -204,7 +210,7 @@ fn expected_export(case: &Value) -> (AnchoredExportInput, ExpectedExport) {
     let digest = e
         .get("digest")
         .and_then(Value::as_str)
-        .map(|s| digest32(s))
+        .map(digest32)
         .unwrap_or([0u8; 32]);
     let version = e
         .get("object_version")
@@ -266,7 +272,8 @@ fn producer_canonicality_corpus_all_cases_agree() {
             run_encode(case)
         };
         assert_eq!(
-            ok, want_valid,
+            ok,
+            want_valid,
             "{id} ({}): expected verdict {}, got ok={ok}",
             case["class"].as_str().unwrap(),
             case["expected"]["verdict"].as_str().unwrap()

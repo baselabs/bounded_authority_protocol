@@ -18,7 +18,7 @@ the Elixir reference implementation for traceability.
 ## Status
 
 **Not published.** The crate is not on crates.io; the name `bounded-authority-protocol` is the
-one it will use. It moves to its own repository when it is first published
+one it will use, and any crate of that name there is not ours until this page says otherwise. It moves to its own repository when it is first published
 (ADR 0015). Until then, depend on
 a checkout of this repository.
 
@@ -29,14 +29,9 @@ a checkout of this repository.
   dependency of `p256`; later 1.x releases need Rust 1.85). See the
   [deployment notes](../../docs/deployment/rust-sdk.md) for the full tree and its `unsafe` use.
 - `#![forbid(unsafe_code)]` covers this crate's own source.
-- **Erratum 3 (producer canonicality) is not yet implemented.** The producers that frame a
-  signature check its width but not its value: `assemble_compact` and `encode_anchored_export`
-  (and their `v2` and `v3` forms), `assemble_local_loopback_http_compact`,
-  `assemble_attestation_compact`, and `assemble_content_assertion_compact`. So they can
-  assemble an Ed25519 signature with `S >= L` or a non-canonical or small-order `R`, or an
-  ES256 signature that is out of range or high-S. Every verifier, this
-  one included, rejects such a credential. Until this crate implements erratum 3, check a
-  signature from an external signer before assembly (for ES256, normalize to low S).
+- **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
+  conforming signer emits, with the same clauses as the Elixir reference, and the certified
+  `bap-producer-canonicality/1` corpus (75 cases) runs with this SDK's conformance suite.
 
 ## Install from a checkout
 
@@ -245,7 +240,8 @@ cargo test --locked --test conformance_strict   # 2,410 strict-Ed25519 cases
 cargo test --locked --test content_assertion    # 131 + 9 + 14 cases
 ```
 
-The producer-canonicality corpus (erratum 3) is not run yet; see Status.
+The producer-canonicality corpus (erratum 3) runs too, as the
+`conformance_producer_canonicality` test target.
 
 ## What this SDK does not do
 

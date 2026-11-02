@@ -366,10 +366,9 @@ red-capable with a per-language mutation test. The three in-repository SDKs also
 local-loopback (36 URI + 8 proof), role-attestation (40), content-assertion (131 + 9 + 14), and
 strict-Ed25519 (2,410) corpora; the TypeScript repository runs the same profile corpora.
 
-Erratum 3 (producer canonicality, above) is not yet implemented in any SDK: their compact
-assembly and anchored-export encoding check only the signature width, so they can assemble a
-signature that every verifier rejects. Validate or normalize a signature before assembling it
-with an SDK until that SDK's release notes say otherwise. See the [SDK index](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/README.md).
+Erratum 3 (producer canonicality, above) is implemented in every SDK: compact assembly and
+anchored-export encoding refuse a signature no conforming signer emits, and each SDK runs the
+`bap-producer-canonicality/1` corpus. See the [SDK index](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/README.md).
 
 ## Standards posture
 

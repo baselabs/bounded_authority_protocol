@@ -48,7 +48,6 @@ role-attestation, content-assertion, and strict-Ed25519 corpora, runs them in CI
 each `index.json` SHA-256 at load. When this repository rotates a corpus, the SDK repository
 takes a snapshot-bump commit, and the load-time check fails on any drift.
 
-Erratum 3 (producer canonicality) is not implemented in release 0.7.0: its compact assembly
-and anchored-export encoding (for every profile it implements) do not yet refuse a
-non-canonical signature, and it does not yet run the `bap-producer-canonicality/1` corpus.
-Verification is unaffected.
+Erratum 3 (producer canonicality) is implemented since release 0.8.0: compact assembly and
+anchored-export encoding (for every profile it implements) refuse a non-canonical signature,
+and the package runs the `bap-producer-canonicality/1` corpus. No verification verdict changes.

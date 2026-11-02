@@ -26,11 +26,11 @@ go mod edit \
 Record the commit you build from: without a published version, the commit is the identity of
 what you deployed.
 
-Erratum 3 (producer canonicality) is not implemented in this SDK yet: `AssembleCompact`,
+Erratum 3 (producer canonicality) is implemented: `AssembleCompact`,
 `EncodeAnchoredExport` (and their `Profile` and `EcdsaProfile` methods),
 `AssembleLocalLoopbackHTTPCompact`, `AssembleAttestationCompact`, and
-`AssembleContentAssertionCompact` do not refuse a non-canonical signature. Verification is
-unaffected. See the SDK README.
+`AssembleContentAssertionCompact` refuse a non-canonical signature. No verification verdict
+changes. See the SDK README.
 
 ## Runtime posture
 

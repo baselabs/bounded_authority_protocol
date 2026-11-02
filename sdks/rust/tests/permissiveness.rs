@@ -2026,7 +2026,11 @@ fn two_transition_export() -> ConformantExport {
             &max(),
         )
         .expect("t1");
-        compact_with_signature(&p.protected_segment, &p.payload_segment, &gate_passing_sig())
+        compact_with_signature(
+            &p.protected_segment,
+            &p.payload_segment,
+            &gate_passing_sig(),
+        )
     };
     let t2 = {
         let p = key_transition_signing_input(
@@ -2042,7 +2046,11 @@ fn two_transition_export() -> ConformantExport {
             &max(),
         )
         .expect("t2");
-        compact_with_signature(&p.protected_segment, &p.payload_segment, &gate_passing_sig())
+        compact_with_signature(
+            &p.protected_segment,
+            &p.payload_segment,
+            &gate_passing_sig(),
+        )
     };
     let end = {
         let p = boundary_anchor_signing_input(
@@ -2058,7 +2066,11 @@ fn two_transition_export() -> ConformantExport {
             &max(),
         )
         .expect("end anchor (seq 2)");
-        compact_with_signature(&p.protected_segment, &p.payload_segment, &gate_passing_sig())
+        compact_with_signature(
+            &p.protected_segment,
+            &p.payload_segment,
+            &gate_passing_sig(),
+        )
     };
     let expected = ExpectedExport {
         chain: ExpectedChain {
@@ -3643,7 +3655,10 @@ fn es256_rejects_prior_major_bytes_both_directions() {
         "{}.{}.{}",
         String::from_utf8(produced.protected_segment.clone()).unwrap(),
         String::from_utf8(produced.payload_segment.clone()).unwrap(),
-        String::from_utf8(bounded_authority_protocol::base64url_encode(&gate_passing_sig())).unwrap(),
+        String::from_utf8(bounded_authority_protocol::base64url_encode(
+            &gate_passing_sig()
+        ))
+        .unwrap(),
     );
     assert!(v3::decode_grant(compact.as_bytes(), &max()).is_ok());
     assert_eq!(
