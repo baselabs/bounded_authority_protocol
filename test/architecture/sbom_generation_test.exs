@@ -44,12 +44,8 @@ defmodule BoundedAuthorityProtocol.Architecture.SbomGenerationTest do
 
     assert release["bomFormat"] == "CycloneDX"
     assert release["components"] in [nil, []]
-    assert Enum.any?(tooling["components"], &(&1["name"] == "sbom" and &1["version"] == "0.11.0"))
-
-    assert Enum.any?(
-             tooling["components"],
-             &(&1["name"] == "protobuf" and &1["version"] == "0.17.1")
-           )
+    assert Enum.any?(tooling["components"], &(&1["name"] == "sbom"))
+    assert Enum.any?(tooling["components"], &(&1["name"] == "protobuf"))
 
     {license_output, license_status} =
       System.cmd(

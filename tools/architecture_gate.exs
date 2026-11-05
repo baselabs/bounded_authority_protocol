@@ -1,17 +1,17 @@
 defmodule BoundedAuthorityProtocol.ArchitectureGate do
   @moduledoc false
 
+  # Which development tools may appear, and only in dev/test. Version requirements live in
+  # mix.exs alone; Dependabot proposes updates and CI decides.
   @approved_dependencies %{
-    credo: {"~> 1.7", [:dev, :test]},
-    dialyxir: {"~> 1.4", [:dev, :test]},
-    ex_doc: {"~> 0.40.3", [:dev, :test]},
-    jsonschex: {"~> 0.11.0", [:dev, :test]},
-    mix_audit: {"~> 2.1", [:dev, :test]},
-    sbom: {"~> 0.11.0", [:dev, :test]},
-    # sbom 0.11.0 still requires hex_core ~> 0.19.0; the dev/test override takes 0.20.0
-    # for EEF-CVE-2026-103502 until an sbom release accepts it.
-    hex_core: {"~> 0.20.0", [:dev, :test]},
-    stream_data: {"~> 1.1", [:dev, :test]}
+    credo: [:dev, :test],
+    dialyxir: [:dev, :test],
+    ex_doc: [:dev, :test],
+    jsonschex: [:dev, :test],
+    mix_audit: [:dev, :test],
+    sbom: [:dev, :test],
+    hex_core: [:dev, :test],
+    stream_data: [:dev, :test]
   }
 
   @compiled_dynamic_allowances %{
@@ -1097,22 +1097,20 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           :error ->
             []
 
-          {:ok, {requirement, environments}} ->
-            dependency_option_violations(dependency, requirement, environments)
+          {:ok, environments} ->
+            dependency_option_violations(dependency, environments)
         end
       end)
 
     unexpected ++ missing ++ invalid
   end
 
-  defp dependency_option_violations(dependency, requirement, environments) do
+  defp dependency_option_violations(dependency, environments) do
     options = dependency.options
     only = options |> Keyword.get(:only) |> List.wrap() |> Enum.sort()
     expected_only = Enum.sort(environments)
 
     checks = [
-      {dependency.requirement == requirement,
-       "requirement must be #{inspect(requirement)}, got #{inspect(dependency.requirement)}"},
       {only == expected_only, "only must be #{inspect(expected_only)}, got #{inspect(only)}"},
       {Keyword.get(options, :runtime) == false, "runtime must be false"},
       {not Keyword.has_key?(options, :path), "path dependencies are forbidden"},
