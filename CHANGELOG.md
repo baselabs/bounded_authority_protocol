@@ -6,6 +6,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- Replace retired test tooling jsonschex 0.10.0 (Hex security retirement) with the non-retired 0.11 line.
 - The three in-repo verifier SDKs (`sdks/python`, `sdks/rust`, `sdks/go`) implement erratum 3's
   producer-canonicality refusal on their assembly and anchored-export-encoding surfaces, with the
   same clauses as the Elixir reference and the graduated TypeScript verifier: Ed25519

@@ -72,7 +72,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       {:ex_doc, "~> 0.40.3", only: [:dev, :test], runtime: false},
       # Deliberate pin, not drift: 0.10 is a major-version jump pending a review of
       # its validator changes against the certified corpus schema gates.
-      {:jsonschex, "~> 0.10.0", only: [:dev, :test], runtime: false},
+      {:jsonschex, "~> 0.11.0", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # scripts/generate_sbom.exs runs through mix run --no-start and calls SBoM.CLI
       # after explicit startup; hex_core stays code-only so its :ssh dependency
