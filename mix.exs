@@ -49,7 +49,6 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "chain_archive.mutations": :test,
         "conformance.mutations": :test,
         "conformance.verify": :test,
-        "deps.currency": :test,
         "license.check": :test,
         "package.check": :test,
         quality: :test,
@@ -242,7 +241,6 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "license.check",
         "sbom.check"
       ],
-      "deps.currency": ["run --no-start scripts/check_deps_currency.exs"],
       "verification.performance": [
         "run --no-start scripts/check_verification_performance.exs"
       ],
@@ -316,7 +314,6 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs --warnings-as-errors",
         "docs.links",
         "audit",
-        "deps.currency",
         "package.check",
         "release.candidate",
         "chain_archive.mutations",

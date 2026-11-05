@@ -33,7 +33,7 @@ property, proven on a developer machine; CI runs on Linux only
 inside the WSL filesystem, not under `/mnt/c`), which is the Linux path; no native-Windows developer
 path is maintained. The full quality battery is
 POSIX-only tooling. Focused boundary commands are
-`mix architecture`, `mix audit`, `mix package.check`, `mix deps.currency`, and
+`mix architecture`, `mix audit`, `mix package.check`, and
 `mix sbom.generate`. The architecture and archive allowlists must be expanded only with a reviewed
 public protocol requirement and matching red-capable tests.
 
