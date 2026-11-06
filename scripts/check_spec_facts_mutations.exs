@@ -193,8 +193,20 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
   ]
 
   def run do
-    Enum.each(@mutations, &run_mutation/1)
+    # Every mutation and its own baseline run in their own scratch copies, so they run side by
+    # side, one per scheduler.
+    parallel(@mutations, &run_mutation/1)
     IO.puts("spec facts mutation gate: ok mutations=#{length(@mutations)}")
+  end
+
+  defp parallel(items, fun) do
+    items
+    |> Task.async_stream(fun,
+      max_concurrency: System.schedulers_online(),
+      ordered: false,
+      timeout: :infinity
+    )
+    |> Stream.run()
   end
 
   defp run_mutation(mutation) do
@@ -237,7 +249,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
   defp baseline_green!(mutation) do
     key = {:baseline_green, mutation.name}
 
-    if Process.get(key) != :ok do
+    if :persistent_term.get(key, nil) != :ok do
       scratch =
         Path.join(
           System.tmp_dir!(),
@@ -263,7 +275,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
                   "#{status}, so a post-mutation red cannot be attributed to the mutation\n#{output}"
         end
 
-        Process.put(key, :ok)
+        :persistent_term.put(key, :ok)
       after
         File.rm_rf!(scratch)
       end

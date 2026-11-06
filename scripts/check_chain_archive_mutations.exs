@@ -451,8 +451,24 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
   ]
 
   def run do
-    Enum.each(@mutations, &run_mutation/1)
+    # Each distinct command's baseline once, then every mutation; all of them run in their own
+    # scratch copy, so they run side by side, one per scheduler.
+    @mutations
+    |> Enum.uniq_by(& &1.command)
+    |> parallel(&baseline_green!/1)
+
+    parallel(@mutations, &run_mutation/1)
     IO.puts("chain_archive mutation gate: ok mutations=#{length(@mutations)}")
+  end
+
+  defp parallel(items, fun) do
+    items
+    |> Task.async_stream(fun,
+      max_concurrency: System.schedulers_online(),
+      ordered: false,
+      timeout: :infinity
+    )
+    |> Stream.run()
   end
 
   defp run_mutation(mutation) do
@@ -496,7 +512,7 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
   defp baseline_green!(mutation) do
     key = {:baseline_green, mutation.command}
 
-    if Process.get(key) != :ok do
+    if :persistent_term.get(key, nil) != :ok do
       scratch =
         Path.join(
           System.tmp_dir!(),
@@ -522,7 +538,7 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
                   "#{status}, so a post-mutation red cannot be attributed to the mutation\n#{output}"
         end
 
-        Process.put(key, :ok)
+        :persistent_term.put(key, :ok)
       after
         File.rm_rf!(scratch)
       end
