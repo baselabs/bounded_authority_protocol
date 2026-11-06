@@ -1437,6 +1437,14 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     |> Stream.run()
   end
 
+  # Each run's own temporary directory, beside its scratch copy: tests that use fixed names
+  # under System.tmp_dir!/0 would otherwise collide when one test file runs in two copies at once.
+  defp private_tmp!(scratch) do
+    path = scratch <> ".tmp"
+    File.mkdir_p!(path)
+    path
+  end
+
   defp run_mutation(mutation) do
     baseline_green!(mutation)
 
@@ -1457,7 +1465,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       {output, status} =
         System.cmd(hd(command_for(mutation)), command_args(command_for(mutation)),
           cd: scratch,
-          env: [{"MIX_ENV", "test"}],
+          env: [{"MIX_ENV", "test"}, {"TMPDIR", private_tmp!(scratch)}],
           stderr_to_stdout: true
         )
 
@@ -1473,6 +1481,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       IO.puts("mutation caught: #{mutation.name}")
     after
       File.rm_rf!(scratch)
+      File.rm_rf!(scratch <> ".tmp")
     end
   end
 
@@ -1501,7 +1510,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         {output, status} =
           System.cmd(hd(command_for(mutation)), command_args(command_for(mutation)),
             cd: scratch,
-            env: [{"MIX_ENV", "test"}],
+            env: [{"MIX_ENV", "test"}, {"TMPDIR", private_tmp!(scratch)}],
             stderr_to_stdout: true
           )
 
@@ -1513,6 +1522,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         :persistent_term.put(key, :ok)
       after
         File.rm_rf!(scratch)
+        File.rm_rf!(scratch <> ".tmp")
       end
     end
 
