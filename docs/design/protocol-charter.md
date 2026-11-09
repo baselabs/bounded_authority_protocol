@@ -9,9 +9,8 @@ state remain outside it.
 ## Standards posture
 
 The protocol is on a standards track governed by the
-[standards track charter](standards-track.md) and
-ADR 0006 and
-ADR 0027: each closed wire profile is
+[standards track charter](standards-track.md) and the
+[governance policy](../governance.md): each closed wire profile is
 permanent and evolution happens above it through parallel contract-majors or byte-distinct sibling
 application proof profiles with their own protected type, API, media type, and corpus; the
 current profile is the named suite `BAP1-Ed25519-SHA256` with a specified post-quantum succession
@@ -60,8 +59,8 @@ A stateful authority may issue a separate, narrower current-v1 `ba+cap` to a new
 resulting compact is an ordinary issuer-signed grant and carries no parent proof. Parent comparison,
 lineage, ancestor revocation, and fan-out policy remain online runtime responsibilities. The
 current profile still rejects `ba_dlg` and `ba+cap-delegated`; portable holder-signed delegation
-remains the successor-major design in ADR 0010, as
-clarified by ADR 0020.
+remains successor-major design work, charted in the
+[successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md).
 
 ## Holder proof
 

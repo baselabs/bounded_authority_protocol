@@ -1,9 +1,10 @@
 # The successor-major (v2) charter — consolidated scope
 
-**Status:** design-only. This charter consolidates everything a successor contract-major is
-charted to standardize, from the accepted ADRs that carry each mechanism. It activates
-nothing: every name and mechanism below is reserved-and-rejected in the closed v1 profile
-(the 283-green conformance corpus proves the rejection mechanically), and activation follows
+**Status:** in force. Two successor contract-majors have been activated under this charter:
+contract-major 2 ([`spec/bap-v2.md`](../../spec/bap-v2.md), the inclusive range selector kinds
+of § 5 below) and contract-major 3 ([`spec/bap-v3.md`](../../spec/bap-v3.md), the ES256
+signature suite). The remaining mechanisms below stay reserved-and-rejected in every shipped
+major (the certified corpora prove the rejection mechanically); activating any of them follows
 the successor-major process (complete closed profile, corpus, cross-suite evidence rules).
 
 ## The absolute constants (unchanged across majors)
@@ -20,7 +21,7 @@ These do not move — they are the protocol's identity, not its features:
 
 ## Successor-major scope
 
-### 1. Delegation with attenuation (ADR 0010)
+### 1. Delegation with attenuation
 
 The `ba_dlg` parent-grant-hash claim and the `ba+cap-delegated` typ with header-`jwk`
 parent-holder key binding; the four-part attenuation relation (set-containment on distinct
@@ -28,7 +29,7 @@ tuples over the existing selector algebra, proven decidable); the depth-bounded
 chain-verification algorithm. Portable holder-signed delegation is successor-major; the
 current v1 wire rejects both names.
 
-### 2. Offline-eligible floor limits (ADR 0016)
+### 2. Offline-eligible floor limits
 
 The reserved `ba_offline` claim: the closed `{cnt, cur, max, win}` nested object (maximum
 value with explicit currency, maximum offline use count, offline-window expiry), the
@@ -37,9 +38,9 @@ interaction. Absence means online-only. The endpoint honors floor limits at its 
 within the window; the runtime reconciles deferred consumption and surfaces over-consumption
 as a first-class event.
 
-### 3. Suite succession and cross-suite evidence (ADR 0009 + ADR 0026)
+### 3. Suite succession and cross-suite evidence
 
-The `BAP2-*` ML-DSA candidate family (RFC 9964's JOSE mapping; ML-DSA-65 baseline,
+An ML-DSA candidate family under the next free `BAP<contract-major>-*` name (RFC 9964's JOSE mapping; ML-DSA-65 baseline,
 ML-DSA-87 tier); the hybrid-composite posture option (draft-ietf-jose-pq-composite-sigs,
 decided at definition time); the content-covering `ba+suite-attestation` / `ba_sut`
 countersignature that keeps v1 evidence verifiable after a classical break; the re-anchoring
@@ -66,7 +67,7 @@ semantics only:
   nonces for high-consequence operations; replay accounting and per-invocation audit from
   the consumption chain (`ba_inv` chained into append-only evidence); the status-check
   profile for long-lived grants defined once so deployments do not improvise; offline floor
-  limits per ADR 0016 for connectivity-window fleets.
+  limits (§ 2 above) for connectivity-window fleets.
 
 ### 5. Selector expressiveness (owner decision, 2026-08-26)
 
@@ -94,5 +95,5 @@ points here.
 1. Complete closed profile + spec revision under its own major.
 2. Conformance corpus with its own certified identity.
 3. Cross-suite evidence rules for prior-major artifacts.
-4. Registries: reserved names flip to active by ADR.
+4. Registries: reserved names flip to active in the published registries.
 5. The v1 profile's availability follows the governance document's deprecation policy.

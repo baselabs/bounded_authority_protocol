@@ -1,19 +1,17 @@
 # Requirement-to-conformance map (contract-major 1)
 
-This is the BAP-10 acceptance artifact: the traceability map from every normative requirement
-identifier (per ADR 0007, `REQ1-<SURFACE>-<tag>`
-for the `normative profile` and `REQ1-EVO-*` for the
+This is the requirement traceability map: it maps every normative requirement identifier
+(`REQ1-<SURFACE>-<tag>` for the [normative profile](../../spec/bap-v1.md) and `REQ1-EVO-*` for the
 [evolution contract](standards-track.md)) to the conformance corpus cells that prove it.
 
-The BAP-10 acceptance bar (ADR 0006
-§3; `docs/ROADMAP.md` BAP-10): *every MUST maps to at least one conformance applicability cell
-(surface × class) or a named falsifiable gap, with the mapping published.* A cell satisfies §3 only
-when it is **populated** (the `(surface, class)` pair has at least one executed case in
-`priv/conformance/v1/corpus/index.json`). `n/a` and `gap` rows do not satisfy §3 on their own; they
-are recorded with a falsifiable reason and are reviewed at closeout against the
-ADR 0005 n_a criterion (an input-algebra
-impossibility, not a process/deployment constraint — a process-constraint reason is the
-self-contradiction ADR 0005 warns about and is a blocking finding).
+The acceptance bar: *every MUST maps to at least one conformance applicability cell
+(surface × class) or a named falsifiable gap, with the mapping published.* A cell satisfies the bar
+only when it is **populated** (the `(surface, class)` pair has at least one executed case in
+`priv/conformance/v1/corpus/index.json`). `n/a` and `gap` rows do not satisfy the bar on their own;
+they are recorded with a falsifiable reason and are reviewed against the
+[conformance contract](conformance-contract.md)'s `n_a` criterion: the reason must be an
+input-algebra impossibility, not a process or deployment constraint. A process-constraint reason
+contradicts that criterion and is a blocking finding.
 
 ## Schema
 
@@ -23,8 +21,8 @@ self-contradiction ADR 0005 warns about and is a blocking finding).
 | Requirement | One-line restatement of the normative requirement. |
 | Surface(s) | Corpus surface name(s) (one of the 28 in `index.json`). |
 | Cell class(es) | The conformance class(es) on that surface proving the requirement. |
-| Cell-type | `populated` (≥1 executed case — satisfies §3) · `n/a` (matrix marks it not-applicable, with reason) · `gap` (no cell on any surface; falsifiable reason required). |
-| Evidence / falsifiable reason | The `index.json` cell count for populated; the ADR 0005 input-algebra reason for n/a/gap. |
+| Cell-type | `populated` (≥1 executed case — satisfies the bar) · `n/a` (matrix marks it not-applicable, with reason) · `gap` (no cell on any surface; falsifiable reason required). |
+| Evidence / falsifiable reason | The `index.json` cell count for populated; the input-algebra reason for n/a/gap. |
 | Corpus rev | The corpus revision integer (`revision.json` sidecar) this row was validated against. |
 
 **Corpus revision for every row:** `1`.
@@ -56,7 +54,7 @@ could detect nothing — the sidecar's monotone integer replaced it). See § Mai
 
 | REQ-id | Requirement | Surface(s) | Cell class(es) | Cell-type | Evidence / reason |
 |---|---|---|---|---|---|
-| REQ1-B64-alphabet; REQ1-B64-no-padding; REQ1-B64-length; REQ1-B64-canonical | Segments use only the base64url alphabet, no padding/whitespace, length mod 4 ≠ 1, canonical re-encode reproduces input | base64url.decode | invalid_encoding | populated | base64url.decode.invalid_encoding=2 — **partial coverage**: the two cases exercise padding rejection (`AAA=`) and alphabet rejection (`a+b`); they do NOT exercise length-mod-4-equals-1, whitespace, non-zero pad bits, or alternate canonical encodings. Full coverage of every B64 trigger is a corpus-growth obligation (BAP-10 cannot add cases — verdict change). |
+| REQ1-B64-alphabet; REQ1-B64-no-padding; REQ1-B64-length; REQ1-B64-canonical | Segments use only the base64url alphabet, no padding/whitespace, length mod 4 ≠ 1, canonical re-encode reproduces input | base64url.decode | invalid_encoding | populated | base64url.decode.invalid_encoding=2 — **partial coverage**: the two cases exercise padding rejection (`AAA=`) and alphabet rejection (`a+b`); they do NOT exercise length-mod-4-equals-1, whitespace, non-zero pad bits, or alternate canonical encodings. Full coverage of every B64 trigger is a corpus-growth obligation (this map cannot add cases — that is a verdict change). |
 
 ## HEADER — protected headers (`decode_grant`, `decode_proof`, `verify_grant`, jwk surfaces)
 
@@ -104,7 +102,7 @@ could detect nothing — the sidecar's monotone integer replaced it). See § Mai
 | REQ-id | Requirement | Surface(s) | Cell class(es) | Cell-type | Evidence / reason |
 |---|---|---|---|---|---|
 | REQ1-SIGNING-exact-input; REQ1-SIGNING-any-order; REQ1-SIGNING-deterministic-produce | Exact RFC 7515 signing input, no bytes before/after; received segments; producers emit one deterministic JCS | grant_signing_input, proof_signing_input | valid | populated | grant_signing_input.valid=1; proof_signing_input.valid=2 |
-| REQ1-SIGNING-backend-reject | Backend rejection/exception after the strict Ed25519 gate returns exactly `{:error, :invalid}` (restated by ADR 0040) | verify_grant, check_envelope, ed25519.verify_strict | tamper_meaningful_byte, invalid | populated | verify_grant.tamper_meaningful_byte=1; check_envelope.tamper_meaningful_byte=1; the strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1) primitive family adds 4 gate-passing inputs the backend rejects (ed25519.verify_strict invalid=4) |
+| REQ1-SIGNING-backend-reject | Backend rejection/exception after the strict Ed25519 gate returns exactly `{:error, :invalid}` (restated by erratum 2) | verify_grant, check_envelope, ed25519.verify_strict | tamper_meaningful_byte, invalid | populated | verify_grant.tamper_meaningful_byte=1; check_envelope.tamper_meaningful_byte=1; the strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1) primitive family adds 4 gate-passing inputs the backend rejects (ed25519.verify_strict invalid=4) |
 | REQ1-SIGNING-ed25519-canonical-point | Ed25519 `A` and `R` are canonical encodings (`y < p`; no sign bit when `x = 0`), checked before any backend call | ed25519.verify_strict, verify_grant, check_envelope, verify_historical_anchor, verify_key_transition, verify_anchored_export, local_loopback_http, role_attestation, content_assertion | invalid, invalid_key, invalid_encoding, invalid_signature | populated | strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1): 237 cases — ed25519.verify_strict invalid=172 (including 4 published speccheck vectors); verify_grant invalid_key=6, invalid_encoding=2; check_envelope invalid_key=12, invalid_encoding=4; verify_historical_anchor invalid_key=6, invalid_encoding=2; verify_key_transition invalid_key=6, invalid_encoding=2; verify_anchored_export invalid_key=1; local_loopback_http 8; role_attestation 8; content_assertion invalid_signature=8. Every surface case violates only this rule |
 | REQ1-SIGNING-ed25519-small-order-reject | Neither Ed25519 `A` nor `R` is one of the eight points of order dividing 8, checked before any backend call | ed25519.verify_strict, verify_grant, check_envelope, verify_historical_anchor, verify_key_transition, verify_anchored_export, local_loopback_http, role_attestation, content_assertion | invalid, invalid_key, invalid_encoding, invalid_signature | populated | strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1): 294 cases — ed25519.verify_strict invalid=146 (including the key-holder-built small-order-`R` vectors and 3 published speccheck vectors); verify_grant invalid_key=9, invalid_encoding=9; check_envelope invalid_key=18, invalid_encoding=18; verify_historical_anchor and verify_key_transition invalid_key=9, invalid_encoding=9 each; verify_anchored_export invalid_key=3, invalid_encoding=1; local_loopback_http 18; role_attestation 18; content_assertion invalid_signature=18 |
 | REQ1-SIGNING-ed25519-scalar-range | The Ed25519 scalar `S` is below the group order `L`, checked before any backend call | ed25519.verify_strict, verify_grant, check_envelope, verify_historical_anchor, verify_key_transition, verify_anchored_export, local_loopback_http, role_attestation, content_assertion | invalid, invalid_encoding, invalid_signature | populated | strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1): 158 cases — ed25519.verify_strict invalid=141; verify_grant, verify_historical_anchor, and verify_key_transition invalid_encoding=2 each; check_envelope invalid_encoding=4; verify_anchored_export invalid_encoding=1; local_loopback_http 2; role_attestation 2; content_assertion invalid_signature=2. Backends also reject `S >= L`, so the gate check's load-bearing proof is the unit and mutation tier, not a corpus verdict |
@@ -117,7 +115,7 @@ could detect nothing — the sidecar's monotone integer replaced it). See § Mai
 
 The strict-Ed25519 rows above and below cite the additive strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1), certified index SHA-256
 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9` (2,410 cases;
-ADR 0040). In these rows `populated` means at
+erratum 2). In these rows `populated` means at
 least one executed case in that corpus; the v1 corpus and its cells are unchanged.
 
 | REQ-id | Requirement | Surface(s) | Cell class(es) | Cell-type | Evidence / reason |
@@ -175,7 +173,7 @@ least one executed case in that corpus; the v1 corpus and its cells are unchange
 These requirements govern the evolution mechanism, which lives above the wire format — they are not
 exercised by the v1 conformance corpus (the corpus verifies the *current* closed profile, not
 successor-major behavior, which does not yet exist). Each is recorded as a `gap` with a falsifiable
-input-algebra reason (per the gap gate, ADR 0005 n_a criterion): the current corpus's input algebra
+input-algebra reason (per the gap gate and the conformance contract's `n_a` criterion): the current corpus's input algebra
 cannot express a successor contract-major, a deprecation window, or an erratum, because none of those
 artifacts exist yet in v1. They become mappable when a successor-major corpus ships; the corpus-revision
 qualifier + re-walk obligation (§ Maintenance) makes that the successor slice's job.
@@ -188,16 +186,16 @@ qualifier + re-walk obligation (§ Maintenance) makes that the successor slice's
 | REQ1-EVO-mixed-major-invalid | Mixed-major envelopes invalid by construction | `populated` | check_envelope.invalid_request=3 (same cell family). |
 | REQ1-EVO-no-downgrade | No cross-major fallback/downgrade/best-effort parsing | `gap` | Input-algebra impossibility: "no fallback/downgrade path exists" is the absence of a code path, and a v1 corpus case is a single `(artifact, bounds)→verdict` pair that cannot express the non-existence of an alternative resolution path. The closed rejection any other major hits is exercised by `verify_grant.invalid_algorithm=1` (the mechanism no-downgrade relies on); the "no fallback path" governance invariant is over the codebase's structure, not a v1 input. |
 | REQ1-EVO-deprecation-prerequisites | Deprecation requires successor profile + corpus + 2 independent passing implementations | `gap` | Input-algebra impossibility: the v1 corpus input algebra is `(compact bytes, bounds)` and has no axis for "a successor contract-major exists, with a published corpus and two independent passing implementations." That is an industry-adoption state, not a v1 input→verdict pair, so no v1 corpus case can express it. |
-| REQ1-EVO-deprecation-window-minimum | Deprecation window never shorter than 12 months (a security contract-major is exempt — charter § Security policy, ADR 0012) | `gap` | Input-algebra impossibility: the v1 corpus input algebra has no temporal/policy axis; a 12-month minimum duration cannot be expressed as a v1 `(compact bytes, bounds)` input (the v1 verifier has no wall-clock input to test a duration against). |
+| REQ1-EVO-deprecation-window-minimum | Deprecation window never shorter than 12 months (a security contract-major is exempt — charter § Security policy) | `gap` | Input-algebra impossibility: the v1 corpus input algebra has no temporal/policy axis; a 12-month minimum duration cannot be expressed as a v1 `(compact bytes, bounds)` input (the v1 verifier has no wall-clock input to test a duration against). |
 | REQ1-EVO-parallel-support-during-window | Conforming deployments support both majors during the window | `gap` | Input-algebra impossibility: a v1 corpus case is a single `(artifact, bounds)→verdict` pair against the v1 closed profile; "a deployment accepts both v1 and a successor major in parallel" is a multi-artifact, multi-major deployment state with no successor major in scope to express. |
-| REQ1-EVO-sunset-is-deployment-decision | Sunset is a deployment decision after the window, never a silent library change; a soundness repair is not a sunset (ADR 0040) | `gap` | Input-algebra impossibility: "sunset is a deployment decision, never a silent library change" is a cross-release governance property over the library's version history; a v1 corpus case is a fixed `(compact bytes, bounds)→verdict` pair that cannot express a property spanning releases. |
-| REQ1-EVO-no-verdict-flip | No erratum may flip a verdict of an existing certified corpus; a soundness repair adds its cases in a new corpus and flips none (ADR 0040) | `gap` | Input-algebra impossibility: "no future erratum flips a corpus verdict" is a governance invariant over the errata process across releases; a v1 corpus case is a fixed `(compact bytes, bounds)→verdict` pair that cannot express a property over future errata. Verdict stability *within v1* is exercised by the mutation battery (conformance mutation gate, 55 mutations); the no-verdict-flip invariant is over the errata process, not a v1 input. |
+| REQ1-EVO-sunset-is-deployment-decision | Sunset is a deployment decision after the window, never a silent library change; a soundness repair is not a sunset (governance § Soundness repairs) | `gap` | Input-algebra impossibility: "sunset is a deployment decision, never a silent library change" is a cross-release governance property over the library's version history; a v1 corpus case is a fixed `(compact bytes, bounds)→verdict` pair that cannot express a property spanning releases. |
+| REQ1-EVO-no-verdict-flip | No erratum may flip a verdict of an existing certified corpus; a soundness repair adds its cases in a new corpus and flips none (governance § Soundness repairs) | `gap` | Input-algebra impossibility: "no future erratum flips a corpus verdict" is a governance invariant over the errata process across releases; a v1 corpus case is a fixed `(compact bytes, bounds)→verdict` pair that cannot express a property over future errata. Verdict stability *within v1* is exercised by the mutation battery (conformance mutation gate, 55 mutations); the no-verdict-flip invariant is over the errata process, not a v1 input. |
 
 ## v2 — the contract-major 2 profile (`spec/bap-v2.md`, corpus `priv/conformance/v2/corpus`, revision 1)
 
-The v2 profile activates the `lte`/`gte` range selector kinds (ADR 0028,
-ADR 0030). Its requirement ids carry the `REQ2-*`
-range (ADR 0007); cells cite the v2 index
+The v2 profile activates the `lte`/`gte` range selector kinds
+([`spec/bap-v2.md` § 4](../../spec/bap-v2.md#selectors)). Its requirement ids carry the `REQ2-*`
+range; cells cite the v2 index
 (`bounded-authority-protocol-v2-conformance-corpus-index`, 268 cases). The six new v2 gates'
 red proofs were executed against the mutation battery
 (`scripts/check_conformance_mutations.exs`, entries `v2-*`) on 2026-09-13 — each mutation was
@@ -218,10 +216,10 @@ observed failing, and the source restored byte-identical.
 | REQ2-SELECTOR-range-signed-zero | −0.0 = 0.0 by numeric comparison; a float-tagged zero bound (reachable through non-JCS bytes, which verifiers accept) stays valid and compares numerically | decode_grant, check_envelope | valid | populated | Corrected by erratum 6: the earlier claim that the wire cannot carry a float-tagged zero was false, because verification accepts non-JCS payload bytes. selector float-zero corpus (`bap-selector-float-zero/1`, revision 1, index SHA-256 `97fd7a99cdbf3acc0a78f5ba1c6556e23a63e0ad66f533e31fd69f82dc5f3003`), `major: 2` grant-decode valid=6 (`lte`/`gte` bounds `0.0`, `-0.0`, `-0e0`) and envelope valid=4 (`lte`/`gte` zero bounds against host `0.0`/`-0.0`) |
 | REQ2-SELECTOR-float-zero | v1 § 12 float-zero rule bound to contract-major 2 (`equals`/`one_of` only) (erratum 6) | decode_grant, check_envelope | invalid_selector, valid | populated | selector float-zero corpus (`bap-selector-float-zero/1`, revision 1, index SHA-256 `97fd7a99cdbf3acc0a78f5ba1c6556e23a63e0ad66f533e31fd69f82dc5f3003`), `major: 2` grant-decode invalid_selector=14, valid=14; envelope invalid_selector=8, valid=5. RED PROOF: with the decode check removed the corpus disagrees on 14 grant-decode and 3 envelope cases |
 | REQ2-SIGNING-integral-float-selector | `grant_signing_input` refuses a float-tagged integral number in any selector value, `lte`/`gte` bounds included (erratum 6) | grant_signing_input | invalid_selector, valid | populated | selector float-zero corpus (`bap-selector-float-zero/1`, revision 1, index SHA-256 `97fd7a99cdbf3acc0a78f5ba1c6556e23a63e0ad66f533e31fd69f82dc5f3003`), `major: 2` grant-signing-input invalid_selector=12, valid=6. RED PROOF: with the producer check removed all 12 refusals disagree |
-| REQ2-SELECTOR-attenuation-unchanged | Attenuation (when a successor major activates delegation) composes conjunctively over selector tuples, never inspects kind, and never widens; a cross-tag conjunct is unsatisfiable | (no v2 surface) | — | `gap` | Delegation is not active in contract-major 2 (ADR 0010 charter scope; ADR 0030 names it successor-major work), so no corpus surface exists to populate. The invariant is carried normatively by spec/bap-v2.md §4 and ADR 0028 §5, and becomes cell-populatable at the activating major. |
+| REQ2-SELECTOR-attenuation-unchanged | Attenuation (when a successor major activates delegation) composes conjunctively over selector tuples, never inspects kind, and never widens; a cross-tag conjunct is unsatisfiable | (no v2 surface) | — | `gap` | Delegation is not active in contract-major 2 (successor-major charter scope), so no corpus surface exists to populate. The invariant is carried normatively by spec/bap-v2.md §4, and becomes cell-populatable at the activating major. |
 | REQ2-SELECTOR-range-path-required; REQ2-SELECTOR-path-shape; REQ2-SELECTOR-range-interval; REQ2-SELECTOR-no-strict-kinds; REQ2-SELECTOR-count | Missing path fails closed; path/selector maxima bind range kinds; intervals are conjunctive; crossed endpoints unsatisfiable-not-error; strict kinds excluded | verify_grant, check_envelope | invalid_selector, valid, exact_bound | populated | verify_grant.invalid_selector=4 (empty path, over-maxima 65 selectors); check_envelope valid interval cases (endpoints exact_bound) and the equals-mix valid case; `lt` unknown-kind reject |
 | REQ2-SELECTOR-not-authorization; REQ2-SELECTOR-verdict-internal | No selector grants authorization; standalone grant verification never evaluates selectors | verify_grant, check_envelope | valid | populated | verify_grant.valid=1, check_envelope.valid=6 (facts carry `authorization: :not_evaluated`; range-bearing grants verify standalone without selector evaluation) |
-| REQ2-BOUNDS-inherited | Every v1 bound carries over unchanged; no new bound (ADR 0028 §4 review) | bounds.new | exact_bound, maximum_plus_one, invalid_limit | populated | bounds.new.exact_bound=38, maximum_plus_one=33, invalid_limit=6 (byte-carried v1 cells; the bounds module is shared) |
+| REQ2-BOUNDS-inherited | Every v1 bound carries over unchanged; no new bound (range-selector bounds review) | bounds.new | exact_bound, maximum_plus_one, invalid_limit | populated | bounds.new.exact_bound=38, maximum_plus_one=33, invalid_limit=6 (byte-carried v1 cells; the bounds module is shared) |
 | REQ2-SIGNING-ed25519-canonical-point | v2 Ed25519 `A` and `R` are canonical encodings, checked before any backend call | verify_grant, check_envelope, verify_historical_anchor, verify_key_transition, verify_anchored_export | invalid_key, invalid_encoding | populated | strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1), `major: 2` cases: 41 — verify_grant invalid_key=6, invalid_encoding=2; check_envelope invalid_key=12, invalid_encoding=4; verify_historical_anchor and verify_key_transition invalid_key=6, invalid_encoding=2 each; verify_anchored_export invalid_key=1 |
 | REQ2-SIGNING-ed25519-small-order-reject | Neither v2 Ed25519 `A` nor `R` is of small order, checked before any backend call | verify_grant, check_envelope, verify_historical_anchor, verify_key_transition, verify_anchored_export | invalid_key, invalid_encoding | populated | strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1), `major: 2` cases: 94 — verify_grant invalid_key=9, invalid_encoding=9; check_envelope invalid_key=18, invalid_encoding=18; verify_historical_anchor and verify_key_transition invalid_key=9, invalid_encoding=9 each; verify_anchored_export invalid_key=3, invalid_encoding=1 |
 | REQ2-SIGNING-ed25519-scalar-range | The v2 Ed25519 scalar `S` is below `L`, checked before any backend call | verify_grant, check_envelope, verify_historical_anchor, verify_key_transition, verify_anchored_export | invalid_encoding | populated | strict-Ed25519 corpus (`bap-strict-ed25519/1`, revision 1), `major: 2` cases: 11 — verify_grant, verify_historical_anchor, and verify_key_transition invalid_encoding=2 each; check_envelope invalid_encoding=4; verify_anchored_export invalid_encoding=1 |
@@ -232,11 +230,12 @@ observed failing, and the source restored byte-identical.
 
 ## v3 — the contract-major 3 ES256 suite (`spec/bap-v3.md`, corpus `priv/conformance/v3/corpus`, revision 1)
 
-The v3 profile activates the `BAP3-ES256-SHA256` suite (ADR 0035):
+The v3 profile activates the `BAP3-ES256-SHA256` suite
+([`spec/bap-v3.md`](../../spec/bap-v3.md)):
 `alg: "ES256"` over EC P-256, the RFC 7518 §3.4 raw `r || s` signature form with the low-S
 canonicality rule, EC JWKs and RFC 7638 EC thumbprints, uncompressed-SEC1 raw keys, and
 `BAP3-*` domain separators, under the five-kind selector algebra inherited from v2. Its
-requirement ids carry the `REQ3-*` range (ADR 0007);
+requirement ids carry the `REQ3-*` range;
 cells cite the v3 index (`bounded-authority-protocol-v3-conformance-corpus-index`, 292 cases).
 The v3 mutation gates' red proofs were executed against the battery
 (`scripts/check_conformance_mutations.exs`, entries `v3-*`) on 2026-09-21 — each mutation was
@@ -266,7 +265,7 @@ adjudicated as not verdict-provable is disclosed in its row below.
 | REQ3-SIGNING-integral-float-selector | `grant_signing_input` refuses a float-tagged integral number in any selector value, range bounds included (erratum 6) | grant_signing_input | invalid_selector, valid | populated | selector float-zero corpus (`bap-selector-float-zero/1`, revision 1, index SHA-256 `97fd7a99cdbf3acc0a78f5ba1c6556e23a63e0ad66f533e31fd69f82dc5f3003`), `major: 3` grant-signing-input invalid_selector=12, valid=6. RED PROOF: with the producer check removed all 12 refusals disagree |
 | REQ3-SIGNING-backend-reject | Backend rejection or exception (off-curve point raises at :crypto.verify) returns exactly closed invalid, never a crash | verify_grant, check_envelope, jwk.decode_public | invalid_key, tamper_meaningful_byte | populated | verify_grant.tamper_meaningful_byte=3 and check_envelope.tamper_meaningful_byte=1 (backend rejects wrong-math signatures); the off-curve JWK is rejected BEFORE the backend by the pure-arithmetic on-curve check (REQ3-KEY-point-on-curve). Since erratum 3 the public `BoundedAuthorityProtocol.Es256.verify_strict/3` admits the backend only for a binary message, a canonical signature, and an acceptable key (coordinates below `p`, on the curve; P-256 has prime order), so no input on which the backend raises reaches it; the former rescue clause was unreachable and is removed |
 | REQ3-SIGNING-digest-prefix | Request-digest prefix `BAP3-REQUEST\0` exact ASCII incl. final zero byte; archive prefix `BAP3-ARCHIVE\0EXPORT\0`; row hash domain `BAP3-CHAIN\0` | request_digest, encode_consumption_entry, check_chain, encode_anchored_export | valid, exact_bound | populated | request_digest.valid=2, exact_bound=1 (digests are prefix-bound); check_chain.valid=1 and encode_anchored_export.valid=1 (BAP3-CHAIN/BAP3-ARCHIVE framing end to end); the v1/v2 archive and row cross-major rejects are prefix-caught. RED PROOF: mutation `v3-request-digest-prefix-downgraded` (BAP3→BAP1) → the CLI test fails |
-| REQ3-BOUNDS-inherited | Every v1 bound carries over unchanged; no new bound | bounds.new | exact_bound, maximum_plus_one, invalid_limit | populated | bounds.new.exact_bound=38, maximum_plus_one=33, invalid_limit=6 (byte-carried v1 cells; the bounds module is shared). The suite's own fixed-width rules (65-byte keys, 64-byte signatures, 32-byte coordinates) are ADR 0035 §5's inert-width decision, not new Bounds entries |
+| REQ3-BOUNDS-inherited | Every v1 bound carries over unchanged; no new bound | bounds.new | exact_bound, maximum_plus_one, invalid_limit | populated | bounds.new.exact_bound=38, maximum_plus_one=33, invalid_limit=6 (byte-carried v1 cells; the bounds module is shared). The suite's own fixed-width rules (65-byte keys, 64-byte signatures, 32-byte coordinates) are fixed suite widths (`spec/bap-v3.md` § 5), not new Bounds entries |
 | REQ3-BOUNDS-fixed-widths | The EC fixed widths: 65-byte raw keys, 32-byte coordinates, 64-byte raw signatures, 32-byte digests | jwk.decode_public, jwk.encode_public, assemble_compact | invalid_key, invalid_encoding | populated | short/padded-coordinate rejects (jwk.decode_public.invalid_key=8); length-64/compressed key rejects (jwk.encode_public.invalid_key=2); short-signature reject (assemble_compact) |
 | REQ3-BOUNDS-ordering | Raw/encoded size checks precede decode; width checks precede the backend call; all precede crypto (the v1 ordering under EC shapes) | bounds.new, json.decode, decode_grant, jwk.decode_public | exact_bound, maximum_plus_one, invalid_key | populated | bounds.new.exact_bound=38, maximum_plus_one=33; json.decode byte-carried exact_bound cells; the short-coordinate JWK is rejected at width before any curve arithmetic |
 | REQ3-CORPUS-certified-identity | The v3 corpus is a certified artifact with its own pinned index identity | (CLI + SDK runners) | — | populated | certified SHA-256 pinned in the CLI (major-keyed map), the CLI test, and every SDK v3 runner; `mix conformance.verify` runs all three corpora (v1 = 283 unchanged pin, v2 = 268 unchanged pin, v3 = 292) |
@@ -289,7 +288,7 @@ proof. Three categories a standards reader must distinguish:
    *partially* proven by the current corpus). Where a requirement is only partially covered, the row
    is `populated` (the cell exists and rejects the inputs it names) but the partial coverage is
    disclosed in the evidence column; full coverage of every named trigger is a corpus-growth
-   obligation, not a BAP-10 deliverable (BAP-10 cannot add corpus cases — that is a verdict change).
+   obligation, not this map's (the map cannot add corpus cases — that is a verdict change).
 3. **Family proof** — a closed-set requirement (e.g. `REQ1-HEADER-closed-set`) is proven by the union
    of that surface's rejection cells (`invalid_algorithm`, `invalid_encoding`, `invalid_claim`, ...),
    each of which rejects one class of unlisted member. No single cell is "the" closed-set proof; the
@@ -308,17 +307,17 @@ never silently overstated as `populated`.
 
 - **93 requirement ids** total: 83 `REQ1-*` (spec/bap-v1.md) + 10 `REQ1-EVO-*` (standards-track.md).
   Six of the 83 (the four strict-Ed25519 `SIGNING` rows, `REQ1-KEY-ed25519-acceptable`, and
-  `REQ1-HOST-ed25519-torsion-free`) were added by erratum 2 (ADR 0040)
+  `REQ1-HOST-ed25519-torsion-free`) were added by erratum 2
   and map to populated cells of the additive strict-Ed25519 corpus; one
   (`REQ1-SIGNING-ed25519-producer-canonical`) was added by erratum 3 and maps to populated cells of
   the additive producer-canonicality corpus.
-- **v2 (ADR 0030 activation):** 28 `REQ2-*` ids over `spec/bap-v2.md` (22 at activation plus the
+- **v2:** 28 `REQ2-*` ids over `spec/bap-v2.md` (22 at activation plus the
   five strict-Ed25519 ids of erratum 2, which map to the strict corpus's `major: 2` cells, and the
   producer-canonicality id of erratum 3, which maps to that corpus's `major: 2` cells); the
   other 22 map to populated v2 corpus cells except the signed-zero row (input-algebra impossibility) and the
   attenuation row (delegation is not active in major 2), both recorded above. Corpus: `bounded-authority-protocol-v2-conformance-corpus-index` (268 cases, 28
   surfaces, 16 classes).
-- **v3 (ADR 0035 activation):** 24 `REQ3-*` ids over `spec/bap-v3.md`; 23 map to populated
+- **v3:** 24 `REQ3-*` ids over `spec/bap-v3.md`; 23 map to populated
   v3 corpus cells and `REQ3-SIGNING-producer-canonical` (erratum 3) to the producer-canonicality
   corpus. The earlier `REQ3-SIGNING-range` red-proof adjudication is withdrawn: its clauses are
   backend-coincident at verify, and the producer surfaces now isolate each of them, so
