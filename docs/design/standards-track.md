@@ -241,14 +241,10 @@ credibility step and the policy is what makes single-maintainer tolerable to ado
   ADR 0040 Decision 4.
 - **Deprecation policy.** As defined in the evolution contract above; the policy text there is the
   authoritative one.
-- **Security policy.** SECURITY.md governs vulnerability intake; a vulnerability whose fix would
-  change a verdict is handled as a contract-major security release with an accelerated overlap
-  window — published at announcement and set proportional to the vulnerability's severity, exempt
-  from the twelve-month deprecation minimum above (§ The evolution contract), yet still a published,
-  deployment-decided sunset, not a flag-day — never as a silent verdict change. A fix that meets
-  every soundness-repair condition (ADR 0040
-  Decision 4) lands instead as an erratum with an advisory, in the same release across every
-  implementation.
+- **Security policy.** SECURITY.md governs vulnerability intake. The verdict-change handling rule,
+  including soundness repairs and their disclosure, is stated in
+  [governance § Security policy](../governance.md#security-policy) and
+  [§ Soundness repairs](../governance.md#soundness-repairs).
 
 The governance policy's single normative home is [docs/governance.md](../governance.md);
 this charter cites it and carries no independent policy statements (the single-home

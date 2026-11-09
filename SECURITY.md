@@ -40,8 +40,8 @@ TypeScript verifier through the Security tab of its own repository,
 
 For a vulnerability whose fix would change a verification verdict, see the
 [governance policy § Security policy](docs/governance.md#security-policy) for the verdict-change
-handling rule: a soundness repair (an erratum with an advisory, shipped by every implementation
-in the same release) when every condition of
+handling rule: a soundness repair (an erratum, with an advisory when governance requires one,
+shipped by every implementation in the same release) when every condition of
 [§ Soundness repairs](docs/governance.md#soundness-repairs) holds, and otherwise an accelerated,
 published, deployment-decided contract-major overlap. A verdict never changes silently.
 

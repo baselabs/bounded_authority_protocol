@@ -1,11 +1,9 @@
 # Governance policy
 
-This document publishes the governance policy whose authoritative source is the
-[standards track charter](design/standards-track.md) § Governance; in any conflict, the charter
-governs. It is a companion republication: the policy is settled (decided in
-ADR 0006 §7 and stated in
-the charter § Governance), published here as a standalone normative project document so adopters
-read it directly.
+This document is the single normative home of the project's governance policy. The
+[standards track charter](design/standards-track.md) § Governance points here and carries no
+independent policy statement. The policy was first stated in the charter (decided in ADR 0006 §7)
+and is published here as a standalone normative project document so adopters read it directly.
 
 The bulk of each section below is verbatim from the charter § Governance
 ([standards-track.md](design/standards-track.md) § Governance). Four kinds of departure are
@@ -56,8 +54,10 @@ conforming. It is allowed only when all of the following hold:
    independent runners over every existing corpus;
 4. the new cases land in a new additive corpus with its own certified identity;
 5. every maintained SDK and the independent runners ship the repair in the same release window;
-6. disclosure follows the order: private advisory, then publication of the fixed releases, then
-   the public advisory.
+6. disclosure follows the order private advisory, then publication of the fixed releases, then
+   public advisory, when a party without the signing key can make a release before the repair
+   accept a newly rejected input; otherwise the errata entry, published with the fixed releases,
+   is the disclosure and names every affected release of every implementation.
 
 Verifiers that each conform to the published profile yet return different verdicts for the same
 issuer-signed bytes are an equivalent soundness failure: a constraint the issuer signed is enforced
@@ -65,10 +65,19 @@ by some conforming hosts and not by others, which defeats the certified corpus. 
 float zero) is a soundness repair on that ground.
 
 A soundness repair is not a sunset: the major continues, and it keeps no overlap window during
-which the vulnerable verdict remains conforming. Releases before the repair are retired on the
-package registry. A change that fails any condition remains contract-major work. The decision,
+which the vulnerable verdict remains conforming. Releases before a repair that needs an advisory
+under condition 6 are retired on the package registry; other earlier releases stay installable and
+return the pre-repair verdict, which the errata entry records. A change that fails any condition
+remains contract-major work. The decision,
 its split justification, and the first instance are in
 ADR 0040.
+
+*Note (2026-11-09):* condition 6 distinguishes keyless repairs from signer-bound ones. Erratum 2
+(strict Ed25519) is keyless: anyone can produce a malleable `S + L` signature, so it shipped with
+advisories and the earlier releases were retired. Erratum 6 (selector float zero) is signer-bound:
+every affected selector value sits inside issuer-signed bytes, so its errata entry is the
+disclosure and the earlier releases stay installable. The distinction was introduced with
+erratum 6.
 
 ## Byte-distinct sibling proof profiles
 
@@ -159,9 +168,8 @@ yet still a published, deployment-decided sunset, not a flag-day — never as a 
 ([standards-track.md](design/standards-track.md):214-218, the charter § Governance security-policy
 bullet, verbatim except the deictic "above (§ The evolution contract)" resolved to a cross-doc link
 — departure 1.)
-A fix that meets every soundness-repair condition lands as an erratum with a security advisory,
-in the same release across every implementation; ADR 0040 amends the charter
-bullet accordingly.
+A fix that meets every soundness-repair condition lands as an erratum, disclosed as condition 6
+of § Soundness repairs requires, in the same release across every implementation.
 [SECURITY.md](../SECURITY.md) cross-references this section instead of restating the rule, so the
 verdict-change rule lives in one place.
 
@@ -172,7 +180,8 @@ no-verdict-flip governance instrument, with a numbered entry and per-entry corpu
 currently carries Erratum 1, the correction for the v1 `all` selector's three recognized member
 sets (ADR 0021); Erratum 2, the strict Ed25519 verification soundness repair (ADR 0040); Erratum 3,
 producer-surface signature canonicality; Erratum 4, an editorial correction of the torsion
-encoding count in `spec/bap-v1.md` § 14.1; and Erratum 5, editorial heading anchors and
-cross-reference links in the contract-major specifications. New errata follow the § Errata channel no-verdict-flip process above. *(This
+encoding count in `spec/bap-v1.md` § 14.1; Erratum 5, editorial heading anchors and
+cross-reference links in the contract-major specifications; and Erratum 6, the signer-bound
+selector float-zero soundness repair. New errata follow the § Errata channel no-verdict-flip process above. *(This
 statement is this document's own framing of the registry's operational posture, not a charter
 extract — labeled as such.)*
