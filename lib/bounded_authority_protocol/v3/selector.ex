@@ -3,7 +3,7 @@ defmodule BoundedAuthorityProtocol.V3.Selector do
   Closed selector type used by `BoundedAuthorityProtocol.V3.Operation`.
 
   The v2 profile admits the two inclusive range kinds `lte` and `gte`
-  (ADR 0028) alongside the v1
+  (`spec/bap-v2.md` § 4) alongside the v1
   kinds. Both operands of a range comparison must carry the same numeric tag;
   comparison is by numeric value on the decoder-bounded finite binary64 domain.
   Selector enforcement is performed through the verification façade.
@@ -91,7 +91,7 @@ defmodule BoundedAuthorityProtocol.V3.Selector do
   defp numeric_bound?(_bound), do: false
 
   # Each arm's tag pattern is the same-tag domain: an {:integer, _} operand
-  # never satisfies an {:float, _} bound and vice versa (ADR 0028 §2), so a
+  # never satisfies an {:float, _} bound and vice versa (the same-tag rule), so a
   # cross-tag pair falls through to false rather than comparing numerically.
   defp lte?({:integer, left}, {:integer, right}), do: left <= right
   defp lte?({:float, left}, {:float, right}), do: left <= right

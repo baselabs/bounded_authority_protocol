@@ -8,8 +8,10 @@ single normative authority for the v1 wire profile. It is authored to be verifia
 machine extraction of its normative tables is frozen and drift-gated, and every requirement
 statement carries a stable requirement identifier mapped to conformance evidence. It makes no
 submission claim about any external venue. Revision 2 incorporates erratum 2, the strict Ed25519
-verification soundness repair of ADR 0040 ([§ 14.1](#strict-ed25519)). Revision 3 incorporates
-erratum 6, the selector float-zero soundness repair ([§ 12](#selectors)).
+verification soundness repair ([§ 14.1](#strict-ed25519)); errata 3 (producer-surface signature
+canonicality, [§ 16](#verification)), 4, and 5 (editorial) amend revision 2 in place. Revision 3
+incorporates erratum 6, the selector float-zero soundness repair ([§ 12](#selectors)). The
+[errata registry](../docs/errata.md) records each entry.
 
 A conforming implementation rejects every unlisted member, value, encoding, or extension with a
 single closed error value. Successful decode or verification is not a trust-selection or
@@ -37,7 +39,7 @@ grant:
   temporal validity, and a closed set of permitted operations.
 
 proof:
-: A closed, holder-signed request-binding object in the DPoP family [RFC9449], binding one
+: A closed, holder-signed request-binding object in the DPoP family [RFC 9449](https://www.rfc-editor.org/rfc/rfc9449), binding one
   HTTP method, target URI, invocation identifier, operation name, request digest, and the grant
   digest.
 
@@ -77,7 +79,7 @@ is not a defensive posture but the profile's central safety invariant.
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT",
 "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted
-as described in BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all capitals,
+as described in BCP 14 [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174) when, and only when, they appear in all capitals,
 as shown here. Lowercase forms carry their normal English meaning and impose no requirement.
 
 The closed-rejection rule is the profile's central invariant (`REQ1-CORE-reject-unlisted`): a
@@ -90,11 +92,11 @@ evidence is published in the requirement map (Appendix C locates the companion a
 ## 5. Suite identity
 
 This profile constitutes the cryptographic suite `BAP1-Ed25519-SHA256`: EdDSA over Ed25519
-[RFC8032] [RFC8037] verified under the strict rule of [§ 14.1](#strict-ed25519), SHA-256 digests, RFC 8785 canonical bytes [RFC8785], and the `BAP1-*`
+[RFC 8032](https://www.rfc-editor.org/rfc/rfc8032) [RFC 8037](https://www.rfc-editor.org/rfc/rfc8037) verified under the strict rule of [§ 14.1](#strict-ed25519), SHA-256 digests, RFC 8785 canonical bytes [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785), and the `BAP1-*`
 domain separators, with the fixed widths listed in the bounds table [§ 17](#maxima). Every artifact
 self-declares this identity through its `v` claim, `typ` header, `alg` value, and domain
 separators. Evolution happens above this profile, never inside it: successor contract-majors carry
-their own complete closed profiles and suites, while an ADR 0027 sibling application proof profile
+their own complete closed profiles and suites, while a byte-distinct sibling application proof profile
 carries a byte-distinct protected type, API, media type, and corpus and remains rejected by this
 profile. A proof's contract-major MUST equal its grant's (`REQ1-CORE-proof-major-equals-grant`), and
 the closed-rejection rule above is exactly what makes parallel majors and sibling profiles safe —
@@ -103,19 +105,19 @@ an artifact of any other major, suite, or proof profile fails closed here
 
 ## 6. Normative references
 
-[RFC2119]: Key words for use in RFCs to Indicate Requirement Levels
-[RFC8174]: Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words
-[RFC8259]: The JavaScript Object Notation (JSON) Data Interchange Format
-[RFC8785]: JSON Canonicalization Scheme (JCS)
-[RFC4648]: The Base16, Base32, and Base64 Data Encodings
-[RFC7515]: JSON Web Signature (JWS)
-[RFC7519]: JSON Web Token (JWT)
-[RFC7638]: JSON Web Key (JWK) Thumbprint
-[RFC8032]: Edwards-Curve Digital Signature Algorithm (EdDSA)
-[RFC8037]: Algorithm Identifiers for Ed25519 in JOSE
-[RFC3986]: Uniform Resource Identifier (URI): Generic Syntax
-[RFC6838]: Media Type Specifications and Registration Procedures
-[RFC9449]: OAuth 2.0 Demonstrating Proof-of-Possession (DPoP)
+- [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119): Key words for use in RFCs to Indicate Requirement Levels
+- [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174): Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words
+- [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259): The JavaScript Object Notation (JSON) Data Interchange Format
+- [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785): JSON Canonicalization Scheme (JCS)
+- [RFC 4648](https://www.rfc-editor.org/rfc/rfc4648): The Base16, Base32, and Base64 Data Encodings
+- [RFC 7515](https://www.rfc-editor.org/rfc/rfc7515): JSON Web Signature (JWS)
+- [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519): JSON Web Token (JWT)
+- [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638): JSON Web Key (JWK) Thumbprint
+- [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032): Edwards-Curve Digital Signature Algorithm (EdDSA)
+- [RFC 8037](https://www.rfc-editor.org/rfc/rfc8037): Algorithm Identifiers for Ed25519 in JOSE
+- [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986): Uniform Resource Identifier (URI): Generic Syntax
+- [RFC 6838](https://www.rfc-editor.org/rfc/rfc6838): Media Type Specifications and Registration Procedures
+- [RFC 9449](https://www.rfc-editor.org/rfc/rfc9449): OAuth 2.0 Demonstrating Proof-of-Possession (DPoP)
 
 These references supply generic encodings. The closed fields, values, digest prefixes, and
 bounds in the sections below are this profile's choices.
@@ -669,13 +671,13 @@ contract-major.
 ## 20. IANA considerations
 
 IANA is asked to register the following claim names in the JSON Web Token Claims Registry
-[RFC7519] (Specification Required): `ba_inv` (invocation UUID), `ba_op` (operation name), and
+[RFC 7519](https://www.rfc-editor.org/rfc/rfc7519) (Specification Required): `ba_inv` (invocation UUID), `ba_op` (operation name), and
 `ba_req` (request digest). The names `ba_dlg`, `ba_offline`, and `ba_sut` are reserved by this
 profile and are NOT registered; no implementation or deployment may use them for anything else
 before their activating contract-major.
 
 IANA is asked to register the media types `application/ba-cap+jwt`,
-`application/ba-chain-anchor+jwt`, and `application/ba-key-transition+jwt` (RFC 6838 [RFC6838]
+`application/ba-chain-anchor+jwt`, and `application/ba-key-transition+jwt` (RFC 6838 [RFC 6838](https://www.rfc-editor.org/rfc/rfc6838)
 field template; LIMITED USE). The names `application/ba-cap-delegated+jwt` and
 `application/ba-suite-attestation+jwt` are reserved for a successor contract-major and are NOT
 registered. The media-type namespace is distinct from the wire `typ` header values, which are

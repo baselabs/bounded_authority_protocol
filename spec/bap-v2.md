@@ -1,10 +1,11 @@
 # Bounded Authority Protocol v2 Wire Profile
 
-Document revision: rev 3 (2026-11-09; erratum 6; rev 2, 2026-10-12: erratum 2, ADR 0040). Status: normative. Contract-major 2, suite
-`BAP2-Ed25519-SHA256`. This profile is activated by
-ADR 0030 under the
-[successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md); the selector
-mechanism it activates is specified by ADR 0028.
+Document revision: rev 3 (2026-11-09: erratum 6; rev 2, 2026-10-12: erratum 2; errata 3 and 5
+amend revision 2 in place; see the [errata registry](../docs/errata.md)). Status: normative.
+Contract-major 2, suite `BAP2-Ed25519-SHA256`. This profile was activated under the
+[successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md);
+the selector mechanism it adds, the inclusive range kinds `lte` and `gte`, is specified in full in
+§4.
 
 The v2 profile is a complete closed wire profile parallel to the frozen v1 profile
 ([bap-v1.md](bap-v1.md)). Conformance language, the abstract data model, JSON decoding and
@@ -66,8 +67,8 @@ v2 grant, and the v2 façade exposes no loopback functions.
 
 ## 3. Hard maxima
 
-The v2 profile inherits every v1 bound unchanged (`REQ2-BOUNDS-inherited`): the ADR 0028 §4
-review found that a range comparison consumes two decoder-bounded numbers and produces a boolean
+The v2 profile inherits every v1 bound unchanged (`REQ2-BOUNDS-inherited`): the range-selector
+design review found that a range comparison consumes two decoder-bounded numbers and produces a boolean
 — it derives no new magnitude, so no new `Bounds` member is required. The complete bound set is
 the v1 §17 table, including the selector maxima restated in §5 below.
 
@@ -149,8 +150,8 @@ refuses a float-tagged integral number in any selector value, the `lte`/`gte` bo
 
 ## 5. Requirement identifiers
 
-The v2 profile carries its own `REQ2-*` range per
-ADR 0007; `REQ1-*` ids remain bound to
+The v2 profile carries its own `REQ2-*` range under the stable requirement-identifier
+scheme of [bap-v1.md](bap-v1.md); `REQ1-*` ids remain bound to
 the v1 profile and never apply to v2 behavior. The v2 MUST-to-cell traceability lives in the
 [requirement map](../docs/design/requirement-map.md) § v2.
 
@@ -159,7 +160,8 @@ the v1 profile and never apply to v2 behavior. The v2 MUST-to-cell traceability 
 The v2 conformance corpus is a certified artifact with its own identity
 (`priv/conformance/v2/corpus`, 268 cases across the 28 surfaces, 16 classes, revision 1). Its
 certified index SHA-256 is pinned in the verifier CLI and every SDK runner exactly as the v1
-corpus is (ADR 0014 D4). Version-neutral primitive surfaces (JSON/JCS/base64url/JWK/URI/bounds)
+corpus is; a runner fails closed unless the loaded corpus is that exact certified snapshot.
+Version-neutral primitive surfaces (JSON/JCS/base64url/JWK/URI/bounds)
 execute the same shared implementations the v1 corpus certifies, and their cases are carried
 into the v2 corpus byte-for-byte; the profile-bound surfaces carry v2-minted fixtures, the full
 range-selector applicability classes, and cross-major rejection vectors. Signed fixtures were
@@ -176,7 +178,7 @@ corpus changes.
 ## 7. Strict Ed25519 verification
 
 Revision 2 incorporates erratum 2, the strict Ed25519 verification soundness repair
-(ADR 0040). Every Ed25519 signature a v2
+([errata registry](../docs/errata.md), entry 2). Every Ed25519 signature a v2
 verifier checks is verified under the strict rule of [bap-v1.md § 14.1](bap-v1.md#strict-ed25519),
 with these v2 requirement identifiers:
 
