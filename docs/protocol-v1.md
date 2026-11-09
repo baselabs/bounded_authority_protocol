@@ -3,12 +3,13 @@
 
 # Bounded Authority Protocol v1 Wire Profile
 
-Document status: normative for contract-major 1. Document revision: rev 2. This document is the
+Document status: normative for contract-major 1. Document revision: rev 3. This document is the
 single normative authority for the v1 wire profile. It is authored to be verifiable in-repo: a
 machine extraction of its normative tables is frozen and drift-gated, and every requirement
 statement carries a stable requirement identifier mapped to conformance evidence. It makes no
 submission claim about any external venue. Revision 2 incorporates erratum 2, the strict Ed25519
-verification soundness repair of ADR 0040 ([§ 14.1](#strict-ed25519)).
+verification soundness repair of ADR 0040 ([§ 14.1](#strict-ed25519)). Revision 3 incorporates
+erratum 6, the selector float-zero soundness repair ([§ 12](#selectors)).
 
 A conforming implementation rejects every unlisted member, value, encoding, or extension with a
 single closed error value. Successful decode or verification is not a trust-selection or
@@ -139,6 +140,9 @@ order; duplicate-name rejection before any map conversion).
   without floating-point rounding (`REQ1-JSON-raw-lexeme`). Integers and finite floats are
   bounded symmetrically to `-9007199254740991..9007199254740991`
   (`REQ1-JSON-number-bounds`).
+- The sign of a float-tagged zero is not part of the algebra: `0.0`, `-0.0`, and every other
+  spelling of a float zero (`-0e0`, an underflowing `1e-400`) denote one value, and no verdict
+  depends on the sign a decoder happens to keep (erratum 6).
 
 The typed projection below maps the tagged algebra onto closed JSON for digest construction:
 each tagged value projects to a two-element array whose first element names the type, so an
@@ -190,6 +194,8 @@ The `BAP1-*` domain separators below are the suite-identity markers of `BAP1-Ed2
 `BAP1-CHAIN\0` and `BAP1-ARCHIVE\0` remain reserved for the chain and archive constructions
 of [§ 15](#chain) and [the anchored export framing](#archive). The retired `BAP1-GRANT\0` and `BAP1-PROOF\0` strings are invalid
 signing prefixes (`REQ1-SIGNING-retired-prefixes`).
+
+<a id="json"></a>
 
 ## 8. JSON decoding and canonical serialization
 
@@ -290,6 +296,8 @@ digits, the punctuation bytes ``! # $ % & ' * + - . ^ _ | ~``, and grave accent
 The grant `v` claim MUST be exactly the integer `1` (`REQ1-CLAIM-v`). The proof `v` claim MUST
 be exactly the integer `1` (`REQ1-CLAIM-proof-v`).
 
+<a id="selectors"></a>
+
 ## 12. Selector algebra
 
 Selectors are closed ordered objects with exactly one of three recognized member sets:
@@ -318,6 +326,19 @@ compares duplicate-free objects recursively as unordered key/value sets
 (`REQ1-SELECTOR-semantic-identity`). It never gives source member order meaning or collapses
 integer and float tags (`REQ1-SELECTOR-no-tag-collapse`). No selector grants business
 authorization (`REQ1-SELECTOR-not-authorization`).
+
+An `equals` value or `one_of` member MUST NOT contain a float-tagged number equal to zero at any
+depth: grant decode rejects such a selector with the closed error value, whatever the number's
+sign or spelling (`REQ1-SELECTOR-float-zero`). The rule is keyed on the decoded value, never on
+the lexeme, and does not reach the inert members of an `all` selector. RFC 8785 writes a float
+zero as `0`, which decodes integer-tagged, so no conforming producer emits one; verifiers must
+still accept non-JCS payload bytes ([§ 8](#json)), and before this rule conforming verifiers
+disagreed on whether `0.0` and `-0.0` are the same selector value (erratum 6, a soundness repair).
+For the same reason the grant producer MUST refuse, with the closed error value, a selector value
+that contains a float-tagged integral number (`0.0`, `-0.0`, `10.0`) at any depth: its JCS bytes
+would decode integer-tagged, so the signed grant would not mean what the producer was given
+(`REQ1-SIGNING-integral-float-selector`). The cases are in the additive
+`bap-selector-float-zero/1` corpus (`priv/conformance/selector-float-zero`).
 
 ## 13. URI normalization
 
@@ -986,4 +1007,4 @@ documentation.
 
 ---
 
-Generated from `spec/bap-v1.md` rev 2 (the single normative authority).
+Generated from `spec/bap-v1.md` rev 3 (the single normative authority).

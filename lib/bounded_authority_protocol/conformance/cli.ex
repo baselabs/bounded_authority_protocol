@@ -1,8 +1,9 @@
 defmodule BoundedAuthorityProtocol.Conformance.Cli do
   @moduledoc """
   Deterministic offline verifier CLI for the conformance corpora: the v1, v2 and v3 corpora and
-  the additive strict-Ed25519 (`priv/conformance/strict-ed25519`) and producer-canonicality
-  (`priv/conformance/producer-canonicality`) corpora.
+  the additive strict-Ed25519 (`priv/conformance/strict-ed25519`), producer-canonicality
+  (`priv/conformance/producer-canonicality`) and selector float-zero
+  (`priv/conformance/selector-float-zero`) corpora.
 
   This is the package's I/O carve-out: argv parsing, `File.read`/`File.ls` to load a corpus
   directory, and report output (`IO.binwrite`/`File.write`). Every judgment — corpus integrity,
@@ -40,6 +41,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   @certified_index_sha256 %{
     :strict_ed25519 => "cyEX3-GIG1U5mBJqlSSpW_sRcSV-OI1UMKCgmfIofLk",
     :producer_canonicality => "me5vu_MnWLA9RjBkf3IdjU40nwYo2GBJPWZ_5udixgE",
+    :selector_float_zero => "l_16mc2_OswKePW6HGVW4jpj4K1m9TPjH9afgtxfMAM",
     1 => "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs",
     2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A",
     3 => "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw"
@@ -107,13 +109,14 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
     end
   end
 
-  # A directory is a contract-major corpus, the strict-Ed25519 corpus or the
-  # producer-canonicality corpus; each loader accepts only its own index format, so at most one
+  # A directory is a contract-major corpus or one of the additive corpora (strict-Ed25519,
+  # producer-canonicality, selector float-zero); each loader accepts only its own index format, so at most one
   # can succeed and all fail closed.
   defp load_corpus(map) do
     with {:error, :invalid} <- Corpus.load(map),
-         {:error, :invalid} <- Corpus.load_strict_ed25519(map) do
-      Corpus.load_producer_canonicality(map)
+         {:error, :invalid} <- Corpus.load_strict_ed25519(map),
+         {:error, :invalid} <- Corpus.load_producer_canonicality(map) do
+      Corpus.load_selector_float_zero(map)
     end
   end
 

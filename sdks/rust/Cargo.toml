@@ -53,6 +53,13 @@ path = "conformance/run.rs"
 name = "conformance_producer_canonicality"
 path = "conformance/run_producer_canonicality.rs"
 
+# The selector float-zero runner (erratum 6): the vendored additive 161-case
+# corpus-selector-float-zero snapshot (profile bap-selector-float-zero/1) against
+# grant decode, the grant signing-input producer and check_envelope, majors 1-3.
+[[test]]
+name = "conformance_selector_float_zero"
+path = "conformance/run_selector_float_zero.rs"
+
 # The v2 conformance runner: the contract-major 2 acceptance gate over the
 # vendored 268-case corpus-v2 snapshot (same SHA-bind + two-boundary census
 # discipline as the v1 runner, against the `v2` façade and the shared

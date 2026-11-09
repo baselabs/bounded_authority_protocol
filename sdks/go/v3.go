@@ -445,6 +445,9 @@ func (EcdsaProfile) validateSelector(v Value, bounds *Bounds) error {
 			}
 		}
 	}
+	if !selectorFloatZeroFree(obj) {
+		return ErrInvalid // REQ3-SELECTOR-float-zero (erratum 6)
+	}
 	return nil
 }
 
@@ -1300,6 +1303,9 @@ func (EcdsaProfile) GrantSigningInput(g Grant, bounds *Bounds) (si SigningInput,
 		for _, sel := range op.Selectors {
 			if ecdsaSuite.validateSelector(sel, &b) != nil {
 				return SigningInput{}, ErrInvalid
+			}
+			if !selectorIntegralFloatFree(sel) {
+				return SigningInput{}, ErrInvalid // REQ3-SIGNING-integral-float-selector (erratum 6)
 			}
 			sels = append(sels, sel)
 		}

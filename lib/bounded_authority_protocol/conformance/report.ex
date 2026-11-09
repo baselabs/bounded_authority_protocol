@@ -18,7 +18,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Report do
     3 => "bounded-authority-protocol-v3-conformance-report",
     :strict_ed25519 => "bounded-authority-protocol-strict-ed25519-conformance-report",
     :producer_canonicality =>
-      "bounded-authority-protocol-producer-canonicality-conformance-report"
+      "bounded-authority-protocol-producer-canonicality-conformance-report",
+    :selector_float_zero => "bounded-authority-protocol-selector-float-zero-conformance-report"
   }
 
   @enforce_keys [:agreement, :exit_status, :total, :agreed, :disagreed]

@@ -109,6 +109,64 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
     assert output =~ "index_sha256=#{@strict_index_sha256}"
   end
 
+  test "independent runner agrees on the selector float-zero corpus (erratum 6)" do
+    {output, 0} =
+      run_node([
+        "--selector-float-zero",
+        Path.join(@root, "priv/conformance/selector-float-zero")
+      ])
+
+    # Contract-major 1 only, as in strict mode: the major-2 and major-3 cases are not covered.
+    assert output =~
+             "selector-float-zero agreed=43 disagreed=0 total=161 not_covered=118"
+
+    assert output =~
+             "index_sha256=97fd7a99cdbf3acc0a78f5ba1c6556e23a63e0ad66f533e31fd69f82dc5f3003"
+  end
+
+  test "a non-JCS grant payload over the JSON node maximum is rejected (as the reference does)" do
+    # Grant payloads are decoded as received (no JCS requirement), so every structural maximum
+    # must still bind them: 17 arrays of 240 nulls is 4,117 nodes, over the 4,096 maximum, while
+    # staying inside the byte and per-array limits.
+    big =
+      "[" <>
+        Enum.map_join(1..17, ",", fn _ ->
+          "[" <> Enum.join(List.duplicate("null", 240), ",") <> "]"
+        end) <> "]"
+
+    payload =
+      ~s( {"aud":["https://resource.example.test"],"cnf":{"jkt":"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"},) <>
+        ~s("exp":2000,"iat":1000,"iss":"https://issuer.example.test","jti":"urn:example:grant:nodes","nbf":1000,) <>
+        ~s("operations":[{"name":"transfer","selectors":[{"kind":"equals","path":["x"],"value":#{big}}]}],"v":1})
+
+    b64 = &Base.url_encode64(&1, padding: false)
+
+    compact =
+      b64.(~s({"alg":"EdDSA","kid":"issuer","typ":"ba+cap"})) <>
+        "." <> b64.(payload) <> "." <> b64.(:binary.copy(<<0x11>>, 64))
+
+    assert {:error, :invalid} = BoundedAuthorityProtocol.V1.decode_grant(compact, %{})
+
+    dir = Path.join(System.tmp_dir!(), "bap-node-bound-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    on_exit(fn -> File.rm_rf!(dir) end)
+    source = File.read!(@script)
+    [runner, _main] = String.split(source, "\ntry {\n  main();", parts: 2)
+    File.write!(Path.join(dir, "runner.mjs"), runner <> "\nexport { dispatchDecodeGrant };\n")
+
+    File.write!(Path.join(dir, "probe.mjs"), """
+    import { dispatchDecodeGrant } from "./runner.mjs";
+    try { dispatchDecodeGrant({ compact: process.argv[2] }); console.log("ACCEPT"); }
+    catch (error) { console.log("REJECT " + error.message); }
+    """)
+
+    {output, 0} =
+      System.cmd("node", [Path.join(dir, "probe.mjs"), compact], stderr_to_stdout: true)
+
+    assert output =~ "REJECT"
+    assert output =~ "node bound"
+  end
+
   test "a strict-corpus case byte flip is rejected by the strict loader" do
     dir =
       Path.join(

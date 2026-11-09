@@ -59,6 +59,11 @@ conforming. It is allowed only when all of the following hold:
 6. disclosure follows the order: private advisory, then publication of the fixed releases, then
    the public advisory.
 
+Verifiers that each conform to the published profile yet return different verdicts for the same
+issuer-signed bytes are an equivalent soundness failure: a constraint the issuer signed is enforced
+by some conforming hosts and not by others, which defeats the certified corpus. Erratum 6 (selector
+float zero) is a soundness repair on that ground.
+
 A soundness repair is not a sunset: the major continues, and it keeps no overlap window during
 which the vulnerable verdict remains conforming. Releases before the repair are retired on the
 package registry. A change that fails any condition remains contract-major work. The decision,

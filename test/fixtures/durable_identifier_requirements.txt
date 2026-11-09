@@ -58,6 +58,7 @@ REQ1-LOCATOR-not-authority
 REQ1-LOCATOR-opaque-payload
 REQ1-LOCATOR-three-segments
 REQ1-SELECTOR-closed-set
+REQ1-SELECTOR-float-zero
 REQ1-SELECTOR-no-tag-collapse
 REQ1-SELECTOR-not-authorization
 REQ1-SELECTOR-one-of-size
@@ -74,6 +75,7 @@ REQ1-SIGNING-ed25519-producer-canonical
 REQ1-SIGNING-ed25519-scalar-range
 REQ1-SIGNING-ed25519-small-order-reject
 REQ1-SIGNING-exact-input
+REQ1-SIGNING-integral-float-selector
 REQ1-SIGNING-retired-prefixes
 REQ1-URI-no-network
 REQ1-URI-pre-normalized
@@ -103,6 +105,7 @@ REQ2-KEY-ed25519-acceptable
 REQ2-SELECTOR-attenuation-unchanged
 REQ2-SELECTOR-closed-set
 REQ2-SELECTOR-count
+REQ2-SELECTOR-float-zero
 REQ2-SELECTOR-no-strict-kinds
 REQ2-SELECTOR-not-authorization
 REQ2-SELECTOR-path-shape
@@ -119,6 +122,7 @@ REQ2-SIGNING-ed25519-cofactorless
 REQ2-SIGNING-ed25519-producer-canonical
 REQ2-SIGNING-ed25519-scalar-range
 REQ2-SIGNING-ed25519-small-order-reject
+REQ2-SIGNING-integral-float-selector
 REQ3-BOUNDS-fixed-widths
 REQ3-BOUNDS-inherited
 REQ3-BOUNDS-ordering
@@ -137,8 +141,11 @@ REQ3-HEADER-proof-jwk
 REQ3-HEADER-thumbprint
 REQ3-KEY-point-on-curve
 REQ3-KEY-uncompressed-sec1
+REQ3-SELECTOR-float-zero
+REQ3-SELECTOR-range-signed-zero
 REQ3-SIGNING-backend-reject
 REQ3-SIGNING-digest-prefix
+REQ3-SIGNING-integral-float-selector
 REQ3-SIGNING-low-s
 REQ3-SIGNING-producer-canonical
 REQ3-SIGNING-range

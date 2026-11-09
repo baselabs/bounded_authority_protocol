@@ -709,6 +709,8 @@ pub fn grant_signing_input(grant: &GrantInput, bounds: &Bounds) -> Result<Produc
         }
         for selector in &op.selectors {
             selector::validate(selector, bounds)?;
+            // Erratum 6: never sign a float-tagged integral selector value.
+            selector::require_signable_values(selector)?;
         }
     }
 

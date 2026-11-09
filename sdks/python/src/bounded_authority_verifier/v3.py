@@ -83,6 +83,7 @@ from .json_alg import (
     utf8_str,
 )
 from .selector import Selector as _V1Selector
+from .selector import integral_float_free
 from .selector import parse_selector as _parse_v1_selector
 from .selector import selector_matches as _v1_selector_matches
 from .uri import uri_normalize
@@ -1850,6 +1851,8 @@ def _selector_to_tagged(s: SelectorInput, b: Bounds) -> Tagged:
             path = _validate_path(cast("Sequence[str]", s["path"]), b)
             value = cast("Tagged", s["value"])
             _validate_selector_value(value, b)
+            if not integral_float_free(value):
+                fail("selector: integral float")
             return JObject({
                 "kind": JString(str_utf8("equals")),
                 "path": path,
@@ -1862,6 +1865,8 @@ def _selector_to_tagged(s: SelectorInput, b: Bounds) -> Tagged:
                 fail("selector: values count")
             for v in values:
                 _validate_selector_value(v, b)
+                if not integral_float_free(v):
+                    fail("selector: integral float")
             return JObject({
                 "kind": JString(str_utf8("one_of")),
                 "path": path,
@@ -1886,6 +1891,8 @@ def _selector_to_tagged(s: SelectorInput, b: Bounds) -> Tagged:
             else:
                 fail("selector: numeric bound")
             _validate_selector_value(bound, b)
+            if not integral_float_free(bound):
+                fail("selector: integral float")
             return JObject({
                 "kind": JString(str_utf8(kind)),
                 "path": path,

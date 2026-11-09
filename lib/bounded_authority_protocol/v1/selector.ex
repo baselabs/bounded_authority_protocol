@@ -59,6 +59,37 @@ defmodule BoundedAuthorityProtocol.V1.Selector do
 
   def semantic_equal?(_left, _right), do: false
 
+  @doc false
+  # Erratum 6, verification: an `equals` value or `one_of` member is admissible only when it holds
+  # no float-tagged zero at any depth. Keyed on the decoded value, so every spelling of zero
+  # (`0.0`, `-0e0`, `1e-400`, ...) is covered. Callers apply it after the bounded JCS check.
+  @spec float_zero_free?(BoundedAuthorityProtocol.V1.Json.value()) :: boolean()
+  def float_zero_free?({:float, value}) when is_float(value) and value == 0.0, do: false
+
+  def float_zero_free?({:array, values}) when is_list(values),
+    do: Enum.all?(values, &float_zero_free?/1)
+
+  def float_zero_free?({:object, members}) when is_list(members),
+    do: Enum.all?(members, fn {_key, value} -> float_zero_free?(value) end)
+
+  def float_zero_free?(_value), do: true
+
+  @doc false
+  # Erratum 6, producers: RFC 8785 writes an integral float as integer text, which decodes
+  # integer-tagged, so a producer refuses any float-tagged integral selector value rather than
+  # sign a value whose tag the wire changes.
+  @spec integral_float_free?(BoundedAuthorityProtocol.V1.Json.value()) :: boolean()
+  def integral_float_free?({:float, value}) when is_float(value) and value == trunc(value),
+    do: false
+
+  def integral_float_free?({:array, values}) when is_list(values),
+    do: Enum.all?(values, &integral_float_free?/1)
+
+  def integral_float_free?({:object, members}) when is_list(members),
+    do: Enum.all?(members, fn {_key, value} -> integral_float_free?(value) end)
+
+  def integral_float_free?(_value), do: true
+
   defp matches?(:all, _arguments, _bounds), do: true
 
   defp matches?({:equals, path, expected}, arguments, bounds) do

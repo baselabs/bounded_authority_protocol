@@ -12,7 +12,7 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
   @version Mix.Project.config() |> Keyword.fetch!(:version)
 
   @case_count 283
-  @spec_revision 2
+  @spec_revision 3
 
   defp release_state(changelog, candidate_version) do
     released_version =

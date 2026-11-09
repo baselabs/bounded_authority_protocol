@@ -341,6 +341,9 @@ sdks/rust/conformance/corpus-strict/cases/key-transition/probe.json
 priv/conformance/producer-canonicality/cases/es256-assemble/probe.json
 sdks/go/conformance/corpus-producer-canonicality/cases/es256-assemble/probe.json
 sdks/rust/conformance/corpus-producer-canonicality/cases/ed25519-export-encode/probe.json
+priv/conformance/selector-float-zero/cases/envelope/probe.json
+sdks/go/conformance/corpus-selector-float-zero/cases/grant-decode/probe.json
+sdks/rust/conformance/corpus-selector-float-zero/cases/grant-signing-input/probe.json
 spec/facts/requirement-statements-v1.json
 lib/non_fixture_probe.ex'
   canary_file="$check_dir/root-canaries.txt"

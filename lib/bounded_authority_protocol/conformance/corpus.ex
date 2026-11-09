@@ -42,7 +42,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
           cases: [{binary(), [map()]}],
           raws: %{binary() => binary()},
           case_ids: term(),
-          major: 1 | 2 | 3 | :strict_ed25519 | :producer_canonicality
+          major: 1 | 2 | 3 | :strict_ed25519 | :producer_canonicality | :selector_float_zero
         }
 
   # The index format string names the corpus's contract-major; the loader derives
@@ -119,6 +119,15 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
       "bounded-authority-protocol-producer-canonicality-conformance-corpus-revision"
   }
 
+  @selector_float_zero %{
+    major: :selector_float_zero,
+    profile: "bap-selector-float-zero/1",
+    index_format: "bounded-authority-protocol-selector-float-zero-conformance-corpus-index",
+    case_format: "bounded-authority-protocol-selector-float-zero-conformance-cases",
+    profile_format: "bounded-authority-protocol-selector-float-zero-conformance-profile",
+    revision_format: "bounded-authority-protocol-selector-float-zero-conformance-corpus-revision"
+  }
+
   @additive_sidecars ["profile.json", "revision.json"]
 
   # One clause per sidecar: `in` over a list of binaries compiles to :lists.member/2 on
@@ -144,6 +153,17 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     do: load_additive(map, @producer_canonicality)
 
   def load_producer_canonicality(_map), do: {:error, :invalid}
+
+  @doc """
+  Loads and integrity-verifies the `%{path => binary}` selector float-zero corpus map (profile
+  `bap-selector-float-zero/1`, erratum 6). The loaded corpus carries `major: :selector_float_zero`;
+  each case names its own contract-major.
+  """
+  @spec load_selector_float_zero(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
+  def load_selector_float_zero(map) when is_map(map),
+    do: load_additive(map, @selector_float_zero)
+
+  def load_selector_float_zero(_map), do: {:error, :invalid}
 
   defp load_additive(map, %{major: major} = spec) do
     with {:ok, index_bytes} <- fetch_index(map),

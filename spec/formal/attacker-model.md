@@ -1,7 +1,9 @@
 # BAP v1 formal attacker model
 
-Pinned to: `spec/bap-v1.md` rev 2 (Doc-Revision). This file is a companion of the specification
-at exactly that revision; the spec-facts gate (rule 8) reds if either side drifts alone.
+Pinned to: `spec/bap-v1.md` rev 3 (Doc-Revision). This file is a companion of the specification
+at exactly that revision; the spec-facts gate (rule 8) reds if either side drifts alone. Rev 3
+(erratum 6) changes only which selector values a grant may carry; the model treats selector
+values as opaque terms, so no model statement or result changes.
 
 ## Scope
 

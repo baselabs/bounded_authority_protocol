@@ -32,6 +32,12 @@ a checkout of this repository.
 - **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
   conforming signer emits, with the same clauses as the Elixir reference, and the certified
   `bap-producer-canonicality/1` corpus (75 cases) runs with this SDK's conformance suite.
+- **Erratum 6 (selector float zero) is implemented.** Grant decode on every contract-major
+  rejects an `equals` value or `one_of` member holding a float-tagged zero at any depth, of any
+  sign or spelling (range bounds and inert `all` members are unchanged), and the grant producer
+  refuses any float-tagged integral selector value, with the same clauses as the Elixir
+  reference. The certified `bap-selector-float-zero/1` corpus (161 cases) runs with this SDK's
+  conformance suite.
 
 ## Install from a checkout
 
@@ -241,7 +247,9 @@ cargo test --locked --test content_assertion    # 131 + 9 + 14 cases
 ```
 
 The producer-canonicality corpus (erratum 3) runs too, as the
-`conformance_producer_canonicality` test target.
+`conformance_producer_canonicality` test target, and so does the selector float-zero corpus
+(erratum 6, 161 cases, vendored with its `index.json` SHA-256 asserted at load), as the
+`conformance_selector_float_zero` test target.
 
 ## What this SDK does not do
 

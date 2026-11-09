@@ -155,6 +155,9 @@ func (Profile) validateSelector(v Value, bounds *Bounds) error {
 			}
 		}
 	}
+	if !selectorFloatZeroFree(obj) {
+		return ErrInvalid // REQ2-SELECTOR-float-zero (erratum 6)
+	}
 	return nil
 }
 
@@ -893,6 +896,9 @@ func (Profile) GrantSigningInput(g Grant, bounds *Bounds) (si SigningInput, err 
 		for _, sel := range op.Selectors {
 			if successor.validateSelector(sel, &b) != nil {
 				return SigningInput{}, ErrInvalid
+			}
+			if !selectorIntegralFloatFree(sel) {
+				return SigningInput{}, ErrInvalid // REQ2-SIGNING-integral-float-selector (erratum 6)
 			}
 			sels = append(sels, sel)
 		}

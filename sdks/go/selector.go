@@ -1,6 +1,9 @@
 package verifier
 
-import "crypto/sha256"
+import (
+	"crypto/sha256"
+	"math"
+)
 
 // Selector algebra (spec/bap-v1.md § Selector algebra): closed ordered
 // objects of kind all | equals | one_of over object-member paths. Selectors
@@ -110,7 +113,101 @@ func validateSelector(v Value, bounds *Bounds) error {
 			}
 		}
 	}
+	if !selectorFloatZeroFree(obj) {
+		return ErrInvalid // REQ1-SELECTOR-float-zero (erratum 6)
+	}
 	return nil
+}
+
+// Erratum 6, the selector float-zero soundness repair (spec/bap-v1.md § 7 and § 12, bap-v2.md
+// and bap-v3.md § 4). RFC 8785 writes a float-tagged zero as "0", which decodes integer-tagged,
+// so a grant whose equals/one_of operand holds one cannot survive a canonical round trip with its
+// tag intact. Verification rejects it; producers refuse every float-tagged integral operand,
+// whose JCS bytes would likewise change its tag. Both rules are keyed on the decoded value,
+// never the lexeme. The Elixir reference is V1.Selector.float_zero_free?/1 and
+// integral_float_free?/1.
+
+// selectorFloatZeroFree is the verification rule (contract-majors 1, 2 and 3): no equals value
+// or one_of member holds a float-tagged zero, of either sign, at any depth. Range bounds compare
+// numerically (-0.0 = 0.0) and all members are inert, so neither is inspected. The selector has
+// already passed the closed-set checks.
+func selectorFloatZeroFree(sel Obj) bool {
+	return selectorOperandsFree(sel, false, floatZeroFree)
+}
+
+// selectorIntegralFloatFree is the producer rule (contract-majors 1, 2 and 3): no equals value,
+// one_of member, or lte/gte bound holds a float-tagged integral number at any depth. Inert all
+// members are not inspected. The selector has already passed the closed-set checks.
+func selectorIntegralFloatFree(sel Value) bool {
+	obj, ok := sel.(Obj)
+	return ok && selectorOperandsFree(obj, true, integralFloatFree)
+}
+
+// selectorOperandsFree applies free to the selector's operands: the equals value, every one_of
+// member, and, when ranges is set, the lte/gte bound.
+func selectorOperandsFree(sel Obj, ranges bool, free func(Value) bool) bool {
+	var kind Str
+	var operands []Value
+	for _, m := range sel {
+		switch m.Key {
+		case "kind":
+			if k, ok := m.Val.(Str); ok {
+				kind = k
+			}
+		case "value":
+			operands = append(operands, m.Val)
+		case "values":
+			if vs, ok := m.Val.(Arr); ok {
+				operands = append(operands, vs...)
+			}
+		}
+	}
+	switch kind {
+	case "equals", "one_of":
+	case "lte", "gte":
+		if !ranges {
+			return true
+		}
+	default:
+		return true // all: inert members
+	}
+	for _, operand := range operands {
+		if !free(operand) {
+			return false
+		}
+	}
+	return true
+}
+
+// floatZeroFree reports whether no float-tagged zero (0.0 or -0.0) occurs in the value tree.
+func floatZeroFree(v Value) bool {
+	return tagFree(v, func(f Float) bool { return f == 0 })
+}
+
+// integralFloatFree reports whether no float-tagged integral number occurs in the value tree.
+func integralFloatFree(v Value) bool {
+	return tagFree(v, func(f Float) bool { return float64(f) == math.Trunc(float64(f)) })
+}
+
+// tagFree reports whether no Float in the value tree satisfies bad.
+func tagFree(v Value, bad func(Float) bool) bool {
+	switch val := v.(type) {
+	case Float:
+		return !bad(val)
+	case Arr:
+		for _, item := range val {
+			if !tagFree(item, bad) {
+				return false
+			}
+		}
+	case Obj:
+		for _, m := range val {
+			if !tagFree(m.Val, bad) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // hasProtoMember reports whether any object in the value tree carries a

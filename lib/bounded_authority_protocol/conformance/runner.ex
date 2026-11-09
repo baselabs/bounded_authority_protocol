@@ -135,6 +135,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   defp execute_case(case_obj, _raws, :producer_canonicality),
     do: %{case_id: case_obj["id"], agree: producer_agrees?(case_obj)}
 
+  defp execute_case(case_obj, _raws, :selector_float_zero),
+    do: %{case_id: case_obj["id"], agree: float_zero_agrees?(case_obj)}
+
   defp execute_case(case_obj, raws, major) do
     surface = case_obj["surface"]
     input = Map.get(case_obj, "input", %{})
@@ -272,6 +275,48 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   end
 
   defp producer_agrees?(_case_obj), do: false
+
+  # --- selector float-zero corpus (erratum 6) ------------------------------
+
+  # Each case runs its contract-major's own surface. Values whose float tag matters travel as
+  # JSON text (`operations_json`, `cast_arguments_json`); they are decoded here with the
+  # package's tag-preserving decoder and spliced into the ordinary corpus input shapes.
+  defp float_zero_agrees?(%{
+         "major" => major,
+         "surface" => surface,
+         "input" => input,
+         "expected" => expected
+       })
+       when major in [1, 2, 3] and
+              surface in ["decode_grant", "grant_signing_input", "check_envelope"] do
+    # Typed text that does not decode is a corpus defect, never agreement with `invalid`.
+    case untext(input) do
+      {:ok, input} -> agrees?(expected, dispatch(major, surface, input, %{}))
+      _malformed -> false
+    end
+  end
+
+  defp float_zero_agrees?(_case_obj), do: false
+
+  defp untext(%{"operations_json" => text} = input) when is_binary(text) do
+    with {:ok, operations} <- Json.decode(text, Bounds.maximum()) do
+      {:ok, input |> Map.delete("operations_json") |> Map.put("operations", to_plain(operations))}
+    end
+  end
+
+  defp untext(%{"expected" => %{"cast_arguments_json" => text} = expected} = input)
+       when is_binary(text) do
+    with {:ok, arguments} <- Json.decode(text, Bounds.maximum()) do
+      expected =
+        expected
+        |> Map.delete("cast_arguments_json")
+        |> Map.put("cast_arguments", to_plain(arguments))
+
+      {:ok, Map.put(input, "expected", expected)}
+    end
+  end
+
+  defp untext(input), do: {:ok, input}
 
   defp profile_signing_kind("bap-application-proof/local-loopback-http/1"),
     do: {:ok, "local_loopback_http_proof"}

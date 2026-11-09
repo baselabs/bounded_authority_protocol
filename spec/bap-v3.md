@@ -1,6 +1,6 @@
 # Bounded Authority Protocol v3 Wire Profile
 
-Document revision: rev 1 (2026-09-21). Status: normative. Contract-major 3, suite
+Document revision: rev 2 (2026-11-09; erratum 6; rev 1, 2026-09-21). Status: normative. Contract-major 3, suite
 `BAP3-ES256-SHA256`. This profile is activated by
 ADR 0035 under the
 [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md); the signature-suite bridge
@@ -162,6 +162,12 @@ interval conjunction, and the v2 path/count/verdict-internal rules
 [bap-v2.md](bap-v2.md) §4. Attenuation posture and the no-strict-kinds exclusion carry over
 unchanged.
 
+Erratum 6 carries the selector float-zero rule over with the algebra: grant decode rejects an
+`equals` value or `one_of` member that contains a float-tagged zero at any depth
+(`REQ3-SELECTOR-float-zero`), range bounds compare numerically with −0.0 = 0.0
+(`REQ3-SELECTOR-range-signed-zero`), and the grant producer refuses a float-tagged integral
+number in any selector value, range bounds included (`REQ3-SIGNING-integral-float-selector`).
+
 <a id="maxima"></a>
 
 ## 5. Hard maxima
@@ -209,3 +215,8 @@ Producer-surface signature canonicality is certified by the additive `bap-produc
 corpus (`priv/conformance/producer-canonicality`, revision 1, erratum 3), whose index SHA-256
 `99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601` is pinned beside this
 corpus's. No verdict of this corpus changes.
+
+The selector float-zero rule (erratum 6) is certified by the additive `bap-selector-float-zero/1`
+corpus (`priv/conformance/selector-float-zero`, revision 1), whose index SHA-256
+`97fd7a99cdbf3acc0a78f5ba1c6556e23a63e0ad66f533e31fd69f82dc5f3003` is pinned beside this corpus's. No verdict of this
+corpus changes.

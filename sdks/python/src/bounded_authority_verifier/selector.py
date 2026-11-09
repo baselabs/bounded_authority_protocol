@@ -14,6 +14,7 @@ int/float distinction survives (REQ1-SELECTOR-no-tag-collapse).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve
@@ -74,6 +75,8 @@ def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Selector:
         if value is None:
             fail("selector: value")
         _validate_selector_value(value, bounds)
+        if not float_zero_free(value):
+            fail("selector: float zero")
         return SelEquals(path, value)
     # one_of
     if len(members) != 3:
@@ -89,6 +92,8 @@ def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Selector:
     values = tuple(values_v.v)
     for v in values:
         _validate_selector_value(v, bounds)
+        if not float_zero_free(v):
+            fail("selector: float zero")
     return SelOneOf(path, values)
 
 
@@ -133,6 +138,33 @@ def _check_node(v: Tagged, depth: int, bounds: Bounds) -> None:
             fail("selector: object members")
         for val in v.v.values():
             _check_node(val, depth + 1, bounds)
+
+
+def float_zero_free(value: Tagged) -> bool:
+    """Erratum 6, verification (REQ1/REQ2/REQ3-SELECTOR-float-zero): an ``equals`` value or
+    ``one_of`` member is admissible only when it holds no float-tagged zero at any depth. Keyed
+    on the decoded value, so every spelling of zero (``0.0``, ``-0e0``, ``1e-400``, ...) is
+    covered. Range bounds and inert ``all`` members are not checked. Mirrors the Elixir
+    reference ``Selector.float_zero_free?/1``."""
+    return _no_float_where(value, lambda x: x == 0.0)
+
+
+def integral_float_free(value: Tagged) -> bool:
+    """Erratum 6, producers (REQ1/REQ2/REQ3-SIGNING-integral-float-selector): RFC 8785 writes an
+    integral float as integer text, which decodes integer-tagged, so a producer refuses any
+    float-tagged integral selector value (``0.0``, ``-0.0``, ``10.0``) rather than sign a value
+    whose tag the wire changes. Mirrors the Elixir reference ``Selector.integral_float_free?/1``."""
+    return _no_float_where(value, float.is_integer)
+
+
+def _no_float_where(value: Tagged, banned: Callable[[float], bool]) -> bool:
+    if isinstance(value, _JFloat):
+        return not banned(value.v)
+    if isinstance(value, JArray):
+        return all(_no_float_where(item, banned) for item in value.v)
+    if isinstance(value, JObject):
+        return all(_no_float_where(member, banned) for member in value.v.values())
+    return True
 
 
 def semantic_identity(value: Tagged) -> bytes:

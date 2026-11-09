@@ -1,6 +1,6 @@
 # Bounded Authority Protocol v2 Wire Profile
 
-Document revision: rev 2 (2026-10-12; erratum 2, ADR 0040). Status: normative. Contract-major 2, suite
+Document revision: rev 3 (2026-11-09; erratum 6; rev 2, 2026-10-12: erratum 2, ADR 0040). Status: normative. Contract-major 2, suite
 `BAP2-Ed25519-SHA256`. This profile is activated by
 ADR 0030 under the
 [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md); the selector
@@ -98,12 +98,14 @@ Range-kind rules (`REQ2-SELECTOR-range-same-tag`, `REQ2-SELECTOR-range-inclusive
 - Comparison is by numeric value on the closed numeric domain the bounded decoder admits
   (integers and floats within ±9007199254740991). Under IEEE 754 numeric comparison −0.0 = 0.0;
   because RFC 8785 serializes both as `0` (the ECMAScript `Number::toString` rule), signed zero
-  distinguishes no authority in either the comparison or the canonical bytes, and a zero-valued
-  operand re-derives from the wire with the integer tag (`REQ2-SELECTOR-range-signed-zero`).
+  distinguishes no authority in either the comparison or the canonical bytes, and a JCS-produced
+  zero operand re-derives from the wire with the integer tag. A float-tagged zero bound carried by
+  non-JCS bytes stays valid and compares numerically (`REQ2-SELECTOR-range-signed-zero`).
 - By the same serialization rule, an integral-valued float bound (e.g. `10.0`) canonicalizes to
   `10` and decodes back integer-tagged: float-tagged bounds are wire-distinguishable only when
   non-integral. Issuers therefore express integer bounds as integers; the tag carries the
-  operand domain, not a unit.
+  operand domain, not a unit. The grant producer refuses a float-tagged integral bound
+  (`REQ2-SIGNING-integral-float-selector`, below).
 - Non-numeric operands fail closed: a `string`, `boolean`, `null`, `array`, or `object` value at
   the path never satisfies a range selector, and a non-numeric `value` member makes the whole
   grant `{:error, :invalid}` at decode (`REQ2-SELECTOR-range-numeric`). A missing path
@@ -138,6 +140,13 @@ tuples and never inspects kind; the new kinds are new tuple inhabitants of the e
 and a child that adds a cross-tag conjunct produces an unsatisfiable conjunction — fail closed,
 never a widening (`REQ2-SELECTOR-attenuation-unchanged`).
 
+Erratum 6 binds the selector float-zero rule of [bap-v1.md § 12](bap-v1.md#selectors) to this
+profile: grant decode rejects an `equals` value or `one_of` member that contains a float-tagged
+zero at any depth (`REQ2-SELECTOR-float-zero`); range bounds are unaffected. The grant producer
+refuses a float-tagged integral number in any selector value, the `lte`/`gte` bounds included
+(`REQ2-SIGNING-integral-float-selector`). The v2 cases carry `major: 2` in the additive
+`bap-selector-float-zero/1` corpus (`priv/conformance/selector-float-zero`).
+
 ## 5. Requirement identifiers
 
 The v2 profile carries its own `REQ2-*` range per
@@ -156,6 +165,11 @@ into the v2 corpus byte-for-byte; the profile-bound surfaces carry v2-minted fix
 range-selector applicability classes, and cross-major rejection vectors. Signed fixtures were
 minted with ephemeral in-memory Ed25519 keys; no private material is tracked
 (`REQ2-CORPUS-certified-identity`).
+
+The selector float-zero rule of erratum 6 is certified by the additive `bap-selector-float-zero/1`
+corpus (`priv/conformance/selector-float-zero`, revision 1), whose index SHA-256
+`97fd7a99cdbf3acc0a78f5ba1c6556e23a63e0ad66f533e31fd69f82dc5f3003` is pinned beside this corpus's. No verdict of this
+corpus changes.
 
 <a id="strict-ed25519"></a>
 

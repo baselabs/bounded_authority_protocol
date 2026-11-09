@@ -209,6 +209,7 @@ function verifyFixture(fixture) {
 
   const grant = verifyCompactRecord(fixture.grant, issuerJwk, "grant");
   const proof = verifyCompactRecord(fixture.proof, holderJwk, "proof");
+  assertGrantSelectorValues(grant.payload, "grant");
   exactKeys(grant.header, ["alg", "kid", "typ"], "grant header");
   exactKeys(proof.header, ["alg", "jwk", "typ"], "proof header");
   assertDeepEqual(exactPublicJwk(proof.header.jwk), holderJwk, "proof public JWK");
@@ -417,6 +418,7 @@ function verifyAuxiliaryCases(
   for (const timeCase of fixture.grant_time_cases) {
     const record = verifyCompactRecord(timeCase.grant, issuerJwk, `grant time ${timeCase.name}`);
     const payload = record.payload;
+    assertGrantSelectorValues(payload, `grant time ${timeCase.name}`);
     const expected = fixture.expected_context;
     const valid =
       payload.iat < payload.exp &&
@@ -525,6 +527,7 @@ function verifyMemberOrderVariant(fixture, issuerJwk, holderJwk) {
   assertEqual(variant.expected_verdict, "valid", "member-order variant verdict");
   const grant = verifyCompactRecord(variant.grant, issuerJwk, "member-order grant");
   const proof = verifyCompactRecord(variant.proof, holderJwk, "member-order proof");
+  assertGrantSelectorValues(grant.payload, "member-order grant");
 
   assertDeepEqual(grant.header, fixture.grant.header, "member-order grant header semantics");
   assertDeepEqual(grant.payload, fixture.grant.payload, "member-order grant payload semantics");
@@ -966,14 +969,48 @@ function selectorAllows(selector, input) {
   const value = typedObjectPath(input, selector.path);
   if (value === missing) return false;
   if (selector.kind === "equals") {
-    return semanticEqual(value, typedJsonMember(selector, "value"));
+    return typedEqual(value, typedJsonMember(selector, "value"));
   }
   if (selector.kind === "one_of") {
     return selector.values.some((candidate, index) =>
-      semanticEqual(value, typedJsonMember(selector.values, index, candidate)),
+      typedEqual(value, typedJsonMember(selector.values, index, candidate)),
     );
   }
   return false;
+}
+
+// Erratum 6 (spec/bap-v1.md § 12, REQ1-SELECTOR-float-zero): grant decode rejects an `equals`
+// value or `one_of` member that holds, at any depth, a float-tagged number equal to zero, whatever
+// its sign or spelling (`0.0`, `-0.0`, `0e0`, `-0e-5`, `1e-400`). The rule reads the decoded value
+// and its lexeme tag; it does not reach the inert members of an `all` selector.
+function assertGrantSelectorValues(payload, label) {
+  for (const operation of payload.operations) {
+    for (const selector of operation.selectors) {
+      if (selector.kind === "equals") {
+        assert(!typedFloatZero(typedJsonMember(selector, "value")), `${label} selector float zero`);
+      } else if (selector.kind === "one_of") {
+        selector.values.forEach((candidate, index) => {
+          assert(
+            !typedFloatZero(typedJsonMember(selector.values, index, candidate)),
+            `${label} selector float zero`,
+          );
+        });
+      }
+    }
+  }
+}
+
+function typedFloatZero(value) {
+  switch (value[0]) {
+    case "float":
+      return value[1] === 0;
+    case "array":
+      return value[1].some(typedFloatZero);
+    case "object":
+      return Object.values(value[1]).some(typedFloatZero);
+    default:
+      return false;
+  }
 }
 
 function typedObjectPath(value, path) {
@@ -997,7 +1034,9 @@ function typedJsonMember(owner, key, value = owner[key]) {
   if (typeof value === "number") {
     const lexeme = numberLexemes.get(owner)?.get(key);
     assert(typeof lexeme === "string", "selector number lexeme");
-    return [/[.eE]/.test(lexeme) ? "float" : "integer", value];
+    if (/[.eE]/.test(lexeme)) return ["float", value];
+    // The integer lexeme `-0` decodes to the integer 0.
+    return ["integer", value === 0 ? 0 : value];
   }
   if (typeof value === "string") return ["string", value];
   if (Array.isArray(value)) {
@@ -1012,25 +1051,37 @@ function typedJsonMember(owner, key, value = owner[key]) {
   ];
 }
 
-function semanticEqual(left, right) {
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return (
-      Array.isArray(left) &&
-      Array.isArray(right) &&
-      left.length === right.length &&
-      left.every((value, index) => semanticEqual(value, right[index]))
-    );
+// Semantic identity over the tagged algebra (spec/bap-v1.md § 7 and § 12): tags never collapse;
+// integers compare as integers and float-tagged values compare numerically, so the integer 0
+// equals the integer 0 whatever the lexeme sign and −0.0 equals 0.0 (erratum 6); arrays compare
+// positionally and objects as unordered key/value sets.
+function typedEqual(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left[0] !== right[0]) return false;
+  switch (left[0]) {
+    case "null":
+      return true;
+    case "boolean":
+    case "string":
+    case "integer":
+    case "float":
+      return left[1] === right[1];
+    case "array":
+      return (
+        left[1].length === right[1].length &&
+        left[1].every((value, index) => typedEqual(value, right[1][index]))
+      );
+    case "object": {
+      if (!isPlainObject(left[1]) || !isPlainObject(right[1])) return false;
+      const leftKeys = Object.keys(left[1]).sort();
+      const rightKeys = Object.keys(right[1]).sort();
+      return (
+        JSON.stringify(leftKeys) === JSON.stringify(rightKeys) &&
+        leftKeys.every((key) => typedEqual(left[1][key], right[1][key]))
+      );
+    }
+    default:
+      return false;
   }
-  if (isPlainObject(left) || isPlainObject(right)) {
-    if (!isPlainObject(left) || !isPlainObject(right)) return false;
-    const leftKeys = Object.keys(left).sort();
-    const rightKeys = Object.keys(right).sort();
-    return (
-      JSON.stringify(leftKeys) === JSON.stringify(rightKeys) &&
-      leftKeys.every((key) => semanticEqual(left[key], right[key]))
-    );
-  }
-  return Object.is(left, right);
 }
 
 function canonicalize(value) {

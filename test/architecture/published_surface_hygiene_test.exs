@@ -34,6 +34,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "priv/conformance/attestation-profiles/content-assertion/v1",
     "priv/conformance/strict-ed25519",
     "priv/conformance/producer-canonicality",
+    "priv/conformance/selector-float-zero",
     ".formatter.exs",
     "mix.exs",
     "README.md",

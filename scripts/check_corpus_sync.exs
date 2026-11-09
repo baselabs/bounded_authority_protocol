@@ -15,7 +15,13 @@ defmodule BoundedAuthorityProtocol.CorpusSyncGate do
     {"sdks/rust/conformance/corpus-v2", "priv/conformance/v2/corpus"},
     {"sdks/go/conformance/corpus-v2", "priv/conformance/v2/corpus"},
     {"sdks/rust/conformance/corpus-v3", "priv/conformance/v3/corpus"},
-    {"sdks/go/conformance/corpus-v3", "priv/conformance/v3/corpus"}
+    {"sdks/go/conformance/corpus-v3", "priv/conformance/v3/corpus"},
+    {"sdks/rust/conformance/corpus-producer-canonicality",
+     "priv/conformance/producer-canonicality"},
+    {"sdks/go/conformance/corpus-producer-canonicality",
+     "priv/conformance/producer-canonicality"},
+    {"sdks/rust/conformance/corpus-selector-float-zero", "priv/conformance/selector-float-zero"},
+    {"sdks/go/conformance/corpus-selector-float-zero", "priv/conformance/selector-float-zero"}
   ]
 
   def run do

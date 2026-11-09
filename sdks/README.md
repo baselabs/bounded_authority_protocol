@@ -45,6 +45,10 @@ decisions.
   profile and anchored-export encoding refuse a signature no conforming signer emits, and each
   SDK runs the certified `bap-producer-canonicality/1` corpus — 75 cases). The npm verifier
   implemented it in 0.8.0.
+- **Erratum 6 (selector float zero) is implemented in all three.** Grant decode rejects a
+  float-tagged zero inside an `equals` value or `one_of` member on every contract-major, and the
+  grant producer refuses a float-tagged integral selector value; each SDK runs the certified
+  `bap-selector-float-zero/1` corpus (161 cases).
 - **Facts rendering.** The specification requires facts to have a fixed redacted rendering.
   The Python `repr`, the Rust derived `Debug`, and Go's `fmt` formatting print every field.
   Facts never hold secrets, but log the fields you need by name.

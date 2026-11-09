@@ -43,6 +43,12 @@ defmodule BoundedAuthorityProtocol.V2.Selector do
         ) :: boolean()
   defdelegate semantic_equal?(left, right), to: SharedSelector
 
+  @doc false
+  defdelegate float_zero_free?(value), to: SharedSelector
+
+  @doc false
+  defdelegate integral_float_free?(value), to: SharedSelector
+
   defp matches?(:all, _arguments, _bounds), do: true
 
   defp matches?({:equals, path, expected}, arguments, bounds) do

@@ -30,6 +30,13 @@ install it from this repository.
 - **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
   conforming signer emits, with the same clauses as the Elixir reference, and the certified
   `bap-producer-canonicality/1` corpus (75 cases) runs with this SDK's conformance suite.
+- **Erratum 6 (selector float zero) is implemented.** Grant decode on contract-majors 1, 2 and 3
+  rejects an `equals` value or `one_of` member holding a float-tagged zero at any depth
+  (`0.0`, `-0.0`, `-0e0`, `1e-400`); range bounds and inert `all` members are unchanged, and
+  range comparison treats -0.0 and 0.0 as equal. `grant_signing_input` refuses any float-tagged
+  integral selector value (`0.0`, `10.0`), range bounds included. The clauses match the Elixir
+  reference, and the certified `bap-selector-float-zero/1` corpus (161 cases) runs with this
+  SDK's conformance suite.
 
 ## Install from this repository
 
@@ -236,7 +243,8 @@ python tests/conformance/run_strict.py   # strict Ed25519: 2410/2410
 role-attestation, and content-assertion corpora, the permissiveness battery (which builds each
 defect a parser closure exists to reject and proves the closure catches it), and pytest
 wrappers for the v1 and strict-Ed25519 runners. The producer-canonicality corpus (erratum 3)
-runs too, through `tests/conformance/run_producer_canonicality.py`.
+runs too, through `tests/conformance/run_producer_canonicality.py`, and so does the
+selector float-zero corpus (erratum 6), through `tests/conformance/run_selector_float_zero.py`.
 
 ## What this SDK does not do
 

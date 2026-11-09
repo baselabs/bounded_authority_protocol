@@ -190,8 +190,15 @@ function equalBytes(left, right, context) {
 
 // --- duplicate-rejecting JSON parser (strict, mirrors siblings) ------------
 
-function parseJsonNoDuplicates(text, context) {
+// Number lexemes are tagged as in jsonDecode (a fraction or exponent marks a float member, recorded
+// with markFloatMember), so case-file values such as `cast_arguments` keep the tag their lexeme
+// carries rather than collapsing an integral float into an integer. `received` (protocol bytes,
+// not corpus files) adds the lexeme byte ceiling and rejects a lexeme whose exact decimal value is
+// out of bound while its binary64 rounding is not; the plain magnitude bound stays with the field
+// validators (isInteger, withinJsonBounds), which see the rounded value.
+function parseJsonNoDuplicates(text, context, received = false) {
   let index = 0;
+  let lastFloat = false;
 
   function skipWhitespace() {
     while (index < text.length && /[\t\n\r ]/.test(text[index])) index += 1;
@@ -217,8 +224,17 @@ function parseJsonNoDuplicates(text, context) {
 
   function parseValue() {
     skipWhitespace();
-    if (text[index] === "{") return parseObject();
-    if (text[index] === "[") return parseArray();
+    lastFloat = false;
+    if (text[index] === "{") {
+      const object = parseObject();
+      lastFloat = false;
+      return object;
+    }
+    if (text[index] === "[") {
+      const array = parseArray();
+      lastFloat = false;
+      return array;
+    }
     if (text[index] === '"') return parseString();
 
     for (const [literal, value] of [
@@ -238,7 +254,15 @@ function parseJsonNoDuplicates(text, context) {
     assert(index === text.length || /[\t\n\r ,\]}]/.test(text[index]), `${context}: number`);
     const value = Number(match[0]);
     assert(Number.isFinite(value), `${context}: finite number`);
-    return value;
+    if (received) {
+      assert(match[0].length <= MAXIMA.number_lexeme_bytes, `${context}: number lexeme bound`);
+      assert(
+        Math.abs(value) > MAXIMA.integer_magnitude || exactMagnitudeWithin(match[0]),
+        `${context}: exact number magnitude`,
+      );
+    }
+    lastFloat = /[.eE]/.test(match[0]);
+    return !lastFloat && value === 0 ? 0 : value;
   }
 
   function parseObject() {
@@ -259,6 +283,7 @@ function parseJsonNoDuplicates(text, context) {
       assert(text[index] === ":", `${context}: member separator`);
       index += 1;
       value[name] = parseValue();
+      if (lastFloat) markFloatMember(value, name);
       skipWhitespace();
       if (text[index] === "}") {
         index += 1;
@@ -280,6 +305,7 @@ function parseJsonNoDuplicates(text, context) {
     }
     while (text.length) {
       value.push(parseValue());
+      if (lastFloat) markFloatMember(value, value.length - 1);
       skipWhitespace();
       if (text[index] === "]") {
         index += 1;
@@ -314,12 +340,30 @@ function containerDepth(value) {
 }
 
 function parseCanonicalJson(bytes, context) {
+  const value = parseReceivedJson(bytes, context);
+  assert(canonical(value) === bytes.toString("utf8"), `${context}: canonical bytes`);
+  return value;
+}
+
+// The exact received bytes, decoded without requiring JCS (spec/bap-v1.md § 7: verifiers accept
+// non-JCS payload bytes; any member order, any number spelling). Each number keeps its lexeme tag.
+function parseReceivedJson(bytes, context) {
   const text = bytes.toString("utf8");
   assert(Buffer.from(text, "utf8").equals(bytes), `${context}: UTF-8`);
-  const value = parseJsonNoDuplicates(text, context);
-  assert(canonical(value) === text, `${context}: canonical bytes`);
+  const value = parseJsonNoDuplicates(text, context, true);
   assert(containerDepth(value) <= MAXIMA.depth, `${context}: depth`);
+  // A received (non-JCS) payload can carry more than total_nodes values inside the byte bound,
+  // for example 17 arrays of 240 nulls in one selector value; the reference rejects it.
+  assert(countJsonNodes(value) <= MAXIMA.total_nodes, `${context}: json node bound`);
   return value;
+}
+
+// A grant payload is the exact received segment; unlike the JWS headers it is not required to be
+// JCS bytes (spec/bap-v1.md § 7: verifiers accept non-JCS payload bytes; § 12: a float-tagged
+// selector zero is only reachable through them). Each number keeps its lexeme tag, which the
+// selector rules and the integer claims read.
+function decodeGrantPayload(bytes, context) {
+  return parseReceivedJson(bytes, context);
 }
 
 function readJsonFile(path, context) {
@@ -404,7 +448,13 @@ function jcsEncode(value) {
 // rules that the corpus exercises; an exact re-implementation of every internal
 // counter is not required for agreement (the corpus cases target the observable
 // rejection classes), but the rules below cover every case class present.
-function jsonDecode(bytes, context) {
+//
+// The decoder produces the tagged algebra of spec/bap-v1.md § 7 from the raw lexeme: a number
+// lexeme with a fraction or an exponent is float-tagged (recorded per member with
+// markFloatMember; a root float is reported through `out.float`), every other number is
+// integer-tagged, and the integer lexeme `-0` decodes to the integer 0. The magnitude bound
+// compares the exact decimal value of the lexeme, never a rounded binary64.
+function jsonDecode(bytes, context, out = undefined) {
   assert(Buffer.isBuffer(bytes), `${context}: bytes`);
   assert(bytes.length <= 65536, `${context}: json byte bound`);
   const text = bytes.toString("utf8");
@@ -412,6 +462,7 @@ function jsonDecode(bytes, context) {
 
   let index = 0;
   let nodes = 0;
+  let lastFloat = false;
 
   function skipWhitespace() {
     while (index < text.length && /[\t\n\r ]/.test(text[index])) index += 1;
@@ -469,13 +520,10 @@ function jsonDecode(bytes, context) {
     assert(index === text.length || /[\t\n\r ,\]}]/.test(text[index]), "json number terminator");
     const value = Number(lexeme);
     assert(Number.isFinite(value), "json finite number");
-    if (Number.isInteger(value)) {
-      assert(Math.abs(value) <= 9007199254740991, "json integer magnitude");
-    } else {
-      assert(Math.abs(value) <= 9007199254740991, "json float magnitude");
-    }
+    assert(exactMagnitudeWithin(lexeme), "json number magnitude");
     countNode();
-    return value;
+    lastFloat = /[.eE]/.test(lexeme);
+    return !lastFloat && value === 0 ? 0 : value;
   }
 
   function decodeValue(depth) {
@@ -487,8 +535,17 @@ function jsonDecode(bytes, context) {
     skipWhitespace();
     assert(index < text.length, "json value");
     const ch = text[index];
-    if (ch === "{") return decodeObject(depth);
-    if (ch === "[") return decodeArray(depth);
+    lastFloat = false;
+    if (ch === "{") {
+      const object = decodeObject(depth);
+      lastFloat = false;
+      return object;
+    }
+    if (ch === "[") {
+      const array = decodeArray(depth);
+      lastFloat = false;
+      return array;
+    }
     if (ch === '"') return decodeString();
     if (text.startsWith("true", index)) {
       index += 4;
@@ -532,6 +589,7 @@ function jsonDecode(bytes, context) {
       assert(text[index] === ":", "json member separator");
       index += 1;
       value[name] = decodeValue(depth + 1);
+      if (lastFloat) markFloatMember(value, name);
       skipWhitespace();
       if (text[index] === "}") {
         index += 1;
@@ -555,6 +613,7 @@ function jsonDecode(bytes, context) {
     }
     while (text.length) {
       value.push(decodeValue(depth + 1));
+      if (lastFloat) markFloatMember(value, value.length - 1);
       assert(value.length <= 256, "json array bound");
       skipWhitespace();
       if (text[index] === "]") {
@@ -568,9 +627,31 @@ function jsonDecode(bytes, context) {
   }
 
   const value = decodeValue(1);
+  if (out !== undefined) out.float = lastFloat;
   skipWhitespace();
   assert(index === text.length, "json trailing bytes");
   return value;
+}
+
+// Exact decimal magnitude of an RFC 8259 number lexeme against the symmetric bound
+// 9007199254740991, without binary64 rounding (spec/bap-v1.md § 7, REQ1-JSON-number-bounds).
+function exactMagnitudeWithin(lexeme) {
+  const match = /^-?(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(lexeme);
+  assert(match !== null, "json number lexeme");
+  const fraction = match[2] ?? "";
+  let digits = (match[1] + fraction).replace(/^0+/, "");
+  if (digits === "") return true;
+  let exponent = BigInt(match[3] ?? "0") - BigInt(fraction.length);
+  const trimmed = digits.replace(/0+$/, "");
+  exponent += BigInt(digits.length - trimmed.length);
+  digits = trimmed;
+  const integerDigits = BigInt(digits.length) + exponent;
+  if (integerDigits < 16n) return true;
+  if (integerDigits > 16n) return false;
+  const bound = 9007199254740991n;
+  return exponent >= 0n
+    ? BigInt(digits) * 10n ** exponent <= bound
+    : BigInt(digits) <= bound * 10n ** -exponent;
 }
 
 // --- URI normalize (RFC 3986 §6, https-only; mirrors V1.Uri) ---------------
@@ -1591,11 +1672,18 @@ function buildSelector(selector, context) {
   // input may give the "all" selector as the bare string "all" — normalize it.
   if (selector === "all") return { kind: "all" };
   if (selector && selector.kind === "all") return { kind: "all" };
+  // Erratum 6 (REQ1-SIGNING-integral-float-selector): the producer refuses a selector value holding
+  // a float-tagged integral number at any depth, because its JCS bytes would decode integer-tagged.
   if (selector && selector.kind === "equals" && Array.isArray(selector.path)) {
+    if (containsIntegralFloat(selector, "value")) fail(`${context}: integral float selector value`);
     return { kind: "equals", path: selector.path, value: selector.value };
   }
   if (selector && selector.kind === "one_of" && Array.isArray(selector.path) && Array.isArray(selector.values)) {
-    return { kind: "one_of", path: selector.path, values: selector.values };
+    const values = selector.values;
+    if (values.some((_, index) => containsIntegralFloat(values, index))) {
+      fail(`${context}: integral float selector value`);
+    }
+    return { kind: "one_of", path: selector.path, values };
   }
   fail(`${context}: selector shape`);
 }
@@ -1656,7 +1744,7 @@ function dispatchProofSigningInput(input) {
     ath: sha256(Buffer.from(grantCompact, "ascii")).toString("base64url"),
     ba_inv: invocationId,
     ba_op: operation,
-    ba_req: requestDigest(operation, castArguments),
+    ba_req: requestDigest(operation, castArguments, isFloatMember(input, "cast_arguments")),
     htm: method,
     htu: targetUri,
     iat: issuedAt,
@@ -1765,7 +1853,7 @@ function dispatchDecodeGrant(input) {
   assert(validKeyId(header.kid), "decode_grant: kid");
   // decode is a full-payload validation surface (no expected context), so the runner mirrors the
   // whole of decode_grant_fields here rather than only reading a field back.
-  const payload = parseCanonicalJson(jws.payloadBytes, "decode_grant payload");
+  const payload = decodeGrantPayload(jws.payloadBytes, "decode_grant payload");
   exactKeys(
     payload,
     ["aud", "cnf", "exp", "iat", "iss", "jti", "nbf", "operations", "v"],
@@ -1869,12 +1957,44 @@ function dispatchCheckChain(input) {
 // distinction. The canonical serialization of a tagged value is the JCS of its
 // array form: ["integer",10], ["string","x"], ["object",{...}], etc.
 
-function toTagged(value) {
+//
+// The tag comes from the raw lexeme, never from the decoded JS number (spec/bap-v1.md § 7-8): both
+// decoders record each member whose lexeme has a fraction or an exponent in FLOAT_MEMBERS, keyed by
+// the owning container and the member name or array index, so `10.0` is {:float, 10.0} and `10` is
+// {:integer, 10}. A value that is not a member of a decoded container (the root) passes its tag
+// explicitly. Integers compare as integers (the lexeme `-0` is the integer 0) and float-tagged
+// values compare numerically (−0.0 = 0.0, erratum 6): the identity below is the JCS of the tagged
+// form, and JCS writes every zero as `0`.
+
+const FLOAT_MEMBERS = new WeakMap();
+
+function markFloatMember(owner, key) {
+  if (!FLOAT_MEMBERS.has(owner)) FLOAT_MEMBERS.set(owner, new Set());
+  FLOAT_MEMBERS.get(owner).add(key);
+}
+
+function isFloatMember(owner, key) {
+  return FLOAT_MEMBERS.get(owner)?.has(key) === true;
+}
+
+// Decode one JSON text with the bounded lexeme-aware decoder; `float` reports a float-tagged root.
+function decodeJsonText(text, context) {
+  assert(typeof text === "string", `${context}: JSON text`);
+  const out = {};
+  const value = jsonDecode(Buffer.from(text, "utf8"), context, out);
+  return { value, float: out.float === true };
+}
+
+function toTagged(value, float = false) {
   if (value === null) return ["null"];
   if (typeof value === "boolean") return ["boolean", value];
   if (typeof value === "string") return ["string", value];
   if (typeof value === "number") {
-    return Number.isInteger(value) ? ["integer", value] : ["float", value];
+    if (float) return ["float", value];
+    // A non-integral number without a float lexeme record can only be a runner bug: abort, never
+    // launder it into an INVALID verdict.
+    if (!Number.isInteger(value)) throw new Error("tagged number without its lexeme tag");
+    return ["integer", value === 0 ? 0 : value];
   }
   if (Array.isArray(value)) return ["array", value.map((v, i) => taggedMember(value, i, v))];
   assert(value && typeof value === "object", "tagged JSON value");
@@ -2028,6 +2148,10 @@ function decodeAudiences(aud) {
 // Full mirror of `decode_grant_fields` beyond the already-closed header/cnf/operations checks.
 // The payload's exact member set is closed by the caller; this validates each member's VALUE.
 function validateGrantPayloadFields(payload, context) {
+  // Integer claims carry the integer tag: a float lexeme (`1000.0`, `1e3`) is {:float, _}.
+  for (const claim of ["v", "iat", "nbf", "exp"]) {
+    assert(!isFloatMember(payload, claim), `${context}: grant ${claim} float tag`);
+  }
   assert(payload.v === 1 && isInteger(payload.v), `${context}: grant version`);
   assert(validIdentifier(payload.iss), `${context}: grant issuer`);
   assert(validIdentifier(payload.jti), `${context}: grant id`);
@@ -2068,8 +2192,8 @@ function validateProofPayloadFields(payload, context) {
 // `level < depth`, root value at `level 0` (jcs.ex:28/33/40/49/58 vs 65/77). A uniform
 // `depth > MAXIMA.depth` gate (root at 1) wrongly rejected a scalar at the deepest legal level.
 // This checks the PER-NODE bounds only; the AGGREGATE bounds the official Jcs.encode also applies —
-// total_nodes and jcs_bytes — are NOT enforced here. For selector values (compact-carried, capped
-// by string_bytes) both aggregates are inline-inexpressible (the disclosed gap). For the
+// total_nodes and jcs_bytes — are NOT enforced here. For selector values (compact-carried) the
+// grant payload's total_nodes is enforced on the whole received payload (parseReceivedJson). For the
 // request_digest/check_envelope typed projection (value-carried cast_arguments) total_nodes AND
 // jcs_bytes ARE expressible and are enforced at the `requestDigest` call site (countJsonNodes + the
 // canonical byte length), not here.
@@ -2127,7 +2251,31 @@ function countJsonNodes(value) {
 }
 
 function taggedMember(owner, key, value) {
-  return toTagged(value);
+  return toTagged(value, isFloatMember(owner, key));
+}
+
+// Erratum 6 (spec/bap-v1.md § 12, REQ1-SELECTOR-float-zero): the member holds, at any depth, a
+// float-tagged number equal to zero, whatever its sign or spelling. Keyed on the decoded value.
+function containsFloatZero(owner, key) {
+  const value = owner[key];
+  if (typeof value === "number") return value === 0 && isFloatMember(owner, key);
+  if (Array.isArray(value)) return value.some((_, index) => containsFloatZero(value, index));
+  if (value && typeof value === "object") {
+    return Object.keys(value).some((name) => containsFloatZero(value, name));
+  }
+  return false;
+}
+
+// REQ1-SIGNING-integral-float-selector: the member holds, at any depth, a float-tagged number with
+// an integral value (`0.0`, `-0.0`, `10.0`), whose JCS bytes would decode integer-tagged.
+function containsIntegralFloat(owner, key) {
+  const value = owner[key];
+  if (typeof value === "number") return Number.isInteger(value) && isFloatMember(owner, key);
+  if (Array.isArray(value)) return value.some((_, index) => containsIntegralFloat(value, index));
+  if (value && typeof value === "object") {
+    return Object.keys(value).some((name) => containsIntegralFloat(value, name));
+  }
+  return false;
 }
 
 // --- selector matching ------------------------------------------------------
@@ -2143,11 +2291,9 @@ function taggedMember(owner, key, value) {
 // survives the round-trip because JSON.stringify re-emits the same escape.
 //
 // Identity is the JCS of the tagged form — the same tagged projection ba_req uses (arrays
-// positional, objects unordered). One tag distinction the official draws is NOT recoverable here:
-// the official carries {:integer, 10} and {:float, 10.0} separately, while JSON.parse collapses
-// `10` and `10.0` to the same JS number, so this runner tags by Number.isInteger. Selector values
-// in the corpus are therefore strings (design note D1); an integral-float selector value would
-// disagree with the official and must not be authored without closing this gap first.
+// positional, objects unordered). The integer/float tag comes from each member's raw lexeme (see
+// the typed JSON algebra above), so {:integer, 10} and {:float, 10.0} stay distinct and an
+// integral-float selector value is decided exactly as the official decides it.
 // No selector grants business authorization; this is a bounded structural match only.
 function validSelectorPath(path) {
   if (!Array.isArray(path) || path.length < 1 || path.length > MAXIMA.path_segments) return false;
@@ -2161,16 +2307,18 @@ function validSelectorPath(path) {
 
 function traverseObjectPath(value, path) {
   let current = value;
+  let owner;
   for (const segment of path) {
     if (current === null || typeof current !== "object" || Array.isArray(current)) return undefined;
     if (!Object.prototype.hasOwnProperty.call(current, segment)) return undefined;
+    owner = current;
     current = current[segment];
   }
-  return { found: current };
+  return { found: current, owner, key: path[path.length - 1] };
 }
 
-function taggedIdentity(value) {
-  return canonical(toTagged(value));
+function taggedIdentity(owner, key) {
+  return canonical(taggedMember(owner, key, owner[key]));
 }
 
 // Full mirror of the official `operations/2` -> `operation/2` (runtime.ex): a bounded non-empty
@@ -2218,10 +2366,19 @@ function validSelectorShape(selector, context) {
   // pattern, so a selector carrying kind:"all" alongside path/value decodes as :all rather than
   // being rejected. Requiring members === "kind" here made this runner STRICTER than the official
   // — the one divergence direction that fails a conforming implementation.
+  // Its inert members still pass the enclosing bounded decoder (spec/bap-v1.md § 12), whose scalar
+  // magnitude, string and key bounds withinJsonBounds mirrors; nothing else reads them.
+  if (
+    selector.kind === "all" &&
+    !["path", "value", "values"].every((m) => !Object.hasOwn(selector, m) || withinJsonBounds(selector[m]))
+  ) {
+    fail(`${context}: inert selector member bounds`);
+  }
   if (selector.kind === "all") return;
   if (selector.kind === "equals" && members === "kind,path,value") {
     if (!validSelectorPath(selector.path)) fail(`${context}: selector path`);
     if (!withinJsonBounds(selector.value)) fail(`${context}: selector value bounds`);
+    if (containsFloatZero(selector, "value")) fail(`${context}: selector float zero`);
     return;
   }
   if (selector.kind === "one_of" && members === "kind,path,values") {
@@ -2231,6 +2388,7 @@ function validSelectorShape(selector, context) {
       fail(`${context}: selector values`);
     }
     if (!values.every((v) => withinJsonBounds(v))) fail(`${context}: selector value bounds`);
+    if (values.some((_, index) => containsFloatZero(values, index))) fail(`${context}: selector float zero`);
     return;
   }
   fail(`${context}: selector shape`);
@@ -2248,7 +2406,7 @@ function selectorMatches(selector, args) {
     if (!validSelectorPath(selector.path)) fail("check_envelope: selector path");
     if (!withinJsonBounds(selector.value)) fail("check_envelope: selector value bounds");
     const hit = traverseObjectPath(args, selector.path);
-    return hit !== undefined && taggedIdentity(hit.found) === taggedIdentity(selector.value);
+    return hit !== undefined && taggedIdentity(hit.owner, hit.key) === taggedIdentity(selector, "value");
   }
   if (selector.kind === "one_of" && members === "kind,path,values") {
     if (!validSelectorPath(selector.path)) fail("check_envelope: selector path");
@@ -2259,22 +2417,22 @@ function selectorMatches(selector, args) {
     if (!values.every((v) => withinJsonBounds(v))) fail("check_envelope: selector value bounds");
     const hit = traverseObjectPath(args, selector.path);
     if (hit === undefined) return false;
-    const target = taggedIdentity(hit.found);
-    return values.some((v) => taggedIdentity(v) === target);
+    const target = taggedIdentity(hit.owner, hit.key);
+    return values.some((_, index) => taggedIdentity(values, index) === target);
   }
   fail("check_envelope: selector shape");
 }
 
 // --- request_digest ---------------------------------------------------------
 
-function requestDigest(operation, castArguments) {
+function requestDigest(operation, castArguments, rootFloat = false) {
   // Full mirror of the official `RequestDigest.digest` (request_digest.ex): valid_operation? AND a
   // bounded `Jcs.encode({:array,[{:string,op}, typed(args)]}, bounds)`. The runner previously
   // computed an UNBOUNDED canonical digest, certifying a request the official rejects. The bounds
   // apply to the TYPED projection (not the raw args): `typed` deepens/triples the tree, so the
   // depth boundary is ~15 (not 32) and total_nodes is reachable inline.
   assert(validOperationName(operation), "request_digest: operation");
-  const projected = [operation, toTagged(castArguments)];
+  const projected = [operation, toTagged(castArguments, rootFloat)];
   // Per-node bounds (depth per-node-type / members / items / string / magnitude / key).
   if (!withinJsonBounds(projected)) fail("request_digest: cast_arguments bounds");
   // total_nodes: the projection can exceed 4096 nodes for a value-carried cast_arguments.
@@ -2291,7 +2449,7 @@ function requestDigest(operation, castArguments) {
 function dispatchRequestDigest(input) {
   const operation = fetchBinary(input, "operation", "request_digest");
   if (input.cast_arguments === undefined) fail("request_digest: cast_arguments");
-  return { digest: requestDigest(operation, input.cast_arguments) };
+  return { digest: requestDigest(operation, input.cast_arguments, isFloatMember(input, "cast_arguments")) };
 }
 
 // --- verify surfaces (Ed25519 via node:crypto — the import boundary) --------
@@ -2335,7 +2493,7 @@ function dispatchVerifyGrant(input) {
   exactKeys(header, ["alg", "kid", "typ"], "verify_grant header");
   assert(header.alg === "EdDSA" && header.typ === "ba+cap", "verify_grant header values");
   assert(header.kid === keyId, "verify_grant: kid");
-  const payload = parseCanonicalJson(jws.payloadBytes, "verify_grant payload");
+  const payload = decodeGrantPayload(jws.payloadBytes, "verify_grant payload");
   // Closed like the official (runtime.ex `closed_map(payload_members, @grant_payload_keys)`), and
   // `cnf` with it — this dispatcher reads payload.cnf.jkt below.
   exactKeys(
@@ -2461,7 +2619,7 @@ function dispatchCheckEnvelope(input) {
   exactKeys(grantHeader, ["alg", "kid", "typ"], "check_envelope grant header");
   assert(grantHeader.alg === "EdDSA" && grantHeader.typ === "ba+cap", "check_envelope grant header");
   assert(grantHeader.kid === grantKeyId, "check_envelope: grant kid");
-  const grantPayload = parseCanonicalJson(grantJws.payloadBytes, "check_envelope grant payload");
+  const grantPayload = decodeGrantPayload(grantJws.payloadBytes, "check_envelope grant payload");
   exactKeys(
     grantPayload,
     ["aud", "cnf", "exp", "iat", "iss", "jti", "nbf", "operations", "v"],
@@ -2513,7 +2671,7 @@ function dispatchCheckEnvelope(input) {
   const operation = fetchBinary(expected, "operation", "check_envelope");
   assert(proofPayload.ba_op === operation, "check_envelope: operation");
   if (expected.cast_arguments === undefined) fail("check_envelope: cast_arguments");
-  const baReq = requestDigest(operation, expected.cast_arguments);
+  const baReq = requestDigest(operation, expected.cast_arguments, isFloatMember(expected, "cast_arguments"));
   assert(proofPayload.ba_req === baReq, "check_envelope: ba_req");
   // Proof time window.
   assert(proofPayload.iat >= evaluationTime - proofMaxAge - clockSkew, "check_envelope: proof iat min");
@@ -2827,6 +2985,7 @@ function parseArguments(argv) {
   let manifestPath = null;
   let scanPath = null;
   let strict = false;
+  let floatZero = false;
   let i = 0;
   while (i < argv.length) {
     const arg = argv[i];
@@ -2836,6 +2995,9 @@ function parseArguments(argv) {
       i += 2;
     } else if (arg === "--strict") {
       strict = true;
+      i += 1;
+    } else if (arg === "--selector-float-zero") {
+      floatZero = true;
       i += 1;
     } else if (arg === "--scan") {
       if (i + 1 >= argv.length) throw new Error("usage");
@@ -2848,8 +3010,8 @@ function parseArguments(argv) {
       i += 1;
     }
   }
-  if (positional.length !== 1) throw new Error("usage");
-  return { corpusDir: positional[0], manifestPath, scanPath, strict };
+  if (positional.length !== 1 || (strict && floatZero)) throw new Error("usage");
+  return { corpusDir: positional[0], manifestPath, scanPath, strict, floatZero };
 }
 
 // ===========================================================================
@@ -2957,10 +3119,167 @@ function runStrict(corpusDir) {
   }
 }
 
+// ===========================================================================
+// Selector float-zero corpus mode (--selector-float-zero): profile bap-selector-float-zero/1
+// ===========================================================================
+//
+// Erratum 6 (spec/bap-v1.md § 7 and § 12, bap-v2.md § 4, bap-v3.md § 4). The exact index.json
+// bytes are pinned by SHA-256 before any case runs; then integrity (per-file SHA-256 hex, exact
+// file set both directions, per-file, per-family and total counts, case-id uniqueness, the closed
+// case envelope, the class-to-verdict mapping and the family-to-surface mapping). Values whose
+// float tag matters travel as JSON text (`input.operations_json`,
+// `input.expected.cast_arguments_json`) and are decoded here with this runner's own lexeme-aware
+// bounded decoder (a fraction or exponent marks a float) before they are spliced into the
+// ordinary v1 input shapes. This runner implements contract-major 1 only, so it decides every
+// major-1 case of all three families (grant-decode, grant-signing-input, envelope) and counts the
+// major-2 and major-3 cases as not covered, by family, and never as agreement.
+
+const FLOAT_ZERO_INDEX_SHA256 = "97fd7a99cdbf3acc0a78f5ba1c6556e23a63e0ad66f533e31fd69f82dc5f3003";
+const FLOAT_ZERO_SURFACES = {
+  "grant-decode": "decode_grant",
+  "grant-signing-input": "grant_signing_input",
+  envelope: "check_envelope",
+};
+
+function loadFloatZeroCorpus(corpusDir) {
+  const indexBytes = readFileSync(join(corpusDir, "index.json"));
+  const indexSha256 = createHash("sha256").update(indexBytes).digest("hex");
+  assert(indexSha256 === FLOAT_ZERO_INDEX_SHA256, `float-zero index sha256 ${indexSha256}`);
+  const index = parseJsonNoDuplicates(indexBytes.toString("utf8"), "float-zero index");
+  exactKeys(
+    index,
+    ["families", "files", "format", "private_material_tracked", "profile", "revision", "total_cases"],
+    "float-zero index",
+  );
+  assert(
+    index.format === "bounded-authority-protocol-selector-float-zero-conformance-corpus-index",
+    "float-zero index format",
+  );
+  assert(index.profile === "bap-selector-float-zero/1" && index.revision === 1, "float-zero index identity");
+  assert(index.private_material_tracked === false, "float-zero index private material");
+  const declared = new Set(index.files.map((f) => f.path));
+  assert(declared.size === index.files.length, "float-zero duplicate file entry");
+  const onDisk = listCorpusFiles(corpusDir)
+    .map((full) => relative(corpusDir, full).split("\\").join("/"))
+    .filter((rel) => rel !== "index.json");
+  assert(onDisk.length === declared.size && onDisk.every((rel) => declared.has(rel)), "float-zero file set");
+  const cases = [];
+  const ids = new Set();
+  const families = {};
+  for (const file of index.files) {
+    const bytes = readFileSync(join(corpusDir, file.path));
+    assert(createHash("sha256").update(bytes).digest("hex") === file.sha256, `${file.path}: sha256`);
+    if (!file.path.startsWith("cases/")) {
+      assert(file.cases === 0, `${file.path}: case count`);
+      continue;
+    }
+    const doc = parseJsonNoDuplicates(bytes.toString("utf8"), file.path);
+    exactKeys(doc, ["cases", "family", "format", "provenance"], `${file.path}: document`);
+    assert(doc.format === "bounded-authority-protocol-selector-float-zero-conformance-cases", `${file.path}: format`);
+    assert(doc.provenance?.private_material_tracked === false, `${file.path}: private material`);
+    assert(Object.hasOwn(FLOAT_ZERO_SURFACES, doc.family), `${file.path}: family`);
+    assert(Array.isArray(doc.cases) && doc.cases.length === file.cases, `${file.path}: case count`);
+    for (const c of doc.cases) {
+      exactKeys(c, ["class", "construction", "expected", "id", "input", "major", "rule", "surface"], `${file.path}: case`);
+      assert(!ids.has(c.id), `${c.id}: duplicate id`);
+      ids.add(c.id);
+      assert([1, 2, 3].includes(c.major), `${c.id}: major`);
+      assert(c.surface === FLOAT_ZERO_SURFACES[doc.family], `${c.id}: surface`);
+      assert(
+        (c.class === "invalid_selector" && c.expected?.verdict === "invalid") ||
+          (c.class === "valid" && c.expected?.verdict === "valid"),
+        `${c.id}: class mapping`,
+      );
+      cases.push({ family: doc.family, caseObj: c });
+    }
+    families[doc.family] = (families[doc.family] ?? 0) + doc.cases.length;
+  }
+  const profile = parseJsonNoDuplicates(readFileSync(join(corpusDir, "profile.json"), "utf8"), "float-zero profile");
+  assert(profile.profile === index.profile, "float-zero profile identity");
+  assert(canonical(Object.keys(families).sort()) === canonical([...profile.families].sort()), "float-zero profile families");
+  assert(canonical(families) === canonical(index.families), "float-zero family counts");
+  assert(cases.length === index.total_cases, "float-zero total");
+  return { indexSha256, cases };
+}
+
+// Decode one JSON text field with this runner's bounded, lexeme-aware decoder and splice the value
+// in place of the text. The splice target becomes the value's owner, so a root float keeps its tag.
+function untextFloatZero(owner, textKey, valueKey, context) {
+  const text = owner[textKey];
+  assert(typeof text === "string", `${context}: ${textKey}`);
+  const spliced = Object.create(null);
+  for (const [key, value] of Object.entries(owner)) {
+    if (key !== textKey) spliced[key] = value;
+  }
+  const decoded = decodeJsonText(text, context);
+  spliced[valueKey] = decoded.value;
+  if (decoded.float) markFloatMember(spliced, valueKey);
+  return spliced;
+}
+
+function floatZeroInput(caseObj) {
+  const input = caseObj.input;
+  if (caseObj.surface === "grant_signing_input") {
+    return untextFloatZero(input, "operations_json", "operations", "grant_signing_input");
+  }
+  if (caseObj.surface === "check_envelope") {
+    const spliced = Object.create(null);
+    for (const [key, value] of Object.entries(input)) spliced[key] = value;
+    spliced.expected = untextFloatZero(input.expected, "cast_arguments_json", "cast_arguments", "check_envelope");
+    return spliced;
+  }
+  return input;
+}
+
+function runFloatZero(corpusDir) {
+  const { indexSha256, cases } = loadFloatZeroCorpus(corpusDir);
+  let agreed = 0;
+  let disagreed = 0;
+  const disagreements = [];
+  const notCovered = {};
+  const expectedImports = new Set();
+  for (const { family, caseObj } of cases) {
+    if (caseObj.major !== 1) {
+      notCovered[family] = (notCovered[family] ?? 0) + 1;
+      continue;
+    }
+    let actual;
+    try {
+      actual = dispatch(caseObj.surface, floatZeroInput(caseObj), {});
+    } catch (error) {
+      if (!(error instanceof InvalidError)) throw error;
+      actual = INVALID;
+    }
+    if (caseObj.class === "valid" && caseObj.surface === "check_envelope") {
+      collectCaseKeys(caseObj.input, expectedImports);
+    }
+    if (agree(caseObj.expected, actual)) agreed += 1;
+    else {
+      disagreed += 1;
+      disagreements.push(caseObj.id);
+    }
+  }
+  // Verification-import assertion, as in the v1 corpus mode: every trusted key a valid envelope
+  // case declares must have reached node:crypto createPublicKey during the run.
+  for (const fp of expectedImports) {
+    assert(verificationImportedFingerprints.has(fp), `float-zero verification-import: key ${fp} never imported`);
+  }
+  const skipped = Object.values(notCovered).reduce((a, b) => a + b, 0);
+  process.stdout.write(
+    `corpus_independent: selector-float-zero agreed=${agreed} disagreed=${disagreed} total=${cases.length} ` +
+      `not_covered=${skipped} ${canonical(notCovered)} index_sha256=${indexSha256}\n`,
+  );
+  if (disagreed > 0) {
+    process.stderr.write(`corpus_independent: disagreements: ${disagreements.join(", ")}\n`);
+    process.exitCode = 1;
+  }
+}
+
 function main() {
   const args = parseArguments(process.argv.slice(2));
   const corpusDir = resolve(args.corpusDir);
   if (args.strict) return runStrict(corpusDir);
+  if (args.floatZero) return runFloatZero(corpusDir);
 
   const { index, cases, raws } = loadCorpus(corpusDir);
 

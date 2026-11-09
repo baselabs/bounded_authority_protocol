@@ -26,6 +26,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        "test/bap_walkthrough_test.exs",
                        "test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",
                        "test/bounded_authority_protocol/signature_width_error_shape_test.exs",
+                       # Erratum 6 exercises the same selector rule on contract-majors 1, 2 and 3.
+                       "test/bounded_authority_protocol/selector_float_zero_test.exs",
                        "test/docs_currency_test.exs",
                        "test/spec_facts_test.exs"
                      ])

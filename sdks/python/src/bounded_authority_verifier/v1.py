@@ -70,7 +70,7 @@ from .jwk import (
     jwk_from_public_key,
     thumbprint_raw,
 )
-from .selector import parse_selector, selector_matches
+from .selector import integral_float_free, parse_selector, selector_matches
 from .uri import local_loopback_http_uri_normalize, uri_normalize
 
 # --- constants (the closed v1 profile header/claim literals) ---
@@ -1466,6 +1466,8 @@ def _selector_to_tagged(s: SelectorInput, b: Bounds) -> Tagged:
             path = _validate_path(cast("Sequence[str]", s["path"]), b)
             value = cast("Tagged", s["value"])
             _validate_selector_value(value, b)
+            if not integral_float_free(value):
+                fail("selector: integral float")
             return JObject({
                 "kind": JString(str_utf8("equals")),
                 "path": path,
@@ -1478,6 +1480,8 @@ def _selector_to_tagged(s: SelectorInput, b: Bounds) -> Tagged:
                 fail("selector: values count")
             for v in values:
                 _validate_selector_value(v, b)
+                if not integral_float_free(v):
+                    fail("selector: integral float")
             return JObject({
                 "kind": JString(str_utf8("one_of")),
                 "path": path,

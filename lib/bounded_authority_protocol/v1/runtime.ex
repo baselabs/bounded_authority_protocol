@@ -717,7 +717,8 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
 
   defp encode_selector({:equals, path, value}, bounds) do
     with true <- valid_path?(path, bounds),
-         {:ok, _encoded} <- Jcs.encode(value, bounds) do
+         {:ok, _encoded} <- Jcs.encode(value, bounds),
+         true <- Selector.integral_float_free?(value) do
       {:ok,
        {:object,
         [
@@ -733,7 +734,8 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
   defp encode_selector({:one_of, path, values}, bounds) do
     with true <- valid_path?(path, bounds),
          true <- nonempty_bounded?(values, bounds.one_of_values),
-         true <- Enum.all?(values, &match?({:ok, _}, Jcs.encode(&1, bounds))) do
+         true <- Enum.all?(values, &match?({:ok, _}, Jcs.encode(&1, bounds))),
+         true <- Enum.all?(values, &Selector.integral_float_free?/1) do
       {:ok,
        {:object,
         [
@@ -789,7 +791,8 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
        }} ->
         with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),
              true <- path != [],
-             {:ok, _encoded} <- Jcs.encode(value, bounds) do
+             {:ok, _encoded} <- Jcs.encode(value, bounds),
+             true <- Selector.float_zero_free?(value) do
           {:ok, {:equals, path, value}}
         else
           _failure -> {:error, :invalid}
@@ -804,7 +807,8 @@ defmodule BoundedAuthorityProtocol.V1.Runtime do
         with {:ok, path} <- strings(path_values, bounds.path_segments, bounds.key_bytes),
              true <- path != [],
              true <- nonempty_bounded?(values, bounds.one_of_values),
-             true <- Enum.all?(values, &match?({:ok, _}, Jcs.encode(&1, bounds))) do
+             true <- Enum.all?(values, &match?({:ok, _}, Jcs.encode(&1, bounds))),
+             true <- Enum.all?(values, &Selector.float_zero_free?/1) do
           {:ok, {:one_of, path, values}}
         else
           _failure -> {:error, :invalid}

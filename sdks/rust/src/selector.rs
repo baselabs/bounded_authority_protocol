@@ -54,8 +54,9 @@ pub(crate) fn validate(selector: &JsonValue, bounds: &Bounds) -> Result<()> {
         "all" => Ok(()),
         "equals" => {
             extract_path(members, "path", bounds)?;
-            jcs_encode(member_value(members, "value")?, bounds)?;
-            Ok(())
+            let value = member_value(members, "value")?;
+            jcs_encode(value, bounds)?;
+            require_float_free(value, is_zero)
         }
         "one_of" => {
             extract_path(members, "path", bounds)?;
@@ -68,6 +69,7 @@ pub(crate) fn validate(selector: &JsonValue, bounds: &Bounds) -> Result<()> {
             }
             for value in values {
                 jcs_encode(value, bounds)?;
+                require_float_free(value, is_zero)?;
             }
             Ok(())
         }
@@ -123,6 +125,60 @@ fn recognized_member_set(members: &[(String, JsonValue)]) -> bool {
 }
 
 // ============================================================================
+// Erratum 6 — float-tagged zero and integral floats in selector values
+// (REQ{1,2,3}-SELECTOR-float-zero, REQ{1,2,3}-SIGNING-integral-float-selector).
+// RFC 8785 writes a float zero as `0`, which decodes integer-tagged, so no
+// conforming producer emits one; verifiers accept non-JCS payload bytes, and
+// conforming verifiers disagreed on whether `0.0` and `-0.0` are the same
+// selector value. Decode therefore refuses a float-tagged zero anywhere inside
+// an `equals` value or `one_of` member, and the grant producer refuses every
+// float-tagged integral selector value (its JCS bytes would decode
+// integer-tagged). Both are keyed on the decoded value, never on the lexeme,
+// and share one depth walk. Range bounds compare numerically (-0.0 = 0.0) and
+// stay admissible at decode; inert `all` members are never inspected.
+// ============================================================================
+
+/// `Err(Invalid)` when any float-tagged number at any depth of `value` satisfies `hit`.
+fn require_float_free(value: &JsonValue, hit: fn(f64) -> bool) -> Result<()> {
+    match value {
+        JsonValue::Float(f) if hit(*f) => Err(Invalid),
+        JsonValue::Array(items) => items.iter().try_for_each(|v| require_float_free(v, hit)),
+        JsonValue::Object(members) => members
+            .iter()
+            .try_for_each(|(_, v)| require_float_free(v, hit)),
+        _ => Ok(()),
+    }
+}
+
+/// Every spelling of zero (`0.0`, `-0e0`, `1e-400`, ...) decodes to a value equal to `0.0`.
+fn is_zero(f: f64) -> bool {
+    f == 0.0
+}
+
+/// An integral float (`0.0`, `-3.0`, `4503599627370496.0`); RFC 8785 writes it as integer text.
+fn is_integral(f: f64) -> bool {
+    f.trunc() == f
+}
+
+/// The producer half of erratum 6: run after [`validate`] / [`validate_v2`] on a
+/// selector the grant signing-input producer is about to sign. Refuses a
+/// float-tagged integral number anywhere in an `equals` value, a `one_of`
+/// member, or an `lte`/`gte` bound. `all` is left alone: its members are inert.
+pub(crate) fn require_signable_values(selector: &JsonValue) -> Result<()> {
+    let members = match selector {
+        JsonValue::Object(m) => m,
+        _ => return Err(Invalid),
+    };
+    match member_str(members, "kind")? {
+        "equals" | "lte" | "gte" => {
+            require_float_free(member_value(members, "value")?, is_integral)
+        }
+        "one_of" => require_float_free(member_value(members, "values")?, is_integral),
+        _ => Ok(()),
+    }
+}
+
+// ============================================================================
 // v2 selector algebra — the closed set extended by the two inclusive range
 // kinds `lte`/`gte` (ADR 0028). The v1 closed set is untouched: `validate` /
 // `evaluate` above keep rejecting `lte`/`gte` (an lte-bearing grant is invalid
@@ -151,8 +207,9 @@ pub(crate) fn validate_v2(selector: &JsonValue, bounds: &Bounds) -> Result<()> {
         "all" => Ok(()),
         "equals" => {
             extract_path(members, "path", bounds)?;
-            jcs_encode(member_value(members, "value")?, bounds)?;
-            Ok(())
+            let value = member_value(members, "value")?;
+            jcs_encode(value, bounds)?;
+            require_float_free(value, is_zero)
         }
         "one_of" => {
             extract_path(members, "path", bounds)?;
@@ -165,6 +222,7 @@ pub(crate) fn validate_v2(selector: &JsonValue, bounds: &Bounds) -> Result<()> {
             }
             for value in values {
                 jcs_encode(value, bounds)?;
+                require_float_free(value, is_zero)?;
             }
             Ok(())
         }

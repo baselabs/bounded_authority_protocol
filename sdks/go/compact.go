@@ -137,6 +137,9 @@ func GrantSigningInput(g Grant, bounds *Bounds) (si SigningInput, err error) {
 			if validateSelector(sel, &b) != nil {
 				return SigningInput{}, ErrInvalid
 			}
+			if !selectorIntegralFloatFree(sel) {
+				return SigningInput{}, ErrInvalid // REQ1-SIGNING-integral-float-selector (erratum 6)
+			}
 			sels = append(sels, sel)
 		}
 		ops = append(ops, Obj{{Key: "name", Val: Str(op.Name)}, {Key: "selectors", Val: sels}})
