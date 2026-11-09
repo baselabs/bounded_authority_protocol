@@ -463,6 +463,9 @@ sdks/typescript/conformance/corpus-v2/cases/grant-verify/probe.json
 priv/conformance/producer-canonicality/cases/es256-export-encode/probe.json
 sdks/go/conformance/corpus-producer-canonicality/cases/es256-export-encode/probe.json
 sdks/rust/conformance/corpus-producer-canonicality/cases/es256-export-encode/probe.json
+priv/conformance/selector-float-zero/cases/envelope/probe.json
+sdks/go/conformance/corpus-selector-float-zero/cases/grant-decode/probe.json
+sdks/rust/conformance/corpus-selector-float-zero/cases/grant-signing-input/probe.json
 EOF
   python3 - "$config" "$generic_paths_file" "$jwt_paths_file" <<'PY'
 import re
