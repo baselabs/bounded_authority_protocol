@@ -25,11 +25,10 @@ The declared Elixir range is `~> 1.18` (1.18/1.19/1.20) and the supported Erlang
 **27, 28, 29** — floor-limited by the stdlib `:json` module (OTP 27+) and enforced by
 `config/config.exs` at config load, before anything compiles; the assert is not shipped in the Hex
 package, so consumers enforce their own. The mix.exs range, the config set, `.tool-versions`, and
-the CI lanes move together in one commit
-(ADR 0031). The clone →
+the CI lanes move together in one commit. The clone →
 `deps.get` → compile → test contract must hold on macOS and Linux as a developer-setup
-property, proven on a developer machine; CI runs on Linux only
-(ADR 0033). Windows developers use WSL2 (clone
+property, proven on a developer machine; CI runs on Linux only, one lane per supported
+Erlang/OTP major plus the complete-quality lane. Windows developers use WSL2 (clone
 inside the WSL filesystem, not under `/mnt/c`), which is the Linux path; no native-Windows developer
 path is maintained. The full quality battery is
 POSIX-only tooling. Focused boundary commands are
@@ -47,7 +46,8 @@ merge-aware history, staged-index, and tracked-working-tree scans; `mix quality`
 
 Cross-language verifier SDKs under `sdks/` are authored in this repository but **do not publish
 from it**. Each SDK graduates to its own per-SDK repository (`bounded_authority_protocol_<lang>`)
-on first publication; see ADR 0015. A
+on first publication, because a registry publication is irreversible and each SDK's release
+cadence and credentials belong to its own repository. A
 local pre-commit hook (`sh scripts/install-hooks.sh`) and a CI job on `main` reject SDK publish
 infrastructure (registry-publish steps, `prepublishOnly`/`prepack` scripts, `publishConfig`)
 committed to this repository. Contributor hook installation works without a confidential-term

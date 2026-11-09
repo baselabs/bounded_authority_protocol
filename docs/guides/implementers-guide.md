@@ -1,9 +1,9 @@
-# The implementer's guide: building a conforming BAP v1 verifier
+# The implementer's guide: building a conforming BAP verifier
 
-Everything a fifth implementer needs to build a verifier that passes the conformance corpus —
-without reading any sibling runner's source. The normative authority is the specification
-(`spec/bap-v1.md` in the repository; the package ships it); this guide is the operational
-recipe.
+Everything a fifth implementer needs to build a verifier that passes the conformance corpora —
+without reading any sibling runner's source. Start with contract-major 1: its specification
+(`spec/bap-v1.md` in the repository; the package ships it) is the normative authority, and
+contract-majors 2 and 3 incorporate it by reference (§14). This guide is the operational recipe.
 
 ## 1. Read in this order
 
@@ -152,7 +152,7 @@ transport evidence.
 ## 10. Implementing the role-attestation sibling profile
 
 The standard corpora remain unchanged. The role attestation is the protocol's first sibling
-attestation profile (ADR 0036): a standalone, grant-unbound compact defined by
+attestation profile: a standalone, grant-unbound compact defined by
 `spec/bap-role-attestation-v1.md` and certified under
 `priv/conformance/attestation-profiles/role-attestation/v1`.
 
@@ -172,7 +172,7 @@ preimage — never a hash of raw key bytes.
 
 ## 11. Implementing the content-assertion sibling profile
 
-The content assertion is the second sibling attestation profile (ADR 0037): a standalone,
+The content assertion is the second sibling attestation profile: a standalone,
 grant-unbound compact defined by `spec/bap-content-assertion-v1.md` and certified under
 `priv/conformance/attestation-profiles/content-assertion/v1`.
 
@@ -202,8 +202,8 @@ rejection in both directions.
 ## 12. Implementing strict Ed25519 verification
 
 Every Ed25519 surface uses one rule, specified in
-[`spec/bap-v1.md` § 14.1](../../spec/bap-v1.md#strict-ed25519) and decided in
-ADR 0040. Put it at your single Ed25519
+[`spec/bap-v1.md` § 14.1](../../spec/bap-v1.md#strict-ed25519) and introduced by erratum 2 in
+the [errata registry](../errata.md). Put it at your single Ed25519
 verification point, ahead of the backend call:
 
 1. Reject a non-canonical `A` or `R`: the low 255 bits read as `y >= p`, or one of the two
@@ -259,3 +259,26 @@ Run the producer-canonicality corpus (`priv/conformance/producer-canonicality`,
 cases sit exactly at the rule's bound and must emit the signing input plus the signature
 unchanged; their signatures are not verifiable. Add a permissiveness mutant that deletes your
 assembly check and watch the 60 refused cases go red.
+
+## 14. Contract-majors 2 and 3, and the selector float-zero rule
+
+Contract-major 2 ([`spec/bap-v2.md`](../../spec/bap-v2.md), suite `BAP2-Ed25519-SHA256`) and
+contract-major 3 ([`spec/bap-v3.md`](../../spec/bap-v3.md), suite `BAP3-ES256-SHA256`) are
+complete closed profiles that incorporate contract-major 1 by reference with the substitutions
+each specification lists in its § 2. Contract-major 2 adds the inclusive range selector kinds
+`lte` and `gte`; contract-major 3 keeps that selector algebra and changes the signature suite to
+ECDSA P-256 with raw `r || s` signatures and low-S canonicality. Each major parses only its own
+bytes: dispatch on the payload `v` claim and never retry another major after a failure.
+
+Run each major's certified corpus (`priv/conformance/v2/corpus`, 268 cases, and
+`priv/conformance/v3/corpus`, 292 cases) with the same runner contract as §2, pinning each index
+SHA-256 at load.
+
+Erratum 6 adds one rule to the selector algebra of every major. Grant decode rejects an `equals`
+value or `one_of` member that contains a float-tagged number equal to zero at any depth, whatever
+its sign or spelling (`0.0`, `-0.0`, `-0e0`, an underflowing `1e-400`); range bounds and inert
+`all` members are unchanged. The grant producer refuses any float-tagged integral selector value,
+because its canonical bytes would decode integer-tagged. Test the decoded value, not the lexeme,
+so underflow is covered. Run the additive selector float-zero corpus
+(`priv/conformance/selector-float-zero`, `bap-selector-float-zero/1`, 161 cases) and pin its index
+SHA-256 `97fd7a99cdbf3acc0a78f5ba1c6556e23a63e0ad66f533e31fd69f82dc5f3003` at load.
