@@ -137,7 +137,13 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Development tooling: sbom 0.12.1 (with purl 0.5.2) accepts hex_core 0.21, so the `hex_core`
   override is gone and hex_core 0.21.1 arrives dev/test-only through sbom. CI action pins move to
   setup-node 7.1.0, setup-python 7.1.0, upload-artifact 7.0.2, setup-ocaml 3.9.1 and setup-ruby
-  1.338.0. The unpublished Rust SDK takes serde_json 1.0.154 and zeroize 1.8.2. The package has no runtime dependencies, so nothing shipped changes.
+  1.338.0. The unpublished Rust SDK takes serde_json 1.0.154 and zeroize 1.8.2. The package has
+  no runtime dependencies, so nothing shipped changes.
+- Release reproducibility: the Hex client is pinned in `.hex-version` (2.7.0). CI, the
+  supply-chain attestation and the release-candidate gate use it, and the gate refuses another
+  client, because Hex writes its own version into the archive metadata and a different client
+  builds different archive bytes. The supply-chain workflow installs Node 22.23.1 like CI instead
+  of using the runner image's Node.
 
 ## [0.9.1] — 2026-10-31
 

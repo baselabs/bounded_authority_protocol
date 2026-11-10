@@ -40,6 +40,7 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
   def run! do
     source_root = File.cwd!()
     assert_mix_lock_present!(source_root)
+    assert_hex_pinned!(source_root)
 
     tmp = unique_tmp_root!()
 
@@ -77,6 +78,22 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
       IO.puts("candidate archive SHA-256: #{digest1}")
     after
       File.rm_rf!(tmp)
+    end
+  end
+
+  # The Hex client writes its own version into the archive's metadata.config (build_env), so the
+  # same source builds different bytes under different Hex releases. .hex-version pins the client
+  # that CI and the supply-chain attestation use; a local build must match it to reproduce the
+  # attested archive.
+  defp assert_hex_pinned!(source_root) do
+    pinned = source_root |> Path.join(".hex-version") |> File.read!() |> String.trim()
+    running = to_string(Application.spec(:hex, :vsn) || "none")
+
+    unless running == pinned do
+      fail!(
+        "Hex #{running} is running but .hex-version pins #{pinned}; the archive would not " <>
+          "match CI's attested bytes. Run `mix local.hex #{pinned} --force` and retry."
+      )
     end
   end
 
