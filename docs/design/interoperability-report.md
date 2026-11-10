@@ -13,7 +13,7 @@ identities:
 
 | Implementation | Identity | Toolchain |
 |---|---|---|
-| Elixir reference | protocol commit `205d1b598f6fc01de4e412798ed1e81578ccc69e` (source for the next release after 0.9.1) | Elixir 1.20.2, Erlang/OTP 29 |
+| Elixir reference | protocol commit `205d1b598f6fc01de4e412798ed1e81578ccc69e` (pre-release source of 1.0.0) | Elixir 1.20.2, Erlang/OTP 29 |
 | TypeScript verifier | `bounded_authority_protocol_typescript` commit `88e86762e908e483ca054e14e6abbd18f3e65e8f` (package version 1.0.0 plus the unreleased erratum 6) | Node 22.23.1, pnpm 10.20.0 |
 | Python SDK | `sdks/python` 0.1.0 at the protocol commit above | CPython 3.13.13, `cryptography` 50.0.2 |
 | Rust SDK | `sdks/rust` 0.1.0 at the protocol commit above | Rust 1.81.0, the crate's declared minimum |

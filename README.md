@@ -24,7 +24,7 @@ release carries several profiles.
 
 | What | Version | Namespace | Suite | Specification |
 |---|---|---|---|---|
-| Hex package | 0.9.1 | `BoundedAuthorityProtocol` | | [Changelog](CHANGELOG.md) |
+| Hex package | 1.0.0 | `BoundedAuthorityProtocol` | | [Changelog](CHANGELOG.md) |
 | Contract-major 1 | frozen | `BoundedAuthorityProtocol.V1` | `BAP1-Ed25519-SHA256` | [spec](spec/bap-v1.md) |
 | Contract-major 2 | frozen | `BoundedAuthorityProtocol.V2` | `BAP2-Ed25519-SHA256` | [spec](spec/bap-v2.md) |
 | Contract-major 3 | frozen | `BoundedAuthorityProtocol.V3` | `BAP3-ES256-SHA256` | [spec](spec/bap-v3.md) |
@@ -39,7 +39,7 @@ See [Choosing a profile](docs/guides/choosing-a-profile.md) and
 
 ```elixir
 def deps do
-  [{:bounded_authority_protocol, "~> 0.9.1"}]
+  [{:bounded_authority_protocol, "~> 1.0"}]
 end
 ```
 
@@ -154,7 +154,7 @@ Every certified corpus ships under `priv/conformance`, with a CLI that exits `0`
 complete agreement. Contract-major 1's corpus alone has 283 cases across 28 surfaces:
 
 ```bash
-mix escript.install hex bounded_authority_protocol 0.9.1
+mix escript.install hex bounded_authority_protocol 1.0.0
 bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus
 ```
 

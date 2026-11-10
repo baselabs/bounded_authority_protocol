@@ -17,7 +17,7 @@ operational.
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 0.9.1"}]
+  [{:bounded_authority_protocol, "~> 1.0"}]
 end
 ```
 
@@ -288,7 +288,7 @@ usage error). Install it once and run it against a packaged corpus from your pro
 `mix deps.get`:
 
 ```sh
-mix escript.install hex bounded_authority_protocol 0.9.1
+mix escript.install hex bounded_authority_protocol 1.0.0
 bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus
 ```
 

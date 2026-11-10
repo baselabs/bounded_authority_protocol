@@ -25,12 +25,12 @@ show them in code.
 11. Treat chain consistency as consistency only. It cannot by itself prove that a validly
     shortened or relinked history omitted nothing.
 12. Keep commitment preimages private. The public row carries only a fixed-width commitment.
-13. Depend on the published Hex release (`{:bounded_authority_protocol, "~> 0.9.1"}`), never on a
+13. Depend on the published Hex release (`{:bounded_authority_protocol, "~> 1.0"}`), never on a
     source tag or a mutable checkout. Select one profile per boundary through its named
     namespace: the contract-major surfaces stay byte- and verdict-identical, and each sibling
     profile is reached only through its own API.
 14. Run the verifier CLI with an explicit `--corpus DIR` pointing at a packaged corpus: install it
-    with `mix escript.install hex bounded_authority_protocol 0.9.1` and run
+    with `mix escript.install hex bounded_authority_protocol 1.0.0` and run
     `bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus`,
     or call `BoundedAuthorityProtocol.Conformance.Cli.run/1` from Elixir. Never rely on a default
     corpus path. Treat exit 0 as conformance evidence only; it does not authorize.

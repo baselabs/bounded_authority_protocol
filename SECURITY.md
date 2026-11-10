@@ -2,18 +2,20 @@
 
 ## Supported versions
 
-The `0.9.x` source release line is supported. `v0.9.1` is the current tagged source release
-and contains contract-majors 1, 2, and 3, the local-loopback application profile, the
-role-attestation and content-assertion sibling profiles, the strict Ed25519 verification
-soundness repair (erratum 2),
-and the producer-canonicality signature refusal (erratum 3).
-The public API surface is locked. Registry consumers use the published Hex archive:
-[registry release](https://hex.pm/packages/bounded_authority_protocol/0.9.1). Releases `0.7.0` and
-earlier accept Ed25519 signatures that the strict rule rejects and are not supported; upgrade to
-`0.9.x` and follow the [strict Ed25519 upgrade guidance](docs/guides/upgrading.md). Releases `0.1.0` through `0.7.0` are
-retired on Hex for security. See the security advisory
-[GHSA-jwvm-w9r9-qqf8](https://github.com/baselabs/bounded_authority_protocol/security/advisories/GHSA-jwvm-w9r9-qqf8)
-for the affected versions and details.
+The `1.0.x` source release line is supported. `v1.0.0` is the current tagged source release and contains
+contract-majors 1, 2, and 3, the local-loopback application profile, the role-attestation and
+content-assertion sibling profiles, the strict Ed25519 verification soundness repair (erratum 2),
+the producer-canonicality signature refusal (erratum 3), and the selector float-zero soundness
+repair (erratum 6). Its public API follows the
+[1.x stability contract](docs/guides/api-stability.md). Registry consumers use the published Hex
+archive: [registry release](https://hex.pm/packages/bounded_authority_protocol/1.0.0).
+
+Releases `0.9.1` and earlier accept a float-tagged zero in an `equals` or `one_of` selector value
+(erratum 6); they stay installable and are not supported. Releases `0.7.0` and earlier also
+accept Ed25519 signatures that the strict rule rejects; releases `0.1.0` through `0.7.0` are
+retired on Hex for security (see the security advisory
+[GHSA-jwvm-w9r9-qqf8](https://github.com/baselabs/bounded_authority_protocol/security/advisories/GHSA-jwvm-w9r9-qqf8)).
+Upgrade to `1.x` with the [upgrade guide](docs/guides/upgrading.md).
 
 The verifier returns redacted, non-authorizing facts: trust and authorization, where a result
 carries them, are explicitly not evaluated. The package does not select trust, hold keys, reserve

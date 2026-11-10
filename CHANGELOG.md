@@ -2,7 +2,7 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
-## [Unreleased]
+## [1.0.0] — 2026-11-10
 
 ### Changed
 
