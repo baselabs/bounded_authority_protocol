@@ -23,7 +23,6 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        # producer canonicality check (erratum 3).
                        "test/architecture/producer_canonicality_scope_test.exs",
                        "test/docs_guides_test.exs",
-                       "test/bap_walkthrough_test.exs",
                        "test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",
                        "test/bounded_authority_protocol/signature_width_error_shape_test.exs",
                        # Erratum 6 exercises the same selector rule on contract-majors 1, 2 and 3.

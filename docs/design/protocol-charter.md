@@ -9,9 +9,8 @@ state remain outside it.
 ## Standards posture
 
 The protocol is on a standards track governed by the
-[standards track charter](standards-track.md) and
-ADR 0006 and
-ADR 0027: each closed wire profile is
+[standards track charter](standards-track.md) and the
+[governance policy](../governance.md): each closed wire profile is
 permanent and evolution happens above it through parallel contract-majors or byte-distinct sibling
 application proof profiles with their own protected type, API, media type, and corpus; the
 current profile is the named suite `BAP1-Ed25519-SHA256` with a specified post-quantum succession
@@ -23,7 +22,7 @@ verification chain.
 
 ## Verification chain
 
-1. The caller supplies raw credentials and expected issuer/request context to the private runtime.
+1. The caller supplies raw credentials and expected issuer/request context to a stateful authority runtime.
 2. The bounded `untrusted_key_locator/2` returns only the protected grant `kid` as an explicitly
    untrusted lookup hint.
 3. The runtime combines expected issuer context with that hint and resolves a candidate public-key
@@ -60,8 +59,8 @@ A stateful authority may issue a separate, narrower current-v1 `ba+cap` to a new
 resulting compact is an ordinary issuer-signed grant and carries no parent proof. Parent comparison,
 lineage, ancestor revocation, and fan-out policy remain online runtime responsibilities. The
 current profile still rejects `ba_dlg` and `ba+cap-delegated`; portable holder-signed delegation
-remains the successor-major design in ADR 0010, as
-clarified by ADR 0020.
+remains successor-major design work, charted in the
+[successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md).
 
 ## Holder proof
 
@@ -85,11 +84,11 @@ accepted.
 
 `GrantFacts` and `EnvelopeFacts` are immutable, closed, bounded, value-bearing, and redacted. Their
 fixed inspection does not expose fields, and they implement no generic encoder. They contain only
-the exact identifiers, times, fingerprints, and hashes required by the private runtime, plus
+the exact identifiers, times, fingerprints, and hashes required by a stateful authority runtime, plus
 `authorization: :not_evaluated`; they exclude arguments, selector values, raw credentials,
 signatures, JWK containers, and nonces.
 
-Those facts are not operational decisions. The private runtime accepts raw credential bytes at
+Those facts are not operational decisions. A stateful authority runtime accepts raw credential bytes at
 its public boundary and produces facts internally; it never treats a caller-provided facts struct
 as an execution credential.
 

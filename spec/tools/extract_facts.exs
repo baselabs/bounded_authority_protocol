@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.ExtractFacts do
   # Spec-facts extractor (spec-decoupling L2). Reads the `<!-- facts:key -->` anchor-annotated
   # normative blocks of the CURRENT authority (spec/bap-v1.md since the authority swap; the
-  # pre-swap extraction from docs/protocol-v1.md + ADR 0004 + registries.md is preserved
+  # pre-swap extraction from docs/protocol-v1.md + the archive design record + registries.md is preserved
   # byte-for-byte in spec/facts/baseline-v1.json) and emits a deterministic, canonical-JSON
   # facts map. The swap certification was extract(spec) == baseline with an empty delta.
   #
@@ -12,7 +12,7 @@ defmodule BoundedAuthorityProtocol.ExtractFacts do
   # profiles, which incorporate v1 by enumerated reference) extract their DELTA facts — suite
   # identity, domain separators, selector kinds, and the v3 suite rules/constants — so a
   # silent edit of any successor-major normative constant reds rule 1b exactly as a v1 edit
-  # does (ADR 0030's and ADR 0035 §9's named deferral, closed).
+  # does (the successor-major activations' named deferral, closed).
   #
   # Region rule: an anchor's region runs from the anchor line to the next `#` heading or the
   # next facts anchor, whichever comes first. Each major's anchor set is closed and each key
@@ -192,7 +192,7 @@ defmodule BoundedAuthorityProtocol.ExtractFacts do
 
   # Splits the document into {anchor_key, region_lines} pairs. A region ends at the next
   # section heading (a line starting with "#" but not "###" — subsections continue a region,
-  # which is what keeps ADR 0004's four ### blocks inside archive-framing) or at the next
+  # which is what keeps the archive section's four ### blocks inside archive-framing) or at the next
   # anchor, whichever comes first.
   defp build_regions(contents, keys) do
     lines = String.split(contents, "\n")

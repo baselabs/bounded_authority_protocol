@@ -25,11 +25,10 @@ The declared Elixir range is `~> 1.18` (1.18/1.19/1.20) and the supported Erlang
 **27, 28, 29** — floor-limited by the stdlib `:json` module (OTP 27+) and enforced by
 `config/config.exs` at config load, before anything compiles; the assert is not shipped in the Hex
 package, so consumers enforce their own. The mix.exs range, the config set, `.tool-versions`, and
-the CI lanes move together in one commit
-(ADR 0031). The clone →
+the CI lanes move together in one commit. The clone →
 `deps.get` → compile → test contract must hold on macOS and Linux as a developer-setup
-property, proven on a developer machine; CI runs on Linux only
-(ADR 0033). Windows developers use WSL2 (clone
+property, proven on a developer machine; CI runs on Linux only, one lane per supported
+Erlang/OTP major plus the complete-quality lane. Windows developers use WSL2 (clone
 inside the WSL filesystem, not under `/mnt/c`), which is the Linux path; no native-Windows developer
 path is maintained. The full quality battery is
 POSIX-only tooling. Focused boundary commands are
@@ -47,44 +46,22 @@ merge-aware history, staged-index, and tracked-working-tree scans; `mix quality`
 
 Cross-language verifier SDKs under `sdks/` are authored in this repository but **do not publish
 from it**. Each SDK graduates to its own per-SDK repository (`bounded_authority_protocol_<lang>`)
-on first publication; see ADR 0015. A
+on first publication, because a registry publication is irreversible and each SDK's release
+cadence and credentials belong to its own repository. A
 local pre-commit hook (`sh scripts/install-hooks.sh`) and a CI job on `main` reject SDK publish
 infrastructure (registry-publish steps, `prepublishOnly`/`prepack` scripts, `publishConfig`)
-committed to this repository. Contributor hook installation works without a confidential-term
-inventory; maintainer checks activate through the local policy described below. The deliberate-admin bypass is `git commit --no-verify`, documented
+committed to this repository. Contributor hook installation works without any local policy;
+maintainer checks activate only where a maintainer has set one up. The deliberate-admin bypass is `git commit --no-verify`, documented
 here as the sanctioned escape hatch. Neither layer catches a literal ad-hoc publish command run
 against a working tree — that is a runtime act no commit gate sees; CI on `main` is the hard gate
 for committed infrastructure.
 
 ## Maintainer checks
 
-Maintainer checks for confidential terms require an ignored identifier inventory, integrity policy,
-and activation marker, plus activation recorded in local Git configuration. The inventory owner
-prepares the inventory locally, then initializes its policy with
-`python3 scripts/private_identifier_guard.py --repo "$PWD" initialize --expected-count COUNT`,
-using the verified entry count. Install with `sh scripts/install-hooks.sh`. Routine installation
-validates the existing policy; it does not accept a changed inventory. After activation, missing
-or changed inputs fail closed even if the entire ignored policy directory is removed. Partial
-owner-policy state without activation also denies. Contributor mode prints an inactive notice.
-The installer refuses a configured alternate hooks path or a linked worktree before writing hooks.
-Explicit initialization can accept an updated
-inventory; the local owner remains trusted. Do not share the inventory or its digest in source,
-reviews, issues, or CI.
-
-These hooks check staged bytes, raw pending messages, and outgoing Git objects. Automatic merge,
-cherry-pick, rebase, and mail-application commits can skip the commit checks; the pre-push check
-is their local backstop. Creating a new remote ref scans its full ancestry, including commits
-already retained under another remote ref.
-
-The message hook rejects confidential terms even in editor comments, verbose diffs, or templates:
-Git does not tell this hook which cleanup mode will later remove those bytes. For deletion-only
-cleanup, stage the removal with `git rm -- path` and use an explicit clean message with
-`git commit -m 'Remove obsolete material'`. Avoid including confidential paths in the message.
-
-The public CI checks
-directory classes and generic secret signatures; it cannot attest to confidential-term coverage.
-Inventory-owner confirmation of confidential-term coverage remains necessary. Other hosts, web
-edits, provider merge actions, and bypassed hooks remain outside local enforcement.
+Maintainers also run local confidential-term checks through the same hooks; contributors do not
+need them, and the hooks print an inactive notice without the local policy. The repository's
+[maintainer notes](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/reference/maintainer-checks.md)
+describe them.
 
 Do not submit secrets, production credentials, private key fixtures, customer data, or proprietary
 consumer code. Runtime code, public APIs, wire formats, and conformance artifacts must remain

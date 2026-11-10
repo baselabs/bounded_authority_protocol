@@ -87,7 +87,7 @@ revocation, and effects.
 
 ## Strict-Ed25519 corpus
 
-The strict Ed25519 rule (ADR 0040,
+The strict Ed25519 rule ([erratum 2](../errata.md),
 `spec/bap-v1.md` § 14.1, `spec/bap-v2.md` § 7) has its own additive certified corpus under
 `priv/conformance/strict-ed25519`: profile `bap-strict-ed25519/1`, revision 1, 2,410 cases in 14
 families, index SHA-256 `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`. Its
@@ -182,13 +182,13 @@ failures only if those classes cannot widen the runtime surface.
 ## Cross-vendor findings → corpus/spec mapping
 
 The cross-language SDKs (BAP-09) were hardened by a multi-vendor review that surfaced byte-level
-divergences from the Elixir reference. To keep the ADR 0014 D5 bar — a new SDK is authored from
+divergences from the Elixir reference. To keep the clean-room bar — a new SDK is authored from
 `spec/bap-v1.md` + the corpus **alone**, with no code-level derivation from the Elixir
 reference or a sibling SDK — each behavior the review pinned is reachable from the spec or carried as
 a corpus case. The table maps every byte-level finding to its pinning artifact; `(d)`-class host
 closures stay as per-SDK mutation-gates (the corpus cannot express them).
 
-| Finding | Surface | Class | Spec / ADR pin | Where pinned |
+| Finding | Surface | Class | Spec pin | Where pinned |
 |---|---|---|---|---|
 | astral codepoint → 4-byte UTF-8 raw | `jcs.encode` | valid | RFC 8785 §3.2.2.2 | `jcs-encode-astral-raw` |
 | DEL `U+007F` raw-emit (not `\u007f`) | `jcs.encode` | valid | RFC 8785 §3.2.2.2 + `protocol-v1.md` JCS subsection | `jcs-encode-del-raw` |
@@ -199,16 +199,16 @@ closures stay as per-SDK mutation-gates (the corpus cannot express them).
 | malformed IPv6 literals | `uri.normalize` | invalid_uri | REQ1-URI-reject-list | `uri-normalize-ipv6-*` (3 cases) |
 | locator decodes protected only | `untrusted_key_locator` | valid | REQ1-LOCATOR-opaque-payload | `untrusted-key-locator-empty-payload-signature` |
 | canonical re-encode of raw rows | `check_chain` | invalid_encoding | REQ1-CHAIN-raw-rows-bounds | `check-chain-canonical-reencode` |
-| rejects sequence 0 | `check_chain` | invalid_claim | ADR 0004 | `check-chain-sequence-zero-row` |
+| rejects sequence 0 | `check_chain` | invalid_claim | `spec/bap-v1.md` § 15 | `check-chain-sequence-zero-row` |
 | genesis previous_hash binding | `check_chain` | invalid_claim | REQ1-CHAIN-raw-rows-bounds | `check-chain-genesis-previous-hash-forge` |
-| seq-1 + nonzero previous | `encode_consumption_entry` | invalid_encoding | ADR 0004 (genesis row) | `encode-consumption-entry-invalid-seq1-nonzero-previous` |
-| seq-0 + nonzero chain_hash | `boundary_anchor_signing_input` | invalid_key | ADR 0004 (genesis anchor) | `boundary-anchor-signing-input-invalid-seq0-nonzero-chain-hash` |
-| start-anchor binding (`seq == first_sequence-1`) | `encode_anchored_export` | invalid_encoding | ADR 0004 | `encode-anchored-export-invalid-start-anchor-binding` |
+| seq-1 + nonzero previous | `encode_consumption_entry` | invalid_encoding | `spec/bap-v1.md` § 15 (genesis row) | `encode-consumption-entry-invalid-seq1-nonzero-previous` |
+| seq-0 + nonzero chain_hash | `boundary_anchor_signing_input` | invalid_key | `spec/bap-v1.md` § 15 (genesis anchor) | `boundary-anchor-signing-input-invalid-seq0-nonzero-chain-hash` |
+| start-anchor binding (`seq == first_sequence-1`) | `encode_anchored_export` | invalid_encoding | `spec/bap-v1.md` § 15 | `encode-anchored-export-invalid-start-anchor-binding` |
 | empty chunk | `verify_anchored_export` | invalid_encoding | REQ1-EXPORT-complete-scan | `verify-anchored-export-invalid-empty-chunk` |
-| non-monotone `effective_at` | `verify_anchored_export` | invalid_time | ADR 0004 "strictly increase" | `verify-anchored-export-invalid-non-monotone-transitions` |
-| fingerprint cycle A→B→A | `verify_anchored_export` | invalid_key | ADR 0004 "cannot cycle" | `verify-anchored-export-invalid-fingerprint-cycle` |
-| one-key / zero-transition valid | `verify_anchored_export` | valid | ADR 0004 (no min key count) | `verify-anchored-export-valid-one-key` |
-| per-node encode bounds | `jcs.encode` | (d) | bounds threading (host closure) | per-SDK mutation-gate (ADR 0014 D6/D7) |
+| non-monotone `effective_at` | `verify_anchored_export` | invalid_time | `spec/bap-v1.md` § 15 "strictly increase" | `verify-anchored-export-invalid-non-monotone-transitions` |
+| fingerprint cycle A→B→A | `verify_anchored_export` | invalid_key | `spec/bap-v1.md` § 15 "cannot cycle" | `verify-anchored-export-invalid-fingerprint-cycle` |
+| one-key / zero-transition valid | `verify_anchored_export` | valid | `spec/bap-v1.md` § 15 (no minimum key count) | `verify-anchored-export-valid-one-key` |
+| per-node encode bounds | `jcs.encode` | (d) | bounds threading (host closure) | per-SDK mutation-gate |
 | transition-count bound (257) | `encode_anchored_export` | n_a | REQ1-BOUNDS at `bounds.new` | `index.json` `n_a` reason (representation-blocked) |
 | chunk-count bound (65797) | `verify_anchored_export` | n_a | `bounds.new` `archive_chunks` | `index.json` `n_a` reason (representation-blocked) |
 

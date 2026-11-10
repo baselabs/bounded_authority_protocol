@@ -2,45 +2,45 @@
 
 This document is the single normative home of the project's governance policy. The
 [standards track charter](design/standards-track.md) § Governance points here and carries no
-independent policy statement. The policy was first stated in the charter (decided in ADR 0006 §7)
-and is published here as a standalone normative project document so adopters read it directly.
-
-The bulk of each section below is verbatim from the charter § Governance
-([standards-track.md](design/standards-track.md) § Governance). Four kinds of departure are
-unavoidable when the text is lifted out of its charter context, and are LABELED as such — never
-disguised as verbatim:
-
-1. **Deictic resolution** — the charter's "see below" is resolved to an explicit link (the referent
-   only follows physically inside the charter).
-2. **Intro rationale carried** — the charter § Governance opening rationale is carried here as this
-   document's own opening.
-3. **Cross-source composite** (§ Errata channel) — the charter splits one policy fact across
-   § Governance and the evolution contract; this section stitches them and cites both.
-4. **Facts vs. identifiers** (§ Deprecation policy) — the deprecation window NUMBERS are carried
-   here as policy facts, while the authoritative prose and conformance-traced `REQ1-EVO-*`
-   requirement identifiers stay cross-referenced to the evolution contract (single-sourced).
+independent policy statement. Decisions publish through this policy, the normative
+specifications, and the [errata registry](errata.md); there are no separately published decision
+records.
 
 ## Why governance is published now
 
 Published now, while the project is single-maintainer, because publishing the policy is the
-credibility step and the policy is what makes single-maintainer tolerable to adopters
-([standards-track.md](design/standards-track.md) § Governance, opening rationale — carried verbatim;
-departure 2).
+credibility step and the policy is what makes single-maintainer tolerable to adopters.
 
 ## Change classes
 
 Editorial (errata; never verdict-changing) · soundness repair (an erratum that changes verdicts
 only from accept to reject on producer-impossible inputs, under every condition of
-ADR 0040 Decision 4) · clarifying (minor version;
-additive docs/cases only) ·
-byte-distinct sibling proof profile (breaking pre-1.0 package release, public ADR, independent
-normative/corpus/API identity) · byte-distinct sibling attestation profile (same release/ADR/identity
-shape, under its own class conditions) · existing-profile wire or verification behavior
-(contract-major only, with a public ADR).
-([standards-track.md](design/standards-track.md) § Governance; amended by
-ADR 0027,
-ADR 0036, and
-ADR 0040.)
+§ [Soundness repairs](#soundness-repairs)) · clarifying (additive docs/cases only) ·
+byte-distinct sibling proof profile (independent normative/corpus/API identity,
+§ [Byte-distinct sibling proof profiles](#byte-distinct-sibling-proof-profiles)) · byte-distinct
+sibling attestation profile (same identity shape, under its own class conditions,
+§ [Byte-distinct sibling attestation profiles](#byte-distinct-sibling-attestation-profiles)) ·
+existing-profile wire or verification behavior (contract-major only). Each class maps to a
+package version as § [Package versions](#package-versions) states.
+
+## Package versions
+
+The Hex package follows Semantic Versioning. Package versions and contract-majors are separate
+numbers: "package 1.x" names a release line of this package, and "contract-major N" (suite
+`BAPN-…`) names a wire profile. One package release carries several contract-majors, and a new
+package major changes no wire profile.
+
+From package 1.0.0:
+
+- **Minor:** a new contract-major, a new sibling profile, a new public function, a new optional
+  argument, or a new struct field with a default; a soundness repair that meets every condition of
+  § [Soundness repairs](#soundness-repairs); a clarifying change; a raised toolchain floor
+  (Elixir or Erlang/OTP), announced in the CHANGELOG.
+- **Patch:** an editorial erratum, or a fix that changes no documented behavior or verdict.
+- **Major (2.0.0):** removing a namespace, or changing a struct field, a function arity, a return
+  shape, an enforced key, or a documented error.
+
+Before 1.0.0, a breaking change shipped as a `0.x.0` release; that rule ends at 1.0.0.
 
 ## Soundness repairs
 
@@ -68,9 +68,8 @@ A soundness repair is not a sunset: the major continues, and it keeps no overlap
 which the vulnerable verdict remains conforming. Releases before a repair that needs an advisory
 under condition 6 are retired on the package registry; other earlier releases stay installable and
 return the pre-repair verdict, which the errata entry records. A change that fails any condition
-remains contract-major work. The decision,
-its split justification, and the first instance are in
-ADR 0040.
+remains contract-major work. The first soundness repair was erratum 2 (strict Ed25519
+verification).
 
 *Note (2026-11-09):* condition 6 distinguishes keyless repairs from signer-bound ones. Erratum 2
 (strict Ed25519) is keyless: anyone can produce a malleable `S + L` signature, so it shipped with
@@ -86,102 +85,89 @@ machine-visible identity, every existing profile rejects those bytes, and no byt
 existing profile changes meaning or verdict. It has its own public namespace, normative
 specification, stable requirement namespace, conformance corpus identity, registry entry, and
 independent implementations. Every shipped SDK implements its relevant verification surface before
-release. Its first publication is a breaking pre-1.0 package release (`0.x.0`) with immutable source,
-package, corpus, and real-substrate evidence.
+release. Its first publication is a package minor release (§ [Package versions](#package-versions))
+with immutable source, package, corpus, and real-substrate evidence.
 
 This class does not create an open extension mechanism: there is no runtime profile registry,
-negotiation, inference, fallback, or best-effort parsing. Every future sibling is another numbered
-public ADR and closed corpus. Any change to an existing profile's accepted bytes, claims, algorithms,
-bounds, suite, or verdicts remains contract-major work. The complete decision and rejection tests
-are in ADR 0027.
+negotiation, inference, fallback, or best-effort parsing. Every future sibling is another published
+specification and closed corpus. Any change to an existing profile's accepted bytes, claims,
+algorithms, bounds, suite, or verdicts remains contract-major work.
 
 ## Byte-distinct sibling attestation profiles
 
-A sibling attestation profile is the second sibling class
-(ADR 0036), permitted only when its artifact carries a new
-signed protected `typ`, is standalone and grant-unbound (parsed by no existing profile's verification
-path, verified only through its own named API), cross-rejects every existing profile by corpus leg in
-both directions, and changes no byte, bound, or verdict anywhere. It has its own public namespace,
-normative specification, profile-scoped requirement range, conformance corpus identity, and registry
-entry; it single-sources the shared primitives of the contract-major it binds; every shipped SDK
-implements its verification surface before any release bearing it; its first publication is a
-breaking pre-1.0 package release (`0.x.0`) with immutable source, package, corpus, and the
-ADR-0036 release-evidence conditions. No runtime registry, negotiation, inference, fallback, or
-plugin mechanism exists. The charter's reserve-and-activate-in-a-major discipline for attestation
-shapes governs verifier-integration-bound artifacts; a consumer-gated artifact no major verifier
-ingests takes this class. The complete decision, the class conditions, and the rejection tests are
-in ADR 0036.
+A sibling attestation profile is the second sibling class, permitted only when its artifact carries
+a new signed protected `typ`, is standalone and grant-unbound (parsed by no existing profile's
+verification path, verified only through its own named API), cross-rejects every existing profile
+by corpus leg in both directions, and changes no byte, bound, or verdict anywhere. It has its own
+public namespace, normative specification, profile-scoped requirement range, conformance corpus
+identity, and registry entry; it single-sources the shared primitives of the contract-major it
+binds; every shipped SDK implements its verification surface before any release bearing it; its
+first publication is a package minor release (§ [Package versions](#package-versions)) with
+immutable source, package, corpus, and real-substrate release evidence. No runtime registry,
+negotiation, inference, fallback, or plugin mechanism exists. The charter's
+reserve-and-activate-in-a-major discipline for attestation shapes governs
+verifier-integration-bound artifacts; a consumer-gated artifact no major verifier ingests takes
+this class.
 
 ## Change control
 
-Every product-shaping decision lands as a numbered public ADR. Once at least two independent
-external implementations pass the conformance corpus, contract-major ADRs and sibling-profile ADRs
-gain a published comment window of no fewer than thirty days and a change-control group with
-implementer representation. The
-hand-off criterion to a formal standards body is adoption, not ceremony: when a venue (see the
-charter § [Venue strategy](design/standards-track.md#venue-strategy)) accepts the work, that venue's
+Every product-shaping decision is published through this policy, a normative specification, or
+the errata registry. Once at least two independent external implementations pass the conformance
+corpus, contract-major and sibling-profile proposals gain a published comment window of no fewer
+than thirty days and a change-control group with implementer representation. The hand-off
+criterion to a formal standards body is adoption, not ceremony: when a venue (see the charter
+§ [Venue strategy](design/standards-track.md#venue-strategy)) accepts the work, that venue's
 process supersedes this one.
-([standards-track.md](design/standards-track.md):204-208, verbatim except for departure 1 — the
-charter's "see below" is resolved to an explicit link to the charter § Venue strategy; the
-sibling-profile extension is ADR 0036 Decision 1.)
 
 ## Errata channel
 
 [docs/errata.md](errata.md) is the numbered errata registry; each entry names affected versions and
-its corpus impact, and the no-verdict-flip invariant is checked at review
-([standards-track.md](design/standards-track.md):209-211, the charter § Governance errata bullet,
-verbatim). **No erratum may flip a verdict of an existing certified corpus** — any change that
-would alter such an accept/reject outcome is by definition a contract-major change and follows the
-evolution contract, never this registry. The one exception is a soundness repair
-(§ Soundness repairs), which adds its cases in a new corpus, flips no existing corpus verdict, and
-is recorded in this registry with its corpus impact. A sibling proof profile is not an erratum and cannot
-reclassify an existing case (the no-verdict-flip invariant, stated in the evolution contract as
-`REQ1-EVO-no-verdict-flip`, [standards-track.md](design/standards-track.md):66-69).
-*(This section is a composite — departure 3: the charter splits the errata fact across § Governance
-:207-209, the registry + "checked at review," and the evolution contract :64-67, the "any change…
-contract-major" gloss. Both sources are cited.)*
+its corpus impact, and the no-verdict-flip invariant is checked at review. **No erratum may flip a
+verdict of an existing certified corpus** — any change that would alter such an accept/reject
+outcome is by definition a contract-major change and follows the evolution contract, never this
+registry. The one exception is a soundness repair (§ [Soundness repairs](#soundness-repairs)),
+which adds its cases in a new corpus, flips no existing corpus verdict, and is recorded in this
+registry with its corpus impact. A sibling proof profile is not an erratum and cannot reclassify an
+existing case (the no-verdict-flip invariant, stated in the
+[evolution contract](design/standards-track.md#the-evolution-contract) as
+`REQ1-EVO-no-verdict-flip`).
 
 ## Deprecation policy
 
 A contract-major enters deprecation only after its successor has a published normative profile, a
 published conformance corpus, and **at least two independent implementations passing that corpus**.
 The deprecation window is published at announcement and is **never shorter than twelve months**,
-except for a security contract-major (§ Security policy below); during the window, conforming
-verifier deployments support both majors in parallel. Sunset of a major is a deployment decision
-after the published window, never a silent library change.
-([standards-track.md](design/standards-track.md):56-65 — the window numbers are policy FACTS, carried
-here per departure 4.) The authoritative deprecation prose and the conformance-traced requirement
-identifiers (`REQ1-EVO-deprecation-prerequisites`, `-window-minimum`,
-`-parallel-support-during-window`, `-sunset-is-deployment-decision`) live in the charter § evolution
-contract ([standards-track.md](design/standards-track.md) § Parallel-version support and
-deprecation, :52-69) and are not duplicated here; the charter explicitly names that text "the
-authoritative one" for deprecation ([standards-track.md](design/standards-track.md):213).
+except for a security contract-major (§ [Security policy](#security-policy) below); during the
+window, conforming verifier deployments support both majors in parallel. Sunset of a major is a
+deployment decision after the published window, never a silent library change. The authoritative
+deprecation prose and the conformance-traced requirement identifiers
+(`REQ1-EVO-deprecation-prerequisites`, `-window-minimum`, `-parallel-support-during-window`,
+`-sunset-is-deployment-decision`) live in the charter § [Parallel-version support and
+deprecation](design/standards-track.md#parallel-version-support-and-deprecation) and are not
+duplicated here.
 
 ## Security policy
 
 [SECURITY.md](../SECURITY.md) governs vulnerability intake; a vulnerability whose fix would change a
-verdict and that does not meet every soundness-repair condition (§ Soundness repairs) is handled
-as a contract-major security release with an accelerated overlap window —
-published at announcement and set proportional to the vulnerability's severity, exempt from the
-twelve-month deprecation minimum (charter § [The evolution contract](design/standards-track.md#the-evolution-contract)),
-yet still a published, deployment-decided sunset, not a flag-day — never as a silent verdict change.
-([standards-track.md](design/standards-track.md):214-218, the charter § Governance security-policy
-bullet, verbatim except the deictic "above (§ The evolution contract)" resolved to a cross-doc link
-— departure 1.)
-A fix that meets every soundness-repair condition lands as an erratum, disclosed as condition 6
-of § Soundness repairs requires, in the same release across every implementation.
-[SECURITY.md](../SECURITY.md) cross-references this section instead of restating the rule, so the
-verdict-change rule lives in one place.
+verdict and that does not meet every soundness-repair condition (§ [Soundness
+repairs](#soundness-repairs)) is handled as a contract-major security release with an accelerated
+overlap window — published at announcement and set proportional to the vulnerability's severity,
+exempt from the twelve-month deprecation minimum (charter § [The evolution
+contract](design/standards-track.md#the-evolution-contract)), yet still a published,
+deployment-decided sunset, not a flag-day — never as a silent verdict change. A fix that meets
+every soundness-repair condition lands as an erratum, disclosed as condition 6 of § Soundness
+repairs requires, in the same release across every implementation. [SECURITY.md](../SECURITY.md)
+cross-references this section instead of restating the rule, so the verdict-change rule lives in
+one place.
 
 ## Errata registry posture
 
 The errata registry at [docs/errata.md](errata.md) is **live** — it is the operational
 no-verdict-flip governance instrument, with a numbered entry and per-entry corpus impact. It
-currently carries Erratum 1, the correction for the v1 `all` selector's three recognized member
-sets (ADR 0021); Erratum 2, the strict Ed25519 verification soundness repair (ADR 0040); Erratum 3,
+currently carries Erratum 1, the correction for the contract-major 1 `all` selector's three
+recognized member sets; Erratum 2, the strict Ed25519 verification soundness repair; Erratum 3,
 producer-surface signature canonicality; Erratum 4, an editorial correction of the torsion
 encoding count in `spec/bap-v1.md` § 14.1; Erratum 5, editorial heading anchors and
 cross-reference links in the contract-major specifications; and Erratum 6, the signer-bound
-selector float-zero soundness repair. New errata follow the § Errata channel no-verdict-flip process above. *(This
-statement is this document's own framing of the registry's operational posture, not a charter
-extract — labeled as such.)*
+selector float-zero soundness repair. New errata follow the § [Errata channel](#errata-channel)
+no-verdict-flip process above.

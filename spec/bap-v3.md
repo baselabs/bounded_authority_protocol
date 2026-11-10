@@ -1,8 +1,8 @@
 # Bounded Authority Protocol v3 Wire Profile
 
-Document revision: rev 2 (2026-11-09; erratum 6; rev 1, 2026-09-21). Status: normative. Contract-major 3, suite
-`BAP3-ES256-SHA256`. This profile is activated by
-ADR 0035 under the
+Document revision: rev 2 (2026-11-09: erratum 6; rev 1, 2026-09-21; errata 3 and 5 amend revision
+1 in place; see the [errata registry](../docs/errata.md)). Status: normative. Contract-major 3,
+suite `BAP3-ES256-SHA256`. This profile was activated under the
 [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md); the signature-suite bridge
 it realizes is specified by the [AP2 interop profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/ap2-interop-profile.md) §3.
 
@@ -24,7 +24,7 @@ v3-specific normative rules in full, including the ES256 signature suite.
 The v3 profile's suite is `BAP3-ES256-SHA256`: ECDSA over the NIST P-256 curve with SHA-256
 (`ES256`, RFC 7518 §3.4), SHA-256 digests, RFC 8785 JCS canonical bytes, and the `BAP3-*`
 domain separators — under the major-bound naming scheme `BAP<contract-major>-<signature>-<digest>`
-(ADR 0009 §1) with the signature family changed from EdDSA/Ed25519 to ECDSA/P-256.
+(see the [registries](../docs/design/registries.md)) with the signature family changed from EdDSA/Ed25519 to ECDSA/P-256.
 
 Every v3 artifact declares its contract-major mechanically: the payload `v` claim is exactly
 integer `3`, the protected `typ` header carries the same closed values as v1, the protected
@@ -38,7 +38,8 @@ There is no cross-major fallback, downgrade, or best-effort parsing in any direc
 presents artifacts of one major end-to-end: a v3 proof MUST pair with a v3 grant
 (`REQ3-EVO-proof-major-equals-grant`); mixed-major credentials are invalid by construction
 (`REQ3-EVO-mixed-major-invalid`). Cross-suite evidence rules for prior-major artifacts remain
-the reserved `ba+suite-attestation` mechanism of ADR 0009; this profile activates none of it.
+the reserved `ba+suite-attestation` mechanism of the suite-succession design; this profile
+activates none of it.
 
 <a id="substitutions"></a>
 
@@ -184,13 +185,13 @@ for this suite as immutable cryptographic constants (`REQ3-BOUNDS-fixed-widths`)
 | SHA-256 digest | 32 |
 
 No new magnitude arises: ECDSA verification consumes two range-checked 32-byte integers, a
-65-byte point, and the bounded signing input (the ADR 0035 §5 review). Callers tighten
+65-byte point, and the bounded signing input (the contract-major 3 bounds review). Callers tighten
 ceilings exactly as in v1; the fixed widths cannot be tightened or widened.
 
 ## 6. Requirement identifiers
 
-The v3 profile carries its own `REQ3-*` range per
-ADR 0007; `REQ1-*` and `REQ2-*` ids
+The v3 profile carries its own `REQ3-*` range under the stable requirement-identifier
+scheme of [bap-v1.md](bap-v1.md); `REQ1-*` and `REQ2-*` ids
 remain bound to the v1 and v2 profiles and never apply to v3 behavior. The v3 MUST-to-cell
 traceability lives in the [requirement map](../docs/design/requirement-map.md) § v3.
 
@@ -198,7 +199,8 @@ traceability lives in the [requirement map](../docs/design/requirement-map.md) �
 
 The v3 conformance corpus is a certified artifact with its own identity
 (`priv/conformance/v3/corpus`, revision 1). Its certified index SHA-256 is pinned in the
-verifier CLI and every SDK runner exactly as the v1 and v2 corpora are (ADR 0014 D4).
+verifier CLI and every SDK runner exactly as the v1 and v2 corpora are; a runner fails closed unless the loaded corpus is that
+exact certified snapshot.
 Version-neutral primitive surfaces execute the same shared implementations the v1 corpus
 certifies, and their cases are carried into the v3 corpus byte-for-byte; the profile-bound
 surfaces carry v3-minted fixtures — every applicability cell v1 populates is populated in v3,

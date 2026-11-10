@@ -10,8 +10,8 @@ has the quickstart and the full API list.
 ## Not published yet
 
 The module has no tagged version and the Go module proxy does not serve it, so `go get` fails.
-It moves to its own repository when it is first published
-(ADR 0015). Until then, build against a
+It moves to its own repository when it is first published.
+Until then, build against a
 checkout of this repository. From an empty directory:
 
 ```bash
@@ -62,7 +62,7 @@ literal `127.0.0.1`/`[::1]` HTTP targets and require the server nonce. Never der
 ## Strict Ed25519 verification
 
 Every Ed25519 verification in the SDK applies rule S1 of
-ADR 0040 at its single Ed25519 verification
+the contract-major 1 specification (`spec/bap-v1.md` § 14.1) at its single Ed25519 verification
 point: canonical point encodings, no small-order key or `R`, a scalar below the group order, and
 the cofactorless equation. Key import, JWK encode and decode, and thumbprint functions refuse a
 key that fails key acceptance. Call `TorsionFree` at key enrollment, at trust install, and before

@@ -13,7 +13,7 @@ Evidence classes at load-bearing claims:
 - **OBSERVED** — verified first-hand against the A2A specification and proto at pinned commit
   `afda8316c64951a2ecb2a0d3d10867405d2b4095`
   ([a2aproject/A2A](https://github.com/a2aproject/A2A)), or against this repository at
-  `fb83133` (the v1/v2 specs, registries, ADRs, the BAP-08 drafts, the AP2 interop profile,
+  `fb83133` (the contract-major 1 and 2 specs, registries, design records, the extension drafts, the AP2 interop profile,
   the successor-major charter), or against the gRPC over HTTP/2 protocol specification at its
   pinned commit (§1).
 - **DERIVED** — restated from a program record; not re-verified for this document.
@@ -49,7 +49,7 @@ extended):
 
 The binding covers a defined surface. **In scope:** the three standard A2A bindings over
 HTTPS — JSON-RPC (HTTP/S), HTTP+JSON/REST, gRPC (HTTP/2 with TLS) — per §6. **Out of scope,
-deliberately:** custom (non-HTTP) bindings (an ADR 0027-class sibling profile would be the
+deliberately:** custom (non-HTTP) bindings (a byte-distinct sibling proof profile would be the
 mechanism if one ever needs proof semantics); plain-HTTP deployments other than literal-loopback
 development endpoints (which use the already-active
 `bap-application-proof/local-loopback-http/1` profile; non-loopback plain HTTP has no proof
@@ -67,8 +67,8 @@ the *configuration* of push notifications as request content, never the webhook 
   is `lf.a2a.v1`). OBSERVED.
 - This repository at `fb83133`: `spec/bap-v1.md` (§§7, 10–14, 16, 17), `spec/bap-v2.md` (§4),
   `docs/design/registries.md`, `docs/design/ap2-interop-profile.md` (§6 cited, not restated),
-  `docs/design/successor-major-charter.md`, ADR 0010, ADR 0013, ADR 0027,
-  ADR 0029 (cited), `docs/extensions/capability-authorization.mdx` (the MCP binding
+  `docs/design/successor-major-charter.md`, `docs/governance.md` (the sibling profile classes),
+  `docs/extensions/capability-authorization.mdx` (the MCP binding
   precedent). OBSERVED.
 - gRPC over HTTP/2 protocol specification
   (`https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md`): requests are
@@ -126,7 +126,7 @@ An agent (A2A server) that consumes this binding declares it in its AgentCard:
 ```
 
 - **Extension URI (INFERRED, decided).** `https://bounded-authority.io/extensions/a2a-capability-binding/v1`
-  under the project-controlled domain (ADR 0013 confirmed ownership), in A2A's https identifier
+  under the project-controlled domain, in A2A's https identifier
   style (A2A §4.6 examples), versioned in the URI per A2A §4.6.3 — a breaking change to this binding
   gets a new URI. The URI is an identifier, not a promise of hosted content, and declares no
   A2A-venue status. The project's reversed-DNS prefix (`io.bounded-authority/…`, the MCP
@@ -209,9 +209,9 @@ Every proof is the published `dpop+jwt` profile with unchanged claims and semant
   fail-closed direction.
 - Plain-HTTP (non-production) deployments cannot carry the HTTPS-only `dpop+jwt` profile;
   literal-loopback development endpoints use the already-active
-  `bap-application-proof/local-loopback-http/1` profile (ADR 0027; registries) with its nonce
+  `bap-application-proof/local-loopback-http/1` profile (a sibling proof profile; registries) with its nonce
   requirement and `127.0.0.1`/`[::1]` host discipline. Custom (non-HTTP) bindings are out of
-  scope; if one ever needs proof semantics, an ADR 0027-class sibling profile is the mechanism,
+  scope; if one ever needs proof semantics, a byte-distinct sibling proof profile is the mechanism,
   not a redefinition of `dpop+jwt`.
 
 ## 7. Operation vocabulary — `ba_op`
@@ -356,7 +356,7 @@ reaches an individual part or element of a repeated field. Part content integrit
 per-part digests inside `ba_req` (§8 rule 3). A v1 grant expresses exact-value and enumerated
 bounds; a v2 grant adds `lte`/`gte` on numeric members (same-tag, inclusive). Cumulative
 budgets remain outside the selector algebra in both majors and route to the issuer-attestation
-/ runtime-accounting posture (ADR 0029) — unchanged by this binding.
+/ runtime-accounting posture (the [successor-major charter](successor-major-charter.md) § 5 budget posture) — unchanged by this binding.
 
 ## 11. `TASK_STATE_AUTH_REQUIRED` composition
 
@@ -380,7 +380,7 @@ rule.
   or its authorization layer). Attenuation is available only as issuance-time narrowness. Any
   requirement that a downstream agent hold a derivative of an upstream grant — sub-agent
   chains, narrowed re-issuance by the holder, in-band forwarding — is BAP delegation, reserved
-  to the successor contract-major (ADR 0010; charter § Delegation with attenuation), and is
+  to the successor contract-major (charter § Delegation with attenuation), and is
   recorded here as a dependency of that program: when it activates, it owes an A2A-specific
   composition note for how a delegated chain rides this binding. Any requirement naming the
   human principal on whose behalf the client acts is the reserved on-behalf-of surface; both it
@@ -388,8 +388,8 @@ rule.
   gate sentence.
 - **UCP.** Outside this binding decision's scope; a separately-owned open
   question whose precondition is pinning and reading a UCP source first. Nothing in this
-  profile designs a UCP riding point. That question is now closed by
-  ADR 0034: the riding point is transport-composed,
+  profile designs a UCP riding point. That question is now closed: the riding point is
+  transport-composed,
   and this profile covers UCP's A2A transport as-is for deployments speaking A2A 1.0.
 
 ## 13. Verification posture and vectors
@@ -403,8 +403,8 @@ rule.
   certified-corpus work. No interop claim will rest on self-round-trips; a cross-protocol claim
   would require an independent implementation exercising both sides.
 - The ES256 suite is orthogonal: this binding is suite- and major-agnostic — it
-  binds whatever contract-major the deployment's verifier accepts, under ADR 0009's succession
-  rules unchanged.
+  binds whatever contract-major the deployment's verifier accepts, under the charter's suite
+  succession rules unchanged.
 
 ## 14. Disclosure-gate compliance
 
@@ -417,7 +417,7 @@ existing reserved registry rows. Compliance read of this document:
 - The reserved verifier discovery document stays untouched, its purpose unrealized here (the
   empty-`params` posture of §4); the grant status-check profile is not referenced beyond this
   sentence.
-- No cumulative-budget material is designed (ADR 0029 governs; §10 cites it).
+- No cumulative-budget material is designed (the [successor-major charter](successor-major-charter.md) § 5 budget posture governs; §10 cites it).
 - No forward promise of submission, upstream contribution, or runtime compatibility appears
   (§0's non-claims govern the whole document).
 

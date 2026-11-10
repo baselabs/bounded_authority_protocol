@@ -1,0 +1,175 @@
+# Cheatsheet
+
+Every block runs, in order, in the repository's test suite.
+
+## Keys and grants
+{: .col-2}
+
+### Keys
+
+```elixir
+alias BoundedAuthorityProtocol.V1
+alias BoundedAuthorityProtocol.V1.{Credentials, ExpectedGrant, ExpectedRequest, Grant, Operation, Proof, TrustedIssuer}
+
+{issuer_pub, issuer_priv} = :crypto.generate_key(:eddsa, :ed25519)
+{holder_pub, holder_priv} = :crypto.generate_key(:eddsa, :ed25519)
+{:ok, thumbprint} = V1.Jwk.public_key_thumbprint_raw(holder_pub, %{})
+sign = &:crypto.sign(:eddsa, :none, &1, [&2, :ed25519])
+byte_size(thumbprint)
+```
+
+The value is `32`.
+
+### Sign a grant
+
+```elixir
+grant = %Grant{
+  key_id: "iss-1", issuer: "https://iss.example", grant_id: "g-1",
+  audiences: ["https://api.example"], issued_at: 1_800_000_000,
+  not_before: 1_800_000_000, expires_at: 1_800_003_600,
+  holder_thumbprint: thumbprint,
+  operations: [%Operation{name: "read_file", selectors: [{:equals, ["path"], {:string, "/notes.txt"}}]}]
+}
+
+{:ok, gi} = V1.grant_signing_input(grant, %{})
+{:ok, grant_c} = V1.assemble_compact(gi, sign.(gi.message, issuer_priv))
+length(String.split(grant_c, "."))
+```
+
+The value is `3`.
+
+## Proofs and verification
+{: .col-2}
+
+### Sign a proof
+
+```elixir
+args = {:object, [{"path", {:string, "/notes.txt"}}]}
+
+proof = %Proof{
+  holder_public_key: holder_pub, proof_id: "p-1", method: "GET",
+  target_uri: "https://api.example/files", issued_at: 1_800_000_100, nonce: nil,
+  invocation_id: "1f9b2c4d-6e8a-4b0c-9d2e-3f5a7b9c1d0e", operation: "read_file",
+  grant_compact: grant_c, cast_arguments: args
+}
+
+{:ok, pi} = V1.proof_signing_input(proof, %{})
+{:ok, proof_c} = V1.assemble_compact(pi, sign.(pi.message, holder_priv))
+length(String.split(proof_c, "."))
+```
+
+The value is `3`.
+
+### Verify an envelope
+
+```elixir
+trusted = %TrustedIssuer{key_id: "iss-1", public_key: issuer_pub}
+
+expected = %ExpectedRequest{
+  trusted_issuer: trusted, issuer: "https://iss.example", audience: "https://api.example",
+  method: "GET", target_uri: "https://api.example/files",
+  invocation_id: "1f9b2c4d-6e8a-4b0c-9d2e-3f5a7b9c1d0e", operation: "read_file",
+  cast_arguments: args, evaluation_time: 1_800_000_100, clock_skew: 60, proof_max_age: 300,
+  nonce: :not_required, bounds: %{}
+}
+
+{:ok, facts} = V1.check_envelope(%Credentials{grant: grant_c, proof: proof_c}, expected)
+facts.authorization
+```
+
+The value is `:not_evaluated`.
+
+### Verify a grant alone
+
+```elixir
+expected_grant = %ExpectedGrant{
+  issuer: "https://iss.example", audience: "https://api.example",
+  evaluation_time: 1_800_000_100, clock_skew: 60, bounds: %{}
+}
+
+{:ok, grant_facts} = V1.verify_grant(grant_c, trusted, expected_grant)
+grant_facts.grant_id
+```
+
+The value is `"g-1"`.
+
+## Decoding and diagnosis
+{: .col-2}
+
+### Read the key id (untrusted)
+
+```elixir
+{:ok, locator} = V1.untrusted_key_locator(grant_c, %{})
+{locator.kid, locator.trust}
+```
+
+The value is `{"iss-1", :not_evaluated}`.
+
+### Decode without verifying
+
+```elixir
+{:ok, decoded} = V1.decode_grant(grant_c, %{})
+{decoded.issuer, decoded.verification}
+```
+
+The value is `{"https://iss.example", :not_evaluated}`.
+
+### Tagged JSON from bytes
+
+```elixir
+V1.Json.decode(~s({"n":2,"x":2.5,"ok":true}), %{})
+```
+
+The value is
+`{:ok, {:object, [{"n", {:integer, 2}}, {"x", {:float, 2.5}}, {"ok", {:boolean, true}}]}}`.
+
+### Normalize a URI
+
+```elixir
+V1.Uri.normalize("HTTPS://API.example:443/files", %{})
+```
+
+The value is `{:ok, "https://api.example/files"}`.
+
+## Limits and errors
+{: .col-2}
+
+### Every failure
+
+```elixir
+V1.check_envelope(%Credentials{grant: grant_c, proof: proof_c}, %{expected | method: "PUT"})
+```
+
+The value is `{:error, :invalid}`.
+
+### Tighten a bound
+
+```elixir
+{V1.Bounds.coerce(%{depth: 8}) |> elem(0), V1.Bounds.coerce(%{depth: 10_000})}
+```
+
+The value is `{:ok, {:error, :invalid}}`: bounds only tighten.
+
+## Contract-majors and suites
+{: .col-2}
+
+### Pick a namespace
+
+| Namespace | Suite | Selectors |
+|---|---|---|
+| `V1` | `BAP1-Ed25519-SHA256` | `equals`, `one_of`, `all` |
+| `V2` | `BAP2-Ed25519-SHA256` | adds `lte`, `gte` |
+| `V3` | `BAP3-ES256-SHA256` | adds `lte`, `gte` |
+
+### ES256 signature from DER
+
+```elixir
+alias BoundedAuthorityProtocol.Es256
+{_es_pub, es_priv} = :crypto.generate_key(:ecdh, :prime256v1)
+der = :crypto.sign(:ecdsa, :sha256, "message", [es_priv, :prime256v1])
+{:ok, raw} = Es256.der_to_raw(der)
+{:ok, low_s} = Es256.normalize_low_s(raw)
+{byte_size(low_s), Es256.canonical_signature?(low_s)}
+```
+
+The value is `{64, true}`.

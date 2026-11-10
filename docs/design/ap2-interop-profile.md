@@ -51,7 +51,7 @@ registry rows and the published charter text (§10).
   `sdjwt/kb_sd_jwt.py`, `constraints.py`, `payment_mandate_chain.py`,
   `checkout_mandate_chain.py`, `receipt_wrapper.py`, `utils.py`). All OBSERVED.
 - This repository at `3994b4f`: `spec/bap-v1.md`, `spec/bap-v2.md`,
-  `docs/design/successor-major-charter.md`, ADR 0029,
+  `docs/design/successor-major-charter.md` (§ 5, the budget posture),
   `docs/extensions/ap2-mandate-mapping.md`. All OBSERVED.
 - RFC 9901 §4.3/§4.3.1 (`sd_hash`), fetched from datatracker 2026-09-20. OBSERVED. RFCs 7515,
   7518 §3.4, 7638, 8785, 9449 are cited for their published constructions; none was re-derived
@@ -82,8 +82,9 @@ note's stated composition seam.
 
 **The bridge.** An ES256 contract-major suite is the chosen bridge, under the charter's
 major-bound naming: `BAP<n>-ES256-SHA256` with `BAP<n>-*` domain separators, where the suite's
-own ADR fixes `n`. This profile describes the bridge contract; the suite's ADR, corpus, and
-implementation build it. The suite gives BAP:
+own specification fixes `n` (contract-major 3, [`spec/bap-v3.md`](../../spec/bap-v3.md)). This
+profile describes the bridge contract; the suite's specification, corpus, and implementation
+build it. The suite gives BAP:
 
 - ECDSA over P-256 with SHA-256 per RFC 7518 §3.4, over the exact RFC 7515 signing input;
 - a proof-key JWK shape `{kty: "EC", crv: "P-256", x, y}` and an RFC 7638 thumbprint over the
@@ -103,12 +104,12 @@ credentials. Note also that AP2's ECDSA requirement on the merchant Checkout JWT
 rainbow-table resistance (deterministic signatures leak enumerable content hashes;
 `specification.md` § Payment Mandate; `security_and_privacy_considerations.md` § Rainbow Table
 Attacks, both OBSERVED) — the ES256 suite choice for BAP is independent of that AP2-internal
-rationale and must be justified in its own ADR on BAP's own terms.
+rationale and must be justified in its own specification on BAP's own terms.
 
 **Two suite profiles, one suite name.** The bridge does not make Ed25519 BAP credentials
 interoperable with AP2, nor ES256 a requirement for BAP generally: `BAP1-`/`BAP2-Ed25519-SHA256`
 remain frozen and complete, and the ES256 suite is an additional contract-major under the
-charter's succession discipline (ADR 0009).
+charter's succession discipline.
 
 ## 4. Element 2 — Digest-spelling map
 
@@ -186,8 +187,8 @@ The evidence chain (all OBSERVED first-hand unless noted):
    ("float-tagged bounds are wire-distinguishable only when non-integral"), so the only stable
    operand domain for money is integer.
 5. The sole float-permissive money field, `budget.max` (typed `"number"`), is deliberately
-   outside the projection anyway: budgets have no selector correspondence in any major (ADR
-   0029, the citable posture). Notably the SDK reads `budget.max` as MAJOR units —
+   outside the projection anyway: budgets have no selector correspondence in any major (the [successor-major charter](successor-major-charter.md) § 5 budget posture, the
+   citable posture). Notably the SDK reads `budget.max` as MAJOR units —
    `int(self.constraint.max * 100)` in `constraints.py` — a different unit and type from
    `amount_range`'s integer minor units, which independently confirms that budget content must
    never be projected onto the amount paths.
@@ -259,7 +260,7 @@ the evaluator compares, so whole-object identity is equivalent there.)
 | pre-set `payment_instrument` / `execution_date` (checked by exact equality) | `equals` on the projected value — the whole `payment_instrument` object, or `execution_date` as-is |
 | `payment.reference` (REQUIRED in every open payment mandate per the schema's `contains` — OBSERVED) | `{kind: "equals", path: ["open_checkout_mandate_hash"], value: <conditional_transaction_id digest of the associated open Checkout Mandate>}` — the constraint binds the payment to the open CHECKOUT mandate, not to the open payment mandate |
 | `payment.execution_date` | range selectors only after runtime normalization to `execution_date_epoch` (`gte` from `not_before`, `lte` from `not_after`); AP2's own evaluation compares ISO8601 strings on the AP2 side and is not replaced. INFERRED pending runtime design |
-| `payment.budget`, `payment.agent_recurrence` | **no projection, deliberately** — ADR 0029; stateful evaluation belongs to the AP2 verifier or the composing runtime |
+| `payment.budget`, `payment.agent_recurrence` | **no projection, deliberately** — the [successor-major charter](successor-major-charter.md) § 5 budget posture; stateful evaluation belongs to the AP2 verifier or the composing runtime |
 
 Worked examples, verified against the actual selector shapes (`spec/bap-v1.md` §12,
 `spec/bap-v2.md` §4 — member sets, path shape, `one_of` spelling, numeric-bound tags all
@@ -302,8 +303,8 @@ What this profile can state structurally (all OBSERVED or cited-to-published):
 plus the binding-surface separation above as the constraint any answer must respect. Nothing
 here settles that question. Both have since been settled: the A2A binding by the [A2A
 capability-binding profile](a2a-capability-binding-profile.md), and BAP's UCP riding point by
-ADR 0034 (transport-composed; this profile's §6
-separation is the constraint both respected).
+a transport-composed design (this profile's §6 separation is the constraint both
+respected).
 
 ## 7. Element 5 — Receipt correspondence
 
@@ -348,7 +349,7 @@ returns the 22 schema JSON files). OBSERVED. Upstream vector offers sit in AP2 P
 Questions this profile leaves to their owning decisions:
 
 1. **The A2A binding** (§6); this profile records constraints, not answers.
-2. **The ES256 suite** — its ADR fixes the major number, the JWK/thumbprint encodings, corpus
+2. **The ES256 suite** — its specification fixes the major number, the JWK/thumbprint encodings, corpus
    identity, and the SDK/signer cohort sweep; §3 describes the bridge contract only.
 3. **The projection vectors** (§8).
 4. **`execution_date_epoch` normalization** (§5.2) — INFERRED until a runtime design owns the
@@ -363,9 +364,10 @@ existing reserved registry rows. Compliance read of this document against the ac
 
 - Reserved mechanism names appear only inside §0 and §10 as the gate's own enumeration — never
   designed, specified, or promised.
-- Budget material cites ADR 0029 and the charter's published selector-expressiveness text; no
-  `ba+budget-window` shape is designed (the ADR itself defers it).
-- The ES256 suite is described in its bridge role only, deferring all design to its own ADR.
+- Budget material cites the [successor-major charter](successor-major-charter.md) § 5 budget posture, the charter's published selector-expressiveness text; no
+  `ba+budget-window` shape is designed (that posture defers it).
+- The ES256 suite is described in its bridge role only, deferring all design to its own
+  specification.
   No public announcement is made here beyond what the mapping note already states as fact (the
   suite difference).
 - No forward promise of submission, upstream contribution, or runtime compatibility appears

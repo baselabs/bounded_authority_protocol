@@ -1,12 +1,8 @@
----
-title: BAP Local Loopback HTTP Proof Profile 1
-docname: bap-local-loopback-http-v1
----
-
 # BAP Local Loopback HTTP Proof Profile 1
 
 Document status: normative for application proof profile
-`bap-application-proof/local-loopback-http/1`. Document revision: rev 2 (erratum 2, ADR 0040). This document composes with
+`bap-application-proof/local-loopback-http/1`. Document revision: rev 2 (erratum 2; erratum 3 amends revision 2 in place; see the
+[errata registry](../docs/errata.md)). This document composes with
 the contract-major 1 grant and common proof mechanics in [BAP v1](bap-v1.md); it does not change that
 profile's `dpop+jwt` proof contract or verdicts.
 
@@ -26,8 +22,7 @@ the strict Ed25519 rule of [BAP v1 § 14.1](bap-v1.md#strict-ed25519)
 (`REQ1-SIGNING-ed25519-canonical-point`, `REQ1-SIGNING-ed25519-small-order-reject`,
 `REQ1-SIGNING-ed25519-scalar-range`, `REQ1-SIGNING-ed25519-cofactorless`). The holder JWK and the trusted issuer key MUST pass key
 acceptance (`REQ1-KEY-ed25519-acceptable`); a failure returns the single closed error. Revision 2
-adds this statement (erratum 2,
-ADR 0040); the profile corpus and its
+adds this statement (erratum 2); the profile corpus and its
 verdicts are unchanged, and the cases live in the additive strict-Ed25519 corpus.
 
 The profile identity is `bap-application-proof/local-loopback-http/1`. A conforming proof MUST carry

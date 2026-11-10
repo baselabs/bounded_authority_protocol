@@ -1,207 +1,89 @@
-# Upgrading — the published compatibility contract
+# Upgrading to 1.0
 
-What a consumer of `bounded_authority_protocol` may rely on across releases, and what each
-release kind changes. The locked 0.1.0 release-candidate contract
-(ADR 0008) remains the HISTORICAL record
-of the frozen API surface; THIS document is the living contract consumers read.
+Package 1.0.0 is the first release under the 1.x stability contract: from here on, a minor
+release only adds, and anything that would break your code waits for 2.0.0
+([API stability and versioning](api-stability.md)). This page lists what changes when you move
+from a 0.x release to 1.0, then the extra steps for older starting points. The
+[changelog](../../CHANGELOG.md) has the full history.
 
-## 0.9.0 to 0.9.1
+## Move the requirement
 
-Documentation-only patch. Architecture decision records are no longer distributed in the public
-source, Hex package, or HexDocs. Existing `~> 0.9.0` requirements accept this release; run
-`mix deps.update bounded_authority_protocol`. There are no API, wire, or verification changes.
+```elixir
+defp deps do
+  [{:bounded_authority_protocol, "~> 1.0"}]
+end
+```
 
-## 0.8.0 to 0.9.0
+`~> 1.0` admits every 1.x release. A 0.x requirement such as `~> 0.9.1` never selects 1.0, so
+the change is explicit. Then run `mix deps.update bounded_authority_protocol` and the packaged
+corpora ([Recipes](recipes.md#run-every-packaged-corpus)).
 
-Clarifying minor (erratum 3). No verification verdict changes. The requirement `~> 0.8.0` does
-not select 0.9.0; move to `~> 0.9.0`.
+## What changes in 1.0
 
-- Every producer that frames a signature refuses one that no conforming signer emits, with
-  `{:error, :invalid}`, and never rewrites accepted bytes: `assemble_compact/2,3` and
-  `encode_anchored_export/2` in `BoundedAuthorityProtocol.V1`, `V2`, and `V3`, and
-  `assemble_compact/2,3` in `BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1`,
-  `BoundedAuthorityProtocol.RoleAttestation.V1`, and `BoundedAuthorityProtocol.ContentAssertion.V1`. Under contract-major 3 that
-  is `r` or `s` out of range or high-S; under Ed25519 it is `S ≥ L` or an `R` that is
-  non-canonical or of small order. Every verifier already rejected these signatures, so a
-  credential that assembled and verified before still does.
-- If you sign through an HSM, KMS, or secret store and assemble yourself, convert and normalize
-  before assembly: `BoundedAuthorityProtocol.Es256.der_to_raw/1`, then
-  `BoundedAuthorityProtocol.Es256.normalize_low_s/1`. The companion signers already normalize.
-- Decode is unchanged: `decode_grant/2` and `decode_proof/2` still decode a high-S compact,
-  because a decoded compact is not a verified one.
-- New public module `BoundedAuthorityProtocol.Es256`.
+No wire byte changes, and every certified corpus keeps its cases and verdicts. These changes
+can affect your code:
 
-## 0.7.0 to 0.8.0
+1. **Float zero in selectors (erratum 6).** On every contract-major, grant decode and
+   verification reject a grant whose `equals` value or `one_of` member holds a float-tagged
+   zero (`0.0`, `-0.0`, or an underflowing literal), and the grant producers refuse a
+   float-tagged whole-number selector value such as `{:float, 2.0}`. Conforming verifiers
+   disagreed about these values, and no conforming producer emits them.
+   **Action:** tag whole numbers `{:integer, n}` in selectors. If you stored grants you did not
+   produce with this package, decode them once; one that no longer decodes held such a value and
+   must be re-issued. See the [errata registry](../errata.md).
+2. **Conformance internals are hidden.** `BoundedAuthorityProtocol.Conformance.Corpus`,
+   `Runner`, and `Report` are no longer documented or covered by the stability contract.
+   **Action:** call `BoundedAuthorityProtocol.Conformance.Cli.run/1`, which returns the exit
+   status (`0`, `1`, or `2`), or run the `bounded_authority_conformance` command. Do not call
+   `Conformance.Cli.Main.main/1`; it halts the VM.
+3. **The conformance CLI is stricter.** It reads only the files a corpus index names, refuses
+   symbolic links and over-size files, checks that it ran every case the certified index lists
+   exactly once, verifies the three sibling-profile corpora (local-loopback, role attestation,
+   content assertion), exits `0` on `--help`, writes one line to standard error on a failure, and
+   ends its report with a newline. Its flags, exit statuses, and report fields are now part of
+   the stability contract.
+4. **`Bounds` fields default to the maxima.** `%Bounds{}` equals `Bounds.maximum()`, and
+   `%Bounds{depth: 8}` is a one-field tightening. Code that built the struct with every field
+   still works; `new/1`, `maximum/0`, and `coerce/1` are unchanged.
+5. **`inspect/2` redacts credentials.** Inspecting `Credentials`, `ExpectedRequest`, proofs,
+   decoded proofs, or a `SigningInput` shows `:redacted` in place of the compact credentials,
+   the cast arguments, the nonce, and the signing bytes. If your tests matched on inspected
+   output, match on the fields instead. Redaction protects against accidental logging only;
+   reading a field still returns its value.
+6. **The thumbprint helpers are documented.** `V1.Jwk.public_key_thumbprint_raw/2`,
+   `V1.Jwk.thumbprint_raw/2`, `V3.EcJwk.public_key_thumbprint_raw/2`, and
+   `V3.EcJwk.thumbprint_raw/2` are now part of the stable surface. Code that already used them
+   needs no change.
+7. **The request-digest projection is bounded while it walks.** `request_digest/3`,
+   `proof_signing_input/2`, and `check_envelope/2` stop at the depth, node, container, and
+   string budgets as they project the arguments, instead of after. The accepted set and every
+   digest byte are unchanged; an oversized argument tree is rejected without being walked.
 
-Soundness-repair minor (erratum 2, ADR 0040):
-every release before 0.8.0 accepts Ed25519 signatures under small-order and non-canonical keys,
-so every consumer should upgrade; see the security advisory. The requirement `~> 0.7.0` does not
-select 0.8.0; move to `~> 0.8.0`.
+Every public function now has a typespec and every public struct documents its fields, which
+helps Dialyzer and your editor but changes no behavior.
 
-- Every Ed25519 verification applies rule S1: canonical point encodings, no small-order key or
-  `R`, a scalar below the group order, and the cofactorless equation. Signatures from conforming
-  RFC 8032 signers keep verifying; only inputs no conforming producer emits change from accept to
-  reject.
-- Producers and key functions return `{:error, :invalid}` for a public key that fails key
-  acceptance (wrong width, non-canonical, small order, or off the curve): proof, boundary-anchor,
-  key-transition, and role-attestation signing-input construction, `V1.Jwk.encode_public/2`,
-  `V1.Jwk.decode_public/2`, and the JWK thumbprint functions. Code that used an all-zero or
-  otherwise synthetic 32-byte key as a placeholder must generate a real key.
-- New public module `BoundedAuthorityProtocol.Ed25519` with `verify_strict/3`,
-  `acceptable_public_key?/1`, and `torsion_free?/1`.
-- New host obligation: call `torsion_free?/1` at key enrollment, at trust install, and before any
-  deny-list or revocation comparison (`REQ1-HOST-ed25519-torsion-free`).
-- Before upgrading, run `acceptable_public_key?/1` and `torsion_free?/1` over every stored
-  trusted key, enrolled holder key, role-attestation subject and attestor key, and every key in
-  the historical key chain of each retained anchored export. Treat a failure as a compromise:
-  revoke the key, re-issue what it signed, and re-anchor the affected archives. After the upgrade,
-  an archive whose key chain contains a key that fails key acceptance no longer verifies.
-- Every existing certified corpus, its index digest, and its verdicts are unchanged; the new
-  strict-Ed25519 corpus is additive.
+## From older releases
 
-## 0.6.2 to 0.7.0
+Apply every row from your starting release down to 1.0.
 
-Additive sibling-profile minor: `0.7.0` ships the first package bearing
-`bap-content-assertion/1` (ADR 0037), the `BoundedAuthorityProtocol.ContentAssertion.V1`
-namespace (`assertion_signing_input/2`, `assemble_compact/2,3`, `decode_assertion/2`,
-`verify_assertion/2`, `content_digest/2`, `assertion_digest/2`, `verify_successor/3`) and its
-certified corpus. The bounds contract gains one tightenable ceiling, `content_bytes` (maximum
-65,536), used only by `content_digest/2`; every existing bound keeps its value.
-`%BoundedAuthorityProtocol.V1.Bounds{}` now enforces that key, so code that builds the struct
-literally must add it; `Bounds.new/1`, `Bounds.maximum/0`, and plain override maps are
-unaffected. `V1.SigningInput` gains the `:content_assertion` kind, admitted with the protected
-`typ` `ba+content-assertion` only through the new namespace. No contract-major, loopback, or
-role-attestation byte or verdict changes. The requirement `~> 0.6.2` does not select 0.7.0;
-move to `~> 0.7.0` to adopt it. Consumers that never call the new namespace and never build
-`Bounds` literally need no code changes.
+| You are on | Also do this |
+|---|---|
+| 0.8.x | ES256 compact assembly refuses a high-S or out-of-range signature. If you sign through a KMS or an HSM and assemble yourself, convert with `Es256.der_to_raw/1`, then `Es256.normalize_low_s/1`, before `assemble_compact/2` ([Recipes](recipes.md#es256-from-a-kms-or-hsm)). |
+| 0.7.x or earlier | Every Ed25519 verification applies the strict rule: canonical encodings, no small-order key or `R`, `S` below the group order. Before upgrading, run `Ed25519.acceptable_public_key?/1` and `Ed25519.torsion_free?/1` over every stored trusted key, enrolled holder key, attestation key, and archived key chain, and treat a failure as a compromise. From then on, call `torsion_free?/1` at enrollment, at trust install, and before revocation comparisons. Producers refuse a placeholder key such as 32 zero bytes. These releases are retired on Hex. |
 
-## 0.6.1 to 0.6.2
+## Checking that you are unaffected
 
-Repair patch with **no verdict, wire-format, or public-API change**: the role-attestation codec's
-closed-role membership and bounded-size checks now compile to version-stable Erlang on every
-supported Elixir (expression-position `in` compiled to `:lists.member`/`Enum.member?` imports on
-1.18/1.19, which the compiled purity and package gates reject), and the secret-scan sensitivity
-battery regained its role-attestation corpus fixture. Consumers need no changes; `~> 0.6.1`
-picks 0.6.2 up on the next `mix deps.update`.
+1. Move the requirement and keep `mix.lock` committed, so the exact release is recorded.
+2. Run every packaged corpus from your project
+   ([Recipes](recipes.md#run-every-packaged-corpus)). Exit `0` for each means the installed
+   release agrees with every certified corpus.
+3. If your own tests pin a corpus index digest, it does not change in 1.0.
+4. Run your integration tests, including the rejection paths, and fix any test that matched on
+   `inspect/2` output.
 
-## 0.6.0 to 0.6.1
+## After 1.0
 
-Repair patch for the role-attestation surface: caller-tightened bound enforcement,
-producer/decoder limit agreement, closed-error shapes for malformed caller input, and in-repo
-SDK alignment. No corpus, pin, or ADR change; no verdict moves on legal input. Consumers on 0.6.0
-holding caller-tightened bounds should upgrade: the 0.6.0 codec ignored a tightened
-`anchor_bytes` for standalone attestations. `~> 0.6.0` picks 0.6.1 up on the next
-`mix deps.update`.
-
-## 0.5.1 to 0.6.0
-
-Additive sibling-profile release: `0.6.0` ships the first package bearing
-`bap-role-attestation/1` (ADR 0036) — the `BoundedAuthorityProtocol.RoleAttestation.V1`
-namespace (`attestation_signing_input/2`, `assemble_compact/2,3`, `decode_attestation/2`,
-`verify_attestation/2`) and its certified corpus. No contract-major byte or verdict changes:
-the v1/v2/v3 profiles, corpora, and certified pins are unchanged, and the only v1/v2-tree
-behavior change is a closed-error-shape fix (wrong-width signatures now return exactly
-`{:error, :invalid}` instead of a bare `false` — no accept/reject verdict moves). Consumers on
-`0.5.x` who never touch the new namespace need no changes; the minor-bounded `~> 0.6.0`
-requirement picks it up on the next `mix deps.update`.
-
-## 0.5.0 to 0.5.1
-
-Documentation-truth patch with **no code, wire-format, bound, or public-API change**: the
-published doc set is trimmed to implementer-facing content (the IANA pre-filing drafts, the
-AP2/A2A interop design profiles, the successor-major activation checklist, and the superseded
-0.1.0 release-candidate contract leave the package and hexdocs while remaining tracked in the
-repository). Consumers on 0.5.0 need not upgrade; the pin bump is optional.
-
-## 0.4.2 to 0.5.0
-
-Additive contract-major release: `0.5.0` activates the ES256 suite as contract-major 3 under
-`BoundedAuthorityProtocol.V3` (`BAP3-ES256-SHA256` — ECDSA P-256/SHA-256, RFC 7518 §3.4 raw
-`r || s` signatures with low-S canonicality, EC JWK holder keys, 65-byte uncompressed-SEC1 raw
-keys; ADR 0035) with its certified 292-case
-corpus, and ships the spec-facts v2/v3 extraction baselines inside the package. v1 and v2 are
-byte-frozen: wire bytes, bounds, public APIs, verdicts, and certified pins are unchanged, so
-v1/v2 consumers need only bump the requirement pin. The new namespace is opt-in — nothing that
-does not reference `BoundedAuthorityProtocol.V3` changes.
-
-## 0.4.1 to 0.4.2
-
-Documentation-truth patch: the corrected AP2 mandate-mapping note and the capability extension's
-selector-scope paragraph, ADR 0029 (the cumulative-budget
-posture; the `ba+budget-window` attestation-shape design explicitly deferred), and a batched
-dependency sweep. **No wire-format or public-API change**; no consumer action.
-
-## 0.4.0 to 0.4.1
-
-No wire-format or public-API change: 0.4.1 lands the self-enforcing toolchain and the
-tri-platform build bar (ADR 0031)
-and the dependency-currency gate (ADR 0032) inside the
-repository — the OTP assert is not shipped in the package, so consumer builds are unaffected.
-Bump the requirement as convenient; nothing else changes for consumers.
-
-## 0.2.x to 0.3.0
-
-`0.3.0` adds `bap-application-proof/local-loopback-http/1` as a separately named application
-profile. Standard `dpop+jwt` bytes, bounds, public signatures, the 283-case standard corpus, and all
-standard verdicts are unchanged. Existing consumers that never select the new profile need only
-update the package pin and rerun the standard corpus.
-
-Consumers adopting the new profile must select its five-surface API explicitly, pin its certified
-index SHA-256 (`10fc4cf05affcddc9e6340ff392c247e25ab038cd938f2557829a7ce63b1a5e4`), require the server nonce,
-derive the target from the direct literal-loopback listener, and keep standard/local proof bytes
-mutually rejected. Do not adopt from the Git tag alone: wait for the immutable Hex archive and
-verify its registry checksum before changing a package dependency.
-
-## Contract classes
-
-| Release kind | Wire formats | Bounds and verdicts | Public API | Conformance corpus |
-|---|---|---|---|---|
-| Patch (0.x.y → 0.x.z) | byte-identical | identical | additive bug-fix only; no signature change | identical (corpus revision unchanged) |
-| Minor (0.x → 0.x+1) | byte-identical on the v1 profile | identical | additive; existing signatures stable | may grow (corpus revision bumps; new cases only — no verdict flips) |
-| New application profile (pre-1.0: next 0.x.0) | standard profiles byte-identical; new profile has a distinct `typ` | existing profiles identical; new profile has its own closed verdict contract | separately named APIs; no inference or fallback | separate certified corpus and digest |
-| Major (successor contract-major) | new closed profile; the v1 profile never downgrades inside it | per its own spec | a new namespace; v1 remains verifiable | new corpus |
-
-## What may never change inside v1
-
-- A single standard-v1 wire byte, bound, or verdict: the profile is closed permanently. Evolution
-  uses parallel contract-majors or separately identified byte-distinct application profiles whose
-  APIs, `typ`, specification, and corpus cannot be inferred or used as fallback.
-- The error shape (`{:error, :invalid}`) and the facts contracts (value-bearing, redacted,
-  non-authorizing, with their not-evaluated markers).
-- The locked public API surface enforced by the architecture gate.
-
-## What a minor release may do
-
-- Add public functions, add corpus cases (corpus revision bump — cited documents update in
-  the same change), tighten documentation, and add gates. A consumer that pins a corpus index
-  digest rotates that pin in the same change as the upgrade. This repository moves its own pins
-  (five per contract-major corpus: the CLI, its test, and the Go, Python, and Rust runners) with
-  `elixir scripts/regen_corpus_digests.exs --write`.
-- A new byte-distinct application profile is a breaking pre-1.0 release (`0.x.0`), never a patch.
-  Consumers opt into its separately named API and independently pin its certified corpus index.
-
-## How to check you are unaffected
-
-1. Use the minor-bounded requirement (`~> 0.8.0`) and keep `mix.lock` committed so the exact
-   version is recorded; the conformance corpora ship inside the package.
-2. Run the verifier CLI against the packaged corpora from your project (exit 0 means the
-   installed release agrees with each certified corpus):
-
-   ```sh
-   mix run -e 'BoundedAuthorityProtocol.Conformance.Cli.Main.main(["--corpus", "deps/bounded_authority_protocol/priv/conformance/v1/corpus"])'
-   ```
-
-   Repeat with `v2/corpus`, `v3/corpus`, and `strict-ed25519`. The CLI pins each certified
-   index digest itself.
-3. If your own tests pin a corpus index digest, update that pin in the same change as the
-   upgrade (the new value is the SHA-256 of the installed corpus's exact `index.json` bytes),
-   then re-run your suite.
-4. For a sibling application profile: select its named API explicitly, pin its separate corpus
-   index digest, and prove the standard profile still rejects its artifacts (and vice versa).
-
-## Deprecation policy
-
-Nothing inside v1 deprecates. Successor-majors carry their own complete profiles; the v1
-profile's availability follows the repository's governance document (minimum twelve-month
-deprecation windows for anything that ever retires, published change-control, and a
-security-release policy).
+Read the changelog's entry for each minor release you adopt. A minor release may add a
+contract-major, a sibling profile, functions, optional arguments, defaulted struct fields, or a
+soundness repair recorded in the errata registry, and may raise the Elixir or Erlang/OTP floor;
+none requires a code change. A 2.0.0 release would say what to change.

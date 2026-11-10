@@ -1,13 +1,10 @@
----
-title: BAP Role Attestation Profile 1
-docname: bap-role-attestation-v1
----
-
 # BAP Role Attestation Profile 1
 
 Document status: normative for attestation profile `bap-role-attestation/1`. Document revision:
-rev 2 (erratum 2, ADR 0040). This document defines a standalone sibling attestation profile under
-ADR 0036; it changes no contract-major
+rev 2 (erratum 2; erratum 3 amends revision 2 in place; see the
+[errata registry](../docs/errata.md)). This document defines a standalone sibling attestation
+profile under [governance § Byte-distinct sibling attestation
+profiles](../docs/governance.md#byte-distinct-sibling-attestation-profiles); it changes no contract-major
 profile's bytes or verdicts.
 
 The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **SHOULD**,
@@ -96,7 +93,7 @@ the subject public key, both in the payload and in the expected binding, MUST pa
 (`REQ1-KEY-ed25519-acceptable`), and attestation signing-input construction refuses a subject key
 that fails it. A host MUST apply the torsion-free check to an attestor key at trust install and to
 a subject key at enrollment (`REQ1-HOST-ed25519-torsion-free`). Revision 2 adds these statements
-(erratum 2, ADR 0040); the profile corpus
+(erratum 2); the profile corpus
 and its verdicts are unchanged, and the cases live in the additive strict-Ed25519 corpus.
 
 A successful verification returns closed, value-bearing, redacted, non-authorizing

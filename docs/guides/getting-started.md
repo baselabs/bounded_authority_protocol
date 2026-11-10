@@ -21,9 +21,9 @@ defp deps do
 end
 ```
 
-Release 0.9.1 is the current Hex release. Releases 0.7.0 and earlier are retired for a security
-fix; the [changelog](../../CHANGELOG.md) and [Upgrading](upgrading.md)
-describe each release. Depend on the Hex package, never on a Git tag or checkout. The package
+The [changelog](../../CHANGELOG.md) describes each release, and [Upgrading](upgrading.md) what
+to change when you move between them. Depend on the Hex package, never on a source checkout. The
+package
 has no runtime dependencies. Mix enforces its `elixir: "~> 1.18"` requirement; it also needs
 Erlang/OTP 27 or later (the standard-library `:json` module), which nothing checks for you. CI
 tests Elixir 1.18 on OTP 27, 1.19 on OTP 28, and 1.20 on OTP 29.
@@ -100,8 +100,7 @@ The value is `3`: a compact JWS has three dot-separated parts.
 
 `grant_signing_input/2` returns the exact bytes to sign (`grant_input.message`);
 `assemble_compact/2` checks the signature width and the encoded parts and returns the compact
-JWS. Since 0.9.0, it also refuses a signature that no
-conforming signer emits (for Ed25519, `S` not below the group order or a non-canonical or
+JWS. It also refuses a signature that no conforming signer emits (for Ed25519, `S` not below the group order or a non-canonical or
 small-order `R`) and never rewrites the bytes it accepts. Neither function sees a private key.
 
 ### 3. The proof
@@ -285,22 +284,23 @@ has its own functions: `verify_historical_anchor/3`, `verify_key_transition/4`, 
 
 The package ships its certified conformance corpora and a verifier CLI that checks every case
 and exits `0` only on full agreement (`1` on any disagreement or integrity failure, `2` on a
-usage error). From your project, after `mix deps.get`:
+usage error). Install it once and run it against a packaged corpus from your project, after
+`mix deps.get`:
 
 ```sh
-mix run -e 'BoundedAuthorityProtocol.Conformance.Cli.Main.main(["--corpus", "deps/bounded_authority_protocol/priv/conformance/v1/corpus"])'
+mix escript.install hex bounded_authority_protocol 0.9.1
+bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus
 ```
 
-Repeat with `v2/corpus`, `v3/corpus`, or `strict-ed25519` in place of `v1/corpus`. To install
-the CLI as a command instead, run `mix escript.install hex bounded_authority_protocol 0.9.1`
-(it lands in `~/.mix/escripts`) and then
-`bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus`.
-In a checkout of this repository, `mix escript.build` builds the same CLI, and the repository's
-quality gate runs it over every corpus. Exit `0` is conformance evidence, not an authorization.
+`mix escript.install` puts the command in `~/.mix/escripts`; add that directory to your `PATH`.
+To run every packaged corpus from Elixir, for example in your own test suite, call
+`BoundedAuthorityProtocol.Conformance.Cli.run/1` as [Recipes](recipes.md#run-every-packaged-corpus)
+shows. Exit `0` is conformance evidence, not an authorization.
 
 For your own service, test the rejection paths, not only the happy path: a changed byte, a wrong
 audience, an expired grant, an argument outside the selectors, and a replayed invocation id
-(your replay store, not this package, must catch that one).
+(your replay store, not this package, must catch that one). When a request you expected to pass
+fails, the [troubleshooting checklist](troubleshooting.md) finds the input that differs.
 
 ## The three rules that surprise newcomers
 
@@ -335,8 +335,13 @@ input or retry another after a rejection. The
 
 ## Where to go next
 
-- The [Livebook walkthrough](../livebooks/bap-walkthrough.livemd): every profile, with the
-  attacks each one rejects.
+- [Recipes](recipes.md): Plug and Phoenix integration, selectors per contract-major, ES256 keys
+  in a KMS or HSM, key rotation, nonces, and running every corpus.
+- The Livebooks: the [protocol walkthrough](../livebooks/bap-walkthrough.livemd) runs every
+  profile with the attacks each one rejects, [service integration](../livebooks/service-integration.livemd)
+  covers rotation, nonces, and time, and [chains and archives](../livebooks/chains-and-archives.livemd)
+  builds the evidence formats.
+- [Choosing a profile](choosing-a-profile.md) and the [cheatsheet](cheatsheet.cheatmd).
 - [Usage rules](../../usage-rules.md): what a consuming host must do.
-- [Upgrading](upgrading.md): what each release changes.
+- [Upgrading](upgrading.md) and [API stability and versioning](api-stability.md).
 - The [implementer's guide](implementers-guide.md): building a verifier in another language.

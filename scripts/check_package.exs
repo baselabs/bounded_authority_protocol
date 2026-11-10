@@ -22,10 +22,17 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/guides/implementers-guide.md",
                     "docs/guides/upgrading.md",
                     "docs/livebooks/bap-walkthrough.livemd",
-                    "docs/deployment/go-sdk.md",
-                    "docs/deployment/python-sdk.md",
-                    "docs/deployment/rust-sdk.md",
-                    "docs/deployment/typescript-sdk.md",
+                    "docs/guides/choosing-a-profile.md",
+                    "docs/guides/recipes.md",
+                    "docs/guides/evidence.md",
+                    "docs/guides/troubleshooting.md",
+                    "docs/guides/api-stability.md",
+                    "docs/guides/other-languages.md",
+                    "docs/guides/glossary.md",
+                    "docs/guides/faq.md",
+                    "docs/guides/cheatsheet.cheatmd",
+                    "docs/livebooks/service-integration.livemd",
+                    "docs/livebooks/chains-and-archives.livemd",
                     "docs/design/conformance-contract.md",
                     "docs/design/interoperability-report.md",
                     "docs/design/protocol-charter.md",
@@ -912,6 +919,18 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
         "BoundedAuthorityProtocolConsumer.grant_proof_contract?() and " <>
         "BoundedAuthorityProtocolConsumer.chain_archive_contract?() do " <>
         "System.halt(1) end"
+
+    # The PACKAGED notebooks run against the unpacked package, with every cell checked against
+    # the value its prose states; only each notebook's Mix.install setup cell is swapped for
+    # this consumer's path dependency. The harness halts the VM non-zero on any mismatch.
+    harness = Path.join(source_root, "test_support/livebook_harness.ex")
+    livebooks = Path.join(package_root, "docs/livebooks")
+
+    livebook_code =
+      "Code.require_file(#{inspect(harness)}); " <>
+        "BoundedAuthorityProtocol.TestSupport.LivebookHarness.gate!(#{inspect(livebooks)})"
+
+    check_code = check_code <> "; " <> livebook_code
 
     run!(
       "mix",

@@ -12,7 +12,7 @@ request binding, and facts disclosure. The consumption chain, boundary anchors, 
 transitions, and archive framing are ORDERED-EVIDENCE constructions whose core invariants
 (hash-chain integrity, positional authentication, exact-EOF framing) are proven by the
 conformance corpus's tamper classes and the mutation gates; a process-calculus treatment of
-their ordering is the named follow-on (ADR 0025).
+their ordering is the named follow-on (see `README.md`).
 
 ## Attacker
 
@@ -27,7 +27,7 @@ Symbolic assumptions, recorded: perfect cryptography; Ed25519/SHA-256 as symboli
 time abstracted to an order with a bounded skew window (no dense-time reasoning); JSON
 canonicalization taken as an injective encoding (the typed projection makes this sound — the
 tagged algebra is a free term algebra, which is exactly what the typed-projection table buys
-the model). Revision 2 adds the strict Ed25519 rule (spec § 14.1, ADR 0040). The model already
+the model). Revision 2 adds the strict Ed25519 rule (spec § 14.1, erratum 2). The model already
 treats Ed25519 as an ideal signature, so it is unchanged; the strict rule is what makes
 implementations meet that assumption for small-order and non-canonical keys, which an ideal
 signature never accepts.

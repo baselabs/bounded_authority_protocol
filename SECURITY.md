@@ -5,7 +5,7 @@
 The `0.9.x` source release line is supported. `v0.9.1` is the current tagged source release
 and contains contract-majors 1, 2, and 3, the local-loopback application profile, the
 role-attestation and content-assertion sibling profiles, the strict Ed25519 verification
-soundness repair (ADR 0040, erratum 2),
+soundness repair (erratum 2),
 and the producer-canonicality signature refusal (erratum 3).
 The public API surface is locked. Registry consumers use the published Hex archive:
 [registry release](https://hex.pm/packages/bounded_authority_protocol/0.9.1). Releases `0.7.0` and

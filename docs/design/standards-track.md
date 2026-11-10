@@ -11,17 +11,18 @@ item here is cheap to define before third parties implement the profile and near
 retrofit after.
 
 This document is the standing authority for standards-track decisions. The
-[protocol charter](protocol-charter.md) defines what the verifier does; the
-`normative profile` freezes the current contract-major's bytes; the
+[protocol charter](protocol-charter.md) defines what the verifier does; the normative
+specifications ([contract-major 1](../../spec/bap-v1.md), [2](../../spec/bap-v2.md), and
+[3](../../spec/bap-v3.md)) freeze each contract-major's bytes; the
 [conformance contract](conformance-contract.md) defines how conformance is proven. This charter
 defines how all three survive time.
 
 Normative keywords in this charter (MUST, MUST NOT, MAY) carry the meanings defined in BCP 14
-[RFC2119] [RFC8174] when, and only when, they appear in all capitals, as carried by the
-`normative profile`. Evolution-contract requirements use the stable identifier
-scheme of ADR 0007 under the `REQ1-EVO-*`
-prefix and are traced to conformance cells in the requirement map
-[requirement map](requirement-map.md).
+[RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174)
+when, and only when, they appear in all capitals, as carried by the
+[contract-major 1 specification](../../spec/bap-v1.md). Evolution-contract requirements use the
+specification's stable requirement-identifier scheme under the `REQ1-EVO-*` prefix and are traced
+to conformance cells in the [requirement map](requirement-map.md).
 
 ## The evolution contract
 
@@ -30,7 +31,8 @@ or extension. That posture is permanent (`REQ1-EVO-closed-format-permanent`). It
 structurally kills the `alg:"none"`, `crit`-confusion, and permissive-compatibility class that
 destroyed the security reputation of prior token formats, and no evolution need weakens it.
 Evolution therefore happens through complete parallel contract-majors or the byte-distinct sibling
-proof-profile class defined by ADR 0027,
+proof-profile class defined in
+[governance § Byte-distinct sibling proof profiles](../governance.md#byte-distinct-sibling-proof-profiles),
 never by widening an existing profile in place (`REQ1-EVO-evolution-above-wire`). A sibling profile
 has a new signed `typ`, separate normative/corpus/API identity, and is rejected by every existing
 profile; it is not an erratum or alternate interpretation of existing bytes.
@@ -53,11 +55,12 @@ the profile of any artifact from its bytes alone. Negotiation is therefore disco
   best-effort parsing (`REQ1-EVO-no-downgrade`).
 - Acceptance of a byte-distinct sibling proof profile is an explicit deployment choice through its
   separately named API. A deployment never infers it from URI or request metadata and never retries
-  another profile after failure (ADR 0027). The same posture governs byte-distinct sibling
-  attestation profiles (ADR 0036): standalone, grant-unbound artifacts parsed by no major's
-  verification path, verified only through their own named API — the consumer-gated branch of the
-  evolution contract, distinct from the verifier-integration-bound attestation shapes that activate
-  inside a successor contract-major (labeled departure from this charter text: ADR 0036 Decision 1).
+  another profile after failure. The same posture governs byte-distinct sibling attestation
+  profiles ([governance § Byte-distinct sibling attestation
+  profiles](../governance.md#byte-distinct-sibling-attestation-profiles)): standalone,
+  grant-unbound artifacts parsed by no major's verification path, verified only through their own
+  named API — the consumer-gated branch of the evolution contract, distinct from the
+  verifier-integration-bound attestation shapes that activate inside a successor contract-major.
 
 ### Parallel-version support and deprecation
 
@@ -77,7 +80,7 @@ Successor contract-majors overlap rather than flag-day:
   clarify prose, correct non-normative text, or add conformance cases; **no erratum may flip a
   verdict of an existing certified corpus** (`REQ1-EVO-no-verdict-flip`). Any other change that
   would alter an accept/reject outcome is by definition a contract-major change. A soundness repair
-  (ADR 0040 Decision 4) changes verdicts only
+  ([governance § Soundness repairs](../governance.md#soundness-repairs)) changes verdicts only
   from accept to reject, only on inputs proven producer-impossible, with its cases in a new
   additive corpus and every existing corpus verdict unchanged; it is not a sunset, so it keeps no
   overlap window for the vulnerable verdict. The errata registry lives at
@@ -89,10 +92,10 @@ Operation-name conventions and selector kinds genuinely vary within the protocol
 governed by [registries](registries.md) rather than by code. The registries also carry reserved
 claim names, `typ` values, application-proof profiles, and cryptographic suite identifiers.
 Reservation is cheap and immediate. Reserved shared claims, selector kinds, and suite semantics
-activate only with a contract-major. A byte-distinct sibling proof `typ` may activate under ADR 0027
+activate only with a contract-major. A byte-distinct sibling proof `typ` may activate under the sibling proof-profile class
 because it creates a new closed profile and every existing profile continues to reject it; a
-byte-distinct sibling attestation `typ` may activate under ADR 0036 on the same rejection basis
-(labeled departure from this charter text: ADR 0036 Decision 1). Names are
+byte-distinct sibling attestation `typ` may activate under the sibling attestation-profile class
+on the same rejection basis (both classes are defined in [governance](../governance.md)). Names are
 coordinated so independent implementers never collide while no accepted byte changes meaning.
 
 ## Cryptographic suite identity
@@ -108,20 +111,20 @@ contract-major — the same closed posture, different constants. The `kid`/thumb
 the key-locator boundary is already key-type independent, so trusted-key resolution survives suite
 succession unchanged.
 
-The successor candidate family is the `BAP2-*` ML-DSA family (FIPS 204, JOSE mapping per
-RFC 9964), with a hybrid Ed25519+ML-DSA composite posture reserved per
-draft-ietf-jose-pq-composite-sigs — the concrete names, parameter sets, quantum-readiness
-statement, and revisit triggers are recorded in ADR 0026.
+The post-quantum successor candidate is an ML-DSA family (FIPS 204, JOSE mapping per RFC 9964)
+under the next free `BAP<contract-major>-*` name (contract-majors 2 and 3 took `BAP2-*` and
+`BAP3-*`), with a hybrid Ed25519+ML-DSA composite posture reserved per
+draft-ietf-jose-pq-composite-sigs. The candidate parameter sets (ML-DSA-65 baseline, ML-DSA-87
+higher tier) are listed in the [registries](registries.md).
 Post-quantum migration is a decade-scale industry program already underway; this charter's
 commitment is that the migration is a suite succession, not a redesign.
 
 ### Evidence longevity and cross-suite attestation
 
-BAP-04 anchored exports and historical-key rollover exist so evidence verifies years later.
+Anchored exports and historical-key rollover exist so evidence verifies years later.
 Long-retention evidence under a frozen signature algorithm means the evidence's trustworthiness
 would expire before its retention period — a design problem, not a hypothetical. The committed
-design direction, specified now and activated in a successor contract-major (carried to ADR
-quality in ADR 0009):
+design direction, specified now and activated in a successor contract-major:
 
 - **Cross-suite content-covering countersignature.** A boundary anchor of a current suite
   countersigns an archive whose rows and anchors were produced under an earlier suite, attesting
@@ -132,15 +135,14 @@ quality in ADR 0009):
   complete rules, and an authenticated content-covering countersignature from a currently trusted
   suite re-attests the archive's content. Trust freshness comes from the newest countersignature,
   not from the original signature surviving cryptanalysis.
-- The archive's existing SHA-256 content digest (BAP-04, computed over every raw byte) is the
+- The archive's existing SHA-256 content digest (computed over every raw byte) is the
   binding target; suite succession reuses the anchored-export digest mechanism rather than
   inventing a parallel one.
 
 ## Conformance language
 
-The normative profile currently expresses requirements as declarative prose. Before the
-release-candidate contract (BAP-06), the profile is rewritten with RFC 2119 / RFC 8174 conformance
-keywords, and every requirement receives a stable requirement identifier. The acceptance bar is
+Each normative specification states its requirements with RFC 2119 / RFC 8174 conformance
+keywords, and every requirement carries a stable requirement identifier. The acceptance bar is
 mechanical and unique to this project's method: **every MUST maps to at least one conformance-
 corpus applicability cell (surface × class) or to a named, falsifiable gap** — requirement-to-
 corpus traceability, so a standards reviewer can walk from any normative keyword to the executable
@@ -153,8 +155,8 @@ The protocol's claim names (`ba_inv`, `ba_op`, `ba_req`) and `typ` values (`ba+c
 `ba+key-transition`, `ba+role-attestation`, `ba+content-assertion`) are currently unregistered. For the standards track they
 are registered with IANA — the JWT Claims registry and the media-type suffix conventions
 respectively — both for collision safety and because registration is the visible signal of a
-standards posture rather than a vendor format. Registration templates are prepared as their own
-roadmap row and filed at first external submission. Until filing, the `ba_` and `ba+` prefixes are
+standards posture rather than a vendor format. Registration templates are prepared and are filed
+at first external submission. Until filing, the `ba_` and `ba+` prefixes are
 the collision-avoidance namespace, and the [registries](registries.md) document is authoritative
 for every name this protocol uses or reserves.
 
@@ -183,8 +185,8 @@ already-decided shape rather than opening a design debate after external adoptio
 The names this design needs (`ba_dlg`, a delegated-capability `typ`) are reserved in the
 registries now. The full mechanism — the `ba_dlg` claim schema, the `ba+cap-delegated` typ with
 its parent-holder key binding, the depth-bounded chain-verification algorithm, and the attenuation
-subset rules proven decidable against the existing selector algebra — is specified in
-ADR 0010.
+subset rules proven decidable against the existing selector algebra — is charted in the
+[successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md).
 
 ## Revocation and freshness
 
@@ -205,12 +207,11 @@ guidance with normative force at submission time:
   (kiosk / EV-charging / vending fleets), an issuer MAY price an offline risk acceptance into a
   grant via floor-limit claims (the reserved `ba_offline`): maximum value with explicit currency,
   maximum offline use count, and an offline-window expiry. The endpoint honors these at its own
-  risk within the window; the runtime (in the private `bounded_authority`) reconciles deferred
-  consumption and surfaces over-consumption as a first-class event. The closed claim shape, the
-  non-authorizing facts contract, the `ba_dlg` attenuation composition, and the successor-major
-  activation are specified in ADR 0016; the
-  requirements are R-BAP-1..6 (the requirements input was relocated out of the published set on 2026-09-22; ADR 0016 is the mechanism of record). The closed v1 profile
-  rejects the reserved name today; activation arrives with a successor contract-major.
+  risk within the window; a stateful authority runtime reconciles deferred consumption and
+  surfaces over-consumption as a first-class event. The closed claim shape, the non-authorizing
+  facts contract, the `ba_dlg` attenuation composition, and the successor-major activation are
+  charted in the successor-major charter. Every shipped contract-major rejects the reserved name
+  today; activation arrives with a successor contract-major.
 
 ## Principal binding
 
@@ -228,17 +229,17 @@ Published now, while the project is single-maintainer, because publishing the po
 credibility step and the policy is what makes single-maintainer tolerable to adopters:
 
 - **Change classes.** The normative classes live in
-  [governance.md](../governance.md), including ADR 0027's byte-distinct sibling-proof-profile class;
-  existing-profile wire or verification changes remain contract-major only.
-- **Change control.** Every product-shaping decision lands as a numbered public ADR. Once at least
-  two independent external implementations pass the conformance corpus, contract-major ADRs gain a
-  published comment window of no fewer than thirty days and a change-control group with implementer
-  representation. The hand-off criterion to a formal standards body is adoption, not ceremony:
-  when a venue (see below) accepts the work, that venue's process supersedes this one.
+  [governance § Change classes](../governance.md#change-classes), including the byte-distinct
+  sibling profile classes; existing-profile wire or verification changes remain contract-major
+  only.
+- **Change control.** Decisions publish through [governance](../governance.md#change-control), the
+  specifications, and the errata registry; the comment-window and change-group rules are stated
+  there. The hand-off criterion to a formal standards body is adoption, not ceremony: when a venue
+  (see below) accepts the work, that venue's process supersedes this one.
 - **Errata channel.** [docs/errata.md](../errata.md) is the numbered errata registry; each entry
   names affected versions and its corpus impact, and the no-verdict-flip invariant is checked at
   review. A soundness repair is recorded there too, under the conditions of
-  ADR 0040 Decision 4.
+  [governance § Soundness repairs](../governance.md#soundness-repairs).
 - **Deprecation policy.** As defined in the evolution contract above; the policy text there is the
   authoritative one.
 - **Security policy.** SECURITY.md governs vulnerability intake. The verdict-change handling rule,
@@ -254,7 +255,7 @@ duplicated content here).
 
 ## Venue strategy
 
-- **First:** the MCP `ext-auth` extensions repository (roadmap row BAP-08) — fast, targeted, and
+- **First:** the MCP `ext-auth` extensions repository — fast, targeted, and
   aimed at exactly the agentic-invocation audience this protocol serves. The extension documents
   the already-normative profile; nothing normative is introduced outside it.
 - **Durable home:** IETF (OAuth/GNAP working-group orbit) if and when external traction warrants —
@@ -266,17 +267,15 @@ duplicated content here).
 
 ## Sequencing
 
-Ordered, and wired into the repository roadmap (`docs/ROADMAP.md`, repository-internal) as
-dependencies of the first public release — BAP-07 does not publish without the items that cannot
-be retrofitted:
+These items were decided and specified before the first public release, because none of them can
+be retrofitted once third parties implement the profile:
 
-1. **Evolution contract + registries + RFC 2119 normative pass** (row BAP-10) — the one item that
-   becomes impossible after third parties implement.
-2. **Cryptographic suite identity + evidence longevity design** (row BAP-11) — cheap now,
-   expensive later; the domain separators and key indirection already carry the bones.
-3. **IANA registration templates** (row BAP-12) and **published governance** (row BAP-13) —
-   mechanical, disproportionate credibility.
-4. **Delegation-with-attenuation contract design** (row BAP-14) — decided above; the row carries
-   the full design to ADR quality so the successor contract-major starts from a specification.
+1. **Evolution contract, registries, and the RFC 2119 normative pass** — the one item that becomes
+   impossible after third parties implement.
+2. **Cryptographic suite identity and the evidence-longevity design** — the domain separators and
+   key indirection already carry the bones.
+3. **IANA registration templates and published governance.**
+4. **The delegation-with-attenuation design** — decided above, so a successor contract-major starts
+   from a specification.
 
-The venue decision is made (this charter); BAP-08 executes it.
+The venue decision is made (this charter); the extension drafts execute it.

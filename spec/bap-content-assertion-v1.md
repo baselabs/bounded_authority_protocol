@@ -1,15 +1,11 @@
----
-title: BAP Content Assertion Profile 1
-docname: bap-content-assertion-v1
----
-
 # BAP Content Assertion Profile 1
 
-Document status: normative contract for `bap-content-assertion/1`, revision 2 (erratum 2,
-ADR 0040);
-first released in package 0.7.0; the companion signer supports it from
-`bounded_authority_report_adapter` 0.9.0. Governing decision:
-ADR 0037.
+Document status: normative contract for `bap-content-assertion/1`, revision 2 (erratum 2;
+erratum 3 amends revision 2 in place; see the [errata registry](../docs/errata.md)); first
+released in package 0.7.0; the companion signer supports it from
+`bounded_authority_report_adapter` 0.9.0. It is a sibling attestation profile under
+[governance § Byte-distinct sibling attestation
+profiles](../docs/governance.md#byte-distinct-sibling-attestation-profiles).
 
 The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, and **MAY** are
 interpreted as described in BCP 14 only when they appear in all capitals.
@@ -132,7 +128,7 @@ The signature check of item 7 MUST follow the strict Ed25519 rule of
 [BAP v1 § 14.1](bap-v1.md#strict-ed25519) (`REQ1-SIGNING-ed25519-canonical-point`, `REQ1-SIGNING-ed25519-small-order-reject`,
 `REQ1-SIGNING-ed25519-scalar-range`, `REQ1-SIGNING-ed25519-cofactorless`), and the attestor public key
 MUST pass key acceptance (`REQ1-KEY-ed25519-acceptable`). Revision 2 adds this statement
-(erratum 2, ADR 0040); the profile corpus
+(erratum 2); the profile corpus
 and its verdicts are unchanged, and the cases live in the additive strict-Ed25519 corpus.
 
 Structural `iat <= nbf` and the current-window check imply `iat <= now`.
