@@ -23,6 +23,17 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # The Rust SDK's minimum supported Rust is 1.81 (rust-toolchain.toml, Cargo.toml
+    # rust-version). These lines need edition 2024 (Rust >= 1.85; sha2 0.11 needs 1.88), and
+    # p256 0.14 / sha2 0.11 also change the API es256.rs uses. Moving to them is an MSRV
+    # decision, not a Dependabot bump.
+    ignore:
+      - dependency-name: p256
+        versions: [">= 0.14"]
+      - dependency-name: zeroize
+        versions: [">= 1.9"]
+      - dependency-name: sha2
+        versions: [">= 0.11"]
 
   - package-ecosystem: pip
     directory: /sdks/python
