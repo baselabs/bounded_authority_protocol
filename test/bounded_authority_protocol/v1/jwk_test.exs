@@ -3,6 +3,9 @@ defmodule BoundedAuthorityProtocol.V1.JwkTest do
 
   alias BoundedAuthorityProtocol.V1.Jwk
 
+  # The documented thumbprint helpers carry executable examples.
+  doctest BoundedAuthorityProtocol.V1.Jwk
+
   @jwk ~s({"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"})
   @thumbprint_preimage ~s({"crv":"Ed25519","kty":"OKP","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"})
   @thumbprint "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"

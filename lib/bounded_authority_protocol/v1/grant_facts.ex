@@ -1,5 +1,21 @@
 defmodule BoundedAuthorityProtocol.V1.GrantFacts do
-  @moduledoc "Closed value-bearing, redacted, non-authorizing verified grant facts."
+  @moduledoc """
+  Closed value-bearing, redacted, non-authorizing verified grant facts.
+
+  ## Fields
+
+  * `version` - the contract-major, always `1`.
+  * `issuer` - the verified `iss` claim.
+  * `grant_id` - the verified `jti` claim.
+  * `issuer_key_fingerprint` - the raw 32-byte RFC 7638 thumbprint of the trusted issuer public key
+    the caller supplied.
+  * `holder_thumbprint` - the raw 32-byte RFC 7638 thumbprint the grant confirms (`cnf.jkt`).
+  * `matched_audience` - the expected audience, which the grant's `aud` contains.
+  * `issued_at` - the grant `iat`, integer Unix time in seconds.
+  * `not_before` - the grant `nbf`, integer Unix time in seconds.
+  * `expires_at` - the grant `exp`, integer Unix time in seconds.
+  * `authorization` - always `:not_evaluated`: these facts are never an authorization decision.
+  """
 
   @enforce_keys [
     :version,
@@ -15,6 +31,7 @@ defmodule BoundedAuthorityProtocol.V1.GrantFacts do
   ]
   defstruct @enforce_keys
 
+  @typedoc "Facts from a verified grant."
   @type t :: %__MODULE__{
           version: 1,
           issuer: binary(),

@@ -41,13 +41,42 @@ defmodule BoundedAuthorityProtocol.V1 do
   producers and verify them with `check_envelope/2`; the repository's test suite runs both.
   """
 
+  alias BoundedAuthorityProtocol.V1.AnchoredExportFacts
+  alias BoundedAuthorityProtocol.V1.AnchoredExportInput
+  alias BoundedAuthorityProtocol.V1.AnchorFacts
+  alias BoundedAuthorityProtocol.V1.ArchivedObject
   alias BoundedAuthorityProtocol.V1.Base64Url
+  alias BoundedAuthorityProtocol.V1.BoundaryAnchor
   alias BoundedAuthorityProtocol.V1.Bounds
+  alias BoundedAuthorityProtocol.V1.ChainFacts
+  alias BoundedAuthorityProtocol.V1.ChainInput
+  alias BoundedAuthorityProtocol.V1.ConsumptionEntry
+  alias BoundedAuthorityProtocol.V1.Credentials
+  alias BoundedAuthorityProtocol.V1.DecodedGrant
+  alias BoundedAuthorityProtocol.V1.DecodedProof
+  alias BoundedAuthorityProtocol.V1.EncodedAnchoredExport
+  alias BoundedAuthorityProtocol.V1.EncodedConsumptionEntry
+  alias BoundedAuthorityProtocol.V1.EnvelopeFacts
+  alias BoundedAuthorityProtocol.V1.ExpectedAnchor
+  alias BoundedAuthorityProtocol.V1.ExpectedAnchoredExport
+  alias BoundedAuthorityProtocol.V1.ExpectedChain
+  alias BoundedAuthorityProtocol.V1.ExpectedExport
+  alias BoundedAuthorityProtocol.V1.ExpectedGrant
+  alias BoundedAuthorityProtocol.V1.ExpectedKeyTransition
+  alias BoundedAuthorityProtocol.V1.ExpectedRequest
+  alias BoundedAuthorityProtocol.V1.Grant
+  alias BoundedAuthorityProtocol.V1.GrantFacts
+  alias BoundedAuthorityProtocol.V1.HistoricalKeyChain
+  alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
   alias BoundedAuthorityProtocol.V1.Json
   alias BoundedAuthorityProtocol.V1.KeyLocator
+  alias BoundedAuthorityProtocol.V1.KeyTransition
+  alias BoundedAuthorityProtocol.V1.KeyTransitionFacts
+  alias BoundedAuthorityProtocol.V1.Proof
   alias BoundedAuthorityProtocol.V1.RequestDigest
   alias BoundedAuthorityProtocol.V1.Runtime
   alias BoundedAuthorityProtocol.V1.SigningInput
+  alias BoundedAuthorityProtocol.V1.TrustedIssuer
 
   @doc """
   Parses only the protected grant header and returns its untrusted `kid` hint.
@@ -84,6 +113,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   of profile (for example an empty audience list, an expiry not after the start, or a selector
   outside the closed set) or over `limits`.
   """
+  @spec grant_signing_input(Grant.t(), Bounds.t() | map()) ::
+          {:ok, SigningInput.t()} | {:error, :invalid}
   defdelegate grant_signing_input(grant, limits), to: Runtime
 
   @doc """
@@ -95,6 +126,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   `{:ok, %BoundedAuthorityProtocol.V1.SigningInput{}}` or `{:error, :invalid}`; the holder
   public key must pass `BoundedAuthorityProtocol.Ed25519.acceptable_public_key?/1`.
   """
+  @spec proof_signing_input(Proof.t(), Bounds.t() | map()) ::
+          {:ok, SigningInput.t()} | {:error, :invalid}
   defdelegate proof_signing_input(proof, limits), to: Runtime
 
   @doc """
@@ -103,6 +136,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   Returns `{:ok, %BoundedAuthorityProtocol.V1.EncodedConsumptionEntry{bytes: row, hash: hash}}`
   with the exact canonical row bytes and their domain-separated hash, or `{:error, :invalid}`.
   """
+  @spec encode_consumption_entry(ConsumptionEntry.t(), Bounds.t() | map()) ::
+          {:ok, EncodedConsumptionEntry.t()} | {:error, :invalid}
   defdelegate encode_consumption_entry(entry, limits), to: Runtime
 
   @doc """
@@ -114,6 +149,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   consistent chain proves consistency only; it cannot show that a validly shortened history
   omitted nothing (usage rule 11).
   """
+  @spec check_chain(ChainInput.t(), ExpectedChain.t()) ::
+          {:ok, ChainFacts.t()} | {:error, :invalid}
   defdelegate check_chain(input, expected), to: Runtime
 
   @doc """
@@ -122,6 +159,8 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   Returns `{:ok, %BoundedAuthorityProtocol.V1.SigningInput{}}` or `{:error, :invalid}`.
   """
+  @spec boundary_anchor_signing_input(BoundaryAnchor.t(), Bounds.t() | map()) ::
+          {:ok, SigningInput.t()} | {:error, :invalid}
   defdelegate boundary_anchor_signing_input(anchor, limits), to: Runtime
 
   @doc """
@@ -131,6 +170,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   Returns `{:ok, %BoundedAuthorityProtocol.V1.SigningInput{}}` or `{:error, :invalid}`; both
   keys must pass `BoundedAuthorityProtocol.Ed25519.acceptable_public_key?/1`.
   """
+  @spec key_transition_signing_input(KeyTransition.t(), Bounds.t() | map()) ::
+          {:ok, SigningInput.t()} | {:error, :invalid}
   defdelegate key_transition_signing_input(transition, limits), to: Runtime
 
   @doc """
@@ -145,6 +186,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
   signature bytes it accepts.
   """
+  @spec encode_anchored_export(AnchoredExportInput.t(), ExpectedExport.t()) ::
+          {:ok, EncodedAnchoredExport.t()} | {:error, :invalid}
   defdelegate encode_anchored_export(input, expected), to: Runtime
 
   @doc """
@@ -182,6 +225,7 @@ defmodule BoundedAuthorityProtocol.V1 do
   Returns `{:ok, %BoundedAuthorityProtocol.V1.DecodedGrant{verification: :not_evaluated}}` or
   `{:error, :invalid}`. Use it to diagnose a rejection, never to make a decision.
   """
+  @spec decode_grant(binary(), Bounds.t() | map()) :: {:ok, DecodedGrant.t()} | {:error, :invalid}
   defdelegate decode_grant(compact, limits), to: Runtime
 
   @doc """
@@ -190,6 +234,7 @@ defmodule BoundedAuthorityProtocol.V1 do
   Returns `{:ok, %BoundedAuthorityProtocol.V1.DecodedProof{verification: :not_evaluated}}` or
   `{:error, :invalid}`. Use it to diagnose a rejection, never to make a decision.
   """
+  @spec decode_proof(binary(), Bounds.t() | map()) :: {:ok, DecodedProof.t()} | {:error, :invalid}
   defdelegate decode_proof(compact, limits), to: Runtime
 
   @doc """
@@ -203,6 +248,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   Returns `{:ok, %BoundedAuthorityProtocol.V1.GrantFacts{authorization: :not_evaluated}}` or
   `{:error, :invalid}`.
   """
+  @spec verify_grant(binary(), TrustedIssuer.t(), ExpectedGrant.t()) ::
+          {:ok, GrantFacts.t()} | {:error, :invalid}
   defdelegate verify_grant(compact, trusted_issuer, expected_grant), to: Runtime
 
   @doc """
@@ -213,6 +260,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   Returns `{:ok, %BoundedAuthorityProtocol.V1.AnchorFacts{trust: :not_evaluated}}` or
   `{:error, :invalid}`.
   """
+  @spec verify_historical_anchor(binary(), HistoricalPublicKey.t(), ExpectedAnchor.t()) ::
+          {:ok, AnchorFacts.t()} | {:error, :invalid}
   defdelegate verify_historical_anchor(compact, key, expected_anchor), to: Runtime
 
   @doc """
@@ -223,6 +272,12 @@ defmodule BoundedAuthorityProtocol.V1 do
   Returns `{:ok, %BoundedAuthorityProtocol.V1.KeyTransitionFacts{trust: :not_evaluated}}` or
   `{:error, :invalid}`.
   """
+  @spec verify_key_transition(
+          binary(),
+          HistoricalPublicKey.t(),
+          HistoricalPublicKey.t(),
+          ExpectedKeyTransition.t()
+        ) :: {:ok, KeyTransitionFacts.t()} | {:error, :invalid}
   defdelegate verify_key_transition(compact, current_key, next_key, expected), to: Runtime
 
   @doc """
@@ -235,6 +290,11 @@ defmodule BoundedAuthorityProtocol.V1 do
   or `{:error, :invalid}`. Supply the expectations from your own records, never from the
   archive being verified (usage rule 10).
   """
+  @spec verify_anchored_export(
+          ArchivedObject.t(),
+          HistoricalKeyChain.t(),
+          ExpectedAnchoredExport.t()
+        ) :: {:ok, AnchoredExportFacts.t()} | {:error, :invalid}
   defdelegate verify_anchored_export(archived, key_chain, expected), to: Runtime
 
   @doc """
@@ -252,6 +312,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   operation. Returns `{:ok, %BoundedAuthorityProtocol.V1.EnvelopeFacts{authorization: :not_evaluated}}`
   or `{:error, :invalid}`. Replay reservation of the invocation id stays with the caller.
   """
+  @spec check_envelope(Credentials.t(), ExpectedRequest.t()) ::
+          {:ok, EnvelopeFacts.t()} | {:error, :invalid}
   defdelegate check_envelope(credentials, expected_request), to: Runtime
 
   @doc """
@@ -261,6 +323,8 @@ defmodule BoundedAuthorityProtocol.V1 do
   Integer and float arguments stay distinct: `{:integer, 1}` and `{:float, 1.0}` digest
   differently.
   """
+  @spec request_digest(binary(), Json.value(), Bounds.t() | map()) ::
+          {:ok, binary()} | {:error, :invalid}
   def request_digest(operation, cast_arguments, limits),
     do: RequestDigest.digest(operation, cast_arguments, limits)
 

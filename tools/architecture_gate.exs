@@ -681,6 +681,23 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "lib/bounded_authority_protocol/content_assertion/v1/expected_content_assertion.ex"
   ]
 
+  # Input and decoded structs that hold credentials (compacts, typed arguments, nonces). Their
+  # Inspect impls render the struct with those fields redacted, built only from
+  # Inspect.Algebra.string/1 and Kernel.inspect/1 of the non-sensitive fields.
+  @redacted_input_source_paths [
+    "lib/bounded_authority_protocol/v1/credentials.ex",
+    "lib/bounded_authority_protocol/v1/decoded_proof.ex",
+    "lib/bounded_authority_protocol/v1/expected_request.ex",
+    "lib/bounded_authority_protocol/v1/proof.ex",
+    "lib/bounded_authority_protocol/v1/signing_input.ex",
+    "lib/bounded_authority_protocol/v2/decoded_proof.ex",
+    "lib/bounded_authority_protocol/v2/proof.ex",
+    "lib/bounded_authority_protocol/v3/decoded_proof.ex",
+    "lib/bounded_authority_protocol/v3/proof.ex"
+  ]
+
+  @inspect_source_paths @fact_source_paths ++ @redacted_input_source_paths
+
   @chain_codec_source_paths [
     "lib/bounded_authority_protocol/v1/anchored_export_codec.ex",
     "lib/bounded_authority_protocol/v1/boundary_anchor_codec.ex",
@@ -1398,7 +1415,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         true -> nil
       end
 
-    if function == :inspect and path in @fact_source_paths do
+    if function == :inspect and path in @inspect_source_paths do
       []
     else
       category_violation(category, path, "forbidden local call #{function}/#{length(args)}")
@@ -1727,7 +1744,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules("lib/bounded_authority_protocol/uri_path.ex"),
     do: ~w(Enum List)
 
-  defp approved_source_modules(path) when path in @fact_source_paths, do: ~w(Inspect)
+  defp approved_source_modules(path) when path in @inspect_source_paths, do: ~w(Inspect)
 
   defp approved_source_modules(path) when path in @chain_codec_source_paths,
     do: ~w(Access Enum Map String StringOrUri URI)
@@ -2042,7 +2059,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       ]
 
   defp approved_source_call?(path, "Inspect.Algebra", :string)
-       when path in @fact_source_paths,
+       when path in @inspect_source_paths,
        do: true
 
   defp approved_source_call?(

@@ -68,7 +68,20 @@ defmodule BoundedAuthorityProtocol.V1.Jwk do
     end
   end
 
-  @doc false
+  @doc """
+  Returns the raw 32-byte SHA-256 RFC 7638 thumbprint of an exact public OKP JWK.
+
+  This is the digest `thumbprint/2` base64url-encodes. The JWK must be the exact canonical
+  member set `decode_public/2` accepts, carrying an acceptable key; anything else is
+  `{:error, :invalid}`.
+
+  ## Example
+
+      iex> jwk = ~s({"crv":"Ed25519","kty":"OKP","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"})
+      iex> {:ok, digest} = BoundedAuthorityProtocol.V1.Jwk.thumbprint_raw(jwk, %{})
+      iex> Base.url_encode64(digest, padding: false)
+      "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+  """
   @spec thumbprint_raw(binary(), Bounds.t() | map()) :: {:ok, binary()} | {:error, :invalid}
   def thumbprint_raw(jwk, limits) do
     with {:ok, preimage} <- thumbprint_preimage(jwk, limits) do
@@ -76,7 +89,22 @@ defmodule BoundedAuthorityProtocol.V1.Jwk do
     end
   end
 
-  @doc false
+  @doc """
+  Returns the raw 32-byte SHA-256 RFC 7638 thumbprint of a raw 32-byte Ed25519 public key.
+
+  Equivalent to `encode_public/2` followed by `thumbprint_raw/2`. Use it to compute the
+  holder confirmation a `BoundedAuthorityProtocol.V1.Grant` carries: pass the raw digest
+  as `holder_thumbprint` (the producer base64url-encodes it into the `cnf.jkt` claim). A key that fails
+  `BoundedAuthorityProtocol.Ed25519.acceptable_public_key?/1` is `{:error, :invalid}`.
+
+  ## Example
+
+      iex> public_key =
+      ...>   Base.decode16!("D75A980182B10AB7D54BFED3C964073A0EE172F3DAA62325AF021A68F707511A")
+      iex> {:ok, digest} = BoundedAuthorityProtocol.V1.Jwk.public_key_thumbprint_raw(public_key, %{})
+      iex> Base.url_encode64(digest, padding: false)
+      "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+  """
   @spec public_key_thumbprint_raw(binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
   def public_key_thumbprint_raw(public_key, limits) do

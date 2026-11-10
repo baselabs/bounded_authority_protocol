@@ -4,6 +4,25 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- `inspect/2` no longer prints credentials. `V1.Credentials` redacts both compacts;
+  `V1.ExpectedRequest` redacts `cast_arguments` and a required nonce (`{:required, :redacted}`);
+  the `Proof` input of every contract-major redacts `grant_compact`, `cast_arguments` and the
+  nonce; every major's `DecodedProof` redacts the nonce; `V1.SigningInput` redacts its segments
+  and message. The other fields still render, as `#Module<field: value, …>`. Facts structs keep
+  their fixed `#Module<redacted>` form. Deliberately logging a field still logs it.
+
+### Documentation
+
+- Every public input, decoded and facts struct has a `@typedoc` and a "Fields" section giving each
+  field's meaning, unit, limit (the `Bounds` key that caps it) and normalization, and every
+  `V1`, `V2`, `V3` and local-loopback façade function has a `@spec`. No behavior change.
+- `V1.Jwk.thumbprint_raw/2`, `V1.Jwk.public_key_thumbprint_raw/2`, `V3.EcJwk.thumbprint_raw/2` and
+  `V3.EcJwk.public_key_thumbprint_raw/2` are now documented public API (they were `@doc false`
+  although the quickstart uses them), with executable examples. `V1.Jwk.thumbprint_digest_unchecked/1`
+  stays undocumented and outside the stable surface.
+
 ### Fixed
 
 - Erratum 6, a soundness repair (selector float zero). Grant decode on every contract-major now
