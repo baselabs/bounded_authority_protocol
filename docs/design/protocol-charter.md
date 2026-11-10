@@ -22,7 +22,7 @@ verification chain.
 
 ## Verification chain
 
-1. The caller supplies raw credentials and expected issuer/request context to the private runtime.
+1. The caller supplies raw credentials and expected issuer/request context to a stateful authority runtime.
 2. The bounded `untrusted_key_locator/2` returns only the protected grant `kid` as an explicitly
    untrusted lookup hint.
 3. The runtime combines expected issuer context with that hint and resolves a candidate public-key
@@ -84,11 +84,11 @@ accepted.
 
 `GrantFacts` and `EnvelopeFacts` are immutable, closed, bounded, value-bearing, and redacted. Their
 fixed inspection does not expose fields, and they implement no generic encoder. They contain only
-the exact identifiers, times, fingerprints, and hashes required by the private runtime, plus
+the exact identifiers, times, fingerprints, and hashes required by a stateful authority runtime, plus
 `authorization: :not_evaluated`; they exclude arguments, selector values, raw credentials,
 signatures, JWK containers, and nonces.
 
-Those facts are not operational decisions. The private runtime accepts raw credential bytes at
+Those facts are not operational decisions. A stateful authority runtime accepts raw credential bytes at
 its public boundary and produces facts internally; it never treats a caller-provided facts struct
 as an execution credential.
 

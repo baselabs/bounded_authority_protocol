@@ -11,8 +11,8 @@ has the quickstart and the full API list.
 ## Not published yet
 
 The package is not on PyPI, and any package of this name there is not ours until this page
-says otherwise. It moves to its own repository when it is first published
-(ADR 0015). Until then, install it from
+says otherwise. It moves to its own repository when it is first published.
+Until then, install it from
 this repository at a pinned commit:
 
 ```bash
@@ -57,7 +57,7 @@ from `Forwarded`/`X-Forwarded-*`, accept `localhost`, or retry standard `dpop+jw
 ## Strict Ed25519 verification
 
 Every Ed25519 verification in the SDK applies rule S1 of
-ADR 0040 at its single Ed25519 verification
+the contract-major 1 specification (`spec/bap-v1.md` § 14.1) at its single Ed25519 verification
 point: canonical point encodings, no small-order key or `R`, a scalar below the group order, and
 the cofactorless equation. Key import, JWK encode and decode, and thumbprint functions refuse a
 key that fails key acceptance. Call `torsion_free` at key enrollment, at trust install, and
