@@ -101,12 +101,29 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
     assert Enum.any?(ahead_errors, &String.contains?(&1, "must carry an Unreleased section"))
   end
 
+  # The documented dependency requirement. From 1.0 on, `~> MAJOR.MINOR` admits every later 1.x
+  # minor (additive changes and soundness repairs) and stops before 2.0. Before 1.0 a minor may
+  # break, so the requirement pins the exact release series, `~> 0.MINOR.PATCH`.
+  defp install_requirement(version) do
+    case String.split(version, ".") do
+      ["0", _minor, _patch] -> "~> #{version}"
+      [major, minor, _patch] -> "~> #{major}.#{minor}"
+    end
+  end
+
+  test "the install requirement is ~> MAJOR.MINOR from 1.0 and the exact series before it" do
+    assert install_requirement("0.9.1") == "~> 0.9.1"
+    assert install_requirement("1.0.0") == "~> 1.0"
+    assert install_requirement("1.4.2") == "~> 1.4"
+    assert install_requirement("2.0.1") == "~> 2.0"
+  end
+
   test "every live release surface derives from the latest released version" do
     changelog = File.read!("CHANGELOG.md")
     {released_version, []} = release_state(changelog, @version)
     [major, minor, _patch] = String.split(released_version, ".")
     series = "#{major}.#{minor}"
-    requirement = "~> #{released_version}"
+    requirement = install_requirement(released_version)
 
     expectations = [
       {"README install", "README.md", "{:bounded_authority_protocol, \"#{requirement}\"}"},

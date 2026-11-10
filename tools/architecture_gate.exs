@@ -278,13 +278,16 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:verify_transitions, 7} => %{variable_call: 2}
     },
     "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam" => %{
+      {:assertion_round_trips?, 3} => %{variable_call: 5},
       {:build_loopback_request, 1} => %{variable_call: 13},
+      {:content_expected, 3} => %{variable_call: 4},
       {:reduce_build, 2} => %{variable_call: 1},
+      {:sibling_agrees?, 4} => %{variable_call: 25},
+      {:side_verdict, 2} => %{variable_call: 3},
       {:strict_agrees?, 1} => %{variable_call: 6}
     },
     "Elixir.BoundedAuthorityProtocol.Conformance.Cli.beam" => %{
-      {:load_and_run, 2} => %{variable_call: 5},
-      {:walk, 3} => %{variable_call: 5}
+      {:verify, 2} => %{variable_call: 5}
     },
     "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1},
@@ -292,11 +295,18 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:verify_raw_bindings, 2} => %{enum_reduce: 1},
       {:check_one_tamper, 2} => %{variable_call: 2},
       {:check_raw_binding, 3} => %{variable_call: 2},
+      {:declared_paths, 1} => %{variable_call: 3},
       {:decode_case_file, 2} => %{variable_call: 4},
+      {:decode_case_list, 2} => %{variable_call: 3},
       {:decode_plain, 2} => %{variable_call: 2},
       {:indexed_target_bytes, 2} => %{variable_call: 2},
       {:load_json_file, 3} => %{variable_call: 2},
       {:load_additive_case_file, 3} => %{variable_call: 7},
+      {:load_content_assertion, 1} => %{variable_call: 10},
+      {:load_local_loopback_http, 1} => %{variable_call: 6},
+      {:load_role_attestation, 1} => %{variable_call: 3},
+      {:load_sibling, 2} => %{variable_call: 10},
+      {:sibling_corpus, 6} => %{enum_reduce: 1},
       {:tamper_verbatim_matches?, 5} => %{variable_call: 2},
       {:verify_hashes, 2} => %{variable_call: 2},
       {:verify_additive_counts, 3} => %{enum_reduce: 2},
@@ -402,6 +412,16 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
                                     verify_successor: 3,
                                     module_info: 0,
                                     module_info: 1
+                                  ],
+                                  "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.beam" => [
+                                    __info__: 1,
+                                    assemble_compact: 2,
+                                    assemble_compact: 3,
+                                    attestation_signing_input: 2,
+                                    decode_attestation: 2,
+                                    module_info: 0,
+                                    module_info: 1,
+                                    verify_attestation: 2
                                   ],
                                   "Elixir.BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.beam" =>
                                     [
@@ -623,6 +643,289 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
                                 },
                                 Map.new(@bap04_struct_beams, &{&1, @struct_exports})
                               )
+
+  # The package 1.x stable surface: every documented module. A module joins it only by a minor
+  # release; removing one, or changing a pinned struct's field set, is a package 2.0.0. The
+  # stability page (docs/guides/api-stability.md) is tested against these lists.
+  @stable_modules ~w(
+    BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1
+    BoundedAuthorityProtocol.Conformance.Cli
+    BoundedAuthorityProtocol.ContentAssertion.V1
+    BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertion
+    BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts
+    BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion
+    BoundedAuthorityProtocol.ContentAssertion.V1.ExpectedContentAssertion
+    BoundedAuthorityProtocol.Ed25519
+    BoundedAuthorityProtocol.Es256
+    BoundedAuthorityProtocol.RoleAttestation.V1
+    BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts
+    BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation
+    BoundedAuthorityProtocol.RoleAttestation.V1.ExpectedAttestation
+    BoundedAuthorityProtocol.RoleAttestation.V1.RoleAttestation
+    BoundedAuthorityProtocol.V1
+    BoundedAuthorityProtocol.V1.AnchorFacts
+    BoundedAuthorityProtocol.V1.AnchoredExportFacts
+    BoundedAuthorityProtocol.V1.AnchoredExportInput
+    BoundedAuthorityProtocol.V1.ArchivedObject
+    BoundedAuthorityProtocol.V1.Base64Url
+    BoundedAuthorityProtocol.V1.BoundaryAnchor
+    BoundedAuthorityProtocol.V1.Bounds
+    BoundedAuthorityProtocol.V1.ChainFacts
+    BoundedAuthorityProtocol.V1.ChainInput
+    BoundedAuthorityProtocol.V1.ConsumptionEntry
+    BoundedAuthorityProtocol.V1.Credentials
+    BoundedAuthorityProtocol.V1.DecodedGrant
+    BoundedAuthorityProtocol.V1.DecodedProof
+    BoundedAuthorityProtocol.V1.EncodedAnchoredExport
+    BoundedAuthorityProtocol.V1.EncodedConsumptionEntry
+    BoundedAuthorityProtocol.V1.EnvelopeFacts
+    BoundedAuthorityProtocol.V1.ExpectedAnchor
+    BoundedAuthorityProtocol.V1.ExpectedAnchoredExport
+    BoundedAuthorityProtocol.V1.ExpectedChain
+    BoundedAuthorityProtocol.V1.ExpectedExport
+    BoundedAuthorityProtocol.V1.ExpectedGrant
+    BoundedAuthorityProtocol.V1.ExpectedKeyTransition
+    BoundedAuthorityProtocol.V1.ExpectedRequest
+    BoundedAuthorityProtocol.V1.Grant
+    BoundedAuthorityProtocol.V1.GrantFacts
+    BoundedAuthorityProtocol.V1.HistoricalKeyChain
+    BoundedAuthorityProtocol.V1.HistoricalPublicKey
+    BoundedAuthorityProtocol.V1.Jcs
+    BoundedAuthorityProtocol.V1.Json
+    BoundedAuthorityProtocol.V1.Jwk
+    BoundedAuthorityProtocol.V1.KeyLocator
+    BoundedAuthorityProtocol.V1.KeyTransition
+    BoundedAuthorityProtocol.V1.KeyTransitionFacts
+    BoundedAuthorityProtocol.V1.Operation
+    BoundedAuthorityProtocol.V1.Proof
+    BoundedAuthorityProtocol.V1.Selector
+    BoundedAuthorityProtocol.V1.SigningInput
+    BoundedAuthorityProtocol.V1.TrustedIssuer
+    BoundedAuthorityProtocol.V1.Uri
+    BoundedAuthorityProtocol.V2
+    BoundedAuthorityProtocol.V2.AnchorFacts
+    BoundedAuthorityProtocol.V2.AnchoredExportFacts
+    BoundedAuthorityProtocol.V2.ChainFacts
+    BoundedAuthorityProtocol.V2.DecodedGrant
+    BoundedAuthorityProtocol.V2.DecodedProof
+    BoundedAuthorityProtocol.V2.EnvelopeFacts
+    BoundedAuthorityProtocol.V2.Grant
+    BoundedAuthorityProtocol.V2.GrantFacts
+    BoundedAuthorityProtocol.V2.KeyTransitionFacts
+    BoundedAuthorityProtocol.V2.Operation
+    BoundedAuthorityProtocol.V2.Proof
+    BoundedAuthorityProtocol.V2.Selector
+    BoundedAuthorityProtocol.V3
+    BoundedAuthorityProtocol.V3.AnchorFacts
+    BoundedAuthorityProtocol.V3.AnchoredExportFacts
+    BoundedAuthorityProtocol.V3.ChainFacts
+    BoundedAuthorityProtocol.V3.DecodedGrant
+    BoundedAuthorityProtocol.V3.DecodedProof
+    BoundedAuthorityProtocol.V3.EcJwk
+    BoundedAuthorityProtocol.V3.EnvelopeFacts
+    BoundedAuthorityProtocol.V3.Grant
+    BoundedAuthorityProtocol.V3.GrantFacts
+    BoundedAuthorityProtocol.V3.KeyTransitionFacts
+    BoundedAuthorityProtocol.V3.Operation
+    BoundedAuthorityProtocol.V3.Proof
+    BoundedAuthorityProtocol.V3.Selector
+  )
+
+  # Exported but outside the stable surface: internal modules a caller can still reach, and
+  # undocumented helpers inside stable modules.
+  @excluded_surface ~w(
+    BoundedAuthorityProtocol.V1.Runtime
+    BoundedAuthorityProtocol.V2.Runtime
+    BoundedAuthorityProtocol.V3.Runtime
+    BoundedAuthorityProtocol.Conformance.Corpus
+    BoundedAuthorityProtocol.Conformance.Runner
+    BoundedAuthorityProtocol.Conformance.Report
+    BoundedAuthorityProtocol.Conformance.Cli.Main
+    BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1
+    BoundedAuthorityProtocol.Ed25519.signature_gate?/1
+    BoundedAuthorityProtocol.Ed25519.strict_gate?/2
+    BoundedAuthorityProtocol.V1.Selector.float_zero_free?/1
+    BoundedAuthorityProtocol.V1.Selector.integral_float_free?/1
+    BoundedAuthorityProtocol.V1.Selector.match_all/3
+    BoundedAuthorityProtocol.V1.Selector.semantic_equal?/2
+    BoundedAuthorityProtocol.V2.Selector.float_zero_free?/1
+    BoundedAuthorityProtocol.V2.Selector.integral_float_free?/1
+    BoundedAuthorityProtocol.V2.Selector.match_all/3
+    BoundedAuthorityProtocol.V2.Selector.semantic_equal?/2
+    BoundedAuthorityProtocol.V3.Selector.float_zero_free?/1
+    BoundedAuthorityProtocol.V3.Selector.integral_float_free?/1
+    BoundedAuthorityProtocol.V3.Selector.match_all/3
+    BoundedAuthorityProtocol.V3.Selector.semantic_equal?/2
+  )
+
+  # The exact field set of every stable struct (sorted). Adding a field with a default is a minor
+  # release and updates this pin in the same change; removing or renaming one is a 2.0.0.
+  @public_struct_fields %{
+    "BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertion" =>
+      ~w(attestor_key_id aud content_digest exp gen iat iss jti nbf prev profile profile_digest
+        sub)a,
+    "BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts" =>
+      ~w(attestor_key_fingerprint attestor_key_id aud content_digest digest exp gen iat iss jti
+        nbf prev profile profile_digest sub trust verification version)a,
+    "BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion" =>
+      ~w(attestor_key_id aud content_digest exp gen iat iss jti nbf prev profile profile_digest
+        sub verification version)a,
+    "BoundedAuthorityProtocol.ContentAssertion.V1.ExpectedContentAssertion" =>
+      ~w(attestor audience bounds content_digest issuer now profile profile_digest subject)a,
+    "BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts" =>
+      ~w(attestor_key_fingerprint attestor_key_id exp jti nbf role subject_key_fingerprint
+        subject_key_id trust verification version)a,
+    "BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation" =>
+      ~w(attestor_key_id exp jti key_id nbf public_key role verification version)a,
+    "BoundedAuthorityProtocol.RoleAttestation.V1.ExpectedAttestation" =>
+      ~w(attestor bounds now subject_key_id subject_public_key)a,
+    "BoundedAuthorityProtocol.RoleAttestation.V1.RoleAttestation" =>
+      ~w(attestor_key_id exp jti key_id nbf public_key role)a,
+    "BoundedAuthorityProtocol.V1.AnchorFacts" =>
+      ~w(anchor_id anchored_at chain_hash chain_id key_fingerprint sequence trust verification
+        version)a,
+    "BoundedAuthorityProtocol.V1.AnchoredExportFacts" =>
+      ~w(authorization chain_id digest end_anchor_id end_anchored_at end_key_fingerprint
+        first_sequence last_hash last_sequence previous_hash row_count start_anchor_id
+        start_anchored_at start_key_fingerprint transition_count trust verification version)a,
+    "BoundedAuthorityProtocol.V1.AnchoredExportInput" =>
+      ~w(end_anchor rows start_anchor transitions)a,
+    "BoundedAuthorityProtocol.V1.ArchivedObject" => ~w(chunks version)a,
+    "BoundedAuthorityProtocol.V1.BoundaryAnchor" =>
+      ~w(anchor_id anchored_at chain_hash chain_id key_id public_key sequence)a,
+    "BoundedAuthorityProtocol.V1.Bounds" =>
+      ~w(anchor_bytes archive_bytes archive_chunks archive_header_bytes array_items audiences
+        chain_row_bytes chain_rows clock_skew compact_bytes content_bytes decoded_segment_bytes
+        depth digest_bytes encoded_segment_bytes float_magnitude identifier_bytes
+        integer_magnitude jcs_bytes json_bytes key_bytes key_transitions kid_bytes method_bytes
+        nonce_bytes number_lexeme_bytes object_members object_version_bytes one_of_values
+        operation_bytes operations path_segments proof_max_age public_key_bytes selectors
+        signature_bytes string_bytes total_nodes uri_bytes)a,
+    "BoundedAuthorityProtocol.V1.ChainFacts" =>
+      ~w(chain_id first_sequence last_hash last_sequence previous_hash row_count trust
+        verification version)a,
+    "BoundedAuthorityProtocol.V1.ChainInput" => ~w(rows)a,
+    "BoundedAuthorityProtocol.V1.ConsumptionEntry" =>
+      ~w(chain_id commitment previous_hash sequence)a,
+    "BoundedAuthorityProtocol.V1.Credentials" => ~w(grant proof)a,
+    "BoundedAuthorityProtocol.V1.DecodedGrant" =>
+      ~w(audiences expires_at grant_id holder_thumbprint issued_at issuer key_id not_before
+        operations verification version)a,
+    "BoundedAuthorityProtocol.V1.DecodedProof" =>
+      ~w(grant_hash holder_public_key holder_thumbprint invocation_id issued_at method nonce
+        operation proof_id request_hash target_uri verification version)a,
+    "BoundedAuthorityProtocol.V1.EncodedAnchoredExport" => ~w(byte_count chunks digest)a,
+    "BoundedAuthorityProtocol.V1.EncodedConsumptionEntry" => ~w(bytes hash)a,
+    "BoundedAuthorityProtocol.V1.EnvelopeFacts" =>
+      ~w(authorization expires_at grant_hash grant_id holder_thumbprint invocation_id issued_at
+        issuer issuer_key_fingerprint matched_audience not_before operation proof_id
+        proof_issued_at request_hash target_uri version)a,
+    "BoundedAuthorityProtocol.V1.ExpectedAnchor" =>
+      ~w(anchor_id anchored_at bounds chain_hash chain_id key_fingerprint key_id sequence)a,
+    "BoundedAuthorityProtocol.V1.ExpectedAnchoredExport" =>
+      ~w(bounds chain digest end_anchor object_version start_anchor transitions)a,
+    "BoundedAuthorityProtocol.V1.ExpectedChain" =>
+      ~w(bounds chain_id first_sequence last_hash last_sequence previous_hash row_count)a,
+    "BoundedAuthorityProtocol.V1.ExpectedExport" =>
+      ~w(bounds chain end_anchor start_anchor transitions)a,
+    "BoundedAuthorityProtocol.V1.ExpectedGrant" =>
+      ~w(audience bounds clock_skew evaluation_time issuer)a,
+    "BoundedAuthorityProtocol.V1.ExpectedKeyTransition" =>
+      ~w(bounds chain_id current_key_fingerprint current_key_id effective_at
+        next_key_fingerprint next_key_id transition_id)a,
+    "BoundedAuthorityProtocol.V1.ExpectedRequest" =>
+      ~w(audience bounds cast_arguments clock_skew evaluation_time invocation_id issuer method
+        nonce operation proof_max_age target_uri trusted_issuer)a,
+    "BoundedAuthorityProtocol.V1.Grant" =>
+      ~w(audiences expires_at grant_id holder_thumbprint issued_at issuer key_id not_before
+        operations)a,
+    "BoundedAuthorityProtocol.V1.GrantFacts" =>
+      ~w(authorization expires_at grant_id holder_thumbprint issued_at issuer
+        issuer_key_fingerprint matched_audience not_before version)a,
+    "BoundedAuthorityProtocol.V1.HistoricalKeyChain" => ~w(keys)a,
+    "BoundedAuthorityProtocol.V1.HistoricalPublicKey" =>
+      ~w(key_id public_key valid_before valid_from)a,
+    "BoundedAuthorityProtocol.V1.KeyLocator" => ~w(kid trust)a,
+    "BoundedAuthorityProtocol.V1.KeyTransition" =>
+      ~w(chain_id current_key_id current_public_key effective_at next_key_id next_public_key
+        transition_id)a,
+    "BoundedAuthorityProtocol.V1.KeyTransitionFacts" =>
+      ~w(chain_id current_key_fingerprint effective_at next_key_fingerprint transition_id trust
+        verification version)a,
+    "BoundedAuthorityProtocol.V1.Operation" => ~w(name selectors)a,
+    "BoundedAuthorityProtocol.V1.Proof" =>
+      ~w(cast_arguments grant_compact holder_public_key invocation_id issued_at method nonce
+        operation proof_id target_uri)a,
+    "BoundedAuthorityProtocol.V1.SigningInput" =>
+      ~w(kind message payload_segment protected_segment)a,
+    "BoundedAuthorityProtocol.V1.TrustedIssuer" => ~w(key_id public_key)a,
+    "BoundedAuthorityProtocol.V2.AnchorFacts" =>
+      ~w(anchor_id anchored_at chain_hash chain_id key_fingerprint sequence trust verification
+        version)a,
+    "BoundedAuthorityProtocol.V2.AnchoredExportFacts" =>
+      ~w(authorization chain_id digest end_anchor_id end_anchored_at end_key_fingerprint
+        first_sequence last_hash last_sequence previous_hash row_count start_anchor_id
+        start_anchored_at start_key_fingerprint transition_count trust verification version)a,
+    "BoundedAuthorityProtocol.V2.ChainFacts" =>
+      ~w(chain_id first_sequence last_hash last_sequence previous_hash row_count trust
+        verification version)a,
+    "BoundedAuthorityProtocol.V2.DecodedGrant" =>
+      ~w(audiences expires_at grant_id holder_thumbprint issued_at issuer key_id not_before
+        operations verification version)a,
+    "BoundedAuthorityProtocol.V2.DecodedProof" =>
+      ~w(grant_hash holder_public_key holder_thumbprint invocation_id issued_at method nonce
+        operation proof_id request_hash target_uri verification version)a,
+    "BoundedAuthorityProtocol.V2.EnvelopeFacts" =>
+      ~w(authorization expires_at grant_hash grant_id holder_thumbprint invocation_id issued_at
+        issuer issuer_key_fingerprint matched_audience not_before operation proof_id
+        proof_issued_at request_hash target_uri version)a,
+    "BoundedAuthorityProtocol.V2.Grant" =>
+      ~w(audiences expires_at grant_id holder_thumbprint issued_at issuer key_id not_before
+        operations)a,
+    "BoundedAuthorityProtocol.V2.GrantFacts" =>
+      ~w(authorization expires_at grant_id holder_thumbprint issued_at issuer
+        issuer_key_fingerprint matched_audience not_before version)a,
+    "BoundedAuthorityProtocol.V2.KeyTransitionFacts" =>
+      ~w(chain_id current_key_fingerprint effective_at next_key_fingerprint transition_id trust
+        verification version)a,
+    "BoundedAuthorityProtocol.V2.Operation" => ~w(name selectors)a,
+    "BoundedAuthorityProtocol.V2.Proof" =>
+      ~w(cast_arguments grant_compact holder_public_key invocation_id issued_at method nonce
+        operation proof_id target_uri)a,
+    "BoundedAuthorityProtocol.V3.AnchorFacts" =>
+      ~w(anchor_id anchored_at chain_hash chain_id key_fingerprint sequence trust verification
+        version)a,
+    "BoundedAuthorityProtocol.V3.AnchoredExportFacts" =>
+      ~w(authorization chain_id digest end_anchor_id end_anchored_at end_key_fingerprint
+        first_sequence last_hash last_sequence previous_hash row_count start_anchor_id
+        start_anchored_at start_key_fingerprint transition_count trust verification version)a,
+    "BoundedAuthorityProtocol.V3.ChainFacts" =>
+      ~w(chain_id first_sequence last_hash last_sequence previous_hash row_count trust
+        verification version)a,
+    "BoundedAuthorityProtocol.V3.DecodedGrant" =>
+      ~w(audiences expires_at grant_id holder_thumbprint issued_at issuer key_id not_before
+        operations verification version)a,
+    "BoundedAuthorityProtocol.V3.DecodedProof" =>
+      ~w(grant_hash holder_public_key holder_thumbprint invocation_id issued_at method nonce
+        operation proof_id request_hash target_uri verification version)a,
+    "BoundedAuthorityProtocol.V3.EnvelopeFacts" =>
+      ~w(authorization expires_at grant_hash grant_id holder_thumbprint invocation_id issued_at
+        issuer issuer_key_fingerprint matched_audience not_before operation proof_id
+        proof_issued_at request_hash target_uri version)a,
+    "BoundedAuthorityProtocol.V3.Grant" =>
+      ~w(audiences expires_at grant_id holder_thumbprint issued_at issuer key_id not_before
+        operations)a,
+    "BoundedAuthorityProtocol.V3.GrantFacts" =>
+      ~w(authorization expires_at grant_id holder_thumbprint issued_at issuer
+        issuer_key_fingerprint matched_audience not_before version)a,
+    "BoundedAuthorityProtocol.V3.KeyTransitionFacts" =>
+      ~w(chain_id current_key_fingerprint effective_at next_key_fingerprint transition_id trust
+        verification version)a,
+    "BoundedAuthorityProtocol.V3.Operation" => ~w(name selectors)a,
+    "BoundedAuthorityProtocol.V3.Proof" =>
+      ~w(cast_arguments grant_compact holder_public_key invocation_id issued_at method nonce
+        operation proof_id target_uri)a
+  }
 
   @module_categories %{
     "Ecto" => :database,
@@ -884,6 +1187,20 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     (Map.keys(@compiled_export_allowances) ++ Map.keys(@compiled_dynamic_allowances))
     |> Enum.uniq()
   end
+
+  @doc "The package 1.x stable modules, as module-name strings."
+  @spec stable_modules() :: [binary()]
+  def stable_modules, do: @stable_modules
+
+  @doc """
+  Exported names outside the stable surface: module-name strings and `Module.fun/arity` strings.
+  """
+  @spec excluded_surface() :: [binary()]
+  def excluded_surface, do: @excluded_surface
+
+  @doc "The pinned field set of every stable struct, keyed by module-name string."
+  @spec public_struct_fields() :: %{binary() => [atom()]}
+  def public_struct_fields, do: @public_struct_fields
 
   @doc """
   Violations for pinned beams absent from `present` (a MapSet of compiled beam basenames). Pure and
@@ -1767,7 +2084,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     do: ~w(Enum)
 
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/cli.ex"),
-    do: ~w(File IO Path)
+    do: ~w(File IO Keyword Mix Path)
 
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/cli/main.ex"),
     do: ~w(Cli System)
@@ -2103,8 +2420,10 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   end
 
   # CLI I/O carve-out (C1): exact-path + exact-function allowances. cli.ex may use File.read/1,
-  # File.ls/1, File.write/2, File.dir?/1, IO.binwrite/2, and Path.join/2 (the only filesystem/io
-  # calls in the verification tool's loader/output path). No halt here.
+  # File.ls/1, File.lstat/1 (entries are inspected without following links), File.write/2,
+  # IO.binwrite/1,2 and Path.join/2 (the only filesystem/io calls in the verification tool's
+  # loader/output path), plus Mix.Project.config/0 and Keyword.fetch!/2 in the compile-time
+  # @version attribute (no Mix call reaches the compiled module). No halt here.
   defp approved_source_call?(
          "lib/bounded_authority_protocol/conformance/cli.ex",
          module,
@@ -2114,10 +2433,12 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          {module, function} in [
            {"File", :read},
            {"File", :ls},
+           {"File", :lstat},
            {"File", :write},
-           {"File", :dir?},
            {"IO", :binwrite},
+           {"Keyword", :fetch!},
            {"Map", :get},
+           {"Mix.Project", :config},
            {"Path", :join}
          ]
 
@@ -2183,7 +2504,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            {"Map", :delete},
            {"Map", :get},
            {"Map", :new},
-           {"String", :ends_with?}
+           {"String", :ends_with?},
+           {"String", :split}
          ] or function == :get
 
   defp approved_source_call?(
@@ -2820,7 +3142,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Map, :delete},
           {Map, :get},
           {Map, :new},
-          {String, :ends_with?}
+          {String, :ends_with?},
+          {String, :split}
         ]
 
       "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam" ->
@@ -2830,18 +3153,16 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Map, :get}
         ]
 
-      # CLI I/O carve-out compiled imports (C1): the exact File/IO/Path functions cli.ex uses,
-      # plus String.Chars.to_string (string interpolation in the relative-path joiner).
+      # CLI I/O carve-out compiled imports (C1): the exact File/IO/Path functions cli.ex uses.
       "Elixir.BoundedAuthorityProtocol.Conformance.Cli.beam" ->
         [
-          {File, :dir?},
           {File, :ls},
+          {File, :lstat},
           {File, :read},
           {File, :write},
           {IO, :binwrite},
           {Map, :get},
-          {Path, :join},
-          {String.Chars, :to_string}
+          {Path, :join}
         ]
 
       # cli/main.ex compiled imports: System.halt/1 only.

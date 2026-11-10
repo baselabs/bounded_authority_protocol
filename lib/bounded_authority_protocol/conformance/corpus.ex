@@ -1,40 +1,41 @@
 defmodule BoundedAuthorityProtocol.Conformance.Corpus do
-  @moduledoc """
-  Pure loader and integrity verifier for the portable conformance corpus.
+  @moduledoc false
 
-  `load/1` takes `%{path => binary}` (no I/O), decodes every `.json` file through
-  `BoundedAuthorityProtocol.V1.Json.decode/2` at `Bounds.maximum()`, and verifies every
-  corpus-integrity property named by the conformance contract:
-
-  - per-file SHA-256 (`.json` and `.raw`) against the index,
-  - exact file-set equality both directions,
-  - per-file and total case counts,
-  - corpus-wide case-id uniqueness,
-  - applicability totality (every surface exactly 28, every class leaf exactly 16, required cells
-    nonempty, `n_a` cells empty), and
-  - tamper verbatim-vs-derived byte equality and `.raw` hash binding.
-
-  `.raw` sidecars are hash-verified and carried as opaque binaries; they are never parsed.
-
-  Every failure returns the fixed value-free `{:error, :invalid}`. The loaded corpus carries
-  decoded cases, sidecar bytes, and the index for the runner and report.
-
-  `load_strict_ed25519/1` loads the additive strict-Ed25519 corpus (profile
-  `bap-strict-ed25519/1`), whose index has its own closed shape: per-file lowercase-hex SHA-256,
-  per-file and per-family case counts, a profile and a revision sidecar, and no applicability
-  matrix. The loaded corpus carries `major: :strict_ed25519`; each case names its own surface
-  and, for v1/v2-shaped families, its own contract-major.
-
-  `load_producer_canonicality/1` loads the additive producer-canonicality corpus (profile
-  `bap-producer-canonicality/1`, erratum 3) through the same closed index shape; it carries
-  `major: :producer_canonicality`.
-  """
+  # Internal to the conformance CLI (not public API). Pure loader and integrity verifier for the
+  # portable conformance corpora. Every loader takes `%{path => binary}` (no I/O), decodes every
+  # `.json` file through `V1.Json.decode/2` at `Bounds.maximum()`, verifies the corpus's own
+  # integrity properties, and returns the fixed value-free `{:error, :invalid}` on any failure.
+  #
+  # - `load/1`: a contract-major corpus (v1, v2, v3). Per-file SHA-256 (`.json` and `.raw`)
+  #   against the index, exact file-set equality, per-file and total case counts, corpus-wide
+  #   case-id uniqueness, applicability totality (every surface 28, every class leaf 16, required
+  #   cells nonempty, `n_a` cells empty), tamper verbatim-vs-derived byte equality and `.raw`
+  #   hash binding. `.raw` sidecars are hash-verified and carried opaque.
+  # - `load_strict_ed25519/1`, `load_producer_canonicality/1`, `load_selector_float_zero/1`: the
+  #   additive corpora, which share one closed index shape (per-file lowercase-hex SHA-256,
+  #   per-file and per-family counts, profile and revision sidecars, no applicability matrix).
+  # - `load_local_loopback_http/1`, `load_role_attestation/1`, `load_content_assertion/1`: the
+  #   sibling-profile corpora, each with its own closed index (an exact ordered file list with
+  #   lowercase-hex SHA-256 and per-kind case counts) and a `profile.json` the runner reads.
+  #
+  # `total_cases` is the census the CLI requires the runner to execute exactly: the index's
+  # `total_cases` for contract-major and additive corpora, the sum of the declared per-kind counts
+  # for sibling corpora (plus the local-loopback profile's certified proofs, which run as cases).
 
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Json
 
   @enforce_keys [:index, :index_bytes, :cases, :raws, :case_ids, :major]
-  defstruct [:index, :index_bytes, :cases, :raws, :case_ids, :major]
+  defstruct [
+    :index,
+    :index_bytes,
+    :cases,
+    :raws,
+    :case_ids,
+    :major,
+    profile: nil,
+    total_cases: nil
+  ]
 
   @type t :: %__MODULE__{
           index: map(),
@@ -42,7 +43,18 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
           cases: [{binary(), [map()]}],
           raws: %{binary() => binary()},
           case_ids: term(),
-          major: 1 | 2 | 3 | :strict_ed25519 | :producer_canonicality | :selector_float_zero
+          major:
+            1
+            | 2
+            | 3
+            | :strict_ed25519
+            | :producer_canonicality
+            | :selector_float_zero
+            | :local_loopback_http
+            | :role_attestation
+            | :content_assertion,
+          profile: map() | nil,
+          total_cases: non_neg_integer() | nil
         }
 
   # The index format string names the corpus's contract-major; the loader derives
@@ -88,12 +100,108 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
          cases: cases,
          raws: raws,
          case_ids: case_ids,
-         major: major
+         major: major,
+         total_cases: index["total_cases"]
        }}
     end
   end
 
   def load(_map), do: {:error, :invalid}
+
+  @doc """
+  Loads `map` with whichever loader accepts its index. Each loader accepts only its own index
+  format, so at most one can succeed; all fail closed.
+  """
+  @spec load_any(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
+  def load_any(map) do
+    with {:error, :invalid} <- load(map),
+         {:error, :invalid} <- load_strict_ed25519(map),
+         {:error, :invalid} <- load_producer_canonicality(map),
+         {:error, :invalid} <- load_selector_float_zero(map),
+         {:error, :invalid} <- load_local_loopback_http(map),
+         {:error, :invalid} <- load_role_attestation(map) do
+      load_content_assertion(map)
+    end
+  end
+
+  @doc """
+  The relative paths an index names, for the CLI to read and nothing else. Every path must be a
+  plain relative path: forward-slash segments, none empty, `.` or `..`, no backslash or NUL, and
+  never `index.json` itself. Duplicates are invalid.
+  """
+  @spec declared_paths(binary()) :: {:ok, [binary()]} | {:error, :invalid}
+  def declared_paths(index_bytes) when is_binary(index_bytes) do
+    with {:ok, %{"files" => files}} when is_list(files) <- decode_index(index_bytes),
+         {:ok, paths} <- collect_paths(files),
+         true <- length(paths) == MapSet.size(MapSet.new(paths)) do
+      {:ok, paths}
+    else
+      _invalid -> {:error, :invalid}
+    end
+  end
+
+  def declared_paths(_index_bytes), do: {:error, :invalid}
+
+  @doc """
+  `:ok` when every present path is `index.json` or a declared path; the CLI refuses a corpus
+  directory holding any file the index does not name.
+  """
+  @spec only_declared(present :: [binary()], declared :: [binary()]) :: :ok | {:error, :invalid}
+  def only_declared(present, declared) do
+    if present -- ["index.json" | declared] == [],
+      do: :ok,
+      else: {:error, :invalid}
+  end
+
+  @doc """
+  True when `results` are exactly the loaded census: unique case ids, the same id set as the
+  corpus, `total_cases` of them, and each under the file that declared it. The report requires
+  it for agreement.
+  """
+  @spec complete?(t(), [{binary(), [%{case_id: binary(), agree: boolean()}]}]) :: boolean()
+  def complete?(%__MODULE__{cases: cases, case_ids: case_ids, total_cases: total}, results)
+      when is_list(results) do
+    declared =
+      cases
+      |> Enum.flat_map(fn {path, list} -> Enum.map(list, &{&1["id"], path}) end)
+      |> Map.new()
+
+    executed =
+      Enum.flat_map(results, fn {path, list} ->
+        Enum.map(list, fn %{case_id: id} -> {id, path} end)
+      end)
+
+    unique = executed |> Enum.map(&elem(&1, 0)) |> MapSet.new()
+
+    length(executed) == total and MapSet.size(unique) == total and
+      MapSet.equal?(unique, case_ids) and
+      Enum.all?(executed, fn {id, path} -> Map.get(declared, id) == path end)
+  end
+
+  defp collect_paths(files) do
+    paths = Enum.map(files, &declared_path/1)
+    if Enum.all?(paths, &is_binary/1), do: {:ok, paths}, else: :error
+  end
+
+  defp declared_path(%{"path" => path}) when is_binary(path) do
+    if path == "index.json" or not String.valid?(path) or
+         not Enum.all?(String.split(path, "/"), &safe_segment?/1),
+       do: :invalid,
+       else: path
+  end
+
+  defp declared_path(_entry), do: :invalid
+
+  defp safe_segment?(""), do: false
+  defp safe_segment?("."), do: false
+  defp safe_segment?(".."), do: false
+  defp safe_segment?(segment), do: plain_bytes?(segment)
+
+  # No backslash (a Windows separator) and no NUL inside a segment.
+  defp plain_bytes?(<<>>), do: true
+  defp plain_bytes?(<<?\\, _rest::binary>>), do: false
+  defp plain_bytes?(<<0, _rest::binary>>), do: false
+  defp plain_bytes?(<<_byte, rest::binary>>), do: plain_bytes?(rest)
 
   # --- additive corpora (strict-Ed25519, producer-canonicality) -------------
 
@@ -185,7 +293,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
          cases: cases,
          raws: %{},
          case_ids: case_ids,
-         major: major
+         major: major,
+         total_cases: index["total_cases"]
        }}
     end
   end
@@ -313,6 +422,220 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   end
 
   defp sha256_hex(bytes), do: Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
+
+  # --- sibling-profile corpora ---------------------------------------------
+
+  # Each sibling corpus has a closed index: exactly these members, an exact ordered file list of
+  # {path, sha256} (lowercase hex), revision 1, and per-kind case counts. Each case is tagged with
+  # its kind here so the runner dispatches on data the loader verified.
+  @local_loopback_http %{
+    major: :local_loopback_http,
+    profile: "bap-application-proof/local-loopback-http/1",
+    index_keys: ["files", "profile", "proof_cases", "revision", "uri_cases"],
+    files: ["profile.json", "proof-cases.json"]
+  }
+
+  @role_attestation %{
+    major: :role_attestation,
+    profile: "bap-role-attestation/1",
+    index_keys: ["attestation_cases", "files", "profile", "revision"],
+    files: ["profile.json", "attestation-cases.json"]
+  }
+
+  @content_assertion %{
+    major: :content_assertion,
+    profile: "bap-content-assertion/1",
+    index_keys: [
+      "assertion_cases",
+      "digest_cases",
+      "files",
+      "private_material_tracked",
+      "profile",
+      "revision",
+      "successor_cases"
+    ],
+    files: [
+      "profile.json",
+      "digest-cases.json",
+      "assertion-structure-cases.json",
+      "assertion-verification-cases.json",
+      "successor-cases.json",
+      "content-base.raw",
+      "content-maximum.raw",
+      "content-over-limit.raw"
+    ]
+  }
+
+  @doc "Loads and integrity-verifies the local-loopback HTTP application-profile corpus map."
+  @spec load_local_loopback_http(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
+  def load_local_loopback_http(map) when is_map(map) do
+    with {:ok, index_bytes, index, profile} <- load_sibling(map, @local_loopback_http),
+         uri_cases when is_list(uri_cases) <- profile["uri_cases"],
+         proofs when is_map(proofs) and map_size(proofs) > 0 <- profile["proofs"],
+         {:ok, proof_cases} <- decode_case_list(map, "proof-cases.json"),
+         true <- length(uri_cases) == index["uri_cases"],
+         true <- length(proof_cases) == index["proof_cases"] do
+      certified =
+        proofs
+        |> Map.to_list()
+        |> Enum.sort_by(&elem(&1, 0))
+        |> Enum.map(fn {family, proof} -> certified_proof_case(family, proof) end)
+
+      cases = [
+        {"profile.json", tag_cases(uri_cases, "uri") ++ certified},
+        {"proof-cases.json", tag_cases(proof_cases, "proof")}
+      ]
+
+      sibling_corpus(index_bytes, index, profile, cases, %{}, :local_loopback_http)
+    else
+      _invalid -> {:error, :invalid}
+    end
+  end
+
+  def load_local_loopback_http(_map), do: {:error, :invalid}
+
+  @doc "Loads and integrity-verifies the role-attestation profile corpus map."
+  @spec load_role_attestation(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
+  def load_role_attestation(map) when is_map(map) do
+    with {:ok, index_bytes, index, profile} <- load_sibling(map, @role_attestation),
+         {:ok, cases} <- decode_case_list(map, "attestation-cases.json"),
+         true <- length(cases) == index["attestation_cases"] do
+      sibling_corpus(
+        index_bytes,
+        index,
+        profile,
+        [{"attestation-cases.json", tag_cases(cases, "attestation")}],
+        %{},
+        :role_attestation
+      )
+    else
+      _invalid -> {:error, :invalid}
+    end
+  end
+
+  def load_role_attestation(_map), do: {:error, :invalid}
+
+  @doc "Loads and integrity-verifies the content-assertion profile corpus map."
+  @spec load_content_assertion(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
+  def load_content_assertion(map) when is_map(map) do
+    with {:ok, index_bytes, index, profile} <- load_sibling(map, @content_assertion),
+         true <- index["private_material_tracked"] == false,
+         {:ok, digest} <- decode_case_list(map, "digest-cases.json"),
+         {:ok, structure} <- decode_case_list(map, "assertion-structure-cases.json"),
+         {:ok, verification} <- decode_case_list(map, "assertion-verification-cases.json"),
+         {:ok, successor} <- decode_case_list(map, "successor-cases.json"),
+         true <- length(digest) == index["digest_cases"],
+         true <- length(structure) + length(verification) == index["assertion_cases"],
+         true <- length(successor) == index["successor_cases"],
+         raws = content_raws(map),
+         true <- content_sidecar_bound?(profile, raws) do
+      cases = [
+        {"digest-cases.json", tag_cases(digest, "digest")},
+        {"assertion-structure-cases.json", tag_cases(structure, "assertion")},
+        {"assertion-verification-cases.json", tag_cases(verification, "assertion")},
+        {"successor-cases.json", tag_cases(successor, "successor")}
+      ]
+
+      sibling_corpus(index_bytes, index, profile, cases, raws, :content_assertion)
+    else
+      _invalid -> {:error, :invalid}
+    end
+  end
+
+  def load_content_assertion(_map), do: {:error, :invalid}
+
+  defp load_sibling(map, %{profile: profile_name, index_keys: keys, files: paths}) do
+    with {:ok, index_bytes} <- fetch_index(map),
+         {:ok, index} <- decode_index(index_bytes),
+         true <- exact_keys?(index, keys),
+         true <- index["profile"] == profile_name and index["revision"] == 1,
+         {:ok, files} <- sibling_files(index["files"]),
+         true <- Enum.map(files, &elem(&1, 0)) == paths,
+         :ok <- verify_file_set(Enum.map(files, fn {path, hash} -> {path, hash, 0} end), map),
+         true <- Enum.all?(files, fn {path, hash} -> additive_hash_matches?(map, path, hash) end),
+         {:ok, profile} <- decode_plain(map, "profile.json"),
+         true <- profile["profile"] == profile_name and profile["revision"] == 1 do
+      {:ok, index_bytes, index, profile}
+    else
+      _invalid -> {:error, :invalid}
+    end
+  end
+
+  defp exact_keys?(map, keys) do
+    present = Map.keys(map)
+    length(present) == length(keys) and present -- keys == []
+  end
+
+  defp sibling_files(entries) when is_list(entries) do
+    files = Enum.map(entries, &sibling_file/1)
+    if Enum.all?(files, &is_tuple/1), do: {:ok, files}, else: {:error, :invalid}
+  end
+
+  defp sibling_files(_entries), do: {:error, :invalid}
+
+  defp sibling_file(%{"path" => path, "sha256" => hash} = entry)
+       when is_binary(path) and is_binary(hash) and map_size(entry) == 2,
+       do: {path, hash}
+
+  defp sibling_file(_entry), do: :invalid
+
+  defp decode_case_list(map, path) do
+    with {:ok, bytes} <- fetch_path(map, path),
+         {:ok, {:array, items}} <- Json.decode(bytes, Bounds.maximum()),
+         cases = Enum.map(items, &to_plain/1),
+         true <- Enum.all?(cases, &sibling_case?/1) do
+      {:ok, cases}
+    else
+      _invalid -> {:error, :invalid}
+    end
+  end
+
+  defp sibling_case?(%{"id" => id}) when is_binary(id), do: true
+  defp sibling_case?(_case_obj), do: false
+
+  defp tag_cases(cases, kind), do: Enum.map(cases, &Map.put(&1, "kind", kind))
+
+  defp certified_proof_case(family, proof) when is_map(proof),
+    do: proof |> Map.put("id", "proofs/" <> family) |> Map.put("kind", "certified_proof")
+
+  defp certified_proof_case(family, _proof),
+    do: %{"id" => "proofs/" <> family, "kind" => "certified_proof"}
+
+  # load_sibling already proved every indexed file present with its digest.
+  defp content_raws(map) do
+    Map.new(["content-base.raw", "content-maximum.raw", "content-over-limit.raw"], fn path ->
+      bytes = Map.fetch!(map, path)
+      {path, {bytes, sha256_hex(bytes)}}
+    end)
+  end
+
+  # profile.json names the base content file and its digest; it must be one of the indexed raws.
+  defp content_sidecar_bound?(%{"content" => %{"path" => path, "sha256" => hash}}, raws) do
+    case Map.get(raws, path) do
+      {_bytes, ^hash} -> true
+      _other -> false
+    end
+  end
+
+  defp content_sidecar_bound?(_profile, _raws), do: false
+
+  defp sibling_corpus(index_bytes, index, profile, cases, raws, major) do
+    with :ok <- verify_case_ids(cases) do
+      total = Enum.reduce(cases, 0, fn {_path, list}, acc -> acc + length(list) end)
+
+      {:ok,
+       %__MODULE__{
+         index: index,
+         index_bytes: index_bytes,
+         cases: cases,
+         raws: raws,
+         case_ids: cases |> Enum.flat_map(&elem(&1, 1)) |> Enum.map(& &1["id"]) |> MapSet.new(),
+         major: major,
+         profile: profile,
+         total_cases: total
+       }}
+    end
+  end
 
   # --- index decoding ------------------------------------------------------
 

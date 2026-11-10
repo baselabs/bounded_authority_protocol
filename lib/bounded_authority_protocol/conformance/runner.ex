@@ -1,21 +1,20 @@
 defmodule BoundedAuthorityProtocol.Conformance.Runner do
-  @moduledoc """
-  Pure case executor for the loaded corpus.
+  @moduledoc false
 
-  `run/1` dispatches each case against the corpus's declared contract-major facade (the frozen
-  v1 facade or the v2 facade; version-neutral primitive surfaces execute the shared modules)
-  and compares the result to the case-declared expectation. `.raw` sidecar bytes pass through
-  opaque. Every case result is `%{"actual" => ..., "agree" => boolean}` for a valid expectation or
-  `%{"actual" => ..., "agree" => boolean}` for an invalid expectation (agreement = the facade
-  returned `{:error, :invalid}` exactly). The runner never selects trust, reserves replay, or
-  checks revocation — it exercises the pure facade only.
-
-  A strict-Ed25519 corpus (`major: :strict_ed25519`) runs each case on the surface it names:
-  v1/v2-shaped cases through the same dispatch as their own contract-major; `ed25519.*` cases
-  through `BoundedAuthorityProtocol.Ed25519`; and the loopback, role-attestation and
-  content-assertion cases through those profiles' facades, comparing every verdict the case
-  declares.
-  """
+  # Internal to the conformance CLI (not public API). Pure case executor for a loaded corpus.
+  #
+  # `run/1` executes every case the loader returned and reports `%{case_id, agree}` per case,
+  # grouped by the file that declared it. Contract-major cases dispatch to their major's façade
+  # (version-neutral primitive surfaces run the shared modules) and agree when the result matches
+  # the declared expectation exactly; an `invalid` expectation agrees only with
+  # `{:error, :invalid}`. The additive corpora run each case on the surface (and, where named,
+  # the contract-major or sibling profile) it declares: strict-Ed25519 through the façades and
+  # `BoundedAuthorityProtocol.Ed25519`, producer-canonicality through the producers and sibling
+  # assemblers, selector float-zero through each major's grant and envelope surfaces. The
+  # sibling-profile corpora run through their own façades with the loaded profile.json as
+  # context, comparing every verdict each case declares (decode, verify, envelope, producer
+  # bytes, cross-profile rejection). `.raw` sidecar bytes pass through opaque. The runner never
+  # selects trust, reserves replay, or checks revocation.
 
   alias BoundedAuthorityProtocol.Conformance.Corpus
   alias BoundedAuthorityProtocol.V1.AnchoredExportInput
@@ -117,11 +116,24 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     "archive_chunks" => :archive_chunks,
     "archive_bytes" => :archive_bytes,
     "object_version_bytes" => :object_version_bytes,
-    "key_transitions" => :key_transitions
+    "key_transitions" => :key_transitions,
+    "content_bytes" => :content_bytes
   }
 
   @doc "Executes every loaded case against the frozen facade."
   @spec run(Corpus.t()) :: [{binary(), [%{case_id: binary(), agree: boolean()}]}]
+  def run(%Corpus{cases: cases, raws: raws, major: major, profile: profile})
+      when major in [:local_loopback_http, :role_attestation, :content_assertion] do
+    Enum.map(cases, fn {path, file_cases} ->
+      results =
+        Enum.map(file_cases, fn case_obj ->
+          %{case_id: case_obj["id"], agree: sibling_agrees?(major, case_obj, profile, raws)}
+        end)
+
+      {path, results}
+    end)
+  end
+
   def run(%Corpus{cases: cases, raws: raws, major: major}) do
     Enum.map(cases, fn {path, file_cases} ->
       results = Enum.map(file_cases, fn case_obj -> execute_case(case_obj, raws, major) end)
@@ -318,6 +330,416 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
 
   defp untext(input), do: {:ok, input}
 
+  # --- sibling-profile corpora ---------------------------------------------
+
+  # The loader tags every case with its kind and carries the decoded profile.json; each kind
+  # compares every verdict its case declares. A malformed case never agrees.
+  defp sibling_agrees?(:local_loopback_http, %{"kind" => "uri"} = case_obj, _profile, _raws) do
+    actual =
+      BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.normalize_uri(
+        case_obj["input"],
+        %{}
+      )
+
+    case case_obj do
+      %{"valid" => true, "normalized" => normalized} -> actual == {:ok, normalized}
+      %{"valid" => false} -> actual == {:error, :invalid}
+      _malformed -> false
+    end
+  end
+
+  defp sibling_agrees?(
+         :local_loopback_http,
+         %{"kind" => "certified_proof"} = certified,
+         profile,
+         _raws
+       ) do
+    request = Map.get(profile, "request", %{})
+
+    with {:ok, compact} <- fetch_binary(certified, "compact"),
+         [protected, payload, encoded_signature] <- String.split(compact, "."),
+         {:ok, signature} <- decode_b64_item(encoded_signature),
+         {:ok, holder_public_key} <- b64_field(profile, "holder_public_key"),
+         {:ok, cast_arguments} <- json_field(request, "cast_arguments"),
+         {:ok, expected} <- loopback_expected(profile, certified),
+         proof = %Proof{
+           holder_public_key: holder_public_key,
+           proof_id: certified["proof_id"],
+           method: request["method"],
+           target_uri: certified["target_uri"],
+           issued_at: request["evaluation_time"],
+           nonce: certified["nonce"],
+           invocation_id: request["invocation_id"],
+           operation: request["operation"],
+           grant_compact: profile["grant_compact"],
+           cast_arguments: cast_arguments
+         },
+         {:ok, %SigningInput{protected_segment: ^protected, payload_segment: ^payload} = input} <-
+           BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.proof_signing_input(
+             proof,
+             %{}
+           ),
+         {:ok, ^compact} <-
+           BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.assemble_compact(
+             input,
+             signature,
+             %{}
+           ),
+         {:ok, _decoded} <-
+           BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.decode_proof(
+             compact,
+             %{}
+           ),
+         {:ok, _facts} <-
+           BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.check_envelope(
+             %Credentials{grant: profile["grant_compact"], proof: compact},
+             expected
+           ) do
+      true
+    else
+      _disagree -> false
+    end
+  end
+
+  defp sibling_agrees?(:local_loopback_http, %{"kind" => "proof"} = case_obj, profile, _raws) do
+    ipv4 = profile |> Map.get("proofs", %{}) |> Map.get("ipv4", %{})
+    compact = case_obj["compact"]
+
+    with true <- is_binary(compact),
+         {:ok, expected} <- loopback_expected(profile, ipv4),
+         {:ok, expected} <- loopback_overrides(expected, Map.get(case_obj, "expected_overrides")) do
+      envelope =
+        BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.check_envelope(
+          %Credentials{grant: profile["grant_compact"], proof: compact},
+          expected
+        )
+
+      verdicts_agree?(case_obj, [
+        {"decode_local",
+         BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.decode_proof(
+           compact,
+           %{}
+         )},
+        {"decode_standard", BoundedAuthorityProtocol.V1.decode_proof(compact, %{})},
+        {"envelope_local", envelope}
+      ])
+    else
+      _malformed -> false
+    end
+  end
+
+  defp sibling_agrees?(:role_attestation, %{"kind" => "attestation"} = case_obj, profile, _raws) do
+    compact = case_obj["compact"]
+
+    with true <- is_binary(compact),
+         {:ok, context} <-
+           attestation_context(profile, Map.get(case_obj, "expected_overrides", %{})),
+         {:ok, expected} <- build_expected_attestation(context) do
+      standard = BoundedAuthorityProtocol.V1.decode_grant(compact, %{})
+
+      verdicts_agree?(case_obj, [
+        {"decode", BoundedAuthorityProtocol.RoleAttestation.V1.decode_attestation(compact, %{})},
+        {"verify",
+         BoundedAuthorityProtocol.RoleAttestation.V1.verify_attestation(compact, expected)}
+      ]) and match?({:ok, _grant}, standard) == Map.get(case_obj, "v1_grant", false) and
+        V2Facade.decode_grant(compact, %{}) == {:error, :invalid} and
+        V3Facade.decode_grant(compact, %{}) == {:error, :invalid}
+    else
+      _malformed -> false
+    end
+  end
+
+  defp sibling_agrees?(:content_assertion, %{"kind" => "digest"} = case_obj, _profile, raws) do
+    input = Map.get(case_obj, "input", %{})
+    expected = Map.get(case_obj, "expected", %{})
+
+    with {:ok, content} <- assertion_content(input, raws),
+         {:ok, limits} <- case_bounds(input) do
+      case {BoundedAuthorityProtocol.ContentAssertion.V1.content_digest(content, limits),
+            expected} do
+        {{:ok, digest}, %{"verdict" => "valid", "digest" => encoded}} ->
+          decode_b64_item(encoded) == {:ok, digest}
+
+        {{:error, :invalid}, %{"verdict" => "invalid"}} ->
+          true
+
+        _disagree ->
+          false
+      end
+    else
+      _malformed -> false
+    end
+  end
+
+  defp sibling_agrees?(:content_assertion, %{"kind" => "assertion"} = case_obj, profile, _raws) do
+    compact = case_obj["compact"]
+    declared = Map.get(case_obj, "expected", %{})
+
+    with true <- is_binary(compact),
+         {:ok, limits} <- case_bounds(case_obj),
+         {:ok, expected} <- content_expected(profile, case_obj, limits) do
+      decoded = BoundedAuthorityProtocol.ContentAssertion.V1.decode_assertion(compact, limits)
+      verified = BoundedAuthorityProtocol.ContentAssertion.V1.verify_assertion(compact, expected)
+
+      verdict_name(decoded) == declared["decode"] and
+        verdict_name(verified) == declared["verify"] and
+        legacy_agrees?(compact, Map.get(case_obj, "legacy_accepts", [])) and
+        assertion_round_trips?(decoded, compact, limits)
+    else
+      _malformed -> false
+    end
+  end
+
+  defp sibling_agrees?(:content_assertion, %{"kind" => "successor"} = case_obj, profile, _raws) do
+    predecessor = Map.get(case_obj, "predecessor", %{})
+    successor = Map.get(case_obj, "successor", %{})
+    declared = Map.get(case_obj, "expected", %{})
+
+    with {:ok, limits} <- case_bounds(case_obj),
+         {:ok, previous} <- side_verdict(profile, predecessor),
+         {:ok, next} <- side_verdict(profile, successor),
+         {:ok, relation} <- successor_relation(previous, next, predecessor, successor, limits) do
+      verdict_name(previous) == declared["predecessor"] and
+        verdict_name(next) == declared["successor"] and relation == declared["relation"]
+    else
+      _malformed -> false
+    end
+  end
+
+  defp sibling_agrees?(_major, _case_obj, _profile, _raws), do: false
+
+  defp loopback_expected(profile, proof) do
+    build_loopback_request(%{
+      "grant" => profile["grant_compact"],
+      "issuer" => Map.get(profile, "issuer", %{}),
+      "request" => Map.get(profile, "request", %{}),
+      "target_uri" => proof["target_uri"],
+      "nonce" => proof["nonce"]
+    })
+  end
+
+  defp loopback_overrides(expected, nil), do: {:ok, expected}
+
+  defp loopback_overrides(expected, %{"trusted_issuer_public_key" => encoded} = overrides)
+       when map_size(overrides) == 1 do
+    with {:ok, public_key} <- decode_b64_item(encoded) do
+      {:ok, %{expected | trusted_issuer: %{expected.trusted_issuer | public_key: public_key}}}
+    end
+  end
+
+  defp loopback_overrides(expected, %{"invocation_id" => invocation_id} = overrides)
+       when map_size(overrides) == 1 and is_binary(invocation_id),
+       do: {:ok, %{expected | invocation_id: invocation_id}}
+
+  defp loopback_overrides(_expected, _overrides), do: {:error, :invalid}
+
+  @attestation_override_keys [
+    "attestor_public_key",
+    "now",
+    "subject_key_id",
+    "subject_public_key"
+  ]
+
+  # The profile's attestor, subject and evaluation time, with the case's closed overrides applied.
+  defp attestation_context(profile, overrides) when is_map(overrides) do
+    if Enum.all?(overrides, fn {key, _value} -> member?(@attestation_override_keys, key) end) do
+      attestor = Map.get(profile, "attestor", %{})
+      subject = Map.get(profile, "subject", %{})
+
+      {:ok,
+       %{
+         "attestor" => override_key(attestor, "public_key", overrides, "attestor_public_key"),
+         "subject" =>
+           subject
+           |> override_key("key_id", overrides, "subject_key_id")
+           |> override_key("public_key", overrides, "subject_public_key"),
+         "now" => Map.get(overrides, "now", profile["now"])
+       }}
+    else
+      {:error, :invalid}
+    end
+  end
+
+  defp attestation_context(_profile, _overrides), do: {:error, :invalid}
+
+  defp override_key(map, key, overrides, override) do
+    case Map.fetch(overrides, override) do
+      {:ok, value} -> Map.put(map, key, value)
+      :error -> map
+    end
+  end
+
+  defp assertion_content(%{"content_file" => path}, raws) do
+    case Map.get(raws, path) do
+      {bytes, _hash} -> {:ok, bytes}
+      nil -> {:error, :invalid}
+    end
+  end
+
+  defp assertion_content(%{"content_base64url" => encoded}, _raws), do: decode_b64_item(encoded)
+  defp assertion_content(_input, _raws), do: {:error, :invalid}
+
+  defp case_bounds(case_obj) do
+    case Map.get(case_obj, "bounds", %{}) do
+      overrides when is_map(overrides) ->
+        case normalize_bounds_overrides(overrides) do
+          {:ok, limits} -> {:ok, limits}
+          :error -> {:error, :invalid}
+        end
+
+      _malformed ->
+        {:error, :invalid}
+    end
+  end
+
+  # The expected context: the profile's defaults with the case's overrides, and the named attestor
+  # key (the profile's primary key unless the case names another) with its own overrides.
+  defp content_expected(profile, case_obj, limits) do
+    overrides = Map.get(case_obj, "expected_overrides", %{})
+    key_name = Map.get(case_obj, "attestor", "primary")
+
+    with true <- is_map(overrides),
+         attestors when is_map(attestors) <- Map.get(profile, "attestors"),
+         key when is_map(key) <- Map.get(attestors, key_name),
+         context when is_map(context) <- profile["expected"] do
+      attestor =
+        key
+        |> override_key("key_id", overrides, "attestor_key_id")
+        |> override_key("public_key", overrides, "attestor_public_key")
+        |> override_key("valid_from", overrides, "attestor_valid_from")
+        |> override_key("valid_before", overrides, "attestor_valid_before")
+
+      with {:ok, expected} <-
+             build_expected_assertion(%{
+               "attestor" => attestor,
+               "expected_context" => Map.merge(context, overrides)
+             }) do
+        {:ok, %{expected | bounds: limits}}
+      end
+    else
+      _malformed -> {:error, :invalid}
+    end
+  end
+
+  # Every other profile's decoder accepts exactly the decoders the case lists.
+  defp legacy_agrees?(compact, accepts) when is_list(accepts) do
+    [
+      {"v1_grant", BoundedAuthorityProtocol.V1.decode_grant(compact, %{})},
+      {"v2_grant", V2Facade.decode_grant(compact, %{})},
+      {"v3_grant", V3Facade.decode_grant(compact, %{})},
+      {"loopback",
+       BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.decode_proof(compact, %{})},
+      {"role_attestation",
+       BoundedAuthorityProtocol.RoleAttestation.V1.decode_attestation(compact, %{})}
+    ]
+    |> Enum.all?(fn {name, result} ->
+      match?({:ok, _value}, result) == member?(accepts, name)
+    end)
+  end
+
+  defp legacy_agrees?(_compact, _accepts), do: false
+
+  defp member?([item | _rest], item), do: true
+  defp member?([_other | rest], item), do: member?(rest, item)
+  defp member?(_list, _item), do: false
+
+  # A decoded assertion re-produces its exact signing input, compact and digest.
+  defp assertion_round_trips?({:ok, decoded}, compact, limits) do
+    assertion = %BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertion{
+      attestor_key_id: decoded.attestor_key_id,
+      jti: decoded.jti,
+      iss: decoded.iss,
+      aud: decoded.aud,
+      sub: decoded.sub,
+      profile: decoded.profile,
+      profile_digest: decoded.profile_digest,
+      content_digest: decoded.content_digest,
+      gen: decoded.gen,
+      prev: decoded.prev,
+      iat: decoded.iat,
+      nbf: decoded.nbf,
+      exp: decoded.exp
+    }
+
+    with [header, payload, encoded_signature] <- String.split(compact, "."),
+         {:ok, signature} <- decode_b64_item(encoded_signature),
+         {:ok, input} <-
+           BoundedAuthorityProtocol.ContentAssertion.V1.assertion_signing_input(assertion, limits),
+         true <- input.message == header <> "." <> payload,
+         {:ok, ^compact} <-
+           BoundedAuthorityProtocol.ContentAssertion.V1.assemble_compact(input, signature, limits) do
+      BoundedAuthorityProtocol.ContentAssertion.V1.assertion_digest(compact, limits) ==
+        {:ok, :crypto.hash(:sha256, compact)}
+    else
+      _disagree -> false
+    end
+  end
+
+  defp assertion_round_trips?(_decoded, _compact, _limits), do: true
+
+  defp side_verdict(profile, side) do
+    with {:ok, limits} <- case_bounds(side),
+         compact when is_binary(compact) <- side["compact"],
+         {:ok, expected} <- content_expected(profile, side, limits) do
+      {:ok, BoundedAuthorityProtocol.ContentAssertion.V1.verify_assertion(compact, expected)}
+    else
+      _malformed -> {:error, :malformed}
+    end
+  end
+
+  defp successor_relation({:ok, previous}, {:ok, next}, predecessor, successor, limits) do
+    with {:ok, previous} <- override_facts(previous, Map.get(predecessor, "facts_overrides", %{})),
+         {:ok, next} <- override_facts(next, Map.get(successor, "facts_overrides", %{})) do
+      {:ok,
+       verdict_name(
+         BoundedAuthorityProtocol.ContentAssertion.V1.verify_successor(previous, next, limits)
+       )}
+    end
+  end
+
+  defp successor_relation(_previous, _next, _predecessor, _successor, _limits),
+    do: {:ok, "not_run"}
+
+  # Closed string -> field maps for the facts a successor case may override; raw-byte fields
+  # travel base64url and the two posture fields as their atom names.
+  @facts_raw_fields %{
+    "digest" => :digest,
+    "profile_digest" => :profile_digest,
+    "content_digest" => :content_digest,
+    "prev" => :prev,
+    "attestor_key_fingerprint" => :attestor_key_fingerprint
+  }
+  @facts_posture_fields %{"verification" => :verification, "trust" => :trust}
+  @facts_postures %{
+    "not_evaluated" => :not_evaluated,
+    "evaluated" => :evaluated,
+    "signature_and_window" => :signature_and_window
+  }
+
+  defp override_facts(facts, overrides) when is_map(overrides) do
+    Enum.reduce_while(overrides, {:ok, facts}, fn {field, value}, {:ok, acc} ->
+      case override_fact(field, value) do
+        {:ok, key, parsed} -> {:cont, {:ok, Map.put(acc, key, parsed)}}
+        _invalid -> {:halt, {:error, :invalid}}
+      end
+    end)
+  end
+
+  defp override_facts(_facts, _overrides), do: {:error, :invalid}
+
+  defp override_fact(field, value) do
+    case {Map.fetch(@facts_raw_fields, field), Map.fetch(@facts_posture_fields, field)} do
+      {{:ok, key}, :error} ->
+        with {:ok, raw} <- decode_b64_item(value), do: {:ok, key, raw}
+
+      {:error, {:ok, key}} ->
+        with {:ok, posture} <- Map.fetch(@facts_postures, value), do: {:ok, key, posture}
+
+      _unknown ->
+        {:error, :invalid}
+    end
+  end
+
   defp profile_signing_kind("bap-application-proof/local-loopback-http/1"),
     do: {:ok, "local_loopback_http_proof"}
 
@@ -368,6 +790,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end)
   end
 
+  defp verdict_name(:ok), do: "valid"
   defp verdict_name({:ok, _value}), do: "valid"
   defp verdict_name(_error), do: "invalid"
 
@@ -1445,9 +1868,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     {:ok, {:one_of, path, Enum.map(values, &to_tagged/1)}}
   end
 
-  # The inclusive range kinds exist in the v2-and-later selector algebra (ADR 0028; the
-  # v3 profile inherits the five-kind set per ADR 0035); the v1 builder admits no
-  # reserved-kind tuple.
+  # The inclusive range kinds exist in the selector algebra of contract-major 2 and later
+  # (contract-major 3 inherits the five-kind set); the v1 builder admits no reserved-kind tuple.
   defp build_selector(%{"kind" => "lte", "path" => path, "value" => value}, major)
        when major in [2, 3] and is_list(path) do
     {:ok, {:lte, path, to_tagged(value)}}

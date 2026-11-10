@@ -1,12 +1,14 @@
 defmodule BoundedAuthorityProtocol.Conformance.Report do
-  @moduledoc """
-  Pure report builder for the loaded corpus and runner results.
+  @moduledoc false
 
-  `build/2` computes overall agreement (every case agreed with its expectation), the exit
-  status (0 on complete agreement, 1 otherwise), and the applicability matrix summary.
-  `to_bytes/2` emits deterministic JCS-canonical report bytes through the package's own
-  `V1.Jcs.encode/2` — one canonicalizer, no second encoder.
-  """
+  # Internal to the conformance CLI (not public API). Pure report builder for a loaded corpus and
+  # its runner results. `build/2` computes agreement and the exit status; `to_bytes/2` emits the
+  # deterministic JCS report bytes through the package's own `V1.Jcs.encode/2`.
+  #
+  # Agreement needs more than zero disagreements: the results must be the loaded census exactly.
+  # Executed case ids are unique, their set equals the certified corpus's `case_ids`, their count
+  # equals the corpus's `total_cases`, and every result sits under the file that declared its
+  # case. A runner that dropped, duplicated, invented or misfiled a case cannot report agreement.
 
   alias BoundedAuthorityProtocol.Conformance.Corpus
   alias BoundedAuthorityProtocol.V1.Bounds
@@ -19,7 +21,10 @@ defmodule BoundedAuthorityProtocol.Conformance.Report do
     :strict_ed25519 => "bounded-authority-protocol-strict-ed25519-conformance-report",
     :producer_canonicality =>
       "bounded-authority-protocol-producer-canonicality-conformance-report",
-    :selector_float_zero => "bounded-authority-protocol-selector-float-zero-conformance-report"
+    :selector_float_zero => "bounded-authority-protocol-selector-float-zero-conformance-report",
+    :local_loopback_http => "bounded-authority-protocol-local-loopback-http-conformance-report",
+    :role_attestation => "bounded-authority-protocol-role-attestation-conformance-report",
+    :content_assertion => "bounded-authority-protocol-content-assertion-conformance-report"
   }
 
   @enforce_keys [:agreement, :exit_status, :total, :agreed, :disagreed]
@@ -35,7 +40,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Report do
 
   @doc "Builds the agreement report from the loaded corpus and runner results."
   @spec build(Corpus.t(), [{binary(), [%{case_id: binary(), agree: boolean()}]}]) :: t()
-  def build(%Corpus{}, results) do
+  def build(%Corpus{} = corpus, results) do
     all = results |> Enum.flat_map(&elem(&1, 1))
 
     total = length(all)
@@ -45,7 +50,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Report do
     # zero disagreements. Without the `total > 0` floor an empty-but-valid corpus (total_cases:0,
     # files:[], every applicability cell n_a) passes integrity and reports agreement -> exit 0,
     # which is the vacuous-conformance-green failure the CLI's required --corpus exists to kill.
-    agreement = total > 0 and disagreed == 0
+    agreement = total > 0 and disagreed == 0 and Corpus.complete?(corpus, results)
 
     %__MODULE__{
       agreement: agreement,
@@ -79,8 +84,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Report do
 
   @doc """
   The canonical corpus identity: base64url of the SHA-256 of the exact `index.json` bytes the run
-  loaded. Recomputed at load; bound into the report and asserted against the certified snapshot by
-  the CLI (ADR 0014 D4 — parity with the SDK runners, which pin the same value).
+  loaded. Recomputed at load; bound into the report and asserted by the CLI against the certified
+  snapshot (the SDK runners pin the same values).
   """
   @spec index_identity(binary()) :: binary()
   def index_identity(index_bytes) do
