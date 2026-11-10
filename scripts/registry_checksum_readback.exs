@@ -130,7 +130,13 @@ defmodule BoundedAuthorityProtocol.RegistryChecksumReadback do
   defp registry_checksum(version) do
     {:ok, _apps} = Application.ensure_all_started([:inets, :ssl])
 
-    request = {String.to_charlist(@api <> version), [{~c"accept", ~c"application/json"}]}
+    # The Hex API answers HTTP 400 to a request without a User-Agent.
+    headers = [
+      {~c"accept", ~c"application/json"},
+      {~c"user-agent", ~c"bounded_authority_protocol-registry-readback"}
+    ]
+
+    request = {String.to_charlist(@api <> version), headers}
 
     ssl = [
       verify: :verify_peer,
