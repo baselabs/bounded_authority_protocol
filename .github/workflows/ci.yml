@@ -143,8 +143,12 @@ jobs:
           echo "6eac9c860c823a1d47c13c47cff04f91f3c6e02f699f9a64800b4bbf15e6989f  /tmp/kramdown-rfc.gem" | sha256sum -c -
           gem install /tmp/kramdown-rfc.gem
 
+      # The specification carries no YAML front matter (HexDocs printed it as text); kramdown-rfc
+      # needs one, so the render prepends this CI-only header.
       - name: Render spec/bap-v1.md through kramdown-rfc
-        run: kramdown-rfc spec/bap-v1.md > /tmp/bap-v1.xml
+        run: |
+          cat .github/spec-render/bap-v1-front-matter.md spec/bap-v1.md > /tmp/bap-v1.md
+          kramdown-rfc /tmp/bap-v1.md > /tmp/bap-v1.xml
 
       - name: Rendered output is a nonempty xml2rfc v3 document
         run: grep -q '<rfc ' /tmp/bap-v1.xml
