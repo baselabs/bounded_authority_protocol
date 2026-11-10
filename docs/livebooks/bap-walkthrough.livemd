@@ -1,6 +1,4 @@
-<!-- livebook:{"persist_outputs":true} -->
-
-# Bounded Authority Protocol — end-to-end walkthrough
+# Bounded Authority Protocol: end-to-end walkthrough
 
 ```elixir
 Mix.install([
@@ -10,21 +8,26 @@ Mix.install([
 
 ## What this notebook covers
 
-The setup cell installs release 0.9.1 from public Hex. The immutable package identity is the
-published Hex release; the source tag provides reviewable release evidence.
-
-The full produce → assemble → verify → reject loop with the verifier package alone. We mint
-our OWN ephemeral Ed25519 and P-256 keys at runtime (nothing tracked, nothing persisted — the
-package accepts public keys only; the notebook does the signing, the package does the
-verifying), build a grant and a proof through the package's deterministic producers, verify
-the envelope, and then watch every classic attack fail.
+This notebook runs the full produce, assemble, verify, and reject loop with the verifier package
+alone. It mints its own ephemeral Ed25519 and P-256 keys at runtime: nothing is tracked or
+persisted. The package accepts public keys only, so the notebook does the signing and the package
+does the verifying. It builds a grant and a proof through the package's deterministic producers,
+verifies the envelope, and then watches each classic attack fail.
 
 The later sections cover the local-loopback, role-attestation, and content-assertion sibling
-profiles; strict Ed25519 verification (rule S1), with forged keys and signatures taken from the
-certified strict-Ed25519 corpus; and contract-major 3, the ES256 suite.
+profiles; strict Ed25519 verification, with forged keys and signatures taken from the certified
+strict-Ed25519 corpus; and contract-major 3, the ES256 suite.
 
-Run top to bottom. Rerunning the notebook mints fresh keys and produces different bytes with the
-same verdicts. The only file it reads is the certified corpus that ships inside the package.
+Run it top to bottom. A rerun mints fresh keys and produces different bytes with the same
+verdicts. After each cell, the text states the value the cell returns; the package's test suite
+runs this notebook and checks every one of those statements. The only file the notebook reads
+is the certified corpus that ships inside the package.
+
+Two companion notebooks continue from here:
+[service integration](https://hexdocs.pm/bounded_authority_protocol/service-integration.html)
+(key rotation, nonces, clocks, diagnosing a rejection) and
+[chains and archives](https://hexdocs.pm/bounded_authority_protocol/chains-and-archives.html)
+(consumption chains, boundary anchors, key transitions, anchored exports).
 
 ## 1. Ephemeral keys
 
@@ -35,8 +38,11 @@ same verdicts. The only file it reads is the certified corpus that ships inside 
 {:ok, holder_thumbprint} =
   BoundedAuthorityProtocol.V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
 
-%{issuer_public: issuer_public, holder_thumbprint_raw: holder_thumbprint}
+{byte_size(issuer_public), byte_size(holder_thumbprint)}
 ```
+
+The cell returns `{32, 32}`: a raw 32-byte Ed25519 public key, and the raw 32-byte RFC 7638
+thumbprint of the holder key that the grant will name.
 
 ## 2. Build and sign a grant
 
@@ -71,10 +77,13 @@ issuer_signature = :crypto.sign(:eddsa, :none, signing_input.message, [issuer_pr
 grant_compact
 ```
 
+The cell's value matches `"eyJ" <> _`: a compact JWS whose first segment is the base64url form of
+the protected header `{"alg":"EdDSA",…}`. The signature is fresh on every run.
+
 ## 3. Build and sign the holder proof
 
-The proof binds THIS grant (via `ath`, the digest of the exact grant compact bytes), THIS
-request (via the server-derived operation and typed arguments), and THIS context.
+The proof binds this grant (through `ath`, the digest of the exact grant compact bytes), this
+request (through the server-derived operation and typed arguments), and this context.
 
 ```elixir
 alias BoundedAuthorityProtocol.V1.Proof
@@ -105,10 +114,12 @@ holder_signature = :crypto.sign(:eddsa, :none, proof_input.message, [holder_priv
 proof_compact
 ```
 
+The cell's value matches `"eyJ" <> _`: the proof is a compact JWS of type `dpop+jwt`.
+
 ## 4. Verify the grant
 
-The verifier holds no state and reads no clock — we supply the trusted key, the expected
-context, and the evaluation time.
+The verifier holds no state and reads no clock. The caller supplies the trusted key, the
+expected context, and the evaluation time.
 
 ```elixir
 alias BoundedAuthorityProtocol.V1.{TrustedIssuer, ExpectedGrant}
@@ -125,9 +136,12 @@ expected_grant = %ExpectedGrant{
 
 {:ok, grant_facts} = BoundedAuthorityProtocol.V1.verify_grant(grant_compact, trusted, expected_grant)
 
-# Facts are value-bearing and redacted, and authorization is explicitly not evaluated:
-Map.from_struct(grant_facts) |> Map.take([:issuer, :grant_id, :authorization])
+Map.take(Map.from_struct(grant_facts), [:issuer, :grant_id, :authorization])
 ```
+
+The cell returns `%{issuer: "https://issuer.example", grant_id: "grant-2026-001", authorization: :not_evaluated}`.
+Facts carry identifiers, digests, and times, never keys or signatures, and
+`authorization: :not_evaluated` says that deciding is still your job.
 
 ## 5. Verify the full envelope
 
@@ -158,13 +172,17 @@ expected_request = %ExpectedRequest{
 
 {:ok, envelope_facts} = BoundedAuthorityProtocol.V1.check_envelope(credentials, expected_request)
 
-Map.from_struct(envelope_facts) |> Map.take([:operation, :authorization])
+Map.take(Map.from_struct(envelope_facts), [:operation, :authorization])
 ```
+
+The cell returns `%{operation: "read_record", authorization: :not_evaluated}`. The facts struct
+itself prints as `#BoundedAuthorityProtocol.V1.EnvelopeFacts<redacted>`, so logging it leaks
+nothing.
 
 ## 6. Every attack fails closed
 
 ```elixir
-# A tampered signature byte:
+# A changed byte in the grant signature:
 tampered =
   grant_compact
   |> String.split(".")
@@ -175,39 +193,42 @@ tampered =
   end)
   |> Enum.join(".")
 
-# The SAME proof against DIFFERENT arguments (selector-disallowed):
-wrong_args = %ExpectedRequest{expected_request |
-  cast_arguments:
-    {:object,
-     [
-       {"record", {:object, [{"tier", {:string, "bronze"}}, {"region", {:string, "us-east"}}]}}
-     ]}
+# The same proof against different arguments (the tier selector disallows "bronze"):
+wrong_args = %ExpectedRequest{
+  expected_request
+  | cast_arguments:
+      {:object,
+       [
+         {"record", {:object, [{"tier", {:string, "bronze"}}, {"region", {:string, "us-east"}}]}}
+       ]}
 }
 
-# A stale proof (outside the max-age + skew window):
+# A stale proof, outside the maximum age plus the clock skew:
 stale = %ExpectedRequest{expected_request | evaluation_time: now + 361}
 
-results = %{
+%{
   tampered_grant:
     BoundedAuthorityProtocol.V1.check_envelope(
       %Credentials{grant: tampered, proof: proof_compact},
       expected_request
     ),
-  selector_disallowed:
-    BoundedAuthorityProtocol.V1.check_envelope(credentials, wrong_args),
+  selector_disallowed: BoundedAuthorityProtocol.V1.check_envelope(credentials, wrong_args),
   stale_proof: BoundedAuthorityProtocol.V1.check_envelope(credentials, stale)
 }
-
-# Every one is exactly {:error, :invalid} — no partial information, no exceptions.
-Enum.map(results, fn {k, v} -> {k, v == {:error, :invalid}} end)
 ```
+
+The cell returns `%{tampered_grant: {:error, :invalid}, selector_disallowed: {:error, :invalid}, stale_proof: {:error, :invalid}}`.
+Each attack gets exactly `{:error, :invalid}`: no partial information and no exception. The error
+never says which check failed; the
+[troubleshooting guide](https://hexdocs.pm/bounded_authority_protocol/troubleshooting.html)
+walks through diagnosing a rejection from your own inputs.
 
 ## 7. Produce and verify the local-loopback application proof
 
 The local-development profile is byte-distinct from standard `dpop+jwt`. It accepts only
-canonical literal-loopback HTTP targets and requires a server nonce. The target below represents
-a direct listener-derived request target; never substitute `localhost`, a forwarding header, or a
-client-asserted authority.
+canonical literal-loopback HTTP targets and requires a server nonce. The target below stands for
+a target derived directly from the listener; never substitute `localhost`, a forwarding header,
+or a client-asserted authority.
 
 ```elixir
 alias BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1, as: LocalLoopback
@@ -263,13 +284,15 @@ loopback_expected = %ExpectedRequest{
 {:ok, loopback_facts} =
   LocalLoopback.check_envelope(loopback_credentials, loopback_expected)
 
-Map.from_struct(loopback_facts) |> Map.take([:target_uri, :operation, :authorization])
+Map.take(Map.from_struct(loopback_facts), [:target_uri, :operation, :authorization])
 ```
+
+The cell returns `%{target_uri: "http://127.0.0.1:4000/invoke", operation: "read_record", authorization: :not_evaluated}`.
 
 ## 8. Cross-profile, wrong-nonce, and hostname attempts fail closed
 
 ```elixir
-loopback_rejections = %{
+%{
   wrong_nonce:
     LocalLoopback.check_envelope(
       loopback_credentials,
@@ -279,21 +302,19 @@ loopback_rejections = %{
     BoundedAuthorityProtocol.V1.check_envelope(loopback_credentials, loopback_expected),
   hostname: LocalLoopback.normalize_uri("http://localhost:4000/invoke", %{})
 }
-
-Enum.map(loopback_rejections, fn {k, v} -> {k, v == {:error, :invalid}} end)
 ```
 
-This notebook exercises the pure profile APIs. The repository's
-`mix local_loopback_http.verify` gate separately opens real IPv4 and IPv6 listeners and proves a
-verifier-bypass mutation RED. Loopback HTTP is not TLS and does not isolate another local process.
+The cell returns `%{wrong_nonce: {:error, :invalid}, standard_profile: {:error, :invalid}, hostname: {:error, :invalid}}`.
+A host selects one profile and never retries another after a failure. This notebook exercises the
+pure profile functions only. Loopback HTTP is not TLS, and it does not isolate one local process
+from another.
 
 ## 9. Produce and verify a role attestation
 
-The role-attestation profile (ADR 0036) is the protocol's first sibling ATTESTATION profile: a
-standalone, grant-unbound compact JWS (`typ: "ba+role-attestation"`) in which an attestor key
-binds a subject key to the `issuer` or `holder` role for a window contained in the attestor
-key's own validity. Like every sibling profile, selection is explicit — no contract-major
-parses these bytes and the profile parses none of theirs.
+A role attestation is a standalone compact JWS (`typ: "ba+role-attestation"`), bound to no
+grant, in which an attestor key binds a subject key to the `issuer` or `holder` role for a window
+inside the attestor key's own validity. As with every sibling profile, selection is explicit: no
+contract-major parses these bytes, and the profile parses none of theirs.
 
 ```elixir
 alias BoundedAuthorityProtocol.RoleAttestation.V1, as: RoleAttestationV1
@@ -336,70 +357,61 @@ expected_attestation = %RoleAttestationV1.ExpectedAttestation{
 {:ok, attestation_facts} =
   RoleAttestationV1.verify_attestation(attestation_compact, expected_attestation)
 
-# Anchor-posture facts — trust is explicitly not evaluated and there is no
-# authorization marker at all:
-Map.from_struct(attestation_facts)
-|> Map.take([:attestor_key_id, :subject_key_id, :role, :trust])
+Map.take(Map.from_struct(attestation_facts), [:attestor_key_id, :subject_key_id, :role, :trust])
 ```
+
+The cell returns `%{attestor_key_id: "authority-attestor-1", subject_key_id: "holder-key-1", role: "issuer", trust: :not_evaluated}`.
+The facts say `trust: :not_evaluated` and carry no authorization marker at all.
 
 ## 10. Role-attestation attacks fail closed
 
 ```elixir
-# A true self-attestation: the wire itself binds the attestor's own key id AND key material,
-# and the expected subject binding matches it — so every binding gate passes and only the
-# structural self-attestation rejection can fire:
-self_attestation = %{
-  attestation
-  | key_id: "authority-attestor-1",
-    public_key: attestor_public
-}
+# A true self-attestation: the payload binds the attestor's own key id and key material, and
+# the expected subject matches it, so every binding check passes and only the structural
+# self-attestation rejection can fire.
+self_attestation = %{attestation | key_id: "authority-attestor-1", public_key: attestor_public}
 
 {:ok, self_input} = RoleAttestationV1.attestation_signing_input(self_attestation, %{})
-
-self_signature =
-  :crypto.sign(:eddsa, :none, self_input.message, [attestor_private, :ed25519])
-
+self_signature = :crypto.sign(:eddsa, :none, self_input.message, [attestor_private, :ed25519])
 {:ok, self_compact} = RoleAttestationV1.assemble_compact(self_input, self_signature)
 
-role_attestation_rejections = %{
+%{
   self_attested:
     RoleAttestationV1.verify_attestation(self_compact, %{
       expected_attestation
       | subject_key_id: "authority-attestor-1",
         subject_public_key: attestor_public
     }),
-  # now == exp — the acceptance window is the half-open [nbf, exp):
+  # now == exp: the acceptance window is the half-open [nbf, exp).
   now_at_exp:
     RoleAttestationV1.verify_attestation(attestation_compact, %{
       expected_attestation
       | now: now + 3_600
     }),
-  # The attestation outlives the attestor key's own validity window:
+  # The attestation outlives the attestor key's own validity window.
   outliving_window:
     RoleAttestationV1.verify_attestation(attestation_compact, %{
       expected_attestation
       | attestor: %{expected_attestation.attestor | valid_before: now + 1_800}
     }),
-  # Cross-profile, both directions:
+  # Cross-profile, both directions.
   attestation_through_major_one:
     BoundedAuthorityProtocol.V1.decode_grant(attestation_compact, %{}),
   grant_through_attestation: RoleAttestationV1.decode_attestation(grant_compact, %{})
 }
-
-Enum.map(role_attestation_rejections, fn {k, v} -> {k, v == {:error, :invalid}} end)
 ```
 
+The cell returns `%{self_attested: {:error, :invalid}, now_at_exp: {:error, :invalid}, outliving_window: {:error, :invalid}, attestation_through_major_one: {:error, :invalid}, grant_through_attestation: {:error, :invalid}}`.
+
 A role attestation is evidence of a binding, not an authorization: which attestor to trust,
-which role a consumer requires, and replay reservation stay with the caller
-(`spec/bap-role-attestation-v1.md` §5).
+which role a consumer requires, and replay reservation stay with the caller.
 
 ## 11. Produce and verify a content assertion
 
-The content-assertion profile (ADR 0037) is a second sibling attestation profile: a
-standalone, grant-unbound compact JWS (`typ: "ba+content-assertion"`) that binds the digest
-of exact external content bytes to an issuer, audience, lineage subject, semantic profile,
-validity window, and predecessor. The package hashes the bytes you pass and never parses them;
-what the content means stays with you.
+A content assertion is a second sibling attestation profile: a standalone compact JWS
+(`typ: "ba+content-assertion"`) that binds the digest of exact external content bytes to an
+issuer, audience, lineage subject, semantic profile, validity window, and predecessor. The
+package hashes the bytes you pass and never parses them; what the content means stays with you.
 
 ```elixir
 alias BoundedAuthorityProtocol.ContentAssertion.V1, as: ContentAssertionV1
@@ -456,9 +468,10 @@ expected_assertion = %ContentAssertionV1.ExpectedContentAssertion{
 {:ok, assertion_facts} =
   ContentAssertionV1.verify_assertion(assertion_compact, expected_assertion)
 
-Map.from_struct(assertion_facts)
-|> Map.take([:attestor_key_id, :sub, :gen, :verification, :trust])
+Map.take(Map.from_struct(assertion_facts), [:attestor_key_id, :sub, :gen, :verification, :trust])
 ```
+
+The cell returns `%{attestor_key_id: "content-attestor-1", sub: "urn:example:lineage:document-1", gen: 1, verification: :signature_and_window, trust: :not_evaluated}`.
 
 Generation 2 names generation 1 by the SHA-256 of its exact compact bytes. The pairwise check
 compares two verified facts values; it keeps no history of its own.
@@ -487,19 +500,21 @@ successor_signature =
 ContentAssertionV1.verify_successor(assertion_facts, successor_facts, %{})
 ```
 
+The cell returns `:ok`: generation 2 follows generation 1.
+
 ## 12. Content-assertion attacks fail closed
 
 ```elixir
 {:ok, changed_digest} = ContentAssertionV1.content_digest(content_bytes <> " ", %{})
 
-content_assertion_rejections = %{
+%{
   # One changed content byte changes the digest the verifier requires:
   changed_content:
     ContentAssertionV1.verify_assertion(assertion_compact, %{
       expected_assertion
       | content_digest: changed_digest
     }),
-  # now == exp: the acceptance window is the half-open [nbf, exp):
+  # now == exp: the acceptance window is the half-open [nbf, exp).
   now_at_exp:
     ContentAssertionV1.verify_assertion(assertion_compact, %{expected_assertion | now: now + 3_600}),
   # Lineage runs forward only:
@@ -509,23 +524,36 @@ content_assertion_rejections = %{
   role_through_assertion: ContentAssertionV1.decode_assertion(attestation_compact, %{}),
   assertion_through_major_one: BoundedAuthorityProtocol.V1.decode_grant(assertion_compact, %{})
 }
-
-Enum.map(content_assertion_rejections, fn {k, v} -> {k, v == {:error, :invalid}} end)
 ```
 
-A content assertion proves that a trusted-by-you key signed this exact digest and context.
-It does not prove the content is true, that the key is still trusted, or that you hold the
-latest generation. Trusted keys, durable lineage state, and replay handling stay with the
-caller (`spec/bap-content-assertion-v1.md` §7).
+The cell returns:
 
-## 13. Strict Ed25519 verification (rule S1)
+<!-- livebook:{"force_markdown":true} -->
 
-Since release 0.8.0, every Ed25519 signature the protocol verifies is checked under one strict
-rule, rule S1 (ADR 0040, `spec/bap-v1.md` §14.1). Before any backend call, the public key `A`
-and the signature's point `R` must be canonical encodings (the encoded `y` is below
-`p = 2^255 - 19`, and the sign bit is clear when `x = 0`) and must not be one of the eight points
-of small order, and the scalar `S` must be below `L`, the prime order of the base point `B`.
-Only then does the cofactorless equation `encode([S]B - [k]A) == R` run, compared byte for byte.
+```elixir
+%{
+  changed_content: {:error, :invalid},
+  now_at_exp: {:error, :invalid},
+  reversed_lineage: {:error, :invalid},
+  assertion_through_role: {:error, :invalid},
+  role_through_assertion: {:error, :invalid},
+  assertion_through_major_one: {:error, :invalid}
+}
+```
+
+A content assertion proves that a key you trust signed this exact digest and context. It does
+not prove that the content is true, that the key is still trusted, or that you hold the latest
+generation. Trusted keys, durable lineage state, and replay handling stay with the caller.
+
+## 13. Strict Ed25519 verification
+
+Every Ed25519 signature the protocol verifies is checked under one strict rule, rule S1
+([specification § 14.1](https://hexdocs.pm/bounded_authority_protocol/bap-v1.html#strict-ed25519)).
+Before any backend call, the public key `A` and the signature's point `R` must be canonical
+encodings (the encoded `y` is below `p = 2^255 - 19`, and the sign bit is clear when `x = 0`) and
+must not be one of the eight points of small order, and the scalar `S` must be below `L`, the
+prime order of the base point `B`. Only then does the cofactorless equation
+`encode([S]B - [k]A) == R` run, compared byte for byte.
 
 `BoundedAuthorityProtocol.Ed25519` owns the rule:
 
@@ -546,6 +574,8 @@ alias BoundedAuthorityProtocol.Ed25519
 }
 ```
 
+The cell returns `%{verify_strict: true, acceptable_public_key?: true, torsion_free?: true}`.
+
 ## 14. Forged Ed25519 keys and signatures fail closed
 
 The byte values below come from the certified strict-Ed25519 corpus that ships inside the
@@ -562,11 +592,11 @@ trusted-issuer validation, before it looks at the signature, because neither pas
 
 The third attack adds `L` to the `S` of the honest holder signature from section 3 (corpus
 construction `s-plus-l`). Both scalars give the same point, `[S + L]B = [S]B`, so only a range
-check tells them apart. The backend enforces `S < L` as well (RFC 8032 §5.1.7), so this one is
+check tells them apart. The backend enforces `S < L` as well (RFC 8032 § 5.1.7), so this one is
 refused twice: by rule S1 before the backend call, and by the backend.
 
 ```elixir
-# The prime order of the base point (spec/bap-v1.md §14.1, RFC 8032):
+# The prime order of the base point (specification § 14.1, RFC 8032):
 l = 2 ** 252 + 27_742_317_777_372_353_535_851_937_790_883_648_493
 
 # Corpus case key-only-v1-identity-a-basepoint-r-s1-0: R = B, then S = 1 (little-endian).
@@ -644,6 +674,34 @@ end
 }
 ```
 
+The cell returns:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  backend: %{
+    accepts_key_only_forgery: %{small_order_key: true, noncanonical_key: true},
+    accepts_s_plus_l: false
+  },
+  primitives: %{
+    small_order_key_acceptable?: false,
+    noncanonical_key_acceptable?: false,
+    forgery_under_small_order_key: false,
+    forgery_under_noncanonical_key: false,
+    s_plus_l: false
+  },
+  verification: %{
+    small_order_key: {:error, :invalid},
+    noncanonical_key: {:error, :invalid},
+    s_plus_l: {:error, :invalid}
+  }
+}
+```
+
+The backend alone accepts the key-only forgery under both identity-point keys; the package
+refuses all three attacks.
+
 The corpus also carries complete signed grants for each clause of the rule. The next cell reads
 six of them from the installed package and runs each through `verify_grant`: the honest control,
 an isolated forgery under an order-8 key, an isolated forgery under `y = p`, an honest key that
@@ -693,48 +751,66 @@ for id <- [
     do: {id, run_corpus_case.(id)}
 ```
 
+The cell returns:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  {"grant-verify-v1-issuer-honest",
+   %{verify_grant: {:ok, "urn:example:grant:1"}, acceptable_public_key?: true, torsion_free?: true}},
+  {"grant-verify-v1-issuer-iso-small-order-a-1",
+   %{verify_grant: {:error, :invalid}, acceptable_public_key?: false, torsion_free?: false}},
+  {"grant-verify-v1-issuer-iso-noncanonical-a-y-p-plus-0",
+   %{verify_grant: {:error, :invalid}, acceptable_public_key?: false, torsion_free?: false}},
+  {"grant-verify-v1-issuer-honest-a-identity-r",
+   %{verify_grant: {:error, :invalid}, acceptable_public_key?: true, torsion_free?: true}},
+  {"grant-verify-v1-issuer-s-plus-l",
+   %{verify_grant: {:error, :invalid}, acceptable_public_key?: true, torsion_free?: true}},
+  {"grant-verify-v1-issuer-mixed-a-mixed-r-both",
+   %{verify_grant: {:ok, "urn:example:grant:1"}, acceptable_public_key?: true, torsion_free?: false}}
+]
+```
+
 Every forgery returns the single closed error, `{:error, :invalid}`. The last case is the one
 rule S1 accepts on purpose. Its key is an honest key plus a small torsion component: canonical,
 not of small order, and on the curve, so it is acceptable, and its signature satisfies the
-cofactorless equation. Verification performs no subgroup check (`spec/bap-v1.md` §14.1). One
-secret can sign under its honest key and up to seven torsioned variants of it, each with its own
-thumbprint. A host therefore calls `torsion_free?/1` on a key at enrollment, at trust install, and
-before any deny-list or revocation comparison, and refuses the key at each of those points.
+cofactorless equation. Verification performs no subgroup check. One secret can sign under its
+honest key and up to seven torsioned variants of it, each with its own thumbprint. A host
+therefore calls `torsion_free?/1` on a key at enrollment, at trust install, and before any
+deny-list or revocation comparison, and refuses the key at each of those points.
 
 ## 15. Contract-major 3: ES256 grants and proofs
 
-Contract-major 3 (`BoundedAuthorityProtocol.V3`, released in 0.5.0, ADR 0035,
-`spec/bap-v3.md`) is the `BAP3-ES256-SHA256` suite: ECDSA over P-256 with SHA-256. Grants and
-proofs carry `v: 3` and `alg: "ES256"`, the holder key travels as an EC JWK, and a signature is
-the raw 64-byte `r || s` form of RFC 7518 §3.4 with `s` in the low half (`s <= n/2`).
-`BoundedAuthorityProtocol.V3` has its own grant and proof producers; the trusted-issuer,
-expected-context, and credentials structs are the same ones the earlier sections used.
+Contract-major 3 (`BoundedAuthorityProtocol.V3`,
+[specification](https://hexdocs.pm/bounded_authority_protocol/bap-v3.html)) is the
+`BAP3-ES256-SHA256` suite: ECDSA over P-256 with SHA-256. Grants and proofs carry `v: 3` and
+`alg: "ES256"`, the holder key travels as an EC JWK, and a signature is the raw 64-byte `r || s`
+form of RFC 7518 § 3.4 with `s` in the low half (`s <= n/2`). `BoundedAuthorityProtocol.V3` has
+its own grant and proof producers; the trusted-issuer, expected-context, and credentials structs
+are the ones the earlier sections used.
 
-`:crypto` returns ECDSA signatures in DER and may return either `s`, so the signer converts the
-signature to `r || s` and normalizes `s` to the low half before assembly. Release 0.9.0 adds
-`BoundedAuthorityProtocol.Es256`, a public module with the ES256 checks, including `der_to_raw/1`
-and `normalize_low_s/1` for this step. The cell below does the conversion by hand, so it runs on
-every release, including the ones without that module.
+`:crypto`, like most KMS and HSM interfaces, returns an ECDSA signature in DER and may return
+either `s`. The signer converts it with `BoundedAuthorityProtocol.Es256.der_to_raw/1` and then
+`BoundedAuthorityProtocol.Es256.normalize_low_s/1` before assembly. Assembly itself never
+normalizes; it refuses a high-S signature.
 
 ```elixir
+alias BoundedAuthorityProtocol.Es256
 alias BoundedAuthorityProtocol.V3
 alias BoundedAuthorityProtocol.V3.EcJwk
 
 {es_issuer_public, es_issuer_private} = :crypto.generate_key(:ecdh, :prime256v1)
 {es_holder_public, es_holder_private} = :crypto.generate_key(:ecdh, :prime256v1)
 
-# The P-256 group order (spec/bap-v3.md §3.2):
-n = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
-
 es256_sign = fn message, private_key ->
   der = :crypto.sign(:ecdsa, :sha256, message, [private_key, :prime256v1])
-  {:"ECDSA-Sig-Value", r, s} = :public_key.der_decode(:"ECDSA-Sig-Value", der)
-  low_s = if s > div(n, 2), do: n - s, else: s
-  <<r::256, low_s::256>>
+  {:ok, raw} = Es256.der_to_raw(der)
+  {:ok, low_s} = Es256.normalize_low_s(raw)
+  low_s
 end
 
-{:ok, es_holder_jwk} = EcJwk.encode_public(es_holder_public, %{})
-{:ok, es_holder_thumbprint} = EcJwk.thumbprint(es_holder_jwk, %{})
+{:ok, es_holder_thumbprint} = EcJwk.public_key_thumbprint_raw(es_holder_public, %{})
 
 es_grant = %V3.Grant{
   key_id: "es-issuer-1",
@@ -744,7 +820,7 @@ es_grant = %V3.Grant{
   issued_at: 1_800_000_000,
   not_before: 1_800_000_000,
   expires_at: 1_800_003_600,
-  holder_thumbprint: Base.url_decode64!(es_holder_thumbprint, padding: false),
+  holder_thumbprint: es_holder_thumbprint,
   operations: [
     %V3.Operation{
       name: "start_job",
@@ -805,32 +881,58 @@ es_expected = %ExpectedRequest{
 {:ok, es_envelope_facts} = V3.check_envelope(es_credentials, es_expected)
 
 %{
-  grant: Map.from_struct(es_grant_facts) |> Map.take([:version, :grant_id, :authorization]),
-  envelope: Map.from_struct(es_envelope_facts) |> Map.take([:operation, :authorization])
+  grant: Map.take(Map.from_struct(es_grant_facts), [:version, :grant_id, :authorization]),
+  envelope: Map.take(Map.from_struct(es_envelope_facts), [:operation, :authorization])
+}
+```
+
+The cell returns:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  grant: %{version: 3, grant_id: "grant-2026-es-001", authorization: :not_evaluated},
+  envelope: %{operation: "start_job", authorization: :not_evaluated}
 }
 ```
 
 ## 16. ES256 attacks fail closed
 
-ECDSA signatures are malleable: if `(r, s)` verifies, so does `(r, n - s)`. The v3 profile
+ECDSA signatures are malleable: if `(r, s)` verifies, so does `(r, n - s)`. Contract-major 3
 accepts only the low-`s` member of each pair (`REQ3-SIGNING-low-s`). Below, the backend alone
-accepts the high-S twin of the holder signature, and `check_envelope` refuses it.
+accepts the high-S twin of the holder signature, and `check_envelope` refuses it. The `Es256`
+helpers turn the twin's DER form back into the original low-S signature, which is what a signer
+does with whatever its KMS or HSM returns.
 
 Each contract-major parses only its own bytes (`REQ3-CORE-cross-major-reject`). Decoding takes no
-key, so the cross-major attempts below use `decode_grant` and `decode_proof`: the v3 decoders
-refuse the grant and proof of the v1 envelope from section 5, and the v1 and v2 decoders refuse
-the v3 grant and proof. The `same_major_decodes` entries show each set of bytes decoding under
-its own major, so the refusals come from the major check alone. The last attempt presents the v3
-grant with a proof signed by a key the grant does not name.
+key, so the cross-major attempts below use `decode_grant` and `decode_proof`: the contract-major 3
+decoders refuse the grant and proof of the contract-major 1 envelope from section 5, and the
+contract-major 1 and 2 decoders refuse the contract-major 3 grant and proof. The
+`same_major_decodes` entries show each set of bytes decoding under its own major, so the
+refusals come from the major check alone. The last attempt presents the contract-major 3 grant
+with a proof signed by a key the grant does not name.
 
 ```elixir
+# The P-256 group order (contract-major 3 specification § 3.2):
+n = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+
 <<es_r::256, es_s::256>> = es_proof_signature
 high_s_signature = <<es_r::256, n - es_s::256>>
 
 high_s_proof =
   es_proof_input.message <> "." <> Base.url_encode64(high_s_signature, padding: false)
 
-high_s_der = :public_key.der_encode(:"ECDSA-Sig-Value", {:"ECDSA-Sig-Value", es_r, n - es_s})
+# The backend verifies DER, so frame the twin as a DER ECDSA-Sig-Value
+# (SEQUENCE { INTEGER r, INTEGER s }; a leading zero byte keeps an INTEGER positive):
+der_integer = fn integer ->
+  bytes = :binary.encode_unsigned(integer)
+  bytes = if :binary.first(bytes) >= 0x80, do: <<0>> <> bytes, else: bytes
+  <<0x02, byte_size(bytes)>> <> bytes
+end
+
+high_s_body = der_integer.(es_r) <> der_integer.(n - es_s)
+high_s_der = <<0x30, byte_size(high_s_body)>> <> high_s_body
 
 backend_accepts_high_s_twin =
   :crypto.verify(:ecdsa, :sha256, es_proof_input.message, high_s_der, [
@@ -849,6 +951,9 @@ decodes? = &match?({:ok, _decoded}, &1)
 
 %{
   backend_accepts_high_s_twin: backend_accepts_high_s_twin,
+  helpers_recover_low_s:
+    with({:ok, raw} <- Es256.der_to_raw(high_s_der), do: Es256.normalize_low_s(raw)) ==
+      {:ok, es_proof_signature},
   same_major_decodes: %{
     major_one_grant: decodes?.(BoundedAuthorityProtocol.V1.decode_grant(grant_compact, %{})),
     major_one_proof: decodes?.(BoundedAuthorityProtocol.V1.decode_proof(proof_compact, %{})),
@@ -874,37 +979,59 @@ decodes? = &match?({:ok, _decoded}, &1)
 }
 ```
 
-The high-S proof was framed by hand. A v3 verifier rejects it whatever produced it, and a
-conforming signer never emits it.
+The cell returns:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  backend_accepts_high_s_twin: true,
+  helpers_recover_low_s: true,
+  same_major_decodes: %{
+    major_one_grant: true,
+    major_one_proof: true,
+    major_three_grant: true,
+    major_three_proof: true
+  },
+  rejections: %{
+    high_s: {:error, :invalid},
+    major_one_grant_through_major_three: {:error, :invalid},
+    major_one_proof_through_major_three: {:error, :invalid},
+    major_three_grant_through_major_one: {:error, :invalid},
+    major_three_proof_through_major_one: {:error, :invalid},
+    major_three_grant_through_major_two: {:error, :invalid},
+    major_three_proof_through_major_two: {:error, :invalid},
+    wrong_holder_key: {:error, :invalid}
+  }
+}
+```
+
+The high-S proof was framed by hand. A contract-major 3 verifier rejects it whatever produced
+it, and a conforming signer never emits it.
 
 ## What you just saw
 
-- Deterministic producers + `assemble_compact` built exact compact JWS values from ephemeral
-  signatures — the package never sees a private key.
-- `verify_grant` and `check_envelope` checked every binding from caller-supplied trusted
+- Deterministic producers and `assemble_compact` built exact compact JWS values from ephemeral
+  signatures; the package never saw a private key.
+- `verify_grant` and `check_envelope` checked every binding against caller-supplied trusted
   inputs and returned redacted, non-authorizing facts.
-- A tampered byte, a selector-disallowed argument swap, and a stale proof each failed closed
-  with the single error value.
-- The local-loopback profile produced and verified byte-distinct proof bytes with a required nonce;
-  the wrong nonce, the standard verifier, and a hostname target each failed closed.
+- A changed byte, a selector-disallowed argument swap, and a stale proof each failed closed with
+  the single error value.
+- The local-loopback profile produced and verified byte-distinct proof bytes with a required
+  nonce; the wrong nonce, the standard verifier, and a hostname target each failed closed.
 - The role-attestation profile bound a subject key to a role inside the attestor key's own
-  window and returned anchor-posture facts; a true self-attestation, `now == exp`, an
-  outliving window, and cross-profile bytes in both directions each failed closed.
-- The content-assertion profile bound an exact content digest and context, linked a successor
-  to its predecessor's compact digest, and returned non-authorizing facts; changed content,
-  `now == exp`, a reversed lineage, and cross-profile bytes each failed closed.
-- `BoundedAuthorityProtocol.Ed25519` accepted the honest key and signature under rule S1. A
-  key-only forgery that the backend alone accepts, under a small-order key and under a
-  non-canonical key, an `S + L` signature, and the corpus grants for an order-8 key, `y = p`, and
-  an identity `R` each failed closed. The
-  torsioned corpus key verified, as the rule specifies, and `torsion_free?/1` refused it for the
-  host to act on at enrollment.
-- Contract-major 3 produced and verified an ES256 grant and holder proof from ephemeral P-256
-  keys and EC JWK holder binding. The high-S twin of a valid signature and a proof from a key
-  the grant does not name failed `check_envelope`; the v3 decoders refused the v1 grant and
-  proof, and the v1 and v2 decoders refused the v3 grant and proof, while each decoded under its
-  own major.
+  window; a true self-attestation, `now == exp`, an outliving window, and cross-profile bytes in
+  both directions each failed closed.
+- The content-assertion profile bound an exact content digest and context and linked a
+  successor to its predecessor; changed content, `now == exp`, a reversed lineage, and
+  cross-profile bytes each failed closed.
+- `BoundedAuthorityProtocol.Ed25519` accepted the honest key and signature under rule S1 and
+  refused every forgery; the torsioned corpus key verified, as the rule specifies, and
+  `torsion_free?/1` refused it for the host to act on at enrollment.
+- Contract-major 3 produced and verified an ES256 grant and holder proof, with the `Es256`
+  helpers turning DER signatures into low-S raw form; the high-S twin, a proof from a key the
+  grant does not name, and every cross-major decode failed closed.
 
-What this notebook did NOT do: select trusted keys, reserve replay, check revocation, or make
-an authorization decision — those belong to a stateful authority runtime. See the
-specification's verification-contract section for the boundary in normative terms.
+What this notebook did not do: select trusted keys, reserve replay, check revocation, or make an
+authorization decision. Those belong to the host or a stateful authority runtime. See
+[usage rules](https://hexdocs.pm/bounded_authority_protocol/usage-rules.html) for the boundary.

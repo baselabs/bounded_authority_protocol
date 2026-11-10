@@ -1,0 +1,474 @@
+# Bounded Authority Protocol: chains and archives
+
+```elixir
+Mix.install([
+  {:bounded_authority_protocol, "~> 0.9.1"}
+])
+```
+
+## What this notebook covers
+
+A service that accepts bounded-authority requests often keeps evidence of what it accepted. The
+protocol defines four evidence formats, and this notebook builds and verifies each one with
+ephemeral keys:
+
+1. a **consumption chain**: hash-linked rows, one per accepted invocation;
+2. **boundary anchors**: signed statements that a chain had a given head at a given time;
+3. a **key transition**: the old archive key authenticating its successor;
+4. an **anchored export**: one archive object holding the rows, the anchors, and the transitions,
+   verified as a whole against an out-of-band object version.
+
+Every function here belongs to contract-major 1 (`BoundedAuthorityProtocol.V1`); contract-majors 2
+and 3 have the same functions under their own domain separators. Every verified result carries
+`trust: :not_evaluated`: the package checks bytes against the keys and expectations you supply,
+and which keys and records to trust stays with you. After each cell, the text states the value
+the cell returns, and the package's test suite runs this notebook and checks each of those
+statements. The
+[evidence guide](https://hexdocs.pm/bounded_authority_protocol/evidence.html) covers the same
+formats in prose.
+
+## 1. A consumption chain
+
+A row binds a chain id, a sequence number, the previous row's hash, and a 32-byte commitment the
+host computes over whatever it recorded for that invocation. The package never sees what the
+commitment covers. Row 1 links to the all-zero hash.
+
+```elixir
+alias BoundedAuthorityProtocol.V1
+alias BoundedAuthorityProtocol.V1.{ConsumptionEntry, ChainInput, ExpectedChain}
+
+chain_id = "urn:example:chain:deployments"
+genesis = <<0::256>>
+
+# The host's commitment for each accepted invocation, here a digest of a record it keeps:
+commitments =
+  for record <- ["deploy web 1.4.2", "deploy api 2.0.1", "rollback web 1.4.1"],
+      do: :crypto.hash(:sha256, record)
+
+{rows, head} =
+  commitments
+  |> Enum.with_index(1)
+  |> Enum.map_reduce(genesis, fn {commitment, sequence}, previous ->
+    entry = %ConsumptionEntry{
+      chain_id: chain_id,
+      sequence: sequence,
+      previous_hash: previous,
+      commitment: commitment
+    }
+
+    {:ok, encoded} = V1.encode_consumption_entry(entry, %{})
+    {encoded.bytes, encoded.hash}
+  end)
+
+hd(rows)
+```
+
+The cell returns
+`~s({"chain_id":"urn:example:chain:deployments","commitment":"63bGGvMVGWT__9Xss9A0kdn9kmBIayXF93V91_T9Dr4","previous":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","sequence":1,"v":1})`:
+the exact canonical bytes of row 1. Each row's hash is the SHA-256 of a domain separator and
+these bytes, and the next row carries it as `previous`.
+
+## 2. Verify the chain
+
+`check_chain/2` takes the raw rows and what you expect of them: the chain id, the first and last
+sequence, the row count, the predecessor of the first row, and the head.
+
+```elixir
+expected_chain = %ExpectedChain{
+  chain_id: chain_id,
+  first_sequence: 1,
+  last_sequence: 3,
+  row_count: 3,
+  previous_hash: genesis,
+  last_hash: head,
+  bounds: %{}
+}
+
+{:ok, chain_facts} = V1.check_chain(%ChainInput{rows: rows}, expected_chain)
+
+Map.take(Map.from_struct(chain_facts), [:row_count, :verification, :trust])
+```
+
+The cell returns `%{row_count: 3, verification: :boundary_consistent, trust: :not_evaluated}`.
+
+## 3. Chain attacks fail closed
+
+```elixir
+[first, second, third] = rows
+
+%{
+  dropped_row: V1.check_chain(%ChainInput{rows: [first, third]}, expected_chain),
+  reordered: V1.check_chain(%ChainInput{rows: [first, third, second]}, expected_chain),
+  truncated_head:
+    V1.check_chain(%ChainInput{rows: [first, second]}, %{
+      expected_chain
+      | last_sequence: 2,
+        row_count: 2
+    }),
+  edited_row:
+    V1.check_chain(
+      %ChainInput{rows: [String.replace(first, "\"sequence\":1", "\"sequence\":1 "), second, third]},
+      expected_chain
+    ),
+  wrong_predecessor:
+    V1.encode_consumption_entry(
+      %ConsumptionEntry{
+        chain_id: chain_id,
+        sequence: 1,
+        previous_hash: <<1::256>>,
+        commitment: hd(commitments)
+      },
+      %{}
+    )
+}
+```
+
+The cell returns:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  dropped_row: {:error, :invalid},
+  reordered: {:error, :invalid},
+  truncated_head: {:error, :invalid},
+  edited_row: {:error, :invalid},
+  wrong_predecessor: {:error, :invalid}
+}
+```
+
+Truncation fails because the head you expect is the head you recorded, not the last row you were
+handed. A row with a non-canonical byte fails even though its JSON means the same thing, and the
+producer refuses to encode a first row that does not link to the all-zero hash.
+
+## 4. Boundary anchors
+
+An anchor is a compact JWS (`typ: "ba+chain-anchor"`) in which an archive key states that the
+chain had a given sequence and head at a given time. The start anchor sits at sequence 0, with
+the all-zero hash, before any row. Archive keys are historical keys: each has a validity window,
+and an anchor verifies only when its time falls inside the window of the key that signed it.
+
+```elixir
+alias BoundedAuthorityProtocol.V1.{BoundaryAnchor, ExpectedAnchor, HistoricalPublicKey}
+
+{key_a_public, key_a_private} = :crypto.generate_key(:eddsa, :ed25519)
+{key_b_public, key_b_private} = :crypto.generate_key(:eddsa, :ed25519)
+{:ok, key_a_fingerprint} = V1.Jwk.public_key_thumbprint_raw(key_a_public, %{})
+{:ok, key_b_fingerprint} = V1.Jwk.public_key_thumbprint_raw(key_b_public, %{})
+
+key_a = %HistoricalPublicKey{
+  key_id: "archive-2026-a",
+  public_key: key_a_public,
+  valid_from: 1_799_990_000,
+  valid_before: 1_800_010_000
+}
+
+key_b = %HistoricalPublicKey{
+  key_id: "archive-2026-b",
+  public_key: key_b_public,
+  valid_from: 1_800_005_000,
+  valid_before: :unbounded
+}
+
+sign = fn input, private_key ->
+  signature = :crypto.sign(:eddsa, :none, input.message, [private_key, :ed25519])
+  {:ok, compact} = V1.assemble_compact(input, signature)
+  compact
+end
+
+{:ok, start_input} =
+  V1.boundary_anchor_signing_input(
+    %BoundaryAnchor{
+      anchor_id: "urn:example:anchor:deployments:start",
+      anchored_at: 1_800_000_000,
+      chain_id: chain_id,
+      sequence: 0,
+      chain_hash: genesis,
+      key_id: "archive-2026-a",
+      public_key: key_a_public
+    },
+    %{}
+  )
+
+start_anchor = sign.(start_input, key_a_private)
+
+expected_start = %ExpectedAnchor{
+  anchor_id: "urn:example:anchor:deployments:start",
+  anchored_at: 1_800_000_000,
+  chain_id: chain_id,
+  sequence: 0,
+  chain_hash: genesis,
+  key_id: "archive-2026-a",
+  key_fingerprint: key_a_fingerprint,
+  bounds: %{}
+}
+
+{:ok, anchor_facts} = V1.verify_historical_anchor(start_anchor, key_a, expected_start)
+
+%{
+  anchor: Map.take(Map.from_struct(anchor_facts), [:sequence, :verification, :trust]),
+  outside_key_window:
+    V1.verify_historical_anchor(start_anchor, %{key_a | valid_from: 1_800_000_001}, expected_start),
+  other_key: V1.verify_historical_anchor(start_anchor, key_b, expected_start)
+}
+```
+
+The cell returns:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  anchor: %{sequence: 0, verification: :signature_and_window, trust: :not_evaluated},
+  outside_key_window: {:error, :invalid},
+  other_key: {:error, :invalid}
+}
+```
+
+The key fingerprint is the raw RFC 7638 thumbprint of the archive key, the same construction
+the holder binding uses.
+
+## 5. A key transition
+
+Before key A's window closes, the archive moves to key B. Key A signs a transition
+(`typ: "ba+key-transition"`) that names key B by id and fingerprint, effective at a time inside
+both keys' windows. A verifier that trusts key A can then follow the archive onto key B without
+trusting B out of band.
+
+```elixir
+alias BoundedAuthorityProtocol.V1.{KeyTransition, ExpectedKeyTransition}
+
+{:ok, transition_input} =
+  V1.key_transition_signing_input(
+    %KeyTransition{
+      transition_id: "urn:example:transition:deployments:1",
+      chain_id: chain_id,
+      effective_at: 1_800_006_000,
+      current_key_id: "archive-2026-a",
+      current_public_key: key_a_public,
+      next_key_id: "archive-2026-b",
+      next_public_key: key_b_public
+    },
+    %{}
+  )
+
+transition = sign.(transition_input, key_a_private)
+
+expected_transition = %ExpectedKeyTransition{
+  transition_id: "urn:example:transition:deployments:1",
+  chain_id: chain_id,
+  effective_at: 1_800_006_000,
+  current_key_id: "archive-2026-a",
+  current_key_fingerprint: key_a_fingerprint,
+  next_key_id: "archive-2026-b",
+  next_key_fingerprint: key_b_fingerprint,
+  bounds: %{}
+}
+
+{:ok, transition_facts} =
+  V1.verify_key_transition(transition, key_a, key_b, expected_transition)
+
+%{
+  transition: Map.take(Map.from_struct(transition_facts), [:verification, :trust]),
+  signed_by_next_key: V1.verify_key_transition(transition, key_b, key_a, expected_transition)
+}
+```
+
+The cell returns:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  transition: %{verification: :authenticated_transition, trust: :not_evaluated},
+  signed_by_next_key: {:error, :invalid}
+}
+```
+
+## 6. The end anchor and the anchored export
+
+Key B signs the end anchor at sequence 3 with the chain head. `encode_anchored_export/2` then
+frames the rows, both anchors, and the transition into one archive object, after checking them
+against the same expectations a verifier will use. It returns the object as a list of chunks, its
+SHA-256 digest, and its byte count.
+
+```elixir
+alias BoundedAuthorityProtocol.V1.{AnchoredExportInput, ExpectedExport}
+
+{:ok, end_input} =
+  V1.boundary_anchor_signing_input(
+    %BoundaryAnchor{
+      anchor_id: "urn:example:anchor:deployments:end",
+      anchored_at: 1_800_007_000,
+      chain_id: chain_id,
+      sequence: 3,
+      chain_hash: head,
+      key_id: "archive-2026-b",
+      public_key: key_b_public
+    },
+    %{}
+  )
+
+end_anchor = sign.(end_input, key_b_private)
+
+expected_end = %ExpectedAnchor{
+  anchor_id: "urn:example:anchor:deployments:end",
+  anchored_at: 1_800_007_000,
+  chain_id: chain_id,
+  sequence: 3,
+  chain_hash: head,
+  key_id: "archive-2026-b",
+  key_fingerprint: key_b_fingerprint,
+  bounds: %{}
+}
+
+{:ok, export} =
+  V1.encode_anchored_export(
+    %AnchoredExportInput{
+      rows: rows,
+      start_anchor: start_anchor,
+      transitions: [transition],
+      end_anchor: end_anchor
+    },
+    %ExpectedExport{
+      chain: expected_chain,
+      start_anchor: expected_start,
+      transitions: [expected_transition],
+      end_anchor: expected_end,
+      bounds: %{}
+    }
+  )
+
+{length(export.chunks), byte_size(export.digest), export.byte_count == IO.iodata_length(export.chunks)}
+```
+
+The cell returns `{8, 32, true}`: eight chunks (the archive prefix, a header, the start anchor,
+the transition, three rows, and the end anchor), a 32-byte digest, and a byte count that matches
+the chunks.
+
+## 7. Verify the archive
+
+The host stores the chunks in an object store and records the digest and the object version the
+store reports. To verify the archive later, it supplies the bytes it reads back, the ordered
+archive key history it trusts, and every expectation from its own records, never from the
+archive being verified.
+
+```elixir
+alias BoundedAuthorityProtocol.V1.{ArchivedObject, ExpectedAnchoredExport, HistoricalKeyChain}
+
+archived = %ArchivedObject{chunks: export.chunks, version: "object-version-7"}
+key_history = %HistoricalKeyChain{keys: [key_a, key_b]}
+
+expected_archive = %ExpectedAnchoredExport{
+  chain: expected_chain,
+  start_anchor: expected_start,
+  transitions: [expected_transition],
+  end_anchor: expected_end,
+  digest: export.digest,
+  object_version: "object-version-7",
+  bounds: %{}
+}
+
+{:ok, archive_facts} = V1.verify_anchored_export(archived, key_history, expected_archive)
+
+Map.take(Map.from_struct(archive_facts), [
+  :row_count,
+  :transition_count,
+  :verification,
+  :trust,
+  :authorization
+])
+```
+
+The cell returns:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  row_count: 3,
+  transition_count: 1,
+  verification: :anchored_export,
+  trust: :not_evaluated,
+  authorization: :not_evaluated
+}
+```
+
+The facts struct prints as `#BoundedAuthorityProtocol.V1.AnchoredExportFacts<redacted>`.
+
+## 8. Archive attacks fail closed
+
+```elixir
+all_bytes = IO.iodata_to_binary(export.chunks)
+
+%{
+  trailing_byte:
+    V1.verify_anchored_export(
+      %{archived | chunks: export.chunks ++ [<<0>>]},
+      key_history,
+      expected_archive
+    ),
+  rechunked_but_identical:
+    elem(
+      V1.verify_anchored_export(
+        %{archived | chunks: [all_bytes]},
+        key_history,
+        expected_archive
+      ),
+      0
+    ),
+  other_object_version:
+    V1.verify_anchored_export(
+      %{archived | version: "object-version-8"},
+      key_history,
+      expected_archive
+    ),
+  other_digest:
+    V1.verify_anchored_export(archived, key_history, %{expected_archive | digest: <<0::256>>}),
+  missing_key_history:
+    V1.verify_anchored_export(archived, %HistoricalKeyChain{keys: [key_a]}, expected_archive),
+  transition_dropped_at_export:
+    V1.encode_anchored_export(
+      %AnchoredExportInput{
+        rows: rows,
+        start_anchor: start_anchor,
+        transitions: [],
+        end_anchor: end_anchor
+      },
+      %ExpectedExport{
+        chain: expected_chain,
+        start_anchor: expected_start,
+        transitions: [expected_transition],
+        end_anchor: expected_end,
+        bounds: %{}
+      }
+    )
+}
+```
+
+The cell returns:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  trailing_byte: {:error, :invalid},
+  rechunked_but_identical: :ok,
+  other_object_version: {:error, :invalid},
+  other_digest: {:error, :invalid},
+  missing_key_history: {:error, :invalid},
+  transition_dropped_at_export: {:error, :invalid}
+}
+```
+
+Chunk boundaries do not matter, so an object store may return the bytes in any split; every
+byte to the exact end of the object does. The object version is out-of-band context the store
+reports, not a value inside the archive.
+
+## What the host still owns
+
+The package checks evidence; it does not keep it. The host decides what each commitment covers,
+appends rows atomically, chooses when to anchor, stores archives, records each digest and object
+version, and decides which archive keys it trusts and for which windows. A verified archive says
+that these bytes are consistent with the keys and records you supplied; whether that is enough
+for an audit is your decision.
