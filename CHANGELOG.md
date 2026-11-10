@@ -134,6 +134,10 @@ All notable changes to `bounded_authority_protocol` are documented here.
   shipped document cites the specification, governance, or errata text instead of an unpublished
   decision-record number. The implementer's guide covers contract-majors 2 and 3 and the selector
   float-zero corpus.
+- Development tooling: sbom 0.12.1 (with purl 0.5.2) accepts hex_core 0.21, so the `hex_core`
+  override is gone and hex_core 0.21.1 arrives dev/test-only through sbom. CI action pins move to
+  setup-node 7.1.0, setup-python 7.1.0, upload-artifact 7.0.2, setup-ocaml 3.9.1 and setup-ruby
+  1.336.0. The package has no runtime dependencies, so nothing shipped changes.
 
 ## [0.9.1] — 2026-10-31
 

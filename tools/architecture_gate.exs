@@ -10,7 +10,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     jsonschex: [:dev, :test],
     mix_audit: [:dev, :test],
     sbom: [:dev, :test],
-    hex_core: [:dev, :test],
     stream_data: [:dev, :test]
   }
 
