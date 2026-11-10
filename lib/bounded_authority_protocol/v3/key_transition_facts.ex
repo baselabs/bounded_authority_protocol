@@ -1,5 +1,19 @@
 defmodule BoundedAuthorityProtocol.V3.KeyTransitionFacts do
-  @moduledoc "Closed redacted non-authorizing authenticated key-transition facts."
+  @moduledoc """
+  Closed redacted non-authorizing authenticated key-transition facts.
+
+  ## Fields
+
+  * `version` - the contract-major, always `3`.
+  * `transition_id` - the verified transition identity.
+  * `effective_at` - the verified effective time, integer Unix time in seconds.
+  * `chain_id` - the verified chain identity.
+  * `current_key_fingerprint` - the raw 32-byte RFC 7638 fingerprint of the key that signed the
+    transition.
+  * `next_key_fingerprint` - the raw 32-byte RFC 7638 fingerprint of the key it authenticates.
+  * `verification` - always `:authenticated_transition`.
+  * `trust` - always `:not_evaluated`.
+  """
 
   @enforce_keys [
     :version,
@@ -13,6 +27,7 @@ defmodule BoundedAuthorityProtocol.V3.KeyTransitionFacts do
   ]
   defstruct @enforce_keys
 
+  @typedoc "Facts from a verified key transition."
   @type t :: %__MODULE__{
           version: 3,
           transition_id: binary(),

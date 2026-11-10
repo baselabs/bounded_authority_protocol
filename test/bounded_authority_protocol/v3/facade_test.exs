@@ -8,6 +8,9 @@ defmodule BoundedAuthorityProtocol.V3.FacadeTest do
   alias BoundedAuthorityProtocol.V3, as: V3
   alias BoundedAuthorityProtocol.V3.EcJwk
 
+  # The documented EC thumbprint helpers carry executable examples.
+  doctest BoundedAuthorityProtocol.V3.EcJwk
+
   @issuer_key_id "issuer-a"
   @issuer "https://issuer.example.test"
   @audience "https://resource.example.test"

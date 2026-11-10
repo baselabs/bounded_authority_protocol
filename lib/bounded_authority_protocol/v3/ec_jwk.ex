@@ -70,7 +70,21 @@ defmodule BoundedAuthorityProtocol.V3.EcJwk do
     end
   end
 
-  @doc false
+  @doc """
+  Returns the raw 32-byte SHA-256 RFC 7638 thumbprint of an exact public EC JWK.
+
+  This is the digest `thumbprint/2` base64url-encodes. The JWK must be the exact canonical
+  member set `decode_public/2` accepts, carrying an on-curve P-256 point; anything else is
+  `{:error, :invalid}`.
+
+  ## Example
+
+      iex> jwk =
+      ...>   ~s({"crv":"P-256","kty":"EC","x":"axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY","y":"T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU"})
+      iex> {:ok, digest} = BoundedAuthorityProtocol.V3.EcJwk.thumbprint_raw(jwk, %{})
+      iex> Base.url_encode64(digest, padding: false)
+      "xx0BcA-wMohw8atYDJOe6peGModklG2wRHBlXHMvl0M"
+  """
   @spec thumbprint_raw(binary(), Bounds.t() | map()) :: {:ok, binary()} | {:error, :invalid}
   def thumbprint_raw(jwk, limits) do
     with {:ok, preimage} <- thumbprint_preimage(jwk, limits) do
@@ -78,7 +92,26 @@ defmodule BoundedAuthorityProtocol.V3.EcJwk do
     end
   end
 
-  @doc false
+  @doc """
+  Returns the raw 32-byte SHA-256 RFC 7638 thumbprint of a raw 65-byte uncompressed SEC1
+  P-256 public key (`0x04 || x || y`).
+
+  Equivalent to `encode_public/2` followed by `thumbprint_raw/2`. Use it to compute the
+  holder confirmation a `BoundedAuthorityProtocol.V3.Grant` carries: pass the raw digest
+  as `holder_thumbprint` (the producer base64url-encodes it into the `cnf.jkt` claim). A point that fails
+  `BoundedAuthorityProtocol.Es256.acceptable_public_key?/1` is `{:error, :invalid}`.
+
+  ## Example
+
+      iex> public_key =
+      ...>   Base.decode16!(
+      ...>     "046B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296" <>
+      ...>       "4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5"
+      ...>   )
+      iex> {:ok, digest} = BoundedAuthorityProtocol.V3.EcJwk.public_key_thumbprint_raw(public_key, %{})
+      iex> Base.url_encode64(digest, padding: false)
+      "xx0BcA-wMohw8atYDJOe6peGModklG2wRHBlXHMvl0M"
+  """
   @spec public_key_thumbprint_raw(binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
   def public_key_thumbprint_raw(public_key, limits) do

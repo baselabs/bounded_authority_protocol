@@ -3,13 +3,21 @@ defmodule BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1 do
 
   alias BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.Uri
   alias BoundedAuthorityProtocol.V1.Bounds
+  alias BoundedAuthorityProtocol.V1.Credentials
+  alias BoundedAuthorityProtocol.V1.DecodedProof
+  alias BoundedAuthorityProtocol.V1.EnvelopeFacts
+  alias BoundedAuthorityProtocol.V1.ExpectedRequest
+  alias BoundedAuthorityProtocol.V1.Proof
   alias BoundedAuthorityProtocol.V1.Runtime
   alias BoundedAuthorityProtocol.V1.SigningInput
 
   @doc "Normalizes one bounded local-loopback HTTP target URI without DNS or network access."
+  @spec normalize_uri(binary(), Bounds.t() | map()) :: {:ok, binary()} | {:error, :invalid}
   defdelegate normalize_uri(uri, limits), to: Uri, as: :normalize
 
   @doc "Builds the deterministic byte-distinct local-loopback proof signing input."
+  @spec proof_signing_input(Proof.t(), Bounds.t() | map()) ::
+          {:ok, SigningInput.t()} | {:error, :invalid}
   defdelegate proof_signing_input(proof, limits),
     to: Runtime,
     as: :local_loopback_proof_signing_input
@@ -33,9 +41,12 @@ defmodule BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1 do
     do: Runtime.assemble_local_loopback_compact(signing_input, signature, limits)
 
   @doc "Boundedly decodes a local-loopback proof without evaluating trust."
+  @spec decode_proof(binary(), Bounds.t() | map()) :: {:ok, DecodedProof.t()} | {:error, :invalid}
   defdelegate decode_proof(compact, limits), to: Runtime, as: :decode_local_loopback_proof
 
   @doc "Verifies a raw grant and local-loopback proof against server-derived context."
+  @spec check_envelope(Credentials.t(), ExpectedRequest.t()) ::
+          {:ok, EnvelopeFacts.t()} | {:error, :invalid}
   defdelegate check_envelope(credentials, expected_request),
     to: Runtime,
     as: :check_local_loopback_envelope

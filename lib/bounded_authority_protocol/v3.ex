@@ -20,11 +20,40 @@ defmodule BoundedAuthorityProtocol.V3 do
   the facts, which have their own modules under this namespace.
   """
 
+  alias BoundedAuthorityProtocol.V1.AnchoredExportInput
+  alias BoundedAuthorityProtocol.V1.ArchivedObject
   alias BoundedAuthorityProtocol.V1.Base64Url
+  alias BoundedAuthorityProtocol.V1.BoundaryAnchor
   alias BoundedAuthorityProtocol.V1.Bounds
+  alias BoundedAuthorityProtocol.V1.ChainInput
+  alias BoundedAuthorityProtocol.V1.ConsumptionEntry
+  alias BoundedAuthorityProtocol.V1.Credentials
+  alias BoundedAuthorityProtocol.V1.EncodedAnchoredExport
+  alias BoundedAuthorityProtocol.V1.EncodedConsumptionEntry
+  alias BoundedAuthorityProtocol.V1.ExpectedAnchor
+  alias BoundedAuthorityProtocol.V1.ExpectedAnchoredExport
+  alias BoundedAuthorityProtocol.V1.ExpectedChain
+  alias BoundedAuthorityProtocol.V1.ExpectedExport
+  alias BoundedAuthorityProtocol.V1.ExpectedGrant
+  alias BoundedAuthorityProtocol.V1.ExpectedKeyTransition
+  alias BoundedAuthorityProtocol.V1.ExpectedRequest
+  alias BoundedAuthorityProtocol.V1.HistoricalKeyChain
+  alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
   alias BoundedAuthorityProtocol.V1.Json
   alias BoundedAuthorityProtocol.V1.KeyLocator
+  alias BoundedAuthorityProtocol.V1.KeyTransition
   alias BoundedAuthorityProtocol.V1.SigningInput
+  alias BoundedAuthorityProtocol.V1.TrustedIssuer
+  alias BoundedAuthorityProtocol.V3.AnchoredExportFacts
+  alias BoundedAuthorityProtocol.V3.AnchorFacts
+  alias BoundedAuthorityProtocol.V3.ChainFacts
+  alias BoundedAuthorityProtocol.V3.DecodedGrant
+  alias BoundedAuthorityProtocol.V3.DecodedProof
+  alias BoundedAuthorityProtocol.V3.EnvelopeFacts
+  alias BoundedAuthorityProtocol.V3.Grant
+  alias BoundedAuthorityProtocol.V3.GrantFacts
+  alias BoundedAuthorityProtocol.V3.KeyTransitionFacts
+  alias BoundedAuthorityProtocol.V3.Proof
   alias BoundedAuthorityProtocol.V3.RequestDigest
   alias BoundedAuthorityProtocol.V3.Runtime
 
@@ -56,21 +85,33 @@ defmodule BoundedAuthorityProtocol.V3 do
   def untrusted_key_locator(_compact, _limits), do: {:error, :invalid}
 
   @doc "Builds the deterministic standard-JWS grant signing input."
+  @spec grant_signing_input(Grant.t(), Bounds.t() | map()) ::
+          {:ok, SigningInput.t()} | {:error, :invalid}
   defdelegate grant_signing_input(grant, limits), to: Runtime
 
   @doc "Builds the deterministic standard-JWS holder-proof signing input."
+  @spec proof_signing_input(Proof.t(), Bounds.t() | map()) ::
+          {:ok, SigningInput.t()} | {:error, :invalid}
   defdelegate proof_signing_input(proof, limits), to: Runtime
 
   @doc "Encodes one exact canonical consumption-chain row."
+  @spec encode_consumption_entry(ConsumptionEntry.t(), Bounds.t() | map()) ::
+          {:ok, EncodedConsumptionEntry.t()} | {:error, :invalid}
   defdelegate encode_consumption_entry(entry, limits), to: Runtime
 
   @doc "Checks a raw nonempty consumption-chain range against mandatory caller boundaries."
+  @spec check_chain(ChainInput.t(), ExpectedChain.t()) ::
+          {:ok, ChainFacts.t()} | {:error, :invalid}
   defdelegate check_chain(input, expected), to: Runtime
 
   @doc "Builds the deterministic standard-JWS boundary-anchor signing input."
+  @spec boundary_anchor_signing_input(BoundaryAnchor.t(), Bounds.t() | map()) ::
+          {:ok, SigningInput.t()} | {:error, :invalid}
   defdelegate boundary_anchor_signing_input(anchor, limits), to: Runtime
 
   @doc "Builds the deterministic standard-JWS historical-key-transition signing input."
+  @spec key_transition_signing_input(KeyTransition.t(), Bounds.t() | map()) ::
+          {:ok, SigningInput.t()} | {:error, :invalid}
   defdelegate key_transition_signing_input(transition, limits), to: Runtime
 
   @doc """
@@ -83,6 +124,8 @@ defmodule BoundedAuthorityProtocol.V3 do
   `BoundedAuthorityProtocol.Es256.normalize_low_s/1` before assembly (erratum 3). It never
   rewrites the signature bytes it accepts.
   """
+  @spec encode_anchored_export(AnchoredExportInput.t(), ExpectedExport.t()) ::
+          {:ok, EncodedAnchoredExport.t()} | {:error, :invalid}
   defdelegate encode_anchored_export(input, expected), to: Runtime
 
   @doc "Assembles a validated signing input and raw ES256 signature at profile maxima."
@@ -107,27 +150,48 @@ defmodule BoundedAuthorityProtocol.V3 do
     do: Runtime.assemble_compact(signing_input, signature, limits)
 
   @doc "Boundedly decodes a raw compact grant without evaluating trust."
+  @spec decode_grant(binary(), Bounds.t() | map()) :: {:ok, DecodedGrant.t()} | {:error, :invalid}
   defdelegate decode_grant(compact, limits), to: Runtime
 
   @doc "Boundedly decodes a raw compact proof without evaluating trust."
+  @spec decode_proof(binary(), Bounds.t() | map()) :: {:ok, DecodedProof.t()} | {:error, :invalid}
   defdelegate decode_proof(compact, limits), to: Runtime
 
   @doc "Verifies one raw compact grant against caller-supplied trust and expected context."
+  @spec verify_grant(binary(), TrustedIssuer.t(), ExpectedGrant.t()) ::
+          {:ok, GrantFacts.t()} | {:error, :invalid}
   defdelegate verify_grant(compact, trusted_issuer, expected_grant), to: Runtime
 
   @doc "Verifies one raw compact boundary anchor against one exact historical public key."
+  @spec verify_historical_anchor(binary(), HistoricalPublicKey.t(), ExpectedAnchor.t()) ::
+          {:ok, AnchorFacts.t()} | {:error, :invalid}
   defdelegate verify_historical_anchor(compact, key, expected_anchor), to: Runtime
 
   @doc "Verifies one raw compact authenticated historical-key transition."
+  @spec verify_key_transition(
+          binary(),
+          HistoricalPublicKey.t(),
+          HistoricalPublicKey.t(),
+          ExpectedKeyTransition.t()
+        ) :: {:ok, KeyTransitionFacts.t()} | {:error, :invalid}
   defdelegate verify_key_transition(compact, current_key, next_key, expected), to: Runtime
 
   @doc "Atomically verifies one raw anchored export against caller boundaries and key history."
+  @spec verify_anchored_export(
+          ArchivedObject.t(),
+          HistoricalKeyChain.t(),
+          ExpectedAnchoredExport.t()
+        ) :: {:ok, AnchoredExportFacts.t()} | {:error, :invalid}
   defdelegate verify_anchored_export(archived, key_chain, expected), to: Runtime
 
   @doc "Verifies a raw grant-and-proof envelope against server-derived expected context."
+  @spec check_envelope(Credentials.t(), ExpectedRequest.t()) ::
+          {:ok, EnvelopeFacts.t()} | {:error, :invalid}
   defdelegate check_envelope(credentials, expected_request), to: Runtime
 
   @doc "Returns the canonical type-preserving request digest."
+  @spec request_digest(binary(), Json.value(), Bounds.t() | map()) ::
+          {:ok, binary()} | {:error, :invalid}
   def request_digest(operation, cast_arguments, limits),
     do: RequestDigest.digest(operation, cast_arguments, limits)
 

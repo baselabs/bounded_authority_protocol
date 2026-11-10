@@ -27,6 +27,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        "test/bounded_authority_protocol/signature_width_error_shape_test.exs",
                        # Erratum 6 exercises the same selector rule on contract-majors 1, 2 and 3.
                        "test/bounded_authority_protocol/selector_float_zero_test.exs",
+                       # Inspect redaction is checked on the proof structs of every contract-major.
+                       "test/bounded_authority_protocol/inspect_redaction_test.exs",
                        "test/docs_currency_test.exs",
                        "test/spec_facts_test.exs"
                      ])
