@@ -1,8 +1,8 @@
 defmodule BoundedAuthorityProtocol.DocsSamplesTest do
   @moduledoc """
-  Runs the Elixir code blocks of the README quickstart and the getting-started guide, in order,
-  against this package, and pins the value each block ends with. Only the dependency block
-  (`deps`) is skipped, because it is project configuration rather than code.
+  Runs the Elixir code blocks of the README quickstart and every guide, in order, against this
+  package, and pins the value each block ends with. Only a dependency block (`deps`) is skipped,
+  because it is project configuration rather than code.
 
   The prose is checked too: after each block, the text before the next block must state the
   block's value as "The value is `TERM`", "The final value is `TERM`", "The result is `TERM`",
@@ -36,6 +36,35 @@ defmodule BoundedAuthorityProtocol.DocsSamplesTest do
            ]
 
     assert claim_errors(path, File.read!(path)) == []
+  end
+
+  # Every guide page with Elixir code. Each runs top to bottom in one binding, and every block's
+  # value must equal the value the prose states after it.
+  @guides [
+    "docs/guides/recipes.md",
+    "docs/guides/evidence.md",
+    "docs/guides/troubleshooting.md",
+    "docs/guides/cheatsheet.cheatmd"
+  ]
+
+  for path <- @guides do
+    test "every block of #{path} runs with the value its prose states" do
+      path = unquote(path)
+      {blocks, _deps} = elixir_blocks(File.read!(path))
+      assert blocks != [], "#{path} has no runnable elixir block"
+      assert claim_errors(path, File.read!(path)) == []
+    end
+  end
+
+  test "every guide page with an elixir block is executed here" do
+    executed = MapSet.new(["docs/guides/getting-started.md" | @guides])
+
+    with_code =
+      for path <- Path.wildcard("docs/guides/*.{md,cheatmd}"),
+          match?({[_ | _], _deps}, path |> File.read!() |> elixir_blocks()),
+          do: path
+
+    assert Enum.reject(with_code, &MapSet.member?(executed, &1)) == []
   end
 
   test "the block extractor sees every elixir block and skips only the dependency block" do
@@ -78,18 +107,32 @@ defmodule BoundedAuthorityProtocol.DocsSamplesTest do
 
   # Runs the blocks and returns, per block, its value and the prose that follows it.
   defp run_markdown(markdown, path) do
-    {blocks, [_deps]} = elixir_blocks(markdown)
+    {blocks, _deps} = elixir_blocks(markdown)
     assert blocks != [], "#{path} has no runnable elixir block"
 
     # Aliases from an earlier block stay in scope for later ones, as in an IEx session.
-    {values, _state} =
-      Enum.map_reduce(blocks, {[], Code.env_for_eval(file: path)}, fn block, {binding, env} ->
-        quoted = Code.string_to_quoted!(block, file: path)
-        {value, binding, env} = Code.eval_quoted_with_env(quoted, binding, env)
-        {value, {binding, env}}
+    {{values, _state}, warnings} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Enum.map_reduce(blocks, {[], Code.env_for_eval(file: path)}, fn block, {binding, env} ->
+          quoted = Code.string_to_quoted!(block, file: path)
+          {value, binding, env} = Code.eval_quoted_with_env(quoted, binding, env)
+          {value, {binding, env}}
+        end)
       end)
 
+    assert unexpected_warnings(warnings) == [], "#{path} compiles with warnings:\n#{warnings}"
     Enum.zip(values, prose_after_blocks(markdown))
+  end
+
+  # The Plug recipe calls Plug.Conn, which this package does not depend on; the compiler's
+  # "is undefined" warning for exactly that module is expected. Any other warning fails.
+  defp unexpected_warnings(output) do
+    output
+    |> String.split("\n")
+    |> Enum.filter(&String.contains?(&1, "warning:"))
+    |> Enum.reject(
+      &(&1 =~ ~r/warning: Plug\.Conn\.\w+\/\d is undefined \(module Plug\.Conn is not available/)
+    )
   end
 
   defp claim_errors(path, markdown) do
@@ -100,11 +143,11 @@ defmodule BoundedAuthorityProtocol.DocsSamplesTest do
 
   defp block_claim_errors(value, prose) do
     whole =
-      Regex.scan(~r/\b(?:value|result) is `([^`]+)`/, prose, capture: :all_but_first)
+      Regex.scan(~r/\b(?:value|result) is\s+`([^`]+)`/, prose, capture: :all_but_first)
       |> List.flatten()
 
     each =
-      Regex.scan(~r/\bEach entry is `([^`]+)`/, prose, capture: :all_but_first)
+      Regex.scan(~r/\bEach entry is\s+`([^`]+)`/, prose, capture: :all_but_first)
       |> List.flatten()
 
     if whole == [] and each == [] do

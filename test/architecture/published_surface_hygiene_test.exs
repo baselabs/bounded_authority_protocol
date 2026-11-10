@@ -53,10 +53,17 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "docs/guides/implementers-guide.md",
     "docs/guides/upgrading.md",
     "docs/livebooks/bap-walkthrough.livemd",
-    "docs/deployment/go-sdk.md",
-    "docs/deployment/python-sdk.md",
-    "docs/deployment/rust-sdk.md",
-    "docs/deployment/typescript-sdk.md",
+    "docs/guides/choosing-a-profile.md",
+    "docs/guides/recipes.md",
+    "docs/guides/evidence.md",
+    "docs/guides/troubleshooting.md",
+    "docs/guides/api-stability.md",
+    "docs/guides/other-languages.md",
+    "docs/guides/glossary.md",
+    "docs/guides/faq.md",
+    "docs/guides/cheatsheet.cheatmd",
+    "docs/livebooks/service-integration.livemd",
+    "docs/livebooks/chains-and-archives.livemd",
     "docs/design/conformance-contract.md",
     "docs/design/interoperability-report.md",
     "docs/design/protocol-charter.md",
@@ -116,6 +123,112 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     File.write!(path, "a kimosabe note")
     assert path in wildcard(root)
     assert Enum.any?(@banned, &Regex.match?(&1, File.read!(path)))
+  end
+
+  # Decision records are local and unpublished, so a shipped file or HexDocs page that cites one
+  # by number points the reader at nothing. Shipped text states the rule itself or links a
+  # shipped section (a specification, governance, or the errata registry).
+  @adr_citation ~r/\bADR[ -]?0\d/
+
+  test "no shipped file or HexDocs page cites a decision record by number" do
+    violations =
+      for path <- shipped_and_extras(),
+          line <- path |> File.read!() |> String.split("\n") |> Enum.with_index(1),
+          {text, number} = line,
+          Regex.match?(@adr_citation, text),
+          do: "#{path}:#{number}: #{String.trim(text)}"
+
+    assert violations == [],
+           "decision-record citations in the published surface:\n#{Enum.join(violations, "\n")}"
+  end
+
+  test "the decision-record check is red-capable" do
+    for text <- ["see ADR 0040", "(ADR-0015)", "ADR 0021 §2"] do
+      assert Regex.match?(@adr_citation, text), text
+    end
+
+    refute Regex.match?(@adr_citation, "a GRADR 01 token")
+  end
+
+  test "no HexDocs page starts with YAML front matter" do
+    violations = for path <- extras(), front_matter?(File.read!(path)), do: path
+    assert violations == [], "front matter renders as text on HexDocs: #{inspect(violations)}"
+    assert front_matter?("---\ntitle: x\n---\n# Heading\n")
+    refute front_matter?("# Heading\n\n---\n")
+  end
+
+  # Prose names the wire contract "contract-major N" and the package "package 1.x" or a release
+  # number. A bare "v1" in guide prose is ambiguous between the two, so it is refused outside
+  # code, inline code, and link targets.
+  @guide_prose ["README.md", "usage-rules.md", "docs/guides", "docs/livebooks"]
+
+  test "guide prose never says a bare v1, v2, or v3" do
+    violations =
+      for root <- @guide_prose,
+          path <- wildcard(root),
+          Path.extname(path) in [".md", ".cheatmd", ".livemd"],
+          {line, number} <- path |> File.read!() |> prose_lines(),
+          [token] <- Regex.scan(~r/\b[vV][1-9]\b/, line),
+          do: "#{path}:#{number}: #{token} in #{inspect(String.trim(line))}"
+
+    assert violations == [],
+           ~s{say "contract-major N" (wire) or "package 1.x" (Hex), not a bare major:\n} <>
+             Enum.join(violations, "\n")
+  end
+
+  test "the bare-major prose check is red-capable and skips code" do
+    markdown = """
+    The v1 envelope verifies.
+
+    ```elixir
+    alias BoundedAuthorityProtocol.V1
+    ```
+
+    Call `V1.verify_grant/3` or read [the spec](spec/bap-v1.md) for contract-major 1.
+    """
+
+    assert [{"The v1 envelope verifies.", 1}] =
+             markdown |> prose_lines() |> Enum.filter(&(elem(&1, 0) =~ ~r/\b[vV][1-9]\b/))
+  end
+
+  defp extras do
+    for extra <- Mix.Project.config()[:docs][:extras] do
+      case extra do
+        {path, _options} -> path
+        path -> path
+      end
+    end
+  end
+
+  defp shipped_and_extras do
+    @roots |> Enum.flat_map(&wildcard/1) |> Enum.concat(extras()) |> Enum.uniq()
+  end
+
+  defp front_matter?(source), do: String.starts_with?(source, "---\n")
+
+  # Lines of prose with fenced blocks, HTML comments, inline code, link targets, and URLs removed.
+  defp prose_lines(markdown) do
+    {lines, _fenced?} =
+      markdown
+      |> String.split("\n")
+      |> Enum.with_index(1)
+      |> Enum.map_reduce(false, fn {line, number}, fenced? ->
+        cond do
+          String.starts_with?(String.trim_leading(line), "```") -> {nil, not fenced?}
+          fenced? -> {nil, fenced?}
+          true -> {{strip_code_and_links(line), number}, fenced?}
+        end
+      end)
+
+    Enum.reject(lines, &is_nil/1)
+  end
+
+  defp strip_code_and_links(line) do
+    line
+    |> String.replace(~r/<!--.*?-->/, "")
+    |> String.replace(~r/`[^`]*`/, "")
+    |> String.replace(~r/\]\([^)]*\)/, "]")
+    |> String.replace(~r/https?:\/\/\S+/, "")
   end
 
   defp wildcard(root) do
