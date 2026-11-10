@@ -11,18 +11,16 @@ issuer signs a **capability grant** that names exactly which operations a holder
 which arguments; the holder signs a **proof of possession** for each request; a verifier checks
 the exact bytes and returns redacted facts. It never returns an authorization decision.
 
-The package is pure and deterministic. It holds no keys, reads no clock, performs no I/O, and
-has no runtime dependencies. Every failure is the single value-free `{:error, :invalid}`, and
-the wire profile is closed: unknown members, algorithms, encodings, and over-limit structures
-are rejected, with no permissive mode. It builds on compact JWS ([RFC 7515](https://www.rfc-editor.org/rfc/rfc7515)),
-DPoP ([RFC 9449](https://www.rfc-editor.org/rfc/rfc9449)), JCS ([RFC 8785](https://www.rfc-editor.org/rfc/rfc8785)),
-JWK thumbprints ([RFC 7638](https://www.rfc-editor.org/rfc/rfc7638)), Ed25519
-([RFC 8032](https://www.rfc-editor.org/rfc/rfc8032)), and ES256 ([RFC 7518](https://www.rfc-editor.org/rfc/rfc7518)).
+The package is pure and deterministic: no keys, no clock, no I/O, no runtime dependencies. Every
+failure is the single value-free `{:error, :invalid}`, and the wire profile is closed, with no
+permissive mode. It builds on compact JWS, DPoP, JCS, and JWK thumbprints
+([RFC 7515](https://www.rfc-editor.org/rfc/rfc7515), [9449](https://www.rfc-editor.org/rfc/rfc9449),
+[8785](https://www.rfc-editor.org/rfc/rfc8785), [7638](https://www.rfc-editor.org/rfc/rfc7638)).
 
 ## Versions
 
-The Hex package and the wire contract are versioned separately. "Package 1.x" is a Hex release
-line; "contract-major N" is a closed wire profile, and a package release carries several of them.
+"Package 1.x" is a Hex release line; "contract-major N" is a closed wire profile. One package
+release carries several profiles.
 
 | What | Version | Namespace | Suite | Specification |
 |---|---|---|---|---|
@@ -34,23 +32,19 @@ line; "contract-major N" is a closed wire profile, and a package release carries
 | Role attestations | profile 1 | `...RoleAttestation.V1` | Ed25519 | [spec](spec/bap-role-attestation-v1.md) |
 | Content assertions | profile 1 | `...ContentAssertion.V1` | Ed25519 | [spec](spec/bap-content-assertion-v1.md) |
 
-[Choosing a profile](docs/guides/choosing-a-profile.md) explains which one to use, and
-[API stability and versioning](docs/guides/api-stability.md) lists what each package release
-line promises.
+See [Choosing a profile](docs/guides/choosing-a-profile.md) and
+[API stability and versioning](docs/guides/api-stability.md).
 
 ## Installation
 
 ```elixir
 def deps do
-  [
-    {:bounded_authority_protocol, "~> 0.9.1"}
-  ]
+  [{:bounded_authority_protocol, "~> 0.9.1"}]
 end
 ```
 
-Mix enforces `elixir: "~> 1.18"`. The package also needs Erlang/OTP 27 or later for the
-standard-library `:json` module; nothing checks that for you. CI tests Elixir 1.18 on OTP 27,
-1.19 on OTP 28, and 1.20 on OTP 29. Depend on the Hex release, never on a Git tag or checkout.
+Elixir 1.18 or later (Mix enforces it) and Erlang/OTP 27 or later (for `:json`; nothing checks
+it). CI tests Elixir 1.18, 1.19, and 1.20 on OTP 27, 28, and 29.
 
 ## Quickstart
 
@@ -146,55 +140,43 @@ other_section = {:object, [{"section", {:string, "sports"}}, {"title", {:string,
 The final value is `{"publish_article", :not_evaluated}`: the bytes verified, and the
 authorization decision is still yours to make.
 
-## What it does, and what it leaves to you
+## What it leaves to you
 
-The package verifies grants and proofs, consumption chains, boundary anchors, key transitions,
-and anchored exports; it computes the exact signing input for every protocol object and
-assembles compact forms from a signature you supply. It does not select trusted keys, issue
-grants, hold or use private keys, reserve replay, check live revocation, or decide whether an
-effect is authorized. Those belong to your service or a stateful authority runtime; the
-[usage rules](usage-rules.md) list them. To sign with keys in an HSM, a KMS, or a local key
-store, use the holder-side companion
-[`bounded_authority_report_adapter`](https://hex.pm/packages/bounded_authority_report_adapter).
+The package verifies grants, proofs, and the evidence formats, and computes the exact bytes to
+sign for every protocol object. It does not select trusted keys, hold private keys, reserve
+replay, check revocation, or decide whether an effect is authorized; the
+[usage rules](usage-rules.md) list what your service owns. To sign with keys in an HSM, a KMS, or
+a key store, use [`bounded_authority_report_adapter`](https://hex.pm/packages/bounded_authority_report_adapter).
 
 ## Conformance
 
-The package ships every certified corpus under `priv/conformance` and a verifier CLI that exits
-`0` only on complete agreement (`1` on any disagreement or integrity failure, `2` on a usage
-error). Contract-major 1's corpus has 283 cases across 28 surfaces, independently re-verified by
-a second implementation. To run a corpus from your project:
+Every certified corpus ships under `priv/conformance`, with a CLI that exits `0` only on
+complete agreement. Contract-major 1's corpus alone has 283 cases across 28 surfaces:
 
 ```bash
 mix escript.install hex bounded_authority_protocol 0.9.1
 bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus
 ```
 
-[Recipes](docs/guides/recipes.md#run-every-packaged-corpus) runs every packaged corpus from
-Elixir. Python, Rust, Go, and TypeScript verifiers pass the same corpora; see
-[Other languages](docs/guides/other-languages.md).
+TypeScript, Python, Rust, and Go verifiers pass the same corpora
+([Other languages](docs/guides/other-languages.md)).
 
 ## Documentation
 
-- Start: [Getting started](docs/guides/getting-started.md), the
-  [cheatsheet](docs/guides/cheatsheet.cheatmd), and three Livebooks: the
-  [protocol walkthrough](docs/livebooks/bap-walkthrough.livemd),
-  [service integration](docs/livebooks/service-integration.livemd), and
-  [chains and archives](docs/livebooks/chains-and-archives.livemd).
-- Guides: [Choosing a profile](docs/guides/choosing-a-profile.md),
-  [Recipes](docs/guides/recipes.md), [Evidence](docs/guides/evidence.md),
-  [Troubleshooting `{:error, :invalid}`](docs/guides/troubleshooting.md),
-  [Usage rules](usage-rules.md), [Upgrading](docs/guides/upgrading.md), and the
-  [implementer's guide](docs/guides/implementers-guide.md).
-- Reference: [API stability and versioning](docs/guides/api-stability.md),
-  [Glossary](docs/guides/glossary.md), [FAQ](docs/guides/faq.md),
-  [threat model](docs/design/threat-model.md), [governance](docs/governance.md), and the
-  [errata registry](docs/errata.md).
+[Getting started](docs/guides/getting-started.md), the [cheatsheet](docs/guides/cheatsheet.cheatmd),
+and three Livebooks: the [walkthrough](docs/livebooks/bap-walkthrough.livemd),
+[service integration](docs/livebooks/service-integration.livemd), and
+[chains and archives](docs/livebooks/chains-and-archives.livemd). Then the guides:
+[Recipes](docs/guides/recipes.md), [Evidence](docs/guides/evidence.md),
+[Troubleshooting](docs/guides/troubleshooting.md), [Upgrading](docs/guides/upgrading.md), the
+[glossary](docs/guides/glossary.md), the [FAQ](docs/guides/faq.md), the
+[threat model](docs/design/threat-model.md), and [governance](docs/governance.md).
 
 ## Security
 
-Report a vulnerability privately through the repository's
-[Security tab](https://github.com/baselabs/bounded_authority_protocol/security) ("Report a
-vulnerability"). [`SECURITY.md`](SECURITY.md) has the supported versions and the process.
+Report a vulnerability privately through the
+[Security tab](https://github.com/baselabs/bounded_authority_protocol/security); see
+[`SECURITY.md`](SECURITY.md).
 
 ## License
 
