@@ -12,6 +12,17 @@ All notable changes to `bounded_authority_protocol` are documented here.
   nonce; every major's `DecodedProof` redacts the nonce; `V1.SigningInput` redacts its segments
   and message. The other fields still render, as `#Module<field: value, …>`. Facts structs keep
   their fixed `#Module<redacted>` form. Deliberately logging a field still logs it.
+- `V1.Bounds` no longer enforces its keys: every field defaults to its profile maximum, so
+  `%Bounds{}` equals `Bounds.maximum()` and `%Bounds{depth: 8}` tightens one ceiling. A bound added
+  in a later minor release defaults to its maximum and leaves existing literals compiling.
+  `coerce/1` still rejects widened, zero, negative, non-integer and fixed-width-changing values;
+  no maximum changes. The module documents every field with its maximum and unit.
+- The request-digest projection enforces its depth, node, container and string budgets while it
+  walks `cast_arguments`, on every contract-major (`request_digest/3`, proof production and
+  envelope verification all share it). Before, it projected the whole host-supplied tree and only
+  then checked bounds, so a two-million-item argument cost a full walk; it now stops at the first
+  exceeded budget. The accepted set and the digest bytes are unchanged (a property test compares
+  it with the unbudgeted projection).
 
 ### Documentation
 

@@ -30,6 +30,14 @@ defmodule BoundedAuthorityProtocol.V1.BoundsTest do
     assert {:error, :invalid} = Bounds.new(:invalid)
   end
 
+  test "every field defaults to its profile maximum, so literals survive added bounds" do
+    assert %Bounds{} == Bounds.maximum()
+    assert {:ok, %Bounds{} = tightened} = Bounds.coerce(%Bounds{depth: 8})
+    assert tightened == %{Bounds.maximum() | depth: 8}
+    assert {:error, :invalid} = Bounds.coerce(%Bounds{depth: 33})
+    assert {:error, :invalid} = Bounds.coerce(%Bounds{digest_bytes: 16})
+  end
+
   test "a forged struct cannot widen any profile maximum" do
     maximum = Bounds.maximum()
 
