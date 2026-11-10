@@ -25,8 +25,8 @@ a checkout of this repository.
 - Rust **1.81** or later (`rust-version` in `Cargo.toml`; `rust-toolchain.toml` pins 1.81 for
   development and CI).
 - Runtime dependencies: `ed25519-dalek` 2.2 (default features off), `p256` 0.13 (ECDSA only, for
-  contract-major 3), `sha2` 0.10, `ryu-js` 1.0, and `zeroize` pinned to exactly 1.8.1 (a
-  dependency of `p256`; later 1.x releases need Rust 1.85). See the
+  contract-major 3), `sha2` 0.10, `ryu-js` 1.0, and `zeroize` pinned to exactly 1.8.2 (a
+  dependency of `p256`; its 1.9 line needs Rust 1.85). See the
   [deployment notes](../../docs/deployment/rust-sdk.md) for the full tree and its `unsafe` use.
 - `#![forbid(unsafe_code)]` covers this crate's own source.
 - **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
