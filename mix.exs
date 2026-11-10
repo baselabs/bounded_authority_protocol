@@ -170,7 +170,21 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "BoundedAuthorityProtocol.Conformance.Runner",
         "BoundedAuthorityProtocol.Conformance.Report",
         "BoundedAuthorityProtocol.Conformance.Cli.Main",
-        "BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1"
+        "BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1",
+        "BoundedAuthorityProtocol.Ed25519.signature_gate?/1",
+        "BoundedAuthorityProtocol.Ed25519.strict_gate?/2",
+        "BoundedAuthorityProtocol.V1.Selector.float_zero_free?/1",
+        "BoundedAuthorityProtocol.V1.Selector.integral_float_free?/1",
+        "BoundedAuthorityProtocol.V1.Selector.match_all/3",
+        "BoundedAuthorityProtocol.V1.Selector.semantic_equal?/2",
+        "BoundedAuthorityProtocol.V2.Selector.float_zero_free?/1",
+        "BoundedAuthorityProtocol.V2.Selector.integral_float_free?/1",
+        "BoundedAuthorityProtocol.V2.Selector.match_all/3",
+        "BoundedAuthorityProtocol.V2.Selector.semantic_equal?/2",
+        "BoundedAuthorityProtocol.V3.Selector.float_zero_free?/1",
+        "BoundedAuthorityProtocol.V3.Selector.integral_float_free?/1",
+        "BoundedAuthorityProtocol.V3.Selector.match_all/3",
+        "BoundedAuthorityProtocol.V3.Selector.semantic_equal?/2"
       ],
       extras: [
         {"README.md", [title: "Overview"]},

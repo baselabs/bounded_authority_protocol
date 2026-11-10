@@ -54,6 +54,23 @@ All notable changes to `bounded_authority_protocol` are documented here.
   `V3.EcJwk.public_key_thumbprint_raw/2` are now documented public API (they were `@doc false`
   although the quickstart uses them), with executable examples. `V1.Jwk.thumbprint_digest_unchecked/1`
   stays undocumented and outside the stable surface.
+- New guides: Choosing a profile; Recipes (Plug and Phoenix integration with tagged
+  `cast_arguments`, selectors per contract-major, ES256 from KMS or HSM DER, issuer key rotation,
+  nonce modes, running every packaged corpus through `Conformance.Cli.run/1`); Evidence;
+  Troubleshooting `{:error, :invalid}`; API stability and versioning, checked against the
+  architecture gate's stable surface; Other languages, which replaces the four SDK deployment
+  pages on HexDocs; Glossary; FAQ; and a runnable cheatsheet. Upgrading is rewritten for 0.x to
+  1.0, the README is a short landing page with a versions table, and the threat model covers
+  ES256 and the sibling profiles. Every Elixir block in the guides runs in the test suite.
+- Two new Livebooks, service integration and chains and archives; the walkthrough uses the
+  `Es256` helpers and states each expected result. One harness runs every notebook against the
+  checkout in `mix test` and against the unpacked package archive in `mix package.check`, and
+  `scripts/livebook_registry_readback.exs` runs each notebook's own `Mix.install` against Hex
+  after a release.
+- HexDocs groups: Start here, Guides, Reference, Specifications, Conformance and governance, and
+  Project; facade functions are grouped as Producers, Decoders, and Verifiers. A docs gate rejects
+  decision-record citations in shipped files, front matter on HexDocs pages, and a bare
+  "v1"/"v2"/"v3" in guide prose.
 
 ### Fixed
 

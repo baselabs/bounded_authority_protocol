@@ -146,7 +146,7 @@ Sibling profiles:
 Conformance:
 
 - `BoundedAuthorityProtocol.Conformance.Cli`: `run/1` and the `bounded_authority_conformance`
-  command. Its flags (`--corpus DIR`, required; `--report PATH`; `--help`), its exit statuses
+  command. Its flags (`--corpus DIR`, required; `--report PATH`; `--help`; `--version`), its exit statuses
   (`0` complete agreement, `1` any disagreement, integrity, completeness, or I/O failure, `2` a
   usage error), and its report's JSON fields (`format`, `agreement`, `exit_status`, `total`,
   `agreed`, `disagreed`, `index_sha256_base64url`) are part of the contract.
@@ -162,8 +162,15 @@ change in any release:
   and `BoundedAuthorityProtocol.Conformance.Report`, the CLI's internals;
 - `BoundedAuthorityProtocol.Conformance.Cli.Main`, the escript entry point;
 - `BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1`;
-- the undocumented gate helpers in `BoundedAuthorityProtocol.Ed25519` and
-  `BoundedAuthorityProtocol.Es256`;
+- the signature gate helpers `BoundedAuthorityProtocol.Ed25519.signature_gate?/1` and
+  `BoundedAuthorityProtocol.Ed25519.strict_gate?/2`;
+- the selector helpers that verification and the producers share, in each of `BoundedAuthorityProtocol.V1.Selector`, `BoundedAuthorityProtocol.V2.Selector`, and `BoundedAuthorityProtocol.V3.Selector`:
+  - `BoundedAuthorityProtocol.V1.Selector.float_zero_free?/1`, `BoundedAuthorityProtocol.V1.Selector.integral_float_free?/1`,
+    `BoundedAuthorityProtocol.V1.Selector.match_all/3`, `BoundedAuthorityProtocol.V1.Selector.semantic_equal?/2`;
+  - `BoundedAuthorityProtocol.V2.Selector.float_zero_free?/1`, `BoundedAuthorityProtocol.V2.Selector.integral_float_free?/1`,
+    `BoundedAuthorityProtocol.V2.Selector.match_all/3`, `BoundedAuthorityProtocol.V2.Selector.semantic_equal?/2`;
+  - `BoundedAuthorityProtocol.V3.Selector.float_zero_free?/1`, `BoundedAuthorityProtocol.V3.Selector.integral_float_free?/1`,
+    `BoundedAuthorityProtocol.V3.Selector.match_all/3`, `BoundedAuthorityProtocol.V3.Selector.semantic_equal?/2`;
 - every function or module marked `@doc false` or `@moduledoc false`.
 
 Also not covered: the text of `inspect/2` output (it redacts credentials, arguments, and nonces,
@@ -175,7 +182,7 @@ any message the CLI writes to standard error.
 Whatever the package version:
 
 - every verification and production function returns `{:ok, value}` or exactly
-  `{:error, :invalid}`, and never raises on any input;
+  `{:error, :invalid}`, and signals every failure with that one value;
 - the facts are redacted and never authorize (`authorization: :not_evaluated`,
   `trust: :not_evaluated`);
 - the package performs no I/O, reads no clock, and holds no keys, outside the conformance CLI's
