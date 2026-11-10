@@ -20,6 +20,11 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   @shipped_corpus Path.expand("../../priv/conformance/v1/corpus", __DIR__)
   @shipped_v2_corpus Path.expand("../../priv/conformance/v2/corpus", __DIR__)
   @shipped_v3_corpus Path.expand("../../priv/conformance/v3/corpus", __DIR__)
+  @priv_conformance Path.expand("../../priv/conformance", __DIR__)
+  @role_corpus Path.expand(
+                 "../../priv/conformance/attestation-profiles/role-attestation/v1",
+                 __DIR__
+               )
 
   # --- in-VM Cli.run/1 unit tests (the coverage path) -----------------------
 
@@ -52,7 +57,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     assert Cli.run(["--corpus", @shipped_v3_corpus]) == 0
   end
 
-  # --- ADR 0014 D4: the certified-corpus pin (index-SHA) ---------------------
+  # --- the certified-corpus pin (index-SHA) -----------------------------------
   # The pin fails closed on any corpus that is NOT the certified snapshot, and the certified value
   # is NOT caller-overridable (no seam). Proven WITHOUT a seam: a corpus whose index.json carries
   # insignificant trailing whitespace still decodes, verifies, and agrees (integrity is over the
@@ -223,6 +228,195 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     end)
 
     assert Cli.run(["--corpus", corpus]) == 1
+  end
+
+  # --- help, version, stderr -------------------------------------------------
+
+  test "--help and -h print the usage to stdout and exit 0" do
+    for flag <- ["--help", "-h"] do
+      out = ExUnit.CaptureIO.capture_io(fn -> assert Cli.run([flag]) == 0 end)
+      assert out =~ "usage: bounded_authority_conformance --corpus DIR"
+    end
+  end
+
+  test "--version prints the package version and exits 0" do
+    out = ExUnit.CaptureIO.capture_io(fn -> assert Cli.run(["--version"]) == 0 end)
+    assert out == Mix.Project.config()[:version] <> "\n"
+  end
+
+  test "a usage error prints the usage to stderr, not stdout, and exits 2" do
+    err =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        assert ExUnit.CaptureIO.capture_io(fn -> assert Cli.run(["--bogus"]) == 2 end) == ""
+      end)
+
+    assert err =~ "usage:"
+  end
+
+  test "a failure writes one value-free line to stderr and no report" do
+    corpus = tampered_corpus_copy(&flip_one_case_byte/1)
+    on_exit(fn -> File.rm_rf!(corpus) end)
+
+    {out, err} = run_captured(["--corpus", corpus])
+    assert out == ""
+    assert err == "bounded_authority_conformance: the corpus failed integrity verification\n"
+    refute err =~ corpus
+  end
+
+  test "every packaged corpus verifies with a newline-terminated report of its full census" do
+    for {dir, format, total} <- [
+          {"v1/corpus", "v1", nil},
+          {"v2/corpus", "v2", nil},
+          {"v3/corpus", "v3", nil},
+          {"strict-ed25519", "strict-ed25519", nil},
+          {"producer-canonicality", "producer-canonicality", nil},
+          {"selector-float-zero", "selector-float-zero", 161},
+          {"application-profiles/local-loopback-http/v1", "local-loopback-http", 46},
+          {"attestation-profiles/role-attestation/v1", "role-attestation", 40},
+          {"attestation-profiles/content-assertion/v1", "content-assertion", 154}
+        ] do
+      path = Path.join(@priv_conformance, dir)
+      {out, err} = run_captured(["--corpus", path])
+      assert err == "", dir
+      assert String.ends_with?(out, "}\n"), dir
+      report = :json.decode(out)
+
+      assert Map.keys(report) |> Enum.sort() ==
+               ~w(agreed agreement disagreed exit_status format index_sha256_base64url total)
+
+      assert report["format"] == "bounded-authority-protocol-#{format}-conformance-report"
+      assert report["agreement"] == true and report["exit_status"] == 0
+      assert report["disagreed"] == 0 and report["agreed"] == report["total"]
+
+      expected_total =
+        total || :json.decode(File.read!(Path.join(path, "index.json")))["total_cases"]
+
+      assert report["total"] == expected_total, dir
+    end
+  end
+
+  # --- what the CLI reads -----------------------------------------------------
+
+  test "a symbolic link anywhere inside the corpus is refused, even to an identical file" do
+    for target <- [:case_file, :index, :directory] do
+      dir = sibling_copy()
+      on_exit(fn -> File.rm_rf!(dir) end)
+
+      case target do
+        :case_file ->
+          path = Path.join(dir, "attestation-cases.json")
+          File.rm!(path)
+          File.ln_s!(Path.expand(Path.join(@role_corpus, "attestation-cases.json")), path)
+
+        :index ->
+          path = Path.join(dir, "index.json")
+          File.rm!(path)
+          File.ln_s!(Path.expand(Path.join(@role_corpus, "index.json")), path)
+
+        :directory ->
+          File.ln_s!(System.tmp_dir!(), Path.join(dir, "linked"))
+      end
+
+      {_out, err} = run_captured(["--corpus", dir])
+      assert err =~ "symbolic link", inspect(target)
+    end
+  end
+
+  test "a file the index does not name is refused, at any depth" do
+    for extra <- ["stray.json", "nested/deeper/stray.raw"] do
+      dir = sibling_copy()
+      on_exit(fn -> File.rm_rf!(dir) end)
+      path = Path.join(dir, extra)
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, "{}")
+      {_out, err} = run_captured(["--corpus", dir])
+      assert err =~ "does not name", extra
+    end
+  end
+
+  test "files over 1 MiB and directories over 4096 entries are refused before reading" do
+    dir = sibling_copy()
+    on_exit(fn -> File.rm_rf!(dir) end)
+    File.write!(Path.join(dir, "attestation-cases.json"), :binary.copy(" ", 1_048_577))
+    {_out, err} = run_captured(["--corpus", dir])
+    assert err =~ "exceeds the 1 MiB limit"
+
+    dir = sibling_copy()
+    on_exit(fn -> File.rm_rf!(dir) end)
+    many = Path.join(dir, "many")
+    File.mkdir_p!(many)
+    for n <- 1..4_096, do: File.write!(Path.join(many, "#{n}"), "")
+    {_out, err} = run_captured(["--corpus", dir])
+    assert err =~ "4096 entries"
+  end
+
+  test "an index that is not JSON, or names an unsafe path, is refused" do
+    for index <- [
+          "not json",
+          ~s({"files":"nope"}),
+          ~s({"files":[{"path":"../escape.json"}]}),
+          ~s({"files":[{"path":"/absolute.json"}]}),
+          ~s({"files":[{"path":"a/./b.json"}]}),
+          ~s({"files":[{"path":"a\\\\b.json"}]}),
+          ~s({"files":[{"path":"index.json"}]}),
+          ~s({"files":[{"path":"a.json"},{"path":"a.json"}]}),
+          ~s({"files":[{"name":"a.json"}]})
+        ] do
+      dir = sibling_copy()
+      on_exit(fn -> File.rm_rf!(dir) end)
+      File.write!(Path.join(dir, "index.json"), index)
+      {_out, err} = run_captured(["--corpus", dir])
+      assert err =~ "index is missing, malformed or names an unsafe path", index
+    end
+  end
+
+  test "an unreadable subdirectory or a missing corpus directory is refused" do
+    dir = sibling_copy()
+    locked = Path.join(dir, "locked")
+    File.mkdir_p!(locked)
+    File.chmod!(locked, 0o000)
+
+    on_exit(fn ->
+      File.chmod(locked, 0o755)
+      File.rm_rf!(dir)
+    end)
+
+    {_out, err} = run_captured(["--corpus", dir])
+    assert err =~ "cannot read"
+
+    {_out, err} = run_captured(["--corpus", Path.join(dir, "absent")])
+    assert err =~ "cannot read"
+  end
+
+  test "a sibling corpus that is internally consistent but not certified fails closed" do
+    dir = sibling_copy()
+    on_exit(fn -> File.rm_rf!(dir) end)
+    index = Path.join(dir, "index.json")
+    File.write!(index, File.read!(index) <> "\n")
+    {_out, err} = run_captured(["--corpus", dir])
+    assert err =~ "not a certified corpus"
+  end
+
+  defp sibling_copy do
+    dir = Path.join(System.tmp_dir!(), "bap-cli-sibling-#{System.unique_integer([:positive])}")
+    File.cp_r!(@role_corpus, dir)
+    dir
+  end
+
+  defp run_captured(argv) do
+    parent = self()
+
+    err =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        out = ExUnit.CaptureIO.capture_io(fn -> send(parent, {:status, Cli.run(argv)}) end)
+        send(parent, {:out, out})
+      end)
+
+    assert_received {:status, status}
+    assert_received {:out, out}
+    assert status in [0, 1]
+    assert status == 0 == (err == "")
+    {out, err}
   end
 
   # --- escript integration tests (end-to-end exit contract) -----------------

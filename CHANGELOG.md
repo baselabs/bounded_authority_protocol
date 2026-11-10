@@ -23,6 +23,27 @@ All notable changes to `bounded_authority_protocol` are documented here.
   then checked bounds, so a two-million-item argument cost a full walk; it now stops at the first
   exceeded budget. The accepted set and the digest bytes are unchanged (a property test compares
   it with the unbudgeted projection).
+- `Conformance.Corpus`, `Conformance.Runner` and `Conformance.Report` are now internal
+  (`@moduledoc false`) and outside the stable surface; `Conformance.Cli.run/1` and the
+  `bounded_authority_conformance` escript are the supported way to run a corpus. The CLI now exits
+  0 only when the executed cases are exactly the certified census: unique case ids, the same id set
+  and count as the index, each case executed from the file that declares it. Before, a run that
+  dropped a case (or dropped one and repeated another) still reported agreement. The report's
+  members (`format`, `agreement`, `exit_status`, `total`, `agreed`, `disagreed`,
+  `index_sha256_base64url`), the flags and the exit statuses are a stable CLI contract, documented
+  on `Conformance.Cli`.
+- The conformance CLI verifies the three sibling-profile corpora (local-loopback HTTP, role
+  attestation, content assertion), recognized from their index like the other six, so every
+  packaged corpus runs from an installed package. `mix conformance.verify` runs all nine.
+- The conformance CLI reads `index.json` and then only the files it names, never following a
+  symbolic link: it refuses a link or other non-regular entry inside the corpus directory, a file
+  the index does not name, an unsafe index path, a file over 1 MiB and a directory over 4,096
+  entries. `--help`/`-h` and `--version` print to standard output and exit 0 (`--help` used to
+  exit 2). Usage errors go to standard error. Every failure writes one value-free line to standard
+  error naming its class, and the report ends with a newline.
+- The architecture gate pins the package 1.x stable surface (`stable_modules/0`), its exclusions
+  (`excluded_surface/0`), the field set of every stable struct (`public_struct_fields/0`) and the
+  `RoleAttestation.V1` exports; a test checks them against the compiled package.
 
 ### Documentation
 
