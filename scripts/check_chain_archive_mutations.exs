@@ -1,4 +1,8 @@
+Code.require_file("mutation_gate_support.exs", __DIR__)
+
 defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
+  alias BoundedAuthorityProtocol.MutationGateSupport
+
   @root Path.expand("..", __DIR__)
 
   @mutations [
@@ -451,24 +455,21 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
   ]
 
   def run do
+    # Several targets run the independent Node runners; a different Node can change their verdicts.
+    MutationGateSupport.require_tool_node!()
+
     # Each distinct command's baseline once, then every mutation; all of them run in their own
-    # scratch copy, so they run side by side, one per scheduler.
+    # scratch copy, so they run side by side, one per scheduler. Any survival or failed baseline
+    # halts with status 3 and no ok line.
     @mutations
     |> Enum.uniq_by(& &1.command)
-    |> parallel(&baseline_green!/1)
+    |> MutationGateSupport.run_all(&baseline_green!/1, nil)
 
-    parallel(@mutations, &run_mutation/1)
-    IO.puts("chain_archive mutation gate: ok mutations=#{length(@mutations)}")
-  end
-
-  defp parallel(items, fun) do
-    items
-    |> Task.async_stream(fun,
-      max_concurrency: System.schedulers_online(),
-      ordered: false,
-      timeout: :infinity
+    MutationGateSupport.run_all(
+      @mutations,
+      &run_mutation/1,
+      "chain_archive mutation gate: ok mutations=#{length(@mutations)}"
     )
-    |> Stream.run()
   end
 
   # Each run's own temporary directory, beside its scratch copy: tests that use fixed names

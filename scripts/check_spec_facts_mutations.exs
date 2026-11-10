@@ -1,4 +1,8 @@
+Code.require_file("mutation_gate_support.exs", __DIR__)
+
 defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
+  alias BoundedAuthorityProtocol.MutationGateSupport
+
   # Spec-facts mutation battery (spec-decoupling L2). Mirrors scripts/check_conformance_mutations.exs:
   # for each entry, isolate a scratch copy of the repo, apply exactly one source mutation at a
   # one-match anchor, run the targeted gate/test command, and raise `mutation survived` when a
@@ -194,19 +198,12 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
 
   def run do
     # Every mutation and its own baseline run in their own scratch copies, so they run side by
-    # side, one per scheduler.
-    parallel(@mutations, &run_mutation/1)
-    IO.puts("spec facts mutation gate: ok mutations=#{length(@mutations)}")
-  end
-
-  defp parallel(items, fun) do
-    items
-    |> Task.async_stream(fun,
-      max_concurrency: System.schedulers_online(),
-      ordered: false,
-      timeout: :infinity
+    # side, one per scheduler. Any survival or failed baseline halts with status 3 and no ok line.
+    MutationGateSupport.run_all(
+      @mutations,
+      &run_mutation/1,
+      "spec facts mutation gate: ok mutations=#{length(@mutations)}"
     )
-    |> Stream.run()
   end
 
   # Each run's own temporary directory, beside its scratch copy: tests that use fixed names

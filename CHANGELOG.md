@@ -81,6 +81,16 @@ All notable changes to `bounded_authority_protocol` are documented here.
   claim-type, lexeme-length and exact-magnitude checks kept), and runs the new corpus for
   contract-major 1 with `--selector-float-zero`.
 - Replace retired test tooling jsonschex 0.10.0 (Hex security retirement) with the non-retired 0.11 line.
+- Release gates. `mix secrets` now runs the same `scripts/secret_scan.sh --check` sensitivity
+  self-check CI runs (which ends with the history scan), then the staged and unstaged scans; before,
+  it skipped the self-check. The conformance, chain/archive and spec-facts mutation batteries
+  collect every entry's outcome and halt with status 3, naming each failed entry, without printing
+  their `ok` line when any mutation survives or a baseline is not green. The conformance and
+  chain/archive batteries stop with status 2 and a clear message unless `node --version` equals
+  the `.tool-versions` pin (22.23.1). `verification.performance` sets a reduction ceiling on
+  rejecting over-limit request arguments on every contract-major. New
+  `scripts/registry_checksum_readback.exs` compares a published release's Hex registry checksum
+  (and optionally a local archive) with the attested `SHA256SUMS`, for the post-publish read-back.
 - The three in-repo verifier SDKs (`sdks/python`, `sdks/rust`, `sdks/go`) implement erratum 3's
   producer-canonicality refusal on their assembly and anchored-export-encoding surfaces, with the
   same clauses as the Elixir reference and the graduated TypeScript verifier: Ed25519

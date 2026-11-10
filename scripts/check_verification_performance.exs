@@ -16,6 +16,11 @@ defmodule BoundedAuthorityProtocol.VerificationPerformance do
   @maximum_reductions 5_000_000
   @maximum_heap_growth_words 1_048_576
 
+  # Over-limit request arguments are rejected while the projection walks them, so the cost is a
+  # budget's worth of nodes however large the host tree: about 2,100 reductions at most on every
+  # major (measured 2026-11-09). An unbudgeted walk of the two-million-item tree costs millions.
+  @over_limit_maximum_reductions 50_000
+
   def run! do
     fixture =
       Path.expand("../priv/conformance/v1/vectors/grant-holder-proof.json", __DIR__)
@@ -97,6 +102,23 @@ defmodule BoundedAuthorityProtocol.VerificationPerformance do
           "worst_heap_growth_words=#{worst_heap_growth}"
       )
     end)
+
+    over_limit_arguments = [
+      {"wide", {:array, List.duplicate({:integer, 1}, 2_000_000)}},
+      {"deep", Enum.reduce(1..200_000, {:integer, 1}, fn _level, inner -> {:array, [inner]} end)},
+      {"members", {:object, Enum.map(1..1_000_000, &{"k#{&1}", :null})}}
+    ]
+
+    for facade <- [V1, BoundedAuthorityProtocol.V2, BoundedAuthorityProtocol.V3],
+        {shape, value} <- over_limit_arguments do
+      name = "#{inspect(facade)}.request_digest over-limit #{shape}"
+      operation = fn -> facade.request_digest("op", value, bounds) end
+      {:error, :invalid} = operation.()
+      samples = Enum.map(1..@samples, fn _sample -> measure(operation) end)
+      worst_reductions = samples |> Enum.map(& &1.reductions) |> Enum.max()
+      require_bounded!(name, :reductions, worst_reductions, @over_limit_maximum_reductions)
+      IO.puts("#{name}: worst_reductions=#{worst_reductions}")
+    end
 
     IO.puts("verification portable timing/allocation bounds passed")
   end
