@@ -61,6 +61,11 @@ defmodule BoundedAuthorityProtocol.InspectRedactionTest do
     assert rendered =~ "nonce: {:required, :redacted}"
 
     assert inspect(%{expected | nonce: :not_required}) =~ "nonce: :not_required"
+
+    # A malformed nonce (not one of the two documented forms) is still never printed.
+    malformed = inspect(%{expected | nonce: "malformed-nonce-secret"})
+    refute malformed =~ "malformed-nonce-secret"
+    assert malformed =~ "nonce: :redacted"
   end
 
   for major <- [

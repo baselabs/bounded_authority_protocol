@@ -1,4 +1,8 @@
+Code.require_file("mutation_gate_support.exs", __DIR__)
+
 defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
+  alias BoundedAuthorityProtocol.MutationGateSupport
+
   # BAP-05 Task 6 — conformance mutation battery (gate-integrity layer).
   #
   # Mirrors scripts/check_chain_archive_mutations.exs: for each entry, isolate a scratch copy of
@@ -1421,20 +1425,16 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
   ]
 
   def run do
-    # Every mutation and its own baseline run in their own scratch copies, so they run side by
-    # side, one per scheduler.
-    parallel(@mutations, &run_mutation/1)
-    IO.puts("conformance mutation gate: ok mutations=#{length(@mutations)}")
-  end
+    # Several targets run the independent Node runners; a different Node can change their verdicts.
+    MutationGateSupport.require_tool_node!()
 
-  defp parallel(items, fun) do
-    items
-    |> Task.async_stream(fun,
-      max_concurrency: System.schedulers_online(),
-      ordered: false,
-      timeout: :infinity
+    # Every mutation and its own baseline run in their own scratch copies, so they run side by
+    # side, one per scheduler. Any survival or failed baseline halts with status 3 and no ok line.
+    MutationGateSupport.run_all(
+      @mutations,
+      &run_mutation/1,
+      "conformance mutation gate: ok mutations=#{length(@mutations)}"
     )
-    |> Stream.run()
   end
 
   # Each run's own temporary directory, beside its scratch copy: tests that use fixed names

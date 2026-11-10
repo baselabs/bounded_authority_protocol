@@ -930,8 +930,10 @@ case "${1:-local}" in
     history_scan
     ;;
   local)
-    require_version "$expected_version"
-    history_scan
+    # `mix secrets`: the same sensitivity self-check CI runs (`--check`, which ends with the
+    # history scan), in a subshell so its isolated git settings stay there, then the staged and
+    # unstaged scans CI cannot see.
+    ( run_check )
     staged_scan
     unstaged_scan
     ;;
