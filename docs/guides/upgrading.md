@@ -1,8 +1,9 @@
 # Upgrading to 1.0
 
-Package 1.0.0 is the first release under the 1.x stability contract: from here on, a minor
-release only adds, and anything that would break your code waits for 2.0.0
-([API stability and versioning](api-stability.md)). This page lists what changes when you move
+Package 1.0.0 is the first release under the 1.x stability contract: from here on, anything that
+would break your code waits for 2.0.0, with two exceptions a minor release may carry. A soundness
+repair can reject inputs that no conforming producer emits, and a raised Elixir or Erlang/OTP floor
+is announced in the changelog ([API stability and versioning](api-stability.md)). This page lists what changes when you move
 from a 0.x release to 1.0, then the extra steps for older starting points. The
 [changelog](../../CHANGELOG.md) has the full history.
 
