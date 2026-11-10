@@ -23,9 +23,9 @@ ed25519-dalek = { version = "2.2", default-features = false }
 p256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
 # Exact pin: zeroize is a transitive dep of p256 whose 1.9.x line requires the
 # edition2024 Cargo feature (Rust >= 1.85); this crate's toolchain is pinned
-# 1.81 (rust-toolchain.toml). The =1.8.1 pin keeps the resolver on the line
+# 1.81 (rust-toolchain.toml). The =1.8.2 pin keeps the resolver on the line
 # that builds under 1.81. No other dependency changes.
-zeroize = "=1.8.1"
+zeroize = "=1.8.2"
 sha2 = "0.10"
 ryu-js = "1.0"
 
