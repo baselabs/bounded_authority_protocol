@@ -48,7 +48,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       telemetry: ":telemetry.execute([:event], %{}, %{})",
       product: "Ash.read!(nil)",
       product: "HostProduct.API.run(:forbidden)",
-      product: "QorPay.Authority.verify(:forbidden)",
+      product: "HostProduct.Authority.verify(:forbidden)",
       private_runtime: "BoundedAuthority.verify(:forbidden)",
       filesystem: "File.read!(\"secret\")",
       network: ":gen_tcp.connect(~c\"localhost\", 443, [])",
@@ -133,7 +133,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
 
   test "the project gate rejects every prohibited direct dependency" do
     Enum.each(
-      [:ecto_sql, :postgrex, :req, :finch, :telemetry, :plug, :ash, :host_product, :qorpay],
+      [:ecto_sql, :postgrex, :req, :finch, :telemetry, :plug, :ash, :host_product],
       fn dependency ->
         root = copy_actual_project!()
         mix_path = Path.join(root, "mix.exs")

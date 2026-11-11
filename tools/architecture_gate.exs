@@ -935,8 +935,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "Plug" => :http,
     "Ash" => :product,
     "HostProduct" => :product,
-    "QorPay" => :product,
-    "Qorpay" => :product,
     "BoundedAuthority" => :private_runtime,
     "Oban" => :private_runtime,
     "Reactor" => :private_runtime,

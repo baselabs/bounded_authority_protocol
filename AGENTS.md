@@ -51,7 +51,7 @@ grant operational authority by itself.
    revocation state, replay reservation, invocation claims, outcomes, consumption writes, archive
    removal, witnesses, recovery, and operational health belong to the private
    `bounded_authority` runtime.
-5. **No product vocabulary.** Runtime and wire surfaces contain no host-product, Ash, AshAI, QorPay,
+5. **No product vocabulary.** Runtime and wire surfaces contain no host-product, Ash, AshAI,
    ScopeAxis, tenant, merchant, asset, partition, or provider-specific semantics.
 6. **No secret material.** The verifier accepts public keys only. Private keys, signing callbacks,
    KMS/HSM clients, credentials, and secrets cannot enter the package or conformance fixtures.
@@ -60,10 +60,8 @@ grant operational authority by itself.
    limits, and errors are versioned and independently tested.
 8. **Public compatibility is deliberate.** Once released, wire formats and public APIs follow
    SemVer and the contract-major discipline. No permissive compatibility parser is added.
-9. **QorPay is out of bounds.** Do not access its repository. Never edit, import, decode, issue, or
-   promise compatibility with private QorPay credentials, schemas, or wire formats.
-10. **Apache-2.0 is the stable release license.** Do not introduce proprietary source, private
-    package dependencies, or a timed license conversion.
+9. **Apache-2.0 is the stable release license.** Do not introduce proprietary source, private
+   package dependencies, or a timed license conversion.
 
 ## Repository relationships
 
@@ -78,14 +76,12 @@ grant operational authority by itself.
   for that exact release)
 - Product consumers: private; their repository identities and deployment topology are not part of
   this public protocol's documentation or history
-- QorPay: unchanged and not a dependency
 
 ```text
 private authority runtime  -> bounded_authority_protocol + runtime dependencies
 private product consumers  -> private authority runtime
 holder report adapter      -> bounded_authority_protocol (holder-side signing; never the reverse)
 bounded_authority_protocol -> pure protocol/crypto dependencies only
-qorpay                     -> no authority dependency
 ```
 
 A production consumer obtains an operational decision from a stateful authority runtime. It does
