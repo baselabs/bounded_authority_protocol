@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 
+from ._inputs import _bytes
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .error import InvalidError, Ok, Result, _fail, _unwrap, err
 from .json_alg import str_utf8, utf8_str
@@ -27,27 +28,21 @@ _IPV4_OCTET = re.compile(rb"^(?:0|[1-9]\d{0,2})$")
 
 
 def uri_normalize(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
-    if type(data) is not bytes:
-        return err()
     try:
+        data = _bytes(data)
         return Ok(_unwrap(str_utf8(_normalize(data, _unwrap(coerce_bounds(bounds))))))
-    except Exception as e:
-        if _is_invalid(e):
-            return err()
-        raise
+    except InvalidError:
+        return err()
 
 
 def local_loopback_http_uri_normalize(
     data: bytes, bounds: Bounds = MAXIMUM_BOUNDS
 ) -> Result[bytes]:
-    if type(data) is not bytes:
-        return err()
     try:
+        data = _bytes(data)
         return Ok(_unwrap(str_utf8(_normalize_local_loopback_http(data, _unwrap(coerce_bounds(bounds))))))
-    except Exception as e:
-        if _is_invalid(e):
-            return err()
-        raise
+    except InvalidError:
+        return err()
 
 
 def _normalize_local_loopback_http(data: bytes, bounds: Bounds) -> str:
@@ -70,7 +65,7 @@ def _normalize_local_loopback_http(data: bytes, bounds: Bounds) -> str:
     raw_port = authority_match.group(2)
     if raw_port is not None:
         significant = raw_port.lstrip(b"0")
-        if len(significant) == 0 or len(significant) > 5:
+        if len(significant) == 0 or len(significant) > 5 or (len(significant) == 5 and significant > b"65535"):
             _fail("uri: port")
         port_number = int(significant)
         if port_number < 1 or port_number > 65535:
@@ -142,7 +137,10 @@ def _normalize(data: bytes, bounds: Bounds) -> str:
     if port != b"":
         if not re.match(rb"^\d+$", port):
             _fail("uri: port")
-        port_number = int(port)
+        significant = port.lstrip(b"0")
+        if not significant or len(significant) > 5 or (len(significant) == 5 and significant > b"65535"):
+            _fail("uri: port range")
+        port_number = int(significant)
         if port_number < 1 or port_number > 65535:
             _fail("uri: port range")
         port = b"" if port_number == 443 else f":{port_number}".encode("ascii")
@@ -294,8 +292,3 @@ def _ipv6_side_length(side: bytes) -> int | None:
                 return None
             total += 1
     return total
-
-
-def _is_invalid(e: BaseException) -> bool:
-
-    return isinstance(e, InvalidError)

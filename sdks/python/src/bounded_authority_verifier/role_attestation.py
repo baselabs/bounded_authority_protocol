@@ -28,12 +28,13 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, is_dataclass
 from typing import Any, TypeVar, Union, get_args, get_origin, get_type_hints
 
+from ._inputs import _normalize_arg
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMA, MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .compact import CompactSegments, SigningInput, _parse_compact, assemble_segments
 from .ed25519 import _ed25519_verify, _import_public_key, acceptable_public_key
 from .error import InvalidError, Ok, Result, _fail, _unwrap, err
-from .facts import AttestationDecoded, AttestationFacts
+from .facts import AttestationDecoded, AttestationFacts, _Facts
 from .jcs import jcs_encode
 from .json_alg import (
     JArray,
@@ -288,7 +289,7 @@ def _validate_attestation_payload(p: Tagged, payload_bytes: bytes, bounds: Bound
         _fail("attestation: v=1")
     _require_string_or_uri(p.v.get("jti"), "jti", bounds)
     _require_kid_value(p.v.get("key_id"), "key_id", "attestation payload", bounds)
-    if not _unwrap(acceptable_public_key(_require_b64url_n(p.v.get("public_key"), "public_key", 32))):
+    if not acceptable_public_key(_require_b64url_n(p.v.get("public_key"), "public_key", 32)):
         _fail("attestation: subject public key not acceptable")
     _require_role(p.v.get("role"))
     nbf = _require_int(p.v.get("nbf"), "nbf")
@@ -347,17 +348,10 @@ def _preflight_attestation_compact(compact: bytes, bounds: Bounds) -> None:
             _fail("role_attestation: decoded segment bound")
 
 
-# --- the closed-Result shape gate (ADR 0017 clauses 1-2) ---
-#
-# A wrong-typed caller value (a non-string role, a float nbf, a bool in an int field, an entirely
-# non-struct argument) must return Err, never raise AttributeError/TypeError out of the public
-# façade and never be silently coerced. The gate is annotation-driven and total over the declared
-# contract: the façade signatures and dataclass fields ARE the shape contract. Shape rules are
-# exact on scalars — bool is not int (clause 2), bytearray is not bytes — while sequence containers
-# (tuple[X, ...], Sequence[X]) accept list|tuple, the historical input surface. The tagged JSON
-# algebra (JNull..JObject) and Bounds are matched opaquely: their interiors are validated by the
-# bodies' own bounds/semantic gates. An annotation form the gate does not understand raises at
-# import (fail fast for the developer), never silently under-validates.
+# --- closed-Result input boundary ---
+# Validate declared shapes and copy bytes-like inputs and underlying string data before
+# protocol code uses caller values. Tagged algebra is depth-, width-, and node-bounded.
+# Unsupported annotations are SDK defects and propagate; malformed inputs return Err.
 
 _OPAQUE_ANNOTATIONS = (Bounds, JNull, JBool, JInt, JFloat, JString, JArray, JObject)
 _DATACLASS_HINTS: dict[type, dict[str, object]] = {}
@@ -373,7 +367,8 @@ _MISSING = _MissingField()
 def _dataclass_hints(cls: type) -> dict[str, object]:
     hints = _DATACLASS_HINTS.get(cls)
     if hints is None:
-        hints = get_type_hints(cls)
+        hints = get_type_hints(cls.__init__) if issubclass(cls, _Facts) else get_type_hints(cls)
+        hints.pop("return", None)
         _DATACLASS_HINTS[cls] = hints
     return hints
 
@@ -389,7 +384,7 @@ def _walk_annotation(annotation: object) -> None:
     if isinstance(annotation, type):
         if annotation in _OPAQUE_ANNOTATIONS or annotation in (str, bytes, int, float, bool):
             return
-        if is_dataclass(annotation):
+        if is_dataclass(annotation) or issubclass(annotation, _Facts):
             for sub in _dataclass_hints(annotation).values():
                 _walk_annotation(sub)
             return
@@ -431,7 +426,7 @@ def _shape_ok(value: object, annotation: object) -> bool:
             return isinstance(value, float)
         if annotation is bool:
             return isinstance(value, bool)
-        if is_dataclass(annotation):
+        if is_dataclass(annotation) or issubclass(annotation, _Facts):
             if not isinstance(value, annotation):
                 return False
             # A struct can arrive malformed (constructed via __new__ or a broken subclass) with
@@ -466,8 +461,7 @@ def _shape_ok(value: object, annotation: object) -> bool:
 
 def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
     """Façade decorator: validate caller arguments against their declared shapes before the
-    body runs; a wrong-typed argument returns the closed Err directly (never raises, never
-    coerces). Applied to all four public functions of this sibling profile. Hints resolve lazily
+    body runs; malformed values return Err, and accepted buffers are copied. Applied to all four public functions of this sibling profile. Hints resolve lazily
     on the first call — façade signatures forward-reference structs defined in this module."""
     resolved: list[tuple[dict[str, object], inspect.Signature]] = []
 
@@ -481,11 +475,16 @@ def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
             resolved.append((hints, inspect.signature(fn)))
         hints, signature = resolved[0]
         bound = signature.bind(*args, **kwargs)
-        for name, value in bound.arguments.items():
-            annotation = hints.get(name)
-            if annotation is not None and not _shape_ok(value, annotation):
-                return err()
-        return fn(*args, **kwargs)
+        try:
+            for name, value in bound.arguments.items():
+                annotation = hints.get(name)
+                if annotation is not None:
+                    bound.arguments[name] = _normalize_arg(value, annotation)
+                    if not _shape_ok(bound.arguments[name], annotation):
+                        return err()
+        except InvalidError:
+            return err()
+        return fn(*bound.args, **bound.kwargs)
 
     return wrapper
 
@@ -527,7 +526,7 @@ def _attestation_signing_input_body(
         _fail("attestation_signing_input: key_id charset")
     if len(attestation.public_key) != 32:
         _fail("attestation_signing_input: public key width")
-    if not _unwrap(acceptable_public_key(attestation.public_key)):
+    if not acceptable_public_key(attestation.public_key):
         _fail("attestation_signing_input: public key not acceptable")
     if attestation.role not in ROLES:
         _fail("attestation_signing_input: role closed set")
@@ -678,7 +677,7 @@ def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> A
         expected.subject_public_key
     ) != 32:
         _fail("verify_attestation: subject key width")
-    if not _unwrap(acceptable_public_key(expected.subject_public_key)):
+    if not acceptable_public_key(expected.subject_public_key):
         _fail("verify_attestation: subject key not acceptable")
     if not _is_int(getattr(expected, "now", None)):
         _fail("verify_attestation: integer now")

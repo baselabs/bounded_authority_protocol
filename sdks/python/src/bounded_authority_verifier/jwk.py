@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ._inputs import _bytes, _normalize_arg
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMUM_BOUNDS, Bounds
 from .ed25519 import acceptable_public_key, sha256
@@ -35,6 +36,7 @@ class OkpPublic:
 def jwk_encode_public(raw_key: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
     """Encode a raw 32-byte Ed25519 public key as the canonical OKP JCS JSON bytes."""
     try:
+        raw_key = _bytes(raw_key)
         _require(len(raw_key) == 32, "jwk.encode_public: public key width must be 32")
         jwk = _unwrap(jwk_from_public_key(raw_key))
         members: dict[str, Tagged] = {
@@ -43,18 +45,17 @@ def jwk_encode_public(raw_key: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result
             "x": JString(_unwrap(str_utf8(jwk.x))),
         }
         return Ok(_unwrap(jcs_encode(JObject(members), bounds)))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
 def jwk_decode_public(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
     """Decode an OKP public JWK from JSON bytes. Returns ``Ok(raw32)`` or ``Err``."""
     try:
+        data = _bytes(data)
         value = _unwrap(json_decode(data, bounds))
-    except Exception as e:
-        if _is_invalid(e):
-            return err()
-        raise
+    except InvalidError:
+        return err()
     try:
         if not isinstance(value, JObject):
             _fail("jwk.decode_public: not an object")
@@ -75,23 +76,22 @@ def jwk_decode_public(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[by
         raw = _unwrap(base64url_decode(x.v))
         if len(raw) != 32:
             _fail("jwk.decode_public: x width")
-        if not _unwrap(acceptable_public_key(raw)):
+        if not acceptable_public_key(raw):
             _fail("jwk.decode_public: key not acceptable")
         return Ok(raw)
-    except Exception as e:
-        if _is_invalid(e):
-            return err()
-        raise
+    except InvalidError:
+        return err()
 
 
 def jwk_from_public_key(raw_key: bytes) -> Result[OkpPublic]:
     try:
+        raw_key = _bytes(raw_key)
         _require(len(raw_key) == 32, "jwk: public key width")
-        _require(_unwrap(acceptable_public_key(raw_key)), "jwk: key not acceptable")
+        _require(acceptable_public_key(raw_key), "jwk: key not acceptable")
         return Ok(OkpPublic(
             crv="Ed25519", kty="OKP", x=_unwrap(utf8_str(_unwrap(base64url_encode(raw_key))))
         ))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
@@ -100,9 +100,10 @@ def thumbprint_preimage(jwk: OkpPublic) -> Result[bytes]:
 
     Fallible: an ``x`` that does not decode to an acceptable key is the closed invalid value."""
     try:
-        _require(_unwrap(acceptable_public_key(_unwrap(base64url_decode(_unwrap(str_utf8(jwk.x)))))), "jwk: key not acceptable")
+        jwk = _normalize_arg(jwk, OkpPublic)
+        _require(acceptable_public_key(_unwrap(base64url_decode(_unwrap(str_utf8(jwk.x))))), "jwk: key not acceptable")
         return Ok(_thumbprint_preimage_unchecked(jwk))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
@@ -118,24 +119,27 @@ def _thumbprint_preimage_unchecked(jwk: OkpPublic) -> bytes:
 def thumbprint(jwk: OkpPublic) -> Result[str]:
     """Thumbprint as base64url SHA-256 of the preimage."""
     try:
+        jwk = _normalize_arg(jwk, OkpPublic)
         return Ok(_unwrap(utf8_str(_unwrap(base64url_encode(_unwrap(sha256(_unwrap(thumbprint_preimage(jwk)))))))))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
 def thumbprint_raw(jwk: OkpPublic) -> Result[bytes]:
     """Raw 32-byte thumbprint."""
     try:
+        jwk = _normalize_arg(jwk, OkpPublic)
         return Ok(_unwrap(sha256(_unwrap(thumbprint_preimage(jwk)))))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
 def public_key_thumbprint_raw(raw_key: bytes) -> Result[bytes]:
     """Raw 32-byte thumbprint directly from a raw 32-byte public key."""
     try:
+        raw_key = _bytes(raw_key)
         return Ok(_unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(raw_key)))))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
@@ -145,14 +149,9 @@ def thumbprint_digest_unchecked(raw_key: bytes) -> Result[bytes]:
     For censuses and corpus generators only (it must hash weak keys too). Never call it on a verify
     or key-import path; ``public_key_thumbprint_raw`` is the checked form."""
     try:
+        raw_key = _bytes(raw_key)
         _require(len(raw_key) == 32, "jwk: public key width")
         jwk = OkpPublic(crv="Ed25519", kty="OKP", x=_unwrap(utf8_str(_unwrap(base64url_encode(raw_key)))))
         return Ok(_unwrap(sha256(_thumbprint_preimage_unchecked(jwk))))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
-
-
-def _is_invalid(e: BaseException) -> bool:
-    from .error import InvalidError
-
-    return isinstance(e, InvalidError)

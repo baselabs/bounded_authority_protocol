@@ -27,6 +27,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, is_dataclass, replace
 from typing import Any, Literal, TypeVar, Union, cast, get_args, get_origin, get_type_hints
 
+from ._inputs import _normalize_arg
 from .base64url import base64url_decode, base64url_encode
 from .bounds import (  # noqa: F401
     MAXIMA,
@@ -56,6 +57,7 @@ from .facts import (
     KeyLocator,
     KeyTransitionFacts,
     ProofDecoded,
+    _Facts,
 )
 from .jcs import jcs_encode
 from .json_alg import (
@@ -67,6 +69,7 @@ from .json_alg import (
     JObject,
     JString,
     Tagged,
+    _normalize_tagged,
     json_decode,
     str_utf8,
     utf8_str,
@@ -157,6 +160,7 @@ def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[V2Sel
     the same-tag domain.
     """
     try:
+        obj = _normalize_tagged(obj, bounds)
         if not isinstance(obj, JObject):
             _fail("selector: object")
         kind_v = obj.v.get("kind")
@@ -175,7 +179,7 @@ def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[V2Sel
             _fail(f"selector: {kind} numeric bound")
         _validate_selector_value(bound, bounds)
         return Ok((SelLte if kind == "lte" else SelGte)(path, bound))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
@@ -209,6 +213,8 @@ def _traverse_selector_path(root: Tagged, path: tuple[str, ...]) -> Tagged | Non
 def selector_matches(sel: V2Selector, cast_arguments: Tagged) -> Result[bool]:
     """v2 apply: lte/gte are inclusive same-tag numeric comparisons; the v1 kinds delegate."""
     try:
+        sel = _normalize_arg(sel, V2Selector)
+        cast_arguments = _normalize_tagged(cast_arguments, MAXIMUM_BOUNDS)
         if isinstance(sel, (SelLte, SelGte)):
             target = _traverse_selector_path(cast_arguments, sel.path)
             if target is None:
@@ -223,7 +229,7 @@ def selector_matches(sel: V2Selector, cast_arguments: Tagged) -> Result[bool]:
                 return Ok(target.v <= bound.v if inclusive_low else target.v >= bound.v)
             return Ok(False)
         return Ok(_unwrap(_v1_selector_matches(sel, cast_arguments)))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
@@ -854,24 +860,10 @@ def _trying(fn: Callable[[], _T]) -> Result[_T]:
         return err()
 
 
-# --- the closed-Result shape gate (ADR 0017 clauses 1-2) ---
-#
-# A wrong-typed caller value (non-string chain_id, non-bytes hash, a bool in an int field, an
-# entirely non-struct argument) must return Err, never raise AttributeError/TypeError out of the
-# public façade and never be silently coerced. The 2026-08-17 ledger named two escape paths; the
-# 2026-08-18 family sweep proved the class total (31/34 parameter sites, every struct field), so
-# the gate is annotation-driven and total over the declared contract instead of per-site: the
-# façade signatures and dataclass fields ARE the shape contract (the reference enforces the same
-# via pattern matching + guards at every struct access). Shape rules are exact on scalars — bool is
-# not int (clause 2), bytearray is not bytes — while sequence containers (tuple[X, ...],
-# Sequence[X]) accept list|tuple, the input surface the bodies have always iterated. The tagged JSON
-# algebra (JNull..JObject) and Bounds are matched opaquely: their interiors are validated by the
-# bodies' own bounds/semantic gates, which already existed. An annotation form the gate does not
-# understand raises at import (fail fast for the developer), never silently under-validates.
-# Accepted margin (cross-vendor round 18, claude note): the gate walks caller sequences
-# element-by-element BEFORE the bodies' count ceilings run — inherent to entry-position
-# gating; the per-element cost is an isinstance check only, and constructing an oversized
-# caller list costs the caller more than the walk costs us.
+# --- closed-Result input boundary ---
+# Validate declared shapes and copy bytes-like inputs and underlying string data before
+# protocol code uses caller values. Tagged algebra is depth-, width-, and node-bounded.
+# Unsupported annotations are SDK defects and propagate; malformed inputs return Err.
 
 _OPAQUE_ANNOTATIONS = (Bounds, JNull, JBool, JInt, JFloat, JString, JArray, JObject)
 _DATACLASS_HINTS: dict[type, dict[str, object]] = {}
@@ -887,7 +879,8 @@ _MISSING = _MissingField()
 def _dataclass_hints(cls: type) -> dict[str, object]:
     hints = _DATACLASS_HINTS.get(cls)
     if hints is None:
-        hints = get_type_hints(cls)
+        hints = get_type_hints(cls.__init__) if issubclass(cls, _Facts) else get_type_hints(cls)
+        hints.pop("return", None)
         _DATACLASS_HINTS[cls] = hints
     return hints
 
@@ -903,7 +896,7 @@ def _walk_annotation(annotation: object) -> None:
     if isinstance(annotation, type):
         if annotation in _OPAQUE_ANNOTATIONS or annotation in (str, bytes, int, float, bool):
             return
-        if is_dataclass(annotation):
+        if is_dataclass(annotation) or issubclass(annotation, _Facts):
             for sub in _dataclass_hints(annotation).values():
                 _walk_annotation(sub)
             return
@@ -945,7 +938,7 @@ def _shape_ok(value: object, annotation: object) -> bool:
             return isinstance(value, float)
         if annotation is bool:
             return isinstance(value, bool)
-        if is_dataclass(annotation):
+        if is_dataclass(annotation) or issubclass(annotation, _Facts):
             if not isinstance(value, annotation):
                 return False
             # A struct can arrive malformed (constructed via __new__ or a broken subclass) with
@@ -980,8 +973,7 @@ def _shape_ok(value: object, annotation: object) -> bool:
 
 def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
     """Façade decorator: validate caller arguments against their declared shapes before the
-    body runs; a wrong-typed argument returns the closed Err directly (never raises, never
-    coerces). Applied to all 17 public functions. Hints resolve lazily on the first call —
+    body runs; malformed values return Err, and accepted buffers are copied. Applied to all 17 public functions. Hints resolve lazily on the first call —
     façade signatures forward-reference structs defined later in this module (ExpectedExport);
     an unsupported annotation form therefore fails on first call (the family sweep exercises
     every façade, so it fails in CI, just not at import)."""
@@ -997,11 +989,16 @@ def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
             resolved.append((hints, inspect.signature(fn)))
         hints, signature = resolved[0]
         bound = signature.bind(*args, **kwargs)
-        for name, value in bound.arguments.items():
-            annotation = hints.get(name)
-            if annotation is not None and not _shape_ok(value, annotation):
-                return err()
-        return fn(*args, **kwargs)
+        try:
+            for name, value in bound.arguments.items():
+                annotation = hints.get(name)
+                if annotation is not None:
+                    bound.arguments[name] = _normalize_arg(value, annotation)
+                    if not _shape_ok(bound.arguments[name], annotation):
+                        return err()
+        except InvalidError:
+            return err()
+        return fn(*bound.args, **bound.kwargs)
 
     return wrapper
 
@@ -2897,9 +2894,7 @@ def _validate_chunks(chunks: Sequence[bytes], bounds: Bounds = MAXIMUM_BOUNDS) -
     """Validate the chunk list BEFORE concatenation (spec/bap-v1.md §15 (archives)
     validate_chunks): at least one chunk, each chunk nonempty, count < archive_chunks, running total
     ≤ archive_bytes."""
-    # (chunk TYPE is owned by the _closed_shape gate — tuple[bytes, ...]; cross-vendor
-    # round 18 reconciled the previously bytearray-tolerant arm to the gate's exact-bytes
-    # contract. The round-17 escape class it closed is pinned by the family sweep.)
+    # The input boundary copies each bytes-like chunk to immutable bytes.
     if len(chunks) == 0:
         _fail("archive: no chunks")
     # Cross-vendor re-review Finding 2: the reference's validate_chunks guard is

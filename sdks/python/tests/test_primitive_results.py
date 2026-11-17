@@ -55,9 +55,6 @@ def test_public_primitive_invalid_input_is_closed(
     (bap.str_utf8, ("ok",), b"ok"),
     (bap.utf8_str, (b"ok",), "ok"),
     (bap.bounds_maximum, (), bap.MAXIMUM_BOUNDS),
-    (bap.verify_strict, (b"", b"", b""), False),
-    (bap.acceptable_public_key, (b"",), False),
-    (bap.torsion_free, (b"",), False),
 ])
 def test_public_primitive_success_is_result(
     primitive: Callable[..., object], args: tuple[object, ...], expected: object

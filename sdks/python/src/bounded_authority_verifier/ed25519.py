@@ -22,7 +22,7 @@ small-order, and on the curve. ``torsion_free`` additionally requires ``[L]A = O
 scalar multiplication and never runs on the verification path. A ``True`` result proves only that the
 bytes satisfy the rule; it never selects trusted keys or grants authority.
 
-A backend rejection or exception returns exactly Invalid (REQ1-SIGNING-backend-reject).
+Malformed input and invalid signatures return False. Unexpected backend failures propagate.
 
 Purity note: ``hashlib`` and ``cryptography`` primitives are pure transformations (no I/O, clock,
 RNG, or network) — the purity gate's ban list targets ``datetime.now``/``time.time``/``random.*``/
@@ -37,7 +37,8 @@ import hashlib
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-from .error import InvalidError, Ok, Result, _fail, _require, _unwrap, err
+from ._inputs import _bytes
+from .error import InvalidError, Ok, Result, _require, err
 
 # --- rule S1 constants ---------------------------------------------------------------------------
 # The field prime p = 2^255 - 19, the base-point order L, the curve constant d = -121665/121666 mod p,
@@ -70,10 +71,6 @@ _SMALL_ORDER: frozenset[bytes] = frozenset(
 )
 
 _Extended = tuple[int, int, int, int]
-
-
-def _is_bytes(value: object) -> bool:
-    return isinstance(value, (bytes, bytearray))
 
 
 def _canonical(encoding: bytes) -> bool:
@@ -152,31 +149,25 @@ def _is_identity(point: _Extended) -> bool:
     return x % _P == 0 and (y - z) % _P == 0
 
 
-def acceptable_public_key(raw_key: bytes) -> Result[bool]:
-    """Whether a raw 32-byte Ed25519 public key may enter a verification input: canonical, not one of
-    the eight small-order encodings, and on the curve. Any other input returns ``Ok(False)``."""
+def acceptable_public_key(raw_key: bytes) -> bool:
+    """Whether the bytes encode an acceptable Ed25519 key. Malformed inputs return False."""
     try:
-        if not _is_bytes(raw_key) or len(raw_key) != 32:
-            return Ok(False)
-        key = bytes(raw_key)
-        return Ok(_canonical(key) and key not in _SMALL_ORDER and _decode_point(key) is not None)
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
-        return err()
+        key = _bytes(raw_key)
+    except InvalidError:
+        return False
+    return len(key) == 32 and _canonical(key) and key not in _SMALL_ORDER and _decode_point(key) is not None
 
 
-def torsion_free(raw_key: bytes) -> Result[bool]:
-    """Whether a raw 32-byte key is acceptable and torsion free (``[L]A = O``).
-
-    A host calls this at key enrollment, at trust install, and before any deny-list or revocation
-    comparison. It runs one full scalar multiplication, so it never belongs on the per-signature
-    verification path. A canonical, torsion-free key has exactly one encoding per secret."""
+def torsion_free(raw_key: bytes) -> bool:
+    """Whether a key is acceptable and torsion free (``[L]A = O``)."""
     try:
-        if not _unwrap(acceptable_public_key(raw_key)):
-            return Ok(False)
-        point = _decode_point(bytes(raw_key))
-        return Ok(point is not None and _is_identity(_multiply(_L, point)))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
-        return err()
+        key = _bytes(raw_key)
+    except InvalidError:
+        return False
+    if not acceptable_public_key(key):
+        return False
+    point = _decode_point(key)
+    return point is not None and _is_identity(_multiply(_L, point))
 
 # Census tracking: every key imported via import_public_key is recorded here, so the conformance
 # runner can assert discovery == verify-import == index public_key_fingerprints (both directions).
@@ -197,13 +188,8 @@ def _import_public_key(raw_key: bytes, fingerprint: str) -> Ed25519PublicKey:
     Throws InvalidError on a malformed key. Mirrors the TS ``createPublicKey`` boundary.
     """
     _require(len(raw_key) == 32, "ed25519: public key must be 32 bytes")
-    _require(_unwrap(acceptable_public_key(raw_key)), "ed25519: public key not acceptable")
-    try:
-        key = Ed25519PublicKey.from_public_bytes(raw_key)
-    except Exception:
-        # Any backend rejection (malformed encoding) is a closed Invalid — not a verdict-bearing
-        # agreement. Mirrors the whitelist discipline.
-        _fail("ed25519: invalid public key")
+    _require(acceptable_public_key(raw_key), "ed25519: public key not acceptable")
+    key = Ed25519PublicKey.from_public_bytes(raw_key)
     _census_fingerprints.add(fingerprint)
     return key
 
@@ -213,8 +199,7 @@ def _ed25519_verify(message: bytes, signature: bytes, public_key: Ed25519PublicK
 
     This is the SDK's single verify choke point: every grant, proof, anchor, transition, role
     attestation and content assertion signature goes through it. The byte-level gate runs before the
-    backend. Maps backend exceptions (other than InvalidSignature, which is a normal False) to
-    InvalidError (REQ1-SIGNING-backend-reject).
+    backend. InvalidSignature returns False; unexpected SDK or backend failures propagate.
     """
     _require(len(signature) == 64, "ed25519: signature must be 64 bytes")
     raw_key = public_key.public_bytes_raw()
@@ -225,25 +210,19 @@ def _ed25519_verify(message: bytes, signature: bytes, public_key: Ed25519PublicK
         return True
     except InvalidSignature:
         return False
-    except Exception:
-        _fail("ed25519: backend rejected")
 
 
-def verify_strict(message: bytes, signature: bytes, public_key: bytes) -> Result[bool]:
-    """Public mirror of rule S1 over raw bytes. Never raises: any input that is not a 32-byte key and a
-    64-byte signature passing the gate and the cofactorless equation returns ``Ok(False)``."""
+
+def verify_strict(message: bytes, signature: bytes, public_key: bytes) -> bool:
+    """Raw-byte rule S1 predicate. Malformed caller inputs return False; SDK defects propagate."""
     try:
-        if not (_is_bytes(message) and _is_bytes(signature) and _is_bytes(public_key)):
-            return Ok(False)
-        if not _strict_gate(bytes(signature), bytes(public_key)):
-            return Ok(False)
-        try:
-            key = Ed25519PublicKey.from_public_bytes(bytes(public_key))
-            return Ok(_ed25519_verify(bytes(message), bytes(signature), key))
-        except Exception:
-            return Ok(False)
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
-        return err()
+        message, signature, public_key = _bytes(message), _bytes(signature), _bytes(public_key)
+    except InvalidError:
+        return False
+    if not _strict_gate(signature, public_key) or not acceptable_public_key(public_key):
+        return False
+    key = Ed25519PublicKey.from_public_bytes(public_key)
+    return _ed25519_verify(message, signature, key)
 
 
 def sha256(*parts: bytes) -> Result[bytes]:
@@ -251,7 +230,7 @@ def sha256(*parts: bytes) -> Result[bytes]:
     try:
         h = hashlib.sha256()
         for p in parts:
-            h.update(p)
+            h.update(_bytes(p))
         return Ok(h.digest())
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()

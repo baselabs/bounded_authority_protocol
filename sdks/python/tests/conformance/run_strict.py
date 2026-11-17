@@ -135,15 +135,15 @@ def _run_primitive(case: dict[str, Any]) -> bool:
 
     surface, inp, expected = case["surface"], case["input"], case["expected"]
     if surface == "ed25519.verify_strict":
-        accepted = _unwrap(verify_strict(
+        accepted = verify_strict(
             _b64d(inp["message"]) if inp["message"] else b"",
             _b64d(inp["signature"]),
             _b64d(inp["public_key"]),
-        ))
+        )
     elif surface == "ed25519.acceptable_public_key":
-        accepted = _unwrap(acceptable_public_key(_b64d(inp["public_key"])))
+        accepted = acceptable_public_key(_b64d(inp["public_key"]))
     elif surface == "ed25519.torsion_free":
-        accepted = _unwrap(torsion_free(_b64d(inp["public_key"])))
+        accepted = torsion_free(_b64d(inp["public_key"]))
     else:
         abort(f"{case['id']}: unknown primitive surface {surface}")
     return _verdict(expected, accepted)

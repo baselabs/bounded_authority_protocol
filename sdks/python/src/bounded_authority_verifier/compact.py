@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ._inputs import _bytes, _normalize_arg
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .ed25519 import _signature_gate
@@ -124,6 +125,8 @@ def assemble_segments(signing_input: SigningInput, signature: bytes) -> Result[b
     REQ1-VERIFY-no-signer-callback: it takes a signature, never a key.
     """
     try:
+        signing_input = _normalize_arg(signing_input, SigningInput)
+        signature = _bytes(signature)
         if signing_input.kind not in _KINDS:
             _fail("assemble_segments: kind closed set")
         _require(len(signature) == 64, "assemble_segments: signature width 64")
@@ -154,6 +157,8 @@ def assemble_segments_es256(signing_input: SigningInput, signature: bytes) -> Re
     REQ1-VERIFY-no-signer-callback: takes a signature, never a key.
     """
     try:
+        signing_input = _normalize_arg(signing_input, SigningInput)
+        signature = _bytes(signature)
         if signing_input.kind not in ("grant", "proof", "boundary_anchor", "key_transition"):
             _fail("assemble_segments: kind closed set")
         _require(len(signature) == 64, "assemble_segments: signature width 64")

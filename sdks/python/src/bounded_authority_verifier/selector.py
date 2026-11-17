@@ -17,11 +17,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from ._inputs import _normalize_arg
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve
 from .digest import typed_project
 from .error import InvalidError, Ok, Result, _fail, _unwrap, err
 from .jcs import jcs_encode
-from .json_alg import JArray, JObject, JString, Tagged, utf8_str
+from .json_alg import JArray, JObject, JString, Tagged, _normalize_tagged, utf8_str
 
 _SELECTOR_KINDS = {"all", "equals", "one_of"}
 _SELECTOR_MEMBER_SETS = {
@@ -54,6 +55,7 @@ Selector = SelAll | SelEquals | SelOneOf
 def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[Selector]:
     """Validate + parse a selector from a decoded tagged object. Rejects unknown members, bad shapes."""
     try:
+        obj = _normalize_tagged(obj, bounds)
         if not isinstance(obj, JObject):
             _fail("selector: object")
         members = obj.v
@@ -96,7 +98,7 @@ def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[Selec
             if not _float_zero_free(v):
                 _fail("selector: float zero")
         return Ok(SelOneOf(path, values))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
@@ -173,8 +175,9 @@ def _no_float_where(value: Tagged, banned: Callable[[float], bool]) -> bool:
 def semantic_identity(value: Tagged) -> Result[bytes]:
     """Semantic identity = JCS of the typed-projected form. Returns canonical bytes for comparison."""
     try:
+        value = _normalize_tagged(value, MAXIMUM_BOUNDS)
         return Ok(_unwrap(jcs_encode(_unwrap(typed_project(value)))))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
@@ -191,6 +194,8 @@ def _traverse_path(root: Tagged, path: tuple[str, ...]) -> Tagged | None:
 def selector_matches(sel: Selector, cast_arguments: Tagged) -> Result[bool]:
     """Does this selector match? equals/one_of REQUIRE the path to exist (missing path → no match)."""
     try:
+        sel = _normalize_arg(sel, Selector)
+        cast_arguments = _normalize_tagged(cast_arguments, MAXIMUM_BOUNDS)
         if isinstance(sel, SelAll):
             return Ok(True)
         target = _traverse_path(cast_arguments, sel.path)
@@ -201,7 +206,7 @@ def selector_matches(sel: Selector, cast_arguments: Tagged) -> Result[bool]:
             return Ok(_unwrap(semantic_identity(sel.value)) == target_id)
         # one_of
         return Ok(any(_unwrap(semantic_identity(v)) == target_id for v in sel.values))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 

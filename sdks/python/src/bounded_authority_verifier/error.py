@@ -1,9 +1,10 @@
 """The single closed error value + the Result shape.
 
-Every public function returns ``Result[T] = Ok | Err``. Internal helpers may raise
-``InvalidError`` to propagate a rejection to their enclosing Result boundary. Public primitives
-also close exceptions caused by malformed caller values (invalid host types, Unicode, numeric
-ranges, indexing, or recursive structures); they do not catch unrelated system failures.
+Public protocol functions return ``Result[T] = Ok | Err``; the three Ed25519 predicates
+return plain booleans. Input gates explicitly turn malformed caller values into ``InvalidError``.
+Public boundaries catch only ``InvalidError``. A runner or SDK programming error must propagate,
+never masquerade as a protocol rejection. Results refuse implicit truth testing; inspect ``is_ok``
+or match ``Ok`` / ``Err`` explicitly.
 
 ``Result`` is a frozen dataclass: ``Ok(value) | Err(InvalidError)`` — never both. The ``Err``
 branch carries an ``InvalidError`` (closed, value-free) so callers can match on the type, but it
@@ -31,6 +32,9 @@ class Ok(Generic[T]):
 
     value: T
 
+    def __bool__(self) -> bool:
+        raise TypeError("Result has no implicit truth value; match Ok or Err")
+
     @property
     def is_ok(self) -> bool:
         return True
@@ -41,6 +45,9 @@ class Err:
     """The failure variant of Result — closed, value-free (carries an InvalidError sentinel)."""
 
     error: InvalidError
+
+    def __bool__(self) -> bool:
+        raise TypeError("Result has no implicit truth value; match Ok or Err")
 
     @property
     def is_ok(self) -> bool:

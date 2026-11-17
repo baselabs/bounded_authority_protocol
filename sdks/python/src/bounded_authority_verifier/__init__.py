@@ -9,7 +9,7 @@ import ``v3`` explicitly (``from bounded_authority_verifier import v3``).
 There is no ``authorized`` or decision surface. Every public function, including JSON, JCS,
 base64url, bounds, JWK, thumbprint, and cryptographic primitives, returns
 ``Result[T] = Ok | Err``. Caller-input rejection is a closed, value-free ``Err`` rather than
-an escaping exception. Cryptographic predicates return ``Result[bool]``.
+an escaping exception. The three Ed25519 predicates return plain ``bool`` (malformed input is False).
 Facts are value-bearing and non-authorizing.
 """
 

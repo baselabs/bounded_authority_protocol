@@ -1,7 +1,8 @@
 
 import hashlib
+import inspect
 import json
-from dataclasses import fields, replace
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -127,7 +128,7 @@ def test_producer_decode_verify_and_assertion_digest() -> None:
     assert verified.value.digest == hashlib.sha256(compact).digest()
     assert verified.value.verification == "signature_and_window"
     assert verified.value.trust == "not_evaluated"
-    assert {field.name for field in fields(verified.value)} == {
+    assert set(inspect.signature(type(verified.value)).parameters) == {
         "version",
         "attestor_key_id",
         "attestor_key_fingerprint",
@@ -266,7 +267,7 @@ def test_successor_allows_expired_predecessor_and_rotated_key() -> None:
     predecessor_verified = verify_assertion(predecessor_compact, predecessor_expected)
     assert predecessor_verified.is_ok
 
-    successor = replace(
+    successor = _replace_facts(
         predecessor,
         attestor_key_id="attestor-ca-2",
         jti="urn:example:assertion:2",
@@ -287,11 +288,11 @@ def test_successor_allows_expired_predecessor_and_rotated_key() -> None:
     ).is_ok
 
     failures = (
-        replace(successor_verified.value, iss="urn:example:issuer:other"),
-        replace(successor_verified.value, gen=3),
-        replace(successor_verified.value, prev=b"x" * 32),
-        replace(successor_verified.value, iat=999),
-        replace(successor_verified.value, jti=predecessor_verified.value.jti),
+        _replace_facts(successor_verified.value, iss="urn:example:issuer:other"),
+        _replace_facts(successor_verified.value, gen=3),
+        _replace_facts(successor_verified.value, prev=b"x" * 32),
+        _replace_facts(successor_verified.value, iat=999),
+        _replace_facts(successor_verified.value, jti=predecessor_verified.value.jti),
     )
     assert all(
         not verify_successor(predecessor_verified.value, value, _unwrap(bounds_maximum())).is_ok
@@ -303,7 +304,7 @@ def test_successor_requires_explicit_bounds() -> None:
     compact, expected, _producer_value, _signature = _signed()
     predecessor = verify_assertion(compact, expected)
     assert predecessor.is_ok
-    successor = replace(
+    successor = _replace_facts(
         predecessor.value,
         jti="urn:example:assertion:2",
         gen=2,
@@ -319,7 +320,7 @@ def test_successor_rejects_decoded_partial_and_forged_markers() -> None:
     facts = verify_assertion(compact, expected)
     decoded = decode_assertion(compact)
     assert facts.is_ok and decoded.is_ok
-    successor = replace(
+    successor = _replace_facts(
         facts.value,
         jti="urn:example:assertion:2",
         gen=2,
@@ -330,10 +331,10 @@ def test_successor_rejects_decoded_partial_and_forged_markers() -> None:
     assert not verify_successor(object(), facts.value, _unwrap(bounds_maximum())).is_ok  # type: ignore[arg-type]
     for marker, forged in (("verification", "not_evaluated"), ("trust", "evaluated")):
         assert not verify_successor(
-            replace(facts.value, **{marker: forged}), successor, _unwrap(bounds_maximum())
+            _replace_facts(facts.value, **{marker: forged}), successor, _unwrap(bounds_maximum())
         ).is_ok
         assert not verify_successor(
-            facts.value, replace(successor, **{marker: forged}), _unwrap(bounds_maximum())
+            facts.value, _replace_facts(successor, **{marker: forged}), _unwrap(bounds_maximum())
         ).is_ok
 
 
@@ -342,7 +343,7 @@ def test_successor_revalidates_typed_facts_numeric_boundaries() -> None:
     facts = verify_assertion(compact, expected)
     assert facts.is_ok
 
-    negative_magnitude = replace(
+    negative_magnitude = _replace_facts(
         facts.value,
         gen=2,
         prev=b"x" * 32,
@@ -354,7 +355,7 @@ def test_successor_revalidates_typed_facts_numeric_boundaries() -> None:
         content_assertion_module._facts(negative_magnitude, _unwrap(bounds_maximum()))
     assert not verify_successor(negative_magnitude, facts.value, _unwrap(bounds_maximum())).is_ok
 
-    zero_generation_nonzero_prev = replace(facts.value, gen=0, prev=b"x" * 32)
+    zero_generation_nonzero_prev = _replace_facts(facts.value, gen=0, prev=b"x" * 32)
     with pytest.raises(InvalidError):
         content_assertion_module._facts(zero_generation_nonzero_prev, _unwrap(bounds_maximum()))
     assert not verify_successor(zero_generation_nonzero_prev, facts.value, _unwrap(bounds_maximum())).is_ok
@@ -551,7 +552,7 @@ def _verified_corpus_artifact(
     for key in ("digest", "profile_digest", "content_digest", "prev", "attestor_key_fingerprint"):
         if key in normalized:
             normalized[key] = _corpus_b64(normalized[key])
-    return replace(facts, **normalized)
+    return _replace_facts(facts, **normalized)
 
 
 def test_content_assertion_successor_corpus_separates_artifact_and_relation_verdicts() -> None:
@@ -570,3 +571,7 @@ def test_content_assertion_successor_corpus_separates_artifact_and_relation_verd
         assert predecessor is not None and successor is not None
         relation = verify_successor(predecessor, successor, _unwrap(bounds_maximum()))
         assert relation.is_ok == (case["expected"]["relation"] == "valid"), case["id"]
+
+
+def _replace_facts(facts, **changes):
+    return type(facts)(**{name: changes.get(name, getattr(facts, name)) for name in inspect.signature(type(facts)).parameters})

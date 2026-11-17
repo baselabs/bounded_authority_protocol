@@ -13,12 +13,24 @@ across majors (different prefix bytes, REQ1-SIGNING-digest-prefix per major).
 
 from __future__ import annotations
 
+from ._inputs import _text
 from .base64url import base64url_encode
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .ed25519 import sha256
 from .error import InvalidError, Ok, Result, _fail, _invalid_error, _unwrap, err
 from .jcs import jcs_encode
-from .json_alg import JArray, JBool, JFloat, JInt, JNull, JObject, JString, Tagged, str_utf8
+from .json_alg import (
+    JArray,
+    JBool,
+    JFloat,
+    JInt,
+    JNull,
+    JObject,
+    JString,
+    Tagged,
+    _normalize_tagged,
+    str_utf8,
+)
 
 REQUEST_PREFIX = b"BAP1-REQUEST\x00"
 """The 13-byte ASCII prefix including its final zero byte (REQ1-SIGNING-digest-prefix)."""
@@ -35,24 +47,30 @@ def typed_project(value: Tagged) -> Result[Tagged]:
     - ``array`` → ``["array", [typed(v)...]]``; ``object`` → ``["object", {k: typed(v)...}]``
     """
     try:
-        if isinstance(value, JNull):
-            return Ok(JArray((JString(_unwrap(str_utf8("null"))),)))
-        if isinstance(value, JBool):
-            return Ok(JArray((JString(_unwrap(str_utf8("boolean"))), JBool(value.v))))
-        if isinstance(value, JInt):
-            return Ok(JArray((JString(_unwrap(str_utf8("integer"))), JInt(value.v))))
-        if isinstance(value, JFloat):
-            return Ok(JArray((JString(_unwrap(str_utf8("float"))), JFloat(value.v))))
-        if isinstance(value, JString):
-            return Ok(JArray((JString(_unwrap(str_utf8("string"))), JString(value.v))))
-        if isinstance(value, JArray):
-            return Ok(JArray((JString(_unwrap(str_utf8("array"))), JArray(tuple(_unwrap(typed_project(i)) for i in value.v)))))
-        if isinstance(value, JObject):
-            out = {k: _unwrap(typed_project(v)) for k, v in value.v.items()}
-            return Ok(JArray((JString(_unwrap(str_utf8("object"))), JObject(out))))
-        raise _invalid_error("typed: unknown tag")  # unreachable — the algebra is closed
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        value = _normalize_tagged(value, MAXIMUM_BOUNDS)
+        return Ok(_typed_project(value))
+    except InvalidError:
         return err()
+
+
+
+def _typed_project(value: Tagged) -> Tagged:
+    if isinstance(value, JNull):
+        return JArray((JString(_unwrap(str_utf8("null"))),))
+    if isinstance(value, JBool):
+        return JArray((JString(_unwrap(str_utf8("boolean"))), JBool(value.v)))
+    if isinstance(value, JInt):
+        return JArray((JString(_unwrap(str_utf8("integer"))), JInt(value.v)))
+    if isinstance(value, JFloat):
+        return JArray((JString(_unwrap(str_utf8("float"))), JFloat(value.v)))
+    if isinstance(value, JString):
+        return JArray((JString(_unwrap(str_utf8("string"))), JString(value.v)))
+    if isinstance(value, JArray):
+        return JArray((JString(_unwrap(str_utf8("array"))), JArray(tuple(_typed_project(i) for i in value.v))))
+    if isinstance(value, JObject):
+        out = {k: _typed_project(v) for k, v in value.v.items()}
+        return JArray((JString(_unwrap(str_utf8("object"))), JObject(out)))
+    raise _invalid_error("typed: unknown tag")  # unreachable — the algebra is closed
 
 
 def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
@@ -61,16 +79,20 @@ def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXI
     ``operation`` is validated printable ASCII 1..128.
     """
     try:
+        operation = _text(operation)
+        cast_arguments = _normalize_tagged(cast_arguments, bounds)
         return Ok(_request_digest_with_prefix(REQUEST_PREFIX, operation, cast_arguments, bounds))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
 def request_digest_v2(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
     """The v2-profile request digest (BAP2-REQUEST\\0 separator, identical projection + bounds)."""
     try:
+        operation = _text(operation)
+        cast_arguments = _normalize_tagged(cast_arguments, bounds)
         return Ok(_request_digest_with_prefix(REQUEST_PREFIX_V2, operation, cast_arguments, bounds))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
@@ -154,6 +176,8 @@ def request_digest_b64url(operation: str, cast_arguments: Tagged, bounds: Bounds
     Returns Ok<str> | Err (cross-vendor #21 + the bounds-ignored note: bounds threaded into the digest).
     """
     try:
+        operation = _text(operation)
+        cast_arguments = _normalize_tagged(cast_arguments, bounds)
         raw = _unwrap(request_digest(operation, cast_arguments, bounds))
         return Ok(_unwrap(base64url_encode(raw)).decode("ascii"))
     except InvalidError:

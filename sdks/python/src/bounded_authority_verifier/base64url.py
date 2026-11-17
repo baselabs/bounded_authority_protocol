@@ -12,6 +12,7 @@ decoder is hand-rolled.
 
 from __future__ import annotations
 
+from ._inputs import _bytes
 from .error import InvalidError, Ok, Result, _fail, _unwrap, err
 
 _ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
@@ -25,8 +26,7 @@ def _classify(byte: int) -> int:
 
 def base64url_decode(data: bytes, max_decoded_bytes: int | None = None) -> Result[bytes]:
     try:
-        if type(data) is not bytes:
-            return err()
+        data = _bytes(data)
         if max_decoded_bytes is not None and (type(max_decoded_bytes) is not int or max_decoded_bytes < 0):
             return err()
         n = len(data)
@@ -83,14 +83,13 @@ def base64url_decode(data: bytes, max_decoded_bytes: int | None = None) -> Resul
         if re_encoded != data:
             _fail("base64url: non-canonical input")
         return Ok(result)
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
 def base64url_encode(data: bytes) -> Result[bytes]:
     try:
-        if type(data) is not bytes:
-            return err()
+        data = _bytes(data)
         n = len(data)
         rem = n % 3
         out_len = ((n + 2) // 3) * 4
@@ -127,5 +126,5 @@ def base64url_encode(data: bytes) -> Result[bytes]:
             out[op] = ord(_ALPHABET[(b & 0x0F) << 2])
             op += 1
         return Ok(bytes(out))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ._inputs import _bytes, _decode_utf8, _text
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .error import InvalidError, Ok, Result, _fail, _invalid_error, _unwrap, err
 
@@ -95,8 +96,8 @@ class _Ctx:
 def json_decode(src: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[Tagged]:
     """Decode one complete RFC 8259 value with recursive duplicate rejection + bounds."""
     try:
-        if type(src) is not bytes:
-            return err()
+        src = _bytes(src)
+        src = _bytes(src)
         bounds = _unwrap(coerce_bounds(bounds))
         if len(src) > _unwrap(bounds_resolve(bounds, "json_bytes")):
             _fail("json: input exceeds json_bytes bound")
@@ -110,7 +111,7 @@ def json_decode(src: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[Tagged]:
         if ctx.nodes > _unwrap(bounds_resolve(bounds, "total_nodes")):
             _fail("json: total_nodes bound exceeded")
         return Ok(value)
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
@@ -516,35 +517,81 @@ def _skip_ws(ctx: _Ctx) -> None:
 
 
 def utf8_str(b: bytes) -> Result[str]:
-    """Decode UTF-8 bytes to ``Ok(str)``; invalid UTF-8 returns a closed rejection."""
     try:
-        if type(b) is not bytes:
-            return err()
-        return Ok(b.decode("utf-8"))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        b = _bytes(b)
+        return Ok(_decode_utf8(b))
+    except InvalidError:
         return err()
 
 
 def is_valid_utf8(b: bytes) -> Result[bool]:
-    """Return ``Ok(True)`` for valid UTF-8, ``Ok(False)`` for malformed bytes.
-
-    A wrong host type returns the closed ``Err``; no caller-input exception escapes.
-    """
     try:
+        b = _bytes(b)
         try:
-            b.decode("utf-8")
-        except UnicodeDecodeError:
+            _decode_utf8(b)
+        except InvalidError:
             return Ok(False)
         return Ok(True)
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
 def str_utf8(s: str) -> Result[bytes]:
-    """Encode a str to UTF-8 bytes."""
     try:
-        if type(s) is not str:
-            return err()
+        s = _text(s)
         return Ok(s.encode("utf-8"))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
+
+
+def _normalize_tagged(value: object, bounds: Bounds = MAXIMUM_BOUNDS) -> Tagged:
+    """Validate host-created algebra before arithmetic, indexing, or recursion; copy buffers."""
+    b = _unwrap(coerce_bounds(bounds))
+    nodes = 0
+    missing = object()
+
+    def walk(node: object, level: int) -> Tagged:
+        nonlocal nodes
+        nodes += 1
+        if level > _unwrap(bounds_resolve(b, "depth")) or nodes > _unwrap(bounds_resolve(b, "total_nodes")):
+            _fail()
+        if isinstance(node, JNull):
+            return JNull()
+        member = getattr(node, "v", missing)
+        if member is missing:
+            _fail()
+        if isinstance(node, JBool):
+            if type(member) is not bool:
+                _fail()
+            return JBool(member)
+        if isinstance(node, JInt):
+            if not isinstance(member, int) or isinstance(member, bool) or abs(member) > _unwrap(bounds_resolve(b, "integer_magnitude")):
+                _fail()
+            return JInt(int.__int__(member))
+        if isinstance(node, JFloat):
+            if not isinstance(member, float) or not (-_unwrap(bounds_resolve(b, "float_magnitude")) <= member <= _unwrap(bounds_resolve(b, "float_magnitude"))):
+                _fail()
+            return JFloat(float.__float__(member))
+        if isinstance(node, JString):
+            raw = _bytes(member)
+            if len(raw) > _unwrap(bounds_resolve(b, "string_bytes")):
+                _fail()
+            _decode_utf8(raw)
+            return JString(raw)
+        if isinstance(node, JArray):
+            if not isinstance(member, (list, tuple)) or len(member) > _unwrap(bounds_resolve(b, "array_items")) or level >= _unwrap(bounds_resolve(b, "depth")):
+                _fail()
+            return JArray(tuple(walk(child, level + 1) for child in member))
+        if isinstance(node, JObject):
+            if not isinstance(member, dict) or len(member) > _unwrap(bounds_resolve(b, "object_members")) or level >= _unwrap(bounds_resolve(b, "depth")):
+                _fail()
+            out = {}
+            for key, child in member.items():
+                name = _text(key)
+                if len(name.encode("utf-8")) > _unwrap(bounds_resolve(b, "key_bytes")):
+                    _fail()
+                out[name] = walk(child, level + 1)
+            return JObject(out)
+        raise _invalid_error()
+
+    return walk(value, 0)

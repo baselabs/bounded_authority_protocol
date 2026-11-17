@@ -169,7 +169,7 @@ def _probe_decoded_segment(module: types.ModuleType) -> bool:
 
 def _probe_negative_magnitude(module: types.ModuleType) -> bool:
     _compact, _expected, facts = _signed(module)
-    hostile = replace(
+    hostile = _replace_facts(
         facts,
         gen=2,
         prev=b"x" * 32,
@@ -182,13 +182,13 @@ def _probe_negative_magnitude(module: types.ModuleType) -> bool:
 
 def _probe_positive_generation(module: types.ModuleType) -> bool:
     _compact, _expected, facts = _signed(module)
-    hostile = replace(facts, gen=0, prev=b"x" * 32)
+    hostile = _replace_facts(facts, gen=0, prev=b"x" * 32)
     return _rejects(lambda: module._facts(hostile, _unwrap(bounds_maximum())))
 
 
 def _valid_successor_pair(module: types.ModuleType) -> tuple[Any, Any]:
     _compact, _expected, predecessor = _signed(module)
-    successor = replace(
+    successor = _replace_facts(
         predecessor,
         jti="urn:example:assertion:2",
         content_digest=b"n" * 32,
@@ -203,10 +203,10 @@ def _probe_markers(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return (
         not module.verify_successor(
-            replace(predecessor, verification="not_evaluated"), successor, _unwrap(bounds_maximum())
+            _replace_facts(predecessor, verification="not_evaluated"), successor, _unwrap(bounds_maximum())
         ).is_ok
         and not module.verify_successor(
-            predecessor, replace(successor, trust="evaluated"), _unwrap(bounds_maximum())
+            predecessor, _replace_facts(successor, trust="evaluated"), _unwrap(bounds_maximum())
         ).is_ok
     )
 
@@ -214,35 +214,35 @@ def _probe_markers(module: types.ModuleType) -> bool:
 def _probe_context(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return not module.verify_successor(
-        predecessor, replace(successor, iss="urn:example:issuer:other"), _unwrap(bounds_maximum())
+        predecessor, _replace_facts(successor, iss="urn:example:issuer:other"), _unwrap(bounds_maximum())
     ).is_ok
 
 
 def _probe_generation(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return not module.verify_successor(
-        predecessor, replace(successor, gen=3), _unwrap(bounds_maximum())
+        predecessor, _replace_facts(successor, gen=3), _unwrap(bounds_maximum())
     ).is_ok
 
 
 def _probe_predecessor(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return not module.verify_successor(
-        predecessor, replace(successor, prev=b"x" * 32), _unwrap(bounds_maximum())
+        predecessor, _replace_facts(successor, prev=b"x" * 32), _unwrap(bounds_maximum())
     ).is_ok
 
 
 def _probe_time(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return not module.verify_successor(
-        predecessor, replace(successor, iat=predecessor.iat - 1), _unwrap(bounds_maximum())
+        predecessor, _replace_facts(successor, iat=predecessor.iat - 1), _unwrap(bounds_maximum())
     ).is_ok
 
 
 def _probe_identity(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return not module.verify_successor(
-        predecessor, replace(successor, jti=predecessor.jti), _unwrap(bounds_maximum())
+        predecessor, _replace_facts(successor, jti=predecessor.jti), _unwrap(bounds_maximum())
     ).is_ok
 
 
@@ -344,3 +344,8 @@ def test_content_assertion_guard_mutation_is_killed(
 ) -> None:
     mutant = _mutant(name, needle, replacement)
     assert not probe(mutant), f"survived mutation: {name}"
+
+
+def _replace_facts(facts, **changes):
+    import inspect
+    return type(facts)(**{name: changes.get(name, getattr(facts, name)) for name in inspect.signature(type(facts)).parameters})

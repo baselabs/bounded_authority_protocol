@@ -218,20 +218,34 @@ root, because those profiles bind contract-major 1 or stand alone. Import `v3` e
 for every exported name, including the argument dataclasses and the tagged JSON types
 (`JObject`, `JString`, `JInt`, `JFloat`, and so on).
 
-**Results and errors.** Every public function returns `Result[T]`: `Ok(value)` or
+**Results and errors.** Public protocol functions return `Result[T]`: `Ok(value)` or
 `Err(InvalidError())`. This includes JSON decoding, JCS, base64url encoding and decoding,
-bounds construction and resolution, JWK encoding, thumbprints, and cryptographic helpers.
-Caller-input rejections return `Err` without a reason or partial value; callers do not catch
-input exceptions. `verify_strict`, `acceptable_public_key`, and `torsion_free` return
-`Result[bool]`, with `Ok(False)` for a key or signature that fails their predicate.
+bounds construction and resolution, JWK encoding, thumbprints, and SHA-256. The three
+Ed25519 predicates `verify_strict`, `acceptable_public_key`, and `torsion_free` return plain
+`bool`; malformed input returns `False`. Caller-input rejections return `Err` without a
+reason or partial value. Boundaries catch only `InvalidError`; SDK and runner programming
+errors propagate. `bool(Ok(...))` and `bool(Err(...))` raise `TypeError`: match `Ok` / `Err`
+or inspect `is_ok` explicitly.
+
+**Input types.** Byte parameters accept `bytes`, `bytearray`, and `memoryview`; boundaries
+copy their contents to immutable `bytes`. Released memoryviews and other types return `Err`
+(or `False` for the three predicates). Text parameters accept `str` and its subclasses,
+using the underlying characters without invoking an overridden `__str__`. Invalid Unicode
+and wrong types return `Err`. A `Bounds` constructor validates and copies its limits once;
+resolving a limit does not revalidate the mapping.
 
 **Facts.** `GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`, `KeyTransitionFacts`,
-`AnchoredExportFacts`, `AttestationFacts`, and `ContentAssertionFacts` are frozen dataclasses
-holding identifiers, digests, times, and counts, never raw signatures, keys, nonces, or
-arguments. Their `authorization` or `trust` field is `"not_evaluated"`; there is no `allowed`,
-`authorized`, or decision field. Their `repr` and `str` always render as `#Type<redacted>` (for example,
-`#GrantFacts<redacted>`), including when nested in a Result or container.
-Read individual fields explicitly when needed.
+`AnchoredExportFacts`, `AttestationFacts`, and `ContentAssertionFacts` are slotted value
+objects with read-only properties holding identifiers, digests, times, and counts, never raw
+signatures, keys, nonces, or arguments. Their `authorization` or `trust` field is
+`"not_evaluated"`; there is no `allowed`, `authorized`, or decision field. Their `repr` and
+`str` match the full Elixir rendering, for example
+`#BoundedAuthorityProtocol.V1.GrantFacts<redacted>` and
+`#BoundedAuthorityProtocol.V2.GrantFacts<redacted>`, including nested Results and containers.
+Sibling profiles use `RoleAttestation.V1` and `ContentAssertion.V1`. Facts refuse
+`dataclasses.asdict`, `dataclasses.fields`, `vars`, generic JSON encoding, pickling, and
+copy reduction. Read named properties explicitly; construct a new facts object explicitly
+when a copy is needed.
 
 ## Strict Ed25519
 

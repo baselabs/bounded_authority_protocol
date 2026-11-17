@@ -25,14 +25,39 @@ All notable changes to `bounded_authority_protocol` are documented here.
 ## [1.0.0] (2026-11-10)
 ## Unreleased
 
+### Changed
+
+- **Breaking changes to the unpublished Python SDK:** protocol primitives now return the
+  closed `Result` (`Ok(value)` or `Err(InvalidError())`), including JSON, UTF-8, JCS,
+  base64url, bounds, URI, JWK, thumbprint, digest, selector, and compact primitives.
+  Migration: match `Ok` / `Err` and read `Ok.value` instead of using a raw return value or
+  catching caller-input exceptions.
+- Python's `verify_strict`, `acceptable_public_key`, and `torsion_free` return plain `bool`;
+  malformed input returns `False`. Migration: use their boolean directly, without unwrapping
+  a Result. These three predicates are the exception to the protocol Result API.
+- Python Results refuse implicit truth testing. Migration: replace `if result:` with
+  `isinstance(result, Ok)`, explicit pattern matching, or `result.is_ok`.
+- Python's internal rejection and validation helpers are private; `fail` and `require` are
+  removed from `__all__`. Migration: consume the public Result API instead of importing
+  `fail`, `require`, `invalid_error`, or `unwrap`; those helpers have private names.
+- Python byte parameters accept `bytes`, `bytearray`, and `memoryview`, copied to immutable
+  bytes. Text parameters accept `str` subclasses by their underlying character data.
+  Migration: pass one of those types; wrong types, released views, and invalid Unicode
+  return `Err` (or `False` for Ed25519 predicates).
+- Python verified facts are slotted objects with read-only properties rather than
+  dataclasses, and refuse generic enumeration, copying, and pickling. Migration: read named
+  properties and explicitly construct any new facts object; replace `asdict`, `fields`,
+  `vars`, `dataclasses.replace`, copy reduction, and pickle use.
+- Python facts render the exact full Elixir module name, preserving each
+  contract-major and sibling namespace. Migration: update display assertions such as
+  `#GrantFacts<redacted>` to `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`.
+
 ### Fixed
 
-- Python verifier primitives now return the closed `Result` type on success and caller-input
-  rejection, including JSON, JCS, base64url, bounds, JWKs, thumbprints, and crypto predicates.
-
-- Python, Rust, and Go verifier facts now use fixed `#Type<redacted>` rendering on every
-  default display path, including nested Results and Go formatting flags. Field values remain
-  accessible explicitly.
+- Python rejects oversized URI ports before numeric conversion, validates malformed host
+  values before arithmetic or recursion, and catches only protocol rejections. SDK and
+  runner bugs propagate instead of becoming `Err`.
+- Python bounds validate once at construction and resolve limits without revalidation.
 
 ## [1.0.0] — 2026-11-10
 

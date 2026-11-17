@@ -26,6 +26,7 @@ from .json_alg import (
     JObject,
     JString,
     Tagged,
+    _normalize_tagged,
     is_valid_utf8,
     str_utf8,
     utf8_str,
@@ -47,13 +48,14 @@ def jcs_encode(value: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
     # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits past
     # MAXIMA, bypassing bounds_new). Mirrors the reference's Bounds.coerce.
     try:
+        value = _normalize_tagged(value, bounds)
         b = _unwrap(coerce_bounds(bounds))
         out = bytearray()
         _emit(value, out, b, 0, 0)
         if len(out) > _unwrap(bounds_resolve(b, "jcs_bytes")):
             _fail("jcs: jcs_bytes bound")
         return Ok(bytes(out))
-    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+    except InvalidError:
         return err()
 
 
