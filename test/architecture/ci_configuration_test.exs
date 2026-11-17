@@ -4,8 +4,8 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
   # A public repository: every job runs on a GitHub-hosted runner, never a self-hosted one.
   @runner "ubuntu-24.04"
   @gate ".github/workflows/ci.yml"
-  # The Pages deployment publishes site/ after a change is on main; it checks nothing.
-  @not_gates [".github/workflows/pages.yml"]
+  # Maintainers dispatch publication and site deployment only after landing.
+  @not_gates [".github/workflows/pages.yml", ".github/workflows/publish.yml"]
 
   defp workflows, do: Path.wildcard(".github/workflows/*.{yml,yaml}")
   defp read(path), do: YamlElixir.read_from_file!(path)
@@ -19,14 +19,36 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     end
   end
 
+  test "every executable job has a timeout and every checkout discards credentials" do
+    for path <- workflows(), {name, job} <- read(path)["jobs"] do
+      if Map.has_key?(job, "steps") do
+        timeout = job["timeout-minutes"]
+
+        if is_integer(timeout) do
+          assert timeout >= 5, "#{path} job #{name} must have a timeout with a 5-minute floor"
+        else
+          assert timeout == "${{ matrix.timeout }}", "#{path} job #{name} has no timeout"
+
+          for entry <- job["strategy"]["matrix"]["include"] do
+            assert is_integer(entry["timeout"]) and entry["timeout"] >= 5
+          end
+        end
+      else
+        refute Map.has_key?(job, "timeout-minutes"), "reusable callers cannot take a timeout"
+      end
+
+      for step <- job["steps"] || [], uses?(step, "actions/checkout@") do
+        assert step["with"]["persist-credentials"] == false, "#{path} job #{name}"
+      end
+    end
+  end
+
   # A landing qualifies on one run of ci.yml, so every check is part of that run: a gate that
   # starts itself on a push or pull request would run beside the landing without gating it.
   test "every check is part of the one CI run that gates a landing" do
     ci = read(@gate)
     assert ci["name"] == "CI"
-    branches = get_in(ci, ["on", "push", "branches"])
-    assert "main" in branches and "kci/**" in branches
-    assert Map.has_key?(ci["on"], "pull_request")
+    assert ci["on"] == %{"push" => %{"branches" => ["kci/**"]}}
 
     for {_event, filters} <- ci["on"], is_map(filters) do
       refute Map.has_key?(filters, "paths") or Map.has_key?(filters, "paths-ignore"),
@@ -44,7 +66,36 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     end
   end
 
-  test "history gates require complete checkout and landing builds cannot attest" do
+  test "qualified needs every other job and refuses every non-success result" do
+    jobs = read(@gate)["jobs"]
+    qualified = jobs["qualified"]
+    assert qualified["if"] == "always()"
+    assert MapSet.new(qualified["needs"]) == MapSet.new(Map.keys(jobs) -- ["qualified"])
+    [step] = qualified["steps"]
+    assert step["env"]["NEEDS_JSON"] == "${{ toJSON(needs) }}"
+    refute step["run"] =~ "${{"
+
+    success = Map.new(qualified["needs"], &{&1, %{"result" => "success"}})
+
+    check = fn needs ->
+      System.cmd("bash", ["-c", step["run"]],
+        env: [{"NEEDS_JSON", needs |> :json.encode() |> IO.iodata_to_binary()}],
+        stderr_to_stdout: true
+      )
+    end
+
+    assert {_, 0} = check.(success)
+
+    for name <- qualified["needs"], result <- ["failure", "skipped", "cancelled"] do
+      {_, status} = check.(Map.put(success, name, %{"result" => result}))
+      assert status != 0, "qualified accepted #{name}=#{result}"
+    end
+
+    {_, status} = check.(%{})
+    assert status != 0
+  end
+
+  test "history gates require complete checkout and qualification includes attestation" do
     ci = read(@gate)
     assert ci["env"]["BAP_REQUIRE_FULL_HISTORY"] == "1"
     assert ci["permissions"] == %{"contents" => "read"}
@@ -64,12 +115,111 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     attest = ci["jobs"]["attest"]
     assert attest["uses"] == "./.github/workflows/supply-chain.yml"
 
-    assert attest["if"] ==
-             "github.event_name != 'schedule' && " <>
-               "(github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))"
+    refute Map.has_key?(attest, "if")
 
     assert attest["permissions"]["id-token"] == "write"
     assert read(".github/workflows/supply-chain.yml")["permissions"] == %{"contents" => "read"}
+  end
+
+  test "dependency review always compares the default branch with the candidate commit" do
+    refute Map.has_key?(read(@gate)["jobs"]["dependency-review"], "if")
+    [job] = Map.values(read(".github/workflows/dependency-review.yml")["jobs"])
+    step = Enum.find(job["steps"], &uses?(&1, "actions/dependency-review-action@"))
+    assert step["with"]["base-ref"] == "${{ github.event.repository.default_branch }}"
+    assert step["with"]["head-ref"] == "${{ github.sha }}"
+  end
+
+  test "BEAM installations are strict and primary toolchains read the version file" do
+    for path <- workflows(), {_name, job} <- read(path)["jobs"], step <- job["steps"] || [] do
+      if uses?(step, "erlef/setup-beam@") do
+        assert step["with"]["version-type"] == "strict"
+
+        assert step["with"]["version-file"] == ".tool-versions" or
+                 (step["with"]["elixir-version"] == "${{ matrix.elixir }}" and
+                    step["with"]["otp-version"] == "${{ matrix.otp }}")
+      end
+    end
+
+    ci = read(@gate)
+    legs = ci["jobs"]["compatibility"]["strategy"]["matrix"]["include"]
+
+    assert Enum.map(Enum.reject(legs, & &1["primary"]), &{&1["elixir"], &1["otp"]}) == [
+             {"1.18.4", "27.3.4.14"},
+             {"1.19.5", "28.5.0.3"}
+           ]
+
+    quality_steps = ci["jobs"]["quality"]["steps"]
+    node = Enum.find(quality_steps, &uses?(&1, "actions/setup-node@"))
+    go = Enum.find(quality_steps, &uses?(&1, "actions/setup-go@"))
+    assert node["with"]["node-version-file"] == ".tool-versions"
+    assert go["with"]["go-version-file"] == ".tool-versions"
+
+    for step <- quality_steps, String.contains?(step["run"] || "", "mix deps.get") do
+      assert step["run"] == "mix deps.get --check-locked"
+    end
+  end
+
+  test "Pages deploys only when dispatched from the default branch" do
+    pages = read(".github/workflows/pages.yml")
+    assert pages["on"] == %{"workflow_dispatch" => nil}
+    assert_default_branch_first(pages["jobs"]["build"])
+    assert pages["jobs"]["deploy"]["environment"]["name"] == "github-pages"
+  end
+
+  test "Hex publication is dispatch-only, maintainer-restricted and environment-scoped" do
+    path = ".github/workflows/publish.yml"
+    workflow = read(path)
+    assert workflow["on"] == %{"workflow_dispatch" => nil}
+    assert workflow["permissions"] == %{"contents" => "read", "checks" => "read"}
+    [job] = Map.values(workflow["jobs"])
+    assert job["environment"] == "publish"
+
+    assert job["if"] ==
+             ~s|contains(fromJSON('["corepay","palermo-git"]'), github.actor) && contains(fromJSON('["corepay","palermo-git"]'), github.triggering_actor)|
+
+    assert_default_branch_first(job)
+    refute Map.has_key?(workflow, "env")
+    refute Map.has_key?(job, "env")
+    steps = job["steps"]
+    [publish] = Enum.filter(steps, &String.contains?(&1["run"] || "", "mix hex.publish"))
+    assert publish["run"] == "mix hex.publish --yes"
+    assert publish["env"] == %{"HEX_API_KEY" => "${{ secrets.HEX_API_KEY }}"}
+    assert List.last(steps) == publish
+
+    # Remove the one allowed declaration; no other workflow location may carry this key.
+    without_key = put_in(workflow, ["jobs", "publish", "steps"], steps -- [publish])
+    refute inspect(without_key) =~ "HEX_API_KEY"
+
+    for other <- workflows() -- [path] do
+      refute File.read!(other) =~ "HEX_API_KEY", other
+    end
+
+    for step <- steps do
+      refute uses?(step, "actions/cache")
+      refute Map.has_key?(step["with"] || %{}, "cache")
+    end
+
+    check = Enum.find(steps, &String.contains?(&1["run"] || "", "/check-runs"))
+    assert check["env"]["GH_TOKEN"] == "${{ github.token }}"
+    assert check["run"] =~ ~s(.name == "qualified")
+    assert check["run"] =~ ~s(.conclusion == "success")
+    assert check["run"] =~ "exit 1"
+
+    version_guard = Enum.find(steps, &String.contains?(&1["run"] || "", "git ls-remote"))
+    assert version_guard["run"] =~ "@version"
+    assert version_guard["run"] =~
+             "https://hex.pm/api/packages/bounded_authority_protocol/releases/"
+    assert version_guard["run"] =~ "200)"
+    assert version_guard["run"] =~ "404)"
+    assert version_guard["run"] =~ "refs/tags/v$version"
+
+    commands = Enum.map(steps, &(&1["run"] || ""))
+    assert "mix deps.get --check-locked" in commands
+    docs = Enum.find_index(commands, &(&1 == "mix docs"))
+    build = Enum.find_index(commands, &(&1 == "mix hex.build"))
+    inspect_package = Enum.find_index(commands, &String.contains?(&1, "inspect_publish_package"))
+    assert is_integer(docs) and is_integer(build) and is_integer(inspect_package)
+    assert docs < build and build < inspect_package and inspect_package < length(steps) - 1
   end
 
   test "the attested package passed the complete quality gate in the job that built it" do
@@ -81,7 +231,11 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     quality = Enum.find_index(steps, &(&1["run"] == "mix quality"))
     archive = Enum.find_index(steps, &String.contains?(&1["run"] || "", "mix hex.build"))
 
+    inspect_package =
+      Enum.find_index(steps, &String.contains?(&1["run"] || "", "inspect_publish_package"))
+
     assert quality != nil and archive != nil and quality < archive
+    assert is_integer(inspect_package) and archive < inspect_package
     refute Map.has_key?(Enum.at(steps, quality), "if"), "mix quality must run on every event"
 
     [attest] = Map.values(read(".github/workflows/supply-chain.yml")["jobs"])
@@ -144,6 +298,25 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
         manifest = Path.join(directory, Map.fetch!(manifests, ecosystem))
         assert manifest in paths, "Dependabot entry has no committed manifest: #{manifest}"
       end
+    end
+  end
+
+  defp assert_default_branch_first(job) do
+    [first | _] = job["steps"]
+    refute Map.has_key?(first, "if")
+    refute Map.has_key?(first, "uses")
+    assert first["env"]["DEFAULT_BRANCH"] == "${{ github.event.repository.default_branch }}"
+    assert first["run"] =~ ~s(if [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ])
+    assert first["run"] =~ "exit 1"
+
+    for ref <- ["refs/heads/main", "refs/heads/kci/candidate", "refs/tags/v1.0.0"] do
+      {_, status} =
+        System.cmd("bash", ["-c", first["run"]],
+          env: [{"DEFAULT_BRANCH", "main"}, {"GITHUB_REF", ref}],
+          stderr_to_stdout: true
+        )
+
+      assert (status == 0) == (ref == "refs/heads/main")
     end
   end
 end

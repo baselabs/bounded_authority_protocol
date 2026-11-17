@@ -52,15 +52,16 @@ published, deployment-decided contract-major overlap. A verdict never changes si
 
 Every CI run builds the package archive in its complete quality job, after the full quality gate
 has passed in that job, with a SHA-256 checksum and release and tooling CycloneDX SBOM documents.
-For pushes to `main` and version tags, and a manual dispatch from `main`, CI then calls the
-supply-chain workflow, which signs separate build-provenance and SBOM attestations for that same
-archive. A downloaded archive can be verified with:
+In that same `kci/<sha>` qualification run, CI calls the supply-chain workflow, which signs
+separate build-provenance and SBOM attestations for that archive. Verify the exact source commit,
+which must be on `main` before release; the attestation's source ref is the qualification branch.
+A downloaded archive can be verified with:
 
 ```bash
 sha256sum --check SHA256SUMS
 gh attestation verify bounded_authority_protocol-<version>.tar \
   --repo baselabs/bounded_authority_protocol \
   --signer-workflow baselabs/bounded_authority_protocol/.github/workflows/supply-chain.yml \
-  --source-ref refs/heads/main \
+  --source-digest <commit> \
   --deny-self-hosted-runners
 ```

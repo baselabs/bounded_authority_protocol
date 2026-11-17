@@ -12,7 +12,7 @@
 # so an un-staged revert does not fool the gate. Fail the commit on the first hit.
 #
 # Honesty limit: this catches publish infrastructure STAGED. It cannot catch a
-# literal 'npm publish' run against a working tree. CI on main is the hard,
+# literal 'npm publish' run against a working tree. The kci qualification run is the hard,
 # non-bypassable backstop for committed infrastructure; this hook is honor-system
 # fast feedback for contributors.
 

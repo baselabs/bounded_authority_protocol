@@ -7,12 +7,16 @@ fixed value-free errors, and independent conformance requirements in the
 Report security vulnerabilities privately, never in an issue or pull request: see
 [SECURITY.md](SECURITY.md).
 
-Before a pull request:
+A pull request, including one from a fork, gets no CI run of its own. A maintainer qualifies
+it with the `kci/<sha>` run when landing it: `ci.yml` runs only on pushes to `kci/**`, and
+`main` moves to that exact commit only when the final `qualified` job is green.
+
+Before submitting a change:
 
 1. open a design discussion before protocol, cryptography, canonicalization, or conformance changes;
 2. add allow, deny, malformed-input, and mutation-red tests;
 3. update normative vectors and obtain independent exact-byte verification when wire bytes change;
-4. run `mix deps.get` and `mix quality`;
+4. fetch with `mix deps.get --check-locked`; the qualification run executes `mix quality`;
 5. update the changelog and every affected contract document.
 
 Application-profile changes also update their normative specification, certified corpus and digest,
@@ -25,10 +29,10 @@ The declared Elixir range is `~> 1.18` (1.18/1.19/1.20) and the supported Erlang
 **27, 28, 29**, with a floor set by the stdlib `:json` module (OTP 27+) and enforced by
 `config/config.exs` at config load, before anything compiles; the assert is not shipped in the Hex
 package, so consumers enforce their own. The mix.exs range, the config set, `.tool-versions`, and
-the CI lanes move together in one commit. The clone →
-`deps.get` → compile → test contract must hold on macOS and Linux as a developer-setup
-property, proven on a developer machine; CI runs on Linux only, one lane per supported
-Erlang/OTP major plus the complete-quality lane. Windows developers use WSL2 (clone
+the CI lanes move together in one commit. Primary CI toolchains are exact versions in
+`.tool-versions`; strict installation and installed-version checks refuse drift. The Linux
+qualification run covers each supported Erlang/OTP major plus the complete-quality lane;
+the older compatibility lanes retain exact version literals. Windows developers use WSL2 (clone
 inside the WSL filesystem, not under `/mnt/c`), which is the Linux path; no native-Windows developer
 path is maintained. The full quality battery is
 POSIX-only tooling. Focused boundary commands are
@@ -53,8 +57,20 @@ infrastructure (registry-publish steps, `prepublishOnly`/`prepack` scripts, `pub
 committed to this repository. Contributor hook installation works without any local policy;
 maintainer checks activate only where a maintainer has set one up. The deliberate-admin bypass is `git commit --no-verify`, documented
 here as the sanctioned escape hatch. Neither layer catches a literal ad-hoc publish command run
-against a working tree, since no commit gate sees that runtime act; CI on `main` is the hard gate
-for committed infrastructure.
+against a working tree, since no commit gate sees that runtime act; the `kci/<sha>` qualification
+run is the hard gate for committed infrastructure. Only the Elixir Hex command in
+`.github/workflows/publish.yml` is exempt; every other registry command and action stays blocked.
+Existing checkouts must rerun `sh scripts/install-hooks.sh` after updating the hook.
+
+## Package publication and site deployment
+
+Contributors and agents never publish, tag a version, deploy or dispatch a workflow. The
+maintainers' release operator dispatches `publish.yml` for Hex and `pages.yml` for the static
+site, both from `main`; neither workflow starts on a push. Publication requires a successful
+`qualified` check for the exact commit, rejects an existing registry version or origin tag,
+and inspects the newly built archive before publishing. The registry credential belongs only
+to the `publish` environment and the publication step. The operator verifies publication and
+creates the version tag on the published commit.
 
 ## Maintainer checks
 

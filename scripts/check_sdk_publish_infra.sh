@@ -14,12 +14,13 @@
 # monorepo. Each SDK graduates to its own per-SDK repo on first publication. This
 # script catches the ENABLING change: registry-publish commands, registry-publish
 # GitHub Actions, and npm publish lifecycle hooks committed to manifests or
-# workflows. Scope is SDK-only per ADR 0015; the Elixir package is not scanned
-# here (its publish path, if any, is a separate decision under BAP-07).
+# workflows. The sole Elixir publication exception is the exact path
+# .github/workflows/publish.yml: only the Hex publish command is allowed there.
+# Every other registry command and action remains blocked, including in that file.
 #
 # Honesty limit: this catches publish infrastructure STAGED/COMMITTED. It cannot
 # catch a literal ad-hoc 'npm publish' typed at a working tree; that is a runtime
-# act no commit gate sees. CI on main is the hard gate for committed infrastructure;
+# act no commit gate sees. The kci qualification run gates committed infrastructure;
 # the local hook is honor-system for contributors. The deliberate-admin bypass is
 # 'git commit --no-verify' (documented in CONTRIBUTING.md).
 
@@ -105,6 +106,9 @@ done
 # Publish actions + contiguous forms (fixed string): every scanned surface.
 while IFS= read -r cmd; do
   [ -n "$cmd" ] || continue
+  if [ "$path" = .github/workflows/publish.yml ] && [ "$cmd" = 'mix hex.publish' ]; then
+    continue
+  fi
   if printf '%s' "$content" 2>/dev/null | grep -qF -- "$cmd"; then
     printf '%s: publish signal "%s": SDKs must not publish from the monorepo (ADR 0015)\n' \
       "$path" "$cmd" >&2

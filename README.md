@@ -46,7 +46,11 @@ end
 ```
 
 Elixir 1.18 or later (Mix enforces it) and Erlang/OTP 27 or later (for `:json`; nothing checks
-it). CI tests Elixir 1.18, 1.19, and 1.20 on OTP 27, 28, and 29.
+it). CI tests Elixir 1.18, 1.19, and 1.20 on OTP 27, 28, and 29. A maintainer qualifies each
+change with one push to `kci/<sha>`; `main` moves to that exact commit only when `qualified`
+is green. Pull requests, including forks, get no CI run of their own. The maintainers' release
+operator dispatches Hex publication and site deployment from `main`; see
+[Contributing](CONTRIBUTING.md#package-publication-and-site-deployment).
 
 ## Quickstart
 

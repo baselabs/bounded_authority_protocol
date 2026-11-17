@@ -1,9 +1,8 @@
 name: SDK conformance
 
-# Cross-language verifier SDK gate (ADR 0014 D8). CI calls this workflow on every run, with no
-# path filter: pull requests, pushes to main and kci landing branches, version tags, manual
-# dispatch, and the daily schedule that catches upstream cryptographic-runtime drift. The SDK
-# suites run separately from the Elixir `mix quality` battery.
+# Cross-language verifier SDK gate (ADR 0014 D8). CI calls this workflow on every
+# kci/<sha> qualification run without path filters. These suites run separately
+# from the Elixir mix quality battery.
 
 on:
   workflow_call:
@@ -11,18 +10,31 @@ on:
 permissions:
   contents: read
 
+env:
+  GOTOOLCHAIN: local
+
 jobs:
   sdks-conformance:
     name: Cross-language SDK conformance (Python)
     runs-on: ubuntu-24.04
+    timeout-minutes: 5 # 5-minute floor; slowest green 1.0 min, run 44095313459.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read Python version
+        id: python
+        run: bash scripts/ci_tool_versions.sh read python
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.13"
+          python-version: ${{ steps.python.outputs.python }}
+
+      - name: Refuse Python version drift
+        run: bash scripts/ci_tool_versions.sh python
 
       # The TypeScript SDK graduated to its own repository on first publication
       # (ADR 0015, 2026-09-14): baselabs/bounded_authority_protocol_typescript
@@ -84,22 +96,40 @@ jobs:
         run: python tests/conformance/run_v3.py
         working-directory: sdks/python
 
-  # TypeScript runs in its graduated repository. The independent Node runner stays
-  # pinned to 22.23.1 in ci.yml's quality job, matching .tool-versions and
+  # TypeScript runs in its graduated repository. The independent Node runner reads
+  # .tool-versions in ci.yml's quality job, matching
   # its strict-Ed25519 backend evidence; SDK jobs here have no Node dependency.
   # The Rust MSRV (1.88) is pinned by sdks/rust/rust-toolchain.toml; this job installs
   # that exact toolchain so the MSRV floor is the CI-tested floor.
   rust-conformance:
     name: Cross-language SDK conformance (Rust MSRV 1.88)
     runs-on: ubuntu-24.04
+    timeout-minutes: 9 # 2x slowest green 4.5 min, run 44095313459.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read Python version
+        id: python
+        run: bash scripts/ci_tool_versions.sh read python
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ steps.python.outputs.python }}
+
+      - name: Refuse Python version drift
+        run: bash scripts/ci_tool_versions.sh python
 
       - name: Install Rust (MSRV 1.88.0 + rustfmt + clippy)
         run: |
           rustup toolchain install 1.88.0 --profile minimal --component rustfmt --component clippy --no-self-update
           rustup default 1.88.0
+
+      - name: Refuse Rust MSRV drift
+        run: bash scripts/ci_tool_versions.sh rust
 
       - name: "Rust: audit Cargo.lock"
         run: |
@@ -135,7 +165,7 @@ jobs:
         working-directory: sdks/rust
 
   # Go runs as its own job in the same call. The go.mod floor (1.25) is the
-  # CI-tested floor: this job installs exactly 1.25, mirroring the Rust MSRV
+  # CI-tested floor: this job installs exactly 1.25.0, mirroring the Rust MSRV
   # pattern. Zero runtime dependencies means no go.sum to lock; `go vet` +
   # `go test ./...` cover the library unit suite, the permissiveness
   # mutation-gate battery (incl. the white-box work-pin legs), and the
@@ -144,14 +174,33 @@ jobs:
   go-conformance:
     name: Cross-language SDK conformance (Go 1.25)
     runs-on: ubuntu-24.04
+    timeout-minutes: 5 # 5-minute floor; slowest green 0.7 min, run 44103442816.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read Python version
+        id: python
+        run: bash scripts/ci_tool_versions.sh read python
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ steps.python.outputs.python }}
+
+      - name: Refuse Python version drift
+        run: bash scripts/ci_tool_versions.sh python
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.25.0"
+          cache: false
+
+      - name: Refuse Go floor drift
+        run: bash scripts/ci_tool_versions.sh golang 1.25.0
 
       - name: "Go: closure removal must fail"
         run: python3 scripts/check_sdk_closures.py go
@@ -181,14 +230,21 @@ jobs:
   go-advisories:
     name: Go module advisories
     runs-on: ubuntu-24.04
+    timeout-minutes: 5 # 5-minute floor; slowest green 0.6 min, run 44095267479.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up patched Go for the advisory scan
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.27.4"
+          go-version-file: .tool-versions
+          cache: false
+
+      - name: Refuse Go version drift
+        run: bash scripts/ci_tool_versions.sh golang
 
       - name: Audit every module, including packages without reachable symbols
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 -scan=module
@@ -197,23 +253,48 @@ jobs:
   isolated-distribution:
     name: Isolated SDK and unpacked package (${{ matrix.sdk }})
     runs-on: ubuntu-24.04
+    timeout-minutes: ${{ matrix.timeout }} # Rust: 2x 4.1 min, run 44138809033; Python/Go: 5-minute floor, 2.0/1.0 min, run 44095693142.
     strategy:
       fail-fast: false
       matrix:
-        sdk: [python, rust, go]
+        include:
+          - sdk: python
+            timeout: 5
+          - sdk: rust
+            timeout: 9
+          - sdk: go
+            timeout: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.13"
+          persist-credentials: false
+      - name: Read Python version
+        id: python
+        run: bash scripts/ci_tool_versions.sh read python
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ steps.python.outputs.python }}
+
+      - name: Refuse Python version drift
+        run: bash scripts/ci_tool_versions.sh python
+
       - if: matrix.sdk == 'python'
         run: python -m pip install uv==0.11.20
       - if: matrix.sdk == 'rust'
         run: rustup toolchain install 1.88.0 --profile minimal --no-self-update && rustup default 1.88.0
+      - if: matrix.sdk == 'rust'
+        name: Refuse Rust MSRV drift
+        run: bash scripts/ci_tool_versions.sh rust
       - if: matrix.sdk == 'go'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.25.0"
+          cache: false
+      - if: matrix.sdk == 'go'
+        name: Refuse Go floor drift
+        run: bash scripts/ci_tool_versions.sh golang 1.25.0
       - if: matrix.sdk == 'go'
         name: Cache the module zip verifier
         run: go mod download golang.org/x/mod@v0.29.0

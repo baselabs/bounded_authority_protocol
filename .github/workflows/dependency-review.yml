@@ -1,8 +1,7 @@
 name: Dependency review
 
-# Called by CI for pull requests and pushes. A pull request uses the action's own base and head;
-# a push to main compares with the commit it replaced; any other push (a kci landing branch, a
-# version tag) compares with the default branch.
+# Every kci/<sha> qualification run compares the default branch with the candidate
+# commit. Dependency review is part of the gate for every change.
 on:
   workflow_call:
 
@@ -13,15 +12,18 @@ jobs:
   dependency-review:
     name: Vulnerability and license review
     runs-on: ubuntu-24.04
+    timeout-minutes: 5 # 5-minute floor; slowest green 0.2 min, run 44145068716.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          base-ref: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' && github.event.before || github.event.repository.default_branch) || '' }}
-          head-ref: ${{ github.event_name == 'push' && github.sha || '' }}
+          base-ref: ${{ github.event.repository.default_branch }}
+          head-ref: ${{ github.sha }}
           fail-on-severity: low
           fail-on-scopes: runtime, development, unknown
           allow-licenses: >-

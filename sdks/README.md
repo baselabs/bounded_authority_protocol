@@ -15,7 +15,11 @@ The SDKs have no private-key access or custody and do not choose trust or author
 local path or Git commit; each README shows how. Each SDK moves to its own repository when it is
 first published, never publishing from this one
 ([publication guard](../scripts/check_sdk_publish_infra.sh)); a pre-commit hook and a CI job
-reject registry-publish setup here. Each SDK root already contains its full test suite and corpus inputs; CI proves that closure
+reject SDK registry-publish setup here in every `kci/<sha>` qualification run. Pull requests,
+including forks, get no CI run of their own; a maintainer's landing run qualifies the exact
+commit before `main` moves. The sole publication exception is the Elixir package in
+`.github/workflows/publish.yml`, dispatched from `main` by the maintainers' release operator.
+Each SDK root already contains its full test suite and corpus inputs; CI proves that closure
 from a copied directory and from the language's distributable format.
 
 ## What is here

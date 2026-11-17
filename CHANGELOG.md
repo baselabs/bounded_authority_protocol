@@ -6,6 +6,15 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Qualify commits only on `kci/**` pushes, with a final `qualified` job requiring every
+  check and attestation to succeed before `main` moves. Review dependencies against the
+  default branch on every run, enforce measured job timeouts, discard checkout credentials,
+  install exact toolchains from `.tool-versions`, and refuse unlocked dependency changes.
+- Restrict Hex publication and Pages deployment to maintainer-dispatched workflows from
+  `main`. Publication requires the commit's successful qualification, rejects published or
+  tagged versions, and inspects package identity and contents; the SDK publication guard
+  permits only the Hex command in that single workflow.
+
 - Run every check in one CI workflow run. SDK conformance, the SDK publish guard, dependency
   review and attestation are reusable workflows called from `ci.yml`, without path filters, so
   the run that qualifies a landing covers all of them. The complete quality job builds the

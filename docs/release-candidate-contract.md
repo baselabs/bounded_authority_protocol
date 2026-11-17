@@ -12,19 +12,29 @@ operational authority or replace a deployment's authorization checks.
 ## Candidate verification
 
 [CI](../.github/workflows/ci.yml) builds an unpublished Hex archive in its complete quality job,
-with its SHA-256 checksum and release and tooling CycloneDX documents. For `main` and version
-tags, the [supply-chain workflow](../.github/workflows/supply-chain.yml) that CI calls signs
-separate build-provenance and SBOM attestations for that archive. To compare a candidate with
-those artifacts:
+with its SHA-256 checksum and release and tooling CycloneDX documents. In the same
+`kci/<sha>` qualification run, the
+[supply-chain workflow](../.github/workflows/supply-chain.yml) signs separate build-provenance
+and SBOM attestations for that archive. Verify by source commit, because the attestation names
+the qualification branch. The commit must be on `main` before release. To compare a candidate
+with those artifacts:
 
 ```bash
 sha256sum --check SHA256SUMS
 gh attestation verify bounded_authority_protocol-<version>.tar \
   --repo baselabs/bounded_authority_protocol \
   --signer-workflow baselabs/bounded_authority_protocol/.github/workflows/supply-chain.yml \
-  --source-ref refs/heads/main \
+  --source-digest <commit> \
   --deny-self-hosted-runners
 ```
+
+The maintainers' release operator dispatches [publish.yml](../.github/workflows/publish.yml)
+from `main` to publish the Hex package after qualification. It rejects an already published
+or tagged version, builds docs and the archive without a cache, and checks package identity,
+file inventory and source bytes before publication. Contributors and agents do not publish,
+tag or dispatch. The operator verifies the published release and tags its exact commit.
+[pages.yml](../.github/workflows/pages.yml) is also dispatch-only from `main` and retains its
+`github-pages` environment.
 
 An attested candidate is not a registry release. See the [security policy](../SECURITY.md)
 for vulnerability reporting and the supported release line.

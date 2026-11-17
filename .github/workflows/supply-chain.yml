@@ -1,7 +1,7 @@
 name: Supply chain
 
 # Attests the package that CI's complete quality job built and checked earlier in the same run.
-# CI calls this workflow for main and version tags. It is a reusable workflow of its own so that
+# CI calls this workflow inside every kci/<sha> qualification run. It is reusable so that
 # every attestation names it as the signer:
 # `gh attestation verify --signer-workflow .../.github/workflows/supply-chain.yml`.
 on:
@@ -19,6 +19,7 @@ jobs:
   attest:
     name: Attest trusted package
     runs-on: ubuntu-24.04
+    timeout-minutes: 5 # 5-minute floor; slowest green 0.3 min, run 44095050166.
     permissions:
       contents: read
       id-token: write

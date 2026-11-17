@@ -1,0 +1,95 @@
+name: Publish Hex package
+
+# The maintainers' release operator dispatches publication after the version
+# commit has landed on main through a successful qualification run.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: contains(fromJSON('["corepay","palermo-git"]'), github.actor) && contains(fromJSON('["corepay","palermo-git"]'), github.triggering_actor)
+    environment: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20 # Estimate: 10 min for a cold dependency fetch, docs, archive inspection and publication; 2x.
+    steps:
+      - name: Require the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+            echo "Publication must be dispatched from the default branch." >&2
+            exit 1
+          fi
+
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require a successful qualified check for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          checks="$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?per_page=100" \
+            --jq '.check_runs[] | select(.name == "qualified" and .status == "completed" and .conclusion == "success") | .id')"
+          if [ -z "$checks" ]; then
+            echo "This commit has no successful qualified check-run." >&2
+            exit 1
+          fi
+
+      - name: Refuse a published or tagged version
+        run: |
+          version="$(sed -nE 's/^  @version "([^"]+)"$/\1/p' mix.exs)"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Cannot read one package version from mix.exs." >&2
+            exit 1
+          fi
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            "https://hex.pm/api/packages/bounded_authority_protocol/releases/$version")"
+          case "$status" in
+            404) ;;
+            200) echo "Version $version is already on Hex." >&2; exit 1 ;;
+            *) echo "Hex version lookup failed with HTTP $status." >&2; exit 1 ;;
+          esac
+          tags="$(git ls-remote --tags origin "refs/tags/v$version" "refs/tags/v$version^{}")"
+          if [ -n "$tags" ]; then
+            echo "Tag v$version already exists on origin." >&2
+            exit 1
+          fi
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Refuse BEAM version drift
+        run: bash scripts/ci_tool_versions.sh beam
+
+      - name: Pin the Hex client
+        run: mix local.hex "$(cat .hex-version)" --force
+
+      - name: Install dependencies
+        run: mix deps.get --check-locked
+
+      - name: Build docs
+        run: mix docs
+
+      - name: Build package
+        run: mix hex.build
+
+      - name: Inspect package identity and exact file inventory
+        run: mix run --no-start scripts/inspect_publish_package.exs
+
+      - name: Publish the Hex package
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+        run: mix hex.publish --yes

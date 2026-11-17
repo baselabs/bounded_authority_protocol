@@ -55,6 +55,49 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
              1
   end
 
+  test "only the canonical Hex workflow may publish the Elixir package" do
+    content = "      - run: mix hex.publish --yes\n"
+    assert run(content, ".github/workflows/publish.yml") == 0
+
+    for path <- [
+          ".github/workflows/ci.yml",
+          ".github/workflows/release.yml",
+          ".github/workflows/publish.yaml",
+          ".github/workflows/nested/publish.yml",
+          ".github/actions/publish/action.yml",
+          "sdks/elixir/release.sh",
+          "Makefile"
+        ] do
+      assert run(content, path) == 1, path
+    end
+  end
+
+  test "the Hex workflow exception never permits other registry commands or actions" do
+    for command <- [
+          "npm publish",
+          "pnpm publish",
+          "yarn -s publish",
+          "cargo +stable publish",
+          "hatch publish",
+          "flit publish",
+          "uv publish",
+          "twine upload dist/*",
+          "cargo-release publish",
+          "pypa/gh-action-pypi-publish",
+          "JS-DevTools/npm-publish",
+          "JS-DevTools/action-publish",
+          "crate-ci/cargo-release"
+        ] do
+      content = "run: mix hex.publish --yes\nrun: #{command}\n"
+      assert run(content, ".github/workflows/publish.yml") == 1, command
+    end
+  end
+
+  test "the committed Hex workflow is allowed by the shared guard" do
+    path = ".github/workflows/publish.yml"
+    assert run(File.read!(path), path) == 0
+  end
+
   test "the guard does not self-match its own literal pattern list" do
     # The guard file carries every publish command string as data; scanning it must NOT red.
     assert run(File.read!(@guard_source), "scripts/check_sdk_publish_infra.sh") == 0
@@ -135,6 +178,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
     end
 
     for path <- [
+          ".github/workflows/publish.yml",
           ".github/workflows/release.yml",
           ".github/actions/release/action.yml",
           "sdks/rust/release.sh",
