@@ -1823,7 +1823,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
         case Base.url_decode64(encoded, padding: false) do
           {:ok, decoded} -> decoded
           # Malformed nonce encoding -> treat as absent (a nil nonce fails nonce_matches? when
-          # a nonce is required, and passes when not required — fail-closed without over-rejecting).
+          # a nonce is required, and passes when not required, failing closed without over-rejecting).
           :error -> nil
         end
 

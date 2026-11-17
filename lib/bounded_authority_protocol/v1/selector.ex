@@ -8,6 +8,21 @@ defmodule BoundedAuthorityProtocol.V1.Selector do
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Jcs
 
+  @typedoc """
+  One contract-major 1 selector in a `BoundedAuthorityProtocol.V1.Operation`.
+
+  `:all` matches any tagged JSON root. `{:equals, path, value}` requires equality at the path;
+  `{:one_of, path, values}` requires equality to one member of a nonempty list. An operation's
+  selectors are conjunctive. Values use `t:BoundedAuthorityProtocol.V1.Json.value/0`; integer and
+  float tags remain distinct, with no string or numeric coercion. Producers refuse integral
+  float-tagged selector values that canonical JSON would re-tag as integers.
+
+  Paths contain 1 to 32 nonempty object-member names, each at most 128 UTF-8 bytes. Traversal
+  never indexes arrays, and a missing member fails the selector. Caller bounds may tighten
+  these maxima. Numeric ranges are not part of this profile; use contract-major 2 or 3 for them.
+  See the [normative selector rules](../spec/bap-v1.md#selectors) and the grant producer
+  `BoundedAuthorityProtocol.V1.grant_signing_input/2`.
+  """
   @type t ::
           :all
           | {:equals, [binary()], BoundedAuthorityProtocol.V1.Json.value()}

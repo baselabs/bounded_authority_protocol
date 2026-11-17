@@ -6,7 +6,7 @@ import Config
 # package never inherit this assert; each consuming repository enforces its own
 # toolchain. OTP 27 is the floor because lib/bounded_authority_protocol/v1/json.ex
 # decodes through the stdlib :json module (OTP 27+). :erlang.system_info(:otp_release)
-# returns a charlist — to_string/1 is required or the membership test always fails.
+# returns a charlist, so to_string/1 is required for the membership test to succeed.
 supported_otp = ["27", "28", "29"]
 running_otp = to_string(:erlang.system_info(:otp_release))
 

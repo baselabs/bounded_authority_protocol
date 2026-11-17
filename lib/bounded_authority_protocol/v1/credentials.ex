@@ -6,8 +6,8 @@ defmodule BoundedAuthorityProtocol.V1.Credentials do
 
   ## Fields
 
-  * `grant` - the exact grant compact bytes as received. Redacted by `inspect/2`.
-  * `proof` - the exact proof compact bytes as received. Redacted by `inspect/2`.
+  * `grant`: the exact grant compact bytes as received. Redacted by `inspect/2`.
+  * `proof`: the exact proof compact bytes as received. Redacted by `inspect/2`.
   """
 
   @enforce_keys [:grant, :proof]

@@ -4,9 +4,9 @@ defmodule BoundedAuthorityProtocol.V2.Operation do
 
   ## Fields
 
-  * `name` - the operation name: 1 to `operation_bytes` (128) printable ASCII bytes, unique within
+  * `name`: the operation name: 1 to `operation_bytes` (128) printable ASCII bytes, unique within
     the grant.
-  * `selectors` - an ordered nonempty list of at most `selectors` (64)
+  * `selectors`: an ordered nonempty list of at most `selectors` (64)
     `BoundedAuthorityProtocol.V2.Selector` terms (kinds `:all`, `equals`, `one_of` and the inclusive
     ranges `lte` and `gte`), applied conjunctively to the request's typed arguments.
   """

@@ -36,7 +36,7 @@ The protected header has exactly these members:
 | Member | Required value |
 |---|---|
 | `alg` | `EdDSA` |
-| `kid` | attestor key id — bounded ASCII `[A-Za-z0-9.-_~]` under the BAP1 `kid` rules; a hint, never a trust selector |
+| `kid` | attestor key id using bounded ASCII `[A-Za-z0-9.-_~]` under the BAP1 `kid` rules; a hint, never a trust selector |
 | `typ` | `ba+role-attestation` |
 
 Every unlisted member or value is invalid (`REQ-RA1-HEADER-closed-set`). The header is
@@ -48,7 +48,7 @@ The payload has exactly these members:
 | Member | Type | Rule |
 |---|---|---|
 | `v` | integer | exactly `1` (`REQ-RA1-CLAIM-v`) |
-| `jti` | string | non-empty bounded StringOrUri identifier under the BAP1 grant `jti` rules — the audit and revocation-reference handle (`REQ-RA1-CLAIM-jti`) |
+| `jti` | string | non-empty bounded StringOrUri identifier under the BAP1 grant `jti` rules, serving as the audit and revocation-reference handle (`REQ-RA1-CLAIM-jti`) |
 | `key_id` | string | the attested subject key id under the BAP1 `kid` rules (`REQ-RA1-CLAIM-key-id`) |
 | `public_key` | string | base64url of exactly 32 raw Ed25519 subject public-key bytes (`REQ-RA1-CLAIM-public-key`) |
 | `role` | string | exactly `"issuer"` or `"holder"` (`REQ-RA1-CLAIM-role-closed-set`) |
@@ -58,8 +58,8 @@ The payload has exactly these members:
 Every unlisted member is invalid, every listed member is required, and a numeric member
 encoded as a float (for example `1.0`) is invalid (`REQ-RA1-CLAIM-closed-required`). Both
 segments MUST equal their RFC 8785 canonical re-encoding, duplicate members are invalid, and
-fingerprints derived by implementations use the RFC 7638 Ed25519 thumbprint preimage —
-`{"crv":"Ed25519","kty":"OKP","x":…}` — never a hash of raw key bytes (`REQ-RA1-CLAIM-canonical`).
+fingerprints derived by implementations use the RFC 7638 Ed25519 thumbprint preimage
+`{"crv":"Ed25519","kty":"OKP","x":…}`, not a hash of raw key bytes (`REQ-RA1-CLAIM-canonical`).
 
 ## 3. Verification contract
 
@@ -76,7 +76,7 @@ when any fails (`REQ-RA1-VERIFY-fail-closed`):
    (`REQ-RA1-VERIFY-closed-sets`);
 2. the header `kid` equals the attestor key id, and the Ed25519 signature verifies under the
    attestor public key (`REQ-RA1-VERIFY-attestor-signature`);
-3. the payload subject binding equals the expected subject binding — `key_id` equality and
+3. the payload subject binding equals the expected subject binding, requiring `key_id` equality and
    raw `public_key` byte-equality (`REQ-RA1-VERIFY-subject-binding`);
 4. the attestor and the subject are distinct: the attestor thumbprint MUST NOT equal the
    subject thumbprint, and the attestor key id MUST NOT equal the subject key id
@@ -134,7 +134,7 @@ A role attestation is evidence of a binding, not an authorization. It MUST NOT b
 as granting execution, and a verified attestation MUST NOT be treated as an authorization
 decision (`REQ-RA1-SECURITY-not-authority`). An attestation is valid wherever its attestor key
 is trusted: deployments scope attestations through their trust configuration, and issuers
-SHOULD issue bounded attestor windows — a configured unbounded attestor window admits
+SHOULD issue bounded attestor windows because a configured unbounded attestor window admits
 unbounded attestation lifetimes by that choice (`REQ-RA1-SECURITY-trust-scope`). A `holder`
 attestation is admission control and defense-in-depth only; per-grant holder standing remains
 each grant's `cnf.jkt` binding (`REQ-RA1-SECURITY-holder-semantics`). Replay reservation,

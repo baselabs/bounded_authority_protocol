@@ -19,7 +19,11 @@ defmodule BoundedAuthorityProtocol do
     * `BoundedAuthorityProtocol.Ed25519` and `BoundedAuthorityProtocol.Es256`: the signature
       rules each suite's verification and producer surfaces share.
 
-  Every verification function returns redacted facts or exactly `{:error, :invalid}`; a
-  result is never an authorization decision. Start with the getting-started guide.
+  Credential and evidence verifiers return `{:ok, facts}` or `{:error, :invalid}`; facts have
+  redacted inspection. `BoundedAuthorityProtocol.ContentAssertion.V1.verify_successor/3` instead
+  checks consistency between supplied facts and returns `:ok` or `{:error, :invalid}` without
+  establishing their provenance. Public signature and key predicates return booleans. No result
+  is an authorization decision. Already-trusted public keys and time are explicit inputs; this
+  package has no private-key access or custody. Start with the getting-started guide.
   """
 end

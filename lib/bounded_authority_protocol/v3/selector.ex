@@ -2,7 +2,7 @@ defmodule BoundedAuthorityProtocol.V3.Selector do
   @moduledoc """
   Closed selector type used by `BoundedAuthorityProtocol.V3.Operation`.
 
-  The v2 profile admits the two inclusive range kinds `lte` and `gte`
+  Like v2, this profile admits the two inclusive range kinds `lte` and `gte`
   (`spec/bap-v2.md` § 4) alongside the v1
   kinds. Both operands of a range comparison must carry the same numeric tag;
   comparison is by numeric value on the decoder-bounded finite binary64 domain.
@@ -13,6 +13,23 @@ defmodule BoundedAuthorityProtocol.V3.Selector do
   alias BoundedAuthorityProtocol.V1.Jcs
   alias BoundedAuthorityProtocol.V1.Selector, as: SharedSelector
 
+  @typedoc """
+  A contract-major 3 selector for `BoundedAuthorityProtocol.V3.Operation`.
+
+  Uses the same forms and semantics as `t:BoundedAuthorityProtocol.V2.Selector.t/0`: `:all`,
+  `{:equals, path, value}`, `{:one_of, path, values}`, `{:lte, path, bound}`, and
+  `{:gte, path, bound}`. V3 changes the cryptographic suite to ES256, not selector meaning.
+  Values use `t:BoundedAuthorityProtocol.V1.Json.value/0`; ranges are inclusive and same-tag
+  numeric, with no coercion. Producers refuse integral float-tagged selector operands because
+  JCS would re-tag them as integers.
+
+  Selectors are conjunctive. Except for `:all`, they require an existing path of 1 to 32 nonempty
+  object-member names, each at most 128 UTF-8 bytes, and never index arrays. Bounds may tighten
+  those maxima. See the [v3 contract](../spec/bap-v3.md),
+  [inherited range rules](../spec/bap-v2.md#4-selector-algebra), and
+  [base selector rules](../spec/bap-v1.md#selectors). Producer input validation is exposed by
+  `BoundedAuthorityProtocol.V3.grant_signing_input/2`.
+  """
   @type t ::
           :all
           | {:equals, [binary()], BoundedAuthorityProtocol.V1.Json.value()}

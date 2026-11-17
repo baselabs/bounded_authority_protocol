@@ -1,8 +1,8 @@
 defmodule BoundedAuthorityProtocol.DocsSamplesTest do
   @moduledoc """
-  Runs the Elixir code blocks of the README quickstart and every guide, in order, against this
-  package, and pins the value each block ends with. Only a dependency block (`deps`) is skipped,
-  because it is project configuration rather than code.
+  Runs the README quickstart and protocol-only guide blocks in order against this package,
+  pinning each block's final value. Recipes run separately in DocsConsumerTest with real Plug.
+  Dependency blocks (`deps`) are project configuration and are exercised by the fresh consumer.
 
   The prose is checked too: after each block, the text before the next block must state the
   block's value as "The value is `TERM`", "The final value is `TERM`", "The result is `TERM`",
@@ -41,7 +41,6 @@ defmodule BoundedAuthorityProtocol.DocsSamplesTest do
   # Every guide page with Elixir code. Each runs top to bottom in one binding, and every block's
   # value must equal the value the prose states after it.
   @guides [
-    "docs/guides/recipes.md",
     "docs/guides/evidence.md",
     "docs/guides/troubleshooting.md",
     "docs/guides/cheatsheet.cheatmd"
@@ -57,7 +56,8 @@ defmodule BoundedAuthorityProtocol.DocsSamplesTest do
   end
 
   test "every guide page with an elixir block is executed here" do
-    executed = MapSet.new(["docs/guides/getting-started.md" | @guides])
+    # Recipes run in DocsConsumerTest with the real Plug dependency, not in this core project.
+    executed = MapSet.new(["docs/guides/getting-started.md", "docs/guides/recipes.md" | @guides])
 
     with_code =
       for path <- Path.wildcard("docs/guides/*.{md,cheatmd}"),
@@ -124,15 +124,10 @@ defmodule BoundedAuthorityProtocol.DocsSamplesTest do
     Enum.zip(values, prose_after_blocks(markdown))
   end
 
-  # The Plug recipe calls Plug.Conn, which this package does not depend on; the compiler's
-  # "is undefined" warning for exactly that module is expected. Any other warning fails.
   defp unexpected_warnings(output) do
     output
     |> String.split("\n")
     |> Enum.filter(&String.contains?(&1, "warning:"))
-    |> Enum.reject(
-      &(&1 =~ ~r/warning: Plug\.Conn\.\w+\/\d is undefined \(module Plug\.Conn is not available/)
-    )
   end
 
   defp claim_errors(path, markdown) do

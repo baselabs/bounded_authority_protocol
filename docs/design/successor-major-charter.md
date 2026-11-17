@@ -1,4 +1,4 @@
-# The successor-major (v2) charter — consolidated scope
+# Consolidated scope of the successor-major (v2) charter
 
 **Status:** in force. Two successor contract-majors have been activated under this charter:
 contract-major 2 ([`spec/bap-v2.md`](../../spec/bap-v2.md), the inclusive range selector kinds
@@ -9,7 +9,7 @@ the successor-major process (complete closed profile, corpus, cross-suite eviden
 
 ## The absolute constants (unchanged across majors)
 
-These do not move — they are the protocol's identity, not its features:
+These invariants define the protocol's identity and do not change:
 
 - The public verifier is pure, deterministic, and stateless. It never gains revocation state,
   replay reservation, trust selection, or an authorization decision (critical rules 1 and 4).
@@ -48,7 +48,7 @@ procedure for long-lived chain/archive evidence.
 
 ### 4. The revocation and freshness posture (consolidated; amended 2026-08-26)
 
-What a successor major MAY standardize AT THE INTERFACE — claim shapes and verifier-side
+At the interface, a successor major MAY standardize claim shapes and verifier-side
 semantics only:
 
 - **Freshness-bearing claim shapes.** Window-semantics claims (e.g. a short-lived
@@ -74,12 +74,12 @@ semantics only:
 The v1 selector algebra binds exact-value (`equals`) and enumerated-set (`one_of`) arguments.
 Successor-major scope, decided deliberately rather than parked:
 
-- **Per-request range constraints** — amount floor/ceiling, execution-date windows, and the
-  like — are pure inequality selector kinds: a stateless verifier checks them from the grant
+- **Per-request range constraints**, including amount floor/ceiling and execution-date windows,
+  are pure inequality selector kinds: a stateless verifier checks them from the grant
   bytes and the typed arguments alone. These are the natural successor-major extension of
   the selector algebra (the payments-vertical "spend up to X per request" mandate shape) and
   BELONG in the successor major's selector design.
-- **Cumulative budgets** — "up to $500/day" — are NOT stateless: no verifier can check a
+- **Cumulative budgets**, such as "up to $500/day", are NOT stateless: no verifier can check a
   cumulative bound from bytes and context alone. A naive `budget` selector kind would be a
   silent false security property. Budget enforcement routes to the freshness/revocation
   posture's runtime-private territory: issuer attestation (a re-issued grant or a signed

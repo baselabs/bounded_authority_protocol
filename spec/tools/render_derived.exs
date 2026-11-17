@@ -44,7 +44,7 @@ defmodule BoundedAuthorityProtocol.RenderDerived do
       |> String.trim_trailing()
 
     header =
-      "<!-- DERIVED VIEW — generated from spec/bap-v1.md; DO NOT EDIT.\n" <>
+      "<!-- DERIVED VIEW generated from spec/bap-v1.md; DO NOT EDIT.\n" <>
         "     Regenerate: mix run --no-start spec/tools/render_derived.exs --write -->\n\n"
 
     footer = "\n\n---\n\nGenerated from `spec/bap-v1.md` rev #{@spec_revision} (the single normative authority).\n"

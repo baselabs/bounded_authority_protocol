@@ -1,18 +1,18 @@
-# AP2 interop profile — design specification
+# Design specification for the AP2 interop profile
 
-Status: accepted — owner approval 2026-09-20, following an independent adversarial review of the
+Status: accepted with owner approval on 2026-09-20, following an independent adversarial review of the
 draft (all findings repaired and re-verified). This document changes no wire format, public API,
 verifier behavior, or package dependency; it is the composition contract between this protocol's
 published contract-majors and AP2 v0.2.
 
 Evidence classes at each load-bearing claim:
 
-- **OBSERVED** — verified first-hand on 2026-09-20 against the AP2 text at pinned commit
+- **OBSERVED** means verified first-hand on 2026-09-20 against the AP2 text at pinned commit
   `e1ea56d` ([google-agentic-commerce/AP2](https://github.com/google-agentic-commerce/AP2)),
   this repository at `3994b4f` (v0.4.2), or RFC 9901 fetched from datatracker (§ per claim names
   the source).
-- **DERIVED** — restated from a program record or handoff; not re-verified for this document.
-- **INFERRED** — a design recommendation of this profile, not verifiable against any source.
+- **DERIVED** means restated from a program record or handoff without re-verification for this document.
+- **INFERRED** identifies a design recommendation of this profile, not verifiable against any source.
 
 The AP2 observations retain that pinned source and date. The BAP updates below follow the
 shipped [contract-major 3 facade](../../lib/bounded_authority_protocol/v3.ex),
@@ -25,7 +25,7 @@ shipped [contract-major 3 facade](../../lib/bounded_authority_protocol/v3.ex),
 This profile specifies how the published Bounded Authority Protocol (contract-majors 1, 2,
 and 3) composes with the pinned AP2 text (v0.2 at `e1ea56d`) at the agent-authorization
 layer. The framing is the owner's settled sentence: BAP is **"a different answer at the same
-layer as AP2's agent authorization framework, composable with it"** — never "a deeper layer
+layer as AP2's agent authorization framework, composable with it"**, never "a deeper layer
 under AP2 with no overlap."
 
 The profile composes with **published specification text only**. It claims structural
@@ -74,7 +74,7 @@ proof cast arguments from schema-conformant AP2 closed-mandate content. The two 
 unrelated mechanisms that happen to share a word; every reference below means the cast-argument
 projection unless it cites §7.
 
-## 3. Element 1 — Signature-suite bridge
+## 3. Element 1: Signature-suite bridge
 
 **Fact base (OBSERVED).** AP2's holder side is profiled EC P-256 with ES256 throughout: the open
 mandate's `cnf.jwk` is a full EC P-256 JWK (`agent_authorization.md` ~337; every worked example
@@ -108,7 +108,7 @@ vice versa. The bridge composes the two protocols over one holder key; it does n
 credentials. Note also that AP2's ECDSA requirement on the merchant Checkout JWT exists for
 rainbow-table resistance (deterministic signatures leak enumerable content hashes;
 `specification.md` § Payment Mandate; `security_and_privacy_considerations.md` § Rainbow Table
-Attacks, both OBSERVED) — the ES256 suite choice for BAP is independent of that AP2-internal
+Attacks, both OBSERVED). The ES256 suite choice for BAP is independent of that AP2-internal
 rationale and must be justified in its own specification on BAP's own terms.
 
 **Separate suites.** The bridge does not make Ed25519 BAP credentials
@@ -116,20 +116,20 @@ interoperable with AP2, nor ES256 a requirement for BAP generally: `BAP1-`/`BAP2
 remain frozen and complete, and the ES256 suite is an additional contract-major under the
 charter's succession discipline.
 
-## 4. Element 2 — Digest-spelling map
+## 4. Element 2: Digest-spelling map
 
 **Fact base (OBSERVED).** Three digest spellings appear across the composed stack:
 
 1. **AP2: bare unpadded base64url over ASCII token bytes.** RFC 9901 §4.3.1 defines `sd_hash` as
    the base64url encoding (unpadded, RFC 7515 §2) of the full digest over the US-ASCII bytes of
-   the encoded SD-JWT — issuer-signed JWT, a tilde, and zero or more disclosures each followed by
-   a tilde — excluding the KB-JWT; the algorithm is the disclosure algorithm (`_sd_alg`,
+   the encoded SD-JWT (issuer-signed JWT, a tilde, and zero or more disclosures each followed by
+   a tilde), excluding the KB-JWT; the algorithm is the disclosure algorithm (`_sd_alg`,
    default sha-256). The AP2 SDK implements exactly this (`sdjwt/common.py` `compute_sd_hash`;
    `b64url_encode` strips padding). The same spelling carries every AP2 digest surface:
    `issuer_jwt_hash` (over the issuer JWT alone), `checkout_hash` and `transaction_id`
-   (base64url hash of the `checkout_jwt` value, `_sd_alg`-matched, default sha-256 —
+   (base64url hash of the `checkout_jwt` value, `_sd_alg`-matched, default sha-256;
    `checkout_mandate.json`, `payment_mandate.json`), and the Mandate Receipt `reference`
-   ("calculated in the same manner as `sd_hash`" over the final SD-JWT in the chain —
+   ("calculated in the same manner as `sd_hash`" over the final SD-JWT in the chain;
    `agent_authorization.md` Mandate Receipt).
 2. **BAP: unpadded base64url on the wire, raw 32 bytes inside.** BAP wire digests are canonical
    unpadded base64url: proof `ath` (SHA-256 over the ASCII bytes of the complete received grant
@@ -140,7 +140,7 @@ charter's succession discipline.
    (`REQ1-HEADER-digest-width`), and chain rows hash and link as raw binaries
    (`SHA-256("BAP1-CHAIN\0" || canonical_row_bytes)`; verification accepts raw row binaries).
    (For precision: v1's `ath` is base64url-spelled on the wire; the raw-32-byte spelling is the
-   facts/chain-row internal one — `spec/bap-v1.md` §11 and §10.)
+   facts/chain-row internal one, as specified by `spec/bap-v1.md` §11 and §10.)
 3. **CAP: the `sha-256:` tagged spelling.** DERIVED (program record); the Charter Agreement
    Protocol repository owns that spelling and any change to it.
 
@@ -151,17 +151,17 @@ share); they differ in textual wrapping only:
 |---|---|---|---|
 | bare base64url | — | base64url-decode, verify 32 bytes | prefix the bare string with `sha-256:` |
 | raw 32 bytes | unpadded base64url-encode | — | base64url-encode, then prefix `sha-256:` |
-| tagged | strip the `sha-256:` prefix — the remainder is the bare base64url string | strip prefix, base64url-decode | — |
+| tagged | strip the `sha-256:` prefix to obtain the bare base64url string | strip prefix, base64url-decode | — |
 
 Every cell is a lossless byte-level conversion; no re-hashing occurs in any direction.
 
 **Honest bounds.** The map governs spelling only. No two digest VALUES coincide across the
 protocols: AP2's `sd_hash` and BAP's `ath` hash different constructions over different inputs,
 and nothing in this profile implies equal digests. The one value-coincidence relationship in the
-program — receipt `reference` vs CAP `grant_digest` (§7) — lives in the CAP repository and is
+program, comparing receipt `reference` with CAP `grant_digest` (§7), lives in the CAP repository and is
 not asserted here as verified.
 
-## 5. Element 3 — Cast-argument projection, and the integer decision
+## 5. Element 3: Cast-argument projection and the integer decision
 
 ### 5.1 The integer-versus-float decision
 
@@ -174,36 +174,36 @@ The evidence chain (all OBSERVED first-hand unless noted):
 1. The AP2 schema types the projection's inputs as integers in minor units:
    `open_payment_mandate.json` `$defs.amount_range` types `max` and `min` as `"integer"`
    ("Maximum allowed amount in minor (cents) unit of currency"), and `types/amount.json` types
-   `amount` as `"integer"` ("Amount in minor units, according to the ISO-4217 spec") —
+   `amount` as `"integer"` ("Amount in minor units, according to the ISO-4217 spec");
    `payment_mandate.json` and `open_payment_mandate.json` both reference it for
    `payment_amount`.
 2. The AP2 SDK enforces the schema types: the generated pydantic models reject a non-integral
    float for an integer field, and `constraints.py` `AmountRangeEvaluator` compares
    integer-typed operands.
-3. The float spelling exists only in `payment_mandate.md`'s prose examples — `"max": 100.50,
-   "min": 10.00` (amount_range) and `"max": 1000.00` (budget) — contradicting the schema; AP2
+3. The float spelling exists only in `payment_mandate.md`'s prose examples, specifically `"max": 100.50,
+   "min": 10.00` (amount_range) and `"max": 1000.00` (budget), contradicting the schema; AP2
    PR #340 tracks the contradiction upstream (DERIVED). The normative sources (schema, SDK,
    evaluator) are integer; the contradictory example is not normative text.
 4. BAP contract-major 2 range kinds are same-tag numeric (`spec/bap-v2.md`
    `REQ2-SELECTOR-range-same-tag`): an integer-tagged value never matches a float-tagged bound,
    and vice versa. A float projection would therefore make every range selector unsatisfiable
-   against schema-conformant integer-tagged mandate content — a dead projection, silently.
+   against schema-conformant integer-tagged mandate content, silently producing a dead projection.
    BAP producers refuse integral float-tagged selector bounds because JCS would re-tag them
    as integers (erratum 6). Verification still accepts float-tagged range bounds in non-JCS
    payloads; the same-tag rule still applies. This projection therefore keeps the AP2 amount
    domain integer-tagged and introduces no float-to-integer coercion.
 5. The sole float-permissive money field, `budget.max` (typed `"number"`), is deliberately
    outside the projection anyway: budgets have no selector correspondence in any major (the [successor-major charter](successor-major-charter.md) § 5 budget posture, the
-   citable posture). Notably the SDK reads `budget.max` as MAJOR units —
-   `int(self.constraint.max * 100)` in `constraints.py` — a different unit and type from
+   citable posture). The SDK reads `budget.max` as MAJOR units using
+   `int(self.constraint.max * 100)` in `constraints.py`, a different unit and type from
    `amount_range`'s integer minor units, which independently confirms that budget content must
    never be projected onto the amount paths.
 
 **Failure boundary.** The projection is total over schema-conformant closed-mandate content and
-undefined elsewhere: float-spelled money content is schema-invalid on AP2's own terms — in
+undefined elsewhere: float-spelled money content is schema-invalid on AP2's own terms, both in
 `payment_amount` for `mandate.payment.1` (closed), and for `mandate.payment.open.1` (open) both
 in the `amount_range` constraint and in a pre-set `payment_amount` (the open schema references
-the same integer-typed `types/amount.json`) — failing the schema and the SDK's model validation
+the same integer-typed `types/amount.json`), failing the schema and the SDK's model validation
 before any BAP composition, and this profile adds no coercion, no tolerance, and no permissive
 compatibility path (the repository's critical rules 3 and 8; v1's no-tag-collapse invariant).
 If AP2 revises the schemas to floats, that revision ships as a new `vct` suffix under AP2's own
@@ -212,7 +212,7 @@ projection for `.1` content stays integer; a projection for a `.2` mandate kind 
 profile revision, fail-closed in the interim.
 
 The merchant Checkout object (`checkout_jwt` payload) may carry float prices (`"price": 199.0`
-in `checkout_mandate.md`'s worked example, OBSERVED) — that content is outside AP2's own schema
+in `checkout_mandate.md`'s worked example, OBSERVED). That content is outside AP2's own schema
 scope and enters BAP composition only as an opaque digest input (`checkout_hash` /
 `transaction_id`); it is never projected, so its float spelling is immaterial here.
 
@@ -220,7 +220,7 @@ scope and enters BAP composition only as an opaque digest input (`checkout_hash`
 
 Cast arguments are server-derived (`spec/bap-v1.md` §12: selectors apply to "the server-derived
 tagged arguments"); the runtime owns derivation. **Evidence class: the cast-argument member
-names, tagged types, and selector rows below are INFERRED — design recommendations of this
+names, tagged types, and selector rows below are INFERRED design recommendations of this
 profile, not verifiable against any source. The AP2 source column, the matcher keying, and the
 preset-check semantics they build on are OBSERVED** (`payment_mandate.json`,
 `open_payment_mandate.json`, `types/*.json`, and `constraints.py`, all first-hand).
@@ -237,9 +237,9 @@ against a stable shape, projected from schema-conformant closed Payment Mandate 
 | `payment_instrument` | `payment_instrument` | object (members `id`, `type` required; `description` optional) |
 | `pisp` | `pisp` | object (members `legal_name`, `brand_name`, `domain_name`, all required) |
 | `transaction_id` | `transaction_id` | string (bare base64url digest) |
-| — (chain context: the digest of the associated open Checkout Mandate — AP2's `payment.reference.conditional_transaction_id`, REQUIRED in every open payment mandate; the runtime derives it from the presented checkout-side chain, spelled per §4's AP2 column) | `open_checkout_mandate_hash` | string (bare base64url digest) |
+| Chain context: the digest of the associated open Checkout Mandate, carried in AP2's `payment.reference.conditional_transaction_id` and REQUIRED in every open payment mandate; the runtime derives it from the presented checkout-side chain, spelled per §4's AP2 column | `open_checkout_mandate_hash` | string (bare base64url digest) |
 | `execution_date` (optional, ISO8601 string) | `execution_date` | string (ISO8601, as-is) |
-| — (runtime normalization of `execution_date`, only when a range selector is wanted on it) | `execution_date_epoch` | integer (Unix seconds) |
+| Runtime normalization of `execution_date`, only when a range selector is wanted on it | `execution_date_epoch` | integer (Unix seconds) |
 
 `risk_data`, `vct`, `iat`, `exp` have no cast-argument projection (timestamps are BAP proof
 claims already; `vct` selects the AP2 profile, not an invocation argument).
@@ -249,7 +249,7 @@ matchers key on identifier members, not whole objects** (`constraints.py`, OBSER
 match by `id` when both sides carry one, else by `name` + `website`; payment instruments match by
 `id` only. BAP selector identity is whole-value (`REQ1-SELECTOR-semantic-identity` compares
 objects as unordered key/value sets), so a `one_of`/`equals` over a whole projected object is
-STRICTER than AP2's matcher — an optional member (`website`, `description`) present on one side
+STRICTER than AP2's matcher, since an optional member (`website`, `description`) present on one side
 and absent on the other fails closed on content AP2 itself accepts. The faithful correspondence
 addresses the identifier members; whole-object selectors on `payee` or `payment_instrument` are
 not the correspondence. (`pisp` is the exception: its schema requires exactly the three members
@@ -257,19 +257,19 @@ the evaluator compares, so whole-object identity is equivalent there.)
 
 | Open-mandate constraint | BAP selectors on the projected arguments |
 |---|---|
-| `payment.amount_range` `{min?, max, currency}` | conjunctive `{kind: "gte", path: ["payment_amount","amount"], value: min}` (when `min` present) + `{kind: "lte", path: ["payment_amount","amount"], value: max}` + `{kind: "equals", path: ["payment_amount","currency"], value: currency}` — v2 §4's interval composition and unit-member guidance, verbatim |
+| `payment.amount_range` `{min?, max, currency}` | conjunctive `{kind: "gte", path: ["payment_amount","amount"], value: min}` (when `min` present) + `{kind: "lte", path: ["payment_amount","amount"], value: max}` + `{kind: "equals", path: ["payment_amount","currency"], value: currency}`, following v2 §4's interval composition and unit-member guidance verbatim |
 | `payment.allowed_payees` | `{kind: "one_of", path: ["payee","id"], values: [...]}` (id-keyed, matching `merchant_matches`). An id-less composition has no single-member correspondence; a runtime supporting AP2's `name`+`website` fallback expresses it as conjunctive `equals` on `payee.name` + `payee.website` |
 | `payment.allowed_payment_instruments` | `{kind: "one_of", path: ["payment_instrument","id"], values: [...]}` (the evaluator compares `id` only) |
-| `payment.allowed_pisps` | `one_of` on `pisp` (whole object — equivalent, see above), or conjunctive `equals` on its three members |
-| pre-set `payment_amount` (AP2 checks exact object equality — `constraints.py` `check_preset_payment_claims`, OBSERVED) | conjunctive `equals` on `payment_amount.amount` + `payment_amount.currency` |
+| `payment.allowed_pisps` | `one_of` on the whole `pisp` object (equivalent, see above), or conjunctive `equals` on its three members |
+| pre-set `payment_amount` (AP2 checks exact object equality in `constraints.py` `check_preset_payment_claims`, OBSERVED) | conjunctive `equals` on `payment_amount.amount` + `payment_amount.currency` |
 | pre-set `payee` (checked with `merchant_matches`, id-keyed) | `equals` on `payee.id` (fallback as for `allowed_payees`) |
-| pre-set `payment_instrument` / `execution_date` (checked by exact equality) | `equals` on the projected value — the whole `payment_instrument` object, or `execution_date` as-is |
-| `payment.reference` (REQUIRED in every open payment mandate per the schema's `contains` — OBSERVED) | `{kind: "equals", path: ["open_checkout_mandate_hash"], value: <conditional_transaction_id digest of the associated open Checkout Mandate>}` — the constraint binds the payment to the open CHECKOUT mandate, not to the open payment mandate |
+| pre-set `payment_instrument` / `execution_date` (checked by exact equality) | `equals` on the whole projected `payment_instrument` object, or on `execution_date` as-is |
+| `payment.reference` (REQUIRED in every open payment mandate per the schema's `contains`, OBSERVED) | `{kind: "equals", path: ["open_checkout_mandate_hash"], value: <conditional_transaction_id digest of the associated open Checkout Mandate>}`, binding the payment to the open CHECKOUT mandate rather than the open payment mandate |
 | `payment.execution_date` | range selectors only after runtime normalization to `execution_date_epoch` (`gte` from `not_before`, `lte` from `not_after`); AP2's own evaluation compares ISO8601 strings on the AP2 side and is not replaced. INFERRED pending runtime design |
-| `payment.budget`, `payment.agent_recurrence` | **no projection, deliberately** — the [successor-major charter](successor-major-charter.md) § 5 budget posture; stateful evaluation belongs to the AP2 verifier or the composing runtime |
+| `payment.budget`, `payment.agent_recurrence` | **no projection, deliberately**, per the [successor-major charter](successor-major-charter.md) § 5 budget posture; stateful evaluation belongs to the AP2 verifier or the composing runtime |
 
 Worked examples, verified against the actual selector shapes (`spec/bap-v1.md` §12,
-`spec/bap-v2.md` §4 — member sets, path shape, `one_of` spelling, numeric-bound tags all
+`spec/bap-v2.md` §4, with member sets, path shape, `one_of` spelling, and numeric-bound tags all
 checked against the published algebra):
 
 ```json
@@ -282,7 +282,7 @@ Range selectors require a contract-major 2 or 3 grant (v1 grants carry no `lte`/
 note states the same for the constraint correspondence). A v1-only composition can express the
 `equals`/`one_of` rows but not the amount-range row.
 
-## 6. Element 4 — Where a BAP proof rides in A2A and UCP
+## 6. Element 4: Where a BAP proof rides in A2A and UCP
 
 The accepted [A2A capability-binding profile](a2a-capability-binding-profile.md) defines
 discovery and negotiation at the A2A layer, with `BA-Grant` and `BA-Proof` HTTP headers
@@ -304,7 +304,7 @@ What this profile can state structurally (all OBSERVED or cited-to-published):
   step; the composition must not assume AP2's credential-level binding covers a BAP
   request-level binding or the reverse.
 - In UCP terms, AP2's own composition point is the Checkout object (the merchant-signed
-  `checkout_jwt` MUST be the UCP Checkout when used with UCP — `checkout_mandate.md`, OBSERVED).
+  `checkout_jwt` MUST be the UCP Checkout when used with UCP, per `checkout_mandate.md`, OBSERVED).
   BAP's UCP riding point is transport-composed: the A2A profile applies to deployments speaking
   its pinned A2A 1.0 shape; UCP over MCP stays within the MCP extension's still-open message
   binding; a UCP-REST operation vocabulary and projection are not defined here; Embedded
@@ -314,10 +314,10 @@ What this profile can state structurally (all OBSERVED or cited-to-published):
 separate AP2 and BAP proof-binding surfaces. A design is not implementation evidence, and
 neither protocol's proof substitutes for the other's.
 
-## 7. Element 5 — Receipt correspondence
+## 7. Element 5: Receipt correspondence
 
 **Fact base (OBSERVED).** AP2's verifier-signed Mandate Receipt carries `result` (`success` /
-`error`) and `reference` — the base64url hash of the received mandate, "calculated in the same
+`error`) and `reference`, the base64url hash of the received mandate, "calculated in the same
 manner as `sd_hash`" over the final SD-JWT in the chain, `_sd_alg`-matched with sha-256 default
 (`agent_authorization.md` Mandate Receipt). The Payment and Checkout Receipt schemas both carry
 `reference` as "the hash of the closed Mandate that this receipt is binding to." BAP's verifier
@@ -328,11 +328,11 @@ mapping note's fourth table row).
 **The join, noted only.** An AP2 receipt's `reference` and a CAP receipt's `grant_digest` decode
 to the same 32 bytes (both are bare-base64url SHA-256 spellings per §4's map), so
 `grant.scheme: "ap2"` is the natural join key at the evidence-archive layer (DERIVED: program
-record; the join is the CAP repository's to define and verify — no work here, no claim here
+record; the CAP repository owns defining and verifying the join. No work or claim here
 that it is verified). The layer separation bears repeating: BAP never issues, verifies, or
 consumes AP2 receipts; the correspondence lives entirely in CAP's archive joins.
 
-## 8. Element 6 — Cross-vectors posture
+## 8. Element 6: Cross-vectors posture
 
 **Fact base.** AP2 at `e1ea56d` ships no in-tree conformance or golden vectors: a
 filename-and-content probe across the tree (vector/conformance/golden/fixture patterns over
@@ -366,12 +366,12 @@ implementation dependencies are:
 
 ## 10. Disclosure-gate compliance
 
-The gate: nothing beyond published specification text enters this repository until lifted — no
+Until the gate is lifted, nothing beyond published specification text enters this repository: no
 `ba_dlg`/`ba_obo`/`ba_offline`/`ba_sut`/detached-profile activation or documentation beyond
 existing reserved registry rows. Compliance read of this document against the accepted bytes,
 2026-09-20:
 
-- Reserved mechanism names appear only inside §0 and §10 as the gate's own enumeration — never
+- Reserved mechanism names appear only inside §0 and §10 as the gate's own enumeration, never
   designed, specified, or promised.
 - Budget material cites the [successor-major charter](successor-major-charter.md) § 5 budget posture, the charter's published selector-expressiveness text; no
   `ba+budget-window` shape is designed (that posture defers it).

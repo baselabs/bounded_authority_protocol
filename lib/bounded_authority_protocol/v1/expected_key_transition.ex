@@ -4,15 +4,15 @@ defmodule BoundedAuthorityProtocol.V1.ExpectedKeyTransition do
 
   ## Fields
 
-  * `transition_id` - the expected transition identity.
-  * `chain_id` - the chain identity: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
+  * `transition_id`: the expected transition identity.
+  * `chain_id`: the chain identity: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
     bytes.
-  * `effective_at` - the expected effective time, integer Unix time in seconds.
-  * `current_key_id` - the expected signing key identifier.
-  * `current_key_fingerprint` - the expected raw 32-byte RFC 7638 fingerprint of the signing key.
-  * `next_key_id` - the expected next key identifier.
-  * `next_key_fingerprint` - the expected raw 32-byte RFC 7638 fingerprint of the next key.
-  * `bounds` - a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
+  * `effective_at`: the expected effective time, integer Unix time in seconds.
+  * `current_key_id`: the expected signing key identifier.
+  * `current_key_fingerprint`: the expected raw 32-byte RFC 7638 fingerprint of the signing key.
+  * `next_key_id`: the expected next key identifier.
+  * `next_key_fingerprint`: the expected raw 32-byte RFC 7638 fingerprint of the next key.
+  * `bounds`: a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
     means the profile maxima (see `BoundedAuthorityProtocol.V1.Bounds.coerce/1`).
   """
 

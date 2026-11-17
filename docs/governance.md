@@ -123,7 +123,7 @@ process supersedes this one.
 
 [docs/errata.md](errata.md) is the numbered errata registry; each entry names affected versions and
 its corpus impact, and the no-verdict-flip invariant is checked at review. **No erratum may flip a
-verdict of an existing certified corpus** — any change that would alter such an accept/reject
+verdict of an existing certified corpus**. Any change that would alter such an accept/reject
 outcome is by definition a contract-major change and follows the evolution contract, never this
 registry. The one exception is a soundness repair (§ [Soundness repairs](#soundness-repairs)),
 which adds its cases in a new corpus, flips no existing corpus verdict, and is recorded in this
@@ -151,10 +151,10 @@ duplicated here.
 [SECURITY.md](../SECURITY.md) governs vulnerability intake; a vulnerability whose fix would change a
 verdict and that does not meet every soundness-repair condition (§ [Soundness
 repairs](#soundness-repairs)) is handled as a contract-major security release with an accelerated
-overlap window — published at announcement and set proportional to the vulnerability's severity,
+overlap window published at announcement and set proportional to the vulnerability's severity,
 exempt from the twelve-month deprecation minimum (charter § [The evolution
 contract](design/standards-track.md#the-evolution-contract)), yet still a published,
-deployment-decided sunset, not a flag-day — never as a silent verdict change. A fix that meets
+deployment-decided sunset rather than a flag-day, never as a silent verdict change. A fix that meets
 every soundness-repair condition lands as an erratum, disclosed as condition 6 of § Soundness
 repairs requires, in the same release across every implementation. [SECURITY.md](../SECURITY.md)
 cross-references this section instead of restating the rule, so the verdict-change rule lives in
@@ -162,7 +162,7 @@ one place.
 
 ## Errata registry posture
 
-The errata registry at [docs/errata.md](errata.md) is **live** — it is the operational
+The **live** errata registry at [docs/errata.md](errata.md) is the operational
 no-verdict-flip governance instrument, with a numbered entry and per-entry corpus impact. It
 currently carries Erratum 1, the correction for the contract-major 1 `all` selector's three
 recognized member sets; Erratum 2, the strict Ed25519 verification soundness repair; Erratum 3,

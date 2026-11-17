@@ -4,12 +4,12 @@ defmodule BoundedAuthorityProtocol.V1.ExpectedGrant do
 
   ## Fields
 
-  * `issuer` - the expected `iss`, compared byte-for-byte.
-  * `audience` - one audience your service answers to; the grant's `aud` must contain it.
-  * `evaluation_time` - the caller's current time, integer Unix time in seconds; the library reads
+  * `issuer`: the expected `iss`, compared byte-for-byte.
+  * `audience`: one audience your service answers to; the grant's `aud` must contain it.
+  * `evaluation_time`: the caller's current time, integer Unix time in seconds; the library reads
     no clock.
-  * `clock_skew` - the tolerated clock skew in seconds, `0` to `clock_skew` (60).
-  * `bounds` - a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
+  * `clock_skew`: the tolerated clock skew in seconds, `0` to `clock_skew` (60).
+  * `bounds`: a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
     means the profile maxima (see `BoundedAuthorityProtocol.V1.Bounds.coerce/1`).
   """
 

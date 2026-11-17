@@ -30,6 +30,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        # Inspect redaction is checked on the proof structs of every contract-major.
                        "test/bounded_authority_protocol/inspect_redaction_test.exs",
                        "test/docs_currency_test.exs",
+                       # The documentation consumer invokes the documented contract-major 1 API.
+                       "test/fixtures/docs_consumer/middleware_test.exs",
                        "test/spec_facts_test.exs"
                      ])
   @local_loopback_profile_paths MapSet.new([
@@ -224,6 +226,10 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
        do: external_namespace_path?(path)
 
   defp contract_identity?("scripts/check_package.exs", :atom, "V1"), do: true
+
+  # This is the BEAM documentation chunk format, not an implementation lifecycle name.
+  defp contract_identity?("test/architecture/public_type_docs_test.exs", :atom, "docs_v1"),
+    do: true
 
   defp contract_identity?(path, :requirement_id, name) do
     case Regex.run(~r/\AREQ([123])-([A-Z0-9]+)-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\z/, name) do

@@ -1,6 +1,6 @@
 # Conformance corpus generator (re-derivability tooling)
 
-This directory is authoring tooling for the v1 conformance corpus — it is NOT a conformance
+This directory contains authoring tooling for the v1 conformance corpus, not a conformance
 runner and is not part of the published package. The runners live under `conformance/*.mjs`,
 `sdks/*/`, and the Elixir verifier CLI.
 
@@ -9,15 +9,15 @@ runner and is not part of the published package. The runners live under `conform
 The corpus's signed fixtures (every file under `cases/`, including the `.raw` byte sidecars)
 are **frozen, authoritative inputs**. They were minted with ephemeral in-memory Ed25519 keys at
 authoring time; the throwaway mint script was removed afterward, as the vectors' provenance
-blocks record. No tool can re-mint them — fresh keys would produce different bytes — and none
+blocks record. Fresh keys would produce different bytes, so no tool can re-mint them and none
 is provided here.
 
 Everything else is **mechanically derived** and byte-verified by this tool:
 
-- `index.json` — per-file SHA-256 digests, per-file case counts, the total, the applicability
+- `index.json` records per-file SHA-256 digests, per-file case counts, the total, the applicability
   matrix, and the files set, all rebuilt from the frozen case files, the revision sidecar, and
   the curated inputs below.
-- `revision.json` — the monotone corpus revision integer and its provenance note.
+- `revision.json` records the monotone corpus revision integer and its provenance note.
 
 Two blocks of the index are **curated inputs**, shipped here so the rebuild is complete:
 `curated-inputs.json` carries the n_a applicability reasons (prose, not derivable from case
@@ -44,7 +44,7 @@ A corpus amendment is ONE commit that carries: the case-file changes, the rebuil
 snapshots, all six certified-index-SHA pins rotated in the same change
 (`elixir scripts/regen_corpus_digests.exs --write`), and the consumer documentation that cites
 the count or digest. The revision integer in `revision.json` is the citation target for
-corpus-dependent documents (it replaced the vacuous `format`-string citation — the format value
+corpus-dependent documents (it replaced the vacuous `format`-string citation, whose format value
 never changes across revisions, so it could not detect drift).
 
 ## Provenance

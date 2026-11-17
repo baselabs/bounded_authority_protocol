@@ -32,9 +32,12 @@ The value is `{32, 32}`: a raw Ed25519 public key and a raw SHA-256 thumbprint.
 
 A service verifies a request in three steps: derive the expected values from its own routing and
 configuration, read the two compact credentials from the request, and call `check_envelope/2`.
-The protocol defines no HTTP binding, so the header names are a choice your deployment makes and
-documents; the example uses `authorization: DPoP <grant>` and `dpop: <proof>`, as in
-[RFC 9449](https://www.rfc-editor.org/rfc/rfc9449), and an `invocation-id` header.
+The core wire profile does not prescribe general-purpose HTTP header names. This generic recipe
+uses the deployment convention `authorization: DPoP <grant>` and `dpop: <proof>`, following the
+carriage shape in [RFC 9449](https://www.rfc-editor.org/rfc/rfc9449), plus `invocation-id`.
+Document your chosen convention. A2A integrations instead use the existing `BA-Grant` and
+`BA-Proof` carriage in the [A2A binding](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/a2a-capability-binding-profile.md), rather
+than treating this recipe as a replacement binding.
 
 ### Turn already-parsed params into tagged arguments
 
@@ -171,10 +174,16 @@ end
 
 The value is `:ok`. In Phoenix, add the plug to a pipeline or a controller, then read
 `conn.assigns.bounded_authority_facts` in the action. The facts say the bytes verified; your
-action still reserves `facts.invocation_id` in its replay store, checks revocation of
-`facts.grant_id`, and decides.
+action still reserves the issuer/grant/invocation execution identity atomically in shared durable
+storage, checks revocation of `facts.grant_id`, and decides. Keep that reservation through
+`facts.expires_at + maximum_permitted_clock_skew`, or retain an authoritative durable execution
+record longer. Proof freshness is not the retention period: a holder can sign a fresh proof
+carrying the same invocation while the grant remains valid. A restart or retry must not erase
+the execution identity. The [service notebook](../notebooks/service-integration.livemd) executes
+this fresh-proof case as well as immediate replay.
 
-To see the boundary work, a holder signs a grant and a proof, and a request shaped like a
+To see the pure verification boundary work, the issuer signs a grant, the holder signs a proof,
+and a request shaped like a
 `Plug.Conn` (the plug reads only `method`, `request_path`, `req_headers`, and `body_params`) goes
 through `verify/3`:
 
@@ -246,6 +255,113 @@ options = %{
 The value is
 `{"export_dataset", "0c7d2f4a-5b1e-4f8a-9d3c-2e6b8a1f4c70", {:error, :invalid}}`: the request
 verifies, and the same credentials with a dataset outside the grant's `one_of` selector do not.
+
+## Verify a role attestation
+
+Role attestations bind a subject key to `"issuer"` or `"holder"`. An already-trusted attestor
+key and its validity window, the expected subject key/id, time, and bounds are required inputs.
+Success does not make that subject trusted. See the
+[profile specification](../../spec/bap-role-attestation-v1.md).
+
+```elixir
+alias BoundedAuthorityProtocol.RoleAttestation.V1, as: Role
+alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
+
+attestor = %HistoricalPublicKey{
+  key_id: "attestor-1", public_key: issuer_public,
+  valid_from: 1_800_000_000, valid_before: 1_800_003_600
+}
+attestation = %Role.RoleAttestation{
+  attestor_key_id: "attestor-1", jti: "role-1", key_id: "holder-1",
+  public_key: holder_public, role: "holder", nbf: 1_800_000_000, exp: 1_800_003_600
+}
+{:ok, role_input} = Role.attestation_signing_input(attestation, %{})
+{:ok, role_compact} = Role.assemble_compact(role_input, ed25519_sign.(role_input.message, issuer_private))
+{:ok, decoded_role} = Role.decode_attestation(role_compact, %{})
+role_expected = %Role.ExpectedAttestation{
+  attestor: attestor, subject_key_id: "holder-1", subject_public_key: holder_public,
+  now: now, bounds: %{}
+}
+{:ok, role_facts} = Role.verify_attestation(role_compact, role_expected)
+{decoded_role.role, role_facts.trust,
+ Role.verify_attestation(role_compact, %{role_expected | subject_key_id: "other"})}
+```
+
+The value is `{"holder", :not_evaluated, {:error, :invalid}}`. Decoding alone checks no
+signature; verification checks the supplied context without choosing trust or reserving replay.
+
+## Verify content and its successor
+
+Content assertions bind nonempty content bytes to a profile, subject lineage, and window. Both
+digests below are raw 32-byte binaries. Keep authoritative lineage state: a valid adjacent pair
+does not rule out a fork or rollback. See the [specification](../../spec/bap-content-assertion-v1.md).
+
+```elixir
+alias BoundedAuthorityProtocol.ContentAssertion.V1, as: Content
+
+{:ok, content_hash} = Content.content_digest("report bytes", %{})
+profile_hash = :crypto.hash(:sha256, "application profile v1")
+assertion = %Content.ContentAssertion{
+  attestor_key_id: "attestor-1", jti: "content-1", iss: "https://issuer.example",
+  aud: "https://data.example", sub: "report-1", profile: "https://data.example/report-v1",
+  profile_digest: profile_hash, content_digest: content_hash, gen: 1, prev: <<0::256>>,
+  iat: 1_800_000_000, nbf: 1_800_000_000, exp: 1_800_003_600
+}
+sign_assertion = fn value ->
+  {:ok, input} = Content.assertion_signing_input(value, %{})
+  {:ok, compact} = Content.assemble_compact(input, ed25519_sign.(input.message, issuer_private))
+  compact
+end
+content_compact = sign_assertion.(assertion)
+content_expected = %Content.ExpectedContentAssertion{
+  attestor: attestor, issuer: assertion.iss, audience: assertion.aud, subject: assertion.sub,
+  profile: assertion.profile, profile_digest: profile_hash, content_digest: content_hash,
+  now: now, bounds: %{}
+}
+{:ok, content_facts} = Content.verify_assertion(content_compact, content_expected)
+{:ok, predecessor_hash} = Content.assertion_digest(content_compact, %{})
+next_compact = sign_assertion.(%{assertion | jti: "content-2", gen: 2, prev: predecessor_hash})
+{:ok, next_facts} = Content.verify_assertion(next_compact, content_expected)
+{:ok, decoded_content} = Content.decode_assertion(next_compact, %{})
+{decoded_content.gen, Content.verify_successor(content_facts, next_facts, %{}),
+ Content.verify_assertion(content_compact, %{content_expected | content_digest: <<0::256>>})}
+```
+
+The value is `{2, :ok, {:error, :invalid}}`. `verify_successor/3` compares the facts supplied to
+it; it does not establish their provenance, current trust, or permission to act.
+
+## Verify a local-loopback request
+
+The byte-distinct loopback profile reuses a standard contract-major 1 grant but requires a
+literal-loopback HTTP target and an issued nonce. Production HTTPS proofs use the standard
+namespace instead. See the [specification](../../spec/bap-local-loopback-http-v1.md).
+
+```elixir
+alias BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1, as: Loopback
+
+{:ok, loopback_uri} = Loopback.normalize_uri("http://127.0.0.1:4000/exports", %{})
+loopback_proof = %{proof | target_uri: loopback_uri, nonce: "challenge-loopback-1"}
+{:ok, loopback_input} = Loopback.proof_signing_input(loopback_proof, %{})
+{:ok, loopback_compact} = Loopback.assemble_compact(
+  loopback_input, ed25519_sign.(loopback_input.message, holder_private)
+)
+{:ok, decoded_loopback} = Loopback.decode_proof(loopback_compact, %{})
+loopback_expected = %ExpectedRequest{
+  trusted_issuer: %TrustedIssuer{key_id: grant.key_id, public_key: issuer_public},
+  issuer: grant.issuer, audience: "https://data.example", method: "POST",
+  target_uri: loopback_uri, invocation_id: proof.invocation_id, operation: proof.operation,
+  cast_arguments: arguments, evaluation_time: now, clock_skew: 60, proof_max_age: 300,
+  nonce: {:required, "challenge-loopback-1"}, bounds: %{}
+}
+loopback_credentials = %Credentials{grant: grant_compact, proof: loopback_compact}
+{:ok, loopback_facts} = Loopback.check_envelope(loopback_credentials, loopback_expected)
+{decoded_loopback.target_uri, loopback_facts.authorization,
+ Loopback.check_envelope(loopback_credentials, %{loopback_expected | nonce: :not_required})}
+```
+
+The value is `{"http://127.0.0.1:4000/exports", :not_evaluated, {:error, :invalid}}`. The host
+must atomically reserve the invocation and consume the nonce before any effect; neither happens
+inside pure verification.
 
 ## Selectors per contract-major
 

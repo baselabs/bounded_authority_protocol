@@ -131,7 +131,7 @@
    "restrictions_on_usage": "Reserved",
    "author": "Bounded Authority Protocol maintainers",
    "change_controller": "Bounded Authority Protocol maintainers",
-   "spec_purpose": "Delegated attenuated grant — charter § Delegation with attenuation; full mechanism charted in the successor-major charter",
+   "spec_purpose": "Delegated attenuated grant, per charter § Delegation with attenuation; full mechanism charted in the successor-major charter",
    "wire_typ": "ba+cap-delegated"
   },
   {
@@ -150,7 +150,7 @@
    "restrictions_on_usage": "Reserved",
    "author": "Bounded Authority Protocol maintainers",
    "change_controller": "Bounded Authority Protocol maintainers",
-   "spec_purpose": "Cross-suite content-covering countersignature — a current-suite key signs the archive's content digest so evidence trust survives the original suite's cryptanalytic break; charter § Evidence longevity and cross-suite attestation",
+   "spec_purpose": "A current-suite key signs the archive's content digest as a cross-suite content-covering countersignature, so evidence trust survives the original suite's cryptanalytic break; charter § Evidence longevity and cross-suite attestation",
    "wire_typ": "ba+suite-attestation"
   }
  ]

@@ -4,11 +4,11 @@ defmodule BoundedAuthorityProtocol.V1.ExpectedExport do
 
   ## Fields
 
-  * `chain` - the `BoundedAuthorityProtocol.V1.ExpectedChain` the rows must satisfy.
-  * `start_anchor` - the `BoundedAuthorityProtocol.V1.ExpectedAnchor` for the start anchor.
-  * `transitions` - the ordered `BoundedAuthorityProtocol.V1.ExpectedKeyTransition` list.
-  * `end_anchor` - the `BoundedAuthorityProtocol.V1.ExpectedAnchor` for the end anchor.
-  * `bounds` - a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
+  * `chain`: the `BoundedAuthorityProtocol.V1.ExpectedChain` the rows must satisfy.
+  * `start_anchor`: the `BoundedAuthorityProtocol.V1.ExpectedAnchor` for the start anchor.
+  * `transitions`: the ordered `BoundedAuthorityProtocol.V1.ExpectedKeyTransition` list.
+  * `end_anchor`: the `BoundedAuthorityProtocol.V1.ExpectedAnchor` for the end anchor.
+  * `bounds`: a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
     means the profile maxima (see `BoundedAuthorityProtocol.V1.Bounds.coerce/1`).
   """
 

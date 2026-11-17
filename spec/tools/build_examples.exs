@@ -1,8 +1,8 @@
 defmodule BoundedAuthorityProtocol.BuildExamples do
   # Spec Appendix A generator (spec-decoupling L3). Selects representative conformance-corpus
-  # cases by id and embeds their exact public artifacts — compact bytes, public keys, expected
-  # facts or the single rejection outcome — into spec/bap-v1.md between the examples markers.
-  # Corpus PUBLIC keys only (critical rule 6: no private material can appear — the corpus
+  # cases by id and embeds their exact public artifacts (compact bytes, public keys, expected
+  # facts or the single rejection outcome) into spec/bap-v1.md between the examples markers.
+  # Corpus PUBLIC keys only (critical rule 6: no private material can appear, since the corpus
   # itself is public-only and this tool copies verbatim).
   #
   # Deterministic: same corpus + same spec -> byte-identical appendix. The regeneration gate
@@ -122,7 +122,7 @@ defmodule BoundedAuthorityProtocol.BuildExamples do
   end
 
   # Public artifacts only: compacts and public key material; never expected-context secrets
-  # (the corpus carries none — public keys only by construction).
+  # (the corpus carries only public keys by construction).
   defp compact_fields(input) do
     for {key, value} <- [{"compact", input["compact"]}, {"grant", input["grant"]},
                           {"proof", input["proof"]}, {"key", input["key"]},
@@ -138,8 +138,8 @@ defmodule BoundedAuthorityProtocol.BuildExamples do
 
   defp join_list(_), do: nil
 
-  defp outcome_text("valid"), do: "accepted — verification succeeds with redacted, non-authorizing facts"
-  defp outcome_text("invalid"), do: "rejected — the single closed error value, no other observable"
+  defp outcome_text("valid"), do: "verification accepts with redacted, non-authorizing facts"
+  defp outcome_text("invalid"), do: "verification rejects with the single closed error value and no other observable"
 
   defp write_appendix(rendered) do
     path = Path.join(@root, @spec_path)

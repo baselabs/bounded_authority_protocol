@@ -1,4 +1,4 @@
-<!-- DERIVED VIEW — generated from spec/bap-v1.md; DO NOT EDIT.
+<!-- DERIVED VIEW generated from spec/bap-v1.md; DO NOT EDIT.
      Regenerate: mix run --no-start spec/tools/render_derived.exs --write -->
 
 # Bounded Authority Protocol v1 Wire Profile
@@ -72,7 +72,7 @@ packages header, anchors, transitions, and rows as length-framed bytes with an e
 offline verifier can re-derive and check every byte against caller-supplied boundaries and an
 out-of-band stored-object version.
 
-Every closed set in this profile is exactly that — closed. The rejection of everything unlisted
+Every closed set in this profile rejects everything unlisted. That rejection
 is not a defensive posture but the profile's central safety invariant.
 
 ## 4. Conformance language
@@ -99,7 +99,7 @@ separators. Evolution happens above this profile, never inside it: successor con
 their own complete closed profiles and suites, while a byte-distinct sibling application proof profile
 carries a byte-distinct protected type, API, media type, and corpus and remains rejected by this
 profile. A proof's contract-major MUST equal its grant's (`REQ1-CORE-proof-major-equals-grant`), and
-the closed-rejection rule above is exactly what makes parallel majors and sibling profiles safe —
+the closed-rejection rule above makes parallel majors and sibling profiles safe because
 an artifact of any other major, suite, or proof profile fails closed here
 (`REQ1-CORE-cross-major-reject`).
 
@@ -214,7 +214,7 @@ control range and is emitted as the raw byte `0x7f`. Lone surrogates are rejecte
 
 Number serialization follows RFC 8785 section 3.2.2.3 (the ECMAScript `Number::toString`
 operation): a finite float serializes as the shortest decimal text that round-trips under
-binary64, fixed or scientific by the decimal exponent `e` of the leading digit — scientific
+binary64, fixed or scientific according to the decimal exponent `e` of the leading digit: scientific
 when `e < -6` or `e >= 21` (lowercase `e`, mandatory exponent sign), fixed otherwise. `0.0` and
 `-0.0` both serialize as `0`. An integer serializes as plain decimal text with no exponent.
 Non-finite floats are rejected (`REQ1-JSON-jcs-exact`).
@@ -521,7 +521,7 @@ trusted inputs and expected context to one of: a value-bearing, redacted facts r
 single closed error value (`REQ1-VERIFY-revalidate` revalidates every structured input field at
 each public boundary). Verification never selects trusted keys, reserves replay, checks live
 revocation, grants execution, or overrides a host policy. Compact assembly accepts exactly a
-signing input and a 64-byte signature — never a key, signer, or callback
+signing input and a 64-byte signature, without accepting a key, signer, or callback
 (`REQ1-VERIFY-no-signer-callback`).
 
 Compact assembly and anchored-export encoding are producer surfaces listed here because they are
@@ -632,7 +632,7 @@ informative (Appendix C).
 
 Callers MAY tighten resource ceilings with a positive integer (`REQ1-BOUNDS-tighten-only`). The
 32-byte public-key and digest widths and 64-byte signature width are the immutable
-cryptographic constants of the suite `BAP1-Ed25519-SHA256` — they are protocol constants, MUST
+cryptographic constants of the suite `BAP1-Ed25519-SHA256`. These protocol constants MUST
 remain exact (`REQ1-BOUNDS-fixed-widths`), and cannot be tightened or widened (a successor
 suite carries its own widths under its own contract-major). Unknown, non-integer, zero,
 negative, widening, or fixed-width-changing limits are invalid
@@ -717,8 +717,8 @@ with them; redacted facts and nothing else cross out.
 
 Bounded closed parsing precedes all cryptography, defeating allocation amplification and
 encoding smuggling (`REQ1-BOUNDS-ordering`, `REQ1-CORE-reject-unlisted`). Exact-byte
-constructions — the RFC 7515 signing input, RFC 8785 canonical bytes, the typed projection,
-and the domain-separated digests — remove ambient-byte and canonicalization-confusion attacks
+constructions (the RFC 7515 signing input, RFC 8785 canonical bytes, the typed projection,
+and the domain-separated digests) remove ambient-byte and canonicalization-confusion attacks
 (`REQ1-SIGNING-exact-input`, `REQ1-SIGNING-digest-prefix`). Holder possession is proven by the
 `cnf` thumbprint and proof-key binding (`REQ1-VERIFY-envelope-binding`); grant binding by the
 `ath` grant digest (`REQ1-CLAIM-ath`); request binding by the server-derived request digest
@@ -740,7 +740,7 @@ implementation reaches the same verdict on the same bytes
 A successful verification proves only that caller-supplied bytes satisfy caller-supplied
 trusted inputs and expected context (`REQ1-LOCATOR-not-authority`,
 `REQ1-CHAIN-facts-not-evaluated`). Trust selection, replay reservation, revocation state, and
-every operational decision are outside this profile BY DESIGN — an implementation that treats
+every operational decision are outside this profile BY DESIGN. An implementation that treats
 a facts result as execution authority has moved those checks to nothing, which is a security
 hole in that implementation, not a gap in this profile. Facts are value-bearing, redacted, and
 carry explicit not-evaluated markers so they cannot silently become credentials
@@ -793,7 +793,7 @@ proof-of-possession credentials of this shape.
 Consumption chains and anchored exports are designed to be durable, verifiable evidence: rows
 commit to invocation-level digests and are sequentially hash-linked, anchors sign the range
 ends, and archives freeze complete object generations. The privacy consequence is that
-retention decisions made by the runtime ARE the privacy posture — the profile makes evidence
+retention decisions made by the runtime define the privacy posture. The profile makes evidence
 compact and independently checkable, and it makes deletion detectable (a shortened archive
 fails the original boundaries), which is an integrity-privacy tension deployments resolve by
 policy: retention windows, minimization of commitment preimages (which stay opaque and private
@@ -811,7 +811,7 @@ leave the claim absent (its optionality is a privacy feature).
 Verification facts are value-bearing but redacted: they carry identifiers and digests, never
 cast arguments, selector values, raw credentials, signatures, JWK containers, or nonces
 (`REQ1-VERIFY-facts-redacted`). This bounds what a logging or telemetry layer can accumulate
-from verification outcomes — the loudest privacy control in the profile — and deployments keep
+from verification outcomes as a privacy control, and deployments keep
 it intact by not logging the raw inputs alongside the facts. (informative)
 
 ### Digests of guessable inputs
@@ -834,21 +834,21 @@ keyed commitments where that matters. (informative)
 Corpus case `grant-decode-valid` (surface `decode_grant`, class `valid`).
 
 - **Compact:** `eyJhbGciOiJFZERTQSIsImtpZCI6Imlzc3VlciIsInR5cCI6ImJhK2NhcCJ9.eyJhdWQiOlsiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QiXSwiY25mIjp7ImprdCI6ImQ0dWNFWnd2SlRmd3hYQ040ZjJ4bUlFNVpCRm9INWk1bWx6ZVdaYUIzeUkifSwiZXhwIjoyMDAwLCJpYXQiOjEwMDAsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUudGVzdCIsImp0aSI6InVybjpleGFtcGxlOmdyYW50OjEiLCJuYmYiOjEwMDAsIm9wZXJhdGlvbnMiOlt7Im5hbWUiOiJyZWFkIiwic2VsZWN0b3JzIjpbeyJraW5kIjoiYWxsIn1dfV0sInYiOjF9.NaCpUf3ebKldiRpjHtKcJuvCjSVLSsmgZVWXa3Sz6Zvas3TeTEm3LqVDsUL8yc1VuakYOvFmsYxqQw8PV23uDA`
-- **Outcome:** accepted — verification succeeds with redacted, non-authorizing facts
+- **Outcome:** verification accepts with redacted, non-authorizing facts
 
 ### A valid holder proof (decode surface)
 
 Corpus case `proof-decode-valid` (surface `decode_proof`, class `valid`).
 
 - **Compact:** `eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Ilcxczd5RTlmR0RNQmJtZHBxWVZ3UTFoRENYdHpPZVBVRDNmSWYxdDdGRGsifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJzVjhkZ1ZLcFExTHZpa1lrNmVvOEd2RGZhYkpyMWd0VlhrdkRnazdxLVpZIiwiYmFfaW52IjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwiYmFfb3AiOiJyZWFkIiwiYmFfcmVxIjoidXYyMFBpQzh0UlFvT3k5LWVSbEJGUFFuZ3RpRFhrd19TQ2JiZ3p4akMyZyIsImh0bSI6IlBPU1QiLCJodHUiOiJodHRwczovL3Jlc291cmNlLmV4YW1wbGUudGVzdC9pbnZva2UiLCJpYXQiOjExMDAsImp0aSI6InVybjpleGFtcGxlOnByb29mOjEiLCJ2IjoxfQ.BUONibEL8cesx2D905h2CwHhL8sdtZ33sABKd7jRl27UdBOo0jpQX9UGl8VLlpEVxSFiZlhBGwNg85VBakhwAw`
-- **Outcome:** accepted — verification succeeds with redacted, non-authorizing facts
+- **Outcome:** verification accepts with redacted, non-authorizing facts
 
 ### A valid grant (verification surface)
 
 Corpus case `verify-grant-valid` (surface `verify_grant`, class `valid`).
 
 - **Compact:** `eyJhbGciOiJFZERTQSIsImtpZCI6Imlzc3VlciIsInR5cCI6ImJhK2NhcCJ9.eyJhdWQiOlsiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QiXSwiY25mIjp7ImprdCI6ImQ0dWNFWnd2SlRmd3hYQ040ZjJ4bUlFNVpCRm9INWk1bWx6ZVdaYUIzeUkifSwiZXhwIjoyMDAwLCJpYXQiOjEwMDAsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUudGVzdCIsImp0aSI6InVybjpleGFtcGxlOmdyYW50OjEiLCJuYmYiOjEwMDAsIm9wZXJhdGlvbnMiOlt7Im5hbWUiOiJyZWFkIiwic2VsZWN0b3JzIjpbeyJraW5kIjoiYWxsIn1dfV0sInYiOjF9.NaCpUf3ebKldiRpjHtKcJuvCjSVLSsmgZVWXa3Sz6Zvas3TeTEm3LqVDsUL8yc1VuakYOvFmsYxqQw8PV23uDA`
-- **Outcome:** accepted — verification succeeds with redacted, non-authorizing facts
+- **Outcome:** verification accepts with redacted, non-authorizing facts
 
 ### A valid request envelope
 
@@ -856,19 +856,19 @@ Corpus case `check-envelope-valid` (surface `check_envelope`, class `valid`).
 
 - **Grant:** `eyJhbGciOiJFZERTQSIsImtpZCI6Imlzc3VlciIsInR5cCI6ImJhK2NhcCJ9.eyJhdWQiOlsiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QiXSwiY25mIjp7ImprdCI6ImQ0dWNFWnd2SlRmd3hYQ040ZjJ4bUlFNVpCRm9INWk1bWx6ZVdaYUIzeUkifSwiZXhwIjoyMDAwLCJpYXQiOjEwMDAsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUudGVzdCIsImp0aSI6InVybjpleGFtcGxlOmdyYW50OjEiLCJuYmYiOjEwMDAsIm9wZXJhdGlvbnMiOlt7Im5hbWUiOiJyZWFkIiwic2VsZWN0b3JzIjpbeyJraW5kIjoiYWxsIn1dfV0sInYiOjF9.NaCpUf3ebKldiRpjHtKcJuvCjSVLSsmgZVWXa3Sz6Zvas3TeTEm3LqVDsUL8yc1VuakYOvFmsYxqQw8PV23uDA`
 - **Proof:** `eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Ilcxczd5RTlmR0RNQmJtZHBxWVZ3UTFoRENYdHpPZVBVRDNmSWYxdDdGRGsifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJzVjhkZ1ZLcFExTHZpa1lrNmVvOEd2RGZhYkpyMWd0VlhrdkRnazdxLVpZIiwiYmFfaW52IjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwiYmFfb3AiOiJyZWFkIiwiYmFfcmVxIjoidXYyMFBpQzh0UlFvT3k5LWVSbEJGUFFuZ3RpRFhrd19TQ2JiZ3p4akMyZyIsImh0bSI6IlBPU1QiLCJodHUiOiJodHRwczovL3Jlc291cmNlLmV4YW1wbGUudGVzdC9pbnZva2UiLCJpYXQiOjExMDAsImp0aSI6InVybjpleGFtcGxlOnByb29mOjEiLCJ2IjoxfQ.BUONibEL8cesx2D905h2CwHhL8sdtZ33sABKd7jRl27UdBOo0jpQX9UGl8VLlpEVxSFiZlhBGwNg85VBakhwAw`
-- **Outcome:** accepted — verification succeeds with redacted, non-authorizing facts
+- **Outcome:** verification accepts with redacted, non-authorizing facts
 
 ### A valid consumption chain
 
 Corpus case `check-chain-valid` (surface `check_chain`, class `valid`).
 
-- **Outcome:** accepted — verification succeeds with redacted, non-authorizing facts
+- **Outcome:** verification accepts with redacted, non-authorizing facts
 
 ### A valid anchored export
 
 Corpus case `verify-anchored-export-valid` (surface `verify_anchored_export`, class `valid`).
 
-- **Outcome:** accepted — verification succeeds with redacted, non-authorizing facts
+- **Outcome:** verification accepts with redacted, non-authorizing facts
 
 ## A.2. Rejected examples
 
@@ -877,28 +877,28 @@ Corpus case `verify-anchored-export-valid` (surface `verify_anchored_export`, cl
 Corpus case `grant-decode-invalid-encoding` (surface `decode_grant`, class `invalid_encoding`).
 
 - **Compact:** `bad`
-- **Outcome:** rejected — the single closed error value, no other observable
+- **Outcome:** verification rejects with the single closed error value and no other observable
 
 ### Rejected: algorithm none
 
 Corpus case `grant-decode-invalid-algorithm-none` (surface `decode_grant`, class `invalid_algorithm`).
 
 - **Compact:** `eyJhbGciOiJub25lIiwia2lkIjoiaXNzdWVyIiwidHlwIjoiYmErY2FwIn0.eyJhdWQiOlsiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QiXSwiY25mIjp7ImprdCI6ImQ0dWNFWnd2SlRmd3hYQ040ZjJ4bUlFNVpCRm9INWk1bWx6ZVdaYUIzeUkifSwiZXhwIjoyMDAwLCJpYXQiOjEwMDAsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUudGVzdCIsImp0aSI6InVybjpleGFtcGxlOmdyYW50OjEiLCJuYmYiOjEwMDAsIm9wZXJhdGlvbnMiOlt7Im5hbWUiOiJyZWFkIiwic2VsZWN0b3JzIjpbeyJraW5kIjoiYWxsIn1dfV0sInYiOjF9.NaCpUf3ebKldiRpjHtKcJuvCjSVLSsmgZVWXa3Sz6Zvas3TeTEm3LqVDsUL8yc1VuakYOvFmsYxqQw8PV23uDA`
-- **Outcome:** rejected — the single closed error value, no other observable
+- **Outcome:** verification rejects with the single closed error value and no other observable
 
 ### Rejected: incoherent signed times
 
 Corpus case `decode-grant-invalid-encoding-times-iat-ge-exp` (surface `decode_grant`, class `invalid_encoding`).
 
 - **Compact:** `eyJhbGciOiJFZERTQSIsImtpZCI6Imlzc3VlciIsInR5cCI6ImJhK2NhcCJ9.eyJhdWQiOlsiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QiXSwiY25mIjp7ImprdCI6IlRySTFnOWhlcjVtek50ZHdUaFV5cXd3R2ZaVkxLZDNNTW9Xa1JZLUZuOGMifSwiZXhwIjoyMDAwLCJpYXQiOjIwMDAsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUudGVzdCIsImp0aSI6InVybjpleGFtcGxlOmdyYW50OmZpZWxkcyIsIm5iZiI6MTAwMCwib3BlcmF0aW9ucyI6W3sibmFtZSI6InJlYWQiLCJzZWxlY3RvcnMiOlt7ImtpbmQiOiJhbGwifV19XSwidiI6MX0.tsqChETJ86teYYzsBsHMhg5uxFoCwNdbUhoXWC9Zp8yBddfp8OFPnAxjwDTbgkffuO9nDhdtl5dekbT0m4UWCA`
-- **Outcome:** rejected — the single closed error value, no other observable
+- **Outcome:** verification rejects with the single closed error value and no other observable
 
 ### Rejected: duplicate audience
 
 Corpus case `decode-grant-invalid-encoding-audiences-duplicate` (surface `decode_grant`, class `invalid_encoding`).
 
 - **Compact:** `eyJhbGciOiJFZERTQSIsImtpZCI6Imlzc3VlciIsInR5cCI6ImJhK2NhcCJ9.eyJhdWQiOlsiaHR0cHM6Ly9hLnRlc3QiLCJodHRwczovL2EudGVzdCJdLCJjbmYiOnsiamt0IjoiVHJJMWc5aGVyNW16TnRkd1RoVXlxd3dHZlpWTEtkM01Nb1drUlktRm44YyJ9LCJleHAiOjIwMDAsImlhdCI6MTAwMCwiaXNzIjoiaHR0cHM6Ly9pc3N1ZXIuZXhhbXBsZS50ZXN0IiwianRpIjoidXJuOmV4YW1wbGU6Z3JhbnQ6ZmllbGRzIiwibmJmIjoxMDAwLCJvcGVyYXRpb25zIjpbeyJuYW1lIjoicmVhZCIsInNlbGVjdG9ycyI6W3sia2luZCI6ImFsbCJ9XX1dLCJ2IjoxfQ.iyY5mBkEqFJyVSsAa0P71OZi1JqeCa17C3tAx7aVafnHBJnPtXsBGzODdd7_DHW9lV8ZrwFRYoTZdV0wgOE0DQ`
-- **Outcome:** rejected — the single closed error value, no other observable
+- **Outcome:** verification rejects with the single closed error value and no other observable
 
 ### Rejected: holder binding mismatch
 
@@ -906,7 +906,7 @@ Corpus case `check-envelope-invalid-claim-holder-binding` (surface `check_envelo
 
 - **Grant:** `eyJhbGciOiJFZERTQSIsImtpZCI6Imlzc3VlciIsInR5cCI6ImJhK2NhcCJ9.eyJhdWQiOlsiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QiXSwiY25mIjp7ImprdCI6IlRySTFnOWhlcjVtek50ZHdUaFV5cXd3R2ZaVkxLZDNNTW9Xa1JZLUZuOGMifSwiZXhwIjoyMDAwLCJpYXQiOjEwMDAsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUudGVzdCIsImp0aSI6InVybjpleGFtcGxlOmdyYW50OmJpbmRpbmctYSIsIm5iZiI6MTAwMCwib3BlcmF0aW9ucyI6W3sibmFtZSI6InJlYWQiLCJzZWxlY3RvcnMiOlt7ImtpbmQiOiJhbGwifV19XSwidiI6MX0.TWfkUWpq2AwChiE35-rrkbyxgXTr8aywpRJAOX2LI7IJ2AcJ7AyBuMIbA5r90Ow8wSdXjIQIXRyJobTGCNr-Dg`
 - **Proof:** `eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6IlRMV3I5cTE1LV9XcnZNcjh3bW5ZWE5KbEh0UzRoYldHbnlRYTdmQ2x1aWsifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiIwZ3Nqd1QtRHkzZkp1S2xGZXNFYWhjQ3YzNG91eERjcFk3aUZ3cFFhSlV3IiwiYmFfaW52IjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwiYmFfb3AiOiJyZWFkIiwiYmFfcmVxIjoidXYyMFBpQzh0UlFvT3k5LWVSbEJGUFFuZ3RpRFhrd19TQ2JiZ3p4akMyZyIsImh0bSI6IlBPU1QiLCJodHUiOiJodHRwczovL3Jlc291cmNlLmV4YW1wbGUudGVzdC9pbnZva2UiLCJpYXQiOjExMDAsImp0aSI6InVybjpleGFtcGxlOnByb29mOmJpbmRpbmctd3JvbmctaG9sZGVyIiwidiI6MX0.-6-8UsOBgxTXbprpywP1kyPyhARQMyCgSAMb4iFj_9ZEyfVhxa-7iXNeY2eWeFyl_x_sRLmBmwgtBQt8-CNjCg`
-- **Outcome:** rejected — the single closed error value, no other observable
+- **Outcome:** verification rejects with the single closed error value and no other observable
 
 ### Rejected: selector-disallowed arguments
 
@@ -914,7 +914,7 @@ Corpus case `check-envelope-invalid-selector` (surface `check_envelope`, class `
 
 - **Grant:** `eyJhbGciOiJFZERTQSIsImtpZCI6Imlzc3VlciIsInR5cCI6ImJhK2NhcCJ9.eyJhdWQiOlsiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QiXSwiY25mIjp7ImprdCI6IlRySTFnOWhlcjVtek50ZHdUaFV5cXd3R2ZaVkxLZDNNTW9Xa1JZLUZuOGMifSwiZXhwIjoyMDAwLCJpYXQiOjEwMDAsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUudGVzdCIsImp0aSI6InVybjpleGFtcGxlOmdyYW50OnNlbGVjdG9yLTEiLCJuYmYiOjEwMDAsIm9wZXJhdGlvbnMiOlt7Im5hbWUiOiJyZWFkIiwic2VsZWN0b3JzIjpbeyJraW5kIjoiZXF1YWxzIiwicGF0aCI6WyJyZWNvcmQiLCJpZCJdLCJ2YWx1ZSI6InJlYy0xIn1dfV0sInYiOjF9.RhKhp0dsUxk_YOZyRjTJlnkVNVoOJdeW6bFTLDP3Z3IZaTScAVSdC9jvU0kx2EXJi3O2tFLlqBV6uP3kCAfvCQ`
 - **Proof:** `eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6ImRDSzVpSFdZQm80eXhFU0tsSnJiS1EwUFRqVzU0QnNPNWZHaDVnRC1KblEifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJldnl3ZGx0Q2FGSDFPVTRaN0M0bGVENGJma3FOVkF2SWlYVmhrWXRTX0RZIiwiYmFfaW52IjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwiYmFfb3AiOiJyZWFkIiwiYmFfcmVxIjoiSXVRSXhZOHZ6Ny03MkhjMlQ0b2JBZ0l6Sm5GRk1sQjJDTGlnYmhWZHpDUSIsImh0bSI6IlBPU1QiLCJodHUiOiJodHRwczovL3Jlc291cmNlLmV4YW1wbGUudGVzdC9pbnZva2UiLCJpYXQiOjExMDAsImp0aSI6InVybjpleGFtcGxlOnByb29mOnNlbGVjdG9yLXJlamVjdCIsInYiOjF9.QxlsuJEJIw6DUTVxqTIvS8IFMloBHgoCectZ0CSaiq0cRmgHK2HjrVQLvBPipD9IOClS81Lf9nIW6y0Ynl0iBg`
-- **Outcome:** rejected — the single closed error value, no other observable
+- **Outcome:** verification rejects with the single closed error value and no other observable
 
 ### Rejected: missing required nonce
 
@@ -922,7 +922,7 @@ Corpus case `check-envelope-invalid-nonce-required` (surface `check_envelope`, c
 
 - **Grant:** `eyJhbGciOiJFZERTQSIsImtpZCI6Imlzc3VlciIsInR5cCI6ImJhK2NhcCJ9.eyJhdWQiOlsiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QiXSwiY25mIjp7ImprdCI6ImQ0dWNFWnd2SlRmd3hYQ040ZjJ4bUlFNVpCRm9INWk1bWx6ZVdaYUIzeUkifSwiZXhwIjoyMDAwLCJpYXQiOjEwMDAsImlzcyI6Imh0dHBzOi8vaXNzdWVyLmV4YW1wbGUudGVzdCIsImp0aSI6InVybjpleGFtcGxlOmdyYW50OjEiLCJuYmYiOjEwMDAsIm9wZXJhdGlvbnMiOlt7Im5hbWUiOiJyZWFkIiwic2VsZWN0b3JzIjpbeyJraW5kIjoiYWxsIn1dfV0sInYiOjF9.NaCpUf3ebKldiRpjHtKcJuvCjSVLSsmgZVWXa3Sz6Zvas3TeTEm3LqVDsUL8yc1VuakYOvFmsYxqQw8PV23uDA`
 - **Proof:** `eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Ilcxczd5RTlmR0RNQmJtZHBxWVZ3UTFoRENYdHpPZVBVRDNmSWYxdDdGRGsifSwidHlwIjoiZHBvcCtqd3QifQ.eyJhdGgiOiJzVjhkZ1ZLcFExTHZpa1lrNmVvOEd2RGZhYkpyMWd0VlhrdkRnazdxLVpZIiwiYmFfaW52IjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwiYmFfb3AiOiJyZWFkIiwiYmFfcmVxIjoidXYyMFBpQzh0UlFvT3k5LWVSbEJGUFFuZ3RpRFhrd19TQ2JiZ3p4akMyZyIsImh0bSI6IlBPU1QiLCJodHUiOiJodHRwczovL3Jlc291cmNlLmV4YW1wbGUudGVzdC9pbnZva2UiLCJpYXQiOjExMDAsImp0aSI6InVybjpleGFtcGxlOnByb29mOjEiLCJ2IjoxfQ.BUONibEL8cesx2D905h2CwHhL8sdtZ33sABKd7jRl27UdBOo0jpQX9UGl8VLlpEVxSFiZlhBGwNg85VBakhwAw`
-- **Outcome:** rejected — the single closed error value, no other observable
+- **Outcome:** verification rejects with the single closed error value and no other observable
 <!-- examples:end -->
 
 

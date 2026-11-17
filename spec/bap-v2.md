@@ -12,7 +12,7 @@ The v2 profile is a complete closed wire profile parallel to the frozen v1 profi
 canonical serialization, base64url, protected headers, claims, URI normalization, signing and
 digest inputs, the consumption chain and anchored export, the public verification contract, hard
 maxima, the untrusted key locator, `typ` values, and security/privacy considerations are
-INCORPORATED FROM v1 BY REFERENCE with the substitutions of §2 — every such section is normative
+INCORPORATED FROM v1 BY REFERENCE with the substitutions of §2. Every such section is normative
 for v2 exactly as for v1, with the named constants replaced. No section of the v1 profile is
 optional, open, or best-effort in v2. Sections 3–6 state the v2-specific normative rules in
 full, including the selector algebra with the two range kinds. Section 7 states the strict
@@ -24,7 +24,7 @@ Ed25519 verification rule that revision 2 adds for v2.
 
 <!-- facts:suite-identity -->
 The v2 profile's suite is `BAP2-Ed25519-SHA256`: EdDSA over Ed25519, SHA-256 digests, RFC 8785
-JCS canonical bytes, and the `BAP2-*` domain separators — the same closed posture and algorithms
+JCS canonical bytes, and the `BAP2-*` domain separators, retaining the same closed posture and algorithms
 as `BAP1-Ed25519-SHA256` under the major-bound naming scheme `BAP<contract-major>-<signature>-<digest>`.
 
 Every v2 artifact declares its contract-major mechanically: the payload `v` claim is exactly
@@ -33,7 +33,7 @@ separators are version-bound. A conforming v2 verifier detects the profile of an
 its bytes alone.
 
 Cross-major rules (`REQ2-CORE-cross-major-reject`): a v2 verifier rejects every artifact whose
-payload `v` is not exactly `2` — including all v1 artifacts — with the single closed error; the
+payload `v` is not exactly `2` (including all v1 artifacts) with the single closed error; the
 v1 profile rejects all v2 bytes symmetrically. There is no cross-major fallback, downgrade, or
 best-effort parsing in either direction. A holder presents artifacts of one major end-to-end: a
 v2 proof MUST pair with a v2 grant (`REQ2-EVO-proof-major-equals-grant`); mixed-major
@@ -49,7 +49,7 @@ these substitutions (`REQ2-CORE-v1-incorporation`):
 
 | v1 constant | v2 constant |
 |---|---|
-| `v` claim value `1` (grant, proof, boundary anchor, key transition, chain row, export header) — grants and proofs MUST carry exactly integer `2` (`REQ2-CLAIM-v`, `REQ2-CLAIM-proof-v`); anchors, transitions, rows, and the export header inherit the same substitution | `2` |
+| `v` claim value `1` (grant, proof, boundary anchor, key transition, chain row, export header). Grants and proofs MUST carry exactly integer `2` (`REQ2-CLAIM-v`, `REQ2-CLAIM-proof-v`); anchors, transitions, rows, and the export header inherit the same substitution | `2` |
 | request-digest prefix `BAP1-REQUEST\0` | `BAP2-REQUEST\0` (`REQ2-SIGNING-digest-prefix`) |
 | chain-row domain `BAP1-CHAIN\0` | `BAP2-CHAIN\0` |
 | archive prefix `BAP1-ARCHIVE\0EXPORT\0` | `BAP2-ARCHIVE\0EXPORT\0` |
@@ -68,8 +68,8 @@ v2 grant, and the v2 façade exposes no loopback functions.
 ## 3. Hard maxima
 
 The v2 profile inherits every v1 bound unchanged (`REQ2-BOUNDS-inherited`): the range-selector
-design review found that a range comparison consumes two decoder-bounded numbers and produces a boolean
-— it derives no new magnitude, so no new `Bounds` member is required. The complete bound set is
+design review found that a range comparison consumes two decoder-bounded numbers and produces a
+boolean without deriving a new magnitude, so no new `Bounds` member is required. The complete bound set is
 the v1 §17 table, including the selector maxima restated in §5 below.
 
 <a id="selectors"></a>
@@ -86,13 +86,13 @@ verbatim (`REQ2-SELECTOR-closed-set`), with the `kind` selecting among FIVE kind
 | all | Any recognized member set; `path`, `value`, and `values` are inert when present |
 | equals | Exactly `{kind: "equals", path: path, value: JSON_value}` |
 | one-of | Exactly `{kind: "one_of", path: path, values: non_empty_JSON_array}` |
-| lte | Exactly `{kind: "lte", path: path, value: numeric_bound}` — the value at `path` must be same-tag numeric and numerically ≤ `bound` (inclusive) |
-| gte | Exactly `{kind: "gte", path: path, value: numeric_bound}` — the value at `path` must be same-tag numeric and numerically ≥ `bound` (inclusive) |
+| lte | Exactly `{kind: "lte", path: path, value: numeric_bound}`. The value at `path` must be same-tag numeric and numerically ≤ `bound` (inclusive) |
+| gte | Exactly `{kind: "gte", path: path, value: numeric_bound}`. The value at `path` must be same-tag numeric and numerically ≥ `bound` (inclusive) |
 
 Range-kind rules (`REQ2-SELECTOR-range-same-tag`, `REQ2-SELECTOR-range-inclusive`,
 `REQ2-SELECTOR-range-numeric`):
 
-- Both operands — the traversed value at `path` and the bound in `value` — MUST carry the same
+- Both operands (the traversed value at `path` and the bound in `value`) MUST carry the same
   numeric tag: both integer-tagged or both float-tagged. A cross-tag pair does not match; it
   fails closed exactly as `equals` never collapses tags. This extends the v1
   no-tag-collapse invariant from identity to ordering.
@@ -125,7 +125,7 @@ object-member names, 1–128 UTF-8 bytes each, object traversal only, never arra
 operation carries 1–64 selectors unchanged (`REQ2-SELECTOR-count`). Selector matching is
 verdict-internal: the standalone grant verification checks signature, issuer, audience, and
 times only, and never evaluates selectors (`REQ2-SELECTOR-verdict-internal`). Facts are
-unchanged — a range bound is a payload magnitude read from the decoded grant of the same
+unchanged, since a range bound is a payload magnitude read from the decoded grant of the same
 verified bytes, never a fact, and no selector grants business authorization
 (`REQ2-SELECTOR-not-authorization`).
 
@@ -138,7 +138,7 @@ object member.
 
 Attenuation (when a successor major activates delegation) composes conjunctively over selector
 tuples and never inspects kind; the new kinds are new tuple inhabitants of the existing algebra,
-and a child that adds a cross-tag conjunct produces an unsatisfiable conjunction — fail closed,
+and a child that adds a cross-tag conjunct produces an unsatisfiable conjunction, failing closed
 never a widening (`REQ2-SELECTOR-attenuation-unchanged`).
 
 Erratum 6 binds the selector float-zero rule of [bap-v1.md § 12](bap-v1.md#selectors) to this

@@ -17,7 +17,7 @@ with the official `ext-auth` track as a gated follow-on.
 - **Extension identifier:** `io.bounded-authority/capability-authorization`
 - **Author(s):** Russ Palermo, BaseLabs
 - **Sponsor:** None (seeking sponsor)
-- **Working Group:** (to be identified — `ext-auth` authorization working group)
+- **Working Group:** (`ext-auth` authorization working group; to be identified)
 - **Extension Maintainers:** (to be identified)
 
 ## Abstract
@@ -31,9 +31,9 @@ this SEP documents it for the MCP venue. The capability-authorization *mechanism
 selector algebra, verification) introduces nothing normative outside that profile; the extension's
 negotiation and graceful-degradation surfaces are normative requirements this extension defines for
 MCP per [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions), and its transport binding
-is scoped to streamable-HTTP for this draft with the per-message binding left open — none a
+is scoped to streamable-HTTP for this draft with the per-message binding left open. None is a
 restatement of the v1 profile. The
-extension composes with — does not replace — the OAuth-scope authorization the existing `ext-auth`
+extension preserves and composes with the OAuth-scope authorization the existing `ext-auth`
 extensions assume.
 
 ## Motivation
@@ -42,16 +42,16 @@ MCP's existing authorization model (the `ext-auth` extensions) is OAuth-scope-ba
 presents a scoped access token, and the server decides whether the scope permits the invocation.
 Scopes are coarse, string-based, and delegated entirely to the authorization server; they do not
 cryptographically bind *which arguments* an operation may be invoked with, nor bind a specific
-invocation to a specific holder proof. For agent-driven invocations — where an autonomous agent
-calls tools on a user's behalf, and the consequences of an over-broad capability are real — a
+invocation to a specific holder proof. When an autonomous agent calls tools on a user's behalf,
+an over-broad capability has real consequences. A
 finer-grained, cryptographically bound capability model closes a gap that scopes leave open: the
 *object-level* authority ("this agent may call `transfer_funds` only for account A, only until
 time T") is provable per-invocation, not merely asserted by a scope string. (The v1 selector
-algebra expresses exact-value and enumerated-set argument bounds — `equals`/`one_of` — plus
+algebra expresses exact-value and enumerated-set argument bounds with `equals`/`one_of`, plus
 operation, time, and audience bounds; it does not express inequality/range bounds like "up to
 amount N," which remain a server-side policy check.)
 
-The Bounded Authority Protocol already specifies this mechanism — bounded proof-of-possession grants
+The Bounded Authority Protocol already specifies bounded proof-of-possession grants
 with a conjunctive selector algebra over invocation arguments, holder proofs that bind the request
 operation and digest, and a closed, fail-closed verification profile. This SEP proposes documenting
 it as an MCP extension so MCP implementers can adopt it without re-deriving the design.
@@ -103,7 +103,7 @@ governs changes to the underlying mechanism.
 ## Security implications
 
 See [`capability-authorization.mdx`](./capability-authorization.mdx) § Security considerations. The
-load-bearing posture: **verification is not authority** — a verified grant + proof proves only that
+load-bearing posture: **verification is not authority**. A verified grant + proof proves only that
 the bytes satisfy caller-supplied trusted inputs; replay reservation, revocation state, and the
 authorization decision are the MCP server's responsibility. The closed profile structurally rejects
 the algorithm-confusion and permissive-parsing classes.
@@ -123,7 +123,7 @@ filing is gated on it.
 ## Submission gates (external, recorded honestly)
 
 Per [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions), official acceptance of this
-extension requires — none of which this draft performs:
+extension requires, none of which this draft performs:
 
 1. A reference implementation in an official MCP SDK (negotiated with the SDK maintainers).
 2. A Working Group and Extension Maintainers identified in this SEP's Preamble
@@ -135,7 +135,7 @@ extension requires — none of which this draft performs:
 5. On acceptance, a PR adding the `.mdx` to `modelcontextprotocol/ext-auth`.
 
 Until these gates close, this draft targets the **experimental-extension** track
-([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Experimental Extensions) — the
+([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Experimental Extensions), so the
 sanctioned incubation path, which does not require the reference-SDK implementation. That track is
 reachable *before* SEP submission, but it is still not unilaterally standable-up by this project:
 [SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Experimental Extensions requires

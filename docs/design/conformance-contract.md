@@ -23,7 +23,7 @@ decoder-and-corpus checks.
 ## Key census integrity
 
 The manifest partitions its canonical public-key fingerprints into exact sorted sets for each
-independent verifier. Each set equals—not merely contains—the keys observed at that verifier's
+independent verifier. Each set equals the keys observed at that verifier's
 standard-library public-key import boundary, and the exact union equals the canonical manifest set
 across every tracked vector. Repository-wide discovery remains a supplemental private-material
 and unlisted-key gate; it cannot satisfy import reach. Every fixture key occupies a
@@ -59,8 +59,8 @@ falsifiable: a cell is not-applicable only when the input algebra cannot express
 that surface; required cells must be ≥1, `n_a` cells must be 0, both directions enforced. Every
 invalid vector on the cryptographic verifying surfaces (algorithm-confusion, meaningful-byte
 tamper, key/claim/time/request/nonce binding, archive and chain integrity) is a one-defect
-skip-would-accept construction — it differs from a passing valid case in exactly the dimension its
-class names, so a verifier that skips that check would accept it — confirmed rejected by BOTH
+skip-would-accept construction: it differs from a passing valid case in exactly the dimension its
+class names, so a verifier that skips that check would accept it. Rejection is confirmed by BOTH
 implementations before it is normative (a wrong invalid vector silently certifies nonconforming
 verifiers, so it is worse than a missing one). BAP-06 owns immutable candidate-archive proof.
 
@@ -182,9 +182,9 @@ failures only if those classes cannot widen the runtime surface.
 ## Cross-vendor findings → corpus/spec mapping
 
 The cross-language SDKs (BAP-09) were hardened by a multi-vendor review that surfaced byte-level
-divergences from the Elixir reference. To keep the clean-room bar — a new SDK is authored from
+divergences from the Elixir reference. To preserve clean-room authorship, a new SDK is authored from
 `spec/bap-v1.md` + the corpus **alone**, with no code-level derivation from the Elixir
-reference or a sibling SDK — each behavior the review pinned is reachable from the spec or carried as
+reference or a sibling SDK. Each behavior the review pinned is reachable from the spec or carried as
 a corpus case. The table maps every byte-level finding to its pinning artifact; `(d)`-class host
 closures stay as per-SDK mutation-gates (the corpus cannot express them).
 
@@ -218,4 +218,4 @@ over-bound structured array (65797 chunks or 257 transitions) exceeds the loader
 carried as a corpus case; the bound itself stays pinned at `bounds.new` and is proven red-capable by
 the source-isolated mutation battery. The upper JCS float threshold (`>= 21`) is unreachable from the
 bounded algebra (the largest representable float has decimal exponent ≈ 15.95), so no corpus case
-pins it — the spec subsection documents both thresholds and the reference implements both.
+pins it. The spec subsection documents both thresholds and the reference implements both.

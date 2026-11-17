@@ -12,6 +12,9 @@ raw credentials and secrets; the logging notes below describe their display limi
 is a **verifier, not an authority**: it never selects trusted keys, reserves replay, checks
 revocation, or decides whether a request may run. Those stay in your service.
 
+Already-trusted public keys, expected context, and time are explicit inputs. The SDK has no
+private-key access or custody and reads no clock.
+
 Its behavior is defined by the [specifications][specs] and the certified conformance corpora;
 source comments cross-reference the Elixir reference implementation for traceability.
 

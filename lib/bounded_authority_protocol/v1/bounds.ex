@@ -31,7 +31,7 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
   | `string_bytes` | 8,192 | UTF-8 bytes in one JSON string |
   | `key_bytes` | 128 | UTF-8 bytes in one JSON object member name |
   | `number_lexeme_bytes` | 64 | bytes of one JSON number as written |
-  | `integer_magnitude` | 9,007,199,254,740,991 | absolute value of a JSON integer (2^53 - 1) |
+  | `integer_magnitude` | 9,007,199,254,740,991 | absolute value of a JSON integer (`2^53 - 1`) |
   | `float_magnitude` | 9,007,199,254,740,991 | absolute value of a JSON float |
   | `kid_bytes` | 128 | bytes of a JWS `kid` header value |
   | `jcs_bytes` | 65,536 | bytes of one RFC 8785 (JCS) serialization the library produces |

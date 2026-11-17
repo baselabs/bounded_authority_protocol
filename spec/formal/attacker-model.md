@@ -25,7 +25,7 @@ honest; verifiers are honest; the network is hostile.
 
 Symbolic assumptions, recorded: perfect cryptography; Ed25519/SHA-256 as symbolic sign/hash;
 time abstracted to an order with a bounded skew window (no dense-time reasoning); JSON
-canonicalization taken as an injective encoding (the typed projection makes this sound — the
+canonicalization taken as an injective encoding (the typed projection makes this sound because the
 tagged algebra is a free term algebra, which is exactly what the typed-projection table buys
 the model). Revision 2 adds the strict Ed25519 rule (spec § 14.1, erratum 2). The model already
 treats Ed25519 as an ideal signature, so it is unchanged; the strict rule is what makes
@@ -38,16 +38,16 @@ signature never accepts.
   digest of g, and the acceptance is impossible against any other grant: cross-grant replay is
   impossible even for the malicious holder who holds valid keys and multiple valid grants.
 - **P2 (request binding).** The request digest accepted by a verifier equals the digest of the
-  VERIFIER-DERIVED pair (operation, typed(cast_arguments)) — a proof signed for one request
+  VERIFIER-DERIVED pair (operation, typed(cast_arguments)). A proof signed for one request
   cannot be accepted for a different operation or any different typed-arguments value
   (injectivity of the typed projection is the load-bearing lemma).
 - **P3 (context-binding completeness).** Acceptance requires equality of every context
-  element — method, target URI, invocation identifier, operation, request digest, grant digest,
-  holder thumbprint, and the nonce in required mode — with the verifier's expected context.
+  element (method, target URI, invocation identifier, operation, request digest, grant digest,
+  holder thumbprint, and the nonce in required mode) with the verifier's expected context.
   Time is abstracted (assumption above): temporal windows are modeled as ordered predicates
   the verifier checks, not as clock physics.
 - **P4 (facts disclosure).** The facts returned on acceptance disclose exactly the declared
-  fields: identifiers, digests, times, and the not-evaluated markers — never arguments,
+  fields: identifiers, digests, times, and the not-evaluated markers. They never contain arguments,
   selector values, raw credentials, signatures, JWK containers, or nonces.
 
 ## Out of model

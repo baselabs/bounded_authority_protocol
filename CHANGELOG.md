@@ -23,6 +23,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
   exclude exactly those tests with an explicit reason and reject the CI full-history flag.
 
 ## [1.0.0] — 2026-11-10
+## [1.0.0] (2026-11-10)
 
 ### Changed
 
@@ -131,7 +132,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - The three in-repo verifier SDKs (`sdks/python`, `sdks/rust`, `sdks/go`) implement erratum 3's
   producer-canonicality refusal on their assembly and anchored-export-encoding surfaces, with the
   same clauses as the Elixir reference and the graduated TypeScript verifier: Ed25519
-  (`signature_gate` — R canonical, R not of small order, S < L) at every Ed25519 assembler
+  (`signature_gate`, requiring canonical R, R not of small order, and S < L) at every Ed25519 assembler
   (contract-majors 1 and 2, local loopback, role attestation, content assertion) and at every
   major's export encoding; ES256 (the canonical-signature rule `0 < r < n`, `0 < s ≤ ⌊n/2⌋`) at
   the v3 assembler and export encoding. Each SDK vendors and runs the certified
@@ -165,7 +166,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
   builds different archive bytes. The supply-chain workflow installs Node 22.23.1 like CI instead
   of using the runner image's Node.
 
-## [0.9.1] — 2026-10-31
+## [0.9.1] (2026-10-31)
 
 ### Documentation
 
@@ -174,7 +175,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Installation examples, the Livebook, and security guidance point to this ADR-free release.
 - No runtime, public API, wire format, or verification verdict changes.
 
-## [0.9.0] — 2026-10-29
+## [0.9.0] (2026-10-29)
 
 A clarifying minor release (erratum 3). No verification verdict and no verdict of any existing
 certified corpus changes.
@@ -282,7 +283,7 @@ certified corpus changes.
   its own test suite (Go `Example`, Rust doctest, Python pytest). The TypeScript deployment
   notes describe the published 0.7.0 package.
 
-## [0.8.0] — 2026-10-13
+## [0.8.0] (2026-10-13)
 
 The strict Ed25519 verification release: a soundness repair (erratum 2,
 the strict-Ed25519 erratum decision record). Upgrade from every earlier
@@ -342,7 +343,7 @@ release; see the security advisory for affected versions and details.
   reuse Hex's CA certificates for license metadata requests. The production
   dependency boundary is unchanged.
 
-## [0.7.0] — 2026-09-28
+## [0.7.0] (2026-09-28)
 
 The content-assertion release: the second sibling attestation profile. No contract-major,
 loopback, or role-attestation byte, verdict, or certified pin changes.
@@ -373,22 +374,22 @@ loopback, or role-attestation byte, verdict, or certified pin changes.
 - CI runs on Linux only (the Linux-only CI decision record); developer portability across macOS, Linux, and Windows
   is unchanged. The supply-chain workflow runs on manifest changes, weekly, and on demand.
 
-## [0.6.2] — 2026-09-24
+## [0.6.2] (2026-09-24)
 
 The cross-Elixir compilation and scan-sensitivity repair patch over 0.6.1: no verdict,
-wire-format, or public-API change — the certified corpora, index digests, decision records, and
+wire-format, or public-API change. The certified corpora, index digests, decision records, and
 governance documents are unchanged.
 
-### Fixed — cross-toolchain compilation and gates
+### Fixed: cross-toolchain compilation and gates
 
 - The role-attestation codec's closed-role membership and bounded-size checks compile to
   version-stable Erlang on every supported Elixir. On Elixir 1.18/1.19, expression-position `in`
   over a literal list compiled to a `:lists.member/2` import and runtime-bounded ranges compiled
-  to `Enum.member?/2` + `Function.identity/1` imports — findings the compiled purity and package
+  to `Enum.member?/2` + `Function.identity/1` imports, findings the compiled purity and package
   gates correctly rejected, turning the 1.18/1.19 CI lanes red (RED observed locally on
   1.18.4-otp-28: three failures; GREEN after the rewrite on 1.18.4-otp-28 and a fresh
   1.19.5-otp-28 build). The membership and bounds are explicit comparisons, verdict-identical on
-  every input for every bound the public API can reach — `Bounds` coercion admits positive
+  every input for every bound the public API can reach, since `Bounds` coercion admits positive
   integers only, and for n >= 1 the predicates agree on every input (the unreachable n <= 0
   forms differed only in dead code); the gates are unchanged and no allowances were added.
 - The secret-scan sensitivity battery plants a JWT fixture at the role-attestation corpus path:
@@ -412,35 +413,35 @@ governance documents are unchanged.
   `p256`/`zeroize` ES256 backend rows; the interoperability report's TypeScript row and
   publication-status claims are corrected to the graduated repository; the guides index carries
   the role-attestation spec as a normative authority; and the docs-currency test now pins the
-  graduated SDK posture — three in-repo SDKs plus the graduated npm scope and repository,
+  graduated SDK posture, covering three in-repo SDKs plus the graduated npm scope and repository,
   rejecting the retired `@bounded-authority/verifier` scope and any in-tree `typescript/` link.
 
-## [0.6.1] — 2026-09-23
+## [0.6.1] (2026-09-23)
 
 The cross-vendor repair patch over 0.6.0: the second independent review family's pass
 over the role-attestation landing range (e5cd033..d470814, executed 2026-09-23 after the
-account-quota window reset) confirmed eight product findings — three blocking — all fixed
+account-quota window reset) confirmed eight product findings, including three blocking findings, all fixed
 in `05c24a8` with RED→GREEN evidence and the full quality gate green (584 tests, 100%
 coverage). The certified corpus bytes, index digests, and the role-attestation profile decision record are unchanged; verdicts
 on legal input do not move. The full adjudication with severities and repair evidence is
 retained in the repository's local review records.
 
-Why each fix, in one line each: (1) the Python codec joined member sets with a comma —
+Why each fix, in one line each: (1) the Python codec joined member sets with a comma;
 an exact-set comparison closes a `KeyError` collision; (2) trailing-newline identifiers
-and URIs were accepted by Python and rejected by the reference — full-string checks at
+and URIs were accepted by Python and rejected by the reference, prompting full-string checks at
 all three positions; (3) the standalone attestation ignored the caller-tightened
 `anchor_bytes` ceiling on all four surfaces (upgrading the review's original
-source-inference to OBSERVED — the earlier "verdict-neutral" characterization is
+source-inference to OBSERVED. The earlier "verdict-neutral" characterization is
 REFUTED by a caller-tightened runtime counterexample); (4) producers now validate their
 emitted JSON under decoder limits and project final compact/segment sizes; (5) the
 in-repo SDKs' StringOrUri handling diverged from the reference on IP literals, ports,
-and escapes — profile-local helpers align them; (6) Python caller-input validation
+and escapes, which profile-local helpers align; (6) Python caller-input validation
 returned raw exceptions instead of the closed error; (7) Elixir raised `KeyError` on
 incomplete caller structs instead of `{:error, :invalid}`; (8) the Rust parser decoded
-segments before checking limits — encoded-size and projected-decoded-size checks now
+segments before checking limits. Encoded-size and projected-decoded-size checks now
 precede base64 decoding (Go and Python preflight all three segments equivalently).
 
-### Fixed — role-attestation validation
+### Fixed: role-attestation validation
 
 - Role-attestation signing-input production applies the same caller-tightened parser
   limits as assembly, decoding, and verification. The Python, Rust, and Go SDKs also
@@ -452,17 +453,17 @@ precede base64 decoding (Go and Python preflight all three segments equivalently
   signing-input, expected-context, and attestor-key structs. The Python, Rust, and Go
   SDKs check segment limits before base64 decoding.
 
-## [0.6.0] — 2026-09-23
+## [0.6.0] (2026-09-23)
 
 The role-attestation release (the role-attestation profile decision record: the first `0.x.0` bearing the
-`bap-role-attestation/1` profile). Additive public surface — the
-`BoundedAuthorityProtocol.RoleAttestation.V1` namespace and the certified profile corpus —
-with zero verdict changes on existing input; also carries the v1/v2 closed-error-shape fix
+`bap-role-attestation/1` profile). The additive public surface consists of the
+`BoundedAuthorityProtocol.RoleAttestation.V1` namespace and the certified profile corpus,
+with zero verdict changes on existing input. This release also carries the v1/v2 closed-error-shape fix
 found by the profile corpus's ES256 confusion case.
 
-### Added — the role-attestation sibling profile `bap-role-attestation/1` (the role-attestation profile decision record; the BARA RA11 prerequisite)
+### Added: the role-attestation sibling profile `bap-role-attestation/1` (the role-attestation profile decision record; the BARA RA11 prerequisite)
 
-- `BoundedAuthorityProtocol.RoleAttestation.V1` — the protocol's first sibling attestation
+- `BoundedAuthorityProtocol.RoleAttestation.V1` introduces the protocol's first sibling attestation
   profile: a standalone, grant-unbound compact JWS (protected `typ: "ba+role-attestation"`)
   binding a subject key to `issuer` or `holder` for a bounded window. Four surfaces:
   `attestation_signing_input/2`, `assemble_compact/{2,3}`, `decode_attestation/2`, and
@@ -484,35 +485,35 @@ found by the profile corpus's ES256 confusion case.
   authority-runtime issuance receipt, and the companion-signer consumption receipt in their own
   repositories.
 
-### Fixed — v1/v2 closed error shape under wrong-width signatures
+### Fixed: v1/v2 closed error shape under wrong-width signatures
 
 - `V1/V2.decode_grant/2`, `decode_proof/2`, and the verify paths behind them returned a bare
   `false` (a `with` guard leak) instead of `{:error, :invalid}` for compacts whose signature
-  segment decodes to a byte length other than the suite width — found by the profile corpus's
+  segment decodes to a byte length other than the suite width, as found by the profile corpus's
   ES256 confusion case (a raw ECDSA `r||s` signature), fixed V3-style (parse normalization),
   pinned RED-first by `test/bounded_authority_protocol/signature_width_error_shape_test.exs`. No
   accept/reject verdict changes; the v1/v2/v3 corpora and their certified pins are unchanged.
 
-### Fixed — cross-vendor review legs (2026-09-22, over the BAP-23 range)
+### Fixed: cross-vendor review legs (2026-09-22, over the BAP-23 range)
 
 - The Python and Go SDKs now magnitude-bound the attestor context's window endpoints in
   `verify_attestation` (parity with the Elixir reference's `ContextValidation.historical_key`
   and the Rust gate): a caller context with `valid_from` below or `valid_before` above the
-  integer magnitude ceiling returned `ok` where the reference returns `{:error, :invalid}` —
+  integer magnitude ceiling returned `ok` where the reference returns `{:error, :invalid}`;
   containment alone is trivially satisfied by an out-of-magnitude window, so nothing
   downstream rejected it. Pinned RED-first in both SDKs' attestation suites; corpus verdicts
   and the certified index are unchanged (all corpus contexts are in-magnitude).
 - `scripts/check_role_attestation.exs` (`mix role_attestation.verify`) now compares the
   computed corpus index digest against the certified pin
-  (`REQ-RA1-CONFORMANCE-certified-pin`) instead of only echoing it — a regenerated,
+  (`REQ-RA1-CONFORMANCE-certified-pin`) instead of only echoing it. A regenerated,
   self-consistent corpus previously verified green. Red-proven by a bogus-pin probe.
 - The Python SDK's decode surface carries the raw 32-byte subject `public_key` (the member
-  shape the Elixir/Go/Rust decode surfaces all expose) instead of a derived thumbprint — an
+  shape the Elixir/Go/Rust decode surfaces all expose) instead of a derived thumbprint, an
   unpublished-surface alignment so the four bindings decode portably.
 
-## [0.5.1] - 2026-09-22
+## [0.5.1] (2026-09-22)
 
-### Docs maintenance — the published doc set trimmed to implementer-facing content
+### Docs maintenance: the published doc set trimmed to implementer-facing content
 
 - The Hex package and hexdocs now carry the implementer-facing set only: the four specs, the
   decision records, the guides/deployment/livebook docs, the normative contracts
@@ -526,39 +527,39 @@ found by the profile corpus's ES256 confusion case.
   wire, bound, or verdict change; the package census and the published-surface hygiene
   roots are re-pinned to the trimmed set.
 
-## [0.5.0] - 2026-09-22
+## [0.5.0] (2026-09-22)
 
-### Added — spec-facts extraction baselines for contract-majors 2 and 3 (the activation records' deferral closed; no wire or API change)
+### Added: spec-facts extraction baselines for contract-majors 2 and 3 (the activation records' deferral closed; no wire or API change)
 
 - The spec-facts drift gate is major-keyed: `spec/bap-v2.md` and `spec/bap-v3.md` now carry
   closed facts-anchor sets (suite identity, domain separators, selector kinds; v3 adds the
-  protected-header members, the §3 suite rules — curve, EC JWK member set, 32/65/64-byte
-  fixed widths, raw `r || s`, the low-S rule, the rejected-encoding list — and the §5
+  protected-header members, the §3 suite rules (curve, EC JWK member set, 32/65/64-byte
+  fixed widths, raw `r || s`, the low-S rule, the rejected-encoding list), and the §5
   fixed-width constants), extracted deterministically and frozen byte-for-byte in
   `spec/facts/baseline-v2.json` / `baseline-v3.json`. Rule 1b reds on any silent
   successor-major normative edit exactly as for v1; the v1 baseline bytes, ten-anchor set,
   and extraction output are unchanged. The spec-facts mutation battery grows from seven to
-  sixteen legs, each observed RED on the real tree before wiring — including the literal-NUL
+  sixteen legs, each observed RED on the real tree before wiring, including the literal-NUL
   separator class of the requirement-map incident (a NUL byte where the two-character `\0`
   text belongs is not matched and reds).
 
-### Added — ES256 contract-major activation: the `BAP3-ES256-SHA256` suite (the ES256 activation decision record)
+### Added: ES256 contract-major activation of the `BAP3-ES256-SHA256` suite (the ES256 activation decision record)
 
-- `BoundedAuthorityProtocol.V3` — the complete contract-major 3 closed profile: ECDSA over
+- `BoundedAuthorityProtocol.V3` implements the complete contract-major 3 closed profile: ECDSA over
   NIST P-256 with SHA-256 (`alg: "ES256"`), RFC 7518 §3.4 raw `r || s` signatures with the
   REQUIRED low-S canonicality rule and `0 < r < n` range checks, EC JWK holder keys
   (`{crv,kty,x,y}`) with RFC 7638 thumbprints, 65-byte uncompressed-SEC1 raw keys,
   `BAP3-*` domain separators, payload `v: 3`, and the five-kind selector algebra inherited
   from v2. Each major verifies under its own complete closed profile; v1 and v2 reject v3
   bytes and v3 rejects v1 and v2 bytes (the ES256 activation decision record).
-- `spec/bap-v3.md` — the normative v3 profile; the certified v3 corpus
+- `spec/bap-v3.md` defines the normative v3 profile; the certified v3 corpus
   (`priv/conformance/v3/corpus`, 292 cases across 28 surfaces, revision 1) verifies 292/292
   through the CLI with its index SHA-256 pinned in the major-keyed certified map. The
   signature-canonicality matrix (high-S, tampered r/s, zero r/s, r/s ≥ n), the EC JWK
   closed set, the thumbprint member set, and the cross-major rejections (v1 and v2 bytes on
   every artifact family) are corpus-certified. Six verdict-provable mutation-battery
   entries executed RED; two battery adjudications are disclosed in the requirement map § v3
-  (the r < n check is backend-coincident for out-of-range scalars — unit-level proof; v3
+  (the r < n check is backend-coincident for out-of-range scalars, with unit-level proof; v3
   cross-major rejection is pinned at both the alg and the v claim).
 - Registries: `BAP3-ES256-SHA256` active; the `lte`/`gte` rows name the v3 closed profile
   alongside v2's; the ML-DSA anticipated index advances to the next successor major. The
@@ -567,20 +568,20 @@ found by the profile corpus's ES256 confusion case.
   mutation gates; the TypeScript cohort (graduated verifier repository snapshot-bump,
   signer suite adoption) and the A2A `BA-Grant`/`BA-Proof` drill land with this
   activation per the ES256 activation decision record. The §8 kiosk-demo refresh named in the 2026-09-20 cohort
-  decision is withdrawn — its demo tree no longer exists (owner decision, 2026-09-22;
+  decision is withdrawn because its demo tree no longer exists (owner decision, 2026-09-22;
   see the ES256 activation decision record's post-acceptance note).
 
-### Added — UCP riding-point decision (the UCP riding-point decision record) and A2A venue extension draft (no wire or API change)
+### Added: UCP riding-point decision (the UCP riding-point decision record) and A2A venue extension draft (no wire or API change)
 
 - The UCP riding-point decision record (resolution of the open question
   both interop profiles recorded; UCP read first-hand at pinned `d3ccb55`): the riding point is
-  transport-composed — UCP's A2A transport is covered as-is by the A2A binding profile for
-  deployments speaking A2A 1.0 (UCP's published A2A binding is at 0.3-era shapes —
-  `X-A2A-Extensions`, `message/send` — and reconciliation is UCP's); UCP's MCP transport is the
+  transport-composed. UCP's A2A transport is covered as-is by the A2A binding profile for
+  deployments speaking A2A 1.0 (UCP's published A2A binding uses the 0.3-era shapes
+  `X-A2A-Extensions` and `message/send`, whose reconciliation belongs to UCP); UCP's MCP transport is the
   BAP-08 extension's scope; a UCP-REST binding profile is the named follow-on under the
   project's own reverse-domain prefix (UCP reserves `dev.ucp.*`); Embedded is out of scope. The
   three-layer composition doctrine (UCP's RFC 9421 transport identity, BAP invocation authority,
-  AP2 payment authorization — disjoint surfaces, none covers another) extends the AP2 profile's
+  AP2 payment authorization, separate surfaces that do not subsume one another) extends the AP2 profile's
   §6 separation. Closed-by pointers added to both design profiles and the ROADMAP.
 - `docs/extensions/a2a-capability-binding.mdx`: pre-submission venue-facing restatement of the
   A2A binding profile for the A2A ecosystem (not proposed to A2A's sponsorship/TSC path; no
@@ -589,12 +590,12 @@ found by the profile corpus's ES256 confusion case.
   attributed to RFC 7800, also fixed in the MCP precedent), and the no-implementation status.
   README now names both extension drafts; `AGENTS.md` decision-record roster corrected.
 
-### Added — A2A capability-binding profile (design contract, no wire or API change)
+### Added: A2A capability-binding profile (design contract, no wire or API change)
 
 - `docs/design/a2a-capability-binding-profile.md` (owner-approved 2026-09-20 after the design
   method: options analysis over the binding-layer fork, then independent adversarial review of
-  both the analysis and the specification — two rounds each, all findings repaired and
-  re-verified): the composition contract with A2A at pinned `afda8316` — extension-mechanism
+  both the analysis and the specification, with two rounds each and all findings repaired and
+  re-verified): the composition contract with A2A at pinned `afda8316`, covering extension-mechanism
   negotiation (empty `params`, matching the MCP extension precedent) with transport-layer
   proof binding (unchanged `dpop+jwt` bytes; `BA-Grant`/`BA-Proof` HTTP headers and gRPC
   metadata; `htm`/`htu` per binding incl. the commit-pinned gRPC HTTP/2 grammar); the bounded
@@ -607,35 +608,35 @@ found by the profile corpus's ES256 confusion case.
   separately-owned open question. Structural-correspondence claims only; no compatibility or
   runtime guarantee claimed.
 
-### Added — AP2 interop profile (design contract, no wire or API change)
+### Added: AP2 interop profile (design contract, no wire or API change)
 
 - `docs/design/ap2-interop-profile.md` (owner-approved 2026-09-20 after independent adversarial
   review: original FAIL with 3 P2 + 4 P3 findings, all repaired, repair-diff PASS): the
-  composition contract with AP2 v0.2 at pinned `e1ea56d` — the ES256 suite bridge contract
+  composition contract with AP2 v0.2 at pinned `e1ea56d`, covering the ES256 suite bridge contract
   (`BAP<n>-ES256-SHA256`, suite decision pending), the three-spelling digest map (AP2 bare
   base64url / BAP wire-base64url and internal-raw / CAP tagged; lossless byte conversions, no
   value-coincidence claims), the cast-argument projection over integer minor units (the
   integer-vs-float decision is evidence-forced: AP2 schema and SDK integer, v2 same-tag range
   rules; float money content never projects), host-riding questions recorded open (A2A binding
   undecided), the CAP receipt join noted only, and the cross-vectors posture (AP2 ships no
-  in-tree vectors — probed with a working control). Structural-correspondence claims only; no
+  in-tree vectors, probed with a working control). Structural-correspondence claims only; no
   compatibility or runtime guarantee claimed.
 
-## [0.4.2] — 2026-09-20
+## [0.4.2] (2026-09-20)
 
-### Changed — CI is Linux-only (developer portability, not tri-OS proof)
+### Changed: CI is Linux-only (developer portability, not tri-OS proof)
 
 - Per the owner's directive (the Linux-only CI decision record, superseding the per-push Windows-lane element of
-  the toolchain lockstep decision record): CI runs Linux only — the Elixir/OTP compatibility lanes and the
+  the toolchain lockstep decision record): CI runs Linux only, both the Elixir/OTP compatibility lanes and the
   complete-quality lane. The portability contract for contributors (clone, `deps.get`,
-  compile, test on Windows/macOS/Linux) stays enforced in-repo at zero runner cost —
+  compile, test on Windows/macOS/Linux) stays enforced in-repo at zero runner cost through
   portable test support, the LF-forcing `.gitattributes`, no POSIX shell inside declared
-  gates — and non-Linux lanes run only ad hoc when a platform-specific defect is suspected.
+  gates. Non-Linux lanes run only ad hoc when a platform-specific defect is suspected.
 - The architecture gate's jsonschex pin moved to `~> 0.10.0` in lockstep with the batched
   dependency sweep (the requirement bump without the pin mismatch is what reddened the first
   post-sweep CI run).
 
-### Changed — documentation truth: AP2 mapping note, selector-scope paragraph, budget-window record
+### Changed: documentation truth in the AP2 mapping note, selector-scope paragraph, and budget-window record
 
 - The `tracked-authoring-paths` gate admits one previously committed file (from commit
   `47297b8`) at exactly its committed blob, mode, and stage 0. Any other content at that path
@@ -648,7 +649,7 @@ found by the profile corpus's ES256 confusion case.
   `cnf`-bound), with the closed-mandate key-binding hop mapped to the holder proof; the stale
   claims that the selector algebra "does not express" range bounds and that range kinds are
   successor-major scope are corrected (contract-major 2 ships `lte`/`gte`; the range-selector and contract-major 2 activation decision records); and
-  the note now names the structural differences it previously omitted — mandate chains, the
+  the note now names previously omitted structural differences, including mandate chains, the
   verifier-signed Mandate Receipt versus facts marked `not_evaluated`, the fail-closed
   unknown-constraint rule, the Trusted Surface, the signature-suite seam, and selective
   disclosure. Still a pre-submission draft (BAP-08); still no compatibility claim.
@@ -656,16 +657,16 @@ found by the profile corpus's ES256 confusion case.
   scoped to contract-major 1 (this draft binds `v` exactly `1`) and points at the contract-major
   2 range kinds; the budget-routing sentence now cites the budget-window decision record.
 - The budget-window decision record is added: the cumulative-budget posture is
-  consolidated as citable law — no cumulative selector kind in any major; enforcement routes to
-  issuer attestation or runtime accounting — and the `ba+budget-window` attestation-shape design
+  consolidated as citable law: no cumulative selector kind in any major, with enforcement routed to
+  issuer attestation or runtime accounting. The `ba+budget-window` attestation-shape design
   is explicitly deferred (no wire name reserved, no shape specified, no code change). The
   package files list and the published-surface hygiene roots gain the record file, and the
   planned-but-unwritten forward references in the range-selector decision record and the contract-major 2 activation decision record are reconciled to the
   written record.
 
-## [0.4.1] — 2026-09-17
+## [0.4.1] (2026-09-17)
 
-### Changed — self-enforcing toolchain, dependency currency, tri-platform build bar
+### Changed: self-enforcing toolchain, dependency currency, tri-platform build bar
 
 - The repository now enforces its own toolchain before anything compiles: `config/config.exs`
   raises at config load on an Erlang/OTP major outside the supported set **{27, 28, 29}**
@@ -678,13 +679,13 @@ found by the profile corpus's ES256 confusion case.
   supported-OTP set, `.tool-versions`, and the CI compatibility lanes move together in one commit.
 - `.tool-versions` now declares the test battery's Node dependency (`nodejs 22.23.1`, matching the
   CI quality lane's Node 22): the independent Node verifier runner in `mix test` previously
-  depended on whatever `node` the host PATH provided — the dev shell's Homebrew node — and an
+  depended on whatever `node` the host PATH provided (the dev shell's Homebrew node), and an
   asdf-managed host had no `nodejs` pin at all (OBSERVED: asdf shim exit 126, "No version is set
   for command node", 36 battery failures before the pin).
 - The clone → `deps.get` → compile → test contract is now gated for macOS, Linux, and Windows:
   `.gitattributes` forces LF checkout (Git-for-Windows' documented `core.autocrlf=true` default
   would CRLF-convert every tracked text file on checkout and byte-mangle the digest-pinned
-  certified corpora — INFERRED from git's default, removed by policy) with the byte-exact
+  certified corpora, INFERRED from git's default and removed by policy) with the byte-exact
   conformance trees `-text`; the test path lost its POSIX-only mechanisms (portable
   `mix`/`elixir`/`escript` spawning via `test_support/portable.ex`, `System.tmp_dir!()` scratch
   paths, guarded carve-outs for the chmod-based, symlink-based, and POSIX-shell tests); a
@@ -702,7 +703,7 @@ found by the profile corpus's ES256 confusion case.
   `jsonschex` stays `~> 0.9.2` with an inline reason (0.10 is a major jump pending review against
   the certified corpus schema gates).
 
-### Documentation — published-surface corrections
+### Documentation: published-surface corrections
 
 - v1 privacy considerations gain "Digests of guessable inputs": facts carry unkeyed digests, so
   a request digest over a small argument space can be confirmed by hashing candidates, and
@@ -720,7 +721,7 @@ found by the profile corpus's ES256 confusion case.
 - AGENTS.md lists the accepted decision records.
 - Two typos in the v1 spec are fixed.
 
-### Changed — repository hygiene
+### Changed: repository hygiene
 
 - Correction: the September 14 rewrite removed the legacy local-harness tree from `main`
   and release-tag histories, not from every public ref. OBSERVED September 15 UTC with a fresh
@@ -740,9 +741,9 @@ found by the profile corpus's ES256 confusion case.
   local authoring-tool directories and their HEAD history, with one byte-pinned public manifest
   exception. These controls do not establish confidential-term coverage or provider removal.
 
-## [0.4.0] — 2026-09-14
+## [0.4.0] (2026-09-14)
 
-### Changed — TypeScript SDK graduated (the SDK-graduation decision record executed)
+### Changed: TypeScript SDK graduated (the SDK-graduation decision record executed)
 
 - The TypeScript verifier SDK moved out of this monorepo on its first npm publication and now
   lives at
@@ -757,7 +758,7 @@ found by the profile corpus's ES256 confusion case.
   Rust/Go snapshots. The 0.1.0 seed under the retired `@bounded-authority/verifier` scope was
   unpublished during the rename window.
 
-### Changed — published-surface hygiene
+### Changed: published-surface hygiene
 
 - The shipped package surface (changelog and four decision records) carried internal
   authoring-tooling vocabulary from the hardening-arc records; identified references were
@@ -767,7 +768,7 @@ found by the profile corpus's ES256 confusion case.
   vocabulary class (word-bounded; the deliberately unshipped ROADMAP excluded; legacy
   local-tooling paths banned while ordinary cryptographic vocabulary stays legal).
 
-### Added — v2 contract-major: `lte`/`gte` range selector kinds activated (BAP-21, the contract-major 2 activation decision record)
+### Added: v2 contract-major with `lte`/`gte` range selector kinds activated (BAP-21, the contract-major 2 activation decision record)
 
 - Add the successor contract-major 2 profile per the successor-major charter activation
   checklist and the range-selector decision record: payload `v: 2`, the
@@ -803,7 +804,7 @@ found by the profile corpus's ES256 confusion case.
   major. The contract-major 2 activation decision record records the activation,
   the inherited-bounds review, and the named follow-ups.
 
-### Closed — 0.4.0 publication record
+### Closed: 0.4.0 publication record
 
 - Published 2026-09-14 (registry insert 2026-09-14T06:10:54Z, source commit `5390e97` = `v0.4.0`):
   registry checksum `e6b812fa96211614608a3a8e926381856f575b9656689265ae86a1a83105a60e` equal to
@@ -818,7 +819,7 @@ found by the profile corpus's ES256 confusion case.
   profile, v1 rejects v2 bytes and v2 rejects v1 bytes, and there is no fallback or
   downgrade in either direction. v1 is not deprecated by this activation.
 
-### Closed — BAP-19 publication (status-record reconciliation)
+### Closed: BAP-19 publication (status-record reconciliation)
 
 - Record the 2026-08-31 owner-authorized Hex publication and registry read-back that executed
   without a tracked record: release 0.3.0 (registry insert 2026-08-31T06:08:42Z, source commit
@@ -829,7 +830,7 @@ found by the profile corpus's ES256 confusion case.
   README, getting-started guide, and Livebook installation prose now state the package resolves
   from the public registry. Zero code, wire, bound, or verdict change.
 
-### Changed — repository hygiene
+### Changed: repository hygiene
 
 - Retire the legacy local-harness artifact tree. The tracked critical-surface declaration
   moves to the local-harness critical-surfaces path (the path the current local guards read;
@@ -846,9 +847,9 @@ found by the profile corpus's ES256 confusion case.
 - Amend the published-governance and verifier-SDK decision records with dated relocation notes for the critical-surface
   manifest path (the legacy harness path → the local-harness path); decisions unchanged.
 
-## [0.3.0] — 2026-08-30
+## [0.3.0] (2026-08-30)
 
-### Added — byte-distinct local-loopback HTTP application proof
+### Added: byte-distinct local-loopback HTTP application proof
 
 - Add normative profile `bap-application-proof/local-loopback-http/1`, protected
   `typ: "ba+loopback-proof"`, mandatory nonce, and exact `127.0.0.1`/`[::1]` HTTP URI rules.
@@ -875,9 +876,9 @@ found by the profile corpus's ES256 confusion case.
   read-back are separate release actions; consumers must not adopt from the tag or a mutable
   checkout as though either were an immutable package identity.
 
-## [0.2.0] — 2026-08-26
+## [0.2.0] (2026-08-26)
 
-### Changed — release 0.2.0
+### Changed: release 0.2.0
 
 The spec-decoupling program's public surface, released: the specification
 `spec/bap-v1.md` is the single normative authority (ships in the package);
@@ -885,15 +886,15 @@ The spec-decoupling program's public surface, released: the specification
 corpus tooling (six-pin digest rotation, revision sidecar, re-derivability
 generator, vendored-snapshot sync), the formal model (ProVerif, P1–P4 proven),
 the IANA templates, the guides set, and the interoperability report land
-together. Zero wire, bound, verdict, or SDK behavior change — every entry
+together. Wire bytes, bounds, verdicts, and SDK behavior are unchanged; every entry
 below is the 0.2.0 content.
 
-### Fixed — program closeout cross-vendor review findings
+### Fixed: program closeout cross-vendor review findings
 
 The closeout review (two peer families over the full program range) returned two blocking and
 several note findings, all in surfaces this program touched. All fixed:
 
-- **[blocking] .gitleaks.toml silently disabled ALL default detection rules** — a config file
+- **[blocking] .gitleaks.toml silently disabled ALL default detection rules** because a config file
   defining only an allowlist replaces gitleaks' rule set entirely. The config now
   `[extend] useDefault = true` plus scoped, documented allowlists for the public-key-only
   fixture surfaces (the generated spec documents, the corpus/vectors trees, the vendored SDK
@@ -901,11 +902,11 @@ several note findings, all in surfaces this program touched. All fixed:
   canonical reverse-alphabet gate self-test fakes). Verified both directions: a fake PAT in a
   scratch tree is DETECTED (3 findings) under the config, and the tracked tree scans clean
   (the only residuals are untracked gitignored build artifacts).
-- **[blocking] supply-chain checksum step always failed** — `working-directory: artifacts`
+- **[blocking] supply-chain checksum step always failed** because `working-directory: artifacts`
   plus `cd artifacts` targeted a nonexistent `artifacts/artifacts`. The double-entry removed.
 - **[note] Python/TS runners now check the revision sidecar's index entry declares zero
-  cases** (Rust already asserted it) — a nonzero declaration fails all five consumers now.
-- **[note] CI pin consistency** — `ocaml/setup-ocaml` SHA-pinned like every other action;
+  cases** (Rust already asserted it). A nonzero declaration fails all five consumers now.
+- **[note] CI pin consistency**: `ocaml/setup-ocaml` SHA-pinned like every other action;
   the cddl gem checksum-pinned (`scripts/cddl-gem.sha256`) like kramdown-rfc per the A2
   amendment.
 - **[note] comment anchors garbled by the spec-path rewrite** ("spec/bap-v1.md,319") fixed to
@@ -918,15 +919,15 @@ several note findings, all in surfaces this program touched. All fixed:
   duplicate-rejecting JSON parsers in four host languages for that state is disproportionate,
   recorded as accepted residual.
 
-### Added — the successor-major charter + governance single-home + ROADMAP backfill (design-only)
+### Added: the successor-major charter, governance single-home, and ROADMAP backfill (design-only)
 
-- **`docs/design/successor-major-charter.md`**: the consolidated successor-major scope — delegation
+- **`docs/design/successor-major-charter.md`** consolidates the successor-major scope: delegation
   with attenuation (the delegation decision record), offline floor limits (the offline floor-limit decision record), suite succession and
   cross-suite evidence (the suite-succession and post-quantum suite records), the revocation/freshness posture (what a successor
-  major MAY standardize at the interface — freshness-bearing claim shapes with stateless
-  window semantics — vs what stays runtime-private permanently: live revocation lookup,
-  replay reservation, trust selection, per-invocation accounting), and — per the owner's
-  2026-08-26 directive — the DECIDED selector-expressiveness posture: per-request range
+  major MAY standardize at the interface (freshness-bearing claim shapes with stateless
+  window semantics) versus what stays runtime-private permanently: live revocation lookup,
+  replay reservation, trust selection, per-invocation accounting), and, per the owner's
+  2026-08-26 directive, the DECIDED selector-expressiveness posture: per-request range
   selector kinds are successor-major scope (statelessly verifiable inequality kinds); a
   naive cumulative `budget` selector is explicitly rejected as a silent false security
   property, with budgets routed to issuer-attestation/runtime accounting. The parked fork in
@@ -935,20 +936,20 @@ several note findings, all in surfaces this program touched. All fixed:
   the charter; an activation checklist closes it. Activates nothing.
 - **Governance single-normative-home**: docs/governance.md is the one home for policy
   statements; the standards-track charter's duplicate-content claim is replaced by a
-  citation — the line-cite dual-source drift class is dead. No line-number citations between
+  citation, eliminating line-cite dual-source drift. No line-number citations between
   the two remain.
-- **ROADMAP backfill (additive, the public-history boundary decision record — no rewrites)**: BAP-07's closeout evidence now
+- **ROADMAP backfill (additive, per the public-history boundary decision record, with no rewrites)**: BAP-07's closeout evidence now
   records the index-SHA-pin deferral's double closure (the 0.1.2 pin landing + the
   spec-decoupling program's six-pin one-command rotation gate and the tamper-covered corpus
   revision sidecar); BAP-18's records the authority swap's documentation catch-up (spec as
   single authority, derived view, bounds gated at all poles).
 - **Vendor-neutrality sweep re-proven live**: a planted topology canary in the new tracked
   charter file reds the privacy gate ("found forbidden generic topology", exit 2) and the
-  clean file passes — rule 9's mechanism covers every program-touched tracked file.
+  clean file passes, demonstrating rule 9's coverage of every program-touched tracked file.
 
-### Added — the post-quantum successor-suite statement (design-only, no wire change)
+### Added: the post-quantum successor-suite statement (design-only, no wire change)
 
-- **The post-quantum suite decision record (accepted)**: the concrete successor statement — the `BAP2-*` candidate family
+- **The post-quantum suite decision record (accepted)** defines the concrete successor statement: the `BAP2-*` candidate family
   (ML-DSA-65 baseline, ML-DSA-87 higher tier; RFC 9964's JOSE mapping as the wire vehicle),
   hybrid-composite posture room reserved (draft-ietf-jose-pq-composite-sigs, decided at
   successor definition time), the quantum-readiness statement (NIST IR 8547 IPD 2030/2035
@@ -959,10 +960,10 @@ several note findings, all in surfaces this program touched. All fixed:
 - **Registries + standards-track reconciled**: the anticipated-suite row now names the
   `BAP2-*` family with the post-quantum suite decision record; the charter's succession paragraph cites it.
 
-### Added — the interoperability report (no wire change)
+### Added: the interoperability report (no wire change)
 
 - **`docs/design/interoperability-report.md`**: the cross-validation evidence document for
-  the frozen v1 profile — the reference Elixir verifier, the four cross-language SDKs (each
+  the frozen v1 profile: the reference Elixir verifier, the four cross-language SDKs (each
   authored from the spec + corpus alone per the verifier-SDK decision record's derivation-hygiene rule), and the
   THREE independent Node second-implementation runners (corrected count:
   corpus/chain-archive/grant-proof), each 283/283 agreed with the two-boundary key census
@@ -972,46 +973,46 @@ several note findings, all in surfaces this program touched. All fixed:
   reproduction path. Stated limitations: no registry publication yet (the SDK-graduation decision record), v1 only.
 - **No hand numbers**: the report's certified digest (both encodings), the corpus revision
   integer, the case/surface/key counts are pinned to the LIVE corpus identity by a new
-  docs-currency leg — a rotated corpus without a report update reds with the expected value
+  docs-currency leg. A rotated corpus without a report update fails with the expected value
   named.
 
-### Added — docs-currency gate + the upgrading contract (no wire change)
+### Added: docs-currency gate and the upgrading contract (no wire change)
 
-- **`test/docs_currency_test.exs`**: pins the public documentation surfaces to CURRENT facts —
+- **`test/docs_currency_test.exs`** pins the public documentation surfaces to CURRENT facts:
   the changelog/version cross-reference, the four-SDK listing (case-insensitive stale-count
   check), the 283-case corpus counts, the supply-chain artifact-filename DERIVATION (no
   hardcoded versioned filename may return), the derived view's spec-revision footer, and the
   spec Doc-Revision pin shared by its formal companions. All three mutation legs executed
   red and restored: a version/changelog drift, a stale SDK count (this leg immediately caught
-  a real defect — the ticket-18 README edit had landed "All four" without the Go bullet,
+  a real defect: the ticket-18 README edit had landed "All four" without the Go bullet,
   now fixed), and a returning hardcoded supply-chain filename.
 - **`docs/guides/upgrading.md`** (replacing its placeholder): the published compatibility
-  contract — per-release-kind labels (patch/minor/major), what may never change inside v1,
+  contract, covering per-release-kind labels (patch/minor/major), what may never change inside v1,
   what a minor may do (corpus growth with revision bump + the six-pin rotation), the
   three-step unaffectedness check, and the deprecation pointer. The 0.1.0 RC contract remains
   the historical record.
-- `/doc/` (generated ExDoc output) is confirmed gitignored — the doc/ vs docs/ hazard stays
+- `/doc/` (generated ExDoc output) is confirmed gitignored, so the doc/ versus docs/ hazard stays
   dead.
 
-### Changed — housekeeping: SDK README, supply-chain derivation, dependabot, deployment guides
+### Changed: SDK README, supply-chain derivation, dependabot, and deployment-guide housekeeping
 
 - **`sdks/README.md`**: the Go SDK entry and the four-SDK count (the stale "all three" is
   gone); per-SDK deployment-guide links.
 - **`supply-chain.yml`**: the artifact filename is DERIVED from `mix.exs` `@version` at run
-  time — the hardcoded `0.1.0` filename (a quiet-mislabel class the moment the version moves)
+  time. The hardcoded `0.1.0` filename (which silently mislabels the release when the version moves)
   is gone from the workflow; actionlint clean.
 - **`dependabot.yml`**: pip (sdks/python) and gomod (sdks/go) ecosystems join mix,
-  github-actions, npm, and cargo — all four SDKs now covered.
+  github-actions, npm, and cargo, covering all four SDKs.
 - **Deployment guides**: `docs/deployment/{typescript,python,go}-sdk.md` join the existing
-  Rust guide — runtime posture, deployment targets, supply-chain posture, and the
+  Rust guide, covering runtime posture, deployment targets, supply-chain posture, and the
   verification-is-not-authority boundary per SDK; the Rust guide's spec pointer repointed at
   the normative authority.
 
-### Added — the Livebook walkthrough (no wire change)
+### Added: the Livebook walkthrough (no wire change)
 
 - **`docs/notebooks/bap-walkthrough.livemd`**: the end-to-end produce → assemble → verify →
   reject notebook. It mints its OWN ephemeral Ed25519 keys at runtime via `:crypto` (zero
-  tracked private material — critical rule 6; the package accepts public keys only and the
+  tracked private material, per critical rule 6; the package accepts public keys only and the
   notebook does the signing), builds a grant and proof through the deterministic producers,
   assembles both compacts, verifies the grant and the full envelope with caller-supplied
   trusted context, and then fails three classic attacks closed (a tampered signature byte, a
@@ -1021,26 +1022,26 @@ several note findings, all in surfaces this program touched. All fixed:
   run: a mis-grouped expiry literal and a `defp` helper cell that cannot exist at Livebook
   top level.
 - **`test/bap_walkthrough_test.exs`** (the notebook's mirror): re-executes the walkthrough's
-  exact code shape against the real package — if the notebook's code stops running, the test
-  fails (a non-running livebook is worse than none) — and a shape-parity leg pins the
+  exact code shape against the real package. If the notebook's code stops running, the test
+  fails; a shape-parity leg also pins the
   notebook's code markers to the test (mutation leg executed: breaking the notebook's code
   shape reds with the marker named; restored green).
 
-### Added — corpus vendored-snapshot sync gate (no wire change)
+### Added: corpus vendored-snapshot sync gate (no wire change)
 
 - **`scripts/check_corpus_sync.exs` + `mix corpus.sync` (quality leg)**: byte-compares the
   certified corpus (`priv/conformance/v1/corpus/`) against BOTH vendored SDK snapshots
-  (Rust, Go) — every file, both directions, content equality. A snapshot drift is caught at
+  (Rust, Go), checking every file in both directions for content equality. Snapshot drift is caught at
   COMMIT time instead of as a red SDK suite or a confusing digest rotation. Within the corpus-distribution decision record
   (an intra-repo drift check, not a distribution artifact). Mutation leg executed: a flipped
   byte in a vendored revision.json reds with the file named; restored green.
 - The CI quality job already runs `mix quality`, so the new leg is enforced there without a
   new workflow.
 
-### Added — the implementer's guide (fifth-SDK recipe; no wire change)
+### Added: the implementer's guide (fifth-SDK recipe; no wire change)
 
 - **`docs/guides/implementers-guide.md`** (replacing its placeholder): everything a fifth
-  implementer needs without reading a sibling runner's source — the conformance-runner
+  implementer needs without reading a sibling runner's source, including the conformance-runner
   contract (startup corpus-identity assertion, full integrity verification, total verdict
   comparison: crashes are failures, never skips); the 28-surface dispatch table with each
   surface's role; the two-boundary key census (discovery == verify-import == index set,
@@ -1054,7 +1055,7 @@ several note findings, all in surfaces this program touched. All fixed:
   against the LIVE corpus surface enumeration, both directions named on drift (a corpus
   surface without a guide row, or a phantom guide row, reds).
 
-### Added — code of conduct, guides taxonomy, README restructure (no wire change)
+### Added: code of conduct, guides taxonomy, and README restructure (no wire change)
 
 - **`CODE_OF_CONDUCT.md`** (Contributor Covenant v2.1, canonical text) at the root, linked
   from CONTRIBUTING.md.
@@ -1064,51 +1065,51 @@ several note findings, all in surfaces this program touched. All fixed:
   placeholders).
 - **README restructure**: a Documentation section leading with the guides index; a "When NOT
   to use this" section (authorization decisions, transport/confidentiality/storage,
-  permissive parsing, online revocation/replay — each pointing at what to use instead); and a
+  permissive parsing, online revocation/replay, each pointing at what to use instead); and a
   Named-misuses section (facts-as-authority, facts-as-runtime-input, kid-as-key-selector,
-  bound-loosening, client-derived request context) — the ash_onetime anti-pattern format,
+  bound-loosening, client-derived request context), using the ash_onetime anti-pattern format,
   product-neutral.
 
-### Added — ProVerif model + CI harness + findings ledger (no wire change)
+### Added: ProVerif model, CI harness, and findings ledger (no wire change)
 
-- **`spec/formal/proverif/bap-core.pv`**: the stateless-core model under ProVerif 2.05 —
+- **`spec/formal/proverif/bap-core.pv`** defines the stateless-core model under ProVerif 2.05:
   Dolev-Yao network attacker plus a malicious holder with a fully-controlled signing oracle;
   the typed projection and compact framing as free constructors (the recorded symbolic
   assumptions); every verifier step annotated with its REQ id. **All four properties PROVEN
-  TRUE**: P1 (a proof binds exactly the `ath`-named grant — the verifier event carries the
+  TRUE**: P1 (a proof binds exactly the `ath`-named grant, whose verifier event carries the
   digest of the grant IT was presented), P2 (request-digest equality with the verifier-derived
-  pair), P3 (context-tuple equality), P4 (the server-derived cast arguments stay secret — the
+  pair), P3 (context-tuple equality), P4 (the server-derived cast arguments stay secret because the
   facts output constructor takes only declared fields).
 - **Model non-vacuity proven by mutation**: removing the `ath` check makes P1 unprovable; the
   strengthened query and per-issuance grant freshness were themselves the ledger's first
-  (refuted) finding — the initial P1 was too weak to see cross-grant replay.
+  (refuted) finding, since the initial P1 was too weak to see cross-grant replay.
 - **`scripts/run_formal.sh` + `mix formal` (quality leg) + a CI job**: pinned ProVerif
   re-run with the RESULT-line diff against the frozen `expected-summary.txt` (a
-  verdict-changing model edit reds — leg executed), REQ-id coverage with a pinned step-
-  annotation set (dropping an annotation reds — leg executed), and the findings-ledger schema
-  check (an undispositioned entry reds — leg executed). An escalated disposition prints
+  verdict-changing model edit fails; leg executed), REQ-id coverage with a pinned step-
+  annotation set (dropping an annotation fails; leg executed), and the findings-ledger schema
+  check (an undispositioned entry fails; leg executed). An escalated disposition prints
   loudly and blocks the program done-claim (the formal-analysis decision record).
 - **`spec/formal/FINDINGS.md`**: the ledger, one terminal disposition per finding
   (refuted/documented/escalated); first entry dispositioned refuted; none escalated.
 - The model joins the rule-8 companion pin (spec Doc-Revision); `spec/formal/` ships in the
   package; census extended exactly.
 
-### Added — formal attacker model + formal-analysis decision record + gate rule 8 (no wire change)
+### Added: formal attacker model, formal-analysis decision record, and gate rule 8 (no wire change)
 
-- **`spec/formal/attacker-model.md`**: the formal attacker — Dolev-Yao network attacker plus a
+- **`spec/formal/attacker-model.md`** defines a Dolev-Yao network attacker plus a
   malicious holder attempting cross-grant/cross-operation/cross-endpoint/cross-invocation
-  confusion — and the four modeled properties: P1 (a proof binds exactly the `ath`-named
+  confusion, and the four modeled properties: P1 (a proof binds exactly the `ath`-named
   grant), P2 (the request digest binds the verifier-derived operation + typed arguments
   exactly; typed-projection injectivity is the load-bearing lemma), P3 (context-binding
   completeness across method/URI/invocation/nonce, with time abstracted symbolically and the
   assumption recorded), P4 (facts disclose nothing beyond declared fields). Scope and
   symbolic assumptions stated; self-contained and vendor-neutral; pinned to the spec's
   Doc-Revision.
-- **The formal-analysis decision record (accepted)**: the formal-analysis program — ProVerif chosen for automation fit on
+- **The formal-analysis decision record (accepted)** defines the formal-analysis program: ProVerif chosen for automation fit on
   the stateless core (decision recorded as decided-with-open-evidence: no published
   machine-checked DPoP-family model exists; FAPI 2.0 CCS 2024 defers formal models), Tamarin
   named follow-on with a recorded trigger (first chain/archive ordering or timepoint lemma
-  need), the standing CI posture, and the three-valued findings-ledger disposition contract —
+  need), the standing CI posture, and the three-valued findings-ledger disposition contract:
   `escalated` routes to the owner via SECURITY.md and blocks the program's done-claim until
   the owner rules; the coupling is stated, not hidden.
 - **Spec-facts rule 8**: every spec/formal companion names the revision it was written
@@ -1116,13 +1117,13 @@ several note findings, all in surfaces this program touched. All fixed:
   named. Mutation leg executed: a lone spec rev bump reds, restored green. (The ProVerif model
   joins the companion list at its own landing.)
 
-### Changed — docs/protocol-v1.md becomes a generated view; repoint census; spec-decoupling record
+### Changed: docs/protocol-v1.md becomes a generated view, with repointed census and spec-decoupling record
 
 - **`spec/tools/render_derived.exs` + `mix spec.render` (quality leg)**: the package-facing
-  `docs/protocol-v1.md` is no longer authored — it is generated from the normative
+  `docs/protocol-v1.md` is generated rather than authored, using the normative
   `spec/bap-v1.md` (front matter stripped, citations normalized, generation footer naming the
   authority and revision). Hand edits are gate-red; the write is idempotent.
-- **Repoint census**: the living normative citations now point at the spec — README, the
+- **Repoint census**: the living normative citations now point at the spec, including README, the
   requirement map, registries, standards-track charter, conformance contract, and the four SDK
   sources' docstrings (comment-only; zero behavioral SDK change; all four suites re-verified
   283/283 + census). Historical records (decision records, roadmap rows, errata) keep their
@@ -1138,31 +1139,31 @@ several note findings, all in surfaces this program touched. All fixed:
   exactly; the architecture-gate package boundary green.
 - **The one-time full comparative read** of the new spec against the old authority was
   performed with written dispositions (mechanical parity: 76/76 REQ ids, 37 bounds rows,
-  byte-identical constructions; one real gap found and fixed — the frozen façade listing now
+  byte-identical constructions. One gap was found and fixed: the frozen facade listing now
   restored verbatim into informative Appendix C). Disposition record: the swap's review
   artifact; the empty-delta certification continues to run in `mix quality`.
 
-### Added — generated worked examples (spec Appendix A; no wire change)
+### Added: generated worked examples (spec Appendix A; no wire change)
 
 - **`spec/tools/build_examples.exs` + `mix spec.examples` (quality leg)**: Appendix A of the
-  specification is now GENERATED from the conformance corpus — thirteen representative cases by
+  specification is now GENERATED from the conformance corpus, with thirteen representative cases by
   id (a valid grant/proof/envelope/chain/anchored-export per surface family, plus rejected
   exemplars across the invalid-class families), each embedding the exact compact bytes, the
   public key material, and the single expected outcome (accepted-with-redacted-facts or the one
-  closed error), labeled with its corpus case id. Corpus PUBLIC keys only — no private material
+  closed error), labeled with its corpus case id. Only corpus PUBLIC keys are used; no private material
   can appear (the corpus is public-only by construction and the tool copies verbatim).
 - The regeneration gate reds on a hand-edited example byte (mutation leg executed: flipped
   compact byte caught, restored) and on a deleted/renamed cited case id (mutation leg executed:
-  the rebuild raises naming the missing id, restored) — the appendix cannot drift from the
+  the rebuild raises naming the missing id, restored), so the appendix cannot drift from the
   corpus and cannot go vacuous.
 - The write path is idempotent (byte-identical across consecutive regenerations); the
   empty-delta certification is untouched (the appendix carries no facts anchors and no
   capitalized keywords).
 
-### Added — Security and Privacy Considerations + spec-facts rule 11 (no wire change)
+### Added: Security and Privacy Considerations and spec-facts rule 11 (no wire change)
 
 - **Spec section 21 (Security considerations, RFC 3552 grade)**: assets and goals (integrity,
-  not confidentiality — every wire object is plaintext by design), adversaries and the exact
+  not confidentiality, since every wire object is plaintext by design), adversaries and the exact
   trust boundary (raw bytes in, redacted facts out), the per-control mapping to REQ ids
   (parsing-before-crypto, exact-byte constructions, holder/grant/request bindings, temporal
   and nonce semantics, authenticated transitions, complete-scan archive acceptance),
@@ -1177,11 +1178,11 @@ several note findings, all in surfaces this program touched. All fixed:
   control. Deployment recommendations carry NO capitalized RFC-2119 keywords.
 - **Spec-facts rule 11 (keyword census)**: every capitalized MUST/MUST NOT/SHOULD/SHOULD
   NOT/REQUIRED/SHALL/SHALL NOT in the spec is either a quoted mention, or shares its sentence
-  with a `REQ1-*` id, or sits under an explicit informative marker — a naked keyword in
+  with a `REQ1-*` id, or sits under an explicit informative marker. A naked keyword in
   unanchored prose reds with the sentence quoted. Mutation leg red-quoted (planted naked MUST
   caught) and restored; every mapped id exists in the requirement map (rule 3).
 
-### Added — IANA registration templates + spec-facts rule 7 (no wire change)
+### Added: IANA registration templates and spec-facts rule 7 (no wire change)
 
 - **`docs/design/iana/`**: the machine-readable registration sources and rendered ready-to-file
   markdown for the profile's IANA entries. JSON Web Token Claims Registry (its published
@@ -1191,7 +1192,7 @@ several note findings, all in surfaces this program touched. All fixed:
   `application/ba-chain-anchor+jwt`, `application/ba-key-transition+jwt` ready to file;
   `application/ba-cap-delegated+jwt`, `application/ba-suite-attestation+jwt` reserved. The
   drafted `ba+*` wire `typ` values are NOT registrable as-is (`+cap` is not a registered
-  structured suffix; `+jwt` is) — **the wire `typ` values are unchanged**; the media-type
+  structured suffix; `+jwt` is). **The wire `typ` values are unchanged**; the media-type
   namespace is distinct. Filing is externally gated (the BAP-08 official-submission
   preconditions); the templates make in-repo readiness verifiable.
 - **Spec §IANA considerations** (section 20): the registration requests, the reserved names,
@@ -1200,14 +1201,14 @@ several note findings, all in surfaces this program touched. All fixed:
   facts between the registries document and the IANA sources.
 - **Spec-facts rule 7**: registries.md == IANA template sources, exact names/statuses/purposes
   both directions, with two documented allowsets (`ba_obo`: reserved without a template by
-  design; `dpop+jwt`: registered by RFC 9449) — BAP-12's acceptance criterion mechanized.
+  design; `dpop+jwt`: registered by RFC 9449), mechanizing BAP-12's acceptance criterion.
   Mutation leg proven red (flipped template status caught, named) and restored.
 
-### Added — the v1 specification `spec/bap-v1.md`; authority swap certified with an EMPTY delta
+### Added: the v1 specification `spec/bap-v1.md`, with authority swap certified by an EMPTY delta
 
 - **`spec/bap-v1.md`** (kramdown-rfc conventions, `[@RFC2119]`-style citations, no IETF
-  stream/IPR title-block fields — in-repo readiness, zero submission intent): the complete
-  normative v1 profile in one language-neutral document — conformance language and the
+  stream/IPR title-block fields, establishing in-repo readiness without submission intent): the complete
+  normative v1 profile in one language-neutral document, including conformance language and the
   closed-rejection invariant, suite identity, normative references without repo paths, the
   abstract tagged data model and typed projection, JSON decoding and JCS serialization,
   base64url, wire objects (headers, claims, selectors, URI normalization), signing and digest
@@ -1219,12 +1220,12 @@ several note findings, all in surfaces this program touched. All fixed:
   binding table, D the requirement-inventory pointer.
 - **The authority swap is certified**: the spec-facts extractor now reads `spec/bap-v1.md`
   (all ten anchors in the one normative document) and `extract(new spec) ==
-  spec/facts/baseline-v1.json` byte-for-byte — the frozen pre-swap extraction, EMPTY delta.
+  spec/facts/baseline-v1.json` byte-for-byte, matching the frozen pre-swap extraction with an EMPTY delta.
   `docs/protocol-v1.md` keeps its anchors but is no longer read (the derived view lands with
   its own landing); the chain-and-archive decision record and registries.md remain extended records.
 - **Framing oracle** (new spec-facts rule): a corpus archive-bearing valid case's real bytes
   are re-parsed against the EXTRACTED framing facts (archive prefix, UINT32_BE nonzero-length
-  frames, exact EOF) — a spec whose framing prose drifts from accepted bytes reds even when
+  frames, exact EOF). A spec whose framing prose drifts from accepted bytes fails even when
   the delta gate happens to pass. Proven red twice during construction (wrong prefix form,
   wrong chunk decoding) and green on the shipped corpus.
 - **`spec/cddl/bap-v1.cddl`** (informative): the closed wire objects in CDDL, honest about
@@ -1232,59 +1233,59 @@ several note findings, all in surfaces this program touched. All fixed:
   binary framing). **CI coherence job** (`scripts/check_cddl_coherence.rb`, pinned cddl
   validator 0.12.14, executed locally at authoring): every valid corpus case's CDDL-covered
   artifact validates (grant/proof/anchor/transition payloads, consumption rows), and four
-  PINNED invalid exemplars (regexp/size/closed-set violations) reject — the pinned list cannot
+  PINNED invalid exemplars (regexp/size/closed-set violations) reject, so the pinned list cannot
   go vacuous. A pinned-and-checksummed kramdown-rfc 1.7.40 render job renders the spec to
   xml2rfc v3 (verified locally: renders clean).
 - The spec-facts battery entries re-anchored at the spec (a digit drift or deleted anchor in
   `spec/bap-v1.md` reds). `mix spec.facts` green against the NEW authority in ~0.1s.
 
-### Added — spec-facts mutation battery (no wire, bound, or verdict change)
+### Added: spec-facts mutation battery (no wire, bound, or verdict change)
 
 - **`scripts/check_spec_facts_mutations.exs` + `mix spec_facts.mutations` (wired into
   `mix quality`)**: the spec-facts gate's own red-capability battery, mirroring the conformance
-  mutation-gate doctrine — scratch-copy isolation, one anchored source mutation per entry,
+  mutation-gate doctrine: scratch-copy isolation, one anchored source mutation per entry,
   baseline-green non-vacuity (a deleted target can never score as "caught"), and one
   inverted-assertion calibration self-proof executed at authoring (under a neutered rule-1
-  assertion the bounds mutation SURVIVES green — the exact condition the battery raises on).
+  assertion the bounds mutation SURVIVES green, the exact condition the battery raises on).
   Seven entries, each proven red in-landing: spec bounds digit, live Bounds digit, requirement
   statement softening, cited-count drift, revision-citation drift, deleted anchor, and a
   renamed optional-unobserved coverage mark (the marks file is load-bearing). The privacy-canary
-  mutation stays outside the battery by design — the canary sweep needs the real git worktree
+  mutation stays outside the battery because the canary sweep needs the real git worktree
   and carries its own calibration tests.
 
-### Added — spec-facts drift gate against the current authority (no wire, bound, or verdict change)
+### Added: spec-facts drift gate against the current authority (no wire, bound, or verdict change)
 
 - **`spec/tools/extract_facts.exs` + `spec/facts/baseline-v1.json`**: the normative facts of the
   CURRENT authority (`docs/protocol-v1.md` + the chain-and-archive decision record byte definitions + the registries typ
   table) are now machine-extracted from ten closed `<!-- facts:key -->` anchor regions (bounds,
   header members, grant/proof claims, selector kinds, typ values, domain separators, digest
   constructions, archive framing, error shape) and frozen as a byte-deterministic baseline. A
-  future editor who changes any normative fact — spec, bound, corpus, requirement map, or
-  registry — is stopped by `mix spec.facts` naming the divergent pole pair.
+  future editor who changes any normative fact in the spec, bounds, corpus, requirement map, or
+  registry is stopped by `mix spec.facts` naming the divergent pole pair.
 - **`scripts/check_spec_facts.exs` + `mix spec.facts` (wired into `mix quality`)**: rule 1b
   (extraction == frozen baseline), rule 2 (spec closed sets ⊇ the corpus's valid-case member
   unions, direction-aware, with justified optional-unobserved marks in
   `spec/facts/coverage-v1.json`), rule 3 (spec REQ-id set == requirement-map set, each defined
-  once), rule 4 (requirement-statement hashes == `spec/facts/requirement-statements-v1.json` —
+  once), rule 4 (requirement-statement hashes == `spec/facts/requirement-statements-v1.json`, with
   silent softening reds), rule 5 (map-cited counts re-derived from the live corpus index),
   rule 6 (map cites the corpus revision integer), rule 9 (every authority file git-tracked and
-  thus inside the public-surface privacy gate's full-tree canary sweep — the public-history boundary decision record topology;
+  thus inside the public-surface privacy gate's full-tree canary sweep, following the public-history boundary decision record topology;
   no term list is tracked), rule 10 (anchor completeness: every normative table inside exactly
   one anchored region, with the JSON-algebra binding table's coverage mechanically verified
   against the typed-projection facts). Rule 1's bounds-dump equality lives as
   `test/spec_facts_test.exs` (needs the compiled Bounds module).
-- The gate ships GREEN against the old authority — the guards are proven against the world they
+- The gate ships GREEN against the old authority, proving the guards against the world they
   protect BEFORE the authority swap. Every rule proven red-capable at landing by a named
   mutation (spec digit, Bounds digit, map statement softening, cited count, revision citation,
-  a planted privacy-canary term in an authority doc, a deleted anchor — each caught, each
+  a planted privacy-canary term in an authority doc, a deleted anchor, each caught and each
   restored). Gate runtime ~0.2s; rules 7 (IANA), 8 (formal companions), and 11 (keyword census)
   arrive with their owning landings.
 
-### Added — corpus revision sidecar + re-derivability generator (no case byte or verdict change)
+### Added: corpus revision sidecar and re-derivability generator (no case byte or verdict change)
 
 - **`priv/conformance/v1/corpus/revision.json`**: the corpus's monotone revision integer (1)
   with a generated-from provenance note, hash-covered as an entry in `index.json`'s per-file
-  SHA `files` set and enforced by exact file-set equality in every consumer — a tampered,
+  SHA `files` set and enforced by exact file-set equality in every consumer. A tampered,
   deleted, malformed, or wrongly-shaped sidecar fails every loader closed. `index.json` bytes
   change once (the single files entry; 283 cases, verdicts, counts, and applicability are
   byte-identical). The corpus-index schema's file-path pattern admits exactly the one reserved
@@ -1298,18 +1299,18 @@ several note findings, all in surfaces this program touched. All fixed:
   honest provenance: the signed fixtures were minted with ephemeral keys at authoring time and
   cannot be re-minted; everything derived is machine-rebuilt and byte-verified.
 - Every corpus consumer recognizes the sidecar fail-closed (Elixir loader + CLI, the
-  independent Node runner, and the TypeScript/Python/Rust/Go SDK runners — the two loaders that
+  independent Node runner, and the TypeScript/Python/Rust/Go SDK runners. The two loaders that
   previously skipped case-free files silently now enforce the sidecar's SHA and closed shape).
 - `docs/design/requirement-map.md` cites the revision integer (the `format`-string citation
   was constant across revisions and could detect nothing); the five consumer-doc digest
   citations refreshed to the rotated values.
 
-### Added — corpus digest regeneration gate (no wire, bound, or verdict change)
+### Added: corpus digest regeneration gate (no wire, bound, or verdict change)
 
 - **`scripts/regen_corpus_digests.exs` + `mix corpus.digests`**: one command regenerates every
-  certified corpus index-SHA machine pin — the four SDK conformance runners in their native
+  certified corpus index-SHA machine pin: the four SDK conformance runners in their native
   encodings (base64url: TypeScript, Go; hex: Python, Rust) plus the two Elixir pins (the CLI's
-  fail-closed certified-corpus assertion and its test mirror) — and the check leg, wired into
+  fail-closed certified-corpus assertion and its test mirror), and the check leg, wired into
   `mix quality`, fails red the moment any pinned constant drifts from the live `index.json`
   digest (corrupt-one-constant and scratch-index-byte mutation legs proven red at landing). The
   Elixir-side pin itself landed in the 0.1.2 hardening; this closes the tooling gap the BAP-07
@@ -1317,21 +1318,21 @@ several note findings, all in surfaces this program touched. All fixed:
   same-commit affair (the corpus-distribution decision record atomic-landing template). No corpus byte changes in this landing:
   all six constants keep their current values, and `--write` is byte-idempotent today.
 
-### Fixed — public-history privacy boundary
+### Fixed: public-history privacy boundary
 
 - Public documentation and reachable Git history no longer identify private product repositories
   or their deployment topology. The public-history boundary decision record records the durable boundary and the all-ref rewrite.
 
-### Fixed — v1 selector contract reconciliation
+### Fixed: v1 selector contract reconciliation
 
 - The protocol and both shipped selector schemas now describe the released `all` behavior: `all`
   accepts any of the three recognized member sets and treats `path`/`value(s)` as inert. Go,
   TypeScript, Python, and Rust now reject every other member combination, matching the Elixir
   reference and independent runner. The `all`-selector erratum decision record records the zero-verdict-change erratum.
 
-### Added — Go verifier SDK (BAP-16; no Elixir package change)
+### Added: Go verifier SDK (BAP-16; no Elixir package change)
 
-- **`sdks/go/` — the typed Go verifier SDK** for the frozen v1 profile, authored from the spec +
+- **`sdks/go/` implements the typed Go verifier SDK** for the frozen v1 profile, authored from the spec +
   decision records + conformance corpus alone (the verifier-SDK decision record): the 17-function façade plus versioned primitives,
   zero runtime dependencies (stdlib `crypto/ed25519` + `crypto/sha256` only), Go floor 1.25. Passes
   all 283 conformance vectors from a vendored corpus snapshot with startup index SHA-256 assertion
@@ -1350,25 +1351,25 @@ several note findings, all in surfaces this program touched. All fixed:
   classification with lowercased decoded bytes, tightened integer-magnitude enforcement,
   UTF-8 object-version validation, chunk-vs-byte bound separation at encode, a digest-deriving
   export producer, proof-producer nonce support, constant-time nonce comparison, and
-  runner/purity-gate hardening — each behavioral fix pinned by a red-capable
+  runner/purity-gate hardening, with each behavioral fix pinned by a red-capable
   review-regression leg.
 
-## [0.1.2] — 2026-08-20
+## [0.1.2] (2026-08-20)
 
-### Changed — release/verification gate hardening (no wire, bound, or verdict change)
+### Changed: release/verification gate hardening (no wire, bound, or verdict change)
 
 - **`mix conformance.verify` pins the certified corpus index SHA-256** (the verifier-SDK decision record). The Elixir
-  verifier CLI now fails closed unless the loaded corpus is the exact certified snapshot — closing
+  verifier CLI now fails closed unless the loaded corpus is the exact certified snapshot, closing
   the gap where a self-consistent but shrunken corpus (regenerated index) passed integrity and
   agreement. Parity with the three SDK runners, which already pin the identical value.
 - **The architecture gate asserts every pinned beam is present** (keys-⊆-present). A pinned public
   surface deleted or renamed without updating the allowance now reds the gate instead of vanishing
   silently.
 - **The SDK publish guard scans SDK scripts, Makefiles, justfiles, and composite actions**, not
-  only workflows and top-level manifests — a registry-publish command can no longer hide in an SDK
+  only workflows and top-level manifests. A registry-publish command can no longer hide in an SDK
   release script or a composite action.
 
-## [0.1.1] — 2026-08-20
+## [0.1.1] (2026-08-20)
 
 ### Added
 
@@ -1377,11 +1378,11 @@ several note findings, all in surfaces this program touched. All fixed:
   are the acceptance oracle a holder-side consumer verifies its envelope production against
   (the capability-authorization extension decision record's corpus-as-oracle posture). 0.1.0 shipped `corpus` + `schemas` but not
   `vectors`, so a Hex consumer could not reach the oracle vector; 0.1.1 ships it. Public
-  test data, same class as the already-shipped corpus — no private material (verified: the
+  test data, the same class as the already-shipped corpus, without private material (verified: the
   manifest carries only discovery roots and public-key fingerprints). The exact-file
   package census is extended to match. Zero wire byte, bound, or verdict change.
 
-## [0.1.0] — 2026-08-20
+## [0.1.0] (2026-08-20)
 
 ### Added
 
@@ -1407,13 +1408,13 @@ several note findings, all in surfaces this program touched. All fixed:
   the retired private-runtime PG 16/17/18 matrix (a private-runtime decision made PostgreSQL 18
   the sole supported major); the ROADMAP Next-action note, the release-candidate contract's Status,
   the README Status, and SECURITY.md's supported-versions note each described BAP-07 as gated on the
-  private runtime's connected gates —
+  private runtime's connected gates:
   private BA-14 completed 2026-08-18, so BAP-07 is fully unblocked (the Hex-publication half stays
   deferred by maintainer decision). Docs-only: zero code, wire, bound, or verdict change.
 - **Cross-vendor review round 18 (blocking + should-fix/notes across the vendor lenses, all
   closed).** Blocking findings: the TS shape gate's nested expected-export members were opaque `"object"`
   specs, so a malformed nested struct (chain missing `previousHash`, empty anchor) passed the
-  gate and the clause-3 hoist then derefed the missing field — a `TypeError` escape past
+  gate and the clause-3 hoist then dereferenced the missing field, causing a `TypeError` escape past
   `trying()`; the nested members are now fully specified (chain/anchor/transition field shapes,
   `archived.chunks` as a bytes sequence), red-leg + mutation proven (opaque specs → RED).
   Should-fix findings: the Python and Rust hoists walked `expected.transitions` per-element BEFORE the
@@ -1423,29 +1424,29 @@ several note findings, all in surfaces this program touched. All fixed:
   ceilings are a documented accepted margin (typeof-only per element); Python's body-level
   `bytearray` tolerance was dead under the exact-bytes gate and is reconciled to bytes-only.
   The timed-out fable peer's transcript was mined: it was converging on the ordering finding
-  (fixed) and an API-shape note that is benign (the SDKs' optional bounds default to maximum —
+  (fixed) and a benign API-shape note (the SDKs' optional bounds default to maximum,
   behavior-identical to the reference's public façade).
 - **Round-12..14 per-clause pin debt paid on the touched surfaces (the inter-SDK contract decision record's Honest limit,
   amended).** The 2026-08-18 cluster's legs double as the owed per-clause pins: the pre-digest
   export gates (version shape/equality, key-count, key-id charset, key magnitude) are now pinned as
-  WORK legs in the Python battery (reject with zero sha256 calls — all five mutation-proven
+  WORK legs in the Python battery (reject with zero sha256 calls, all five mutation-proven
   load-bearing) with TS/Rust verdict matrices. Root cause of the "unpayable" debt: each gate is
   verdict-subsumed by a later gate, so verdict legs were structurally impossible; the work form is
   the red-capable pin. Still owed and disclosed: the standalone anchor-path `anchor_bytes` gates
   (round 12) and allocation bounds (round 15) on untouched surfaces.
 - **The SDK bounds contract decision record's named `assemble_compact` divergence closed: caller bounds threaded through
   assembly in all three SDKs.** The reference takes limits at assemble (`runtime.ex:147-155` →
-  `CompactJws.assemble` — encoded-segment bounds, compact_bytes, and the kind re-parse against
+  `CompactJws.assemble`: encoded-segment bounds, compact_bytes, and the kind re-parse against
   `Bounds.coerce(limits)`); the SDKs hardcoded maximum. Each SDK now takes an optional bounds
   parameter (Python `bounds: Bounds | None = None`, TypeScript `bounds?: Bounds`, Rust
-  `bounds: Option<&Bounds>` — an additive public-API change; absent bounds = maximum, backward
+  `bounds: Option<&Bounds>`, an additive public-API change; absent bounds = maximum, backward
   compatible) and threads it through the reference's gates. `signature_bytes` carries no
-  assemble-time gate — fixed-width at Bounds construction (the reference's check is subsumed).
+  assemble-time gate, since Bounds construction fixes the width (the reference's check is subsumed).
   Mutation-proven per SDK (reverting the threading reddens each battery's tightened-bounds legs).
 - **The inter-SDK contract decision record exception 2 closed: the expected-anchor identity ordering divergence (all three
   SDKs).** The reference validates the expected struct (chain + both anchors' identity/binding
   well-formedness + transitions) BEFORE hashing the archive chunks (`anchored_export_codec.ex:88-104`);
-  the SDKs ran those gates only post-digest. Verdict-invariant by subsumption — the fix restores the
+  the SDKs ran those gates only post-digest. The fix is verdict-invariant by subsumption and restores the
   clause-3 work ordering: malformed caller metadata now rejects without hashing the archive. The
   Python battery proves it behaviorally (sha256 call-count == 0 on malformed-expected rejections,
   mutation-proven); TS and Rust pin the ordering structurally (hoist block before the digest site,
@@ -1454,8 +1455,8 @@ several note findings, all in surfaces this program touched. All fixed:
   mechanical family sweep (every façade × every parameter × wrong-typed values, then every struct
   field the same way) proved the 2026-08-17 ledgered Python escapes were not two instances but a
   total class: 31/34 Python parameter sites and every caller-supplied struct field raised
-  `AttributeError`/`TypeError` past the closed `Result`, and TypeScript — whose coercion the record
-  had classed as a "disclosed margin" — silently accepted `requestDigest(123/true/null/{})`
+  `AttributeError`/`TypeError` past the closed `Result`. TypeScript silently accepted
+  `requestDigest(123/true/null/{})`, coercion the record had classed as a "disclosed margin",
   (digesting the coerced text) and threw `TypeError` past `trying()` on 109 parameter positions.
   Both dynamic SDKs now gate every façade argument's shape before the body runs (Python:
   annotation-driven `_closed_shape` over the declared dataclass shapes, `bool` ≠ `int`; TS:
@@ -1476,7 +1477,7 @@ several note findings, all in surfaces this program touched. All fixed:
 
 - **The SDK contract decision records (BAP-15 documentation slice).** Three new accepted records capture contracts
   that had shipped as code + ROADMAP evidence amendments only: the inter-SDK contract decision record
-  (the inter-SDK behavioral contract the 17-round cross-vendor hardening arc converged on — closed
+  (the inter-SDK behavioral contract reached by the 17-round cross-vendor hardening arc: closed
   Result surface, type strictness, pre-hash validation, canonical-form byte equality +
   signature-width gates, role-bounded frame reads), the SDK bounds contract decision record
   (the caller-tightenable bounds contract through the expected structs, including the
@@ -1497,54 +1498,54 @@ several note findings, all in surfaces this program touched. All fixed:
 - **BAP-09 SDK conformance hardening (TypeScript + Python).** The TS + Python verifier SDKs now
   enforce two checks the Elixir reference has and the SDKs were missing: (1) a decoded
   **signature-width gate** in `parseCompact`/`parse_compact` (`len(signature) == signature_bytes`,
-  mirroring `runtime.ex:237`/`:259` — `scanCompact`/`scan_compact` intentionally stays shape-only,
+  mirroring `runtime.ex:237`/`:259`. `scanCompact`/`scan_compact` intentionally stays shape-only,
   mirroring `CompactJws.scan`); (2) **canonical-form equality** for boundary-anchor + key-transition
-  compacts — the protected header AND payload segments must equal the exact JCS re-encoding
+  compacts: the protected header AND payload segments must equal the exact JCS re-encoding
   (mirroring `boundary_anchor_codec.ex:95-96,118-119` + `key_transition_codec.ex:127-128,151-152`),
   so a non-canonical encoding (e.g. reordered members) is rejected. New red-capable tests cover the
   anchor + transition canonical paths (header + payload) and the signature-width gate. Verified: TS
-  92 unit + conformance 283/283; Python 62 unit + conformance 283/283. (The Rust/Go SDKs — BAP-15/16
-  — may carry the same gaps; a separate check is owed.)
+  92 unit + conformance 283/283; Python 62 unit + conformance 283/283. (The BAP-15/16 Rust/Go SDKs
+  may carry the same gaps; a separate check is owed.)
 
 - **All-SDK pre-hash validation hardening (BAP-15, cross-vendor rounds 11-15).** The archive
   verify paths across Rust/TS/Python now validate the full caller-context shape BEFORE the
   digest: the object versions (string, non-empty, UTF-8 bytes <= 512, well-formed, equal),
   the key chain (exact count, key-id ASCII-unreserved class + width), key windows
-  (integral + magnitude + ordering), and identifier well-formedness — malformed metadata
+  (integral + magnitude + ordering), and identifier well-formedness. Malformed metadata
   no longer forces maximum-sized hashing, ill-formed strings fail closed in every SDK
   (Python's UnicodeEncodeError escape closed; TS's silent U+FFFD replacement closed), and
   frame reads are role-bounded per chain_row_bytes/anchor_bytes.
 
 - **Result-contract fail-closure + ChainInput type strictness (BAP-15, cross-vendor rounds 16-17).**
   Every path where a caller-supplied Python value could raise out of the closed Result API
-  now fails closed instead *(2026-08-17 delta: "every" was overclaimed — two further escape paths
+  now fails closed instead *(2026-08-17 delta: "every" was overclaimed; two further escape paths
   were found by the inter-SDK contract review and routed; see the SDK contract records row below)*: ill-formed
   or non-str identifier strings (`_utf8_bytes` gates
   chain_ids, key_ids, versions, and every expected-side string the header construction
   encodes), non-int chain integers (gated before the sequence arithmetic), non-bytes chunk
-  elements, and Boolean ChainInput integers (True == 1 no longer verifies — TS's strict
+  elements, and Boolean ChainInput integers (True == 1 no longer verifies, matching TS's strict
   equality and Rust's typing already rejected them). The TS chunk-type sibling gate added
   for family symmetry; the check_chain chain_id StringOrURI shape validation that only
   Rust carried is now in all three SDKs.
 
 - **Rust SDK bounds parity (BAP-15; closes the LAST named delta).** Caller-tightenable
-  bounds through the expected structs — the exact reference/sibling shape: five additive
+  bounds through the expected structs, using the exact reference/sibling shape: five additive
   `Option<Bounds>` fields (None = the profile maximum), the nested-bounds pins with identity
   semantics (a present nested must coerce-equal the outer; an absent nested is valid only under
-  an effectively-untightened outer — identity overrides are NOT tightening), and the resolved
+  an effectively-untightened outer, since identity overrides are NOT tightening), and the resolved
   bounds threaded through every ceiling at encode AND verify + the standalone chain/anchor/
-  transition entries. 27 mutation-proven legs at closeout (permissiveness 39 → 67 — the original 12 plus
+  transition entries. 27 mutation-proven legs at closeout (permissiveness 39 → 67, the original 12 plus
   the five the four closeout lenses forced: the chain_rows count, the standalone
   transition, the verify-pin family on a REAL corpus-signed archive, and the two
   encode-pin isolations; the standalone anchor leg, the chunk-count MAGIC pin now reachable and landed, and a 7/7
   Elixir oracle receipt (local re-runnable oracle artifact). `assemble_compact` stays at maximum
-  (the siblings too). (Scope driver: the 2026-08-14 maintainer direction — direction input,
+  (the siblings too). (Scope driver: the 2026-08-14 maintainer direction, treated as direction input,
   not this entry's verdict.)
 
 - **TypeScript + Python encode-path validation parity (BAP-15).** Both sibling SDKs gain the
   same producer contract the Rust SDK just closed: a full `checkChain` re-check of the rows, and
   gated parses + 7-field matches for the START anchor, the END anchor, and every transition
-  (their expected-side + key-path validations were already present — the deltas were the parses,
+  (their expected-side + key-path validations were already present; the deltas were the parses,
   the matches, and the row re-check; the start anchor was framed raw too, plan-review F1).
   15 legs per SDK at closeout (control + 8 tampers + the six pin/threading legs the
   delta- and diff-reviews forced; the five pin legs each isolated under their named
@@ -1561,24 +1562,24 @@ several note findings, all in surfaces this program touched. All fixed:
   reached at encode), and the key-path walk (running key, strictly-after transition times,
   seen-list cycle guard, end anchor binding the final key with NON-STRICT `>=` chronology).
   19 red-capable battery legs at closeout (permissiveness 19 → 38), each mutation-proven; every leg
-  verified against the Elixir reference oracle (20/20 fixtures — the 15 + control + the four
+  verified against the Elixir reference oracle (20/20 fixtures, comprising the 15 + control + the four
   closeout-lens additions; the receipt is a local re-runnable oracle artifact). Honest
   residuals, both NAMED: the TypeScript/Python SDKs carried the same producer permissiveness
   (CLOSED by the sibling entries above); the Rust SDK is a documented maximum-bounds posture
-  at encode (the reference + siblings thread caller-tightened `expected.bounds` — carrying
+  at encode (the reference + siblings thread caller-tightened `expected.bounds`, carrying
   that is a public-API change, its own slice; the sibling identity fix also WIDENS TS/Python
   VERIFY-path acceptance for identity-override configurations, matching the reference; the
   Rust chunk-count parity fix is a latent verdict-tightening flip unreachable at the frozen
-  maximum bounds — its pin is owed by the future caller-bounds slice).
+  maximum bounds; its pin is owed by the future caller-bounds slice).
 
 - **Rust SDK conformance hardening (BAP-15).** The Rust verifier SDK now enforces the same two
   checks the Elixir reference has (closing the "separate check owed" note above, mirroring
   `18c6467`): (1) a decoded **signature-width gate** in all four `decode_*_parts` fns
   (`REQ1-BOUNDS-fixed-widths`, mirroring `runtime.ex:237`/`:259`,
-  `boundary_anchor_codec.ex:88`, `key_transition_codec.ex:120`) — public verdict flips on
+  `boundary_anchor_codec.ex:88`, `key_transition_codec.ex:120`), with public verdict flips on
   `decode_grant`/`decode_proof` (accepted a wrong-width signature at decode) and
   `encode_anchored_export` (the start-anchor parse never width-checked its signature segment);
-  (2) **canonical-form equality** for boundary-anchor + key-transition compacts — the four
+  (2) **canonical-form equality** for boundary-anchor + key-transition compacts, where the four
   validators now assert `jcs_encode(value) == segment_bytes` for the protected header AND
   payload (mirroring `boundary_anchor_codec.ex:95-96,118-119` +
   `key_transition_codec.ex:127-128,151-152`), so a non-canonical (member-reordered) segment is
@@ -1587,28 +1588,28 @@ several note findings, all in surfaces this program touched. All fixed:
   (4 canonical + 2 decode-width + 1 export-encode width + 2 canonical-exclusion pins + the
   four closeout-lens legs), each mutation-proven. Verified: cargo 338 unit + conformance 283/283 + permissiveness 38;
   clippy/fmt clean. Honest residuals, all
-  routed: the encode path validates less than the reference producer — it frames the END
+  routed: the encode path validates less than the reference producer because it frames the END
   anchor AND every TRANSITION raw without parsing them (the reference parses both anchors +
   all transitions through the width/canonical-gating codecs,
   `anchored_export_codec.ex:40-52`), binds the start anchor by sequence only (the reference
   matches all signed fields via `anchor_matches?`/`transition_matches?`), and does not
   re-check rows against the chain at encode (`ConsumptionChain.check`). A non-canonical or
   wrong-width end anchor or transition is therefore still accepted at Rust encode (probe-
-  proven; caught downstream — `verify_anchored_export` gates all of them); closing these
+  proven; caught downstream by `verify_anchored_export`, which gates all of them); closing these
   flips further verdict classes and is its own reviewed change. The Go SDK (BAP-16) picks
   both classes up at authoring.
 
-- **BAP-17 — offline-eligible grant claims (reserve + specify).** Reserve the `ba_offline`
+- **BAP-17: offline-eligible grant claims (reserve + specify).** Reserve the `ba_offline`
   grant-payload claim name in the [registries](docs/design/registries.md) (issuer-set offline
   floor limits: maximum value with explicit currency, maximum offline use count, offline-window
-  expiry — a closed nested object; absence means online-only, per
+  expiry in a closed nested object; absence means online-only, per
   R-BAP-1). The offline floor-limit decision record
   carries the activating-major mechanism to spec quality: the closed `{cnt, cur, max, win}` object,
-  the non-authorizing facts contract (an `offline_eligible` flag + `win` only — magnitudes are read
+  the non-authorizing facts contract (an `offline_eligible` flag + `win` only; magnitudes are read
   from the decoded grant, not redacted facts), malformed⇒`:invalid` (online-only is the *absent*
   default), a wire-layer `max × cnt` ceiling (the cross-language SDKs compute exposure in fixed-width
   integers), the `ba_dlg` attenuation composition, and the freshness scoping. **Activation is a
-  successor contract-major** — the closed v1 profile rejects `ba_offline` today (the `v0.1.0`-amend
+  successor contract-major**. The closed v1 profile rejects `ba_offline` today (the `v0.1.0`-amend
   alternative was considered and is the heavier path: the published governance change-class rule, the
   three corpus-SHA-pinning SDKs, and intra-major fragmentation). This is a design-only slice: zero
   `lib/`/`docs/protocol-v1.md`/`priv/conformance/` wire-behavior change (mirror BAP-11/BAP-14); an
@@ -1619,29 +1620,29 @@ several note findings, all in surfaces this program touched. All fixed:
   landed and verified green). `sdks/rust/tests/permissiveness.rs` is the named per-language permissiveness
   battery exercising all six verifier-SDK decision record closures through the public crate boundary (duplicate-reject,
   source-order preservation, raw-lexeme ceiling, single-value, int/float tag distinction, base64url
-  pad-bits), each documented with its red-capable mutation. Closure #6 — the `(d)`-class per-node encode
-  bounds — is now enforced IN `jcs_encode`'s recursion (depth + total_nodes + a per-node `jcs_bytes`
+  pad-bits), each documented with its red-capable mutation. Closure #6, the `(d)`-class per-node encode
+  bounds, is now enforced IN `jcs_encode`'s recursion (depth + total_nodes + a per-node `jcs_bytes`
   early bail), so a hand-built value passed directly to the public primitive cannot force unbounded
   recursion, traversal, or intermediate allocation. This narrows `jcs_encode`'s accept set
-  (verdict-preserving on every corpus case — all corpus inputs are decode-bounded within the same
+  (verdict-preserving on every corpus case, since all corpus inputs are decode-bounded within the same
   ceilings; verified lib 331/331, conformance 283/283); the depth and total_nodes guards are proven
   red-capable by live mutation. `sdks/rust/tools/purity_check.sh` + `license_check.sh` enforce the
   lib-path purity invariant (no I/O/clock/RNG/network/env in `src/`; `#![forbid(unsafe_code)]` is the
   compile-time `unsafe` half) and the runtime dependency-license allowlist (15 runtime deps, all
-  permissive; dev-deps excluded as non-consumer-facing) — both shellcheck-clean and red-capable. The
+  permissive; dev-deps excluded as non-consumer-facing), both shellcheck-clean and red-capable. The
   `rust-conformance` CI job ([`.github/workflows/sdks.yml`](https://github.com/baselabs/bounded_authority_protocol/blob/main/.github/workflows/sdks.yml)) runs fmt + clippy + the full `cargo test`
   (unit + permissiveness + 283-vector conformance + census) + purity + license on the MSRV 1.88
   toolchain. The publish guard now scans `sdks/*/Cargo.toml` and blocks `cargo publish` /
   `cargo release publish` / `cargo-release publish` / `crate-ci/cargo-release` (the SDK-graduation decision record). New docs:
   [`sdks/rust/README.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/rust/README.md) and the deployment guide
   (`docs/deployment/rust-sdk.md`) (AWS Lambda `provided.al2023`; PostgreSQL
-  `plrust` — ed25519-dalek-based verification is NOT plrust-trusted-mode-compatible as built). The three
+  `plrust`, since ed25519-dalek-based verification is NOT plrust-trusted-mode-compatible as built). The three
   signed anchored-export rows in [`docs/design/conformance-contract.md`](docs/design/conformance-contract.md)
   are updated to their landed case ids. Zero wire byte, bound, or verdict change to the Elixir package.
 - Close the BAP-15 prerequisite spec/corpus gaps (no-key half). `docs/protocol-v1.md` gains a
   normative **JCS string and number serialization** subsection transcribing RFC 8785 §3.2.2.2–3
   (control-range escapes, raw DEL `U+007F`, ECMAScript `Number::toString` float thresholds
-  `e < -6` / `e >= 21`, `-0`→`0`, shortest-round-trip digits — both ECMA §7.1.12.1 and TC39
+  `e < -6` / `e >= 21`, `-0`→`0`, and shortest-round-trip digits, as specified by both ECMA §7.1.12.1 and TC39
   §6.1.6.1.20 cited). The conformance corpus grows **259 → 280 cases**: 5 JCS float cases pinning
   both threshold sides, a raw-DEL bare-string case, an astral-codepoint (U+10000) raw-emit case, a
   float `cast_arguments` request-digest case, malformed-UTF-8-member-name and float-magnitude
@@ -1649,10 +1650,10 @@ several note findings, all in surfaces this program touched. All fixed:
   protected-only (empty-segment) valid case, three `check_chain` rejects (canonical re-encode,
   sequence-zero, genesis previous-hash forge), the byte-level cross-vendor findings for
   `encode_consumption_entry` (seq-1 nonzero previous), `boundary_anchor_signing_input` (seq-0
-  nonzero chain_hash), `encode_anchored_export` (start-anchor sequence binding — a signed start
+  nonzero chain_hash), `encode_anchored_export` (start-anchor sequence binding, where a signed start
   anchor carries a bogus sequence, isolating `start.sequence == first_sequence-1`), and
   `verify_anchored_export` (empty chunk). Every invalid case is a one-defect **skip-would-accept**
-  construction (a verifier that drops its target check would accept it) — proven by defect-injecting
+  construction (a verifier that drops its target check would accept it), proven by defect-injecting
   each target check in the independent runner and confirming the case flips. The two
   `encode_/verify_anchored_export.maximum_plus_one` `n_a` reasons are corrected to name all three
   bounds (`archive_bytes` + `archive_chunks` + `historical_key_transitions`) and the loader
@@ -1660,7 +1661,7 @@ several note findings, all in surfaces this program touched. All fixed:
   IPv6-structure (node:net `isIP`, replacing a crude charset check), consumption-entry and
   boundary-anchor genesis bindings, `check_chain` positive-`first_sequence` and canonical-rehash
   (hashing the canonical re-encode, not raw row bytes, matching `ConsumptionChain.parse_row/1`),
-  anchored-export start/end anchor bindings, and verify per-chunk emptiness — the invariants the new
+  anchored-export start/end anchor bindings, and verify per-chunk emptiness, the invariants the new
   cases exposed; every new case is dual-verified (`agreed=280 disagreed=0`). SDK
   `CERTIFIED_INDEX_SHA` constants (Python hex + TypeScript base64url) rebind to the new `index.json`.
   The encode_anchored_export binding case's authoring key is seed-generated and never enters the
@@ -1674,7 +1675,7 @@ several note findings, all in surfaces this program touched. All fixed:
   keys join `public_key_fingerprints` (**8→11**) since the export verifier imports them; their seeds
   never enter the corpus. The independent Node runner is strengthened to mirror the reference's
   cross-transition invariants (`validate_expected_key_path`): strictly-increasing transition times,
-  fingerprint no-cycle, and the end-anchor chronologically at-or-after the last transition — gates
+  fingerprint no-cycle, and the end-anchor chronologically at-or-after the last transition, gates
   the per-element compact checks cannot express. Every new invalid case is a one-defect
   **skip-would-accept** construction (a monotone / no-cycle variant accepts); every new case is
   dual-verified (`agreed=283 disagreed=0`). SDK `CERTIFIED_INDEX_SHA` constants (Python hex +
@@ -1694,11 +1695,11 @@ several note findings, all in surfaces this program touched. All fixed:
   committed publish infrastructure, not a literal ad-hoc publish run against a working tree; CI on
   main is the non-bypassable backstop, the local hook is honor-system. Bypass:
   `git commit --no-verify`.
-- Add ROADMAP rows BAP-15 (Rust verifier SDK) and BAP-16 (Go verifier SDK) — typed reimplementations
+- Add ROADMAP rows BAP-15 (Rust verifier SDK) and BAP-16 (Go verifier SDK), typed reimplementations
   of the frozen v1 profile from spec + corpus alone, authored under `sdks/` and graduating per
   the SDK-graduation decision record. Post-1.0 rows; no code shipped.
 - Ship cross-language verifier SDKs (TypeScript `@bounded-authority/verifier` + Python
-  `bounded-authority-verifier`) under `sdks/` — typed reimplementations of the frozen v1 profile from
+  `bounded-authority-verifier`) under `sdks/`, providing typed reimplementations of the frozen v1 profile from
   the spec + corpus alone, with no code-level derivation from the Elixir reference
   (the verifier-SDK decision record). Each passes all 283 conformance vectors
   (recomputed from scratch), asserts the corpus `index.json` SHA at startup, and proves every
@@ -1708,7 +1709,7 @@ several note findings, all in surfaces this program touched. All fixed:
   ([`.github/workflows/sdks.yml`](https://github.com/baselabs/bounded_authority_protocol/blob/main/.github/workflows/sdks.yml)) gates every `sdks/**` /
   `priv/conformance/**` change. Zero wire byte, bound, or verdict change to the Elixir package.
 - Draft the capability-authorization extension as a pre-submission package for the MCP
-  experimental-extension track (`docs/extensions/` — a draft `.mdx`, a draft
+  experimental-extension track (`docs/extensions/`, containing a draft `.mdx`, a draft
   Extensions-Track SEP, and an Agent Payments Protocol (AP2) mandate-mapping note;
   the capability-authorization extension decision record), documenting the already-normative
   v1 protocol. Identifier `io.bounded-authority/capability-authorization`. Partial conformance to the
@@ -1721,7 +1722,7 @@ several note findings, all in surfaces this program touched. All fixed:
 - Publish the governance policy (change classes, change-control triggers, errata no-verdict-flip
   prohibition, deprecation windows, security-release handling) as a standalone normative project
   document ([docs/governance.md](docs/governance.md); the published-governance decision record)
-  — a companion republication of the charter § Governance, which remains the authoritative source.
+  as a companion republication of the charter § Governance, which remains the authoritative source.
   [SECURITY.md](SECURITY.md) cross-references the verdict-change rule; the
   [errata registry](docs/errata.md) header retargets to governance.md as the published policy home;
   `SECURITY.md`, `docs/governance.md`, and `docs/design/standards-track.md` join
@@ -1729,11 +1730,11 @@ several note findings, all in surfaces this program touched. All fixed:
   bound, or verdict change.
 - Resolve a contradiction in the deprecation/security policy: the twelve-month deprecation-window
   minimum (`REQ1-EVO-deprecation-window-minimum`) is scoped to planned deprecations, and a security
-  contract-major (one remediating a verdict-changing vulnerability) is exempt — its accelerated
+  contract-major (one remediating a verdict-changing vulnerability) is exempt, with its accelerated
   overlap window is published at announcement, proportional to severity, and a deployment-decided
   sunset, never a silent change (the security-release decision record;
   charter § The evolution contract + § Governance; [governance.md](docs/governance.md) re-synced).
-  Deployment-policy refinement only — zero wire byte, bound, or verdict change.
+  This refines deployment policy without changing wire bytes, bounds, or verdicts.
 
 ### Changed
 
@@ -1742,32 +1743,32 @@ several note findings, all in surfaces this program touched. All fixed:
   behavioral-closure cluster head `c281938`, with the superlative date-bounded ("as of
   2026-08-18") so the claim expires visibly instead of silently: CI run 32118915019 and
   supply-chain run 32118915034 passed at that exact revision, and the doc's own verification
-  recipe was re-run against the downloaded archive — checksum OK (ubuntu-built archive SHA-256
+  recipe was re-run against the downloaded archive, confirming its checksum (ubuntu-built archive SHA-256
   `c9b5b0cf…`), SLSA build-provenance attestation verified constrained to this repository, the
   supply-chain workflow, `refs/heads/main`, that source digest, and GitHub-hosted runners; BAP-06
   `4c64be3` joins the earlier-heads list. The TypeScript conformance runner's startup comment
-  miscited the corpus binding as the verifier-SDK record's enforcement-posture decision — corrected to its corpus-binding decision, matching
+  miscited the corpus binding as the verifier-SDK record's enforcement-posture decision; it now cites its corpus-binding decision, matching
   the file's own correct citations. usage-rules rule 13's era-frozen "BAP-04 verification is
-  implemented" now states the v1 verification surface is implemented. Docs-only — no code, wire,
+  implemented" now states the v1 verification surface is implemented. This is docs-only, with no code, wire,
   bound, or verdict change.
-- **Documentation reconciliation — status prose frozen at the BAP-10 era (alignment-audit items
+- **Documentation reconciliation: status prose frozen at the BAP-10 era (alignment-audit items
   1–9).** `AGENTS.md` "Current state" rewritten from the tracker: names the closed set (BAP-00..06,
   08..11, 13..15, 17), the three verifier SDKs under `sdks/` (verifier-SDK and SDK-graduation topology,
   none published), the decision records, and the 283-case corpus + verifier CLI. README's status section
   corrected the same way; the BAP-07 framing in README, SECURITY.md, and the release-candidate
-  contract now records the maintainer decision (Hex publication deferred — internal consumption via
+  contract now records the maintainer decision (Hex publication deferred, with internal consumption via
   the `v0.1.0` git tag at `c65d3be`, not a registry pin). SECURITY.md now cites the most recent
   package-bearing verified head (BAP-06 `4c64be3`) with the BAP-05/BAP-04 history retained. The
-  TypeScript and Python SDK READMEs no longer point Install at registry URLs that do not resolve —
+  TypeScript and Python SDK READMEs no longer point Install at registry URLs that do not resolve;
   they carry the Rust README's reserved-identifier/not-yet-published framing, and "one of two" SDK
   prose corrected to three; `sdks/README.md` floor corrected to Node >= 22 with the not-published
   disclaimer. `docs/design/offline-authorization-requirements.md` status now points at the closed
   BAP-17 row (the offline floor-limit decision record). ROADMAP repairs: BAP-17 added to the complete list, the Rust façade count
   corrected 15 → 17 (the exported public contract), and amendment #2's garbled closure/residual
   splice repaired so the `assemble_compact` maximum-bounds residual stands as its own sentence,
-  consistent with amendment #3's restatement. Docs-only — no code, wire, bound, or verdict change.
+  consistent with amendment #3's restatement. This is docs-only, with no code, wire, bound, or verdict change.
 
-## 0.1.0 release-candidate record — 2026-08-17 (published above as [0.1.0])
+## 0.1.0 release-candidate record (2026-08-17; published above as [0.1.0])
 
 ### Added
 
@@ -1855,18 +1856,18 @@ several note findings, all in surfaces this program touched. All fixed:
   starts; neither changes any wire format, limit, or verification rule.
 - Close the check_envelope selector-binding gap: add a non-trivial (`equals`) selector valid case
   plus an `invalid_selector` case, teach the independent Node verifier to evaluate grant selectors,
-  and add a `selector-reject` mutation — so a verifier that ignores grant selectors now fails the
+  and add a `selector-reject` mutation, so a verifier that ignores grant selectors now fails the
   corpus. Uses two new deterministic conformance keypairs (census 6→8); a companion
   `proof_signing_input` valid case carries the new holder key as a labeled field so the
   cross-verifier census discovery scan finds it (corpus 212→215).
 - Close the check_envelope authority-binding gap the same re-signing capability exposed: the
   holder (`cnf.jkt`), grant (`ath`), request-argument (`ba_req`), and operation (`ba_op`) bindings
   had no corpus case isolating them, so a verifier omitting any one of them still scored a perfect
-  corpus run — omitting the holder binding accepts any holder's proof against any grant. Add four
+  corpus run. Omitting the holder binding accepts any holder's proof against any grant. Add four
   `invalid_claim` cases (each a one-defect variant of a shared valid base, with the named binding
   as the sole rejecter) and four matching mutation-battery entries. The `ba_op` case needs a
   hand-built proof payload: the request digest is computed over the server-derived operation, never
-  over the proof's own `ba_op` claim, so only a dishonest producer — which the façade cannot be —
+  over the proof's own `ba_op` claim, so only a dishonest producer (which the facade cannot be)
   emits a proof whose two operation fields disagree (corpus 215→219).
 - Add an empty-path `invalid_selector` case so the independent runner's selector shape and width
   validation is falsifiable: the official rejects an empty selector path at grant decode, and a
@@ -1879,22 +1880,22 @@ several note findings, all in surfaces this program touched. All fixed:
   validates every operation and enforces global name uniqueness, not just the requested one); a
   lone surrogate in a selector path (the official requires valid UTF-8); and a `__proto__` member
   in a selector value, which the tagged projection silently dropped to the prototype setter so that
-  two structurally different values compared equal — a collapse that reached the request digest as
+  two structurally different values compared equal, a collapse that reached the request digest as
   well as selector matching. Selector values are now also held to the protocol JSON bounds. The
   same operation validation is applied on `verify_grant`, which reaches the same official decode
   path (corpus 220→247; `check_envelope/invalid_encoding` 6, `verify_grant/invalid_encoding` 5).
 - Add `.gitleaks.toml`: the `jwt` and `generic-api-key` rules are allowlisted for the conformance
   corpus and vector paths only, where all 283 findings are JWT-shaped high-entropy public test
   material (109 `jwt`, 174 `generic-api-key`, the latter entirely key fingerprints). Every other
-  default rule still applies in those trees — a `ghp_…` token committed there is still caught —
+  default rule still applies in those trees, so a `ghp_…` token committed there is still caught,
   and every rule applies everywhere else. Stated residual: a credential matching ONLY those two
   rules, under those two machine-generated fixture directories, is not flagged.
 - Complete the payload-field decode mirror, closing the last of the runner's permissiveness
   against the official decoder. The runner previously validated only the grant/proof fields the
   expected-context comparison happened to touch; it now mirrors decode_grant_fields /
-  decode_proof_fields field for field — issuer/grant-id/audience StringOrURI validity and length,
+  decode_proof_fields field for field, including issuer/grant-id/audience StringOrURI validity and length,
   audience count bound and uniqueness, coherent times (iat<exp, nbf<exp), method token charset,
-  invocation UUID shape, and htu normalization — wherever it reads a grant or proof payload
+  invocation UUID shape, and htu normalization, wherever it reads a grant or proof payload
   (check_envelope, verify_grant, decode_grant, decode_proof). Nine cases on the DECODE surfaces
   (no expected context to mask the validator, so each is the sole reject reason) with six mutation
   entries prove them; corpus 236→247. One bound stays out of scope by construction: the aggregate
@@ -1903,14 +1904,14 @@ several note findings, all in surfaces this program touched. All fixed:
   the json.decode surface instead. Two further field checks the first mirror pass missed,
   found by the closeout review: the StringOrURI structural gate (the official validates
   iss/jti/aud through URI.new, so it rejects a non-numeric port, an unterminated IPv6
-  literal, or a double `@`; the byte-only mirror accepted them — now matched to URI.new
+  literal, or a double `@`; the byte-only mirror accepted them and now matches URI.new
   across a 56-input boundary set, using node:net for IPv6 literals so the mirror is neither
   looser nor stricter), and the optional proof nonce (present must be a 1..nonce_bytes
   well-formed string). Each with a decode case and mutation entry; corpus 236→247.
 - Close three further runner/official divergences the final cross-vendor pass found in selector
   value validation, each now carried by a corpus case and a mutation entry: the magnitude bound
   (the official caps |value| at 9007199254740991 and rejects 2^53; the runner checked only
-  finiteness), and a one-byte floor on object member keys that the official does not impose — the
+  finiteness), and a one-byte floor on object member keys that the official does not impose. The
   runner rejected `{"":1}`, which `Json.decode` and `Jcs.encode` both accept, making it STRICTER
   than the reference. Corpus 233→236 (a valid empty-object-key case pins the strictness fix).
 - Adopt the standards track charter (the standards-track decision record, `docs/design/standards-track.md`,
@@ -1928,9 +1929,9 @@ several note findings, all in surfaces this program touched. All fixed:
   surface × class applicability matrix, `.raw` sidecars for oversize wire inputs) and the pure
   `Conformance.Corpus`/`Runner`/`Report` core that loads, executes, and reports agreement.
 - Harden the corpus against vacuous green: author the invalid vectors the crypto verifying
-  surfaces were missing — algorithm-confusion (`alg:"none"`), meaningful-byte signature/commitment/
+  surfaces were missing: algorithm-confusion (`alg:"none"`), meaningful-byte signature/commitment/
   anchor tampers (via a target-addressed tamper loader that binds a single-byte flip to the
-  compact / grant / proof / row / chunk bytes), and archive/chain/envelope binding failures — plus
+  compact / grant / proof / row / chunk bytes), and archive/chain/envelope binding failures, plus
   exact-bound and maximum-plus-one pairs for every `json.decode` structural limit. Each new invalid
   vector is a one-defect construction confirmed rejected by BOTH the official facade and the
   independent Node runner; every remaining not-applicable applicability cell carries a falsifiable
@@ -1941,7 +1942,7 @@ several note findings, all in surfaces this program touched. All fixed:
   `System.halt` in `cli/main.ex` only) enforced by the architecture gate.
 - Add the independent Node second-implementation runner
   (`conformance/corpus_independent.mjs`, node:* only) that recomputes every corpus verdict from
-  scratch — making the corpus normative. Evolve the public-key census to three partitions
+  scratch, making the corpus normative. Evolve the public-key census to three partitions
   (bap03 + chain_archive + corpus = the canonical set); the corpus self-census is hard two-way.
 - Add stream_data property gates (JCS determinism/idempotence, base64url round-trip/pad rejection,
   URI normalization idempotence, facade closure totality) and a deterministic-PRNG fuzz gate.
@@ -1955,11 +1956,11 @@ several note findings, all in surfaces this program touched. All fixed:
 - Close the remaining independent-runner permissiveness residuals surfaced by a cross-vendor design
   review (corpus grows 247 → 259 cases). The Node runner now mirrors the official on: the integer
   magnitude bound for every integer claim (a proof `iat` of 2^53 is rejected); the full
-  `request_digest` gate on `cast_arguments` — operation validity, per-node bounds, `total_nodes`, and
+  `request_digest` gate on `cast_arguments`, checking operation validity, per-node bounds, `total_nodes`, and
   `jcs_bytes` on the type-tagged projection, not an unbounded digest; and whole-payload container
   depth on grant/proof payloads (a payload nested past depth 32 is rejected at parse). Fix the sibling
   `jsonDecode` per-node-type depth error (it rejected a 32-deep scalar-inner nest the official
-  accepts — the too-strict direction that fails a conforming verifier). Twelve exact-bound /
+  accepts, a too-strict result that fails a conforming verifier). Twelve exact-bound /
   maximum-plus-one cases and seven source mutations pin each, each verdict confirmed against the
   official facade. The corpus-format decision record corrected: whole-payload depth and value-carried `cast_arguments`
   node/byte bounds are inline-expressible and now tested; only compact-carried whole-payload
@@ -1971,4 +1972,4 @@ several note findings, all in surfaces this program touched. All fixed:
   add the `release.candidate` reproducibility gate (two cache-isolated builds, byte-equal SHA-256,
   wired into `mix quality`), and author the candidate-facing docs (release-candidate-contract.md,
   SECURITY.md, CHANGELOG `[0.1.0]`, README). Zero wire byte, bound, or verdict change. Published
-  2026-08-20 — BAP-07 published the exact candidate after the connected gates passed.
+  2026-08-20, when BAP-07 published the exact candidate after the connected gates passed.

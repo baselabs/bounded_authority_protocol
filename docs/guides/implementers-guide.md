@@ -1,18 +1,18 @@
 # The implementer's guide: building a conforming BAP verifier
 
-Everything a fifth implementer needs to build a verifier that passes the conformance corpora —
+This guide explains how to build another verifier that passes the conformance corpora,
 without reading any sibling runner's source. Start with contract-major 1: its specification
 (`spec/bap-v1.md` in the repository; the package ships it) is the normative authority, and
 contract-majors 2 and 3 incorporate it by reference (§14). This guide is the operational recipe.
 
 ## 1. Read in this order
 
-1. The specification — sections 4 (conformance language), 7 (abstract data model), 8-9
+1. Read the specification: sections 4 (conformance language), 7 (abstract data model), 8-9
    (JSON decoding, base64url), 10-14 (protected headers, claims, selectors, URI normalization,
    signing and digest inputs, including 14.1 strict Ed25519), 15 (consumption chain and anchored
    export), 16 (public verification contract), 17 (hard maxima), and 18 (untrusted key
    locator).
-2. The requirement map (`docs/design/requirement-map.md`) — every `REQ1-*` id to its
+2. Read the requirement map (`docs/design/requirement-map.md`), which maps every `REQ1-*` id to its
    conformance evidence cells.
 3. This guide, then the corpus.
 
@@ -24,14 +24,14 @@ A conforming runner:
    any `.raw` sidecars, and the `revision.json` sidecar (see §5).
 2. Asserts the corpus identity at startup: the base64url SHA-256 of `index.json`'s exact bytes
    against the certified digest recorded in your runner (rotate it only in the same change as
-   the corpus — the repository ships a regeneration script).
+   the corpus; the repository ships a regeneration script).
 3. Verifies corpus integrity itself: per-file SHA-256 against the index, exact file-set
    equality both directions, per-file and total case counts, corpus-wide case-id uniqueness,
    the applicability matrix (every surface × class cell: declared count equals executed
    count; `n_a` cells execute zero), and every tamper case's verbatim artifact re-derived
    from its base case with the documented single-byte xor flip.
 4. Executes every case: dispatch by `surface`, apply the case's `input`, compare the outcome
-   to `expected.verdict` — valid cases must produce the expected value-bearing facts;
+   to `expected.verdict`. Valid cases must produce the expected value-bearing facts;
    invalid cases must produce the single closed error value, with no other observable.
 5. Prints a machine-readable agreement report and exits nonzero on any disagreement.
 
@@ -86,35 +86,36 @@ run reports 11 keys.
 
 ## 5. Corpus formats
 
-- `index.json` — closed 5-member object: `format`, `public_key_fingerprints`, `files`
+- `index.json` is a closed 5-member object: `format`, `public_key_fingerprints`, `files`
   (path, per-file base64url SHA-256, per-file case count), `total_cases`, `applicability`.
-- `revision.json` — the corpus revision sidecar: closed 3-member object (format, monotone
+- `revision.json` is the corpus revision sidecar: a closed 3-member object (format, monotone
   integer `revision`, `generated_from` provenance), hash-covered as a `files` entry and
   enforced by file-set equality. Citation target for corpus-dependent documents.
-- Case files — closed objects (`format`, `provenance`, `cases`); every case carries `id`,
+- Case files are closed objects (`format`, `provenance`, `cases`); every case carries `id`,
   `surface`, `class`, `input`, `expected`. Structural schemas (Draft 2020-12) ship under
   `priv/conformance/v1/schemas/`.
-- `.raw` sidecars — opaque byte inputs, hash-bound, never parsed.
+- `.raw` sidecars contain opaque, hash-bound byte inputs and are never parsed.
 
 ## 6. The permissiveness-mutation expectation
 
 Your implementation must not be MORE permissive than the reference. The corpus catches most
-of this by disagreement, but each language has its own trap class — prove each of these
-red-capable in YOUR language (construct the defect, assert your runner rejects it, then
-mechanically remove the guard and watch the test go green — that survivor is the bug):
+of this by disagreement, but each language has its own trap classes. For each class below,
+show the correct implementation passing. Deliberately remove the guard and require the
+discriminating assertion to fail. Restore the guard and require the test to pass again. A mutant
+that still passes is a failed guard demonstration, as in `scripts/check_conformance_mutations.exs`:
 
-- **Duplicate-member rejection at every depth** (e.g. `{"a":1,"a":1}`) — most language JSON
+- **Duplicate-member rejection at every depth** (e.g. `{"a":1,"a":1}`): most language JSON
   parsers silently keep the last member.
-- **Null-prototype equivalence** (the JS `__proto__` class) — constructing objects with
+- **Null-prototype equivalence** (the JS `__proto__` class): constructing objects with
   prototype inheritance can make two distinct values canonicalize identically; use
   prototype-free dictionaries for the tagged algebra.
-- **Raw numeric-lexeme ceiling** — the 64-byte ceiling applies to the RAW lexeme before
+- **Raw numeric-lexeme ceiling**: the 64-byte ceiling applies to the RAW lexeme before
   conversion, with exact decimal magnitude comparison (no floating-point rounding).
-- **Single-value, no trailing content** — input is exactly one complete JSON value plus
+- **Single-value, no trailing content**: input is exactly one complete JSON value plus
   whitespace.
-- **Integer/float tag distinction** — `1` and `1.0` are different typed values with different
+- **Integer/float tag distinction**: `1` and `1.0` are different typed values with different
   request-digest projections; a language that unifies them cannot produce conforming digests.
-- **Decode-depth scalar asymmetry** — containers are depth-bounded, scalars are not: a
+- **Decode-depth scalar asymmetry**: containers are depth-bounded, scalars are not: a
   maximum-depth-inner SCALAR is valid where a maximum-depth-inner container is not.
 
 ## 7. Embedding the spec: the facts-anchor contract
@@ -168,7 +169,7 @@ redacted facts with `trust: :not_evaluated` and no authorization marker. Pin the
 index SHA-256 (`be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a`), verify the
 declared two-file set and per-file hashes, execute all 40 cases, and prove cross-profile
 rejection in both directions. Derive every fingerprint with the RFC 7638 Ed25519 thumbprint
-preimage — never a hash of raw key bytes.
+preimage. Hashing raw key bytes is not equivalent.
 
 ## 11. Implementing the content-assertion sibling profile
 

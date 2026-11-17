@@ -6,15 +6,15 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation do
 
   ## Fields
 
-  * `version` - always `1`.
-  * `attestor_key_id` - the header `kid`.
-  * `jti` - the attestation identifier.
-  * `key_id` - the subject key identifier.
-  * `public_key` - the subject's raw 32-byte Ed25519 public key.
-  * `role` - `"issuer"` or `"holder"`.
-  * `nbf` - the start of the window, integer Unix time in seconds.
-  * `exp` - the exclusive end of the window, integer Unix time in seconds.
-  * `verification` - always `:not_evaluated`.
+  * `version`: always `1`.
+  * `attestor_key_id`: the header `kid`.
+  * `jti`: the attestation identifier.
+  * `key_id`: the subject key identifier.
+  * `public_key`: the subject's raw 32-byte Ed25519 public key.
+  * `role`: `"issuer"` or `"holder"`.
+  * `nbf`: the start of the window, integer Unix time in seconds.
+  * `exp`: the exclusive end of the window, integer Unix time in seconds.
+  * `verification`: always `:not_evaluated`.
   """
 
   @enforce_keys [

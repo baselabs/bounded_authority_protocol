@@ -22,7 +22,7 @@ repository), README/guides/Livebook, and the cross-profile rejection proofs. Run
 self-round-trip or canned HTTP response is not interoperability or transport evidence.
 
 The declared Elixir range is `~> 1.18` (1.18/1.19/1.20) and the supported Erlang/OTP majors are
-**27, 28, 29** — floor-limited by the stdlib `:json` module (OTP 27+) and enforced by
+**27, 28, 29**, with a floor set by the stdlib `:json` module (OTP 27+) and enforced by
 `config/config.exs` at config load, before anything compiles; the assert is not shipped in the Hex
 package, so consumers enforce their own. The mix.exs range, the config set, `.tool-versions`, and
 the CI lanes move together in one commit. The clone →
@@ -53,7 +53,7 @@ infrastructure (registry-publish steps, `prepublishOnly`/`prepack` scripts, `pub
 committed to this repository. Contributor hook installation works without any local policy;
 maintainer checks activate only where a maintainer has set one up. The deliberate-admin bypass is `git commit --no-verify`, documented
 here as the sanctioned escape hatch. Neither layer catches a literal ad-hoc publish command run
-against a working tree — that is a runtime act no commit gate sees; CI on `main` is the hard gate
+against a working tree, since no commit gate sees that runtime act; CI on `main` is the hard gate
 for committed infrastructure.
 
 ## Maintainer checks

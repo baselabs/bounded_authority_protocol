@@ -7,15 +7,15 @@ defmodule BoundedAuthorityProtocol.V1.ExpectedChain do
 
   ## Fields
 
-  * `chain_id` - the chain identity: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
+  * `chain_id`: the chain identity: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
     bytes.
-  * `first_sequence` - the expected sequence number of the first row.
-  * `last_sequence` - the expected sequence number of the last row.
-  * `row_count` - the expected number of rows.
-  * `previous_hash` - the raw 32-byte hash of the row before `first_sequence` (32 zero bytes when it
+  * `first_sequence`: the expected sequence number of the first row.
+  * `last_sequence`: the expected sequence number of the last row.
+  * `row_count`: the expected number of rows.
+  * `previous_hash`: the raw 32-byte hash of the row before `first_sequence` (32 zero bytes when it
     is `1`).
-  * `last_hash` - the raw 32-byte hash of the row at `last_sequence` (the head).
-  * `bounds` - a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
+  * `last_hash`: the raw 32-byte hash of the row at `last_sequence` (the head).
+  * `bounds`: a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
     means the profile maxima (see `BoundedAuthorityProtocol.V1.Bounds.coerce/1`).
   """
 

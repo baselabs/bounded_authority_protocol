@@ -11,6 +11,9 @@ and expected context that you supply, and returns facts or the single error
 replay, checks revocation, or decides whether a request may run. Those stay in your service.
 Facts exclude raw credentials and secrets; the logging notes below describe their display limitations.
 
+Already-trusted public keys, expected context, and time are explicit inputs. The SDK has no
+private-key access or custody and reads no clock.
+
 Its behavior is defined by the specifications ([v1](../../spec/bap-v1.md),
 [v2](../../spec/bap-v2.md), [v3](../../spec/bap-v3.md), and the sibling profiles under
 [`spec/`](../../spec/)) and the certified conformance corpora; source comments cross-reference

@@ -58,7 +58,7 @@ the profile of any artifact from its bytes alone. Negotiation is therefore disco
   profiles ([governance § Byte-distinct sibling attestation
   profiles](../governance.md#byte-distinct-sibling-attestation-profiles)): standalone,
   grant-unbound artifacts parsed by no major's verification path, verified only through their own
-  named API — the consumer-gated branch of the evolution contract, distinct from the
+  named API, following the consumer-gated branch of the evolution contract rather than the
   verifier-integration-bound attestation shapes that activate inside a successor contract-major.
 
 ### Parallel-version support and deprecation
@@ -112,7 +112,7 @@ identities rather than implicitly belonging to every suite.
 
 Suite succession follows the naming scheme `BAP<contract-major>-<signature>-<digest>`. A successor
 suite binds new domain separators, new `alg` values, and new fixed widths under its own
-contract-major — the same closed posture, different constants. The `kid`/thumbprint indirection at
+contract-major, retaining the closed posture with different constants. The `kid`/thumbprint indirection at
 the key-locator boundary is already key-type independent, so trusted-key resolution survives suite
 succession unchanged.
 
@@ -128,13 +128,13 @@ commitment is that the migration is a suite succession, not a redesign.
 
 Anchored exports and historical-key rollover exist so evidence verifies years later.
 Long-retention evidence under a frozen signature algorithm means the evidence's trustworthiness
-would expire before its retention period — a design problem, not a hypothetical. The committed
+would expire before its retention period. This is a design problem. The committed
 design direction, specified now and activated in a successor contract-major:
 
 - **Cross-suite content-covering countersignature.** A boundary anchor of a current suite
   countersigns an archive whose rows and anchors were produced under an earlier suite, attesting
   "verified complete under suite A at time T" by signing the archive's CONTENT DIGEST (not merely
-  chaining key/suite identity — a content-covering signature is required so trust survives the
+  chaining key/suite identity, since a content-covering signature is required so trust survives the
   original suite's cryptanalytic break, since the original signatures are forgeable under break).
 - Verification of aged evidence then has two parts: the archive verifies under its original suite's
   complete rules, and an authenticated content-covering countersignature from a currently trusted
@@ -149,7 +149,7 @@ design direction, specified now and activated in a successor contract-major:
 Each normative specification states its requirements with RFC 2119 / RFC 8174 conformance
 keywords, and every requirement carries a stable requirement identifier. The acceptance bar is
 mechanical and unique to this project's method: **every MUST maps to at least one conformance-
-corpus applicability cell (surface × class) or to a named, falsifiable gap** — requirement-to-
+corpus applicability cell (surface × class) or to a named, falsifiable gap**, establishing requirement-to-
 corpus traceability, so a standards reviewer can walk from any normative keyword to the executable
 cases that prove it both directions. Prose that cannot be mapped is either not a requirement or a
 missing corpus case, and the mapping exposes which.
@@ -158,8 +158,8 @@ missing corpus case, and the mapping exposes which.
 
 The protocol's claim names (`ba_inv`, `ba_op`, `ba_req`) and `typ` values (`ba+cap`, `ba+loopback-proof`, `ba+chain-anchor`,
 `ba+key-transition`, `ba+role-attestation`, `ba+content-assertion`) are currently unregistered. For the standards track they
-are registered with IANA — the JWT Claims registry and the media-type suffix conventions
-respectively — both for collision safety and because registration is the visible signal of a
+are registered with IANA using the JWT Claims registry and media-type suffix conventions,
+respectively, both for collision safety and because registration is the visible signal of a
 standards posture rather than a vendor format. Registration templates are prepared and are filed
 at first external submission. Until filing, the `ba_` and `ba+` prefixes are
 the collision-avoidance namespace, and the [registries](registries.md) document is authoritative
@@ -179,7 +179,7 @@ already-decided shape rather than opening a design debate after external adoptio
   operations are a subset of the parent's by name; a child operation's selectors are the parent's
   selectors PLUS additional conjunctive selectors; the child validity window and audience set lie
   within the parent's. Because the existing selector algebra is conjunctive, adding selectors can
-  only narrow — the subset relation is decidable without any new language.
+  only narrow, and the subset relation is decidable without any new language.
 - **No caveat interpreter.** Macaroons and biscuits demonstrated attenuation's value and its cost:
   an open-ended caveat DSL is exactly the extension surface this protocol's closed posture forbids.
   Here the closed selector algebra IS the attenuation language. Nothing is interpreted; everything
@@ -188,9 +188,9 @@ already-decided shape rather than opening a design debate after external adoptio
   signature and subset relation under the same closed rules; the holder proof binds the leaf grant.
 
 The names this design needs (`ba_dlg`, a delegated-capability `typ`) are reserved in the
-registries now. The full mechanism — the `ba_dlg` claim schema, the `ba+cap-delegated` typ with
+registries now. The full mechanism (the `ba_dlg` claim schema, the `ba+cap-delegated` typ with
 its parent-holder key binding, the depth-bounded chain-verification algorithm, and the attenuation
-subset rules proven decidable against the existing selector algebra — is charted in the
+subset rules proven decidable against the existing selector algebra) is charted in the
 [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md).
 
 ## Revocation and freshness
@@ -223,8 +223,8 @@ guidance with normative force at submission time:
 Regulatory direction is converging on binding agent actions to the human or organizational
 principal who authorized them. `ba_inv` plus the consumption chain gives invocation-level
 attribution; what is missing is an explicit, issuer-asserted on-behalf-of claim. The registry
-reserves `ba_obo` — an issuer-asserted principal identifier (StringOrURI), verified as exact
-expected context like every other bound claim — with semantics activated in a successor
+reserves `ba_obo`, an issuer-asserted principal identifier (StringOrURI) verified as exact
+expected context like every other bound claim, with semantics activated in a successor
 contract-major. Reserving it now means independent implementations never squat the name and the
 audit story has a designed home.
 
@@ -255,15 +255,15 @@ credibility step and the policy is what makes single-maintainer tolerable to ado
 The governance policy's single normative home is [docs/governance.md](../governance.md);
 this charter cites it and carries no independent policy statements (the single-home
 discipline: a policy sentence lives in exactly one normative document, and every other
-document points at it — including this one, for the governance paragraph that previously
+document points at it, including this one for the governance paragraph that previously
 duplicated content here).
 
 ## Venue strategy
 
-- **First:** the MCP `ext-auth` extensions repository — fast, targeted, and
+- **First:** the MCP `ext-auth` extensions repository, chosen for its targeted scope and
   aimed at exactly the agentic-invocation audience this protocol serves. The extension documents
   the already-normative profile; nothing normative is introduced outside it.
-- **Durable home:** IETF (OAuth/GNAP working-group orbit) if and when external traction warrants —
+- **Durable home:** IETF (OAuth/GNAP working-group orbit) if and when external traction warrants,
   the registries, RFC 2119 profile, and IANA templates in this charter are built to that
   submission bar from the start.
 - **ISO:** treated as a design checklist (consistency, testability, conformity assessment,
@@ -275,12 +275,12 @@ duplicated content here).
 These items were decided and specified before the first public release, because none of them can
 be retrofitted once third parties implement the profile:
 
-1. **Evolution contract, registries, and the RFC 2119 normative pass** — the one item that becomes
+1. **Evolution contract, registries, and the RFC 2119 normative pass**, the one item that becomes
    impossible after third parties implement.
-2. **Cryptographic suite identity and the evidence-longevity design** — the domain separators and
+2. **Cryptographic suite identity and the evidence-longevity design**, covering the domain separators and
    key indirection already carry the bones.
 3. **IANA registration templates and published governance.**
-4. **The delegation-with-attenuation design** — decided above, so a successor contract-major starts
+4. **The delegation-with-attenuation design**, decided above so a successor contract-major starts
    from a specification.
 
 The venue decision is made (this charter); the extension drafts execute it.

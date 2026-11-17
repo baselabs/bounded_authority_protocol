@@ -4,24 +4,24 @@ defmodule BoundedAuthorityProtocol.V3.AnchoredExportFacts do
 
   ## Fields
 
-  * `version` - the contract-major, always `3`.
-  * `chain_id` - the verified chain identity.
-  * `first_sequence` - the first exported sequence number.
-  * `last_sequence` - the last exported sequence number.
-  * `row_count` - the number of exported rows.
-  * `previous_hash` - the raw 32-byte hash that preceded the first row.
-  * `last_hash` - the raw 32-byte hash of the last row.
-  * `digest` - the raw 32-byte SHA-256 of the complete archive bytes.
-  * `start_anchor_id` - the start anchor's identity.
-  * `start_anchored_at` - the start anchor's time, integer Unix time in seconds.
-  * `start_key_fingerprint` - the raw 32-byte fingerprint of the key that signed the start anchor.
-  * `end_anchor_id` - the end anchor's identity.
-  * `end_anchored_at` - the end anchor's time, integer Unix time in seconds.
-  * `end_key_fingerprint` - the raw 32-byte fingerprint of the key that signed the end anchor.
-  * `transition_count` - the number of authenticated key transitions in the archive.
-  * `verification` - always `:anchored_export`.
-  * `trust` - always `:not_evaluated`.
-  * `authorization` - always `:not_evaluated`.
+  * `version`: the contract-major, always `3`.
+  * `chain_id`: the verified chain identity.
+  * `first_sequence`: the first exported sequence number.
+  * `last_sequence`: the last exported sequence number.
+  * `row_count`: the number of exported rows.
+  * `previous_hash`: the raw 32-byte hash that preceded the first row.
+  * `last_hash`: the raw 32-byte hash of the last row.
+  * `digest`: the raw 32-byte SHA-256 of the complete archive bytes.
+  * `start_anchor_id`: the start anchor's identity.
+  * `start_anchored_at`: the start anchor's time, integer Unix time in seconds.
+  * `start_key_fingerprint`: the raw 32-byte fingerprint of the key that signed the start anchor.
+  * `end_anchor_id`: the end anchor's identity.
+  * `end_anchored_at`: the end anchor's time, integer Unix time in seconds.
+  * `end_key_fingerprint`: the raw 32-byte fingerprint of the key that signed the end anchor.
+  * `transition_count`: the number of authenticated key transitions in the archive.
+  * `verification`: always `:anchored_export`.
+  * `trust`: always `:not_evaluated`.
+  * `authorization`: always `:not_evaluated`.
   """
 
   @enforce_keys [

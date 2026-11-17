@@ -6,22 +6,22 @@ defmodule BoundedAuthorityProtocol.V3.DecodedProof do
 
   ## Fields
 
-  * `version` - the contract-major, always `3`.
-  * `proof_id` - the `jti` claim: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
+  * `version`: the contract-major, always `3`.
+  * `proof_id`: the `jti` claim: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
     bytes.
-  * `method` - the `htm` claim, byte-for-byte as signed.
-  * `target_uri` - the `htu` claim; decode refuses a value that is not already in normal form.
-  * `issued_at` - the `iat` claim, integer Unix time in seconds.
-  * `nonce` - the `nonce` claim, or `nil` when absent. Redacted by `inspect/2`.
-  * `invocation_id` - the `ba_inv` claim, a lowercase RFC 4122 UUID.
-  * `operation` - the `ba_op` claim, the operation name.
-  * `grant_hash` - the decoded `ath` claim: the raw 32-byte SHA-256 of the grant compact the proof
+  * `method`: the `htm` claim, byte-for-byte as signed.
+  * `target_uri`: the `htu` claim; decode refuses a value that is not already in normal form.
+  * `issued_at`: the `iat` claim, integer Unix time in seconds.
+  * `nonce`: the `nonce` claim, or `nil` when absent. Redacted by `inspect/2`.
+  * `invocation_id`: the `ba_inv` claim, a lowercase RFC 4122 UUID.
+  * `operation`: the `ba_op` claim, the operation name.
+  * `grant_hash`: the decoded `ath` claim: the raw 32-byte SHA-256 of the grant compact the proof
     names.
-  * `request_hash` - the decoded `ba_req` claim: the raw 32-byte request digest.
-  * `holder_public_key` - the holder's raw 65-byte uncompressed SEC1 P-256 point `0x04 || x || y`,
+  * `request_hash`: the decoded `ba_req` claim: the raw 32-byte request digest.
+  * `holder_public_key`: the holder's raw 65-byte uncompressed SEC1 P-256 point `0x04 || x || y`,
     decoded from the header JWK.
-  * `holder_thumbprint` - the raw 32-byte RFC 7638 thumbprint of the header JWK.
-  * `verification` - always `:not_evaluated`: no signature, key or expected context was checked.
+  * `holder_thumbprint`: the raw 32-byte RFC 7638 thumbprint of the header JWK.
+  * `verification`: always `:not_evaluated`: no signature, key or expected context was checked.
   """
 
   @enforce_keys [

@@ -4,26 +4,26 @@ defmodule BoundedAuthorityProtocol.V1.Proof do
 
   ## Fields
 
-  * `holder_public_key` - the holder's raw 32-byte Ed25519 public key, embedded in the proof header
+  * `holder_public_key`: the holder's raw 32-byte Ed25519 public key, embedded in the proof header
     as a public JWK; it must pass `BoundedAuthorityProtocol.Ed25519.acceptable_public_key?/1` and
     match the grant's `holder_thumbprint`.
-  * `proof_id` - the `jti` claim: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
+  * `proof_id`: the `jti` claim: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
     bytes.
-  * `method` - the `htm` claim: a 1 to `method_bytes` (32) byte RFC 9110 method token, compared
+  * `method`: the `htm` claim: a 1 to `method_bytes` (32) byte RFC 9110 method token, compared
     byte-for-byte and never case-normalized (`"POST"` and `"post"` differ).
-  * `target_uri` - the `htu` claim: the HTTPS target URI already in normal form
+  * `target_uri`: the `htu` claim: the HTTPS target URI already in normal form
     (`BoundedAuthorityProtocol.V1.Uri.normalize/2`), at most `uri_bytes` (8,192) bytes; a value that
     is not already normalized is refused.
-  * `issued_at` - the `iat` claim, integer Unix time in seconds.
-  * `nonce` - `nil` for no nonce, or a non-empty UTF-8 string of at most `nonce_bytes` (512) bytes.
+  * `issued_at`: the `iat` claim, integer Unix time in seconds.
+  * `nonce`: `nil` for no nonce, or a non-empty UTF-8 string of at most `nonce_bytes` (512) bytes.
     Redacted by `inspect/2`.
-  * `invocation_id` - the `ba_inv` claim: a lowercase RFC 4122 UUID naming this one invocation;
+  * `invocation_id`: the `ba_inv` claim: a lowercase RFC 4122 UUID naming this one invocation;
     reserving it against replay stays with the caller.
-  * `operation` - the `ba_op` claim: the operation name, 1 to `operation_bytes` (128) printable
+  * `operation`: the `ba_op` claim: the operation name, 1 to `operation_bytes` (128) printable
     ASCII bytes; it must name an operation of the grant.
-  * `grant_compact` - the exact grant compact the proof is bound to; the proof carries the SHA-256
+  * `grant_compact`: the exact grant compact the proof is bound to; the proof carries the SHA-256
     of these bytes (`ath`). Redacted by `inspect/2`.
-  * `cast_arguments` - the typed request arguments as a tagged
+  * `cast_arguments`: the typed request arguments as a tagged
     `BoundedAuthorityProtocol.V1.Json.value()` (for example `{:object, [{"amount", {:integer,
     5}}]}`); the proof binds their request digest (`ba_req`). Redacted by `inspect/2`.
   """

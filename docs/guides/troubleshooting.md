@@ -1,6 +1,6 @@
 # Troubleshooting `{:error, :invalid}`
 
-Every verification failure returns the same value, `{:error, :invalid}`. A wrong key, a changed
+Every credential-verification failure returns the same value, `{:error, :invalid}`. A wrong key, a changed
 byte, an expired grant, and an argument outside a selector all look identical, so the error
 tells an attacker nothing. The cost is that it tells you nothing either. This page is the
 checklist for finding the cause from your own inputs, in the order verification checks them.

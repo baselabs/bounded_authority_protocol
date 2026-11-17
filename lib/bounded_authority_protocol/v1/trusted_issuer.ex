@@ -6,9 +6,9 @@ defmodule BoundedAuthorityProtocol.V1.TrustedIssuer do
 
   ## Fields
 
-  * `key_id` - the exact `kid` the grant header must carry: 1 to `kid_bytes` (128) bytes of ASCII
+  * `key_id`: the exact `kid` the grant header must carry: 1 to `kid_bytes` (128) bytes of ASCII
     letters, digits, `-`, `.`, `_` or `~`.
-  * `public_key` - the issuer's raw public key in the suite's fixed width: 32-byte Ed25519 under
+  * `public_key`: the issuer's raw public key in the suite's fixed width: 32-byte Ed25519 under
     contract-majors 1 and 2, the 65-byte uncompressed SEC1 P-256 point `0x04 || x || y` under
     contract-major 3.
   """

@@ -7,19 +7,51 @@ Every Elixir block below runs, in order, in the repository's test suite.
 ## What you are holding
 
 `bounded_authority_protocol` is a pure, deterministic verification library. It proves that the
-bytes a caller supplies satisfy the trusted keys and expected context the caller also supplies.
+bytes a caller supplies satisfy already-trusted public keys, expected context, and time that
+the caller also supplies. It has no private-key access or custody.
 It never selects trusted keys, reserves replay, checks revocation, or grants execution: those
 belong to your service or to a stateful authority runtime. The
 [standard specification](../../spec/bap-v1.md) is the normative profile; this guide is
 operational.
 
-## Install
+## Create and start a project
+
+Install Elixir 1.18 or newer in the supported 1.x range and Erlang/OTP 27 or newer with crypto
+support. The package's supported OTP releases are 27, 28, and 29. Check `elixir --version` and
+`mix --version` first. You also need access to hex.pm to fetch dependencies. If Hex is not yet
+installed, run `mix local.hex` and accept its installation prompt.
+
+From a directory where you keep projects, create the application:
+
+<!-- reader-create -->
+```sh
+mix new bap_reader
+cd bap_reader
+```
+
+Mix prints the created files and `Your Mix project was created successfully.` Open the new
+`mix.exs` and replace its `defp deps` function with this exact dependency declaration:
 
 ```elixir
 defp deps do
   [{:bounded_authority_protocol, "~> 1.0"}]
 end
 ```
+
+Fetch the package and start IEx from that same `bap_reader` directory:
+
+<!-- reader-start -->
+```sh
+mix deps.get
+iex -S mix
+```
+
+The fetch resolves `bounded_authority_protocol` 1.x. IEx compiles the project, prints its
+`Interactive Elixir` banner, and presents an `iex>` prompt. Paste the numbered Elixir blocks
+below into that session in order. The dependency declaration above belongs only in `mix.exs`,
+not at the prompt. Exit IEx with Ctrl-C twice when finished. The fresh-consumer test performs
+this creation, dependency edit, fetch, and IEx journey against an unpacked release archive;
+the guide's own requirement is checked before substituting that local release for Hex.
 
 The [changelog](../../CHANGELOG.md) describes each release, and [Upgrading](upgrading.md) what
 to change when you move between them. Depend on the Hex package, never on a source checkout. The
@@ -197,6 +229,10 @@ The value is `{"grant-restart-001", :not_evaluated}`.
 
 Verification is one input to your decision. Before you act, your service still has to reserve
 the invocation id against replay, check that the grant is not revoked, and apply its own policy.
+Reserve the issuer/grant/invocation execution identity atomically in shared durable storage
+through grant expiry plus the service's maximum permitted skew, or longer in an authoritative
+execution record. Expiring a reservation with its first proof lets a holder use a fresh proof
+for the same invocation. See the [executed service notebook](../notebooks/service-integration.livemd).
 See [usage rules](../../usage-rules.md).
 
 ## Handle a rejection

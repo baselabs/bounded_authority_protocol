@@ -350,30 +350,53 @@ second = V1.check_envelope(credentials, expected)
 {elem(first, 0), elem(second, 0)}
 ```
 
-The cell returns `{:ok, :ok}`. Replay defense is the host's job. A host reserves each
-`invocation_id` atomically after verification and before acting, in storage shared by every
-instance of the service (a database unique constraint, for example); a second presentation then
-fails the reservation. The sketch below keeps the reservations in a map to show the order of
-steps; a real service never keeps them in process memory.
+The cell returns `{:ok, :ok}`. Replay defense is the host's job. Reserve the issuer/grant/invocation
+execution identity atomically after verification and before acting, in durable storage shared by
+every service instance (a database unique constraint, for example). Retain it through the grant's
+expiry plus the service's maximum permitted clock skew, or longer in an authoritative execution
+record. Never expire it with the first proof: the holder can sign a fresh proof for the same
+invocation under a still-valid grant. Nonce consumption is an additional check, not a substitute.
+
+This sequential map sketch demonstrates retention and ordering, not a production store. A real
+service must make reservation atomic, survive restarts, and prevent duplicate effects on retry.
 
 ```elixir
 accept = fn credentials, expected, reserved ->
-  with {:ok, facts} <- V1.check_envelope(credentials, expected),
-       false <- MapSet.member?(reserved, expected.invocation_id) do
-    {{:accepted, facts.operation}, MapSet.put(reserved, expected.invocation_id)}
-  else
-    true -> {{:rejected, :replayed}, reserved}
-    {:error, :invalid} -> {{:rejected, :invalid}, reserved}
+  case V1.check_envelope(credentials, expected) do
+    {:ok, facts} ->
+      key = {facts.issuer, facts.grant_id, facts.invocation_id}
+      reserved = Map.reject(reserved, fn {_key, until} -> until <= expected.evaluation_time end)
+
+      if Map.has_key?(reserved, key) do
+        {{:rejected, :replayed}, reserved}
+      else
+        until = facts.expires_at + expected.clock_skew
+        {{:accepted, facts.operation}, Map.put(reserved, key, until)}
+      end
+
+    {:error, :invalid} ->
+      {{:rejected, :invalid}, reserved}
   end
 end
 
-{first_result, reserved} = accept.(credentials, expected, MapSet.new())
-{second_result, _reserved} = accept.(credentials, expected, reserved)
+{first_result, reserved} = accept.(credentials, expected, %{})
+{second_result, reserved} = accept.(credentials, expected, reserved)
 
-[first_result, second_result]
+# The first proof is too old, but the grant remains live and the holder can sign again.
+later = %{expected | evaluation_time: issued_at + 400}
+fresh = sign_proof.(proof_id: "proof-build-002", issued_at: later.evaluation_time)
+{:error, :invalid} = V1.check_envelope(credentials, later)
+{:ok, fresh_facts} = V1.check_envelope(fresh, later)
+{fresh_result, _reserved} = accept.(fresh, later, reserved)
+
+[first_result, second_result, {fresh_facts.operation, fresh_result}]
 ```
 
-The cell returns `[{:accepted, "trigger_build"}, {:rejected, :replayed}]`.
+The cell returns `[{:accepted, "trigger_build"}, {:rejected, :replayed}, {"trigger_build", {:rejected, :replayed}}]`.
+
+The fresh envelope verifies cryptographically but cannot execute the same invocation again.
+Changing the reservation to `facts.proof_issued_at + expected.proof_max_age + expected.clock_skew`
+makes this cell fail its stated result: the second execution would be accepted.
 
 The host also owns:
 

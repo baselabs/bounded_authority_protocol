@@ -1,5 +1,46 @@
 defmodule BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1 do
-  @moduledoc "Explicit entry point for the byte-distinct local-loopback HTTP application proof profile."
+  @moduledoc """
+  Byte-distinct holder proofs for literal-loopback HTTP development listeners.
+
+  This profile reuses contract-major 1 grants, keys, request digests, and expected-request types,
+  but has its own proof header and URI rules. It never retries the standard HTTPS profile.
+  See the [normative specification](../spec/bap-local-loopback-http-v1.md).
+
+  ## Required context
+
+  `check_envelope/2` takes raw `BoundedAuthorityProtocol.V1.Credentials` and a complete
+  `BoundedAuthorityProtocol.V1.ExpectedRequest`: already-trusted issuer key, expected issuer,
+  audience, method, normalized target URI, invocation ID, operation, tagged cast arguments,
+  evaluation time in integer Unix seconds, clock skew, proof maximum age, nonce, and bounds.
+  Use `nonce: {:required, issued_nonce}`. `:not_required` is always refused by this profile.
+  The host issues and atomically retires that nonce; pure verification only checks its match.
+
+  Targets use HTTP with the literal host `127.0.0.1` or `[::1]` and an optional port from 1 to
+  65535; port 80 is omitted in normal form. Names such as `localhost`, alternate IP spellings, userinfo, query, and fragment are
+  refused. Normalization performs no DNS or network access. This is not a production transport
+  security substitute. Configure expected context from trusted routing, not client host headers.
+
+  ## Operations and results
+
+  * `normalize_uri/2` returns `{:ok, normalized_uri}` under the closed loopback rules.
+  * `proof_signing_input/2` returns `{:ok, SigningInput}` with the exact bytes to sign elsewhere.
+  * `assemble_compact/2` and `assemble_compact/3` return `{:ok, compact}` after checking profile
+    structure and signature encoding. Assembly establishes neither signature validity nor trust.
+  * `decode_proof/2` returns `{:ok, DecodedProof}` for untrusted diagnosis without a signature check.
+  * `check_envelope/2` re-verifies both raw credentials and returns `{:ok, EnvelopeFacts}` with
+    redacted inspection and `authorization: :not_evaluated`.
+
+  Every operation returns exactly `{:error, :invalid}` on invalid or over-limit input or a failed
+  check. `%{}` limits use profile maxima and overrides only tighten them. Public keys and time
+  are explicit inputs; this package has no private-key access or custody. The host still owns
+  trust selection, invocation and nonce reservation, live revocation, and authorization policy.
+
+  ## Executed example
+
+  [The loopback recipe](../docs/guides/recipes.md#verify-a-local-loopback-request) signs a proof,
+  verifies it with a required nonce, and rejects the same envelope in nonce-optional mode. The
+  documentation consumer executes the actual example.
+  """
 
   alias BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.Uri
   alias BoundedAuthorityProtocol.V1.Bounds

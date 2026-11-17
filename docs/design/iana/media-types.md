@@ -1,4 +1,4 @@
-# Media type registrations — ready-to-file entries
+# Ready-to-file media type registrations
 
 Rendered from `media-types.json` (RFC 6838 section 5.6 field order). The wire `typ`
 header values are unchanged; the media-type namespace is distinct from the wire `typ`.

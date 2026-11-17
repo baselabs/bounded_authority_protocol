@@ -1,8 +1,46 @@
 defmodule BoundedAuthorityProtocol.ContentAssertion.V1 do
   @moduledoc """
-  Explicit standalone content-assertion profile: signatures bind exact content digests,
-  caller-supplied context and a bounded window. Verification never grants authority.
-  The caller owns content semantics, trusted key selection, replay and durable lineage state.
+  Standalone Ed25519 content assertions (`bap-content-assertion/1`).
+
+  Signatures bind exact content digests, caller-pinned profile identity, context, a generation,
+  predecessor digest, and a bounded window. These are byte-distinct sibling assertions, not
+  grants or request proofs. See the [normative specification](../spec/bap-content-assertion-v1.md).
+
+  ## Required context
+
+  `verify_assertion/2` takes compact bytes and a
+  `BoundedAuthorityProtocol.ContentAssertion.V1.ExpectedContentAssertion`. Supply the already-trusted
+  attestor `BoundedAuthorityProtocol.V1.HistoricalPublicKey`, exact `issuer`, `audience`, `subject`,
+  and `profile` strings, raw 32-byte `profile_digest` and `content_digest`, integer Unix seconds
+  as `now`, and `bounds`. No digest check can be opted out of. The assertion's entire window must
+  fit within the attestor key's validity window, and `nbf <= now < exp`. Bounds can only tighten
+  profile maxima; `%{}` uses those maxima. The library reads no clock or key store.
+
+  ## Operations and results
+
+  * `assertion_signing_input/2` returns `{:ok, SigningInput}`; sign its `message` outside this
+    package. `assemble_compact/2` and `assemble_compact/3` return `{:ok, compact}` after checking
+    the profile and signature encoding, without establishing signature validity or trust.
+  * `decode_assertion/2` returns `{:ok, DecodedContentAssertion}` without checking the signature.
+  * `verify_assertion/2` returns `{:ok, ContentAssertionFacts}` with redacted inspection and
+    `trust: :not_evaluated`. This checks the supplied public key, context, digest, and window.
+  * `content_digest/2` returns `{:ok, raw_32_byte_digest}` for nonempty exact content bytes.
+    `assertion_digest/2` returns the same result shape for exact profile-parseable compact bytes;
+    it does not check their signature or canonicalize them.
+  * `verify_successor/3` returns `:ok`, not new facts, for a consistent pair of supplied facts.
+    It checks their lineage relationship without verifying either fact's provenance.
+
+  Each operation returns exactly `{:error, :invalid}` for invalid inputs or a failed check. A
+  digest proves neither content meaning nor approval. The caller must verify each assertion,
+  choose trusted keys, check revocation, reserve replay, and maintain durable lineage high-water
+  state. A valid pair alone cannot exclude a fork or rollback. Success never grants execution.
+
+  ## Executed example
+
+  [The content-assertion recipe](../docs/guides/recipes.md#verify-content-and-its-successor)
+  hashes content, signs two generations, verifies both, and checks their successor relationship.
+  It also checks rejection of a changed content digest. The documentation consumer executes
+  the exact example against this package.
   """
   alias BoundedAuthorityProtocol.ContentAssertion.V1.{
     Codec,
@@ -53,7 +91,13 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1 do
   @spec assertion_digest(binary(), Bounds.t() | map()) :: {:ok, binary()} | {:error, :invalid}
   defdelegate assertion_digest(compact, limits), to: Codec
 
-  @doc "Checks pairwise lineage facts; caller owns their provenance, current trust and high-water state."
+  @doc """
+  Checks pairwise lineage consistency and returns `:ok` or `{:error, :invalid}`.
+
+  This compares caller-supplied facts; it neither verifies their provenance nor returns new
+  verified facts. Verify both assertions first and retain authoritative high-water state to
+  detect forks or rollback. Current trust and authorization remain the caller's responsibility.
+  """
   @spec verify_successor(ContentAssertionFacts.t(), ContentAssertionFacts.t(), Bounds.t() | map()) ::
           :ok | {:error, :invalid}
   defdelegate verify_successor(previous, next, limits), to: Codec

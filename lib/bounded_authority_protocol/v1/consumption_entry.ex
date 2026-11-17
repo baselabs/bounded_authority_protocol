@@ -4,12 +4,12 @@ defmodule BoundedAuthorityProtocol.V1.ConsumptionEntry do
 
   ## Fields
 
-  * `chain_id` - the chain identity: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
+  * `chain_id`: the chain identity: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
     bytes.
-  * `sequence` - the row's positive sequence number; `1` starts a chain.
-  * `previous_hash` - the raw 32-byte hash of the preceding row; 32 zero bytes when `sequence` is
+  * `sequence`: the row's positive sequence number; `1` starts a chain.
+  * `previous_hash`: the raw 32-byte hash of the preceding row; 32 zero bytes when `sequence` is
     `1`.
-  * `commitment` - a raw 32-byte opaque commitment to the consumption record; its preimage stays
+  * `commitment`: a raw 32-byte opaque commitment to the consumption record; its preimage stays
     private to the caller.
   """
 

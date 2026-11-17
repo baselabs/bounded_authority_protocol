@@ -8,6 +8,9 @@ and content-assertion sibling profiles, from the specifications ([v1](../spec/ba
 [`priv/conformance/`](../priv/conformance/). They are distribution surfaces for third-party
 verifiers, not additional normative text.
 
+Verification takes already-trusted public keys, expected context, and time as explicit inputs.
+The SDKs have no private-key access or custody and do not choose trust or authorize execution.
+
 **None of the three is published to a registry yet.** Install them from this repository by
 local path or Git commit; each README shows how. Each SDK moves to its own repository when it is
 first published, never publishing from this one
@@ -44,7 +47,7 @@ comments cross-reference the Elixir reference implementation for traceability.
 
 - **Erratum 3 (producer canonicality) is implemented in all three** (compact assembly for every
   profile and anchored-export encoding refuse a signature no conforming signer emits, and each
-  SDK runs the certified `bap-producer-canonicality/1` corpus — 75 cases). The npm verifier
+  SDK runs all 75 cases in the certified `bap-producer-canonicality/1` corpus). The npm verifier
   implemented it in 0.8.0.
 - **Erratum 6 (selector float zero) is implemented in all three.** Grant decode rejects a
   float-tagged zero inside an `equals` value or `one_of` member on every contract-major, and the

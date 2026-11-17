@@ -4,7 +4,7 @@ defmodule BoundedAuthorityProtocol.V1.HistoricalKeyChain do
 
   ## Fields
 
-  * `keys` - a nonempty ordered list of `BoundedAuthorityProtocol.V1.HistoricalPublicKey` structs:
+  * `keys`: a nonempty ordered list of `BoundedAuthorityProtocol.V1.HistoricalPublicKey` structs:
     the start anchor's key first, then one key per transition, in order (at most `key_transitions`
     (256) transitions).
   """

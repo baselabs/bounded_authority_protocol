@@ -1,4 +1,4 @@
-# JWT Claims Registry — ready-to-file entries
+# Ready-to-file JWT Claims Registry entries
 
 Rendered from `jwt-claims.json` (the machine-readable source; rule 7 of the spec-facts
 gate proves the source agrees with `docs/design/registries.md` exactly). Filing is

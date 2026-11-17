@@ -11,8 +11,10 @@ issuer signs a **capability grant** that names exactly which operations a holder
 which arguments; the holder signs a **proof of possession** for each request; a verifier checks
 the exact bytes and returns redacted facts. It never returns an authorization decision.
 
-The package is pure and deterministic: no keys, no clock, no I/O, no runtime dependencies. Every
-failure is the single value-free `{:error, :invalid}`, and the wire profile is closed, with no
+The package is pure and deterministic, with no private-key access or custody, clock reads, I/O,
+or runtime dependencies. Already-trusted public keys and time are explicit caller inputs.
+Credential validation failures use the single value-free `{:error, :invalid}`; crypto predicates
+return booleans. The wire profile is closed, with no
 permissive mode. It builds on compact JWS, DPoP, JCS, and JWK thumbprints
 ([RFC 7515](https://www.rfc-editor.org/rfc/rfc7515), [9449](https://www.rfc-editor.org/rfc/rfc9449),
 [8785](https://www.rfc-editor.org/rfc/rfc8785), [7638](https://www.rfc-editor.org/rfc/rfc7638)).

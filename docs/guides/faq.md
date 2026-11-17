@@ -7,11 +7,14 @@ act, your service still selects which keys it trusts, reserves the invocation id
 replay, checks that the grant is not revoked, and applies its own policy. Every facts struct
 says so in its `authorization: :not_evaluated` or `trust: :not_evaluated` field.
 
-### Why does every failure return the same `{:error, :invalid}`?
+### Why does credential verification always reject with `{:error, :invalid}`?
 
 So a rejection tells an attacker nothing about which check failed. To debug your own
 credentials, use the [troubleshooting checklist](troubleshooting.md), which compares the decoded
 claims with your expectations.
+
+This is the credential-verifier error contract. Public crypto predicates return booleans instead;
+the [API stability page](api-stability.md) distinguishes each function family's result shape.
 
 ### Why does the package not sign anything?
 
@@ -30,11 +33,16 @@ guides span several domains for that reason.
 
 ### How is this different from OAuth access tokens or plain DPoP?
 
-An access token says who may call; a grant also says which operations, with which argument
-values, and binds every request to one holder key. The proof format follows DPoP
+OAuth 2.0 is an authorization framework for delegated, scoped access, not a proof of identity.
+BAP complements OAuth by expressing operation and argument constraints in a holder-bound grant
+and binding its proof to the exact request context and canonical argument bytes. OAuth scopes,
+DPoP, and BAP overlap in limiting access and proving possession; your resource server's policy
+decides how they compose. The proof format follows DPoP
 ([RFC 9449](https://www.rfc-editor.org/rfc/rfc9449)) and adds a digest of the operation and its
 typed arguments, so a proof for one set of arguments never verifies for another. The wire
-profile is closed: there is no algorithm negotiation and no unknown member is ignored.
+profile is closed: there is no algorithm negotiation and no unknown member is ignored. Pure
+verification returns facts, not permission to execute. Trusted-key selection, replay reservation,
+revocation checks, and the authorization decision remain the host's responsibility.
 
 ### Which contract-major should I use?
 
@@ -60,7 +68,12 @@ See [Recipes](recipes.md#es256-from-a-kms-or-hsm).
 ### Does the verifier check revocation or replay?
 
 No. The package is stateless: it reads no clock, store, or network. Revocation and replay belong
-to your service or a stateful authority runtime.
+to your service or a stateful authority runtime. Reserve the issuer/grant/invocation execution
+identity atomically before any effect, in durable storage shared by every service instance.
+Keep it through grant expiry plus the maximum clock skew your service permits, or retain an
+authoritative execution record longer. A proof's freshness window is not a safe retention
+period, since the holder can sign another proof for the same invocation. The
+[service notebook](../notebooks/service-integration.livemd) executes that case.
 
 ### How do I rotate issuer keys?
 

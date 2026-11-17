@@ -731,7 +731,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
 
   # Closed 3-member shape: exactly {format, revision, generated_from}, the major's format
   # const, a monotone integer revision (1..integer_magnitude), and a non-empty bounded
-  # provenance string. A self-consistent sidecar of any other shape fails closed — the
+  # provenance string. A self-consistent sidecar of any other shape fails closed because the
   # per-file hash cannot catch a sidecar that was rewritten together with its index entry.
   defp valid_revision_sidecar?(bytes, major) do
     case Json.decode(bytes, Bounds.maximum()) do
@@ -954,7 +954,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
       n when is_integer(n) and n >= 1 -> observed_count == n
       "n_a" -> observed_count == 0
       # An applicability leaf may carry a falsifiable reason: {"n_a": "<reason>"}. The reason
-      # is for human review (Q29 obligation), not machine logic — treated identically to the
+      # is for human review (Q29 obligation), not machine logic, and is treated identically to the
       # bare "n_a" string (not-applicable: zero executed cases).
       %{"n_a" => _reason} -> observed_count == 0
       _ -> false
@@ -983,7 +983,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
       if tamper_verbatim_matches?(case_obj, base, target, index, xor), do: :ok, else: :invalid
     else
       # A PRESENT tamper block that is malformed (non-integer byte_index/xor) or references a
-      # missing base_case is a corrupt corpus — reject, matching the independent Node audit
+      # missing base_case means a corrupt corpus; reject it, matching the independent Node audit
       # (which asserts base present + integer byte_index/xor). Only a case with NO tamper block is
       # a non-tamper case (the second clause) and passes this check untouched.
       _ -> :invalid
@@ -1004,7 +1004,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
 
   # Re-derive the FULL tampered bytes from the base case: the base with the single
   # documented byte flipped by xor. The verbatim artifact must byte-equal this
-  # (design Q25) — not just match at the one index.
+  # (design Q25), rather than merely matching at one index.
   defp derive_tampered_bytes(base_bytes, index, xor) do
     size = byte_size(base_bytes)
 

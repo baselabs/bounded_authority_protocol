@@ -1,4 +1,4 @@
-# bounded_authority_protocol — AI Agent and Contributor Guide
+# Contributor guide for bounded_authority_protocol
 
 ## Where to read, by area
 
@@ -66,7 +66,7 @@ grant operational authority by itself.
 - Public protocol: [`baselabs/bounded_authority_protocol`](https://github.com/baselabs/bounded_authority_protocol)
 - Holder-side signer companion:
   [`baselabs/bounded_authority_report_adapter`](https://github.com/baselabs/bounded_authority_report_adapter)
-  (public Hex package `bounded_authority_report_adapter`; one-directional — it depends on this
+  (public Hex package `bounded_authority_report_adapter`; its dependency is one-directional: it depends on this
   package, which never depends on it)
 - Stateful runtime consumers own operational authorization and live state; this package
   supplies only pure verification.

@@ -18,9 +18,10 @@ retired on Hex for security (see the security advisory
 Upgrade to `1.x` with the [upgrade guide](docs/guides/upgrading.md).
 
 The verifier returns redacted, non-authorizing facts: trust and authorization, where a result
-carries them, are explicitly not evaluated. The package does not select trust, hold keys, reserve
+carries them, are explicitly not evaluated. Callers supply already-trusted public keys and time.
+The package does not select trust, access or hold private keys, reserve
 replay, inspect live revocation, certify deletion or retention, remove archives, or authorize an
-effect — those are the responsibility of a stateful authority runtime and the consuming host.
+effect. A stateful authority runtime and the consuming host own those responsibilities.
 
 ## Reporting a vulnerability
 

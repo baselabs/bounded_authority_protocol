@@ -8,24 +8,24 @@ defmodule BoundedAuthorityProtocol.V1.ExpectedRequest do
 
   ## Fields
 
-  * `trusted_issuer` - the `BoundedAuthorityProtocol.V1.TrustedIssuer` your service already trusts.
-  * `issuer` - the expected grant `iss`, compared byte-for-byte.
-  * `audience` - one audience your service answers to; the grant's `aud` must contain it.
-  * `method` - the request method as received, compared byte-for-byte (never case-normalized).
-  * `target_uri` - the request target as your server derives it, already in normal form
+  * `trusted_issuer`: the `BoundedAuthorityProtocol.V1.TrustedIssuer` your service already trusts.
+  * `issuer`: the expected grant `iss`, compared byte-for-byte.
+  * `audience`: one audience your service answers to; the grant's `aud` must contain it.
+  * `method`: the request method as received, compared byte-for-byte (never case-normalized).
+  * `target_uri`: the request target as your server derives it, already in normal form
     (`BoundedAuthorityProtocol.V1.Uri.normalize/2`).
-  * `invocation_id` - the lowercase RFC 4122 UUID your service assigned to this invocation.
-  * `operation` - the operation name the request performs.
-  * `cast_arguments` - the typed arguments your server derived from the request, as a tagged
+  * `invocation_id`: the lowercase RFC 4122 UUID your service assigned to this invocation.
+  * `operation`: the operation name the request performs.
+  * `cast_arguments`: the typed arguments your server derived from the request, as a tagged
     `BoundedAuthorityProtocol.V1.Json.value()`; every selector of the operation must accept them.
     Redacted by `inspect/2`.
-  * `evaluation_time` - the caller's current time, integer Unix time in seconds; the library reads
+  * `evaluation_time`: the caller's current time, integer Unix time in seconds; the library reads
     no clock.
-  * `clock_skew` - the tolerated clock skew in seconds, `0` to `clock_skew` (60).
-  * `proof_max_age` - the maximum proof age in seconds, `1` to `proof_max_age` (300).
-  * `nonce` - `:not_required` (the proof must carry no nonce) or `{:required, nonce}` (the proof
+  * `clock_skew`: the tolerated clock skew in seconds, `0` to `clock_skew` (60).
+  * `proof_max_age`: the maximum proof age in seconds, `1` to `proof_max_age` (300).
+  * `nonce`: `:not_required` (the proof must carry no nonce) or `{:required, nonce}` (the proof
     must carry exactly `nonce`). The nonce is redacted by `inspect/2`.
-  * `bounds` - a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
+  * `bounds`: a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
     means the profile maxima (see `BoundedAuthorityProtocol.V1.Bounds.coerce/1`).
   """
 

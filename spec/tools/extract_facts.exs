@@ -9,8 +9,8 @@ defmodule BoundedAuthorityProtocol.ExtractFacts do
   # its own spec file under its own closed anchor set, and frozen per major
   # (spec/facts/baseline-v<N>.json). Major 1's ten-key set and its baseline bytes are the
   # original swap certification and never change shape. Majors 2 and 3 (the successor closed
-  # profiles, which incorporate v1 by enumerated reference) extract their DELTA facts — suite
-  # identity, domain separators, selector kinds, and the v3 suite rules/constants — so a
+  # profiles, which incorporate v1 by enumerated reference) extract their DELTA facts (suite
+  # identity, domain separators, selector kinds, and the v3 suite rules/constants) so a
   # silent edit of any successor-major normative constant reds rule 1b exactly as a v1 edit
   # does (the successor-major activations' named deferral, closed).
   #
@@ -148,7 +148,7 @@ defmodule BoundedAuthorityProtocol.ExtractFacts do
   end
 
   # Anchor validation BEFORE region building: the anchor set of each authority file must be a
-  # permutation of the major's closed key list — no unknown key, no duplicate, no missing key.
+  # permutation of the major's closed key list, with no unknown, duplicate, or missing key.
   # This is the closed-set discipline v1 carries, enforced per file instead of per merged set.
   defp regions_of(contents, file, keys) do
     case validate_anchors(contents, file, keys) do
@@ -191,7 +191,7 @@ defmodule BoundedAuthorityProtocol.ExtractFacts do
   end
 
   # Splits the document into {anchor_key, region_lines} pairs. A region ends at the next
-  # section heading (a line starting with "#" but not "###" — subsections continue a region,
+  # section heading (a line starting with "#" but not "###", since subsections continue a region,
   # which is what keeps the archive section's four ### blocks inside archive-framing) or at the next
   # anchor, whichever comes first.
   defp build_regions(contents, keys) do
@@ -292,7 +292,7 @@ defmodule BoundedAuthorityProtocol.ExtractFacts do
   end
 
   # Majors 2 and 3 name their separators in the substitutions table; the wire spellings carry
-  # the two-character \0 text (a literal NUL byte — the cd42445 incident class — does not
+  # the two-character \0 text (a literal NUL byte, as in the cd42445 incident class, does not
   # match and reds rule 1b).
   defp do_parse_region({"domain-separators", major}, region, _regions)
        when major in [2, 3] do
@@ -522,7 +522,7 @@ defmodule BoundedAuthorityProtocol.ExtractFacts do
     text |> String.replace("`", "") |> String.trim()
   end
 
-  # The sole distinct candidate, or "" when absent/ambiguous — an ambiguous value never
+  # The sole distinct candidate, or "" when absent/ambiguous, so an ambiguous value never
   # freezes silently (it diverges from the frozen baseline and reds rule 1b).
   defp sole(candidates) do
     case Enum.uniq(candidates) do
@@ -613,7 +613,7 @@ end
 
 # CLI trailer: executes only under an explicit argv contract (--print, or --write TARGET) so
 # requiring this file from the gate script stays side-effect free. --major N selects the
-# major's extraction (default 1) — the successor baselines freeze with
+# major's extraction (default 1). The successor baselines freeze with
 # `--major 2 --write spec/facts/baseline-v2.json` and `--major 3 ...` exactly as v1's did.
 case System.argv() do
   ["--print"] ->

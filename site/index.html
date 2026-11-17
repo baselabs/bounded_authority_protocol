@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BAP — the Bounded Authority Protocol</title>
-<meta name="description" content="Bounded Authority: the open protocol that proves what a caller may do — not just who they are. Signed capability grants, holder proofs, independent verification, for MCP servers, agents, and APIs that authenticate with OAuth.">
+<title>BAP: the Bounded Authority Protocol</title>
+<meta name="description" content="Holder-bound grants and exact-request proofs that complement OAuth authorization. Pure verification returns facts; resource-server policy decides execution.">
 <link rel="stylesheet" href="./styles.css?v=2">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%230f172a'/%3E%3Ctext x='24' y='32' font-family='Arial,sans-serif' font-size='19' font-weight='800' text-anchor='middle' fill='%23fbbf24'%3E[BAP]%3C/text%3E%3C/svg%3E">
 </head>
@@ -28,8 +28,8 @@
     <span class="brand"><span class="wordmark"><i>[</i>BAP<i>]</i></span></span>
     <span class="fam">
       <a href="#" class="here" title="You are here">Protocol</a>
-      <a href="https://baselabs.github.io/bounded_authority_protocol_typescript/" title="The verifier package — with the live bench">Verifier</a>
-      <a href="https://baselabs.github.io/bounded_authority_signer_typescript/" title="The signer package — with the live envelope playground">Signer</a>
+      <a href="https://baselabs.github.io/bounded_authority_protocol_typescript/" title="Explore the verifier package on its live bench">Verifier</a>
+      <a href="https://baselabs.github.io/bounded_authority_signer_typescript/" title="Explore the signer package in its envelope playground">Signer</a>
       <a href="https://github.com/baselabs/bounded_authority_report_adapter" title="The Elixir reference implementation">Elixir&nbsp;reference</a>
     </span>
     <a class="gh" href="https://github.com/baselabs/bounded_authority_protocol">GitHub&nbsp;↗</a>
@@ -39,12 +39,12 @@
 <section class="hero">
   <div class="wrap">
     <p class="kicker"><span class="wordmark hero-mark"><i>[</i>BAP<i>]</i></span> Bounded Authority Protocol</p>
-    <h1>OAuth proved <em>who</em>.<br>This protocol proves <em>what they may do</em>.</h1>
-    <p class="lede">Bounded Authority is an open wire protocol for per-request capability: an issuer
-    signs a grant naming permitted operations, argument bounds, audiences, and a validity window; the holder's key signs a proof
-    binding that grant to one specific request; the resource verifies the envelope and keeps the
-    cryptographic facts. Transport authentication — OAuth, mTLS, whatever you run — stays exactly
-    where it is. This is the layer it leaves out.</p>
+    <h1>Bound authority.<br>Prove the <em>exact request</em>.</h1>
+    <p class="lede">OAuth authorizes delegated, scoped access. Bounded Authority complements it with
+    holder-bound grants naming permitted operations, argument bounds, audiences, and a validity
+    window. The holder signs a proof binding the grant to the exact request context and canonical
+    argument bytes. Pure verification returns cryptographic facts. The resource server still
+    selects trusted keys, reserves replay, checks revocation, and applies its authorization policy.</p>
     <div class="hero-actions">
       <a class="btn primary" href="https://baselabs.github.io/bounded_authority_signer_typescript/"><svg class="ic"><use href="#i-terminal"/></svg> Run the playground</a>
       <a class="btn ghost" href="#specs">Read the specs</a>
@@ -66,14 +66,14 @@
 <section id="why" class="wrap why">
   <div class="why-head">
     <h2>Three properties, on purpose</h2>
-    <p>The protocol is designed so that authority is bounded before it is exercised — not
-    audited after.</p>
+    <p>Signed constraints let a service check the bounds before it acts. Audit evidence records
+    what was verified.</p>
   </div>
   <div class="grid3">
     <article class="whycard">
       <h3>Every capability is narrow.</h3>
-      <p class="pain">A bearer token’s power is decided by whatever checked it, at whatever moment
-      — and lives until it expires.</p>
+      <p class="pain">OAuth scopes limit delegated access. A service may also need signed constraints
+      on individual operations and argument values.</p>
       <p class="answer"><svg class="ic"><use href="#i-check"/></svg> A grant is a signed, byte-frozen object naming <strong>operations,
       argument bounds, audiences, and a validity window</strong>. The proof binds the specific request target.</p>
     </article>
@@ -81,15 +81,17 @@
       <h3>Every request is proven.</h3>
       <p class="pain">Replay and confusion attacks ride the gap between “authenticated session”
       and “this exact call.”</p>
-      <p class="answer"><svg class="ic"><use href="#i-check"/></svg> The proof commits to a digest of <strong>this request</strong> — method,
-      target, invocation, arguments — under the holder’s key. Replay it elsewhere and it dies.</p>
+      <p class="answer"><svg class="ic"><use href="#i-check"/></svg> The holder's proof binds the method,
+      target, invocation, grant, and digest of the operation and typed arguments. Changed context
+      fails verification; repeated execution still requires the host's replay defense.</p>
     </article>
     <article class="whycard">
-      <h3>Verification trusts no one.</h3>
-      <p class="pain">Authorization that phones home (introspection, policy services) adds a
-      trusted party and a failure mode to every call.</p>
-      <p class="answer"><svg class="ic"><use href="#i-check"/></svg> The verifier checks signatures and bindings offline —
-      <strong>deterministic, pure, closed results</strong>. No oracle, no partial acceptance.</p>
+      <h3>Trust is an explicit input.</h3>
+      <p class="pain">Signature validity cannot decide which issuers a service trusts or whether a
+      verified operation may execute now.</p>
+      <p class="answer"><svg class="ic"><use href="#i-check"/></svg> Already-trusted public keys and time
+      are caller inputs. The verifier has no private-key access or custody and checks signatures and
+      bindings offline, with <strong>deterministic, pure, closed results</strong>.</p>
     </article>
   </div>
 </section>
@@ -97,11 +99,11 @@
 <section id="lifecycle" class="wrap">
   <div class="why-head"><h2>The family lifecycle</h2><p>Three protocols, one chain of evidence: what the agent is, what was agreed, what this call may do.</p></div>
   <div class="lifecycle">
-<a class="lstep" href="https://baselabs.github.io/agent_blueprint_protocol/"><span class="lmark"><i>[</i>ABP<i>]</i></span><div><b>Define the agent</b><small>Blueprint Core + Deployment Manifest — identity, bounds that only narrow, evidence commitments, pinned to one release digest</small></div></a>
+<a class="lstep" href="https://baselabs.github.io/agent_blueprint_protocol/"><span class="lmark"><i>[</i>ABP<i>]</i></span><div><b>Define the agent</b><small>A Blueprint Core and Deployment Manifest pin identity, narrowing bounds, and evidence commitments to one release digest</small></div></a>
     <div class="larrow">→</div>
-<a class="lstep" href="https://baselabs.github.io/charter_agreement_protocol/"><span class="lmark"><i>[</i>CAP<i>]</i></span><div><b>Agree the terms</b><small>Charter revisions bind ABP release digests (abp_bindings); every receipt records the action’s deployment digest — signed by both parties</small></div></a>
+<a class="lstep" href="https://baselabs.github.io/charter_agreement_protocol/"><span class="lmark"><i>[</i>CAP<i>]</i></span><div><b>Agree the terms</b><small>Charter revisions bind ABP release digests (abp_bindings); both parties sign receipts recording the action's deployment digest</small></div></a>
     <div class="larrow">→</div>
-<span class="lstep now"><span class="lmark"><i>[</i>BAP<i>]</i></span><div><b>Authorize each request</b><small>Issuer-signed grants + holder proofs govern every call, per request — the authority layer over OAuth</small></div></span>
+<span class="lstep now"><span class="lmark"><i>[</i>BAP<i>]</i></span><div><b>Verify each request</b><small>Issuer-signed grants and holder proofs bind request context and argument bytes; OAuth scopes and host policy still govern execution</small></div></span>
   </div>
 </section>
 
@@ -121,14 +123,14 @@
     <article class="famcard">
       <h3><svg class="ic"><use href="#i-seal"/></svg> The signer <small>· TypeScript</small></h3>
       <p>The holder/issuer companion that produces signed grants, proofs, anchors, and key
-      transitions through a caller-owned key handle — the private key never enters the library.</p>
+      transitions through a caller-owned key handle. Private-key custody stays with that handle.</p>
       <div class="links"><a href="https://baselabs.github.io/bounded_authority_signer_typescript/">playground</a><a href="https://www.npmjs.com/package/@bounded-authority-protocol/signer">npm</a><a href="https://github.com/baselabs/bounded_authority_signer_typescript">repository</a></div>
     </article>
     <article class="famcard">
       <h3><svg class="ic"><use href="#i-shield"/></svg> The verifier <small>· TypeScript</small></h3>
       <p>The deterministic verify side for all three contract-majors plus the role-attestation and
-      content-assertion profiles: checkEnvelope, decode, and the historical surfaces — closed
-      results, pure verify path, conformance-proven against the certified corpora.</p>
+      content-assertion profiles. checkEnvelope, decode, and the historical surfaces have closed
+      results and a pure verification path checked against the certified corpora.</p>
       <div class="links"><a href="https://baselabs.github.io/bounded_authority_protocol_typescript/">the bench</a><a href="https://www.npmjs.com/package/@bounded-authority-protocol/verifier">npm</a><a href="https://github.com/baselabs/bounded_authority_protocol_typescript">repository</a></div>
     </article>
     <article class="famcard">
@@ -143,7 +145,7 @@
 <section id="specs" class="wrap">
   <div class="sec-head"><h2>The wire specs</h2></div>
   <div class="libgrid">
-    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v1.md">bap-v1</a><br><small>the frozen v1 wire format — grants, proofs, compacts</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v1.md">bap-v1</a><br><small>grants, proofs, and compacts in the frozen v1 wire format</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-local-loopback-http-v1.md">bap-local-loopback-http-v1</a><br><small>the byte-distinct development-listener profile</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v2.md">bap-v2</a><br><small>the v2 contract-major, beside the byte-frozen v1</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v3.md">bap-v3</a><br><small>the v3 contract-major: the ES256 suite</small></div>

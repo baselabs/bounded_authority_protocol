@@ -6,13 +6,13 @@ defmodule BoundedAuthorityProtocol.V1.ExpectedAnchoredExport do
 
   ## Fields
 
-  * `chain` - the `BoundedAuthorityProtocol.V1.ExpectedChain` boundaries of the exported range.
-  * `start_anchor` - the `BoundedAuthorityProtocol.V1.ExpectedAnchor` for the start anchor.
-  * `transitions` - the ordered `BoundedAuthorityProtocol.V1.ExpectedKeyTransition` list.
-  * `end_anchor` - the `BoundedAuthorityProtocol.V1.ExpectedAnchor` for the end anchor.
-  * `digest` - the expected raw 32-byte SHA-256 of the complete archive.
-  * `object_version` - the expected object-store version string.
-  * `bounds` - a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
+  * `chain`: the `BoundedAuthorityProtocol.V1.ExpectedChain` boundaries of the exported range.
+  * `start_anchor`: the `BoundedAuthorityProtocol.V1.ExpectedAnchor` for the start anchor.
+  * `transitions`: the ordered `BoundedAuthorityProtocol.V1.ExpectedKeyTransition` list.
+  * `end_anchor`: the `BoundedAuthorityProtocol.V1.ExpectedAnchor` for the end anchor.
+  * `digest`: the expected raw 32-byte SHA-256 of the complete archive.
+  * `object_version`: the expected object-store version string.
+  * `bounds`: a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
     means the profile maxima (see `BoundedAuthorityProtocol.V1.Bounds.coerce/1`).
   """
 

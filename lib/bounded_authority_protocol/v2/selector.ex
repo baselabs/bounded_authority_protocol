@@ -13,6 +13,23 @@ defmodule BoundedAuthorityProtocol.V2.Selector do
   alias BoundedAuthorityProtocol.V1.Jcs
   alias BoundedAuthorityProtocol.V1.Selector, as: SharedSelector
 
+  @typedoc """
+  A contract-major 2 selector, used by `BoundedAuthorityProtocol.V2.Operation`.
+
+  Includes every `t:BoundedAuthorityProtocol.V1.Selector.t/0` form and adds `{:lte, path, bound}`
+  and `{:gte, path, bound}`. These ranges are inclusive and require a numeric tagged JSON bound
+  and an argument with the same tag: integers compare only with integers, floats only with
+  floats. Values use `t:BoundedAuthorityProtocol.V1.Json.value/0`, never native maps or numbers.
+  Producers refuse integral float-tagged selector operands that JCS would re-tag as integers;
+  verification of non-JCS payloads still follows the normative same-tag rules.
+
+  All selectors on an operation must match. `:all` accepts any root; other forms require an
+  existing path of 1 to 32 nonempty object-member names, each at most 128 UTF-8 bytes. Paths
+  never index arrays. Caller bounds may tighten the maxima. See the
+  [range rules](../spec/bap-v2.md#4-selector-algebra) and
+  [base selector rules](../spec/bap-v1.md#selectors), plus
+  `BoundedAuthorityProtocol.V2.grant_signing_input/2` for producer validation.
+  """
   @type t ::
           :all
           | {:equals, [binary()], BoundedAuthorityProtocol.V1.Json.value()}

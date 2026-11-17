@@ -57,7 +57,10 @@ audiences, a validity window, and the operations the holder may invoke, each wit
 The package handles it as raw 32 bytes.
 
 **Invocation id.** A fresh identifier per request, carried in the proof. The host reserves it in
-its replay store; the package only checks that it matches what you expect.
+its replay store; the package only checks that it matches what you expect. Retain the
+issuer/grant/invocation execution identity through grant expiry plus the service's maximum
+permitted clock skew, not just the first proof's freshness window. Reservation must be atomic
+and durable across service instances and restarts.
 
 **Issuer.** The party that signs grants. The verifier trusts an issuer key only because you pass
 it in `TrustedIssuer`.

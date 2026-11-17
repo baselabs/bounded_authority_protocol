@@ -1173,7 +1173,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   end
 
   @doc """
-  Every pinned beam — exact-export OR dynamic-call-count allowance. `check_compiled` inspects only
+  Includes every pinned beam, whether covered by exact exports or a dynamic-call-count allowance. `check_compiled` inspects only
   beams that EXIST, so without this a pinned module's deletion or rename removes its beam and no
   export check runs: a pinned public surface could vanish with the gate green. The
   keys-subset-of-present assertion (below) closes that: `Map.keys(allowances)` MUST be a subset of
@@ -1247,7 +1247,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   end
 
   # C1 carve-out pin (plan-review F6): the test_coverage ignore_modules list must equal EXACTLY
-  # [BoundedAuthorityProtocol.Conformance.Cli.Main] — the escript entry whose only behavior is
+  # [BoundedAuthorityProtocol.Conformance.Cli.Main], the escript entry whose only behavior is
   # System.halt (untestable in-VM). A second entry or a missing entry is a violation: a second
   # entry hides untested code, a missing entry fails the coverage threshold.
   @cli_main_module "BoundedAuthorityProtocol.Conformance.Cli.Main"
@@ -2440,7 +2440,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          ]
 
   # cli/main.ex is the escript entry: System.halt/1 only (delegates to Cli.run, which is an
-  # approved_source_module above). No File/IO here — the two-line entry.
+  # approved_source_module above). This two-line entry performs no File/IO.
   defp approved_source_call?(
          "lib/bounded_authority_protocol/conformance/cli/main.ex",
          "System",

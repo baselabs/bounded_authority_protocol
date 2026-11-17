@@ -65,6 +65,23 @@ defmodule BoundedAuthorityProtocol.LivebooksTest do
   end
 
   describe "the harness is red-capable" do
+    test "proof-lifetime reservation cannot satisfy the fresh-proof replay example" do
+      path = Path.join(@directory, "service-integration.livemd")
+      markdown = File.read!(path)
+
+      mutated =
+        String.replace(
+          markdown,
+          "until = facts.expires_at + expected.clock_skew",
+          "until = facts.proof_issued_at + expected.proof_max_age + expected.clock_skew"
+        )
+
+      assert mutated != markdown
+      assert [error] = LivebookHarness.check(mutated, path)
+      assert error =~ "got"
+      assert error =~ ":accepted"
+    end
+
     test "a wrong stated value is reported with the cell and the value" do
       source = notebook("1 + 1", "The cell returns `3`.")
       assert [error] = LivebookHarness.check(source, "planted.livemd")

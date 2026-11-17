@@ -36,8 +36,11 @@ release) and run the packaged corpora after each upgrade
 ([Recipes](recipes.md#run-every-packaged-corpus)).
 
 Within a contract-major, the accepted bytes and verdicts never change except through such a
-repair. The contract-major and sibling-profile facades keep returning `{:ok, value}` or exactly
-`{:error, :invalid}`, and the facts structs keep their not-evaluated markers. Public crypto
+repair. The contract-major and sibling-profile producers, decoders, and credential/evidence
+verifiers return `{:ok, value}` or exactly `{:error, :invalid}`. The pairwise consistency check
+`BoundedAuthorityProtocol.ContentAssertion.V1.verify_successor/3` returns `:ok` or
+`{:error, :invalid}`; it does not establish the provenance of supplied facts. Facts structs keep
+their not-evaluated markers. Public crypto
 predicates, including `BoundedAuthorityProtocol.Ed25519.verify_strict/3` and
 `BoundedAuthorityProtocol.Es256.verify_strict/3`, return booleans instead.
 
@@ -183,10 +186,12 @@ any message the CLI writes to standard error.
 
 Whatever the package version:
 
-- every contract-major and sibling-profile facade returns `{:ok, value}` or exactly
-  `{:error, :invalid}`; crypto predicates return `false` for invalid inputs, while the ES256
+- contract-major and sibling-profile producers, decoders, and credential/evidence verifiers
+  return `{:ok, value}` or exactly `{:error, :invalid}`. The successor consistency check returns
+  `:ok` or `{:error, :invalid}`; crypto predicates return `false` for invalid inputs, while the ES256
   conversion and normalization helpers use the success/error tuple convention;
 - the facts are redacted and never authorize (`authorization: :not_evaluated`,
   `trust: :not_evaluated`);
-- the package performs no I/O, reads no clock, and holds no keys, outside the conformance CLI's
-  documented file reads.
+- the package performs no I/O, reads no clock, and has no private-key access or custody. Trusted
+  public keys and time are explicit inputs. The conformance CLI's documented file reads are
+  outside that pure boundary.

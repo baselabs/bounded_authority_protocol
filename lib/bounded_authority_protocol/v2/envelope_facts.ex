@@ -4,24 +4,24 @@ defmodule BoundedAuthorityProtocol.V2.EnvelopeFacts do
 
   ## Fields
 
-  * `version` - the contract-major, always `2`.
-  * `issuer` - the verified `iss` claim.
-  * `grant_id` - the verified `jti` claim.
-  * `issuer_key_fingerprint` - the raw 32-byte RFC 7638 thumbprint of the trusted issuer public key
+  * `version`: the contract-major, always `2`.
+  * `issuer`: the verified `iss` claim.
+  * `grant_id`: the verified `jti` claim.
+  * `issuer_key_fingerprint`: the raw 32-byte RFC 7638 thumbprint of the trusted issuer public key
     the caller supplied.
-  * `holder_thumbprint` - the raw 32-byte RFC 7638 thumbprint the grant confirms (`cnf.jkt`).
-  * `matched_audience` - the expected audience, which the grant's `aud` contains.
-  * `issued_at` - the grant `iat`, integer Unix time in seconds.
-  * `not_before` - the grant `nbf`, integer Unix time in seconds.
-  * `expires_at` - the grant `exp`, integer Unix time in seconds.
-  * `authorization` - always `:not_evaluated`: these facts are never an authorization decision.
-  * `proof_id` - the verified proof `jti`.
-  * `invocation_id` - the verified `ba_inv`; reserve it against replay yourself.
-  * `operation` - the verified operation name.
-  * `target_uri` - the verified normalized target URI.
-  * `grant_hash` - the raw 32-byte SHA-256 of the grant compact the proof is bound to.
-  * `request_hash` - the raw 32-byte request digest the proof is bound to.
-  * `proof_issued_at` - the proof `iat`, integer Unix time in seconds.
+  * `holder_thumbprint`: the raw 32-byte RFC 7638 thumbprint the grant confirms (`cnf.jkt`).
+  * `matched_audience`: the expected audience, which the grant's `aud` contains.
+  * `issued_at`: the grant `iat`, integer Unix time in seconds.
+  * `not_before`: the grant `nbf`, integer Unix time in seconds.
+  * `expires_at`: the grant `exp`, integer Unix time in seconds.
+  * `authorization`: always `:not_evaluated`: these facts are never an authorization decision.
+  * `proof_id`: the verified proof `jti`.
+  * `invocation_id`: the verified `ba_inv`; reserve it against replay yourself.
+  * `operation`: the verified operation name.
+  * `target_uri`: the verified normalized target URI.
+  * `grant_hash`: the raw 32-byte SHA-256 of the grant compact the proof is bound to.
+  * `request_hash`: the raw 32-byte request digest the proof is bound to.
+  * `proof_issued_at`: the proof `iat`, integer Unix time in seconds.
   """
 
   @enforce_keys [

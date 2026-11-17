@@ -1,4 +1,4 @@
-# Interoperability report — BAP conformance cross-validation
+# BAP conformance cross-validation report
 
 **Status:** current for corpus revision 1, certified index digest
 `TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs` (base64url SHA-256 of `index.json`;
@@ -26,8 +26,8 @@ identities:
 This is NOT an implementer's-list document. The evidence norm used here is the
 test-vectors-plus-independent-cross-validation model: the contract-major 1 conformance corpus is a
 set of 283 published test vectors across 28 verification surfaces, and interoperability is
-demonstrated by independent implementations agreeing on every vector's verdict — including the
-two-boundary public-key census — not by listing organizations. An implementation appears here only
+demonstrated by independent implementations agreeing on every vector's verdict, including the
+two-boundary public-key census. Listing organizations proves nothing. An implementation appears here only
 with its independently re-executed result against the certified corpus snapshot or in-place
 binding named above.
 
@@ -55,7 +55,7 @@ disagreed on any case.
 
 ### Reference implementation
 
-- **Elixir** (`bounded_authority_protocol`) — the reference verifier. Its deterministic CLI
+- **Elixir** (`bounded_authority_protocol`) is the reference verifier. Its deterministic CLI
   executes the full corpus: **283/283 agreed, 0 disagreed, census two-way equal (11 keys)**,
   asserting the certified index digest at startup.
 
@@ -220,7 +220,9 @@ oracle for their verdicts):
    census asymmetry fails the run.
 4. Every implementation additionally ships a permissiveness mutation battery: the guard
    families that keep it from being MORE permissive than the reference are each proven
-   red-capable (construct the defect, watch the test go green, fix).
+   red-capable: the correct implementation passes, a deliberate permissiveness mutation fails
+   on the discriminating assertion, and the restored implementation passes. A surviving mutant
+   is a failed guard demonstration.
 5. Each application-profile and attestation-profile corpus is separate from the standard corpora.
    Each implementation verifies the exact declared file set and counts, then executes every case
    through the profile's separately named surfaces; no implementation infers or retries a profile.
@@ -237,7 +239,7 @@ repository.
 
 ## Current limitations (stated, not hidden)
 
-- Three of the four SDKs — Python, Rust, and Go — are not published to registries; each moves
+- The Python, Rust, and Go SDKs are not published to registries; each moves
   to its own repository on first publication. Their cross-validation above is
   repository-executed, not registry-distributed. The TypeScript verifier is published from its
   own repository.

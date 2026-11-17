@@ -4,11 +4,11 @@ defmodule BoundedAuthorityProtocol.V1.AnchoredExportInput do
 
   ## Fields
 
-  * `rows` - the raw canonical rows to export, in sequence order.
-  * `start_anchor` - the boundary-anchor compact at the start of the range, at most `anchor_bytes`
+  * `rows`: the raw canonical rows to export, in sequence order.
+  * `start_anchor`: the boundary-anchor compact at the start of the range, at most `anchor_bytes`
     (8,192).
-  * `transitions` - the ordered key-transition compacts, at most `key_transitions` (256).
-  * `end_anchor` - the boundary-anchor compact at the end of the range.
+  * `transitions`: the ordered key-transition compacts, at most `key_transitions` (256).
+  * `end_anchor`: the boundary-anchor compact at the end of the range.
   """
 
   @enforce_keys [:rows, :start_anchor, :transitions, :end_anchor]

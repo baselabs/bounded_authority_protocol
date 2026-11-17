@@ -4,10 +4,10 @@ defmodule BoundedAuthorityProtocol.V1.EncodedAnchoredExport do
 
   ## Fields
 
-  * `chunks` - the archive bytes as an ordered nonempty chunk list; their concatenation is the
+  * `chunks`: the archive bytes as an ordered nonempty chunk list; their concatenation is the
     archive.
-  * `digest` - the raw 32-byte SHA-256 of the complete archive bytes; store it in your own records.
-  * `byte_count` - the total archive length in bytes, at most `archive_bytes`.
+  * `digest`: the raw 32-byte SHA-256 of the complete archive bytes; store it in your own records.
+  * `byte_count`: the total archive length in bytes, at most `archive_bytes`.
   """
 
   @enforce_keys [:chunks, :digest, :byte_count]

@@ -4,15 +4,15 @@ defmodule BoundedAuthorityProtocol.V1.ExpectedAnchor do
 
   ## Fields
 
-  * `anchor_id` - the expected anchor identity.
-  * `anchored_at` - the expected anchor time, integer Unix time in seconds.
-  * `chain_id` - the chain identity: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
+  * `anchor_id`: the expected anchor identity.
+  * `anchored_at`: the expected anchor time, integer Unix time in seconds.
+  * `chain_id`: the chain identity: non-empty StringOrURI of at most `identifier_bytes` (512) UTF-8
     bytes.
-  * `sequence` - the expected anchored sequence number.
-  * `chain_hash` - the expected raw 32-byte chain hash at `sequence`.
-  * `key_id` - the expected signing key identifier.
-  * `key_fingerprint` - the expected raw 32-byte RFC 7638 fingerprint of the signing key.
-  * `bounds` - a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
+  * `sequence`: the expected anchored sequence number.
+  * `chain_hash`: the expected raw 32-byte chain hash at `sequence`.
+  * `key_id`: the expected signing key identifier.
+  * `key_fingerprint`: the expected raw 32-byte RFC 7638 fingerprint of the signing key.
+  * `bounds`: a `BoundedAuthorityProtocol.V1.Bounds` struct or a map of tightening overrides; `%{}`
     means the profile maxima (see `BoundedAuthorityProtocol.V1.Bounds.coerce/1`).
   """
 

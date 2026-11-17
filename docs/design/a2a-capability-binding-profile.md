@@ -1,6 +1,6 @@
-# A2A capability-binding profile — design specification
+# Design specification for the A2A capability-binding profile
 
-Status: accepted — owner approval 2026-09-20, following the project's design method: an options
+Status: accepted with owner approval on 2026-09-20, following the project's design method: an options
 analysis over the binding-layer fork, then independent adversarial review of both the analysis
 and this specification (two review rounds each; every finding adjudicated against first-hand
 sources and repaired). This document changes no wire format, public API, verifier behavior, or
@@ -10,14 +10,14 @@ authentication surfaces.
 
 Evidence classes at load-bearing claims:
 
-- **OBSERVED** — verified first-hand against the A2A specification and proto at pinned commit
+- **OBSERVED** means verified first-hand against the A2A specification and proto at pinned commit
   `afda8316c64951a2ecb2a0d3d10867405d2b4095`
   ([a2aproject/A2A](https://github.com/a2aproject/A2A)), or against this repository at
   `fb83133` (the contract-major 1 and 2 specs, registries, design records, the extension drafts, the AP2 interop profile,
   the successor-major charter), or against the gRPC over HTTP/2 protocol specification at its
   pinned commit (§1).
-- **DERIVED** — restated from a program record; not re-verified for this document.
-- **INFERRED** — this document's own design decisions, verifiable against no source.
+- **DERIVED** means restated from a program record without re-verification for this document.
+- **INFERRED** identifies this document's own design decisions, verifiable against no source.
 
 ## 0. Scope and framing
 
@@ -40,7 +40,7 @@ extended):
 - no claim that an A2A-conforming agent can consume a BAP grant + proof (unverified);
 - no claim that A2A's authentication validates either artifact;
 - no claim that BAP verification yields an authorization decision, receipt, or any runtime
-  guarantee — verification is not authority (repository critical rule 1); replay reservation,
+  guarantee. Verification is not authority (repository critical rule 1); replay reservation,
   revocation state, and the server's authorization decision remain the A2A server's own
   (A2A §7.5, §13.1 say the same in A2A's vocabulary: authorization logic is the agent's own);
 - no interop claim resting on self-round-trips (repository workflow rule);
@@ -48,13 +48,13 @@ extended):
   `docs/standards/submissions.md` reads "Nothing has been submitted").
 
 The binding covers a defined surface. **In scope:** the three standard A2A bindings over
-HTTPS — JSON-RPC (HTTP/S), HTTP+JSON/REST, gRPC (HTTP/2 with TLS) — per §6. **Out of scope,
+HTTPS: JSON-RPC (HTTP/S), HTTP+JSON/REST, and gRPC (HTTP/2 with TLS), per §6. **Out of scope,
 deliberately:** custom (non-HTTP) bindings (a byte-distinct sibling proof profile would be the
 mechanism if one ever needs proof semantics); plain-HTTP deployments other than literal-loopback
 development endpoints (which use the already-active
 `bap-application-proof/local-loopback-http/1` profile; non-loopback plain HTTP has no proof
-profile and no binding here — deployments use HTTPS); and push-notification webhooks, whose
-agent→client direction is A2A's own `AuthenticationInfo` mechanism (A2A §4.3, §13.2) — §8 binds
+profile and no binding here, so deployments use HTTPS); and push-notification webhooks, whose
+agent→client direction is A2A's own `AuthenticationInfo` mechanism (A2A §4.3, §13.2). Section 8 binds
 the *configuration* of push notifications as request content, never the webhook delivery itself.
 
 ## 1. Normative sources
@@ -62,7 +62,7 @@ the *configuration* of push notifications as request content, never the webhook 
 - A2A at `afda8316c64951a2ecb2a0d3d10867405d2b4095`
   ([a2aproject/A2A](https://github.com/a2aproject/A2A)), read first-hand from a pinned clone:
   `docs/specification.md` (§§3–5, 7–14 read end to end; §§1–2, 6, appendices at section level)
-  and `specification/a2a.proto` (normative data model per A2A §1.4 — the spec text calls it
+  and `specification/a2a.proto` (normative data model per A2A §1.4, where the spec text calls it
   `spec/a2a.proto`; the file sits at `specification/a2a.proto` in the repository; its package
   is `lf.a2a.v1`). OBSERVED.
 - This repository at `fb83133`: `spec/bap-v1.md` (§§7, 10–14, 16, 17), `spec/bap-v2.md` (§4),
@@ -80,29 +80,29 @@ the *configuration* of push notifications as request content, never the webhook 
 
 ## 2. Terminology
 
-- **Carriage** — where the grant and proof travel on a binding (HTTP header fields; gRPC
-  metadata entries). Distinct from **binding surface** — what the proof's claims cryptographically
+- **Carriage** identifies where the grant and proof travel on a binding (HTTP header fields; gRPC
+  metadata entries). The **binding surface** identifies what the proof's claims cryptographically
   name (`htm`, `htu`, `ba_inv`, `ba_op`, `ba_req`, `ath`, `nonce`; every claim the v1 proof
   table requires, placed by §§6–9).
-- **Canonical request object** — the operation's request message as defined by the A2A proto
+- **Canonical request object** means the operation's request message as defined by the A2A proto
   (e.g. `SendMessageRequest`), reconstructed from the wire per the binding's own member-to-wire
   mapping (JSON-RPC `params`; REST body / path / query per A2A §11.5 and the proto's HTTP
-  annotations; gRPC request message). Binding-independent by construction — with one recorded
+  annotations; gRPC request message). It is binding-independent by construction, with one recorded
   exception: default-valued scalar presence follows the binding's serialization (§8 rule 5), so
   the object's *shape* is binding-independent while presence of default-valued members is not.
-- **Bounded projection** — the closed JSON value this profile defines each operation's request
+- **Bounded projection** means the closed JSON value this profile defines each operation's request
   object to project to for `ba_req` (§8): value members as themselves, unbounded members as
   digests, always inside the v1 §17 ceilings.
-- **Namespaced operation identity** — the `ba_op` spelling (§7).
+- **Namespaced operation identity** means the `ba_op` spelling (§7).
 
 ## 3. The binding decision (recorded)
 
 **Composition.** Negotiation at the A2A layer (§4); binding and carriage at the transport layer
 (§§5–6); the canonical-object bounded projection in between (§8). Rejected alternatives,
 recorded from the binding-decision options analysis: Option A (carriage inside the A2A data
-model) — a digest-circularity exclusion taxing the exact-bytes digest discipline, task-history
+model), requiring a digest-circularity exclusion that taxes the exact-bytes digest discipline, task-history
 persistence exposing proof material, and a second carriage surface still owed for the
-non-message operations; Option B (pure HTTP layer) — no in-band discovery, no degradation hook,
+non-message operations; Option B (pure HTTP layer), which offers no in-band discovery or degradation hook,
 and no declarable card scheme name. DERIVED (program record); the analysis itself is internal
 provenance, and this section carries its operative conclusions.
 
@@ -127,7 +127,7 @@ An agent (A2A server) that consumes this binding declares it in its AgentCard:
 
 - **Extension URI (INFERRED, decided).** `https://bounded-authority.io/extensions/a2a-capability-binding/v1`
   under the project-controlled domain, in A2A's https identifier
-  style (A2A §4.6 examples), versioned in the URI per A2A §4.6.3 — a breaking change to this binding
+  style (A2A §4.6 examples), versioned in the URI per A2A §4.6.3. A breaking change to this binding
   gets a new URI. The URI is an identifier, not a promise of hosted content, and declares no
   A2A-venue status. The project's reversed-DNS prefix (`io.bounded-authority/…`, the MCP
   extension identifier's form) remains the fallback spelling if the owner prefers one namespace
@@ -144,7 +144,7 @@ An agent (A2A server) that consumes this binding declares it in its AgentCard:
   that merely accept it leave the flag false.
 - **Graceful degradation (per the mdx §4.3 pattern).** If one party supports the binding and
   the other does not, the supporting party reverts to the card's declared `securitySchemes`
-  posture — the authorization posture it applied before adding the binding. The capability
+  posture, meaning the authorization posture it applied before adding the binding. The capability
   layer never widens that posture.
 - **Per-skill requirements (DECIDED).** This binding does not use per-skill
   `AgentSkill.security_requirements` (proto): the declaration is card-level. Per-skill
@@ -154,19 +154,19 @@ An agent (A2A server) that consumes this binding declares it in its AgentCard:
   extension declaration. Where the binding is load-bearing, deployments SHOULD verify a card
   signature (A2A §8.4) or pin the card out-of-band.
 - **Undeclared carriage (DECIDED).** `BA-*` carriage arriving at a server that has not declared
-  the extension, or on a request without the `A2A-Extensions` opt-in, is not processed — the
+  the extension, or on a request without the `A2A-Extensions` opt-in, is not processed; the
   headers are ignored, the request proceeds under the card's declared posture. The negotiated
   contract governs; undeclared proofs are neither a bypass nor an error (A2A's own
-  forward-compatibility posture — implementations SHOULD ignore unrecognized fields, A2A §5.7 —
+  forward-compatibility posture (implementations SHOULD ignore unrecognized fields, A2A §5.7)
   is followed). Consequence, stated plainly: the opt-in is client-controlled, so a deployment
   that relies on this binding to narrow its authorization posture MUST either set
-  `required: true` or enforce the capability check in its own authorization layer — otherwise
+  `required: true` or enforce the capability check in its own authorization layer. Otherwise
   the narrowing is client-optional and a holder holding both a narrow grant and broader
   credentials can simply omit the opt-in.
 
 ## 5. Carriage
 
-The grant and proof ride as one value each, outside the request body (the RFC 9449 structure —
+The grant and proof ride as one value each, outside the request body (following the RFC 9449 structure,
 the proof signs the request; the request does not contain the proof):
 
 | Binding | Grant carriage | Proof carriage |
@@ -179,9 +179,9 @@ the proof signs the request; the request does not contain the proof):
   each).
 - **Naming (INFERRED, decided).** `BA-Grant` / `BA-Proof` (gRPC lowercases per its metadata
   convention, A2A §10.2) are modeled on the registries' prefix convention, extended to a
-  surface — HTTP header field names — that the registries do not govern (the `ba_`/`ba+`
+  surface (HTTP header field names) that the registries do not govern (the `ba_`/`ba+`
   convention scopes claims and media-type suffixes). They stay clear of the `a2a-` prefix,
-  which A2A reserves for its own spec-defined service parameters (A2A §3.2.6 — A2A states its
+  which A2A reserves for its own spec-defined service parameters (A2A §3.2.6, where A2A states its
   own side; the stay-clear rule is this program's inference). These names are unregistered; an
   eventual IANA header registration would follow the template path A2A itself uses for its
   headers (A2A §14.2) and is outside this slice.
@@ -190,7 +190,7 @@ the proof signs the request; the request does not contain the proof):
   deployment's carriage budget (as guidance: ≤ 8 KiB of total `BA-*` carriage per request); a
   grant too large for the carrier fails closed at the carrier, never at the verifier.
 
-## 6. Proof binding — `htm`, `htu`
+## 6. Binding `htm` and `htu` in the proof
 
 Every proof is the published `dpop+jwt` profile with unchanged claims and semantics
 (`spec/bap-v1.md` §11); `htm`/`htu` bind the concrete transport request:
@@ -198,14 +198,14 @@ Every proof is the published `dpop+jwt` profile with unchanged claims and semant
 | Binding | `htm` | `htu` |
 |---|---|---|
 | JSON-RPC | `POST` | normalized HTTPS URL of the selected `AgentInterface` entry |
-| HTTP+JSON/REST | the verb of the route actually used, per the proto's HTTP annotations (the normative source, A2A §1.4) — note a divergence in the A2A repository itself for `SubscribeToTask`: the annotations say `GET /tasks/{id=*}:subscribe` while the specification text's §11.3.2 and §5.3 tables say `POST`; this binding follows the proto annotations and records the divergence | normalized HTTPS URL of the interface entry + the route path actually used (bare or `/{tenant}/…` additional route); no query — A2A §11.5 query parameters are covered by the projection (§8) |
-| gRPC | `POST` | `https://{authority}/lf.a2a.v1.A2AService/{Method}` — `:method POST` and the `/Service-Name/{method}` path are the gRPC over HTTP/2 specification's grammar (§1, pinned); the interface entry declares the authority as `hostname:port`; port 443 drops, nondefault ports keep, per v1 §13 |
+| HTTP+JSON/REST | the verb of the route actually used, per the proto's HTTP annotations (the normative source, A2A §1.4). For `SubscribeToTask`, the annotations say `GET /tasks/{id=*}:subscribe` while the specification text's §11.3.2 and §5.3 tables say `POST`; this binding follows the proto annotations and records the divergence | normalized HTTPS URL of the interface entry + the route path actually used (bare or `/{tenant}/…` additional route), without query; A2A §11.5 query parameters are covered by the projection (§8) |
+| gRPC | `POST` | `https://{authority}/lf.a2a.v1.A2AService/{Method}`, following the gRPC over HTTP/2 specification's grammar for `:method POST` and the `/Service-Name/{method}` path (§1, pinned); the interface entry declares the authority as `hostname:port`; port 443 drops, nondefault ports keep, per v1 §13 |
 
 - URI normalization is v1 §13 verbatim (HTTPS-only, query-free, pre-normalized, no network
   work). The binding's functional equivalence (A2A §5.1) holds at the operation level: the
-  projection (§8 — modulo default-valued scalar presence, which follows the binding's
+  projection (§8, modulo default-valued scalar presence, which follows the binding's
   serialization per its rule 5) and `ba_op` (§7) are binding-independent, while the proof bytes
-  are per-binding — a proof minted for one binding does not verify at another, the correct
+  are per-binding. A proof minted for one binding does not verify at another, the correct
   fail-closed direction.
 - Plain-HTTP (non-production) deployments cannot carry the HTTPS-only `dpop+jwt` profile;
   literal-loopback development endpoints use the already-active
@@ -214,13 +214,13 @@ Every proof is the published `dpop+jwt` profile with unchanged claims and semant
   scope; if one ever needs proof semantics, a byte-distinct sibling proof profile is the mechanism,
   not a redefinition of `dpop+jwt`.
 
-## 7. Operation vocabulary — `ba_op`
+## 7. Operation vocabulary in `ba_op`
 
 The registries fix the namespace discipline: bare operation names are deployment-scoped;
 cross-vendor interoperable vocabularies use reverse-DNS prefixes. An A2A binding's operation
 vocabulary is cross-vendor by construction.
 
-**Decision (INFERRED):** `ba_op` is spelled `io.bounded-authority/a2a/{Method}` — the
+**Decision (INFERRED):** `ba_op` is spelled `io.bounded-authority/a2a/{Method}`, using the
 project-controlled reversed-DNS prefix (available now; the vocabulary definition is this
 binding's) over the canonical A2A method name (the PascalCase identity shared by JSON-RPC and
 gRPC; REST routes are binding framing, not operation identity). An A2A-domain prefix would
@@ -232,7 +232,7 @@ inside the 128-byte ceiling.
 
 | `ba_op` | Canonical method |
 |---|---|
-| `io.bounded-authority/a2a/SendMessage` | SendMessage (also SendStreamingMessage's request shape — see §8) |
+| `io.bounded-authority/a2a/SendMessage` | SendMessage (also SendStreamingMessage's request shape; see §8) |
 | `io.bounded-authority/a2a/SendStreamingMessage` | SendStreamingMessage |
 | `io.bounded-authority/a2a/GetTask` | GetTask |
 | `io.bounded-authority/a2a/ListTasks` | ListTasks |
@@ -246,44 +246,44 @@ inside the 128-byte ceiling.
 
 `SendMessage` and `SendStreamingMessage` share one request message but are distinct operations
 (distinct `ba_op`, distinct `htm`/`htu` on the REST binding's `/message:send` vs
-`/message:stream`) — the table gives each its own row.
+`/message:stream`), so the table gives each its own row.
 
 ## 8. The bounded cast-arguments projection
 
-`ba_req` is the published v1 construction —
-`base64url(SHA-256("BAP1-REQUEST\0" || JCS([operation, typed(cast_arguments)])))` — with
+`ba_req` uses the published v1 construction
+`base64url(SHA-256("BAP1-REQUEST\0" || JCS([operation, typed(cast_arguments)])))`, with
 `operation` the namespaced `ba_op` string and `cast_arguments` the projection defined here.
 
 **Rules (INFERRED; every ceiling cited is v1 §17, OBSERVED):**
 
 1. **Value members project as themselves:** identifiers, ProtoJSON enum strings, booleans,
    integers, and arrays of bounded strings. One timestamp rendering is fixed: timestamps
-   project as `YYYY-MM-DDTHH:mm:ss.sssZ` — millisecond precision, zero-filled, with
-   sub-millisecond digits truncated toward zero — regardless of source precision
+   project as `YYYY-MM-DDTHH:mm:ss.sssZ` at zero-filled millisecond precision, truncating
+   sub-millisecond digits toward zero regardless of source precision
    (A2A §5.6.1 permits omitted or zero-filled fractions and makes millisecond precision a
    SHOULD; the projection picks one spelling so `ba_req` is deterministic).
 2. **Unbounded members project as digests.** `digest(v) = base64url(SHA-256(ASCII("ba-a2a-digest\0") || JCS(typed(v))))`,
-   where `typed(v)` is the v1 §7 tagged projection of the member's decoded JSON value — the
-   same integer/float tag preservation the outer construction uses, kept inside digested
-   members. The label `ba-a2a-digest\0` is this binding's internal projection construction —
+   where `typed(v)` is the v1 §7 tagged projection of the member's decoded JSON value. Digested
+   members preserve integer/float tags just as the outer construction does.
+   The label `ba-a2a-digest\0` belongs to this binding's internal projection construction,
    deliberately outside the `ba_`/`ba+` registry prefixes, which govern claims, `typ` values,
    and media types, not projection-internal separators. Digesting is streaming work outside
    the bounded decoder; the resulting 43-character string is a bounded member.
 3. **Parts project as a digest array:** `message.parts` projects to an array of
-   `digest(part)`, one per part, in source order — part content is bound by digest, never by
+   `digest(part)`, one per part, in source order. Part content is bound by digest, never by
    inclusion. A message with more parts than the 256-item array ceiling has no representable
    projection (fail closed).
 4. **`tenant` is covered by every projection, including its declared absence:** the string
    when the selected `AgentInterface` declares one; JSON `null` when it does not (A2A §8.3.2
-   rule 4 directs omission on the wire — the projection makes the absence explicit so a proof
+   rule 4 directs omission on the wire, making absence explicit in the projection so a proof
    minted for one tenant cannot be replayed at another sharing the endpoint).
-5. **The projection is over the received serialization — except where another rule fixes a
+5. **The projection uses the received serialization unless another rule fixes a
    canonical rendering.** Rules 1 (timestamps) and 4 (tenant absence) re-render canonically;
    everything else follows the received form. On the JSON bindings, a body member projects as
    present exactly when the received JSON carries it (a serialized `contextId: ""` and an
    omitted `contextId` are distinct wire states, projected distinctly). On REST path- and
    query-borne members (A2A §11.5), a member projects as present exactly when the path segment
-   or query parameter is present on the request — an empty query value projects as the empty
+   or query parameter is present on the request. An empty query value projects as the empty
    string, not as absence. On gRPC, the canonical object is the request message's ProtoJSON
    form (default-suppressing), reconstructed identically by producer and verifier. A2A §5.7's
    presence semantics (the `optional` keyword) govern the wire form; the projection never
@@ -294,15 +294,15 @@ inside the 128-byte ceiling.
    members. The projection is over the canonical request object.
 7. **The projection is closed and fail-closed against the ceilings.** Members not named in the
    table below do not project and are therefore outside `ba_req` (A2A's forward-compatibility
-   rule — implementations SHOULD ignore unrecognized fields, A2A §5.7 — is respected; the
+   rule (implementations SHOULD ignore unrecognized fields, A2A §5.7) is respected; the
    binding covers the schema-defined surface). And every member carries the ceilings: any
    string member beyond 8,192 bytes (including `pageToken`, `url`, `token`, and every
    extension URI or mode string), any array beyond 256 items (`extensions`,
    `referenceTaskIds`, `acceptedOutputModes` included), or a projection whose typed form
-   exceeds any v1 §17 maximum has no representable projection — verification fails closed. The
+   exceeds any v1 §17 maximum has no representable projection, so verification fails closed. The
    ceilings measure the typed projection (each scalar costs three nodes under the v1 tagged
-   form), so the worst representable case — the largest table row plus four 256-item
-   bounded-string arrays — is ≈3,100 nodes against the 4,096-node ceiling: inside with
+   form), so the worst representable case (the largest table row plus four 256-item
+   bounded-string arrays) is ≈3,100 nodes against the 4,096-node ceiling: inside with
    headroom, and closed beyond it.
 
 **Per-operation projection table** (member names in ProtoJSON camelCase per A2A §5.5;
@@ -329,13 +329,13 @@ table row: 10 value members + 4 digest members).
 
 - **Audience (INFERRED, guidance).** Grant `aud` names the target A2A server identity.
   Deployments SHOULD set it to the normalized HTTPS URL of the selected `AgentInterface`
-  entry — for gRPC entries, the `hostname:port` form converted per §6's rule
-  (`https://{authority}`) before use — or to a deployment-defined agent identity, and fix the
+  entry (for gRPC entries, converting `hostname:port` to `https://{authority}` per §6
+  before use) or to a deployment-defined agent identity, and fix the
   verifier's `expected.audience` out-of-band. Exact audience match is required by the profile
   (`REQ1-VERIFY-grant-exact`); tenant multiplexing behind one endpoint is covered by the
   projection (§8 rule 4), not by `aud`.
 - **`ba_inv` (INFERRED, decided).** Each proof carries a fresh lowercase RFC 4122 UUID minted
-  by the holder for that A2A request — one proof per request, one `ba_inv` per proof, never
+  by the holder for that A2A request, with one proof per request and one `ba_inv` per proof, never
   derived from `messageId`/`taskId` (which the issuer did not bind and which may repeat across
   bindings). Correlating `ba_inv` into the consumption row is the runtime's responsibility,
   not the verifier's (verification is not authority).
@@ -345,25 +345,25 @@ table row: 10 value members + 4 digest members).
   nonce surface); the nonce is then bound per proof as published (`REQ1-VERIFY-nonce-mode`).
   Replay reservation in all modes is the server's state, never the verifier's.
 - **Times.** Proofs are per-request (`jti`, `iat` fresh; maximum age 300 s, skew ≤ 60 s per the
-  profile) — one proof per A2A request, no session credential.
+  profile), with one proof per A2A request rather than a session credential.
 
 ## 10. Selector expressiveness boundary
 
 Selector paths traverse objects only and never index arrays (`spec/bap-v1.md` §12; v2 §4
-identical). Under this binding, selectors can bound the request envelope — `tenant`,
-`message.taskId`, `message.contextId`, configuration members, list filters — but no selector
+identical). Under this binding, selectors can bound envelope members such as `tenant`,
+`message.taskId`, `message.contextId`, configuration members, and list filters, but no selector
 reaches an individual part or element of a repeated field. Part content integrity rests on the
 per-part digests inside `ba_req` (§8 rule 3). A v1 grant expresses exact-value and enumerated
 bounds; a v2 grant adds `lte`/`gte` on numeric members (same-tag, inclusive). Cumulative
 budgets remain outside the selector algebra in both majors and route to the issuer-attestation
-/ runtime-accounting posture (the [successor-major charter](successor-major-charter.md) § 5 budget posture) — unchanged by this binding.
+/ runtime-accounting posture (the [successor-major charter](successor-major-charter.md) § 5 budget posture), which this binding leaves unchanged.
 
 ## 11. `TASK_STATE_AUTH_REQUIRED` composition
 
-A2A §7.6.3 recommends — as a SHOULD, and specifically for *in-band* credential exchange; the
-out-of-band default it prefers is not covered by the sentence at all — that credentials be
+A2A §7.6.3's recommendation applies specifically to *in-band* credential exchange; it does not
+cover the out-of-band default A2A prefers. For in-band exchange, it recommends as a SHOULD that credentials be
 "bound to the agent which originated the request." On this program's reading of that phrase,
-that agent is the one that raised the state and will spend the credential — the opposite
+that agent is the one that raised the state and will spend the credential, the opposite
 holder position from this binding's client-held, client→server proof. The intersection with
 BAP is therefore issuance-shaped, not presentation-shaped: an issuer may mint a separate grant
 naming the receiving agent as holder, for the downstream resource that triggered the state;
@@ -378,8 +378,8 @@ rule.
 - **Delegation.** This binding covers exactly one hop of
   published single-holder semantics: issuer → holder (A2A client agent) → verifier (A2A server
   or its authorization layer). Attenuation is available only as issuance-time narrowness. Any
-  requirement that a downstream agent hold a derivative of an upstream grant — sub-agent
-  chains, narrowed re-issuance by the holder, in-band forwarding — is BAP delegation, reserved
+  requirement that a downstream agent hold a derivative of an upstream grant (sub-agent
+  chains, narrowed re-issuance by the holder, in-band forwarding) is BAP delegation, reserved
   to the successor contract-major (charter § Delegation with attenuation), and is
   recorded here as a dependency of that program: when it activates, it owes an A2A-specific
   composition note for how a delegated chain rides this binding. Any requirement naming the
@@ -400,23 +400,23 @@ rule.
 
 - The binding adds no BAP code and no new wire surface: verification is the published pure
   functions over the deployment's expected context (trusted keys, audience per §9, evaluation
-  time, nonce mode). Facts are unchanged — `GrantFacts` / `EnvelopeFacts` with
+  time, nonce mode). Facts remain `GrantFacts` / `EnvelopeFacts` with
   `authorization: :not_evaluated`; no decision, no receipt.
 - Conformance vectors for the projection (cases pinning the §8 table, the digest-member
   boundary, the tenant-absence shape, and the §6 per-binding `htu` spellings) are follow-on
   certified-corpus work. No interop claim will rest on self-round-trips; a cross-protocol claim
   would require an independent implementation exercising both sides.
-- The ES256 suite is orthogonal: this binding is suite- and major-agnostic — it
+- The ES256 suite is orthogonal: this suite- and major-agnostic binding
   binds whatever contract-major the deployment's verifier accepts, under the charter's suite
   succession rules unchanged.
 
 ## 14. Disclosure-gate compliance
 
-The gate: nothing beyond published specification text enters this repository until lifted — no
+Until the gate is lifted, nothing beyond published specification text enters this repository: no
 `ba_dlg`/`ba_obo`/`ba_offline`/`ba_sut`/detached-profile activation or documentation beyond the
 existing reserved registry rows. Compliance read of this document:
 
-- Reserved mechanism names appear only inside this section's gate sentence — never designed,
+- Reserved mechanism names appear only inside this section's gate sentence and are never designed,
   specified, or promised.
 - The reserved verifier discovery document stays untouched, its purpose unrealized here (the
   empty-`params` posture of §4); the grant status-check profile is not referenced beyond this
@@ -429,9 +429,9 @@ existing reserved registry rows. Compliance read of this document:
 
 1. Hosting or submitting the existing [venue-facing A2A extension draft](../extensions/a2a-capability-binding.mdx)
    remains owner-gated. The draft exists; venue acceptance and implementation are not claimed.
-2. Eventual IANA registration of the carriage header names (template path per A2A §14.2) —
+2. Eventual IANA registration of the carriage header names (template path per A2A §14.2),
    outside this slice; coordinates with the BAP-12 row's claims/media-type filings, which are
    separate registries.
 3. Projection and `htu` conformance vectors (§13).
-4. Real-substrate runtime evidence (an actual A2A server verifying a proof) — a future
+4. Real-substrate runtime evidence (an actual A2A server verifying a proof), a future
    implementation slice's work; this document is design-only.

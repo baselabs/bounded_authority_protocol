@@ -4,8 +4,8 @@ defmodule BoundedAuthorityProtocol.V1.EncodedConsumptionEntry do
 
   ## Fields
 
-  * `bytes` - the exact canonical JCS row bytes, at most `chain_row_bytes` (4,096).
-  * `hash` - the raw 32-byte domain-separated hash of `bytes` under the contract-major that encoded
+  * `bytes`: the exact canonical JCS row bytes, at most `chain_row_bytes` (4,096).
+  * `hash`: the raw 32-byte domain-separated hash of `bytes` under the contract-major that encoded
     it; the next row's `previous_hash`.
   """
 
