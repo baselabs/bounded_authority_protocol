@@ -1,14 +1,11 @@
 package verifier
 
-import (
-	"fmt"
-	"io"
-)
+import "fmt"
 
 // Verified facts (spec/bap-v1.md § Public verification contract). Facts
 // are value-bearing and redacted: they contain only their exact documented
 // fields, no raw credentials, signatures, JWK containers, nonces, request
-// argument values, or selector values. They carry no JSON, string, or generic
+// argument values, or selector values. They carry no JSON or generic
 // encoder and are not credentials (REQ1-VERIFY-facts-redacted,
 // REQ1-VERIFY-facts-not-credentials). String, GoString, and Format always
 // emit the fixed #Type<redacted> rendering, including flags and precision.
@@ -130,7 +127,7 @@ func (GrantFacts) GoString() string { return "#GrantFacts<redacted>" }
 
 // Format keeps every formatting verb, flag, width, and precision value-free.
 func (GrantFacts) Format(state fmt.State, _ rune) {
-	_, _ = io.WriteString(state, "#GrantFacts<redacted>")
+	_, _ = state.Write([]byte("#GrantFacts<redacted>"))
 }
 
 // String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
@@ -141,7 +138,7 @@ func (EnvelopeFacts) GoString() string { return "#EnvelopeFacts<redacted>" }
 
 // Format keeps every formatting verb, flag, width, and precision value-free.
 func (EnvelopeFacts) Format(state fmt.State, _ rune) {
-	_, _ = io.WriteString(state, "#EnvelopeFacts<redacted>")
+	_, _ = state.Write([]byte("#EnvelopeFacts<redacted>"))
 }
 
 // String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
@@ -152,7 +149,7 @@ func (ChainFacts) GoString() string { return "#ChainFacts<redacted>" }
 
 // Format keeps every formatting verb, flag, width, and precision value-free.
 func (ChainFacts) Format(state fmt.State, _ rune) {
-	_, _ = io.WriteString(state, "#ChainFacts<redacted>")
+	_, _ = state.Write([]byte("#ChainFacts<redacted>"))
 }
 
 // String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
@@ -163,7 +160,7 @@ func (AnchorFacts) GoString() string { return "#AnchorFacts<redacted>" }
 
 // Format keeps every formatting verb, flag, width, and precision value-free.
 func (AnchorFacts) Format(state fmt.State, _ rune) {
-	_, _ = io.WriteString(state, "#AnchorFacts<redacted>")
+	_, _ = state.Write([]byte("#AnchorFacts<redacted>"))
 }
 
 // String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
@@ -174,7 +171,7 @@ func (KeyTransitionFacts) GoString() string { return "#KeyTransitionFacts<redact
 
 // Format keeps every formatting verb, flag, width, and precision value-free.
 func (KeyTransitionFacts) Format(state fmt.State, _ rune) {
-	_, _ = io.WriteString(state, "#KeyTransitionFacts<redacted>")
+	_, _ = state.Write([]byte("#KeyTransitionFacts<redacted>"))
 }
 
 // String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
@@ -185,7 +182,7 @@ func (AnchoredExportFacts) GoString() string { return "#AnchoredExportFacts<reda
 
 // Format keeps every formatting verb, flag, width, and precision value-free.
 func (AnchoredExportFacts) Format(state fmt.State, _ rune) {
-	_, _ = io.WriteString(state, "#AnchoredExportFacts<redacted>")
+	_, _ = state.Write([]byte("#AnchoredExportFacts<redacted>"))
 }
 
 // String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
@@ -196,7 +193,7 @@ func (AttestationFacts) GoString() string { return "#AttestationFacts<redacted>"
 
 // Format keeps every formatting verb, flag, width, and precision value-free.
 func (AttestationFacts) Format(state fmt.State, _ rune) {
-	_, _ = io.WriteString(state, "#AttestationFacts<redacted>")
+	_, _ = state.Write([]byte("#AttestationFacts<redacted>"))
 }
 
 // String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
@@ -207,5 +204,5 @@ func (ContentAssertionFacts) GoString() string { return "#ContentAssertionFacts<
 
 // Format keeps every formatting verb, flag, width, and precision value-free.
 func (ContentAssertionFacts) Format(state fmt.State, _ rune) {
-	_, _ = io.WriteString(state, "#ContentAssertionFacts<redacted>")
+	_, _ = state.Write([]byte("#ContentAssertionFacts<redacted>"))
 }
