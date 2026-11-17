@@ -231,7 +231,7 @@ mod tests {
 
     /// Decodes a hex string to bytes (test-only fixture helper).
     fn hex_decode(hex: &str) -> Vec<u8> {
-        assert!(hex.len() % 2 == 0, "hex length must be even");
+        assert!(hex.len().is_multiple_of(2), "hex length must be even");
         (0..hex.len())
             .step_by(2)
             .map(|i| {
