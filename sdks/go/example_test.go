@@ -97,7 +97,7 @@ func Example() {
 	credentials := verifier.Credentials{Grant: grant, Proof: proof}
 
 	facts, err := verifier.CheckEnvelope(credentials, expected)
-	fmt.Println(facts.Operation, facts.GrantID, facts.Authorization == verifier.AuthorizationNotEvaluated, err)
+	fmt.Println(facts.Operation(), facts.GrantID(), facts.Authorization() == verifier.AuthorizationNotEvaluated, err)
 
 	// The same proof against other arguments fails closed, with no detail.
 	expected.CastArguments = mustJSON(`{"section":"sports","title":"Tides"}`)

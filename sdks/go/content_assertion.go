@@ -38,6 +38,10 @@ type ExpectedContentAssertion struct {
 }
 
 type DecodedContentAssertion struct {
+	data func() *decodedContentAssertionData
+}
+
+type decodedContentAssertionData struct {
 	Version       int
 	AttestorKeyID string
 	Jti           string
@@ -58,6 +62,10 @@ type DecodedContentAssertion struct {
 // ContentAssertionFacts is redacted evidence of signature and window checks,
 // never an authorization decision.
 type ContentAssertionFacts struct {
+	data func() *contentAssertionFactsData
+}
+
+type contentAssertionFactsData struct {
 	Version                int
 	AttestorKeyID          string
 	AttestorKeyFingerprint [32]byte
@@ -170,9 +178,9 @@ func DecodeContentAssertion(compact string, bounds *Bounds) (decoded DecodedCont
 		return DecodedContentAssertion{}, ErrInvalid
 	}
 	c := parts.Claims
-	return DecodedContentAssertion{Version: 1, AttestorKeyID: parts.KeyID, Jti: c.Jti, Iss: c.Iss, Aud: c.Aud, Sub: c.Sub,
+	return DecodedContentAssertion{data: privateValue(&decodedContentAssertionData{Version: 1, AttestorKeyID: parts.KeyID, Jti: c.Jti, Iss: c.Iss, Aud: c.Aud, Sub: c.Sub,
 		Profile: c.Profile, ProfileDigest: c.ProfileDigest, ContentDigest: c.ContentDigest, Gen: c.Gen, Prev: c.Prev,
-		Iat: c.Iat, Nbf: c.Nbf, Exp: c.Exp, Verification: DecodeVerificationNotEvaluated}, nil
+		Iat: c.Iat, Nbf: c.Nbf, Exp: c.Exp, Verification: DecodeVerificationNotEvaluated})}, nil
 }
 
 func AssertionDigest(compact string, bounds *Bounds) (digest [32]byte, err error) {
@@ -214,12 +222,12 @@ func VerifyContentAssertion(compact string, expected ExpectedContentAssertion) (
 	if verifyEd25519(expected.Attestor.PublicKey, signingInputMessage(si), parts.Compact.Signature) != nil {
 		return ContentAssertionFacts{}, ErrInvalid
 	}
-	return ContentAssertionFacts{
+	return ContentAssertionFacts{data: privateValue(&contentAssertionFactsData{
 		Version: 1, AttestorKeyID: parts.KeyID, AttestorKeyFingerprint: jwkThumbprintOfKey(expected.Attestor.PublicKey),
 		Jti: c.Jti, Iss: c.Iss, Aud: c.Aud, Sub: c.Sub, Profile: c.Profile, ProfileDigest: c.ProfileDigest,
 		ContentDigest: c.ContentDigest, Gen: c.Gen, Prev: c.Prev, Iat: c.Iat, Nbf: c.Nbf, Exp: c.Exp,
 		Digest: sha256.Sum256([]byte(compact)), Verification: AttestationVerificationSignatureAndWindow, Trust: TrustNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 func VerifyContentAssertionSuccessor(predecessor, successor ContentAssertionFacts, bounds *Bounds) (err error) {
@@ -231,10 +239,10 @@ func VerifyContentAssertionSuccessor(predecessor, successor ContentAssertionFact
 	if err != nil || validateContentAssertionFacts(predecessor, b) != nil || validateContentAssertionFacts(successor, b) != nil {
 		return ErrInvalid
 	}
-	if predecessor.Iss != successor.Iss || predecessor.Aud != successor.Aud || predecessor.Sub != successor.Sub || predecessor.Profile != successor.Profile || predecessor.ProfileDigest != successor.ProfileDigest {
+	if predecessor.Iss() != successor.Iss() || predecessor.Aud() != successor.Aud() || predecessor.Sub() != successor.Sub() || predecessor.Profile() != successor.Profile() || predecessor.ProfileDigest() != successor.ProfileDigest() {
 		return ErrInvalid
 	}
-	if predecessor.Gen >= int64(b.IntegerMagnitude) || successor.Gen != predecessor.Gen+1 || successor.Prev != predecessor.Digest || successor.Iat < predecessor.Iat || successor.Jti == predecessor.Jti {
+	if predecessor.Gen() >= int64(b.IntegerMagnitude) || successor.Gen() != predecessor.Gen()+1 || successor.Prev() != predecessor.Digest() || successor.Iat() < predecessor.Iat() || successor.Jti() == predecessor.Jti() {
 		return ErrInvalid
 	}
 	return nil
@@ -456,7 +464,7 @@ func validateExpectedContentAssertion(e ExpectedContentAssertion, b Bounds) erro
 }
 
 func validateContentAssertionFacts(f ContentAssertionFacts, b Bounds) error {
-	if f.Version != 1 || f.Verification != AttestationVerificationSignatureAndWindow || f.Trust != TrustNotEvaluated || !validKid(f.AttestorKeyID, b.KidBytes) || !validContentAssertionIdentifier(f.Jti, b) || !validContentAssertionIdentifier(f.Iss, b) || !validContentAssertionIdentifier(f.Aud, b) || !validContentAssertionIdentifier(f.Sub, b) || !validContentAssertionIdentifier(f.Profile, b) || !validContentAssertionNumbers(f.Gen, f.Iat, f.Nbf, f.Exp, f.Prev, b) {
+	if f.Version() != 1 || f.Verification() != AttestationVerificationSignatureAndWindow || f.Trust() != TrustNotEvaluated || !validKid(f.AttestorKeyID(), b.KidBytes) || !validContentAssertionIdentifier(f.Jti(), b) || !validContentAssertionIdentifier(f.Iss(), b) || !validContentAssertionIdentifier(f.Aud(), b) || !validContentAssertionIdentifier(f.Sub(), b) || !validContentAssertionIdentifier(f.Profile(), b) || !validContentAssertionNumbers(f.Gen(), f.Iat(), f.Nbf(), f.Exp(), f.Prev(), b) {
 		return ErrInvalid
 	}
 	return nil

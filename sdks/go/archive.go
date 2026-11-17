@@ -325,7 +325,7 @@ func VerifyHistoricalAnchor(compact string, key HistoricalPublicKey, expected Ex
 	if err != nil {
 		return AnchorFacts{}, ErrInvalid
 	}
-	return AnchorFacts{
+	return AnchorFacts{data: privateValue(&anchorFactsData{
 		Version:    1,
 		AnchorID:   claims.AnchorID,
 		ChainID:    claims.ChainID,
@@ -333,7 +333,7 @@ func VerifyHistoricalAnchor(compact string, key HistoricalPublicKey, expected Ex
 		Sequence:   claims.Sequence,
 		AnchoredAt: claims.AnchoredAt,
 		Trust:      TrustNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // verifyAnchorCompact is the shared anchor primitive: role-bounded frame
@@ -429,7 +429,7 @@ func VerifyKeyTransition(compact string, currentKey, nextKey HistoricalPublicKey
 	if err != nil {
 		return KeyTransitionFacts{}, ErrInvalid
 	}
-	return KeyTransitionFacts{
+	return KeyTransitionFacts{data: privateValue(&keyTransitionFactsData{
 		Version:         1,
 		TransitionID:    claims.TransitionID,
 		ChainID:         claims.ChainID,
@@ -438,7 +438,7 @@ func VerifyKeyTransition(compact string, currentKey, nextKey HistoricalPublicKey
 		ToFingerprint:   claims.ToFingerprint,
 		ToKeyID:         claims.ToKeyID,
 		Trust:           TrustNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 func verifyTransitionCompact(compact string, currentKey, nextKey HistoricalPublicKey, expected ExpectedKeyTransition, b Bounds) (transitionClaims, error) {

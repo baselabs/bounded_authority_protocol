@@ -168,7 +168,7 @@ func Example() {
 	credentials := verifier.Credentials{Grant: grant, Proof: proof}
 
 	facts, err := verifier.CheckEnvelope(credentials, expected)
-	fmt.Println(facts.Operation, facts.GrantID, facts.Authorization == verifier.AuthorizationNotEvaluated, err)
+	fmt.Println(facts.Operation(), facts.GrantID(), facts.Authorization() == verifier.AuthorizationNotEvaluated, err)
 
 	// The same proof against other arguments fails closed, with no detail.
 	expected.CastArguments = mustJSON(`{"section":"sports","title":"Tides"}`)
@@ -215,18 +215,28 @@ cannot fail. A `nil` `*Bounds` means the profile maxima; build tighter limits wi
 **Facts.** `GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`, `KeyTransitionFacts`,
 `AnchoredExportFacts`, `AttestationFacts`, and `ContentAssertionFacts` hold identifiers,
 digests, times, and counts, never raw signatures, keys, nonces, or arguments. `GrantFacts`,
-`EnvelopeFacts`, and `AnchoredExportFacts` carry `Authorization: AuthorizationNotEvaluated`; the
+`EnvelopeFacts`, and `AnchoredExportFacts` carry `Authorization() == AuthorizationNotEvaluated`; the
 chain, anchor, transition, export, attestation, and content-assertion facts carry
-`Trust: TrustNotEvaluated`. There is no `Authorized` or decision field. The facts types implement `String`, `GoString`, and
+`Trust() == TrustNotEvaluated`. There is no `Authorized` or decision field. The facts types implement `String`, `GoString`, and
 `Format`: values and pointers match the full Elixir rendering (for example,
 `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`), including `%v`, `%+v`, and `%#v`.
 Contract-majors retain their `V1`, `V2`, or `V3` namespace; sibling facts use
 `RoleAttestation.V1` and `ContentAssertion.V1`. `MarshalJSON`, `MarshalText`, and `GobEncode`
-return `ErrInvalid` without encoded field values. Read individual fields explicitly.
+return `ErrInvalid` without encoded field values. Read individual values through named accessor
+methods, for example `facts.GrantID()` and `facts.Operation()`. Facts store their values behind
+an unexported closure; slice accessors return copies. A zero value has zero-valued accessors.
 
-Go's `fmt` cannot call formatting methods through an unexported field of a containing
-struct, so formatting such a container can expose facts fields. Keep facts in exported
-fields when formatting containers, or format the facts value directly.
+All formatting verbs, flags, pointer forms, and nested containers preserve redaction. Go's
+`fmt` can skip methods for an unexported containing field or a bad verb, but its fallback
+sees only the private closure, never the stored values. It may print pointer or type
+metadata instead of the fixed rendering. Facts are no longer comparable with `==`;
+compare the named values that matter to the caller.
+
+**Decoded diagnostics.** Grants and role attestations use the Elixir structural inspection
+notation. Proofs expose named accessors and redact their nonce; content assertions expose
+named accessors and render fully redacted. Both refuse JSON, text, and gob encoding.
+Decoded proofs now include `GrantHash()`, `RequestHash()`, `HolderPublicKey()`, and
+`HolderThumbprint()`; the returned public-key slice is a copy.
 
 ## Strict Ed25519
 

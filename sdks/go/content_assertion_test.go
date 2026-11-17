@@ -1,7 +1,6 @@
 package verifier
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
@@ -95,7 +94,7 @@ func TestContentAssertionProducerDecodeVerifyAndDigest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if decoded.Verification != DecodeVerificationNotEvaluated || decoded.ContentDigest != a.ContentDigest || decoded.Gen != 1 {
+	if decoded.Verification() != DecodeVerificationNotEvaluated || decoded.ContentDigest() != a.ContentDigest || decoded.Gen() != 1 {
 		t.Fatalf("decoded mismatch: %#v", decoded)
 	}
 	facts, err := VerifyContentAssertion(compact, expected)
@@ -103,7 +102,7 @@ func TestContentAssertionProducerDecodeVerifyAndDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantDigest := sha256.Sum256([]byte(compact))
-	if facts.Digest != wantDigest || facts.Verification != AttestationVerificationSignatureAndWindow || facts.Trust != TrustNotEvaluated {
+	if facts.Digest() != wantDigest || facts.Verification() != AttestationVerificationSignatureAndWindow || facts.Trust() != TrustNotEvaluated {
 		t.Fatalf("facts mismatch: %#v", facts)
 	}
 	if got, err := AssertionDigest(compact, nil); err != nil || got != wantDigest {
@@ -162,8 +161,8 @@ func TestContentAssertionSuccessorAllowsRotationAndExpiredPredecessor(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	succInput, succExpected, succPrivate := contentAssertionFixture(t, "attestor-new", 2, predFacts.Digest, 200, 210, 300)
-	succInput.Iss, succInput.Aud, succInput.Sub, succInput.Profile, succInput.ProfileDigest = predFacts.Iss, predFacts.Aud, predFacts.Sub, predFacts.Profile, predFacts.ProfileDigest
+	succInput, succExpected, succPrivate := contentAssertionFixture(t, "attestor-new", 2, predFacts.Digest(), 200, 210, 300)
+	succInput.Iss, succInput.Aud, succInput.Sub, succInput.Profile, succInput.ProfileDigest = predFacts.Iss(), predFacts.Aud(), predFacts.Sub(), predFacts.Profile(), predFacts.ProfileDigest()
 	succExpected.Issuer, succExpected.Audience, succExpected.Subject, succExpected.Profile, succExpected.ProfileDigest = succInput.Iss, succInput.Aud, succInput.Sub, succInput.Profile, succInput.ProfileDigest
 	succCompact := signContentAssertion(t, succInput, succPrivate, nil)
 	succFacts, err := VerifyContentAssertion(succCompact, succExpected)
@@ -177,17 +176,19 @@ func TestContentAssertionSuccessorAllowsRotationAndExpiredPredecessor(t *testing
 	if err := VerifyContentAssertionSuccessor(predFacts, succFacts, nil); err != ErrInvalid {
 		t.Fatalf("missing successor bounds error = %v", err)
 	}
-	bad := succFacts
-	bad.Jti = predFacts.Jti
+	badStorage := *succFacts.data()
+	bad := ContentAssertionFacts{data: privateValue(&badStorage)}
+	bad.data().Jti = predFacts.Jti()
 	if err := VerifyContentAssertionSuccessor(predFacts, bad, &bounds); err != ErrInvalid {
 		t.Fatalf("same jti error = %v", err)
 	}
-	bad = succFacts
-	bad.Verification = AttestationVerification(99)
+	badStorage = *succFacts.data()
+	bad = ContentAssertionFacts{data: privateValue(&badStorage)}
+	bad.data().Verification = AttestationVerification(99)
 	if err := VerifyContentAssertionSuccessor(predFacts, bad, &bounds); err != ErrInvalid {
 		t.Fatalf("malformed marker error = %v", err)
 	}
-	if bytes.Equal(predFacts.AttestorKeyFingerprint[:], succFacts.AttestorKeyFingerprint[:]) {
+	if predFacts.AttestorKeyFingerprint() == succFacts.AttestorKeyFingerprint() {
 		t.Fatal("fixture did not rotate signing keys")
 	}
 }

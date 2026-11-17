@@ -311,11 +311,11 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 			ClockSkew:      rawInt(t, c.Input, "clock_skew"),
 		})
 		checkVerdict(t, c, err)
-		if c.Expected["grant_id"] != nil && got.GrantID != rawString(t, c.Expected, "grant_id") {
-			t.Fatalf("case %s: grant id %s", c.ID, got.GrantID)
+		if c.Expected["grant_id"] != nil && got.GrantID() != rawString(t, c.Expected, "grant_id") {
+			t.Fatalf("case %s: grant id %s", c.ID, got.GrantID())
 		}
-		if c.Expected["issuer"] != nil && got.Issuer != rawString(t, c.Expected, "issuer") {
-			t.Fatalf("case %s: issuer %s", c.ID, got.Issuer)
+		if c.Expected["issuer"] != nil && got.Issuer() != rawString(t, c.Expected, "issuer") {
+			t.Fatalf("case %s: issuer %s", c.ID, got.Issuer())
 		}
 	case "check_envelope":
 		exp := subObject(t, c.Input, "expected")

@@ -555,8 +555,8 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 	case "decode_proof":
 		got, err := es256Profile.DecodeProof(rawStringField(t, c.Input, "compact"), nil)
 		es256CheckVerdict(t, c, err)
-		if c.Expected["proof_id"] != nil && got.ProofID != rawStringField(t, c.Expected, "proof_id") {
-			t.Fatalf("case %s: proof id %s", c.ID, got.ProofID)
+		if c.Expected["proof_id"] != nil && got.ProofID() != rawStringField(t, c.Expected, "proof_id") {
+			t.Fatalf("case %s: proof id %s", c.ID, got.ProofID())
 		}
 	case "untrusted_key_locator":
 		got, err := es256Profile.UntrustedKeyLocator(rawStringField(t, c.Input, "compact"), nil)
@@ -577,11 +577,11 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 			ClockSkew:      es256RawInt(t, c.Input, "clock_skew"),
 		})
 		es256CheckVerdict(t, c, err)
-		if c.Expected["grant_id"] != nil && got.GrantID != rawStringField(t, c.Expected, "grant_id") {
-			t.Fatalf("case %s: grant id %s", c.ID, got.GrantID)
+		if c.Expected["grant_id"] != nil && got.GrantID() != rawStringField(t, c.Expected, "grant_id") {
+			t.Fatalf("case %s: grant id %s", c.ID, got.GrantID())
 		}
-		if c.Expected["issuer"] != nil && got.Issuer != rawStringField(t, c.Expected, "issuer") {
-			t.Fatalf("case %s: issuer %s", c.ID, got.Issuer)
+		if c.Expected["issuer"] != nil && got.Issuer() != rawStringField(t, c.Expected, "issuer") {
+			t.Fatalf("case %s: issuer %s", c.ID, got.Issuer())
 		}
 	case "check_envelope":
 		exp := es256SubObject(t, c.Input, "expected")
@@ -649,8 +649,8 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 			RowCount:      es256RawInt(t, c.Input, "row_count"),
 		})
 		es256CheckVerdict(t, c, err)
-		if c.Expected["chain_id"] != nil && got.ChainID != rawStringField(t, c.Expected, "chain_id") {
-			t.Fatalf("case %s: chain id %s", c.ID, got.ChainID)
+		if c.Expected["chain_id"] != nil && got.ChainID() != rawStringField(t, c.Expected, "chain_id") {
+			t.Fatalf("case %s: chain id %s", c.ID, got.ChainID())
 		}
 	case "verify_historical_anchor":
 		key := es256SubObject(t, c.Input, "key")
@@ -658,8 +658,8 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		es256CensusKey(pk)
 		got, err := es256Profile.VerifyHistoricalAnchor(rawStringField(t, c.Input, "compact"), es256HistoricalKey(t, key, pk), es256ExpectedAnchor(t, es256SubObject(t, c.Input, "expected")))
 		es256CheckVerdict(t, c, err)
-		if c.Expected["anchor_id"] != nil && got.AnchorID != rawStringField(t, c.Expected, "anchor_id") {
-			t.Fatalf("case %s: anchor id %s", c.ID, got.AnchorID)
+		if c.Expected["anchor_id"] != nil && got.AnchorID() != rawStringField(t, c.Expected, "anchor_id") {
+			t.Fatalf("case %s: anchor id %s", c.ID, got.AnchorID())
 		}
 	case "verify_key_transition":
 		cur := es256SubObject(t, c.Input, "current_key")
@@ -671,8 +671,8 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 			es256HistoricalKey(t, next, rawStringField(t, next, "public_key")),
 			es256ExpectedTransition(t, es256SubObject(t, c.Input, "expected")))
 		es256CheckVerdict(t, c, err)
-		if c.Expected["transition_id"] != nil && got.TransitionID != rawStringField(t, c.Expected, "transition_id") {
-			t.Fatalf("case %s: transition id %s", c.ID, got.TransitionID)
+		if c.Expected["transition_id"] != nil && got.TransitionID() != rawStringField(t, c.Expected, "transition_id") {
+			t.Fatalf("case %s: transition id %s", c.ID, got.TransitionID())
 		}
 	case "encode_anchored_export":
 		input, expected := es256ExportEncodeInput(t, c)
@@ -692,8 +692,8 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		obj, keys, expected := es256ExportVerifyInput(t, c)
 		got, err := es256Profile.VerifyAnchoredExport(obj, keys, expected)
 		es256CheckVerdict(t, c, err)
-		if c.Expected["chain_id"] != nil && got.ChainID != rawStringField(t, c.Expected, "chain_id") {
-			t.Fatalf("case %s: chain id %s", c.ID, got.ChainID)
+		if c.Expected["chain_id"] != nil && got.ChainID() != rawStringField(t, c.Expected, "chain_id") {
+			t.Fatalf("case %s: chain id %s", c.ID, got.ChainID())
 		}
 	default:
 		t.Fatalf("case %s: unknown surface %s", c.ID, c.Surface)

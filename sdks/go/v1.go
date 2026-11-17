@@ -412,16 +412,24 @@ type GrantDecoded struct {
 
 // ProofDecoded is the decode_proof result.
 type ProofDecoded struct {
-	ProofID      string
-	Version      int
-	Method       string
-	TargetURI    string
-	IssuedAt     int64
-	InvocationID string
-	Operation    string
-	Nonce        string
-	HasNonce     bool
-	Verification DecodeStatus
+	data func() *proofDecodedData
+}
+
+type proofDecodedData struct {
+	GrantHash        [32]byte
+	RequestHash      [32]byte
+	HolderPublicKey  []byte
+	HolderThumbprint [32]byte
+	ProofID          string
+	Version          int
+	Method           string
+	TargetURI        string
+	IssuedAt         int64
+	InvocationID     string
+	Operation        string
+	Nonce            string
+	HasNonce         bool
+	Verification     DecodeStatus
 }
 
 // DecodeGrant decodes and closed-set-validates a raw grant compact. It
@@ -479,14 +487,20 @@ func decodeProofFor(compact string, bounds *Bounds, profile proofProfile) (d Pro
 	if err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
-	if _, err := decodeProofHeaderFor(parts, b, profile); err != nil {
+	holderKey, err := decodeProofHeaderFor(parts, b, profile)
+	if err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
 	claims, err := decodeProofPayloadFor(parts, b, profile)
 	if err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
-	out := ProofDecoded{
+	holderThumbprint, err := PublicKeyThumbprintRaw(holderKey, &b)
+	if err != nil {
+		return ProofDecoded{}, ErrInvalid
+	}
+	out := ProofDecoded{data: privateValue(&proofDecodedData{
+		GrantHash: claims.AthRaw, RequestHash: claims.BaReqRaw, HolderPublicKey: holderKey, HolderThumbprint: holderThumbprint,
 		ProofID:      claims.ProofID,
 		Version:      1,
 		Method:       claims.Method,
@@ -495,10 +509,10 @@ func decodeProofFor(compact string, bounds *Bounds, profile proofProfile) (d Pro
 		InvocationID: claims.Invocation,
 		Operation:    claims.Operation,
 		Verification: DecodeVerificationNotEvaluated,
-	}
+	})}
 	if claims.Nonce != nil {
-		out.HasNonce = true
-		out.Nonce = *claims.Nonce
+		out.data().HasNonce = true
+		out.data().Nonce = *claims.Nonce
 	}
 	return out, nil
 }
@@ -591,7 +605,7 @@ func verifyGrantCore(compact string, issuer TrustedIssuer, exp ExpectedGrant, b 
 	if err != nil {
 		return grantClaimsData{}, GrantFacts{}, ErrInvalid
 	}
-	return claims, GrantFacts{
+	return claims, GrantFacts{data: privateValue(&grantFactsData{
 		Version:              1,
 		Issuer:               claims.Issuer,
 		GrantID:              claims.GrantID,
@@ -602,7 +616,7 @@ func verifyGrantCore(compact string, issuer TrustedIssuer, exp ExpectedGrant, b 
 		NotBefore:            claims.NotBefore,
 		ExpiresAt:            claims.ExpiresAt,
 		Authorization:        AuthorizationNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // VerifyGrant verifies a raw grant compact against an exact trusted issuer
@@ -743,16 +757,16 @@ func checkEnvelopeFor(creds Credentials, expected ExpectedRequest, profile proof
 	if err := applySelectors(ops, expected.CastArguments); err != nil {
 		return EnvelopeFacts{}, ErrInvalid
 	}
-	return EnvelopeFacts{
+	return EnvelopeFacts{data: privateValue(&envelopeFactsData{
 		Version:              1,
-		Issuer:               gfacts.Issuer,
-		GrantID:              gfacts.GrantID,
-		IssuerKeyFingerprint: gfacts.IssuerKeyFingerprint,
-		HolderThumbprint:     gfacts.HolderThumbprint,
-		MatchedAudience:      gfacts.MatchedAudience,
-		IssuedAt:             gfacts.IssuedAt,
-		NotBefore:            gfacts.NotBefore,
-		ExpiresAt:            gfacts.ExpiresAt,
+		Issuer:               gfacts.Issuer(),
+		GrantID:              gfacts.GrantID(),
+		IssuerKeyFingerprint: gfacts.IssuerKeyFingerprint(),
+		HolderThumbprint:     gfacts.HolderThumbprint(),
+		MatchedAudience:      gfacts.MatchedAudience(),
+		IssuedAt:             gfacts.IssuedAt(),
+		NotBefore:            gfacts.NotBefore(),
+		ExpiresAt:            gfacts.ExpiresAt(),
 		ProofID:              proof.ProofID,
 		InvocationID:         proof.Invocation,
 		Operation:            proof.Operation,
@@ -761,7 +775,7 @@ func checkEnvelopeFor(creds Credentials, expected ExpectedRequest, profile proof
 		RequestHash:          baReqRaw,
 		ProofIssuedAt:        proof.IssuedAt,
 		Authorization:        AuthorizationNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // jwkThumbprintOfKey is the RFC 7638 thumbprint of a raw public key's JWK.

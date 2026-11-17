@@ -264,8 +264,8 @@ func TestReviewProofProducerNonce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode produced proof with nonce: %v", err)
 	}
-	if !decoded.HasNonce || decoded.Nonce != proof.Nonce {
-		t.Fatalf("produced nonce lost: has_nonce=%v nonce=%q", decoded.HasNonce, decoded.Nonce)
+	if !decoded.HasNonce() || decoded.Nonce() != proof.Nonce {
+		t.Fatalf("produced nonce lost: has_nonce=%v nonce=%q", decoded.HasNonce(), decoded.Nonce())
 	}
 
 	// The placeholder key is refused at the producer (the contrast that shows the key was the only

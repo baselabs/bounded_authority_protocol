@@ -994,14 +994,20 @@ func (EcdsaProfile) DecodeProof(compact string, bounds *Bounds) (d ProofDecoded,
 	if err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
-	if _, err := decodeProofHeaderES(parts, b); err != nil {
+	holderKey, err := decodeProofHeaderES(parts, b)
+	if err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
 	claims, err := ecdsaSuite.decodeProofPayload(parts, b)
 	if err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
-	out := ProofDecoded{
+	holderThumbprint, err := ecdsaSuite.PublicKeyThumbprintRaw(holderKey, &b)
+	if err != nil {
+		return ProofDecoded{}, ErrInvalid
+	}
+	out := ProofDecoded{data: privateValue(&proofDecodedData{
+		GrantHash: claims.AthRaw, RequestHash: claims.BaReqRaw, HolderPublicKey: holderKey, HolderThumbprint: holderThumbprint,
 		ProofID:      claims.ProofID,
 		Version:      3,
 		Method:       claims.Method,
@@ -1010,10 +1016,10 @@ func (EcdsaProfile) DecodeProof(compact string, bounds *Bounds) (d ProofDecoded,
 		InvocationID: claims.Invocation,
 		Operation:    claims.Operation,
 		Verification: DecodeVerificationNotEvaluated,
-	}
+	})}
 	if claims.Nonce != nil {
-		out.HasNonce = true
-		out.Nonce = *claims.Nonce
+		out.data().HasNonce = true
+		out.data().Nonce = *claims.Nonce
 	}
 	return out, nil
 }
@@ -1103,7 +1109,7 @@ func (EcdsaProfile) verifyGrantCore(compact string, issuer TrustedIssuer, exp Ex
 	if err != nil {
 		return grantClaimsData{}, GrantFacts{}, ErrInvalid
 	}
-	return claims, GrantFacts{
+	return claims, GrantFacts{data: privateValue(&grantFactsData{
 		Version:              3,
 		Issuer:               claims.Issuer,
 		GrantID:              claims.GrantID,
@@ -1114,7 +1120,7 @@ func (EcdsaProfile) verifyGrantCore(compact string, issuer TrustedIssuer, exp Ex
 		NotBefore:            claims.NotBefore,
 		ExpiresAt:            claims.ExpiresAt,
 		Authorization:        AuthorizationNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // VerifyGrant verifies a raw grant compact of this major against an exact
@@ -1235,16 +1241,16 @@ func (EcdsaProfile) CheckEnvelope(creds Credentials, expected ExpectedRequest) (
 	if err := ecdsaSuite.applySelectors(ops, expected.CastArguments); err != nil {
 		return EnvelopeFacts{}, ErrInvalid
 	}
-	return EnvelopeFacts{
+	return EnvelopeFacts{data: privateValue(&envelopeFactsData{
 		Version:              3,
-		Issuer:               gfacts.Issuer,
-		GrantID:              gfacts.GrantID,
-		IssuerKeyFingerprint: gfacts.IssuerKeyFingerprint,
-		HolderThumbprint:     gfacts.HolderThumbprint,
-		MatchedAudience:      gfacts.MatchedAudience,
-		IssuedAt:             gfacts.IssuedAt,
-		NotBefore:            gfacts.NotBefore,
-		ExpiresAt:            gfacts.ExpiresAt,
+		Issuer:               gfacts.Issuer(),
+		GrantID:              gfacts.GrantID(),
+		IssuerKeyFingerprint: gfacts.IssuerKeyFingerprint(),
+		HolderThumbprint:     gfacts.HolderThumbprint(),
+		MatchedAudience:      gfacts.MatchedAudience(),
+		IssuedAt:             gfacts.IssuedAt(),
+		NotBefore:            gfacts.NotBefore(),
+		ExpiresAt:            gfacts.ExpiresAt(),
 		ProofID:              proof.ProofID,
 		InvocationID:         proof.Invocation,
 		Operation:            proof.Operation,
@@ -1253,7 +1259,7 @@ func (EcdsaProfile) CheckEnvelope(creds Credentials, expected ExpectedRequest) (
 		RequestHash:          baReqRaw,
 		ProofIssuedAt:        proof.IssuedAt,
 		Authorization:        AuthorizationNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // ---- deterministic producers ----
@@ -1799,7 +1805,7 @@ func (EcdsaProfile) CheckChain(input ChainInput, expected ExpectedChain) (f Chai
 	if lastHash != wantHead {
 		return ChainFacts{}, ErrInvalid // caller head binding
 	}
-	return ChainFacts{
+	return ChainFacts{data: privateValue(&chainFactsData{
 		Version:       3,
 		ChainID:       expected.ChainID,
 		FirstSequence: expected.FirstSequence,
@@ -1811,7 +1817,7 @@ func (EcdsaProfile) CheckChain(input ChainInput, expected ExpectedChain) (f Chai
 			"predecessor_links", "row_count", "caller_boundaries",
 		},
 		Trust: TrustNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // ---- anchors and transitions ----
@@ -2070,7 +2076,7 @@ func (EcdsaProfile) VerifyHistoricalAnchor(compact string, key HistoricalPublicK
 	if err != nil {
 		return AnchorFacts{}, ErrInvalid
 	}
-	return AnchorFacts{
+	return AnchorFacts{data: privateValue(&anchorFactsData{
 		Version:    3,
 		AnchorID:   claims.AnchorID,
 		ChainID:    claims.ChainID,
@@ -2078,7 +2084,7 @@ func (EcdsaProfile) VerifyHistoricalAnchor(compact string, key HistoricalPublicK
 		Sequence:   claims.Sequence,
 		AnchoredAt: claims.AnchoredAt,
 		Trust:      TrustNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // verifyTransitionCompact is this major's transition primitive.
@@ -2167,7 +2173,7 @@ func (EcdsaProfile) VerifyKeyTransition(compact string, currentKey, nextKey Hist
 	if err != nil {
 		return KeyTransitionFacts{}, ErrInvalid
 	}
-	return KeyTransitionFacts{
+	return KeyTransitionFacts{data: privateValue(&keyTransitionFactsData{
 		Version:         3,
 		TransitionID:    claims.TransitionID,
 		ChainID:         claims.ChainID,
@@ -2176,7 +2182,7 @@ func (EcdsaProfile) VerifyKeyTransition(compact string, currentKey, nextKey Hist
 		ToFingerprint:   claims.ToFingerprint,
 		ToKeyID:         claims.ToKeyID,
 		Trust:           TrustNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // ---- anchored export ----
@@ -2464,7 +2470,7 @@ func (EcdsaProfile) verifyAnchoredExportCore(obj ArchivedObject, keys Historical
 	if lastHash != wantHead {
 		return AnchoredExportFacts{}, ErrInvalid
 	}
-	return AnchoredExportFacts{
+	return AnchoredExportFacts{data: privateValue(&anchoredExportFactsData{
 		Version:         3,
 		ChainID:         expected.Chain.ChainID,
 		FirstSequence:   expected.Chain.FirstSequence,
@@ -2480,7 +2486,7 @@ func (EcdsaProfile) verifyAnchoredExportCore(obj ArchivedObject, keys Historical
 		},
 		Trust:         TrustNotEvaluated,
 		Authorization: AuthorizationNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // VerifyAnchoredExport verifies a complete archived object of this major

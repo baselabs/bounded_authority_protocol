@@ -588,14 +588,20 @@ func (Profile) DecodeProof(compact string, bounds *Bounds) (d ProofDecoded, err 
 	if err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
-	if _, err := decodeProofHeaderFor(parts, b, proofProfileStandard); err != nil {
+	holderKey, err := decodeProofHeaderFor(parts, b, proofProfileStandard)
+	if err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
 	claims, err := successor.decodeProofPayload(parts, b)
 	if err != nil {
 		return ProofDecoded{}, ErrInvalid
 	}
-	out := ProofDecoded{
+	holderThumbprint, err := PublicKeyThumbprintRaw(holderKey, &b)
+	if err != nil {
+		return ProofDecoded{}, ErrInvalid
+	}
+	out := ProofDecoded{data: privateValue(&proofDecodedData{
+		GrantHash: claims.AthRaw, RequestHash: claims.BaReqRaw, HolderPublicKey: holderKey, HolderThumbprint: holderThumbprint,
 		ProofID:      claims.ProofID,
 		Version:      2,
 		Method:       claims.Method,
@@ -604,10 +610,10 @@ func (Profile) DecodeProof(compact string, bounds *Bounds) (d ProofDecoded, err 
 		InvocationID: claims.Invocation,
 		Operation:    claims.Operation,
 		Verification: DecodeVerificationNotEvaluated,
-	}
+	})}
 	if claims.Nonce != nil {
-		out.HasNonce = true
-		out.Nonce = *claims.Nonce
+		out.data().HasNonce = true
+		out.data().Nonce = *claims.Nonce
 	}
 	return out, nil
 }
@@ -697,7 +703,7 @@ func (Profile) verifyGrantCore(compact string, issuer TrustedIssuer, exp Expecte
 	if err != nil {
 		return grantClaimsData{}, GrantFacts{}, ErrInvalid
 	}
-	return claims, GrantFacts{
+	return claims, GrantFacts{data: privateValue(&grantFactsData{
 		Version:              2,
 		Issuer:               claims.Issuer,
 		GrantID:              claims.GrantID,
@@ -708,7 +714,7 @@ func (Profile) verifyGrantCore(compact string, issuer TrustedIssuer, exp Expecte
 		NotBefore:            claims.NotBefore,
 		ExpiresAt:            claims.ExpiresAt,
 		Authorization:        AuthorizationNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // VerifyGrant verifies a raw grant compact of this major against an exact
@@ -829,16 +835,16 @@ func (Profile) CheckEnvelope(creds Credentials, expected ExpectedRequest) (f Env
 	if err := successor.applySelectors(ops, expected.CastArguments); err != nil {
 		return EnvelopeFacts{}, ErrInvalid
 	}
-	return EnvelopeFacts{
+	return EnvelopeFacts{data: privateValue(&envelopeFactsData{
 		Version:              2,
-		Issuer:               gfacts.Issuer,
-		GrantID:              gfacts.GrantID,
-		IssuerKeyFingerprint: gfacts.IssuerKeyFingerprint,
-		HolderThumbprint:     gfacts.HolderThumbprint,
-		MatchedAudience:      gfacts.MatchedAudience,
-		IssuedAt:             gfacts.IssuedAt,
-		NotBefore:            gfacts.NotBefore,
-		ExpiresAt:            gfacts.ExpiresAt,
+		Issuer:               gfacts.Issuer(),
+		GrantID:              gfacts.GrantID(),
+		IssuerKeyFingerprint: gfacts.IssuerKeyFingerprint(),
+		HolderThumbprint:     gfacts.HolderThumbprint(),
+		MatchedAudience:      gfacts.MatchedAudience(),
+		IssuedAt:             gfacts.IssuedAt(),
+		NotBefore:            gfacts.NotBefore(),
+		ExpiresAt:            gfacts.ExpiresAt(),
 		ProofID:              proof.ProofID,
 		InvocationID:         proof.Invocation,
 		Operation:            proof.Operation,
@@ -847,7 +853,7 @@ func (Profile) CheckEnvelope(creds Credentials, expected ExpectedRequest) (f Env
 		RequestHash:          baReqRaw,
 		ProofIssuedAt:        proof.IssuedAt,
 		Authorization:        AuthorizationNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // ---- deterministic producers ----
@@ -1389,7 +1395,7 @@ func (Profile) CheckChain(input ChainInput, expected ExpectedChain) (f ChainFact
 	if lastHash != wantHead {
 		return ChainFacts{}, ErrInvalid // caller head binding
 	}
-	return ChainFacts{
+	return ChainFacts{data: privateValue(&chainFactsData{
 		Version:       2,
 		ChainID:       expected.ChainID,
 		FirstSequence: expected.FirstSequence,
@@ -1401,7 +1407,7 @@ func (Profile) CheckChain(input ChainInput, expected ExpectedChain) (f ChainFact
 			"predecessor_links", "row_count", "caller_boundaries",
 		},
 		Trust: TrustNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // ---- anchors and transitions ----
@@ -1640,7 +1646,7 @@ func (Profile) VerifyHistoricalAnchor(compact string, key HistoricalPublicKey, e
 	if err != nil {
 		return AnchorFacts{}, ErrInvalid
 	}
-	return AnchorFacts{
+	return AnchorFacts{data: privateValue(&anchorFactsData{
 		Version:    2,
 		AnchorID:   claims.AnchorID,
 		ChainID:    claims.ChainID,
@@ -1648,7 +1654,7 @@ func (Profile) VerifyHistoricalAnchor(compact string, key HistoricalPublicKey, e
 		Sequence:   claims.Sequence,
 		AnchoredAt: claims.AnchoredAt,
 		Trust:      TrustNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // verifyTransitionCompact is this major's transition primitive.
@@ -1737,7 +1743,7 @@ func (Profile) VerifyKeyTransition(compact string, currentKey, nextKey Historica
 	if err != nil {
 		return KeyTransitionFacts{}, ErrInvalid
 	}
-	return KeyTransitionFacts{
+	return KeyTransitionFacts{data: privateValue(&keyTransitionFactsData{
 		Version:         2,
 		TransitionID:    claims.TransitionID,
 		ChainID:         claims.ChainID,
@@ -1746,7 +1752,7 @@ func (Profile) VerifyKeyTransition(compact string, currentKey, nextKey Historica
 		ToFingerprint:   claims.ToFingerprint,
 		ToKeyID:         claims.ToKeyID,
 		Trust:           TrustNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // ---- anchored export ----
@@ -1934,7 +1940,7 @@ func (Profile) verifyAnchoredExportCore(obj ArchivedObject, keys HistoricalKeyCh
 	if lastHash != wantHead {
 		return AnchoredExportFacts{}, ErrInvalid
 	}
-	return AnchoredExportFacts{
+	return AnchoredExportFacts{data: privateValue(&anchoredExportFactsData{
 		Version:         2,
 		ChainID:         expected.Chain.ChainID,
 		FirstSequence:   expected.Chain.FirstSequence,
@@ -1950,7 +1956,7 @@ func (Profile) verifyAnchoredExportCore(obj ArchivedObject, keys HistoricalKeyCh
 		},
 		Trust:         TrustNotEvaluated,
 		Authorization: AuthorizationNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // VerifyAnchoredExport verifies a complete archived object of this major

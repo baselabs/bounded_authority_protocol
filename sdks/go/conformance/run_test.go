@@ -415,8 +415,8 @@ func runCase(t *testing.T, c corpusCase) {
 	case "decode_proof":
 		got, err := v.DecodeProof(rawString(t, c.Input, "compact"), nil)
 		checkVerdict(t, c, err)
-		if c.Expected["proof_id"] != nil && got.ProofID != rawString(t, c.Expected, "proof_id") {
-			t.Fatalf("case %s: proof id %s", c.ID, got.ProofID)
+		if c.Expected["proof_id"] != nil && got.ProofID() != rawString(t, c.Expected, "proof_id") {
+			t.Fatalf("case %s: proof id %s", c.ID, got.ProofID())
 		}
 	case "untrusted_key_locator":
 		got, err := v.UntrustedKeyLocator(rawString(t, c.Input, "compact"), nil)
@@ -437,11 +437,11 @@ func runCase(t *testing.T, c corpusCase) {
 			ClockSkew:      rawInt(t, c.Input, "clock_skew"),
 		})
 		checkVerdict(t, c, err)
-		if c.Expected["grant_id"] != nil && got.GrantID != rawString(t, c.Expected, "grant_id") {
-			t.Fatalf("case %s: grant id %s", c.ID, got.GrantID)
+		if c.Expected["grant_id"] != nil && got.GrantID() != rawString(t, c.Expected, "grant_id") {
+			t.Fatalf("case %s: grant id %s", c.ID, got.GrantID())
 		}
-		if c.Expected["issuer"] != nil && got.Issuer != rawString(t, c.Expected, "issuer") {
-			t.Fatalf("case %s: issuer %s", c.ID, got.Issuer)
+		if c.Expected["issuer"] != nil && got.Issuer() != rawString(t, c.Expected, "issuer") {
+			t.Fatalf("case %s: issuer %s", c.ID, got.Issuer())
 		}
 	case "check_envelope":
 		exp := subObject(t, c.Input, "expected")

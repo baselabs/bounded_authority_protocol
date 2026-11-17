@@ -467,7 +467,7 @@ func TestCertifiedRoleAttestationCorpusDrivesGoVerdicts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantFacts := AttestationFacts{
+	wantFacts := AttestationFacts{data: privateValue(&attestationFactsData{
 		AttestorKeyID:          profile.Attestor.KeyID,
 		AttestorKeyFingerprint: jwkThumbprintOfKey(attestorKey[:]),
 		SubjectKeyID:           profile.Subject.KeyID,
@@ -478,13 +478,13 @@ func TestCertifiedRoleAttestationCorpusDrivesGoVerdicts(t *testing.T) {
 		Exp:                    1735693200,
 		Verification:           AttestationVerificationSignatureAndWindow,
 		Trust:                  TrustNotEvaluated,
-	}
-	if facts != wantFacts {
+	})}
+	if *facts.data() != *wantFacts.data() {
 		t.Fatalf("issuer-valid facts = %+v, want %+v", facts, wantFacts)
 	}
 	holderFacts, err := VerifyAttestation(cases[1].Compact, expected)
-	if err != nil || holderFacts.Role != "holder" {
-		t.Fatalf("holder-valid facts role = %q, %v", holderFacts.Role, err)
+	if err != nil || holderFacts.Role() != "holder" {
+		t.Fatalf("holder-valid facts role = %q, %v", holderFacts.Role(), err)
 	}
 
 	// producer/assembly over the corpus key material: a test-generated
@@ -548,7 +548,7 @@ func TestCertifiedRoleAttestationCorpusDrivesGoVerdicts(t *testing.T) {
 			t.Fatalf("%s v1 grant decoder accepted attestation bytes", role)
 		}
 		producedFacts, err := VerifyAttestation(assembled, generatedExpected)
-		if err != nil || producedFacts.Role != role || producedFacts.AttestorKeyFingerprint != jwkThumbprintOfKey(generatedKey[:]) {
+		if err != nil || producedFacts.Role() != role || producedFacts.AttestorKeyFingerprint() != jwkThumbprintOfKey(generatedKey[:]) {
 			t.Fatalf("%s verify of assembled attestation mismatch: %+v, %v", role, producedFacts, err)
 		}
 	}

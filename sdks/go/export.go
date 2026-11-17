@@ -370,7 +370,7 @@ func verifyAnchoredExportCore(obj ArchivedObject, keys HistoricalKeyChain, expec
 	if lastHash != wantHead {
 		return AnchoredExportFacts{}, ErrInvalid
 	}
-	return AnchoredExportFacts{
+	return AnchoredExportFacts{data: privateValue(&anchoredExportFactsData{
 		Version:         1,
 		ChainID:         expected.Chain.ChainID,
 		FirstSequence:   expected.Chain.FirstSequence,
@@ -386,7 +386,7 @@ func verifyAnchoredExportCore(obj ArchivedObject, keys HistoricalKeyChain, expec
 		},
 		Trust:         TrustNotEvaluated,
 		Authorization: AuthorizationNotEvaluated,
-	}, nil
+	})}, nil
 }
 
 // archiveDigest is the archive-hashing seam: the public façade resolves it,

@@ -29,6 +29,10 @@ const (
 
 // GrantFacts is the standalone raw-grant verification result.
 type GrantFacts struct {
+	data func() *grantFactsData
+}
+
+type grantFactsData struct {
 	Version              int
 	Issuer               string
 	GrantID              string
@@ -43,6 +47,10 @@ type GrantFacts struct {
 
 // EnvelopeFacts is the combined grant+proof verification result.
 type EnvelopeFacts struct {
+	data func() *envelopeFactsData
+}
+
+type envelopeFactsData struct {
 	Version              int
 	Issuer               string
 	GrantID              string
@@ -66,6 +74,10 @@ type EnvelopeFacts struct {
 // identifiers, times, counts, hashes, and performed-verification labels only
 // (REQ1-CHAIN-facts-shape).
 type ChainFacts struct {
+	data func() *chainFactsData
+}
+
+type chainFactsData struct {
 	Version       int
 	ChainID       string
 	FirstSequence int64
@@ -78,6 +90,10 @@ type ChainFacts struct {
 
 // AnchorFacts is the historical boundary-anchor verification result.
 type AnchorFacts struct {
+	data func() *anchorFactsData
+}
+
+type anchorFactsData struct {
 	Version    int
 	AnchorID   string
 	ChainID    string
@@ -89,6 +105,10 @@ type AnchorFacts struct {
 
 // KeyTransitionFacts is the historical key-transition verification result.
 type KeyTransitionFacts struct {
+	data func() *keyTransitionFactsData
+}
+
+type keyTransitionFactsData struct {
 	Version         int
 	TransitionID    string
 	ChainID         string
@@ -103,6 +123,10 @@ type KeyTransitionFacts struct {
 // the performed cryptographic checks and never carries rows, commitments,
 // compacts, archive bytes, or the object-store version.
 type AnchoredExportFacts struct {
+	data func() *anchoredExportFactsData
+}
+
+type anchoredExportFactsData struct {
 	Version         int
 	ChainID         string
 	FirstSequence   int64
@@ -126,7 +150,7 @@ type KeyLocator struct {
 
 // String returns the exact fixed rendering for the verified profile.
 func (facts GrantFacts) String() string {
-	switch facts.Version {
+	switch facts.Version() {
 	case 2:
 		return "#BoundedAuthorityProtocol.V2.GrantFacts<redacted>"
 	case 3:
@@ -155,7 +179,7 @@ func (GrantFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
 
 // String returns the exact fixed rendering for the verified profile.
 func (facts EnvelopeFacts) String() string {
-	switch facts.Version {
+	switch facts.Version() {
 	case 2:
 		return "#BoundedAuthorityProtocol.V2.EnvelopeFacts<redacted>"
 	case 3:
@@ -184,7 +208,7 @@ func (EnvelopeFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
 
 // String returns the exact fixed rendering for the verified profile.
 func (facts ChainFacts) String() string {
-	switch facts.Version {
+	switch facts.Version() {
 	case 2:
 		return "#BoundedAuthorityProtocol.V2.ChainFacts<redacted>"
 	case 3:
@@ -213,7 +237,7 @@ func (ChainFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
 
 // String returns the exact fixed rendering for the verified profile.
 func (facts AnchorFacts) String() string {
-	switch facts.Version {
+	switch facts.Version() {
 	case 2:
 		return "#BoundedAuthorityProtocol.V2.AnchorFacts<redacted>"
 	case 3:
@@ -242,7 +266,7 @@ func (AnchorFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
 
 // String returns the exact fixed rendering for the verified profile.
 func (facts KeyTransitionFacts) String() string {
-	switch facts.Version {
+	switch facts.Version() {
 	case 2:
 		return "#BoundedAuthorityProtocol.V2.KeyTransitionFacts<redacted>"
 	case 3:
@@ -271,7 +295,7 @@ func (KeyTransitionFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
 
 // String returns the exact fixed rendering for the verified profile.
 func (facts AnchoredExportFacts) String() string {
-	switch facts.Version {
+	switch facts.Version() {
 	case 2:
 		return "#BoundedAuthorityProtocol.V2.AnchoredExportFacts<redacted>"
 	case 3:

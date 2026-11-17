@@ -88,6 +88,10 @@ const (
 // (REQ-RA1-VERIFY-facts). Facts carry no raw key material, no signature, and
 // no decision (REQ-RA1-VERIFY-facts-non-authorizing).
 type AttestationFacts struct {
+	data func() *attestationFactsData
+}
+
+type attestationFactsData struct {
 	AttestorKeyID          string
 	AttestorKeyFingerprint [32]byte
 	SubjectKeyID           string
@@ -575,7 +579,7 @@ func VerifyAttestation(compact string, expected ExpectedAttestation) (f Attestat
 	if expected.Now < claims.Nbf || expected.Now >= claims.Exp {
 		return AttestationFacts{}, ErrInvalid // REQ-RA1-VERIFY-now-window
 	}
-	return AttestationFacts{
+	return AttestationFacts{data: privateValue(&attestationFactsData{
 		AttestorKeyID:          kid,
 		AttestorKeyFingerprint: attestorFP,
 		SubjectKeyID:           claims.KeyID,
@@ -586,5 +590,5 @@ func VerifyAttestation(compact string, expected ExpectedAttestation) (f Attestat
 		Exp:                    claims.Exp,
 		Verification:           AttestationVerificationSignatureAndWindow,
 		Trust:                  TrustNotEvaluated,
-	}, nil
+	})}, nil
 }

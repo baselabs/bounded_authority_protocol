@@ -208,7 +208,7 @@ func CheckChain(input ChainInput, expected ExpectedChain) (f ChainFacts, err err
 	if lastHash != wantHead {
 		return ChainFacts{}, ErrInvalid // caller head binding
 	}
-	return ChainFacts{
+	return ChainFacts{data: privateValue(&chainFactsData{
 		Version:       1,
 		ChainID:       expected.ChainID,
 		FirstSequence: expected.FirstSequence,
@@ -220,5 +220,5 @@ func CheckChain(input ChainInput, expected ExpectedChain) (f ChainFacts, err err
 			"predecessor_links", "row_count", "caller_boundaries",
 		},
 		Trust: TrustNotEvaluated,
-	}, nil
+	})}, nil
 }

@@ -252,7 +252,7 @@ func TestCertifiedContentAssertionCorpusIntegrityAndVerdicts(t *testing.T) {
 			decodeOK = decodeErr == nil
 			if decodeOK {
 				producerCases++
-				si, producerErr := AssertionSigningInput(ContentAssertion{AttestorKeyID: decoded.AttestorKeyID, Jti: decoded.Jti, Iss: decoded.Iss, Aud: decoded.Aud, Sub: decoded.Sub, Profile: decoded.Profile, ProfileDigest: decoded.ProfileDigest, ContentDigest: decoded.ContentDigest, Gen: decoded.Gen, Prev: decoded.Prev, Iat: decoded.Iat, Nbf: decoded.Nbf, Exp: decoded.Exp}, &bounds)
+				si, producerErr := AssertionSigningInput(ContentAssertion{AttestorKeyID: decoded.AttestorKeyID(), Jti: decoded.Jti(), Iss: decoded.Iss(), Aud: decoded.Aud(), Sub: decoded.Sub(), Profile: decoded.Profile(), ProfileDigest: decoded.ProfileDigest(), ContentDigest: decoded.ContentDigest(), Gen: decoded.Gen(), Prev: decoded.Prev(), Iat: decoded.Iat(), Nbf: decoded.Nbf(), Exp: decoded.Exp()}, &bounds)
 				if producerErr != nil || Base64urlEncode(si.Protected) != strings.Split(c.Compact, ".")[0] || Base64urlEncode(si.Payload) != strings.Split(c.Compact, ".")[1] {
 					t.Errorf("%s producer bytes mismatch", c.ID)
 				}
@@ -324,15 +324,15 @@ func TestCertifiedContentAssertionSuccessorCorpus(t *testing.T) {
 		for name, value := range c.Successor.FactsOverrides {
 			switch name {
 			case "verification":
-				successor.Verification = AttestationVerification(99)
+				successor.data().Verification = AttestationVerification(99)
 			case "trust":
-				successor.Trust = Trust(99)
+				successor.data().Trust = Trust(99)
 			case "digest":
 				parsed, err := corpusFixedDigest(value)
 				if err != nil {
 					overridesOK = false
 				} else {
-					successor.Digest = parsed
+					successor.data().Digest = parsed
 				}
 			default:
 				overridesOK = false
