@@ -7,7 +7,8 @@ verification on every Ed25519 surface. The distribution is `bounded-authority-ve
 import package is `bounded_authority_verifier`.
 
 It checks the exact bytes of a grant, a holder proof, or an evidence object against public keys
-and expected context that you supply, and returns redacted facts or a value-free rejection. It
+and expected context that you supply, and returns facts or a value-free rejection. Facts exclude
+raw credentials and secrets; the logging notes below describe their display limitations. It
 is a **verifier, not an authority**: it never selects trusted keys, reserves replay, checks
 revocation, or decides whether a request may run. Those stay in your service.
 
@@ -19,7 +20,8 @@ source comments cross-reference the Elixir reference implementation for traceabi
 ## Status
 
 **Not published.** The package is not on PyPI; `bounded-authority-verifier` is the name it will
-use, and any package of that name there is not ours until this page says otherwise. It moves to its own repository when it is first published (ADR 0015). Until then,
+use, and any package of that name there is not ours until this page says otherwise. It moves to
+its own repository when it is first published. Until then,
 install it from this repository.
 
 - Version `0.1.0`, pre-1.0: the API may change between minor versions.
@@ -224,7 +226,7 @@ so log the fields you need by name.
 ## Strict Ed25519
 
 Every Ed25519 signature check goes through one module (`bounded_authority_verifier.ed25519`)
-that applies rule S1 of ADR 0040 before the `cryptography` backend: exact widths,
+that applies rule S1 of [erratum 2](../../docs/errata.md) before the `cryptography` backend: exact widths,
 canonical `A` and `R`, neither of small order, `S < L`, then the cofactorless equation.
 `acceptable_public_key` is the key-entry check (canonical, not small order, on the curve), and
 the JWK and thumbprint functions refuse a key that fails it. `torsion_free` adds `[L]A = O`; call

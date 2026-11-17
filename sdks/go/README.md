@@ -6,9 +6,10 @@ profile, and the role-attestation and content-assertion profiles, with strict Ed
 verification on every Ed25519 surface.
 
 It checks the exact bytes of a grant, a holder proof, or an evidence object against public keys
-and expected context that you supply, and returns redacted facts or the single error
+and expected context that you supply, and returns facts or the single error
 `ErrInvalid`. It is a **verifier, not an authority**: it never selects trusted keys, reserves
 replay, checks revocation, or decides whether a request may run. Those stay in your service.
+Facts exclude raw credentials and secrets; the logging notes below describe their display limitations.
 
 Its behavior is defined by the specifications ([v1](../../spec/bap-v1.md),
 [v2](../../spec/bap-v2.md), [v3](../../spec/bap-v3.md), and the sibling profiles under
@@ -20,7 +21,7 @@ the Elixir reference implementation for traceability.
 **Not published.** There is no tagged module version and the Go module proxy does not serve
 this module, so `go get github.com/baselabs/bounded_authority_protocol_go` fails. The module
 moves to its own repository when it is first published
-(ADR 0015). Until then, use it
+with self-contained tests and corpus inputs. Until then, use it
 from a checkout of this repository.
 
 - Go **1.25** or later (`go.mod`). CI installs Go with `actions/setup-go` and
@@ -219,7 +220,7 @@ redacted `String` method yet, so `fmt` prints their fields; log the fields you n
 ## Strict Ed25519
 
 Every Ed25519 signature check goes through one function (`verifyEd25519` in `ed25519.go`) that
-applies rule S1 of ADR 0040 before
+applies rule S1 of [erratum 2](../../docs/errata.md) before
 the standard-library backend: exact widths, canonical `A` and `R`, neither of small order,
 `S < L`, then the cofactorless equation. `AcceptablePublicKey` is the key-entry check (canonical,
 not small order, on the curve), and every JWK and thumbprint function returns `ErrInvalid` for a
@@ -263,7 +264,7 @@ No I/O, filesystem, clock, randomness, network, environment, or process access i
 (`tools/purity_check.sh` scans every non-test file and allowlists its imports). No trust
 discovery, key custody, signing, replay reservation, revocation state, issuance, or
 authorization decisions. No registry-publish setup: a pre-commit hook and a CI job reject it
-here (ADR 0015).
+here.
 
 ## Development
 

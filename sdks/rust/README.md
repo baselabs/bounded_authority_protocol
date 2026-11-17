@@ -6,7 +6,8 @@ profile, and the role-attestation and content-assertion profiles, with strict Ed
 verification on every Ed25519 surface.
 
 It checks the exact bytes of a grant, a holder proof, or an evidence object against public keys
-and expected context that you supply, and returns redacted facts or the single error `Invalid`.
+and expected context that you supply, and returns facts or the single error `Invalid`.
+Facts exclude raw credentials and secrets; the logging notes below describe their display limitations.
 It is a **verifier, not an authority**: it never selects trusted keys, reserves replay, checks
 revocation, or decides whether a request may run. Those stay in your service.
 
@@ -19,7 +20,7 @@ the Elixir reference implementation for traceability.
 
 **Not published.** The crate is not on crates.io; the name `bounded-authority-protocol` is the
 one it will use, and any crate of that name there is not ours until this page says otherwise. It moves to its own repository when it is first published
-(ADR 0015). Until then, depend on
+with self-contained tests and corpus inputs. Until then, depend on
 a checkout of this repository.
 
 - Rust **1.88** or later (`rust-version` in `Cargo.toml`; `rust-toolchain.toml` pins 1.88.0 for
@@ -222,7 +223,7 @@ you need by name.
 ## Strict Ed25519
 
 Every Ed25519 signature check goes through one function (`ed25519::verify`, internal) that
-applies rule S1 of ADR 0040 before
+applies rule S1 of [erratum 2](../../docs/errata.md) before
 the `ed25519-dalek` backend: exact widths, canonical `A` and `R`, neither of small order,
 `S < L`, then the cofactorless equation (dalek's `verify`, not its `verify_strict`).
 `acceptable_public_key` is the key-entry check (canonical, not small order, on the curve), and
@@ -262,7 +263,7 @@ The producer-canonicality corpus (erratum 3) runs too, as the
 No I/O, filesystem, clock, randomness, network, environment, or process access in the library
 (`tools/purity_check.sh` enforces it for `src/`). No trust discovery, key custody, signing,
 replay reservation, revocation state, issuance, or authorization decisions. No registry-publish
-setup: a pre-commit hook and a CI job reject it here (ADR 0015).
+setup: a pre-commit hook and a CI job reject it here.
 
 ## Development
 

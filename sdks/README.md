@@ -11,8 +11,9 @@ verifiers, not additional normative text.
 **None of the three is published to a registry yet.** Install them from this repository by
 local path or Git commit; each README shows how. Each SDK moves to its own repository when it is
 first published, never publishing from this one
-(ADR 0015); a pre-commit hook and a
-CI job reject registry-publish setup here.
+([publication guard](../scripts/check_sdk_publish_infra.sh)); a pre-commit hook and a CI job
+reject registry-publish setup here. Graduation also requires making the SDK's tests and
+corpus inputs self-contained; an in-tree subtree is not necessarily ready to publish by itself.
 
 ## What is here
 
@@ -33,11 +34,11 @@ from [`baselabs/bounded_authority_protocol_typescript`](https://github.com/basel
 its source and conformance runners no longer live here.
 
 All four are pure verification libraries (no I/O, clock, randomness, or network in the library).
-They return redacted facts or a single value-free rejection, never an authorization decision.
+Their verification facades return facts or a single value-free rejection, never an authorization
+decision. Facts exclude raw credentials and secrets; field-redacted display is a separate
+requirement, with the current rendering limitations listed below.
 Their behavior is defined by the specifications and the corpora; the in-repository SDKs' source
 comments cross-reference the Elixir reference implementation for traceability.
-ADR 0014 records the packaging and support
-decisions.
 
 ## Known gaps
 
@@ -61,12 +62,12 @@ decisions.
   mandatory nonce, literal `127.0.0.1`/`[::1]` targets only, and mutual rejection with standard
   `dpop+jwt`. Each SDK pins the profile corpus index SHA-256 and runs its 36 URI and 8 proof
   cases.
-- **Role attestations** (ADR 0036): the four
+- **[Role attestations](../spec/bap-role-attestation-v1.md)**: the four
   attestation surfaces and the 40-case corpus.
-- **Content assertions** (ADR 0037):
+- **[Content assertions](../spec/bap-content-assertion-v1.md)**:
   verification, both digest functions, pairwise successor checks, the producer, and assembly,
   with the 131 assertion, 9 digest, and 14 successor cases.
-- **Strict Ed25519** (ADR 0040): rule S1
+- **Strict Ed25519** ([erratum 2](../docs/errata.md)): rule S1
   at each SDK's single Ed25519 verification point, the `verify_strict`, `acceptable_public_key`,
   and `torsion_free` helpers in the language's naming, and the strict-Ed25519 corpus
   (`bap-strict-ed25519/1`, [`priv/conformance/strict-ed25519`](../priv/conformance/strict-ed25519/),
@@ -100,14 +101,17 @@ cargo test --locked
 go test ./...
 ```
 
-The TypeScript verifier runs its vendored corpora in its own repository.
+The TypeScript verifier runs its vendored corpora in its own repository. Python reads the
+repository's corpora in place. Go and Rust vendor the base and security corpora, but their
+sibling-profile tests still read repository-level fixtures; Go's major-2 and major-3 key censuses also read
+the repository's curated generator inputs. These are test dependencies, not library I/O.
 
 Beyond the corpora, each SDK has a permissiveness battery: for every parser closure that guards
 against a host-language trap (duplicate-rejecting decoding, raw numeric-lexeme limits, a single
 value with no trailing content, the integer and float distinction), a test builds the defect
 the closure exists to reject and proves the closure catches it. This applies the
-ADR 0005 independent-runner
-discipline per language, covering a class the corpus has no cases for.
+[independent-runner discipline](../docs/design/conformance-contract.md) per language,
+covering a class the corpus has no cases for.
 
 CI also runs `python scripts/check_sdk_closures.py python` (or `rust` or `go`) from the
 repository root. After a green baseline, it removes each closure independently in a temporary

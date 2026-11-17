@@ -37,7 +37,7 @@ node conformance/generators/build_corpus.mjs --bump-revision --note "why this re
 a tamper case whose verbatim artifact disagrees with the re-derived base-with-one-flip, or a
 stale index/sidecar.
 
-## Amending the corpus (the atomic-landing template, ADR 0019)
+## Amending the corpus (the atomic-landing template)
 
 A corpus amendment is ONE commit that carries: the case-file changes, the rebuilt `index.json`
 (`--rebuild-index` or `--bump-revision`), the re-vendored `sdks/{rust,go}/conformance/corpus/`

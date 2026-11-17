@@ -9,7 +9,10 @@ when it loads; the [interoperability report](../design/interoperability-report.m
 latest results.
 
 Like this package, each is a pure verification library: no I/O, clock, randomness, or network,
-and no authorization decision. Each returns redacted facts or one value-free rejection.
+and no authorization decision. Verification returns facts or one value-free rejection. Facts
+exclude raw credentials and secrets; that is distinct from field-redacted display. Check the
+[SDK logging notes](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/README.md#known-gaps)
+for the current language-specific rendering limitations before logging facts.
 
 | Language | Package | Status | Runtime | Notes |
 |---|---|---|---|---|
@@ -24,6 +27,11 @@ package's repository. Each moves to its own repository when it is first publishe
 TypeScript verifier did; until then, the commit you install from is the identity of what you
 deployed. A package with one of the planned names on a public registry is not this project's
 until that SDK's README says it is published.
+
+Graduation includes making the tests self-contained. Python currently reads repository-level
+corpora; Go and Rust vendor base and security snapshots but still use repository-level inputs
+for some tests. The [SDK overview](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/README.md#conformance)
+describes those bindings. They do not add I/O to the verification libraries.
 
 ## Signing in other languages
 
