@@ -22,7 +22,6 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Complete-history invariants run in CI with a full checkout; shallow development snapshots
   exclude exactly those tests with an explicit reason and reject the CI full-history flag.
 
-## [1.0.0] — 2026-11-10
 ## [1.0.0] (2026-11-10)
 
 ### Changed
@@ -1631,7 +1630,7 @@ several note findings, all in surfaces this program touched. All fixed:
   compile-time `unsafe` half) and the runtime dependency-license allowlist (15 runtime deps, all
   permissive; dev-deps excluded as non-consumer-facing), both shellcheck-clean and red-capable. The
   `rust-conformance` CI job ([`.github/workflows/sdks.yml`](https://github.com/baselabs/bounded_authority_protocol/blob/main/.github/workflows/sdks.yml)) runs fmt + clippy + the full `cargo test`
-  (unit + permissiveness + 283-vector conformance + census) + purity + license on the MSRV 1.88
+  (unit + permissiveness + 283-vector conformance + census) + purity + license on the MSRV 1.81
   toolchain. The publish guard now scans `sdks/*/Cargo.toml` and blocks `cargo publish` /
   `cargo release publish` / `cargo-release publish` / `crate-ci/cargo-release` (the SDK-graduation decision record). New docs:
   [`sdks/rust/README.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/rust/README.md) and the deployment guide

@@ -21,7 +21,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/guides/getting-started.md",
                     "docs/guides/implementers-guide.md",
                     "docs/guides/upgrading.md",
-                    "docs/livebooks/bap-walkthrough.livemd",
+                    "docs/notebooks/bap-walkthrough.livemd",
                     "docs/guides/choosing-a-profile.md",
                     "docs/guides/recipes.md",
                     "docs/guides/evidence.md",
@@ -31,8 +31,8 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/guides/glossary.md",
                     "docs/guides/faq.md",
                     "docs/guides/cheatsheet.cheatmd",
-                    "docs/livebooks/service-integration.livemd",
-                    "docs/livebooks/chains-and-archives.livemd",
+                    "docs/notebooks/service-integration.livemd",
+                    "docs/notebooks/chains-and-archives.livemd",
                     "docs/design/conformance-contract.md",
                     "docs/design/interoperability-report.md",
                     "docs/design/protocol-charter.md",
@@ -924,11 +924,11 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     # the value its prose states; only each notebook's Mix.install setup cell is swapped for
     # this consumer's path dependency. The harness halts the VM non-zero on any mismatch.
     harness = Path.join(source_root, "test_support/livebook_harness.ex")
-    livebooks = Path.join(package_root, "docs/livebooks")
+    notebooks = Path.join(package_root, "docs/notebooks")
 
     livebook_code =
       "Code.require_file(#{inspect(harness)}); " <>
-        "BoundedAuthorityProtocol.TestSupport.LivebookHarness.gate!(#{inspect(livebooks)})"
+        "BoundedAuthorityProtocol.TestSupport.LivebookHarness.gate!(#{inspect(notebooks)})"
 
     check_code = check_code <> "; " <> livebook_code
 

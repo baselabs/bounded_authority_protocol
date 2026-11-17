@@ -3,7 +3,7 @@
 #
 #     elixir scripts/livebook_registry_readback.exs [NOTEBOOK.livemd ...]
 #
-# With no arguments it reads every notebook under docs/livebooks. Each notebook runs in its own
+# With no arguments it reads every notebook under docs/notebooks. Each notebook runs in its own
 # `elixir` VM: its own Mix.install setup cell installs the package from the public Hex registry
 # (no path or Git dependency is substituted), then the shared harness
 # (test_support/livebook_harness.ex) evaluates the remaining cells and compares every stated
@@ -22,7 +22,7 @@ defmodule BoundedAuthorityProtocol.LivebookRegistryReadback do
   def main(arguments) do
     notebooks =
       case arguments do
-        [] -> @root |> Path.join("docs/livebooks/*.livemd") |> Path.wildcard() |> Enum.sort()
+        [] -> @root |> Path.join("docs/notebooks/*.livemd") |> Path.wildcard() |> Enum.sort()
         paths -> Enum.map(paths, &Path.expand/1)
       end
 
