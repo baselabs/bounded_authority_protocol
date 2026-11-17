@@ -887,8 +887,7 @@ condition = "AND"
 targetRules = ["jwt"]
 regexTarget = "match"
 commits = [
-  "50c108f95fcc2eed6c175fb6bee39401445e8980",
-  "3c371c5b94519193733d18ce3c26b9ee262ace73",
+  "6e6b44affbf719c6da5f3190bb99c34532ac7d4c",
 ]
 paths = [
   '''^sdks/decoded-wire-rendering\.json$''',
