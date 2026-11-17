@@ -41,7 +41,7 @@
     <p class="kicker"><span class="wordmark hero-mark"><i>[</i>BAP<i>]</i></span> Bounded Authority Protocol</p>
     <h1>OAuth proved <em>who</em>.<br>This protocol proves <em>what they may do</em>.</h1>
     <p class="lede">Bounded Authority is an open wire protocol for per-request capability: an issuer
-    signs a grant naming one operation, one target, one window; the holder’s key signs a proof
+    signs a grant naming permitted operations, argument bounds, audiences, and a validity window; the holder's key signs a proof
     binding that grant to one specific request; the resource verifies the envelope and keeps the
     cryptographic facts. Transport authentication — OAuth, mTLS, whatever you run — stays exactly
     where it is. This is the layer it leaves out.</p>
@@ -74,8 +74,8 @@
       <h3>Every capability is narrow.</h3>
       <p class="pain">A bearer token’s power is decided by whatever checked it, at whatever moment
       — and lives until it expires.</p>
-      <p class="answer"><svg class="ic"><use href="#i-check"/></svg> A grant is a signed, byte-frozen object: <strong>one
-      operation, one target, one time window</strong> — the resource never guesses scope.</p>
+      <p class="answer"><svg class="ic"><use href="#i-check"/></svg> A grant is a signed, byte-frozen object naming <strong>operations,
+      argument bounds, audiences, and a validity window</strong>. The proof binds the specific request target.</p>
     </article>
     <article class="whycard">
       <h3>Every request is proven.</h3>
@@ -108,8 +108,8 @@
 <section id="family" class="wrap">
   <div class="why-head">
     <h2>The family</h2>
-    <p>One spec, four repositories. The TypeScript packages are on npm; the Elixir packages on
-    hex.pm; every site runs the real code in your browser.</p>
+    <p>One protocol, four repositories. The TypeScript packages are on npm; the Elixir packages on
+    hex.pm. This site links the specifications, verifier bench, and signer playground.</p>
   </div>
   <div class="fammap">
     <article class="famcard here">
