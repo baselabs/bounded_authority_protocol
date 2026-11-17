@@ -193,7 +193,9 @@ def test_real_decoded_compacts_match_independent_reference():
         major = {1: v1, 2: v2, 3: v3}[row["major"]]
         result = getattr(major, f"decode_{row['kind']}")(row["compact"].encode())
         assert isinstance(result, Ok)
-        assert str(result.value) == repr(result.value) == row["expected"], row.get("id", row["kind"])
+        assert str(result.value) == repr(result.value) == row["expected"], row.get(
+            "id", row["kind"]
+        )
 
 
 def test_decoded_binary_notation_matches_independent_reference():
@@ -206,7 +208,9 @@ def test_decoded_binary_notation_matches_independent_reference():
         (Path(__file__).parent / "fixtures" / "decoded-binary-rendering.json").read_text()
     )
     for row in rows:
-        assert _inspect.binary(bytes.fromhex(row["hex"])) == row["expected"], row.get("id", row["hex"][:32])
+        assert _inspect.binary(bytes.fromhex(row["hex"])) == row["expected"], row.get(
+            "id", row["hex"][:32]
+        )
 
 
 def test_float_notation_matches_specified_fixture_bytes():
@@ -214,6 +218,7 @@ def test_float_notation_matches_specified_fixture_bytes():
     from pathlib import Path
 
     from bounded_authority_verifier import _inspect
+
     gold = json.loads((Path(__file__).parent / "fixtures" / "decoded-rendering.json").read_text())
     for key, expected in gold.items():
         if key.startswith("float:"):
@@ -227,23 +232,31 @@ def test_hand_built_selectors_and_nested_values_are_total():
     for kind in [b"x\ny", b"\xff", b"", b"Upper", b"a-b", b"a?b", "é".encode()]:
         value = JObject({"kind": JString(kind), "path": JArray(()), "value": JInt(1)})
         assert display.render(display.selector(value)) == "{#unrenderable, [], {:integer, 1}}"
-    malformed = [JInt(1), JObject({}), JObject({"kind": JInt(1)}),
-                 JObject({"kind": JString(b"eq")}),
-                 JObject({"kind": JString(b"eq"), "path": JInt(1), "value": JInt(1)}),
-                 JObject({"kind": JString(b"eq"), "path": JArray((JInt(1),)), "value": JInt(1)}),
-                 JObject({"kind": JString(b"eq"), "path": JArray(())}),
-                 JObject({"kind": JString(b"one_of"), "path": JArray(()), "values": JInt(1)})]
+    malformed = [
+        JInt(1),
+        JObject({}),
+        JObject({"kind": JInt(1)}),
+        JObject({"kind": JString(b"eq")}),
+        JObject({"kind": JString(b"eq"), "path": JInt(1), "value": JInt(1)}),
+        JObject({"kind": JString(b"eq"), "path": JArray((JInt(1),)), "value": JInt(1)}),
+        JObject({"kind": JString(b"eq"), "path": JArray(())}),
+        JObject({"kind": JString(b"one_of"), "path": JArray(()), "values": JInt(1)}),
+    ]
     for value in malformed:
         assert display.render(display.selector(value)) == "#unrenderable"
     for kind in ["_", "ready?", "run!", "aB_9"]:
         assert display.render(display.atom(kind)) == ":" + kind
     for value in [float("nan"), float("inf"), -float("inf")]:
-        assert display.render(display.tagged(JArray((JFloat(value),)))) == "{:array, [float: #unrenderable]}"
+        assert (
+            display.render(display.tagged(JArray((JFloat(value),))))
+            == "{:array, [float: #unrenderable]}"
+        )
     assert display.render(display.tagged(JString(b"\xff"))) == "{:string, <<255>>}"
     assert display.render(display.operations((JObject({}),), 1)) == "[#unrenderable]"
     operation = JObject({"name": JObject({}), "selectors": JInt(1)})
     import json
     from pathlib import Path
+
     gold = json.loads((Path(__file__).with_name("fixtures") / "decoded-rendering.json").read_text())
     assert display.render(display.operations((operation,), 1)) == gold["handbuilt:operation"]
     cycle = []

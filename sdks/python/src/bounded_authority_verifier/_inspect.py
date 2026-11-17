@@ -1,4 +1,5 @@
 """Specified diagnostic rendering (spec/diagnostic-rendering.md § Diagnostic rendering), including shared container and printable limits."""
+
 from __future__ import annotations
 
 import math
@@ -20,7 +21,10 @@ class Term:
 
 
 def atom(value: object) -> Term:
-    if not issubclass(type(value), str) or re.fullmatch(r"[a-z_][a-zA-Z0-9_]*[?!]?", cast(str, value)) is None:
+    if (
+        not issubclass(type(value), str)
+        or re.fullmatch(r"[a-z_][a-zA-Z0-9_]*[?!]?", cast(str, value)) is None
+    ):
         return Term("unrenderable")
     return Term("atom", str.__str__(cast(str, value)))
 
@@ -37,7 +41,9 @@ def scalar(value: object) -> Term:
         while number:
             number, chunk = divmod(number, 1_000_000_000)
             chunks.append(chunk)
-        digits = str(chunks[-1]) + "".join(f"{c:09d}" for c in reversed(chunks[:-1])) if chunks else "0"
+        digits = (
+            str(chunks[-1]) + "".join(f"{c:09d}" for c in reversed(chunks[:-1])) if chunks else "0"
+        )
         return Term("scalar", ("-" if value < 0 else "") + digits)
     if value == 0.0:
         return Term("scalar", repr(value))
@@ -74,7 +80,11 @@ def raw(value: object) -> Term:
     if not issubclass(type(value), bytes):
         return native(value)
     value = cast(bytes, value)
-    return Term("binary", raw=bytes.__getitem__(value, slice(None, 16384)), more=bytes.__len__(value) > 16384)
+    return Term(
+        "binary",
+        raw=bytes.__getitem__(value, slice(None, 16384)),
+        more=bytes.__len__(value) > 16384,
+    )
 
 
 @dataclass(frozen=True)
@@ -139,10 +149,51 @@ def structure(name: str, fields: list[tuple[str, Term]]) -> Term:
 def _quoted(value: bytes, more: bool = False) -> str | None:
     # Surrogate escapes retain each invalid byte for prefix scanning and suffix escaping.
     decoded = value.decode("utf-8", errors="surrogateescape")
-    if not all((32 <= ord(c) <= 127 or 160 <= ord(c) <= 55295 or 57344 <= ord(c) <= 65533 or 65536 <= ord(c) <= 1114111) or c in "\a\b\t\n\v\f\r\x1b" for c in decoded[:4096]):
+    if not all(
+        (
+            32 <= ord(c) <= 127
+            or 160 <= ord(c) <= 55295
+            or 57344 <= ord(c) <= 65533
+            or 65536 <= ord(c) <= 1114111
+        )
+        or c in "\a\b\t\n\v\f\r\x1b"
+        for c in decoded[:4096]
+    ):
         return None
-    escapes = {"\a": r"\a", "\b": r"\b", "\t": r"\t", "\n": r"\n", "\v": r"\v", "\f": r"\f", "\r": r"\r", "\x1b": r"\e", "\x7f": r"\d", "\0": r"\0", '"': r'\"', "\\": r"\\"}
-    invisible = {0xFEFF, 0x061C, 0x200E, 0x200F, 0x200C, 0x200D, 0x034F, 0x00A0, 0x200B, 0x2060, 0x2028, 0x2029, 0x205F, *range(0x2061, 0x2065), *range(0x202A, 0x202F), *range(0x2066, 0x206A), *range(0xFFF9, 0xFFFD), *range(0x2000, 0x200B)}
+    escapes = {
+        "\a": r"\a",
+        "\b": r"\b",
+        "\t": r"\t",
+        "\n": r"\n",
+        "\v": r"\v",
+        "\f": r"\f",
+        "\r": r"\r",
+        "\x1b": r"\e",
+        "\x7f": r"\d",
+        "\0": r"\0",
+        '"': r"\"",
+        "\\": r"\\",
+    }
+    invisible = {
+        0xFEFF,
+        0x061C,
+        0x200E,
+        0x200F,
+        0x200C,
+        0x200D,
+        0x034F,
+        0x00A0,
+        0x200B,
+        0x2060,
+        0x2028,
+        0x2029,
+        0x205F,
+        *range(0x2061, 0x2065),
+        *range(0x202A, 0x202F),
+        *range(0x2066, 0x206A),
+        *range(0xFFF9, 0xFFFD),
+        *range(0x2000, 0x200B),
+    }
     # The specified diagnostic rendering counts interpolation as one printable-limit unit
     # (spec/diagnostic-rendering.md § Diagnostic rendering; decoded-binary-rendering.json).
     pieces: list[str] = []
@@ -152,7 +203,7 @@ def _quoted(value: bytes, more: bool = False) -> str | None:
             break
         c = decoded[i]
         i += 1
-        if c == "#" and decoded[i:i + 1] == "{":
+        if c == "#" and decoded[i : i + 1] == "{":
             pieces.append(r"\#{")
             i += 1
         else:
@@ -198,6 +249,7 @@ def render(term: Term) -> str:
     def keyword_entry(value: Term) -> bool:
         if value.kind == "tagged":
             from .json_alg import JArray, JBool, JFloat, JInt, JObject, JString
+
             item = value.value
             if type(item) in (JBool, JFloat, JInt, JString):
                 return True
@@ -250,6 +302,7 @@ def tagged(value: object) -> Term:
 
 def _tagged(value: object) -> Term:
     from .json_alg import JArray, JBool, JFloat, JInt, JNull, JObject, JString
+
     if type(value) is JNull:
         return atom("null")
     if type(value) is JBool:
@@ -275,6 +328,7 @@ def _member_pair(value: object) -> Term:
 
 def selector(value: object) -> Term:
     from .json_alg import JArray, JObject, JString
+
     if type(value) is not JObject or not issubclass(type(value.v), dict):
         return Term("unrenderable")
     if not all(type(key) is str for key in dict.keys(value.v)):
@@ -286,7 +340,13 @@ def selector(value: object) -> Term:
     if kind == "all":
         return atom("all")
     path = dict.get(value.v, "path")
-    if type(path) is not JArray or not _sequence(path.v) or not all(type(v) is JString and issubclass(type(v.v), bytes) for v in _sequence_items(path.v)):
+    if (
+        type(path) is not JArray
+        or not _sequence(path.v)
+        or not all(
+            type(v) is JString and issubclass(type(v.v), bytes) for v in _sequence_items(path.v)
+        )
+    ):
         return Term("unrenderable")
     names = mapped_listing(path.v, _path_name)
     if kind == "one_of":
@@ -303,11 +363,13 @@ def selector(value: object) -> Term:
 
 def _path_name(value: object) -> Term:
     from .json_alg import JString
+
     return raw(value.v) if type(value) is JString else Term("unrenderable")
 
 
 def _ordinary(value: object) -> Term:
     from .json_alg import JArray, JBool, JFloat, JInt, JNull, JString
+
     if type(value) is JNull:
         return atom("nil")
     if type(value) is JBool:
@@ -325,12 +387,25 @@ def operations(values: object, version: int) -> Term:
     from .json_alg import JArray, JObject
 
     def operation(value: object) -> Term:
-        if type(value) is not JObject or not issubclass(type(value.v), dict) or not all(type(key) is str for key in dict.keys(value.v)) or not {"name", "selectors"} <= dict.keys(value.v):
+        if (
+            type(value) is not JObject
+            or not issubclass(type(value.v), dict)
+            or not all(type(key) is str for key in dict.keys(value.v))
+            or not {"name", "selectors"} <= dict.keys(value.v)
+        ):
             return Term("unrenderable")
         selectors = dict.__getitem__(value.v, "selectors")
-        selected = mapped_listing(selectors.v, selector) if type(selectors) is JArray and _sequence(selectors.v) else _ordinary(selectors)
-        return structure(f"BoundedAuthorityProtocol.V{version}.Operation", [
-            ("name", _ordinary(dict.__getitem__(value.v, "name"))), ("selectors", selected),
-        ])
+        selected = (
+            mapped_listing(selectors.v, selector)
+            if type(selectors) is JArray and _sequence(selectors.v)
+            else _ordinary(selectors)
+        )
+        return structure(
+            f"BoundedAuthorityProtocol.V{version}.Operation",
+            [
+                ("name", _ordinary(dict.__getitem__(value.v, "name"))),
+                ("selectors", selected),
+            ],
+        )
 
     return mapped_listing(values, operation)
