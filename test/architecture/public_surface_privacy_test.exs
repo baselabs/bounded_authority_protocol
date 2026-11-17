@@ -1,5 +1,3 @@
-Code.require_file("../../test_support/git_history.ex", __DIR__)
-
 defmodule BoundedAuthorityProtocol.PublicSurfacePrivacyTest do
   use ExUnit.Case, async: false
   use ExUnitProperties
@@ -27,8 +25,9 @@ defmodule BoundedAuthorityProtocol.PublicSurfacePrivacyTest do
     [99, 111, 110, 116, 114, 111, 108, 32, 112, 108, 97, 110, 101]
   ]
 
+  @tag :git_history
   test "tracked files and reachable history contain no consumer-specific topology" do
-    assert scan_repo(".", BoundedAuthorityProtocol.TestSupport.GitHistory.complete!(".")) ==
+    assert scan_repo(".") ==
              {0, false, false, false, false},
            "public-surface privacy gate found forbidden generic topology"
   end
@@ -213,9 +212,8 @@ defmodule BoundedAuthorityProtocol.PublicSurfacePrivacyTest do
     end
   end
 
-  defp scan_repo(repo, history_repo \\ nil) do
-    history_repo = history_repo || repo
-    assert_full_history!(history_repo)
+  defp scan_repo(repo) do
+    assert_full_history!(repo)
 
     tracked_findings =
       repo
@@ -223,15 +221,15 @@ defmodule BoundedAuthorityProtocol.PublicSurfacePrivacyTest do
       |> String.split(<<0>>, trim: true)
       |> Enum.count(fn path -> forbidden?(path <> "\n" <> File.read!(Path.join(repo, path))) end)
 
-    messages = git!(history_repo, ["log", "--all", "--format=fuller"])
+    messages = git!(repo, ["log", "--all", "--format=fuller"])
 
     historical_paths =
-      git!(history_repo, ["log", "--all", "--format=", "--name-only", "--diff-merges=separate"])
+      git!(repo, ["log", "--all", "--format=", "--name-only", "--diff-merges=separate"])
 
-    tag_messages = git!(history_repo, ["for-each-ref", "--format=%(contents)", "refs/tags"])
+    tag_messages = git!(repo, ["for-each-ref", "--format=%(contents)", "refs/tags"])
 
     {tracked_findings, forbidden?(messages), forbidden?(historical_paths),
-     historical_content_forbidden?(history_repo), forbidden?(tag_messages)}
+     historical_content_forbidden?(repo), forbidden?(tag_messages)}
   end
 
   defp historical_content_forbidden?(repo) do

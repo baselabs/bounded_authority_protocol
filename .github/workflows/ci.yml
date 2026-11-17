@@ -8,6 +8,9 @@ on:
       - "kci/**"
   workflow_dispatch:
 
+env:
+  BAP_REQUIRE_FULL_HISTORY: "1"
+
 permissions:
   contents: read
 

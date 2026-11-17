@@ -1,5 +1,3 @@
-Code.require_file("../../test_support/git_history.ex", __DIR__)
-
 defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
   @moduledoc false
   use ExUnit.Case, async: true
@@ -12,7 +10,8 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     ".kimosabe/handoffs/2026-09-19-ap2-interop-and-ecdsa-suite.md"
   ]
 
-  test "real index and HEAD ancestry exclude local authoring directories" do
+  @tag :git_history
+  test "real index and every reachable ref exclude local authoring directories" do
     entries = git!(".", ["ls-files", "-z"]) |> String.split(<<0>>, trim: true)
 
     for positive <- [".gitleaks.toml", ".formatter.exs"] do
@@ -23,7 +22,7 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
       refute historical in entries
     end
 
-    assert scan(".", BoundedAuthorityProtocol.TestSupport.GitHistory.complete!(".")) == []
+    assert scan(".") == []
   end
 
   test "a formerly tracked path is a finding when tracked again" do
@@ -111,18 +110,47 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     assert scan(repo) != []
   end
 
-  test "a shallow snapshot still finds deleted paths in its complete ancestry" do
+  test "a real shallow clone excludes history tests unless full history is required" do
     source = repo!()
-    put!(source, ".kimosabe/removed.txt", "public canary\n")
+    put!(source, "removed.txt", "public canary\n")
     commit!(source)
-    git!(source, ["rm", ".kimosabe/removed.txt"])
+    git!(source, ["rm", "removed.txt"])
     commit!(source)
     shallow = source <> "-shallow"
     on_exit(fn -> File.rm_rf!(shallow) end)
     git!(source, ["clone", "--depth=1", "--no-local", source, shallow])
+    helper = Path.join(shallow, "test_helper.exs")
+    File.cp!(Path.expand("../test_helper.exs", __DIR__), helper)
+    probe = Path.join(shallow, "history_probe.exs")
 
-    completed = BoundedAuthorityProtocol.TestSupport.GitHistory.complete!(shallow, source)
-    assert scan(shallow, completed) == [:historical_path, :historical_path]
+    File.write!(probe, """
+    defmodule HistoryProbe do
+      use ExUnit.Case
+      @tag :git_history
+      test "repository history invariant", do: flunk("history test must be excluded here")
+    end
+    """)
+
+    {output, 0} =
+      System.cmd("elixir", ["-r", helper, probe],
+        cd: shallow,
+        stderr_to_stdout: true,
+        env: [{"BAP_REQUIRE_FULL_HISTORY", nil}]
+      )
+
+    assert output =~ "Excluding :git_history tests: shallow checkout"
+    assert output =~ "1 excluded"
+
+    {output, status} =
+      System.cmd("elixir", ["-r", helper, probe],
+        cd: shallow,
+        stderr_to_stdout: true,
+        env: [{"BAP_REQUIRE_FULL_HISTORY", "1"}]
+      )
+
+    assert status != 0
+    assert output =~ "BAP_REQUIRE_FULL_HISTORY=1 requires a complete checkout"
+    refute output =~ "Excluding :git_history"
     assert String.trim(git!(shallow, ["rev-parse", "--is-shallow-repository"])) == "true"
   end
 
@@ -140,12 +168,9 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     end
   end
 
-  # Read the index, never the contents of a tracked file. History is HEAD ancestry,
-  # including both parents of merges; unrelated refs are an owner audit.
-  def scan(repo, history_repo \\ nil) do
-    history_repo = history_repo || repo
-
-    unless String.trim(git!(history_repo, ["rev-parse", "--is-shallow-repository"])) == "false" do
+  # Check every reachable ref, including both merge parents and annotated tags.
+  def scan(repo) do
+    unless String.trim(git!(repo, ["rev-parse", "--is-shallow-repository"])) == "false" do
       raise "full history is required"
     end
 
@@ -156,14 +181,14 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
       |> Enum.map(fn _path -> :tracked_path end)
 
     history =
-      git!(history_repo, [
+      git!(repo, [
         "log",
         "--format=",
         "--name-only",
         "-z",
         "--no-renames",
         "--diff-merges=separate",
-        "HEAD"
+        "--all"
       ])
       |> String.split(<<0>>, trim: true)
       |> Enum.map(&String.trim_leading(&1, "\n"))
