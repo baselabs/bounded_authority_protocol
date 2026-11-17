@@ -345,6 +345,11 @@ priv/conformance/selector-float-zero/cases/envelope/probe.json
 sdks/go/conformance/corpus-selector-float-zero/cases/grant-decode/probe.json
 sdks/rust/conformance/corpus-selector-float-zero/cases/grant-signing-input/probe.json
 spec/facts/requirement-statements-v1.json
+sdks/decoded-wire-rendering.json
+test/fixtures/sdk_rendering/decoded-wire-rendering.json
+sdks/python/tests/fixtures/decoded-wire-rendering.json
+sdks/rust/tests/fixtures/decoded-wire-rendering.json
+sdks/go/testdata/decoded-wire-rendering.json
 lib/non_fixture_probe.ex'
   canary_file="$check_dir/root-canaries.txt"
   : > "$canary_file"
@@ -466,6 +471,7 @@ sdks/rust/conformance/corpus-producer-canonicality/cases/es256-export-encode/pro
 priv/conformance/selector-float-zero/cases/envelope/probe.json
 sdks/go/conformance/corpus-selector-float-zero/cases/grant-decode/probe.json
 sdks/rust/conformance/corpus-selector-float-zero/cases/grant-signing-input/probe.json
+sdks/decoded-wire-rendering.json
 test/fixtures/sdk_rendering/decoded-wire-rendering.json
 sdks/python/tests/fixtures/decoded-wire-rendering.json
 sdks/rust/tests/fixtures/decoded-wire-rendering.json

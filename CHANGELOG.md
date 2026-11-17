@@ -59,6 +59,10 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- SDK rendering fixtures live inside each SDK, with canonical bytes and Elixir inspection
+  provenance enforced by repository tests. SDK purity checks reject reference source citations
+  throughout source, tests, tools, and documentation.
+
 - Python rejects oversized URI ports before numeric conversion, validates malformed host
   values before arithmetic or recursion, and catches only protocol rejections. SDK and
   runner bugs propagate instead of becoming `Err`.

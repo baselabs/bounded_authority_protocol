@@ -59,6 +59,10 @@ defmodule BoundedAuthorityProtocol.SdkRenderingFixturesTest do
   end
 
   test "every SDK carries byte-identical copies of every canonical fixture" do
+    for name <- @names do
+      refute File.exists?(Path.join([@root, "sdks", name]))
+    end
+
     for name <- @names, directory <- @copies do
       path = Path.join([@root, directory, name])
       assert File.read(path) == {:ok, File.read!(Path.join(@canonical, name))}, path
