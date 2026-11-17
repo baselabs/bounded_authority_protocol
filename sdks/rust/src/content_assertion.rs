@@ -646,6 +646,6 @@ fn b64_string(bytes: &[u8]) -> Result<String> {
 
 impl std::fmt::Debug for ContentAssertionFacts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("#ContentAssertionFacts<redacted>")
+        f.write_str("#BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts<redacted>")
     }
 }

@@ -1463,6 +1463,7 @@ pub fn check_chain(input: &ChainInput, expected: &ExpectedChain) -> Result<Chain
     }
 
     Ok(ChainFacts {
+        version: 3,
         chain_id: expected.chain_id.clone(),
         row_count: parsed.len() as i64,
         first_sequence: expected.first_sequence,
@@ -1680,6 +1681,7 @@ pub fn verify_historical_anchor(
     es256::verify(&key.public_key, &signing_input, &signature)?;
 
     Ok(AnchorFacts {
+        version: 3,
         anchor_id: a.payload.anchor_id,
         anchored_at: a.payload.anchored_at,
         chain_id: a.payload.chain_id,
@@ -1798,6 +1800,7 @@ pub fn verify_key_transition(
     es256::verify(&current.public_key, &signing_input, &signature)?;
 
     Ok(KeyTransitionFacts {
+        version: 3,
         transition_id: t.payload.transition_id,
         chain_id: t.payload.chain_id,
         effective_at: t.payload.effective_at,
@@ -2510,6 +2513,7 @@ pub fn verify_anchored_export(
     )?;
 
     Ok(AnchoredExportFacts {
+        version: 3,
         chain_id: header.chain_id,
         first_sequence: header.first_sequence,
         last_sequence: header.last_sequence,

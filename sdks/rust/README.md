@@ -219,8 +219,10 @@ keys, nonces, or arguments. `GrantFacts` and `EnvelopeFacts` carry
 `trust: NotEvaluated`; `AnchoredExportFacts` carries both; `AttestationFacts` and
 `ContentAssertionFacts` carry `verification: SignatureAndWindow` and `trust: NotEvaluated`.
 Every facts type derives `Clone` and `PartialEq` (`ContentAssertionFacts` also `Eq`),
-and none implements `Display` or `Serialize`. `Debug` always renders as `#Type<redacted>`
-(for example, `#GrantFacts<redacted>`), including alternate formatting and nested Results.
+and none implements `Display` or `Serialize`. `Debug` matches the full Elixir rendering (for example,
+`#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`), including alternate formatting and
+nested Results. Each contract-major retains its `V1`, `V2`, or `V3` namespace; sibling facts
+use `RoleAttestation.V1` and `ContentAssertion.V1`.
 Read individual fields explicitly when needed.
 
 ## Strict Ed25519

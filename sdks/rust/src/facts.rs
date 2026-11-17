@@ -14,8 +14,9 @@
 //!
 //! # Redaction contract (load-bearing)
 //!
-//! Every facts struct implements fixed `Debug` output: `#Type<redacted>`,
-//! including alternate, width, and precision formatting. No field is inspected.
+//! Every facts struct implements the fixed full Elixir module rendering, for example
+//! `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`, including alternate, width,
+//! and precision formatting. Only the contract-major selects the constant text.
 //! Facts derive [`Clone`] and [`PartialEq`], but never `serde::Serialize`,
 //! `serde::Deserialize`, or `std::fmt::Display`; there is no generic encoder.
 //!
@@ -167,6 +168,8 @@ pub struct EnvelopeFacts {
 /// their public shape (`REQ1-CHAIN-facts-shape`).
 #[derive(Clone, PartialEq)]
 pub struct ChainFacts {
+    /// The verified contract-major, used by the fixed redacted rendering.
+    pub version: i64,
     /// The verified chain identity (`chain_id`).
     pub chain_id: String,
     /// Number of rows in the verified range.
@@ -196,6 +199,8 @@ pub struct ChainFacts {
 /// facts. Anchor facts carry `trust` only (`REQ1-CHAIN-facts-shape`).
 #[derive(Clone, PartialEq)]
 pub struct AnchorFacts {
+    /// The verified contract-major, used by the fixed redacted rendering.
+    pub version: i64,
     /// The anchor `anchor_id`.
     pub anchor_id: String,
     /// The anchor `anchored_at` (integral NumericDate).
@@ -225,6 +230,8 @@ pub struct AnchorFacts {
 /// carry `trust` only (`REQ1-CHAIN-facts-shape`).
 #[derive(Clone, PartialEq)]
 pub struct KeyTransitionFacts {
+    /// The verified contract-major, used by the fixed redacted rendering.
+    pub version: i64,
     /// The transition `transition_id`.
     pub transition_id: String,
     /// The transition `chain_id`.
@@ -256,6 +263,8 @@ pub struct KeyTransitionFacts {
 /// object-store version.
 #[derive(Clone, PartialEq)]
 pub struct AnchoredExportFacts {
+    /// The verified contract-major, used by the fixed redacted rendering.
+    pub version: i64,
     /// The verified chain identity.
     pub chain_id: String,
     /// Sequence number of the first row in the archived range.
@@ -326,43 +335,67 @@ pub struct AttestationFacts {
 
 impl std::fmt::Debug for GrantFacts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("#GrantFacts<redacted>")
+        f.write_str(match self.version {
+            2 => "#BoundedAuthorityProtocol.V2.GrantFacts<redacted>",
+            3 => "#BoundedAuthorityProtocol.V3.GrantFacts<redacted>",
+            _ => "#BoundedAuthorityProtocol.V1.GrantFacts<redacted>",
+        })
     }
 }
 
 impl std::fmt::Debug for EnvelopeFacts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("#EnvelopeFacts<redacted>")
+        f.write_str(match self.grant.version {
+            2 => "#BoundedAuthorityProtocol.V2.EnvelopeFacts<redacted>",
+            3 => "#BoundedAuthorityProtocol.V3.EnvelopeFacts<redacted>",
+            _ => "#BoundedAuthorityProtocol.V1.EnvelopeFacts<redacted>",
+        })
     }
 }
 
 impl std::fmt::Debug for ChainFacts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("#ChainFacts<redacted>")
+        f.write_str(match self.version {
+            2 => "#BoundedAuthorityProtocol.V2.ChainFacts<redacted>",
+            3 => "#BoundedAuthorityProtocol.V3.ChainFacts<redacted>",
+            _ => "#BoundedAuthorityProtocol.V1.ChainFacts<redacted>",
+        })
     }
 }
 
 impl std::fmt::Debug for AnchorFacts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("#AnchorFacts<redacted>")
+        f.write_str(match self.version {
+            2 => "#BoundedAuthorityProtocol.V2.AnchorFacts<redacted>",
+            3 => "#BoundedAuthorityProtocol.V3.AnchorFacts<redacted>",
+            _ => "#BoundedAuthorityProtocol.V1.AnchorFacts<redacted>",
+        })
     }
 }
 
 impl std::fmt::Debug for KeyTransitionFacts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("#KeyTransitionFacts<redacted>")
+        f.write_str(match self.version {
+            2 => "#BoundedAuthorityProtocol.V2.KeyTransitionFacts<redacted>",
+            3 => "#BoundedAuthorityProtocol.V3.KeyTransitionFacts<redacted>",
+            _ => "#BoundedAuthorityProtocol.V1.KeyTransitionFacts<redacted>",
+        })
     }
 }
 
 impl std::fmt::Debug for AnchoredExportFacts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("#AnchoredExportFacts<redacted>")
+        f.write_str(match self.version {
+            2 => "#BoundedAuthorityProtocol.V2.AnchoredExportFacts<redacted>",
+            3 => "#BoundedAuthorityProtocol.V3.AnchoredExportFacts<redacted>",
+            _ => "#BoundedAuthorityProtocol.V1.AnchoredExportFacts<redacted>",
+        })
     }
 }
 
 impl std::fmt::Debug for AttestationFacts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("#AttestationFacts<redacted>")
+        f.write_str("#BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts<redacted>")
     }
 }
 
@@ -484,6 +517,7 @@ mod tests {
         };
         let _ = e.clone();
         let c = ChainFacts {
+            version: 1,
             chain_id: String::new(),
             row_count: 0,
             first_sequence: 0,
@@ -494,6 +528,7 @@ mod tests {
         };
         let _ = c.clone();
         let a = AnchorFacts {
+            version: 1,
             anchor_id: String::new(),
             anchored_at: 0,
             chain_id: String::new(),
@@ -505,6 +540,7 @@ mod tests {
         };
         let _ = a.clone();
         let t = KeyTransitionFacts {
+            version: 1,
             transition_id: String::new(),
             chain_id: String::new(),
             effective_at: 0,
@@ -516,6 +552,7 @@ mod tests {
         };
         let _ = t.clone();
         let x = AnchoredExportFacts {
+            version: 1,
             chain_id: String::new(),
             first_sequence: 0,
             last_sequence: 0,

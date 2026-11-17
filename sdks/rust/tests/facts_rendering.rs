@@ -3,7 +3,7 @@ use bounded_authority_protocol::facts::*;
 
 fn grant() -> GrantFacts {
     GrantFacts {
-        version: 987654321,
+        version: 1,
         issuer: "caller-text-7f3a".into(),
         grant_id: "caller-text-7f3a".into(),
         issuer_key_fingerprint: [173; 32],
@@ -19,7 +19,7 @@ fn grant() -> GrantFacts {
 #[test]
 fn grant_facts_rendering_is_fixed() {
     let facts = GrantFacts {
-        version: 987654321,
+        version: 1,
         issuer: "caller-text-7f3a".into(),
         grant_id: "caller-text-7f3a".into(),
         issuer_key_fingerprint: [173; 32],
@@ -30,22 +30,26 @@ fn grant_facts_rendering_is_fixed() {
         exp: 987654321,
         authorization: NotEvaluated,
     };
-    let expected = "#GrantFacts<redacted>";
-    for rendered in [
-        format!("{facts:?}"),
-        format!("{facts:#?}"),
-        format!("{facts:>80?}"),
-        format!("{facts:.3?}"),
-    ] {
-        assert_eq!(rendered, expected);
-        for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
-            assert!(!rendered.contains(value));
+    for major in 1..=3 {
+        let mut facts = facts.clone();
+        facts.version = major;
+        let expected = format!("#BoundedAuthorityProtocol.V{major}.GrantFacts<redacted>");
+        for rendered in [
+            format!("{facts:?}"),
+            format!("{facts:#?}"),
+            format!("{facts:>80?}"),
+            format!("{facts:.3?}"),
+        ] {
+            assert_eq!(rendered, expected);
+            for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
+                assert!(!rendered.contains(value));
+            }
         }
+        assert_eq!(
+            format!("{:?}", Ok::<_, ()>(facts)),
+            format!("Ok({expected})")
+        );
     }
-    assert_eq!(
-        format!("{:?}", Ok::<_, ()>(facts)),
-        format!("Ok({expected})")
-    );
 }
 
 #[test]
@@ -61,27 +65,32 @@ fn envelope_facts_rendering_is_fixed() {
         proof_iat: 987654321,
         authorization: NotEvaluated,
     };
-    let expected = "#EnvelopeFacts<redacted>";
-    for rendered in [
-        format!("{facts:?}"),
-        format!("{facts:#?}"),
-        format!("{facts:>80?}"),
-        format!("{facts:.3?}"),
-    ] {
-        assert_eq!(rendered, expected);
-        for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
-            assert!(!rendered.contains(value));
+    for major in 1..=3 {
+        let mut facts = facts.clone();
+        facts.grant.version = major;
+        let expected = format!("#BoundedAuthorityProtocol.V{major}.EnvelopeFacts<redacted>");
+        for rendered in [
+            format!("{facts:?}"),
+            format!("{facts:#?}"),
+            format!("{facts:>80?}"),
+            format!("{facts:.3?}"),
+        ] {
+            assert_eq!(rendered, expected);
+            for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
+                assert!(!rendered.contains(value));
+            }
         }
+        assert_eq!(
+            format!("{:?}", Ok::<_, ()>(facts)),
+            format!("Ok({expected})")
+        );
     }
-    assert_eq!(
-        format!("{:?}", Ok::<_, ()>(facts)),
-        format!("Ok({expected})")
-    );
 }
 
 #[test]
 fn chain_facts_rendering_is_fixed() {
     let facts = ChainFacts {
+        version: 1,
         chain_id: "caller-text-7f3a".into(),
         row_count: 987654321,
         first_sequence: 987654321,
@@ -90,27 +99,32 @@ fn chain_facts_rendering_is_fixed() {
         head_hash: [173; 32],
         trust: NotEvaluated,
     };
-    let expected = "#ChainFacts<redacted>";
-    for rendered in [
-        format!("{facts:?}"),
-        format!("{facts:#?}"),
-        format!("{facts:>80?}"),
-        format!("{facts:.3?}"),
-    ] {
-        assert_eq!(rendered, expected);
-        for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
-            assert!(!rendered.contains(value));
+    for major in 1..=3 {
+        let mut facts = facts.clone();
+        facts.version = major;
+        let expected = format!("#BoundedAuthorityProtocol.V{major}.ChainFacts<redacted>");
+        for rendered in [
+            format!("{facts:?}"),
+            format!("{facts:#?}"),
+            format!("{facts:>80?}"),
+            format!("{facts:.3?}"),
+        ] {
+            assert_eq!(rendered, expected);
+            for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
+                assert!(!rendered.contains(value));
+            }
         }
+        assert_eq!(
+            format!("{:?}", Ok::<_, ()>(facts)),
+            format!("Ok({expected})")
+        );
     }
-    assert_eq!(
-        format!("{:?}", Ok::<_, ()>(facts)),
-        format!("Ok({expected})")
-    );
 }
 
 #[test]
 fn anchor_facts_rendering_is_fixed() {
     let facts = AnchorFacts {
+        version: 1,
         anchor_id: "caller-text-7f3a".into(),
         anchored_at: 987654321,
         chain_id: "caller-text-7f3a".into(),
@@ -120,27 +134,32 @@ fn anchor_facts_rendering_is_fixed() {
         key_id: "caller-text-7f3a".into(),
         trust: NotEvaluated,
     };
-    let expected = "#AnchorFacts<redacted>";
-    for rendered in [
-        format!("{facts:?}"),
-        format!("{facts:#?}"),
-        format!("{facts:>80?}"),
-        format!("{facts:.3?}"),
-    ] {
-        assert_eq!(rendered, expected);
-        for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
-            assert!(!rendered.contains(value));
+    for major in 1..=3 {
+        let mut facts = facts.clone();
+        facts.version = major;
+        let expected = format!("#BoundedAuthorityProtocol.V{major}.AnchorFacts<redacted>");
+        for rendered in [
+            format!("{facts:?}"),
+            format!("{facts:#?}"),
+            format!("{facts:>80?}"),
+            format!("{facts:.3?}"),
+        ] {
+            assert_eq!(rendered, expected);
+            for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
+                assert!(!rendered.contains(value));
+            }
         }
+        assert_eq!(
+            format!("{:?}", Ok::<_, ()>(facts)),
+            format!("Ok({expected})")
+        );
     }
-    assert_eq!(
-        format!("{:?}", Ok::<_, ()>(facts)),
-        format!("Ok({expected})")
-    );
 }
 
 #[test]
 fn key_transition_facts_rendering_is_fixed() {
     let facts = KeyTransitionFacts {
+        version: 1,
         transition_id: "caller-text-7f3a".into(),
         chain_id: "caller-text-7f3a".into(),
         effective_at: 987654321,
@@ -150,27 +169,32 @@ fn key_transition_facts_rendering_is_fixed() {
         next_key_id: "caller-text-7f3a".into(),
         trust: NotEvaluated,
     };
-    let expected = "#KeyTransitionFacts<redacted>";
-    for rendered in [
-        format!("{facts:?}"),
-        format!("{facts:#?}"),
-        format!("{facts:>80?}"),
-        format!("{facts:.3?}"),
-    ] {
-        assert_eq!(rendered, expected);
-        for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
-            assert!(!rendered.contains(value));
+    for major in 1..=3 {
+        let mut facts = facts.clone();
+        facts.version = major;
+        let expected = format!("#BoundedAuthorityProtocol.V{major}.KeyTransitionFacts<redacted>");
+        for rendered in [
+            format!("{facts:?}"),
+            format!("{facts:#?}"),
+            format!("{facts:>80?}"),
+            format!("{facts:.3?}"),
+        ] {
+            assert_eq!(rendered, expected);
+            for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
+                assert!(!rendered.contains(value));
+            }
         }
+        assert_eq!(
+            format!("{:?}", Ok::<_, ()>(facts)),
+            format!("Ok({expected})")
+        );
     }
-    assert_eq!(
-        format!("{:?}", Ok::<_, ()>(facts)),
-        format!("Ok({expected})")
-    );
 }
 
 #[test]
 fn anchored_export_facts_rendering_is_fixed() {
     let facts = AnchoredExportFacts {
+        version: 1,
         chain_id: "caller-text-7f3a".into(),
         first_sequence: 987654321,
         last_sequence: 987654321,
@@ -183,22 +207,26 @@ fn anchored_export_facts_rendering_is_fixed() {
         trust: NotEvaluated,
         authorization: NotEvaluated,
     };
-    let expected = "#AnchoredExportFacts<redacted>";
-    for rendered in [
-        format!("{facts:?}"),
-        format!("{facts:#?}"),
-        format!("{facts:>80?}"),
-        format!("{facts:.3?}"),
-    ] {
-        assert_eq!(rendered, expected);
-        for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
-            assert!(!rendered.contains(value));
+    for major in 1..=3 {
+        let mut facts = facts.clone();
+        facts.version = major;
+        let expected = format!("#BoundedAuthorityProtocol.V{major}.AnchoredExportFacts<redacted>");
+        for rendered in [
+            format!("{facts:?}"),
+            format!("{facts:#?}"),
+            format!("{facts:>80?}"),
+            format!("{facts:.3?}"),
+        ] {
+            assert_eq!(rendered, expected);
+            for value in ["caller-text-7f3a", "caller-role-7f3a", "987654321", "173"] {
+                assert!(!rendered.contains(value));
+            }
         }
+        assert_eq!(
+            format!("{:?}", Ok::<_, ()>(facts)),
+            format!("Ok({expected})")
+        );
     }
-    assert_eq!(
-        format!("{:?}", Ok::<_, ()>(facts)),
-        format!("Ok({expected})")
-    );
 }
 
 #[test]
@@ -215,7 +243,7 @@ fn attestation_facts_rendering_is_fixed() {
         verification: SignatureAndWindow,
         trust: NotEvaluated,
     };
-    let expected = "#AttestationFacts<redacted>";
+    let expected = "#BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts<redacted>";
     for rendered in [
         format!("{facts:?}"),
         format!("{facts:#?}"),
@@ -236,7 +264,7 @@ fn attestation_facts_rendering_is_fixed() {
 #[test]
 fn content_assertion_facts_rendering_is_fixed() {
     let facts = ContentAssertionFacts {
-        version: 987654321,
+        version: 1,
         attestor_key_id: "caller-text-7f3a".into(),
         attestor_key_fingerprint: [173; 32],
         jti: "caller-text-7f3a".into(),
@@ -255,7 +283,7 @@ fn content_assertion_facts_rendering_is_fixed() {
         verification: SignatureAndWindow,
         trust: NotEvaluated,
     };
-    let expected = "#ContentAssertionFacts<redacted>";
+    let expected = "#BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts<redacted>";
     for rendered in [
         format!("{facts:?}"),
         format!("{facts:#?}"),
@@ -271,4 +299,16 @@ fn content_assertion_facts_rendering_is_fixed() {
         format!("{:?}", Ok::<_, ()>(facts)),
         format!("Ok({expected})")
     );
+}
+
+#[test]
+fn contract_majors_render_distinctly() {
+    for major in 1..=3 {
+        let mut facts = grant();
+        facts.version = major;
+        assert_eq!(
+            format!("{facts:?}"),
+            format!("#BoundedAuthorityProtocol.V{major}.GrantFacts<redacted>")
+        );
+    }
 }
