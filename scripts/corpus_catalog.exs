@@ -30,6 +30,133 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
 
   @runner_pin ~r/(?m)^\s*(?:const\s+)?(?:_?CERTIFIED_INDEX_SHA(?:256)?|CONTENT_CORPUS_INDEX_SHA256|\w*[Cc]ertified\w*IndexSHA256)\b[^=\n]*=\s*"([^"]*)"/
 
+  # Independently maintained certification evidence. Rotation must never edit these files.
+  # A string key names a preservation artifact outside the CLI certification map.
+  @preservation [
+    {"scripts/check_role_attestation.exs", [{:role_attestation, :hex, 1}]},
+    {"test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",
+     [{:local_loopback_http, :hex, 1}]},
+    {"test/bounded_authority_protocol/content_assertion/corpus_test.exs",
+     [{:content_assertion, :hex, 1}]},
+    {"test/bounded_authority_protocol/role_attestation/v1_test.exs",
+     [{:role_attestation, :hex, 1}]},
+    {"test/conformance/corpus_independent_test.exs",
+     [{:strict_ed25519, :hex, 1}, {:selector_float_zero, :hex, 1}]},
+    {"test/conformance/producer_canonicality_corpus_test.exs",
+     [
+       {:producer_canonicality, :hex, 1},
+       {1, :hex, 1},
+       {2, :hex, 1},
+       {3, :hex, 1},
+       {"priv/conformance/v1/vectors/manifest.json", :hex, 1},
+       {:strict_ed25519, :hex, 1},
+       {:local_loopback_http, :hex, 1},
+       {:role_attestation, :hex, 1},
+       {:content_assertion, :hex, 1}
+     ]},
+    {"test/conformance/selector_float_zero_corpus_test.exs",
+     [
+       {:selector_float_zero, :hex, 1},
+       {1, :hex, 1},
+       {2, :hex, 1},
+       {3, :hex, 1},
+       {"priv/conformance/v1/vectors/manifest.json", :hex, 1},
+       {:strict_ed25519, :hex, 1},
+       {:producer_canonicality, :hex, 1},
+       {:local_loopback_http, :hex, 1},
+       {:role_attestation, :hex, 1},
+       {:content_assertion, :hex, 1}
+     ]},
+    {"test/conformance/strict_ed25519_corpus_test.exs",
+     [
+       {:strict_ed25519, :hex, 1},
+       {1, :hex, 1},
+       {2, :hex, 1},
+       {3, :hex, 1},
+       {"priv/conformance/v1/vectors/manifest.json", :hex, 1},
+       {:local_loopback_http, :hex, 1},
+       {:role_attestation, :hex, 1},
+       {:content_assertion, :hex, 1}
+     ]},
+    {"conformance/corpus_independent.mjs", [{:selector_float_zero, :hex, 1}]}
+  ]
+
+  # Published explanations must match certification, but require an explicit editorial update.
+  @prose [
+    {"spec/bap-content-assertion-v1.md", [{:content_assertion, :hex, 1}]},
+    {"spec/bap-local-loopback-http-v1.md", [{:local_loopback_http, :hex, 1}]},
+    {"spec/bap-role-attestation-v1.md", [{:role_attestation, :hex, 1}]},
+    {"spec/bap-v1.md", [{:strict_ed25519, :hex, 1}]},
+    {"spec/bap-v2.md", [{:selector_float_zero, :hex, 1}, {:strict_ed25519, :hex, 1}]},
+    {"spec/bap-v3.md", [{:producer_canonicality, :hex, 1}, {:selector_float_zero, :hex, 1}]},
+    {"docs/design/conformance-contract.md",
+     [{:strict_ed25519, :hex, 1}, {:producer_canonicality, :hex, 1}]},
+    {"docs/design/content-assertion-requirement-map.md",
+     [
+       {:content_assertion, :hex, 1},
+       {:strict_ed25519, :hex, 1},
+       {:producer_canonicality, :hex, 1}
+     ]},
+    {"docs/design/interoperability-report.md",
+     [
+       {1, :base64url, 1},
+       {1, :hex, 1},
+       {:local_loopback_http, :hex, 1},
+       {2, :hex, 1},
+       {3, :hex, 1},
+       {:role_attestation, :hex, 1},
+       {:content_assertion, :hex, 1},
+       {:strict_ed25519, :hex, 1},
+       {:producer_canonicality, :hex, 1},
+       {:selector_float_zero, :hex, 1}
+     ]},
+    {"docs/design/local-loopback-http-requirement-map.md",
+     [{:strict_ed25519, :hex, 1}, {:producer_canonicality, :hex, 1}]},
+    {"docs/design/requirement-map.md",
+     [
+       {:selector_float_zero, :hex, 7},
+       {:producer_canonicality, :hex, 2},
+       {:strict_ed25519, :hex, 1}
+     ]},
+    {"docs/design/role-attestation-requirement-map.md",
+     [{:role_attestation, :hex, 1}, {:strict_ed25519, :hex, 1}, {:producer_canonicality, :hex, 1}]},
+    {"docs/errata.md",
+     [
+       {:strict_ed25519, :hex, 1},
+       {:producer_canonicality, :hex, 1},
+       {:selector_float_zero, :hex, 1}
+     ]},
+    {"docs/guides/implementers-guide.md",
+     [
+       {:local_loopback_http, :hex, 1},
+       {:role_attestation, :hex, 1},
+       {:content_assertion, :hex, 1},
+       {:strict_ed25519, :hex, 1},
+       {:producer_canonicality, :hex, 1},
+       {:selector_float_zero, :hex, 1}
+     ]},
+    {"docs/protocol-v1.md", [{:strict_ed25519, :hex, 1}]},
+    {"sdks/README.md", [{:strict_ed25519, :hex, 1}]},
+    {"sdks/go/conformance/selector_float_zero_test.go", [{:selector_float_zero, :hex, 1}]}
+  ]
+
+  def preservation, do: @preservation
+  def prose, do: @prose
+  def reference_files, do: Enum.map(@preservation ++ @prose, &elem(&1, 0))
+
+  def reference_digest(key, encoding) when is_binary(key) do
+    digest = :crypto.hash(:sha256, File.read!(Path.join(@root, key)))
+
+    case encoding do
+      :hex -> Base.encode16(digest, case: :lower)
+      :base64url -> Base.url_encode64(digest, padding: false)
+    end
+  end
+
+  def reference_digest(key, encoding) do
+    entries() |> Enum.find(&(&1.key == key)) |> digests() |> Map.fetch!(encoding)
+  end
+
   def root, do: @root
   def cli, do: @cli
   def runner_pin, do: @runner_pin

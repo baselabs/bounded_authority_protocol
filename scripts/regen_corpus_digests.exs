@@ -11,34 +11,8 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
     pins = Enum.flat_map(entries, &pins/1)
 
     if argv == ["--write"] do
-      replacements =
-        Enum.flat_map(entries, fn entry ->
-          old = Base.url_decode64!(entry.certified, padding: false)
-          new = Catalog.digests(entry)
-          [{entry.certified, new.base64url}, {Base.encode16(old, case: :lower), new.hex}]
-        end)
-
-      # Rotate test mirrors, preservation pins and independent runners with the certified pin,
-      # as well as all SDK runners. Exact literal replacement never alters corpus JSON bytes.
-      sources =
-        for root <- ["lib", "test", "sdks", "conformance"],
-            path <- Path.wildcard(Path.join([Catalog.root(), root, "**/*"])),
-            Path.extname(path) in [".ex", ".exs", ".rs", ".go", ".py", ".mjs"],
-            not String.contains?(path, ["/.venv/", "/target/"]) do
-          path
-        end
-
-      Enum.each(sources, fn path ->
-        original = File.read!(path)
-
-        rewritten =
-          Enum.reduce(replacements, original, fn {old, new}, text ->
-            String.replace(text, old, new)
-          end)
-
-        if rewritten != original, do: File.write!(path, rewritten)
-      end)
-
+      # Only declarations owned by this tool rotate. Independent evidence and prose
+      # are checked below and require an explicit, separately reviewed edit.
       # A stale runner pin can predate the CLI pin. Its checked declaration anchor still rotates.
       Enum.each(pins, fn {path, regex, old, expected} ->
         contents = File.read!(path)
@@ -48,7 +22,7 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
       end)
     end
 
-    problems =
+    automatic_problems =
       entries
       |> Enum.flat_map(&pins/1)
       |> Enum.flat_map(fn {path, _regex, actual, expected} ->
@@ -59,12 +33,87 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
           ]
       end)
 
+    preservation_problems = reference_problems(Catalog.preservation(), "hand-kept preservation")
+    prose_problems = reference_problems(Catalog.prose(), "prose")
+
+    problems =
+      automatic_problems ++ preservation_problems ++ prose_problems ++ uncatalogued(entries)
+
+    IO.puts(
+      "corpus digest classes: automatic=#{length(pins)} hand-kept preservation=#{count(Catalog.preservation())} prose=#{count(Catalog.prose())}"
+    )
+
     if problems != [], do: raise("corpus digest pin check FAILED:\n" <> Enum.join(problems, "\n"))
     IO.puts("corpus digests: ok corpora=#{length(entries)} pins=#{length(pins)}")
   end
 
   def run(_),
     do: raise("usage: mix corpus.digests | elixir scripts/regen_corpus_digests.exs --write")
+
+  defp count(references) do
+    for({_path, pins} <- references, {_key, _encoding, count} <- pins, do: count)
+    |> Enum.sum()
+  end
+
+  defp reference_problems(references, class) do
+    for {relative, pins} <- references,
+        contents = File.read!(Path.join(Catalog.root(), relative)),
+        {key, encoding, count} <- pins,
+        expected = Catalog.reference_digest(key, encoding),
+        actual = length(:binary.matches(contents, expected)),
+        actual != count do
+      "#{relative}: #{class} corpus digest drift for #{inspect(key)} (expected #{count} matching quotations, found #{actual}); edit by hand"
+    end
+  end
+
+  # Discover new quotations throughout the public source tree. Existing references have
+  # exact per-file counts above, so a changed, removed, or duplicated quotation also fails.
+  defp uncatalogued(entries) do
+    references = Catalog.preservation() ++ Catalog.prose()
+    automatic = Enum.flat_map(entries, &pins/1)
+
+    classified =
+      Enum.map(automatic, fn {path, _regex, actual, _expected} ->
+        {Path.relative_to(path, Catalog.root()), actual, 1}
+      end) ++
+        for {path, pins} <- references, {key, encoding, count} <- pins do
+          {path, Catalog.reference_digest(key, encoding), count}
+        end
+
+    expected =
+      Enum.reduce(classified, %{}, fn {path, digest, count}, acc ->
+        Map.update(acc, {path, digest}, count, &(&1 + count))
+      end)
+
+    known =
+      for(entry <- entries, value <- Map.values(Catalog.digests(entry)), do: value) ++
+        Enum.map(entries, & &1.certified) ++ Enum.map(classified, &elem(&1, 1))
+
+    known = Enum.uniq(known)
+
+    for root <- ["spec", "docs", "scripts", "test", "sdks", "conformance", "lib"],
+        path <- Path.wildcard(Path.join([Catalog.root(), root, "**/*"])),
+        Path.extname(path) in [
+          ".md",
+          ".mdx",
+          ".ex",
+          ".exs",
+          ".py",
+          ".rs",
+          ".go",
+          ".mjs",
+          ".livemd",
+          ".cheatmd"
+        ],
+        not String.contains?(path, ["/.venv/", "/target/", "/node_modules/"]),
+        relative = Path.relative_to(path, Catalog.root()),
+        contents = File.read!(path),
+        digest <- known,
+        actual = length(:binary.matches(contents, digest)),
+        actual > Map.get(expected, {relative, digest}, 0) do
+      "#{relative}: uncatalogued certified digest quotation; classify as automatic, hand-kept preservation, or prose"
+    end
+  end
 
   defp pins(entry) do
     digests = Catalog.digests(entry)

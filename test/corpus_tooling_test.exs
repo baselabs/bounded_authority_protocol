@@ -13,7 +13,12 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
     on_exit(fn -> File.rm_rf!(root) end)
 
     files =
-      [Catalog.cli(), "test/conformance/cli_test.exs"] ++
+      [
+        Catalog.cli(),
+        "test/conformance/cli_test.exs",
+        "priv/conformance/v1/vectors/manifest.json"
+      ] ++
+        Catalog.reference_files() ++
         Enum.map(
           ["corpus_catalog", "check_corpus_sync", "regen_corpus_digests"],
           &"scripts/#{&1}.exs"
@@ -77,8 +82,38 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
     {output, status} = run(root, "regen_corpus_digests")
     assert status != 0
     assert output =~ "corpus digest drift"
-    assert {_, 0} = run(root, "regen_corpus_digests", ["--write"])
-    assert {_, 0} = run(root, "regen_corpus_digests")
+
+    preserved =
+      for {relative, _pins} <- Catalog.preservation(),
+          into: %{},
+          do: {relative, File.read!(Path.join(root, relative))}
+
+    {output, status} = run(root, "regen_corpus_digests", ["--write"])
+    assert status != 0
+    assert output =~ "hand-kept preservation corpus digest drift"
+    assert output =~ "prose corpus digest drift"
+    refute output =~ "corpus digest drift ("
+    for {relative, bytes} <- preserved, do: assert(File.read!(Path.join(root, relative)) == bytes)
+    cli = File.read!(Path.join(root, Catalog.cli()))
+
+    for entry <- Catalog.entries() do
+      bytes = File.read!(Path.join([root, entry.source, "index.json"]))
+      digest = :crypto.hash(:sha256, bytes)
+      assert cli =~ Base.url_encode64(digest, padding: false)
+
+      for runner <- entry.runners do
+        [_, actual] =
+          Regex.run(
+            Catalog.runner_pin(),
+            File.read!(Path.join(root, Path.relative_to(runner, Catalog.root())))
+          )
+
+        assert actual in [
+                 Base.encode16(digest, case: :lower),
+                 Base.url_encode64(digest, padding: false)
+               ]
+      end
+    end
 
     # Rotation changes source pins, never independently certified corpus bytes.
     for entry <- Catalog.entries() do
@@ -87,6 +122,42 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
       assert File.read!(Path.join(root, relative)) ==
                File.read!(Path.join(Catalog.root(), relative)) <> "\n"
     end
+  end
+
+  test "every preservation pin and prose quotation is checked but never written", %{root: root} do
+    for {class, references} <- [
+          {"hand-kept preservation", Catalog.preservation()},
+          {"prose", Catalog.prose()}
+        ],
+        {relative, pins} <- references,
+        {key, encoding, _count} <- pins do
+      path = Path.join(root, relative)
+      original = File.read!(path)
+      expected = Catalog.reference_digest(key, encoding)
+
+      mutated =
+        String.replace(original, expected, String.duplicate("0", byte_size(expected)),
+          global: false
+        )
+
+      File.write!(path, mutated)
+      {output, status} = run(root, "regen_corpus_digests")
+      assert status != 0
+      assert output =~ "#{relative}: #{class} corpus digest drift"
+      {_, status} = run(root, "regen_corpus_digests", ["--write"])
+      assert status != 0
+      assert File.read!(path) == mutated
+      File.write!(path, original)
+    end
+  end
+
+  test "new certified digest quotations require classification", %{root: root} do
+    relative = "docs/new-corpus-reference.md"
+    path = Path.join(root, relative)
+    File.write!(path, Catalog.reference_digest(1, :hex))
+    {output, status} = run(root, "regen_corpus_digests")
+    assert status != 0
+    assert output =~ "#{relative}: uncatalogued certified digest quotation"
   end
 
   test "an uncatalogued CLI certification or SDK snapshot fails closed", %{root: root} do
