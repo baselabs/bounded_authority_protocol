@@ -1,12 +1,20 @@
 """Decoded diagnostics retain the specified diagnostic rendering (spec/diagnostic-rendering.md § Diagnostic rendering) without exporting redacted members."""
 
 import copy
+import json
 import pickle
 from dataclasses import asdict, fields
+from pathlib import Path
 
 import pytest
 
 from bounded_authority_verifier.facts import ContentAssertionDecoded, ProofDecoded
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def fixture(name):
+    return json.loads((FIXTURES / name).read_text())
 
 
 def content():
@@ -130,13 +138,11 @@ def test_redacted_decoded_types_are_immutable(factory):
 
 @pytest.mark.parametrize("major", [1, 2, 3])
 def test_each_decoded_surface_matches_reference_golden(major):
-    import json
-    from pathlib import Path
 
     from bounded_authority_verifier import JArray, JObject, JString
     from bounded_authority_verifier.facts import AttestationDecoded, GrantDecoded
 
-    gold = json.loads((Path(__file__).parent / "fixtures" / "decoded-rendering.json").read_text())
+    gold = fixture("decoded-rendering.json")
     grant = GrantDecoded(
         major,
         "kid",
@@ -181,14 +187,10 @@ def test_each_decoded_surface_matches_reference_golden(major):
 
 
 def test_real_decoded_compacts_match_independent_reference():
-    import json
-    from pathlib import Path
 
     from bounded_authority_verifier import Ok, v1, v2, v3
 
-    rows = json.loads(
-        (Path(__file__).parent / "fixtures" / "decoded-wire-rendering.json").read_text()
-    )
+    rows = fixture("decoded-wire-rendering.json")
     for row in rows:
         major = {1: v1, 2: v2, 3: v3}[row["major"]]
         result = getattr(major, f"decode_{row['kind']}")(row["compact"].encode())
@@ -199,14 +201,10 @@ def test_real_decoded_compacts_match_independent_reference():
 
 
 def test_decoded_binary_notation_matches_independent_reference():
-    import json
-    from pathlib import Path
 
     from bounded_authority_verifier import _inspect
 
-    rows = json.loads(
-        (Path(__file__).parent / "fixtures" / "decoded-binary-rendering.json").read_text()
-    )
+    rows = fixture("decoded-binary-rendering.json")
     for row in rows:
         assert _inspect.binary(bytes.fromhex(row["hex"])) == row["expected"], row.get(
             "id", row["hex"][:32]
@@ -214,12 +212,10 @@ def test_decoded_binary_notation_matches_independent_reference():
 
 
 def test_float_notation_matches_specified_fixture_bytes():
-    import json
-    from pathlib import Path
 
     from bounded_authority_verifier import _inspect
 
-    gold = json.loads((Path(__file__).parent / "fixtures" / "decoded-rendering.json").read_text())
+    gold = fixture("decoded-rendering.json")
     for key, expected in gold.items():
         if key.startswith("float:"):
             assert _inspect.render(_inspect.scalar(float(key[6:]))) == expected, key
@@ -254,10 +250,8 @@ def test_hand_built_selectors_and_nested_values_are_total():
     assert display.render(display.tagged(JString(b"\xff"))) == "{:string, <<255>>}"
     assert display.render(display.operations((JObject({}),), 1)) == "[#unrenderable]"
     operation = JObject({"name": JObject({}), "selectors": JInt(1)})
-    import json
-    from pathlib import Path
 
-    gold = json.loads((Path(__file__).with_name("fixtures") / "decoded-rendering.json").read_text())
+    gold = fixture("decoded-rendering.json")
     assert display.render(display.operations((operation,), 1)) == gold["handbuilt:operation"]
     cycle = []
     cycle.append(cycle)
