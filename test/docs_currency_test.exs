@@ -384,6 +384,27 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
     |> Enum.uniq()
   end
 
+  # A release names each kind of change once: a reader (and the GitHub Release notes taken from
+  # a section) sees every "Changed" entry under one heading, not the first of two.
+  test "each CHANGELOG section lists each change type under one heading" do
+    repeated =
+      "CHANGELOG.md"
+      |> File.read!()
+      |> String.split(~r/^## /m, trim: true)
+      |> Enum.flat_map(fn section ->
+        [heading | _lines] = String.split(section, "\n", parts: 2)
+
+        ~r/^### (.+)$/m
+        |> Regex.scan(section, capture: :all_but_first)
+        |> List.flatten()
+        |> Enum.frequencies()
+        |> Enum.filter(fn {_type, count} -> count > 1 end)
+        |> Enum.map(fn {type, _count} -> "#{heading}: #{type}" end)
+      end)
+
+    assert repeated == [], "repeated change-type headings: #{inspect(repeated)}"
+  end
+
   test "the spec pins its Doc-Revision and the companions agree" do
     spec = File.read!("spec/bap-v1.md")
     assert spec =~ "Document revision: rev #{@spec_revision}"

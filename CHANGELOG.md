@@ -177,6 +177,30 @@ All notable changes to `bounded_authority_protocol` are documented here.
   (`excluded_surface/0`), the field set of every stable struct (`public_struct_fields/0`) and the
   `RoleAttestation.V1` exports; a test checks them against the compiled package.
 
+- Governance states the package version rules from 1.0.0: a new contract-major, sibling profile,
+  public function, optional argument, or defaulted struct field is a minor release, and so is a
+  soundness repair that meets every governance condition or a raised toolchain floor; an
+  editorial erratum is a patch; removing a namespace or changing a struct field, arity, return
+  shape, enforced key, or documented error is a new package major. Package versions ("package
+  1.x") and contract-majors ("contract-major N") are separate numbers. Decisions publish through
+  governance, the specifications, and the errata registry; sibling profiles first ship in a minor
+  release instead of a breaking `0.x.0`.
+- The specifications drop their YAML front matter (HexDocs printed it as text), link every RFC
+  citation, and state in their revision headers which errata each revision carries. Every
+  shipped document cites the specification, governance, or errata text instead of an unpublished
+  decision-record number. The implementer's guide covers contract-majors 2 and 3 and the selector
+  float-zero corpus.
+- Development tooling: sbom 0.12.1 (with purl 0.5.2) accepts hex_core 0.21, so the `hex_core`
+  override is gone and hex_core 0.21.1 arrives dev/test-only through sbom. CI action pins move to
+  setup-node 7.1.0, setup-python 7.1.0, upload-artifact 7.0.2, setup-ocaml 3.9.1 and setup-ruby
+  1.338.0. The unpublished Rust SDK takes serde_json 1.0.154 and zeroize 1.8.2. The package has
+  no runtime dependencies, so nothing shipped changes.
+- Release reproducibility: the Hex client is pinned in `.hex-version` (2.7.0). CI, the
+  supply-chain attestation and the release-candidate gate use it, and the gate refuses another
+  client, because Hex writes its own version into the archive metadata and a different client
+  builds different archive bytes. The supply-chain workflow installs Node 22.23.1 like CI instead
+  of using the runner image's Node.
+
 ### Documentation
 
 - Every public input, decoded and facts struct has a `@typedoc` and a "Fields" section giving each
@@ -250,32 +274,6 @@ All notable changes to `bounded_authority_protocol` are documented here.
   `bap-producer-canonicality/1` corpus (75 cases, index SHA-256 `99ee6fbb…`, red-first before the
   gates, each gate defect-injected red after them). No verification verdict changes anywhere;
   every existing corpus agrees at unchanged counts in all three SDK suites.
-
-### Changed
-
-- Governance states the package version rules from 1.0.0: a new contract-major, sibling profile,
-  public function, optional argument, or defaulted struct field is a minor release, and so is a
-  soundness repair that meets every governance condition or a raised toolchain floor; an
-  editorial erratum is a patch; removing a namespace or changing a struct field, arity, return
-  shape, enforced key, or documented error is a new package major. Package versions ("package
-  1.x") and contract-majors ("contract-major N") are separate numbers. Decisions publish through
-  governance, the specifications, and the errata registry; sibling profiles first ship in a minor
-  release instead of a breaking `0.x.0`.
-- The specifications drop their YAML front matter (HexDocs printed it as text), link every RFC
-  citation, and state in their revision headers which errata each revision carries. Every
-  shipped document cites the specification, governance, or errata text instead of an unpublished
-  decision-record number. The implementer's guide covers contract-majors 2 and 3 and the selector
-  float-zero corpus.
-- Development tooling: sbom 0.12.1 (with purl 0.5.2) accepts hex_core 0.21, so the `hex_core`
-  override is gone and hex_core 0.21.1 arrives dev/test-only through sbom. CI action pins move to
-  setup-node 7.1.0, setup-python 7.1.0, upload-artifact 7.0.2, setup-ocaml 3.9.1 and setup-ruby
-  1.338.0. The unpublished Rust SDK takes serde_json 1.0.154 and zeroize 1.8.2. The package has
-  no runtime dependencies, so nothing shipped changes.
-- Release reproducibility: the Hex client is pinned in `.hex-version` (2.7.0). CI, the
-  supply-chain attestation and the release-candidate gate use it, and the gate refuses another
-  client, because Hex writes its own version into the archive metadata and a different client
-  builds different archive bytes. The supply-chain workflow installs Node 22.23.1 like CI instead
-  of using the runner image's Node.
 
 ## [0.9.1] (2026-10-31)
 
@@ -1513,70 +1511,6 @@ several note findings, all in surfaces this program touched. All fixed:
   gained the public-repo hygiene the security review named. The `v0.1.0` tag moved to the
   published commit so hexdocs `source_ref` links resolve.
 
-### Fixed
-
-- **BAP-07 readiness reconciled across the repo docs.** The ROADMAP row's acceptance still named
-  the retired private-runtime PG 16/17/18 matrix (a private-runtime decision made PostgreSQL 18
-  the sole supported major); the ROADMAP Next-action note, the release-candidate contract's Status,
-  the README Status, and SECURITY.md's supported-versions note each described BAP-07 as gated on the
-  private runtime's connected gates:
-  private BA-14 completed 2026-08-18, so BAP-07 is fully unblocked (the Hex-publication half stays
-  deferred by maintainer decision). Docs-only: zero code, wire, bound, or verdict change.
-- **Cross-vendor review round 18 (blocking + should-fix/notes across the vendor lenses, all
-  closed).** Blocking findings: the TS shape gate's nested expected-export members were opaque `"object"`
-  specs, so a malformed nested struct (chain missing `previousHash`, empty anchor) passed the
-  gate and the clause-3 hoist then dereferenced the missing field, causing a `TypeError` escape past
-  `trying()`; the nested members are now fully specified (chain/anchor/transition field shapes,
-  `archived.chunks` as a bytes sequence), red-leg + mutation proven (opaque specs → RED).
-  Should-fix findings: the Python and Rust hoists walked `expected.transitions` per-element BEFORE the
-  `key_transitions` count ceiling, regressing the round-3 ceiling-first invariant the TS sibling
-  kept; the ceiling now runs at the top of the hoist in both (the dead later duplicate removed).
-  Notes, reconciled: the entry-position shape gate's sequence walks before count
-  ceilings are a documented accepted margin (typeof-only per element); Python's body-level
-  `bytearray` tolerance was dead under the exact-bytes gate and is reconciled to bytes-only.
-  The timed-out fable peer's transcript was mined: it was converging on the ordering finding
-  (fixed) and a benign API-shape note (the SDKs' optional bounds default to maximum,
-  behavior-identical to the reference's public façade).
-- **Round-12..14 per-clause pin debt paid on the touched surfaces (the inter-SDK contract decision record's Honest limit,
-  amended).** The 2026-08-18 cluster's legs double as the owed per-clause pins: the pre-digest
-  export gates (version shape/equality, key-count, key-id charset, key magnitude) are now pinned as
-  WORK legs in the Python battery (reject with zero sha256 calls, all five mutation-proven
-  load-bearing) with TS/Rust verdict matrices. Root cause of the "unpayable" debt: each gate is
-  verdict-subsumed by a later gate, so verdict legs were structurally impossible; the work form is
-  the red-capable pin. Still owed and disclosed: the standalone anchor-path `anchor_bytes` gates
-  (round 12) and allocation bounds (round 15) on untouched surfaces.
-- **The SDK bounds contract decision record's named `assemble_compact` divergence closed: caller bounds threaded through
-  assembly in all three SDKs.** The reference takes limits at assemble (`runtime.ex:147-155` →
-  `CompactJws.assemble`: encoded-segment bounds, compact_bytes, and the kind re-parse against
-  `Bounds.coerce(limits)`); the SDKs hardcoded maximum. Each SDK now takes an optional bounds
-  parameter (Python `bounds: Bounds | None = None`, TypeScript `bounds?: Bounds`, Rust
-  `bounds: Option<&Bounds>`, an additive public-API change; absent bounds = maximum, backward
-  compatible) and threads it through the reference's gates. `signature_bytes` carries no
-  assemble-time gate, since Bounds construction fixes the width (the reference's check is subsumed).
-  Mutation-proven per SDK (reverting the threading reddens each battery's tightened-bounds legs).
-- **The inter-SDK contract decision record exception 2 closed: the expected-anchor identity ordering divergence (all three
-  SDKs).** The reference validates the expected struct (chain + both anchors' identity/binding
-  well-formedness + transitions) BEFORE hashing the archive chunks (`anchored_export_codec.ex:88-104`);
-  the SDKs ran those gates only post-digest. The fix is verdict-invariant by subsumption and restores the
-  clause-3 work ordering: malformed caller metadata now rejects without hashing the archive. The
-  Python battery proves it behaviorally (sha256 call-count == 0 on malformed-expected rejections,
-  mutation-proven); TS and Rust pin the ordering structurally (hoist block before the digest site,
-  mutation-proven) plus verdict-matrix legs.
-- **The inter-SDK contract decision record exception 1 closed: the SDK closed-Result escape family (Python + TypeScript).** A
-  mechanical family sweep (every façade × every parameter × wrong-typed values, then every struct
-  field the same way) proved the 2026-08-17 ledgered Python escapes were not two instances but a
-  total class: 31/34 Python parameter sites and every caller-supplied struct field raised
-  `AttributeError`/`TypeError` past the closed `Result`. TypeScript silently accepted
-  `requestDigest(123/true/null/{})`, coercion the record had classed as a "disclosed margin",
-  (digesting the coerced text) and threw `TypeError` past `trying()` on 109 parameter positions.
-  Both dynamic SDKs now gate every façade argument's shape before the body runs (Python:
-  annotation-driven `_closed_shape` over the declared dataclass shapes, `bool` ≠ `int`; TS:
-  `closedShape` with per-façade shape specs). Rust excludes the class by typing. The per-SDK
-  family-sweep batteries in `tests/test_permissiveness.{py,ts}` are the pre-fix red run and are
-  mutation-proven per façade. Exception 2 (expected-anchor identity post-digest) remains open.
-
-### Added
-
 - **Bounds-aware public compact assembly and current-major issuer posture.** Add the public
   `BoundedAuthorityProtocol.V1.assemble_compact/3` facade over the existing bounded runtime
   primitive; `/2` remains exactly `/3` with profile maxima. Native tests cover byte equality for
@@ -1846,6 +1780,68 @@ several note findings, all in surfaces this program touched. All fixed:
   sunset, never a silent change (the security-release decision record;
   charter § The evolution contract + § Governance; [governance.md](docs/governance.md) re-synced).
   This refines deployment policy without changing wire bytes, bounds, or verdicts.
+
+### Fixed
+
+- **BAP-07 readiness reconciled across the repo docs.** The ROADMAP row's acceptance still named
+  the retired private-runtime PG 16/17/18 matrix (a private-runtime decision made PostgreSQL 18
+  the sole supported major); the ROADMAP Next-action note, the release-candidate contract's Status,
+  the README Status, and SECURITY.md's supported-versions note each described BAP-07 as gated on the
+  private runtime's connected gates:
+  private BA-14 completed 2026-08-18, so BAP-07 is fully unblocked (the Hex-publication half stays
+  deferred by maintainer decision). Docs-only: zero code, wire, bound, or verdict change.
+- **Cross-vendor review round 18 (blocking + should-fix/notes across the vendor lenses, all
+  closed).** Blocking findings: the TS shape gate's nested expected-export members were opaque `"object"`
+  specs, so a malformed nested struct (chain missing `previousHash`, empty anchor) passed the
+  gate and the clause-3 hoist then dereferenced the missing field, causing a `TypeError` escape past
+  `trying()`; the nested members are now fully specified (chain/anchor/transition field shapes,
+  `archived.chunks` as a bytes sequence), red-leg + mutation proven (opaque specs → RED).
+  Should-fix findings: the Python and Rust hoists walked `expected.transitions` per-element BEFORE the
+  `key_transitions` count ceiling, regressing the round-3 ceiling-first invariant the TS sibling
+  kept; the ceiling now runs at the top of the hoist in both (the dead later duplicate removed).
+  Notes, reconciled: the entry-position shape gate's sequence walks before count
+  ceilings are a documented accepted margin (typeof-only per element); Python's body-level
+  `bytearray` tolerance was dead under the exact-bytes gate and is reconciled to bytes-only.
+  The timed-out fable peer's transcript was mined: it was converging on the ordering finding
+  (fixed) and a benign API-shape note (the SDKs' optional bounds default to maximum,
+  behavior-identical to the reference's public façade).
+- **Round-12..14 per-clause pin debt paid on the touched surfaces (the inter-SDK contract decision record's Honest limit,
+  amended).** The 2026-08-18 cluster's legs double as the owed per-clause pins: the pre-digest
+  export gates (version shape/equality, key-count, key-id charset, key magnitude) are now pinned as
+  WORK legs in the Python battery (reject with zero sha256 calls, all five mutation-proven
+  load-bearing) with TS/Rust verdict matrices. Root cause of the "unpayable" debt: each gate is
+  verdict-subsumed by a later gate, so verdict legs were structurally impossible; the work form is
+  the red-capable pin. Still owed and disclosed: the standalone anchor-path `anchor_bytes` gates
+  (round 12) and allocation bounds (round 15) on untouched surfaces.
+- **The SDK bounds contract decision record's named `assemble_compact` divergence closed: caller bounds threaded through
+  assembly in all three SDKs.** The reference takes limits at assemble (`runtime.ex:147-155` →
+  `CompactJws.assemble`: encoded-segment bounds, compact_bytes, and the kind re-parse against
+  `Bounds.coerce(limits)`); the SDKs hardcoded maximum. Each SDK now takes an optional bounds
+  parameter (Python `bounds: Bounds | None = None`, TypeScript `bounds?: Bounds`, Rust
+  `bounds: Option<&Bounds>`, an additive public-API change; absent bounds = maximum, backward
+  compatible) and threads it through the reference's gates. `signature_bytes` carries no
+  assemble-time gate, since Bounds construction fixes the width (the reference's check is subsumed).
+  Mutation-proven per SDK (reverting the threading reddens each battery's tightened-bounds legs).
+- **The inter-SDK contract decision record exception 2 closed: the expected-anchor identity ordering divergence (all three
+  SDKs).** The reference validates the expected struct (chain + both anchors' identity/binding
+  well-formedness + transitions) BEFORE hashing the archive chunks (`anchored_export_codec.ex:88-104`);
+  the SDKs ran those gates only post-digest. The fix is verdict-invariant by subsumption and restores the
+  clause-3 work ordering: malformed caller metadata now rejects without hashing the archive. The
+  Python battery proves it behaviorally (sha256 call-count == 0 on malformed-expected rejections,
+  mutation-proven); TS and Rust pin the ordering structurally (hoist block before the digest site,
+  mutation-proven) plus verdict-matrix legs.
+- **The inter-SDK contract decision record exception 1 closed: the SDK closed-Result escape family (Python + TypeScript).** A
+  mechanical family sweep (every façade × every parameter × wrong-typed values, then every struct
+  field the same way) proved the 2026-08-17 ledgered Python escapes were not two instances but a
+  total class: 31/34 Python parameter sites and every caller-supplied struct field raised
+  `AttributeError`/`TypeError` past the closed `Result`. TypeScript silently accepted
+  `requestDigest(123/true/null/{})`, coercion the record had classed as a "disclosed margin",
+  (digesting the coerced text) and threw `TypeError` past `trying()` on 109 parameter positions.
+  Both dynamic SDKs now gate every façade argument's shape before the body runs (Python:
+  annotation-driven `_closed_shape` over the declared dataclass shapes, `bool` ≠ `int`; TS:
+  `closedShape` with per-façade shape specs). Rust excludes the class by typing. The per-SDK
+  family-sweep batteries in `tests/test_permissiveness.{py,ts}` are the pre-fix red run and are
+  mutation-proven per façade. Exception 2 (expected-anchor identity post-digest) remains open.
 
 ### Changed
 
