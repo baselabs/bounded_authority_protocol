@@ -83,6 +83,17 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
 
   # Published explanations must match certification, but require an explicit editorial update.
   @prose [
+    # Released changelog sections record the digest each release certified; history is never
+    # rewritten, so a rotation edits this entry, not the changelog.
+    {"CHANGELOG.md",
+     [
+       {:selector_float_zero, :hex, 1},
+       {:producer_canonicality, :hex, 1},
+       {:strict_ed25519, :hex, 1},
+       {:content_assertion, :hex, 1},
+       {2, :hex, 1},
+       {:local_loopback_http, :hex, 1}
+     ]},
     {"spec/bap-content-assertion-v1.md", [{:content_assertion, :hex, 1}]},
     {"spec/bap-local-loopback-http-v1.md", [{:local_loopback_http, :hex, 1}]},
     {"spec/bap-role-attestation-v1.md", [{:role_attestation, :hex, 1}]},

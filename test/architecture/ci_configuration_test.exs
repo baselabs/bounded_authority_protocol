@@ -10,10 +10,17 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     end
   end
 
-  test "every landing gate runs on kci branches" do
-    for name <- ["ci", "sdks", "supply-chain", "sdk-publish-guard"] do
-      workflow = YamlElixir.read_from_file!(".github/workflows/#{name}.yml")
-      assert "kci/**" in get_in(workflow, ["on", "push", "branches"]), name
+  # Every workflow is a gate on both landing paths (a kci branch, then main) except the Pages
+  # deployment, which publishes site/ after a change is on main and checks nothing.
+  @not_gates [".github/workflows/pages.yml"]
+
+  test "every gate workflow runs on main and kci pushes" do
+    gates = Path.wildcard(".github/workflows/*.{yml,yaml}") -- @not_gates
+    assert length(gates) >= 5
+
+    for path <- gates do
+      branches = get_in(YamlElixir.read_from_file!(path), ["on", "push", "branches"]) || []
+      assert "main" in branches and "kci/**" in branches, "#{path} must run on main and kci/**"
     end
   end
 
@@ -46,6 +53,18 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     assert supply["jobs"]["attest"]["permissions"]["id-token"] == "write"
   end
 
+  test "the attested package passed the complete quality gate in the job that built it" do
+    supply = YamlElixir.read_from_file!(".github/workflows/supply-chain.yml")
+    assert supply["jobs"]["attest"]["needs"] == "package"
+
+    steps = supply["jobs"]["package"]["steps"]
+    quality = Enum.find_index(steps, &(&1["run"] == "mix quality"))
+    archive = Enum.find_index(steps, &String.contains?(&1["run"] || "", "mix hex.build"))
+
+    assert quality != nil and archive != nil and quality < archive
+    refute Map.has_key?(Enum.at(steps, quality), "if"), "mix quality must run on every event"
+  end
+
   test "each committed dependency lock has an update policy and every policy has a manifest" do
     entries = YamlElixir.read_from_file!(".github/dependabot.yml")["updates"]
 
@@ -65,6 +84,17 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
 
     {tracked, 0} = System.cmd("git", ["ls-files", "-z"])
     paths = String.split(tracked, <<0>>, trim: true)
+
+    # Any lockfile, of any ecosystem, must be one this test maps; a new kind fails here
+    # instead of passing without an update policy.
+    unmapped =
+      for path <- paths,
+          name = Path.basename(path),
+          name =~ ~r/(^|[._-])lock(file)?([._-]|$)|\.lockb?$|^pylock(\.[^.]+)?\.toml$|^go\.sum$/i,
+          not Map.has_key?(locks, name),
+          do: path
+
+    assert unmapped == [], "lockfiles with no mapped ecosystem: #{inspect(unmapped)}"
 
     for path <- paths, ecosystem = locks[Path.basename(path)], ecosystem != nil do
       directory = if Path.dirname(path) == ".", do: "/", else: "/" <> Path.dirname(path)

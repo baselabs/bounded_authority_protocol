@@ -40,6 +40,9 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
       copy(snapshot, Path.join(root, Path.relative_to(snapshot, Catalog.root())))
     end
 
+    # The quotation scan reads the git source tree, so the copy is a repository too.
+    {_, 0} = System.cmd("git", ["init", "--quiet"], cd: root)
+
     %{root: root}
   end
 
@@ -151,13 +154,19 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
     end
   end
 
-  test "new certified digest quotations require classification", %{root: root} do
-    relative = "docs/new-corpus-reference.md"
-    path = Path.join(root, relative)
-    File.write!(path, Catalog.reference_digest(1, :hex))
-    {output, status} = run(root, "regen_corpus_digests")
-    assert status != 0
-    assert output =~ "#{relative}: uncatalogued certified digest quotation"
+  test "new certified digest quotations require classification anywhere in the tree",
+       %{root: root} do
+    for relative <- ["docs/new-corpus-reference.md", "NEW-NOTE.md", "priv/new-reference.json"] do
+      path = Path.join(root, relative)
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, Catalog.reference_digest(1, :hex))
+      {output, status} = run(root, "regen_corpus_digests")
+      assert status != 0
+      assert output =~ "#{relative}: uncatalogued certified digest quotation"
+      File.rm!(path)
+    end
+
+    assert {_, 0} = run(root, "regen_corpus_digests")
   end
 
   test "an uncatalogued CLI certification or SDK snapshot fails closed", %{root: root} do

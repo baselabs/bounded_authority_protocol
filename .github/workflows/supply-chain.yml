@@ -59,15 +59,11 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
-      # ci.yml runs this same gate on main and kci pushes. Manual, scheduled and
-      # release-tag runs have no matching CI invocation, so they retain the gate.
+      # The package this job archives is the one the attest job signs, so the complete gate
+      # (which also generates and checks the SBOMs) runs here on every event. ci.yml's
+      # parallel run of the same gate cannot stand in for it: no workflow waits on another.
       - name: Run complete quality gate
-        if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
         run: mix quality
-
-      - name: Generate package SBOMs
-        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
-        run: mix sbom.generate && mix sbom.check
 
       - name: Build exact unpublished archive
         id: archive

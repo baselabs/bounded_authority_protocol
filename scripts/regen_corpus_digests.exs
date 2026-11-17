@@ -91,28 +91,26 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
 
     known = Enum.uniq(known)
 
-    for root <- ["spec", "docs", "scripts", "test", "sdks", "conformance", "lib"],
-        path <- Path.wildcard(Path.join([Catalog.root(), root, "**/*"])),
-        Path.extname(path) in [
-          ".md",
-          ".mdx",
-          ".ex",
-          ".exs",
-          ".py",
-          ".rs",
-          ".go",
-          ".mjs",
-          ".livemd",
-          ".cheatmd"
-        ],
-        not String.contains?(path, ["/.venv/", "/target/", "/node_modules/"]),
-        relative = Path.relative_to(path, Catalog.root()),
-        contents = File.read!(path),
+    for relative <- source_tree(),
+        contents = File.read!(Path.join(Catalog.root(), relative)),
         digest <- known,
         actual = length(:binary.matches(contents, digest)),
         actual > Map.get(expected, {relative, digest}, 0) do
       "#{relative}: uncatalogued certified digest quotation; classify as automatic, hand-kept preservation, or prose"
     end
+  end
+
+  # The public source tree: every file git tracks or would track (untracked but not ignored),
+  # at any depth and of any type, so a new quotation is found before it is staged.
+  defp source_tree do
+    {output, 0} =
+      System.cmd("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cd: Catalog.root()
+      )
+
+    output
+    |> String.split(<<0>>, trim: true)
+    |> Enum.filter(&File.regular?(Path.join(Catalog.root(), &1)))
   end
 
   defp pins(entry) do

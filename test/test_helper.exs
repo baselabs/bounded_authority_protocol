@@ -1,4 +1,12 @@
-{shallow, 0} = System.cmd("git", ["rev-parse", "--is-shallow-repository"])
+shallow =
+  case System.cmd("git", ["rev-parse", "--is-shallow-repository"], stderr_to_stdout: true) do
+    {output, 0} ->
+      output
+
+    {output, _status} ->
+      raise "the test suite reads this repository's tracked files and history and must run " <>
+              "in a git checkout; git said: " <> String.trim(output)
+  end
 
 exclude =
   if String.trim(shallow) == "true" do

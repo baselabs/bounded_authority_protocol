@@ -2,6 +2,10 @@ name: Dependency review
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
+      - "kci/**"
 
 permissions:
   contents: read
@@ -17,6 +21,10 @@ jobs:
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
+          # Pull requests use the action's own base and head. A push to main compares with the
+          # commit it replaced; a kci landing branch compares with the default branch.
+          base-ref: ${{ github.ref == 'refs/heads/main' && github.event.before || github.event.repository.default_branch }}
+          head-ref: ${{ github.sha }}
           fail-on-severity: low
           fail-on-scopes: runtime, development, unknown
           allow-licenses: >-
