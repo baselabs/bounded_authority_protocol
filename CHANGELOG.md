@@ -89,6 +89,10 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- The local private-identifier guard uses one Git batch reader and checks only the paths and
+  blobs each outgoing commit introduces relative to its parents, avoiding a subprocess for
+  every blob. New remote refs still scan their full ancestry, and finding sources retain
+  recursive tree-entry numbering.
 - Decoded diagnostics use identical, fixed-budget rendering on every supported Elixir version
   and in the Python, Rust, and Go SDKs, including shortest round-trip float notation, DEL,
   and controls or invalid UTF-8 beyond the printability prefix. Unsupported hand-built decoded

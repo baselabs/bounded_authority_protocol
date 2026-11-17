@@ -49,6 +49,13 @@ class Finding:
     pattern: int
 
 
+@dataclass(frozen=True)
+class TreeEntry:
+    mode: int
+    name: bytes
+    oid: bytes
+
+
 class Guard:
     def __init__(self, repo: Path):
         self.repo = repo.resolve()
@@ -102,6 +109,91 @@ class Guard:
         }.get(self.git("rev-parse", "--show-object-format").strip())
         if self.object_hex_length is None:
             raise GuardError("object-format")
+        self._batch: subprocess.Popen[bytes] | None = None
+        self.seen_blobs: set[bytes] = set()
+        self._trees: dict[bytes, tuple[TreeEntry, ...]] = {}
+        self._tree_counts: dict[bytes, int] = {}
+        self._commits: dict[bytes, tuple[bytes, tuple[bytes, ...], bytes]] = {}
+
+    def __enter__(self) -> Guard:
+        return self
+
+    def __exit__(self, exc_type, _exc_value, _traceback) -> None:
+        try:
+            self.close()
+        except GuardError:
+            if exc_type is None:
+                raise
+
+    def close(self) -> None:
+        process = self._batch
+        if process is None:
+            return
+        self._batch = None
+        failed = False
+        try:
+            for stream in (process.stdin, process.stdout):
+                try:
+                    stream.close()
+                except OSError:
+                    failed = True
+        finally:
+            returncode = process.wait()
+        if failed or returncode != 0:
+            raise GuardError("batch-process")
+
+    def read_object(
+        self, oid: bytes, expected_type: bytes | None = None, *, peel: bool = False
+    ) -> tuple[bytes, bytes, bytes]:
+        self.valid_oid(oid)
+        spec = oid + (b"^{commit}" if peel else b"")
+        try:
+            if self._batch is None:
+                self._batch = subprocess.Popen(
+                    [
+                        "git",
+                        "--no-replace-objects",
+                        "-C",
+                        os.fspath(self.repo),
+                        "cat-file",
+                        "--batch",
+                    ],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    env=self.git_env,
+                )
+            process = self._batch
+            if process.poll() is not None:
+                raise GuardError("batch-process")
+            process.stdin.write(spec + b"\n")
+            process.stdin.flush()
+            header = process.stdout.readline(self.object_hex_length + 64)
+            if header == spec + b" missing\n":
+                raise GuardError("object-missing")
+            if header == spec + b" ambiguous\n":
+                raise GuardError("object-ambiguous")
+            match = re.fullmatch(
+                rb"([0-9a-f]+) (blob|tree|commit|tag) ([0-9]+)\n", header
+            )
+            if match is None:
+                raise GuardError("batch-header")
+            returned_oid, object_type, raw_size = match.groups()
+            self.valid_oid(returned_oid)
+            # Drain the body before any type check so the stream stays in step.
+            size = int(raw_size)
+            data = process.stdout.read(size)
+            if len(data) != size or process.stdout.read(1) != b"\n":
+                raise GuardError("batch-read")
+            if process.poll() is not None:
+                raise GuardError("batch-process")
+            if not peel and returned_oid != oid:
+                raise GuardError("batch-object")
+            if expected_type is not None and object_type != expected_type:
+                raise GuardError("object-type")
+            return returned_oid, object_type, data
+        except (OSError, ValueError, OverflowError) as error:
+            raise GuardError("batch-read") from error
 
     def git(
         self,
@@ -320,6 +412,9 @@ class Guard:
     def match_lines(
         data: bytes, patterns: list[bytes], source: str
     ) -> list[Finding]:
+        lowered = data.translate(ASCII_LOWER)
+        if not any(pattern in lowered for pattern in patterns):
+            return []
         findings: list[Finding] = []
         for line_number, raw_line in enumerate(data.splitlines(), start=1):
             line = raw_line.translate(ASCII_LOWER)
@@ -342,8 +437,11 @@ class Guard:
     def blob_findings(
         self, oid: bytes, patterns: list[bytes], source: str
     ) -> list[Finding]:
-        oid_text = self.valid_oid(oid)
-        blob = self.git("cat-file", "blob", oid_text)
+        self.valid_oid(oid)
+        if oid in self.seen_blobs:
+            return []
+        blob = self.read_object(oid, b"blob")[2]
+        self.seen_blobs.add(oid)
         return self.match_lines(blob, patterns, source)
 
     def valid_oid(self, oid: bytes) -> str:
@@ -372,6 +470,7 @@ class Guard:
                 mode, oid, stage = metadata.split(b" ")
             except ValueError as error:
                 raise GuardError("index-format") from error
+            self.valid_oid(oid)
             if path not in changed_paths:
                 continue
             if stage != b"0" or path in entries:
@@ -381,14 +480,12 @@ class Guard:
             raise GuardError("index-enumeration")
 
         findings: list[Finding] = []
-        seen_blobs: set[bytes] = set()
         for entry_number, path in enumerate(sorted(entries), start=1):
             mode, oid = entries[path]
             findings.extend(
                 self.match_path(path, patterns, f"index-entry={entry_number}")
             )
-            if mode in (b"100644", b"100755", b"120000") and oid not in seen_blobs:
-                seen_blobs.add(oid)
+            if mode in (b"100644", b"100755", b"120000"):
                 findings.extend(
                     self.blob_findings(
                         oid,
@@ -430,29 +527,15 @@ class Guard:
             raise GuardError("grafts") from error
 
     def object_type(self, oid: bytes) -> bytes:
-        return self.git("cat-file", "-t", self.valid_oid(oid)).strip()
+        return self.read_object(oid)[1]
 
     def peel_commit(self, oid: bytes) -> bytes | None:
-        oid_text = self.valid_oid(oid)
-        result = subprocess.run(
-            [
-                "git",
-                "--no-replace-objects",
-                "-C",
-                os.fspath(self.repo),
-                "rev-parse",
-                "--verify",
-                f"{oid_text}^{{commit}}",
-            ],
-            capture_output=True,
-            env=self.git_env,
-            check=False,
-        )
-        if result.returncode != 0:
-            return None
-        peeled = result.stdout.strip()
-        self.valid_oid(peeled)
-        return peeled
+        try:
+            return self.read_object(oid, b"commit", peel=True)[0]
+        except GuardError as error:
+            if error.code == "object-missing":
+                return None
+            raise
 
     def parse_push_updates(self, raw: bytes) -> list[tuple[bytes, bytes, bytes, bytes]]:
         updates: list[tuple[bytes, bytes, bytes, bytes]] = []
@@ -499,47 +582,141 @@ class Guard:
             self.valid_oid(oid)
         return sorted(commits)
 
+    def commit_parts(self, oid: bytes) -> tuple[bytes, tuple[bytes, ...], bytes]:
+        self.valid_oid(oid)
+        if oid not in self._commits:
+            raw = self.read_object(oid, b"commit")[2]
+            header, separator, message = raw.partition(b"\n\n")
+            if not separator:
+                raise GuardError("commit-format")
+            tree: bytes | None = None
+            parents: list[bytes] = []
+            for line in header.split(b"\n"):
+                if line.startswith(b" "):
+                    continue
+                if line.startswith(b"tree "):
+                    if tree is not None:
+                        raise GuardError("commit-format")
+                    tree = line[5:]
+                    self.valid_oid(tree)
+                elif line.startswith(b"parent "):
+                    parent = line[7:]
+                    self.valid_oid(parent)
+                    parents.append(parent)
+            if tree is None:
+                raise GuardError("commit-format")
+            self._commits[oid] = (tree, tuple(parents), message)
+        return self._commits[oid]
+
+    def tree_entries(self, oid: bytes) -> tuple[TreeEntry, ...]:
+        self.valid_oid(oid)
+        if oid not in self._trees:
+            raw = self.read_object(oid, b"tree")[2]
+            entries: list[TreeEntry] = []
+            names: set[bytes] = set()
+            offset = 0
+            oid_length = self.object_hex_length // 2
+            while offset < len(raw):
+                space = raw.find(b" ", offset)
+                nul = raw.find(b"\0", space + 1) if space >= 0 else -1
+                end = nul + 1 + oid_length
+                if space < 0 or nul < 0 or end > len(raw):
+                    raise GuardError("tree-format")
+                raw_mode = raw[offset:space]
+                name = raw[space + 1 : nul]
+                if (
+                    re.fullmatch(rb"[0-7]+", raw_mode) is None
+                    or not name
+                    or b"/" in name
+                    or name in (b".", b"..")
+                    or name in names
+                ):
+                    raise GuardError("tree-format")
+                mode = int(raw_mode, 8)
+                if stat.S_ISREG(mode):
+                    mode = 0o100755 if mode & 0o100 else 0o100644
+                elif stat.S_ISLNK(mode):
+                    mode = 0o120000
+                elif stat.S_ISDIR(mode):
+                    mode = 0o40000
+                else:
+                    mode = 0o160000
+                entry_oid = raw[nul + 1 : end].hex().encode("ascii")
+                self.valid_oid(entry_oid)
+                entries.append(TreeEntry(mode, name, entry_oid))
+                names.add(name)
+                offset = end
+            self._trees[oid] = tuple(entries)
+        return self._trees[oid]
+
+    def tree_entry_count(self, oid: bytes) -> int:
+        if oid not in self._tree_counts:
+            self._tree_counts[oid] = sum(
+                self.tree_entry_count(entry.oid) if entry.mode == 0o40000 else 1
+                for entry in self.tree_entries(oid)
+            )
+        return self._tree_counts[oid]
+
+    def scan_tree(
+        self, tree: bytes, parents: tuple[bytes, ...], patterns: list[bytes], source: str
+    ) -> list[Finding]:
+        findings: list[Finding] = []
+        entry_number = 0
+
+        def walk(oid: bytes, parent_trees: tuple[bytes, ...], prefix: bytes) -> None:
+            nonlocal entry_number
+            # A matching parent subtree introduces nothing, but all its leaves
+            # still occupy positions in ls-tree's recursive output.
+            if oid in parent_trees:
+                entry_number += self.tree_entry_count(oid)
+                return
+            parent_entries = [
+                {entry.name: entry for entry in self.tree_entries(parent)}
+                for parent in parent_trees
+            ]
+            for entry in self.tree_entries(oid):
+                path = prefix + entry.name
+                counterparts = [entries.get(entry.name) for entries in parent_entries]
+                if entry.mode == 0o40000:
+                    subtrees = tuple(
+                        parent.oid
+                        for parent in counterparts
+                        if parent is not None and parent.mode == 0o40000
+                    )
+                    walk(entry.oid, subtrees, path + b"/")
+                    continue
+                entry_number += 1
+                if entry in counterparts:
+                    continue
+                findings.extend(
+                    self.match_path(
+                        path, patterns, f"{source} tree-entry={entry_number}"
+                    )
+                )
+                if entry.mode != 0o160000:
+                    findings.extend(
+                        self.blob_findings(
+                            entry.oid, patterns, f"blob={self.valid_oid(entry.oid)}"
+                        )
+                    )
+
+        walk(tree, parents, b"")
+        return findings
+
     def scan_commits(
         self, commits: list[bytes], patterns: list[bytes]
     ) -> list[Finding]:
         findings: list[Finding] = []
-        seen_blobs: set[bytes] = set()
         for commit_oid in commits:
             commit_text = self.valid_oid(commit_oid)
-            raw_commit = self.git("cat-file", "commit", commit_text)
-            message = raw_commit.partition(b"\n\n")[2]
+            tree, parents, message = self.commit_parts(commit_oid)
             findings.extend(
                 self.match_lines(message, patterns, f"commit={commit_text}")
             )
-            tree = self.git("ls-tree", "-rz", "--full-tree", commit_text)
-            entries = [entry for entry in tree.split(b"\0") if entry]
-            for entry_number, raw_entry in enumerate(entries, start=1):
-                try:
-                    metadata, path = raw_entry.split(b"\t", 1)
-                    mode, object_type, oid = metadata.split(b" ")
-                except ValueError as error:
-                    raise GuardError("tree-format") from error
-                findings.extend(
-                    self.match_path(
-                        path,
-                        patterns,
-                        f"commit={commit_text} tree-entry={entry_number}",
-                    )
-                )
-                if mode in (b"100644", b"100755", b"120000") and object_type == b"blob":
-                    if oid not in seen_blobs:
-                        seen_blobs.add(oid)
-                        findings.extend(
-                            self.blob_findings(
-                                oid,
-                                patterns,
-                                f"blob={self.valid_oid(oid)}",
-                            )
-                        )
-                elif mode == b"160000" and object_type == b"commit":
-                    continue
-                else:
-                    raise GuardError("tree-mode")
+            parent_trees = tuple(self.commit_parts(parent)[0] for parent in parents)
+            findings.extend(
+                self.scan_tree(tree, parent_trees, patterns, f"commit={commit_text}")
+            )
         return sorted(set(findings))
 
     def scan_outgoing_tags(
@@ -557,7 +734,7 @@ class Guard:
             while current not in seen and self.object_type(current) == b"tag":
                 seen.add(current)
                 oid_text = self.valid_oid(current)
-                raw_tag = self.git("cat-file", "tag", oid_text)
+                raw_tag = self.read_object(current, b"tag")[2]
                 header, separator, message = raw_tag.partition(b"\n\n")
                 if not separator:
                     raise GuardError("tag-format")
@@ -581,7 +758,6 @@ class Guard:
     ) -> list[Finding]:
         zero = b"0" * self.object_hex_length
         findings: list[Finding] = []
-        seen_blobs: set[bytes] = set()
         for update_number, (_local_ref, local_oid, _remote_ref, _remote_oid) in enumerate(
             updates, start=1
         ):
@@ -594,7 +770,7 @@ class Guard:
                 if current in seen_tags:
                     raise GuardError("tag-cycle")
                 seen_tags.add(current)
-                raw_tag = self.git("cat-file", "tag", self.valid_oid(current))
+                raw_tag = self.read_object(current, b"tag")[2]
                 header = raw_tag.partition(b"\n\n")[0]
                 target = next(
                     (line[7:] for line in header.splitlines() if line.startswith(b"object ")),
@@ -608,46 +784,19 @@ class Guard:
             if object_type == b"commit":
                 continue
             if object_type == b"blob":
-                if current not in seen_blobs:
-                    seen_blobs.add(current)
-                    findings.extend(
-                        self.blob_findings(
-                            current,
-                            patterns,
-                            f"blob={self.valid_oid(current)}",
-                        )
+                findings.extend(
+                    self.blob_findings(
+                        current,
+                        patterns,
+                        f"blob={self.valid_oid(current)}",
                     )
+                )
                 continue
             if object_type != b"tree":
                 raise GuardError("terminal-object-type")
-            tree = self.git("ls-tree", "-rz", "--full-tree", self.valid_oid(current))
-            for entry_number, raw_entry in enumerate(
-                (entry for entry in tree.split(b"\0") if entry), start=1
-            ):
-                try:
-                    metadata, path = raw_entry.split(b"\t", 1)
-                    mode, entry_type, oid = metadata.split(b" ")
-                except ValueError as error:
-                    raise GuardError("tree-format") from error
-                findings.extend(
-                    self.match_path(
-                        path,
-                        patterns,
-                        f"push-object={update_number} tree-entry={entry_number}",
-                    )
-                )
-                if mode in (b"100644", b"100755", b"120000") and entry_type == b"blob":
-                    if oid not in seen_blobs:
-                        seen_blobs.add(oid)
-                        findings.extend(
-                            self.blob_findings(
-                                oid, patterns, f"blob={self.valid_oid(oid)}"
-                            )
-                        )
-                elif mode == b"160000" and entry_type == b"commit":
-                    continue
-                else:
-                    raise GuardError("tree-mode")
+            findings.extend(
+                self.scan_tree(current, (), patterns, f"push-object={update_number}")
+            )
         return sorted(set(findings))
 
     def pre_push(
@@ -743,40 +892,40 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     try:
-        guard = Guard(Path(args.repo))
-        if args.mode == "initialize":
-            if args.expected_count <= 0:
-                raise GuardError("expected-count")
-            guard.initialize(args.expected_count)
-            return 0
+        with Guard(Path(args.repo)) as guard:
+            if args.mode == "initialize":
+                if args.expected_count <= 0:
+                    raise GuardError("expected-count")
+                guard.initialize(args.expected_count)
+                return 0
 
-        patterns = guard.active_patterns()
-        if patterns is None:
-            print(
-                "private-identifier-guard: inactive; owner policy is not configured",
-                file=sys.stderr,
-            )
-            if args.mode == "audit-remotes":
-                print("status=inactive findings=0 scanned_commits=0")
+            patterns = guard.active_patterns()
+            if patterns is None:
+                print(
+                    "private-identifier-guard: inactive; owner policy is not configured",
+                    file=sys.stderr,
+                )
+                if args.mode == "audit-remotes":
+                    print("status=inactive findings=0 scanned_commits=0")
+                return 0
+            if args.mode == "validate-policy":
+                return 0
+            if args.mode == "pre-commit":
+                findings = guard.pre_commit(patterns)
+            elif args.mode == "commit-msg":
+                findings = guard.commit_message(Path(args.message_file), patterns)
+            elif args.mode == "pre-push":
+                findings = guard.pre_push(args.remote_url, sys.stdin.buffer.read(), patterns)
+            elif args.mode == "audit-remotes":
+                findings, commit_count = guard.audit_remotes(patterns)
+                print(f"findings={len(findings)} scanned_commits={commit_count}")
+                return 1 if findings else 0
+            else:
+                raise GuardError("mode")
+            if findings:
+                emit_findings(findings)
+                return 1
             return 0
-        if args.mode == "validate-policy":
-            return 0
-        if args.mode == "pre-commit":
-            findings = guard.pre_commit(patterns)
-        elif args.mode == "commit-msg":
-            findings = guard.commit_message(Path(args.message_file), patterns)
-        elif args.mode == "pre-push":
-            findings = guard.pre_push(args.remote_url, sys.stdin.buffer.read(), patterns)
-        elif args.mode == "audit-remotes":
-            findings, commit_count = guard.audit_remotes(patterns)
-            print(f"findings={len(findings)} scanned_commits={commit_count}")
-            return 1 if findings else 0
-        else:
-            raise GuardError("mode")
-        if findings:
-            emit_findings(findings)
-            return 1
-        return 0
     except GuardError as error:
         print(
             f"private-identifier-guard: deny guard-state={error.code}",

@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import runpy
+import shlex
 import shutil
 import stat
 import subprocess
@@ -387,6 +389,247 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("tag=", result.stderr)
         self.assert_safe_output(result)
+
+    def test_pre_push_git_invocation_count_is_independent_of_tree_size(self) -> None:
+        real_git = shutil.which("git")
+        self.assertIsNotNone(real_git)
+        wrapper_dir = self.scratch / "bin"
+        wrapper_dir.mkdir()
+        wrapper = wrapper_dir / "git"
+        wrapper.write_text(
+            '#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$GUARD_INVOCATION_LOG"\n'
+            f'exec {shlex.quote(real_git)} "$@"\n',
+            encoding="utf-8",
+        )
+        wrapper.chmod(0o700)
+        log = self.scratch / "git-invocations.log"
+        env = {
+            "PATH": str(wrapper_dir) + os.pathsep + os.environ["PATH"],
+            "GUARD_INVOCATION_LOG": str(log),
+        }
+
+        def invocation_counts(local_oid: str, remote_oid: str) -> tuple[int, int]:
+            log.write_text("", encoding="ascii")
+            result = self.guard(
+                "pre-push",
+                "origin",
+                "unused-remote",
+                input_text=(
+                    f"refs/heads/main {local_oid} refs/heads/main {remote_oid}\n"
+                ),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assert_safe_output(result)
+            calls = log.read_text(encoding="utf-8").splitlines()
+            return len(calls), sum(call.endswith(" cat-file --batch") for call in calls)
+
+        base = git(self.repo, "rev-parse", "HEAD")
+        for number in range(3):
+            path = self.repo / "files" / f"dir-{number % 7}" / f"file-{number}.txt"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f"clean content {number}\n", encoding="ascii")
+        git(self.repo, "add", "files")
+        git(self.repo, "commit", "-qm", "small tree")
+        small = git(self.repo, "rev-parse", "HEAD")
+        small_update, small_update_batches = invocation_counts(small, base)
+        small_new, small_new_batches = invocation_counts(small, ZERO_OID)
+
+        for number in range(3, 323):
+            path = self.repo / "files" / f"dir-{number % 7}" / f"file-{number}.txt"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f"clean content {number}\n", encoding="ascii")
+        git(self.repo, "add", "files")
+        git(self.repo, "commit", "-qm", "large tree")
+        large = git(self.repo, "rev-parse", "HEAD")
+        large_update, large_update_batches = invocation_counts(large, small)
+        large_new, large_new_batches = invocation_counts(large, ZERO_OID)
+        self.assertEqual(small_update, large_update)
+        self.assertEqual(small_new, large_new)
+        self.assertEqual(
+            (small_update_batches, large_update_batches, small_new_batches, large_new_batches),
+            (1, 1, 1, 1),
+        )
+
+    def test_pre_push_tree_entry_number_matches_recursive_ls_tree(self) -> None:
+        for name in ("a/first.txt", "a/nested/second.txt", "m/before.txt", "z/last.txt"):
+            path = self.repo / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("clean\n", encoding="ascii")
+        git(self.repo, "add", "a", "m", "z")
+        git(self.repo, "commit", "-qm", "unchanged sibling trees")
+        remote, remote_oid = self.make_remote()
+        introduced = f"m/deep/nested/{self.pattern}.txt"
+        path = self.repo / introduced
+        path.parent.mkdir(parents=True)
+        path.write_text("clean\n", encoding="ascii")
+        git(self.repo, "add", introduced)
+        git(self.repo, "commit", "-qm", "nested path")
+        local_oid = git(self.repo, "rev-parse", "HEAD")
+        entries = git(self.repo, "ls-tree", "-r", "--full-tree", local_oid).splitlines()
+        index = next(
+            number
+            for number, entry in enumerate(entries, start=1)
+            if entry.endswith("\t" + introduced)
+        )
+        result = self.pre_push(
+            remote, "refs/heads/main", local_oid, "refs/heads/main", remote_oid
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(
+            result.stderr,
+            "private-identifier-guard: deny "
+            f"source=commit={local_oid} tree-entry={index} line=0 pattern=1\n"
+            "private-identifier-guard: deny findings=1\n",
+        )
+        self.assert_safe_output(result)
+
+        tree_oid = git(self.repo, "rev-parse", f"{local_oid}^{{tree}}")
+        result = self.pre_push(
+            remote, tree_oid, tree_oid, "refs/tags/tree-numbering", ZERO_OID
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(
+            result.stderr,
+            "private-identifier-guard: deny "
+            f"source=push-object=1 tree-entry={index} line=0 pattern=1\n"
+            "private-identifier-guard: deny findings=1\n",
+        )
+        self.assert_safe_output(result)
+
+    def test_merge_scans_only_entries_differing_from_every_parent(self) -> None:
+        remote, base = self.make_remote()
+        shared = f"shared-{self.patterns[2]}.txt"
+        left_path = f"left/{self.pattern}.txt"
+        right_path = f"right/{self.other_pattern}.txt"
+        (self.repo / "left").mkdir()
+        (self.repo / left_path).write_text(self.pattern + "\n", encoding="ascii")
+        (self.repo / shared).write_text("left version\n", encoding="ascii")
+        git(self.repo, "add", "left", shared)
+        git(self.repo, "commit", "-qm", "left parent")
+        left = git(self.repo, "rev-parse", "HEAD")
+        git(self.repo, "checkout", "-qb", "right-parent", base)
+        (self.repo / "right").mkdir()
+        (self.repo / right_path).write_text(self.other_pattern + "\n", encoding="ascii")
+        (self.repo / shared).write_text("right version\n", encoding="ascii")
+        git(self.repo, "add", "right", shared)
+        git(self.repo, "commit", "-qm", "right parent")
+        right = git(self.repo, "rev-parse", "HEAD")
+        (self.repo / "left").mkdir()
+        (self.repo / left_path).write_text(self.pattern + "\n", encoding="ascii")
+        (self.repo / shared).write_text(self.patterns[3] + "\n", encoding="ascii")
+        git(self.repo, "add", "left", shared)
+        tree = git(self.repo, "write-tree")
+        merge = git(self.repo, "commit-tree", tree, "-p", left, "-p", right, "-m", "merge")
+        result = self.pre_push(
+            remote, "refs/heads/main", merge, "refs/heads/main", base
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertRegex(result.stderr, rf"commit={left} tree-entry=\d+ line=0 pattern=1")
+        self.assertRegex(result.stderr, rf"commit={right} tree-entry=\d+ line=0 pattern=2")
+        merge_lines = [line for line in result.stderr.splitlines() if f"commit={merge} " in line]
+        self.assertEqual(len(merge_lines), 1)
+        self.assertTrue(merge_lines[0].endswith("line=0 pattern=3"))
+        merged_blob = git(self.repo, "rev-parse", f"{merge}:{shared}")
+        self.assertIn(f"blob={merged_blob} line=1 pattern=4", result.stderr)
+        self.assert_safe_output(result)
+
+    def test_pre_push_denies_rename_of_remote_blob_to_confidential_path(self) -> None:
+        remote, remote_oid = self.make_remote()
+        original_blob = git(self.repo, "rev-parse", "HEAD:baseline.txt")
+        renamed = f"renamed-{self.pattern}.txt"
+        git(self.repo, "mv", "baseline.txt", renamed)
+        git(self.repo, "commit", "-qm", "rename existing blob")
+        local_oid = git(self.repo, "rev-parse", "HEAD")
+        self.assertEqual(git(self.repo, "rev-parse", f"HEAD:{renamed}"), original_blob)
+        result = self.pre_push(
+            remote, "refs/heads/main", local_oid, "refs/heads/main", remote_oid
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f"commit={local_oid} tree-entry=1 line=0 pattern=1", result.stderr)
+        self.assert_safe_output(result)
+
+    def write_raw_tree(self, raw: bytes) -> str:
+        source = self.scratch / "raw-tree"
+        source.write_bytes(raw)
+        return git(self.repo, "hash-object", "-w", "--literally", "-t", "tree", str(source))
+
+    def test_tree_modes_are_canonicalized_before_comparing_parents(self) -> None:
+        blob = bytes.fromhex(git(self.repo, "rev-parse", "HEAD:baseline.txt"))
+        entry = self.pattern.encode("ascii") + b"\0" + blob
+        parent_tree = self.write_raw_tree(b"100664 " + entry)
+        parent = git(self.repo, "commit-tree", parent_tree, "-m", "parent")
+        tree = self.write_raw_tree(b"100644 " + entry)
+        child = git(self.repo, "commit-tree", tree, "-p", parent, "-m", "canonical mode")
+        result = self.pre_push(
+            self.scratch, "refs/heads/main", child, "refs/heads/main", parent
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_safe_output(result)
+
+        tree = self.write_raw_tree(b"100744 " + entry)
+        child = git(self.repo, "commit-tree", tree, "-p", parent, "-m", "executable mode")
+        result = self.pre_push(
+            self.scratch, "refs/heads/main", child, "refs/heads/main", parent
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f"commit={child} tree-entry=1 line=0 pattern=1", result.stderr)
+        self.assert_safe_output(result)
+
+    def test_malformed_missing_and_wrong_type_tree_entries_fail_closed(self) -> None:
+        blob = bytes.fromhex(git(self.repo, "rev-parse", "HEAD:baseline.txt"))
+        commit = bytes.fromhex(git(self.repo, "rev-parse", "HEAD"))
+        cases = (
+            b"10x644 clean\0" + blob,
+            b"100644 clean\0" + blob[:4],
+            b"100644 \0" + blob,
+            b"100644 clean\0" + bytes(20),
+            b"100644 clean\0" + commit,
+            b"40000 clean\0" + blob,
+        )
+        for raw in cases:
+            with self.subTest(raw=raw[:6]):
+                tree = self.write_raw_tree(raw)
+                result = self.pre_push(
+                    self.scratch, tree, tree, "refs/tags/tree-validation", ZERO_OID
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("guard-state=", result.stderr)
+                self.assert_safe_output(result)
+
+    def test_batch_process_is_reaped_on_every_context_exit(self) -> None:
+        namespace = runpy.run_path(str(GUARD))
+        guard_class = namespace["Guard"]
+        guard_error = namespace["GuardError"]
+        head = git(self.repo, "rev-parse", "HEAD").encode("ascii")
+        for mode in ("normal", "guard-error", "unexpected-error", "process-death"):
+            with self.subTest(mode=mode):
+                guard = guard_class(self.repo)
+                self.assertIsNone(guard._batch)
+                try:
+                    with guard:
+                        guard.read_object(head, b"commit")
+                        process = guard._batch
+                        guard.object_type(head)
+                        self.assertIs(guard._batch, process)
+                        if mode == "guard-error":
+                            guard.read_object(b"0" * guard.object_hex_length)
+                        elif mode == "unexpected-error":
+                            raise RuntimeError("synthetic unexpected exception")
+                        elif mode == "process-death":
+                            process.kill()
+                            process.wait()
+                            guard.read_object(head)
+                except guard_error:
+                    self.assertIn(mode, ("guard-error", "process-death"))
+                except RuntimeError:
+                    self.assertEqual(mode, "unexpected-error")
+                else:
+                    self.assertEqual(mode, "normal")
+                self.assertIsNotNone(process.returncode)
+                self.assertTrue(process.stdin.closed)
+                self.assertTrue(process.stdout.closed)
+                self.assertIsNone(guard._batch)
 
     def test_pre_push_scans_remote_ref_name_and_tag_object_from_oid(self) -> None:
         remote, remote_oid = self.make_remote()

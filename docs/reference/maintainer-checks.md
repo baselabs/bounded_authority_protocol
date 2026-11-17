@@ -16,10 +16,11 @@ Explicit initialization can accept an updated
 inventory; the local owner remains trusted. Do not share the inventory or its digest in source,
 reviews, issues, or CI.
 
-These hooks check staged bytes, raw pending messages, and outgoing Git objects. Automatic merge,
-cherry-pick, rebase, and mail-application commits can skip the commit checks; the pre-push check
-is their local backstop. Creating a new remote ref scans its full ancestry, including commits
-already retained under another remote ref.
+These hooks check staged bytes and raw pending messages. Before a push, they check each outgoing
+commit's message and the paths and blobs it introduces relative to its parents, along with pushed
+refs, tags, and terminal objects. Automatic merge, cherry-pick, rebase, and mail-application commits
+can skip the commit checks; the pre-push check is their local backstop. Creating a new remote ref
+still scans its full ancestry, including commits already retained under another remote ref.
 
 The message hook rejects confidential terms even in editor comments, verbose diffs, or templates:
 Git does not tell this hook which cleanup mode will later remove those bytes. For deletion-only
