@@ -3,7 +3,7 @@
 #
 # AGENTS rule 10 + ADR 0014 D8: every dependency a CONSUMER inherits must carry
 # a permissive license. This mirrors the Elixir prod-only gate
-# (scripts/check_dependency_licenses.exs audits `--only prod`): only the
+# (the repository license check audits production dependencies): only the
 # `[dependencies]` closure (cargo `kind=normal`) is audited, because
 # `[dev-dependencies]` (serde/serde_json — the conformance runner's test-time
 # tools) are NOT inherited by a downstream consumer and do not ship in its

@@ -359,7 +359,8 @@ def _parse_anchor_header(seg: CompactSegments, bounds: Bounds) -> str:
     _require_string_lit(h, "alg", ALG, "anchor header alg")
     _require_string_lit(h, "typ", ANCHOR_TYP, "anchor header typ")
     kid = _require_kid(h, bounds)
-    # Canonical form: the protected segment must be the exact JCS encoding (boundary_anchor_codec.ex:95-96).
+    # Canonical form: the protected segment must be the exact JCS encoding (spec/bap-v1.md §15 Boundary
+    # anchors).
     if not _bytes_equal(_unwrap(jcs_encode(h, bounds)), seg.protected_bytes):
         _fail("anchor header: canonical")
     return kid
@@ -371,7 +372,8 @@ def _parse_transition_header(seg: CompactSegments, bounds: Bounds) -> str:
     _require_string_lit(h, "alg", ALG, "transition header alg")
     _require_string_lit(h, "typ", TRANSITION_TYP, "transition header typ")
     kid = _require_kid(h, bounds)
-    # Canonical form: the protected segment must be the exact JCS encoding (key_transition_codec.ex:127-128).
+    # Canonical form: the protected segment must be the exact JCS encoding (spec/bap-v1.md §15 Authenticated
+    # key transitions).
     if not _bytes_equal(_unwrap(jcs_encode(h, bounds)), seg.protected_bytes):
         _fail("transition header: canonical")
     return kid
@@ -660,7 +662,8 @@ def _validate_anchor_payload(p: Tagged, payload_bytes: bytes, bounds: Bounds = M
     _require_int(p.v.get("sequence"), "sequence")
     _require_b64url_n(p.v.get("chain_hash"), "chain_hash", 32)
     _require_b64url_n(p.v.get("key_fingerprint"), "key_fingerprint", 32)
-    # Canonical form: the payload segment must be the exact JCS encoding (boundary_anchor_codec.ex:118-119).
+    # Canonical form: the payload segment must be the exact JCS encoding (spec/bap-v1.md §15 Boundary
+    # anchors).
     if not _bytes_equal(_unwrap(jcs_encode(p, bounds)), payload_bytes):
         _fail("anchor payload: canonical")
 
@@ -690,7 +693,8 @@ def _validate_transition_payload(p: Tagged, payload_bytes: bytes, bounds: Bounds
         _fail("transition: to_key_id bytes")
     if _KID_CHARSET.match(s) is None:
         _fail("transition: to_key_id charset")
-    # Canonical form: the payload segment must be the exact JCS encoding (key_transition_codec.ex:151-152).
+    # Canonical form: the payload segment must be the exact JCS encoding (spec/bap-v1.md §15 Authenticated key
+    # transitions).
     if not _bytes_equal(_unwrap(jcs_encode(p, bounds)), payload_bytes):
         _fail("transition payload: canonical")
 
@@ -881,7 +885,8 @@ def untrusted_key_locator(compact: bytes, bounds: Bounds | None = None) -> Resul
 
 
 def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLocator:
-    # Cross-vendor #13: the reference (v1.ex:21-34) decodes ONLY the protected segment — payload and
+    # Cross-vendor #13: the contract (spec/bap-v1.md §18) decodes ONLY the protected
+    # segment — payload and
     # signature are NOT decoded, interpreted, or independently size-checked. parse_compact decodes
     # all three, so a compact with a valid protected grant header but non-canonical payload/signature
     # bytes was wrongly rejected. Mirror the reference: split into exactly 3 segments, decode protected
@@ -897,7 +902,8 @@ def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLoc
     if len(parts) != 3:
         _fail("key_locator: three segments")
     protected_text = parts[0]
-    # Cross-vendor (key-locator empty segments): the reference (v1.ex:24) only requires exactly 3
+    # Cross-vendor (key-locator empty segments): the contract (spec/bap-v1.md §18) only
+    # requires exactly 3
     # segments and decodes the PROTECTED segment alone — payload and signature are bound to _ and
     # never decoded or size-checked, so empty payload/signature segments are ACCEPTED. Only an empty
     # PROTECTED segment is invalid (it must base64url-decode to a header). Do NOT reject empty
@@ -908,7 +914,8 @@ def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLoc
         _fail("key_locator: protected bound")
     protected_bytes = _unwrap(base64url_decode(protected_text, _unwrap(bounds_resolve(b, "decoded_segment_bytes"))))
     # Cross-vendor re-review Finding 3: thread the caller-resolved bounds into the JSON decode
-    # (reference v1.ex:27 Json.decode(header_bytes, bounds) — depth/total_nodes limits honor bounds).
+    # (spec/bap-v1.md §18 Json.decode(header_bytes, bounds) —
+    # depth/total_nodes limits honor bounds).
     h = _unwrap(json_decode(protected_bytes, b))
     h = _require_object_exact(h, ["alg", "typ", "kid"], "grant header")
     _require_string_lit(h, "alg", ALG, "grant header alg")
@@ -1003,10 +1010,12 @@ def _verify_grant_body(compact: bytes, trusted: TrustedIssuer, expected: Expecte
     if not isinstance(getattr(trusted, "key_id", None), str):
         _fail("verify_grant: issuer key id")
     # Cross-vendor #19: the reference requires is_integer(evaluation_time) and is_integer(clock_skew)
-    # (>= 0) — runtime.ex:522-523. Range-only `< 0` checks accept fractional times.
+    # (>= 0) — spec/bap-v1.md §16. Range-only `< 0` checks accept fractional
+    # times.
     if not _is_int(expected.evaluation_time):
         _fail("verify_grant: integer evaluation time")
-    # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (runtime.ex:186) and
+    # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (spec/bap-v1.md §16 Public
+    # verification contract) and
     # threads it into validate_expected_grant (clock_skew <= bounds.clock_skew) + every bound-sensitive
     # check below. A caller tightening via expected.bounds now actually takes effect.
     b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
@@ -1087,11 +1096,13 @@ def _check_envelope_body(
     if not isinstance(getattr(t, "key_id", None), str):
         _fail("check_envelope: issuer key id")
     # Cross-vendor #19: the reference requires is_integer(evaluation_time), is_integer(clock_skew)
-    # (>= 0), and proof_max_age > 0 (strictly positive) — runtime.ex:522-523,550-551. Range-only
+    # (>= 0), and proof_max_age > 0 (strictly positive) — spec/bap-v1.md §16 Public verification
+    # contract. Range-only
     # `< 0` checks accept fractional times and proof_max_age=0. The signed-time boundary is exact.
     if not _is_int(expected.evaluation_time):
         _fail("check_envelope: integer evaluation time")
-    # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (runtime.ex:204) and
+    # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (spec/bap-v1.md §16 Public
+    # verification contract) and
     # threads it into validate_expected_request (clock_skew, proof_max_age) + parse_grant + parse_proof
     # + every bound-sensitive claim check below. A caller tightening via expected.bounds now takes
     # effect across both the grant and the proof.
@@ -1121,7 +1132,8 @@ def _check_envelope_body(
     gnbf = _require_int(gp.v.get("nbf"), "nbf")
     gexp = _require_int(gp.v.get("exp"), "exp")
     # Cross-vendor #4: check_envelope must enforce grant-time coherence (iat<exp, nbf<exp), mirroring
-    # the reference's coherent_times? (runtime.ex:872-875) which fires at parse time. verify_grant
+    # the reference's coherent_times? (spec/bap-v1.md §16) which fires at parse
+    # time. verify_grant
     # already checks this; check_envelope had its own inline path that omitted it.
     if not (giat < gexp) or not (gnbf < gexp):
         _fail("check_envelope: grant times coherent")
@@ -1146,7 +1158,8 @@ def _check_envelope_body(
     if not isinstance(pp, JObject):
         _fail("check_envelope: proof payload")
     # ath = SHA-256(ASCII grant compact), gated by scan (shape+size, not canonicity) — mirrors
-    # CompactJws.hash (compact_jws.ex:60-66 scan then hash). The grant was already parsed above, so
+    # CompactJws.hash (spec/bap-v1.md §14 scan then hash). The grant was already
+    # parsed above, so
     # this scan is redundant for verify but matches the reference's hash gate exactly.
     _scan_compact(grant_compact, b)
     ath_raw = _unwrap(sha256(grant_compact))
@@ -1256,7 +1269,7 @@ def _encode_consumption_entry_body(entry: ConsumptionEntry, bounds: Bounds | Non
         _fail("encode_consumption_entry: chain_id bytes")
     if not _is_string_or_uri(entry.chain_id):
         _fail("encode_consumption_entry: chain_id string-or-uri")
-    # Genesis invariant (consumption_chain.ex:123 validate_entry): sequence 1 requires the all-zero
+    # Genesis invariant (spec/bap-v1.md §15 (rows) validate_entry): sequence 1 requires the all-zero
     # predecessor. The verifier re-checks this; the producer rejects pre-signing.
     if entry.sequence == 1 and not _bytes_equal(entry.previous_hash, DEFAULT_HASH):
         _fail("encode_consumption_entry: genesis predecessor")
@@ -1304,7 +1317,8 @@ def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
     _expected_int(chain.first_sequence, "check_chain: input first_sequence type")
     _expected_int(chain.last_sequence, "check_chain: input last_sequence type")
     _expected_int(chain.row_count, "check_chain: input row_count type")
-    # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (consumption_chain.ex
+    # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (spec/bap-v1.md §15
+    # Consumption rows
     # check_chain) and threads it into the row-count bound + every parse_row (chain_row_bytes). A
     # caller tightening via expected.bounds now takes effect.
     b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
@@ -1349,7 +1363,7 @@ def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
             _fail(f"check_chain row {i}: sequence")
         # valid_sequence?: sequence must be strictly positive (> 0). The encode_consumption_entry
         # producer already rejects sequence < 1, but the raw row stream is untrusted input here, so
-        # reject sequence 0 at verify time too (mirrors consumption_chain.ex:163 valid_sequence?).
+        # reject sequence 0 at verify time too (mirrors spec/bap-v1.md §15 (rows) valid_sequence?).
         if seq_v.v < 1:
             _fail(f"check_chain row {i}: sequence positive")
         prev_raw = _require_b64url_n(row.v.get("previous"), "previous", 32)
@@ -1357,7 +1371,8 @@ def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
             _fail(f"check_chain row {i}: previous link")
         commitment_raw = _require_b64url_n(row.v.get("commitment"), "commitment", 32)
         # Canonical re-encode: the input row bytes MUST byte-equal the canonical re-encoded form
-        # (mirrors consumption_chain.ex:96 parse_row `encode(entry).bytes == ^bytes`). This rejects
+        # (mirrors spec/bap-v1.md §15 (rows) parse_row `encode(entry).bytes == ^bytes`). This
+        # rejects
         # whitespace drift and member-order drift that would otherwise hash to a different chain link.
         re_encoded = _canonical_row_bytes(chain.chain_id, seq_v.v, prev_raw, commitment_raw, b)
         if not _bytes_equal(re_encoded, row_bytes):
@@ -1591,7 +1606,8 @@ def _proof_signing_input_body(
         "typ": JString(_unwrap(str_utf8(_proof_typ(profile)))),
     }
     # Producer ath: gate the grant compact by scan (shape+size, NOT base64url canonicity) before
-    # hashing it into `ath` — mirrors CompactJws.ath (compact_jws.ex:53-58 scan then hash). A
+    # hashing it into `ath` — mirrors CompactJws.ath (spec/bap-v1.md §14 scan then
+    # hash). A
     # caller-supplied non-compact grant must not be embedded as sha256(garbage) in the proof.
     _scan_compact(proof.grant_compact, b)
     ath_raw = _unwrap(sha256(proof.grant_compact))
@@ -1625,11 +1641,15 @@ def _jwk_to_tagged(jwk: OkpPublic) -> Tagged:
     return JObject(members)
 
 
-# 11. assemble_compact (REQ1-VERIFY-no-signer-callback; public /2 contract, spec/bap-v1.md § Public verification contract).
-# Mirrors runtime.ex:147-155 assemble_compact: assemble via the low-level assembler, then
-# validate_assembled_compact (runtime.ex:754-780) re-parses the composed compact per kind. The
+# 11. assemble_compact (REQ1-VERIFY-no-signer-callback; public /2 contract, spec/bap-v1.md § Public
+# verification contract).
+# Mirrors spec/bap-v1.md §16 assemble_compact: assemble via the low-level
+# assembler, then
+# validate_assembled_compact (spec/bap-v1.md §16) re-parses the composed compact
+# per kind. The
 # signing-input gates (kind↔typ, segment bounds, base64url payload, compact_bytes) come from
-# CompactJws.assemble's valid_signing_input? (compact_jws.ex:36,80-101). The public contract carries
+# CompactJws.assemble's valid_signing_input? (spec/bap-v1.md §14). The public
+# contract carries
 # no caller bounds, so the profile maximum (MAXIMUM_BOUNDS) is used. A mislabeled kind (typ ≠ kind),
 # oversized segment, non-base64url payload, or malformed payload content fails closed — the producer
 # must not mint bytes its own consumer (verify) would reject.
@@ -1653,7 +1673,8 @@ def _assemble_compact_for(
 ) -> Result[bytes]:
     def body() -> bytes:
         # ADR 0018 divergence closed (2026-08-18): the reference takes limits at assemble
-        # (runtime.ex:147-155 → CompactJws.assemble:34-48 — encoded segment bounds, signature
+        # (spec/bap-v1.md §16 → compact assembly — encoded segment
+        # bounds, signature
         # width ≤ signature_bytes, compact_bytes, all against Bounds.coerce(limits)); the SDK
         # previously hardcoded maximum. Absent bounds = maximum (backward compatible).
         b = _unwrap(coerce_bounds(bounds if bounds is not None else MAXIMUM_BOUNDS))
@@ -1722,7 +1743,7 @@ def _boundary_anchor_signing_input_body(anchor: BoundaryAnchorProducer, bounds: 
         _fail("anchor_signing_input: non-negative sequence")
     _require(len(anchor.chain_hash) == 32, "anchor_signing_input: chain_hash width")
     _require(len(anchor.public_key) == 32, "anchor_signing_input: public_key width")
-    # Genesis invariant (boundary_anchor_codec.ex:185-189 valid_anchor_binding?): sequence 0 is the
+    # Genesis invariant (spec/bap-v1.md §15 (anchors) valid_anchor_binding?): sequence 0 is the
     # chain root and requires the all-zero chain_hash. The verifier re-checks this; the producer
     # rejects pre-signing so a mis-bound genesis anchor cannot be minted.
     if anchor.sequence == 0 and not _bytes_equal(anchor.chain_hash, DEFAULT_HASH):
@@ -1806,18 +1827,18 @@ def encode_anchored_export(input_: AnchoredExportInput, expected: ExpectedExport
 
 
 def _encode_anchored_export_body(input_: AnchoredExportInput, expected: ExpectedExport) -> EncodedAnchoredExport:
-    # Validate inputs BEFORE framing (mirrors anchored_export_codec.ex:33-57 encode →
+    # Validate inputs BEFORE framing (mirrors spec/bap-v1.md §15 (archives) encode →
     # validate_expected_export + parse_expected_transitions + validate_expected_key_path). The parser
     # would reject the bytes a too-large input would produce; the producer rejects earlier.
     # BAP-09 #10/#11: resolve expected.bounds once and thread it through the encode-time bounds
     # checks so a caller tightening via expected.bounds takes effect (matches verify_anchored_export).
     b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
     _validate_export_inputs(input_, expected, b)
-    # Row chain re-check (anchored_export_codec.ex:37-39 — ConsumptionChain.check):
+    # Row chain re-check (spec/bap-v1.md §15 (archives) — ConsumptionChain.check):
     # the rows must verify against the expected boundaries before they are archived.
     # The row walk runs under the caller's OUTER bounds (the reference threads
     # %{expected.chain | bounds: bounds}); the chain's nested bounds, when present,
-    # must coerce-equal the outer (anchored_export_codec.ex:352-354). Correctness-lens
+    # must coerce-equal the outer (spec/bap-v1.md §15 (archives)). Correctness-lens
     # F1: resolving only the chain's own bounds let a tightened outer wrong-ACCEPT.
     _require_bounds_equal(expected.chain.bounds, b, "encode_anchored_export: chain bounds")
     _require_bounds_equal(expected.start_anchor.bounds, b, "encode_anchored_export: start anchor bounds")
@@ -1839,7 +1860,7 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
         ),
         "encode_anchored_export: rows chain",
     )
-    # Gated parses + full signed-field matches (anchored_export_codec.ex:40-52): the
+    # Gated parses + full signed-field matches (spec/bap-v1.md §15 (archives)): the
     # start anchor, the end anchor, and every transition go through the width+canonical
     # gated decode and match their expected values field-by-field.
     framed_signatures = [
@@ -1860,7 +1881,8 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     parts.extend(_frame(r) for r in input_.rows)
     parts.append(_frame(input_.end_anchor))
     # Validate the chunk list BEFORE materializing the joined archive (mirrors reference
-    # validate_chunks on the chunk list, anchored_export_codec.ex:69 — not a concatenated binary,
+    # validate_chunks on the chunk list, spec/bap-v1.md §15 (archives) — not a concatenated
+    # binary,
     # so an over-bound input rejects before the allocation).
     if len(parts) > _unwrap(bounds_resolve(b, "archive_chunks")):
         _fail("encode_anchored_export: archive_chunks")
@@ -1902,11 +1924,11 @@ def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str
     # canonicality after the matches (erratum 3).
     """Gated parse + full 7-field match of an anchor compact against its expected
     values (reference BoundaryAnchorCodec.parse + anchor_matches?,
-    anchored_export_codec.ex:40-42/:485-492). Encode never verifies a signature
+    spec/bap-v1.md §15 (archives)). Encode never verifies a signature
     (a producer, not an authority) — it mirrors the reference's structural gates
     (width, canonical form) and the signed-field match."""
     # The reference codec bounds every anchor compact at anchor_bytes
-    # (boundary_anchor_codec.ex:82) — stricter than parse_compact's whole-input
+    # (spec/bap-v1.md §15 (anchors)) — stricter than parse_compact's whole-input
     # compact_bytes ceiling. (The ENCODE path only — the standalone verify has
     # its own gates.)
     if len(compact) > _unwrap(bounds_resolve(b, "anchor_bytes")):
@@ -1942,9 +1964,9 @@ def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition,
     # Returns the decoded signature: encode_anchored_export gates every framed signature's
     # canonicality after the matches (erratum 3).
     """Gated parse + full 7-field match of a transition compact (reference
-    KeyTransitionCodec.parse + transition_matches?, anchored_export_codec.ex:443-504)."""
+    KeyTransitionCodec.parse + transition_matches?, spec/bap-v1.md §15 (archives))."""
     # Same anchor_bytes ceiling the reference enforces on transitions
-    # (key_transition_codec.ex:114).
+    # (spec/bap-v1.md §15 (transitions)).
     if len(compact) > _unwrap(bounds_resolve(b, "anchor_bytes")):
         _fail(f"encode_anchored_export: transition {i} anchor_bytes")
     seg = _parse_compact(compact, b)
@@ -1974,17 +1996,18 @@ def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition,
 
 
 def _validate_export_inputs(input_: AnchoredExportInput, expected: ExpectedExport, b: Bounds) -> None:
-    """Encode-time input validation (mirrors anchored_export_codec.ex validate_expected_export +
+    """Encode-time input validation (mirrors spec/bap-v1.md §15 (archives) validate_expected_export +
     validate_chunks): the transition count, chain range coherence, anchor bindings, and the key-path
     invariants must hold before framing. The parser enforces all of this at verify time; the producer
     must not mint bytes its own consumer would reject."""
     chain = expected.chain
-    # Transition count bound (anchored_export_codec.ex:360 transition_count <= bounds.key_transitions).
+    # Transition count bound (spec/bap-v1.md §15 (archives) transition_count <=
+    # bounds.key_transitions).
     if len(input_.transitions) > _unwrap(bounds_resolve(b, "key_transitions")):
         _fail("encode_anchored_export: transition_count bound")
     if len(expected.transitions) != len(input_.transitions):
         _fail("encode_anchored_export: transition count")
-    # Anchor bindings (anchored_export_codec.ex:364-371): start spans first_sequence-1 with the
+    # Anchor bindings (spec/bap-v1.md §15 (archives)): start spans first_sequence-1 with the
     # chain's previous_hash; end spans last_sequence with the chain's last_hash.
     if expected.start_anchor.sequence != chain.first_sequence - 1:
         _fail("encode_anchored_export: start sequence")
@@ -1994,7 +2017,7 @@ def _validate_export_inputs(input_: AnchoredExportInput, expected: ExpectedExpor
         _fail("encode_anchored_export: end sequence")
     if not _bytes_equal(expected.end_anchor.chain_hash, chain.last_hash):
         _fail("encode_anchored_export: end chain_hash")
-    # All transitions + both anchors carry the chain_id (anchored_export_codec.ex:361-363).
+    # All transitions + both anchors carry the chain_id (spec/bap-v1.md §15 (archives)).
     for i, t in enumerate(expected.transitions):
         if t.chain_id != chain.chain_id:
             _fail(f"encode_anchored_export: transition {i} chain_id")
@@ -2050,13 +2073,13 @@ def verify_historical_anchor(compact: bytes, key: HistoricalPublicKey, expected:
 def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, expected: ExpectedAnchor) -> AnchorFacts:
     _require(len(key.public_key) == 32, "verify_historical_anchor: key width")
     # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check, as
-    # the reference does (boundary_anchor_codec.ex parses the compact + payload under bounds).
+    # the reference does (spec/bap-v1.md §15 (anchors) parses the compact + payload under bounds).
     b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
     # Key-window endpoints magnitude-bounded under the resolved bounds
-    # (context_validation.ex valid_time? — the Rust round-4 parity fix; without
+    # (spec/bap-v1.md §16 valid_time? — the Rust round-4 parity fix; without
     # this the SDKs diverge on in-window times with out-of-magnitude windows).
     # The anchor_bytes compact ceiling at the STANDALONE verify entry (the
-    # reference's parse guard, boundary_anchor_codec.ex:81-82 — cross-vendor
+    # reference's parse guard, spec/bap-v1.md §15 (anchors) — cross-vendor
     # round 12: the encode helper's check does not run on this path).
     if len(compact) > _unwrap(bounds_resolve(b, "anchor_bytes")):
         _fail("verify_historical_anchor: anchor_bytes")
@@ -2137,7 +2160,7 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
     b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
     # Key-window endpoints magnitude-bounded (both keys — the Rust parity).
     # The anchor_bytes compact ceiling at the STANDALONE verify entry
-    # (key_transition_codec.ex:114 — cross-vendor round 12).
+    # (spec/bap-v1.md §15 (transitions) — cross-vendor round 12).
     if len(compact) > _unwrap(bounds_resolve(b, "anchor_bytes")):
         _fail("verify_key_transition: anchor_bytes")
     _ovf = _expected_int(old_key.valid_from, "verify_key_transition: valid_from type")
@@ -2240,7 +2263,7 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # ADR 0017 clause-3 hoist (2026-08-18, exception 2 closed): expected-struct
     # well-formedness BEFORE the digest. The reference validates chain + both anchors +
     # transitions (ContextValidation.expected_chain/expected_anchor/expected_transition via
-    # validate_expected_export, anchored_export_codec.ex:88-98/:345-371) before key shapes,
+    # validate_expected_export, spec/bap-v1.md §15 (archives)) before key shapes,
     # chunks, and hash_chunks; the SDK previously ran these gates only post-digest
     # (verdict-invariant by subsumption — the WORK ordering is the contract, and the
     # malformed-expected legs assert zero sha256 calls).
@@ -2342,7 +2365,7 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
             _fail("verify_anchored_export: key valid_before ordering")
 
     # Static expected-side bindings (reference validate_expected_anchored_export →
-    # validate_expected_export, anchored_export_codec.ex:362-371, reached at verify
+    # validate_expected_export, spec/bap-v1.md §15 (archives), reached at verify
     # :92/:387): the caller's expected anchors + transitions belong to the expected
     # chain (cross-vendor round 2: none of the six were enforced at verify).
     if expected.start_anchor.chain_id != expected.chain.chain_id:
@@ -2362,12 +2385,12 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
             _fail(f"verify_anchored_export: transition {_i} chain_id")
 
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once
-    # (anchored_export_codec.ex:84-185) and threads it into validate_chunks (archive_chunks,
+    # (spec/bap-v1.md §15 (archives)) and threads it into validate_chunks (archive_chunks,
     # archive_bytes), parse_archive (frame reads), and every row check. The inner anchors/transitions
     # carry their own bounds (used by their own compact parsers). A caller tightening via
     # expected.bounds now takes effect.
     b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
-    # Cross-vendor (nested bounds pinning): the reference (anchored_export_codec.ex:352-354, :404-406)
+    # Cross-vendor (nested bounds pinning): the contract (spec/bap-v1.md §15 (archives))
     # pins every nested bounds to the top-level resolved bounds via `{:ok, ^bounds} <- Bounds.coerce(x.bounds)`.
     # The SDK previously preferred the outer bounds and silently discarded the nested value; pin them
     # explicitly so a mismatch fails closed, matching the reference.
@@ -2383,12 +2406,12 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
         _fail("verify_anchored_export: version shape")
     if archived.version != expected.object_version:
         _fail("verify_anchored_export: object version")
-    # Validate the chunk list BEFORE concatenation (mirrors anchored_export_codec.ex:101-102,333-342
+    # Validate the chunk list BEFORE concatenation (mirrors spec/bap-v1.md §15 (archives)
     # validate_chunks): each chunk nonempty, count < archive_chunks, total ≤ archive_bytes. Hashing
     # happens after the shape is validated.
     _validate_chunks(archived.chunks, b)
     # Stream the digest over the chunks WITHOUT materializing the whole archive first (reference
-    # hash_chunks, anchored_export_codec.ex:705-714 — incremental SHA-256 per chunk, no concat). An
+    # hash_chunks, spec/bap-v1.md §15 (archives) — incremental SHA-256 per chunk, no concat). An
     # inauthentic/oversized archive is rejected at the digest compare before the parse materializes
     # the bytes (BAP-15 Rust precedent, v1.rs:30-40). archive_bytes is already enforced by
     # _validate_chunks (running total), so no post-materialization byte bound is needed.
@@ -2429,13 +2452,14 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # takes effect in the nested anchor/transition verification (not just the nested struct's bounds).
     _verify_anchor_compact(parsed.start, key_chain.keys[0], expected.start_anchor, "verify_anchored_export start", b)
     _verify_anchor_compact(parsed.end, key_chain.keys[-1], expected.end_anchor, "verify_anchored_export end", b)
-    # Key-path invariants (anchored_export_codec.ex:506-572 validate_expected_key_path): the expected
+    # Key-path invariants (spec/bap-v1.md §15 (archives) validate_expected_key_path): the
+    # expected
     # transition list must form a strictly-increasing effective_at sequence with no fingerprint cycle,
     # and the end anchor must close the path with a chronologically-non-decreasing anchored_at.
     _validate_key_path(expected.start_anchor, expected.transitions, expected.end_anchor)
     for i, tr in enumerate(parsed.transitions):
         _verify_transition_compact(tr, key_chain.keys[i], key_chain.keys[i + 1], expected.transitions[i], f"verify_anchored_export transition {i}", b)
-    # Chronology over the ACTUAL anchored times (anchored_export_codec.ex:138-154 verify_transitions
+    # Chronology over the ACTUAL anchored times (spec/bap-v1.md §15 (archives) verify_transitions
     # + chronological_end?): each transition's effective_at must be strictly greater than the previous
     # anchor/transition time, and the end anchor's anchored_at must be >= the last transition's
     # effective_at (>= the start anchor's anchored_at for the no-transition case — covered by
@@ -2711,7 +2735,7 @@ def _read_frame(data: bytes, cursor: int, maximum: int, ctx: str) -> tuple[bytes
 def _validate_key_path(
     start: ExpectedAnchor, transitions: Sequence[ExpectedKeyTransition], end: ExpectedAnchor
 ) -> None:
-    """Validate the expected key-transition path (anchored_export_codec.ex:506-572
+    """Validate the expected key-transition path (spec/bap-v1.md §15 (archives)
     validate_expected_key_path). The no-transition path requires the start and end anchors to share
     key id + fingerprint with a chronologically-non-decreasing end anchored_at. The transition path
     requires: each transition's current key matches the running key; effective_at is strictly
@@ -2726,7 +2750,7 @@ def _validate_key_path(
     current_key_id = start.key_id
     current_fp = start.key_fingerprint
     previous_time = start.anchored_at
-    # seen is seeded with the start anchor's fingerprint (anchored_export_codec.ex:523).
+    # seen is seeded with the start anchor's fingerprint (spec/bap-v1.md §15 (archives)).
     seen: list[bytes] = [start.key_fingerprint]
     for i, t in enumerate(transitions):
         if t.current_key_id != current_key_id or not _bytes_equal(t.current_key_fingerprint, current_fp):
@@ -2750,7 +2774,7 @@ def _validate_key_path(
 
 
 def _validate_chunks(chunks: Sequence[bytes], bounds: Bounds = MAXIMUM_BOUNDS) -> None:
-    """Validate the chunk list BEFORE concatenation (anchored_export_codec.ex:333-342
+    """Validate the chunk list BEFORE concatenation (spec/bap-v1.md §15 (archives)
     validate_chunks): at least one chunk, each chunk nonempty, count < archive_chunks, running total
     ≤ archive_bytes."""
     # (chunk TYPE is owned by the _closed_shape gate — tuple[bytes, ...]; cross-vendor
@@ -2775,7 +2799,7 @@ def _validate_chunks(chunks: Sequence[bytes], bounds: Bounds = MAXIMUM_BOUNDS) -
 def _require_bounds_equal(nested: Bounds | None, top: Bounds, ctx: str) -> None:
     """Pin a nested expected.bounds to the top-level resolved bounds (cross-vendor nested-bounds).
 
-    The reference (anchored_export_codec.ex:352-354) pins nested bounds via
+    The contract (spec/bap-v1.md §15 (archives)) pins nested bounds via
     ``{:ok, ^bounds} <- Bounds.coerce(x.bounds)``. When a nested bounds is present it must coerce
     cleanly AND resolve to the same value as ``top`` for every limit. An absent nested bounds is valid
     only when the top is also maximum (no tightening); a tightened top requires every nested struct to
@@ -2784,7 +2808,7 @@ def _require_bounds_equal(nested: Bounds | None, top: Bounds, ctx: str) -> None:
     if nested is None:
         # Gate on EFFECTIVE tightening, not override-map size: an identity override
         # (value == the maximum) merges to the full maximum struct in the reference
-        # (bounds.ex merge), so the pin's struct equality accepts an absent nested
+        # (spec/bap-v1.md §17 merge), so the pin's struct equality accepts an absent nested
         # bounds (cross-vendor finding: map-size gating wrong-rejected identity).
         for _k, _v in top.overrides.items():
             if _v != MAXIMA[_k]:

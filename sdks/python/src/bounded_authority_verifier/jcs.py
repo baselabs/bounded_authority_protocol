@@ -59,7 +59,7 @@ def jcs_encode(value: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
 
 def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int) -> int:  # noqa: RET503
     """Emit one tagged value as RFC 8785 bytes, enforcing every per-node resource bound DURING
-    encode (mirrors jcs.ex:27-101 encode_value). Returns the updated node count.
+    encode (spec/bap-v1.md §8). Returns the updated node count.
 
     Per-node invariants (the reference enforces these at encode, not just on the final byte total):
       scalars (null/bool/int/float/string): level <= depth (NOT <); int/float magnitude;
@@ -82,9 +82,8 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int)
         out += b"true" if value.v else b"false"
         return _next_node(nodes, bounds)
     if isinstance(value, JInt):
-        # Cross-vendor F3: the reference guard is `when is_integer(value)` (jcs.ex:38); a non-integer
-        # int-tag value (1.5) or a bool (isinstance(True, int) is True in Python) must fail closed, not
-        # canonicalize to "1.5"/"True". Python bool is an int subclass — exclude it explicitly.
+        # spec/bap-v1.md §8 preserves the integer tag. Python bool is an int
+        # subclass, so it must be excluded along with other noninteger values.
         mag = _unwrap(bounds_resolve(bounds, "integer_magnitude"))
         if isinstance(value.v, bool) or not isinstance(value.v, int) or level > depth or abs(value.v) > mag:
             _fail("jcs: integer bound")
@@ -97,11 +96,8 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int)
         out += _unwrap(str_utf8(_format_float(value.v)))
         return _next_node(nodes, bounds)
     if isinstance(value, JString):
-        # The decoder already validated UTF-8 + string_bytes; re-check here so a programmatically-
-        # built over-bound value (not from the decoder) is rejected at encode, matching jcs.ex:57-59.
-        # Cross-vendor (JCS UTF-8): the reference guard `String.valid?(value)` (jcs.ex:58) rejects
-        # invalid UTF-8. A programmatically-built JString with invalid bytes would otherwise reach
-        # _escape_string -> utf8_str and raise UnicodeDecodeError past the closed-Result contract.
+        # Programmatically constructed strings must satisfy the same UTF-8 and
+        # byte bounds as decoded strings (spec/bap-v1.md §8).
         if level > depth or len(value.v) > _unwrap(bounds_resolve(bounds, "string_bytes")) or not _unwrap(is_valid_utf8(value.v)):
             _fail("jcs: string bound")
         _escape_string(value.v, out)
@@ -156,14 +152,10 @@ def _format_int(n: int) -> str:
 
 
 def _format_float(n: float) -> str:
-    # RFC 8785 §3.2.2: the ECMAScript Number.prototype.toString serialization (shortest
-    # round-tripping decimal, fixed-vs-exponent thresholds, lowercase unpadded exponent). Python's
-    # repr() gives the shortest digits BUT diverges on formatting (repr(1.0)=="1.0", repr(1e-7)==
-    # "1e-07", repr(1e16)=="1e+16"). We port the Elixir reference's ecmascript_number/1 algorithm
-    # (jcs.ex:151-204): take repr's shortest digits, then re-format to the ECMAScript fixed/scientific
-    # thresholds. Without this, a Python verifier computes a different request digest (ba_req) than an
-    # Elixir/TS signer for ANY float-valued cast_argument — a cross-implementation divergence the
-    # corpus cannot express (its digest cases use integer-only arguments).
+    # RFC 8785 §3.2.2 and spec/bap-v1.md §8 require ECMAScript number text.
+    # Python repr supplies shortest round-tripping digits, but uses different
+    # exponent padding and fixed/scientific thresholds. Reformat those digits
+    # with ECMAScript thresholds so request digests agree across implementations.
     if n != n or n in (float("inf"), float("-inf")):  # NaN / inf
         _fail("jcs: non-finite float")
     if n == 0.0:
@@ -171,7 +163,7 @@ def _format_float(n: float) -> str:
         return "0"
     sign = "-" if n < 0.0 else ""
     magnitude = -n if n < 0.0 else n
-    # repr gives the shortest round-tripping decimal (matches :erlang.float_to_binary [:short]).
+    # repr gives the shortest round-tripping decimal digits.
     raw = repr(magnitude)
     mantissa, exponent = _split_exponent(raw)
     digits, decimal_index = _decimal_digits(mantissa, exponent)
@@ -261,12 +253,8 @@ def _escape_string(src_bytes: bytes, out: bytearray) -> None:
         elif cp == 0x22 or cp == 0x5C:
             out += _SHORT_ESCAPES[cp]
         elif cp == 0x7F:
-            # DEL (0x7F): RFC 8785 serializes strings per ECMAScript JSON.stringify, which escapes
-            # only U+0000–U+001F plus quote (0x22) and backslash (0x5c) — so raw DEL is RFC-COMPLIANT,
-            # NOT an RFC deviation. The Elixir reference (the contract per AGENTS rule 7) emits RAW
-            # 0x7f here (jcs.ex:147 has no DEL case, so the general codepoint branch passes it through
-            # raw), and the SDK matches those bytes for identical signed inputs and request digests.
-            # Verified: Jcs.encode("x<DEL>y") -> raw 0x7f.
+            # RFC 8785 §3.2.2.2 escapes controls U+0000–U+001F, quote and
+            # backslash. DEL is emitted raw, as required by spec/bap-v1.md §8.
             out.append(0x7F)
         else:
             _append_utf8_bytes(cp, out)

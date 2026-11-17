@@ -16,8 +16,8 @@ private-key access or custody and reads no clock.
 
 Its behavior is defined by the specifications ([v1](../../spec/bap-v1.md),
 [v2](../../spec/bap-v2.md), [v3](../../spec/bap-v3.md), and the sibling profiles under
-[`spec/`](../../spec/)) and the certified conformance corpora; source comments cross-reference
-the Elixir reference implementation for traceability.
+[`spec/`](../../spec/)) and the certified conformance corpora; source comments cite
+the tracked normative specifications and independent conformance corpora.
 
 ## Status
 

@@ -55,10 +55,8 @@ def _parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegme
     protected_bytes = _unwrap(base64url_decode(protected_text, _unwrap(bounds_resolve(b, "decoded_segment_bytes"))))
     payload_bytes = _unwrap(base64url_decode(payload_text, _unwrap(bounds_resolve(b, "decoded_segment_bytes"))))
     signature = _unwrap(base64url_decode(signature_text))
-    # Decoded signature-width gate (runtime.ex:237 parse_grant, :259 parse_proof,
-    # boundary_anchor_codec.ex:88, key_transition_codec.ex:120 all enforce byte_size(signature) ==
-    # signature_bytes). scan_compact (the ath/hash gate) intentionally does NOT — it mirrors
-    # CompactJws.scan (shape+size only); the decoded-width check belongs to the decode path.
+    # spec/bap-v1.md §14 and §16 require the fixed decoded signature width.
+    # The hash-only scan checks compact shape and size; decode checks the width.
     if len(signature) != _unwrap(bounds_resolve(b, "signature_bytes")):
         _fail("compact: signature width")
     signing_input = protected_text + bytes([_DOT]) + payload_text
@@ -73,12 +71,10 @@ def _parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegme
 
 
 def _scan_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
-    """Faithful port of the reference ``CompactJws.scan`` (compact_jws.ex:16-27): the shape+size gate
-    that ``ath``/``hash`` run BEFORE hashing a compact. Validates structure + bounds only — NOT
-    base64url canonicity (canonicity is the full verify path's job via _parse_compact). The producer
-    ath (proof signing input) and the verify grant-hash both gate on this so a non-compact grant
-    (wrong segment count, oversized, dotted signature) is rejected rather than hashed. Mirrors the
-    Rust _scan_compact gate added in the BAP-15 closeout.
+    """Validate compact shape and size before hashing (spec/bap-v1.md §14).
+
+    Canonical base64url and decoded signature width belong to the full decode
+    path. A malformed or oversized compact must be rejected before its hash is used.
     """
     b = _unwrap(coerce_bounds(bounds))
     if len(data) > _unwrap(bounds_resolve(b, "compact_bytes")):
@@ -121,15 +117,11 @@ _KINDS = (
 
 
 def assemble_segments(signing_input: SigningInput, signature: bytes) -> Result[bytes]:
-    """``assemble_segments``: the LOW-LEVEL compact assembler (mirrors CompactJws.assemble's byte
-    assembly, compact_jws.ex:41-43). Validates only the kind closed-set + 64-byte signature width,
-    then concatenates protected.payload.base64url(signature). It does NOT validate the signing-input
-    header/payload content — that is the v1.py ``assemble_compact`` FAÇADE's job (re-parse per kind,
-    runtime.ex:151 validate_assembled_compact). Test helpers and conformance use this to build
-    compacts freely; the public contract is the façade (assemble_compact in v1.py).
+    """Assemble protected.payload.base64url(signature) (spec/bap-v1.md §14).
 
-    REQ1-VERIFY-no-signer-callback: takes a signature, never a key. Returns Result, mirroring the
-    Elixir ``{:ok, binary} | {:error, :invalid}``.
+    This internal byte assembler checks the kind and signature canonicality. Public
+    profile producers also reparse the assembled header and payload under §16.
+    REQ1-VERIFY-no-signer-callback: it takes a signature, never a key.
     """
     try:
         if signing_input.kind not in _KINDS:

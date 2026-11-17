@@ -69,9 +69,9 @@ class EnvelopeFacts:
 
 @dataclass(frozen=True)
 class ChainFacts:
-    """ChainFacts (ADR 0004:84-87; REQ1-CHAIN-facts-shape): value-bearing, trust=not_evaluated.
+    """Consumption-row facts with trust=not_evaluated.
 
-    Field set mirrors the Elixir reference ChainFacts (chain_facts.ex) exactly.
+    Fields follow spec/bap-v1.md §16.
     """
 
     version: int
@@ -93,10 +93,10 @@ class ChainFacts:
 
 @dataclass(frozen=True)
 class AnchorFacts:
-    """AnchorFacts (spec/bap-v1.md § Historical anchor verify): trust=not_evaluated.
+    """Boundary-anchor facts with trust=not_evaluated.
 
-    Field set mirrors the Elixir reference AnchorFacts (anchor_facts.ex) exactly. The reference
-    carries NO key_id (only the key_fingerprint).
+    Fields follow spec/bap-v1.md §16: the key binding
+    is its fingerprint, without a key identifier.
     """
 
     version: int
@@ -118,10 +118,10 @@ class AnchorFacts:
 
 @dataclass(frozen=True)
 class KeyTransitionFacts:
-    """KeyTransitionFacts (ADR 0004:44-55): trust=not_evaluated.
+    """Authenticated key-transition facts with trust=not_evaluated.
 
-    Field set mirrors the Elixir reference KeyTransitionFacts (key_transition_facts.ex) exactly. The
-    reference carries fingerprints only (current_/next_key_fingerprint), no key ids.
+    Fields follow spec/bap-v1.md §16: key bindings
+    are current and next fingerprints, without key identifiers.
     """
 
     version: int
@@ -142,9 +142,9 @@ class KeyTransitionFacts:
 
 @dataclass(frozen=True)
 class AnchoredExportFacts:
-    """AnchoredExportFacts (spec/bap-v1.md): the ONLY facts type with an authorization field.
+    """Anchored-export facts carrying both trust and authorization=not_evaluated.
 
-    Field set mirrors the Elixir reference AnchoredExportFacts (anchored_export_facts.ex) exactly.
+    Fields follow spec/bap-v1.md §16.
     """
 
     version: int

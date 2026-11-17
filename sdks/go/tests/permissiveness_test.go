@@ -1024,7 +1024,7 @@ func loadKindCompact(t *testing.T, surface, id string) string {
 // grant/anchor/transition payload) must be rejected. Removing the
 // decodeGrantPayload / reparse{Anchor,Transition}Payload calls in v2.go's
 // AssembleCompact reddens exactly this leg. Mirrors the Elixir reference's
-// validate_assembled_compact (v2/runtime.ex).
+// validate_assembled_compact (spec/bap-v1.md §16).
 func TestPermissiveSuccessorAssemblyRevalidates(t *testing.T) {
 	forged := []byte(`{"aud":"a"}`)
 	sig := make([]byte, 64)
@@ -1076,7 +1076,7 @@ func TestPermissiveSuccessorAssemblyRevalidates(t *testing.T) {
 
 	// Genesis leg: a JCS-canonical, closed-member anchor payload with
 	// sequence 0 and a NON-zero chain hash — the reference's
-	// BoundaryAnchorCodec.parse genesis binding (boundary_anchor_codec.ex:189).
+	// BoundaryAnchorCodec.parse genesis binding (spec/bap-v1.md §15 (anchors)).
 	// Removing the sequence-0/zero-hash check in reparseAnchorPayload reddens
 	// exactly this leg.
 	anchorObj, ok := func() (v.Obj, bool) {

@@ -31,7 +31,7 @@ use crate::types::SigningInput;
 /// Compose the 3-segment compact serialization from a signing input + raw
 /// signature — the internal composer. The public [`crate::assemble_compact`]
 /// (re-exported from the v1 façade) wraps this with per-kind content validation
-/// (the reference `validate_assembled_compact`, runtime.ex:151).
+/// (the reference `validate_assembled_compact`, spec/bap-v1.md §16).
 ///
 /// Returns
 /// `protected_segment || "." || payload_segment || "." || base64url(signature)`.
@@ -157,7 +157,8 @@ mod tests {
 
     #[test]
     fn assemble_rejects_non_canonical_or_empty_segment() {
-        // validate_assembled_compact (reference runtime.ex:151): the composed
+        // validate_assembled_compact (spec/bap-v1.md §16): the
+        // composed
         // compact must be three canonical base64url segments. A caller-supplied
         // protected segment carrying standard-alphabet `+` (NOT base64url) or an
         // empty segment is rejected, not composed into a malformed compact.

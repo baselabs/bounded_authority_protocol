@@ -41,7 +41,9 @@ Their verification facades return facts or a single value-free rejection, never 
 decision. Facts exclude raw credentials and secrets; field-redacted display is a separate
 requirement, with the current rendering limitations listed below.
 Their behavior is defined by the specifications and the corpora; the in-repository SDKs' source
-comments cross-reference the Elixir reference implementation for traceability.
+comments cite the tracked normative specifications and independent conformance corpora.
+ADR 0014 records the packaging and support
+decisions.
 
 ## Known gaps
 

@@ -78,7 +78,8 @@ pub fn jcs_encode(value: &JsonValue, bounds: &Bounds) -> Result<Vec<u8>> {
 /// `integer_magnitude`/`float_magnitude`, `string_bytes`, `array_items`,
 /// `object_members`, `key_bytes`, duplicate-key rejection, non-finite-float
 /// rejection, and the `jcs_bytes` output ceiling (the `(d)`-class closure,
-/// ADR 0014 D6/D7; mirrors the reference `jcs.ex` `encode_value` guard set).
+/// ADR 0014 D6/D7; mirrors the `spec/bap-v1.md §8`
+/// `encode_value` guard set).
 /// `depth` is the container nesting level (root container = 1), mirroring
 /// [`crate::json::json_decode`]'s accounting.
 fn encode_value(
@@ -98,7 +99,8 @@ fn encode_value(
         JsonValue::Bool(true) => out.extend_from_slice(b"true"),
         JsonValue::Bool(false) => out.extend_from_slice(b"false"),
         JsonValue::Int(n) => {
-            // Magnitude bound (reference jcs.ex:40-41): a hand-built integer
+            // Magnitude bound (spec/bap-v1.md §8): a
+            // hand-built integer
             // outside ±integer_magnitude is rejected at encode, matching the
             // decoder. The decoded path never carries such a value.
             let mag = bounds.integer_magnitude() as i64;
@@ -108,7 +110,8 @@ fn encode_value(
             encode_int(*n, out);
         }
         JsonValue::Float(f) => {
-            // Finite + magnitude (reference jcs.ex:49-50): non-finite (the F2
+            // Finite + magnitude (spec/bap-v1.md §8):
+            // non-finite (the F2
             // tripwire) OR over-magnitude floats are rejected before formatting.
             let mag = bounds.float_magnitude() as f64;
             if !f.is_finite() || f.abs() > mag {
@@ -117,7 +120,8 @@ fn encode_value(
             encode_float(*f, out)?;
         }
         JsonValue::String(s) => {
-            // byte_size bound (reference jcs.ex:58). A Rust `String` is valid
+            // byte_size bound (spec/bap-v1.md §8). A Rust
+            // `String` is valid
             // UTF-8 by construction, so the reference's String.valid? check is
             // structurally guaranteed here.
             if s.len() as u64 > bounds.string_bytes() {
@@ -129,7 +133,8 @@ fn encode_value(
             if depth > bounds.depth() {
                 return Err(Invalid);
             }
-            // item-count bound (reference jcs.ex:65 length_bounded?).
+            // item-count bound (spec/bap-v1.md §8
+            // length_bounded?).
             if items.len() as u64 > bounds.array_items() {
                 return Err(Invalid);
             }
@@ -146,12 +151,14 @@ fn encode_value(
             if depth > bounds.depth() {
                 return Err(Invalid);
             }
-            // member-count bound (reference jcs.ex:77).
+            // member-count bound (spec/bap-v1.md §8).
             if members.len() as u64 > bounds.object_members() {
                 return Err(Invalid);
             }
-            // Per-member key-width bound (reference jcs.ex:83) AND duplicate-key
-            // rejection (reference jcs.ex:92): a hand-built Object can carry
+            // Per-member key-width bound (spec/bap-v1.md §8 JSON decoding and canonical
+            // serialization) AND duplicate-key
+            // rejection (spec/bap-v1.md §8): a hand-built
+            // Object can carry
             // duplicate names (the Vec carrier allows it); the reference rejects
             // any object whose member-name set is smaller than its length.
             // BTreeSet (deterministic): a std hash-set's RandomState reads OS
@@ -393,7 +400,8 @@ mod tests {
     fn float_over_magnitude_is_rejected_at_encode() {
         // 1e20 and 1e21 exceed the float magnitude bound (±2^53−1 ≈ 9.0e15), so
         // jcs_encode rejects them — the magnitude half of the (d)-class
-        // per-node closure (reference jcs.ex:49-50). NOTE: these values were
+        // per-node closure (spec/bap-v1.md §8). NOTE:
+        // these values were
         // previously used to exercise ryu-js's e≥21 scientific threshold, but
         // that threshold is UNREACHABLE from within-magnitude floats (the
         // largest representable float has decimal exponent ≈ 15.95 — see

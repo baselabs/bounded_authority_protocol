@@ -2,7 +2,7 @@
 """Library-path purity linter for ``bounded_authority_verifier`` (ADR 0014 D8).
 
 Forbids I/O + clock + RNG + network + filesystem imports/calls in ``src/`` — the analog of the
-Elixir ``architecture_gate.exs`` purity rules for the library path. A stray ``datetime.now()`` /
+repository architecture purity rules for the library path. A stray ``datetime.now()`` /
 ``time.time()`` / ``random.random()`` / ``open(...)`` / ``socket.*`` / ``subprocess.*`` /
 ``os.environ`` / ``urllib.request`` / ``http.client`` in the verify path fails it.
 

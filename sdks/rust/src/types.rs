@@ -17,11 +17,9 @@
 //! cryptographic widths (`[u8; 32]` / `[u8; 64]`) are enforced as array types,
 //! not stored in [`Bounds`] (`REQ1-BOUNDS-fixed-widths`).
 //!
-//! Derived first-hand from `spec/bap-v1.md` § Public verification contract
-//! (lines 291–373) and § Consumption chain and anchored export (lines 443–465),
-//! `docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md`,
-//! and the conformance corpus under `priv/conformance/v1/corpus/cases/` — NOT
-//! from any sibling-SDK or Elixir source (ADR 0014 D5).
+//! Input shapes follow `spec/bap-v1.md` §16 Public verification contract and
+//! §15 Consumption chain and anchored export, with independent byte examples
+//! in the conformance corpus under `priv/conformance/v1/corpus/cases/`.
 
 use crate::bounds::Bounds;
 use crate::error::{Invalid, Result};

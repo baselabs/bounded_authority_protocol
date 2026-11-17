@@ -511,10 +511,9 @@ func DecodeAttestation(compact string, bounds *Bounds) (d AttestationDecoded, er
 }
 
 // VerifyAttestation verifies a raw attestation compact against the exact
-// trusted attestor and expected context (the Go spelling of the citation
-// symbol BoundedAuthorityProtocol.RoleAttestation.V1.verify_attestation/2,
-// REQ-RA1-API-namespace). It proves the closed sets and canonical bytes, the
-// header kid match and the Ed25519 signature under the attestor public key,
+// trusted attestor and expected context (spec/bap-role-attestation-v1.md
+// §4 Public verification contract, REQ-RA1-API-namespace). It proves the
+// closed sets and canonical bytes, the header kid match and the Ed25519 signature under the attestor public key,
 // the expected subject binding, non-self-attestation, attestor-window
 // containment, and the caller's now within [nbf, exp); any failure is
 // exactly ErrInvalid (REQ-RA1-VERIFY-fail-closed). The result is closed,

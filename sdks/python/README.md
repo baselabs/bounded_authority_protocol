@@ -16,7 +16,7 @@ Already-trusted public keys, expected context, and time are explicit inputs. The
 private-key access or custody and reads no clock.
 
 Its behavior is defined by the [specifications][specs] and the certified conformance corpora;
-source comments cross-reference the Elixir reference implementation for traceability.
+source comments cite the tracked normative specifications and independent conformance corpora.
 
 [specs]: https://github.com/baselabs/bounded_authority_protocol/tree/main/spec
 

@@ -3,7 +3,7 @@
 
 Enumerates the SDK's runtime dependency tree and fails if any package license is outside the
 Apache-2.0/BSD/MIT/ISC-compatible allowlist (AGENTS rule 10) — the analog of the Elixir
-``check_dependency_licenses.exs`` for the SDK tree. The ``cryptography`` Apache-2.0/BSD claim is
+the repository dependency-license check for the SDK tree. The ``cryptography`` Apache-2.0/BSD claim is
 verified by this gate, not by author assertion.
 
 Uses ``importlib.metadata`` to resolve installed distributions + their licenses. Run in the venv

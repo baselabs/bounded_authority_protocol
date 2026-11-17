@@ -360,8 +360,8 @@ def _parse_number(ctx: _Ctx) -> Tagged:
         # REQ1-JSON-raw-lexeme: check the magnitude of the RAW lexeme by decimal arithmetic BEFORE
         # float() conversion. A lexeme like "9007199254740991.0001" rounds to the max binary64 value
         # under float(), so a post-conversion abs(n) > MAX check accepts it — defeating the exact
-        # bound. The reference (json.ex magnitude_within?) compares the lexeme's significant digits
-        # against the maximum's digit string. Mirror that here.
+        # bound. Compare the raw significant decimal digits before conversion
+        # as required by spec/bap-v1.md §8, REQ1-JSON-raw-lexeme.
         if not _lexeme_magnitude_within(text, MAX_FLOAT):
             _fail("json: float magnitude bound")
         n = float(text)
@@ -377,11 +377,10 @@ def _parse_number(ctx: _Ctx) -> Tagged:
 
 
 def _lexeme_magnitude_within(text: str, maximum: int) -> bool:
-    """Exact decimal magnitude check of a number lexeme against `maximum`, mirroring the reference
-    (json.ex:298-349 magnitude_within? / compare_boundary). Returns True if |value| <= maximum.
+    """Exact decimal magnitude check before float conversion (spec/bap-v1.md §8).
 
-    Compares the lexeme's significant digits by their effective integer position — NOT the float
-    value (which loses precision). Handles sign, fraction, and exponent exactly.
+    Return True if |value| <= maximum. Compare significant digits by their effective
+    integer position, handling sign, fraction, and exponent without rounding.
     """
     # Strip a leading sign.
     unsigned = text[1:] if text[:1] in ("-", "+") else text

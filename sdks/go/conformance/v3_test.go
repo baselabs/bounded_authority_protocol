@@ -28,7 +28,7 @@ import (
 // The certified pin is declared at function scope inside es256LoadCorpus: the
 // frozen v1/v2 runners already declare the package-level
 // `certifiedIndexSHA256` in this package and in the internal test package,
-// and the corpus rotation script (scripts/regen_corpus_digests.exs) anchors
+// and the corpus digest rotation anchors
 // on the exact line prefix `const certifiedIndexSHA256 = "` in THIS file —
 // the local declaration satisfies both (the anchor strips leading
 // whitespace, matches exactly one line, and preserves indentation on

@@ -24,16 +24,13 @@
 //! SHA-256 DIGESTS or RFC 7638 thumbprints (derived hashes), never raw
 //! credentials (`REQ1-HEADER-digest-width`).
 //!
-//! # Derivation
+//! # Normative sources
 //!
-//! Derived first-hand from `spec/bap-v1.md` § Public verification contract
-//! (lines 336–373) and § Consumption chain and anchored export (lines 443–465),
-//! and `docs/adr/0004-consumption-chain-rollover-and-anchored-export-verification.md`
-//! § Results and authority (lines 82–91) — NOT from any sibling-SDK or Elixir
-//! source (ADR 0014 D5). The chain/anchor/transition/export fact field sets come
-//! from the ADR 0004 contract (the conformance corpus `expected` for those
-//! surfaces carries only `verdict`, so the contract is the authority for the
-//! fact shapes).
+//! Fact fields, markers, and fixed redacted rendering follow `spec/bap-v1.md`
+//! §16 Public verification contract and §15 Consumption chain and anchored
+//! export. Attestation and content-assertion facts follow the public verification
+//! contracts in `spec/bap-role-attestation-v1.md` and
+//! `spec/bap-content-assertion-v1.md`.
 
 use crate::types::Role;
 

@@ -142,7 +142,7 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes
     return index, cases, raws
 
 
-# ---- tamper application (mirrors corpus.ex tamper_target_bytes/2) ----
+# ---- tamper application (spec/bap-v2.md §6 Conformance corpus) ----
 
 
 def apply_tamper(base_input: dict[str, Any], tamper: dict[str, Any], raws: dict[str, bytes]) -> dict[str, Any]:

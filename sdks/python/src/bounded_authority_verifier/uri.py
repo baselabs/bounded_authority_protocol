@@ -257,8 +257,8 @@ def _ipv6_kind(literal: bytes) -> int | str | None:
     return None
 
 
-# Structural IPv6 validation mirroring the reference (uri.ex:181-226 valid_ipv6_literal? /
-# ipv6_side_length / ipv6_groups_length). Rejects malformed literals like ":::", "1:2:3:4:5:6:7:8:9"
+# Structural IPv6 validation (spec/bap-v1.md §13).
+# Rejects malformed literals like ":::", "1:2:3:4:5:6:7:8:9"
 # (too many groups), and a "::" that does not actually compress (< 8 groups required). The prior
 # implementation only checked the character class, so structurally-invalid literals normalized.
 def _valid_ipv6_literal(literal: bytes) -> bool:

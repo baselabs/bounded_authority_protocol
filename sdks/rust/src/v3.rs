@@ -847,7 +847,7 @@ pub fn check_envelope(
 // scan_compact — faithful port of the reference CompactJws.scan (ath hash gate)
 // ============================================================================
 
-/// Faithful port of the reference `CompactJws.scan`: the compact MUST be ≤
+/// Compact structure and size scan: the compact MUST be ≤
 /// `compact_bytes` and split into exactly three non-empty segments (split on
 /// `.`), the protected and payload each ≤ `encoded_segment_bytes`, and the
 /// signature non-empty, ≤ `encoded_segment_bytes`, and dot-free. Unlike
@@ -3540,7 +3540,7 @@ fn validate_proof_payload(payload: &JsonValue, bounds: &Bounds) -> Result<ProofP
 
 /// Extracts a non-empty StringOrURI (<= `identifier_bytes`).
 ///
-/// Per RFC 7519 + the reference `string_or_uri.ex` semantics (incorporated):
+/// Per RFC 7519 + the `spec/bap-v1.md §11` semantics (incorporated):
 /// a colon-free value is a PLAIN string (any valid UTF-8 is accepted); a
 /// colon-bearing value is a URI whose scheme is valid, every byte is alnum /
 /// URI-punctuation / a well-formed `%HH` escape, and (for a `://` authority)

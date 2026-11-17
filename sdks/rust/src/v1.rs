@@ -15,16 +15,14 @@
 //! `verification: NotEvaluated` (`REQ1-VERIFY-decode-not-evaluated`); the
 //! locator carries `trust: NotEvaluated` (`REQ1-LOCATOR-not-authority`).
 //!
-//! # Derivation
+//! # Normative sources
 //!
-//! Derived first-hand from `spec/bap-v1.md` (§ Protected headers,
-//! § Claims, § Signing and digest inputs, § Untrusted key locator, § Public
-//! verification contract), `docs/adr/0004-...` (§ Boundary anchors, §
-//! Authenticated key transitions), RFC 7515/7638/8785, and the conformance
-//! corpus under `priv/conformance/v1/corpus/cases/` — NOT from any sibling-SDK
-//! or Elixir source (ADR 0014 D5). The exact JCS payload member names are
-//! derived by base64url-decoding each surface's corpus `payload_segment`
-//! first-hand (the corpus is the falsifier).
+//! The verification contract is `spec/bap-v1.md` §10 Protected headers,
+//! §11 Claims, §14 Signing and digest inputs, §15 Consumption chain and
+//! anchored export (including Boundary anchors and Authenticated key
+//! transitions), §16 Public verification contract, and §18 Untrusted key
+//! locator. RFC 7515/7638/8785 define the incorporated encodings; the independent
+//! conformance corpus under `priv/conformance/v1/corpus/cases/` pins exact bytes.
 
 use crate::base64url::{base64url_decode, base64url_encode};
 use crate::bounds::Bounds;
@@ -249,7 +247,7 @@ pub fn verify_grant(
     expected: &ExpectedGrant,
 ) -> Result<GrantFacts> {
     // REQ1-VERIFY-time-bounds: the caller's skew MUST NOT exceed the profile
-    // ceiling (reference runtime.ex:523-524 validates clock_skew <= bounds.
+    // ceiling (spec/bap-v1.md §16 validates clock_skew <= bounds.
     // clock_skew). A value above the ceiling silently widens the time window
     // (future iat/nbf, expired exp accepted); reject it before any time
     // arithmetic. The `bounds.clock_skew()` ceiling itself is a tightening-
@@ -363,7 +361,7 @@ fn check_envelope_for(
     let bounds = &expected.bounds;
 
     // REQ1-VERIFY-time-bounds: proof_max_age MUST be positive AND MUST NOT exceed
-    // the profile ceiling (reference runtime.ex:550-551: proof_max_age > 0 and
+    // the profile ceiling (spec/bap-v1.md §16: proof_max_age > 0 and
     // <= bounds.proof_max_age). A zero proof_max_age would admit any proof within
     // the skew window (no max-age floor). The skew ceiling is enforced by the
     // verify_grant call below (which carries expected.skew through ExpectedGrant).
@@ -537,7 +535,7 @@ fn check_envelope_for(
 // scan_compact — faithful port of the reference CompactJws.scan (ath hash gate)
 // ============================================================================
 
-/// Faithful port of the reference `CompactJws.scan` (compact_jws.ex:16-27 +
+/// Compact structure and size scan (spec/bap-v1.md §14 +
 /// `take_segment` :68-75): the compact MUST be ≤ `compact_bytes` and split into
 /// exactly three non-empty segments (split on `.`), the protected and payload
 /// each ≤ `encoded_segment_bytes`, and the signature non-empty, ≤
@@ -577,7 +575,7 @@ fn scan_compact(compact: &[u8], bounds: &Bounds) -> Result<()> {
 ///
 /// Wraps [`compact::compose_compact`] (composition + segment well-formedness)
 /// with the per-kind CONTENT validation the reference's
-/// `validate_assembled_compact` performs (runtime.ex:151 — it re-parses the
+/// `validate_assembled_compact` performs (spec/bap-v1.md §16 — it re-parses the
 /// composed output as a grant/proof/anchor/transition). The public contract is
 /// `/2` (no caller bounds — spec/bap-v1.md), so the per-kind parse runs
 /// against the profile maximum bounds. A caller passing segments that compose
@@ -613,7 +611,8 @@ fn assemble_compact_for(
         return Err(Invalid);
     }
     // ADR 0018 divergence closed (2026-08-18): the reference takes limits at assemble
-    // (runtime.ex:147-155 → CompactJws.assemble:34-48 — encoded segment bounds, signature
+    // (spec/bap-v1.md §16 → compact assembly — encoded segment bounds,
+    // signature
     // width ≤ signature_bytes, compact_bytes, and the kind re-parse, all against
     // Bounds.coerce(limits)); the SDK previously hardcoded maximum. None = maximum.
     let bounds = resolve_bounds(bounds);
@@ -823,7 +822,7 @@ fn proof_signing_input_for(
     }
 
     // ath = base64url(SHA-256(grant_compact ASCII bytes)) — REQ1-CLAIM-ath.
-    // Gate SHA-256 on the reference `CompactJws.scan` (compact_jws.ex:16-27):
+    // Gate SHA-256 on the reference `CompactJws.scan` (spec/bap-v1.md §14):
     // total <= compact_bytes AND three non-empty segments each <=
     // encoded_segment_bytes (signature dot-free). The scan does NOT require
     // base64url canonicity — it gates hashing, not verification — so a
@@ -1073,7 +1072,7 @@ pub fn encode_consumption_entry(
         return Err(Invalid);
     }
     // chain_id is a StringOrURI identifier, not an arbitrary string (reference
-    // consumption_chain.ex:169-172 valid_identifier?): non-empty, ≤ identifier
+    // spec/bap-v1.md §15 (rows) valid_identifier?): non-empty, ≤ identifier
     // _bytes, no control/DEL/non-ASCII, valid scheme if `:`-bearing.
     validate_identifier(&entry.chain_id, bounds)?;
     // Genesis binding: sequence 1 requires the all-zero predecessor (corpus
@@ -1125,7 +1124,7 @@ pub fn encode_consumption_entry(
 /// immutable profile maxima from [`Bounds::maximum`]
 /// (`REQ1-CHAIN-raw-rows-bounds`); caller-tightenable via `expected.bounds`
 /// (None = the immutable profile maxima — the reference threads the caller's
-/// bounds here too, consumption_chain.ex:43).
+/// bounds here too, spec/bap-v1.md §15 (rows)).
 pub fn check_chain(input: &ChainInput, expected: &ExpectedChain) -> Result<ChainFacts> {
     let bounds = resolve_bounds(expected.bounds.as_ref());
     let rows = &input.rows;
@@ -1146,8 +1145,8 @@ pub fn check_chain(input: &ChainInput, expected: &ExpectedChain) -> Result<Chain
         parsed.push(parse_row(row, &bounds)?);
     }
 
-    // Chain identity: validate the identifier shape (reference consumption_chain
-    // .ex:169-172 + context_validation.ex:155-159 valid_identifier?), then every
+    // Chain identity: validate the identifier shape (spec/bap-v1.md §15 (rows)
+    // and spec/bap-v1.md §16), then every
     // row's chain_id == expected.chain_id (the rows therefore also agree amongst
     // themselves). Corpus: cross-graft.
     validate_identifier(&expected.chain_id, &bounds)?;
@@ -1171,9 +1170,9 @@ pub fn check_chain(input: &ChainInput, expected: &ExpectedChain) -> Result<Chain
 
     // Genesis binding. first_sequence < 1 is invalid (sequences begin at 1).
     // The first row's previous is ALWAYS bound to expected.previous_hash
-    // (reference consumption_chain.ex:113, seeded at :47-54), and when
+    // (spec/bap-v1.md §15 (rows), seeded from the expected predecessor), and when
     // first_sequence == 1 expected.previous_hash MUST be the all-zero hash
-    // (reference context_validation.ex:106-107 — a fresh chain has no
+    // (spec/bap-v1.md §16 — a fresh chain has no
     // predecessor, so a caller-inconsistent predecessor is rejected, not
     // attested unchecked into ChainFacts). Corpus: sequence-zero-row +
     // genesis-previous-hash-forge.
@@ -1370,7 +1369,7 @@ pub fn verify_historical_anchor(
 ) -> Result<AnchorFacts> {
     let bounds = resolve_bounds(expected.bounds.as_ref());
     // Key-window endpoints are magnitude-bounded under the resolved bounds
-    // (context_validation.ex valid_time? — cross-vendor round 4: interval
+    // (spec/bap-v1.md §16 valid_time? — cross-vendor round 4: interval
     // membership alone accepted out-of-magnitude endpoints).
     if key.valid_from.unsigned_abs() > bounds.integer_magnitude() {
         return Err(Invalid);
@@ -1380,7 +1379,7 @@ pub fn verify_historical_anchor(
             return Err(Invalid);
         }
         // The reference's valid_before? also requires valid_before > valid_from
-        // (context_validation.ex:139-140 — the closing cross-vendor note).
+        // (spec/bap-v1.md §16 — the closing cross-vendor note).
         if v <= key.valid_from {
             return Err(Invalid);
         }
@@ -1506,7 +1505,7 @@ pub fn verify_key_transition(
     }
     // Signed to_key_id / chain_id / effective_at / transition_id == expected.
     // to_key_id is bound to BOTH the positional next key's identifier AND the
-    // caller's expected id (reference key_transition_codec.ex:68-69) — the
+    // caller's expected id (spec/bap-v1.md §15 (transitions)) — the
     // current-key side at line ~11 binds header.kid to current.key_id; the
     // next side must bind to_key_id to next.key_id too, or the positional key
     // chain could advance under a mismatched identifier.
@@ -1566,7 +1565,7 @@ pub fn verify_key_transition(
 /// corpus header frame).
 ///
 /// Mirrors the reference producer's FULL validation contract
-/// (`anchored_export_codec.ex` encode): expected-side consistency (the chain_id
+/// (`spec/bap-v1.md §15 (archives)` encode): expected-side consistency (the chain_id
 /// binding of both anchors and every transition; the start/end sequence + hash
 /// bindings to the chain — the start binding caught by the corpus
 /// `encode-anchored-export-invalid-start-anchor-binding` case), a full
@@ -1621,7 +1620,7 @@ pub fn encode_anchored_export(
     }
 
     // Expected-side consistency (reference validate_expected_export,
-    // anchored_export_codec.ex:344-375): every transition and both anchors
+    // spec/bap-v1.md §15 (archives)): every transition and both anchors
     // belong to the expected chain; the anchors bind the chain's sequence span
     // and hash boundaries.
     // checked_sub: a caller-supplied first_sequence of i64::MIN would underflow
@@ -1650,7 +1649,7 @@ pub fn encode_anchored_export(
     }
 
     // Row chain re-check (reference ConsumptionChain.check,
-    // anchored_export_codec.ex:37-39): the rows must verify against the
+    // spec/bap-v1.md §15 (archives)): the rows must verify against the
     // expected boundaries before they are archived. Per-row byte ceilings are
     // enforced BEFORE the row set is cloned into ChainInput (which owns its
     // rows) — cloning an oversized caller-controlled row first would amplify
@@ -1696,7 +1695,7 @@ pub fn encode_anchored_export(
     }
     // Start-anchor binding: parse through the width+canonical-gated decoder,
     // then match ALL signed fields against the expected anchor (reference
-    // anchor_matches?, anchored_export_codec.ex:485-492).
+    // anchor_matches?, spec/bap-v1.md §15 (archives)).
     let start_parts = decode_anchor_parts(&input.start_anchor, &bounds)?;
     if !anchor_matches(
         &start_parts.payload,
@@ -1714,7 +1713,7 @@ pub fn encode_anchored_export(
 
     // Transitions: gated parse + full match, positionally (reference
     // parse_expected_transitions + transition_matches?,
-    // anchored_export_codec.ex:443-504).
+    // spec/bap-v1.md §15 (archives)).
     for (compact, exp) in input.transitions.iter().zip(&expected.transitions) {
         let t = decode_transition_parts(compact, &bounds)?;
         if !transition_matches(&t.payload, &t.key_id, exp) {
@@ -1723,10 +1722,10 @@ pub fn encode_anchored_export(
     }
 
     // Key-path walk (reference validate_expected_key_path,
-    // anchored_export_codec.ex:506-572): the running key starts at the start
+    // spec/bap-v1.md §15 (archives)): the running key starts at the start
     // anchor's, every transition carries it and advances strictly in time
     // without cycling fingerprints, and the end anchor binds the final key with
-    // NON-STRICT chronology (chronological_end?, .ex:723: >=).
+    // NON-STRICT chronology (chronological_end?, spec/bap-v1.md §15 (key-path chronology): >=).
     key_path_ok(
         &expected.start_anchor,
         &expected.transitions,
@@ -1772,7 +1771,7 @@ pub fn encode_anchored_export(
         return Err(Invalid);
     }
 
-    // Aggregate ceilings at encode (reference anchored_export_codec.ex:69 ->
+    // Aggregate ceilings at encode (spec/bap-v1.md §15 (archives) ->
     // validate_chunks :337-340): chunk count <= archive_chunks and total bytes
     // <= archive_bytes, checked BEFORE assembling so an over-budget input cannot
     // force a full-archive allocation. Chunk count = magic + header + start +
@@ -1856,7 +1855,7 @@ pub fn encode_anchored_export(
 
 /// Resolves a caller-supplied optional bounds to the effective value: `None`
 /// is the profile maximum (the reference's `%{}` default-to-maximum coerce,
-/// bounds.ex:139-147). Tighten-only by construction — `Bounds::new` rejects
+/// spec/bap-v1.md §17). Tighten-only by construction — `Bounds::new` rejects
 /// widenings and merges overrides onto the maximum struct, so an identity
 /// override (value == maximum) resolves EQUAL to the maximum: the sibling
 /// map-size trap is structurally inexpressible against the full-struct
@@ -1869,7 +1868,7 @@ pub fn resolve_bounds(nested: Option<&Bounds>) -> Bounds {
 }
 
 /// The nested-bounds pin (reference `{:ok, ^bounds} <- Bounds.coerce(x.bounds)`,
-/// anchored_export_codec.ex:352-354/:404-406): a present nested bounds must
+/// spec/bap-v1.md §15 (archives)): a present nested bounds must
 /// equal the outer; an absent nested is valid only when the outer is
 /// effectively maximum (identity overrides are NOT tightening — struct
 /// equality against the maximum, the semantics the siblings' cross-vendor
@@ -1892,7 +1891,7 @@ pub fn require_bounds_equal(nested: Option<&Bounds>, outer: &Bounds) -> Result<(
 }
 
 /// Full signed-field match of a parsed anchor against its expected values
-/// (reference `anchor_matches?`, anchored_export_codec.ex:485-492 — all seven
+/// (reference `anchor_matches?`, spec/bap-v1.md §15 (archives) — all seven
 /// fields).
 fn anchor_matches(payload: &AnchorPayload, key_id: &str, expected: &ExpectedAnchor) -> bool {
     payload.anchor_id == expected.anchor_id
@@ -1905,7 +1904,7 @@ fn anchor_matches(payload: &AnchorPayload, key_id: &str, expected: &ExpectedAnch
 }
 
 /// Full signed-field match of a parsed transition against its expected values
-/// (reference `transition_matches?`, anchored_export_codec.ex:493-504 — all
+/// (reference `transition_matches?`, spec/bap-v1.md §15 (archives) — all
 /// seven fields: both key ids, both fingerprints, chain, time, identity).
 fn transition_matches(
     payload: &TransitionPayload,
@@ -1922,15 +1921,15 @@ fn transition_matches(
 }
 
 /// The key-path walk over the EXPECTED set (reference
-/// `validate_expected_key_path`, anchored_export_codec.ex:506-572): the running
+/// `validate_expected_key_path`, spec/bap-v1.md §15 (archives)): the running
 /// `(key_id, fingerprint)` starts at the start anchor's; each transition must
 /// carry it as its current key, be STRICTLY after the previous time, and name a
 /// next fingerprint not already seen (cycle guard — the running current is
 /// always in `seen`, so a self-loop rejects here, which is also what enforces
 /// the reference's distinct-fingerprints rule by composition); the end anchor
 /// must bind the final running key and carry `anchored_at >=` the running time
-/// (NON-STRICT — `chronological_end?`, .ex:723; the zero-transition case
-/// compares against the start anchor's time the same way, .ex:506-513).
+/// (NON-STRICT — `chronological_end?`, spec/bap-v1.md §15 (key-path chronology); the zero-transition case
+/// compares against the start anchor's time the same way, spec/bap-v1.md §15 (key-path chronology)).
 fn key_path_ok(
     start: &ExpectedAnchor,
     transitions: &[ExpectedKeyTransition],
@@ -1940,7 +1939,7 @@ fn key_path_ok(
     let mut current_fingerprint = start.key_fingerprint;
     let mut previous_time = start.anchored_at;
     // Seed the seen-list with the start fingerprint (the reference seeds
-    // `[start_anchor.key_fingerprint]`, .ex:523).
+    // `[start_anchor.key_fingerprint]`, spec/bap-v1.md §15 (key-path chronology)).
     let mut seen: Vec<[u8; 32]> = vec![start.key_fingerprint];
     for t in transitions {
         if t.current_key_id != *current_key_id || t.current_key_fingerprint != current_fingerprint {
@@ -1996,7 +1995,7 @@ pub fn verify_anchored_export(
     // ADR 0017 clause-3 hoist: expected-struct well-formedness BEFORE the digest
     // (2026-08-18, exception 2 closed). The reference validates chain + both anchors +
     // transitions (ContextValidation.expected_chain/expected_anchor/expected_transition via
-    // validate_expected_export, anchored_export_codec.ex:88-98/:345-371) before key shapes,
+    // validate_expected_export, spec/bap-v1.md §15 (archives)) before key shapes,
     // chunks, and hash_chunks; the SDK previously ran these gates only post-digest
     // (verdict-invariant by subsumption — the WORK ordering is the contract; the Python
     // battery's sha256-call-count leg carries the behavioral proof, this ordering is
@@ -2103,7 +2102,7 @@ pub fn verify_anchored_export(
     }
 
     // Static expected-side bindings (reference validate_expected_anchored_export
-    // → validate_expected_export, anchored_export_codec.ex:362-371, reached at
+    // → validate_expected_export, spec/bap-v1.md §15 (archives), reached at
     // verify :92/:387): the caller's expected anchors belong to the expected chain
     // — sequence/hash bindings are re-checked on the verified facts below, but the
     // chain_id membership is ONLY checked here (cross-vendor round 2: all three
@@ -2152,7 +2151,7 @@ pub fn verify_anchored_export(
     // sides — runs at the compare below; cross-vendor round 11.)
 
     // Stream the digest over the chunks WITHOUT materializing the whole archive
-    // first (reference hash_chunks, anchored_export_codec.ex:705-714 —
+    // first (reference hash_chunks, spec/bap-v1.md §15 (archives) —
     // incremental SHA-256 over each chunk, no concat). A huge inauthentic
     // archive fails this compare before the buf is allocated, so the materialize
     // step below runs only for digest-matching (caller-legitimate) archives.
@@ -2351,12 +2350,12 @@ struct AnchorPayload {
 /// compact. Shared by [`verify_historical_anchor`], [`assemble_compact`], and
 /// the encode path's start-anchor binding check. The decoded signature segment
 /// MUST be exactly 64 bytes (REQ1-BOUNDS-fixed-widths, mirroring
-/// boundary_anchor_codec.ex:88), and the protected/payload segments must equal
-/// their exact JCS re-encoding (canonical form, boundary_anchor_codec.ex:95-96
+/// spec/bap-v1.md §15 (anchors)), and the protected/payload segments must equal
+/// their exact JCS re-encoding (canonical form, spec/bap-v1.md §15 (anchors)
 /// + 118-119) — enforced inside the validators below.
 fn decode_anchor_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedAnchor<'a>> {
     // The whole-input compact_bytes ceiling FIRST (the reference's scan gates it
-    // before the codec's anchor_bytes clause — compact_jws.ex:16-18; cross-vendor
+    // before the codec's anchor_bytes clause — spec/bap-v1.md §14; cross-vendor
     // round 4: a tightened compact_bytes below anchor_bytes was bypassed).
     if compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
@@ -2368,7 +2367,7 @@ fn decode_anchor_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<Decoded
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
     // REQ1-BOUNDS-fixed-widths: the decoded signature is exactly 64 bytes
-    // (boundary_anchor_codec.ex:88).
+    // (spec/bap-v1.md §15 (anchors)).
     let sig_raw = base64url_decode(signature_seg)?;
     if sig_raw.len() != 64 {
         return Err(Invalid);
@@ -2389,7 +2388,7 @@ fn decode_anchor_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<Decoded
 /// Validates the anchor protected header is exactly
 /// `{alg:"EdDSA", typ:"ba+chain-anchor", kid:<valid kid>}`. Returns the kid.
 /// Canonical form: the protected segment bytes must equal the exact JCS
-/// re-encoding of the header (boundary_anchor_codec.ex:95-96).
+/// re-encoding of the header (spec/bap-v1.md §15 (anchors)).
 fn validate_anchor_header(
     header: &JsonValue,
     header_bytes: &[u8],
@@ -2435,7 +2434,7 @@ fn validate_anchor_header(
 /// v:1}`, no extra members. `chain_hash`/`key_fingerprint` are canonical
 /// base64url of exactly 32 bytes. Canonical form: the payload segment bytes
 /// must equal the exact JCS re-encoding of the payload
-/// (boundary_anchor_codec.ex:118-119).
+/// (spec/bap-v1.md §15 (anchors)).
 fn validate_anchor_payload(
     payload: &JsonValue,
     payload_bytes: &[u8],
@@ -2515,7 +2514,7 @@ fn decode_transition_parts<'a>(
     bounds: &Bounds,
 ) -> Result<DecodedTransition<'a>> {
     // The whole-input compact_bytes ceiling FIRST (the reference's scan gates it
-    // before the codec's anchor_bytes clause — compact_jws.ex:16-18; cross-vendor
+    // before the codec's anchor_bytes clause — spec/bap-v1.md §14; cross-vendor
     // round 4: a tightened compact_bytes below anchor_bytes was bypassed).
     if compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
@@ -2527,7 +2526,7 @@ fn decode_transition_parts<'a>(
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
     // REQ1-BOUNDS-fixed-widths: the decoded signature is exactly 64 bytes
-    // (key_transition_codec.ex:120). Publicly reachable through
+    // (spec/bap-v1.md §15 (transitions)). Publicly reachable through
     // encode_anchored_export, which parses caller-supplied transitions here —
     // battery leg `encode_transition_signature_width_rejected` drives a
     // 32-byte signature to exactly this gate. assemble_compact stays
@@ -2553,7 +2552,7 @@ fn decode_transition_parts<'a>(
 /// Validates the transition protected header is exactly
 /// `{alg:"EdDSA", typ:"ba+key-transition", kid:<valid kid>}`. Returns the kid.
 /// Canonical form: the protected segment bytes must equal the exact JCS
-/// re-encoding of the header (key_transition_codec.ex:127-128).
+/// re-encoding of the header (spec/bap-v1.md §15 (transitions)).
 fn validate_transition_header(
     header: &JsonValue,
     header_bytes: &[u8],
@@ -2598,7 +2597,7 @@ fn validate_transition_header(
 /// `{chain_id, effective_at, from_key_fingerprint, to_key_fingerprint,
 /// to_key_id, transition_id, v:1}`. Canonical form: the payload segment bytes
 /// must equal the exact JCS re-encoding of the payload
-/// (key_transition_codec.ex:151-152).
+/// (spec/bap-v1.md §15 (transitions)).
 fn validate_transition_payload(
     payload: &JsonValue,
     payload_bytes: &[u8],
@@ -2924,7 +2923,7 @@ struct DecodedGrant<'a> {
 /// and [`verify_grant`] (which adds the signature, identity, and time checks).
 /// Splits, bounds, decodes, and structurally validates the protected header +
 /// payload claims. The decoded signature segment MUST be exactly 64 bytes
-/// (REQ1-BOUNDS-fixed-widths, mirroring runtime.ex:237 parse_grant).
+/// (REQ1-BOUNDS-fixed-widths, mirroring spec/bap-v1.md §16 parse_grant).
 fn decode_grant_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedGrant<'a>> {
     if compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
@@ -2933,7 +2932,7 @@ fn decode_grant_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedG
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
     // REQ1-BOUNDS-fixed-widths: the decoded signature is exactly 64 bytes
-    // (runtime.ex:237).
+    // (spec/bap-v1.md §16).
     let sig_raw = base64url_decode(signature_seg)?;
     if sig_raw.len() != 64 {
         return Err(Invalid);
@@ -2965,7 +2964,7 @@ struct DecodedProof<'a> {
 /// Shared proof decode used by [`decode_proof`] and [`check_envelope`]. Splits,
 /// bounds, decodes, and structurally validates the proof header (returning the
 /// holder public key) and payload claims. The decoded signature segment MUST be
-/// exactly 64 bytes (REQ1-BOUNDS-fixed-widths, mirroring runtime.ex:259
+/// exactly 64 bytes (REQ1-BOUNDS-fixed-widths, mirroring spec/bap-v1.md §16
 /// parse_proof).
 fn decode_proof_parts_for<'a>(
     compact: &'a [u8],
@@ -2979,7 +2978,7 @@ fn decode_proof_parts_for<'a>(
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
     // REQ1-BOUNDS-fixed-widths: the decoded signature is exactly 64 bytes
-    // (runtime.ex:259).
+    // (spec/bap-v1.md §16).
     let sig_raw = base64url_decode(signature_seg)?;
     if sig_raw.len() != 64 {
         return Err(Invalid);
@@ -3354,7 +3353,7 @@ fn validate_proof_payload_for(
 
 /// Extracts a non-empty StringOrURI (≤ `identifier_bytes`).
 ///
-/// Per RFC 7519 + the reference `string_or_uri.ex`: a colon-free value is a
+/// Per RFC 7519 + the `spec/bap-v1.md §11`: a colon-free value is a
 /// PLAIN string (any valid UTF-8 is accepted); a colon-bearing value is a URI
 /// whose scheme is valid, every byte is alnum / URI-punctuation / a well-formed
 /// `%HH` escape, and (for a `://` authority) the port is all-digit. Rejects an
@@ -3371,7 +3370,7 @@ fn take_string_or_uri(value: Option<&JsonValue>, bounds: &Bounds) -> Result<Stri
 }
 
 /// Validates a StringOrURI / identifier scalar — a faithful port of the
-/// reference `string_or_uri.ex`. A colon-free value is a PLAIN string (any valid
+/// `spec/bap-v1.md §11`. A colon-free value is a PLAIN string (any valid
 /// UTF-8 — `String.valid?`, automatic for a Rust `&str`); a colon-bearing value
 /// is a URI whose scheme is valid and whose every byte is alphanumeric, a URI
 /// punctuation byte (`-._~:/?#[]@!$&'()*+,;=`), or part of a well-formed `%HH`
@@ -3426,7 +3425,7 @@ fn validate_authority_port(value: &str) -> Result<()> {
     Ok(())
 }
 
-/// Reference `string_or_uri.ex` `uri_bytes?/1`: every byte is alphanumeric, one
+/// Reference `spec/bap-v1.md §11` `uri_bytes?/1`: every byte is alphanumeric, one
 /// of the URI punctuation bytes `-._~:/?#[]@!$&'()*+,;=`, or part of a
 /// well-formed `%HH` percent-escape. Rejects `{`, whitespace, control, non-ASCII,
 /// and a bare `%` / `%G` (`urn:{a}`, `urn:trunc%`).
@@ -4514,7 +4513,8 @@ mod tests {
     }
 
     /// assemble_compact validates the composed compact parses as its kind
-    /// (reference validate_assembled_compact, runtime.ex:151). Segments that are
+    /// (reference validate_assembled_compact, spec/bap-v1.md §16). Segments that
+    /// are
     /// canonical base64url but decode to non-grant content (here "a"."b") are
     /// rejected, not composed into a malformed credential. RED-capable: routing
     /// the public fn straight to compose_compact (dropping the per-kind parse)
@@ -4628,7 +4628,7 @@ mod tests {
     #[test]
     fn red_encode_chain_id_string_or_uri() {
         // chain_id is a StringOrURI identifier, faithfully ported from
-        // string_or_uri.ex (consumption_chain.ex:169-172 valid_identifier?). A
+        // spec/bap-v1.md §11 (spec/bap-v1.md §15 (rows) valid_identifier?). A
         // colon-free value is a PLAIN string — any valid UTF-8 (incl. "café" and
         // a newline) is accepted; a colon-bearing value is a URI whose scheme is
         // valid and whose every byte is alnum / URI-punctuation / %HH. The
@@ -4908,7 +4908,7 @@ mod tests {
     /// REQ1-VERIFY-time-bounds ceiling: a caller-supplied skew above the profile
     /// maximum MUST be rejected before the time arithmetic, else the window
     /// silently widens (future iat/nbf, expired exp accepted). Reference
-    /// runtime.ex:523-524 enforces clock_skew <= bounds.clock_skew. Removing the
+    /// spec/bap-v1.md §16 enforces clock_skew <= bounds.clock_skew. Removing the
     /// ceiling check makes this test go RED (the otherwise-valid grant accepts).
     #[test]
     fn red_grant_skew_over_ceiling_rejected() {
@@ -4923,7 +4923,7 @@ mod tests {
 
     /// REQ1-VERIFY-time-bounds ceiling for the proof window: proof_max_age above
     /// the profile maximum MUST be rejected, else stale proofs are admitted.
-    /// Reference runtime.ex:550-551. Removing the check makes this test go RED.
+    /// Reference spec/bap-v1.md §16. Removing the check makes this test go RED.
     #[test]
     fn red_envelope_proof_max_age_over_ceiling_rejected() {
         let (credentials, mut expected) = valid_envelope_fixture();
@@ -4936,7 +4936,8 @@ mod tests {
     }
 
     /// REQ1-VERIFY-time-bounds: proof_max_age MUST be positive (reference
-    /// runtime.ex:550 `proof_max_age > 0`). A zero value would admit any proof
+    /// spec/bap-v1.md §16 `proof_max_age > 0`). A zero value would admit any
+    /// proof
     /// within the skew window (no max-age floor). Removing the `< 1` guard makes
     /// this test go RED.
     #[test]

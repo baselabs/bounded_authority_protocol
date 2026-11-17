@@ -282,7 +282,8 @@ fn closure_6_output_over_jcs_bytes_rejected() {
 
 #[test]
 fn closure_6_over_magnitude_and_duplicate_members_rejected() {
-    // The scalar/members half of closure #6 (mirrors reference jcs.ex encode_value
+    // The scalar/members half of closure #6 (mirrors spec/bap-v1.md §8 JSON decoding and canonical
+    // serialization encode_value
     // guards that the closeout cross-vendor review found the Rust encoder was
     // missing). A hand-built integer above ±2^53−1, and a hand-built Object with
     // a duplicate member name, are both rejected at encode — a permissive encoder
@@ -338,7 +339,8 @@ fn base64url_non_canonical_pad_bits_rejected() {
 
 // =============================================================================
 // Decode-path conformance — canonical form + decoded signature width
-// (reference boundary_anchor_codec.ex / key_transition_codec.ex / runtime.ex)
+// (spec/bap-v1.md §15 (anchors) / spec/bap-v1.md §15 (transitions) /
+// spec/bap-v1.md §16)
 // =============================================================================
 //
 // Two conformance closures the corpus does not express (it is frozen; the
@@ -346,7 +348,7 @@ fn base64url_non_canonical_pad_bits_rejected() {
 //
 // (a) CANONICAL FORM — the reference anchor/transition codecs require the
 //     protected AND payload segments to equal their exact JCS re-encoding
-//     (boundary_anchor_codec.ex:95-96 + :118-119; key_transition_codec.ex:127-128
+//     (spec/bap-v1.md §15 (anchors) + :118-119; spec/bap-v1.md §15 (transitions)
 //     + :151-152). The Rust validators checked only the closed member set, so a
 //     member-REORDERED (non-canonical) segment with valid fields was accepted.
 //     RED-capable mutation: drop the `jcs_encode(value) == bytes` equality in
@@ -358,8 +360,8 @@ fn base64url_non_canonical_pad_bits_rejected() {
 //     rides the same validators via `decode_anchor_parts`/`decode_transition_parts`.
 //
 // (b) DECODED SIGNATURE WIDTH — the reference gates byte_size(signature) == 64
-//     at DECODE (runtime.ex:237 parse_grant + :259 parse_proof;
-//     boundary_anchor_codec.ex:88; key_transition_codec.ex:120). The Rust
+//     at DECODE (spec/bap-v1.md §16 parse_grant + :259 parse_proof;
+//     spec/bap-v1.md §15 (anchors); spec/bap-v1.md §15 (transitions)). The Rust
 //     `decode_grant`/`decode_proof` accepted any width (verify checked later),
 //     and `encode_anchored_export`'s start-anchor parse (v1.rs:1387) never
 //     width-checked at all. RED-capable mutation: delete the width clause in
@@ -684,7 +686,8 @@ fn signature_width_export_encode_start_anchor_rejected() {
 // Canonical-EXCLUSION pinning — grant/proof compacts have NO canonical-form gate
 // =============================================================================
 //
-// The reference parse_grant/parse_proof (runtime.ex:237/:259) gate the decoded
+// The reference parse_grant/parse_proof (spec/bap-v1.md §16) gate the
+// decoded
 // signature width but impose NO Jcs.encode byte-equality on grant/proof
 // segments (REQ1-SIGNING-any-order; canonical-form is an anchor/transition
 // codec property only). These legs PIN that exclusion: a member-reordered
@@ -764,7 +767,7 @@ fn canonical_exclusion_proof_reorder_still_decodes() {
 
 // =============================================================================
 // Encode-path validation parity — the reference producer's full contract
-// (anchored_export_codec.ex encode: expected-side consistency, row chain
+// (spec/bap-v1.md §15 (archives) encode: expected-side consistency, row chain
 // re-check, gated parses + 7-field matches, key-path walk). One red-capable
 // leg per NEW clause/call-site; each names its red mutation. Match legs (5,6,9)
 // tamper ONE side only; expected↔chain and key-path legs (1,2,3,12,13,14,15)
@@ -1181,7 +1184,7 @@ fn encode_key_path_end_before_last_time_rejected() {
 }
 
 // Leg 17 — the NON-STRICT pin: end.anchored_at == the running time MUST be
-// ACCEPTED (chronological_end? is >=, .ex:723). Mutation: flip the clause
+// ACCEPTED (end chronology is >=, spec/bap-v1.md §15). Mutation: flip the clause
 // strict (<) — this leg goes RED. (The equality half of the same BLOCKING.)
 #[test]
 fn encode_key_path_end_time_equality_accepted() {
@@ -1875,7 +1878,7 @@ fn bounds_encode_nested_pin_mismatch_rejects() {
 #[test]
 fn bounds_encode_absent_nested_under_tightened_outer_rejects() {
     // B1: the pin's absent branch — outer tightened, ALL nested None → reject
-    // (the wrong-ACCEPT direction; the reference rejects at .ex:352-354).
+    // (the wrong-ACCEPT direction; spec/bap-v1.md §15 requires rejection).
     let mut f = conformant_export();
     // use a genuinely tightening value so the absent branch is the rejector
     f.expected.bounds = Some(tight(&[("chain_row_bytes", 4000)]));
@@ -2638,7 +2641,7 @@ fn corpus_transition_parts() -> (
 }
 
 // The closing cross-vendor notes: the ordering leg (valid_before > valid_from,
-// context_validation.ex:139-140) — verdict-equivalent today (an inverted window
+// spec/bap-v1.md §16) — verdict-equivalent today (an inverted window
 // admits no time) but a gate reused without membership would inherit the gap.
 
 #[test]
@@ -2735,7 +2738,7 @@ fn bounds_rust_archive_key_window_guards() {
 // exception 2, closed 2026-08-18). The reference validates the expected
 // struct (chain + BOTH anchors' identity/binding well-formedness +
 // transitions, ContextValidation) BEFORE validate_chunks/hash_chunks
-// (anchored_export_codec.ex:88-104); the SDK ran only the static bindings
+// (spec/bap-v1.md §15 (archives)); the SDK ran only the static bindings
 // pre-digest. VERDICT-INVARIANT by subsumption (post-digest equality
 // against bounded parsed values rejects every malformed expected) — the
 // observable is the WORK, and a tests/-outside test cannot intercept a
@@ -2813,8 +2816,8 @@ fn verify_export_malformed_expected_verdict_matrix() {
 
 // =============================================================================
 // The assemble_compact caller-bounds threading (ADR 0018's named divergence,
-// closed 2026-08-18). The reference takes limits at assemble (runtime.ex:147-155
-// → CompactJws.assemble:34-48 — encoded segment bounds, signature width ≤
+// closed 2026-08-18). The reference takes limits at assemble (spec/bap-v1.md §16
+// → compact assembly — encoded segment bounds, signature width ≤
 // signature_bytes, compact_bytes, and the kind re-parse, all against
 // Bounds.coerce(limits)); the SDK hardcoded maximum. Maintainer direction
 // 2026-08-18: thread caller-tightenable bounds.
