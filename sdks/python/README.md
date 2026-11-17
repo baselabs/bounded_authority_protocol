@@ -232,7 +232,13 @@ copy their contents to immutable `bytes`. Released memoryviews and other types r
 (or `False` for the three predicates). Text parameters accept `str` and its subclasses,
 using the underlying characters without invoking an overridden `__str__`. Invalid Unicode
 and wrong types return `Err`. A `Bounds` constructor validates and copies its limits once;
-resolving a limit does not revalidate the mapping.
+resolving a limit does not revalidate the mapping. `MAXIMA` is a read-only `MappingProxyType`.
+Invalid `Bounds(...)` construction produces an unusable value; use `bounds_new` to obtain an
+explicit `Err`. Bounds and all façade struct arguments require their exact SDK class; subclasses
+return `Err`. Native scalar and container subclasses are copied through their builtin storage
+before validation. An arbitrary `Mapping` is snapshotted once; exceptions from its `items()`
+method or iterator become `Err` at that callback boundary. SDK exceptions still propagate.
+Bounds, facts, and redacted decoded values refuse a second initialization.
 
 **Facts.** `GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`, `KeyTransitionFacts`,
 `AnchoredExportFacts`, `AttestationFacts`, and `ContentAssertionFacts` are slotted value
@@ -246,6 +252,13 @@ Sibling profiles use `RoleAttestation.V1` and `ContentAssertion.V1`. Facts refus
 `dataclasses.asdict`, `dataclasses.fields`, `vars`, generic JSON encoding, pickling, and
 copy reduction. Read named properties explicitly; construct a new facts object explicitly
 when a copy is needed.
+
+**Decoded diagnostics.** All four decoded types render the Elixir inspection notation, including
+the contract-major. `GrantDecoded` includes `version` and ordered `operations`; `ProofDecoded`
+now carries all decoded claims and the holder public key, but hides the optional nonce in
+`repr` and `str`. `ProofDecoded` and `ContentAssertionDecoded` are slotted values with read-only
+properties and refuse the same bulk exports and reduction as facts. Grant and role-attestation
+diagnostics have no redacted fields and remain dataclasses.
 
 ## Strict Ed25519
 

@@ -78,3 +78,12 @@ def test_facts_refuse_generic_enumeration_and_reduction(kind, major, operation):
 def test_facts_are_not_dataclasses(kind, major):
     facts, _ = _facts(kind, major)
     assert not is_dataclass(facts)
+
+
+@pytest.mark.parametrize("kind,major", CASES)
+def test_facts_refuse_reinitialization(kind, major):
+    facts, values = _facts(kind, major)
+    with pytest.raises(TypeError):
+        facts.__init__(**values)
+    for name, value in values.items():
+        assert getattr(facts, name) == value

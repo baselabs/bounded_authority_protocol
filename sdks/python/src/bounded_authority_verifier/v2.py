@@ -1083,8 +1083,11 @@ def _decode_grant_body(compact: bytes, bounds: Bounds | None) -> GrantDecoded:
     jkt = _require_b64url_n(cnf.v.get("jkt"), "jkt", 32)
     from .facts import GrantDecoded
 
+    operations = p.v["operations"]
+    assert isinstance(operations, JArray)
     return GrantDecoded(
-        key_id=kid, issuer=iss, grant_id=jti, audiences=tuple(aud),
+        version=VERSION, key_id=kid, issuer=iss, grant_id=jti, audiences=tuple(aud),
+        operations=tuple(op for op in operations.v if isinstance(op, JObject)),
         issued_at=iat, not_before=nbf, expires_at=exp, holder_thumbprint=jkt,
     )
 
@@ -1100,7 +1103,7 @@ def _decode_proof_body(
 ) -> ProofDecoded:
     b = bounds if bounds is not None else MAXIMUM_BOUNDS
     seg = _parse_compact(compact, b)
-    holder_thumbprint, _ = _parse_proof_header(seg, b, profile)
+    holder_thumbprint, holder_public_key = _parse_proof_header(seg, b, profile)
     p = _unwrap(json_decode(seg.payload_bytes, b))
     _validate_proof_payload(p, b, profile)
     if not isinstance(p, JObject):
@@ -1108,7 +1111,21 @@ def _decode_proof_body(
     jti = _require_string_or_uri(p.v.get("jti"), "jti", b)
     from .facts import ProofDecoded
 
-    return ProofDecoded(proof_id=jti, holder_thumbprint=holder_thumbprint)
+    def text(name: str) -> str:
+        member = p.v[name]
+        assert isinstance(member, JString)
+        return _unwrap(utf8_str(member.v))
+
+    nonce = p.v.get("nonce")
+    return ProofDecoded(
+        version=VERSION, proof_id=jti, holder_thumbprint=holder_thumbprint,
+        holder_public_key=holder_public_key, method=text("htm"),
+        target_uri=text("htu"), issued_at=_require_int(p.v.get("iat"), "iat"),
+        nonce=text("nonce") if nonce is not None else None,
+        invocation_id=text("ba_inv"), operation=text("ba_op"),
+        grant_hash=_require_b64url_n(p.v.get("ath"), "ath", 32),
+        request_hash=_require_b64url_n(p.v.get("ba_req"), "ba_req", 32),
+    )
 
 
 # 4. verify_grant (REQ1-VERIFY-grant-exact, grant-times, no-iat-nbf-order).

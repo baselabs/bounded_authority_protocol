@@ -51,19 +51,44 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Python, Rust, and Go facts render the exact full Elixir module name, preserving each
   contract-major and sibling namespace. Migration: update display assertions such as
   `#GrantFacts<redacted>` to `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`.
-- Rust and Go diagnostic facts now retain the contract-major in `version` / `Version`.
-  Migration: set that field when constructing chain, anchor, transition, or export facts
-  directly. Verifiers populate it automatically.
+- Rust and Go diagnostic facts retain the contract-major in `version` / `Version()`.
+  Migration: set Rust's `version` when constructing chain, anchor, transition, or export facts
+  directly; read Go's `Version()` accessor. Verifiers populate the major automatically.
 - Go facts refuse JSON, text, and gob serialization with `ErrInvalid`. Migration: read
-  explicitly named fields instead of passing facts to a generic encoder. Go's `fmt`
-  limitation for unexported containing fields is documented in the SDK README.
+  explicitly named accessors instead of passing facts to a generic encoder.
+
+- **Breaking change in the unpublished Go SDK:** facts, decoded proofs, and decoded content
+  assertions keep values behind private closure storage and expose read-only accessor methods.
+  Migration: replace `facts.GrantID` with `facts.GrantID()` (likewise every other field),
+  remove direct field literals and assignments, and obtain values from the verifier or decoder.
+  Slice accessors return copies. Values are no longer comparable with `==`; compare named
+  accessor results. Every fmt fallback and nested form keeps redacted values private.
+- **Breaking change in the unpublished Python SDK:** bounds and façade structs require their
+  exact SDK class. Migration: construct the SDK type directly instead of subclassing it.
+  Scalar and native container subclasses retain their underlying builtin data semantics.
+- Python `MAXIMA` is a read-only `MappingProxyType`. Migration: pass tightenings to `bounds_new`
+  instead of editing the shared maxima. Invalid `Bounds(...)` builds an unusable value rather
+  than raising; migrate validation to `bounds_new(...)` and match its `Ok` or `Err`.
+- **Breaking change in the unpublished Python SDK:** redacted decoded proofs and content
+  assertions use slotted, read-only properties and refuse bulk enumeration, pickling, and
+  reduction. Migration: read named properties and construct explicit application projections.
+  Bounds, facts, and these decoded values also refuse repeated initialization.
+- Python, Rust, and Go decoded diagnostics match the Elixir rendering, including full namespaces
+  and proof nonce redaction. Migration: update display assertions. Python grants now expose
+  `version` and `operations`; Python proofs expose the complete decoded claim set. Rust grants
+  add `operations`, and Rust proofs add `version` and `holder_public_key`; add these fields to
+  direct struct construction. Go proofs add hash, key, and thumbprint accessors.
 
 ### Fixed
 
 - Python rejects oversized URI ports before numeric conversion, validates malformed host
   values before arithmetic or recursion, and catches only protocol rejections. SDK and
   runner bugs propagate instead of becoming `Err`.
-- Python bounds validate once at construction and resolve limits without revalidation.
+- Python bounds validate once at construction and resolve limits without revalidation. Native
+  subclasses are normalized before range and size checks; overridden methods cannot widen a
+  limit or bypass numeric selector validation. Mapping callback failures return the closed error.
+- Python JSON decoding copies caller input once. Immutable bytes pass between primitives without
+  repeated copies.
 
 ## [1.0.0] — 2026-11-10
 

@@ -26,8 +26,9 @@ PERMISSIVENESS CLOSURES (the load-bearing host-runtime discipline):
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
-from ._inputs import _bytes, _decode_utf8, _text
+from ._inputs import _bytes, _decode_utf8, _sequence, _text
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .error import InvalidError, Ok, Result, _fail, _invalid_error, _unwrap, err
 
@@ -96,7 +97,6 @@ class _Ctx:
 def json_decode(src: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[Tagged]:
     """Decode one complete RFC 8259 value with recursive duplicate rejection + bounds."""
     try:
-        src = _bytes(src)
         src = _bytes(src)
         bounds = _unwrap(coerce_bounds(bounds))
         if len(src) > _unwrap(bounds_resolve(bounds, "json_bytes")):
@@ -548,28 +548,35 @@ def _normalize_tagged(value: object, bounds: Bounds = MAXIMUM_BOUNDS) -> Tagged:
     """Validate host-created algebra before arithmetic, indexing, or recursion; copy buffers."""
     b = _unwrap(coerce_bounds(bounds))
     nodes = 0
-    missing = object()
 
     def walk(node: object, level: int) -> Tagged:
         nonlocal nodes
         nodes += 1
         if level > _unwrap(bounds_resolve(b, "depth")) or nodes > _unwrap(bounds_resolve(b, "total_nodes")):
             _fail()
-        if isinstance(node, JNull):
+        if type(node) is JNull:
             return JNull()
-        member = getattr(node, "v", missing)
-        if member is missing:
+        if type(node) not in (JBool, JInt, JFloat, JString, JArray, JObject):
             _fail()
+        if not isinstance(node, (JBool, JInt, JFloat, JString, JArray, JObject)):
+            _fail()
+        member: object = node.v
         if isinstance(node, JBool):
             if type(member) is not bool:
                 _fail()
             return JBool(member)
         if isinstance(node, JInt):
-            if not isinstance(member, int) or isinstance(member, bool) or abs(member) > _unwrap(bounds_resolve(b, "integer_magnitude")):
+            if not issubclass(type(member), int) or issubclass(type(member), bool):
+                _fail()
+            member = int.__int__(cast(int, member))
+            if abs(member) > _unwrap(bounds_resolve(b, "integer_magnitude")):
                 _fail()
             return JInt(int.__int__(member))
         if isinstance(node, JFloat):
-            if not isinstance(member, float) or not (-_unwrap(bounds_resolve(b, "float_magnitude")) <= member <= _unwrap(bounds_resolve(b, "float_magnitude"))):
+            if not issubclass(type(member), float):
+                _fail()
+            member = float.__float__(cast(float, member))
+            if not (-_unwrap(bounds_resolve(b, "float_magnitude")) <= member <= _unwrap(bounds_resolve(b, "float_magnitude"))):
                 _fail()
             return JFloat(float.__float__(member))
         if isinstance(node, JString):
@@ -579,11 +586,17 @@ def _normalize_tagged(value: object, bounds: Bounds = MAXIMUM_BOUNDS) -> Tagged:
             _decode_utf8(raw)
             return JString(raw)
         if isinstance(node, JArray):
-            if not isinstance(member, (list, tuple)) or len(member) > _unwrap(bounds_resolve(b, "array_items")) or level >= _unwrap(bounds_resolve(b, "depth")):
+            if not issubclass(type(member), (list, tuple)):
+                _fail()
+            member = _sequence(cast(list[Tagged] | tuple[Tagged, ...], member))
+            if len(member) > _unwrap(bounds_resolve(b, "array_items")) or level >= _unwrap(bounds_resolve(b, "depth")):
                 _fail()
             return JArray(tuple(walk(child, level + 1) for child in member))
         if isinstance(node, JObject):
-            if not isinstance(member, dict) or len(member) > _unwrap(bounds_resolve(b, "object_members")) or level >= _unwrap(bounds_resolve(b, "depth")):
+            if not issubclass(type(member), dict):
+                _fail()
+            member = dict.copy(cast(dict[str, Tagged], member))
+            if len(member) > _unwrap(bounds_resolve(b, "object_members")) or level >= _unwrap(bounds_resolve(b, "depth")):
                 _fail()
             out = {}
             for key, child in member.items():

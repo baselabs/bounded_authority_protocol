@@ -183,7 +183,7 @@ def test_mixed_order_a_with_each_small_order_r_is_rejected(index: int) -> None:
             assert verify_strict(message, signature, key_enc) is False
             assert _strict_gate(signature, key_enc) is False
             return
-    pytest._fail("no message found whose challenge cancels the torsion (construction bug)")
+    pytest.fail("no message found whose challenge cancels the torsion (construction bug)")
 
 
 # --- clause: canonical encodings of A and R ---

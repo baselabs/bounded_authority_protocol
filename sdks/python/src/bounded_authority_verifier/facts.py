@@ -14,6 +14,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import NoReturn
 
+from . import _inspect
+from .json_alg import JArray, JObject, JString
+
 
 class _Facts:
     __slots__ = ()
@@ -62,6 +65,8 @@ class GrantFacts(_Facts):
         expires_at: int,
         authorization: str = 'not_evaluated',
     ) -> None:
+        if hasattr(self, "_version"):
+            raise TypeError("Facts cannot be initialized twice")
         object.__setattr__(self, "_version", version)
         object.__setattr__(self, "_issuer", issuer)
         object.__setattr__(self, "_grant_id", grant_id)
@@ -175,6 +180,8 @@ class EnvelopeFacts(_Facts):
         proof_issued_at: int,
         authorization: str = 'not_evaluated',
     ) -> None:
+        if hasattr(self, "_version"):
+            raise TypeError("Facts cannot be initialized twice")
         object.__setattr__(self, "_version", version)
         object.__setattr__(self, "_issuer", issuer)
         object.__setattr__(self, "_grant_id", grant_id)
@@ -307,6 +314,8 @@ class ChainFacts(_Facts):
         verification: str = 'boundary_consistent',
         trust: str = 'not_evaluated',
     ) -> None:
+        if hasattr(self, "_version"):
+            raise TypeError("Facts cannot be initialized twice")
         object.__setattr__(self, "_version", version)
         object.__setattr__(self, "_chain_id", chain_id)
         object.__setattr__(self, "_first_sequence", first_sequence)
@@ -399,6 +408,8 @@ class AnchorFacts(_Facts):
         verification: str = 'signature_and_window',
         trust: str = 'not_evaluated',
     ) -> None:
+        if hasattr(self, "_version"):
+            raise TypeError("Facts cannot be initialized twice")
         object.__setattr__(self, "_version", version)
         object.__setattr__(self, "_anchor_id", anchor_id)
         object.__setattr__(self, "_anchored_at", anchored_at)
@@ -489,6 +500,8 @@ class KeyTransitionFacts(_Facts):
         verification: str = 'authenticated_transition',
         trust: str = 'not_evaluated',
     ) -> None:
+        if hasattr(self, "_version"):
+            raise TypeError("Facts cannot be initialized twice")
         object.__setattr__(self, "_version", version)
         object.__setattr__(self, "_transition_id", transition_id)
         object.__setattr__(self, "_chain_id", chain_id)
@@ -596,6 +609,8 @@ class AnchoredExportFacts(_Facts):
         trust: str = 'not_evaluated',
         authorization: str = 'not_evaluated',
     ) -> None:
+        if hasattr(self, "_version"):
+            raise TypeError("Facts cannot be initialized twice")
         object.__setattr__(self, "_version", version)
         object.__setattr__(self, "_chain_id", chain_id)
         object.__setattr__(self, "_first_sequence", first_sequence)
@@ -716,6 +731,7 @@ class AnchoredExportFacts(_Facts):
 class GrantDecoded:
     """Decode surface — structural grant facts (verification=not_evaluated)."""
 
+    version: int
     key_id: str
     issuer: str
     grant_id: str
@@ -724,16 +740,152 @@ class GrantDecoded:
     not_before: int
     expires_at: int
     holder_thumbprint: bytes
+    operations: tuple[JObject, ...]
     verification: str = "not_evaluated"
 
+    def __repr__(self) -> str:
+        operations = []
+        for operation in self.operations:
+            name, selectors = operation.v["name"], operation.v["selectors"]
+            assert isinstance(name, JString) and isinstance(selectors, JArray)
+            operations.append(_inspect.structure(f"BoundedAuthorityProtocol.V{self.version}.Operation", [
+                ("name", _inspect.raw(name.v)),
+                ("selectors", _inspect.listing([_inspect.selector(s) for s in selectors.v])),
+            ]))
+        return _inspect.render(_inspect.structure(f"BoundedAuthorityProtocol.V{self.version}.DecodedGrant", [
+            ("version", _inspect.scalar(self.version)), ("key_id", _inspect.text(self.key_id)),
+            ("issuer", _inspect.text(self.issuer)), ("grant_id", _inspect.text(self.grant_id)),
+            ("audiences", _inspect.listing([_inspect.text(v) for v in self.audiences])),
+            ("issued_at", _inspect.scalar(self.issued_at)), ("not_before", _inspect.scalar(self.not_before)),
+            ("expires_at", _inspect.scalar(self.expires_at)), ("holder_thumbprint", _inspect.raw(self.holder_thumbprint)),
+            ("operations", _inspect.listing(operations)), ("verification", _inspect.atom("not_evaluated")),
+        ]))
 
-@dataclass(frozen=True)
-class ProofDecoded:
-    """Decode surface — structural proof facts (verification=not_evaluated)."""
+    __str__ = __repr__
 
-    proof_id: str
-    holder_thumbprint: bytes
-    verification: str = "not_evaluated"
+
+class ProofDecoded(_Facts):
+    """Unverified decoded values; generic enumeration and reduction are refused."""
+
+    __slots__ = ('_version', '_proof_id', '_method', '_target_uri', '_issued_at', '_nonce', '_invocation_id', '_operation', '_grant_hash', '_request_hash', '_holder_public_key', '_holder_thumbprint', '_verification')
+    _version: int
+    _proof_id: str
+    _method: str
+    _target_uri: str
+    _issued_at: int
+    _nonce: str | None
+    _invocation_id: str
+    _operation: str
+    _grant_hash: bytes
+    _request_hash: bytes
+    _holder_public_key: bytes
+    _holder_thumbprint: bytes
+    _verification: str
+
+    def __init__(
+        self,
+        version: int,
+        proof_id: str,
+        method: str,
+        target_uri: str,
+        issued_at: int,
+        nonce: str | None,
+        invocation_id: str,
+        operation: str,
+        grant_hash: bytes,
+        request_hash: bytes,
+        holder_public_key: bytes,
+        holder_thumbprint: bytes,
+        verification: str = "not_evaluated",
+    ) -> None:
+        if hasattr(self, "_version"):
+            raise TypeError("Decoded values cannot be initialized twice")
+        object.__setattr__(self, "_version", version)
+        object.__setattr__(self, "_proof_id", proof_id)
+        object.__setattr__(self, "_method", method)
+        object.__setattr__(self, "_target_uri", target_uri)
+        object.__setattr__(self, "_issued_at", issued_at)
+        object.__setattr__(self, "_nonce", nonce)
+        object.__setattr__(self, "_invocation_id", invocation_id)
+        object.__setattr__(self, "_operation", operation)
+        object.__setattr__(self, "_grant_hash", grant_hash)
+        object.__setattr__(self, "_request_hash", request_hash)
+        object.__setattr__(self, "_holder_public_key", holder_public_key)
+        object.__setattr__(self, "_holder_thumbprint", holder_thumbprint)
+        object.__setattr__(self, "_verification", verification)
+
+    @property
+    def version(self) -> int:
+        return self._version
+
+    @property
+    def proof_id(self) -> str:
+        return self._proof_id
+
+    @property
+    def method(self) -> str:
+        return self._method
+
+    @property
+    def target_uri(self) -> str:
+        return self._target_uri
+
+    @property
+    def issued_at(self) -> int:
+        return self._issued_at
+
+    @property
+    def nonce(self) -> str | None:
+        return self._nonce
+
+    @property
+    def invocation_id(self) -> str:
+        return self._invocation_id
+
+    @property
+    def operation(self) -> str:
+        return self._operation
+
+    @property
+    def grant_hash(self) -> bytes:
+        return self._grant_hash
+
+    @property
+    def request_hash(self) -> bytes:
+        return self._request_hash
+
+    @property
+    def holder_public_key(self) -> bytes:
+        return self._holder_public_key
+
+    @property
+    def holder_thumbprint(self) -> bytes:
+        return self._holder_thumbprint
+
+    @property
+    def verification(self) -> str:
+        return self._verification
+
+    def __repr__(self) -> str:
+        return (
+            f"#BoundedAuthorityProtocol.V{self.version}.DecodedProof<"
+            + "version: " + str(self.version) + ", "
+            + "proof_id: " + _inspect.string(self.proof_id) + ", "
+            + "method: " + _inspect.string(self.method) + ", "
+            + "target_uri: " + _inspect.string(self.target_uri) + ", "
+            + "issued_at: " + str(self.issued_at) + ", "
+            + "nonce: " + ("nil" if self.nonce is None else ":redacted") + ", "
+            + "invocation_id: " + _inspect.string(self.invocation_id) + ", "
+            + "operation: " + _inspect.string(self.operation) + ", "
+            + "grant_hash: " + _inspect.binary(self.grant_hash) + ", "
+            + "request_hash: " + _inspect.binary(self.request_hash) + ", "
+            + "holder_public_key: " + _inspect.binary(self.holder_public_key) + ", "
+            + "holder_thumbprint: " + _inspect.binary(self.holder_thumbprint) + ", "
+            + "verification: " + ":not_evaluated" + ">"
+        )
+
+    __str__ = __repr__
+
 
 
 @dataclass(frozen=True)
@@ -762,6 +914,17 @@ class AttestationDecoded:
     nbf: int
     exp: int
     verification: str = "not_evaluated"
+
+    def __repr__(self) -> str:
+        return _inspect.render(_inspect.structure("BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation", [
+            ("version", _inspect.scalar(1)), ("attestor_key_id", _inspect.text(self.attestor_key_id)),
+            ("jti", _inspect.text(self.jti)), ("key_id", _inspect.text(self.subject_key_id)),
+            ("public_key", _inspect.raw(self.public_key)), ("role", _inspect.text(self.role)),
+            ("nbf", _inspect.scalar(self.nbf)), ("exp", _inspect.scalar(self.exp)),
+            ("verification", _inspect.atom("not_evaluated")),
+        ]))
+
+    __str__ = __repr__
 
 
 class AttestationFacts(_Facts):
@@ -792,6 +955,8 @@ class AttestationFacts(_Facts):
         verification: str = 'signature_and_window',
         trust: str = 'not_evaluated',
     ) -> None:
+        if hasattr(self, "_attestor_key_id"):
+            raise TypeError("Facts cannot be initialized twice")
         object.__setattr__(self, "_attestor_key_id", attestor_key_id)
         object.__setattr__(self, "_attestor_key_fingerprint", attestor_key_fingerprint)
         object.__setattr__(self, "_subject_key_id", subject_key_id)
@@ -859,25 +1024,127 @@ class AttestationFacts(_Facts):
         return hash((self._attestor_key_id, self._attestor_key_fingerprint, self._subject_key_id, self._subject_key_fingerprint, self._role, self._jti, self._nbf, self._exp, self._verification, self._trust,))
 
 
-@dataclass(frozen=True)
-class ContentAssertionDecoded:
-    """Structurally decoded content assertion; no signature or trust evaluation."""
+class ContentAssertionDecoded(_Facts):
+    """Unverified decoded values; generic enumeration and reduction are refused."""
 
-    version: int
-    attestor_key_id: str
-    jti: str
-    iss: str
-    aud: str
-    sub: str
-    profile: str
-    profile_digest: bytes
-    content_digest: bytes
-    gen: int
-    prev: bytes
-    iat: int
-    nbf: int
-    exp: int
-    verification: str = "not_evaluated"
+    __slots__ = ('_version', '_attestor_key_id', '_jti', '_iss', '_aud', '_sub', '_profile', '_profile_digest', '_content_digest', '_gen', '_prev', '_iat', '_nbf', '_exp', '_verification')
+    _version: int
+    _attestor_key_id: str
+    _jti: str
+    _iss: str
+    _aud: str
+    _sub: str
+    _profile: str
+    _profile_digest: bytes
+    _content_digest: bytes
+    _gen: int
+    _prev: bytes
+    _iat: int
+    _nbf: int
+    _exp: int
+    _verification: str
+
+    def __init__(
+        self,
+        version: int,
+        attestor_key_id: str,
+        jti: str,
+        iss: str,
+        aud: str,
+        sub: str,
+        profile: str,
+        profile_digest: bytes,
+        content_digest: bytes,
+        gen: int,
+        prev: bytes,
+        iat: int,
+        nbf: int,
+        exp: int,
+        verification: str = "not_evaluated",
+    ) -> None:
+        if hasattr(self, "_version"):
+            raise TypeError("Decoded values cannot be initialized twice")
+        object.__setattr__(self, "_version", version)
+        object.__setattr__(self, "_attestor_key_id", attestor_key_id)
+        object.__setattr__(self, "_jti", jti)
+        object.__setattr__(self, "_iss", iss)
+        object.__setattr__(self, "_aud", aud)
+        object.__setattr__(self, "_sub", sub)
+        object.__setattr__(self, "_profile", profile)
+        object.__setattr__(self, "_profile_digest", profile_digest)
+        object.__setattr__(self, "_content_digest", content_digest)
+        object.__setattr__(self, "_gen", gen)
+        object.__setattr__(self, "_prev", prev)
+        object.__setattr__(self, "_iat", iat)
+        object.__setattr__(self, "_nbf", nbf)
+        object.__setattr__(self, "_exp", exp)
+        object.__setattr__(self, "_verification", verification)
+
+    @property
+    def version(self) -> int:
+        return self._version
+
+    @property
+    def attestor_key_id(self) -> str:
+        return self._attestor_key_id
+
+    @property
+    def jti(self) -> str:
+        return self._jti
+
+    @property
+    def iss(self) -> str:
+        return self._iss
+
+    @property
+    def aud(self) -> str:
+        return self._aud
+
+    @property
+    def sub(self) -> str:
+        return self._sub
+
+    @property
+    def profile(self) -> str:
+        return self._profile
+
+    @property
+    def profile_digest(self) -> bytes:
+        return self._profile_digest
+
+    @property
+    def content_digest(self) -> bytes:
+        return self._content_digest
+
+    @property
+    def gen(self) -> int:
+        return self._gen
+
+    @property
+    def prev(self) -> bytes:
+        return self._prev
+
+    @property
+    def iat(self) -> int:
+        return self._iat
+
+    @property
+    def nbf(self) -> int:
+        return self._nbf
+
+    @property
+    def exp(self) -> int:
+        return self._exp
+
+    @property
+    def verification(self) -> str:
+        return self._verification
+
+    def __repr__(self) -> str:
+        return "#BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion<redacted>"
+
+    __str__ = __repr__
+
 
 
 class ContentAssertionFacts(_Facts):
@@ -924,6 +1191,8 @@ class ContentAssertionFacts(_Facts):
         verification: str = 'signature_and_window',
         trust: str = 'not_evaluated',
     ) -> None:
+        if hasattr(self, "_version"):
+            raise TypeError("Facts cannot be initialized twice")
         object.__setattr__(self, "_version", version)
         object.__setattr__(self, "_attestor_key_id", attestor_key_id)
         object.__setattr__(self, "_attestor_key_fingerprint", attestor_key_fingerprint)

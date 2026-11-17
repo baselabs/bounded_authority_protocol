@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from types import MappingProxyType
+from typing import cast
 
-from ._inputs import _text
+from ._inputs import _mapping_items, _text
 from .error import InvalidError, Ok, Result, _fail, err
 
 # The original 38-row table comes from spec/bap-v1.md. ``content_bytes`` is the ADR 0018
@@ -76,20 +77,24 @@ class Bounds:
     _overrides: Mapping[str, int] | None
 
     def __init__(self, overrides: object = None) -> None:
-        validated: dict[str, int] = {}
-        if overrides is not None:
-            if not isinstance(overrides, Mapping):
-                object.__setattr__(self, "_overrides", None)
-                return
-            for key, value in overrides.items():
-                if not isinstance(key, str) or key not in MAXIMA or not isinstance(value, int) or isinstance(value, bool):
-                    object.__setattr__(self, "_overrides", None)
-                    return
-                if value <= 0 or value > MAXIMA[key] or (key in FIXED_WIDTH_KEYS and value != MAXIMA[key]):
-                    object.__setattr__(self, "_overrides", None)
-                    return
-                validated[str.__str__(key)] = int.__int__(value)
-        object.__setattr__(self, "_overrides", MappingProxyType(validated))
+        if hasattr(self, "_overrides"):
+            raise TypeError("Bounds cannot be initialized twice")
+        try:
+            validated: dict[str, int] = {}
+            if overrides is not None:
+                for key, value in _mapping_items(overrides):
+                    if not issubclass(type(key), str) or not issubclass(type(value), int) or type(value) is bool:
+                        _fail()
+                    key = str.__str__(cast(str, key))
+                    value = int.__int__(cast(int, value))
+                    if key not in MAXIMA or value <= 0 or value > MAXIMA[key]:
+                        _fail()
+                    if key in FIXED_WIDTH_KEYS and value != MAXIMA[key]:
+                        _fail()
+                    validated[key] = value
+            object.__setattr__(self, "_overrides", MappingProxyType(validated))
+        except InvalidError:
+            object.__setattr__(self, "_overrides", None)
 
     def __setattr__(self, name: str, value: object) -> None:
         raise AttributeError("Bounds is immutable")
@@ -102,14 +107,7 @@ class Bounds:
         return self._overrides if self._overrides is not None else MappingProxyType({})
 
     def resolve(self, key: str) -> Result[int]:
-        try:
-            key = _text(key)
-            if key not in MAXIMA or getattr(self, "_overrides", None) is None:
-                _fail()
-            assert self._overrides is not None
-            return Ok(self._overrides.get(key, MAXIMA[key]))
-        except InvalidError:
-            return err()
+        return bounds_resolve(self, key)
 
 
 MAXIMUM_BOUNDS = Bounds()
@@ -121,9 +119,14 @@ def bounds_maximum() -> Result[Bounds]:
 
 
 def bounds_resolve(b: object, key: str) -> Result[int]:
-    if not isinstance(b, Bounds):
+    try:
+        key = _text(key)
+        if type(b) is not Bounds or key not in MAXIMA or getattr(b, "_overrides", None) is None:
+            _fail()
+        assert b._overrides is not None
+        return Ok(b._overrides.get(key, MAXIMA[key]))
+    except InvalidError:
         return err()
-    return b.resolve(key)
 
 
 def bounds_new(tightening: Mapping[str, int] | None = None) -> Result[Bounds]:
@@ -134,6 +137,6 @@ def bounds_new(tightening: Mapping[str, int] | None = None) -> Result[Bounds]:
 
 def coerce_bounds(b: object) -> Result[Bounds]:
     """Accept only a Bounds value whose constructor validated all limits."""
-    if not isinstance(b, Bounds) or getattr(b, "_overrides", None) is None:
+    if type(b) is not Bounds or getattr(b, "_overrides", None) is None:
         return err()
     return Ok(b)
