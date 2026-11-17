@@ -77,7 +77,7 @@ class Bounds:
 
     def __init__(self, overrides: Mapping[str, int] | None = None) -> None:
         # Wrap in a read-only MappingProxyType so the overrides cannot be mutated post-construction
-        # (a caller doing ``bounds_maximum().overrides["depth"] = 999`` raises TypeError, not widens).
+        # (a caller doing ``MAXIMUM_BOUNDS.overrides["depth"] = 999`` raises TypeError, not widens).
         self._overrides: Mapping[str, int] = MappingProxyType(dict(overrides)) if overrides else MappingProxyType({})
 
     @property
@@ -96,7 +96,7 @@ class Bounds:
 
 
 MAXIMUM_BOUNDS = Bounds()
-"""The immutable maximum — ``Bounds.maximum()`` (REQ1-BOUNDS-tighten-only)."""
+"""The immutable maximum returned by ``bounds_maximum`` (REQ1-BOUNDS-tighten-only)."""
 
 
 def bounds_maximum() -> Result[Bounds]:

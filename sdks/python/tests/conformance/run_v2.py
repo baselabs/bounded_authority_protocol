@@ -607,8 +607,7 @@ def _build_export_expected(inp: dict[str, Any], for_encode: bool = False) -> v2.
     bounds_raw = expected.get("bounds")
     bounds = None
     if isinstance(bounds_raw, dict):
-        # bounds_new returns Bounds directly and raises InvalidError on a bad override map
-        # (the bounds.new surface wraps the same call with _run_thunk).
+        # Map the closed bounds Result to the runner's INVALID sentinel.
         built = _run_thunk(lambda: _unwrap(v2.bounds_new(bounds_raw)))
         if built is INVALID:
             abort("export: expected bounds")
