@@ -22,6 +22,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        # Names the v1, v2 and v3 modules whose decode paths must not reach a
                        # producer canonicality check (erratum 3).
                        "test/architecture/producer_canonicality_scope_test.exs",
+                       # Proves SDK fixture rendering against every accepted contract major.
+                       "test/architecture/sdk_rendering_fixtures_test.exs",
                        "test/docs_guides_test.exs",
                        "test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",
                        "test/bounded_authority_protocol/signature_width_error_shape_test.exs",
