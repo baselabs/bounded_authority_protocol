@@ -147,7 +147,7 @@ jobs:
   quality-source:
     name: "Quality: source, static analysis and docs"
     runs-on: ubuntu-24.04
-    timeout-minutes: 90 # no green run yet
+    timeout-minutes: 7 # 2x slowest green 3.5 min, run 44200170042.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -193,7 +193,7 @@ jobs:
   quality-corpus:
     name: "Quality: corpus and distribution"
     runs-on: ubuntu-24.04
-    timeout-minutes: 90 # no green run yet
+    timeout-minutes: 12 # 2x slowest green 5.6 min, run 44200170042.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -262,7 +262,7 @@ jobs:
   quality-tests:
     name: "Quality: seeded coverage suite and performance"
     runs-on: ubuntu-24.04
-    timeout-minutes: 90 # no green run yet
+    timeout-minutes: 20 # 2x slowest green 9.8 min, run 44200170042.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -316,7 +316,7 @@ jobs:
   quality-conformance:
     name: "Quality: conformance verification and mutations"
     runs-on: ubuntu-24.04
-    timeout-minutes: 90 # no green run yet
+    timeout-minutes: 28 # 2x slowest green 13.7 min, run 44200170042.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -358,7 +358,7 @@ jobs:
   quality-mutations:
     name: "Quality: archive, assertion and spec mutations"
     runs-on: ubuntu-24.04
-    timeout-minutes: 90 # no green run yet
+    timeout-minutes: 18 # 2x slowest green 9.0 min, run 44200170042.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -402,7 +402,7 @@ jobs:
     outputs:
       version: ${{ steps.archive.outputs.version }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 90 # no green run yet
+    timeout-minutes: 6 # 2x slowest green 2.9 min, run 44200170042.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -610,7 +610,7 @@ jobs:
       - dependency-review
       - attest
     runs-on: ubuntu-24.04
-    timeout-minutes: 5 # Estimate: under 1 min for the new result aggregation job; 5-minute floor.
+    timeout-minutes: 5 # 5-minute floor; slowest green 2 sec, run 44200170042.
     steps:
       - name: Require every qualification result to succeed
         env:
