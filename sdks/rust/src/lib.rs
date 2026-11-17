@@ -24,6 +24,7 @@ pub mod bounds;
 pub mod content_assertion;
 pub mod error;
 pub mod facts;
+mod inspect;
 pub mod jcs;
 pub mod json;
 pub mod jwk;

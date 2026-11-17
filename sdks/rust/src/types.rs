@@ -245,14 +245,15 @@ pub struct KeyLocator {
 /// verifying the Ed25519 signature, so the result carries
 /// `verification: NotEvaluated` (`REQ1-VERIFY-decode-not-evaluated`). It
 /// surfaces the decoded identity/timing claims a caller inspects before
-/// deciding to verify — a REDACTED VIEW of the parsed compact, not a verified
+/// deciding to verify — an unverified diagnostic view of the parsed compact, not a verified
 /// fact. The corpus `grant-decode/decode.json` `expected` pins only `key_id`;
 /// the remaining fields are the unambiguous decoded scalars (the
 /// `holder_thumbprint` is the decoded `cnf.jkt`, not a verified digest). It
-/// carries NO operations/selectors (the authorization scope is intentionally
-/// not surfaced by the decode view).
-#[derive(Debug, Clone, PartialEq)]
+/// includes the structural operations and selectors, without signature verification.
+#[derive(Clone, PartialEq)]
 pub struct GrantDecoded {
+    /// Structurally decoded operations in grant order.
+    pub operations: Vec<JsonValue>,
     /// The protected-header `kid` (corpus-pinned).
     pub key_id: String,
     /// The grant `v` claim (integral contract-major).
@@ -284,10 +285,13 @@ pub struct GrantDecoded {
 /// `proof-decode/decode.json` `expected` pins only `proof_id`; the remaining
 /// fields are the decoded proof claims. `nonce` is surfaced as an `Option`
 /// because a proof MAY carry one (decode reflects what was decoded; the
-/// facts-redaction contract governs verified facts, not decode views — the
-/// nonce is already public in the proof's cleartext payload).
-#[derive(Debug, Clone, PartialEq)]
+/// diagnostic rendering redacts the nonce, matching the reference decode view).
+#[derive(Clone, PartialEq)]
 pub struct ProofDecoded {
+    /// Contract-major of the proof.
+    pub version: i64,
+    /// Raw holder public key (32-byte Ed25519 or 65-byte uncompressed P-256).
+    pub holder_public_key: Vec<u8>,
     /// The protected-header `kid` hint (the proof header carries a JWK, not a
     /// trusted `kid`).
     pub key_id: String,
@@ -843,9 +847,9 @@ pub struct ExpectedAttestation {
 /// `decode_attestation` parses and structurally validates the compact against
 /// the closed header/payload sets of §2 without verifying the Ed25519
 /// signature, so the result carries `verification: NotEvaluated`
-/// (`REQ-RA1-VERIFY-facts` is the verified shape; this is the redacted parse
+/// (`REQ-RA1-VERIFY-facts` is the verified shape; this is the unverified parse
 /// view). The header `kid` is surfaced as the attestor key id hint.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct AttestationDecoded {
     /// The protected-header `kid` (the attestor key id hint, NOT a trust
     /// selector).
@@ -864,6 +868,56 @@ pub struct AttestationDecoded {
     pub exp: i64,
     /// Signature verification was not performed.
     pub verification: NotEvaluated,
+}
+
+impl std::fmt::Debug for GrantDecoded {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::inspect::{atom, int, operations, raw, render, structure, text, Term};
+        f.write_str(&render(&structure(
+            format!("BoundedAuthorityProtocol.V{}.DecodedGrant", self.version),
+            vec![
+                ("version", int(self.version)),
+                ("key_id", text(&self.key_id)),
+                ("issuer", text(&self.issuer)),
+                ("grant_id", text(&self.grant_id)),
+                (
+                    "audiences",
+                    Term::List(self.audiences.iter().map(|v| text(v)).collect()),
+                ),
+                ("issued_at", int(self.issued_at)),
+                ("not_before", int(self.not_before)),
+                ("expires_at", int(self.expires_at)),
+                ("holder_thumbprint", raw(&self.holder_thumbprint)),
+                ("operations", operations(&self.operations, self.version)),
+                ("verification", atom("not_evaluated")),
+            ],
+        )))
+    }
+}
+impl std::fmt::Debug for ProofDecoded {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::inspect::{binary, string};
+        write!(f,"#BoundedAuthorityProtocol.V{}.DecodedProof<version: {}, proof_id: {}, method: {}, target_uri: {}, issued_at: {}, nonce: {}, invocation_id: {}, operation: {}, grant_hash: {}, request_hash: {}, holder_public_key: {}, holder_thumbprint: {}, verification: :not_evaluated>",self.version,self.version,string(&self.proof_id),string(&self.method),string(&self.target_uri),self.issued_at,if self.nonce.is_some(){":redacted"}else{"nil"},string(&self.invocation_id),string(&self.operation),binary(&self.grant_hash),binary(&self.request_hash),binary(&self.holder_public_key),binary(&self.holder_thumbprint))
+    }
+}
+impl std::fmt::Debug for AttestationDecoded {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::inspect::{atom, int, raw, render, structure, text};
+        f.write_str(&render(&structure(
+            "BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation".into(),
+            vec![
+                ("version", int(1)),
+                ("attestor_key_id", text(&self.attestor_key_id)),
+                ("jti", text(&self.jti)),
+                ("key_id", text(&self.key_id)),
+                ("public_key", raw(&self.public_key)),
+                ("role", text(self.role.as_str())),
+                ("nbf", int(self.nbf)),
+                ("exp", int(self.exp)),
+                ("verification", atom("not_evaluated")),
+            ],
+        )))
+    }
 }
 
 #[cfg(test)]
@@ -1020,6 +1074,7 @@ mod tests {
     #[test]
     fn grant_decoded_constructs() {
         let d = GrantDecoded {
+            operations: vec![],
             key_id: "issuer".to_string(),
             version: 1,
             issuer: "https://issuer.example.test".to_string(),
@@ -1032,7 +1087,7 @@ mod tests {
             verification: NotEvaluated,
         };
         let debug = format!("{d:?}");
-        assert!(debug.contains("GrantDecoded"));
+        assert!(debug.contains("DecodedGrant"));
         assert!(debug.contains("verification"));
         let _ = d.clone();
     }
@@ -1040,6 +1095,8 @@ mod tests {
     #[test]
     fn proof_decoded_constructs_with_and_without_nonce() {
         let base = || ProofDecoded {
+            version: 1,
+            holder_public_key: vec![0; 32],
             key_id: "issuer".to_string(),
             proof_id: "urn:example:proof:1".to_string(),
             method: "POST".to_string(),

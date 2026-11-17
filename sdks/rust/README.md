@@ -284,3 +284,8 @@ Deployment notes, including AWS Lambda and PostgreSQL: see
 ## License
 
 Apache License 2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+
+Decoded diagnostics match the Elixir inspection notation. `GrantDecoded` includes ordered
+`operations`; `ProofDecoded` includes `version` and `holder_public_key` and redacts its optional
+nonce in `Debug`. `DecodedContentAssertion` renders fully redacted. No decoded type implements
+serde serialization. Read named fields explicitly.

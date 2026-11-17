@@ -153,6 +153,7 @@ pub fn untrusted_key_locator(compact: &[u8], bounds: &Bounds) -> Result<KeyLocat
 pub fn decode_grant(compact: &[u8], bounds: &Bounds) -> Result<GrantDecoded> {
     let g = decode_grant_parts(compact, bounds)?;
     Ok(GrantDecoded {
+        operations: g.payload.operations,
         key_id: g.key_id,
         version: g.payload.version,
         issuer: g.payload.issuer,
@@ -184,6 +185,8 @@ pub fn decode_proof(compact: &[u8], bounds: &Bounds) -> Result<ProofDecoded> {
     let p = decode_proof_parts(compact, bounds)?;
     let holder_thumbprint = thumbprint_raw(&p.holder_public_key)?;
     Ok(ProofDecoded {
+        version: 2,
+        holder_public_key: p.holder_public_key.to_vec(),
         // The proof header carries a JWK, not a kid; the field is empty.
         key_id: String::new(),
         proof_id: p.payload.proof_id,
@@ -3063,6 +3066,7 @@ fn validate_proof_header(header: &JsonValue, bounds: &Bounds) -> Result<[u8; 32]
 
 /// Intermediate grant-payload decode (the fields GrantDecoded carries).
 struct GrantPayload {
+    operations: Vec<JsonValue>,
     version: i64,
     issuer: String,
     grant_id: String,
@@ -3123,6 +3127,10 @@ fn validate_grant_payload(payload: &JsonValue, bounds: &Bounds) -> Result<GrantP
         return Err(Invalid);
     }
     Ok(GrantPayload {
+        operations: match operations {
+            Some(JsonValue::Array(v)) => v.clone(),
+            _ => return Err(Invalid),
+        },
         version,
         issuer,
         grant_id,

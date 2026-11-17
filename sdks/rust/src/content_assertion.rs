@@ -48,7 +48,7 @@ pub struct ExpectedContentAssertion {
     pub bounds: Bounds,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct DecodedContentAssertion {
     pub version: i64,
     pub attestor_key_id: String,
@@ -647,5 +647,13 @@ fn b64_string(bytes: &[u8]) -> Result<String> {
 impl std::fmt::Debug for ContentAssertionFacts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("#BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts<redacted>")
+    }
+}
+
+impl std::fmt::Debug for DecodedContentAssertion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(
+            "#BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion<redacted>",
+        )
     }
 }
