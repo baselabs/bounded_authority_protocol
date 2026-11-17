@@ -6,9 +6,8 @@ The Bounded Authority Protocol aims to become the industry standard for cryptogr
 argument-level agent capability verification and attestation. A standard is more than a correct
 library: it is consistent, persistent, and survives upgrades and enhancements. This charter defines
 the evolution, cryptographic-agility, conformance, registration, governance, and delegation
-posture that make those properties true — designed now, before first publication, because every
-item here is cheap to define before third parties implement the profile and nearly impossible to
-retrofit after.
+posture for the published protocol. Each closed profile keeps its own identity as new
+contract-majors and sibling profiles are added.
 
 This document is the standing authority for standards-track decisions. The
 [protocol charter](protocol-charter.md) defines what the verifier does; the normative
@@ -100,10 +99,16 @@ coordinated so independent implementers never collide while no accepted byte cha
 
 ## Cryptographic suite identity
 
-The current profile is not "the" algorithm set; it is a **named suite**:
-`BAP1-Ed25519-SHA256` — EdDSA over Ed25519, SHA-256 digests, RFC 8785 JCS canonical bytes, and the
-`BAP1-*` domain separators. Every current artifact carries this suite identity implicitly through
-its domain separators, `alg` values, and fixed widths. The suite registry names it explicitly.
+Each contract-major has a **named suite**:
+
+- `BAP1-Ed25519-SHA256`: EdDSA over Ed25519, SHA-256, RFC 8785 JCS, and `BAP1-*` domain separators;
+- `BAP2-Ed25519-SHA256`: the same algorithms with `BAP2-*` separators and contract-major 2's range selectors;
+- `BAP3-ES256-SHA256`: ECDSA over P-256 with SHA-256, RFC 8785 JCS, and `BAP3-*` separators.
+
+An artifact's contract-major, `alg`, domain separators, and fixed widths identify its suite
+under the corresponding closed profile. The [suite registry](registries.md#cryptographic-suites)
+lists all three active suites; byte-distinct sibling profiles have their own type and profile
+identities rather than implicitly belonging to every suite.
 
 Suite succession follows the naming scheme `BAP<contract-major>-<signature>-<digest>`. A successor
 suite binds new domain separators, new `alg` values, and new fixed widths under its own
@@ -163,7 +168,7 @@ for every name this protocol uses or reserves.
 ## Delegation with attenuation
 
 Multi-agent topologies sub-delegate: a planner spawns workers, each needing a narrower capability
-than its parent. The current contract-major binds one holder per grant, deliberately. The
+than its parent. Every shipped contract-major binds one holder per grant, deliberately. The
 delegation design is **specified now** so the successor contract-major implements an
 already-decided shape rather than opening a design debate after external adoption:
 

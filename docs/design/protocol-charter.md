@@ -13,8 +13,9 @@ The protocol is on a standards track governed by the
 [governance policy](../governance.md): each closed wire profile is
 permanent and evolution happens above it through parallel contract-majors or byte-distinct sibling
 application proof profiles with their own protected type, API, media type, and corpus; the
-current profile is the named suite `BAP1-Ed25519-SHA256` with a specified post-quantum succession
-and cross-suite evidence-attestation path; names for delegation (`ba_dlg`,
+active suites are `BAP1-Ed25519-SHA256`, `BAP2-Ed25519-SHA256`, and `BAP3-ES256-SHA256`, each
+with its own normative specification and corpus. Post-quantum succession and cross-suite
+evidence attestation remain successor-major designs. Names for delegation (`ba_dlg`,
 `ba+cap-delegated`), principal binding (`ba_obo`), and status checking are reserved in the
 [registries](registries.md) with their designs decided; governance, errata, and deprecation
 policy are published. Nothing in that posture changes a byte, bound, or verdict of this charter's
@@ -30,7 +31,8 @@ verification chain.
 4. Outside a database transaction, `verify_grant/3` verifies the raw compact grant against the
    exact candidate key, issuer, audience, explicit time, skew, and bounds. It returns redacted
    `GrantFacts{authorization: :not_evaluated}`.
-5. The grant binds an Ed25519 holder key through `cnf.jkt`.
+5. The grant binds the holder key through `cnf.jkt`: Ed25519 in contract-majors 1 and 2,
+   P-256 in contract-major 3.
 6. `check_envelope/2` accepts raw grant and proof bytes, re-verifies the raw grant rather than
    accepting the facts, verifies the RFC 9449 proof, and binds holder, grant, method, normalized
    HTTPS URI, invocation ID, operation, cast-argument digest, time, nonce, and selectors.
@@ -52,13 +54,18 @@ audience, grant ID, coherent times, unique operations, ordered selectors, and ho
 Deterministic producers emit JCS protected/payload bytes and return a signing input; the package
 never accepts private key material, a signer, or a signing callback.
 
+Contract-major 2 keeps the Ed25519 suite and adds same-tag numeric range selectors.
+Contract-major 3 uses ES256/P-256 and that five-kind selector algebra. Their exact closed
+profiles are [contract-major 2](../../spec/bap-v2.md) and [contract-major 3](../../spec/bap-v3.md);
+the following proof construction describes contract-major 1, not every active suite.
+
 Unknown versions, algorithms, headers, claims, selectors, duplicate keys, encodings, or
 over-limit structures fail closed. The verifier does not use `kid` to discover trust.
 
 A stateful authority may issue a separate, narrower current-v1 `ba+cap` to a new holder, but the
 resulting compact is an ordinary issuer-signed grant and carries no parent proof. Parent comparison,
 lineage, ancestor revocation, and fan-out policy remain online runtime responsibilities. The
-current profile still rejects `ba_dlg` and `ba+cap-delegated`; portable holder-signed delegation
+shipped profiles still reject `ba_dlg` and `ba+cap-delegated`; portable holder-signed delegation
 remains successor-major design work, charted in the
 [successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md).
 

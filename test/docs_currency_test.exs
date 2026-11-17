@@ -195,6 +195,7 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
 
   defp unreleased_marker_errors(version, ahead?, read) do
     marker = "(unreleased, planned for #{version})"
+
     {listing, 0} =
       System.cmd("git", [
         "ls-files",

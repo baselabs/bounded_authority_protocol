@@ -36,8 +36,10 @@ release) and run the packaged corpora after each upgrade
 ([Recipes](recipes.md#run-every-packaged-corpus)).
 
 Within a contract-major, the accepted bytes and verdicts never change except through such a
-repair. Every function keeps returning `{:ok, value}` or exactly `{:error, :invalid}`, and the
-facts structs keep their not-evaluated markers.
+repair. The contract-major and sibling-profile facades keep returning `{:ok, value}` or exactly
+`{:error, :invalid}`, and the facts structs keep their not-evaluated markers. Public crypto
+predicates, including `BoundedAuthorityProtocol.Ed25519.verify_strict/3` and
+`BoundedAuthorityProtocol.Es256.verify_strict/3`, return booleans instead.
 
 ## Stable surface
 
@@ -181,8 +183,9 @@ any message the CLI writes to standard error.
 
 Whatever the package version:
 
-- every verification and production function returns `{:ok, value}` or exactly
-  `{:error, :invalid}`, and signals every failure with that one value;
+- every contract-major and sibling-profile facade returns `{:ok, value}` or exactly
+  `{:error, :invalid}`; crypto predicates return `false` for invalid inputs, while the ES256
+  conversion and normalization helpers use the success/error tuple convention;
 - the facts are redacted and never authorize (`authorization: :not_evaluated`,
   `trust: :not_evaluated`);
 - the package performs no I/O, reads no clock, and holds no keys, outside the conformance CLI's

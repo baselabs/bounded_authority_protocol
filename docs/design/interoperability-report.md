@@ -3,10 +3,11 @@
 **Status:** current for corpus revision 1, certified index digest
 `TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs` (base64url SHA-256 of `index.json`;
 hex `4cb5072ab40ffd4b111659e6d4ab20209202380505f1f8424b96d22e533cb91b`).
-Every figure in this report is machine-derived: the certified digests and corpus revisions come
-from the corpus identity gates that run in `mix quality`; the case counts come from the certified
-indexes; the per-implementation verdicts come from each implementation's own runner executed
-against the identical corpus. A stale figure here fails the docs-currency tests.
+Certified digests, corpus revisions, and case counts come from the corpus artifacts;
+per-implementation verdicts record each implementation's runner against the identical corpus.
+The docs-currency tests check the contract-major 1 digest, revision, case/surface/key counts,
+and local-loopback corpus identity and counts. They do not validate execution dates,
+implementation commit identities, toolchains, or current registry versions.
 
 Last regenerated November 9, 2026. Every result below was re-executed that day at these
 identities:
@@ -240,9 +241,9 @@ repository.
   to its own repository on first publication. Their cross-validation above is
   repository-executed, not registry-distributed. The TypeScript verifier is published from its
   own repository.
-- The TypeScript row was run at that repository's `main`, which carries the erratum 6 repair
-  ahead of its next release; the published npm 1.0.0 predates erratum 6 and returns the
-  pre-repair verdicts recorded in the [errata registry](../errata.md).
+- The TypeScript row records the November 9 source identity above, not a new execution of a
+  registry package. The repair shipped in npm verifier 2.0.0 on November 10, 2026, alongside
+  protocol 1.0.0; npm 1.0.0 predates erratum 6, as the [errata registry](../errata.md) records.
 - Rows marked "pass" report the implementation's certified-corpus test (which asserts the pinned
   index and the exact case counts and fails on any disagreement), not a printed agreement count.
 - The independent Node runner implements contract-major 1 only, so it reports the strict-Ed25519
