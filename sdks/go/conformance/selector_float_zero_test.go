@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	v "github.com/baselabs/bounded_authority_protocol_go"
+	"github.com/baselabs/bounded_authority_protocol_go/internal/corpuscheck"
 )
 
 // sfzCertifiedIndexSHA256 is the SHA-256 (base64url) of the certified selector float-zero corpus
@@ -29,7 +30,7 @@ import (
 const sfzCertifiedIndexSHA256 = "l_16mc2_OswKePW6HGVW4jpj4K1m9TPjH9afgtxfMAM"
 
 const (
-	sfzCorpusDir  = "corpus-selector-float-zero"
+	sfzCorpusDir  = "priv/conformance/selector-float-zero"
 	sfzProfile    = "bap-selector-float-zero/1"
 	sfzRevision   = 1
 	sfzTotalCases = 161
@@ -48,12 +49,14 @@ type sfzIndex struct {
 }
 
 type sfzCase struct {
-	ID           string `json:"id"`
-	Rule         string `json:"rule"`
-	Major        int    `json:"major"`
-	Surface      string `json:"surface"`
-	Class        string `json:"class"`
-	Construction string `json:"construction"`
+	File         string         `json:"-"`
+	Actual       map[string]any `json:"-"`
+	ID           string         `json:"id"`
+	Rule         string         `json:"rule"`
+	Major        int            `json:"major"`
+	Surface      string         `json:"surface"`
+	Class        string         `json:"class"`
+	Construction string         `json:"construction"`
 	Input        struct {
 		// decode_grant
 		Compact string `json:"compact"`
@@ -136,6 +139,9 @@ func loadSelectorFloatZero(t *testing.T) []sfzCase {
 		}
 		if len(doc.Cases) != file.Cases {
 			t.Fatalf("%s holds %d cases, index declares %d", file.Path, len(doc.Cases), file.Cases)
+		}
+		for i := range doc.Cases {
+			doc.Cases[i].File = file.Path
 		}
 		cases = append(cases, doc.Cases...)
 		counted += len(doc.Cases)
@@ -262,8 +268,12 @@ func sfzRun(t *testing.T, c sfzCase) (bool, string) {
 		default:
 			t.Fatalf("%s: major %d", c.ID, c.Major)
 		}
+		c.Actual["verdict"] = corpuscheck.Verdict(err)
 		if (err == nil) != wantValid {
 			return false, "verdict"
+		}
+		if err == nil {
+			c.Actual["key_id"] = kid
 		}
 		if wantValid && kid != c.Expected.KeyID {
 			return false, "key id " + kid
@@ -282,12 +292,16 @@ func sfzRun(t *testing.T, c sfzCase) (bool, string) {
 		default:
 			t.Fatalf("%s: major %d", c.ID, c.Major)
 		}
+		c.Actual["verdict"] = corpuscheck.Verdict(err)
 		if (err == nil) != wantValid {
 			return false, "verdict"
 		}
 		if wantValid {
 			protected := v.Base64urlEncode(si.Protected)
 			payload := v.Base64urlEncode(si.Payload)
+			c.Actual["protected_segment"] = protected
+			c.Actual["payload_segment"] = payload
+			c.Actual["message"] = protected + "." + payload
 			if protected != c.Expected.ProtectedSegment || payload != c.Expected.PayloadSegment ||
 				protected+"."+payload != c.Expected.Message {
 				return false, "signing-input bytes"
@@ -306,6 +320,7 @@ func sfzRun(t *testing.T, c sfzCase) (bool, string) {
 		default:
 			t.Fatalf("%s: major %d", c.ID, c.Major)
 		}
+		c.Actual["verdict"] = corpuscheck.Verdict(err)
 		if (err == nil) != wantValid {
 			return false, "verdict"
 		}
@@ -316,6 +331,7 @@ func sfzRun(t *testing.T, c sfzCase) (bool, string) {
 }
 
 func TestSelectorFloatZeroCorpus(t *testing.T) {
+	execution := corpuscheck.New(t, sfzCorpusDir, "priv/conformance", sfzCertifiedIndexSHA256)
 	cases := loadSelectorFloatZero(t)
 	seen := map[string]bool{}
 	agreed, rejected, accepted := 0, 0, 0
@@ -328,7 +344,9 @@ func TestSelectorFloatZeroCorpus(t *testing.T) {
 		if c.Expected.Verdict != "valid" && c.Expected.Verdict != "invalid" {
 			t.Fatalf("%s: verdict %q", c.ID, c.Expected.Verdict)
 		}
+		c.Actual = map[string]any{}
 		ok, why := sfzRun(t, c)
+		execution.Record(c.ID, c.File, c.Actual)
 		if !ok {
 			disagreed = append(disagreed, c.ID+" ("+c.Construction+"; "+why+")")
 			continue
@@ -349,6 +367,7 @@ func TestSelectorFloatZeroCorpus(t *testing.T) {
 		}
 		t.Fatalf("selector float-zero: agreed=%d disagreed=%d", agreed, len(disagreed))
 	}
+	execution.Finish()
 	t.Logf("selector float-zero: agreed=%d/%d disagreed=0 (%d rejected, %d accepted)",
 		agreed, sfzTotalCases, rejected, accepted)
 }

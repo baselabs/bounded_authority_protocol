@@ -27,6 +27,7 @@ from bounded_authority_verifier import (
 from bounded_authority_verifier import role_attestation as role_attestation_module
 from bounded_authority_verifier.bounds import Bounds, bounds_new
 from bounded_authority_verifier.error import InvalidError, _unwrap
+from corpus_support import CorpusRun
 
 _CERTIFIED_INDEX_SHA256 = "be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a"
 
@@ -115,7 +116,7 @@ def test_attestation_tightened_size_bounds(surface: str, ceiling: str) -> None:
 
 def _corpus_root() -> Path:
     return (
-        Path(__file__).resolve().parents[3]
+        Path(__file__).resolve().parents[1] / "conformance"
         / "priv/conformance/attestation-profiles/role-attestation/v1"
     )
 
@@ -221,6 +222,7 @@ def _apply_overrides(
 
 def test_certified_role_attestation_corpus_drives_python_verdicts() -> None:
     root = _corpus_root()
+    execution = CorpusRun(root, _CERTIFIED_INDEX_SHA256)
     index_bytes = (root / "index.json").read_bytes()
     assert hashlib.sha256(index_bytes).hexdigest() == _CERTIFIED_INDEX_SHA256
     index = json.loads(index_bytes)
@@ -249,12 +251,16 @@ def test_certified_role_attestation_corpus_drives_python_verdicts() -> None:
     for case in cases:
         compact = case["compact"].encode()
         case_expected = _apply_overrides(expected, case.get("expected_overrides", {}))
+        execution.record(case["id"], {"decode": decode_attestation(compact).is_ok,
+                                      "verify": verify_attestation(compact, case_expected).is_ok}, "attestation-cases.json")
         assert decode_attestation(compact).is_ok == case["decode"], case["id"]
         assert verify_attestation(compact, case_expected).is_ok == case["verify"], case["id"]
         # Cross-profile rejection, this direction: the v1 grant decoder accepts ONLY the case the
         # corpus marks v1_grant (the grant-with-ba+cap confusion probe) and rejects every
         # ba+role-attestation compact.
         assert decode_grant(compact).is_ok == case.get("v1_grant", False), case["id"]
+
+    execution.finish()
 
 
 def test_role_attestation_producer_assembles_and_stays_profile_distinct() -> None:

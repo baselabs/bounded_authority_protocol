@@ -14,23 +14,23 @@ revocation, or decides whether a request may run. Those stay in your service.
 Already-trusted public keys, expected context, and time are explicit inputs. The SDK has no
 private-key access or custody and reads no clock.
 
-Its behavior is defined by the specifications ([v1](../../spec/bap-v1.md),
-[v2](../../spec/bap-v2.md), [v3](../../spec/bap-v3.md), and the sibling profiles under
-[`spec/`](../../spec/)) and the certified conformance corpora; source comments cite
+Its behavior is defined by the specifications ([v1](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v1.md),
+[v2](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v2.md), [v3](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v3.md), and the sibling profiles under
+[`spec/`](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/)) and the certified conformance corpora; source comments cite
 the tracked normative specifications and independent conformance corpora.
 
 ## Status
 
 **Not published.** The crate is not on crates.io; the name `bounded-authority-protocol` is the
 one it will use, and any crate of that name there is not ours until this page says otherwise. It moves to its own repository when it is first published
-with self-contained tests and corpus inputs. Until then, depend on
+with its self-contained tests and corpus inputs. Until then, depend on
 a checkout of this repository.
 
 - Rust **1.88** or later (`rust-version` in `Cargo.toml`; `rust-toolchain.toml` pins 1.88.0 for
   development and CI).
 - Runtime dependencies: `ed25519-dalek` 3.0 (default features off), `p256` 0.14 (ECDSA only, for
   contract-major 3), `sha2` 0.11 and `ryu-js` 1.0. `zeroize` is a transitive dependency. See the
-  [deployment notes](../../docs/deployment/rust-sdk.md) for the full tree and its `unsafe` use.
+  [deployment notes](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/rust-sdk.md) for the full tree and its `unsafe` use.
 - `#![forbid(unsafe_code)]` covers this crate's own source.
 - **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
   conforming signer emits under spec/bap-v1.md §16 and spec/bap-v3.md §3.2. The certified
@@ -48,26 +48,13 @@ testing this checkout. A consuming application maintains and audits its own lock
 
 ## Install from a checkout
 
-Clone this repository next to your crate, so the two directories are siblings:
-
-```text
-parent/
-  bounded_authority_protocol/   (git clone https://github.com/baselabs/bounded_authority_protocol.git)
-  myapp/                        (your crate)
-```
-
-Then, in `myapp/Cargo.toml`:
+Copy this SDK directory into your application's `vendor/bap/` directory and use a local
+Cargo path dependency, or pin this repository's Git commit in your dependency declaration.
+The SDK root is the complete crate, including its tests and inputs.
 
 ```toml
 [dependencies]
-bounded-authority-protocol = { path = "../bounded_authority_protocol/sdks/rust" }
-```
-
-or pin a commit of the repository instead of cloning it:
-
-```toml
-[dependencies]
-bounded-authority-protocol = { git = "https://github.com/baselabs/bounded_authority_protocol", rev = "<commit>" }
+bounded-authority-protocol = { path = "vendor/bap" }
 ```
 
 ## Quickstart
@@ -79,7 +66,7 @@ your dependencies (it builds on Rust 1.88):
 
 ```toml
 [dependencies]
-bounded-authority-protocol = { path = "../bounded_authority_protocol/sdks/rust" }
+bounded-authority-protocol = { path = "vendor/bap" }
 ed25519-dalek = { version = "3.0", default-features = false }
 ```
 
@@ -228,7 +215,7 @@ Read individual fields explicitly when needed.
 ## Strict Ed25519
 
 Every Ed25519 signature check goes through one function (`ed25519::verify`, internal) that
-applies rule S1 of [erratum 2](../../docs/errata.md) before
+applies rule S1 of [erratum 2](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/errata.md) before
 the `ed25519-dalek` backend: exact widths, canonical `A` and `R`, neither of small order,
 `S < L`, then the cofactorless equation (dalek's `verify`, not its `verify_strict`).
 `acceptable_public_key` is the key-entry check (canonical, not small order, on the curve), and
@@ -238,30 +225,43 @@ revocation comparison, never on the verification path.
 
 ## Conformance
 
-`cargo test --locked` runs everything: the unit tests, this README's quickstart, the
-vendored v1 (283 cases), v2 (268), v3 (292), and strict-Ed25519 (2,410) corpus snapshots with
-their `index.json` SHA-256 asserted at load (the three contract-major runners also check a key
-census), the local-loopback,
-role-attestation, and content-assertion corpora read from `priv/conformance/`, and the
-permissiveness battery (`tests/permissiveness.rs`, 83 tests), which builds each defect a parser
-closure exists to reject and proves the closure catches it.
+`conformance/priv/conformance/` is a complete, byte-identical snapshot of the Hex package built
+from this commit's `priv/conformance/` tree. It includes all nine certified corpora, schemas, focused vectors,
+and `verdict-digests.json`. Every test input is inside this SDK root; copying this directory
+alone is sufficient to run the suite.
+The manifest is an unreleased addition after Hex 1.0.0 and will ship in the next Hex release.
+
+| Corpus | Cases |
+|---|---:|
+| v1 / v2 / v3 | 283 / 268 / 292 |
+| Local-loopback HTTP | 44 (36 URI, 8 proof) |
+| Role attestation | 40 |
+| Content assertion | 154 (131 assertion, 9 digest, 14 successor) |
+| Producer canonicality | 75 |
+| Selector float zero | 161 |
+| Strict Ed25519 | 2,410 |
+
+Each runner pins its index, hashes every indexed file, including `.raw` inputs, and rejects
+extra or missing files, duplicate IDs, and skipped cases. It records computed outcomes,
+orders them by the index's file and case order, and checks their JCS/SHA-256 verdict digest
+against the vendored manifest. Expected-value comparison cannot substitute for this check.
+Outcome projections and index ordering are specified in the
+[verdict digest contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/corpus-verdict-digests.md).
+The contract-major runners also retain their public-key import censuses.
+
+Run from this SDK directory:
 
 ```bash
 cargo test --locked
-# From the repository root: independently remove each closure and require its test to fail
-python3 scripts/check_sdk_closures.py rust
-# From sdks/rust:
-# A runner's summary line is visible only with --nocapture:
-cargo test --locked --test conformance -- --nocapture
-# conformance: agreed=283 disagreed=0 total=283 surfaces=28 census=11/11
-cargo test --locked --test conformance_strict   # 2,410 strict-Ed25519 cases
-cargo test --locked --test content_assertion    # 131 + 9 + 14 cases
 ```
 
-The producer-canonicality corpus (erratum 3) runs too, as the
-`conformance_producer_canonicality` test target, and so does the selector float-zero corpus
-(erratum 6, 161 cases, vendored with its `index.json` SHA-256 asserted at load), as the
-`conformance_selector_float_zero` test target.
+The crate archive includes its tests and the complete input tree, including `.raw` sidecars.
+CI runs `cargo package`, unpacks the archive, and runs the full suite from the unpacked crate.
+
+The monorepo's distribution job copies only this SDK root into a temporary directory,
+runs its full suite, checks its package, and removes the temporary artifacts afterward.
+A corpus update replaces the entire snapshot from the verified Hex unpack in one change;
+individual case edits are not a supported update path. These checks do not publish the SDK.
 
 ## What this SDK does not do
 
@@ -279,7 +279,7 @@ sh tools/purity_check.sh && sh tools/license_check.sh
 ```
 
 Deployment notes, including AWS Lambda and PostgreSQL: see
-[`docs/deployment/rust-sdk.md`](../../docs/deployment/rust-sdk.md).
+[`docs/deployment/rust-sdk.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/rust-sdk.md).
 
 ## License
 

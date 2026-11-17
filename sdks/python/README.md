@@ -48,19 +48,17 @@ known on November 16, 2026 (earlier fixes landed in 44.0.1, 46.0.5, 46.0.6, 48.0
 and 49.0.0). CI audits the committed universal lock and a separate lowest-direct
 resolution of every runtime, build, development, and optional dependency declaration.
 
-## Install from this repository
+## Install from a pinned source
+
+Obtain this SDK directory from a pinned monorepo commit. From the SDK root, install the
+locked development environment:
 
 ```bash
-pip install "bounded-authority-verifier @ git+https://github.com/baselabs/bounded_authority_protocol@<commit>#subdirectory=sdks/python"
+uv sync --locked
 ```
 
-or, from a local checkout:
-
-```bash
-pip install ./bounded_authority_protocol/sdks/python
-```
-
-Pin a commit: without a published version, the commit is the identity of what you deployed.
+The commit identifies the unpublished SDK you deployed. The source distribution carries
+its tests and all their inputs; the wheel carries the runtime package.
 
 ## Quickstart
 
@@ -240,6 +238,8 @@ before validation. An arbitrary `Mapping` is snapshotted once; exceptions from i
 method or iterator become `Err` at that callback boundary. SDK exceptions still propagate.
 Bounds, facts, and redacted decoded values refuse a second initialization.
 
+Invalid `Bounds(...)` builds an unusable value rather than silently accepting invalid ceilings. Public operations reject that value with the closed invalid result.
+
 **Facts.** `GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`, `KeyTransitionFacts`,
 `AnchoredExportFacts`, `AttestationFacts`, and `ContentAssertionFacts` are slotted value
 objects with read-only properties holding identifiers, digests, times, and counts, never raw
@@ -263,7 +263,7 @@ diagnostics have no redacted fields and remain dataclasses.
 ## Strict Ed25519
 
 Every Ed25519 signature check goes through one module (`bounded_authority_verifier.ed25519`)
-that applies rule S1 of [erratum 2](../../docs/errata.md) before the `cryptography` backend: exact widths,
+that applies rule S1 of [erratum 2](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/errata.md) before the `cryptography` backend: exact widths,
 canonical `A` and `R`, neither of small order, `S < L`, then the cofactorless equation.
 `acceptable_public_key` is the key-entry check (canonical, not small order, on the curve), and
 the JWK and thumbprint functions refuse a key that fails it. `torsion_free` adds `[L]A = O`; call
@@ -272,23 +272,51 @@ on the verification path.
 
 ## Conformance
 
-Four runners check the contract-major and strict-Ed25519 corpora in place under
-`priv/conformance/`, each asserting its `index.json` SHA-256 at load; the contract-major runners
-also compare the keys they imported with the index's `public_key_fingerprints`:
+`conformance/priv/conformance/` is a complete, byte-identical snapshot of the Hex package built
+from this commit's `priv/conformance/` tree. It includes all nine certified corpora, schemas, focused vectors,
+and `verdict-digests.json`. Every test input is inside this SDK root; copying this directory
+alone is sufficient to run the suite.
+The manifest is an unreleased addition after Hex 1.0.0 and will ship in the next Hex release.
+
+| Corpus | Cases |
+|---|---:|
+| v1 / v2 / v3 | 283 / 268 / 292 |
+| Local-loopback HTTP | 44 (36 URI, 8 proof) |
+| Role attestation | 40 |
+| Content assertion | 154 (131 assertion, 9 digest, 14 successor) |
+| Producer canonicality | 75 |
+| Selector float zero | 161 |
+| Strict Ed25519 | 2,410 |
+
+Each runner pins its index, hashes every indexed file, including `.raw` inputs, and rejects
+extra or missing files, duplicate IDs, and skipped cases. It records computed outcomes,
+orders them by the index's file and case order, and checks their JCS/SHA-256 verdict digest
+against the vendored manifest. Expected-value comparison cannot substitute for this check.
+Outcome projections and index ordering are specified in the
+[verdict digest contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/corpus-verdict-digests.md).
+The contract-major runners also retain their public-key import censuses.
+
+Run from this SDK directory:
 
 ```bash
-python tests/conformance/run.py          # v1: 283/283, census 11 keys
-python tests/conformance/run_v2.py       # v2: 268/268
-python tests/conformance/run_v3.py       # v3: 292/292
-python tests/conformance/run_strict.py   # strict Ed25519: 2410/2410
+uv sync --locked
+uv run pytest -q
+uv run python tests/conformance/run.py
+uv run python tests/conformance/run_v2.py
+uv run python tests/conformance/run_v3.py
+uv run python tests/conformance/run_strict.py
+uv run python tests/conformance/run_producer_canonicality.py
+uv run python tests/conformance/run_selector_float_zero.py
 ```
 
-`python -m pytest tests/` runs the unit tests, this quickstart, the local-loopback,
-role-attestation, and content-assertion corpora, the permissiveness battery (which builds each
-defect a parser closure exists to reject and proves the closure catches it), and pytest
-wrappers for the v1 and strict-Ed25519 runners. The producer-canonicality corpus (erratum 3)
-runs too, through `tests/conformance/run_producer_canonicality.py`, and so does the
-selector float-zero corpus (erratum 6), through `tests/conformance/run_selector_float_zero.py`.
+The source distribution includes the tests, tools, lockfile, and complete input tree. CI
+unpacks it and runs the same suite from that directory. The wheel includes only the runtime
+package and its distribution metadata. Test inputs are not installed with the wheel.
+
+The monorepo's distribution job copies only this SDK root into a temporary directory,
+runs its full suite, checks its package, and removes the temporary artifacts afterward.
+A corpus update replaces the entire snapshot from the verified Hex unpack in one change;
+individual case edits are not a supported update path. These checks do not publish the SDK.
 
 ## What this SDK does not do
 
@@ -313,8 +341,7 @@ python tests/conformance/run_v3.py && python tests/conformance/run_strict.py
 ```
 
 CI audits all dependencies in the committed `uv.lock` with pinned `pip-audit` and runs the
-permissiveness suite again with each closure independently removed. From the repository root,
-run `sdks/python/.venv/bin/python scripts/check_sdk_closures.py python`. Each named test must fail
+permissiveness suite again with each closure independently removed. The monorepo also runs its [closure mutation battery](https://github.com/baselabs/bounded_authority_protocol/blob/main/scripts/check_sdk_closures.py). Each named test must fail
 an assertion after its closure is removed; build or collection errors fail the gate.
 
 Deployment notes: [`docs/deployment/python-sdk.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/python-sdk.md).

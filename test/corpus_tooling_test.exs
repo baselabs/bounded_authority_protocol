@@ -1,4 +1,4 @@
-Code.require_file("../scripts/corpus_catalog.exs", __DIR__)
+Code.require_file("../scripts/corpus_distribution.exs", __DIR__)
 
 defmodule BoundedAuthorityProtocol.CorpusToolingTest do
   use ExUnit.Case, async: false
@@ -6,7 +6,20 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
 
   @moduletag timeout: 300_000
 
-  setup do
+  setup_all do
+    package =
+      Path.join(System.tmp_dir!(), "bap-tooling-hex-#{System.unique_integer([:positive])}")
+
+    on_exit(fn -> File.rm_rf!(package) end)
+
+    BoundedAuthorityProtocol.CorpusDistribution.with_package!(fn unpacked ->
+      File.cp_r!(unpacked, package)
+    end)
+
+    %{package: package}
+  end
+
+  setup context do
     root =
       Path.join(System.tmp_dir!(), "bap-corpus-tooling-#{System.unique_integer([:positive])}")
 
@@ -16,11 +29,12 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
       [
         Catalog.cli(),
         "test/conformance/cli_test.exs",
-        "priv/conformance/v1/vectors/manifest.json"
+        "priv/conformance",
+        "scripts/check_package.exs"
       ] ++
         Catalog.reference_files() ++
         Enum.map(
-          ["corpus_catalog", "check_corpus_sync", "regen_corpus_digests"],
+          ["corpus_catalog", "corpus_distribution", "regen_corpus_digests"],
           &"scripts/#{&1}.exs"
         )
 
@@ -43,19 +57,28 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
     # The quotation scan reads the git source tree, so the copy is a repository too.
     {_, 0} = System.cmd("git", ["init", "--quiet"], cd: root)
 
+    File.write!(
+      Path.join(root, "scripts/check_corpus_sync.exs"),
+      "Code.require_file(\"corpus_distribution.exs\", __DIR__)\nBoundedAuthorityProtocol.CorpusDistribution.check!(" <>
+        inspect(context.package) <> ")\n"
+    )
+
     %{root: root}
   end
 
   test "sync rejects byte drift in each strict-Ed25519 snapshot", %{root: root} do
     assert {_, 0} = run(root, "check_corpus_sync")
 
-    for sdk <- ["rust", "go"] do
-      path = Path.join(root, "sdks/#{sdk}/conformance/corpus-strict/index.json")
+    for sdk <- ["python", "rust", "go"] do
+      path = Path.join(root, "sdks/#{sdk}/conformance/priv/conformance/strict-ed25519/index.json")
       original = File.read!(path)
       File.write!(path, original <> "\n")
       {output, status} = run(root, "check_corpus_sync")
       assert status != 0
-      assert output =~ "#{sdk}/conformance/corpus-strict/index.json: content differs"
+
+      assert output =~
+               "#{sdk}/conformance/priv/conformance/strict-ed25519/index.json: content differs"
+
       File.write!(path, original)
     end
   end
@@ -190,6 +213,63 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
     {output, status} = run(root, "check_corpus_sync")
     assert status != 0
     assert output =~ "uncatalogued SDK snapshots"
+  end
+
+  test "distribution rejects file drift, omissions, and two missing directories", %{root: root} do
+    assert {_, 0} = run(root, "check_corpus_sync")
+    base = "sdks/python/conformance/priv/conformance/v1/corpus"
+
+    for {name, relative, mutation, message} <- [
+          {"case byte", "#{base}/cases/uri/normalize.json", :change, "content differs"},
+          {"raw byte", "#{base}/cases/json/decode-string_bytes-exact.raw", :change,
+           "content differs"},
+          {"missing file", "#{base}/cases/uri/normalize.json", :remove, "file set mismatch"},
+          {"extra file", "#{base}/extra.json", :extra, "file set mismatch"},
+          {"omitted inventory entry", "scripts/check_package.exs", :inventory,
+           "check_package corpus inventory differs"}
+        ] do
+      path = Path.join(root, relative)
+      original = if File.exists?(path), do: File.read!(path), else: nil
+
+      case mutation do
+        :change ->
+          File.write!(path, original <> " ")
+
+        :remove ->
+          File.rm!(path)
+
+        :extra ->
+          File.write!(path, "{}")
+
+        :inventory ->
+          File.write!(
+            path,
+            String.replace(original, "\"priv/conformance/verdict-digests.json\",", "")
+          )
+      end
+
+      {output, status} = run(root, "check_corpus_sync")
+      assert status != 0, name
+      assert output =~ message, output
+      IO.puts("RED #{name}: #{message}")
+      if original, do: File.write!(path, original), else: File.rm!(path)
+      assert {_, 0} = run(root, "check_corpus_sync")
+      IO.puts("GREEN #{name}: restored")
+    end
+
+    for relative <- ["priv/conformance/v1/corpus", base],
+        do: File.rm_rf!(Path.join(root, relative))
+
+    {output, status} = run(root, "check_corpus_sync")
+    assert status != 0
+    assert output =~ "Hex corpus inventory differs from source tree"
+    IO.puts("RED both directories missing: Hex corpus inventory differs from source tree")
+
+    for relative <- ["priv/conformance/v1/corpus", base],
+        do: copy(Path.join(Catalog.root(), relative), Path.join(root, relative))
+
+    assert {_, 0} = run(root, "check_corpus_sync")
+    IO.puts("GREEN both directories missing: restored")
   end
 
   defp run(root, script, args \\ []) do

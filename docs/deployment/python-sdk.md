@@ -78,3 +78,7 @@ A successful verification proves byte-level properties against the inputs the ca
 Trust selection, replay reservation, and revocation belong to your service or a stateful
 authority runtime; the specification's verification-contract section states the boundary in
 normative terms.
+
+Tests and corpus inputs are self-contained under the SDK root. The complete Hex corpus tree
+is vendored at `conformance/priv/conformance/`; copied-alone and unpacked-package checks
+protect that boundary. See the [verdict digest contract](../design/corpus-verdict-digests.md).

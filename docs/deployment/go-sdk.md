@@ -67,7 +67,7 @@ point: canonical point encodings, no small-order key or `R`, a scalar below the 
 the cofactorless equation. Key import, JWK encode and decode, and thumbprint functions refuse a
 key that fails key acceptance. Call `TorsionFree` at key enrollment, at trust install, and before
 any deny-list or revocation comparison. A vendored snapshot of the strict-Ed25519 corpus under
-`conformance/corpus-strict/` runs in `conformance/strict_test.go` with its index SHA-256 pinned.
+`conformance/priv/conformance/strict-ed25519/` runs in `conformance/strict_test.go` with its index SHA-256 pinned.
 
 ## Supply chain
 
@@ -81,3 +81,7 @@ A successful verification proves byte-level properties against the inputs the ca
 Trust selection, replay reservation, and revocation belong to your service or a stateful
 authority runtime; the specification's verification-contract section states the boundary in
 normative terms.
+
+Tests and corpus inputs are self-contained under the SDK root. The complete Hex corpus tree
+is vendored at `conformance/priv/conformance/`; copied-alone and unpacked-package checks
+protect that boundary. See the [verdict digest contract](../design/corpus-verdict-digests.md).

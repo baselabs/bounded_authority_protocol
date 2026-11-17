@@ -1,3 +1,6 @@
+#[path = "../conformance/support.rs"]
+mod support;
+
 use std::fs;
 use std::path::PathBuf;
 
@@ -59,7 +62,8 @@ fn local_loopback_http_uri_profile_accepts_only_exact_loopback_literals() {
 #[test]
 fn certified_local_loopback_corpus_drives_rust_verdicts() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../priv/conformance/application-profiles/local-loopback-http/v1");
+        .join("conformance/priv/conformance/application-profiles/local-loopback-http/v1");
+    let mut execution = support::Run::new(&root, CERTIFIED_INDEX_SHA256);
     let read_json = |name: &str| -> Value {
         serde_json::from_slice(&fs::read(root.join(name)).unwrap()).unwrap()
     };
@@ -107,6 +111,11 @@ fn certified_local_loopback_corpus_drives_rust_verdicts() {
         let id = uri_case["id"].as_str().unwrap();
         let result =
             local_loopback_http_uri_normalize(uri_case["input"].as_str().unwrap(), &bounds);
+        let actual = match &result {
+            Ok(normalized) => serde_json::json!({"valid":true,"normalized":normalized}),
+            Err(_) => serde_json::json!({"valid":false}),
+        };
+        execution.record(id, "profile.json", actual);
         assert_eq!(result.is_ok(), uri_case["valid"].as_bool().unwrap(), "{id}");
         if let Ok(normalized) = result {
             assert_eq!(normalized, uri_case["normalized"].as_str().unwrap(), "{id}");
@@ -299,6 +308,7 @@ fn certified_local_loopback_corpus_drives_rust_verdicts() {
                 panic!("{id}: unsupported expected override");
             }
         }
+        execution.record(id,"proof-cases.json",serde_json::json!({"decode_local":decode_local_loopback_http_proof(&compact,&bounds).is_ok(),"decode_standard":decode_proof(&compact,&bounds).is_ok(),"envelope_local":check_local_loopback_http_envelope(&Credentials{grant:grant.clone(),proof:compact.clone()},&case_expected).is_ok()}));
         assert_eq!(
             decode_local_loopback_http_proof(&compact, &bounds).is_ok(),
             proof_case["decode_local"].as_bool().unwrap(),
@@ -363,4 +373,5 @@ fn certified_local_loopback_corpus_drives_rust_verdicts() {
         &wrong_binding,
     )
     .is_err());
+    execution.finish();
 }

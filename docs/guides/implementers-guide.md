@@ -283,3 +283,11 @@ because its canonical bytes would decode integer-tagged. Test the decoded value,
 so underflow is covered. Run the additive selector float-zero corpus
 (`priv/conformance/selector-float-zero`, `bap-selector-float-zero/1`, 161 cases) and pin its index
 SHA-256 `97fd7a99cdbf3acc0a78f5ba1c6556e23a63e0ad66f533e31fd69f82dc5f3003` at load.
+
+## Distributing corpus inputs
+
+Use the complete `priv/conformance/` tree from a verified Hex unpack as the snapshot boundary.
+Keep the sibling verdict manifest outside every corpus directory. Hash every indexed file,
+require exact file and case ID sets, and reject skipped execution. Compute the shared digest
+from actual results in index order using the [projection contract](../design/corpus-verdict-digests.md).
+A language package must carry the tests and inputs its isolated suite needs.

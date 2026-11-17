@@ -15,8 +15,8 @@ The SDKs have no private-key access or custody and do not choose trust or author
 local path or Git commit; each README shows how. Each SDK moves to its own repository when it is
 first published, never publishing from this one
 ([publication guard](../scripts/check_sdk_publish_infra.sh)); a pre-commit hook and a CI job
-reject registry-publish setup here. Graduation also requires making the SDK's tests and
-corpus inputs self-contained; an in-tree subtree is not necessarily ready to publish by itself.
+reject registry-publish setup here. Each SDK root already contains its full test suite and corpus inputs; CI proves that closure
+from a copied directory and from the language's distributable format.
 
 ## What is here
 
@@ -74,8 +74,7 @@ comments cite the tracked normative specifications and independent conformance c
   and `torsion_free` helpers in the language's naming, and the strict-Ed25519 corpus
   (`bap-strict-ed25519/1`, [`priv/conformance/strict-ed25519`](../priv/conformance/strict-ed25519/),
   2,410 cases in 14 families, index SHA-256
-  `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`). Python reads it in place;
-  Go and Rust carry byte-identical snapshots under `conformance/corpus-strict/`. Its 12 "Taming
+  `732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9`). All three SDKs carry it inside the whole snapshot at `conformance/priv/conformance/strict-ed25519/`. Its 12 "Taming
   the many EdDSAs" vectors come from
   [ed25519-speccheck](https://github.com/novifinancial/ed25519-speccheck) (Apache-2.0),
   attributed in the root and per-SDK `NOTICE` files.
@@ -90,11 +89,13 @@ mismatch. To check:
 ```bash
 # Python (from sdks/python): one runner each for v1, v2, v3, and strict Ed25519; pytest runs the
 # profile corpora and the quickstart
-python tests/conformance/run.py
-python tests/conformance/run_v2.py
-python tests/conformance/run_v3.py
-python tests/conformance/run_strict.py
-python -m pytest tests/
+uv run python tests/conformance/run.py
+uv run python tests/conformance/run_v2.py
+uv run python tests/conformance/run_v3.py
+uv run python tests/conformance/run_strict.py
+uv run python tests/conformance/run_producer_canonicality.py
+uv run python tests/conformance/run_selector_float_zero.py
+uv run pytest -q
 
 # Rust (from sdks/rust): every corpus and the README quickstart run inside the test suite
 cargo test --locked
@@ -103,10 +104,17 @@ cargo test --locked
 go test ./...
 ```
 
-The TypeScript verifier runs its vendored corpora in its own repository. Python reads the
-repository's corpora in place. Go and Rust vendor the base and security corpora, but their
-sibling-profile tests still read repository-level fixtures; Go's major-2 and major-3 key censuses also read
-the repository's curated generator inputs. These are test dependencies, not library I/O.
+The TypeScript verifier runs its vendored corpora in its own repository. Python, Rust, and Go
+each vendor the whole Hex `priv/conformance/` tree under their own
+`conformance/priv/conformance/` directory. Every indexed input is hashed, exact file and ID
+sets are required, and a skipped case fails. Each runner hashes computed outcomes in index
+order and compares the result with the sibling `verdict-digests.json` manifest. See the
+[projection and ordering contract](../docs/design/corpus-verdict-digests.md).
+
+CI copies each SDK root alone and runs its suite there. It also tests the Python sdist and
+Rust crate after unpacking, keeps the Python wheel runtime-only, and checks that the Go
+module zip includes all conformance inputs. The monorepo checks whole-tree byte equality
+against an actual Hex build and verifies every corpus generator's derived inputs.
 
 Beyond the corpora, each SDK has a permissiveness battery: for every parser closure that guards
 against a host-language trap (duplicate-rejecting decoding, raw numeric-lexeme limits, a single

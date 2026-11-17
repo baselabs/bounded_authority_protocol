@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/baselabs/bounded_authority_protocol_go/internal/corpuscheck"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,7 @@ type contentCorpusOverrides struct {
 }
 
 type contentCorpusCase struct {
+	File              string                  `json:"-"`
 	ID                string                  `json:"id"`
 	Compact           string                  `json:"compact"`
 	Attestor          string                  `json:"attestor"`
@@ -59,7 +61,7 @@ type contentCorpusProfile struct {
 }
 
 func contentCorpusRoot() string {
-	return filepath.Join("..", "..", "priv", "conformance", "attestation-profiles", "content-assertion", "v1")
+	return filepath.Join("conformance", "priv", "conformance", "attestation-profiles", "content-assertion", "v1")
 }
 
 func readContentCorpus(t *testing.T, name string, into any) []byte {
@@ -163,6 +165,7 @@ func corpusExpected(profile contentCorpusProfile, attestorName string, overrides
 }
 
 func TestCertifiedContentAssertionCorpusIntegrityAndVerdicts(t *testing.T) {
+	execution := corpuscheck.New(t, contentCorpusRoot(), "conformance/priv/conformance", certifiedContentAssertionIndexSHA256)
 	var index struct {
 		Profile        string `json:"profile"`
 		Revision       int    `json:"revision"`
@@ -222,6 +225,11 @@ func TestCertifiedContentAssertionCorpusIntegrityAndVerdicts(t *testing.T) {
 		} else {
 			err = ErrInvalid
 		}
+		outcome := map[string]any{"verdict": corpuscheck.Verdict(err)}
+		if err == nil {
+			outcome["digest"] = Base64urlEncode(got[:])
+		}
+		execution.Record(c.ID, "digest-cases.json", outcome)
 		if (err == nil) != (c.Expected.Verdict == "valid") {
 			t.Errorf("%s digest verdict mismatch", c.ID)
 			continue
@@ -238,6 +246,9 @@ func TestCertifiedContentAssertionCorpusIntegrityAndVerdicts(t *testing.T) {
 	for _, name := range []string{"assertion-structure-cases.json", "assertion-verification-cases.json"} {
 		var batch []contentCorpusCase
 		readContentCorpus(t, name, &batch)
+		for i := range batch {
+			batch[i].File = name
+		}
 		cases = append(cases, batch...)
 	}
 	if len(cases) != index.AssertionCases {
@@ -266,6 +277,13 @@ func TestCertifiedContentAssertionCorpusIntegrityAndVerdicts(t *testing.T) {
 				verifyOK = err == nil
 			}
 		}
+		word := func(ok bool) string {
+			if ok {
+				return "valid"
+			}
+			return "invalid"
+		}
+		execution.Record(c.ID, c.File, map[string]any{"decode": word(decodeOK), "verify": word(verifyOK)})
 		if decodeOK != (c.Expected.Decode == "valid") {
 			t.Errorf("%s decode=%t want=%s", c.ID, decodeOK, c.Expected.Decode)
 		}
@@ -276,9 +294,11 @@ func TestCertifiedContentAssertionCorpusIntegrityAndVerdicts(t *testing.T) {
 	if producerCases != 38 {
 		t.Fatalf("producer case count = %d, want 38", producerCases)
 	}
+	recordContentAssertionSuccessors(t, execution)
+	execution.Finish()
 }
 
-func TestCertifiedContentAssertionSuccessorCorpus(t *testing.T) {
+func recordContentAssertionSuccessors(t *testing.T, execution *corpuscheck.Run) {
 	var profile contentCorpusProfile
 	readContentCorpus(t, "profile.json", &profile)
 	type artifact struct {
@@ -317,7 +337,14 @@ func TestCertifiedContentAssertionSuccessorCorpus(t *testing.T) {
 			t.Errorf("%s artifact verdict mismatch", c.ID)
 			continue
 		}
-		if c.Expected.Relation == "not_run" {
+		word := func(ok bool) string {
+			if ok {
+				return "valid"
+			}
+			return "invalid"
+		}
+		if !predecessorOK || !successorOK {
+			execution.Record(c.ID, "successor-cases.json", map[string]any{"predecessor": word(predecessorOK), "successor": word(successorOK), "relation": "not_run"})
 			continue
 		}
 		overridesOK := true
@@ -340,6 +367,7 @@ func TestCertifiedContentAssertionSuccessorCorpus(t *testing.T) {
 		}
 		bounds := BoundsMaximum()
 		relationOK := overridesOK && VerifyContentAssertionSuccessor(predecessor, successor, &bounds) == nil
+		execution.Record(c.ID, "successor-cases.json", map[string]any{"predecessor": word(predecessorOK), "successor": word(successorOK), "relation": word(relationOK)})
 		if relationOK != (c.Expected.Relation == "valid") {
 			t.Errorf("%s relation=%t want=%s", c.ID, relationOK, c.Expected.Relation)
 		}

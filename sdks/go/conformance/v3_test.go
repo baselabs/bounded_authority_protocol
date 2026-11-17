@@ -1,6 +1,6 @@
 // Package conformance_test additionally carries the v3-profile (ES256,
 // contract-major 3) acceptance runner: it executes the vendored 292-case
-// corpus-v3 snapshot against the public EcdsaProfile SDK surface and the shared
+// v3 corpus snapshot against the public EcdsaProfile SDK surface and the shared
 // version-neutral primitives exactly as the v1/v2 runners do, SHA-binds the
 // vendored index.json at startup, verifies every case file against the
 // index's per-file SHA-256, and asserts the two-boundary key census against
@@ -16,6 +16,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/baselabs/bounded_authority_protocol_go/internal/corpuscheck"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,14 +28,16 @@ import (
 
 // The certified pin is declared at function scope inside es256LoadCorpus: the
 // frozen v1/v2 runners already declare the package-level
-// `certifiedIndexSHA256` in this package and in the internal test package,
+// `es256CertifiedIndexSHA256` in this package and in the internal test package,
 // and the corpus digest rotation anchors
-// on the exact line prefix `const certifiedIndexSHA256 = "` in THIS file —
+// on the exact line prefix `const es256CertifiedIndexSHA256 = "` in this file;
 // the local declaration satisfies both (the anchor strips leading
 // whitespace, matches exactly one line, and preserves indentation on
 // rewrite).
 
-const es256CorpusDir = "corpus-v3"
+const es256CertifiedIndexSHA256 = "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw"
+
+const es256CorpusDir = "priv/conformance/v3/corpus"
 
 const es256TotalCases = 292
 
@@ -99,17 +102,17 @@ func es256SubObject(t *testing.T, m map[string]json.RawMessage, key string) map[
 
 func es256LoadCorpus(t *testing.T) (*es256CorpusIndex, []es256LoadedFile) {
 	t.Helper()
-	// certifiedIndexSHA256 is the SHA-256 of the certified v3 corpus
+	// es256CertifiedIndexSHA256 is the SHA-256 of the certified v3 corpus
 	// index.json this SDK was conformed against (base64url). A vendored
 	// corpus that hashes to anything else fails closed here — silent drift
 	// is impossible.
-	const certifiedIndexSHA256 = "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw"
+
 	indexBytes, err := os.ReadFile(filepath.Join(es256CorpusDir, "index.json"))
 	if err != nil {
 		t.Fatalf("vendored index.json: %v", err)
 	}
 	sum := sha256.Sum256(indexBytes)
-	if v.Base64urlEncode(sum[:]) != certifiedIndexSHA256 {
+	if v.Base64urlEncode(sum[:]) != es256CertifiedIndexSHA256 {
 		t.Fatalf("vendored corpus index.json SHA-256 mismatch — fail closed on corpus drift")
 	}
 	var idx es256CorpusIndex
@@ -198,6 +201,7 @@ type es256CaseFile struct {
 }
 
 type es256CorpusCase struct {
+	Actual   map[string]any             `json:"-"`
 	ID       string                     `json:"id"`
 	Surface  string                     `json:"surface"`
 	Class    string                     `json:"class"`
@@ -206,6 +210,7 @@ type es256CorpusCase struct {
 }
 
 func TestEcdsaConformance(t *testing.T) {
+	execution := corpuscheck.New(t, es256CorpusDir, "priv/conformance", es256CertifiedIndexSHA256)
 	idx, files := es256LoadCorpus(t)
 	agreed := 0
 	for _, lf := range files {
@@ -215,12 +220,15 @@ func TestEcdsaConformance(t *testing.T) {
 			}
 			c := c
 			if t.Run(c.ID, func(t *testing.T) {
+				c.Actual = map[string]any{}
 				es256RunCase(t, c)
+				execution.Record(c.ID, lf.path, c.Actual)
 			}) {
 				agreed++ // counts AGREED subtests, not merely executed ones
 			}
 		}
 	}
+	execution.Finish()
 	// v3 key census (the v1/v2 runners' census adapted to the EC suite): the
 	// DECLARED census is an index input from the curated generator, and keys
 	// may emit no case — the case-byte discovery is a strict subset by design.
@@ -232,37 +240,9 @@ func TestEcdsaConformance(t *testing.T) {
 	if !es256SortedUniqueStrings(declared) {
 		t.Fatalf("census: index public_key_fingerprints not sorted/unique")
 	}
-	curatedRaw, err := os.ReadFile(es256CuratedCensusPath)
-	if err != nil {
-		t.Fatalf("census: curated inputs: %v", err)
-	}
-	var curatedDoc struct {
-		PublicKeyFingerprints []string `json:"public_key_fingerprints"`
-	}
-	if err := json.Unmarshal(curatedRaw, &curatedDoc); err != nil {
-		t.Fatalf("census: curated inputs parse: %v", err)
-	}
-	curated := curatedDoc.PublicKeyFingerprints
-	if !es256SortedUniqueStrings(curated) {
-		t.Fatalf("census: curated public_key_fingerprints not sorted/unique")
-	}
 	declaredSet := make(map[string]bool, len(declared))
 	for _, fp := range declared {
 		declaredSet[fp] = true
-	}
-	curatedSet := make(map[string]bool, len(curated))
-	for _, fp := range curated {
-		curatedSet[fp] = true
-	}
-	for _, fp := range declared {
-		if !curatedSet[fp] {
-			t.Fatalf("census: index fingerprint %s missing from the curated census", fp)
-		}
-	}
-	for _, fp := range curated {
-		if !declaredSet[fp] {
-			t.Fatalf("census: curated fingerprint %s missing from the index census", fp)
-		}
 	}
 	// subset leg: every key embedded in a case input must be declared
 	discovery := map[string]bool{}
@@ -295,12 +275,8 @@ func TestEcdsaConformance(t *testing.T) {
 		}
 	}
 	t.Logf("agreed=%d disagreed=0 census=%d declared=%d", agreed, len(es256Census), len(declared))
-}
 
-// es256CuratedCensusPath is the monorepo's curated generator directory — the
-// declared census input the index was built from (facts the generator ships
-// that are not derivable from case bytes).
-const es256CuratedCensusPath = "../../../conformance/generators/curated-inputs-v3.json"
+}
 
 // The v3 census key-label heuristic: a member named like a public key
 // carrying an 87-char base64url (65-byte uncompressed SEC1) value;
@@ -377,6 +353,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		b64 := rawStringField(t, c.Input, "base64url")
 		got, err := v.Base64urlDecode(b64)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["decoded"] = string(got)
+		}
 		want := ""
 		if c.Expected["decoded"] != nil {
 			want = rawStringField(t, c.Expected, "decoded")
@@ -393,6 +372,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		}
 		enc, err := v.JcsEncode(val, nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["encoded"] = string(enc)
+		}
 		if c.Expected["encoded"] != nil && string(enc) != rawStringField(t, c.Expected, "encoded") {
 			t.Fatalf("case %s: encoded %s", c.ID, enc)
 		}
@@ -408,6 +390,13 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		}
 		got, err := v.JsonDecode(text, nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			encoded, e := v.JcsEncode(got, nil)
+			if e != nil {
+				t.Fatal("computed JSON value cannot be canonicalized")
+			}
+			c.Actual["value"] = corpuscheck.Decode(encoded)
+		}
 		if c.Expected["value"] != nil {
 			want := es256RawValue(t, c.Expected["value"])
 			gotJCS, err1 := v.JcsEncode(got, nil)
@@ -419,12 +408,18 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 	case "uri.normalize":
 		got, err := v.UriNormalize(rawStringField(t, c.Input, "text"), nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["normalized"] = got
+		}
 		if c.Expected["normalized"] != nil && got != rawStringField(t, c.Expected, "normalized") {
 			t.Fatalf("case %s: normalized %s", c.ID, got)
 		}
 	case "jwk.decode_public":
 		got, err := es256Profile.JwkDecodePublic([]byte(rawStringField(t, c.Input, "text")), nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["public_key"] = v.Base64urlEncode(got)
+		}
 		if c.Expected["public_key"] != nil && v.Base64urlEncode(got) != rawStringField(t, c.Expected, "public_key") {
 			t.Fatalf("case %s: key mismatch", c.ID)
 		}
@@ -433,24 +428,36 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		es256CensusKey(rawStringField(t, c.Input, "public_key"))
 		got, err := es256Profile.JwkEncodePublic(key, nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["encoded"] = string(got)
+		}
 		if c.Expected["encoded"] != nil && string(got) != rawStringField(t, c.Expected, "encoded") {
 			t.Fatalf("case %s: encoded %s", c.ID, got)
 		}
 	case "jwk.thumbprint_preimage":
 		got, err := es256Profile.JwkThumbprintPreimage([]byte(rawStringField(t, c.Input, "text")), nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["preimage"] = string(got)
+		}
 		if c.Expected["preimage"] != nil && string(got) != rawStringField(t, c.Expected, "preimage") {
 			t.Fatalf("case %s: preimage %s", c.ID, got)
 		}
 	case "jwk.thumbprint":
 		got, err := es256Profile.JwkThumbprint([]byte(rawStringField(t, c.Input, "text")), nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["thumbprint"] = got
+		}
 		if c.Expected["thumbprint"] != nil && got != rawStringField(t, c.Expected, "thumbprint") {
 			t.Fatalf("case %s: thumbprint %s", c.ID, got)
 		}
 	case "jwk.thumbprint_raw":
 		got, err := es256Profile.JwkThumbprintRaw([]byte(rawStringField(t, c.Input, "text")), nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["thumbprint_raw"] = v.Base64urlEncode(got[:])
+		}
 		if c.Expected["thumbprint_raw"] != nil && v.Base64urlEncode(got[:]) != rawStringField(t, c.Expected, "thumbprint_raw") {
 			t.Fatalf("case %s: thumbprint_raw mismatch", c.ID)
 		}
@@ -459,6 +466,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		es256CensusKey(rawStringField(t, c.Input, "public_key"))
 		got, err := es256Profile.PublicKeyThumbprintRaw(key, nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["thumbprint_raw"] = v.Base64urlEncode(got[:])
+		}
 		if c.Expected["thumbprint_raw"] != nil && v.Base64urlEncode(got[:]) != rawStringField(t, c.Expected, "thumbprint_raw") {
 			t.Fatalf("case %s: thumbprint_raw mismatch", c.ID)
 		}
@@ -473,8 +483,16 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		for k, val := range overrides {
 			conv[k] = int(val)
 		}
-		_, err := v.BoundsNew(conv)
+		got, err := v.BoundsNew(conv)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			projected := map[string]any{}
+			all := map[string]int{"compact_bytes": got.CompactBytes, "encoded_segment_bytes": got.EncodedSegmentBytes, "decoded_segment_bytes": got.DecodedSegmentBytes, "json_bytes": got.JSONBytes, "jcs_bytes": got.JCSBytes, "depth": got.Depth, "object_members": got.ObjectMembers, "array_items": got.ArrayItems, "total_nodes": got.TotalNodes, "string_bytes": got.StringBytes, "number_lexeme_bytes": got.NumberLexemeBytes, "integer_magnitude": got.IntegerMagnitude, "float_magnitude": got.FloatMagnitude, "kid_bytes": got.KidBytes, "key_bytes": got.KeyBytes, "uri_bytes": got.URIBYtes, "identifier_bytes": got.IdentifierBytes, "nonce_bytes": got.NonceBytes, "method_bytes": got.MethodBytes, "operation_bytes": got.OperationBytes, "audiences": got.Audiences, "operations": got.Operations, "selectors": got.Selectors, "path_segments": got.PathSegments, "one_of_values": got.OneOfValues, "public_key_bytes": got.PublicKeyBytes, "signature_bytes": got.SignatureBytes, "digest_bytes": got.DigestBytes, "clock_skew": got.ClockSkew, "proof_max_age": got.ProofMaxAge, "chain_row_bytes": got.ChainRowBytes, "chain_rows": got.ChainRows, "anchor_bytes": got.AnchorBytes, "archive_header_bytes": got.ArchiveHeaderBytes, "key_transitions": got.KeyTransitions, "archive_chunks": got.ArchiveChunks, "archive_bytes": got.ArchiveBytes, "object_version_bytes": got.ObjectVersionBytes, "content_bytes": got.ContentBytes}
+			for key := range conv {
+				projected[key] = all[key]
+			}
+			c.Actual["bounds"] = projected
+		}
 	case "assemble_compact":
 		si := v.SigningInput{
 			Kind:      es256KindOf(rawStringField(t, c.Input, "kind")),
@@ -484,6 +502,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		sig := es256DecodeB64(t, c, rawStringField(t, c.Input, "signature"))
 		got, err := es256Profile.AssembleCompact(si, sig, nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["compact"] = got
+		}
 		if c.Expected["compact"] != nil && got != rawStringField(t, c.Expected, "compact") {
 			t.Fatalf("case %s: compact %s", c.ID, got)
 		}
@@ -539,6 +560,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 	case "request_digest":
 		got, err := es256Profile.RequestDigest(rawStringField(t, c.Input, "operation"), es256RawValue(t, c.Input["cast_arguments"]), nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["digest"] = got
+		}
 		var want string
 		if c.Expected["digest"] != nil {
 			want = rawStringField(t, c.Expected, "digest")
@@ -549,18 +573,27 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 	case "decode_grant":
 		got, err := es256Profile.DecodeGrant(rawStringField(t, c.Input, "compact"), nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["key_id"] = got.KeyID
+		}
 		if c.Expected["key_id"] != nil && got.KeyID != rawStringField(t, c.Expected, "key_id") {
 			t.Fatalf("case %s: kid %s", c.ID, got.KeyID)
 		}
 	case "decode_proof":
 		got, err := es256Profile.DecodeProof(rawStringField(t, c.Input, "compact"), nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["proof_id"] = got.ProofID()
+		}
 		if c.Expected["proof_id"] != nil && got.ProofID() != rawStringField(t, c.Expected, "proof_id") {
 			t.Fatalf("case %s: proof id %s", c.ID, got.ProofID())
 		}
 	case "untrusted_key_locator":
 		got, err := es256Profile.UntrustedKeyLocator(rawStringField(t, c.Input, "compact"), nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["kid"] = got.KeyID
+		}
 		if c.Expected["kid"] != nil && got.KeyID != rawStringField(t, c.Expected, "kid") {
 			t.Fatalf("case %s: kid %s", c.ID, got.KeyID)
 		}
@@ -577,6 +610,10 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 			ClockSkew:      es256RawInt(t, c.Input, "clock_skew"),
 		})
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["grant_id"] = got.GrantID()
+			c.Actual["issuer"] = got.Issuer()
+		}
 		if c.Expected["grant_id"] != nil && got.GrantID() != rawStringField(t, c.Expected, "grant_id") {
 			t.Fatalf("case %s: grant id %s", c.ID, got.GrantID())
 		}
@@ -618,6 +655,10 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 			Sequence:     es256RawInt(t, c.Input, "sequence"),
 		}, nil)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["bytes"] = v.Base64urlEncode(got.Row)
+			c.Actual["hash"] = v.Base64urlEncode(got.Hash[:])
+		}
 		// the v3 corpus carries the canonical row base64url-encoded in
 		// "bytes" (the v1/v2 corpora carried the raw text; the corpus is the
 		// certified authority, the runner adapts)
@@ -649,6 +690,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 			RowCount:      es256RawInt(t, c.Input, "row_count"),
 		})
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["chain_id"] = got.ChainID()
+		}
 		if c.Expected["chain_id"] != nil && got.ChainID() != rawStringField(t, c.Expected, "chain_id") {
 			t.Fatalf("case %s: chain id %s", c.ID, got.ChainID())
 		}
@@ -658,6 +702,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		es256CensusKey(pk)
 		got, err := es256Profile.VerifyHistoricalAnchor(rawStringField(t, c.Input, "compact"), es256HistoricalKey(t, key, pk), es256ExpectedAnchor(t, es256SubObject(t, c.Input, "expected")))
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["anchor_id"] = got.AnchorID()
+		}
 		if c.Expected["anchor_id"] != nil && got.AnchorID() != rawStringField(t, c.Expected, "anchor_id") {
 			t.Fatalf("case %s: anchor id %s", c.ID, got.AnchorID())
 		}
@@ -671,6 +718,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 			es256HistoricalKey(t, next, rawStringField(t, next, "public_key")),
 			es256ExpectedTransition(t, es256SubObject(t, c.Input, "expected")))
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["transition_id"] = got.TransitionID()
+		}
 		if c.Expected["transition_id"] != nil && got.TransitionID() != rawStringField(t, c.Expected, "transition_id") {
 			t.Fatalf("case %s: transition id %s", c.ID, got.TransitionID())
 		}
@@ -678,6 +728,10 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		input, expected := es256ExportEncodeInput(t, c)
 		got, err := es256Profile.EncodeAnchoredExport(input, expected)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["byte_count"] = got.ByteCount
+			c.Actual["digest"] = v.Base64urlEncode(got.Digest[:])
+		}
 		if c.Expected["byte_count"] != nil {
 			if got.ByteCount != es256RawInt(t, c.Expected, "byte_count") {
 				t.Fatalf("case %s: byte_count %d", c.ID, got.ByteCount)
@@ -692,6 +746,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		obj, keys, expected := es256ExportVerifyInput(t, c)
 		got, err := es256Profile.VerifyAnchoredExport(obj, keys, expected)
 		es256CheckVerdict(t, c, err)
+		if err == nil {
+			c.Actual["chain_id"] = got.ChainID()
+		}
 		if c.Expected["chain_id"] != nil && got.ChainID() != rawStringField(t, c.Expected, "chain_id") {
 			t.Fatalf("case %s: chain id %s", c.ID, got.ChainID())
 		}
@@ -739,6 +796,10 @@ func es256MaybeRaw(t *testing.T, c es256CorpusCase) []byte {
 
 func es256CheckVerdict(t *testing.T, c es256CorpusCase, err error) {
 	t.Helper()
+	c.Actual["verdict"] = "valid"
+	if err != nil {
+		c.Actual["verdict"] = "invalid"
+	}
 	if c.Expected["verdict"] == nil {
 		t.Fatalf("case %s: no verdict", c.ID)
 	}
@@ -753,6 +814,7 @@ func es256CheckVerdict(t *testing.T, c es256CorpusCase, err error) {
 
 func es256CheckInvalid(t *testing.T, c es256CorpusCase, stage string) {
 	t.Helper()
+	c.Actual["verdict"] = "invalid"
 	if rawStringField(t, c.Expected, "verdict") == "valid" {
 		t.Fatalf("case %s: expected valid but rejected at %s", c.ID, stage)
 	}
@@ -783,6 +845,9 @@ func es256KindOf(k string) v.Kind {
 
 func es256CheckSigningInput(t *testing.T, c es256CorpusCase, si v.SigningInput) {
 	t.Helper()
+	c.Actual["protected_segment"] = v.Base64urlEncode(si.Protected)
+	c.Actual["payload_segment"] = v.Base64urlEncode(si.Payload)
+	c.Actual["message"] = v.Base64urlEncode(si.Protected) + "." + v.Base64urlEncode(si.Payload)
 	if c.Expected["message"] == nil {
 		return // invalid cases carry only the verdict
 	}

@@ -111,4 +111,55 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
   test "an out-of-scope file carrying a publish string is not scanned" do
     assert run("do not run `npm publish` here\n", "docs/notes.md") == 0
   end
+
+  test "the CI caller feeds every executable and manifest path class to the checker" do
+    root = Path.join(System.tmp_dir!(), "publish-caller-#{System.unique_integer([:positive])}")
+    on_exit(fn -> File.rm_rf!(root) end)
+    File.mkdir_p!(Path.join(root, "scripts"))
+    File.cp!(@script, Path.join(root, "scripts/check_sdk_publish_infra.sh"))
+    {_, 0} = System.cmd("git", ["init", "--quiet"], cd: root)
+    source = File.read!(".github/workflows/sdk-publish-guard.yml")
+    [_, body] = String.split(source, "        run: |\n", parts: 2)
+
+    body =
+      body
+      |> String.split("\n")
+      |> Enum.map_join("\n", &String.replace_prefix(&1, "          ", ""))
+
+    invoke = fn ->
+      System.cmd("bash", ["-c", body],
+        cd: root,
+        env: [{"CHECKER", "scripts/check_sdk_publish_infra.sh"}],
+        stderr_to_stdout: true
+      )
+    end
+
+    for path <- [
+          ".github/workflows/release.yml",
+          ".github/actions/release/action.yml",
+          "sdks/rust/release.sh",
+          "sdks/rust/Makefile",
+          "sdks/rust/justfile",
+          "Makefile",
+          "justfile",
+          "sdks/javascript/package.json",
+          "sdks/python/pyproject.toml",
+          "sdks/python/setup.py",
+          "sdks/python/setup.cfg",
+          "sdks/rust/Cargo.toml"
+        ] do
+      full = Path.join(root, path)
+      File.mkdir_p!(Path.dirname(full))
+      File.write!(full, "run: cargo publish\n")
+      {_, 0} = System.cmd("git", ["add", "--", path], cd: root)
+      {output, status} = invoke.()
+      assert status != 0, path
+      assert output =~ "#{path}: registry-publish command", output
+      IO.puts("RED publish caller #{path}: registry-publish command")
+      File.write!(full, "# clean\n")
+      {output, status} = invoke.()
+      assert status == 0, output
+      IO.puts("GREEN publish caller #{path}: restored")
+    end
+  end
 end

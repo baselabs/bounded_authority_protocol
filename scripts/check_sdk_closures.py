@@ -202,7 +202,6 @@ def run(sdk: str) -> None:
                 ".ruff_cache",
             ),
         )
-        (scratch / "priv").symlink_to(ROOT / "priv", target_is_directory=True)
         env = dict(os.environ)
         env.pop("RUSTFLAGS", None)
         env["PYTHONDONTWRITEBYTECODE"] = "1"

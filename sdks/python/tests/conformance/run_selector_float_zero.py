@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -32,8 +33,11 @@ from bounded_authority_verifier.json_alg import (
     utf8_str,
 )
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-_CORPUS = _REPO_ROOT / "priv" / "conformance" / "selector-float-zero"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from corpus_support import CorpusRun, integrity  # noqa: E402
+
+_CORPUS_ROOT = Path(__file__).resolve().parents[2] / "conformance"
+_CORPUS = _CORPUS_ROOT / "priv" / "conformance" / "selector-float-zero"
 
 CERTIFIED_INDEX_SHA256 = "97fd7a99cdbf3acc0a78f5ba1c6556e23a63e0ad66f533e31fd69f82dc5f3003"
 PROFILE_IDENTITY = "bap-selector-float-zero/1"
@@ -44,6 +48,7 @@ _MAJORS: dict[int, Any] = {1: v1, 2: v2, 3: v3}
 
 
 def _load() -> list[dict]:
+    integrity(_CORPUS, CERTIFIED_INDEX_SHA256)
     index_bytes = (_CORPUS / "index.json").read_bytes()
     got = hashlib.sha256(index_bytes).hexdigest()
     if got != CERTIFIED_INDEX_SHA256:
@@ -61,7 +66,7 @@ def _load() -> list[dict]:
         doc_cases = json.loads(raw)["cases"]
         if len(doc_cases) != entry["cases"]:
             raise AssertionError(f"{entry['path']}: case count mismatch")
-        cases.extend(doc_cases)
+        cases.extend({**case, "_file": entry["path"]} for case in doc_cases)
     if len(cases) != TOTAL_CASES:
         raise AssertionError(f"case census {len(cases)} != {TOTAL_CASES}")
     return cases
@@ -144,11 +149,10 @@ def _check_envelope(mod: Any, inp: dict) -> Any:
     )
 
 
-def _agrees(case: dict) -> bool:
+def _compute(case: dict) -> dict:
     mod = _MAJORS[case["major"]]
     surface = case["surface"]
     inp = case["input"]
-    expected = case["expected"]
     try:
         if surface == "decode_grant":
             result = mod.decode_grant(_unwrap(str_utf8(inp["compact"])))
@@ -159,36 +163,36 @@ def _agrees(case: dict) -> bool:
         else:
             raise AssertionError(f"{case['id']}: unknown surface {surface}")
     except InvalidError:
-        return expected["verdict"] == "invalid"
+        return {"verdict": "invalid"}
     if not result.is_ok:
-        return expected["verdict"] == "invalid"
-    if expected["verdict"] != "valid":
-        return False
+        return {"verdict": "invalid"}
+    actual = {"verdict": "valid"}
     if surface == "decode_grant":
-        return bool(result.value.key_id == expected["key_id"])
+        actual["key_id"] = result.value.key_id
     if surface == "grant_signing_input":
         protected = _unwrap(utf8_str(result.value.protected_segment))
         payload = _unwrap(utf8_str(result.value.payload_segment))
-        return (
-            protected == expected["protected_segment"]
-            and payload == expected["payload_segment"]
-            and f"{protected}.{payload}" == expected["message"]
-        )
-    return True
+        actual.update(protected_segment=protected, payload_segment=payload, message=f"{protected}.{payload}")
+    return actual
+
 
 
 def run_all() -> dict:
     cases = _load()
+    execution = CorpusRun(_CORPUS, CERTIFIED_INDEX_SHA256)
     failures: list[str] = []
     rejected = accepted = 0
     for case in cases:
-        if not _agrees(case):
+        actual = _compute(case)
+        execution.record(case["id"], actual, case["_file"])
+        if any(actual.get(k) != v for k, v in case["expected"].items()):
             failures.append(f"{case['id']}: expected {case['expected']['verdict']}")
             continue
         if case["expected"]["verdict"] == "valid":
             accepted += 1
         else:
             rejected += 1
+    execution.finish()
     return {"pass": rejected + accepted, "fail": len(failures), "total": len(cases),
             "failures": failures, "rejected": rejected, "accepted": accepted}
 

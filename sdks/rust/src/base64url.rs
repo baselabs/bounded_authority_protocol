@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn corpus_base64url_decode_all_3_cases() {
         let path = format!(
-            "{}/../../priv/conformance/v1/corpus/cases/base64url/decode.json",
+            "{}/conformance/priv/conformance/v1/corpus/cases/base64url/decode.json",
             env!("CARGO_MANIFEST_DIR")
         );
         let content =

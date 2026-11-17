@@ -330,7 +330,7 @@ func swapAnchorChainHash(t *testing.T, compact, newHash string) string {
 // corpusEnvelopeProof extracts the corpus envelope-valid proof compact.
 func corpusEnvelopeProof(t *testing.T) string {
 	t.Helper()
-	raw, err := os.ReadFile("conformance/corpus/cases/envelope/check.json")
+	raw, err := os.ReadFile("conformance/priv/conformance/v1/corpus/cases/envelope/check.json")
 	if err != nil {
 		t.Fatalf("vendored corpus unreachable: %v", err)
 	}
@@ -360,7 +360,7 @@ func loadExportEncodeCase(t *testing.T) (AnchoredExportInput, ExpectedAnchoredEx
 	t.Helper()
 	_, keys, expected := loadExportCase(t)
 	_ = keys
-	raw, err := os.ReadFile("conformance/corpus/cases/anchored-export/encode.json")
+	raw, err := os.ReadFile("conformance/priv/conformance/v1/corpus/cases/anchored-export/encode.json")
 	if err != nil {
 		t.Fatal(err)
 	}

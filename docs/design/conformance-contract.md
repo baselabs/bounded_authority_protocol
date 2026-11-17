@@ -48,7 +48,7 @@ A self-round-trip proves only internal consistency. Byte drift or a manifest cen
 nonzero.
 
 BAP-03's focused vectors and independent verifier are public repository acceptance evidence. The
-Hex package ships the protocol schemas, Elixir runtime, and the portable v1 conformance corpus
+Hex package ships the protocol schemas, runtime, and all nine certified corpora, including the portable v1 corpus
 (283 cases across 28 surfaces with a total surface × class applicability matrix, `.raw` sidecars
 for oversize wire inputs). BAP-05's corpus is normative: a second Node implementation
 (`conformance/corpus_independent.mjs`, node:* only) independently recomputes every corpus verdict
@@ -223,3 +223,17 @@ carried as a corpus case; the bound itself stays pinned at `bounds.new` and is p
 the source-isolated mutation battery. The upper JCS float threshold (`>= 21`) is unreachable from the
 bounded algebra (the largest representable float has decimal exponent ≈ 15.95), so no corpus case
 pins it. The spec subsection documents both thresholds and the reference implements both.
+
+## Corpus distribution and computed verdict binding
+
+A Hex build carries the complete `priv/conformance/` tree, including all nine certified
+corpora and the sibling `verdict-digests.json` manifest. The manifest is an unreleased addition
+after Hex 1.0.0; it will ship with the next release. Each in-tree SDK vendors that exact
+tree at `conformance/priv/conformance/` beneath its own root. The package census, unpacked
+Hex inventory, and every SDK snapshot must agree in both directions, including missing trees.
+
+The [verdict digest contract](corpus-verdict-digests.md) defines index ordering and outcome
+projections for cases with and without `expected`. Each runner records actual results by
+unique case ID, rejects missing execution, and compares its computed digest with the manifest.
+The CLI 1.x report retains its existing members. The manifest sits outside every corpus
+folder, so each corpus's refusal of files absent from its index remains intact.

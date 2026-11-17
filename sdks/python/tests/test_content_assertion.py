@@ -34,9 +34,10 @@ from bounded_authority_verifier import (
     verify_successor,
 )
 from bounded_authority_verifier.error import InvalidError, _unwrap
+from corpus_support import CorpusRun
 
 _CORPUS_ROOT = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[1] / "conformance"
     / "priv/conformance/attestation-profiles/content-assertion/v1"
 )
 _CERTIFIED_INDEX_SHA256 = "14b7436ccf7cc91fece52a1578c3760df6720a93494d147ee5ab523e2ce21876"
@@ -575,3 +576,38 @@ def test_content_assertion_successor_corpus_separates_artifact_and_relation_verd
 
 def _replace_facts(facts, **changes):
     return type(facts)(**{name: changes.get(name, getattr(facts, name)) for name in inspect.signature(type(facts)).parameters})
+
+
+def test_content_corpus_computed_verdict_digest():
+    execution = CorpusRun(_CORPUS_ROOT, _CERTIFIED_INDEX_SHA256)
+    profile = json.loads((_CORPUS_ROOT / "profile.json").read_bytes())
+    def word(result):
+        return "valid" if result.is_ok else "invalid"
+    for path, case in execution.cases:
+        if path == "digest-cases.json":
+            value = case["input"]
+            content = (_CORPUS_ROOT / value["content_file"]).read_bytes() if "content_file" in value else _corpus_b64(value["content_base64url"])
+            try:
+                bounds_value = _unwrap(bounds_new(value["bounds"]))
+                result = content_digest(content, bounds_value)
+                actual = {"verdict": word(result)}
+                if result.is_ok:
+                    import base64
+                    actual["digest"] = base64.urlsafe_b64encode(result.value).rstrip(b"=").decode()
+            except InvalidError:
+                actual = {"verdict": "invalid"}
+        elif path == "successor-cases.json":
+            predecessor = _verified_corpus_artifact(case["predecessor"], profile)
+            successor = _verified_corpus_artifact(case["successor"], profile)
+            relation = word(verify_successor(predecessor, successor, _unwrap(bounds_maximum()))) if predecessor is not None and successor is not None else "not_run"
+            actual = {"predecessor": "valid" if predecessor is not None else "invalid", "successor": "valid" if successor is not None else "invalid", "relation": relation}
+        else:
+            try:
+                bounds_value = _unwrap(bounds_new(case.get("bounds", {})))
+                context = _corpus_expected(profile, attestor_name=case.get("attestor", "primary"), overrides=case.get("expected_overrides"), bounds=bounds_value)
+                compact_value = case["compact"].encode()
+                actual = {"decode": word(decode_assertion(compact_value, bounds_value)), "verify": word(verify_assertion(compact_value, context))}
+            except InvalidError:
+                actual = {"decode": "invalid", "verify": "invalid"}
+        execution.record(case["id"], actual, path)
+    execution.finish()

@@ -48,7 +48,7 @@ point: canonical point encodings, no small-order key or `R`, a scalar below the 
 the cofactorless equation. Key import, JWK encode and decode, and thumbprint functions refuse a
 key that fails key acceptance. Call `torsion_free` at key enrollment, at trust install, and
 before any deny-list or revocation comparison. A vendored snapshot of the strict-Ed25519 corpus
-under `conformance/corpus-strict/` runs through `conformance/run_strict.rs` with its index
+under `conformance/priv/conformance/strict-ed25519/` runs through `conformance/run_strict.rs` with its index
 SHA-256 pinned.
 
 ## Supply chain
@@ -120,3 +120,7 @@ redacted facts. Keep these out of the verifier:
 
 A verifier result is one input to that decision, never the decision itself
 ([protocol charter](../design/protocol-charter.md)).
+
+Tests and corpus inputs are self-contained under the SDK root. The complete Hex corpus tree
+is vendored at `conformance/priv/conformance/`; copied-alone and unpacked-package checks
+protect that boundary. See the [verdict digest contract](../design/corpus-verdict-digests.md).

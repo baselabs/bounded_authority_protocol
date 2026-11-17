@@ -28,9 +28,10 @@ from bounded_authority_verifier.error import _unwrap
 # Locate the package + corpus. The runner is invoked from sdks/python/, so the repo root is two
 # levels up; the package is importable from src/.
 _HERE = Path(__file__).resolve()
-_REPO_ROOT = _HERE.parents[4]
+_CORPUS_ROOT = _HERE.parents[2] / "conformance"
 _SRC = _HERE.parents[2] / "src"
 sys.path.insert(0, str(_SRC))
+sys.path.insert(0, str(_HERE.parents[1]))
 
 from bounded_authority_verifier import v1  # noqa: E402
 from bounded_authority_verifier.base64url import base64url_decode, base64url_encode  # noqa: E402
@@ -60,8 +61,9 @@ from bounded_authority_verifier.jwk import (  # noqa: E402
     thumbprint_preimage,
 )
 from bounded_authority_verifier.uri import uri_normalize  # noqa: E402
+from corpus_support import CorpusRun, computed, integrity  # noqa: E402
 
-CORPUS_DIR = _REPO_ROOT / "priv" / "conformance" / "v1" / "corpus"
+CORPUS_DIR = _CORPUS_ROOT / "priv" / "conformance" / "v1" / "corpus"
 # The certified index.json SHA-256 (ADR 0014 D4). A mismatched vendored corpus fails closed.
 CERTIFIED_INDEX_SHA = "4cb5072ab40ffd4b111659e6d4ab20209202380505f1f8424b96d22e533cb91b"
 
@@ -85,6 +87,7 @@ def abort(msg: str) -> NoReturn:
 
 
 def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes]]:
+    integrity(CORPUS_DIR, CERTIFIED_INDEX_SHA)
     index_path = CORPUS_DIR / "index.json"
     index_raw = index_path.read_bytes()
     # ADR 0014 D4: assert the index.json SHA-256 matches the certified snapshot.
@@ -125,7 +128,7 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes
                 abort("revision.json: generated_from provenance string")
             continue
         file_json = json.loads((CORPUS_DIR / path).read_text("utf8"))
-        cases.extend(file_json["cases"])
+        cases.extend({**case, "_file": path} for case in file_json["cases"])
     if len(cases) != total_cases:
         abort(f"corpus case count mismatch: index says {total_cases}, loaded {len(cases)}")
     # Verify each raw sidecar's recorded SHA.
@@ -802,6 +805,7 @@ def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
 
 def run_all() -> dict[str, Any]:
     index, cases, raws = load_corpus()
+    execution = CorpusRun(CORPUS_DIR, CERTIFIED_INDEX_SHA)
     _reset_census()
     passed = 0
     failed = 0
@@ -815,12 +819,14 @@ def run_all() -> dict[str, Any]:
                 abort(f"{c['id']}: tamper base_case {tamper['base_case']} not found")
             inp = apply_tamper(base["input"], tamper, raws)
         actual = dispatch(c["surface"], inp, raws)
+        execution.record(c["id"], computed(c["expected"], actual, INVALID), c["_file"])
         if compare_verdict(c["expected"], actual):
             passed += 1
         else:
             failed += 1
             failures.append(c["id"])
     run_census(index, cases)
+    execution.finish()
     return {"pass": passed, "fail": failed, "total": len(cases), "index": index, "cases": cases, "failures": failures}
 
 

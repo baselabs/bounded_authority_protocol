@@ -1050,7 +1050,7 @@ mod tests {
     #[test]
     fn corpus_uri_normalize_all_26_cases() {
         let path = format!(
-            "{}/../../priv/conformance/v1/corpus/cases/uri/normalize.json",
+            "{}/conformance/priv/conformance/v1/corpus/cases/uri/normalize.json",
             env!("CARGO_MANIFEST_DIR")
         );
         let content =

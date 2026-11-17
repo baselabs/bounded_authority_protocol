@@ -21,7 +21,7 @@
 //! Derivation hygiene mirrors the v1/v2 façades (ADR 0014 D5): derived from
 //! `spec/bap-v3.md`, `spec/bap-v1.md` (incorporated with the §2
 //! substitutions), `spec/bap-v2.md` §4, and the certified v3 conformance
-//! corpus (`conformance/corpus-v3/`). Derived from the spec and certified corpus,
+//! corpus (`conformance/priv/conformance/v3/corpus/`). Derived from the spec and certified corpus,
 //! not from any sibling-SDK or reference source (ADR 0014 D5). `REQ1-*`/`REQ2-*` citations below name the
 //! incorporated requirement of the same name; v3 carries them as
 //! `REQ3-*` (spec/bap-v3.md §6).
@@ -3950,8 +3950,7 @@ mod tests {
     /// monorepo source tree.
     fn corpus_root() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("conformance")
-            .join("corpus-v3")
+            .join("conformance/priv/conformance/v3/corpus")
     }
 
     fn load_cases(rel: &str) -> Vec<serde_json::Value> {

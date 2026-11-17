@@ -545,8 +545,7 @@ mod tests {
 
     fn corpus_root() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
+            .join("conformance")
             .join("priv")
             .join("conformance")
             .join("v1")

@@ -285,7 +285,7 @@ func TestPermissiveCanonicalAtEncode(t *testing.T) {
 // loadCorpusExportEncodeValid loads the vendored corpus encode-anchored-export-valid case.
 func loadCorpusExportEncodeValid(t *testing.T) (v.AnchoredExportInput, v.ExpectedAnchoredExport) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "conformance", "corpus", "cases", "anchored-export", "encode.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "conformance", "priv/conformance/v1/corpus", "cases", "anchored-export", "encode.json"))
 	if err != nil {
 		t.Fatalf("corpus: %v", err)
 	}
@@ -431,7 +431,7 @@ func TestPermissiveTimeCeilings(t *testing.T) {
 // loadCorpusEnvelopeValid loads the vendored corpus check-envelope-valid case.
 func loadCorpusEnvelopeValid(t *testing.T) (v.Credentials, v.ExpectedRequest) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "conformance", "corpus", "cases", "envelope", "check.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "conformance", "priv/conformance/v1/corpus", "cases", "envelope", "check.json"))
 	if err != nil {
 		t.Fatalf("corpus: %v", err)
 	}
@@ -688,7 +688,7 @@ func mustJSON(t *testing.T, s string) v.Value {
 // case through the public API (the battery's valid export baseline).
 func loadCorpusExportValid(t *testing.T) (v.ArchivedObject, v.HistoricalKeyChain, v.ExpectedAnchoredExport) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "conformance", "corpus", "cases", "anchored-export", "verify.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "conformance", "priv/conformance/v1/corpus", "cases", "anchored-export", "verify.json"))
 	if err != nil {
 		t.Fatalf("corpus: %v", err)
 	}
@@ -808,7 +808,7 @@ var successor = v.Profile{}
 // loadSuccessorEnvelope loads one corpus-v2 check_envelope case by id.
 func loadSuccessorEnvelope(t *testing.T, id string) (v.Credentials, v.ExpectedRequest) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "conformance", "corpus-v2", "cases", "envelope", "check.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "conformance", "priv/conformance/v2/corpus", "cases", "envelope", "check.json"))
 	if err != nil {
 		t.Fatalf("corpus: %v", err)
 	}
@@ -973,7 +973,7 @@ func TestPermissiveSuccessorMajorIsolation(t *testing.T) {
 			t.Fatalf("%s: successor facade must reject v1 bytes", id)
 		}
 	}
-	if _, err := successor.DecodeGrant(loadGrantCompact(t, "corpus", "grant-decode-valid"), nil); err == nil {
+	if _, err := successor.DecodeGrant(loadGrantCompact(t, "priv/conformance/v1/corpus", "grant-decode-valid"), nil); err == nil {
 		t.Fatal("successor DecodeGrant must reject a v1 grant")
 	}
 	// ...and the v1 facade rejects successor bytes
@@ -981,7 +981,7 @@ func TestPermissiveSuccessorMajorIsolation(t *testing.T) {
 	if _, err := successor.CheckEnvelope(v1creds, v1exp); err == nil {
 		t.Fatal("successor facade must reject the v1 envelope")
 	}
-	if _, err := v.DecodeGrant(loadGrantCompact(t, "corpus-v2", "grant-decode-v2-valid"), nil); err == nil {
+	if _, err := v.DecodeGrant(loadGrantCompact(t, "priv/conformance/v2/corpus", "grant-decode-v2-valid"), nil); err == nil {
 		t.Fatal("v1 DecodeGrant must reject a successor grant")
 	}
 	v2creds, v2exp := loadSuccessorEnvelope(t, "check-envelope-v2-valid")
@@ -994,7 +994,7 @@ func TestPermissiveSuccessorMajorIsolation(t *testing.T) {
 // surface file (boundary-anchor / key-transition).
 func loadKindCompact(t *testing.T, surface, id string) string {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "conformance", "corpus-v2", "cases", surface, "verify.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "conformance", "priv/conformance/v2/corpus", "cases", surface, "verify.json"))
 	if err != nil {
 		t.Fatalf("corpus: %v", err)
 	}
@@ -1028,7 +1028,7 @@ func TestPermissiveSuccessorAssemblyRevalidates(t *testing.T) {
 		kind    v.Kind
 		compact string
 	}{
-		{v.KindGrant, loadGrantCompact(t, "corpus-v2", "grant-decode-v2-valid")},
+		{v.KindGrant, loadGrantCompact(t, "priv/conformance/v2/corpus", "grant-decode-v2-valid")},
 		{v.KindBoundaryAnchor, loadKindCompact(t, "boundary-anchor", "verify-historical-anchor-v2-valid")},
 		{v.KindKeyTransition, loadKindCompact(t, "key-transition", "verify-key-transition-v2-valid")},
 	} {

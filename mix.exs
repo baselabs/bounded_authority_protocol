@@ -51,6 +51,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "chain_archive.mutations": :test,
         "conformance.mutations": :test,
         "conformance.verify": :test,
+        "corpus.verdicts": :test,
+        "corpus.distribution.mutations": :test,
         "license.check": :test,
         "package.check": :test,
         quality: :test,
@@ -90,6 +92,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       files: [
         "lib",
         "spec",
+        "priv/conformance/verdict-digests.json",
         "priv/conformance/v1/corpus",
         "priv/conformance/v1/schemas",
         "priv/conformance/v1/vectors",
@@ -131,6 +134,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/notebooks/service-integration.livemd",
         "docs/notebooks/chains-and-archives.livemd",
         "docs/design/conformance-contract.md",
+        "docs/design/corpus-verdict-digests.md",
         "docs/design/interoperability-report.md",
         "docs/design/protocol-charter.md",
         "docs/design/registries.md",
@@ -212,6 +216,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "spec/bap-content-assertion-v1.md",
         "spec/diagnostic-rendering.md",
         "docs/design/conformance-contract.md",
+        "docs/design/corpus-verdict-digests.md",
         "docs/design/requirement-map.md",
         "docs/design/local-loopback-http-requirement-map.md",
         "docs/design/role-attestation-requirement-map.md",
@@ -255,6 +260,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         Specifications: [~r"^spec/"],
         "Conformance and governance": [
           "docs/design/conformance-contract.md",
+          "docs/design/corpus-verdict-digests.md",
           ~r"^docs/design/.*requirement-map\.md$",
           "docs/design/interoperability-report.md",
           "docs/governance.md",
@@ -358,6 +364,23 @@ defmodule BoundedAuthorityProtocol.MixProject do
       "content_assertion.verify": ["run --no-start scripts/check_content_assertion.exs"],
       "role_attestation.verify": ["run scripts/check_role_attestation.exs"],
       "corpus.digests": ["run --no-start scripts/regen_corpus_digests.exs"],
+      "corpus.verdicts": [
+        "run --no-start scripts/regen_verdict_digests.exs",
+        "test test/conformance/verdict_digests_test.exs test/conformance/verdict_digest_gate_test.exs"
+      ],
+      "corpus.generators": [
+        "cmd node conformance/generators/build_corpus.mjs --verify --major 1",
+        "cmd node conformance/generators/build_corpus.mjs --verify --major 2",
+        "cmd node conformance/generators/build_corpus.mjs --verify --major 3",
+        "cmd node conformance/generators/build_strict_ed25519.mjs --verify",
+        "cmd node conformance/generators/build_producer_canonicality.mjs --verify",
+        "cmd node conformance/generators/build_selector_float_zero.mjs --verify",
+        "cmd python3 scripts/build_content_assertion_corpus.py --verify"
+      ],
+      "corpus.distribution.mutations": [
+        "test test/corpus_tooling_test.exs",
+        "cmd python3 scripts/check_corpus_distribution_mutations.py"
+      ],
       "corpus.sync": ["run --no-start scripts/check_corpus_sync.exs"],
       "spec.facts": ["run --no-start scripts/check_spec_facts.exs"],
       "docs.links": ["run --no-start scripts/check_doc_links.exs"],
@@ -389,6 +412,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "privacy.hooks",
         "corpus.sync",
         "corpus.digests",
+        "corpus.verdicts",
+        "corpus.generators",
+        "corpus.distribution.mutations",
         "spec.facts",
         "spec.examples",
         "spec.render",

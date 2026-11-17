@@ -13,7 +13,10 @@ on:
       - "priv/conformance/**"
       - "conformance/**"
       - "spec/**"
-      - "scripts/check_sdk_closures.py"
+      - "scripts/**"
+      - "mix.exs"
+      - ".github/actions/**"
+      - ".github/workflows/ci.yml"
       - "scripts/audit_python_floors.py"
       - ".github/dependabot.yml"
       - ".gitignore"
@@ -28,7 +31,10 @@ on:
       - "priv/conformance/**"
       - "conformance/**"
       - "spec/**"
-      - "scripts/check_sdk_closures.py"
+      - "scripts/**"
+      - "mix.exs"
+      - ".github/actions/**"
+      - ".github/workflows/ci.yml"
       - "scripts/audit_python_floors.py"
       - ".github/dependabot.yml"
       - ".gitignore"
@@ -226,3 +232,30 @@ jobs:
       - name: Audit every module, including packages without reachable symbols
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 -scan=module
         working-directory: sdks/go
+
+  isolated-distribution:
+    name: Isolated SDK and unpacked package (${{ matrix.sdk }})
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [python, rust, go]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - if: matrix.sdk == 'python'
+        run: python -m pip install uv==0.11.20
+      - if: matrix.sdk == 'rust'
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update && rustup default 1.88.0
+      - if: matrix.sdk == 'go'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25.0"
+      - if: matrix.sdk == 'go'
+        name: Cache the module zip verifier
+        run: go mod download golang.org/x/mod@v0.29.0
+      - run: python3 scripts/check_sdk_distribution.py ${{ matrix.sdk }}
+      - if: matrix.sdk != 'python'
+        run: python3 scripts/check_sdk_corpus_mutations.py ${{ matrix.sdk }}

@@ -10,6 +10,9 @@ use bounded_authority_protocol::{
 use ed25519_dalek::{Signer, SigningKey};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+#[path = "../conformance/support.rs"]
+mod support;
+
 use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
@@ -195,7 +198,7 @@ fn successor_allows_rotation_and_expired_predecessor() {
 
 fn corpus_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../priv/conformance/attestation-profiles/content-assertion/v1")
+        .join("conformance/priv/conformance/attestation-profiles/content-assertion/v1")
 }
 
 fn corpus_bytes(name: &str) -> Vec<u8> {
@@ -309,6 +312,7 @@ fn facts_input(
 
 #[test]
 fn certified_content_assertion_corpus_integrity_and_verdicts() {
+    let mut execution = support::Run::new(&corpus_root(), CONTENT_CORPUS_INDEX_SHA256);
     let index_bytes = corpus_bytes("index.json");
     assert_eq!(sha256_hex(&index_bytes), CONTENT_CORPUS_INDEX_SHA256);
     let index: Value = serde_json::from_slice(&index_bytes).unwrap();
@@ -342,6 +346,7 @@ fn certified_content_assertion_corpus_integrity_and_verdicts() {
         };
         let result = corpus_bounds(input.get("bounds"))
             .and_then(|bounds| content.and_then(|bytes| content_digest(&bytes, &bounds)));
+        execution.record(case["id"].as_str().unwrap(),"digest-cases.json",match &result {Ok(digest)=>serde_json::json!({"verdict":"valid","digest":String::from_utf8(bounded_authority_protocol::base64url_encode(digest)).unwrap()}),Err(_)=>serde_json::json!({"verdict":"invalid"})});
         let valid = case["expected"]["verdict"] == "valid";
         assert_eq!(result.is_ok(), valid, "{}", case["id"]);
         if let Ok(actual) = result {
@@ -397,6 +402,7 @@ fn certified_content_assertion_corpus_integrity_and_verdicts() {
                 )
                 .and_then(|expected| verify_content_assertion(compact, &expected))
             });
+            execution.record(id,name,serde_json::json!({"decode":if decoded.is_ok(){"valid"}else{"invalid"},"verify":if verified.is_ok(){"valid"}else{"invalid"}}));
             assert_eq!(
                 verified.is_ok(),
                 case["expected"]["verify"] == "valid",
@@ -406,6 +412,8 @@ fn certified_content_assertion_corpus_integrity_and_verdicts() {
     }
     assert_eq!(assertion_count as i64, index["assertion_cases"]);
     assert_eq!(producer_count, 38);
+    record_content_successors(&mut execution);
+    execution.finish();
 }
 
 fn verify_corpus_artifact(
@@ -443,8 +451,7 @@ fn apply_facts_overrides(
     Ok(facts)
 }
 
-#[test]
-fn certified_content_assertion_successor_corpus_verdicts() {
+fn record_content_successors(execution: &mut support::Run) {
     let index = corpus_json("index.json");
     let profile = corpus_json("profile.json");
     let cases = corpus_json("successor-cases.json");
@@ -466,7 +473,19 @@ fn certified_content_assertion_successor_corpus_verdicts() {
             case["expected"]["successor"] == "valid",
             "{id}"
         );
-        if case["expected"]["relation"] == "not_run" {
+        let pred_verdict = if predecessor.is_ok() {
+            "valid"
+        } else {
+            "invalid"
+        };
+        let succ_verdict = if successor.is_ok() {
+            "valid"
+        } else {
+            "invalid"
+        };
+        if predecessor.is_err() || successor.is_err() {
+            execution.record(id,"successor-cases.json",serde_json::json!({"predecessor":pred_verdict,"successor":succ_verdict,"relation":"not_run"}));
+            assert_eq!(case["expected"]["relation"], "not_run");
             continue;
         }
         let relation = predecessor
@@ -486,6 +505,7 @@ fn certified_content_assertion_successor_corpus_verdicts() {
                         )
                     })
             });
+        execution.record(id,"successor-cases.json",serde_json::json!({"predecessor":pred_verdict,"successor":succ_verdict,"relation":if relation.is_ok(){"valid"}else{"invalid"}}));
         assert_eq!(
             relation.is_ok(),
             case["expected"]["relation"] == "valid",

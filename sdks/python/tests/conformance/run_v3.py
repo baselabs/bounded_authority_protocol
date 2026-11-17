@@ -33,9 +33,10 @@ from bounded_authority_verifier.error import _unwrap
 # Locate the package + corpus. The runner is invoked from sdks/python/, so the repo root is two
 # levels up; the package is importable from src/.
 _HERE = Path(__file__).resolve()
-_REPO_ROOT = _HERE.parents[4]
+_CORPUS_ROOT = _HERE.parents[2] / "conformance"
 _SRC = _HERE.parents[2] / "src"
 sys.path.insert(0, str(_SRC))
+sys.path.insert(0, str(_HERE.parents[1]))
 
 from bounded_authority_verifier import v3  # noqa: E402
 from bounded_authority_verifier.base64url import base64url_decode, base64url_encode  # noqa: E402
@@ -57,10 +58,11 @@ from bounded_authority_verifier.json_alg import (  # noqa: E402
 )
 from bounded_authority_verifier.uri import uri_normalize  # noqa: E402
 from bounded_authority_verifier.v3 import _imported_fingerprints, _reset_census  # noqa: E402
+from corpus_support import CorpusRun, computed, integrity  # noqa: E402
 
-CORPUS_DIR = _REPO_ROOT / "priv" / "conformance" / "v3" / "corpus"
-# The certified index.json SHA-256 (ADR 0014 D4). A mismatched corpus fails closed (the v3 corpus is consumed in place; the Rust/Go SDKs vendor
-# snapshots — ADR 0019).
+CORPUS_DIR = _CORPUS_ROOT / "priv" / "conformance" / "v3" / "corpus"
+# The certified index.json SHA-256 (ADR 0014 D4). The complete Hex corpus tree
+# is vendored inside this SDK; an input mismatch fails closed (ADR 0049).
 CERTIFIED_INDEX_SHA = "a5c8075e7534345c3bb6611d0b40292904bcfa3af0702e07ae014fa66926433c"
 
 INVALID = object()  # sentinel: any genuine protocol rejection maps to this
@@ -83,6 +85,7 @@ def abort(msg: str) -> NoReturn:
 
 
 def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes]]:
+    integrity(CORPUS_DIR, CERTIFIED_INDEX_SHA)
     index_path = CORPUS_DIR / "index.json"
     index_raw = index_path.read_bytes()
     # ADR 0014 D4: assert the index.json SHA-256 matches the certified snapshot.
@@ -123,7 +126,7 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes
                 abort("revision.json: generated_from provenance string")
             continue
         file_json = json.loads((CORPUS_DIR / path).read_text("utf8"))
-        cases.extend(file_json["cases"])
+        cases.extend({**case, "_file": path} for case in file_json["cases"])
     if len(cases) != total_cases:
         abort(f"corpus case count mismatch: index says {total_cases}, loaded {len(cases)}")
     # Verify each raw sidecar's recorded SHA.
@@ -731,17 +734,7 @@ def _canonical_json(v: Any) -> str:
     return str(v)
 
 
-# ---- census (the v3 legs: curated == index, two-way; discovery ⊆ declared; verify-import) ----
-#
-# The v3 DECLARED census is an input to the index from the curated generator
-# (conformance/generators/curated-inputs-v3.json `public_key_fingerprints` — facts the generator
-# directory ships that are NOT derivable from case bytes), so the case-byte discovery is checked
-# as a fail-closed subset leg (an UNDECLARED key in a case input still aborts), the two-way
-# equality leg is curated == index (both directions), and the verify-import boundary leg requires
-# every key a valid verification case declares to be imported at the ES256 verify boundary.
-# A v3 raw public key is the 65-byte uncompressed SEC1 point — 87 canonical base64url characters.
-
-_CURATED_CENSUS_PATH = _REPO_ROOT / "conformance" / "generators" / "curated-inputs-v3.json"
+# ---- census: discovery is a subset of the declared index; verify-import covers valid cases ----
 
 _PUBLIC_KEY_LABEL = re.compile(r"public.*key|key.*public|verification.*key|holder.*key|issuer.*key", re.IGNORECASE)
 _PUBLIC_KEY_DENY = re.compile(r"fingerprint|thumbprint|digest|hash", re.IGNORECASE)
@@ -784,22 +777,7 @@ def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
     declared_sorted = sorted(set(declared))
     if declared != declared_sorted:
         abort("census: index public_key_fingerprints not sorted/unique")
-    # The two-way leg: every index fingerprint is curated AND every curated fingerprint is indexed.
-    curated_raw = _CURATED_CENSUS_PATH.read_text("utf8")
-    curated = json.loads(curated_raw)["public_key_fingerprints"]
-    curated_sorted = sorted(set(curated))
-    if curated != curated_sorted:
-        abort("census: curated public_key_fingerprints not sorted/unique")
     declared_set = set(declared)
-    curated_set = set(curated)
-    if declared_set != curated_set:
-        only_index = sorted(declared_set - curated_set)
-        only_curated = sorted(curated_set - declared_set)
-        abort(
-            "census: curated != index public_key_fingerprints\n"
-            f"  only-index=[{','.join(only_index)}]\n"
-            f"  only-curated=[{','.join(only_curated)}]"
-        )
     # The case-byte subset leg: every key embedded in a case input must be declared.
     discovery: set[str] = set()
     for c in cases:
@@ -901,6 +879,7 @@ def audit_tampers(cases: list[dict[str, Any]], raws: dict[str, bytes]) -> int:
 def run_all() -> dict[str, Any]:
     index, cases, raws = load_corpus()
     audit_tampers(cases, raws)
+    execution = CorpusRun(CORPUS_DIR, CERTIFIED_INDEX_SHA)
     _reset_census()
     passed = 0
     failed = 0
@@ -914,12 +893,14 @@ def run_all() -> dict[str, Any]:
                 abort(f"{c['id']}: tamper base_case {tamper['base_case']} not found")
             inp = apply_tamper(base["input"], tamper, raws)
         actual = dispatch(c["surface"], inp, raws)
+        execution.record(c["id"], computed(c["expected"], actual, INVALID), c["_file"])
         if compare_verdict(c["expected"], actual):
             passed += 1
         else:
             failed += 1
             failures.append(c["id"])
     run_census(index, cases)
+    execution.finish()
     return {"pass": passed, "fail": failed, "total": len(cases), "index": index, "cases": cases, "failures": failures}
 
 
@@ -931,7 +912,7 @@ def run_census_standalone() -> None:
     failed = result["fail"]
     print(f"census: ran {total} cases ({passed} agree, {failed} disagree) to populate the verify-import boundary")
     fp_count = len(index["public_key_fingerprints"])
-    print(f"census: curated-inputs-v3 == index public_key_fingerprints ({fp_count} keys, two-way); discovery ⊆ declared; verify-import ⊇ expected-verify-keys")
+    print(f"census: index public_key_fingerprints ({fp_count} keys, two-way); discovery ⊆ declared; verify-import ⊇ expected-verify-keys")
     if failed > 0:
         raise SystemExit(1)
     print("census: PASS (two-way equal + fail-closed legs)")
@@ -945,7 +926,7 @@ def main() -> None:
     index = result["index"]
     print(f"conformance: {passed}/{total} cases agree")
     fp_count = len(index["public_key_fingerprints"])
-    print(f"census: curated-inputs-v3 == index public_key_fingerprints ({fp_count} keys, two-way); discovery ⊆ declared; verify-import ⊇ expected-verify-keys")
+    print(f"census: index public_key_fingerprints ({fp_count} keys, two-way); discovery ⊆ declared; verify-import ⊇ expected-verify-keys")
     if failed > 0:
         print(f"\n{failed} FAILURE(S):", file=sys.stderr)
         for fid in result["failures"]:

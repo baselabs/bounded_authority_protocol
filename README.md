@@ -163,6 +163,12 @@ bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conf
 TypeScript, Python, Rust, and Go verifiers pass the same corpora
 ([Other languages](docs/guides/other-languages.md)).
 
+The in-tree Python, Rust, and Go SDKs each carry the complete Hex corpus tree at
+`conformance/priv/conformance/` inside their SDK root. Tests run from copied SDK roots and
+unpacked language packages. Input hashes, exact inventories, complete execution, and computed
+verdict digests bind each runner to the same frozen cases. See the
+[distribution and projection contract](docs/design/corpus-verdict-digests.md).
+
 ## Documentation
 
 [Getting started](docs/guides/getting-started.md), the [cheatsheet](docs/guides/cheatsheet.cheatmd),

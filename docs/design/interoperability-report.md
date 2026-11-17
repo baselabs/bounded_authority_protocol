@@ -28,8 +28,7 @@ test-vectors-plus-independent-cross-validation model: the contract-major 1 confo
 set of 283 published test vectors across 28 verification surfaces, and interoperability is
 demonstrated by independent implementations agreeing on every vector's verdict, including the
 two-boundary public-key census. Listing organizations proves nothing. An implementation appears here only
-with its independently re-executed result against the certified corpus snapshot or in-place
-binding named above.
+with its independently re-executed result against the certified corpus snapshot named above.
 
 ## Summary
 
@@ -69,7 +68,7 @@ per-language permissiveness mutation gate proving its closures red-capable.
 | SDK | Language surface | Corpus binding | Contract-major 1 result |
 |---|---|---|---|
 | `@bounded-authority-protocol/verifier` | TypeScript, Node >= 22, `node:crypto` only | graduated repository ([baselabs/bounded_authority_protocol_typescript](https://github.com/baselabs/bounded_authority_protocol_typescript)), vendored snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
-| `bounded-authority-verifier` | Python >= 3.10, `cryptography` | in-place monorepo corpus, startup digest assertion | **283/283 agreed + census (11 keys)** |
+| `bounded-authority-verifier` | Python >= 3.10, `cryptography` | complete vendored Hex tree, file hashes and verdict digest | **283/283 agreed + census (11 keys)** |
 | `bounded-authority-protocol` | Rust, MSRV 1.88, `ed25519-dalek`+`p256`+`sha2` | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 | `bounded_authority_protocol_go` | Go 1.25, stdlib only | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 
@@ -159,9 +158,9 @@ with expected verdicts from an independent arithmetic generator and the 12 publi
 |---|---|
 | Elixir reference (`bounded_authority_conformance --corpus priv/conformance/strict-ed25519`) | **agreed=2410 disagreed=0** |
 | TypeScript (`conformance:strict-ed25519`) | **every case agrees** across 2,410 cases in 14 families |
-| Python (`tests/conformance/run_strict.py`, reads the corpus in place) | **2410/2410 cases agree** |
-| Go (`go test ./conformance/`, vendored `conformance/corpus-strict`) | **agreed=2410/2410** |
-| Rust (`cargo test --locked`, vendored `conformance/corpus-strict`) | **pass** |
+| Python (`tests/conformance/run_strict.py`, complete vendored Hex tree) | **2410/2410 cases agree** |
+| Go (`go test ./conformance/`, vendored `conformance/priv/conformance/strict-ed25519`) | **agreed=2410/2410** |
+| Rust (`cargo test --locked`, vendored `conformance/priv/conformance/strict-ed25519`) | **pass** |
 | Independent Node runner (`node conformance/corpus_independent.mjs --strict priv/conformance/strict-ed25519`) | **agreed=2017 disagreed=0**; it implements contract-major 1, so the 393 contract-major 2 and sibling-profile cases are reported as not covered |
 
 ### Producer-canonicality corpus
@@ -213,8 +212,9 @@ oracle for their verdicts):
 1. The contract-major 1 corpus is the normative test-vector set: 283 cases, 28 surfaces, 16
    conformance classes (valid/boundary/exact/maximum-plus-one plus twelve rejection classes),
    with a tamper-verbatim audit re-deriving every tamper case from its base.
-2. An implementation binds to a corpus either in place (startup digest assertion against the
-   certified value) or through a vendored byte-identical snapshot (sync-gated).
+2. Each in-tree SDK binds to a complete vendored Hex corpus tree. The sync gate compares
+   every byte with an actual Hex unpack; runners hash every input and their computed outcomes
+   in index order. [Outcome projections](corpus-verdict-digests.md) define the shared digest.
 3. A run reports per-case agreement plus the two-boundary key census
    (discovered == verify-imported == index fingerprint set); any disagreement, crash, or
    census asymmetry fails the run.

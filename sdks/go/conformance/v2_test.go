@@ -1,5 +1,5 @@
 // Package conformance_test is the v2-profile acceptance runner: it executes
-// the vendored 268-case corpus-v2 snapshot against the public V2 SDK surface
+// the vendored 268-case v2 corpus snapshot against the public V2 SDK surface
 // only (the same acceptance pattern as the v1 runner), SHA-binds the vendored
 // index.json at startup, verifies every case file against the index's
 // per-file SHA-256, and asserts the two-boundary key census against the
@@ -13,6 +13,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/baselabs/bounded_authority_protocol_go/internal/corpuscheck"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,7 +28,7 @@ import (
 // to anything else fails closed here — silent drift is impossible.
 const certifiedIndexSHA256 = "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A"
 
-const corpusDir = "corpus-v2"
+const corpusDir = "priv/conformance/v2/corpus"
 
 const totalCases = 268
 
@@ -38,6 +39,7 @@ type caseFile struct {
 }
 
 type corpusCase struct {
+	Actual   map[string]any             `json:"-"`
 	ID       string                     `json:"id"`
 	Surface  string                     `json:"surface"`
 	Class    string                     `json:"class"`
@@ -204,6 +206,7 @@ type loadedFile struct {
 }
 
 func TestConformance(t *testing.T) {
+	execution := corpuscheck.New(t, corpusDir, "priv/conformance", certifiedIndexSHA256)
 	idx, files := loadCorpus(t)
 	agreed := 0
 	for _, lf := range files {
@@ -213,12 +216,15 @@ func TestConformance(t *testing.T) {
 			}
 			c := c
 			if t.Run(c.ID, func(t *testing.T) {
+				c.Actual = map[string]any{}
 				runCase(t, c)
+				execution.Record(c.ID, lf.path, c.Actual)
 			}) {
 				agreed++ // counts AGREED subtests, not merely executed ones
 			}
 		}
 	}
+	execution.Finish()
 	// Successor-major key census (the v1 runner's census adapted to the v2
 	// corpus shape): the DECLARED census is an index input from the curated
 	// generator, and one curated key emits no case — the case-byte discovery
@@ -230,37 +236,9 @@ func TestConformance(t *testing.T) {
 	if !sortedUniqueStrings(declared) {
 		t.Fatalf("census: index public_key_fingerprints not sorted/unique")
 	}
-	curatedRaw, err := os.ReadFile(curatedCensusPath)
-	if err != nil {
-		t.Fatalf("census: curated inputs: %v", err)
-	}
-	var curatedDoc struct {
-		PublicKeyFingerprints []string `json:"public_key_fingerprints"`
-	}
-	if err := json.Unmarshal(curatedRaw, &curatedDoc); err != nil {
-		t.Fatalf("census: curated inputs parse: %v", err)
-	}
-	curated := curatedDoc.PublicKeyFingerprints
-	if !sortedUniqueStrings(curated) {
-		t.Fatalf("census: curated public_key_fingerprints not sorted/unique")
-	}
 	declaredSet := make(map[string]bool, len(declared))
 	for _, fp := range declared {
 		declaredSet[fp] = true
-	}
-	curatedSet := make(map[string]bool, len(curated))
-	for _, fp := range curated {
-		curatedSet[fp] = true
-	}
-	for _, fp := range declared {
-		if !curatedSet[fp] {
-			t.Fatalf("census: index fingerprint %s missing from the curated census", fp)
-		}
-	}
-	for _, fp := range curated {
-		if !declaredSet[fp] {
-			t.Fatalf("census: curated fingerprint %s missing from the index census", fp)
-		}
 	}
 	// subset leg: every key embedded in a case input must be declared
 	discovery := map[string]bool{}
@@ -293,12 +271,8 @@ func TestConformance(t *testing.T) {
 		}
 	}
 	t.Logf("agreed=%d disagreed=0 census=%d declared=%d", agreed, len(census), len(declared))
-}
 
-// curatedCensusPath is the monorepo's curated generator directory — the
-// declared census input the index was built from (facts the generator ships
-// that are not derivable from case bytes).
-const curatedCensusPath = "../../../conformance/generators/curated-inputs-v2.json"
+}
 
 // The census key-label heuristic: a member named like a public key carrying a
 // 43-char base64url (32-byte) value; fingerprint/thumbprint/digest/hash
@@ -372,6 +346,9 @@ func runCase(t *testing.T, c corpusCase) {
 		b64 := rawString(t, c.Input, "base64url")
 		got, err := v.Base64urlDecode(b64)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["decoded"] = string(got)
+		}
 		want := ""
 		if c.Expected["decoded"] != nil {
 			want = rawString(t, c.Expected, "decoded")
@@ -388,6 +365,9 @@ func runCase(t *testing.T, c corpusCase) {
 		}
 		enc, err := v.JcsEncode(val, nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["encoded"] = string(enc)
+		}
 		if c.Expected["encoded"] != nil && string(enc) != rawString(t, c.Expected, "encoded") {
 			t.Fatalf("case %s: encoded %s", c.ID, enc)
 		}
@@ -403,6 +383,13 @@ func runCase(t *testing.T, c corpusCase) {
 		}
 		got, err := v.JsonDecode(text, nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			encoded, e := v.JcsEncode(got, nil)
+			if e != nil {
+				t.Fatal("computed JSON value cannot be canonicalized")
+			}
+			c.Actual["value"] = corpuscheck.Decode(encoded)
+		}
 		if c.Expected["value"] != nil {
 			want := rawValue(t, c.Expected["value"])
 			gotJCS, err1 := v.JcsEncode(got, nil)
@@ -414,12 +401,18 @@ func runCase(t *testing.T, c corpusCase) {
 	case "uri.normalize":
 		got, err := v.UriNormalize(rawString(t, c.Input, "text"), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["normalized"] = got
+		}
 		if c.Expected["normalized"] != nil && got != rawString(t, c.Expected, "normalized") {
 			t.Fatalf("case %s: normalized %s", c.ID, got)
 		}
 	case "jwk.decode_public":
 		got, err := v.JwkDecodePublic([]byte(rawString(t, c.Input, "text")), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["public_key"] = v.Base64urlEncode(got)
+		}
 		if c.Expected["public_key"] != nil && v.Base64urlEncode(got) != rawString(t, c.Expected, "public_key") {
 			t.Fatalf("case %s: key mismatch", c.ID)
 		}
@@ -428,29 +421,44 @@ func runCase(t *testing.T, c corpusCase) {
 		censusKey(rawString(t, c.Input, "public_key"))
 		got, err := v.JwkEncodePublic(key, nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["encoded"] = string(got)
+		}
 		if c.Expected["encoded"] != nil && string(got) != rawString(t, c.Expected, "encoded") {
 			t.Fatalf("case %s: encoded %s", c.ID, got)
 		}
 	case "jwk.thumbprint_preimage":
 		got, err := v.JwkThumbprintPreimage([]byte(rawString(t, c.Input, "text")), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["preimage"] = string(got)
+		}
 		if c.Expected["preimage"] != nil && string(got) != rawString(t, c.Expected, "preimage") {
 			t.Fatalf("case %s: preimage %s", c.ID, got)
 		}
 	case "jwk.thumbprint":
 		got, err := v.JwkThumbprint([]byte(rawString(t, c.Input, "text")), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["thumbprint"] = got
+		}
 		if c.Expected["thumbprint"] != nil && got != rawString(t, c.Expected, "thumbprint") {
 			t.Fatalf("case %s: thumbprint %s", c.ID, got)
 		}
 	case "jwk.thumbprint_raw":
-		_, err := v.JwkThumbprintRaw([]byte(rawString(t, c.Input, "text")), nil)
+		got, err := v.JwkThumbprintRaw([]byte(rawString(t, c.Input, "text")), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["thumbprint_raw"] = v.Base64urlEncode(got[:])
+		}
 	case "jwk.public_key_thumbprint_raw":
 		key := decodeB64(t, c, rawString(t, c.Input, "public_key"))
 		censusKey(rawString(t, c.Input, "public_key"))
-		_, err := v.PublicKeyThumbprintRaw(key, nil)
+		got, err := v.PublicKeyThumbprintRaw(key, nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["thumbprint_raw"] = v.Base64urlEncode(got[:])
+		}
 	case "bounds.new":
 		var overrides map[string]int64
 		if err := json.Unmarshal(c.Input["overrides"], &overrides); err != nil {
@@ -462,8 +470,16 @@ func runCase(t *testing.T, c corpusCase) {
 		for k, val := range overrides {
 			conv[k] = int(val)
 		}
-		_, err := v.BoundsNew(conv)
+		got, err := v.BoundsNew(conv)
 		checkVerdict(t, c, err)
+		if err == nil {
+			projected := map[string]any{}
+			all := map[string]int{"compact_bytes": got.CompactBytes, "encoded_segment_bytes": got.EncodedSegmentBytes, "decoded_segment_bytes": got.DecodedSegmentBytes, "json_bytes": got.JSONBytes, "jcs_bytes": got.JCSBytes, "depth": got.Depth, "object_members": got.ObjectMembers, "array_items": got.ArrayItems, "total_nodes": got.TotalNodes, "string_bytes": got.StringBytes, "number_lexeme_bytes": got.NumberLexemeBytes, "integer_magnitude": got.IntegerMagnitude, "float_magnitude": got.FloatMagnitude, "kid_bytes": got.KidBytes, "key_bytes": got.KeyBytes, "uri_bytes": got.URIBYtes, "identifier_bytes": got.IdentifierBytes, "nonce_bytes": got.NonceBytes, "method_bytes": got.MethodBytes, "operation_bytes": got.OperationBytes, "audiences": got.Audiences, "operations": got.Operations, "selectors": got.Selectors, "path_segments": got.PathSegments, "one_of_values": got.OneOfValues, "public_key_bytes": got.PublicKeyBytes, "signature_bytes": got.SignatureBytes, "digest_bytes": got.DigestBytes, "clock_skew": got.ClockSkew, "proof_max_age": got.ProofMaxAge, "chain_row_bytes": got.ChainRowBytes, "chain_rows": got.ChainRows, "anchor_bytes": got.AnchorBytes, "archive_header_bytes": got.ArchiveHeaderBytes, "key_transitions": got.KeyTransitions, "archive_chunks": got.ArchiveChunks, "archive_bytes": got.ArchiveBytes, "object_version_bytes": got.ObjectVersionBytes, "content_bytes": got.ContentBytes}
+			for key := range conv {
+				projected[key] = all[key]
+			}
+			c.Actual["bounds"] = projected
+		}
 	case "assemble_compact":
 		si := v.SigningInput{
 			Kind:      kindOf(rawString(t, c.Input, "kind")),
@@ -473,6 +489,9 @@ func runCase(t *testing.T, c corpusCase) {
 		sig := decodeB64(t, c, rawString(t, c.Input, "signature"))
 		got, err := profile.AssembleCompact(si, sig, nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["compact"] = got
+		}
 		if c.Expected["compact"] != nil && got != rawString(t, c.Expected, "compact") {
 			t.Fatalf("case %s: compact %s", c.ID, got)
 		}
@@ -528,6 +547,9 @@ func runCase(t *testing.T, c corpusCase) {
 	case "request_digest":
 		got, err := profile.RequestDigest(rawString(t, c.Input, "operation"), rawValue(t, c.Input["cast_arguments"]), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["digest"] = got
+		}
 		var want string
 		if c.Expected["digest"] != nil {
 			want = rawString(t, c.Expected, "digest")
@@ -538,18 +560,27 @@ func runCase(t *testing.T, c corpusCase) {
 	case "decode_grant":
 		got, err := profile.DecodeGrant(rawString(t, c.Input, "compact"), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["key_id"] = got.KeyID
+		}
 		if c.Expected["key_id"] != nil && got.KeyID != rawString(t, c.Expected, "key_id") {
 			t.Fatalf("case %s: kid %s", c.ID, got.KeyID)
 		}
 	case "decode_proof":
 		got, err := profile.DecodeProof(rawString(t, c.Input, "compact"), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["proof_id"] = got.ProofID()
+		}
 		if c.Expected["proof_id"] != nil && got.ProofID() != rawString(t, c.Expected, "proof_id") {
 			t.Fatalf("case %s: proof id %s", c.ID, got.ProofID())
 		}
 	case "untrusted_key_locator":
 		got, err := profile.UntrustedKeyLocator(rawString(t, c.Input, "compact"), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["kid"] = got.KeyID
+		}
 		if c.Expected["kid"] != nil && got.KeyID != rawString(t, c.Expected, "kid") {
 			t.Fatalf("case %s: kid %s", c.ID, got.KeyID)
 		}
@@ -566,6 +597,10 @@ func runCase(t *testing.T, c corpusCase) {
 			ClockSkew:      rawInt(t, c.Input, "clock_skew"),
 		})
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["grant_id"] = got.GrantID()
+			c.Actual["issuer"] = got.Issuer()
+		}
 		if c.Expected["grant_id"] != nil && got.GrantID() != rawString(t, c.Expected, "grant_id") {
 			t.Fatalf("case %s: grant id %s", c.ID, got.GrantID())
 		}
@@ -607,6 +642,10 @@ func runCase(t *testing.T, c corpusCase) {
 			Sequence:     rawInt(t, c.Input, "sequence"),
 		}, nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["bytes"] = string(got.Row)
+			c.Actual["hash"] = v.Base64urlEncode(got.Hash[:])
+		}
 		if c.Expected["bytes"] != nil && string(got.Row) != rawString(t, c.Expected, "bytes") {
 			t.Fatalf("case %s: row %s", c.ID, got.Row)
 		}
@@ -626,7 +665,7 @@ func runCase(t *testing.T, c corpusCase) {
 			}
 			rows = append(rows, raw)
 		}
-		_, err := profile.CheckChain(v.ChainInput{Rows: rows}, v.ExpectedChain{
+		got, err := profile.CheckChain(v.ChainInput{Rows: rows}, v.ExpectedChain{
 			ChainID:       rawString(t, c.Input, "chain_id"),
 			FirstSequence: rawInt(t, c.Input, "first_sequence"),
 			LastSequence:  rawInt(t, c.Input, "last_sequence"),
@@ -635,26 +674,39 @@ func runCase(t *testing.T, c corpusCase) {
 			RowCount:      rawInt(t, c.Input, "row_count"),
 		})
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["chain_id"] = got.ChainID()
+		}
 	case "verify_historical_anchor":
 		key := subObject(t, c.Input, "key")
 		pk := rawString(t, key, "public_key")
 		censusKey(pk)
-		_, err := profile.VerifyHistoricalAnchor(rawString(t, c.Input, "compact"), historicalKey(t, key, pk), expectedAnchor(t, subObject(t, c.Input, "expected")))
+		got, err := profile.VerifyHistoricalAnchor(rawString(t, c.Input, "compact"), historicalKey(t, key, pk), expectedAnchor(t, subObject(t, c.Input, "expected")))
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["anchor_id"] = got.AnchorID()
+		}
 	case "verify_key_transition":
 		cur := subObject(t, c.Input, "current_key")
 		next := subObject(t, c.Input, "next_key")
 		censusKey(rawString(t, cur, "public_key"))
 		censusKey(rawString(t, next, "public_key"))
-		_, err := profile.VerifyKeyTransition(rawString(t, c.Input, "compact"),
+		got, err := profile.VerifyKeyTransition(rawString(t, c.Input, "compact"),
 			historicalKey(t, cur, rawString(t, cur, "public_key")),
 			historicalKey(t, next, rawString(t, next, "public_key")),
 			expectedTransition(t, subObject(t, c.Input, "expected")))
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["transition_id"] = got.TransitionID()
+		}
 	case "encode_anchored_export":
 		input, expected := exportEncodeInput(t, c)
 		got, err := profile.EncodeAnchoredExport(input, expected)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["byte_count"] = got.ByteCount
+			c.Actual["digest"] = v.Base64urlEncode(got.Digest[:])
+		}
 		if c.Expected["byte_count"] != nil {
 			if got.ByteCount != rawInt(t, c.Expected, "byte_count") {
 				t.Fatalf("case %s: byte_count %d", c.ID, got.ByteCount)
@@ -667,8 +719,11 @@ func runCase(t *testing.T, c corpusCase) {
 		}
 	case "verify_anchored_export":
 		obj, keys, expected := exportVerifyInput(t, c)
-		_, err := profile.VerifyAnchoredExport(obj, keys, expected)
+		got, err := profile.VerifyAnchoredExport(obj, keys, expected)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["chain_id"] = got.ChainID()
+		}
 	default:
 		t.Fatalf("case %s: unknown surface %s", c.ID, c.Surface)
 	}
@@ -713,6 +768,10 @@ func maybeRaw(t *testing.T, c corpusCase) []byte {
 
 func checkVerdict(t *testing.T, c corpusCase, err error) {
 	t.Helper()
+	c.Actual["verdict"] = "valid"
+	if err != nil {
+		c.Actual["verdict"] = "invalid"
+	}
 	if c.Expected["verdict"] == nil {
 		t.Fatalf("case %s: no verdict", c.ID)
 	}
@@ -727,6 +786,7 @@ func checkVerdict(t *testing.T, c corpusCase, err error) {
 
 func checkInvalid(t *testing.T, c corpusCase, stage string) {
 	t.Helper()
+	c.Actual["verdict"] = "invalid"
 	if rawString(t, c.Expected, "verdict") == "valid" {
 		t.Fatalf("case %s: expected valid but rejected at %s", c.ID, stage)
 	}
@@ -757,6 +817,9 @@ func kindOf(k string) v.Kind {
 
 func checkSigningInput(t *testing.T, c corpusCase, si v.SigningInput) {
 	t.Helper()
+	c.Actual["protected_segment"] = v.Base64urlEncode(si.Protected)
+	c.Actual["payload_segment"] = v.Base64urlEncode(si.Payload)
+	c.Actual["message"] = v.Base64urlEncode(si.Protected) + "." + v.Base64urlEncode(si.Payload)
 	if c.Expected["message"] == nil {
 		return // invalid cases carry only the verdict
 	}

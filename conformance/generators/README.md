@@ -39,10 +39,14 @@ stale index/sidecar.
 
 ## Amending the corpus (the atomic-landing template)
 
-A corpus amendment is ONE commit that carries: the case-file changes, the rebuilt `index.json`
-(`--rebuild-index` or `--bump-revision`), the re-vendored `sdks/{rust,go}/conformance/corpus/`
-snapshots, all six certified-index-SHA pins rotated in the same change
-(`elixir scripts/regen_corpus_digests.exs --write`), and the consumer documentation that cites
+Regenerate the expected verdict manifest after rebuilding the corpus, then copy the complete
+`priv/conformance/` tree into each SDK and rotate every index pin with the regeneration tool.
+The input hashes and expected verdict digest must describe the same rebuilt cases.
+
+A corpus amendment is one commit that carries: the case-file changes, the rebuilt `index.json`
+(`--rebuild-index` or `--bump-revision`), the re-vendored `sdks/{python,rust,go}/conformance/priv/conformance/`
+snapshots, all nine corpora and every SDK certified-index-SHA pin rotated in the same change
+using the digest regeneration tool, and the consumer documentation that cites
 the count or digest. The revision integer in `revision.json` is the citation target for
 corpus-dependent documents (it replaced the vacuous `format`-string citation, whose format value
 never changes across revisions, so it could not detect drift).
@@ -51,3 +55,9 @@ never changes across revisions, so it could not detect drift).
 
 This generator was reconstructed at the revision-sidecar landing (repository history records
 the exact commit); the original ephemeral mint script never lived in the repository.
+
+The complete Hex corpus tree is vendored into each SDK, including schemas, focused vectors,
+and the sibling verdict manifest. Regeneration and gates cover all nine corpora. The
+[verdict digest contract](../../docs/design/corpus-verdict-digests.md) specifies expected
+outcome projections and index order. CI runs every generator's `--verify` mode; signed
+content-assertion fixtures are verified without minting replacement keys or signatures.

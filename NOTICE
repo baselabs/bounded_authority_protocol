@@ -18,6 +18,7 @@ SSR 2020; IACR ePrint 2020/1244). Copyright (c) Facebook, Inc. and its
 affiliates. Licensed under the Apache License, Version 2.0; the upstream
 repository carries no NOTICE file at that commit. The vectors are reproduced
 unmodified; this project adds the base64url input encoding, expected verdicts,
-and provenance fields around them. The same vectors also appear in the Go and
-Rust SDK conformance snapshots under sdks/go/conformance/corpus-strict/ and
-sdks/rust/conformance/corpus-strict/.
+and provenance fields around them. The same vectors also appear in the
+SDK conformance snapshots under sdks/python/conformance/priv/conformance/strict-ed25519/,
+sdks/go/conformance/priv/conformance/strict-ed25519/, and
+sdks/rust/conformance/priv/conformance/strict-ed25519/.

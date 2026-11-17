@@ -277,6 +277,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:verify_transitions, 7} => %{variable_call: 2}
     },
     "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam" => %{
+      {:computed_case, 4} => %{variable_call: 2},
       {:assertion_round_trips?, 3} => %{variable_call: 5},
       {:build_loopback_request, 1} => %{variable_call: 13},
       {:content_expected, 3} => %{variable_call: 4},
@@ -2529,6 +2530,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            {"Base", :url_decode64!},
            {"Enum", :all?},
            {"Enum", :map},
+           {"Enum", :flat_map},
+           {"Enum", :reject},
            {"Enum", :reduce_while},
            {"Enum", :reverse},
            {"Enum", :sort_by},
@@ -3177,6 +3180,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Base, :url_decode64!},
           {Enum, :all?},
           {Enum, :map},
+          {Enum, :flat_map},
+          {Enum, :reject},
           {Enum, :reduce_while},
           {Enum, :reverse},
           {Enum, :sort_by},

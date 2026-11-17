@@ -28,10 +28,11 @@ TypeScript verifier did; until then, the commit you install from is the identity
 deployed. A package with one of the planned names on a public registry is not this project's
 until that SDK's README says it is published.
 
-Graduation includes making the tests self-contained. Python currently reads repository-level
-corpora; Go and Rust vendor base and security snapshots but still use repository-level inputs
-for some tests. The [SDK overview](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/README.md#conformance)
-describes those bindings. They do not add I/O to the verification libraries.
+Each in-tree SDK is self-contained. Its `conformance/priv/conformance/` snapshot contains
+the complete Hex corpus tree, and CI runs both copied-alone SDKs and unpacked language
+packages. The [SDK overview](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/README.md#conformance)
+and [verdict digest contract](../design/corpus-verdict-digests.md) describe byte binding,
+execution completeness, and computed outcome digests. These test inputs add no I/O to the libraries.
 
 ## Signing in other languages
 

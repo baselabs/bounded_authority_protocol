@@ -19,7 +19,8 @@ use bounded_authority_protocol::types::*;
 use bounded_authority_protocol::v2;
 use bounded_authority_protocol::v3;
 use bounded_authority_protocol::{content_assertion, role_attestation, v1, Invalid};
-use serde_json::Value;
+mod support;
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 const CERTIFIED_INDEX_SHA: &str =
@@ -30,8 +31,7 @@ const TOTAL_CASES: usize = 75;
 
 fn corpus_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("conformance")
-        .join("corpus-producer-canonicality")
+        .join("conformance/priv/conformance/producer-canonicality")
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -73,7 +73,10 @@ fn load_cases() -> Vec<Value> {
         let doc_cases = doc["cases"].as_array().unwrap();
         assert_eq!(doc_cases.len(), file["cases"].as_u64().unwrap() as usize);
         counted += doc_cases.len();
-        cases.extend(doc_cases.iter().cloned());
+        cases.extend(doc_cases.iter().cloned().map(|mut c| {
+            c["_file"] = json!(file["path"]);
+            c
+        }));
     }
     assert_eq!(counted, TOTAL_CASES);
     cases
@@ -115,7 +118,7 @@ fn wire_kind(kind: &str) -> SigningKind {
     }
 }
 
-fn run_assemble(case: &Value) -> bool {
+fn run_assemble(case: &Value) -> Value {
     let input = &case["input"];
     let signature = sig64(input["signature"].as_str().unwrap());
     let major = case.get("major").and_then(Value::as_u64);
@@ -152,15 +155,8 @@ fn run_assemble(case: &Value) -> bool {
         },
     };
     match result {
-        Ok(compact) => {
-            assert_eq!(
-                compact,
-                case["expected"]["compact"].as_str().unwrap().as_bytes(),
-                "accepted bytes emitted unchanged"
-            );
-            true
-        }
-        Err(_) => false,
+        Ok(compact) => json!({"verdict":"valid","compact":String::from_utf8(compact).unwrap()}),
+        Err(_) => json!({"verdict":"invalid"}),
     }
 }
 
@@ -246,19 +242,21 @@ fn expected_export(case: &Value) -> (AnchoredExportInput, ExpectedExport) {
     (input_struct, expected)
 }
 
-fn run_encode(case: &Value) -> bool {
+fn run_encode(case: &Value) -> Value {
     let (input, expected) = expected_export(case);
-    match case["major"].as_u64().unwrap() {
-        1 => v1::encode_anchored_export(&input, &expected).is_ok(),
-        2 => v2::encode_anchored_export(&input, &expected).is_ok(),
-        3 => v3::encode_anchored_export(&input, &expected).is_ok(),
+    let result = match case["major"].as_u64().unwrap() {
+        1 => v1::encode_anchored_export(&input, &expected),
+        2 => v2::encode_anchored_export(&input, &expected),
+        3 => v3::encode_anchored_export(&input, &expected),
         m => panic!("major {m}"),
-    }
+    };
+    json!({"verdict":if result.is_ok(){"valid"}else{"invalid"}})
 }
 
 #[test]
 fn producer_canonicality_corpus_all_cases_agree() {
     let cases = load_cases();
+    let mut execution = support::Run::new(&corpus_root(), CERTIFIED_INDEX_SHA);
     let mut refused = 0usize;
     let mut accepted = 0usize;
     let mut seen = std::collections::BTreeSet::new();
@@ -271,6 +269,8 @@ fn producer_canonicality_corpus_all_cases_agree() {
         } else {
             run_encode(case)
         };
+        execution.record(id, case["_file"].as_str().unwrap(), ok.clone());
+        let ok = ok["verdict"] == "valid";
         assert_eq!(
             ok,
             want_valid,
@@ -284,6 +284,7 @@ fn producer_canonicality_corpus_all_cases_agree() {
             refused += 1;
         }
     }
+    execution.finish();
     assert_eq!(seen.len(), TOTAL_CASES);
     assert_eq!((refused, accepted), (60, 15));
 }

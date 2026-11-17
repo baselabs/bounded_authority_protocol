@@ -24,9 +24,10 @@ from typing import Any, NoReturn
 from bounded_authority_verifier.error import _unwrap
 
 _HERE = Path(__file__).resolve()
-_REPO_ROOT = _HERE.parents[4]
+_CORPUS_ROOT = _HERE.parents[2] / "conformance"
 _SRC = _HERE.parents[2] / "src"
 sys.path.insert(0, str(_SRC))
+sys.path.insert(0, str(_HERE.parents[1]))
 
 from bounded_authority_verifier import (  # noqa: E402
     ExpectedAttestation,
@@ -48,8 +49,9 @@ from bounded_authority_verifier import (  # noqa: E402
 )
 from bounded_authority_verifier.base64url import base64url_decode  # noqa: E402
 from bounded_authority_verifier.json_alg import str_utf8  # noqa: E402
+from corpus_support import CorpusRun, canonical, computed, integrity, outcome  # noqa: E402
 
-CORPUS_DIR = _REPO_ROOT / "priv" / "conformance" / "strict-ed25519"
+CORPUS_DIR = _CORPUS_ROOT / "priv" / "conformance" / "strict-ed25519"
 # The certified index.json SHA-256 (ADR 0014 D4). A mismatched corpus fails closed.
 CERTIFIED_INDEX_SHA = "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
 PROFILE = "bap-strict-ed25519/1"
@@ -89,6 +91,7 @@ def _verdict(expected: dict[str, Any], accepted: bool) -> bool:
 
 
 def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    integrity(CORPUS_DIR, CERTIFIED_INDEX_SHA)
     index_raw = (CORPUS_DIR / "index.json").read_bytes()
     index_sha = hashlib.sha256(index_raw).hexdigest()
     if index_sha != CERTIFIED_INDEX_SHA:
@@ -113,6 +116,7 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]]]:
         family_counts[family] = family_counts.get(family, 0) + len(file_json["cases"])
         for case in file_json["cases"]:
             case["_family"] = family
+            case["_file"] = entry["path"]
         cases.extend(file_json["cases"])
     if family_counts != index["families"]:
         abort("family counts differ from the index")
@@ -126,14 +130,14 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]]]:
 # ---- dispatch ----
 
 
-def _run_primitive(case: dict[str, Any]) -> bool:
+def _run_primitive(case: dict[str, Any]) -> dict[str, Any]:
     from bounded_authority_verifier.ed25519 import (
         acceptable_public_key,
         torsion_free,
         verify_strict,
     )
 
-    surface, inp, expected = case["surface"], case["input"], case["expected"]
+    surface, inp = case["surface"], case["input"]
     if surface == "ed25519.verify_strict":
         accepted = verify_strict(
             _b64d(inp["message"]) if inp["message"] else b"",
@@ -146,10 +150,10 @@ def _run_primitive(case: dict[str, Any]) -> bool:
         accepted = torsion_free(_b64d(inp["public_key"]))
     else:
         abort(f"{case['id']}: unknown primitive surface {surface}")
-    return _verdict(expected, accepted)
+    return {"verdict": "valid" if accepted else "invalid"}
 
 
-def _run_shaped(case: dict[str, Any]) -> bool:
+def _run_shaped(case: dict[str, Any]) -> dict[str, Any]:
     module = _RUN_V1 if case["major"] == 1 else _RUN_V2
     if case["major"] not in (1, 2):
         abort(f"{case['id']}: unsupported major {case['major']}")
@@ -161,14 +165,14 @@ def _run_shaped(case: dict[str, Any]) -> bool:
         actual: Any = {"public_key": _b64e(result.value)} if result.is_ok else module.INVALID
     else:
         actual = module.dispatch(surface, inp, {})
-    return bool(module.compare_verdict(case["expected"], actual))
+    return computed(case["expected"], actual, module.INVALID)
 
 
 def _b64e(raw: bytes) -> str:
     return _RUN_V1._b64e(raw)
 
 
-def _run_loopback(case: dict[str, Any]) -> bool:
+def _run_loopback(case: dict[str, Any]) -> dict[str, Any]:
     issuer, request = case["issuer"], case["request"]
     expected = ExpectedRequest(
         trusted_issuer=TrustedIssuer(key_id=issuer["key_id"], public_key=_b64d(issuer["public_key"])),
@@ -185,15 +189,14 @@ def _run_loopback(case: dict[str, Any]) -> bool:
         nonce=NonceRequired(case["nonce"]),
     )
     compact = case["compact"].encode()
-    return (
-        decode_local_loopback_http_proof(compact).is_ok == case["decode_local"]
-        and decode_proof(compact).is_ok == case["decode_standard"]
-        and check_local_loopback_http_envelope(case["grant"].encode(), compact, expected).is_ok
-        == case["envelope_local"]
-    )
+    return {
+        "decode_local": decode_local_loopback_http_proof(compact).is_ok,
+        "decode_standard": decode_proof(compact).is_ok,
+        "envelope_local": check_local_loopback_http_envelope(case["grant"].encode(), compact, expected).is_ok,
+    }
 
 
-def _run_ra1(case: dict[str, Any]) -> bool:
+def _run_ra1(case: dict[str, Any]) -> dict[str, Any]:
     attestor, subject = case["attestor"], case["subject"]
     expected = ExpectedAttestation(
         attestor=TrustedAttestor(
@@ -207,13 +210,11 @@ def _run_ra1(case: dict[str, Any]) -> bool:
         now=case["now"],
     )
     compact = case["compact"].encode()
-    return (
-        decode_attestation(compact).is_ok == case["decode"]
-        and verify_attestation(compact, expected).is_ok == case["verify"]
-    )
+    return {"decode": decode_attestation(compact).is_ok,
+            "verify": verify_attestation(compact, expected).is_ok}
 
 
-def _run_ca1(case: dict[str, Any]) -> bool:
+def _run_ca1(case: dict[str, Any]) -> dict[str, Any]:
     attestor, context = case["attestor"], case["expected_context"]
     expected = ExpectedContentAssertion(
         attestor=HistoricalPublicKey(
@@ -232,14 +233,11 @@ def _run_ca1(case: dict[str, Any]) -> bool:
         bounds=_unwrap(bounds_maximum()),
     )
     compact = case["compact"].encode()
-    want = case["expected"]
-    return (
-        decode_assertion(compact).is_ok == (want["decode"] == "valid")
-        and verify_assertion(compact, expected).is_ok == (want["verify"] == "valid")
-    )
+    return {"decode": "valid" if decode_assertion(compact).is_ok else "invalid",
+            "verify": "valid" if verify_assertion(compact, expected).is_ok else "invalid"}
 
 
-def run_case(case: dict[str, Any]) -> bool:
+def run_case(case: dict[str, Any]) -> dict[str, Any]:
     surface = case["surface"]
     if surface.startswith("ed25519."):
         return _run_primitive(case)
@@ -256,12 +254,16 @@ def run_all(only: frozenset[str] | None = None) -> dict[str, Any]:
     index, cases = load_corpus()
     passed = 0
     failures: list[str] = []
+    execution = CorpusRun(CORPUS_DIR, CERTIFIED_INDEX_SHA)
     selected = [c for c in cases if only is None or c["_family"] in only]
     for case in selected:
-        if run_case(case):
+        actual = run_case(case)
+        execution.record(case["id"], actual, case["_file"])
+        if canonical(actual) == canonical(outcome(case)):
             passed += 1
         else:
             failures.append(case["id"])
+    execution.finish()
     return {
         "pass": passed,
         "fail": len(failures),

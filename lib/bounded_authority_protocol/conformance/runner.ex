@@ -159,6 +159,210 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     %{case_id: case_obj["id"], agree: agree}
   end
 
+  @doc false
+  def computed(%Corpus{} = corpus) do
+    Enum.flat_map(corpus.cases, fn {path, cases} ->
+      cases
+      |> Enum.reject(&(Map.get(&1, "kind") == "certified_proof"))
+      |> Enum.map(fn case_obj ->
+        {case_obj["id"], path, computed_case(corpus.major, case_obj, corpus.profile, corpus.raws)}
+      end)
+    end)
+  end
+
+  defp computed_case(:strict_ed25519, %{"surface" => "ed25519." <> function} = c, _, _) do
+    {:ok, accepted} = strict_primitive(function, c["input"])
+    %{"verdict" => if(accepted, do: "valid", else: "invalid")}
+  end
+
+  defp computed_case(:strict_ed25519, %{"surface" => "local_loopback_http"} = c, _, _) do
+    {:ok, expected} = build_loopback_request(c)
+    computed_loopback(c["compact"], c["grant"], expected)
+  end
+
+  defp computed_case(:strict_ed25519, %{"surface" => "role_attestation"} = c, _, _) do
+    {:ok, expected} = build_expected_attestation(c)
+    computed_attestation(c["compact"], expected)
+  end
+
+  defp computed_case(:strict_ed25519, %{"surface" => "content_assertion"} = c, _, _) do
+    {:ok, expected} = build_expected_assertion(c)
+    computed_assertion(c["compact"], expected, %{})
+  end
+
+  defp computed_case(:local_loopback_http, %{"kind" => "uri"} = c, _, _) do
+    case BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.normalize_uri(
+           c["input"],
+           %{}
+         ) do
+      {:ok, normalized} -> %{"valid" => true, "normalized" => normalized}
+      {:error, :invalid} -> %{"valid" => false}
+    end
+  end
+
+  defp computed_case(:local_loopback_http, c, profile, _) do
+    {:ok, expected} = loopback_expected(profile, profile["proofs"]["ipv4"])
+    {:ok, expected} = loopback_overrides(expected, Map.get(c, "expected_overrides"))
+    computed_loopback(c["compact"], profile["grant_compact"], expected)
+  end
+
+  defp computed_case(:role_attestation, c, profile, _) do
+    {:ok, context} = attestation_context(profile, Map.get(c, "expected_overrides", %{}))
+    {:ok, expected} = build_expected_attestation(context)
+    computed_attestation(c["compact"], expected)
+  end
+
+  defp computed_case(:content_assertion, %{"kind" => "digest"} = c, _, raws) do
+    result =
+      with {:ok, content} <- assertion_content(c["input"], raws),
+           {:ok, limits} <- case_bounds(c["input"]) do
+        BoundedAuthorityProtocol.ContentAssertion.V1.content_digest(content, limits)
+      end
+
+    case result do
+      {:ok, digest} ->
+        %{"verdict" => "valid", "digest" => Base.url_encode64(digest, padding: false)}
+
+      {:error, :invalid} ->
+        %{"verdict" => "invalid"}
+    end
+  end
+
+  defp computed_case(:content_assertion, %{"kind" => "assertion"} = c, profile, _) do
+    with {:ok, limits} <- case_bounds(c),
+         {:ok, expected} <- content_expected(profile, c, limits) do
+      computed_assertion(c["compact"], expected, limits)
+    else
+      {:error, :invalid} -> %{"decode" => "invalid", "verify" => "invalid"}
+    end
+  end
+
+  defp computed_case(:content_assertion, %{"kind" => "successor"} = c, profile, _) do
+    {:ok, limits} = case_bounds(c)
+    {:ok, previous} = side_verdict(profile, c["predecessor"])
+    {:ok, next} = side_verdict(profile, c["successor"])
+    {:ok, relation} = successor_relation(previous, next, c["predecessor"], c["successor"], limits)
+
+    %{
+      "predecessor" => verdict_name(previous),
+      "successor" => verdict_name(next),
+      "relation" => relation
+    }
+  end
+
+  defp computed_case(:producer_canonicality, %{"profile" => profile} = c, _, _) do
+    {:ok, kind} = profile_signing_kind(profile)
+
+    result =
+      with {:ok, input, signature} <- build_assemble_input(Map.put(c["input"], "kind", kind)) do
+        case profile_assemble(profile, input, signature) do
+          {:ok, compact} -> {:ok, %{"compact" => compact}}
+          error -> error
+        end
+      end
+
+    computed_projection(c, result, nil)
+  end
+
+  defp computed_case(:selector_float_zero, c, _, _) do
+    {:ok, input} = untext(c["input"])
+    computed_projection(c, dispatch(c["major"], c["surface"], input, %{}), c["major"])
+  end
+
+  defp computed_case(major, c, _, raws) do
+    major = if is_integer(major), do: major, else: c["major"]
+    computed_projection(c, dispatch(major, c["surface"], Map.get(c, "input", %{}), raws), major)
+  end
+
+  defp computed_projection(_c, {:error, :invalid}, _major), do: %{"verdict" => "invalid"}
+
+  defp computed_projection(c, {:ok, result}, major) do
+    Map.new(c["expected"], fn
+      {"verdict", _} ->
+        {"verdict", "valid"}
+
+      {"bounds", shape} ->
+        limits = project("bounds", result)
+
+        {"bounds",
+         Map.new(shape, fn {key, _} -> {key, Map.get(limits, Map.get(@bounds_keys, key))} end)}
+
+      {key, _} ->
+        value = project(key, result)
+
+        value =
+          cond do
+            key in ["value", "decoded"] ->
+              to_plain(value)
+
+            key in ["public_key", "thumbprint_raw", "hash"] ->
+              Base.url_encode64(value, padding: false)
+
+            key == "digest" and c["surface"] == "encode_anchored_export" ->
+              Base.url_encode64(value, padding: false)
+
+            key == "bytes" and major == 3 ->
+              Base.url_encode64(value, padding: false)
+
+            true ->
+              value
+          end
+
+        {key, value}
+    end)
+  end
+
+  defp computed_loopback(compact, grant, expected) do
+    %{
+      "decode_local" =>
+        match?(
+          {:ok, _},
+          BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.decode_proof(
+            compact,
+            %{}
+          )
+        ),
+      "decode_standard" =>
+        match?({:ok, _}, BoundedAuthorityProtocol.V1.decode_proof(compact, %{})),
+      "envelope_local" =>
+        match?(
+          {:ok, _},
+          BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.check_envelope(
+            %Credentials{grant: grant, proof: compact},
+            expected
+          )
+        )
+    }
+  end
+
+  defp computed_attestation(compact, expected) do
+    %{
+      "decode" =>
+        match?(
+          {:ok, _},
+          BoundedAuthorityProtocol.RoleAttestation.V1.decode_attestation(compact, %{})
+        ),
+      "verify" =>
+        match?(
+          {:ok, _},
+          BoundedAuthorityProtocol.RoleAttestation.V1.verify_attestation(compact, expected)
+        )
+    }
+  end
+
+  defp computed_assertion(compact, expected, limits) do
+    %{
+      "decode" =>
+        verdict_name(
+          BoundedAuthorityProtocol.ContentAssertion.V1.decode_assertion(compact, limits)
+        ),
+      "verify" =>
+        verdict_name(
+          BoundedAuthorityProtocol.ContentAssertion.V1.verify_assertion(compact, expected)
+        )
+    }
+  end
+
   # --- agreement -----------------------------------------------------------
 
   defp agrees?(%{"verdict" => "invalid"}, {:error, :invalid}), do: true

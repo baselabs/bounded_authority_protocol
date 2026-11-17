@@ -16,6 +16,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        "scripts/check_local_loopback_http.exs",
                        "scripts/check_role_attestation.exs",
                        "scripts/check_content_assertion.exs",
+                       "scripts/corpus_verdicts.exs",
                        "scripts/check_spec_facts.exs",
                        "spec/tools/build_examples.exs",
                        "test/architecture/purity_test.exs",
@@ -203,13 +204,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
     {output, 0} =
       System.cmd("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"])
 
-    # The index still names unstaged deletions, including the old half of a rename.
-    {deleted, 0} = System.cmd("git", ["ls-files", "-z", "--deleted"])
-    deleted = MapSet.new(String.split(deleted, <<0>>, trim: true))
-
-    output
-    |> String.split(<<0>>, trim: true)
-    |> Enum.reject(&MapSet.member?(deleted, &1))
+    output |> String.split(<<0>>, trim: true) |> Enum.filter(&File.regular?/1)
   end
 
   defp under_root?(path, root), do: path == root or String.starts_with?(path, root <> "/")
@@ -310,6 +305,21 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
 
   defp contract_identity?(_path, _kind, _name), do: false
 
+  # SDK distributions preserve the accepted wire-version paths byte for byte.
+  defp current_major_path?("sdks/" <> path, name) when name in ["v1", "v2", "v3"] do
+    case String.split(path, "/conformance/priv/", parts: 2) do
+      [sdk, corpus_path] when sdk in ["python", "rust", "go"] ->
+        current_major_path?("priv/" <> corpus_path, name)
+
+      _ ->
+        case name do
+          "v1" -> current_major_source_path?("sdks/" <> path)
+          "v2" -> successor_major_source_path?("sdks/" <> path)
+          "v3" -> es256_major_source_path?("sdks/" <> path)
+        end
+    end
+  end
+
   defp current_major_path?(path, "v1"),
     do:
       current_major_source_path?(path) or MapSet.member?(@local_loopback_profile_paths, path) or
@@ -329,21 +339,11 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
   defp current_major_path?(path, "v3_permissiveness_internal_test"),
     do: path == "sdks/go/v3_permissiveness_internal_test.go"
 
-  defp current_major_path?(path, "corpus-v3"),
-    do:
-      String.starts_with?(path, "sdks/go/conformance/corpus-v3/") or
-        String.starts_with?(path, "sdks/rust/conformance/corpus-v3/")
-
   defp current_major_path?(path, "run_v2")
        when path in ["sdks/python/tests/conformance/run_v2.py", "sdks/rust/conformance/run_v2.rs"],
        do: true
 
   defp current_major_path?(path, "v2_test"), do: path == "sdks/go/conformance/v2_test.go"
-
-  defp current_major_path?(path, "corpus-v2"),
-    do:
-      String.starts_with?(path, "sdks/go/conformance/corpus-v2/") or
-        String.starts_with?(path, "sdks/rust/conformance/corpus-v2/")
 
   defp current_major_path?(path, name) do
     {path, name} in [

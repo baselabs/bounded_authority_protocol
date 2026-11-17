@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 from bounded_authority_verifier import content_assertion, role_attestation, v1, v2, v3
@@ -21,8 +22,11 @@ from bounded_authority_verifier.base64url import base64url_decode
 from bounded_authority_verifier.compact import SigningInput
 from bounded_authority_verifier.error import _unwrap
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-_CORPUS = _REPO_ROOT / "priv" / "conformance" / "producer-canonicality"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from corpus_support import CorpusRun, integrity  # noqa: E402
+
+_CORPUS_ROOT = Path(__file__).resolve().parents[2] / "conformance"
+_CORPUS = _CORPUS_ROOT / "priv" / "conformance" / "producer-canonicality"
 
 CERTIFIED_INDEX_SHA256 = "99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601"
 PROFILE_IDENTITY = "bap-producer-canonicality/1"
@@ -37,6 +41,7 @@ _PROFILE_KINDS = {
 
 
 def _load() -> list[dict]:
+    integrity(_CORPUS, CERTIFIED_INDEX_SHA256)
     index_bytes = (_CORPUS / "index.json").read_bytes()
     got = hashlib.sha256(index_bytes).hexdigest()
     if got != CERTIFIED_INDEX_SHA256:
@@ -56,7 +61,7 @@ def _load() -> list[dict]:
         doc_cases = doc["cases"] if isinstance(doc, dict) else doc
         if len(doc_cases) != entry["cases"]:
             raise AssertionError(f"{entry['path']}: case count mismatch")
-        cases.extend(doc_cases)
+        cases.extend({**case, "_file": entry["path"]} for case in doc_cases)
         counted += len(doc["cases"])
     if counted != TOTAL_CASES:
         raise AssertionError(f"case census {counted} != {TOTAL_CASES}")
@@ -159,6 +164,7 @@ def _encode(case: dict) -> object:
 
 def run_all() -> dict:
     cases = _load()
+    execution = CorpusRun(_CORPUS, CERTIFIED_INDEX_SHA256)
     failures: list[str] = []
     passed = 0
     refused = accepted = 0
@@ -167,6 +173,7 @@ def run_all() -> dict:
         if case["surface"] == "assemble_compact":
             result = _assemble(case)
             ok = result.is_ok
+            execution.record(case["id"], {"verdict": "valid", "compact": bytes(result.value).decode()} if ok else {"verdict": "invalid"}, case["_file"])
             if ok != want_valid:
                 failures.append(f"{case['id']}: expected {case['expected']['verdict']}, got ok={ok}")
                 continue
@@ -176,6 +183,7 @@ def run_all() -> dict:
         else:
             result = _encode(case)
             ok = result.is_ok
+            execution.record(case["id"], {"verdict": "valid" if ok else "invalid"}, case["_file"])
             if ok != want_valid:
                 failures.append(f"{case['id']}: expected {case['expected']['verdict']}, got ok={ok}")
                 continue
@@ -187,5 +195,14 @@ def run_all() -> dict:
         else:
             refused += 1
         passed += 1
+    execution.finish()
     return {"pass": passed, "fail": len(failures), "total": len(cases), "failures": failures,
             "refused": refused, "accepted": accepted}
+
+
+if __name__ == "__main__":
+    result = run_all()
+    for failure in result["failures"]:
+        print(failure)
+    assert result["fail"] == 0, "producer-canonicality disagreements"
+    print(f"producer-canonicality: {result['pass']}/{result['total']} cases agree")

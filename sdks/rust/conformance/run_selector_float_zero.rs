@@ -19,7 +19,8 @@ use bounded_authority_protocol as bap;
 use bounded_authority_protocol::facts::NotEvaluated;
 use bounded_authority_protocol::types::*;
 use bounded_authority_protocol::{v2, v3, Bounds, Invalid, JsonValue};
-use serde_json::Value;
+mod support;
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 const CERTIFIED_INDEX_SHA: &str =
@@ -30,8 +31,7 @@ const TOTAL_CASES: usize = 161;
 
 fn corpus_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("conformance")
-        .join("corpus-selector-float-zero")
+        .join("conformance/priv/conformance/selector-float-zero")
 }
 
 fn max() -> Bounds {
@@ -77,7 +77,10 @@ fn load_cases() -> Vec<Value> {
         let doc_cases = doc["cases"].as_array().unwrap();
         assert_eq!(doc_cases.len(), file["cases"].as_u64().unwrap() as usize);
         counted += doc_cases.len();
-        cases.extend(doc_cases.iter().cloned());
+        cases.extend(doc_cases.iter().cloned().map(|mut c| {
+            c["_file"] = json!(file["path"]);
+            c
+        }));
     }
     assert_eq!(counted, TOTAL_CASES);
     cases
@@ -143,7 +146,7 @@ fn grant_input(input: &Value) -> GrantInput {
     }
 }
 
-fn run_decode(case: &Value) -> bool {
+fn run_decode(case: &Value) -> Value {
     let compact = case["input"]["compact"].as_str().unwrap().as_bytes();
     let key_id = match case["major"].as_u64().unwrap() {
         1 => bap::decode_grant(compact, &max()).map(|d| d.key_id),
@@ -151,14 +154,13 @@ fn run_decode(case: &Value) -> bool {
         3 => v3::decode_grant(compact, &max()).map(|d| d.key_id),
         m => panic!("major {m}"),
     };
-    match (key_id, case["expected"]["verdict"].as_str().unwrap()) {
-        (Ok(k), "valid") => k == case["expected"]["key_id"].as_str().unwrap(),
-        (Err(Invalid), "invalid") => true,
-        _ => false,
+    match key_id {
+        Ok(value) => json!({"verdict":"valid","key_id":value}),
+        Err(Invalid) => json!({"verdict":"invalid"}),
     }
 }
 
-fn run_signing_input(case: &Value) -> bool {
+fn run_signing_input(case: &Value) -> Value {
     let grant = grant_input(&case["input"]);
     let produced = match case["major"].as_u64().unwrap() {
         1 => bap::grant_signing_input(&grant, &max()),
@@ -166,15 +168,11 @@ fn run_signing_input(case: &Value) -> bool {
         3 => v3::grant_signing_input(&grant, &max()),
         m => panic!("major {m}"),
     };
-    let exp = &case["expected"];
-    match (produced, exp["verdict"].as_str().unwrap()) {
-        (Ok(p), "valid") => {
-            p.protected_segment == exp["protected_segment"].as_str().unwrap().as_bytes()
-                && p.payload_segment == exp["payload_segment"].as_str().unwrap().as_bytes()
-                && p.message == exp["message"].as_str().unwrap().as_bytes()
+    match produced {
+        Ok(value) => {
+            json!({"verdict":"valid","protected_segment":String::from_utf8(value.protected_segment).unwrap(),"payload_segment":String::from_utf8(value.payload_segment).unwrap(),"message":String::from_utf8(value.message).unwrap()})
         }
-        (Err(Invalid), "invalid") => true,
-        _ => false,
+        Err(Invalid) => json!({"verdict":"invalid"}),
     }
 }
 
@@ -185,7 +183,7 @@ fn nonce_mode(exp: &Value) -> NonceMode {
     }
 }
 
-fn run_envelope(case: &Value) -> bool {
+fn run_envelope(case: &Value) -> Value {
     let input = &case["input"];
     let exp = &input["expected"];
     let credentials = Credentials {
@@ -242,18 +240,20 @@ fn run_envelope(case: &Value) -> bool {
             v2::check_envelope(&credentials, &expected).map(|f| (f.authorization, f.grant.version))
         }
     };
-    match (result, case["expected"]["verdict"].as_str().unwrap()) {
-        (Ok((authorization, version)), "valid") => {
-            authorization == NotEvaluated && u64::try_from(version) == Ok(major)
+    match result {
+        Ok(value) => {
+            assert_eq!(value.0, NotEvaluated);
+            assert_eq!(value.1 as u64, major);
+            json!({"verdict":"valid"})
         }
-        (Err(Invalid), "invalid") => true,
-        _ => false,
+        Err(Invalid) => json!({"verdict":"invalid"}),
     }
 }
 
 #[test]
 fn selector_float_zero_corpus_all_cases_agree() {
     let cases = load_cases();
+    let mut execution = support::Run::new(&corpus_root(), CERTIFIED_INDEX_SHA);
     let mut seen = BTreeSet::new();
     let mut disagreed = Vec::new();
     let (mut invalid, mut valid) = (0usize, 0usize);
@@ -266,6 +266,8 @@ fn selector_float_zero_corpus_all_cases_agree() {
             "check_envelope" => run_envelope(case),
             s => panic!("unknown surface {s}"),
         };
+        execution.record(id, case["_file"].as_str().unwrap(), agrees.clone());
+        let agrees = agrees == case["expected"];
         if !agrees {
             disagreed.push(format!(
                 "{id} ({}): {}",
@@ -284,6 +286,7 @@ fn selector_float_zero_corpus_all_cases_agree() {
         disagreed.len(),
         disagreed.join("\n")
     );
+    execution.finish();
     assert_eq!(seen.len(), TOTAL_CASES);
     assert_eq!((invalid, valid), (98, 63));
 }

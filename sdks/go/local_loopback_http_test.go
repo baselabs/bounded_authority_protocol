@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/baselabs/bounded_authority_protocol_go/internal/corpuscheck"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,7 +49,8 @@ func TestLocalLoopbackHTTPURIProfileAcceptsOnlyExactLoopbackLiterals(t *testing.
 
 func TestCertifiedLocalLoopbackCorpusDrivesGoVerdicts(t *testing.T) {
 	t.Parallel()
-	root := filepath.Join("..", "..", "priv", "conformance", "application-profiles", "local-loopback-http", "v1")
+	root := filepath.Join("conformance", "priv", "conformance", "application-profiles", "local-loopback-http", "v1")
+	execution := corpuscheck.New(t, root, "conformance/priv/conformance", certifiedLocalLoopbackIndexSHA256)
 	read := func(name string, into any) []byte {
 		t.Helper()
 		bytes, err := os.ReadFile(filepath.Join(root, name))
@@ -134,6 +136,11 @@ func TestCertifiedLocalLoopbackCorpusDrivesGoVerdicts(t *testing.T) {
 	}
 	for _, uriCase := range profile.URICases {
 		actual, err := LocalLoopbackHTTPUriNormalize(uriCase.Input, nil)
+		outcome := map[string]any{"valid": err == nil}
+		if err == nil {
+			outcome["normalized"] = actual
+		}
+		execution.Record(uriCase.ID, "profile.json", outcome)
 		if (err == nil) != uriCase.Valid {
 			t.Fatalf("%s validity mismatch: %v", uriCase.ID, err)
 		}
@@ -306,6 +313,10 @@ func TestCertifiedLocalLoopbackCorpusDrivesGoVerdicts(t *testing.T) {
 		if invocationID != "" {
 			caseExpected.InvocationID = invocationID
 		}
+		_, localErr := DecodeLocalLoopbackHTTPProof(proofCase.Compact, nil)
+		_, standardErr := DecodeProof(proofCase.Compact, nil)
+		_, envelopeErr := CheckLocalLoopbackHTTPEnvelope(Credentials{Grant: profile.GrantCompact, Proof: proofCase.Compact}, caseExpected)
+		execution.Record(proofCase.ID, "proof-cases.json", map[string]any{"decode_local": localErr == nil, "decode_standard": standardErr == nil, "envelope_local": envelopeErr == nil})
 		if _, err := DecodeLocalLoopbackHTTPProof(proofCase.Compact, nil); (err == nil) != proofCase.DecodeLocal {
 			t.Fatalf("%s local decode mismatch: %v", proofCase.ID, err)
 		}
@@ -341,6 +352,7 @@ func TestCertifiedLocalLoopbackCorpusDrivesGoVerdicts(t *testing.T) {
 	); err == nil {
 		t.Fatal("valid local proof accepted under the wrong invocation binding")
 	}
+	execution.Finish()
 }
 
 func mustDecodeLocal(t *testing.T, value string) string {

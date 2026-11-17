@@ -35,7 +35,7 @@ func (panickingDigest) digest([][]byte, int64) ([32]byte, int64, error) {
 
 func loadExportCase(t *testing.T) (ArchivedObject, HistoricalKeyChain, ExpectedAnchoredExport) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("conformance", "corpus", "cases", "anchored-export", "verify.json"))
+	raw, err := os.ReadFile(filepath.Join("conformance", "priv/conformance/v1/corpus", "cases", "anchored-export", "verify.json"))
 	if err != nil {
 		t.Fatalf("corpus: %v", err)
 	}

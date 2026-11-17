@@ -1844,7 +1844,7 @@ def test_archive_verify_key_validity_guards():
     import json as _json
     from pathlib import Path
 
-    corpus = Path(__file__).resolve().parents[3] / "priv" / "conformance" / "v1" / "corpus" / "cases" / "anchored-export" / "verify.json"
+    corpus = Path(__file__).resolve().parents[1] / "conformance" / "priv" / "conformance" / "v1" / "corpus" / "cases" / "anchored-export" / "verify.json"
     cases = _json.loads(corpus.read_text())["cases"]
     c = next(x for x in cases if x["class"] == "valid")
     inp = c["input"]

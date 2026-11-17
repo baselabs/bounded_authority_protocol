@@ -25,7 +25,7 @@ import (
 // corpus (compact plus the trusted-issuer inputs).
 func es256LoadVerifyGrantCase(t *testing.T, id string) (compact string, issuer TrustedIssuer, exp ExpectedGrant) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("conformance", "corpus-v3", "cases", "grant-verify", "verify.json"))
+	raw, err := os.ReadFile(filepath.Join("conformance", "priv/conformance/v3/corpus", "cases", "grant-verify", "verify.json"))
 	if err != nil {
 		t.Fatalf("corpus: %v", err)
 	}
@@ -69,7 +69,7 @@ func es256LoadVerifyGrantCase(t *testing.T, id string) (compact string, issuer T
 // es256LoadCompact loads one case compact from a vendored corpus-v3 surface file.
 func es256LoadCompact(t *testing.T, surfaceDir, file, id string) string {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("conformance", "corpus-v3", "cases", surfaceDir, file))
+	raw, err := os.ReadFile(filepath.Join("conformance", "priv/conformance/v3/corpus", "cases", surfaceDir, file))
 	if err != nil {
 		t.Fatalf("corpus: %v", err)
 	}
@@ -96,7 +96,7 @@ func es256LoadCompact(t *testing.T, surfaceDir, file, id string) string {
 // es256LoadJwkInput loads one jwk-surface case's text or public_key input.
 func es256LoadJwkInput(t *testing.T, id, field string) string {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("conformance", "corpus-v3", "cases", "jwk", "jwk.json"))
+	raw, err := os.ReadFile(filepath.Join("conformance", "priv/conformance/v3/corpus", "cases", "jwk", "jwk.json"))
 	if err != nil {
 		t.Fatalf("corpus: %v", err)
 	}

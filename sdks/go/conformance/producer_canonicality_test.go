@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	v "github.com/baselabs/bounded_authority_protocol_go"
+	"github.com/baselabs/bounded_authority_protocol_go/internal/corpuscheck"
 )
 
 // pcCertifiedIndexSHA256 is the SHA-256 (hex) of the certified producer-canonicality corpus
@@ -28,7 +29,7 @@ import (
 const pcCertifiedIndexSHA256 = "99ee6fbbf32758b03d4630647f721d8d4e349f0628d860493d667fe6e762c601"
 
 const (
-	pcCorpusDir  = "corpus-producer-canonicality"
+	pcCorpusDir  = "priv/conformance/producer-canonicality"
 	pcProfile    = "bap-producer-canonicality/1"
 	pcRevision   = 1
 	pcTotalCases = 75
@@ -47,6 +48,7 @@ type pcIndex struct {
 }
 
 type pcCase struct {
+	File    string `json:"-"`
 	ID      string `json:"id"`
 	Surface string `json:"surface"`
 	Class   string `json:"class"`
@@ -143,6 +145,9 @@ func loadProducerCanonicality(t *testing.T) []pcCase {
 		}
 		if len(doc.Cases) != file.Cases {
 			t.Fatalf("%s holds %d cases, index declares %d", file.Path, len(doc.Cases), file.Cases)
+		}
+		for i := range doc.Cases {
+			doc.Cases[i].File = file.Path
 		}
 		cases = append(cases, doc.Cases...)
 		counted += len(doc.Cases)
@@ -282,6 +287,7 @@ func pcEncode(c pcCase) error {
 }
 
 func TestProducerCanonicalityCorpus(t *testing.T) {
+	execution := corpuscheck.New(t, pcCorpusDir, "priv/conformance", pcCertifiedIndexSHA256)
 	cases := loadProducerCanonicality(t)
 	refused, accepted := 0, 0
 	seen := map[string]bool{}
@@ -294,6 +300,11 @@ func TestProducerCanonicalityCorpus(t *testing.T) {
 		var ok bool
 		if c.Surface == "assemble_compact" {
 			compact, err := pcAssemble(c)
+			actual := map[string]any{"verdict": corpuscheck.Verdict(err)}
+			if err == nil {
+				actual["compact"] = compact
+			}
+			execution.Record(c.ID, c.File, actual)
 			ok = err == nil
 			if ok != wantValid {
 				t.Fatalf("%s (%s): expected verdict %s, got ok=%v err=%v", c.ID, c.Class, c.Expected.Verdict, ok, err)
@@ -303,6 +314,7 @@ func TestProducerCanonicalityCorpus(t *testing.T) {
 			}
 		} else {
 			err := pcEncode(c)
+			execution.Record(c.ID, c.File, map[string]any{"verdict": corpuscheck.Verdict(err)})
 			ok = err == nil
 			if ok != wantValid {
 				t.Fatalf("%s (%s): expected verdict %s, got ok=%v err=%v", c.ID, c.Class, c.Expected.Verdict, ok, err)
@@ -320,6 +332,7 @@ func TestProducerCanonicalityCorpus(t *testing.T) {
 	if len(seen) != pcTotalCases {
 		t.Fatalf("case census %d != %d", len(seen), pcTotalCases)
 	}
+	execution.Finish()
 	t.Logf("producer-canonicality: PASS — %d/%d verdict agreement (%d refused, %d accepted with bytes unchanged)",
 		pcTotalCases, pcTotalCases, refused, accepted)
 }

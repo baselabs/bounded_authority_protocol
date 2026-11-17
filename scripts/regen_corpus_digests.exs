@@ -133,7 +133,28 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
         []
       end
 
-    [cli_pin | mirrors ++ Enum.map(entry.runners, &pin(&1, Catalog.runner_pin(), digests, :auto))]
+    corpus = Path.relative_to(entry.source, "priv/conformance")
+
+    manifest_regex =
+      Regex.compile!(
+        Regex.escape("\"" <> corpus <> "\":{") <> "[^}]*\"index_sha256_base64url\":\"([^\"]*)\""
+      )
+
+    manifests =
+      for prefix <- ["" | Enum.map(["python", "rust", "go"], &"sdks/#{&1}/conformance/")] do
+        pin(
+          Path.join(Catalog.root(), prefix <> "priv/conformance/verdict-digests.json"),
+          manifest_regex,
+          digests,
+          :base64url
+        )
+      end
+
+    [
+      cli_pin
+      | mirrors ++
+          manifests ++ Enum.map(entry.runners, &pin(&1, Catalog.runner_pin(), digests, :auto))
+    ]
   end
 
   defp pin(path, regex, digests, encoding) do

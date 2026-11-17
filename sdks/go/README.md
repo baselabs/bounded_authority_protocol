@@ -14,9 +14,9 @@ Facts exclude raw credentials and secrets; the logging notes below describe thei
 Already-trusted public keys, expected context, and time are explicit inputs. The SDK has no
 private-key access or custody and reads no clock.
 
-Its behavior is defined by the specifications ([v1](../../spec/bap-v1.md),
-[v2](../../spec/bap-v2.md), [v3](../../spec/bap-v3.md), and the sibling profiles under
-[`spec/`](../../spec/)) and the certified conformance corpora; source comments cite
+Its behavior is defined by the specifications ([v1](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v1.md),
+[v2](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v2.md), [v3](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v3.md), and the sibling profiles under
+[`spec/`](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/)) and the certified conformance corpora; source comments cite
 the tracked normative specifications and independent conformance corpora.
 
 ## Status
@@ -24,7 +24,7 @@ the tracked normative specifications and independent conformance corpora.
 **Not published.** There is no tagged module version and the Go module proxy does not serve
 this module, so `go get github.com/baselabs/bounded_authority_protocol_go` fails. The module
 moves to its own repository when it is first published
-with self-contained tests and corpus inputs. Until then, use it
+with its self-contained tests and corpus inputs. Until then, use it
 from a checkout of this repository.
 
 - Go **1.25** or later (`go.mod`). CI installs Go with `actions/setup-go` and
@@ -47,21 +47,16 @@ from a checkout of this repository.
 
 ## Install from a checkout
 
-From an empty directory, clone this repository, create your module next to it, point the
-module at the SDK directory, and run the quickstart below as a test:
+Copy this SDK directory into your application's `vendor/bap/` directory and configure a
+local module replacement to that directory. Pin the source commit in your dependency record.
+The SDK root is the complete module, including its tests and inputs. Its import path is
+`verifier "github.com/baselabs/bounded_authority_protocol_go"`.
+
+From this SDK directory, the quickstart is executable as a checked example:
 
 ```bash
-git clone https://github.com/baselabs/bounded_authority_protocol.git
-mkdir myapp && cd myapp
-go mod init example.com/myapp
-go mod edit \
-  -require=github.com/baselabs/bounded_authority_protocol_go@v0.0.0 \
-  -replace=github.com/baselabs/bounded_authority_protocol_go=../bounded_authority_protocol/sdks/go
-cp ../bounded_authority_protocol/sdks/go/example_test.go .
 go test -run Example .
 ```
-
-In your own code, import it as `verifier "github.com/baselabs/bounded_authority_protocol_go"`.
 
 ## Quickstart
 
@@ -241,7 +236,7 @@ Decoded proofs now include `GrantHash()`, `RequestHash()`, `HolderPublicKey()`, 
 ## Strict Ed25519
 
 Every Ed25519 signature check goes through one function (`verifyEd25519` in `ed25519.go`) that
-applies rule S1 of [erratum 2](../../docs/errata.md) before
+applies rule S1 of [erratum 2](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/errata.md) before
 the standard-library backend: exact widths, canonical `A` and `R`, neither of small order,
 `S < L`, then the cofactorless equation. `AcceptablePublicKey` is the key-entry check (canonical,
 not small order, on the curve), and every JWK and thumbprint function returns `ErrInvalid` for a
@@ -251,33 +246,43 @@ verification path.
 
 ## Conformance
 
-`go test ./...` runs everything:
+`conformance/priv/conformance/` is a complete, byte-identical snapshot of the Hex package built
+from this commit's `priv/conformance/` tree. It includes all nine certified corpora, schemas, focused vectors,
+and `verdict-digests.json`. Every test input is inside this SDK root; copying this directory
+alone is sufficient to run the suite.
+The manifest is an unreleased addition after Hex 1.0.0 and will ship in the next Hex release.
 
-- the root package: unit tests, the quickstart example, the local-loopback (36 URI and 8 proof
-  cases), role-attestation (40), and content-assertion (131 assertion, 9 digest, 14 successor)
-  corpora read from `priv/conformance/`, and the strict-Ed25519 unit and fuzz-seed tests;
-- `conformance/`: the vendored v1 (283 cases), v2 (268), v3 (292), and strict-Ed25519 (2,410)
-  snapshots, each with its `index.json` SHA-256 asserted at load, every case file checked
-  against the index, and a key census comparing the keys the runner imported with the index's
-  `public_key_fingerprints`;
-- `tests/`: the permissiveness battery, which builds each defect a parser closure exists to
-  reject and proves the closure catches it.
+| Corpus | Cases |
+|---|---:|
+| v1 / v2 / v3 | 283 / 268 / 292 |
+| Local-loopback HTTP | 44 (36 URI, 8 proof) |
+| Role attestation | 40 |
+| Content assertion | 154 (131 assertion, 9 digest, 14 successor) |
+| Producer canonicality | 75 |
+| Selector float zero | 161 |
+| Strict Ed25519 | 2,410 |
+
+Each runner pins its index, hashes every indexed file, including `.raw` inputs, and rejects
+extra or missing files, duplicate IDs, and skipped cases. It records computed outcomes,
+orders them by the index's file and case order, and checks their JCS/SHA-256 verdict digest
+against the vendored manifest. Expected-value comparison cannot substitute for this check.
+Outcome projections and index ordering are specified in the
+[verdict digest contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/corpus-verdict-digests.md).
+The contract-major runners also retain their public-key import censuses.
+
+Run from this SDK directory:
 
 ```bash
 go test ./...
-# From the repository root: independently remove each closure and require its test to fail
-python3 scripts/check_sdk_closures.py go
-# From sdks/go:
-go test -v ./conformance/ | grep agreed
-# agreed=283 disagreed=0 census=11
-# strict corpus: agreed=2410/2410
-# agreed=268 disagreed=0 census=22 declared=17
-# agreed=292 disagreed=0 census=8 declared=11
 ```
 
-The producer-canonicality corpus (erratum 3) runs too, in
-`conformance/producer_canonicality_test.go`, and the selector float-zero corpus (erratum 6) in
-`conformance/selector_float_zero_test.go`.
+The module zip includes the complete `conformance/` tree. CI checks it with the official
+module zip tooling and runs the suite from an SDK directory copied alone.
+
+The monorepo's distribution job copies only this SDK root into a temporary directory,
+runs its full suite, checks its package, and removes the temporary artifacts afterward.
+A corpus update replaces the entire snapshot from the verified Hex unpack in one change;
+individual case edits are not a supported update path. These checks do not publish the SDK.
 
 ## What this SDK does not do
 
@@ -295,7 +300,7 @@ go test ./...
 sh tools/purity_check.sh && sh tools/license_check.sh
 ```
 
-Deployment notes: [`docs/deployment/go-sdk.md`](../../docs/deployment/go-sdk.md).
+Deployment notes: [`docs/deployment/go-sdk.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/go-sdk.md).
 
 ## License
 

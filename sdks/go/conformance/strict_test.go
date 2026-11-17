@@ -1,7 +1,7 @@
 package conformance_test
 
 // The strict-Ed25519 acceptance runner (profile bap-strict-ed25519/1): it executes the vendored
-// additive corpus (corpus-strict, a byte-identical snapshot of priv/conformance/strict-ed25519/)
+// additive corpus (strict-ed25519 corpus, a byte-identical snapshot of priv/conformance/strict-ed25519/)
 // against the public SDK surface only, SHA-binds the vendored index.json at startup, verifies every
 // listed file against the index's per-file SHA-256 and case count, and requires every case to agree.
 //
@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	v "github.com/baselabs/bounded_authority_protocol_go"
+	"github.com/baselabs/bounded_authority_protocol_go/internal/corpuscheck"
 )
 
 // strictCertifiedIndexSHA256 is the SHA-256 (hex) of the certified strict corpus index.json. A
@@ -27,7 +28,7 @@ import (
 const strictCertifiedIndexSHA256 = "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
 
 const (
-	strictCorpusDir  = "corpus-strict"
+	strictCorpusDir  = "priv/conformance/strict-ed25519"
 	strictProfile    = "bap-strict-ed25519/1"
 	strictTotalCases = 2410
 )
@@ -108,7 +109,7 @@ func loadStrictCorpus(t *testing.T) []strictCaseRef {
 				t.Fatalf("duplicate strict case id %s", head.ID)
 			}
 			seen[head.ID] = true
-			refs = append(refs, strictCaseRef{head: head, raw: raw})
+			refs = append(refs, strictCaseRef{head: head, raw: raw, file: f.Path})
 		}
 	}
 	if len(families) != len(idx.Families) {
@@ -126,22 +127,27 @@ func loadStrictCorpus(t *testing.T) []strictCaseRef {
 }
 
 type strictCaseRef struct {
-	head strictHead
-	raw  json.RawMessage
+	file   string
+	head   strictHead
+	raw    json.RawMessage
+	Actual map[string]any
 }
 
 func TestStrictEd25519Corpus(t *testing.T) {
+	execution := corpuscheck.New(t, strictCorpusDir, "priv/conformance", strictCertifiedIndexSHA256)
 	refs := loadStrictCorpus(t)
 	agreed := 0
 	for _, ref := range refs {
 		ref := ref
-		if t.Run(ref.head.ID, func(t *testing.T) { runStrictCase(t, ref) }) {
+		ref.Actual = map[string]any{}
+		if t.Run(ref.head.ID, func(t *testing.T) { runStrictCase(t, ref); execution.Record(ref.head.ID, ref.file, ref.Actual) }) {
 			agreed++
 		}
 	}
 	if agreed != strictTotalCases {
 		t.Fatalf("strict corpus: %d/%d cases agree", agreed, strictTotalCases)
 	}
+	execution.Finish()
 	t.Logf("strict corpus: agreed=%d/%d", agreed, strictTotalCases)
 }
 
@@ -226,6 +232,10 @@ func runStrictPrimitive(t *testing.T, ref strictCaseRef) {
 	case "ed25519.torsion_free":
 		accepted = v.TorsionFree(strictB64(t, id, c.Input["public_key"]))
 	}
+	ref.Actual["verdict"] = "invalid"
+	if accepted {
+		ref.Actual["verdict"] = "valid"
+	}
 	strictVerdict(t, id, c.Expected, accepted)
 }
 
@@ -236,6 +246,7 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 	if err := json.Unmarshal(ref.raw, &c); err != nil {
 		t.Fatal(err)
 	}
+	c.Actual = ref.Actual
 	api := strictAPI(ref.head.Major)
 	switch c.Surface {
 	case "json.decode":
@@ -245,7 +256,14 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 		} else {
 			text = []byte(rawString(t, c.Input, "text"))
 		}
-		_, err := v.JsonDecode(text, nil)
+		got, err := v.JsonDecode(text, nil)
+		if err == nil {
+			encoded, e := v.JcsEncode(got, nil)
+			if e != nil {
+				t.Fatal(e)
+			}
+			c.Actual["value"] = corpuscheck.Decode(encoded)
+		}
 		checkVerdict(t, c, err)
 	case "jcs.encode":
 		var text []byte
@@ -261,45 +279,69 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 		}
 		enc, err := v.JcsEncode(val, nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["encoded"] = string(enc)
+		}
 		if c.Expected["encoded"] != nil && string(enc) != rawString(t, c.Expected, "encoded") {
 			t.Fatalf("case %s: encoded %s", c.ID, enc)
 		}
 	case "request_digest":
 		got, err := api.digest(rawString(t, c.Input, "operation"), rawValue(t, c.Input["cast_arguments"]), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["digest"] = got
+		}
 		if c.Expected["digest"] != nil && got != rawString(t, c.Expected, "digest") {
 			t.Fatalf("case %s: digest %s", c.ID, got)
 		}
 	case "jwk.decode_public":
 		got, err := v.JwkDecodePublic([]byte(rawString(t, c.Input, "text")), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["public_key"] = v.Base64urlEncode(got)
+		}
 		if c.Expected["public_key"] != nil && v.Base64urlEncode(got) != rawString(t, c.Expected, "public_key") {
 			t.Fatalf("case %s: key mismatch", c.ID)
 		}
 	case "jwk.encode_public":
 		got, err := v.JwkEncodePublic(decodeB64(t, c, rawString(t, c.Input, "public_key")), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["encoded"] = string(got)
+		}
 		if c.Expected["encoded"] != nil && string(got) != rawString(t, c.Expected, "encoded") {
 			t.Fatalf("case %s: encoded %s", c.ID, got)
 		}
 	case "jwk.thumbprint_preimage":
 		got, err := v.JwkThumbprintPreimage([]byte(rawString(t, c.Input, "text")), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["preimage"] = string(got)
+		}
 		if c.Expected["preimage"] != nil && string(got) != rawString(t, c.Expected, "preimage") {
 			t.Fatalf("case %s: preimage %s", c.ID, got)
 		}
 	case "jwk.thumbprint":
 		got, err := v.JwkThumbprint([]byte(rawString(t, c.Input, "text")), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["thumbprint"] = got
+		}
 		if c.Expected["thumbprint"] != nil && got != rawString(t, c.Expected, "thumbprint") {
 			t.Fatalf("case %s: thumbprint %s", c.ID, got)
 		}
 	case "jwk.thumbprint_raw":
-		_, err := v.JwkThumbprintRaw([]byte(rawString(t, c.Input, "text")), nil)
+		got, err := v.JwkThumbprintRaw([]byte(rawString(t, c.Input, "text")), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["thumbprint_raw"] = v.Base64urlEncode(got[:])
+		}
 	case "jwk.public_key_thumbprint_raw":
-		_, err := v.PublicKeyThumbprintRaw(decodeB64(t, c, rawString(t, c.Input, "public_key")), nil)
+		got, err := v.PublicKeyThumbprintRaw(decodeB64(t, c, rawString(t, c.Input, "public_key")), nil)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["thumbprint_raw"] = v.Base64urlEncode(got[:])
+		}
 	case "verify_grant":
 		got, err := api.verifyGrant(rawString(t, c.Input, "compact"), v.TrustedIssuer{
 			KeyID:     rawString(t, c.Input, "key_id"),
@@ -311,6 +353,10 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 			ClockSkew:      rawInt(t, c.Input, "clock_skew"),
 		})
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["grant_id"] = got.GrantID()
+			c.Actual["issuer"] = got.Issuer()
+		}
 		if c.Expected["grant_id"] != nil && got.GrantID() != rawString(t, c.Expected, "grant_id") {
 			t.Fatalf("case %s: grant id %s", c.ID, got.GrantID())
 		}
@@ -343,22 +389,31 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 		checkVerdict(t, c, err)
 	case "verify_historical_anchor":
 		key := subObject(t, c.Input, "key")
-		_, err := api.anchor(rawString(t, c.Input, "compact"),
+		got, err := api.anchor(rawString(t, c.Input, "compact"),
 			historicalKey(t, key, rawString(t, key, "public_key")),
 			expectedAnchor(t, subObject(t, c.Input, "expected")))
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["anchor_id"] = got.AnchorID()
+		}
 	case "verify_key_transition":
 		cur := subObject(t, c.Input, "current_key")
 		next := subObject(t, c.Input, "next_key")
-		_, err := api.transition(rawString(t, c.Input, "compact"),
+		got, err := api.transition(rawString(t, c.Input, "compact"),
 			historicalKey(t, cur, rawString(t, cur, "public_key")),
 			historicalKey(t, next, rawString(t, next, "public_key")),
 			expectedTransition(t, subObject(t, c.Input, "expected")))
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["transition_id"] = got.TransitionID()
+		}
 	case "verify_anchored_export":
 		obj, keys, expected := exportVerifyInput(t, c)
-		_, err := api.export(obj, keys, expected)
+		got, err := api.export(obj, keys, expected)
 		checkVerdict(t, c, err)
+		if err == nil {
+			c.Actual["chain_id"] = got.ChainID()
+		}
 	default:
 		t.Fatalf("case %s: unknown strict surface %s", c.ID, c.Surface)
 	}
@@ -422,6 +477,9 @@ func runStrictLoopback(t *testing.T, ref strictCaseRef) {
 	_, localErr := v.DecodeLocalLoopbackHTTPProof(c.Compact, nil)
 	_, standardErr := v.DecodeProof(c.Compact, nil)
 	_, envErr := v.CheckLocalLoopbackHTTPEnvelope(v.Credentials{Grant: c.Grant, Proof: c.Compact}, expected)
+	ref.Actual["decode_local"] = localErr == nil
+	ref.Actual["decode_standard"] = standardErr == nil
+	ref.Actual["envelope_local"] = envErr == nil
 	if (localErr == nil) != c.DecodeLocal || (standardErr == nil) != c.DecodeStandard || (envErr == nil) != c.EnvelopeLocal {
 		t.Fatalf("case %s: decode_local=%v decode_standard=%v envelope_local=%v, want %v/%v/%v", id,
 			localErr == nil, standardErr == nil, envErr == nil, c.DecodeLocal, c.DecodeStandard, c.EnvelopeLocal)
@@ -454,6 +512,8 @@ func runStrictRoleAttestation(t *testing.T, ref strictCaseRef) {
 	copy(expected.SubjectPublicKey[:], strictB64(t, id, c.Subject.PublicKey))
 	_, decodeErr := v.DecodeAttestation(c.Compact, nil)
 	_, verifyErr := v.VerifyAttestation(c.Compact, expected)
+	ref.Actual["decode"] = decodeErr == nil
+	ref.Actual["verify"] = verifyErr == nil
 	if (decodeErr == nil) != c.Decode || (verifyErr == nil) != c.Verify {
 		t.Fatalf("case %s: decode=%v verify=%v, want %v/%v", id, decodeErr == nil, verifyErr == nil, c.Decode, c.Verify)
 	}
@@ -495,6 +555,8 @@ func runStrictContentAssertion(t *testing.T, ref strictCaseRef) {
 	copy(expected.ContentDigest[:], strictB64(t, id, c.Context.ContentDigest))
 	_, decodeErr := v.DecodeContentAssertion(c.Compact, &bounds)
 	_, verifyErr := v.VerifyContentAssertion(c.Compact, expected)
+	ref.Actual["decode"] = corpuscheck.Verdict(decodeErr)
+	ref.Actual["verify"] = corpuscheck.Verdict(verifyErr)
 	if (decodeErr == nil) != (c.Expected.Decode == "valid") || (verifyErr == nil) != (c.Expected.Verify == "valid") {
 		t.Fatalf("case %s: %s", id, fmt.Sprintf("decode=%v verify=%v, want %s/%s", decodeErr == nil, verifyErr == nil, c.Expected.Decode, c.Expected.Verify))
 	}

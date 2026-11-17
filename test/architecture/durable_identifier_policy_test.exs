@@ -7,6 +7,21 @@ defmodule BoundedAuthorityProtocol.Architecture.DurableIdentifierPolicyTest do
 
   test "enumerated package and wire identities are accepted" do
     for fixture <- [
+          %{
+            path: "sdks/python/conformance/priv/conformance/v1/corpus/index.json",
+            kind: :path,
+            name: "v1"
+          },
+          %{
+            path: "sdks/rust/conformance/priv/conformance/v2/corpus/index.json",
+            kind: :path,
+            name: "v2"
+          },
+          %{
+            path: "sdks/go/conformance/priv/conformance/v3/corpus/index.json",
+            kind: :path,
+            name: "v3"
+          },
           %{path: "lib/bounded_authority_protocol/v1.ex", kind: :path, name: "v1"},
           %{
             path: "lib/bounded_authority_protocol/v1/grant.ex",

@@ -1620,7 +1620,7 @@ struct CorpusVerifyFixture {
 fn corpus_export_verify_fixture() -> CorpusVerifyFixture {
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/conformance/corpus/cases/anchored-export/verify.json"
+        "/conformance/priv/conformance/v1/corpus/cases/anchored-export/verify.json"
     );
     let raw = std::fs::read(case_path).expect("corpus readable");
     let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
@@ -1873,7 +1873,7 @@ fn bounds_standalone_anchor_verify_tightened_rejects() {
     // entry's bounds threading, red-capable at its own gate.
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/conformance/corpus/cases/boundary-anchor/verify.json"
+        "/conformance/priv/conformance/v1/corpus/cases/boundary-anchor/verify.json"
     );
     let raw = std::fs::read(case_path).expect("corpus readable");
     let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
@@ -2080,7 +2080,7 @@ fn bounds_standalone_transition_verify_tightened_rejects() {
     // dummy-signature fixtures fail crypto-verify before the gate).
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/conformance/corpus/cases/key-transition/verify.json"
+        "/conformance/priv/conformance/v1/corpus/cases/key-transition/verify.json"
     );
     let raw = std::fs::read(case_path).expect("corpus readable");
     let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
@@ -2189,7 +2189,7 @@ fn bounds_standalone_anchor_tightened_compact_bytes_rejects() {
     // 8192 maximum so only the new ceiling can fire).
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/conformance/corpus/cases/boundary-anchor/verify.json"
+        "/conformance/priv/conformance/v1/corpus/cases/boundary-anchor/verify.json"
     );
     let raw = std::fs::read(case_path).expect("corpus readable");
     let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
@@ -2250,7 +2250,7 @@ fn bounds_standalone_anchor_key_window_magnitude_rejects() {
     // membership holds (anchored_at is inside), only the magnitude gate fires.
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/conformance/corpus/cases/boundary-anchor/verify.json"
+        "/conformance/priv/conformance/v1/corpus/cases/boundary-anchor/verify.json"
     );
     let raw = std::fs::read(case_path).expect("corpus readable");
     let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
@@ -2312,7 +2312,7 @@ fn bounds_standalone_anchor_key_window_magnitude_rejects() {
 fn bounds_standalone_transition_tightened_compact_bytes_rejects() {
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/conformance/corpus/cases/key-transition/verify.json"
+        "/conformance/priv/conformance/v1/corpus/cases/key-transition/verify.json"
     );
     let raw = std::fs::read(case_path).expect("corpus readable");
     let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
@@ -2374,7 +2374,7 @@ fn bounds_standalone_transition_key_window_magnitude_rejects() {
     // path (membership holds; only the magnitude gate fires).
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/conformance/corpus/cases/key-transition/verify.json"
+        "/conformance/priv/conformance/v1/corpus/cases/key-transition/verify.json"
     );
     let raw = std::fs::read(case_path).expect("corpus readable");
     let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
@@ -2434,7 +2434,7 @@ fn bounds_standalone_anchor_key_window_magnitude_valid_from_rejects() {
     // 1000 >= -2^62), only the magnitude gate can fire.
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/conformance/corpus/cases/boundary-anchor/verify.json"
+        "/conformance/priv/conformance/v1/corpus/cases/boundary-anchor/verify.json"
     );
     let raw = std::fs::read(case_path).expect("corpus readable");
     let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
@@ -2532,7 +2532,7 @@ fn corpus_transition_parts() -> (
 ) {
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/conformance/corpus/cases/key-transition/verify.json"
+        "/conformance/priv/conformance/v1/corpus/cases/key-transition/verify.json"
     );
     let raw = std::fs::read(case_path).expect("corpus readable");
     let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
@@ -2608,7 +2608,7 @@ fn bounds_anchor_inverted_window_rejects() {
 fn corpus_anchor_triple() -> (Vec<u8>, HistoricalPublicKey, ExpectedAnchor) {
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/conformance/corpus/cases/boundary-anchor/verify.json"
+        "/conformance/priv/conformance/v1/corpus/cases/boundary-anchor/verify.json"
     );
     let raw = std::fs::read(case_path).expect("corpus readable");
     let root: serde_json::Value = serde_json::from_slice(&raw).expect("corpus parses");
@@ -3149,8 +3149,7 @@ fn request_digests_are_domain_separated_across_majors() {
 /// The vendored v3 corpus root (self-contained SDK snapshot — ADR 0015 D5).
 fn successor_corpus_root() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("conformance")
-        .join("corpus-v3")
+        .join("conformance/priv/conformance/v3/corpus")
 }
 
 /// Loads one case from a corpus-v3 case file by id.

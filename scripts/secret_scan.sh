@@ -319,6 +319,8 @@ run_check() {
   git -C "$probe_repo" config user.name 'Secret Scan Probe'
   git -C "$probe_repo" config user.email 'probe@example.invalid'
 
+  # Old paths remain sensitivity probes for the immutable Git history.
+  # New paths cover all three complete SDK snapshots.
   fixture_paths='docs/protocol-v1.md
 spec/bap-v1.md
 priv/conformance/application-profiles/local-loopback-http/v1/profile.json
@@ -327,7 +329,10 @@ priv/conformance/attestation-profiles/content-assertion/v1/assertion-structure-c
 priv/conformance/v2/corpus/cases/anchored-export/probe.json
 priv/conformance/v1/vectors/consumption-chain-archive.json
 sdks/go/conformance/corpus-v2/cases/signing-input/probe.json
+sdks/go/conformance/priv/conformance/v2/corpus/cases/signing-input/probe.json
+sdks/python/conformance/priv/conformance/v2/corpus/cases/signing-input/probe.json
 sdks/rust/conformance/corpus/cases/envelope/probe.json
+sdks/rust/conformance/priv/conformance/v1/corpus/cases/envelope/probe.json
 sdks/go/jwk_test.go
 sdks/go/tests/permissiveness_test.go
 sdks/rust/src/ed25519.rs
@@ -336,14 +341,20 @@ sdks/typescript/conformance/corpus-v2/cases/grant-verify/probe.json
 sdks/typescript/test/facade.test.ts
 priv/conformance/v3/corpus/cases/anchored-export/probe.json
 sdks/go/conformance/corpus-v3/cases/signing-input/probe.json
+sdks/go/conformance/priv/conformance/v3/corpus/cases/signing-input/probe.json
 priv/conformance/strict-ed25519/cases/envelope/probe.json
 sdks/rust/conformance/corpus-strict/cases/key-transition/probe.json
+sdks/rust/conformance/priv/conformance/strict-ed25519/cases/key-transition/probe.json
 priv/conformance/producer-canonicality/cases/es256-assemble/probe.json
 sdks/go/conformance/corpus-producer-canonicality/cases/es256-assemble/probe.json
+sdks/go/conformance/priv/conformance/producer-canonicality/cases/es256-assemble/probe.json
 sdks/rust/conformance/corpus-producer-canonicality/cases/ed25519-export-encode/probe.json
+sdks/rust/conformance/priv/conformance/producer-canonicality/cases/ed25519-export-encode/probe.json
 priv/conformance/selector-float-zero/cases/envelope/probe.json
 sdks/go/conformance/corpus-selector-float-zero/cases/grant-decode/probe.json
+sdks/go/conformance/priv/conformance/selector-float-zero/cases/grant-decode/probe.json
 sdks/rust/conformance/corpus-selector-float-zero/cases/grant-signing-input/probe.json
+sdks/rust/conformance/priv/conformance/selector-float-zero/cases/grant-signing-input/probe.json
 spec/facts/requirement-statements-v1.json
 sdks/decoded-wire-rendering.json
 test/fixtures/sdk_rendering/decoded-wire-rendering.json
@@ -411,6 +422,8 @@ PY
 priv/conformance/v2/corpus/cases/anchored-export/probe.json
 priv/conformance/v1/vectors/consumption-chain-archive.json
 sdks/go/conformance/corpus-v2/cases/signing-input/probe.json
+sdks/go/conformance/priv/conformance/v2/corpus/cases/signing-input/probe.json
+sdks/python/conformance/priv/conformance/v2/corpus/cases/signing-input/probe.json
 sdks/go/jwk_test.go
 sdks/go/tests/permissiveness_test.go
 sdks/rust/src/ed25519.rs
@@ -418,7 +431,9 @@ sdks/typescript/conformance/corpus-v2/cases/anchored-export/probe.json
 sdks/typescript/test/facade.test.ts
 priv/conformance/producer-canonicality/cases/ed25519-assemble/probe.json
 sdks/go/conformance/corpus-producer-canonicality/cases/ed25519-assemble/probe.json
+sdks/go/conformance/priv/conformance/producer-canonicality/cases/ed25519-assemble/probe.json
 sdks/rust/conformance/corpus-producer-canonicality/cases/ed25519-assemble/probe.json
+sdks/rust/conformance/priv/conformance/producer-canonicality/cases/ed25519-assemble/probe.json
 spec/facts/requirement-statements-v1.json
 EOF
   generic_repo="$check_dir/generic-repo"
@@ -463,14 +478,20 @@ priv/conformance/attestation-profiles/content-assertion/v1/assertion-structure-c
 priv/conformance/v2/corpus/cases/envelope/probe.json
 priv/conformance/v1/vectors/grant-holder-proof.json
 sdks/go/conformance/corpus-v2/cases/grant-verify/probe.json
+sdks/go/conformance/priv/conformance/v2/corpus/cases/grant-verify/probe.json
+sdks/python/conformance/priv/conformance/v2/corpus/cases/grant-verify/probe.json
 sdks/go/permissiveness_internal_test.go
 sdks/typescript/conformance/corpus-v2/cases/grant-verify/probe.json
 priv/conformance/producer-canonicality/cases/es256-export-encode/probe.json
 sdks/go/conformance/corpus-producer-canonicality/cases/es256-export-encode/probe.json
+sdks/go/conformance/priv/conformance/producer-canonicality/cases/es256-export-encode/probe.json
 sdks/rust/conformance/corpus-producer-canonicality/cases/es256-export-encode/probe.json
+sdks/rust/conformance/priv/conformance/producer-canonicality/cases/es256-export-encode/probe.json
 priv/conformance/selector-float-zero/cases/envelope/probe.json
 sdks/go/conformance/corpus-selector-float-zero/cases/grant-decode/probe.json
+sdks/go/conformance/priv/conformance/selector-float-zero/cases/grant-decode/probe.json
 sdks/rust/conformance/corpus-selector-float-zero/cases/grant-signing-input/probe.json
+sdks/rust/conformance/priv/conformance/selector-float-zero/cases/grant-signing-input/probe.json
 sdks/decoded-wire-rendering.json
 test/fixtures/sdk_rendering/decoded-wire-rendering.json
 sdks/python/tests/fixtures/decoded-wire-rendering.json

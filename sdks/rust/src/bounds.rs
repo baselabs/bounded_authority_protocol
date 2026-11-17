@@ -705,7 +705,7 @@ mod tests {
     #[test]
     fn corpus_bounds_new_all_79_cases() {
         let path = format!(
-            "{}/../../priv/conformance/v1/corpus/cases/bounds/new.json",
+            "{}/conformance/priv/conformance/v1/corpus/cases/bounds/new.json",
             env!("CARGO_MANIFEST_DIR")
         );
         let content =

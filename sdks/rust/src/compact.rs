@@ -268,7 +268,7 @@ mod tests {
     #[test]
     fn corpus_assemble_compact_all_2_cases() {
         let path = format!(
-            "{}/../../priv/conformance/v1/corpus/cases/assemble-compact/assemble.json",
+            "{}/conformance/priv/conformance/v1/corpus/cases/assemble-compact/assemble.json",
             env!("CARGO_MANIFEST_DIR")
         );
         let content =

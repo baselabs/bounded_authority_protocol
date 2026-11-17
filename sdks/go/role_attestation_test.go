@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/baselabs/bounded_authority_protocol_go/internal/corpuscheck"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -38,7 +39,7 @@ func TestRoleAttestationDecodedSizeProjection(t *testing.T) {
 
 func TestRoleAttestationTightenedSizeBounds(t *testing.T) {
 	t.Parallel()
-	root := filepath.Join("..", "..", "priv", "conformance", "attestation-profiles", "role-attestation", "v1")
+	root := filepath.Join("conformance", "priv", "conformance", "attestation-profiles", "role-attestation", "v1")
 	read := func(name string, target any) {
 		t.Helper()
 		data, err := os.ReadFile(filepath.Join(root, name))
@@ -128,7 +129,7 @@ func TestRoleAttestationTightenedSizeBounds(t *testing.T) {
 
 func TestRoleAttestationTightenedDecoderBounds(t *testing.T) {
 	t.Parallel()
-	root := filepath.Join("..", "..", "priv", "conformance", "attestation-profiles", "role-attestation", "v1")
+	root := filepath.Join("conformance", "priv", "conformance", "attestation-profiles", "role-attestation", "v1")
 	data, err := os.ReadFile(filepath.Join(root, "attestation-cases.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -315,7 +316,8 @@ func TestRoleAttestationStringOrURIProfile(t *testing.T) {
 
 func TestCertifiedRoleAttestationCorpusDrivesGoVerdicts(t *testing.T) {
 	t.Parallel()
-	root := filepath.Join("..", "..", "priv", "conformance", "attestation-profiles", "role-attestation", "v1")
+	root := filepath.Join("conformance", "priv", "conformance", "attestation-profiles", "role-attestation", "v1")
+	execution := corpuscheck.New(t, root, "conformance/priv/conformance", certifiedRoleAttestationIndexSHA256)
 	read := func(name string, into any) []byte {
 		t.Helper()
 		bytes, err := os.ReadFile(filepath.Join(root, name))
@@ -450,6 +452,9 @@ func TestCertifiedRoleAttestationCorpusDrivesGoVerdicts(t *testing.T) {
 		default:
 			t.Fatalf("%s has combined expected overrides", attestationCase.ID)
 		}
+		_, decodeErr := DecodeAttestation(attestationCase.Compact, nil)
+		_, verifyErr := VerifyAttestation(attestationCase.Compact, caseExpected)
+		execution.Record(attestationCase.ID, "attestation-cases.json", map[string]any{"decode": decodeErr == nil, "verify": verifyErr == nil})
 		if _, err := DecodeAttestation(attestationCase.Compact, nil); (err == nil) != attestationCase.Decode {
 			t.Fatalf("%s decode mismatch: %v", attestationCase.ID, err)
 		}
@@ -552,6 +557,7 @@ func TestCertifiedRoleAttestationCorpusDrivesGoVerdicts(t *testing.T) {
 			t.Fatalf("%s verify of assembled attestation mismatch: %+v, %v", role, producedFacts, err)
 		}
 	}
+	execution.Finish()
 }
 
 // Historical key-window endpoints are magnitude-bounded caller input

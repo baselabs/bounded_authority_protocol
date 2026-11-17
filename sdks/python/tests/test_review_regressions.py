@@ -13,7 +13,7 @@ from bounded_authority_verifier import v1, v2, v3
 from bounded_authority_verifier.compact import SigningInput, assemble_segments
 from bounded_authority_verifier.json_alg import is_valid_utf8
 
-_ROOT = Path(__file__).resolve().parents[3]
+_ROOT = Path(__file__).resolve().parents[1] / "conformance"
 
 
 def _b64(value: bytes) -> bytes:

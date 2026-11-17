@@ -1,3 +1,5 @@
+#[path = "../conformance/support.rs"]
+mod support;
 use std::fs;
 use std::path::PathBuf;
 
@@ -20,7 +22,7 @@ const CERTIFIED_INDEX_SHA256: &str =
 
 fn corpus_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../priv/conformance/attestation-profiles/role-attestation/v1")
+        .join("conformance/priv/conformance/attestation-profiles/role-attestation/v1")
 }
 
 fn read_json(name: &str) -> Value {
@@ -291,6 +293,7 @@ fn string_or_uri_rules_are_symmetric_across_every_attestation_surface() {
 
 #[test]
 fn certified_role_attestation_corpus_drives_rust_verdicts() {
+    let mut execution = support::Run::new(&corpus_root(), CERTIFIED_INDEX_SHA256);
     let root = corpus_root();
     let read_file = |name: &str| fs::read(root.join(name)).unwrap();
 
@@ -390,6 +393,7 @@ fn certified_role_attestation_corpus_drives_rust_verdicts() {
             }
         }
 
+        execution.record(id,"attestation-cases.json",serde_json::json!({"decode":decode_attestation(&compact,&bounds).is_ok(),"verify":verify_attestation(&compact,&case_expected).is_ok()}));
         assert_eq!(
             decode_attestation(&compact, &bounds).is_ok(),
             case["decode"].as_bool().unwrap(),
@@ -415,6 +419,7 @@ fn certified_role_attestation_corpus_drives_rust_verdicts() {
             "{id}: v1 grant cross-profile rejection"
         );
     }
+    execution.finish();
 }
 
 #[test]

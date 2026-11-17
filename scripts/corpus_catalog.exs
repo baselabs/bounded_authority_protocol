@@ -7,23 +7,21 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
   # this catalog. Exact key-set equality below makes adding a CLI corpus without its tooling
   # metadata a failure; filesystem discovery also rejects an unregistered SDK snapshot.
   @entries [
-    {1, "v1/corpus", "corpus", "run.py", "run.rs", "conformance/run_test.go"},
-    {2, "v2/corpus", "corpus-v2", "run_v2.py", "run_v2.rs", "conformance/v2_test.go"},
-    {3, "v3/corpus", "corpus-v3", "run_v3.py", "run_v3.rs", "conformance/v3_test.go"},
-    {:strict_ed25519, "strict-ed25519", "corpus-strict", "run_strict.py", "run_strict.rs",
+    {1, "v1/corpus", "run.py", "run.rs", "conformance/run_test.go"},
+    {2, "v2/corpus", "run_v2.py", "run_v2.rs", "conformance/v2_test.go"},
+    {3, "v3/corpus", "run_v3.py", "run_v3.rs", "conformance/v3_test.go"},
+    {:strict_ed25519, "strict-ed25519", "run_strict.py", "run_strict.rs",
      "conformance/strict_test.go"},
-    {:producer_canonicality, "producer-canonicality", "corpus-producer-canonicality",
-     "run_producer_canonicality.py", "run_producer_canonicality.rs",
-     "conformance/producer_canonicality_test.go"},
-    {:selector_float_zero, "selector-float-zero", "corpus-selector-float-zero",
-     "run_selector_float_zero.py", "run_selector_float_zero.rs",
-     "conformance/selector_float_zero_test.go"},
-    {:local_loopback_http, "application-profiles/local-loopback-http/v1", nil,
+    {:producer_canonicality, "producer-canonicality", "run_producer_canonicality.py",
+     "run_producer_canonicality.rs", "conformance/producer_canonicality_test.go"},
+    {:selector_float_zero, "selector-float-zero", "run_selector_float_zero.py",
+     "run_selector_float_zero.rs", "conformance/selector_float_zero_test.go"},
+    {:local_loopback_http, "application-profiles/local-loopback-http/v1",
      "../test_local_loopback_http.py", "../tests/local_loopback_http.rs",
      "local_loopback_http_test.go"},
-    {:role_attestation, "attestation-profiles/role-attestation/v1", nil,
-     "../test_role_attestation.py", "../tests/role_attestation.rs", "role_attestation_test.go"},
-    {:content_assertion, "attestation-profiles/content-assertion/v1", nil,
+    {:role_attestation, "attestation-profiles/role-attestation/v1", "../test_role_attestation.py",
+     "../tests/role_attestation.rs", "role_attestation_test.go"},
+    {:content_assertion, "attestation-profiles/content-assertion/v1",
      "../test_content_assertion.py", "../tests/content_assertion.rs",
      "content_assertion_corpus_test.go"}
   ]
@@ -179,11 +177,10 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
     if keys != MapSet.new(Map.keys(pins)),
       do: raise("corpus catalog differs from CLI certification map")
 
-    Enum.map(@entries, fn {key, source, snapshot, python, rust, go} ->
+    Enum.map(@entries, fn {key, source, python, rust, go} ->
       %{
         key: key,
         source: "priv/conformance/" <> source,
-        snapshot: snapshot,
         certified: Map.fetch!(pins, key),
         runners: [
           Path.join("sdks/python/tests/conformance", python) |> Path.expand(@root),
@@ -195,18 +192,10 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
   end
 
   def snapshots do
-    expected =
-      for sdk <- Path.wildcard(Path.join(@root, "sdks/*/conformance")),
-          entry <- entries(),
-          entry.snapshot != nil do
-        {Path.join(sdk, entry.snapshot), Path.join(@root, entry.source)}
-      end
-
-    observed = Path.wildcard(Path.join(@root, "sdks/*/conformance/corpus*"))
-    known = MapSet.new(Enum.map(expected, &elem(&1, 0)))
-    unknown = Enum.reject(observed, &MapSet.member?(known, &1))
-    if unknown != [], do: raise("uncatalogued SDK snapshots: #{inspect(unknown)}")
-    expected
+    for sdk <- ["python", "rust", "go"] do
+      {Path.join(@root, "sdks/#{sdk}/conformance/priv/conformance"),
+       Path.join(@root, "priv/conformance")}
+    end
   end
 
   def digests(entry) do

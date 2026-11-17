@@ -236,8 +236,8 @@ def test_float_with_only_overridden_gt_cannot_reach_numeric_comparison(selector)
     assert isinstance(v3.selector_matches(selector(("n",), bap.JFloat(1.0)), bap.JObject({"n": value})), bap.Err)
 
 
-def test_changelog_documents_bounds_contract_changes():
-    text = (Path(__file__).parents[3] / "CHANGELOG.md").read_text()
+def test_readme_documents_bounds_contract_changes():
+    text = (Path(__file__).parents[1] / "README.md").read_text()
     assert "`MAXIMA` is a read-only `MappingProxyType`" in text
     assert "Invalid `Bounds(...)` builds an unusable value rather" in text
 

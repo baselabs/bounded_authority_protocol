@@ -11,8 +11,8 @@ condition = "AND"
 targetRules = ["generic-api-key"]
 regexTarget = "match"
 paths = [
-  '''^priv/conformance/v[123]/corpus/cases/(?:anchored-export|boundary-anchor|key-transition|signing-input)/[^/]+\.json$''',
-  '''^priv/conformance/v1/vectors/(?:chain-semantic-edge|consumption-chain-archive)\.json$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/v[123]/corpus/cases/(?:anchored-export|boundary-anchor|key-transition|signing-input)/[^/]+\.json$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/v1/vectors/(?:chain-semantic-edge|consumption-chain-archive)\.json$''',
   '''^sdks/(?:go|rust)/conformance/corpus(?:-v2|-v3)?/cases/(?:anchored-export|boundary-anchor|key-transition|signing-input)/[^/]+\.json$''',
   '''^sdks/go/(?:jwk_test|permissiveness_internal_test|review_regressions_test)\.go$''',
   '''^sdks/go/tests/permissiveness_test\.go$''',
@@ -106,12 +106,12 @@ condition = "AND"
 targetRules = ["jwt"]
 regexTarget = "match"
 paths = [
-  '''^priv/conformance/attestation-profiles/content-assertion/v1/(?:assertion-structure-cases|assertion-verification-cases|successor-cases)\.json$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/attestation-profiles/content-assertion/v1/(?:assertion-structure-cases|assertion-verification-cases|successor-cases)\.json$''',
   '''^(?:docs/protocol-v1|spec/bap-v1)\.md$''',
-  '''^priv/conformance/application-profiles/local-loopback-http/v1/(?:profile|proof-cases)\.json$''',
-  '''^priv/conformance/attestation-profiles/role-attestation/v1/(?:attestation-cases|profile)\.json$''',
-  '''^priv/conformance/v[123]/corpus/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
-  '''^priv/conformance/v1/vectors/(?:chain-semantic-edge|consumption-chain-archive|grant-holder-proof)\.json$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/application-profiles/local-loopback-http/v1/(?:profile|proof-cases)\.json$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/attestation-profiles/role-attestation/v1/(?:attestation-cases|profile)\.json$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/v[123]/corpus/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/v1/vectors/(?:chain-semantic-edge|consumption-chain-archive|grant-holder-proof)\.json$''',
   '''^sdks/(?:go|rust)/conformance/corpus(?:-v2|-v3)?/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
   '''^sdks/go/(?:permissiveness_internal_test|tests/permissiveness_test)\.go$''',
 ]
@@ -624,14 +624,14 @@ regexes = [
 description = "v3 ES256 corpus public compact JWS fixtures (machine-minted, certified, no private material; the corpus loader's private-material sweep and the certified mint prove it; path-scoped because enumerating a generated corpus's compacts is unmaintainable)"
 targetRules = ["jwt", "generic-api-key"]
 paths = [
-  '''^priv/conformance/v3/corpus/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/v3/corpus/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
   '''^sdks/(?:go|rust)/conformance/corpus-v3/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
 ]
 [[allowlists]]
 description = "Strict-Ed25519 corpus public key, signature, and compact JWS fixtures (machine-minted from public test keys, certified, no private material; the generator writes public keys, signatures and messages only and the corpus declares private_material_tracked false; path-scoped because enumerating a generated corpus's values is unmaintainable)"
 targetRules = ["jwt", "generic-api-key"]
 paths = [
-  '''^priv/conformance/strict-ed25519/(?:profile\.json|cases/(?:anchored-export|boundary-anchor|ca1|envelope|grant-verify|jcs-utf8|jwk|key-acceptance|key-transition|loopback|primitive|ra1)/[^/]+\.json)$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/strict-ed25519/(?:profile\.json|cases/(?:anchored-export|boundary-anchor|ca1|envelope|grant-verify|jcs-utf8|jwk|key-acceptance|key-transition|loopback|primitive|ra1)/[^/]+\.json)$''',
   '''^sdks/(?:go|rust)/conformance/corpus-strict/(?:profile\.json|cases/(?:anchored-export|boundary-anchor|ca1|envelope|grant-verify|jcs-utf8|jwk|key-acceptance|key-transition|loopback|primitive|ra1)/[^/]+\.json)$''',
 ]
 [[allowlists]]
@@ -640,7 +640,7 @@ condition = "AND"
 targetRules = ["jwt"]
 regexTarget = "match"
 paths = [
-  '''^priv/conformance/producer-canonicality/cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/producer-canonicality/cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json$''',
   '''^sdks/go/conformance/corpus-producer-canonicality/cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json$''',
   '''^sdks/rust/conformance/corpus-producer-canonicality/cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json$''',
 ]
@@ -683,7 +683,7 @@ condition = "AND"
 targetRules = ["generic-api-key"]
 regexTarget = "match"
 paths = [
-  '''^priv/conformance/producer-canonicality/(?:profile\.json|cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json)$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/producer-canonicality/(?:profile\.json|cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json)$''',
   '''^sdks/go/conformance/corpus-producer-canonicality/(?:profile\.json|cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json)$''',
   '''^sdks/rust/conformance/corpus-producer-canonicality/(?:profile\.json|cases/(?:ed25519-assemble|ed25519-export-encode|es256-assemble|es256-export-encode)/[^/]+\.json)$''',
 ]
@@ -726,7 +726,7 @@ condition = "AND"
 targetRules = ["jwt"]
 regexTarget = "match"
 paths = [
-  '''^priv/conformance/selector-float-zero/cases/(?:envelope|grant-decode|grant-signing-input)/[^/]+\.json$''',
+  '''^(?:sdks/(?:python|rust|go)/conformance/)?priv/conformance/selector-float-zero/cases/(?:envelope|grant-decode|grant-signing-input)/[^/]+\.json$''',
   '''^sdks/go/conformance/corpus-selector-float-zero/cases/(?:envelope|grant-decode|grant-signing-input)/[^/]+\.json$''',
   '''^sdks/rust/conformance/corpus-selector-float-zero/cases/(?:envelope|grant-decode|grant-signing-input)/[^/]+\.json$''',
 ]

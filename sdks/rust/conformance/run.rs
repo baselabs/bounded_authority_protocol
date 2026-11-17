@@ -6,7 +6,7 @@
 //! gate that:
 //!
 //! 1. **SHA-binds** the vendored corpus snapshot (ADR 0014 §D4): hashes
-//!    `conformance/corpus/index.json` at startup and fails closed on mismatch
+//!    `conformance/priv/conformance/v1/corpus/index.json` at startup and fails closed on mismatch
 //!    with the certified SHA — a consumer who vendors a drifted corpus gets a
 //!    hard failure, not silent drift.
 //! 2. **Dispatches all 283 cases** across the 28 surfaces through the public
@@ -27,6 +27,8 @@
 
 #![forbid(unsafe_code)]
 
+mod support;
+use serde_json::json;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -48,9 +50,7 @@ const CERTIFIED_INDEX_SHA: &str =
 
 /// The vendored corpus root (self-contained SDK test corpus — ADR 0015 D5).
 fn corpus_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("conformance")
-        .join("corpus")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("conformance/priv/conformance/v1/corpus")
 }
 
 fn max() -> Bounds {
@@ -90,6 +90,7 @@ fn assert_certified_index_sha(bytes: &[u8]) {
 #[derive(Default)]
 struct KeyCensus {
     observed: BTreeSet<String>,
+    actual: Option<serde_json::Value>,
 }
 
 impl KeyCensus {
@@ -339,22 +340,17 @@ fn json_case_input_bytes(case: &serde_json::Value, root: &Path) -> Result<Vec<u8
     Err("no input shape".to_string())
 }
 
-fn d_base64url_decode(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_base64url_decode(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let input = case["input"]["base64url"].as_str().unwrap();
     let result = bap::base64url_decode(input.as_bytes());
-    match (expected_verdict, &result) {
-        ("valid", Ok(got)) => {
-            let want = case["expected"]["decoded"].as_str().unwrap();
-            got.as_slice() == want.as_bytes()
-        }
-        ("invalid", Err(Invalid)) => true,
-        _ => false,
-    }
+    save(
+        case,
+        census,
+        result.map(|got| json!({"decoded": String::from_utf8(got).unwrap()})),
+    )
 }
 
-fn d_bounds_new(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_bounds_new(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let overrides = &case["input"]["overrides"];
     let overrides_bytes = serde_json::to_vec(overrides).unwrap();
     // Re-decode through the real tagged decoder so the `Bounds::new(Option<&JsonValue>)`
@@ -363,148 +359,106 @@ fn d_bounds_new(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
         Ok(value) => Bounds::new(Some(&value)),
         Err(Invalid) => Err(Invalid),
     };
-    match expected_verdict {
-        "valid" => result.is_ok(),
-        "invalid" => result == Err(Invalid),
-        _ => false,
-    }
+    save(case, census, result.map(|b| {
+        let all = json!({"compact_bytes": b.compact_bytes(),"encoded_segment_bytes": b.encoded_segment_bytes(),"decoded_segment_bytes": b.decoded_segment_bytes(),"json_bytes": b.json_bytes(),"depth": b.depth(),"object_members": b.object_members(),"array_items": b.array_items(),"total_nodes": b.total_nodes(),"string_bytes": b.string_bytes(),"key_bytes": b.key_bytes(),"number_lexeme_bytes": b.number_lexeme_bytes(),"integer_magnitude": b.integer_magnitude(),"float_magnitude": b.float_magnitude(),"kid_bytes": b.kid_bytes(),"jcs_bytes": b.jcs_bytes(),"uri_bytes": b.uri_bytes(),"identifier_bytes": b.identifier_bytes(),"nonce_bytes": b.nonce_bytes(),"method_bytes": b.method_bytes(),"operation_bytes": b.operation_bytes(),"audiences": b.audiences(),"operations": b.operations(),"selectors": b.selectors(),"path_segments": b.path_segments(),"one_of_values": b.one_of_values(),"clock_skew": b.clock_skew(),"proof_max_age": b.proof_max_age(),"chain_row_bytes": b.chain_row_bytes(),"chain_rows": b.chain_rows(),"anchor_bytes": b.anchor_bytes(),"archive_header_bytes": b.archive_header_bytes(),"key_transitions": b.key_transitions(),"archive_chunks": b.archive_chunks(),"archive_bytes": b.archive_bytes(),"object_version_bytes": b.object_version_bytes(),"content_bytes": b.content_bytes()});
+        let projected: serde_json::Map<String,serde_json::Value> = overrides.as_object().unwrap().keys().map(|k|(k.clone(),all[k].clone())).collect();
+        json!({"bounds": projected})
+    }))
 }
 
-fn d_json_decode(case: &serde_json::Value, root: &Path, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_json_decode(case: &serde_json::Value, root: &Path, census: &mut KeyCensus) -> bool {
     let bytes = json_case_input_bytes(case, root).unwrap_or_else(|e| {
         panic!(
             "json case {} input: {e}",
             case["id"].as_str().unwrap_or("?")
         )
     });
-    let actual_ok = bap::json_decode(&bytes, &max()).is_ok();
-    let expected_ok = expected_verdict == "valid";
-    actual_ok == expected_ok
+    save(
+        case,
+        census,
+        bap::json_decode(&bytes, &max()).map(|value| json!({"value": json_value(&value)})),
+    )
 }
 
-fn d_jcs_encode(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_jcs_encode(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let text = case["input"]["text"].as_str().unwrap();
     // JCS surface = decode-then-encode.
-    match bap::json_decode(text.as_bytes(), &max()) {
-        Err(Invalid) => expected_verdict == "invalid",
-        Ok(value) => match bap::jcs_encode(&value, &max()) {
-            Err(Invalid) => expected_verdict == "invalid",
-            Ok(bytes) => match expected_verdict {
-                "valid" => {
-                    let want = case["expected"]["encoded"].as_str().unwrap();
-                    bytes.as_slice() == want.as_bytes()
-                }
-                _ => false,
-            },
-        },
-    }
+    let result =
+        bap::json_decode(text.as_bytes(), &max()).and_then(|v| bap::jcs_encode(&v, &max()));
+    save(
+        case,
+        census,
+        result.map(|bytes| json!({"encoded":String::from_utf8(bytes).unwrap()})),
+    )
 }
 
-fn d_uri_normalize(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_uri_normalize(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let input = case["input"]["text"].as_str().unwrap();
-    match bap::uri_normalize(input, &max()) {
-        Ok(got) => match expected_verdict {
-            "valid" => got == case["expected"]["normalized"].as_str().unwrap(),
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::uri_normalize(input, &max());
+    save(case, census, result.map(|got| json!({"normalized":got})))
 }
 
-fn d_request_digest(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_request_digest(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let operation = case["input"]["operation"].as_str().unwrap();
     let cast_arguments = serde_to_json(&case["input"]["cast_arguments"]);
-    match bap::request_digest(operation, &cast_arguments, &max()) {
-        Ok(digest) => match expected_verdict {
-            "valid" => {
-                String::from_utf8(digest).unwrap() == case["expected"]["digest"].as_str().unwrap()
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::request_digest(operation, &cast_arguments, &max());
+    save(
+        case,
+        census,
+        result.map(|digest| json!({"digest":String::from_utf8(digest).unwrap()})),
+    )
 }
 
-fn d_assemble_compact(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
-    let protected = case["input"]["protected_segment"]
-        .as_str()
-        .unwrap()
-        .as_bytes();
-    let payload = case["input"]["payload_segment"]
-        .as_str()
-        .unwrap()
-        .as_bytes();
-    let kind_str = case["input"]["kind"].as_str().unwrap();
-    let sig_b64 = case["input"]["signature"].as_str().unwrap();
-    // Import boundary: the raw signature must decode to exactly 64 bytes.
-    let sig_decoded = bap::base64url_decode(sig_b64.as_bytes());
-    let sig_is_64 = sig_decoded.as_ref().map(|r| r.len() == 64).unwrap_or(false);
-    match (expected_verdict, sig_is_64) {
-        ("valid", true) => {
-            let mut sig = [0u8; 64];
-            sig.copy_from_slice(&sig_decoded.unwrap());
-            let kind = kind_from_str(kind_str).expect("valid case has known kind");
-            let input = SigningInput {
-                kind,
-                protected_segment: protected.to_vec(),
-                payload_segment: payload.to_vec(),
-            };
-            match bap::assemble_compact(&input, &sig, None) {
-                Ok(compact) => {
-                    let want = case["expected"]["compact"].as_str().unwrap();
-                    String::from_utf8(compact).unwrap() == want
-                }
-                Err(Invalid) => false,
-            }
-        }
-        ("invalid", false) => true, // short-signature reject at the import boundary
-        _ => false,
-    }
+fn d_assemble_compact(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
+    let input = &case["input"];
+    let result = (|| {
+        let sig = b64url_to_64(&input["signature"]).ok_or(Invalid)?;
+        let kind = kind_from_str(input["kind"].as_str().unwrap()).ok_or(Invalid)?;
+        let signing = SigningInput {
+            kind,
+            protected_segment: input["protected_segment"]
+                .as_str()
+                .unwrap()
+                .as_bytes()
+                .to_vec(),
+            payload_segment: input["payload_segment"]
+                .as_str()
+                .unwrap()
+                .as_bytes()
+                .to_vec(),
+        };
+        bap::assemble_compact(&signing, &sig, None)
+    })();
+    save(
+        case,
+        census,
+        result.map(|compact| json!({"compact":String::from_utf8(compact).unwrap()})),
+    )
 }
 
-fn d_untrusted_key_locator(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_untrusted_key_locator(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let compact = case["input"]["compact"].as_str().unwrap().as_bytes();
-    match bap::untrusted_key_locator(compact, &max()) {
-        Ok(loc) => match expected_verdict {
-            "valid" => loc.key_id == case["expected"]["kid"].as_str().unwrap(),
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::untrusted_key_locator(compact, &max());
+    save(case, census, result.map(|loc| json!({"kid":loc.key_id})))
 }
 
-fn d_decode_grant(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_decode_grant(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let compact = case["input"]["compact"].as_str().unwrap().as_bytes();
-    match bap::decode_grant(compact, &max()) {
-        Ok(d) => match expected_verdict {
-            "valid" => d.key_id == case["expected"]["key_id"].as_str().unwrap(),
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::decode_grant(compact, &max());
+    save(case, census, result.map(|loc| json!({"key_id":loc.key_id})))
 }
 
-fn d_decode_proof(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_decode_proof(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let compact = case["input"]["compact"].as_str().unwrap().as_bytes();
-    match bap::decode_proof(compact, &max()) {
-        Ok(d) => match expected_verdict {
-            "valid" => d.proof_id == case["expected"]["proof_id"].as_str().unwrap(),
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::decode_proof(compact, &max());
+    save(
+        case,
+        census,
+        result.map(|loc| json!({"proof_id":loc.proof_id})),
+    )
 }
 
-fn d_grant_signing_input(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_grant_signing_input(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let input = &case["input"];
     let grant = GrantInput {
         issuer: input["issuer"].as_str().unwrap_or("").to_string(),
@@ -538,23 +492,21 @@ fn d_grant_signing_input(case: &serde_json::Value, _census: &mut KeyCensus) -> b
             })
             .unwrap_or_default(),
     };
-    match bap::grant_signing_input(&grant, &max()) {
-        Ok(produced) => match expected_verdict {
-            "valid" => {
-                let exp = &case["expected"];
-                produced.protected_segment == exp["protected_segment"].as_str().unwrap().as_bytes()
-                    && produced.payload_segment
-                        == exp["payload_segment"].as_str().unwrap().as_bytes()
-                    && produced.message == exp["message"].as_str().unwrap().as_bytes()
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::grant_signing_input(&grant, &max());
+    save(
+        case,
+        census,
+        result.map(|produced| {
+            signing_value(
+                &produced.protected_segment,
+                &produced.payload_segment,
+                &produced.message,
+            )
+        }),
+    )
 }
 
 fn d_proof_signing_input(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
     let input = &case["input"];
     let holder_public_key = b64url_to_32(&input["holder_public_key"]).unwrap_or([0u8; 32]);
     // Census the holder key iff it crossed the boundary as a real 32-byte key.
@@ -576,70 +528,44 @@ fn d_proof_signing_input(case: &serde_json::Value, census: &mut KeyCensus) -> bo
         holder_public_key,
         issued_at: input["issued_at"].as_i64().unwrap_or(0),
     };
-    match bap::proof_signing_input(&proof, &max()) {
-        Ok(produced) => match expected_verdict {
-            "valid" => {
-                let exp = &case["expected"];
-                produced.protected_segment == exp["protected_segment"].as_str().unwrap().as_bytes()
-                    && produced.payload_segment
-                        == exp["payload_segment"].as_str().unwrap().as_bytes()
-                    && produced.message == exp["message"].as_str().unwrap().as_bytes()
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::proof_signing_input(&proof, &max());
+    save(
+        case,
+        census,
+        result.map(|produced| {
+            signing_value(
+                &produced.protected_segment,
+                &produced.payload_segment,
+                &produced.message,
+            )
+        }),
+    )
 }
 
 fn d_boundary_anchor_signing_input(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
     let input = &case["input"];
-    let public_key_opt = b64url_to_32(&input["public_key"]);
-    match (expected_verdict, public_key_opt) {
-        ("valid", Some(pk)) => {
-            census.observe(&pk);
-            let anchor = BoundaryAnchor {
-                anchor_id: input["anchor_id"].as_str().unwrap().to_string(),
-                anchored_at: input["anchored_at"].as_i64().unwrap(),
-                chain_hash: b64url_to_32(&input["chain_hash"]).expect("32 bytes"),
-                chain_id: input["chain_id"].as_str().unwrap().to_string(),
-                key_id: input["key_id"].as_str().unwrap().to_string(),
-                public_key: pk,
-                sequence: input["sequence"].as_i64().unwrap(),
-            };
-            match bap::boundary_anchor_signing_input(&anchor, &max()) {
-                Ok(produced) => {
-                    let exp = &case["expected"];
-                    produced.protected_segment
-                        == exp["protected_segment"].as_str().unwrap().as_bytes()
-                        && produced.payload_segment
-                            == exp["payload_segment"].as_str().unwrap().as_bytes()
-                        && produced.message == exp["message"].as_str().unwrap().as_bytes()
-                }
-                Err(Invalid) => false,
-            }
-        }
-        ("invalid", None) => true, // wrong-width key -> import-boundary reject
-        ("invalid", Some(pk)) => {
-            // The producer itself rejects (e.g. seq0 + nonzero chain_hash).
-            census.observe(&pk);
-            let anchor = BoundaryAnchor {
-                anchor_id: input["anchor_id"].as_str().unwrap().to_string(),
-                anchored_at: input["anchored_at"].as_i64().unwrap(),
-                chain_hash: b64url_to_32(&input["chain_hash"]).expect("32 bytes"),
-                chain_id: input["chain_id"].as_str().unwrap().to_string(),
-                key_id: input["key_id"].as_str().unwrap().to_string(),
-                public_key: pk,
-                sequence: input["sequence"].as_i64().unwrap(),
-            };
-            bap::boundary_anchor_signing_input(&anchor, &max()) == Err(Invalid)
-        }
-        _ => false,
-    }
+    let Some(pk) = b64url_to_32(&input["public_key"]) else {
+        return save(case, census, Err(Invalid));
+    };
+    census.observe(&pk);
+    let anchor = BoundaryAnchor {
+        anchor_id: input["anchor_id"].as_str().unwrap().to_string(),
+        anchored_at: input["anchored_at"].as_i64().unwrap(),
+        chain_hash: b64url_to_32(&input["chain_hash"]).expect("32 bytes"),
+        chain_id: input["chain_id"].as_str().unwrap().to_string(),
+        key_id: input["key_id"].as_str().unwrap().to_string(),
+        public_key: pk,
+        sequence: input["sequence"].as_i64().unwrap(),
+    };
+    let result = bap::boundary_anchor_signing_input(&anchor, &max());
+    save(
+        case,
+        census,
+        result.map(|p| signing_value(&p.protected_segment, &p.payload_segment, &p.message)),
+    )
 }
 
 fn d_key_transition_signing_input(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
     let input = &case["input"];
     let current_public_key = b64url_to_32(&input["current_public_key"]).expect("32 bytes");
     let next_public_key = b64url_to_32(&input["next_public_key"]).expect("32 bytes");
@@ -654,23 +580,21 @@ fn d_key_transition_signing_input(case: &serde_json::Value, census: &mut KeyCens
         next_public_key,
         transition_id: input["transition_id"].as_str().unwrap().to_string(),
     };
-    match bap::key_transition_signing_input(&transition, &max()) {
-        Ok(produced) => match expected_verdict {
-            "valid" => {
-                let exp = &case["expected"];
-                produced.protected_segment == exp["protected_segment"].as_str().unwrap().as_bytes()
-                    && produced.payload_segment
-                        == exp["payload_segment"].as_str().unwrap().as_bytes()
-                    && produced.message == exp["message"].as_str().unwrap().as_bytes()
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::key_transition_signing_input(&transition, &max());
+    save(
+        case,
+        census,
+        result.map(|produced| {
+            signing_value(
+                &produced.protected_segment,
+                &produced.payload_segment,
+                &produced.message,
+            )
+        }),
+    )
 }
 
-fn d_encode_consumption_entry(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_encode_consumption_entry(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let input = &case["input"];
     let entry = ConsumptionEntry {
         chain_id: input["chain_id"].as_str().unwrap_or("").to_string(),
@@ -678,22 +602,11 @@ fn d_encode_consumption_entry(case: &serde_json::Value, _census: &mut KeyCensus)
         previous_hash: b64url_to_32(&input["previous_hash"]).unwrap_or([0u8; 32]),
         sequence: input["sequence"].as_i64().unwrap_or(0),
     };
-    match bap::encode_consumption_entry(&entry, &max()) {
-        Ok((bytes, hash)) => match expected_verdict {
-            "valid" => {
-                let exp = &case["expected"];
-                bytes.as_slice() == exp["bytes"].as_str().unwrap().as_bytes()
-                    && bap::base64url_encode(&hash).as_slice()
-                        == exp["hash"].as_str().unwrap().as_bytes()
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::encode_consumption_entry(&entry, &max());
+    save(case, census, result.map(|(bytes,hash)| json!({"bytes":String::from_utf8(bytes).unwrap(),"hash":String::from_utf8(bap::base64url_encode(&hash)).unwrap()})))
 }
 
-fn d_check_chain(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_check_chain(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let input = &case["input"];
     let rows: Vec<Vec<u8>> = input["rows"]
         .as_array()
@@ -713,21 +626,15 @@ fn d_check_chain(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
         head_hash: b64url_to_32(&input["last_hash"]).unwrap_or([0u8; 32]),
         bounds: None,
     };
-    match bap::check_chain(&chain_input, &expected) {
-        Ok(facts) => match expected_verdict {
-            "valid" => {
-                facts.chain_id == input["chain_id"].as_str().unwrap()
-                    && facts.row_count == input["row_count"].as_i64().unwrap()
-                    && facts.trust == NotEvaluated
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::check_chain(&chain_input, &expected);
+    save(
+        case,
+        census,
+        result.map(|facts| json!({"chain_id":facts.chain_id})),
+    )
 }
 
 fn d_verify_grant(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
     let input = &case["input"];
     let public_key = b64url_to_32(&input["public_key"]).unwrap_or([0u8; 32]);
     if b64url_to_32(&input["public_key"]).is_some() {
@@ -745,18 +652,12 @@ fn d_verify_grant(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
         bounds: max(),
     };
     let compact = input["compact"].as_str().unwrap().as_bytes();
-    match bap::verify_grant(compact, &issuer, &expected) {
-        Ok(facts) => match expected_verdict {
-            "valid" => {
-                facts.grant_id == case["expected"]["grant_id"].as_str().unwrap()
-                    && facts.issuer == case["expected"]["issuer"].as_str().unwrap()
-                    && facts.authorization == NotEvaluated
-                    && facts.version == 1
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::verify_grant(compact, &issuer, &expected);
+    save(
+        case,
+        census,
+        result.map(|facts| json!({"grant_id":facts.grant_id,"issuer":facts.issuer})),
+    )
 }
 
 /// Builds the (Credentials, ExpectedRequest) pair for one envelope case
@@ -808,45 +709,33 @@ fn envelope_fixture(
 }
 
 fn d_check_envelope(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
     let (creds, expected) = envelope_fixture(case, census);
-    match bap::check_envelope(&creds, &expected) {
-        Ok(facts) => match expected_verdict {
-            "valid" => {
-                facts.authorization == NotEvaluated
-                    && facts.grant.authorization == NotEvaluated
-                    && facts.grant.version == 1
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::check_envelope(&creds, &expected);
+    save(
+        case,
+        census,
+        result.map(|facts| {
+            assert_eq!(facts.authorization, NotEvaluated);
+            json!({})
+        }),
+    )
 }
 
 fn d_verify_historical_anchor(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
     let input = &case["input"];
     let key = historical_key_from(&input["key"]);
     census.observe(&key.public_key);
     let expected = expected_anchor_from(&input["expected"]);
     let compact = input["compact"].as_str().unwrap().as_bytes();
-    match bap::verify_historical_anchor(compact, &key, &expected) {
-        Ok(facts) => match expected_verdict {
-            "valid" => {
-                facts.anchor_id == expected.anchor_id
-                    && facts.sequence == expected.sequence
-                    && facts.chain_hash == expected.chain_hash
-                    && facts.key_fingerprint == expected.key_fingerprint
-                    && facts.trust == NotEvaluated
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::verify_historical_anchor(compact, &key, &expected);
+    save(
+        case,
+        census,
+        result.map(|facts| json!({"anchor_id":facts.anchor_id})),
+    )
 }
 
 fn d_verify_key_transition(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
     let input = &case["input"];
     let current = historical_key_from(&input["current_key"]);
     let next = historical_key_from(&input["next_key"]);
@@ -854,22 +743,15 @@ fn d_verify_key_transition(case: &serde_json::Value, census: &mut KeyCensus) -> 
     census.observe(&next.public_key);
     let expected = expected_transition_from(&input["expected"]);
     let compact = input["compact"].as_str().unwrap().as_bytes();
-    match bap::verify_key_transition(compact, &current, &next, &expected) {
-        Ok(facts) => match expected_verdict {
-            "valid" => {
-                facts.transition_id == expected.transition_id
-                    && facts.current_key_fingerprint == expected.current_key_fingerprint
-                    && facts.next_key_fingerprint == expected.next_key_fingerprint
-                    && facts.trust == NotEvaluated
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::verify_key_transition(compact, &current, &next, &expected);
+    save(
+        case,
+        census,
+        result.map(|facts| json!({"transition_id":facts.transition_id})),
+    )
 }
 
-fn d_encode_anchored_export(case: &serde_json::Value, _census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
+fn d_encode_anchored_export(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let input = &case["input"];
     let anchored_input = AnchoredExportInput {
         start_anchor: input["start_anchor"].as_str().unwrap().as_bytes().to_vec(),
@@ -904,22 +786,11 @@ fn d_encode_anchored_export(case: &serde_json::Value, _census: &mut KeyCensus) -
             .to_string(),
         bounds: None,
     };
-    match bap::encode_anchored_export(&anchored_input, &expected) {
-        Ok(encoded) => match expected_verdict {
-            "valid" => {
-                let exp = &case["expected"];
-                encoded.byte_count == exp["byte_count"].as_i64().unwrap() as u64
-                    && bap::base64url_encode(&encoded.digest).as_slice()
-                        == exp["digest"].as_str().unwrap().as_bytes()
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::encode_anchored_export(&anchored_input, &expected);
+    save(case, census, result.map(|facts| json!({"byte_count":facts.byte_count,"digest":String::from_utf8(bap::base64url_encode(&facts.digest)).unwrap()})))
 }
 
 fn d_verify_anchored_export(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
     let input = &case["input"];
     let chunks: Vec<Vec<u8>> = input["chunks"]
         .as_array()
@@ -944,111 +815,96 @@ fn d_verify_anchored_export(case: &serde_json::Value, census: &mut KeyCensus) ->
             .collect(),
     };
     let expected = expected_anchored_export_from(&input["expected"]);
-    match bap::verify_anchored_export(&obj, &keys, &expected) {
-        Ok(facts) => match expected_verdict {
-            "valid" => {
-                facts.trust == NotEvaluated
-                    && facts.authorization == NotEvaluated
-                    && facts.chain_id == input["expected"]["chain"]["chain_id"].as_str().unwrap()
-                    && facts.row_count == input["expected"]["chain"]["row_count"].as_i64().unwrap()
-            }
-            _ => false,
-        },
-        Err(Invalid) => expected_verdict == "invalid",
-    }
+    let result = bap::verify_anchored_export(&obj, &keys, &expected);
+    save(
+        case,
+        census,
+        result.map(|facts| json!({"chain_id":facts.chain_id})),
+    )
 }
 
 // ---- jwk.* (6 sub-surfaces, one file) --------------------------------------
 
 fn d_jwk(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     let surface = case["surface"].as_str().unwrap();
-    let expected_verdict = case["expected"]["verdict"].as_str().unwrap();
-    match surface {
-        "jwk.encode_public" => {
-            let key = b64url_to_32(&case["input"]["public_key"]);
-            match (key, expected_verdict) {
-                (Some(key), "valid") => {
-                    census.observe(&key);
-                    let encoded =
-                        bap::jwk_encode_public(&key).expect("an honest corpus key encodes");
-                    String::from_utf8(encoded).unwrap()
-                        == case["expected"]["encoded"].as_str().unwrap()
-                }
-                (None, "invalid") => true, // wrong-width key -> invalid_key
-                _ => false,
+    let input = &case["input"];
+    let result = (|| {
+        let key = if surface == "jwk.encode_public" || surface == "jwk.public_key_thumbprint_raw" {
+            b64url_to_32(&input["public_key"]).ok_or(Invalid)?
+        } else {
+            bap::jwk_decode_public(input["text"].as_str().unwrap().as_bytes())?
+        };
+        census.observe(&key);
+        Ok(match surface {
+            "jwk.encode_public" => {
+                json!({"encoded":String::from_utf8(bap::jwk_encode_public(&key)?).unwrap()})
             }
-        }
-        "jwk.decode_public" => {
-            match bap::jwk_decode_public(case["input"]["text"].as_str().unwrap().as_bytes()) {
-                Ok(key) => match expected_verdict {
-                    "valid" => {
-                        census.observe(&key);
-                        String::from_utf8(bap::base64url_encode(&key)).unwrap()
-                            == case["expected"]["public_key"].as_str().unwrap()
-                    }
-                    _ => false,
-                },
-                Err(Invalid) => expected_verdict == "invalid",
+            "jwk.decode_public" => {
+                json!({"public_key":String::from_utf8(bap::base64url_encode(&key)).unwrap()})
             }
-        }
-        "jwk.thumbprint" => {
-            match bap::jwk_decode_public(case["input"]["text"].as_str().unwrap().as_bytes()) {
-                Ok(key) => match expected_verdict {
-                    "valid" => {
-                        census.observe(&key);
-                        String::from_utf8(bap::thumbprint(&key).unwrap()).unwrap()
-                            == case["expected"]["thumbprint"].as_str().unwrap()
-                    }
-                    _ => false,
-                },
-                Err(Invalid) => expected_verdict == "invalid",
+            "jwk.thumbprint" => {
+                json!({"thumbprint":String::from_utf8(bap::thumbprint(&key)?).unwrap()})
             }
-        }
-        "jwk.thumbprint_preimage" => {
-            match bap::jwk_decode_public(case["input"]["text"].as_str().unwrap().as_bytes()) {
-                Ok(key) => match expected_verdict {
-                    "valid" => {
-                        census.observe(&key);
-                        String::from_utf8(bap::thumbprint_preimage(&key).unwrap()).unwrap()
-                            == case["expected"]["preimage"].as_str().unwrap()
-                    }
-                    _ => false,
-                },
-                Err(Invalid) => expected_verdict == "invalid",
+            "jwk.thumbprint_preimage" => {
+                json!({"preimage":String::from_utf8(bap::thumbprint_preimage(&key)?).unwrap()})
             }
-        }
-        "jwk.thumbprint_raw" => {
-            match bap::jwk_decode_public(case["input"]["text"].as_str().unwrap().as_bytes()) {
-                Ok(key) => match expected_verdict {
-                    "valid" => {
-                        census.observe(&key);
-                        let _ = bap::thumbprint_raw(&key); // verdict-only pin
-                        true
-                    }
-                    _ => false,
-                },
-                Err(Invalid) => expected_verdict == "invalid",
+            "jwk.thumbprint_raw" => {
+                json!({"thumbprint_raw":String::from_utf8(bap::base64url_encode(&bap::thumbprint_raw(&key)?)).unwrap()})
             }
-        }
-        "jwk.public_key_thumbprint_raw" => {
-            let key = b64url_to_32(&case["input"]["public_key"]);
-            match (key, expected_verdict) {
-                (Some(key), "valid") => {
-                    census.observe(&key);
-                    let _ = bap::public_key_thumbprint_raw(&key); // verdict-only pin
-                    true
-                }
-                (None, "invalid") => true,
-                _ => false,
+            "jwk.public_key_thumbprint_raw" => {
+                json!({"thumbprint_raw":String::from_utf8(bap::base64url_encode(&bap::public_key_thumbprint_raw(&key)?)).unwrap()})
             }
-        }
-        other => panic!("unknown jwk surface: {other}"),
-    }
+            _ => panic!("unknown JWK surface"),
+        })
+    })();
+    save(case, census, result)
 }
 
 // ============================================================================
 // Dispatcher: route one case by its `surface` field.
 // ============================================================================
+
+fn save(
+    case: &serde_json::Value,
+    census: &mut KeyCensus,
+    result: Result<serde_json::Value, Invalid>,
+) -> bool {
+    let actual = match result {
+        Ok(mut value) => {
+            value
+                .as_object_mut()
+                .unwrap()
+                .insert("verdict".into(), json!("valid"));
+            value
+        }
+        Err(Invalid) => json!({"verdict":"invalid"}),
+    };
+    let keys = case["expected"].as_object().unwrap();
+    let projected = serde_json::Value::Object(
+        keys.keys()
+            .filter_map(|k| actual.get(k).map(|v| (k.clone(), v.clone())))
+            .collect(),
+    );
+    let agrees = projected == case["expected"];
+    census.actual = Some(projected);
+    agrees
+}
+fn signing_value(protected: &[u8], payload: &[u8], message: &[u8]) -> serde_json::Value {
+    json!({"protected_segment":std::str::from_utf8(protected).unwrap(),"payload_segment":std::str::from_utf8(payload).unwrap(),"message":std::str::from_utf8(message).unwrap()})
+}
+fn json_value(value: &JsonValue) -> serde_json::Value {
+    match value {
+        JsonValue::Null => serde_json::Value::Null,
+        JsonValue::Bool(b) => json!(b),
+        JsonValue::Int(n) => json!(n),
+        JsonValue::Float(n) => json!(n),
+        JsonValue::String(s) => json!(s),
+        JsonValue::Array(a) => json!(a.iter().map(json_value).collect::<Vec<_>>()),
+        JsonValue::Object(o) => {
+            serde_json::Value::Object(o.iter().map(|(k, v)| (k.clone(), json_value(v))).collect())
+        }
+    }
+}
 
 fn dispatch(case: &serde_json::Value, root: &Path, census: &mut KeyCensus) -> bool {
     let surface = case["surface"].as_str().unwrap_or("<no surface>");
@@ -1092,6 +948,7 @@ fn dispatch(case: &serde_json::Value, root: &Path, census: &mut KeyCensus) -> bo
 #[test]
 fn conformance_full_corpus() {
     let root = corpus_root();
+    let mut execution = support::Run::new(&root, CERTIFIED_INDEX_SHA);
 
     // (1) ADR 0014 §D4 — SHA-bind the vendored index.json.
     let index_bytes = fs::read(root.join("index.json")).expect("read vendored index.json");
@@ -1170,7 +1027,10 @@ fn conformance_full_corpus() {
         let cases = file["cases"]
             .as_array()
             .unwrap_or_else(|| panic!("{path} cases array"));
-        all_cases.extend(cases.iter().cloned());
+        all_cases.extend(cases.iter().cloned().map(|mut c| {
+            c["_file"] = json!(path);
+            c
+        }));
     }
 
     assert_eq!(
@@ -1196,7 +1056,13 @@ fn conformance_full_corpus() {
         let expected_verdict = case["expected"]["verdict"]
             .as_str()
             .unwrap_or("<no verdict>");
+        census.actual = None;
         let agree = dispatch(case, &root, &mut census);
+        execution.record(
+            id,
+            case["_file"].as_str().unwrap(),
+            census.actual.take().expect("missing computed outcome"),
+        );
         if agree {
             agreed += 1;
         } else {
@@ -1204,6 +1070,8 @@ fn conformance_full_corpus() {
             eprintln!("DISAGREE: surface={surface} id={id} expected={expected_verdict}");
         }
     }
+
+    execution.finish();
 
     // (4) ADR 0014 §D9 — two-boundary key census (both directions).
     assert_census(&census.observed, &declared_fps);

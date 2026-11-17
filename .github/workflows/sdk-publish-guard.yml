@@ -39,37 +39,29 @@ jobs:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Run SDK publish guard over workflows and SDK manifests
+      - name: Run SDK publish guard over every classified path
         env:
           CHECKER: scripts/check_sdk_publish_infra.sh
         run: |
-          set -eu
-          fail=0
-          # Build the file list once, into a temp, then read from it. (A here-doc
-          # carrying a $(find ...) command substitution triggers shellcheck SC2094
-          # and is needlessly subtle; a temp file is unambiguous.)
-          tmp="$(mktemp)"
-          {
-            find .github/workflows -type f \( -name '*.yml' -o -name '*.yaml' \)
-            find sdks -type f \( -name 'package.json' -o -name 'pyproject.toml' -o -name 'setup.py' -o -name 'setup.cfg' -o -name 'Cargo.toml' \)
-          } | sort -u > "$tmp"
-          while IFS= read -r path; do
-            [ -n "$path" ] || continue
-            # Read the file into a variable, then pipe it. A direct `< "$path"`
-            # redirect trips shellcheck SC2094 (read+write same path in one
-            # pipeline); `cat "$path" |` trips SC2002 (useless cat). Both are
-            # CI hard-fails under actionlint. The variable form avoids both and
-            # matches the hook's staged-blob pattern.
-            content="$(cat "$path")"
-            if ! printf '%s' "$content" | "./$CHECKER" "$path"; then
-              fail=1
-            fi
-          done < "$tmp"
-          rm -f "$tmp"
-          if [ "$fail" -ne 0 ]; then
-            echo
-            echo "SDK publish infrastructure is committed to the monorepo, which ADR 0015 forbids." >&2
-            echo "SDKs graduate to per-SDK repos on first publication; see the Publication section in AGENTS.md." >&2
-            exit 1
-          fi
-          echo "No SDK publish infrastructure found."
+          python3 - <<'PYTHON'
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          paths = subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
+          failed = False
+          for raw_path in paths:
+              if not raw_path:
+                  continue
+              path = os.fsdecode(raw_path)
+              result = subprocess.run(
+                  [str(Path(os.environ["CHECKER"]).resolve()), path],
+                  input=Path(path).read_bytes(),
+                  check=False,
+              )
+              failed = failed or result.returncode != 0
+          if failed:
+              sys.exit("SDK publish infrastructure is forbidden in the monorepo (ADR 0015).")
+          print("No SDK publish infrastructure found.")
+          PYTHON

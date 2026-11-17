@@ -3564,8 +3564,7 @@ mod tests {
     /// monorepo source tree.
     fn corpus_root() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("conformance")
-            .join("corpus-v2")
+            .join("conformance/priv/conformance/v2/corpus")
     }
 
     fn load_cases(rel: &str) -> Vec<serde_json::Value> {

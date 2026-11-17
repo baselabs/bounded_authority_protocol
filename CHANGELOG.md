@@ -6,6 +6,15 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Make Python, Rust, and Go SDK roots self-contained with whole Hex corpus snapshots. Package
+  tests exercise copied-alone roots, unpacked Python sdists and Rust crates, and Go module zips;
+  Python wheels remain runtime-only.
+- Bind every corpus runner to per-file hashes, exact inventories, unique IDs, complete
+  execution, and a shared computed verdict digest. Document profile outcome projections and
+  index ordering without changing frozen corpus bytes, index pins, or CLI 1.x report members.
+- Derive corpus sync inventory from a Hex unpack, cover every SDK pin, verify every corpus
+  generator in CI, and feed all classified paths to the SDK publication guard.
+
 - **Breaking changes to the unpublished Python SDK:** protocol primitives now return the
   closed `Result` (`Ok(value)` or `Err(InvalidError())`), including JSON, UTF-8, JCS,
   base64url, bounds, URI, JWK, thumbprint, digest, selector, and compact primitives.

@@ -15,9 +15,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, ed25519
-from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "priv/conformance/attestation-profiles/content-assertion/v1"
@@ -1188,8 +1185,33 @@ def main() -> None:
     )
 
 
+
+def verify():
+    """Check the frozen signed inputs without minting new ephemeral keys."""
+    index = json.loads((OUT / "index.json").read_bytes())
+    names = [entry["path"] for entry in index["files"]]
+    assert len(names) == len(set(names)), "duplicate indexed inputs"
+    assert {p.relative_to(OUT).as_posix() for p in OUT.rglob("*") if p.is_file()} == {"index.json", *names}, "content corpus file set drift"
+    ids = []
+    counts = {}
+    for entry in index["files"]:
+        name = entry["path"]
+        assert not Path(name).is_absolute() and ".." not in Path(name).parts
+        body = (OUT / name).read_bytes()
+        assert hashlib.sha256(body).hexdigest() == entry["sha256"], f"{name}: file SHA mismatch"
+        if name.endswith("-cases.json"):
+            cases = json.loads(body)
+            ids.extend(case["id"] for case in cases)
+            counts[name] = len(cases)
+    assert len(ids) == len(set(ids)), "duplicate case IDs"
+    assert counts["digest-cases.json"] == index["digest_cases"]
+    assert counts["successor-cases.json"] == index["successor_cases"]
+    assert counts["assertion-structure-cases.json"] + counts["assertion-verification-cases.json"] == index["assertion_cases"]
+    print(f"content assertion frozen generator inputs: verify ok cases={len(ids)}")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--verify", action="store_true")
     parser.add_argument(
         "--add-uri-checks",
         action="store_true",
@@ -1201,8 +1223,14 @@ if __name__ == "__main__":
         help="incrementally add URI authority cases without rotating existing signed bytes",
     )
     arguments = parser.parse_args()
-    if arguments.add_uri_checks and arguments.add_uri_authority_checks:
+    if sum([arguments.verify, arguments.add_uri_checks, arguments.add_uri_authority_checks]) > 1:
         parser.error("choose only one incremental corpus update")
+    if arguments.verify:
+        verify()
+        raise SystemExit(0)
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec, ed25519
+    from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
     if arguments.add_uri_checks:
         add_uri_checks()
     elif arguments.add_uri_authority_checks:

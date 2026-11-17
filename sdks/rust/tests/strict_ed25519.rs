@@ -24,7 +24,9 @@ fn corpus_case(family_file: &str, id: &str) -> Value {
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "conformance",
-        "corpus-strict",
+        "priv",
+        "conformance",
+        "strict-ed25519",
         "cases",
         family_file,
     ]
@@ -137,7 +139,9 @@ fn corpus_keys() -> (Vec<[u8; 32]>, Vec<[u8; 32]>) {
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "conformance",
-        "corpus-strict",
+        "priv",
+        "conformance",
+        "strict-ed25519",
         "cases",
         "key-acceptance",
         "acceptable-public-key.json",
