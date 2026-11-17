@@ -5,6 +5,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
   use ExUnit.Case, async: false
 
   alias BoundedAuthorityProtocol.ArchitectureGate
+  alias BoundedAuthorityProtocol.BuildPath
   alias BoundedAuthorityProtocol.TestSupport.Portable
 
   @root Path.expand("../..", __DIR__)
@@ -50,7 +51,10 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
                )
 
       assert output =~ "Generated bounded_authority_protocol app"
-      violations = ArchitectureGate.check_compiled(root, "prod")
+
+      violations =
+        ArchitectureGate.check_compiled(root, build_path: BuildPath.resolve(root, "prod"))
+
       refute Enum.any?(violations, &(&1.category == :compiled_artifact))
 
       assert Enum.any?(violations, fn violation ->
@@ -63,7 +67,25 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     System.put_env("MIX_BUILD_PATH", missing)
 
     assert [%{category: :compiled_artifact, path: ^missing}] =
-             ArchitectureGate.check_compiled(root, "prod")
+             ArchitectureGate.check_compiled(root, build_path: BuildPath.resolve(root, "prod"))
+  end
+
+  test "a compiled copy never writes into the running project's inherited build path" do
+    original = System.get_env("MIX_BUILD_PATH")
+    root = fixture_root!("def probe, do: :ok")
+    inherited = Path.join(root, "inherited-build")
+
+    on_exit(fn ->
+      if original == nil,
+        do: System.delete_env("MIX_BUILD_PATH"),
+        else: System.put_env("MIX_BUILD_PATH", original)
+    end)
+
+    System.put_env("MIX_BUILD_PATH", inherited)
+    compile_copy!(root, ["compile"])
+
+    refute File.exists?(inherited)
+    assert File.dir?(Path.join(copy_build_path(root), "lib/bounded_authority_protocol/ebin"))
   end
 
   # Deletion-invisibility guard (keys-subset-of-present): a pinned module deleted or renamed
@@ -331,47 +353,63 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       def initialize, do: :ok
       """)
 
-    assert {_output, 0} =
-             System.cmd("mix", ["compile"],
-               cd: root,
-               env: [{"MIX_ENV", "prod"}],
-               stderr_to_stdout: true
-             )
+    compile_copy!(root, ["compile"])
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
-             violation.category == :filesystem and
-               violation.detail =~ "compiled import File.read!"
-           end)
+    assert Enum.any?(
+             compiled_copy_violations(root),
+             fn violation ->
+               violation.category == :filesystem and
+                 violation.detail =~ "compiled import File.read!"
+             end
+           )
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
-             violation.category == :network and
-               violation.detail =~ "compiled import :diameter.add_transport"
-           end)
+    assert Enum.any?(
+             compiled_copy_violations(root),
+             fn violation ->
+               violation.category == :network and
+                 violation.detail =~ "compiled import :diameter.add_transport"
+             end
+           )
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
-             violation.category == :unapproved_runtime and
-               violation.detail =~ "compiled external function MysteryRuntime.perform/1"
-           end)
+    assert Enum.any?(
+             compiled_copy_violations(root),
+             fn violation ->
+               violation.category == :unapproved_runtime and
+                 violation.detail =~ "compiled external function MysteryRuntime.perform/1"
+             end
+           )
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
-             violation.category == :randomness and
-               violation.detail =~ "compiled import :crypto.strong_rand_bytes/1"
-           end)
+    assert Enum.any?(
+             compiled_copy_violations(root),
+             fn violation ->
+               violation.category == :randomness and
+                 violation.detail =~ "compiled import :crypto.strong_rand_bytes/1"
+             end
+           )
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
-             violation.category == :dynamic_dispatch and
-               violation.detail == "compiled variable function invocation"
-           end)
+    assert Enum.any?(
+             compiled_copy_violations(root),
+             fn violation ->
+               violation.category == :dynamic_dispatch and
+                 violation.detail == "compiled variable function invocation"
+             end
+           )
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
-             violation.category == :process and
-               violation.detail == "compiled mailbox receive"
-           end)
+    assert Enum.any?(
+             compiled_copy_violations(root),
+             fn violation ->
+               violation.category == :process and
+                 violation.detail == "compiled mailbox receive"
+             end
+           )
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
-             violation.category == :unapproved_runtime and
-               violation.detail == "compiled module load hook"
-           end)
+    assert Enum.any?(
+             compiled_copy_violations(root),
+             fn violation ->
+               violation.category == :unapproved_runtime and
+                 violation.detail == "compiled module load hook"
+             end
+           )
   end
 
   test "malformed runtime source fails closed" do
@@ -394,14 +432,9 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       end
       """)
 
-    assert {_output, 0} =
-             System.cmd("mix", ["compile"],
-               cd: root,
-               env: [{"MIX_ENV", "prod"}],
-               stderr_to_stdout: true
-             )
+    compile_copy!(root, ["compile"])
 
-    violations = ArchitectureGate.check_compiled(root, "prod")
+    violations = compiled_copy_violations(root)
 
     assert Enum.any?(violations, &(&1.detail == "compiled mailbox receive"))
     assert Enum.any?(violations, &(&1.detail == "compiled variable function invocation"))
@@ -415,15 +448,10 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
   test "compiled dynamic-call allowances are bound to exact existing counts" do
     root = copy_actual_project!()
 
-    assert {_output, 0} =
-             System.cmd("mix", ["compile"],
-               cd: root,
-               env: [{"MIX_ENV", "prod"}],
-               stderr_to_stdout: true
-             )
+    compile_copy!(root, ["compile"])
 
     refute Enum.any?(
-             ArchitectureGate.check_compiled(root, "prod"),
+             compiled_copy_violations(root),
              &(&1.category == :dynamic_dispatch)
            )
 
@@ -442,18 +470,16 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     assert mutated != original
     File.write!(path, mutated)
 
-    assert {_output, 0} =
-             System.cmd("mix", ["compile", "--force"],
-               cd: root,
-               env: [{"MIX_ENV", "prod"}],
-               stderr_to_stdout: true
-             )
+    compile_copy!(root, ["compile", "--force"])
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
-             violation.category == :dynamic_dispatch and
-               violation.detail =~ "compiled dynamic-call allowance" and
-               violation.detail =~ "{:new, 1}"
-           end)
+    assert Enum.any?(
+             compiled_copy_violations(root),
+             fn violation ->
+               violation.category == :dynamic_dispatch and
+                 violation.detail =~ "compiled dynamic-call allowance" and
+                 violation.detail =~ "{:new, 1}"
+             end
+           )
 
     runtime_path = Path.join(root, "lib/bounded_authority_protocol/v1/runtime.ex")
     runtime = File.read!(runtime_path)
@@ -467,18 +493,16 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
                violation.detail == "source dynamic-call allowance expected 2, got 3"
            end)
 
-    assert {_output, 0} =
-             System.cmd("mix", ["compile", "--force"],
-               cd: root,
-               env: [{"MIX_ENV", "prod"}],
-               stderr_to_stdout: true
-             )
+    compile_copy!(root, ["compile", "--force"])
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
-             violation.category == :dynamic_dispatch and
-               violation.detail =~ "compiled dynamic-call allowance" and
-               violation.detail =~ "{:fixed, 1}"
-           end)
+    assert Enum.any?(
+             compiled_copy_violations(root),
+             fn violation ->
+               violation.category == :dynamic_dispatch and
+                 violation.detail =~ "compiled dynamic-call allowance" and
+                 violation.detail =~ "{:fixed, 1}"
+             end
+           )
   end
 
   test "fixed-byte comparison is pinned to constant-time crypto and is mutation-red" do
@@ -539,15 +563,10 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
   test "new protocol mechanics have exact compiled public exports" do
     root = copy_actual_project!()
 
-    assert {_output, 0} =
-             System.cmd("mix", ["compile"],
-               cd: root,
-               env: [{"MIX_ENV", "prod"}],
-               stderr_to_stdout: true
-             )
+    compile_copy!(root, ["compile"])
 
     refute Enum.any?(
-             ArchitectureGate.check_compiled(root, "prod"),
+             compiled_copy_violations(root),
              &(&1.category == :public_surface)
            )
 
@@ -565,17 +584,15 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     assert mutated != original
     File.write!(path, mutated)
 
-    assert {_output, 0} =
-             System.cmd("mix", ["compile", "--force"],
-               cd: root,
-               env: [{"MIX_ENV", "prod"}],
-               stderr_to_stdout: true
-             )
+    compile_copy!(root, ["compile", "--force"])
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
-             violation.category == :public_surface and
-               violation.detail =~ "unexpected_export"
-           end)
+    assert Enum.any?(
+             compiled_copy_violations(root),
+             fn violation ->
+               violation.category == :public_surface and
+                 violation.detail =~ "unexpected_export"
+             end
+           )
   end
 
   test "chain facts expose no generic collection or string protocol and no raw evidence fields" do
@@ -656,6 +673,22 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
                stderr_to_stdout: true
              )
   end
+
+  # A copy is another Mix project: it compiles into a build path of its own, never into the
+  # inherited MIX_BUILD_PATH or MIX_BUILD_ROOT that names the running project's build.
+  defp compile_copy!(root, arguments) do
+    assert {_output, 0} =
+             System.cmd("mix", arguments,
+               cd: root,
+               env: [{"MIX_ENV", "prod"}, {"MIX_BUILD_PATH", copy_build_path(root)}],
+               stderr_to_stdout: true
+             )
+  end
+
+  defp copy_build_path(root), do: BuildPath.isolated(root, "prod")
+
+  defp compiled_copy_violations(root),
+    do: ArchitectureGate.check_compiled(root, build_path: copy_build_path(root))
 
   defp fixture_root!(body) do
     root = tmp_root!()

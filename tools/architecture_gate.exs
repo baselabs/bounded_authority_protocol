@@ -1163,8 +1163,14 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     |> Enum.sort_by(&{&1.category, &1.path, &1.detail})
   end
 
-  def check_compiled(root, environment \\ nil) do
-    build_path = BoundedAuthorityProtocol.BuildPath.resolve(root, environment)
+  # A caller that compiled another checkout into a build path of its own passes that path;
+  # otherwise the root's build resolves as a Mix process in that root would place it.
+  def check_compiled(root, opts \\ []) do
+    build_path =
+      Keyword.get_lazy(opts, :build_path, fn ->
+        BoundedAuthorityProtocol.BuildPath.resolve(root)
+      end)
+
     path = Path.join(build_path, "lib/bounded_authority_protocol/ebin")
     ebin_paths = if File.dir?(path), do: [path], else: []
 
