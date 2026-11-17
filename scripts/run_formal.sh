@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Formal-analysis re-run (ADR 0025): pinned ProVerif execution + three checks.
 #
 #   1. run the model and diff the RESULT lines against spec/formal/expected-summary.txt
@@ -9,7 +9,7 @@
 #
 # Any escalated disposition is printed loudly: it blocks the program's done-claim until the
 # owner rules (routed via SECURITY.md).
-set -euo pipefail
+set -eu
 cd "$(dirname "$0")/.."
 
 MODEL=spec/formal/proverif/bap-core.pv
@@ -31,13 +31,18 @@ if ! command -v proverif >/dev/null 2>&1; then
 fi
 
 # --- 1. non-regression summary diff -------------------------------------------
-proverif "$MODEL" 2>&1 | grep -E '^RESULT' > /tmp/formal-results.txt || true
+results=$(mktemp "${TMPDIR:-/tmp}/bap-formal-results.XXXXXX")
+trap 'rm -f "$results"' 0
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+proverif "$MODEL" 2>&1 | grep -E '^RESULT' > "$results" || true
 expected=$(grep -E '^RESULT' "$SUMMARY")
-actual=$(cat /tmp/formal-results.txt)
+actual=$(cat "$results")
 
 if [ "$expected" != "$actual" ]; then
   echo "run_formal: FAILED — model output diverges from the frozen summary:" >&2
-  diff <(echo "$expected") <(echo "$actual") >&2 || true
+  printf '%s\n' "$expected" | diff - "$results" >&2 || true
   fail=1
 else
   echo "run_formal: summary ok ($(echo "$actual" | grep -c 'is true')/$(echo "$actual" | wc -l | tr -d ' ') queries true)"
@@ -56,8 +61,9 @@ REQ1-HEADER-thumbprint REQ1-HEADER-proof-jwk REQ1-VERIFY-grant-exact
 REQ1-VERIFY-envelope-binding REQ1-VERIFY-facts-redacted REQ1-VERIFY-return-shape
 REQ1-VERIFY-time-bounds REQ1-CLAIM-case-sensitive"
 missing=0
-for id in $(grep -o 'REQ1-[A-Z0-9]*-[a-z0-9-]*' "$MODEL" | sort -u); do
-  if ! echo "$map_ids" | grep -qx "$id"; then
+model_ids=$(grep -o 'REQ1-[A-Z0-9]*-[a-z0-9-]*' "$MODEL" | sort -u)
+for id in $model_ids; do
+  if ! printf '%s\n' "$map_ids" | grep -x "$id" >/dev/null; then
     echo "run_formal: FAILED — model annotates $id which is not in the requirement map" >&2
     missing=1
   fi
