@@ -1,3 +1,5 @@
+Code.require_file("corpus_catalog.exs", __DIR__)
+
 defmodule BoundedAuthorityProtocol.CorpusSyncGate do
   # Corpus vendored-snapshot sync gate (spec-decoupling L1; ADR 0019 intra-repo drift check,
   # NOT a distribution artifact). The Rust and Go SDKs vendor self-contained corpus snapshots;
@@ -9,31 +11,16 @@ defmodule BoundedAuthorityProtocol.CorpusSyncGate do
   # commit in that repository). The Go/Rust runners still read the curated v2 key-census input
   # monorepo-relative — to be vendored at their own graduations.
 
-  @snapshots [
-    {"sdks/rust/conformance/corpus", "priv/conformance/v1/corpus"},
-    {"sdks/go/conformance/corpus", "priv/conformance/v1/corpus"},
-    {"sdks/rust/conformance/corpus-v2", "priv/conformance/v2/corpus"},
-    {"sdks/go/conformance/corpus-v2", "priv/conformance/v2/corpus"},
-    {"sdks/rust/conformance/corpus-v3", "priv/conformance/v3/corpus"},
-    {"sdks/go/conformance/corpus-v3", "priv/conformance/v3/corpus"},
-    {"sdks/rust/conformance/corpus-producer-canonicality",
-     "priv/conformance/producer-canonicality"},
-    {"sdks/go/conformance/corpus-producer-canonicality",
-     "priv/conformance/producer-canonicality"},
-    {"sdks/rust/conformance/corpus-selector-float-zero", "priv/conformance/selector-float-zero"},
-    {"sdks/go/conformance/corpus-selector-float-zero", "priv/conformance/selector-float-zero"}
-  ]
-
   def run do
     problems =
-      Enum.flat_map(@snapshots, fn {snapshot, source} ->
+      Enum.flat_map(BoundedAuthorityProtocol.CorpusCatalog.snapshots(), fn {snapshot, source} ->
         compare(source, snapshot)
       end)
 
     case problems do
       [] ->
         IO.puts(
-          "corpus sync gate: ok snapshots=#{length(@snapshots)} byte-identical to their certified corpora"
+          "corpus sync gate: ok snapshots=#{length(BoundedAuthorityProtocol.CorpusCatalog.snapshots())} byte-identical to their certified corpora"
         )
 
       problems ->
@@ -92,8 +79,8 @@ defmodule BoundedAuthorityProtocol.CorpusSyncGate do
         end)
         |> MapSet.new()
 
-      _ ->
-        MapSet.new()
+      {:error, reason} ->
+        raise "cannot read corpus directory #{dir}: #{inspect(reason)}"
     end
   end
 end

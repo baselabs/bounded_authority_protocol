@@ -109,9 +109,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   # was certified against, keyed by corpus. The SDK runners pin the identical values. This closes
   # the gap a self-consistent but regenerated corpus (for example a shrunken case set with a
   # matching index) would otherwise pass through. To rotate a corpus, bump its constant and every
-  # SDK runner's pin in the same change (scripts/regen_corpus_digests.exs). The contract-major 3 pin
-  # stays the closing entry: scripts/regen_corpus_digests.exs locates each contract-major pin by its
-  # exact single-line shape.
+  # SDK runner's pin in the same change (scripts/regen_corpus_digests.exs). Every corpus in this map
+  # is covered by the shared tooling catalog; no entry may be omitted from rotation.
   @certified_index_sha256 %{
     :strict_ed25519 => "cyEX3-GIG1U5mBJqlSSpW_sRcSV-OI1UMKCgmfIofLk",
     :producer_canonicality => "me5vu_MnWLA9RjBkf3IdjU40nwYo2GBJPWZ_5udixgE",
