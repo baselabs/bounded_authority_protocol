@@ -79,7 +79,7 @@ jobs:
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
   compatibility:
-    name: Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }}
+    name: ${{ matrix.primary && 'Elixir and OTP from .tool-versions' || format('Elixir {0} / OTP {1}', matrix.elixir, matrix.otp) }}
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ matrix.timeout }} # 2x green 9.5/8.7/8.6 min; runs 44109672500/44095313459/44095313459.
     strategy:

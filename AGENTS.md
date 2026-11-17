@@ -86,11 +86,16 @@ The runtime accepts raw credentials at its public boundary, not a caller-provide
 
 ## Workflow
 
-Make the change and commit it with named paths. A maintainer lands it through the qualification run: CI starts only on a push to a `kci/<sha>` branch, and `main` moves to that exact commit only when the run's last job, `qualified`, is green. Pull requests get no CI run of their own; the landing run qualifies them.
+Make the change and commit it with named paths. A maintainer lands it through the
+qualification run: CI starts only on a push to a `kci/<sha>` branch, and `main` moves to that
+exact commit only when the run's last job, `qualified`, is green. Pull requests get no CI run of
+their own; the landing run qualifies them.
 
 - CI runs `mix quality` (package, purity, documentation, advisory, license, SBOM and
   unpacked-consumer checks). Run the parts that cover your change.
-- Contributors and agents never publish, tag a version, deploy or dispatch a workflow. `publish.yml` publishes the Hex package and `pages.yml` deploys the site; the maintainers' release operator dispatches both from `main`.
+- Contributors and agents never publish, tag a version, deploy or dispatch a workflow.
+  `publish.yml` publishes the Hex package and `pages.yml` deploys the site; the maintainers'
+  release operator dispatches both from `main`.
 - A test that fails on every run is a defect: fix it, or quarantine it with a reason, in the
   change that finds it.
 - Update the CHANGELOG when behavior, a dependency or a contract changes; other docs only when
