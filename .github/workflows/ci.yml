@@ -6,11 +6,6 @@ on:
     branches:
       - main
       - "kci/**"
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - "LICENSE*"
-      - ".github/ISSUE_TEMPLATE/**"
   workflow_dispatch:
 
 permissions:
@@ -23,7 +18,7 @@ concurrency:
 jobs:
   secret-scan:
     name: Secret scan
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,7 +39,7 @@ jobs:
 
   workflow-syntax:
     name: Workflow syntax
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,7 +49,7 @@ jobs:
 
   compatibility:
     name: Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     strategy:
       fail-fast: false
       matrix:
@@ -89,7 +84,7 @@ jobs:
 
   quality:
     name: Complete quality and package boundary
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -130,7 +125,7 @@ jobs:
 
   spec-render:
     name: Spec renders under pinned kramdown-rfc
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -161,7 +156,7 @@ jobs:
 
   cddl-coherence:
     name: Informative CDDL stays coherent with the corpus
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -186,7 +181,7 @@ jobs:
 
   formal-analysis:
     name: Pinned ProVerif re-run + ledger checks
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

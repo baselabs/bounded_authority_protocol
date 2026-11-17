@@ -4,13 +4,7 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "mix.exs"
-      - "mix.lock"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "package-lock.json"
-      - ".github/workflows/supply-chain.yml"
+      - "kci/**"
   workflow_dispatch:
   schedule:
     - cron: "17 5 * * 1"
@@ -27,7 +21,7 @@ concurrency:
 jobs:
   package:
     name: Build and attest CI package
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

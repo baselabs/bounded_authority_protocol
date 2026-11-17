@@ -68,7 +68,7 @@ jobs:
           if [ "$fail" -ne 0 ]; then
             echo
             echo "SDK publish infrastructure is committed to the monorepo, which ADR 0015 forbids." >&2
-            echo "SDKs graduate to per-SDK repos on first publication; see docs/adr/0015-sdk-graduation-and-publish-topology.md." >&2
+            echo "SDKs graduate to per-SDK repos on first publication; see the Publication section in AGENTS.md." >&2
             exit 1
           fi
           echo "No SDK publish infrastructure found."
