@@ -116,6 +116,15 @@ from bounded_authority_verifier.v1 import (
 dec = json_decode
 
 
+def invalid_json(text: bytes) -> bool:
+    """Record a decoder rejection so mutation kills are actual assertion failures."""
+    try:
+        dec(text)
+    except InvalidError:
+        return True
+    return False
+
+
 def rejects(label: str):
     """Decorator: the body must raise InvalidError."""
 
@@ -134,8 +143,7 @@ def _to_hex(b: bytes) -> str:
 # invalid_duplicate; this closure's distinct value is depth>=3 + the guarantee that no host-parser
 # fallback exists anywhere in the SDK path.)
 def test_duplicate_member_at_depth_3():
-    with pytest.raises(InvalidError):
-        dec(b'{"a":{"b":{"c":1,"c":2}}}')
+    assert invalid_json(b'{"a":{"b":{"c":1,"c":2}}}')
 
 
 def test_distinct_members_accepted():
@@ -177,20 +185,17 @@ def test_dunder_does_not_collapse_identity():
 # conversion. The 66-byte tiny-float below has value 1e-64 (finite, within magnitude) — it is
 # rejected ONLY by the lexeme ceiling.
 def test_66_byte_number_lexeme():
-    with pytest.raises(InvalidError):
-        dec(b"0." + b"0" * 63 + b"1")
+    assert invalid_json(b"0." + b"0" * 63 + b"1")
 
 
 def test_integer_magnitude_over_bound():
-    with pytest.raises(InvalidError):
-        dec(b"9007199254740992")  # MAXIMA.integer_magnitude + 1
+    assert invalid_json(b"9007199254740992")  # MAXIMA.integer_magnitude + 1
 
 
 # 4. REQ1-JSON-single-value — the host defect: json.loads accepts trailing data after the top-level
 # value in some configurations. The SDK rejects any byte after the single value (whitespace-only).
 def test_trailing_bytes():
-    with pytest.raises(InvalidError):
-        dec(b"{} junk")
+    assert invalid_json(b"{} junk")
 
 
 def test_two_top_level_values():
@@ -318,12 +323,10 @@ def test_float_magnitude_checked_on_raw_lexeme_not_lossy_conversion():
     raw lexeme by decimal arithmetic (json.ex magnitude_within?). Defect: revert to the post-
     conversion `abs(n) > MAX_FLOAT` check → this lexeme is accepted (lossy).
     """
-    with pytest.raises(InvalidError):
-        json_decode(b"9007199254740991.0001")
+    assert invalid_json(b"9007199254740991.0001")
     # Controls: exactly MAX is valid (int); MAX+1 as int is rejected on the raw lexeme too.
     assert json_decode(b"9007199254740991") == JInt(v=9007199254740991)
-    with pytest.raises(InvalidError):
-        json_decode(b"9007199254740992")
+    assert invalid_json(b"9007199254740992")
     # A float strictly under MAX is valid.
     assert isinstance(json_decode(b"9007199254740990.5"), JFloat)
 

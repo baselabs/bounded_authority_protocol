@@ -181,7 +181,7 @@ fn closure_4_trailing_bytes_after_single_value_rejected() {
 fn closure_5_int_and_float_tags_do_not_collapse() {
     let i = json_decode(b"1", &max()).expect("1 decodes");
     let f = json_decode(b"1.0", &max()).expect("1.0 decodes");
-    assert!(matches!(i, JsonValue::Int(_)), "1 is Int");
+    assert!(matches!(i, JsonValue::Int(_)));
     assert!(matches!(f, JsonValue::Float(_)), "1.0 is Float");
     assert_ne!(i, f, "Int(1) and Float(1.0) are distinct variants");
 

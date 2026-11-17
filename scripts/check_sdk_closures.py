@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """ADR 0014 D7: each D6 closure must independently turn its own test red.
 
-Only an assertion failure in the named test kills a mutant. Compiler/import errors,
-missing tests, timeouts, and unrelated failures are gate failures, never proof.
+Python requires a named JUnit AssertionError; Rust requires a named assert!/assert_eq!
+assertion panic. Go requires the named --- FAIL without a panic. Other exceptions,
+compiler/import errors, missing tests, timeouts, and unrelated failures fail the gate.
 The original SDK is untouched; temporary copies and their outputs are always removed.
 """
 
@@ -208,6 +209,19 @@ def run(sdk: str) -> None:
         env["PYTHONPATH"] = str(target / "src")
         # Dependencies may be cached, but code/test artifacts must come from this copy.
         env["CARGO_TARGET_DIR"] = str(target / "target")
+        if sdk == "python":
+            # pytest's JUnit failure element omits exception types. Record the actual
+            # exception class from its report, rather than guessing from error text.
+            with (target / "conftest.py").open("a") as hook:
+                hook.write(
+                    "\nimport pytest\n"
+                    "@pytest.hookimpl(hookwrapper=True)\n"
+                    "def pytest_runtest_makereport(item, call):\n"
+                    "    yield\n"
+                    "    if call.when == 'call' and call.excinfo is not None:\n"
+                    "        cls = call.excinfo.type\n"
+                    "        item.user_properties.append(('exception_type', cls.__module__ + '.' + cls.__qualname__))\n"
+                )
         original: dict[Path, str] = {}
         for filename, _, _, _ in mutations:
             path = (
@@ -273,6 +287,11 @@ def run(sdk: str) -> None:
                     len(cases) == 1
                     and cases[0].get("name") == test
                     and cases[0].find("failure") is not None
+                    and any(
+                        prop.get("name") == "exception_type"
+                        and prop.get("value") == "builtins.AssertionError"
+                        for prop in cases[0].findall("./properties/property")
+                    )
                     and cases[0].find("error") is None
                 )
             elif sdk == "rust":
@@ -280,6 +299,10 @@ def run(sdk: str) -> None:
                     f"test {test} ... FAILED" in result.stdout
                     and "test result: FAILED" in result.stdout
                     and "could not compile" not in result.stdout
+                    and re.search(
+                        r"panicked at[^\n]*\nassertion [`\x27]?", result.stdout
+                    )
+                    is not None
                 )
             else:
                 killed = (
