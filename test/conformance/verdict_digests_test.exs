@@ -106,4 +106,26 @@ defmodule BoundedAuthorityProtocol.Conformance.VerdictDigestsTest do
               %{"decode" => "invalid", "verify" => "invalid"}}
            ]
   end
+
+  test "computed producer outcomes fail closed on malformed assembly input" do
+    root = "priv/conformance/producer-canonicality"
+
+    files =
+      Map.new(Path.wildcard("#{root}/**/*") |> Enum.filter(&File.regular?/1), fn path ->
+        {Path.relative_to(path, root), File.read!(path)}
+      end)
+
+    {:ok, corpus} = Corpus.load_any(files)
+
+    case_obj = %{
+      "id" => "missing-protected-segment",
+      "profile" => "bap-application-proof/local-loopback-http/1",
+      "input" => %{"payload_segment" => "e30", "signature" => "AA"},
+      "expected" => %{"verdict" => "valid"}
+    }
+
+    assert Runner.computed(%{corpus | cases: [{"malformed.json", [case_obj]}]}) == [
+             {"missing-protected-segment", "malformed.json", %{"verdict" => "invalid"}}
+           ]
+  end
 end
