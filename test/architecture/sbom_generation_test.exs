@@ -5,14 +5,14 @@ defmodule BoundedAuthorityProtocol.Architecture.SbomGenerationTest do
   @generator "cmd mix run --no-start scripts/generate_sbom.exs "
   @options "--exclude-system-dependencies --classification library --schema 1.6 --format json --output "
 
-  test "supply-chain CI reaches only the SBOM generator that skips Hex application startup" do
+  test "the CI package build reaches only the SBOM generator that skips Hex application startup" do
     workflow =
       @root
-      |> Path.join(".github/workflows/supply-chain.yml")
+      |> Path.join(".github/workflows/ci.yml")
       |> File.read!()
       |> YamlElixir.read_from_string!()
 
-    steps = workflow["jobs"]["package"]["steps"]
+    steps = workflow["jobs"]["quality"]["steps"]
     quality = Enum.find(steps, &(&1["name"] == "Run complete quality gate"))
     assert quality["run"] == "mix quality"
     refute Enum.any?(steps, &String.contains?(&1["run"] || "", "sbom.cyclonedx"))

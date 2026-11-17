@@ -290,14 +290,14 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
     end
   end
 
-  test "the supply-chain workflow derives the artifact name: no hardcoded version strings" do
-    workflow = File.read!(".github/workflows/supply-chain.yml")
+  test "the CI package build derives the artifact name: no hardcoded version strings" do
+    for path <- [".github/workflows/ci.yml", ".github/workflows/supply-chain.yml"] do
+      refute File.read!(path) =~ ~r/bounded_authority_protocol-\d+\.\d+\.\d+\.tar/,
+             "#{path} contains a hardcoded versioned artifact filename: the quiet-mislabel class"
+    end
 
-    assert workflow =~ "@version",
-           "supply-chain.yml must derive the artifact name from mix.exs @version"
-
-    refute workflow =~ ~r/bounded_authority_protocol-\d+\.\d+\.\d+\.tar/,
-           "supply-chain.yml contains a hardcoded versioned artifact filename: the quiet-mislabel class"
+    assert File.read!(".github/workflows/ci.yml") =~ "@version",
+           "ci.yml must derive the artifact name from mix.exs @version"
   end
 
   test "the derived view's footer names the spec revision" do

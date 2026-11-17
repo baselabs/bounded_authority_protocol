@@ -11,9 +11,11 @@ operational authority or replace a deployment's authorization checks.
 
 ## Candidate verification
 
-The [supply-chain workflow](../.github/workflows/supply-chain.yml) builds an unpublished Hex
-archive, its SHA-256 checksum, release and tooling CycloneDX documents, and separate build
-provenance and SBOM attestations. To compare a candidate with those artifacts:
+[CI](../.github/workflows/ci.yml) builds an unpublished Hex archive in its complete quality job,
+with its SHA-256 checksum and release and tooling CycloneDX documents. For `main` and version
+tags, the [supply-chain workflow](../.github/workflows/supply-chain.yml) that CI calls signs
+separate build-provenance and SBOM attestations for that archive. To compare a candidate with
+those artifacts:
 
 ```bash
 sha256sum --check SHA256SUMS

@@ -6,6 +6,11 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Run every check in one CI workflow run. SDK conformance, the SDK publish guard, dependency
+  review and attestation are reusable workflows called from `ci.yml`, without path filters, so
+  the run that qualifies a landing covers all of them. The complete quality job builds the
+  package archive that the supply-chain workflow attests, and attestations still name
+  `supply-chain.yml` as their signer. Every job runs on a GitHub-hosted runner.
 - Parse SDK dependency paths in manifests and lockfiles, widen the early source traversal lint,
   and require each reviewed exception to match exactly one occurrence. Isolated package runs
   remain the binding self-containment gate.

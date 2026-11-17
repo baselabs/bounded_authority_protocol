@@ -68,8 +68,10 @@ SHA-256 pinned.
 
 ## Supply chain
 
-One runtime dependency (`cryptography`, Apache-2.0 or BSD-3-Clause). Pin the exact versions you
-deploy and verify install-time integrity (for example with `pip install --require-hashes`). The
+One direct runtime dependency (`cryptography`, Apache-2.0 or BSD-3-Clause). It brings `cffi`
+(MIT-0) and `pycparser` (BSD-3-Clause) on CPython, and `typing-extensions` (PSF-2.0) before
+Python 3.11. Pin the exact versions you deploy and verify install-time integrity (for example
+with `pip install --require-hashes`). The
 conformance runners and tests are development tooling and are not installed with the package.
 
 ## Verification is not authority

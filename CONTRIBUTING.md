@@ -48,7 +48,7 @@ Cross-language verifier SDKs under `sdks/` are authored in this repository but *
 from it**. Each SDK graduates to its own per-SDK repository (`bounded_authority_protocol_<lang>`)
 on first publication, because a registry publication is irreversible and each SDK's release
 cadence and credentials belong to its own repository. A
-local pre-commit hook (`sh scripts/install-hooks.sh`) and a CI job on `main` reject SDK publish
+local pre-commit hook (`sh scripts/install-hooks.sh`) and a job in every CI run reject SDK publish
 infrastructure (registry-publish steps, `prepublishOnly`/`prepack` scripts, `publishConfig`)
 committed to this repository. Contributor hook installation works without any local policy;
 maintainer checks activate only where a maintainer has set one up. The deliberate-admin bypass is `git commit --no-verify`, documented

@@ -1,59 +1,20 @@
 name: SDK conformance
 
-# Cross-language verifier SDK gate (ADR 0014 D8). Runs on push/PR touching SDKs,
-# normative specifications, corpus inputs, or the gate itself, plus manual dispatch
-# and a daily schedule (catches upstream crypto-runtime drift). The SDK suites
-# run separately from the Elixir `mix quality` battery.
+# Cross-language verifier SDK gate (ADR 0014 D8). CI calls this workflow on every run, with no
+# path filter: pull requests, pushes to main and kci landing branches, version tags, manual
+# dispatch, and the daily schedule that catches upstream cryptographic-runtime drift. The SDK
+# suites run separately from the Elixir `mix quality` battery.
 
 on:
-  pull_request:
-    paths:
-      - "sdks/**"
-      - "test/fixtures/sdk_rendering/**"
-      - "priv/conformance/**"
-      - "conformance/**"
-      - "spec/**"
-      - "scripts/**"
-      - "mix.exs"
-      - ".github/actions/**"
-      - ".github/workflows/ci.yml"
-      - "scripts/audit_python_floors.py"
-      - ".github/dependabot.yml"
-      - ".gitignore"
-      - ".github/workflows/sdks.yml"
-  push:
-    branches:
-      - main
-      - "kci/**"
-    paths:
-      - "sdks/**"
-      - "test/fixtures/sdk_rendering/**"
-      - "priv/conformance/**"
-      - "conformance/**"
-      - "spec/**"
-      - "scripts/**"
-      - "mix.exs"
-      - ".github/actions/**"
-      - ".github/workflows/ci.yml"
-      - "scripts/audit_python_floors.py"
-      - ".github/dependabot.yml"
-      - ".gitignore"
-      - ".github/workflows/sdks.yml"
-  workflow_dispatch:
-  schedule:
-    - cron: "0 6 * * *"
+  workflow_call:
 
 permissions:
   contents: read
 
-concurrency:
-  group: sdks-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   sdks-conformance:
     name: Cross-language SDK conformance (Python)
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -124,13 +85,13 @@ jobs:
         working-directory: sdks/python
 
   # TypeScript runs in its graduated repository. The independent Node runner stays
-  # pinned to 22.23.1 in ci.yml and supply-chain.yml, matching .tool-versions and
+  # pinned to 22.23.1 in ci.yml's quality job, matching .tool-versions and
   # its strict-Ed25519 backend evidence; SDK jobs here have no Node dependency.
   # The Rust MSRV (1.88) is pinned by sdks/rust/rust-toolchain.toml; this job installs
   # that exact toolchain so the MSRV floor is the CI-tested floor.
   rust-conformance:
     name: Cross-language SDK conformance (Rust MSRV 1.88)
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -173,7 +134,7 @@ jobs:
         run: sh tools/license_check.sh
         working-directory: sdks/rust
 
-  # Go runs as its own job on the same SDK/spec/corpus trigger. The go.mod floor (1.25) is the
+  # Go runs as its own job in the same call. The go.mod floor (1.25) is the
   # CI-tested floor: this job installs exactly 1.25, mirroring the Rust MSRV
   # pattern. Zero runtime dependencies means no go.sum to lock; `go vet` +
   # `go test ./...` cover the library unit suite, the permissiveness
@@ -182,7 +143,7 @@ jobs:
   # against the vendored, startup-SHA-bound corpus snapshot.
   go-conformance:
     name: Cross-language SDK conformance (Go 1.25)
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -219,7 +180,7 @@ jobs:
   # The separate conformance job above still proves the declared Go 1.25 floor.
   go-advisories:
     name: Go module advisories
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -235,7 +196,7 @@ jobs:
 
   isolated-distribution:
     name: Isolated SDK and unpacked package (${{ matrix.sdk }})
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:

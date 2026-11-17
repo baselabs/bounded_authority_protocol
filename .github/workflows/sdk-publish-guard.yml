@@ -2,7 +2,7 @@ name: SDK publish guard
 
 # Non-bypassable backstop for ADR 0015 Decision 5: no SDK publishes from the
 # monorepo. The local hook (scripts/hooks/pre-commit) gives fast contributor
-# feedback; this CI job is the hard gate on main and on pull requests. Both use
+# feedback; this workflow, which CI calls on every run, is the hard gate. Both use
 # the SAME pattern source (scripts/check_sdk_publish_infra.sh), so the two
 # cannot drift apart. That script is the authority on which strings are blocked;
 # this file intentionally does NOT repeat them (an earlier draft listed them in
@@ -17,24 +17,15 @@ name: SDK publish guard
 # layer for committed infrastructure.
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-      - "kci/**"
-  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
-concurrency:
-  group: sdk-publish-guard-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   guard:
     name: No SDK publish infrastructure in monorepo
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

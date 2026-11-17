@@ -1,12 +1,23 @@
 name: CI
 
+# The one gate. A landing qualifies on this workflow's run for its kci/<sha> branch, so every
+# check that must hold before main moves is part of this run: the jobs below and the reusable
+# workflows they call. No other workflow starts itself on a push or a pull request, and no
+# check is path-filtered. This is a public repository: every job runs on a GitHub-hosted
+# runner.
 on:
   pull_request:
   push:
     branches:
       - main
       - "kci/**"
+    tags:
+      - "v*"
   workflow_dispatch:
+  schedule:
+    # Daily, with no change here: catches upstream drift in toolchains, cryptographic
+    # runtimes and advisory databases.
+    - cron: "0 6 * * *"
 
 env:
   BAP_REQUIRE_FULL_HISTORY: "1"
@@ -21,7 +32,7 @@ concurrency:
 jobs:
   secret-scan:
     name: Secret scan
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -42,7 +53,7 @@ jobs:
 
   workflow-syntax:
     name: Workflow syntax
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,7 +63,7 @@ jobs:
 
   compatibility:
     name: Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }}
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -87,7 +98,9 @@ jobs:
 
   quality:
     name: Complete quality and package boundary
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    outputs:
+      version: ${{ steps.archive.outputs.version }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -143,9 +156,38 @@ jobs:
       - name: Run complete quality gate
         run: mix quality
 
+      # The archive the supply-chain workflow attests is built here, after the complete gate
+      # (which also generates and checks the SBOMs) passed in this same job.
+      - name: Build exact unpublished archive
+        id: archive
+        # Derive the artifact name from mix.exs @version; a hardcoded filename is the
+        # quiet-mislabel class (the docs-currency test pins this derivation).
+        run: |
+          VERSION="$(grep -m1 '@version ' mix.exs | sed -E 's/.*@version "([^"]+)".*/\1/')"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          mix hex.build --output "artifacts/bounded_authority_protocol-$VERSION.tar"
+
+      - name: Record archive checksum
+        working-directory: artifacts
+        run: |
+          sha256sum "bounded_authority_protocol-$VERSION.tar" > SHA256SUMS
+
+      - name: Upload CI package evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bounded-authority-protocol-${{ github.sha }}
+          path: |
+            artifacts/bounded_authority_protocol-${{ env.VERSION }}.tar
+            artifacts/release.cdx.json
+            artifacts/tooling.cdx.json
+            artifacts/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
   spec-render:
     name: Spec renders under pinned kramdown-rfc
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -176,7 +218,7 @@ jobs:
 
   cddl-coherence:
     name: Informative CDDL stays coherent with the corpus
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -201,7 +243,7 @@ jobs:
 
   formal-analysis:
     name: Pinned ProVerif re-run + ledger checks
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -222,3 +264,33 @@ jobs:
 
       - name: Run the formal harness
         run: opam exec -- scripts/run_formal.sh
+
+  sdks:
+    name: SDK conformance
+    uses: ./.github/workflows/sdks.yml
+
+  sdk-publish-guard:
+    name: SDK publish guard
+    uses: ./.github/workflows/sdk-publish-guard.yml
+
+  dependency-review:
+    name: Dependency review
+    # A change review compares two revisions; a schedule or a manual dispatch has none.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    uses: ./.github/workflows/dependency-review.yml
+
+  attest:
+    name: Supply chain
+    needs: quality
+    # Trusted refs only, and only for a change or a manual dispatch: the daily drift run
+    # checks main without attesting it again.
+    if: >-
+      github.event_name != 'schedule' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/supply-chain.yml
+    with:
+      version: ${{ needs.quality.outputs.version }}

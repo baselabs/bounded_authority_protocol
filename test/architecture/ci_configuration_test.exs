@@ -1,68 +1,94 @@
 defmodule BoundedAuthorityProtocol.CiConfigurationTest do
   use ExUnit.Case, async: true
 
-  @runner "${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}"
+  # A public repository: every job runs on a GitHub-hosted runner, never a self-hosted one.
+  @runner "ubuntu-24.04"
+  @gate ".github/workflows/ci.yml"
+  # The Pages deployment publishes site/ after a change is on main; it checks nothing.
+  @not_gates [".github/workflows/pages.yml"]
 
-  test "every job uses the operator runner expression" do
-    for path <- Path.wildcard(".github/workflows/*.{yml,yaml}"),
-        {name, job} <- YamlElixir.read_from_file!(path)["jobs"] do
+  defp workflows, do: Path.wildcard(".github/workflows/*.{yml,yaml}")
+  defp read(path), do: YamlElixir.read_from_file!(path)
+  defp uses?(step, action), do: String.starts_with?(step["uses"] || "", action)
+
+  test "every job that runs steps uses a GitHub-hosted runner" do
+    for path <- workflows(),
+        {name, job} <- read(path)["jobs"],
+        not Map.has_key?(job, "uses") do
       assert job["runs-on"] == @runner, "#{path} job #{name} must use #{@runner}"
     end
   end
 
-  # Every workflow is a gate on both landing paths (a kci branch, then main) except the Pages
-  # deployment, which publishes site/ after a change is on main and checks nothing.
-  @not_gates [".github/workflows/pages.yml"]
+  # A landing qualifies on one run of ci.yml, so every check is part of that run: a gate that
+  # starts itself on a push or pull request would run beside the landing without gating it.
+  test "every check is part of the one CI run that gates a landing" do
+    ci = read(@gate)
+    assert ci["name"] == "CI"
+    branches = get_in(ci, ["on", "push", "branches"])
+    assert "main" in branches and "kci/**" in branches
+    assert Map.has_key?(ci["on"], "pull_request")
 
-  test "every gate workflow runs on main and kci pushes" do
-    gates = Path.wildcard(".github/workflows/*.{yml,yaml}") -- @not_gates
-    assert length(gates) >= 5
+    for {_event, filters} <- ci["on"], is_map(filters) do
+      refute Map.has_key?(filters, "paths") or Map.has_key?(filters, "paths-ignore"),
+             "the gate is never path-filtered"
+    end
 
-    for path <- gates do
-      branches = get_in(YamlElixir.read_from_file!(path), ["on", "push", "branches"]) || []
-      assert "main" in branches and "kci/**" in branches, "#{path} must run on main and kci/**"
+    called = for {_name, %{"uses" => "./" <> path}} <- ci["jobs"], into: MapSet.new(), do: path
+    callees = MapSet.new(workflows() -- [@gate | @not_gates])
+    assert MapSet.size(callees) >= 4
+    assert called == callees, "ci.yml must call exactly #{inspect(MapSet.to_list(callees))}"
+
+    for path <- callees do
+      assert Map.keys(read(path)["on"]) == ["workflow_call"], "#{path} runs only when called"
+      refute Map.has_key?(read(path), "concurrency"), "#{path} leaves concurrency to ci.yml"
     end
   end
 
   test "history gates require complete checkout and landing builds cannot attest" do
-    for name <- ["ci", "supply-chain"] do
-      workflow = YamlElixir.read_from_file!(".github/workflows/#{name}.yml")
-      assert workflow["env"]["BAP_REQUIRE_FULL_HISTORY"] == "1"
+    ci = read(@gate)
+    assert ci["env"]["BAP_REQUIRE_FULL_HISTORY"] == "1"
+    assert ci["permissions"] == %{"contents" => "read"}
 
-      for {_name, job} <- workflow["jobs"],
-          Enum.any?(job["steps"], &String.contains?(&1["run"] || "", ["mix quality", "mix test"])) do
-        checkout =
-          Enum.find(job["steps"], &String.starts_with?(&1["uses"] || "", "actions/checkout@"))
+    for {_name, job} <- ci["jobs"],
+        steps = job["steps"] || [],
+        Enum.any?(steps, &String.contains?(&1["run"] || "", ["mix quality", "mix test"])) do
+      checkout = Enum.find(steps, &uses?(&1, "actions/checkout@"))
 
-        assert checkout["with"]["fetch-depth"] == 0
-      end
+      assert checkout["with"]["fetch-depth"] == 0
     end
 
-    supply = YamlElixir.read_from_file!(".github/workflows/supply-chain.yml")
-    assert supply["permissions"] == %{"contents" => "read"}
-    refute Map.has_key?(supply["jobs"]["package"], "permissions")
+    refute Map.has_key?(ci["jobs"]["quality"], "permissions")
 
-    refute Enum.any?(
-             supply["jobs"]["package"]["steps"],
-             &String.starts_with?(&1["uses"] || "", "actions/attest@")
-           )
+    refute Enum.any?(ci["jobs"]["quality"]["steps"], &uses?(&1, "actions/attest@"))
 
-    assert supply["jobs"]["attest"]["if"] ==
-             "github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')"
+    attest = ci["jobs"]["attest"]
+    assert attest["uses"] == "./.github/workflows/supply-chain.yml"
 
-    assert supply["jobs"]["attest"]["permissions"]["id-token"] == "write"
+    assert attest["if"] ==
+             "github.event_name != 'schedule' && " <>
+               "(github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))"
+
+    assert attest["permissions"]["id-token"] == "write"
+    assert read(".github/workflows/supply-chain.yml")["permissions"] == %{"contents" => "read"}
   end
 
   test "the attested package passed the complete quality gate in the job that built it" do
-    supply = YamlElixir.read_from_file!(".github/workflows/supply-chain.yml")
-    assert supply["jobs"]["attest"]["needs"] == "package"
+    ci = read(@gate)
+    assert ci["jobs"]["attest"]["needs"] == "quality"
+    assert ci["jobs"]["attest"]["with"]["version"] == "${{ needs.quality.outputs.version }}"
 
-    steps = supply["jobs"]["package"]["steps"]
+    steps = ci["jobs"]["quality"]["steps"]
     quality = Enum.find_index(steps, &(&1["run"] == "mix quality"))
     archive = Enum.find_index(steps, &String.contains?(&1["run"] || "", "mix hex.build"))
 
     assert quality != nil and archive != nil and quality < archive
     refute Map.has_key?(Enum.at(steps, quality), "if"), "mix quality must run on every event"
+
+    [attest] = Map.values(read(".github/workflows/supply-chain.yml")["jobs"])
+    assert [%{"with" => %{"name" => name}}] =
+             Enum.filter(attest["steps"], &uses?(&1, "actions/download-artifact@"))
+
+    assert Enum.find(steps, &uses?(&1, "actions/upload-artifact@"))["with"]["name"] == name
   end
 
   test "each committed dependency lock has an update policy and every policy has a manifest" do

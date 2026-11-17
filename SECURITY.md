@@ -50,10 +50,11 @@ published, deployment-decided contract-major overlap. A verdict never changes si
 
 ## Supply-chain verification
 
-The supply-chain workflow runs on every push to `main` that changes `mix.exs`, `mix.lock`, or a
-package manifest (a version bump always does), weekly, and on manual dispatch from `main`. Each run
-produces the package archive, a SHA-256 checksum, release and tooling CycloneDX SBOM documents, and
-separate build-provenance and SBOM attestations. A downloaded archive can be verified with:
+Every CI run builds the package archive in its complete quality job, after the full quality gate
+has passed in that job, with a SHA-256 checksum and release and tooling CycloneDX SBOM documents.
+For pushes to `main` and version tags, and a manual dispatch from `main`, CI then calls the
+supply-chain workflow, which signs separate build-provenance and SBOM attestations for that same
+archive. A downloaded archive can be verified with:
 
 ```bash
 sha256sum --check SHA256SUMS

@@ -1,11 +1,10 @@
 name: Dependency review
 
+# Called by CI for pull requests and pushes. A pull request uses the action's own base and head;
+# a push to main compares with the commit it replaced; any other push (a kci landing branch, a
+# version tag) compares with the default branch.
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-      - "kci/**"
+  workflow_call:
 
 permissions:
   contents: read
@@ -13,7 +12,7 @@ permissions:
 jobs:
   dependency-review:
     name: Vulnerability and license review
-    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -21,10 +20,8 @@ jobs:
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          # Pull requests use the action's own base and head. A push to main compares with the
-          # commit it replaced; a kci landing branch compares with the default branch.
-          base-ref: ${{ github.ref == 'refs/heads/main' && github.event.before || github.event.repository.default_branch }}
-          head-ref: ${{ github.sha }}
+          base-ref: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' && github.event.before || github.event.repository.default_branch) || '' }}
+          head-ref: ${{ github.event_name == 'push' && github.sha || '' }}
           fail-on-severity: low
           fail-on-scopes: runtime, development, unknown
           allow-licenses: >-
@@ -34,4 +31,12 @@ jobs:
             CC0-1.0,
             ISC,
             MIT,
-            MPL-2.0
+            MIT-0,
+            0BSD,
+            MPL-2.0,
+            PSF-2.0,
+            Python-2.0,
+            Python-2.0.1
+          # typing-extensions declares PSF-2.0 (its PyPI license expression); GitHub's detection
+          # also reads the GPL row in the license file's Python release-history table.
+          allow-dependencies-licenses: pkg:pypi/typing-extensions
