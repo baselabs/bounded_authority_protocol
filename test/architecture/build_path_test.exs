@@ -92,35 +92,34 @@ defmodule BoundedAuthorityProtocol.BuildPathTest do
   defp loads_build_path?(file, sources, seen) do
     file = Path.relative_to_cwd(Path.expand(file))
 
-    cond do
-      file == "tools/build_path.exs" ->
-        true
+    file == "tools/build_path.exs" or
+      (file not in seen and
+         Enum.any?(required_files(file, sources), &loads_build_path?(&1, sources, [file | seen])))
+  end
 
-      file in seen ->
-        false
+  defp required_files(file, sources) do
+    case source(file, sources) do
+      nil ->
+        []
 
-      true ->
-        case source(file, sources) do
-          nil ->
-            false
+      text ->
+        {_ast, required} =
+          Macro.prewalk(Code.string_to_quoted!(text), [], &collect_require(&1, &2, file))
 
-          text ->
-            {_ast, required} =
-              Macro.prewalk(Code.string_to_quoted!(text), [], fn
-                {{:., _, [{:__aliases__, _, [:Code]}, :require_file]}, _,
-                 [path, {:__DIR__, _, _}]} = node,
-                acc
-                when is_binary(path) ->
-                  {node, [Path.join(Path.dirname(file), path) | acc]}
-
-                node, acc ->
-                  {node, acc}
-              end)
-
-            Enum.any?(required, &loads_build_path?(&1, sources, [file | seen]))
-        end
+        required
     end
   end
+
+  defp collect_require(
+         {{:., _, [{:__aliases__, _, [:Code]}, :require_file]}, _, [path, {:__DIR__, _, _}]} =
+           node,
+         acc,
+         file
+       )
+       when is_binary(path),
+       do: {node, [Path.join(Path.dirname(file), path) | acc]}
+
+  defp collect_require(node, acc, _file), do: {node, acc}
 
   defp source(file, nil), do: if(File.regular?(file), do: File.read!(file))
   defp source(file, sources), do: Map.get(sources, file)
