@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from types import MappingProxyType
 
+from .error import Err, InvalidError, Ok, Result, err
+
 # The original 38-row table comes from spec/bap-v1.md. ``content_bytes`` is the ADR 0018
 # amendment defined by spec/bap-content-assertion-v1.md; existing profile meanings are unchanged.
 MAXIMA: Mapping[str, int] = {
@@ -83,26 +85,33 @@ class Bounds:
         """The read-only override map (a MappingProxyType — mutation raises TypeError)."""
         return self._overrides
 
-    def resolve(self, key: str) -> int:
-        """Resolve a bound: the override if present, else the maximum."""
-        return self._overrides.get(key, MAXIMA[key])
+    def resolve(self, key: str) -> Result[int]:
+        """Resolve a known bound after validating the caller-supplied limits."""
+        if type(key) is not str or key not in MAXIMA:
+            return err()
+        checked = coerce_bounds(self)
+        if isinstance(checked, Err):
+            return checked
+        return Ok(self._overrides.get(key, MAXIMA[key]))
 
 
 MAXIMUM_BOUNDS = Bounds()
 """The immutable maximum — ``Bounds.maximum()`` (REQ1-BOUNDS-tighten-only)."""
 
 
-def bounds_maximum() -> Bounds:
+def bounds_maximum() -> Result[Bounds]:
     """Return the profile maxima (REQ1-BOUNDS-tighten-only)."""
-    return MAXIMUM_BOUNDS
+    return Ok(MAXIMUM_BOUNDS)
 
 
-def bounds_resolve(b: Bounds, key: str) -> int:
+def bounds_resolve(b: Bounds, key: str) -> Result[int]:
     """Module-level resolve helper: the override if present, else the maximum."""
+    if type(b) is not Bounds:
+        return err()
     return b.resolve(key)
 
 
-def bounds_new(tightening: Mapping[str, int] | None = None) -> Bounds:
+def bounds_new(tightening: Mapping[str, int] | None = None) -> Result[Bounds]:
     """Construct a Bounds from a tightening map.
 
     REQ1-BOUNDS-reject-list (L397): unknown, non-integer, zero, negative, widening, or fixed-width-
@@ -112,53 +121,59 @@ def bounds_new(tightening: Mapping[str, int] | None = None) -> Bounds:
     # Local import to avoid a cycle: bounds is imported by error-adjacent primitives, and fail lives
     # in error. (fail does not import bounds, so there is no actual cycle, but the locality keeps the
     # dependency direction explicit.)
-    from .error import fail
+    try:
+        from .error import _fail
 
-    if tightening is None:
-        return MAXIMUM_BOUNDS
-    overrides: dict[str, int] = {}
-    for key, value in tightening.items():
-        if key not in MAXIMA:
-            fail("bounds.new: unknown limit")
-        if not isinstance(value, int) or isinstance(value, bool):
-            fail("bounds.new: non-integer limit")
-        if key in FIXED_WIDTH_KEYS:
-            # REQ1-BOUNDS-fixed-widths: fixed-width keys cannot be tightened or widened, but setting
-            # to the exact maximum is an identity no-op (valid). Any other value rejects.
-            if value != MAXIMA[key]:
-                fail("bounds.new: fixed-width limit must equal maximum")
-        else:
-            if value <= 0:
-                fail("bounds.new: non-positive limit")
-            if value > MAXIMA[key]:
-                fail("bounds.new: widening limit")
-        overrides[key] = value
-    return Bounds(overrides)
+        if tightening is None:
+            return Ok(MAXIMUM_BOUNDS)
+        overrides: dict[str, int] = {}
+        for key, value in tightening.items():
+            if key not in MAXIMA:
+                _fail("bounds.new: unknown limit")
+            if not isinstance(value, int) or isinstance(value, bool):
+                _fail("bounds.new: non-integer limit")
+            if key in FIXED_WIDTH_KEYS:
+                # REQ1-BOUNDS-fixed-widths: fixed-width keys cannot be tightened or widened, but setting
+                # to the exact maximum is an identity no-op (valid). Any other value rejects.
+                if value != MAXIMA[key]:
+                    _fail("bounds.new: fixed-width limit must equal maximum")
+            else:
+                if value <= 0:
+                    _fail("bounds.new: non-positive limit")
+                if value > MAXIMA[key]:
+                    _fail("bounds.new: widening limit")
+            overrides[key] = value
+        return Ok(Bounds(overrides))
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()
 
 
-def coerce_bounds(b: Bounds) -> Bounds:
+def coerce_bounds(b: Bounds) -> Result[Bounds]:
     """Re-validate a Bounds object (mirrors the reference's Bounds.coerce/1).
 
     ``Bounds`` is a class with a public ``overrides`` mapping, so a caller can hand-craft a
     ``Bounds`` that bypasses ``bounds_new`` — including a WIDENING override (compact_bytes > MAXIMA).
-    ``resolve`` trusts the override directly; without this gate the verify/decode paths would honor
-    the forged widening (cross-vendor F2). ``coerce_bounds`` re-runs the ``bounds_new`` validation over
+    Without this validation the verify/decode paths could honor
+    the forged widening. Resolution also uses this gate. ``coerce_bounds`` re-runs the ``bounds_new`` validation over
     the override map so every entry point that resolves caller-supplied bounds fails closed on a
     forgery.
     """
-    from .error import fail
+    try:
+        from .error import _fail
 
-    for key, value in b.overrides.items():
-        if key not in MAXIMA:
-            fail("bounds.coerce: unknown limit")
-        if not isinstance(value, int) or isinstance(value, bool):
-            fail("bounds.coerce: non-integer limit")
-        if key in FIXED_WIDTH_KEYS:
-            if value != MAXIMA[key]:
-                fail("bounds.coerce: fixed-width limit must equal maximum")
-        else:
-            if value <= 0:
-                fail("bounds.coerce: non-positive limit")
-            if value > MAXIMA[key]:
-                fail("bounds.coerce: widening limit")
-    return b
+        for key, value in b.overrides.items():
+            if key not in MAXIMA:
+                _fail("bounds.coerce: unknown limit")
+            if not isinstance(value, int) or isinstance(value, bool):
+                _fail("bounds.coerce: non-integer limit")
+            if key in FIXED_WIDTH_KEYS:
+                if value != MAXIMA[key]:
+                    _fail("bounds.coerce: fixed-width limit must equal maximum")
+            else:
+                if value <= 0:
+                    _fail("bounds.coerce: non-positive limit")
+                if value > MAXIMA[key]:
+                    _fail("bounds.coerce: widening limit")
+        return Ok(b)
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()

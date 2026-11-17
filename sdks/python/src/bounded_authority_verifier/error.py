@@ -1,10 +1,9 @@
 """The single closed error value + the Result shape.
 
-Mirrors the Elixir ``{:error, :invalid}`` (AGENTS rule 1: verification is not authority; rule 3:
-fail closed). Every public façade function returns ``Result[T] = Ok | Err``. A GENUINE protocol
-rejection raises/returns ``InvalidError``; a runner/SDK bug (``TypeError``, ``ValueError``, an
-uncaught library exception) is a distinct class that must NOT map to Invalid (the whitelist
-discipline — only a genuine protocol rejection maps to ``INVALID``; everything else is a bug).
+Every public function returns ``Result[T] = Ok | Err``. Internal helpers may raise
+``InvalidError`` to propagate a rejection to their enclosing Result boundary. Public primitives
+also close exceptions caused by malformed caller values (invalid host types, Unicode, numeric
+ranges, indexing, or recursive structures); they do not catch unrelated system failures.
 
 ``Result`` is a frozen dataclass: ``Ok(value) | Err(InvalidError)`` — never both. The ``Err``
 branch carries an ``InvalidError`` (closed, value-free) so callers can match on the type, but it
@@ -60,25 +59,32 @@ def err() -> Err:
     return Err(InvalidError())
 
 
-def fail(message: str = "invalid") -> NoReturn:
+def _unwrap(result: Result[T]) -> T:
+    """Propagate an internal rejection to the enclosing public Result boundary."""
+    if isinstance(result, Err):
+        raise result.error
+    return result.value
+
+
+def _fail(message: str = "invalid") -> NoReturn:
     """Raise the closed InvalidError. Every protocol rejection funnels through this."""
     raise InvalidError(message)
 
 
-def invalid_error(message: str = "invalid") -> InvalidError:
+def _invalid_error(message: str = "invalid") -> InvalidError:
     """Construct an InvalidError for use in ``raise`` expressions where NoReturn-awareness matters.
 
     Equivalent to ``fail`` semantically; provided so exhaustiveness fallthroughs can write
-    ``raise invalid_error(...)`` (both mypy and ruff recognize a trailing ``raise`` as a return
-    path, which they do not for a bare ``fail()`` call at function end).
+    ``raise _invalid_error(...)`` (both mypy and ruff recognize a trailing ``raise`` as a return
+    path, which they do not for a bare ``_fail()`` call at function end).
     """
     return InvalidError(message)
 
 
-def require(condition: object, message: str = "requirement failed") -> None:
+def _require(condition: object, message: str = "requirement failed") -> None:
     """The precondition helper (mirrors the TS ``assert``). Raise InvalidError when false.
 
     Named ``require`` rather than ``assert`` so it does not shadow the Python keyword.
     """
     if not condition:
-        fail(message)
+        _fail(message)

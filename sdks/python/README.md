@@ -114,6 +114,11 @@ def signed(signing_input: SigningInput, key: Ed25519PrivateKey) -> bytes:
     return result.value
 
 
+holder_jwk = jwk_from_public_key(holder_public)
+assert isinstance(holder_jwk, Ok)
+holder_thumbprint = thumbprint(holder_jwk.value)
+assert isinstance(holder_thumbprint, Ok)
+
 # The issuer grants one operation, restricted to one argument value.
 grant_input = grant_signing_input(
     GrantProducer(
@@ -124,7 +129,7 @@ grant_input = grant_signing_input(
         issued_at=1_800_000_000,
         not_before=1_800_000_000,
         expires_at=1_800_003_600,
-        holder_thumbprint=thumbprint(jwk_from_public_key(holder_public)),
+        holder_thumbprint=holder_thumbprint.value,
         operations=[
             OperationInput(
                 name="publish_article",
@@ -137,7 +142,9 @@ assert isinstance(grant_input, Ok)
 grant = signed(grant_input.value, issuer_key)
 
 # The holder binds one request to the grant.
-arguments = json_decode(b'{"section":"science","title":"Tides"}')
+arguments_result = json_decode(b'{"section":"science","title":"Tides"}')
+assert isinstance(arguments_result, Ok)
+arguments = arguments_result.value
 proof_input = proof_signing_input(
     ProofProducer(
         holder_public_key=holder_public,
@@ -176,7 +183,9 @@ facts = result.value
 print(facts.operation, facts.grant_id, facts.authorization)
 
 # The same proof against other arguments fails closed, with no detail.
-other = replace(expected, cast_arguments=json_decode(b'{"section":"sports","title":"Tides"}'))
+other_arguments = json_decode(b'{"section":"sports","title":"Tides"}')
+assert isinstance(other_arguments, Ok)
+other = replace(expected, cast_arguments=other_arguments.value)
 print(isinstance(check_envelope(grant, proof, other), Err))
 ```
 
@@ -209,14 +218,12 @@ root, because those profiles bind contract-major 1 or stand alone. Import `v3` e
 for every exported name, including the argument dataclasses and the tagged JSON types
 (`JObject`, `JString`, `JInt`, `JFloat`, and so on).
 
-**Results and errors.** The producers, decoders, verifiers, the loopback, attestation, and
-content-assertion functions, `request_digest`, `assemble_compact`, `uri_normalize`, and
-`jwk_decode_public` return `Result[T]`: `Ok(value)` or `Err`, and `Err` carries no reason. The
-lower-level primitives raise `InvalidError` instead: `json_decode`, `jcs_encode`,
-`base64url_decode`, `bounds_new`, `jwk_encode_public`, `jwk_from_public_key`,
-`thumbprint_preimage`, `thumbprint`, `thumbprint_raw`, and `public_key_thumbprint_raw` (the
-key functions raise for a key that fails `acceptable_public_key`). `verify_strict`,
-`acceptable_public_key`, and `torsion_free` return `bool`.
+**Results and errors.** Every public function returns `Result[T]`: `Ok(value)` or
+`Err(InvalidError())`. This includes JSON decoding, JCS, base64url encoding and decoding,
+bounds construction and resolution, JWK encoding, thumbprints, and cryptographic helpers.
+Caller-input rejections return `Err` without a reason or partial value; callers do not catch
+input exceptions. `verify_strict`, `acceptable_public_key`, and `torsion_free` return
+`Result[bool]`, with `Ok(False)` for a key or signature that fails their predicate.
 
 **Facts.** `GrantFacts`, `EnvelopeFacts`, `ChainFacts`, `AnchorFacts`, `KeyTransitionFacts`,
 `AnchoredExportFacts`, `AttestationFacts`, and `ContentAssertionFacts` are frozen dataclasses

@@ -16,7 +16,7 @@ from __future__ import annotations
 from .base64url import base64url_encode
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .ed25519 import sha256
-from .error import InvalidError, Ok, Result, err, fail, invalid_error
+from .error import InvalidError, Ok, Result, _fail, _invalid_error, _unwrap, err
 from .jcs import jcs_encode
 from .json_alg import JArray, JBool, JFloat, JInt, JNull, JObject, JString, Tagged, str_utf8
 
@@ -27,42 +27,51 @@ REQUEST_PREFIX_V2 = b"BAP2-REQUEST\x00"
 """The v2 (contract-major 2) domain separator — same shape, byte-distinct from the v1 prefix."""
 
 
-def typed_project(value: Tagged) -> Tagged:
+def typed_project(value: Tagged) -> Result[Tagged]:
     """``typed()`` projection: tagged value → ``["tag", value]`` JSON array (spec/bap-v1.md).
 
     - ``null`` → ``["null"]``; ``bool`` → ``["boolean", v]``; ``int`` → ``["integer", v]``;
       ``float`` → ``["float", v]``; ``string`` → ``["string", v]``;
     - ``array`` → ``["array", [typed(v)...]]``; ``object`` → ``["object", {k: typed(v)...}]``
     """
-    if isinstance(value, JNull):
-        return JArray((JString(str_utf8("null")),))
-    if isinstance(value, JBool):
-        return JArray((JString(str_utf8("boolean")), JBool(value.v)))
-    if isinstance(value, JInt):
-        return JArray((JString(str_utf8("integer")), JInt(value.v)))
-    if isinstance(value, JFloat):
-        return JArray((JString(str_utf8("float")), JFloat(value.v)))
-    if isinstance(value, JString):
-        return JArray((JString(str_utf8("string")), JString(value.v)))
-    if isinstance(value, JArray):
-        return JArray((JString(str_utf8("array")), JArray(tuple(typed_project(i) for i in value.v))))
-    if isinstance(value, JObject):
-        out = {k: typed_project(v) for k, v in value.v.items()}
-        return JArray((JString(str_utf8("object")), JObject(out)))
-    raise invalid_error("typed: unknown tag")  # unreachable — the algebra is closed
+    try:
+        if isinstance(value, JNull):
+            return Ok(JArray((JString(_unwrap(str_utf8("null"))),)))
+        if isinstance(value, JBool):
+            return Ok(JArray((JString(_unwrap(str_utf8("boolean"))), JBool(value.v))))
+        if isinstance(value, JInt):
+            return Ok(JArray((JString(_unwrap(str_utf8("integer"))), JInt(value.v))))
+        if isinstance(value, JFloat):
+            return Ok(JArray((JString(_unwrap(str_utf8("float"))), JFloat(value.v))))
+        if isinstance(value, JString):
+            return Ok(JArray((JString(_unwrap(str_utf8("string"))), JString(value.v))))
+        if isinstance(value, JArray):
+            return Ok(JArray((JString(_unwrap(str_utf8("array"))), JArray(tuple(_unwrap(typed_project(i)) for i in value.v)))))
+        if isinstance(value, JObject):
+            out = {k: _unwrap(typed_project(v)) for k, v in value.v.items()}
+            return Ok(JArray((JString(_unwrap(str_utf8("object"))), JObject(out))))
+        raise _invalid_error("typed: unknown tag")  # unreachable — the algebra is closed
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()
 
 
-def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> bytes:
+def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
     """``request_digest(operation, cast_arguments, bounds?)``. Returns the raw 32-byte digest.
 
     ``operation`` is validated printable ASCII 1..128.
     """
-    return _request_digest_with_prefix(REQUEST_PREFIX, operation, cast_arguments, bounds)
+    try:
+        return Ok(_request_digest_with_prefix(REQUEST_PREFIX, operation, cast_arguments, bounds))
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()
 
 
-def request_digest_v2(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> bytes:
+def request_digest_v2(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
     """The v2-profile request digest (BAP2-REQUEST\\0 separator, identical projection + bounds)."""
-    return _request_digest_with_prefix(REQUEST_PREFIX_V2, operation, cast_arguments, bounds)
+    try:
+        return Ok(_request_digest_with_prefix(REQUEST_PREFIX_V2, operation, cast_arguments, bounds))
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()
 
 
 def _request_digest_with_prefix(
@@ -74,57 +83,57 @@ def _request_digest_with_prefix(
     domain separator is fixed per profile major).
     """
     # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits).
-    b = coerce_bounds(bounds)
-    op_bytes = str_utf8(operation)
-    if not (1 <= len(op_bytes) <= bounds_resolve(b, "operation_bytes")):
-        fail("request_digest: operation bound")
+    b = _unwrap(coerce_bounds(bounds))
+    op_bytes = _unwrap(str_utf8(operation))
+    if not (1 <= len(op_bytes) <= _unwrap(bounds_resolve(b, "operation_bytes"))):
+        _fail("request_digest: operation bound")
     for byte in op_bytes:
         if byte < 0x20 or byte > 0x7E:
-            fail("request_digest: operation printable ASCII")
+            _fail("request_digest: operation printable ASCII")
     # The projection: [operation_string, typed(cast_arguments)].
-    projected = typed_project(cast_arguments)
+    projected = _unwrap(typed_project(cast_arguments))
     array: Tagged = JArray((JString(op_bytes), projected))
     # Per-node bounds on the TYPED projection (not the raw args): `typed` deepens/triples the tree, so
     # the depth boundary is ~15 (not 32) and total_nodes is reachable inline.
     if not _within_tagged_bounds(array, 0, b):
-        fail("request_digest: cast_arguments bounds")
-    if _count_tagged_nodes(array) > bounds_resolve(b, "total_nodes"):
-        fail("request_digest: total_nodes")
-    jcs = jcs_encode(array, b)
-    if len(jcs) > bounds_resolve(b, "jcs_bytes"):
-        fail("request_digest: jcs_bytes")
-    return sha256(prefix, jcs)
+        _fail("request_digest: cast_arguments bounds")
+    if _count_tagged_nodes(array) > _unwrap(bounds_resolve(b, "total_nodes")):
+        _fail("request_digest: total_nodes")
+    jcs = _unwrap(jcs_encode(array, b))
+    if len(jcs) > _unwrap(bounds_resolve(b, "jcs_bytes")):
+        _fail("request_digest: jcs_bytes")
+    return _unwrap(sha256(prefix, jcs))
 
 
 def _within_tagged_bounds(v: Tagged, level: int, bounds: Bounds) -> bool:
     """Per-node-type bounds gate over the tagged algebra (mirrors the official Jcs.encode per-node gate)."""
     if isinstance(v, (JNull, JBool)):
-        return level <= bounds_resolve(bounds, "depth")
+        return level <= _unwrap(bounds_resolve(bounds, "depth"))
     if isinstance(v, JInt):
-        return level <= bounds_resolve(bounds, "depth") and abs(v.v) <= bounds_resolve(
+        return level <= _unwrap(bounds_resolve(bounds, "depth")) and abs(v.v) <= _unwrap(bounds_resolve(
             bounds, "integer_magnitude"
-        )
+        ))
     if isinstance(v, JFloat):
         return (
-            level <= bounds_resolve(bounds, "depth")
+            level <= _unwrap(bounds_resolve(bounds, "depth"))
             and v.v == v.v  # not NaN
             and v.v not in (float("inf"), float("-inf"))
-            and abs(v.v) <= bounds_resolve(bounds, "float_magnitude")
+            and abs(v.v) <= _unwrap(bounds_resolve(bounds, "float_magnitude"))
         )
     if isinstance(v, JString):
-        return level <= bounds_resolve(bounds, "depth") and len(v.v) <= bounds_resolve(
+        return level <= _unwrap(bounds_resolve(bounds, "depth")) and len(v.v) <= _unwrap(bounds_resolve(
             bounds, "string_bytes"
-        )
+        ))
     if isinstance(v, JArray):
         return (
-            level < bounds_resolve(bounds, "depth")
-            and len(v.v) <= bounds_resolve(bounds, "array_items")
+            level < _unwrap(bounds_resolve(bounds, "depth"))
+            and len(v.v) <= _unwrap(bounds_resolve(bounds, "array_items"))
             and all(_within_tagged_bounds(item, level + 1, bounds) for item in v.v)
         )
     if isinstance(v, JObject):
         return (
-            level < bounds_resolve(bounds, "depth")
-            and len(v.v) <= bounds_resolve(bounds, "object_members")
+            level < _unwrap(bounds_resolve(bounds, "depth"))
+            and len(v.v) <= _unwrap(bounds_resolve(bounds, "object_members"))
             and all(_within_tagged_bounds(val, level + 1, bounds) for val in v.v.values())
         )
     return False  # type: ignore[unreachable] # unreachable — the algebra is closed
@@ -145,7 +154,7 @@ def request_digest_b64url(operation: str, cast_arguments: Tagged, bounds: Bounds
     Returns Ok<str> | Err (cross-vendor #21 + the bounds-ignored note: bounds threaded into the digest).
     """
     try:
-        raw = request_digest(operation, cast_arguments, bounds)
-        return Ok(base64url_encode(raw).decode("ascii"))
+        raw = _unwrap(request_digest(operation, cast_arguments, bounds))
+        return Ok(_unwrap(base64url_encode(raw)).decode("ascii"))
     except InvalidError:
         return err()

@@ -23,6 +23,8 @@ import sys
 from pathlib import Path
 from typing import Any, NoReturn
 
+from bounded_authority_verifier.error import _unwrap
+
 # Locate the package + corpus. The runner is invoked from sdks/python/, so the repo root is two
 # levels up; the package is importable from src/.
 _HERE = Path(__file__).resolve()
@@ -33,8 +35,8 @@ sys.path.insert(0, str(_SRC))
 from bounded_authority_verifier import v2  # noqa: E402
 from bounded_authority_verifier.base64url import base64url_decode, base64url_encode  # noqa: E402
 from bounded_authority_verifier.ed25519 import (  # noqa: E402
-    imported_fingerprints,
-    reset_census,
+    _imported_fingerprints,
+    _reset_census,
     sha256,
 )
 from bounded_authority_verifier.error import InvalidError  # noqa: E402
@@ -68,11 +70,11 @@ INVALID = object()  # sentinel: any genuine protocol rejection maps to this
 
 
 def _b64d(s: str) -> bytes:
-    return base64url_decode(str_utf8(s))
+    return _unwrap(base64url_decode(_unwrap(str_utf8(s))))
 
 
 def _b64e(b: bytes) -> str:
-    return utf8_str(base64url_encode(b))
+    return _unwrap(utf8_str(_unwrap(base64url_encode(b))))
 
 
 def abort(msg: str) -> NoReturn:
@@ -104,7 +106,7 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes
         if path == "revision.json":
             sidecar_raw = (CORPUS_DIR / path).read_bytes()
             sha = entry.get("sha256_base64url")
-            if not sha or _b64e(sha256(sidecar_raw)) != sha:
+            if not sha or _b64e(_unwrap(sha256(sidecar_raw))) != sha:
                 abort("revision.json: hash mismatch")
             sidecar = json.loads(sidecar_raw.decode("utf8"))
             if sorted(sidecar.keys()) != ["format", "generated_from", "revision"]:
@@ -135,7 +137,7 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes
         sha = entry.get("sha256_base64url")
         if not sha:
             abort(f"raw {path}: missing hash")
-        if _b64e(sha256(raws[path])) != sha:
+        if _b64e(_unwrap(sha256(raws[path]))) != sha:
             abort(f"raw {path}: hash mismatch")
     return index, cases, raws
 
@@ -161,7 +163,7 @@ def apply_tamper(base_input: dict[str, Any], tamper: dict[str, Any], raws: dict[
 
     if target in (None, "input.text"):
         if isinstance(inp.get("text"), str):
-            inp["text"] = utf8_str(flip(str_utf8(inp["text"])))
+            inp["text"] = _unwrap(utf8_str(flip(_unwrap(str_utf8(inp["text"])))))
             return inp
         if isinstance(inp.get("base64url"), str):
             inp["base64url"] = b64flip(inp["base64url"])
@@ -170,13 +172,13 @@ def apply_tamper(base_input: dict[str, Any], tamper: dict[str, Any], raws: dict[
         inp["base64url"] = b64flip(inp["base64url"])
         return inp
     if target == "compact" and isinstance(inp.get("compact"), str):
-        inp["compact"] = utf8_str(flip(str_utf8(inp["compact"])))
+        inp["compact"] = _unwrap(utf8_str(flip(_unwrap(str_utf8(inp["compact"])))))
         return inp
     if target == "grant" and isinstance(inp.get("grant"), str):
-        inp["grant"] = utf8_str(flip(str_utf8(inp["grant"])))
+        inp["grant"] = _unwrap(utf8_str(flip(_unwrap(str_utf8(inp["grant"])))))
         return inp
     if target == "proof" and isinstance(inp.get("proof"), str):
-        inp["proof"] = utf8_str(flip(str_utf8(inp["proof"])))
+        inp["proof"] = _unwrap(utf8_str(flip(_unwrap(str_utf8(inp["proof"])))))
         return inp
     m = re.match(r"^(rows|chunks)\[(\d+)\]$", str(target))
     if m:
@@ -212,7 +214,7 @@ def int_field(inp: dict[str, Any], key: str, ctx: str) -> int:
 
 def input_bytes(inp: dict[str, Any], raws: dict[str, bytes], ctx: str) -> bytes:
     if isinstance(inp.get("text"), str):
-        return str_utf8(inp["text"])
+        return _unwrap(str_utf8(inp["text"]))
     if isinstance(inp.get("base64url"), str):
         return _b64d(inp["base64url"])
     if isinstance(inp.get("raw_file"), str):
@@ -247,57 +249,57 @@ def _run_thunk(fn):
 def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
     if surface == "json.decode":
         b = input_bytes(inp, raws, "json.decode")
-        v = _run_thunk(lambda: json_decode(b))
+        v = _run_thunk(lambda: _unwrap(json_decode(b)))
         return INVALID if v is INVALID else {"value": _tagged_to_js(v)}
     if surface == "base64url.decode":
         if isinstance(inp.get("base64url"), str):
             segment = inp["base64url"]
         else:
-            segment = utf8_str(input_bytes(inp, {}, "base64url.decode"))
+            segment = _unwrap(utf8_str(input_bytes(inp, {}, "base64url.decode")))
         if len(segment) == 0:
             return INVALID
         decoded = _run_thunk(lambda: _b64d(segment))
-        return INVALID if decoded is INVALID else {"decoded": utf8_str(decoded)}
+        return INVALID if decoded is INVALID else {"decoded": _unwrap(utf8_str(decoded))}
     if surface == "jcs.encode":
         b = input_bytes(inp, raws, "jcs.encode")
-        encoded = _run_thunk(lambda: jcs_encode(json_decode(b)))
-        return INVALID if encoded is INVALID else {"encoded": utf8_str(encoded)}
+        encoded = _run_thunk(lambda: _unwrap(jcs_encode(_unwrap(json_decode(b)))))
+        return INVALID if encoded is INVALID else {"encoded": _unwrap(utf8_str(encoded))}
     if surface == "uri.normalize":
         b = input_bytes(inp, raws, "uri.normalize")
         r = _run_thunk(lambda: uri_normalize(b))
         if r is INVALID or not r.is_ok:
             return INVALID
-        return {"normalized": utf8_str(r.value)}
+        return {"normalized": _unwrap(utf8_str(r.value))}
     if surface == "jwk.encode_public":
         raw = input_public_key(inp, "jwk.encode_public")
-        encoded = _run_thunk(lambda: v2.jwk_encode_public(raw))
-        return INVALID if encoded is INVALID else {"encoded": utf8_str(encoded)}
+        encoded = _run_thunk(lambda: _unwrap(v2.jwk_encode_public(raw)))
+        return INVALID if encoded is INVALID else {"encoded": _unwrap(utf8_str(encoded))}
     if surface == "jwk.decode_public":
         b = input_bytes(inp, raws, "jwk.decode_public")
-        r = _run_thunk(lambda: _b64d(_exact_public_jwk(json_decode(b)).x))
+        r = _run_thunk(lambda: _b64d(_exact_public_jwk(_unwrap(json_decode(b))).x))
         return INVALID if r is INVALID else {"public_key": _b64e(r)}
     if surface == "jwk.thumbprint_preimage":
         b = input_bytes(inp, raws, "jwk.thumbprint_preimage")
-        r = _run_thunk(lambda: thumbprint_preimage(_exact_public_jwk(json_decode(b))))
-        return INVALID if r is INVALID else {"preimage": utf8_str(r)}
+        r = _run_thunk(lambda: _unwrap(thumbprint_preimage(_exact_public_jwk(_unwrap(json_decode(b))))))
+        return INVALID if r is INVALID else {"preimage": _unwrap(utf8_str(r))}
     if surface == "jwk.thumbprint":
         b = input_bytes(inp, raws, "jwk.thumbprint")
-        r = _run_thunk(lambda: _b64e(sha256(thumbprint_preimage(_exact_public_jwk(json_decode(b))))))
+        r = _run_thunk(lambda: _b64e(_unwrap(sha256(_unwrap(thumbprint_preimage(_exact_public_jwk(_unwrap(json_decode(b)))))))))
         return INVALID if r is INVALID else {"thumbprint": r}
     if surface == "jwk.thumbprint_raw":
         b = input_bytes(inp, raws, "jwk.thumbprint_raw")
-        r = _run_thunk(lambda: sha256(thumbprint_preimage(_exact_public_jwk(json_decode(b)))))
+        r = _run_thunk(lambda: _unwrap(sha256(_unwrap(thumbprint_preimage(_exact_public_jwk(_unwrap(json_decode(b))))))))
         return INVALID if r is INVALID else {"thumbprint_raw": r}
     if surface == "jwk.public_key_thumbprint_raw":
         raw = input_public_key(inp, "jwk.public_key_thumbprint_raw")
-        r = _run_thunk(lambda: sha256(thumbprint_preimage(jwk_from_public_key(raw))))
+        r = _run_thunk(lambda: _unwrap(sha256(_unwrap(thumbprint_preimage(_unwrap(jwk_from_public_key(raw)))))))
         return INVALID if r is INVALID else {"thumbprint_raw": r}
     if surface == "bounds.new":
         overrides = inp.get("overrides", {})
-        r = _run_thunk(lambda: v2.bounds_new(overrides))
+        r = _run_thunk(lambda: _unwrap(v2.bounds_new(overrides)))
         return INVALID if r is INVALID else {"bounds": overrides}
     if surface == "untrusted_key_locator":
-        compact = str_utf8(fetch_binary(inp, "compact", "untrusted_key_locator"))
+        compact = _unwrap(str_utf8(fetch_binary(inp, "compact", "untrusted_key_locator")))
         r = _run_thunk(lambda: v2.untrusted_key_locator(compact))
         if r is INVALID or not r.is_ok:
             return INVALID
@@ -307,18 +309,18 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         if r is INVALID or not r.is_ok:
             return INVALID
         return {
-            "protected_segment": utf8_str(r.value.protected_segment),
-            "payload_segment": utf8_str(r.value.payload_segment),
-            "message": f"{utf8_str(r.value.protected_segment)}.{utf8_str(r.value.payload_segment)}",
+            "protected_segment": _unwrap(utf8_str(r.value.protected_segment)),
+            "payload_segment": _unwrap(utf8_str(r.value.payload_segment)),
+            "message": f"{_unwrap(utf8_str(r.value.protected_segment))}.{_unwrap(utf8_str(r.value.payload_segment))}",
         }
     if surface == "proof_signing_input":
         r = _run_thunk(lambda: v2.proof_signing_input(_build_proof_producer(inp)))
         if r is INVALID or not r.is_ok:
             return INVALID
         return {
-            "protected_segment": utf8_str(r.value.protected_segment),
-            "payload_segment": utf8_str(r.value.payload_segment),
-            "message": f"{utf8_str(r.value.protected_segment)}.{utf8_str(r.value.payload_segment)}",
+            "protected_segment": _unwrap(utf8_str(r.value.protected_segment)),
+            "payload_segment": _unwrap(utf8_str(r.value.payload_segment)),
+            "message": f"{_unwrap(utf8_str(r.value.protected_segment))}.{_unwrap(utf8_str(r.value.payload_segment))}",
         }
     if surface == "boundary_anchor_signing_input":
         r = _run_thunk(lambda: v2.boundary_anchor_signing_input(v2.BoundaryAnchorProducer(
@@ -333,9 +335,9 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         if r is INVALID or not r.is_ok:
             return INVALID
         return {
-            "protected_segment": utf8_str(r.value.protected_segment),
-            "payload_segment": utf8_str(r.value.payload_segment),
-            "message": f"{utf8_str(r.value.protected_segment)}.{utf8_str(r.value.payload_segment)}",
+            "protected_segment": _unwrap(utf8_str(r.value.protected_segment)),
+            "payload_segment": _unwrap(utf8_str(r.value.payload_segment)),
+            "message": f"{_unwrap(utf8_str(r.value.protected_segment))}.{_unwrap(utf8_str(r.value.payload_segment))}",
         }
     if surface == "key_transition_signing_input":
         r = _run_thunk(lambda: v2.key_transition_signing_input(v2.KeyTransitionProducer(
@@ -350,29 +352,29 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         if r is INVALID or not r.is_ok:
             return INVALID
         return {
-            "protected_segment": utf8_str(r.value.protected_segment),
-            "payload_segment": utf8_str(r.value.payload_segment),
-            "message": f"{utf8_str(r.value.protected_segment)}.{utf8_str(r.value.payload_segment)}",
+            "protected_segment": _unwrap(utf8_str(r.value.protected_segment)),
+            "payload_segment": _unwrap(utf8_str(r.value.payload_segment)),
+            "message": f"{_unwrap(utf8_str(r.value.protected_segment))}.{_unwrap(utf8_str(r.value.payload_segment))}",
         }
     if surface == "assemble_compact":
         kind = fetch_binary(inp, "kind", "assemble_compact")
         r = _run_thunk(lambda: v2.assemble_compact(
             v2.SigningInput(
                 kind=kind,
-                protected_segment=str_utf8(fetch_binary(inp, "protected_segment", "assemble_compact")),
-                payload_segment=str_utf8(fetch_binary(inp, "payload_segment", "assemble_compact")),
+                protected_segment=_unwrap(str_utf8(fetch_binary(inp, "protected_segment", "assemble_compact"))),
+                payload_segment=_unwrap(str_utf8(fetch_binary(inp, "payload_segment", "assemble_compact"))),
             ),
             b64_field(inp, "signature", "assemble_compact"),
         ))
-        return INVALID if (r is INVALID or not r.is_ok) else {"compact": utf8_str(r.value)}
+        return INVALID if (r is INVALID or not r.is_ok) else {"compact": _unwrap(utf8_str(r.value))}
     if surface == "decode_grant":
-        compact = str_utf8(fetch_binary(inp, "compact", "decode_grant"))
+        compact = _unwrap(str_utf8(fetch_binary(inp, "compact", "decode_grant")))
         r = _run_thunk(lambda: v2.decode_grant(compact))
         if r is INVALID or not r.is_ok:
             return INVALID
         return {"key_id": r.value.key_id}
     if surface == "decode_proof":
-        compact = str_utf8(fetch_binary(inp, "compact", "decode_proof"))
+        compact = _unwrap(str_utf8(fetch_binary(inp, "compact", "decode_proof")))
         r = _run_thunk(lambda: v2.decode_proof(compact))
         if r is INVALID or not r.is_ok:
             return INVALID
@@ -386,7 +388,7 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         )))
         if r is INVALID or not r.is_ok:
             return INVALID
-        return {"bytes": utf8_str(r.value.bytes_), "hash": _b64e(r.value.hash_)}
+        return {"bytes": _unwrap(utf8_str(r.value.bytes_)), "hash": _b64e(r.value.hash_)}
     if surface == "check_chain":
         rows = tuple(byte_list(inp, "rows", "check_chain"))
         expected = v2.ExpectedChain(
@@ -414,7 +416,7 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         return INVALID if (r is INVALID or not r.is_ok) else {"digest": _b64e(r.value)}
     if surface == "verify_grant":
         r = _run_thunk(lambda: v2.verify_grant(
-            str_utf8(fetch_binary(inp, "compact", "verify_grant")),
+            _unwrap(str_utf8(fetch_binary(inp, "compact", "verify_grant"))),
             v2.TrustedIssuer(
                 key_id=fetch_binary(inp, "key_id", "verify_grant"),
                 public_key=b64_field(inp, "public_key", "verify_grant"),
@@ -441,7 +443,7 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         key = _build_historical_key(inp.get("key") or {}, "verify_historical_anchor key")
         expected = _build_expected_anchor(inp.get("expected") or {}, "verify_historical_anchor expected")
         r = _run_thunk(lambda: v2.verify_historical_anchor(
-            str_utf8(fetch_binary(inp, "compact", "verify_historical_anchor")), key, expected))
+            _unwrap(str_utf8(fetch_binary(inp, "compact", "verify_historical_anchor"))), key, expected))
         if r is INVALID or not r.is_ok:
             return INVALID
         return {"anchor_id": r.value.anchor_id}
@@ -450,7 +452,7 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         nxt = _build_historical_key(inp.get("next_key") or {}, "verify_key_transition next")
         expected = _build_expected_transition(inp.get("expected") or {}, "verify_key_transition expected")
         r = _run_thunk(lambda: v2.verify_key_transition(
-            str_utf8(fetch_binary(inp, "compact", "verify_key_transition")), current, nxt, expected))
+            _unwrap(str_utf8(fetch_binary(inp, "compact", "verify_key_transition"))), current, nxt, expected))
         if r is INVALID or not r.is_ok:
             return INVALID
         return {"transition_id": r.value.transition_id}
@@ -460,8 +462,8 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         cast_args = _js_to_tagged(expected["cast_arguments"])
         nonce = _build_nonce(expected.get("nonce"))
         r = _run_thunk(lambda: v2.check_envelope(
-            str_utf8(fetch_binary(inp, "grant", "check_envelope")),
-            str_utf8(fetch_binary(inp, "proof", "check_envelope")),
+            _unwrap(str_utf8(fetch_binary(inp, "grant", "check_envelope"))),
+            _unwrap(str_utf8(fetch_binary(inp, "proof", "check_envelope"))),
             v2.ExpectedRequest(
                 trusted_issuer=v2.TrustedIssuer(
                     key_id=fetch_binary(ti, "key_id", "check_envelope"),
@@ -486,7 +488,7 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
     if surface == "encode_anchored_export":
         rows = tuple(byte_list(inp, "rows", "encode_anchored_export"))
         transitions_list = inp.get("transitions") or []
-        transitions = tuple(str_utf8(t) for t in transitions_list)
+        transitions = tuple(_unwrap(str_utf8(t)) for t in transitions_list)
         # The v2 encode cases carry no expected.digest/object_version (both are ENCODE OUTPUTS,
         # asserted in the verdict — the v1 corpus happened to carry them; the runner must not
         # require them on this surface).
@@ -495,8 +497,8 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         r = _run_thunk(lambda: v2.encode_anchored_export(
             v2.AnchoredExportInput(
                 rows=rows,
-                start_anchor=str_utf8(fetch_binary(inp, "start_anchor", "encode_anchored_export")),
-                end_anchor=str_utf8(fetch_binary(inp, "end_anchor", "encode_anchored_export")),
+                start_anchor=_unwrap(str_utf8(fetch_binary(inp, "start_anchor", "encode_anchored_export"))),
+                end_anchor=_unwrap(str_utf8(fetch_binary(inp, "end_anchor", "encode_anchored_export"))),
                 transitions=transitions,
                 chain_id=chain.chain_id, first_sequence=chain.first_sequence,
                 last_sequence=chain.last_sequence, row_count=chain.row_count,
@@ -548,7 +550,7 @@ def _build_proof_producer(inp: dict[str, Any]) -> v2.ProofProducer:
         issued_at=int_field(inp, "issued_at", "proof_signing_input"),
         invocation_id=fetch_binary(inp, "invocation_id", "proof_signing_input"),
         operation=fetch_binary(inp, "operation", "proof_signing_input"),
-        grant_compact=str_utf8(fetch_binary(inp, "grant_compact", "proof_signing_input")),
+        grant_compact=_unwrap(str_utf8(fetch_binary(inp, "grant_compact", "proof_signing_input"))),
         cast_arguments=cast_args,
         nonce=inp.get("nonce"),
     )
@@ -607,7 +609,7 @@ def _build_export_expected(inp: dict[str, Any], for_encode: bool = False) -> v2.
     if isinstance(bounds_raw, dict):
         # bounds_new returns Bounds directly and raises InvalidError on a bad override map
         # (the bounds.new surface wraps the same call with _run_thunk).
-        built = _run_thunk(lambda: v2.bounds_new(bounds_raw))
+        built = _run_thunk(lambda: _unwrap(v2.bounds_new(bounds_raw)))
         if built is INVALID:
             abort("export: expected bounds")
         bounds = built
@@ -647,7 +649,7 @@ def _tagged_to_js(v: Tagged) -> Any:
     if isinstance(v, (JInt, JFloat)):
         return v.v
     if isinstance(v, JString):
-        return utf8_str(v.v)
+        return _unwrap(utf8_str(v.v))
     if isinstance(v, JArray):
         return [_tagged_to_js(i) for i in v.v]
     if isinstance(v, JObject):
@@ -665,7 +667,7 @@ def _js_to_tagged(value: Any) -> Tagged:
     if isinstance(value, float):
         return JFloat(value)
     if isinstance(value, str):
-        return JString(str_utf8(value))
+        return JString(_unwrap(str_utf8(value)))
     if isinstance(value, list):
         return JArray(tuple(_js_to_tagged(i) for i in value))
     if isinstance(value, dict):
@@ -679,20 +681,20 @@ def _exact_public_jwk(value: Tagged):
     crv = value.v.get("crv")
     kty = value.v.get("kty")
     x = value.v.get("x")
-    if not isinstance(crv, JString) or utf8_str(crv.v) != "Ed25519":
+    if not isinstance(crv, JString) or _unwrap(utf8_str(crv.v)) != "Ed25519":
         abort("jwk: crv")
-    if not isinstance(kty, JString) or utf8_str(kty.v) != "OKP":
+    if not isinstance(kty, JString) or _unwrap(utf8_str(kty.v)) != "OKP":
         abort("jwk: kty")
     if not isinstance(x, JString):
         abort("jwk: x")
     if len(value.v) != 3:
         abort("jwk: closed members")
-    raw = _b64d(utf8_str(x.v))
+    raw = _b64d(_unwrap(utf8_str(x.v)))
     if len(raw) != 32:
         abort("jwk: x width")
     from bounded_authority_verifier.jwk import OkpPublic
 
-    return OkpPublic(crv="Ed25519", kty="OKP", x=utf8_str(x.v))
+    return OkpPublic(crv="Ed25519", kty="OKP", x=_unwrap(utf8_str(x.v)))
 
 
 # ---- verdict comparison ----
@@ -798,7 +800,7 @@ def _collect_case_keys(value: Any, target: set[str]) -> None:
             if raw is not None:
                 # The census must hash every key the corpus names, weak ones included, so it uses the
                 # raw hash-only path (finding 10a), never the checked thumbprint.
-                target.add(_b64e(thumbprint_digest_unchecked(raw)))
+                target.add(_b64e(_unwrap(thumbprint_digest_unchecked(raw))))
         _collect_case_keys(child, target)
 
 
@@ -833,7 +835,7 @@ def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
             "census: case inputs carry undeclared keys\n"
             f"  undeclared=[{','.join(undeclared)}]"
         )
-    verify_import = sorted(imported_fingerprints())
+    verify_import = sorted(_imported_fingerprints())
     expected_verify: set[str] = set()
     for c in cases:
         if c.get("class") == "valid" and c["surface"] in _VERIFICATION_SURFACES:
@@ -853,7 +855,7 @@ def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
 
 def run_all() -> dict[str, Any]:
     index, cases, raws = load_corpus()
-    reset_census()
+    _reset_census()
     passed = 0
     failed = 0
     failures: list[str] = []

@@ -16,7 +16,7 @@ the Elixir JCS.
 from __future__ import annotations
 
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
-from .error import fail
+from .error import InvalidError, Ok, Result, _fail, _unwrap, err
 from .json_alg import (
     JArray,
     JBool,
@@ -43,15 +43,18 @@ _SHORT_ESCAPES: dict[int, bytes] = {
 }
 
 
-def jcs_encode(value: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> bytes:
+def jcs_encode(value: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
     # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits past
     # MAXIMA, bypassing bounds_new). Mirrors the reference's Bounds.coerce.
-    b = coerce_bounds(bounds)
-    out = bytearray()
-    _emit(value, out, b, 0, 0)
-    if len(out) > bounds_resolve(b, "jcs_bytes"):
-        fail("jcs: jcs_bytes bound")
-    return bytes(out)
+    try:
+        b = _unwrap(coerce_bounds(bounds))
+        out = bytearray()
+        _emit(value, out, b, 0, 0)
+        if len(out) > _unwrap(bounds_resolve(b, "jcs_bytes")):
+            _fail("jcs: jcs_bytes bound")
+        return Ok(bytes(out))
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()
 
 
 def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int) -> int:  # noqa: RET503
@@ -67,31 +70,31 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int)
         the container, then each child.
       total_nodes: incremented at every node, checked <= bounds.total_nodes.
     """
-    depth = bounds_resolve(bounds, "depth")
+    depth = _unwrap(bounds_resolve(bounds, "depth"))
     if isinstance(value, JNull):
         if level > depth:
-            fail("jcs: depth bound")
+            _fail("jcs: depth bound")
         out += b"null"
         return _next_node(nodes, bounds)
     if isinstance(value, JBool):
         if level > depth:
-            fail("jcs: depth bound")
+            _fail("jcs: depth bound")
         out += b"true" if value.v else b"false"
         return _next_node(nodes, bounds)
     if isinstance(value, JInt):
         # Cross-vendor F3: the reference guard is `when is_integer(value)` (jcs.ex:38); a non-integer
         # int-tag value (1.5) or a bool (isinstance(True, int) is True in Python) must fail closed, not
         # canonicalize to "1.5"/"True". Python bool is an int subclass — exclude it explicitly.
-        mag = bounds_resolve(bounds, "integer_magnitude")
+        mag = _unwrap(bounds_resolve(bounds, "integer_magnitude"))
         if isinstance(value.v, bool) or not isinstance(value.v, int) or level > depth or abs(value.v) > mag:
-            fail("jcs: integer bound")
-        out += str_utf8(_format_int(value.v))
+            _fail("jcs: integer bound")
+        out += _unwrap(str_utf8(_format_int(value.v)))
         return _next_node(nodes, bounds)
     if isinstance(value, JFloat):
-        mag = bounds_resolve(bounds, "float_magnitude")
+        mag = _unwrap(bounds_resolve(bounds, "float_magnitude"))
         if level > depth or abs(value.v) > mag:
-            fail("jcs: float bound")
-        out += str_utf8(_format_float(value.v))
+            _fail("jcs: float bound")
+        out += _unwrap(str_utf8(_format_float(value.v)))
         return _next_node(nodes, bounds)
     if isinstance(value, JString):
         # The decoder already validated UTF-8 + string_bytes; re-check here so a programmatically-
@@ -99,13 +102,13 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int)
         # Cross-vendor (JCS UTF-8): the reference guard `String.valid?(value)` (jcs.ex:58) rejects
         # invalid UTF-8. A programmatically-built JString with invalid bytes would otherwise reach
         # _escape_string -> utf8_str and raise UnicodeDecodeError past the closed-Result contract.
-        if level > depth or len(value.v) > bounds_resolve(bounds, "string_bytes") or not is_valid_utf8(value.v):
-            fail("jcs: string bound")
+        if level > depth or len(value.v) > _unwrap(bounds_resolve(bounds, "string_bytes")) or not _unwrap(is_valid_utf8(value.v)):
+            _fail("jcs: string bound")
         _escape_string(value.v, out)
         return _next_node(nodes, bounds)
     if isinstance(value, JArray):
-        if level >= depth or len(value.v) > bounds_resolve(bounds, "array_items"):
-            fail("jcs: array bound")
+        if level >= depth or len(value.v) > _unwrap(bounds_resolve(bounds, "array_items")):
+            _fail("jcs: array bound")
         nodes = _next_node(nodes, bounds)
         out.append(0x5B)  # [
         first = True
@@ -117,34 +120,34 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int)
         out.append(0x5D)  # ]
         return nodes
     if isinstance(value, JObject):
-        if level >= depth or len(value.v) > bounds_resolve(bounds, "object_members"):
-            fail("jcs: object bound")
-        key_bytes = bounds_resolve(bounds, "key_bytes")
+        if level >= depth or len(value.v) > _unwrap(bounds_resolve(bounds, "object_members")):
+            _fail("jcs: object bound")
+        key_bytes = _unwrap(bounds_resolve(bounds, "key_bytes"))
         nodes = _next_node(nodes, bounds)
         # RFC 8785 §3.2.3: object names sorted by unsigned UTF-16 code unit sequence.
         names = sorted(value.v.keys(), key=_utf16_key)
         for name in names:
-            name_b = str_utf8(name)
+            name_b = _unwrap(str_utf8(name))
             if len(name_b) > key_bytes:
-                fail("jcs: key_bytes bound")
+                _fail("jcs: key_bytes bound")
         out.append(0x7B)  # {
         first = True
         for name in names:
             if not first:
                 out.append(0x2C)  # ,
             first = False
-            _escape_string(str_utf8(name), out)
+            _escape_string(_unwrap(str_utf8(name)), out)
             out.append(0x3A)  # :
             nodes = _emit(value.v[name], out, bounds, level + 1, nodes)
         out.append(0x7D)  # }
         return nodes
-    fail("jcs: unknown tag")  # pragma: no cover — the algebra is closed
+    _fail("jcs: unknown tag")  # pragma: no cover — the algebra is closed
 
 
 def _next_node(nodes: int, bounds: Bounds) -> int:
     nxt = nodes + 1
-    if nxt > bounds_resolve(bounds, "total_nodes"):
-        fail("jcs: total_nodes bound")
+    if nxt > _unwrap(bounds_resolve(bounds, "total_nodes")):
+        _fail("jcs: total_nodes bound")
     return nxt
 
 
@@ -162,7 +165,7 @@ def _format_float(n: float) -> str:
     # Elixir/TS signer for ANY float-valued cast_argument — a cross-implementation divergence the
     # corpus cannot express (its digest cases use integer-only arguments).
     if n != n or n in (float("inf"), float("-inf")):  # NaN / inf
-        fail("jcs: non-finite float")
+        _fail("jcs: non-finite float")
     if n == 0.0:
         # Covers +0.0 and -0.0 (RFC 8785: -0 === 0, emits "0"; the sign is dropped).
         return "0"
@@ -228,7 +231,7 @@ def _fixed(digits: str, decimal_index: int) -> str:
 def _escape_string(src_bytes: bytes, out: bytearray) -> None:
     out.append(0x22)  # opening "
     # Decode UTF-8 to code points so \uXXXX escaping (for < 0x20) is correct.
-    s = utf8_str(src_bytes)
+    s = _unwrap(utf8_str(src_bytes))
     i = 0
     n = len(s)
     while i < n:

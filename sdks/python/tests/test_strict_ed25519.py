@@ -25,13 +25,13 @@ import ed25519_reference as ref
 from bounded_authority_verifier import jwk as sdk_jwk
 from bounded_authority_verifier.base64url import base64url_encode
 from bounded_authority_verifier.ed25519 import (
+    _import_public_key,
+    _strict_gate,
     acceptable_public_key,
-    import_public_key,
-    strict_gate,
     torsion_free,
     verify_strict,
 )
-from bounded_authority_verifier.error import InvalidError
+from bounded_authority_verifier.error import Err, InvalidError, _unwrap
 from bounded_authority_verifier.jwk import (
     OkpPublic,
     jwk_decode_public,
@@ -82,9 +82,9 @@ def test_reference_derives_eight_distinct_points_and_agrees_with_the_backend() -
 def test_key_width_is_exactly_32(key_len: int) -> None:
     _seed_, public, signature = _honest()
     bad = (public + bytes(64))[:key_len]
-    assert verify_strict(MESSAGE, signature, bad) is False
-    assert acceptable_public_key(bad) is False
-    assert torsion_free(bad) is False
+    assert _unwrap(verify_strict(MESSAGE, signature, bad)) is False
+    assert _unwrap(acceptable_public_key(bad)) is False
+    assert _unwrap(torsion_free(bad)) is False
 
 
 @pytest.mark.parametrize("key_len", [0, 31, 33])
@@ -93,25 +93,25 @@ def test_strict_gate_checks_widths_itself(key_len: int, sig_len: int) -> None:
     """The gate owns clause 1: a backend would also refuse a wrong width, so only a direct gate test
     shows the clause is present."""
     _seed_, public, signature = _honest()
-    assert strict_gate(signature, (public + bytes(64))[:key_len]) is False
-    assert strict_gate((signature + bytes(64))[:sig_len], public) is False
-    assert strict_gate(signature, public) is True
+    assert _strict_gate(signature, (public + bytes(64))[:key_len]) is False
+    assert _strict_gate((signature + bytes(64))[:sig_len], public) is False
+    assert _strict_gate(signature, public) is True
 
 
 @pytest.mark.parametrize("sig_len", [0, 32, 63, 65, 128])
 def test_signature_width_is_exactly_64(sig_len: int) -> None:
     _seed_, public, signature = _honest()
     bad = (signature + bytes(64))[:sig_len]
-    assert verify_strict(MESSAGE, bad, public) is False
+    assert _unwrap(verify_strict(MESSAGE, bad, public)) is False
 
 
 def test_honest_signature_is_accepted_and_tamper_is_rejected() -> None:
     for _ in range(8):
         _seed_, public, signature = _honest()
-        assert verify_strict(MESSAGE, signature, public) is True
-        assert verify_strict(MESSAGE + b"!", signature, public) is False
+        assert _unwrap(verify_strict(MESSAGE, signature, public)) is True
+        assert _unwrap(verify_strict(MESSAGE + b"!", signature, public)) is False
         flipped = bytes([signature[0] ^ 1]) + signature[1:]
-        assert verify_strict(MESSAGE, flipped, public) is False
+        assert _unwrap(verify_strict(MESSAGE, flipped, public)) is False
 
 
 def test_rfc8032_test_1_vector() -> None:
@@ -120,9 +120,9 @@ def test_rfc8032_test_1_vector() -> None:
         "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e06522490155"
         "5fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
     )
-    assert verify_strict(b"", signature, public) is True
-    assert acceptable_public_key(public) is True
-    assert torsion_free(public) is True
+    assert _unwrap(verify_strict(b"", signature, public)) is True
+    assert _unwrap(acceptable_public_key(public)) is True
+    assert _unwrap(torsion_free(public)) is True
 
 
 # --- clause: A is not small-order (each of the 8, derived by arithmetic) ---
@@ -132,19 +132,19 @@ def test_rfc8032_test_1_vector() -> None:
 def test_small_order_key_is_rejected_by_gate_and_acceptance(index: int) -> None:
     weak = SMALL_ORDER[index]
     _seed_, _public, signature = _honest()
-    assert strict_gate(signature, weak) is False
-    assert acceptable_public_key(weak) is False
-    assert torsion_free(weak) is False
-    assert verify_strict(MESSAGE, signature, weak) is False
+    assert _strict_gate(signature, weak) is False
+    assert _unwrap(acceptable_public_key(weak)) is False
+    assert _unwrap(torsion_free(weak)) is False
+    assert _unwrap(verify_strict(MESSAGE, signature, weak)) is False
 
 
 def test_identity_key_forgery_with_identity_r_and_zero_s_is_rejected() -> None:
     forged = ref.encode(ref.IDENTITY) + bytes(32)
     identity = ref.encode(ref.IDENTITY)
     assert ref.verifies(forged, identity, MESSAGE), "the forgery satisfies the bare equation"
-    assert verify_strict(MESSAGE, forged, identity) is False
+    assert _unwrap(verify_strict(MESSAGE, forged, identity)) is False
     for weak in SMALL_ORDER:
-        assert verify_strict(MESSAGE, forged, weak) is False
+        assert _unwrap(verify_strict(MESSAGE, forged, weak)) is False
 
 
 # --- clause: R is not small-order (the same table serves R) ---
@@ -153,7 +153,7 @@ def test_identity_key_forgery_with_identity_r_and_zero_s_is_rejected() -> None:
 @pytest.mark.parametrize("index", range(8))
 def test_small_order_r_is_rejected_by_the_gate(index: int) -> None:
     _seed_, public, signature = _honest()
-    assert strict_gate(SMALL_ORDER[index] + signature[32:], public) is False
+    assert _strict_gate(SMALL_ORDER[index] + signature[32:], public) is False
 
 
 def test_honest_a_with_identity_r_is_rejected_though_the_equation_holds() -> None:
@@ -162,7 +162,7 @@ def test_honest_a_with_identity_r_is_rejected_though_the_equation_holds() -> Non
     signature = ref.identity_r_signature(seed, MESSAGE)
     assert ref.verifies(signature, public, MESSAGE), "key-holder construction is sound"
     Ed25519PrivateKey.from_private_bytes(seed).public_key().verify(signature, MESSAGE)
-    assert verify_strict(MESSAGE, signature, public) is False
+    assert _unwrap(verify_strict(MESSAGE, signature, public)) is False
 
 
 @pytest.mark.parametrize("index", range(8))
@@ -180,10 +180,10 @@ def test_mixed_order_a_with_each_small_order_r_is_rejected(index: int) -> None:
         k = ref.challenge(r_enc, key_enc, message)
         signature = r_enc + ((k * a) % ref.L).to_bytes(32, "little")
         if ref.verifies(signature, key_enc, message):
-            assert verify_strict(message, signature, key_enc) is False
-            assert strict_gate(signature, key_enc) is False
+            assert _unwrap(verify_strict(message, signature, key_enc)) is False
+            assert _strict_gate(signature, key_enc) is False
             return
-    pytest.fail("no message found whose challenge cancels the torsion (construction bug)")
+    pytest._fail("no message found whose challenge cancels the torsion (construction bug)")
 
 
 # --- clause: canonical encodings of A and R ---
@@ -192,10 +192,10 @@ def test_mixed_order_a_with_each_small_order_r_is_rejected(index: int) -> None:
 def test_every_noncanonical_alias_is_rejected_as_a_key_and_as_r() -> None:
     _seed_, public, signature = _honest()
     for alias in ALIASES:
-        assert acceptable_public_key(alias) is False, alias.hex()
-        assert torsion_free(alias) is False, alias.hex()
-        assert strict_gate(signature, alias) is False, alias.hex()
-        assert strict_gate(alias + signature[32:], public) is False, alias.hex()
+        assert _unwrap(acceptable_public_key(alias)) is False, alias.hex()
+        assert _unwrap(torsion_free(alias)) is False, alias.hex()
+        assert _strict_gate(signature, alias) is False, alias.hex()
+        assert _strict_gate(alias + signature[32:], public) is False, alias.hex()
 
 
 def test_noncanonical_aliases_that_are_not_small_order_isolate_the_canonical_clause() -> None:
@@ -214,8 +214,8 @@ def test_noncanonical_aliases_that_are_not_small_order_isolate_the_canonical_cla
     assert len(isolating) >= 10
     _seed_, public, signature = _honest()
     for alias in isolating:
-        assert strict_gate(signature, alias) is False
-        assert strict_gate(alias + signature[32:], public) is False
+        assert _strict_gate(signature, alias) is False
+        assert _strict_gate(alias + signature[32:], public) is False
 
 
 def test_x_zero_with_sign_bit_is_noncanonical() -> None:
@@ -223,21 +223,21 @@ def test_x_zero_with_sign_bit_is_noncanonical() -> None:
     order2_signed = ((ref.P - 1) | (1 << 255)).to_bytes(32, "little")
     _seed_, public, signature = _honest()
     for enc in (identity_signed, order2_signed):
-        assert acceptable_public_key(enc) is False
-        assert strict_gate(signature, enc) is False
-        assert strict_gate(enc + signature[32:], public) is False
+        assert _unwrap(acceptable_public_key(enc)) is False
+        assert _strict_gate(signature, enc) is False
+        assert _strict_gate(enc + signature[32:], public) is False
 
 
 def test_y_equal_p_boundary_is_noncanonical_and_p_minus_one_is_not_the_boundary() -> None:
     _seed_, public, signature = _honest()
     y_eq_p = ref.P.to_bytes(32, "little")
-    assert strict_gate(signature, y_eq_p) is False
-    assert strict_gate(y_eq_p + signature[32:], public) is False
+    assert _strict_gate(signature, y_eq_p) is False
+    assert _strict_gate(y_eq_p + signature[32:], public) is False
     # y = p - 2 is canonical (and not small-order): the gate must not reject on canonicity.
     below = (ref.P - 2).to_bytes(32, "little")
     assert below not in set(SMALL_ORDER)
-    assert strict_gate(signature, below) is True
-    assert strict_gate(below + signature[32:], public) is True
+    assert _strict_gate(signature, below) is True
+    assert _strict_gate(below + signature[32:], public) is True
 
 
 # --- clause: S < L ---
@@ -249,17 +249,17 @@ def test_y_equal_p_boundary_is_noncanonical_and_p_minus_one_is_not_the_boundary(
 )
 def test_s_at_or_above_l_is_rejected_by_the_gate(s: int) -> None:
     _seed_, public, signature = _honest()
-    assert strict_gate(_with_s(signature, s), public) is False
-    assert verify_strict(MESSAGE, _with_s(signature, s), public) is False
+    assert _strict_gate(_with_s(signature, s), public) is False
+    assert _unwrap(verify_strict(MESSAGE, _with_s(signature, s), public)) is False
 
 
 def test_s_below_l_is_not_rejected_by_the_gate() -> None:
     _seed_, public, signature = _honest()
-    assert strict_gate(_with_s(signature, ref.L - 1), public) is True
-    assert strict_gate(_with_s(signature, 0), public) is True
+    assert _strict_gate(_with_s(signature, ref.L - 1), public) is True
+    assert _strict_gate(_with_s(signature, 0), public) is True
     s = int.from_bytes(signature[32:], "little")
     assert s < ref.L
-    assert strict_gate(signature, public) is True
+    assert _strict_gate(signature, public) is True
 
 
 def test_s_plus_l_malleability_is_rejected_though_the_scalar_is_congruent() -> None:
@@ -267,8 +267,8 @@ def test_s_plus_l_malleability_is_rejected_though_the_scalar_is_congruent() -> N
     s = int.from_bytes(signature[32:], "little")
     assert s + ref.L < (1 << 256)
     malleated = _with_s(signature, s + ref.L)
-    assert verify_strict(MESSAGE, signature, public) is True
-    assert verify_strict(MESSAGE, malleated, public) is False
+    assert _unwrap(verify_strict(MESSAGE, signature, public)) is True
+    assert _unwrap(verify_strict(MESSAGE, malleated, public)) is False
 
 
 # --- gate sanity: nothing outside the derived set is rejected as small-order ---
@@ -282,8 +282,8 @@ def test_gate_rejects_only_the_derived_small_order_set_among_torsion_variants() 
     for t in torsion[1:]:
         variant = ref.encode(ref.add(a_pt, t))
         assert variant not in set(SMALL_ORDER)
-        assert strict_gate(signature, variant) is True, "a mixed-order key is not small-order"
-        assert strict_gate(variant + signature[32:], ref.public_key(seed)) is True
+        assert _strict_gate(signature, variant) is True, "a mixed-order key is not small-order"
+        assert _strict_gate(variant + signature[32:], ref.public_key(seed)) is True
 
 
 # --- torsion variants: acceptable passes, torsion_free fails; verify accepts (R2 pin) ---
@@ -295,35 +295,35 @@ def test_torsion_variant_key_is_acceptable_but_not_torsion_free(index: int) -> N
     torsion = ref.torsion_subgroup()[index]
     key_enc, signature = ref.sign_under_torsion_variant(seed, torsion, MESSAGE)
     assert key_enc != ref.public_key(seed)
-    assert acceptable_public_key(key_enc) is True
-    assert torsion_free(key_enc) is False
-    assert verify_strict(MESSAGE, signature, key_enc) is True, "accepted at verify; host rejects it"
+    assert _unwrap(acceptable_public_key(key_enc)) is True
+    assert _unwrap(torsion_free(key_enc)) is False
+    assert _unwrap(verify_strict(MESSAGE, signature, key_enc)) is True, "accepted at verify; host rejects it"
     # No key substitution: the honest signature does not verify under the torsion variant.
     honest_signature = ref.sign_for_encoded_key(seed, ref.public_key(seed), MESSAGE)
-    assert verify_strict(MESSAGE, honest_signature, key_enc) is False
+    assert _unwrap(verify_strict(MESSAGE, honest_signature, key_enc)) is False
 
 
 def test_prime_order_key_is_acceptable_and_torsion_free() -> None:
     for _ in range(6):
         _seed_, public, _signature = _honest()
-        assert acceptable_public_key(public) is True
-        assert torsion_free(public) is True
+        assert _unwrap(acceptable_public_key(public)) is True
+        assert _unwrap(torsion_free(public)) is True
 
 
 def test_off_curve_key_is_not_acceptable_and_not_torsion_free() -> None:
     off = ref.off_curve_encoding()
     assert ref.decode(off) is None
-    assert acceptable_public_key(off) is False
-    assert torsion_free(off) is False
+    assert _unwrap(acceptable_public_key(off)) is False
+    assert _unwrap(torsion_free(off)) is False
     _seed_, _public, signature = _honest()
-    assert verify_strict(MESSAGE, signature, off) is False
+    assert _unwrap(verify_strict(MESSAGE, signature, off)) is False
 
 
 def test_never_raises_on_arbitrary_input() -> None:
     for junk in (b"", b"\x00", os.urandom(32), os.urandom(64)):
-        assert verify_strict(b"m", os.urandom(64), junk) in (True, False)
-        assert acceptable_public_key(junk) in (True, False)
-        assert torsion_free(junk) in (True, False)
+        assert _unwrap(verify_strict(b"m", os.urandom(64), junk)) in (True, False)
+        assert _unwrap(acceptable_public_key(junk)) in (True, False)
+        assert _unwrap(torsion_free(junk)) in (True, False)
 
 
 # --- differential property: verify_strict equals the pure reference rule (no table, no backend) ---
@@ -371,7 +371,7 @@ def test_verify_strict_matches_the_pure_reference_on_a_differential_set() -> Non
     accepted = 0
     for message, signature, key in cases:
         expected = _reference_verdict(message, signature, key)
-        assert verify_strict(message, signature, key) is expected, (key.hex(), signature.hex())
+        assert _unwrap(verify_strict(message, signature, key)) is expected, (key.hex(), signature.hex())
         accepted += expected
     assert 20 < accepted < len(cases), "the set exercises both verdicts"
 
@@ -380,7 +380,7 @@ def test_verify_strict_matches_the_pure_reference_on_a_differential_set() -> Non
 
 
 def _okp(raw: bytes) -> OkpPublic:
-    return OkpPublic(crv="Ed25519", kty="OKP", x=base64url_encode(raw).decode("ascii"))
+    return OkpPublic(crv="Ed25519", kty="OKP", x=_unwrap(base64url_encode(raw)).decode("ascii"))
 
 
 def _weak_keys() -> list[bytes]:
@@ -390,49 +390,42 @@ def _weak_keys() -> list[bytes]:
 def test_every_public_key_function_rejects_weak_keys_and_accepts_an_honest_key() -> None:
     _seed_, honest, _signature = _honest()
     # Positive controls: every function works on an honest key.
-    assert isinstance(jwk_encode_public(honest), bytes)
-    assert jwk_decode_public(jwk_encode_public(honest)).is_ok
-    assert len(public_key_thumbprint_raw(honest)) == 32
-    assert isinstance(thumbprint(_okp(honest)), str)
-    assert len(thumbprint_raw(_okp(honest))) == 32
-    assert thumbprint_preimage(_okp(honest)).startswith(b'{"crv":"Ed25519"')
-    assert jwk_from_public_key(honest).x
+    assert isinstance(_unwrap(jwk_encode_public(honest)), bytes)
+    assert jwk_decode_public(_unwrap(jwk_encode_public(honest))).is_ok
+    assert len(_unwrap(public_key_thumbprint_raw(honest))) == 32
+    assert isinstance(_unwrap(thumbprint(_okp(honest))), str)
+    assert len(_unwrap(thumbprint_raw(_okp(honest)))) == 32
+    assert _unwrap(thumbprint_preimage(_okp(honest))).startswith(b'{"crv":"Ed25519"')
+    assert _unwrap(jwk_from_public_key(honest)).x
 
     for weak in _weak_keys():
-        with pytest.raises(InvalidError):
-            jwk_encode_public(weak)
+        assert isinstance(jwk_encode_public(weak), Err)
         text = json.dumps(
-            {"crv": "Ed25519", "kty": "OKP", "x": base64url_encode(weak).decode()},
+            {"crv": "Ed25519", "kty": "OKP", "x": _unwrap(base64url_encode(weak)).decode()},
             separators=(",", ":"),
             sort_keys=True,
         ).encode()
         assert not jwk_decode_public(text).is_ok
+        assert isinstance(public_key_thumbprint_raw(weak), Err)
+        assert isinstance(jwk_from_public_key(weak), Err)
+        assert isinstance(thumbprint(_okp(weak)), Err)
+        assert isinstance(thumbprint_raw(_okp(weak)), Err)
+        assert isinstance(thumbprint_preimage(_okp(weak)), Err)
         with pytest.raises(InvalidError):
-            public_key_thumbprint_raw(weak)
-        with pytest.raises(InvalidError):
-            jwk_from_public_key(weak)
-        with pytest.raises(InvalidError):
-            thumbprint(_okp(weak))
-        with pytest.raises(InvalidError):
-            thumbprint_raw(_okp(weak))
-        with pytest.raises(InvalidError):
-            thumbprint_preimage(_okp(weak))
-        with pytest.raises(InvalidError):
-            import_public_key(weak, "fingerprint")
+            _import_public_key(weak, "fingerprint")
 
 
 def test_unchecked_thumbprint_is_a_pure_hash_available_for_weak_keys() -> None:
     _seed_, honest, _signature = _honest()
     for raw in (honest, *SMALL_ORDER, ALIASES[0]):
         preimage = json.dumps(
-            {"crv": "Ed25519", "kty": "OKP", "x": base64url_encode(raw).decode()},
+            {"crv": "Ed25519", "kty": "OKP", "x": _unwrap(base64url_encode(raw)).decode()},
             separators=(",", ":"),
             sort_keys=True,
         ).encode()
-        assert thumbprint_digest_unchecked(raw) == hashlib.sha256(preimage).digest()
-    assert thumbprint_digest_unchecked(honest) == public_key_thumbprint_raw(honest)
-    with pytest.raises(InvalidError):
-        thumbprint_digest_unchecked(honest[:31])
+        assert _unwrap(thumbprint_digest_unchecked(raw)) == hashlib.sha256(preimage).digest()
+    assert _unwrap(thumbprint_digest_unchecked(honest)) == _unwrap(public_key_thumbprint_raw(honest))
+    assert isinstance(thumbprint_digest_unchecked(honest[:31]), Err)
 
 
 def test_thumbprint_digest_unchecked_is_never_called_from_src() -> None:

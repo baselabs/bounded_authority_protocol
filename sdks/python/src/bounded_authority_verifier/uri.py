@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
-from .error import Ok, Result, err, fail
+from .error import InvalidError, Ok, Result, _fail, _unwrap, err
 from .json_alg import str_utf8, utf8_str
 
 _SCHEME_AUTHORITY_PATH = re.compile(rb"^([A-Za-z][A-Za-z0-9+.\-]*):\/\/([^/?#]*)([^?#]*)$")
@@ -27,8 +27,10 @@ _IPV4_OCTET = re.compile(rb"^(?:0|[1-9]\d{0,2})$")
 
 
 def uri_normalize(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
+    if type(data) is not bytes:
+        return err()
     try:
-        return Ok(str_utf8(_normalize(data, coerce_bounds(bounds))))
+        return Ok(_unwrap(str_utf8(_normalize(data, _unwrap(coerce_bounds(bounds))))))
     except Exception as e:
         if _is_invalid(e):
             return err()
@@ -38,8 +40,10 @@ def uri_normalize(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]
 def local_loopback_http_uri_normalize(
     data: bytes, bounds: Bounds = MAXIMUM_BOUNDS
 ) -> Result[bytes]:
+    if type(data) is not bytes:
+        return err()
     try:
-        return Ok(str_utf8(_normalize_local_loopback_http(data, coerce_bounds(bounds))))
+        return Ok(_unwrap(str_utf8(_normalize_local_loopback_http(data, _unwrap(coerce_bounds(bounds))))))
     except Exception as e:
         if _is_invalid(e):
             return err()
@@ -47,19 +51,19 @@ def local_loopback_http_uri_normalize(
 
 
 def _normalize_local_loopback_http(data: bytes, bounds: Bounds) -> str:
-    if len(data) > bounds_resolve(bounds, "uri_bytes"):
-        fail("uri: byte bound")
+    if len(data) > _unwrap(bounds_resolve(bounds, "uri_bytes")):
+        _fail("uri: byte bound")
     for byte in data:
         if byte < 0x21 or byte > 0x7E:
-            fail("uri: ASCII")
-    utf8_str(data)
+            _fail("uri: ASCII")
+    _unwrap(utf8_str(data))
     match = _SCHEME_AUTHORITY_PATH.match(data)
     if match is None or match.group(1).lower() != b"http":
-        fail("uri: scheme")
+        _fail("uri: scheme")
 
     authority_match = re.match(rb"^(127\.0\.0\.1|\[::1\])(?::([0-9]+))?$", match.group(2))
     if authority_match is None:
-        fail("uri: loopback authority")
+        _fail("uri: loopback authority")
 
     host = authority_match.group(1)
     port = b""
@@ -67,80 +71,80 @@ def _normalize_local_loopback_http(data: bytes, bounds: Bounds) -> str:
     if raw_port is not None:
         significant = raw_port.lstrip(b"0")
         if len(significant) == 0 or len(significant) > 5:
-            fail("uri: port")
+            _fail("uri: port")
         port_number = int(significant)
         if port_number < 1 or port_number > 65535:
-            fail("uri: port")
+            _fail("uri: port")
         if port_number != 80:
             port = f":{port_number}".encode("ascii")
 
     normalized = b"http://" + host + port + _normalize_path(match.group(3), enforce_pchar=True)
-    if len(normalized) > bounds_resolve(bounds, "uri_bytes"):
-        fail("uri: byte bound")
-    return utf8_str(normalized)
+    if len(normalized) > _unwrap(bounds_resolve(bounds, "uri_bytes")):
+        _fail("uri: byte bound")
+    return _unwrap(utf8_str(normalized))
 
 
 def _normalize(data: bytes, bounds: Bounds) -> str:
-    if len(data) > bounds_resolve(bounds, "uri_bytes"):
-        fail("uri: byte bound")
+    if len(data) > _unwrap(bounds_resolve(bounds, "uri_bytes")):
+        _fail("uri: byte bound")
     # ASCII-only + valid UTF-8 (REQ1-URI-reject-list: control/non-ASCII invalid). bytes in 0x21..0x7E.
     for b in data:
         if b < 0x21 or b > 0x7E:
-            fail("uri: ASCII")
-    utf8_str(data)
+            _fail("uri: ASCII")
+    _unwrap(utf8_str(data))
     m = _SCHEME_AUTHORITY_PATH.match(data)
     if m is None:
-        fail("uri: hierarchical shape")
-    scheme = utf8_str(m.group(1))
+        _fail("uri: hierarchical shape")
+    scheme = _unwrap(utf8_str(m.group(1)))
     if scheme.lower() != "https":
-        fail("uri: scheme")
+        _fail("uri: scheme")
 
     authority = m.group(2)
     if len(authority) == 0 or b"@" in authority:
-        fail("uri: authority")
+        _fail("uri: authority")
     host = b""
     port = b""
 
     if authority.startswith(b"["):
         close = authority.find(b"]")
         if close <= 1:
-            fail("uri: IPv6 host")
+            _fail("uri: IPv6 host")
         literal = authority[1:close]
         kind = _ipv6_kind(literal)
         if kind is None:
-            fail("uri: IP-literal syntax")
+            _fail("uri: IP-literal syntax")
         host = b"[" + (literal.lower() if kind == 6 else literal) + b"]"
         suffix = authority[close + 1 :]
         if suffix != b"" and not re.match(rb"^:\d+$", suffix):
-            fail("uri: IPv6 port")
+            _fail("uri: IPv6 port")
         port = suffix[1:]
     else:
         colon_count = authority.count(b":")
         if colon_count > 1:
-            fail("uri: host/port ambiguity")
+            _fail("uri: host/port ambiguity")
         sep = authority.rfind(b":")
         if sep >= 0:
             host = authority[:sep]
             port = authority[sep + 1 :]
             if len(port) == 0:
-                fail("uri: empty port")
+                _fail("uri: empty port")
         else:
             host = authority
         if len(host) == 0:
-            fail("uri: host")
+            _fail("uri: host")
         if re.match(rb"^[0-9.]+$", host):
             if not _is_canonical_ipv4(host):
-                fail("uri: IPv4 syntax")
+                _fail("uri: IPv4 syntax")
         else:
             _assert_reg_name(host)
             host = _lowercase_outside_escapes(_normalize_percent_encoding(host))
 
     if port != b"":
         if not re.match(rb"^\d+$", port):
-            fail("uri: port")
+            _fail("uri: port")
         port_number = int(port)
         if port_number < 1 or port_number > 65535:
-            fail("uri: port range")
+            _fail("uri: port range")
         port = b"" if port_number == 443 else f":{port_number}".encode("ascii")
 
     normalized_path = _normalize_path(m.group(3), enforce_pchar=True)
@@ -154,10 +158,10 @@ def _normalize_path(path: bytes, *, enforce_pchar: bool = False) -> bytes:
         for byte in path:
             ch = bytes([byte])
             if ch != b"%" and _PATH_CHAR.match(ch) is None:
-                fail("uri: path character")
+                _fail("uri: path character")
     normalized_path = _remove_dot_segments(_normalize_percent_encoding(path))
     if not normalized_path.startswith(b"/"):
-        fail("uri: absolute path")
+        _fail("uri: absolute path")
     return normalized_path
 
 
@@ -179,7 +183,7 @@ def _assert_reg_name(host: bytes) -> None:
         if ch == b"%" and i + 2 < n and _HEX2.match(host[i + 1 : i + 3]) is not None:
             i += 3
             continue
-        fail("uri: reg-name")
+        _fail("uri: reg-name")
 
 
 def _normalize_percent_encoding(value: bytes) -> bytes:
@@ -192,7 +196,7 @@ def _normalize_percent_encoding(value: bytes) -> bytes:
             i += 1
             continue
         if i + 2 >= n or _HEX2.match(value[i + 1 : i + 3]) is None:
-            fail("uri: escape")
+            _fail("uri: escape")
         octet = int(value[i + 1 : i + 3], 16)
         ch = bytes([octet])
         if _UNRESERVED.match(ch) is not None:
@@ -293,6 +297,5 @@ def _ipv6_side_length(side: bytes) -> int | None:
 
 
 def _is_invalid(e: BaseException) -> bool:
-    from .error import InvalidError
 
     return isinstance(e, InvalidError)

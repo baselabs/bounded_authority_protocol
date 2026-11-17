@@ -39,13 +39,13 @@ from .bounds import (  # noqa: F401
 from .compact import (  # noqa: F401
     CompactSegments,
     SigningInput,
+    _parse_compact,
+    _scan_compact,
     assemble_segments,
-    parse_compact,
-    scan_compact,
 )
 from .digest import request_digest_v2 as compute_request_digest
-from .ed25519 import ed25519_verify, import_public_key, sha256, signature_gate
-from .error import InvalidError, Ok, Result, err, fail, invalid_error, require
+from .ed25519 import _ed25519_verify, _import_public_key, _signature_gate, sha256
+from .error import InvalidError, Ok, Result, _fail, _invalid_error, _require, _unwrap, err
 from .facts import (
     AnchoredExportFacts,
     AnchorFacts,
@@ -78,7 +78,7 @@ from .jwk import (
     thumbprint_raw,
 )
 from .selector import Selector as _V1Selector
-from .selector import integral_float_free
+from .selector import _integral_float_free
 from .selector import parse_selector as _parse_v1_selector
 from .selector import selector_matches as _v1_selector_matches
 from .uri import local_loopback_http_uri_normalize, uri_normalize
@@ -149,47 +149,50 @@ class SelGte:
 V2Selector = _V1Selector | SelLte | SelGte
 
 
-def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> V2Selector:
+def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[V2Selector]:
     """Parse a v2 selector: the v1 kinds delegate; lte/gte validate the numeric bound at decode.
 
     A non-numeric bound (string/boolean/null/array/object) rejects HERE — the producer must not
     mint, and the verifier must not accept, a range selector whose bound cannot participate in
     the same-tag domain.
     """
-    if not isinstance(obj, JObject):
-        fail("selector: object")
-    kind_v = obj.v.get("kind")
-    if not isinstance(kind_v, JString):
-        fail("selector: kind")
-    kind = utf8_str(kind_v.v)
-    if kind not in ("lte", "gte"):
-        return _parse_v1_selector(obj, bounds)
-    # ADR 0028 §3: exactly the {kind, path, value} recognized member set.
-    if frozenset(obj.v) != frozenset({"kind", "path", "value"}):
-        fail("selector: member set")
-    path = _parse_selector_path(obj.v.get("path"), bounds)
-    bound = obj.v.get("value")
-    # isinstance narrows to the numeric tags (JInt | JFloat); every other tag rejects at decode.
-    if not isinstance(bound, (JInt, JFloat)):
-        fail(f"selector: {kind} numeric bound")
-    _validate_selector_value(bound, bounds)
-    return (SelLte if kind == "lte" else SelGte)(path, bound)
+    try:
+        if not isinstance(obj, JObject):
+            _fail("selector: object")
+        kind_v = obj.v.get("kind")
+        if not isinstance(kind_v, JString):
+            _fail("selector: kind")
+        kind = _unwrap(utf8_str(kind_v.v))
+        if kind not in ("lte", "gte"):
+            return Ok(_unwrap(_parse_v1_selector(obj, bounds)))
+        # ADR 0028 §3: exactly the {kind, path, value} recognized member set.
+        if frozenset(obj.v) != frozenset({"kind", "path", "value"}):
+            _fail("selector: member set")
+        path = _parse_selector_path(obj.v.get("path"), bounds)
+        bound = obj.v.get("value")
+        # isinstance narrows to the numeric tags (JInt | JFloat); every other tag rejects at decode.
+        if not isinstance(bound, (JInt, JFloat)):
+            _fail(f"selector: {kind} numeric bound")
+        _validate_selector_value(bound, bounds)
+        return Ok((SelLte if kind == "lte" else SelGte)(path, bound))
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()
 
 
 def _parse_selector_path(path_v: Tagged | None, bounds: Bounds) -> tuple[str, ...]:
     """The shared path discipline (REQ1-SELECTOR-path-shape): 1..32 object-member names, each
     1..128 UTF-8 bytes, traversing OBJECTS only."""
     if path_v is None or not isinstance(path_v, JArray):
-        fail("selector: path array")
-    if not (1 <= len(path_v.v) <= bounds_resolve(bounds, "path_segments")):
-        fail("selector: path length")
+        _fail("selector: path array")
+    if not (1 <= len(path_v.v) <= _unwrap(bounds_resolve(bounds, "path_segments"))):
+        _fail("selector: path length")
     names: list[str] = []
     for seg in path_v.v:
         if not isinstance(seg, JString):
-            fail("selector: path segment string")
-        if not (1 <= len(seg.v) <= bounds_resolve(bounds, "key_bytes")):
-            fail("selector: path segment bytes")
-        names.append(utf8_str(seg.v))
+            _fail("selector: path segment string")
+        if not (1 <= len(seg.v) <= _unwrap(bounds_resolve(bounds, "key_bytes"))):
+            _fail("selector: path segment bytes")
+        names.append(_unwrap(utf8_str(seg.v)))
     return tuple(names)
 
 
@@ -203,22 +206,25 @@ def _traverse_selector_path(root: Tagged, path: tuple[str, ...]) -> Tagged | Non
     return cur
 
 
-def selector_matches(sel: V2Selector, cast_arguments: Tagged) -> bool:
+def selector_matches(sel: V2Selector, cast_arguments: Tagged) -> Result[bool]:
     """v2 apply: lte/gte are inclusive same-tag numeric comparisons; the v1 kinds delegate."""
-    if isinstance(sel, (SelLte, SelGte)):
-        target = _traverse_selector_path(cast_arguments, sel.path)
-        if target is None:
-            return False  # missing path fails closed exactly as equals/one_of
-        bound = sel.bound
-        inclusive_low = isinstance(sel, SelLte)
-        # Same-tag arms ONLY (ADR 0028 §2): JInt pairs compare as integers, JFloat pairs as
-        # floats; every other pairing — cross-tag, or a non-numeric traversed operand — is False.
-        if isinstance(bound, JInt) and isinstance(target, JInt):
-            return target.v <= bound.v if inclusive_low else target.v >= bound.v
-        if isinstance(bound, JFloat) and isinstance(target, JFloat):
-            return target.v <= bound.v if inclusive_low else target.v >= bound.v
-        return False
-    return _v1_selector_matches(sel, cast_arguments)
+    try:
+        if isinstance(sel, (SelLte, SelGte)):
+            target = _traverse_selector_path(cast_arguments, sel.path)
+            if target is None:
+                return Ok(False)  # missing path fails closed exactly as equals/one_of
+            bound = sel.bound
+            inclusive_low = isinstance(sel, SelLte)
+            # Same-tag arms ONLY (ADR 0028 §2): JInt pairs compare as integers, JFloat pairs as
+            # floats; every other pairing — cross-tag, or a non-numeric traversed operand — is False.
+            if isinstance(bound, JInt) and isinstance(target, JInt):
+                return Ok(target.v <= bound.v if inclusive_low else target.v >= bound.v)
+            if isinstance(bound, JFloat) and isinstance(target, JFloat):
+                return Ok(target.v <= bound.v if inclusive_low else target.v >= bound.v)
+            return Ok(False)
+        return Ok(_unwrap(_v1_selector_matches(sel, cast_arguments)))
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()
 
 
 # --- dispatch struct types (match corpus input field names; the contract for each façade) ---
@@ -429,7 +435,7 @@ class EncodedAnchoredExport:
 
 
 def _parse_grant_header(seg: CompactSegments, bounds: Bounds) -> str:
-    h = json_decode(seg.protected_bytes, bounds)
+    h = _unwrap(json_decode(seg.protected_bytes, bounds))
     h = _require_object_exact(h, ["alg", "typ", "kid"], "grant header")
     _require_string_lit(h, "alg", ALG, "grant header alg")
     _require_string_lit(h, "typ", GRANT_TYP, "grant header typ")
@@ -447,61 +453,61 @@ def _parse_proof_header(
     seg: CompactSegments, bounds: Bounds, profile: ProofProfile = "standard"
 ) -> tuple[bytes, bytes]:
     """Returns (holderThumbprint raw32, holderKey raw32)."""
-    h = json_decode(seg.protected_bytes, bounds)
+    h = _unwrap(json_decode(seg.protected_bytes, bounds))
     h = _require_object_exact(h, ["alg", "typ", "jwk"], "proof header")
     _require_string_lit(h, "alg", ALG, "proof header alg")
     _require_string_lit(h, "typ", _proof_typ(profile), "proof header typ")
     jwk_v = h.v.get("jwk")
     if not isinstance(jwk_v, JObject):
-        fail("proof header: jwk object")
+        _fail("proof header: jwk object")
     # Closed OKP members {crv, kty, x}; reject any extra member (incl. private d).
     jwk_v = _require_object_exact(jwk_v, ["crv", "kty", "x"], "proof jwk")
     _require_string_lit(jwk_v, "crv", "Ed25519", "proof jwk crv")
     _require_string_lit(jwk_v, "kty", "OKP", "proof jwk kty")
     x_v = jwk_v.v.get("x")
     if not isinstance(x_v, JString):
-        fail("proof jwk: x string")
-    raw_key = base64url_decode(x_v.v)
+        _fail("proof jwk: x string")
+    raw_key = _unwrap(base64url_decode(x_v.v))
     if len(raw_key) != 32:
-        fail("proof jwk: x width")
-    tp = thumbprint_raw(jwk_from_public_key(raw_key))
+        _fail("proof jwk: x width")
+    tp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(raw_key))))
     return tp, raw_key
 
 
 def _parse_anchor_header(seg: CompactSegments, bounds: Bounds) -> str:
-    h = json_decode(seg.protected_bytes, bounds)
+    h = _unwrap(json_decode(seg.protected_bytes, bounds))
     h = _require_object_exact(h, ["alg", "typ", "kid"], "anchor header")
     _require_string_lit(h, "alg", ALG, "anchor header alg")
     _require_string_lit(h, "typ", ANCHOR_TYP, "anchor header typ")
     kid = _require_kid(h, bounds)
     # Canonical form: the protected segment must be the exact JCS encoding (boundary_anchor_codec.ex:95-96).
-    if not _bytes_equal(jcs_encode(h, bounds), seg.protected_bytes):
-        fail("anchor header: canonical")
+    if not _bytes_equal(_unwrap(jcs_encode(h, bounds)), seg.protected_bytes):
+        _fail("anchor header: canonical")
     return kid
 
 
 def _parse_transition_header(seg: CompactSegments, bounds: Bounds) -> str:
-    h = json_decode(seg.protected_bytes, bounds)
+    h = _unwrap(json_decode(seg.protected_bytes, bounds))
     h = _require_object_exact(h, ["alg", "typ", "kid"], "transition header")
     _require_string_lit(h, "alg", ALG, "transition header alg")
     _require_string_lit(h, "typ", TRANSITION_TYP, "transition header typ")
     kid = _require_kid(h, bounds)
     # Canonical form: the protected segment must be the exact JCS encoding (key_transition_codec.ex:127-128).
-    if not _bytes_equal(jcs_encode(h, bounds), seg.protected_bytes):
-        fail("transition header: canonical")
+    if not _bytes_equal(_unwrap(jcs_encode(h, bounds)), seg.protected_bytes):
+        _fail("transition header: canonical")
     return kid
 
 
 def _require_kid(h: JObject, bounds: Bounds) -> str:
     kid_v = h.v.get("kid")
     if not isinstance(kid_v, JString):
-        fail("header: kid string")
+        _fail("header: kid string")
     b = kid_v.v
-    if not (1 <= len(b) <= bounds_resolve(bounds, "kid_bytes")):
-        fail("header: kid bytes")
-    s = utf8_str(b)
+    if not (1 <= len(b) <= _unwrap(bounds_resolve(bounds, "kid_bytes"))):
+        _fail("header: kid bytes")
+    s = _unwrap(utf8_str(b))
     if _KID_CHARSET.match(s) is None:
-        fail("header: kid charset")
+        _fail("header: kid charset")
     return s
 
 
@@ -512,18 +518,18 @@ def _require_object_exact(v: Tagged, keys: list[str], ctx: str) -> JObject:
     no ``asserts x is T`` type-guard, so the narrowing flows through the return value).
     """
     if not isinstance(v, JObject):
-        fail(f"{ctx}: object")
+        _fail(f"{ctx}: object")
     got = ",".join(sorted(v.v.keys()))
     want = ",".join(sorted(keys))
     if got != want:
-        fail(f"{ctx}: closed members")
+        _fail(f"{ctx}: closed members")
     return v
 
 
 def _require_string_lit(obj: JObject, key: str, lit: str, ctx: str) -> None:
     v = obj.v.get(key)
-    if v is None or not isinstance(v, JString) or utf8_str(v.v) != lit:
-        fail(f"{ctx}: {key}={lit}")
+    if v is None or not isinstance(v, JString) or _unwrap(utf8_str(v.v)) != lit:
+        _fail(f"{ctx}: {key}={lit}")
 
 
 # StringOrURI (RFC 7519 §2; mirrors the official valid_uri? / StringOrURI). A bare string with no
@@ -587,61 +593,61 @@ def _is_well_formed(s: str) -> bool:
 # StringOrURI claim: non-empty, ≤ identifier_bytes, well-formed, valid StringOrURI.
 def _require_string_or_uri(v: Tagged | None, key: str, bounds: Bounds = MAXIMUM_BOUNDS) -> str:
     if v is None or not isinstance(v, JString):
-        fail(f"claim: {key} string")
-    s = utf8_str(v.v)
-    b = str_utf8(s)
-    if not (1 <= len(b) <= bounds_resolve(bounds, "identifier_bytes")):
-        fail(f"claim: {key} bytes")
+        _fail(f"claim: {key} string")
+    s = _unwrap(utf8_str(v.v))
+    b = _unwrap(str_utf8(s))
+    if not (1 <= len(b) <= _unwrap(bounds_resolve(bounds, "identifier_bytes"))):
+        _fail(f"claim: {key} bytes")
     if not _is_string_or_uri(s):
-        fail(f"claim: {key} string-or-uri")
+        _fail(f"claim: {key} string-or-uri")
     return s
 
 
 def _require_int(v: Tagged | None, key: str) -> int:
     if v is None or not isinstance(v, JInt):
-        fail(f"claim: {key} integer")
+        _fail(f"claim: {key} integer")
     return v.v
 
 
 def _require_uuid(v: Tagged | None, key: str) -> str:
     if v is None or not isinstance(v, JString):
-        fail(f"claim: {key} uuid string")
-    s = utf8_str(v.v)
+        _fail(f"claim: {key} uuid string")
+    s = _unwrap(utf8_str(v.v))
     if _UUID_RE.match(s) is None:
-        fail(f"claim: {key} uuid")
+        _fail(f"claim: {key} uuid")
     return s
 
 
 def _require_b64url_n(v: Tagged | None, key: str, n: int) -> bytes:
     if v is None or not isinstance(v, JString):
-        fail(f"claim: {key} b64url string")
-    raw = base64url_decode(v.v)
+        _fail(f"claim: {key} b64url string")
+    raw = _unwrap(base64url_decode(v.v))
     if len(raw) != n:
-        fail(f"claim: {key} width")
+        _fail(f"claim: {key} width")
     return raw
 
 
 def _require_operation(v: Tagged | None, key: str, bounds: Bounds = MAXIMUM_BOUNDS) -> str:
     if v is None or not isinstance(v, JString):
-        fail(f"claim: {key} operation string")
+        _fail(f"claim: {key} operation string")
     b = v.v
-    if not (1 <= len(b) <= bounds_resolve(bounds, "operation_bytes")):
-        fail(f"claim: {key} operation bytes")
-    s = utf8_str(b)
+    if not (1 <= len(b) <= _unwrap(bounds_resolve(bounds, "operation_bytes"))):
+        _fail(f"claim: {key} operation bytes")
+    s = _unwrap(utf8_str(b))
     if _OPERATION_PRINTABLE.match(s) is None:
-        fail(f"claim: {key} operation printable ASCII")
+        _fail(f"claim: {key} operation printable ASCII")
     return s
 
 
 def _require_method(v: Tagged | None, key: str, bounds: Bounds = MAXIMUM_BOUNDS) -> str:
     if v is None or not isinstance(v, JString):
-        fail(f"claim: {key} method string")
+        _fail(f"claim: {key} method string")
     b = v.v
-    if not (1 <= len(b) <= bounds_resolve(bounds, "method_bytes")):
-        fail(f"claim: {key} method bytes")
-    s = utf8_str(b)
+    if not (1 <= len(b) <= _unwrap(bounds_resolve(bounds, "method_bytes"))):
+        _fail(f"claim: {key} method bytes")
+    s = _unwrap(utf8_str(b))
     if _METHOD_TOKEN.match(s) is None:
-        fail(f"claim: {key} method token")
+        _fail(f"claim: {key} method token")
     return s
 
 
@@ -652,17 +658,17 @@ def _require_normalized_uri(
     profile: ProofProfile = "standard",
 ) -> str:
     if v is None or not isinstance(v, JString):
-        fail(f"claim: {key} uri string")
+        _fail(f"claim: {key} uri string")
     b = v.v
-    if not (1 <= len(b) <= bounds_resolve(bounds, "uri_bytes")):
-        fail(f"claim: {key} uri bytes")
-    s = utf8_str(b)
+    if not (1 <= len(b) <= _unwrap(bounds_resolve(bounds, "uri_bytes"))):
+        _fail(f"claim: {key} uri bytes")
+    s = _unwrap(utf8_str(b))
     normalizer = uri_normalize if profile == "standard" else local_loopback_http_uri_normalize
     norm = normalizer(b, bounds)
     if not isinstance(norm, Ok):
-        fail(f"claim: {key} uri normalized")
-    if utf8_str(norm.value) != s:
-        fail(f"claim: {key} uri pre-normalized")
+        _fail(f"claim: {key} uri normalized")
+    if _unwrap(utf8_str(norm.value)) != s:
+        _fail(f"claim: {key} uri pre-normalized")
     return s
 
 
@@ -670,69 +676,69 @@ def _validate_grant_payload(p: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
     pobj = _require_object_exact(p, ["v", "iss", "jti", "aud", "iat", "nbf", "exp", "cnf", "operations"], "grant payload")
     v_v = pobj.v["v"]
     if not isinstance(v_v, JInt) or v_v.v != VERSION:
-        fail("grant: v=2")
+        _fail("grant: v=2")
     ops_v = pobj.v["operations"]
     if not isinstance(ops_v, JArray):
-        fail("grant: operations array")
-    if not (1 <= len(ops_v.v) <= bounds_resolve(bounds, "operations")):
-        fail("grant: operations count")
+        _fail("grant: operations array")
+    if not (1 <= len(ops_v.v) <= _unwrap(bounds_resolve(bounds, "operations"))):
+        _fail("grant: operations count")
     names: set[str] = set()
     for op in ops_v.v:
         op_obj = _require_object_exact(op, ["name", "selectors"], "grant operation")
         name = _require_operation(op_obj.v.get("name"), "operation name", bounds)
         if name in names:
-            fail("grant: operation name unique")
+            _fail("grant: operation name unique")
         names.add(name)
         sels = op_obj.v["selectors"]
         if not isinstance(sels, JArray):
-            fail("grant: selectors array")
-        if not (1 <= len(sels.v) <= bounds_resolve(bounds, "selectors")):
-            fail("grant: selectors count")
+            _fail("grant: selectors array")
+        if not (1 <= len(sels.v) <= _unwrap(bounds_resolve(bounds, "selectors"))):
+            _fail("grant: selectors count")
         for s in sels.v:
-            parse_selector(s, bounds)
+            _unwrap(parse_selector(s, bounds))
 
 
 def _extract_audience(v: Tagged | None, bounds: Bounds = MAXIMUM_BOUNDS) -> list[str]:
     if v is None:
-        fail("claim: aud")
+        _fail("claim: aud")
     if isinstance(v, JString):
-        s = utf8_str(v.v)
-        b = str_utf8(s)
-        if not (1 <= len(b) <= bounds_resolve(bounds, "identifier_bytes")):
-            fail("claim: aud bytes")
+        s = _unwrap(utf8_str(v.v))
+        b = _unwrap(str_utf8(s))
+        if not (1 <= len(b) <= _unwrap(bounds_resolve(bounds, "identifier_bytes"))):
+            _fail("claim: aud bytes")
         if not _is_string_or_uri(s):
-            fail("claim: aud string-or-uri")
+            _fail("claim: aud string-or-uri")
         return [s]
     if isinstance(v, JArray):
-        if not (1 <= len(v.v) <= bounds_resolve(bounds, "audiences")):
-            fail("claim: aud count")
+        if not (1 <= len(v.v) <= _unwrap(bounds_resolve(bounds, "audiences"))):
+            _fail("claim: aud count")
         seen: set[str] = set()
         out: list[str] = []
         for a in v.v:
             if not isinstance(a, JString):
-                fail("claim: aud string")
-            s = utf8_str(a.v)
-            b = str_utf8(s)
-            if not (1 <= len(b) <= bounds_resolve(bounds, "identifier_bytes")):
-                fail("claim: aud member bytes")
+                _fail("claim: aud string")
+            s = _unwrap(utf8_str(a.v))
+            b = _unwrap(str_utf8(s))
+            if not (1 <= len(b) <= _unwrap(bounds_resolve(bounds, "identifier_bytes"))):
+                _fail("claim: aud member bytes")
             if not _is_string_or_uri(s):
-                fail("claim: aud member string-or-uri")
+                _fail("claim: aud member string-or-uri")
             if s in seen:
-                fail("claim: aud unique")
+                _fail("claim: aud unique")
             seen.add(s)
             out.append(s)
         return out
-    raise invalid_error("claim: aud shape")
+    raise _invalid_error("claim: aud shape")
 
 
 def _validate_proof_payload(
     p: Tagged, bounds: Bounds = MAXIMUM_BOUNDS, profile: ProofProfile = "standard"
 ) -> None:
     if not isinstance(p, JObject):
-        fail("proof payload: object")
+        _fail("proof payload: object")
     has_nonce = "nonce" in p.v
     if profile == "local_loopback_http" and not has_nonce:
-        fail("proof: nonce required")
+        _fail("proof: nonce required")
     keys = (
         ["v", "jti", "htm", "htu", "iat", "ba_inv", "ba_op", "ath", "ba_req", "nonce"]
         if has_nonce
@@ -741,7 +747,7 @@ def _validate_proof_payload(
     p = _require_object_exact(p, keys, "proof payload")
     v_v = p.v["v"]
     if not isinstance(v_v, JInt) or v_v.v != VERSION:
-        fail("proof: v=2")
+        _fail("proof: v=2")
     _require_string_or_uri(p.v.get("jti"), "jti", bounds)
     _require_method(p.v.get("htm"), "htm", bounds)
     _require_normalized_uri(p.v.get("htu"), "htu", bounds, profile)
@@ -753,11 +759,11 @@ def _validate_proof_payload(
     if has_nonce:
         n = p.v["nonce"]
         if not isinstance(n, JString):
-            fail("proof: nonce string")
-        ns = utf8_str(n.v)
-        nb = str_utf8(ns)
-        if not (1 <= len(nb) <= bounds_resolve(bounds, "nonce_bytes")):
-            fail("proof: nonce bytes")
+            _fail("proof: nonce string")
+        ns = _unwrap(utf8_str(n.v))
+        nb = _unwrap(str_utf8(ns))
+        if not (1 <= len(nb) <= _unwrap(bounds_resolve(bounds, "nonce_bytes"))):
+            _fail("proof: nonce bytes")
 
 
 def _validate_anchor_payload(p: Tagged, payload_bytes: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
@@ -768,7 +774,7 @@ def _validate_anchor_payload(p: Tagged, payload_bytes: bytes, bounds: Bounds = M
     )
     v_v = p.v["v"]
     if not isinstance(v_v, JInt) or v_v.v != VERSION:
-        fail("anchor: v=2")
+        _fail("anchor: v=2")
     _require_string_or_uri(p.v.get("anchor_id"), "anchor_id", bounds)
     _require_int(p.v.get("anchored_at"), "anchored_at")
     _require_string_or_uri(p.v.get("chain_id"), "chain_id", bounds)
@@ -781,10 +787,10 @@ def _validate_anchor_payload(p: Tagged, payload_bytes: bytes, bounds: Bounds = M
     if isinstance(seq_v, JInt) and seq_v.v == 0 and (
         not isinstance(hash_v, JString) or hash_v.v != b"A" * 43
     ):
-        fail("anchor payload: genesis")
+        _fail("anchor payload: genesis")
     # Canonical form: the payload segment must be the exact JCS encoding (boundary_anchor_codec.ex:118-119).
-    if not _bytes_equal(jcs_encode(p, bounds), payload_bytes):
-        fail("anchor payload: canonical")
+    if not _bytes_equal(_unwrap(jcs_encode(p, bounds)), payload_bytes):
+        _fail("anchor payload: canonical")
 
 
 def _validate_transition_payload(p: Tagged, payload_bytes: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
@@ -798,7 +804,7 @@ def _validate_transition_payload(p: Tagged, payload_bytes: bytes, bounds: Bounds
     )
     v_v = p.v["v"]
     if not isinstance(v_v, JInt) or v_v.v != VERSION:
-        fail("transition: v=2")
+        _fail("transition: v=2")
     _require_string_or_uri(p.v.get("transition_id"), "transition_id", bounds)
     _require_string_or_uri(p.v.get("chain_id"), "chain_id", bounds)
     _require_int(p.v.get("effective_at"), "effective_at")
@@ -806,15 +812,15 @@ def _validate_transition_payload(p: Tagged, payload_bytes: bytes, bounds: Bounds
     _require_b64url_n(p.v.get("to_key_fingerprint"), "to_key_fingerprint", 32)
     to_key_id = p.v["to_key_id"]
     if not isinstance(to_key_id, JString):
-        fail("transition: to_key_id string")
-    s = utf8_str(to_key_id.v)
-    if not (1 <= len(s) <= bounds_resolve(bounds, "kid_bytes")):
-        fail("transition: to_key_id bytes")
+        _fail("transition: to_key_id string")
+    s = _unwrap(utf8_str(to_key_id.v))
+    if not (1 <= len(s) <= _unwrap(bounds_resolve(bounds, "kid_bytes"))):
+        _fail("transition: to_key_id bytes")
     if _KID_CHARSET.match(s) is None:
-        fail("transition: to_key_id charset")
+        _fail("transition: to_key_id charset")
     # Canonical form: the payload segment must be the exact JCS encoding (key_transition_codec.ex:151-152).
-    if not _bytes_equal(jcs_encode(p, bounds), payload_bytes):
-        fail("transition payload: canonical")
+    if not _bytes_equal(_unwrap(jcs_encode(p, bounds)), payload_bytes):
+        _fail("transition payload: canonical")
 
 
 def _in_window(time: int, key: HistoricalPublicKey) -> bool:
@@ -1009,15 +1015,15 @@ def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLoc
     # bytes was wrongly rejected. Mirror the reference: split into exactly 3 segments, decode protected
     # only, validate the grant header + kid. (An invalid payload/signature does not affect the kid.)
     # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits).
-    b = coerce_bounds(bounds if bounds is not None else MAXIMUM_BOUNDS)
+    b = _unwrap(coerce_bounds(bounds if bounds is not None else MAXIMUM_BOUNDS))
     from .facts import KeyLocator
 
-    if len(compact) > bounds_resolve(b, "compact_bytes"):
-        fail("key_locator: compact bound")
+    if len(compact) > _unwrap(bounds_resolve(b, "compact_bytes")):
+        _fail("key_locator: compact bound")
     # Exactly 3 segments on '.' (a 2- or 4-segment input fails the closed shape).
     parts = compact.split(b".")
     if len(parts) != 3:
-        fail("key_locator: three segments")
+        _fail("key_locator: three segments")
     protected_text = parts[0]
     # Cross-vendor (key-locator empty segments): the reference (v1.ex:24) only requires exactly 3
     # segments and decodes the PROTECTED segment alone — payload and signature are bound to _ and
@@ -1025,24 +1031,24 @@ def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLoc
     # PROTECTED segment is invalid (it must base64url-decode to a header). Do NOT reject empty
     # payload/signature.
     if len(protected_text) == 0:
-        fail("key_locator: empty protected segment")
-    if len(protected_text) > bounds_resolve(b, "encoded_segment_bytes"):
-        fail("key_locator: protected bound")
-    protected_bytes = base64url_decode(protected_text, bounds_resolve(b, "decoded_segment_bytes"))
+        _fail("key_locator: empty protected segment")
+    if len(protected_text) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")):
+        _fail("key_locator: protected bound")
+    protected_bytes = _unwrap(base64url_decode(protected_text, _unwrap(bounds_resolve(b, "decoded_segment_bytes"))))
     # Cross-vendor re-review Finding 3: thread the caller-resolved bounds into the JSON decode
     # (reference v1.ex:27 Json.decode(header_bytes, bounds) — depth/total_nodes limits honor bounds).
-    h = json_decode(protected_bytes, b)
+    h = _unwrap(json_decode(protected_bytes, b))
     h = _require_object_exact(h, ["alg", "typ", "kid"], "grant header")
     _require_string_lit(h, "alg", ALG, "grant header alg")
     _require_string_lit(h, "typ", GRANT_TYP, "grant header typ")
     kid_v = h.v.get("kid")
     if not isinstance(kid_v, JString):
-        fail("header: kid string")
-    if not (1 <= len(kid_v.v) <= bounds_resolve(b, "kid_bytes")):
-        fail("header: kid bytes")
-    kid = utf8_str(kid_v.v)
+        _fail("header: kid string")
+    if not (1 <= len(kid_v.v) <= _unwrap(bounds_resolve(b, "kid_bytes"))):
+        _fail("header: kid bytes")
+    kid = _unwrap(utf8_str(kid_v.v))
     if _KID_CHARSET.match(kid) is None:
-        fail("header: kid charset")
+        _fail("header: kid charset")
     return KeyLocator(key_id=kid)
 
 
@@ -1054,12 +1060,12 @@ def decode_grant(compact: bytes, bounds: Bounds | None = None) -> Result[GrantDe
 
 def _decode_grant_body(compact: bytes, bounds: Bounds | None) -> GrantDecoded:
     b = bounds if bounds is not None else MAXIMUM_BOUNDS
-    seg = parse_compact(compact, b)
+    seg = _parse_compact(compact, b)
     kid = _parse_grant_header(seg, b)
-    p = json_decode(seg.payload_bytes, b)
+    p = _unwrap(json_decode(seg.payload_bytes, b))
     _validate_grant_payload(p, b)
     if not isinstance(p, JObject):
-        fail("decode_grant: payload object")
+        _fail("decode_grant: payload object")
     iss = _require_string_or_uri(p.v.get("iss"), "iss", b)
     jti = _require_string_or_uri(p.v.get("jti"), "jti", b)
     aud = _extract_audience(p.v.get("aud"), b)
@@ -1067,7 +1073,7 @@ def _decode_grant_body(compact: bytes, bounds: Bounds | None) -> GrantDecoded:
     nbf = _require_int(p.v.get("nbf"), "nbf")
     exp = _require_int(p.v.get("exp"), "exp")
     if not (iat < exp) or not (nbf < exp):
-        fail("grant: times coherent")
+        _fail("grant: times coherent")
     cnf = p.v["cnf"]
     cnf = _require_object_exact(cnf, ["jkt"], "grant cnf")
     jkt = _require_b64url_n(cnf.v.get("jkt"), "jkt", 32)
@@ -1089,12 +1095,12 @@ def _decode_proof_body(
     compact: bytes, bounds: Bounds | None, profile: ProofProfile
 ) -> ProofDecoded:
     b = bounds if bounds is not None else MAXIMUM_BOUNDS
-    seg = parse_compact(compact, b)
+    seg = _parse_compact(compact, b)
     holder_thumbprint, _ = _parse_proof_header(seg, b, profile)
-    p = json_decode(seg.payload_bytes, b)
+    p = _unwrap(json_decode(seg.payload_bytes, b))
     _validate_proof_payload(p, b, profile)
     if not isinstance(p, JObject):
-        fail("decode_proof: payload object")
+        _fail("decode_proof: payload object")
     jti = _require_string_or_uri(p.v.get("jti"), "jti", b)
     from .facts import ProofDecoded
 
@@ -1112,53 +1118,53 @@ def _verify_grant_body(compact: bytes, trusted: TrustedIssuer, expected: Expecte
     # returns {:error, :invalid} for any malformed context struct. A None OR a struct missing
     # public_key/key_id must fail closed — not raise AttributeError past the Result contract.
     if trusted is None:
-        fail("verify_grant: trusted issuer required")
+        _fail("verify_grant: trusted issuer required")
     if not isinstance(getattr(trusted, "public_key", None), bytes) or len(trusted.public_key) != 32:
-        fail("verify_grant: issuer key width")
+        _fail("verify_grant: issuer key width")
     if not isinstance(getattr(trusted, "key_id", None), str):
-        fail("verify_grant: issuer key id")
+        _fail("verify_grant: issuer key id")
     # Cross-vendor #19: the reference requires is_integer(evaluation_time) and is_integer(clock_skew)
     # (>= 0) — runtime.ex:522-523. Range-only `< 0` checks accept fractional times.
     if not _is_int(expected.evaluation_time):
-        fail("verify_grant: integer evaluation time")
+        _fail("verify_grant: integer evaluation time")
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (runtime.ex:186) and
     # threads it into validate_expected_grant (clock_skew <= bounds.clock_skew) + every bound-sensitive
     # check below. A caller tightening via expected.bounds now actually takes effect.
-    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
-    if not _is_int(expected.clock_skew) or expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(b, "clock_skew"):
-        fail("verify_grant: skew")
-    seg = parse_compact(compact, b)
+    b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
+    if not _is_int(expected.clock_skew) or expected.clock_skew < 0 or expected.clock_skew > _unwrap(bounds_resolve(b, "clock_skew")):
+        _fail("verify_grant: skew")
+    seg = _parse_compact(compact, b)
     kid = _parse_grant_header(seg, b)
     if kid != trusted.key_id:
-        fail("verify_grant: kid exact")
-    p = json_decode(seg.payload_bytes, b)
+        _fail("verify_grant: kid exact")
+    p = _unwrap(json_decode(seg.payload_bytes, b))
     _validate_grant_payload(p, b)
     if not isinstance(p, JObject):
-        fail("verify_grant: payload object")
+        _fail("verify_grant: payload object")
     iss = _require_string_or_uri(p.v.get("iss"), "iss", b)
     if iss != expected.issuer:
-        fail("verify_grant: issuer exact")
+        _fail("verify_grant: issuer exact")
     aud = _extract_audience(p.v.get("aud"), b)
     if expected.audience not in aud:
-        fail("verify_grant: audience match")
+        _fail("verify_grant: audience match")
     iat = _require_int(p.v.get("iat"), "iat")
     nbf = _require_int(p.v.get("nbf"), "nbf")
     exp = _require_int(p.v.get("exp"), "exp")
     if not (iat < exp) or not (nbf < exp):
-        fail("verify_grant: times coherent")
+        _fail("verify_grant: times coherent")
     if not (iat <= expected.evaluation_time + expected.clock_skew):
-        fail("verify_grant: iat window")
+        _fail("verify_grant: iat window")
     if not (nbf <= expected.evaluation_time + expected.clock_skew):
-        fail("verify_grant: nbf window")
+        _fail("verify_grant: nbf window")
     if not (exp > expected.evaluation_time - expected.clock_skew):
-        fail("verify_grant: exp window")
+        _fail("verify_grant: exp window")
     cnf = p.v["cnf"]
     cnf = _require_object_exact(cnf, ["jkt"], "grant cnf")
     jkt = _require_b64url_n(cnf.v.get("jkt"), "jkt", 32)
-    fp = thumbprint_raw(jwk_from_public_key(trusted.public_key))
-    key = import_public_key(trusted.public_key, utf8_str(base64url_encode(fp)))
-    if not ed25519_verify(seg.signing_input, seg.signature, key):
-        fail("verify_grant: signature")
+    fp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(trusted.public_key))))
+    key = _import_public_key(trusted.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(fp)))))
+    if not _ed25519_verify(seg.signing_input, seg.signature, key):
+        _fail("verify_grant: signature")
     from .facts import GrantFacts
 
     return GrantFacts(
@@ -1185,42 +1191,42 @@ def _check_envelope_body(
     # not raise AttributeError on the .public_key deref below. The reference returns {:error,:invalid}
     # for all malformed input.
     if t is None:
-        fail("check_envelope: trusted issuer required")
+        _fail("check_envelope: trusted issuer required")
     if not isinstance(getattr(t, "public_key", None), bytes) or len(t.public_key) != 32:
-        fail("check_envelope: issuer key width")
+        _fail("check_envelope: issuer key width")
     if not isinstance(getattr(t, "key_id", None), str):
-        fail("check_envelope: issuer key id")
+        _fail("check_envelope: issuer key id")
     # Cross-vendor #19: the reference requires is_integer(evaluation_time), is_integer(clock_skew)
     # (>= 0), and proof_max_age > 0 (strictly positive) — runtime.ex:522-523,550-551. Range-only
     # `< 0` checks accept fractional times and proof_max_age=0. The signed-time boundary is exact.
     if not _is_int(expected.evaluation_time):
-        fail("check_envelope: integer evaluation time")
+        _fail("check_envelope: integer evaluation time")
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (runtime.ex:204) and
     # threads it into validate_expected_request (clock_skew, proof_max_age) + parse_grant + parse_proof
     # + every bound-sensitive claim check below. A caller tightening via expected.bounds now takes
     # effect across both the grant and the proof.
-    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
-    if not _is_int(expected.clock_skew) or expected.clock_skew < 0 or expected.clock_skew > bounds_resolve(b, "clock_skew"):
-        fail("check_envelope: skew")
-    if not _is_int(expected.proof_max_age) or expected.proof_max_age <= 0 or expected.proof_max_age > bounds_resolve(b, "proof_max_age"):
-        fail("check_envelope: proof_max_age")
+    b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
+    if not _is_int(expected.clock_skew) or expected.clock_skew < 0 or expected.clock_skew > _unwrap(bounds_resolve(b, "clock_skew")):
+        _fail("check_envelope: skew")
+    if not _is_int(expected.proof_max_age) or expected.proof_max_age <= 0 or expected.proof_max_age > _unwrap(bounds_resolve(b, "proof_max_age")):
+        _fail("check_envelope: proof_max_age")
     if profile == "local_loopback_http" and not isinstance(expected.nonce, NonceRequired):
-        fail("check_envelope: nonce required")
+        _fail("check_envelope: nonce required")
     # --- verify grant (issuer signature + context) ---
-    gseg = parse_compact(grant_compact, b)
+    gseg = _parse_compact(grant_compact, b)
     gkid = _parse_grant_header(gseg, b)
     if gkid != t.key_id:
-        fail("check_envelope: grant kid")
-    gp = json_decode(gseg.payload_bytes, b)
+        _fail("check_envelope: grant kid")
+    gp = _unwrap(json_decode(gseg.payload_bytes, b))
     _validate_grant_payload(gp, b)
     if not isinstance(gp, JObject):
-        fail("check_envelope: grant payload")
+        _fail("check_envelope: grant payload")
     giss = _require_string_or_uri(gp.v.get("iss"), "iss", b)
     if giss != expected.issuer:
-        fail("check_envelope: issuer")
+        _fail("check_envelope: issuer")
     gaud = _extract_audience(gp.v.get("aud"), b)
     if expected.audience not in gaud:
-        fail("check_envelope: audience")
+        _fail("check_envelope: audience")
     giat = _require_int(gp.v.get("iat"), "iat")
     gnbf = _require_int(gp.v.get("nbf"), "nbf")
     gexp = _require_int(gp.v.get("exp"), "exp")
@@ -1228,100 +1234,100 @@ def _check_envelope_body(
     # the reference's coherent_times? (runtime.ex:872-875) which fires at parse time. verify_grant
     # already checks this; check_envelope had its own inline path that omitted it.
     if not (giat < gexp) or not (gnbf < gexp):
-        fail("check_envelope: grant times coherent")
+        _fail("check_envelope: grant times coherent")
     if not (giat <= expected.evaluation_time + expected.clock_skew):
-        fail("check_envelope: grant iat")
+        _fail("check_envelope: grant iat")
     if not (gnbf <= expected.evaluation_time + expected.clock_skew):
-        fail("check_envelope: grant nbf")
+        _fail("check_envelope: grant nbf")
     if not (gexp > expected.evaluation_time - expected.clock_skew):
-        fail("check_envelope: grant exp")
-    gfp = thumbprint_raw(jwk_from_public_key(t.public_key))
-    gkey = import_public_key(t.public_key, utf8_str(base64url_encode(gfp)))
-    if not ed25519_verify(gseg.signing_input, gseg.signature, gkey):
-        fail("check_envelope: grant signature")
+        _fail("check_envelope: grant exp")
+    gfp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(t.public_key))))
+    gkey = _import_public_key(t.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(gfp)))))
+    if not _ed25519_verify(gseg.signing_input, gseg.signature, gkey):
+        _fail("check_envelope: grant signature")
     # --- verify proof (holder signature) ---
-    pseg = parse_compact(proof_compact, b)
+    pseg = _parse_compact(proof_compact, b)
     holder_thumbprint, holder_key = _parse_proof_header(pseg, b, profile)
-    pp = json_decode(pseg.payload_bytes, b)
+    pp = _unwrap(json_decode(pseg.payload_bytes, b))
     _validate_proof_payload(pp, b, profile)
-    hkey = import_public_key(holder_key, utf8_str(base64url_encode(holder_thumbprint)))
-    if not ed25519_verify(pseg.signing_input, pseg.signature, hkey):
-        fail("check_envelope: proof signature")
+    hkey = _import_public_key(holder_key, _unwrap(utf8_str(_unwrap(base64url_encode(holder_thumbprint)))))
+    if not _ed25519_verify(pseg.signing_input, pseg.signature, hkey):
+        _fail("check_envelope: proof signature")
     if not isinstance(pp, JObject):
-        fail("check_envelope: proof payload")
+        _fail("check_envelope: proof payload")
     # ath = SHA-256(ASCII grant compact), gated by scan (shape+size, not canonicity) — mirrors
     # CompactJws.hash (compact_jws.ex:60-66 scan then hash). The grant was already parsed above, so
     # this scan is redundant for verify but matches the reference's hash gate exactly.
-    scan_compact(grant_compact, b)
-    ath_raw = sha256(grant_compact)
-    ath_b64 = utf8_str(base64url_encode(ath_raw))
+    _scan_compact(grant_compact, b)
+    ath_raw = _unwrap(sha256(grant_compact))
+    ath_b64 = _unwrap(utf8_str(_unwrap(base64url_encode(ath_raw))))
     pp_ath = pp.v["ath"]
-    if not isinstance(pp_ath, JString) or utf8_str(pp_ath.v) != ath_b64:
-        fail("check_envelope: ath")
+    if not isinstance(pp_ath, JString) or _unwrap(utf8_str(pp_ath.v)) != ath_b64:
+        _fail("check_envelope: ath")
     # Method / URI / invocation / operation bindings.
     htm = _require_method(pp.v.get("htm"), "htm", b)
     if htm != expected.method:
-        fail("check_envelope: method")
+        _fail("check_envelope: method")
     htu = _require_normalized_uri(pp.v.get("htu"), "htu", b, profile)
     if htu != expected.target_uri:
-        fail("check_envelope: target_uri")
+        _fail("check_envelope: target_uri")
     ba_inv = _require_uuid(pp.v.get("ba_inv"), "ba_inv")
     if ba_inv != expected.invocation_id:
-        fail("check_envelope: invocation_id")
+        _fail("check_envelope: invocation_id")
     ba_op = _require_operation(pp.v.get("ba_op"), "ba_op", b)
     if ba_op != expected.operation:
-        fail("check_envelope: operation")
+        _fail("check_envelope: operation")
     # ba_req = request_digest(operation, cast_arguments) (base64url).
-    ba_req_raw = compute_request_digest(ba_op, expected.cast_arguments, b)
-    ba_req_b64 = utf8_str(base64url_encode(ba_req_raw))
+    ba_req_raw = _unwrap(compute_request_digest(ba_op, expected.cast_arguments, b))
+    ba_req_b64 = _unwrap(utf8_str(_unwrap(base64url_encode(ba_req_raw))))
     pp_ba_req = pp.v["ba_req"]
-    if not isinstance(pp_ba_req, JString) or utf8_str(pp_ba_req.v) != ba_req_b64:
-        fail("check_envelope: ba_req")
+    if not isinstance(pp_ba_req, JString) or _unwrap(utf8_str(pp_ba_req.v)) != ba_req_b64:
+        _fail("check_envelope: ba_req")
     # Proof time window.
     piat = _require_int(pp.v.get("iat"), "iat")
     if not (piat >= expected.evaluation_time - expected.proof_max_age - expected.clock_skew):
-        fail("check_envelope: proof iat min")
+        _fail("check_envelope: proof iat min")
     if not (piat <= expected.evaluation_time + expected.clock_skew):
-        fail("check_envelope: proof iat max")
+        _fail("check_envelope: proof iat max")
     # Nonce binding.
     pp_nonce = pp.v.get("nonce")
     if isinstance(expected.nonce, NonceNotRequired):
         if pp_nonce is not None:
-            fail("check_envelope: nonce must be absent")
+            _fail("check_envelope: nonce must be absent")
     else:
         if (
             pp_nonce is None
             or not isinstance(pp_nonce, JString)
-            or utf8_str(pp_nonce.v) != expected.nonce.value
+            or _unwrap(utf8_str(pp_nonce.v)) != expected.nonce.value
         ):
-            fail("check_envelope: nonce mismatch")
+            _fail("check_envelope: nonce mismatch")
     # Holder thumbprint must match grant cnf.jkt.
     cnf = gp.v["cnf"]
     cnf = _require_object_exact(cnf, ["jkt"], "grant cnf")
     jkt = _require_b64url_n(cnf.v.get("jkt"), "jkt", 32)
     if not _bytes_equal(jkt, holder_thumbprint):
-        fail("check_envelope: holder thumbprint")
+        _fail("check_envelope: holder thumbprint")
     # The requested operation must be unique + every selector conjunctively matches.
     ops_v = gp.v.get("operations")
     if ops_v is None or not isinstance(ops_v, JArray):
-        fail("check_envelope: operations")
+        _fail("check_envelope: operations")
     matching = [
         op for op in ops_v.v
         if isinstance(op, JObject)
         and (name_v := op.v.get("name")) is not None
         and isinstance(name_v, JString)
-        and utf8_str(name_v.v) == expected.operation
+        and _unwrap(utf8_str(name_v.v)) == expected.operation
     ]
     if len(matching) != 1:
-        fail("check_envelope: unique operation")
+        _fail("check_envelope: unique operation")
     match_op = matching[0]
     sels_v = match_op.v.get("selectors")
     if sels_v is None or not isinstance(sels_v, JArray):
-        fail("check_envelope: selectors")
+        _fail("check_envelope: selectors")
     for s in sels_v.v:
-        sel = parse_selector(s, b)
-        if not selector_matches(sel, expected.cast_arguments):
-            fail("check_envelope: selector")
+        sel = _unwrap(parse_selector(s, b))
+        if not _unwrap(selector_matches(sel, expected.cast_arguments)):
+            _fail("check_envelope: selector")
     from .facts import EnvelopeFacts
 
     return EnvelopeFacts(
@@ -1340,7 +1346,7 @@ def _check_envelope_body(
 # the Elixir {:ok, binary} | {:error, :invalid} and the other 15 façade functions).
 @_closed_shape
 def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds | None = None) -> Result[bytes]:
-    return _trying(lambda: compute_request_digest(operation, cast_arguments, bounds if bounds is not None else MAXIMUM_BOUNDS))
+    return _trying(lambda: _unwrap(compute_request_digest(operation, cast_arguments, bounds if bounds is not None else MAXIMUM_BOUNDS)))
 
 
 # 7. encode_consumption_entry (ADR 0004 § Consumption rows). Returns canonical row bytes + hash.
@@ -1352,22 +1358,22 @@ def encode_consumption_entry(entry: ConsumptionEntry, bounds: Bounds | None = No
 def _encode_consumption_entry_body(entry: ConsumptionEntry, bounds: Bounds | None) -> EncodedConsumptionEntry:
     b = bounds if bounds is not None else MAXIMUM_BOUNDS
     if not isinstance(entry.sequence, int) or isinstance(entry.sequence, bool) or entry.sequence < 1:
-        fail("encode_consumption_entry: positive sequence")
-    require(len(entry.previous_hash) == 32, "encode_consumption_entry: previous_hash width")
-    require(len(entry.commitment) == 32, "encode_consumption_entry: commitment width")
-    chain_id_bytes = str_utf8(entry.chain_id)
-    if not (1 <= len(chain_id_bytes) <= bounds_resolve(b, "identifier_bytes")):
-        fail("encode_consumption_entry: chain_id bytes")
+        _fail("encode_consumption_entry: positive sequence")
+    _require(len(entry.previous_hash) == 32, "encode_consumption_entry: previous_hash width")
+    _require(len(entry.commitment) == 32, "encode_consumption_entry: commitment width")
+    chain_id_bytes = _unwrap(str_utf8(entry.chain_id))
+    if not (1 <= len(chain_id_bytes) <= _unwrap(bounds_resolve(b, "identifier_bytes"))):
+        _fail("encode_consumption_entry: chain_id bytes")
     if not _is_string_or_uri(entry.chain_id):
-        fail("encode_consumption_entry: chain_id string-or-uri")
+        _fail("encode_consumption_entry: chain_id string-or-uri")
     # Genesis invariant (consumption_chain.ex:123 validate_entry): sequence 1 requires the all-zero
     # predecessor. The verifier re-checks this; the producer rejects pre-signing.
     if entry.sequence == 1 and not _bytes_equal(entry.previous_hash, DEFAULT_HASH):
-        fail("encode_consumption_entry: genesis predecessor")
+        _fail("encode_consumption_entry: genesis predecessor")
     row_bytes = _canonical_row_bytes_from_id(chain_id_bytes, entry.sequence, entry.previous_hash, entry.commitment, b)
-    if len(row_bytes) > bounds_resolve(b, "chain_row_bytes"):
-        fail("encode_consumption_entry: chain_row_bytes")
-    hash_ = sha256(ROW_PREFIX, row_bytes)
+    if len(row_bytes) > _unwrap(bounds_resolve(b, "chain_row_bytes")):
+        _fail("encode_consumption_entry: chain_row_bytes")
+    hash_ = _unwrap(sha256(ROW_PREFIX, row_bytes))
     return EncodedConsumptionEntry(bytes_=row_bytes, hash_=hash_)
 
 
@@ -1378,18 +1384,18 @@ def _canonical_row_bytes_from_id(
     produces EXACTLY the bytes the producer emits and the chain hash is computed over)."""
     members: dict[str, Tagged] = {
         "chain_id": JString(chain_id_bytes),
-        "commitment": JString(str_utf8(utf8_str(base64url_encode(commitment)))),
-        "previous": JString(str_utf8(utf8_str(base64url_encode(previous_hash)))),
+        "commitment": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(commitment))))))),
+        "previous": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(previous_hash))))))),
         "sequence": JInt(sequence),
         "v": JInt(VERSION),
     }
-    return jcs_encode(JObject(members), b)
+    return _unwrap(jcs_encode(JObject(members), b))
 
 
 def _canonical_row_bytes(
     chain_id: str, sequence: int, previous_hash: bytes, commitment: bytes, b: Bounds = MAXIMUM_BOUNDS,
 ) -> bytes:
-    return _canonical_row_bytes_from_id(str_utf8(chain_id), sequence, previous_hash, commitment, b)
+    return _canonical_row_bytes_from_id(_unwrap(str_utf8(chain_id)), sequence, previous_hash, commitment, b)
 
 
 # 8. check_chain (ADR 0004 § Consumption rows; REQ1-CHAIN-raw-rows-bounds).
@@ -1411,65 +1417,65 @@ def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once (consumption_chain.ex
     # check_chain) and threads it into the row-count bound + every parse_row (chain_row_bytes). A
     # caller tightening via expected.bounds now takes effect.
-    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
     if not isinstance(chain.chain_id, str) or not _is_string_or_uri(chain.chain_id) or expected.chain_id != chain.chain_id:
-        fail("check_chain: chain_id")
+        _fail("check_chain: chain_id")
     if expected.first_sequence != chain.first_sequence:
-        fail("check_chain: first_sequence")
+        _fail("check_chain: first_sequence")
     if expected.last_sequence != chain.last_sequence:
-        fail("check_chain: last_sequence")
+        _fail("check_chain: last_sequence")
     if expected.row_count != chain.row_count:
-        fail("check_chain: row_count")
+        _fail("check_chain: row_count")
     if chain.row_count != len(chain.rows) or chain.row_count < 1:
-        fail("check_chain: row count")
-    if chain.row_count > bounds_resolve(b, "chain_rows"):
-        fail("check_chain: chain_rows bound")
+        _fail("check_chain: row count")
+    if chain.row_count > _unwrap(bounds_resolve(b, "chain_rows")):
+        _fail("check_chain: chain_rows bound")
     if chain.last_sequence != chain.first_sequence + chain.row_count - 1:
-        fail("check_chain: range")
+        _fail("check_chain: range")
     # Genesis: firstSequence === 1 requires the all-zero predecessor.
     if chain.first_sequence == 1 and not _bytes_equal(expected.previous_hash, DEFAULT_HASH):
-        fail("check_chain: genesis predecessor")
+        _fail("check_chain: genesis predecessor")
     # Cross-vendor F4: the reference's check_chain takes ChainInput{rows} + ExpectedChain and uses
     # expected.previous_hash as BOTH the validation seed and the returned fact; the SDK's ChainInput
     # also carries a previous_hash that must equal the expected value in BOTH cases (genesis + non-
     # genesis), so chain.previous_hash is never an unverified echo flowing into the returned facts.
     if not _bytes_equal(expected.previous_hash, chain.previous_hash):
-        fail("check_chain: previous_hash")
+        _fail("check_chain: previous_hash")
     previous = expected.previous_hash
     sequence = chain.first_sequence
     for i, row_bytes in enumerate(chain.rows):
-        if len(row_bytes) > bounds_resolve(b, "chain_row_bytes"):
-            fail(f"check_chain: row {i} bytes")
-        row = json_decode(row_bytes, b)
+        if len(row_bytes) > _unwrap(bounds_resolve(b, "chain_row_bytes")):
+            _fail(f"check_chain: row {i} bytes")
+        row = _unwrap(json_decode(row_bytes, b))
         row = _require_object_exact(row, ["v", "chain_id", "sequence", "previous", "commitment"], f"check_chain row {i}")
         v_v = row.v["v"]
         if not isinstance(v_v, JInt) or v_v.v != VERSION:
-            fail(f"check_chain row {i}: v")
+            _fail(f"check_chain row {i}: v")
         cid_v = row.v["chain_id"]
-        if not isinstance(cid_v, JString) or utf8_str(cid_v.v) != chain.chain_id:
-            fail(f"check_chain row {i}: chain_id")
+        if not isinstance(cid_v, JString) or _unwrap(utf8_str(cid_v.v)) != chain.chain_id:
+            _fail(f"check_chain row {i}: chain_id")
         seq_v = row.v["sequence"]
         if not isinstance(seq_v, JInt) or seq_v.v != sequence:
-            fail(f"check_chain row {i}: sequence")
+            _fail(f"check_chain row {i}: sequence")
         # valid_sequence?: sequence must be strictly positive (> 0). The encode_consumption_entry
         # producer already rejects sequence < 1, but the raw row stream is untrusted input here, so
         # reject sequence 0 at verify time too (mirrors consumption_chain.ex:163 valid_sequence?).
         if seq_v.v < 1:
-            fail(f"check_chain row {i}: sequence positive")
+            _fail(f"check_chain row {i}: sequence positive")
         prev_raw = _require_b64url_n(row.v.get("previous"), "previous", 32)
         if not _bytes_equal(prev_raw, previous):
-            fail(f"check_chain row {i}: previous link")
+            _fail(f"check_chain row {i}: previous link")
         commitment_raw = _require_b64url_n(row.v.get("commitment"), "commitment", 32)
         # Canonical re-encode: the input row bytes MUST byte-equal the canonical re-encoded form
         # (mirrors consumption_chain.ex:96 parse_row `encode(entry).bytes == ^bytes`). This rejects
         # whitespace drift and member-order drift that would otherwise hash to a different chain link.
         re_encoded = _canonical_row_bytes(chain.chain_id, seq_v.v, prev_raw, commitment_raw, b)
         if not _bytes_equal(re_encoded, row_bytes):
-            fail(f"check_chain row {i}: canonical")
-        previous = sha256(ROW_PREFIX, row_bytes)
+            _fail(f"check_chain row {i}: canonical")
+        previous = _unwrap(sha256(ROW_PREFIX, row_bytes))
         sequence += 1
     if not _bytes_equal(previous, expected.last_hash):
-        fail("check_chain: head")
+        _fail("check_chain: head")
     from .facts import ChainFacts
 
     # Cross-vendor F4: return the VERIFIED expected.previous_hash (the reference's contract), not the
@@ -1490,68 +1496,68 @@ def grant_signing_input(grant: GrantProducer, bounds: Bounds | None = None) -> R
 
 def _grant_signing_input_body(grant: GrantProducer, bounds: Bounds | None) -> SigningInput:
     b = bounds if bounds is not None else MAXIMUM_BOUNDS
-    key_id_bytes = str_utf8(grant.key_id)
-    if not (1 <= len(key_id_bytes) <= bounds_resolve(b, "kid_bytes")):
-        fail("grant_signing_input: key_id bytes")
+    key_id_bytes = _unwrap(str_utf8(grant.key_id))
+    if not (1 <= len(key_id_bytes) <= _unwrap(bounds_resolve(b, "kid_bytes"))):
+        _fail("grant_signing_input: key_id bytes")
     if _KID_CHARSET.match(grant.key_id) is None:
-        fail("grant_signing_input: key_id charset")
+        _fail("grant_signing_input: key_id charset")
     if not _is_string_or_uri(grant.issuer):
-        fail("grant_signing_input: issuer")
+        _fail("grant_signing_input: issuer")
     if not _is_string_or_uri(grant.grant_id):
-        fail("grant_signing_input: grant_id")
-    if not (1 <= len(grant.audiences) <= bounds_resolve(b, "audiences")):
-        fail("grant_signing_input: audiences count")
+        _fail("grant_signing_input: grant_id")
+    if not (1 <= len(grant.audiences) <= _unwrap(bounds_resolve(b, "audiences"))):
+        _fail("grant_signing_input: audiences count")
     for a in grant.audiences:
-        ab = str_utf8(a)
-        if not (1 <= len(ab) <= bounds_resolve(b, "identifier_bytes")):
-            fail("grant_signing_input: audience bytes")
+        ab = _unwrap(str_utf8(a))
+        if not (1 <= len(ab) <= _unwrap(bounds_resolve(b, "identifier_bytes"))):
+            _fail("grant_signing_input: audience bytes")
         if not _is_string_or_uri(a):
-            fail("grant_signing_input: audience string-or-uri")
+            _fail("grant_signing_input: audience string-or-uri")
     if not (isinstance(grant.issued_at, int) and isinstance(grant.not_before, int) and isinstance(grant.expires_at, int)):
-        fail("grant_signing_input: integer times")
-    jkt_raw = base64url_decode(str_utf8(grant.holder_thumbprint))
+        _fail("grant_signing_input: integer times")
+    jkt_raw = _unwrap(base64url_decode(_unwrap(str_utf8(grant.holder_thumbprint))))
     if len(jkt_raw) != 32:
-        fail("grant_signing_input: holder_thumbprint width")
-    if not (1 <= len(grant.operations) <= bounds_resolve(b, "operations")):
-        fail("grant_signing_input: operations count")
+        _fail("grant_signing_input: holder_thumbprint width")
+    if not (1 <= len(grant.operations) <= _unwrap(bounds_resolve(b, "operations"))):
+        _fail("grant_signing_input: operations count")
     header: dict[str, Tagged] = {
-        "alg": JString(str_utf8(ALG)),
+        "alg": JString(_unwrap(str_utf8(ALG))),
         "kid": JString(key_id_bytes),
-        "typ": JString(str_utf8(GRANT_TYP)),
+        "typ": JString(_unwrap(str_utf8(GRANT_TYP))),
     }
     payload = _build_grant_payload(grant, b)
     return SigningInput(
         kind="grant",
-        protected_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(JObject(header), b)))),
-        payload_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(payload, b)))),
+        protected_segment=_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(_unwrap(jcs_encode(JObject(header), b)))))))),
+        payload_segment=_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(_unwrap(jcs_encode(payload, b)))))))),
     )
 
 
 def _build_grant_payload(grant: GrantProducer, b: Bounds) -> Tagged:
-    aud_members = tuple(JString(str_utf8(a)) for a in grant.audiences)
+    aud_members = tuple(JString(_unwrap(str_utf8(a))) for a in grant.audiences)
     ops_members: list[Tagged] = []
     for op in grant.operations:
-        name_bytes = str_utf8(op.name)
-        if not (1 <= len(name_bytes) <= bounds_resolve(b, "operation_bytes")):
-            fail("grant_signing_input: operation name bytes")
+        name_bytes = _unwrap(str_utf8(op.name))
+        if not (1 <= len(name_bytes) <= _unwrap(bounds_resolve(b, "operation_bytes"))):
+            _fail("grant_signing_input: operation name bytes")
         if _OPERATION_PRINTABLE.match(op.name) is None:
-            fail("grant_signing_input: operation name charset")
-        if not (1 <= len(op.selectors) <= bounds_resolve(b, "selectors")):
-            fail("grant_signing_input: selectors count")
+            _fail("grant_signing_input: operation name charset")
+        if not (1 <= len(op.selectors) <= _unwrap(bounds_resolve(b, "selectors"))):
+            _fail("grant_signing_input: selectors count")
         sels = tuple(_selector_to_tagged(s, b) for s in op.selectors)
         op_members: dict[str, Tagged] = {
             "name": JString(name_bytes),
             "selectors": JArray(sels),
         }
         ops_members.append(JObject(op_members))
-    cnf_members: dict[str, Tagged] = {"jkt": JString(str_utf8(grant.holder_thumbprint))}
+    cnf_members: dict[str, Tagged] = {"jkt": JString(_unwrap(str_utf8(grant.holder_thumbprint)))}
     payload: dict[str, Tagged] = {
         "aud": JArray(tuple(aud_members)),
         "cnf": JObject(cnf_members),
         "exp": JInt(grant.expires_at),
         "iat": JInt(grant.issued_at),
-        "iss": JString(str_utf8(grant.issuer)),
-        "jti": JString(str_utf8(grant.grant_id)),
+        "iss": JString(_unwrap(str_utf8(grant.issuer))),
+        "jti": JString(_unwrap(str_utf8(grant.grant_id))),
         "nbf": JInt(grant.not_before),
         "operations": JArray(tuple(ops_members)),
         "v": JInt(VERSION),
@@ -1561,33 +1567,33 @@ def _build_grant_payload(grant: GrantProducer, b: Bounds) -> Tagged:
 
 def _selector_to_tagged(s: SelectorInput, b: Bounds) -> Tagged:
     if s == "all":
-        return JObject({"kind": JString(str_utf8("all"))})
+        return JObject({"kind": JString(_unwrap(str_utf8("all")))})
     if isinstance(s, Mapping):
         kind = s.get("kind")
         if kind == "all":
-            return JObject({"kind": JString(str_utf8("all"))})
+            return JObject({"kind": JString(_unwrap(str_utf8("all")))})
         if kind == "equals":
             path = _validate_path(cast("Sequence[str]", s["path"]), b)
             value = cast("Tagged", s["value"])
             _validate_selector_value(value, b)
-            if not integral_float_free(value):
-                fail("selector: integral float")
+            if not _integral_float_free(value):
+                _fail("selector: integral float")
             return JObject({
-                "kind": JString(str_utf8("equals")),
+                "kind": JString(_unwrap(str_utf8("equals"))),
                 "path": path,
                 "value": value,
             })
         if kind == "one_of":
             path = _validate_path(cast("Sequence[str]", s["path"]), b)
             values = cast("Sequence[Tagged]", s["values"])
-            if not (1 <= len(values) <= bounds_resolve(b, "one_of_values")):
-                fail("selector: values count")
+            if not (1 <= len(values) <= _unwrap(bounds_resolve(b, "one_of_values"))):
+                _fail("selector: values count")
             for v in values:
                 _validate_selector_value(v, b)
-                if not integral_float_free(v):
-                    fail("selector: integral float")
+                if not _integral_float_free(v):
+                    _fail("selector: integral float")
             return JObject({
-                "kind": JString(str_utf8("one_of")),
+                "kind": JString(_unwrap(str_utf8("one_of"))),
                 "path": path,
                 "values": JArray(tuple(values)),
             })
@@ -1602,32 +1608,32 @@ def _selector_to_tagged(s: SelectorInput, b: Bounds) -> Tagged:
             if isinstance(raw, (JInt, JFloat)):
                 bound = raw
             elif isinstance(raw, bool):
-                fail("selector: numeric bound")
+                _fail("selector: numeric bound")
             elif isinstance(raw, int):
                 bound = JInt(raw)
             elif isinstance(raw, float):
                 bound = JFloat(raw)
             else:
-                fail("selector: numeric bound")
+                _fail("selector: numeric bound")
             _validate_selector_value(bound, b)
-            if not integral_float_free(bound):
-                fail("selector: integral float")
+            if not _integral_float_free(bound):
+                _fail("selector: integral float")
             return JObject({
-                "kind": JString(str_utf8(kind)),
+                "kind": JString(_unwrap(str_utf8(kind))),
                 "path": path,
                 "value": bound,
             })
-    raise invalid_error("selector: shape")
+    raise _invalid_error("selector: shape")
 
 
 def _validate_path(path: Sequence[str], b: Bounds) -> Tagged:
-    if not (1 <= len(path) <= bounds_resolve(b, "path_segments")):
-        fail("selector: path length")
+    if not (1 <= len(path) <= _unwrap(bounds_resolve(b, "path_segments"))):
+        _fail("selector: path length")
     segs: list[Tagged] = []
     for seg in path:
-        sb = str_utf8(seg)
-        if not (1 <= len(sb) <= bounds_resolve(b, "key_bytes")):
-            fail("selector: path segment bytes")
+        sb = _unwrap(str_utf8(seg))
+        if not (1 <= len(sb) <= _unwrap(bounds_resolve(b, "key_bytes"))):
+            _fail("selector: path segment bytes")
         segs.append(JString(sb))
     return JArray(tuple(segs))
 
@@ -1637,25 +1643,25 @@ def _validate_selector_value(v: Tagged, b: Bounds) -> None:
 
 
 def _check_node(v: Tagged, depth: int, b: Bounds) -> None:
-    if depth > bounds_resolve(b, "depth"):
-        fail("selector: value depth")
+    if depth > _unwrap(bounds_resolve(b, "depth")):
+        _fail("selector: value depth")
     if isinstance(v, JString):
-        if len(v.v) > bounds_resolve(b, "string_bytes"):
-            fail("selector: string bytes")
+        if len(v.v) > _unwrap(bounds_resolve(b, "string_bytes")):
+            _fail("selector: string bytes")
     elif isinstance(v, JInt):
-        if abs(v.v) > bounds_resolve(b, "integer_magnitude"):
-            fail("selector: int magnitude")
+        if abs(v.v) > _unwrap(bounds_resolve(b, "integer_magnitude")):
+            _fail("selector: int magnitude")
     elif isinstance(v, JFloat):
-        if abs(v.v) > bounds_resolve(b, "float_magnitude"):
-            fail("selector: float magnitude")
+        if abs(v.v) > _unwrap(bounds_resolve(b, "float_magnitude")):
+            _fail("selector: float magnitude")
     elif isinstance(v, JArray):
-        if len(v.v) > bounds_resolve(b, "array_items"):
-            fail("selector: array items")
+        if len(v.v) > _unwrap(bounds_resolve(b, "array_items")):
+            _fail("selector: array items")
         for item in v.v:
             _check_node(item, depth + 1, b)
     elif isinstance(v, JObject):
-        if len(v.v) > bounds_resolve(b, "object_members"):
-            fail("selector: object members")
+        if len(v.v) > _unwrap(bounds_resolve(b, "object_members")):
+            _fail("selector: object members")
         for val in v.v.values():
             _check_node(val, depth + 1, b)
 
@@ -1670,78 +1676,78 @@ def _proof_signing_input_body(
     proof: ProofProducer, bounds: Bounds | None, profile: ProofProfile
 ) -> SigningInput:
     b = bounds if bounds is not None else MAXIMUM_BOUNDS
-    require(len(proof.holder_public_key) == 32, "proof_signing_input: holder key width")
-    proof_id_bytes = str_utf8(proof.proof_id)
+    _require(len(proof.holder_public_key) == 32, "proof_signing_input: holder key width")
+    proof_id_bytes = _unwrap(str_utf8(proof.proof_id))
     if not _is_string_or_uri(proof.proof_id) or (
         profile == "local_loopback_http"
-        and not (1 <= len(proof_id_bytes) <= bounds_resolve(b, "identifier_bytes"))
+        and not (1 <= len(proof_id_bytes) <= _unwrap(bounds_resolve(b, "identifier_bytes")))
     ):
-        fail("proof_signing_input: proof_id")
-    method_bytes = str_utf8(proof.method)
-    if not (1 <= len(method_bytes) <= bounds_resolve(b, "method_bytes")):
-        fail("proof_signing_input: method bytes")
+        _fail("proof_signing_input: proof_id")
+    method_bytes = _unwrap(str_utf8(proof.method))
+    if not (1 <= len(method_bytes) <= _unwrap(bounds_resolve(b, "method_bytes"))):
+        _fail("proof_signing_input: method bytes")
     if _METHOD_TOKEN.match(proof.method) is None:
-        fail("proof_signing_input: method token")
+        _fail("proof_signing_input: method token")
     normalizer = uri_normalize if profile == "standard" else local_loopback_http_uri_normalize
-    htu_norm = normalizer(str_utf8(proof.target_uri), b)
+    htu_norm = normalizer(_unwrap(str_utf8(proof.target_uri)), b)
     if not isinstance(htu_norm, Ok):
-        fail("proof_signing_input: htu")
-    if utf8_str(htu_norm.value) != proof.target_uri:
-        fail("proof_signing_input: htu pre-normalized")
+        _fail("proof_signing_input: htu")
+    if _unwrap(utf8_str(htu_norm.value)) != proof.target_uri:
+        _fail("proof_signing_input: htu pre-normalized")
     if not isinstance(proof.issued_at, int) or isinstance(proof.issued_at, bool):
-        fail("proof_signing_input: integer iat")
+        _fail("proof_signing_input: integer iat")
     if _UUID_RE.match(proof.invocation_id) is None:
-        fail("proof_signing_input: invocation_id")
-    op_bytes = str_utf8(proof.operation)
-    if not (1 <= len(op_bytes) <= bounds_resolve(b, "operation_bytes")):
-        fail("proof_signing_input: operation bytes")
+        _fail("proof_signing_input: invocation_id")
+    op_bytes = _unwrap(str_utf8(proof.operation))
+    if not (1 <= len(op_bytes) <= _unwrap(bounds_resolve(b, "operation_bytes"))):
+        _fail("proof_signing_input: operation bytes")
     if _OPERATION_PRINTABLE.match(proof.operation) is None:
-        fail("proof_signing_input: operation charset")
+        _fail("proof_signing_input: operation charset")
     if profile == "local_loopback_http" and proof.nonce is None:
-        fail("proof_signing_input: nonce required")
+        _fail("proof_signing_input: nonce required")
     if proof.nonce is not None:
         if not _is_well_formed(proof.nonce):
-            fail("proof_signing_input: nonce well-formed")
-        nb = str_utf8(proof.nonce)
-        if not (1 <= len(nb) <= bounds_resolve(b, "nonce_bytes")):
-            fail("proof_signing_input: nonce bytes")
-    jwk = jwk_from_public_key(proof.holder_public_key)
+            _fail("proof_signing_input: nonce well-formed")
+        nb = _unwrap(str_utf8(proof.nonce))
+        if not (1 <= len(nb) <= _unwrap(bounds_resolve(b, "nonce_bytes"))):
+            _fail("proof_signing_input: nonce bytes")
+    jwk = _unwrap(jwk_from_public_key(proof.holder_public_key))
     header_members: dict[str, Tagged] = {
-        "alg": JString(str_utf8(ALG)),
+        "alg": JString(_unwrap(str_utf8(ALG))),
         "jwk": _jwk_to_tagged(jwk),
-        "typ": JString(str_utf8(_proof_typ(profile))),
+        "typ": JString(_unwrap(str_utf8(_proof_typ(profile)))),
     }
     # Producer ath: gate the grant compact by scan (shape+size, NOT base64url canonicity) before
     # hashing it into `ath` — mirrors CompactJws.ath (compact_jws.ex:53-58 scan then hash). A
     # caller-supplied non-compact grant must not be embedded as sha256(garbage) in the proof.
-    scan_compact(proof.grant_compact, b)
-    ath_raw = sha256(proof.grant_compact)
-    ba_req_raw = compute_request_digest(proof.operation, proof.cast_arguments, b)
+    _scan_compact(proof.grant_compact, b)
+    ath_raw = _unwrap(sha256(proof.grant_compact))
+    ba_req_raw = _unwrap(compute_request_digest(proof.operation, proof.cast_arguments, b))
     payload_members: dict[str, Tagged] = {
-        "ath": JString(str_utf8(utf8_str(base64url_encode(ath_raw)))),
-        "ba_inv": JString(str_utf8(proof.invocation_id)),
+        "ath": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(ath_raw))))))),
+        "ba_inv": JString(_unwrap(str_utf8(proof.invocation_id))),
         "ba_op": JString(op_bytes),
-        "ba_req": JString(str_utf8(utf8_str(base64url_encode(ba_req_raw)))),
+        "ba_req": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(ba_req_raw))))))),
         "htm": JString(method_bytes),
-        "htu": JString(str_utf8(proof.target_uri)),
+        "htu": JString(_unwrap(str_utf8(proof.target_uri))),
         "iat": JInt(proof.issued_at),
         "jti": JString(proof_id_bytes),
         "v": JInt(VERSION),
     }
     if proof.nonce is not None:
-        payload_members["nonce"] = JString(str_utf8(proof.nonce))
+        payload_members["nonce"] = JString(_unwrap(str_utf8(proof.nonce)))
     return SigningInput(
         kind="proof" if profile == "standard" else "local_loopback_http_proof",
-        protected_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(JObject(header_members), b)))),
-        payload_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(JObject(payload_members), b)))),
+        protected_segment=_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(_unwrap(jcs_encode(JObject(header_members), b)))))))),
+        payload_segment=_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(_unwrap(jcs_encode(JObject(payload_members), b)))))))),
     )
 
 
 def _jwk_to_tagged(jwk: OkpPublic) -> Tagged:
     members: dict[str, Tagged] = {
-        "crv": JString(str_utf8(jwk.crv)),
-        "kty": JString(str_utf8(jwk.kty)),
-        "x": JString(str_utf8(jwk.x)),
+        "crv": JString(_unwrap(str_utf8(jwk.crv))),
+        "kty": JString(_unwrap(str_utf8(jwk.kty))),
+        "x": JString(_unwrap(str_utf8(jwk.x))),
     }
     return JObject(members)
 
@@ -1770,30 +1776,30 @@ def _assemble_compact_for(
         # (runtime.ex:147-155 → CompactJws.assemble:34-48 — encoded segment bounds, signature
         # width ≤ signature_bytes, compact_bytes, all against Bounds.coerce(limits)); the SDK
         # previously hardcoded maximum. Absent bounds = maximum (backward compatible).
-        b = coerce_bounds(bounds if bounds is not None else MAXIMUM_BOUNDS)
+        b = _unwrap(coerce_bounds(bounds if bounds is not None else MAXIMUM_BOUNDS))
         if profile == "local_loopback_http" and input_.kind != "local_loopback_http_proof":
-            fail("assemble_compact: local profile kind")
-        if len(input_.protected_segment) > bounds_resolve(b, "encoded_segment_bytes") or len(input_.payload_segment) > bounds_resolve(b, "encoded_segment_bytes"):
-            fail("assemble_compact: segment bound")
+            _fail("assemble_compact: local profile kind")
+        if len(input_.protected_segment) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")) or len(input_.payload_segment) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")):
+            _fail("assemble_compact: segment bound")
         # (signature_bytes needs no gate: it is a FIXED-WIDTH key rejected at bounds_new
         # unless 64 — the reference's assemble-time check is subsumed.)
         assembled = assemble_segments(input_, signature)
         if not isinstance(assembled, Ok):
-            fail("assemble_compact: signing input")
+            _fail("assemble_compact: signing input")
         compact = assembled.value
-        if len(compact) > bounds_resolve(b, "compact_bytes"):
-            fail("assemble_compact: compact_bytes")
+        if len(compact) > _unwrap(bounds_resolve(b, "compact_bytes")):
+            _fail("assemble_compact: compact_bytes")
         # Re-parse the composed compact per kind (validate_assembled_compact). parse_compact enforces
         # the segment bounds + base64url decode; _parse_xxx_header enforces kind↔typ;
         # _validate_xxx_payload enforces the full payload structure.
-        seg = parse_compact(compact, b)
-        payload = json_decode(seg.payload_bytes, b)
+        seg = _parse_compact(compact, b)
+        payload = _unwrap(json_decode(seg.payload_bytes, b))
         if input_.kind == "grant":
             # Full grant re-parse (decode_grant validates iss/jti/aud/times/cnf, which the structural
             # _validate_grant_payload does not) — mirrors reference validate_assembled_compact → parse_grant.
             r = decode_grant(compact, b)
             if not r.is_ok:
-                fail("assemble_compact: grant re-parse")
+                _fail("assemble_compact: grant re-parse")
         elif input_.kind == "proof" and profile == "standard":
             _parse_proof_header(seg, b, "standard")
             _validate_proof_payload(payload, b, "standard")
@@ -1807,7 +1813,7 @@ def _assemble_compact_for(
             _parse_transition_header(seg, b)
             _validate_transition_payload(payload, seg.payload_bytes, b)
         else:
-            fail("assemble_compact: kind")
+            _fail("assemble_compact: kind")
         return compact
 
     return _trying(body)
@@ -1821,45 +1827,45 @@ def boundary_anchor_signing_input(anchor: BoundaryAnchorProducer, bounds: Bounds
 
 def _boundary_anchor_signing_input_body(anchor: BoundaryAnchorProducer, bounds: Bounds | None) -> SigningInput:
     b = bounds if bounds is not None else MAXIMUM_BOUNDS
-    key_id_bytes = str_utf8(anchor.key_id)
-    if not (1 <= len(key_id_bytes) <= bounds_resolve(b, "kid_bytes")):
-        fail("anchor_signing_input: key_id bytes")
+    key_id_bytes = _unwrap(str_utf8(anchor.key_id))
+    if not (1 <= len(key_id_bytes) <= _unwrap(bounds_resolve(b, "kid_bytes"))):
+        _fail("anchor_signing_input: key_id bytes")
     if _KID_CHARSET.match(anchor.key_id) is None:
-        fail("anchor_signing_input: key_id charset")
+        _fail("anchor_signing_input: key_id charset")
     if not _is_string_or_uri(anchor.anchor_id):
-        fail("anchor_signing_input: anchor_id")
+        _fail("anchor_signing_input: anchor_id")
     if not _is_string_or_uri(anchor.chain_id):
-        fail("anchor_signing_input: chain_id")
+        _fail("anchor_signing_input: chain_id")
     if not isinstance(anchor.anchored_at, int) or isinstance(anchor.anchored_at, bool):
-        fail("anchor_signing_input: integer anchored_at")
+        _fail("anchor_signing_input: integer anchored_at")
     if not isinstance(anchor.sequence, int) or isinstance(anchor.sequence, bool) or anchor.sequence < 0:
-        fail("anchor_signing_input: non-negative sequence")
-    require(len(anchor.chain_hash) == 32, "anchor_signing_input: chain_hash width")
-    require(len(anchor.public_key) == 32, "anchor_signing_input: public_key width")
+        _fail("anchor_signing_input: non-negative sequence")
+    _require(len(anchor.chain_hash) == 32, "anchor_signing_input: chain_hash width")
+    _require(len(anchor.public_key) == 32, "anchor_signing_input: public_key width")
     # Genesis invariant (boundary_anchor_codec.ex:185-189 valid_anchor_binding?): sequence 0 is the
     # chain root and requires the all-zero chain_hash. The verifier re-checks this; the producer
     # rejects pre-signing so a mis-bound genesis anchor cannot be minted.
     if anchor.sequence == 0 and not _bytes_equal(anchor.chain_hash, DEFAULT_HASH):
-        fail("anchor_signing_input: genesis chain_hash")
+        _fail("anchor_signing_input: genesis chain_hash")
     header: dict[str, Tagged] = {
-        "alg": JString(str_utf8(ALG)),
+        "alg": JString(_unwrap(str_utf8(ALG))),
         "kid": JString(key_id_bytes),
-        "typ": JString(str_utf8(ANCHOR_TYP)),
+        "typ": JString(_unwrap(str_utf8(ANCHOR_TYP))),
     }
-    fp = thumbprint_raw(jwk_from_public_key(anchor.public_key))
+    fp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(anchor.public_key))))
     payload: dict[str, Tagged] = {
-        "anchor_id": JString(str_utf8(anchor.anchor_id)),
+        "anchor_id": JString(_unwrap(str_utf8(anchor.anchor_id))),
         "anchored_at": JInt(anchor.anchored_at),
-        "chain_hash": JString(str_utf8(utf8_str(base64url_encode(anchor.chain_hash)))),
-        "chain_id": JString(str_utf8(anchor.chain_id)),
-        "key_fingerprint": JString(str_utf8(utf8_str(base64url_encode(fp)))),
+        "chain_hash": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(anchor.chain_hash))))))),
+        "chain_id": JString(_unwrap(str_utf8(anchor.chain_id))),
+        "key_fingerprint": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(fp))))))),
         "sequence": JInt(anchor.sequence),
         "v": JInt(VERSION),
     }
     return SigningInput(
         kind="boundary_anchor",
-        protected_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(JObject(header), b)))),
-        payload_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(JObject(payload), b)))),
+        protected_segment=_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(_unwrap(jcs_encode(JObject(header), b)))))))),
+        payload_segment=_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(_unwrap(jcs_encode(JObject(payload), b)))))))),
     )
 
 
@@ -1871,45 +1877,45 @@ def key_transition_signing_input(t: KeyTransitionProducer, bounds: Bounds | None
 
 def _key_transition_signing_input_body(t: KeyTransitionProducer, bounds: Bounds | None) -> SigningInput:
     b = bounds if bounds is not None else MAXIMUM_BOUNDS
-    require(len(t.current_public_key) == 32 and len(t.next_public_key) == 32, "transition_signing_input: key width")
+    _require(len(t.current_public_key) == 32 and len(t.next_public_key) == 32, "transition_signing_input: key width")
     if _bytes_equal(t.current_public_key, t.next_public_key):
-        fail("transition_signing_input: distinct keys")
-    current_key_id_bytes = str_utf8(t.current_key_id)
-    if not (1 <= len(current_key_id_bytes) <= bounds_resolve(b, "kid_bytes")):
-        fail("transition_signing_input: current_key_id bytes")
+        _fail("transition_signing_input: distinct keys")
+    current_key_id_bytes = _unwrap(str_utf8(t.current_key_id))
+    if not (1 <= len(current_key_id_bytes) <= _unwrap(bounds_resolve(b, "kid_bytes"))):
+        _fail("transition_signing_input: current_key_id bytes")
     if _KID_CHARSET.match(t.current_key_id) is None:
-        fail("transition_signing_input: current_key_id charset")
-    next_key_id_bytes = str_utf8(t.next_key_id)
-    if not (1 <= len(next_key_id_bytes) <= bounds_resolve(b, "kid_bytes")):
-        fail("transition_signing_input: next_key_id bytes")
+        _fail("transition_signing_input: current_key_id charset")
+    next_key_id_bytes = _unwrap(str_utf8(t.next_key_id))
+    if not (1 <= len(next_key_id_bytes) <= _unwrap(bounds_resolve(b, "kid_bytes"))):
+        _fail("transition_signing_input: next_key_id bytes")
     if _KID_CHARSET.match(t.next_key_id) is None:
-        fail("transition_signing_input: next_key_id charset")
+        _fail("transition_signing_input: next_key_id charset")
     if not _is_string_or_uri(t.transition_id):
-        fail("transition_signing_input: transition_id")
+        _fail("transition_signing_input: transition_id")
     if not _is_string_or_uri(t.chain_id):
-        fail("transition_signing_input: chain_id")
+        _fail("transition_signing_input: chain_id")
     if not isinstance(t.effective_at, int) or isinstance(t.effective_at, bool):
-        fail("transition_signing_input: integer effective_at")
+        _fail("transition_signing_input: integer effective_at")
     header: dict[str, Tagged] = {
-        "alg": JString(str_utf8(ALG)),
+        "alg": JString(_unwrap(str_utf8(ALG))),
         "kid": JString(current_key_id_bytes),
-        "typ": JString(str_utf8(TRANSITION_TYP)),
+        "typ": JString(_unwrap(str_utf8(TRANSITION_TYP))),
     }
-    from_fp = thumbprint_raw(jwk_from_public_key(t.current_public_key))
-    to_fp = thumbprint_raw(jwk_from_public_key(t.next_public_key))
+    from_fp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(t.current_public_key))))
+    to_fp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(t.next_public_key))))
     payload: dict[str, Tagged] = {
-        "chain_id": JString(str_utf8(t.chain_id)),
+        "chain_id": JString(_unwrap(str_utf8(t.chain_id))),
         "effective_at": JInt(t.effective_at),
-        "from_key_fingerprint": JString(str_utf8(utf8_str(base64url_encode(from_fp)))),
-        "to_key_fingerprint": JString(str_utf8(utf8_str(base64url_encode(to_fp)))),
+        "from_key_fingerprint": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(from_fp))))))),
+        "to_key_fingerprint": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(to_fp))))))),
         "to_key_id": JString(next_key_id_bytes),
-        "transition_id": JString(str_utf8(t.transition_id)),
+        "transition_id": JString(_unwrap(str_utf8(t.transition_id))),
         "v": JInt(VERSION),
     }
     return SigningInput(
         kind="key_transition",
-        protected_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(JObject(header), b)))),
-        payload_segment=str_utf8(utf8_str(base64url_encode(jcs_encode(JObject(payload), b)))),
+        protected_segment=_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(_unwrap(jcs_encode(JObject(header), b)))))))),
+        payload_segment=_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(_unwrap(jcs_encode(JObject(payload), b)))))))),
     )
 
 
@@ -1925,7 +1931,7 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     # would reject the bytes a too-large input would produce; the producer rejects earlier.
     # BAP-09 #10/#11: resolve expected.bounds once and thread it through the encode-time bounds
     # checks so a caller tightening via expected.bounds takes effect (matches verify_anchored_export).
-    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
     _validate_export_inputs(input_, expected, b)
     # Row chain re-check (anchored_export_codec.ex:37-39 — ConsumptionChain.check):
     # the rows must verify against the expected boundaries before they are archived.
@@ -1967,7 +1973,7 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     # none — so it refuses any framed signature no conforming signer emits, never rewriting
     # its bytes.
     for _signature in framed_signatures:
-        require(signature_gate(_signature), "encode_anchored_export: signature canonicality")
+        _require(_signature_gate(_signature), "encode_anchored_export: signature canonicality")
     header_bytes = _build_archive_header(input_, expected.chain, b)
     parts = [ARCHIVE_PREFIX, _frame(header_bytes), _frame(input_.start_anchor)]
     parts.extend(_frame(t) for t in input_.transitions)
@@ -1976,12 +1982,12 @@ def _encode_anchored_export_body(input_: AnchoredExportInput, expected: Expected
     # Validate the chunk list BEFORE materializing the joined archive (mirrors reference
     # validate_chunks on the chunk list, anchored_export_codec.ex:69 — not a concatenated binary,
     # so an over-bound input rejects before the allocation).
-    if len(parts) > bounds_resolve(b, "archive_chunks"):
-        fail("encode_anchored_export: archive_chunks")
-    if sum(len(p) for p in parts) > bounds_resolve(b, "archive_bytes"):
-        fail("encode_anchored_export: archive_bytes")
+    if len(parts) > _unwrap(bounds_resolve(b, "archive_chunks")):
+        _fail("encode_anchored_export: archive_chunks")
+    if sum(len(p) for p in parts) > _unwrap(bounds_resolve(b, "archive_bytes")):
+        _fail("encode_anchored_export: archive_bytes")
     archive = b"".join(parts)
-    return EncodedAnchoredExport(archive=archive, digest=sha256(archive))
+    return EncodedAnchoredExport(archive=archive, digest=_unwrap(sha256(archive)))
 
 
 def _utf8_bytes(v: object, ctx: str) -> int:
@@ -1989,25 +1995,25 @@ def _utf8_bytes(v: object, ctx: str) -> int:
     input — .encode raises UnicodeEncodeError/AttributeError, either of which
     would escape the Result contract."""
     if not isinstance(v, str):
-        fail(ctx)
+        _fail(ctx)
     try:
         return len(v.encode("utf-8"))
     except UnicodeEncodeError:
-        fail(ctx)
+        _fail(ctx)
 
 
 def _expected_int(v: object, ctx: str) -> int:
     """Type-strict expected-side integer (cross-vendor round 2: Python ``1 == True``,
     so an untyped boolean expected field would equal a decoded 0/1 at the match)."""
     if not isinstance(v, int) or isinstance(v, bool):
-        fail(ctx)
+        _fail(ctx)
     return v
 
 
 def _require_ok(result: Result[Any], ctx: str) -> Any:
     """Unwrap a Result or fail closed (encode-path helper)."""
     if not result.is_ok:
-        fail(ctx)
+        _fail(ctx)
     return result.value  # type: ignore[union-attr]  # is_ok implies Ok
 
 
@@ -2023,32 +2029,32 @@ def _parse_and_match_anchor(compact: bytes, expected: ExpectedAnchor, which: str
     # (boundary_anchor_codec.ex:82) — stricter than parse_compact's whole-input
     # compact_bytes ceiling. (The ENCODE path only — the standalone verify has
     # its own gates.)
-    if len(compact) > bounds_resolve(b, "anchor_bytes"):
-        fail(f"encode_anchored_export: {which} anchor anchor_bytes")
-    seg = parse_compact(compact, b)
+    if len(compact) > _unwrap(bounds_resolve(b, "anchor_bytes")):
+        _fail(f"encode_anchored_export: {which} anchor anchor_bytes")
+    seg = _parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != expected.key_id:
-        fail(f"encode_anchored_export: {which} anchor kid")
-    p = json_decode(seg.payload_bytes, b)
+        _fail(f"encode_anchored_export: {which} anchor kid")
+    p = _unwrap(json_decode(seg.payload_bytes, b))
     _validate_anchor_payload(p, seg.payload_bytes, b)
     if not isinstance(p, JObject):
-        fail(f"encode_anchored_export: {which} anchor payload")
+        _fail(f"encode_anchored_export: {which} anchor payload")
     if _require_string_or_uri(p.v.get("anchor_id"), "anchor_id", b) != expected.anchor_id:
-        fail(f"encode_anchored_export: {which} anchor_id")
+        _fail(f"encode_anchored_export: {which} anchor_id")
     if _require_int(p.v.get("anchored_at"), "anchored_at") != _expected_int(
         expected.anchored_at, f"encode_anchored_export: {which} anchored_at type"
     ):
-        fail(f"encode_anchored_export: {which} anchored_at")
+        _fail(f"encode_anchored_export: {which} anchored_at")
     if _require_string_or_uri(p.v.get("chain_id"), "chain_id", b) != expected.chain_id:
-        fail(f"encode_anchored_export: {which} chain_id")
+        _fail(f"encode_anchored_export: {which} chain_id")
     if _require_int(p.v.get("sequence"), "sequence") != _expected_int(
         expected.sequence, f"encode_anchored_export: {which} sequence type"
     ):
-        fail(f"encode_anchored_export: {which} sequence")
+        _fail(f"encode_anchored_export: {which} sequence")
     if not _bytes_equal(_require_b64url_n(p.v.get("chain_hash"), "chain_hash", 32), expected.chain_hash):
-        fail(f"encode_anchored_export: {which} chain_hash")
+        _fail(f"encode_anchored_export: {which} chain_hash")
     if not _bytes_equal(_require_b64url_n(p.v.get("key_fingerprint"), "key_fingerprint", 32), expected.key_fingerprint):
-        fail(f"encode_anchored_export: {which} key_fingerprint")
+        _fail(f"encode_anchored_export: {which} key_fingerprint")
     return seg.signature
 
 
@@ -2059,31 +2065,31 @@ def _parse_and_match_transition(compact: bytes, expected: ExpectedKeyTransition,
     KeyTransitionCodec.parse + transition_matches?, anchored_export_codec.ex:443-504)."""
     # Same anchor_bytes ceiling the reference enforces on transitions
     # (key_transition_codec.ex:114).
-    if len(compact) > bounds_resolve(b, "anchor_bytes"):
-        fail(f"encode_anchored_export: transition {i} anchor_bytes")
-    seg = parse_compact(compact, b)
+    if len(compact) > _unwrap(bounds_resolve(b, "anchor_bytes")):
+        _fail(f"encode_anchored_export: transition {i} anchor_bytes")
+    seg = _parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != expected.current_key_id:
-        fail(f"encode_anchored_export: transition {i} kid")
-    p = json_decode(seg.payload_bytes, b)
+        _fail(f"encode_anchored_export: transition {i} kid")
+    p = _unwrap(json_decode(seg.payload_bytes, b))
     _validate_transition_payload(p, seg.payload_bytes, b)
     if not isinstance(p, JObject):
-        fail(f"encode_anchored_export: transition {i} payload")
+        _fail(f"encode_anchored_export: transition {i} payload")
     if _require_string_or_uri(p.v.get("transition_id"), "transition_id", b) != expected.transition_id:
-        fail(f"encode_anchored_export: transition {i} transition_id")
+        _fail(f"encode_anchored_export: transition {i} transition_id")
     if _require_string_or_uri(p.v.get("chain_id"), "chain_id", b) != expected.chain_id:
-        fail(f"encode_anchored_export: transition {i} chain_id")
+        _fail(f"encode_anchored_export: transition {i} chain_id")
     if _require_int(p.v.get("effective_at"), "effective_at") != _expected_int(
         expected.effective_at, f"encode_anchored_export: transition {i} effective_at type"
     ):
-        fail(f"encode_anchored_export: transition {i} effective_at")
+        _fail(f"encode_anchored_export: transition {i} effective_at")
     if not _bytes_equal(_require_b64url_n(p.v.get("from_key_fingerprint"), "from_key_fingerprint", 32), expected.current_key_fingerprint):
-        fail(f"encode_anchored_export: transition {i} from_key_fingerprint")
+        _fail(f"encode_anchored_export: transition {i} from_key_fingerprint")
     if not _bytes_equal(_require_b64url_n(p.v.get("to_key_fingerprint"), "to_key_fingerprint", 32), expected.next_key_fingerprint):
-        fail(f"encode_anchored_export: transition {i} to_key_fingerprint")
+        _fail(f"encode_anchored_export: transition {i} to_key_fingerprint")
     to_key_id = p.v.get("to_key_id")
-    if not isinstance(to_key_id, JString) or utf8_str(to_key_id.v) != expected.next_key_id:
-        fail(f"encode_anchored_export: transition {i} to_key_id")
+    if not isinstance(to_key_id, JString) or _unwrap(utf8_str(to_key_id.v)) != expected.next_key_id:
+        _fail(f"encode_anchored_export: transition {i} to_key_id")
     return seg.signature
 
 
@@ -2094,28 +2100,28 @@ def _validate_export_inputs(input_: AnchoredExportInput, expected: ExpectedExpor
     must not mint bytes its own consumer would reject."""
     chain = expected.chain
     # Transition count bound (anchored_export_codec.ex:360 transition_count <= bounds.key_transitions).
-    if len(input_.transitions) > bounds_resolve(b, "key_transitions"):
-        fail("encode_anchored_export: transition_count bound")
+    if len(input_.transitions) > _unwrap(bounds_resolve(b, "key_transitions")):
+        _fail("encode_anchored_export: transition_count bound")
     if len(expected.transitions) != len(input_.transitions):
-        fail("encode_anchored_export: transition count")
+        _fail("encode_anchored_export: transition count")
     # Anchor bindings (anchored_export_codec.ex:364-371): start spans first_sequence-1 with the
     # chain's previous_hash; end spans last_sequence with the chain's last_hash.
     if expected.start_anchor.sequence != chain.first_sequence - 1:
-        fail("encode_anchored_export: start sequence")
+        _fail("encode_anchored_export: start sequence")
     if not _bytes_equal(expected.start_anchor.chain_hash, chain.previous_hash):
-        fail("encode_anchored_export: start chain_hash")
+        _fail("encode_anchored_export: start chain_hash")
     if expected.end_anchor.sequence != chain.last_sequence:
-        fail("encode_anchored_export: end sequence")
+        _fail("encode_anchored_export: end sequence")
     if not _bytes_equal(expected.end_anchor.chain_hash, chain.last_hash):
-        fail("encode_anchored_export: end chain_hash")
+        _fail("encode_anchored_export: end chain_hash")
     # All transitions + both anchors carry the chain_id (anchored_export_codec.ex:361-363).
     for i, t in enumerate(expected.transitions):
         if t.chain_id != chain.chain_id:
-            fail(f"encode_anchored_export: transition {i} chain_id")
+            _fail(f"encode_anchored_export: transition {i} chain_id")
     if expected.start_anchor.chain_id != chain.chain_id:
-        fail("encode_anchored_export: start chain_id")
+        _fail("encode_anchored_export: start chain_id")
     if expected.end_anchor.chain_id != chain.chain_id:
-        fail("encode_anchored_export: end chain_id")
+        _fail("encode_anchored_export: end chain_id")
     # Key-path invariants (validate_expected_key_path): the no-transition path requires start==end key
     # identity with a chronologically-non-decreasing end anchored_at; the transition path requires strictly
     # increasing effective_at with no fingerprint cycle. Mirrored by _validate_key_path.
@@ -2124,33 +2130,33 @@ def _validate_export_inputs(input_: AnchoredExportInput, expected: ExpectedExpor
 
 def _build_archive_header(input_: AnchoredExportInput, chain: ExpectedChain, b: Bounds) -> bytes:
     if chain.chain_id != input_.chain_id:
-        fail("encode_anchored_export: chain_id")
+        _fail("encode_anchored_export: chain_id")
     if chain.first_sequence != input_.first_sequence:
-        fail("encode_anchored_export: first_sequence")
+        _fail("encode_anchored_export: first_sequence")
     if chain.last_sequence != input_.last_sequence:
-        fail("encode_anchored_export: last_sequence")
+        _fail("encode_anchored_export: last_sequence")
     if chain.row_count != input_.row_count:
-        fail("encode_anchored_export: row_count")
+        _fail("encode_anchored_export: row_count")
     members: dict[str, Tagged] = {
-        "chain_id": JString(str_utf8(chain.chain_id)),
+        "chain_id": JString(_unwrap(str_utf8(chain.chain_id))),
         "first_sequence": JInt(chain.first_sequence),
-        "last_hash": JString(str_utf8(utf8_str(base64url_encode(chain.last_hash)))),
+        "last_hash": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(chain.last_hash))))))),
         "last_sequence": JInt(chain.last_sequence),
-        "previous_hash": JString(str_utf8(utf8_str(base64url_encode(chain.previous_hash)))),
+        "previous_hash": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(chain.previous_hash))))))),
         "row_count": JInt(chain.row_count),
         "transition_count": JInt(len(input_.transitions)),
         "v": JInt(VERSION),
     }
-    header_bytes = jcs_encode(JObject(members), b)
-    if len(header_bytes) > bounds_resolve(b, "archive_header_bytes"):
-        fail("encode_anchored_export: header bytes")
+    header_bytes = _unwrap(jcs_encode(JObject(members), b))
+    if len(header_bytes) > _unwrap(bounds_resolve(b, "archive_header_bytes")):
+        _fail("encode_anchored_export: header bytes")
     return header_bytes
 
 
 def _frame(data: bytes) -> bytes:
     """UINT32_BE(len) || bytes — the archive framing (ADR 0004 § Anchored export)."""
     if len(data) == 0:
-        fail("archive: zero-length frame")
+        _fail("archive: zero-length frame")
     v = len(data)
     return bytes([(v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF]) + data
 
@@ -2162,73 +2168,73 @@ def verify_historical_anchor(compact: bytes, key: HistoricalPublicKey, expected:
 
 
 def _verify_historical_anchor_body(compact: bytes, key: HistoricalPublicKey, expected: ExpectedAnchor) -> AnchorFacts:
-    require(len(key.public_key) == 32, "verify_historical_anchor: key width")
+    _require(len(key.public_key) == 32, "verify_historical_anchor: key width")
     # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check, as
     # the reference does (boundary_anchor_codec.ex parses the compact + payload under bounds).
-    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
     # Key-window endpoints magnitude-bounded under the resolved bounds
     # (context_validation.ex valid_time? — the Rust round-4 parity fix; without
     # this the SDKs diverge on in-window times with out-of-magnitude windows).
     # The anchor_bytes compact ceiling at the STANDALONE verify entry (the
     # reference's parse guard, boundary_anchor_codec.ex:81-82 — cross-vendor
     # round 12: the encode helper's check does not run on this path).
-    if len(compact) > bounds_resolve(b, "anchor_bytes"):
-        fail("verify_historical_anchor: anchor_bytes")
+    if len(compact) > _unwrap(bounds_resolve(b, "anchor_bytes")):
+        _fail("verify_historical_anchor: anchor_bytes")
     _vf = _expected_int(key.valid_from, "verify_historical_anchor: valid_from type")
     _vb = (
         _expected_int(key.valid_before, "verify_historical_anchor: valid_before type")
         if key.valid_before is not None
         else None
     )
-    _mag = bounds_resolve(b, "integer_magnitude")
+    _mag = _unwrap(bounds_resolve(b, "integer_magnitude"))
     if abs(_vf) > _mag:
-        fail("verify_historical_anchor: valid_from magnitude")
+        _fail("verify_historical_anchor: valid_from magnitude")
     if _vb is not None and abs(_vb) > _mag:
-        fail("verify_historical_anchor: valid_before magnitude")
+        _fail("verify_historical_anchor: valid_before magnitude")
     if _vb is not None and _vb <= _vf:
-        fail("verify_historical_anchor: valid_before ordering")
-    seg = parse_compact(compact, b)
+        _fail("verify_historical_anchor: valid_before ordering")
+    seg = _parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != key.key_id:
-        fail("verify_historical_anchor: kid")
+        _fail("verify_historical_anchor: kid")
     if expected.key_id != key.key_id:
-        fail("verify_historical_anchor: expected key id")
-    p = json_decode(seg.payload_bytes, b)
+        _fail("verify_historical_anchor: expected key id")
+    p = _unwrap(json_decode(seg.payload_bytes, b))
     _validate_anchor_payload(p, seg.payload_bytes, b)
     if not isinstance(p, JObject):
-        fail("verify_historical_anchor: payload object")
+        _fail("verify_historical_anchor: payload object")
     anchor_id = _require_string_or_uri(p.v.get("anchor_id"), "anchor_id", b)
     if anchor_id != expected.anchor_id:
-        fail("verify_historical_anchor: anchor_id")
+        _fail("verify_historical_anchor: anchor_id")
     anchored_at = _require_int(p.v.get("anchored_at"), "anchored_at")
     if anchored_at != _expected_int(
         expected.anchored_at, "verify_historical_anchor: anchored_at type"
     ):
-        fail("verify_historical_anchor: anchored_at")
+        _fail("verify_historical_anchor: anchored_at")
     chain_id = _require_string_or_uri(p.v.get("chain_id"), "chain_id", b)
     if chain_id != expected.chain_id:
-        fail("verify_historical_anchor: chain_id")
+        _fail("verify_historical_anchor: chain_id")
     sequence = _require_int(p.v.get("sequence"), "sequence")
     if sequence != _expected_int(
         expected.sequence, "verify_historical_anchor: sequence type"
     ):
-        fail("verify_historical_anchor: sequence")
+        _fail("verify_historical_anchor: sequence")
     chain_hash = _require_b64url_n(p.v.get("chain_hash"), "chain_hash", 32)
     if not _bytes_equal(chain_hash, expected.chain_hash):
-        fail("verify_historical_anchor: chain_hash")
+        _fail("verify_historical_anchor: chain_hash")
     key_fp_raw = _require_b64url_n(p.v.get("key_fingerprint"), "key_fingerprint", 32)
     if not _bytes_equal(key_fp_raw, expected.key_fingerprint):
-        fail("verify_historical_anchor: key_fingerprint")
+        _fail("verify_historical_anchor: key_fingerprint")
     if expected.sequence == 0 and not _bytes_equal(expected.chain_hash, DEFAULT_HASH):
-        fail("verify_historical_anchor: genesis hash")
-    derived_fp = thumbprint_raw(jwk_from_public_key(key.public_key))
+        _fail("verify_historical_anchor: genesis hash")
+    derived_fp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(key.public_key))))
     if not _bytes_equal(derived_fp, expected.key_fingerprint):
-        fail("verify_historical_anchor: fingerprint")
+        _fail("verify_historical_anchor: fingerprint")
     if not _in_window(anchored_at, key):
-        fail("verify_historical_anchor: window")
-    pk = import_public_key(key.public_key, utf8_str(base64url_encode(derived_fp)))
-    if not ed25519_verify(seg.signing_input, seg.signature, pk):
-        fail("verify_historical_anchor: signature")
+        _fail("verify_historical_anchor: window")
+    pk = _import_public_key(key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_fp)))))
+    if not _ed25519_verify(seg.signing_input, seg.signature, pk):
+        _fail("verify_historical_anchor: signature")
     from .facts import AnchorFacts
 
     return AnchorFacts(
@@ -2244,16 +2250,16 @@ def verify_key_transition(compact: bytes, old_key: HistoricalPublicKey, new_key:
 
 
 def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, new_key: HistoricalPublicKey, expected: ExpectedKeyTransition) -> KeyTransitionFacts:
-    require(len(old_key.public_key) == 32 and len(new_key.public_key) == 32, "verify_key_transition: key width")
+    _require(len(old_key.public_key) == 32 and len(new_key.public_key) == 32, "verify_key_transition: key width")
     if _bytes_equal(old_key.public_key, new_key.public_key):
-        fail("verify_key_transition: distinct keys")
+        _fail("verify_key_transition: distinct keys")
     # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check.
-    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
     # Key-window endpoints magnitude-bounded (both keys — the Rust parity).
     # The anchor_bytes compact ceiling at the STANDALONE verify entry
     # (key_transition_codec.ex:114 — cross-vendor round 12).
-    if len(compact) > bounds_resolve(b, "anchor_bytes"):
-        fail("verify_key_transition: anchor_bytes")
+    if len(compact) > _unwrap(bounds_resolve(b, "anchor_bytes")):
+        _fail("verify_key_transition: anchor_bytes")
     _ovf = _expected_int(old_key.valid_from, "verify_key_transition: valid_from type")
     _nvf = _expected_int(new_key.valid_from, "verify_key_transition: valid_from type")
     _ovb = (
@@ -2266,58 +2272,58 @@ def _verify_key_transition_body(compact: bytes, old_key: HistoricalPublicKey, ne
         if new_key.valid_before is not None
         else None
     )
-    _mag = bounds_resolve(b, "integer_magnitude")
+    _mag = _unwrap(bounds_resolve(b, "integer_magnitude"))
     if abs(_ovf) > _mag or abs(_nvf) > _mag:
-        fail("verify_key_transition: valid_from magnitude")
+        _fail("verify_key_transition: valid_from magnitude")
     if (_ovb is not None and abs(_ovb) > _mag) or (_nvb is not None and abs(_nvb) > _mag):
-        fail("verify_key_transition: valid_before magnitude")
+        _fail("verify_key_transition: valid_before magnitude")
     if (_ovb is not None and _ovb <= _ovf) or (_nvb is not None and _nvb <= _nvf):
-        fail("verify_key_transition: valid_before ordering")
-    seg = parse_compact(compact, b)
+        _fail("verify_key_transition: valid_before ordering")
+    seg = _parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != old_key.key_id:
-        fail("verify_key_transition: kid")
+        _fail("verify_key_transition: kid")
     if expected.current_key_id != old_key.key_id:
-        fail("verify_key_transition: current key id")
+        _fail("verify_key_transition: current key id")
     if expected.next_key_id != new_key.key_id:
-        fail("verify_key_transition: next key id")
-    p = json_decode(seg.payload_bytes, b)
+        _fail("verify_key_transition: next key id")
+    p = _unwrap(json_decode(seg.payload_bytes, b))
     _validate_transition_payload(p, seg.payload_bytes, b)
     if not isinstance(p, JObject):
-        fail("verify_key_transition: payload object")
+        _fail("verify_key_transition: payload object")
     transition_id = _require_string_or_uri(p.v.get("transition_id"), "transition_id", b)
     if transition_id != expected.transition_id:
-        fail("verify_key_transition: transition_id")
+        _fail("verify_key_transition: transition_id")
     chain_id = _require_string_or_uri(p.v.get("chain_id"), "chain_id", b)
     if chain_id != expected.chain_id:
-        fail("verify_key_transition: chain_id")
+        _fail("verify_key_transition: chain_id")
     effective_at = _require_int(p.v.get("effective_at"), "effective_at")
     if effective_at != _expected_int(
         expected.effective_at, "verify_key_transition: effective_at type"
     ):
-        fail("verify_key_transition: effective_at")
+        _fail("verify_key_transition: effective_at")
     from_fp_raw = _require_b64url_n(p.v.get("from_key_fingerprint"), "from_key_fingerprint", 32)
     if not _bytes_equal(from_fp_raw, expected.current_key_fingerprint):
-        fail("verify_key_transition: from fp")
+        _fail("verify_key_transition: from fp")
     to_fp_raw = _require_b64url_n(p.v.get("to_key_fingerprint"), "to_key_fingerprint", 32)
     if not _bytes_equal(to_fp_raw, expected.next_key_fingerprint):
-        fail("verify_key_transition: to fp")
+        _fail("verify_key_transition: to fp")
     to_key_id_v = p.v["to_key_id"]
-    if not isinstance(to_key_id_v, JString) or utf8_str(to_key_id_v.v) != expected.next_key_id:
-        fail("verify_key_transition: to_key_id")
-    derived_from = thumbprint_raw(jwk_from_public_key(old_key.public_key))
+    if not isinstance(to_key_id_v, JString) or _unwrap(utf8_str(to_key_id_v.v)) != expected.next_key_id:
+        _fail("verify_key_transition: to_key_id")
+    derived_from = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(old_key.public_key))))
     if not _bytes_equal(derived_from, expected.current_key_fingerprint):
-        fail("verify_key_transition: current fp")
-    derived_to = thumbprint_raw(jwk_from_public_key(new_key.public_key))
+        _fail("verify_key_transition: current fp")
+    derived_to = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(new_key.public_key))))
     if not _bytes_equal(derived_to, expected.next_key_fingerprint):
-        fail("verify_key_transition: next fp")
+        _fail("verify_key_transition: next fp")
     if not _in_window(effective_at, old_key):
-        fail("verify_key_transition: current window")
+        _fail("verify_key_transition: current window")
     if not _in_window(effective_at, new_key):
-        fail("verify_key_transition: next window")
-    pk = import_public_key(old_key.public_key, utf8_str(base64url_encode(derived_from)))
-    if not ed25519_verify(seg.signing_input, seg.signature, pk):
-        fail("verify_key_transition: signature")
+        _fail("verify_key_transition: next window")
+    pk = _import_public_key(old_key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_from)))))
+    if not _ed25519_verify(seg.signing_input, seg.signature, pk):
+        _fail("verify_key_transition: signature")
     from .facts import KeyTransitionFacts
 
     return KeyTransitionFacts(
@@ -2338,10 +2344,10 @@ def _pre_identifier(value: object, ctx: str, bounds: Bounds) -> None:
     if (
         not isinstance(value, str)
         or _utf8_bytes(value, ctx) < 1
-        or _utf8_bytes(value, ctx) > bounds_resolve(bounds, "identifier_bytes")
+        or _utf8_bytes(value, ctx) > _unwrap(bounds_resolve(bounds, "identifier_bytes"))
         or not _is_string_or_uri(value)
     ):
-        fail(ctx)
+        _fail(ctx)
 
 
 def _verify_anchored_export_body(archived: ArchivedObject, key_chain: HistoricalKeyChain, expected: ExpectedExport) -> AnchoredExportFacts:
@@ -2358,70 +2364,70 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # chunks, and hash_chunks; the SDK previously ran these gates only post-digest
     # (verdict-invariant by subsumption — the WORK ordering is the contract, and the
     # malformed-expected legs assert zero sha256 calls).
-    _bpre = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
-    _mpre = bounds_resolve(_bpre, "integer_magnitude")
+    _bpre = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
+    _mpre = _unwrap(bounds_resolve(_bpre, "integer_magnitude"))
     # Cross-vendor round 18 (claude): the count ceiling BEFORE the hoisted per-element walk
     # (the round-3 invariant — the hoist must not regress it; the TS sibling ordered this
     # way from the start).
-    if len(expected.transitions) > bounds_resolve(_bpre, "key_transitions"):
-        fail("verify_anchored_export: transition count bound")
+    if len(expected.transitions) > _unwrap(bounds_resolve(_bpre, "key_transitions")):
+        _fail("verify_anchored_export: transition count bound")
     _pre_identifier(expected.chain.chain_id, "verify_anchored_export: chain chain_id", _bpre)
     if (
         expected.chain.first_sequence < 1 or expected.chain.first_sequence > _mpre
         or expected.chain.last_sequence < 1 or expected.chain.last_sequence > _mpre
         or expected.chain.first_sequence > expected.chain.last_sequence
     ):
-        fail("verify_anchored_export: chain range")
+        _fail("verify_anchored_export: chain range")
     if (
         expected.chain.row_count < 1
-        or expected.chain.row_count > bounds_resolve(_bpre, "chain_rows")
+        or expected.chain.row_count > _unwrap(bounds_resolve(_bpre, "chain_rows"))
         or expected.chain.row_count != expected.chain.last_sequence - expected.chain.first_sequence + 1
     ):
-        fail("verify_anchored_export: chain count")
+        _fail("verify_anchored_export: chain count")
     if len(expected.chain.previous_hash) != 32 or len(expected.chain.last_hash) != 32:
-        fail("verify_anchored_export: chain hash width")
+        _fail("verify_anchored_export: chain hash width")
     if expected.chain.first_sequence == 1 and not _bytes_equal(expected.chain.previous_hash, DEFAULT_HASH):
-        fail("verify_anchored_export: chain genesis")
+        _fail("verify_anchored_export: chain genesis")
     for _anch, _which in ((expected.start_anchor, "start"), (expected.end_anchor, "end")):
         _pre_identifier(_anch.anchor_id, f"verify_anchored_export: {_which} anchor_id", _bpre)
         _pre_identifier(_anch.chain_id, f"verify_anchored_export: {_which} chain_id", _bpre)
         _aa = _expected_int(_anch.anchored_at, f"verify_anchored_export: {_which} anchored_at type")
         if abs(_aa) > _mpre:
-            fail(f"verify_anchored_export: {_which} anchored_at magnitude")
+            _fail(f"verify_anchored_export: {_which} anchored_at magnitude")
         _sq = _expected_int(_anch.sequence, f"verify_anchored_export: {_which} sequence type")
         if _sq < 0 or _sq > _mpre:
-            fail(f"verify_anchored_export: {_which} sequence range")
+            _fail(f"verify_anchored_export: {_which} sequence range")
         if (
             not isinstance(_anch.key_id, str)
-            or not (1 <= _utf8_bytes(_anch.key_id, f"verify_anchored_export: {_which} key_id") <= bounds_resolve(_bpre, "kid_bytes"))
+            or not (1 <= _utf8_bytes(_anch.key_id, f"verify_anchored_export: {_which} key_id") <= _unwrap(bounds_resolve(_bpre, "kid_bytes")))
             or _KID_CHARSET.match(_anch.key_id) is None
         ):
-            fail(f"verify_anchored_export: {_which} key_id")
+            _fail(f"verify_anchored_export: {_which} key_id")
         if len(_anch.chain_hash) != 32 or len(_anch.key_fingerprint) != 32:
-            fail(f"verify_anchored_export: {_which} hash width")
+            _fail(f"verify_anchored_export: {_which} hash width")
         if _sq == 0 and not _bytes_equal(_anch.chain_hash, DEFAULT_HASH):
-            fail(f"verify_anchored_export: {_which} genesis")
+            _fail(f"verify_anchored_export: {_which} genesis")
     for _ti, _t in enumerate(expected.transitions):
         _pre_identifier(_t.transition_id, f"verify_anchored_export: transition {_ti} id", _bpre)
         _pre_identifier(_t.chain_id, f"verify_anchored_export: transition {_ti} chain_id", _bpre)
         _eat = _expected_int(_t.effective_at, f"verify_anchored_export: transition {_ti} effective_at type")
         if abs(_eat) > _mpre:
-            fail(f"verify_anchored_export: transition {_ti} effective_at magnitude")
+            _fail(f"verify_anchored_export: transition {_ti} effective_at magnitude")
         for _kid in (_t.current_key_id, _t.next_key_id):
             if (
                 not isinstance(_kid, str)
-                or not (1 <= _utf8_bytes(_kid, f"verify_anchored_export: transition {_ti} key_id") <= bounds_resolve(_bpre, "kid_bytes"))
+                or not (1 <= _utf8_bytes(_kid, f"verify_anchored_export: transition {_ti} key_id") <= _unwrap(bounds_resolve(_bpre, "kid_bytes")))
                 or _KID_CHARSET.match(_kid) is None
             ):
-                fail(f"verify_anchored_export: transition {_ti} key_id")
+                _fail(f"verify_anchored_export: transition {_ti} key_id")
         if len(_t.current_key_fingerprint) != 32 or len(_t.next_key_fingerprint) != 32 or _bytes_equal(_t.current_key_fingerprint, _t.next_key_fingerprint):
-            fail(f"verify_anchored_export: transition {_ti} fingerprints")
+            _fail(f"verify_anchored_export: transition {_ti} fingerprints")
     _vb0 = _bpre
     # Key-window validity BEFORE chunk processing/hashing (the reference validates
     # key shapes at :91 before validate_chunks — malformed intervals should not
     # force processing of the full archive).
     if len(key_chain.keys) != len(expected.transitions) + 1:
-        fail("verify_anchored_export: key count bound")
+        _fail("verify_anchored_export: key count bound")
     # Expected-side identifier strings used in header construction must be
     # well-formed BEFORE the digest (cross-vendor round 16: a lone-surrogate
     # chain_id raised UnicodeEncodeError out of the Result API at the
@@ -2435,52 +2441,52 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # oversized key ID reached the SHA-256 call in a live probe — the window
     # gates alone were incomplete pre-hash validation).
     for _k in key_chain.keys:
-        if not isinstance(_k.key_id, str) or not _k.key_id or len(_k.key_id) > bounds_resolve(_vb0, "kid_bytes") or _utf8_bytes(_k.key_id, "verify_anchored_export: key id encoding") > bounds_resolve(_vb0, "kid_bytes"):
-            fail("verify_anchored_export: key id shape")
+        if not isinstance(_k.key_id, str) or not _k.key_id or len(_k.key_id) > _unwrap(bounds_resolve(_vb0, "kid_bytes")) or _utf8_bytes(_k.key_id, "verify_anchored_export: key id encoding") > _unwrap(bounds_resolve(_vb0, "kid_bytes")):
+            _fail("verify_anchored_export: key id shape")
         # the reference's ASCII-unreserved key_id class, pre-hash (round 15)
         if not _k.key_id.isascii() or not all(c.isalnum() or c in "-._~" for c in _k.key_id):
-            fail("verify_anchored_export: key id charset")
+            _fail("verify_anchored_export: key id charset")
         # (the isinstance half is owned by the _closed_shape gate — exact bytes;
         # the WIDTH is still this gate's to check)
         if len(_k.public_key) != 32:
-            fail("verify_anchored_export: key width")
+            _fail("verify_anchored_export: key width")
     for _k in key_chain.keys:
         _vf0 = _expected_int(_k.valid_from, "verify_anchored_export: key valid_from type")
         _vbv0 = _expected_int(_k.valid_before, "verify_anchored_export: key valid_before type") if _k.valid_before is not None else None
-        _mag0 = bounds_resolve(_vb0, "integer_magnitude")
+        _mag0 = _unwrap(bounds_resolve(_vb0, "integer_magnitude"))
         if abs(_vf0) > _mag0:
-            fail("verify_anchored_export: key valid_from magnitude")
+            _fail("verify_anchored_export: key valid_from magnitude")
         if _vbv0 is not None and abs(_vbv0) > _mag0:
-            fail("verify_anchored_export: key valid_before magnitude")
+            _fail("verify_anchored_export: key valid_before magnitude")
         if _vbv0 is not None and _vbv0 <= _vf0:
-            fail("verify_anchored_export: key valid_before ordering")
+            _fail("verify_anchored_export: key valid_before ordering")
 
     # Static expected-side bindings (reference validate_expected_anchored_export →
     # validate_expected_export, anchored_export_codec.ex:362-371, reached at verify
     # :92/:387): the caller's expected anchors + transitions belong to the expected
     # chain (cross-vendor round 2: none of the six were enforced at verify).
     if expected.start_anchor.chain_id != expected.chain.chain_id:
-        fail("verify_anchored_export: start chain_id")
+        _fail("verify_anchored_export: start chain_id")
     if expected.end_anchor.chain_id != expected.chain.chain_id:
-        fail("verify_anchored_export: end chain_id")
+        _fail("verify_anchored_export: end chain_id")
     if expected.start_anchor.sequence != expected.chain.first_sequence - 1:
-        fail("verify_anchored_export: start sequence")
+        _fail("verify_anchored_export: start sequence")
     if not _bytes_equal(expected.start_anchor.chain_hash, expected.chain.previous_hash):
-        fail("verify_anchored_export: start chain_hash")
+        _fail("verify_anchored_export: start chain_hash")
     if expected.end_anchor.sequence != expected.chain.last_sequence:
-        fail("verify_anchored_export: end sequence")
+        _fail("verify_anchored_export: end sequence")
     if not _bytes_equal(expected.end_anchor.chain_hash, expected.chain.last_hash):
-        fail("verify_anchored_export: end chain_hash")
+        _fail("verify_anchored_export: end chain_hash")
     for _i, _t in enumerate(expected.transitions):
         if _t.chain_id != expected.chain.chain_id:
-            fail(f"verify_anchored_export: transition {_i} chain_id")
+            _fail(f"verify_anchored_export: transition {_i} chain_id")
 
     # BAP-09 #10/#11: the reference resolves Bounds.coerce(expected.bounds) once
     # (anchored_export_codec.ex:84-185) and threads it into validate_chunks (archive_chunks,
     # archive_bytes), parse_archive (frame reads), and every row check. The inner anchors/transitions
     # carry their own bounds (used by their own compact parsers). A caller tightening via
     # expected.bounds now takes effect.
-    b = coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
+    b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
     # Cross-vendor (nested bounds pinning): the reference (anchored_export_codec.ex:352-354, :404-406)
     # pins every nested bounds to the top-level resolved bounds via `{:ok, ^bounds} <- Bounds.coerce(x.bounds)`.
     # The SDK previously preferred the outer bounds and silently discarded the nested value; pin them
@@ -2493,10 +2499,10 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # Version shape (UTF-8 BYTES, the reference byte_size) + equality BEFORE the
     # digest (cross-vendor round 12: malformed metadata should not force
     # maximum-sized hashing).
-    if not isinstance(archived.version, str) or not archived.version or len(archived.version) > bounds_resolve(b, "object_version_bytes") or not isinstance(expected.object_version, str) or not expected.object_version or len(expected.object_version) > bounds_resolve(b, "object_version_bytes") or _utf8_bytes(archived.version, "verify_anchored_export: version encoding") > bounds_resolve(b, "object_version_bytes") or _utf8_bytes(expected.object_version, "verify_anchored_export: version encoding") > bounds_resolve(b, "object_version_bytes"):
-        fail("verify_anchored_export: version shape")
+    if not isinstance(archived.version, str) or not archived.version or len(archived.version) > _unwrap(bounds_resolve(b, "object_version_bytes")) or not isinstance(expected.object_version, str) or not expected.object_version or len(expected.object_version) > _unwrap(bounds_resolve(b, "object_version_bytes")) or _utf8_bytes(archived.version, "verify_anchored_export: version encoding") > _unwrap(bounds_resolve(b, "object_version_bytes")) or _utf8_bytes(expected.object_version, "verify_anchored_export: version encoding") > _unwrap(bounds_resolve(b, "object_version_bytes")):
+        _fail("verify_anchored_export: version shape")
     if archived.version != expected.object_version:
-        fail("verify_anchored_export: object version")
+        _fail("verify_anchored_export: object version")
     # Validate the chunk list BEFORE concatenation (mirrors anchored_export_codec.ex:101-102,333-342
     # validate_chunks): each chunk nonempty, count < archive_chunks, total ≤ archive_bytes. Hashing
     # happens after the shape is validated.
@@ -2506,29 +2512,29 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # inauthentic/oversized archive is rejected at the digest compare before the parse materializes
     # the bytes (BAP-15 Rust precedent, v1.rs:30-40). archive_bytes is already enforced by
     # _validate_chunks (running total), so no post-materialization byte bound is needed.
-    digest = sha256(*archived.chunks)
+    digest = _unwrap(sha256(*archived.chunks))
     if not _bytes_equal(digest, expected.digest):
-        fail("verify_anchored_export: digest")
+        _fail("verify_anchored_export: digest")
     # (the version SHAPE + equality gates ran before the digest — round 12.)
     # Materialize for parsing ONLY after the digest matches (caller-legitimate, bounded archive).
     archive = b"".join(archived.chunks)
     if len(archive) <= len(ARCHIVE_PREFIX):
-        fail("verify_anchored_export: archive too short")
+        _fail("verify_anchored_export: archive too short")
     parsed = _parse_archive(archive, b)
     # Header canonical equality.
     header_members: dict[str, Tagged] = {
-        "chain_id": JString(str_utf8(expected.chain.chain_id)),
+        "chain_id": JString(_unwrap(str_utf8(expected.chain.chain_id))),
         "first_sequence": JInt(expected.chain.first_sequence),
-        "last_hash": JString(str_utf8(utf8_str(base64url_encode(expected.chain.last_hash)))),
+        "last_hash": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(expected.chain.last_hash))))))),
         "last_sequence": JInt(expected.chain.last_sequence),
-        "previous_hash": JString(str_utf8(utf8_str(base64url_encode(expected.chain.previous_hash)))),
+        "previous_hash": JString(_unwrap(str_utf8(_unwrap(utf8_str(_unwrap(base64url_encode(expected.chain.previous_hash))))))),
         "row_count": JInt(expected.chain.row_count),
         "transition_count": JInt(len(expected.transitions)),
         "v": JInt(VERSION),
     }
-    expected_header_bytes = jcs_encode(JObject(header_members), b)
+    expected_header_bytes = _unwrap(jcs_encode(JObject(header_members), b))
     if not _bytes_equal(parsed.header_bytes, expected_header_bytes):
-        fail("verify_anchored_export: header")
+        _fail("verify_anchored_export: header")
     # Verify start + end anchors + each transition against the ordered historical key chain.
     # A key chain of N keys spans N-1 transitions (keys[0]->[1], ..., keys[N-2]->[N-1]); a 1-key,
     # 0-transition archive is the no-rollover case the reference accepts (validate_historical_key_shapes
@@ -2536,9 +2542,9 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     # Cross-vendor re-review F2: validate the key-chain length BEFORE dereferencing keys[0]/keys[-1]
     # so a zero-key chain fails closed (Err) instead of raising IndexError.
     if len(parsed.transitions) != len(expected.transitions):
-        fail("verify_anchored_export: transition count")
+        _fail("verify_anchored_export: transition count")
     if len(key_chain.keys) != len(parsed.transitions) + 1:
-        fail("verify_anchored_export: key chain length")
+        _fail("verify_anchored_export: key chain length")
     # Cross-vendor re-review F1: pass the export-level resolved bounds b so a top-level tightening
     # takes effect in the nested anchor/transition verification (not just the nested struct's bounds).
     _verify_anchor_compact(parsed.start, key_chain.keys[0], expected.start_anchor, "verify_anchored_export start", b)
@@ -2557,42 +2563,42 @@ def _verify_anchored_export_body(archived: ArchivedObject, key_chain: Historical
     transition_time = expected.start_anchor.anchored_at
     for i, t in enumerate(expected.transitions):
         if not (t.effective_at > transition_time):
-            fail(f"verify_anchored_export transition {i}: chronology")
+            _fail(f"verify_anchored_export transition {i}: chronology")
         transition_time = t.effective_at
     if not (expected.end_anchor.anchored_at >= transition_time):
-        fail("verify_anchored_export: end chronology")
+        _fail("verify_anchored_export: end chronology")
     # Re-check every row (REQ1-EXPORT-complete-scan; mirrors check_chain).
     previous = expected.chain.previous_hash
     sequence = expected.chain.first_sequence
     if expected.chain.first_sequence == 1 and not _bytes_equal(previous, DEFAULT_HASH):
-        fail("verify_anchored_export: genesis predecessor")
+        _fail("verify_anchored_export: genesis predecessor")
     if len(parsed.rows) != expected.chain.row_count:
-        fail("verify_anchored_export: row count")
+        _fail("verify_anchored_export: row count")
     for i, row_bytes in enumerate(parsed.rows):
-        row = json_decode(row_bytes, b)
+        row = _unwrap(json_decode(row_bytes, b))
         row = _require_object_exact(row, ["v", "chain_id", "sequence", "previous", "commitment"], f"verify_anchored_export row {i}")
         v_v = row.v["v"]
         if not isinstance(v_v, JInt) or v_v.v != VERSION:
-            fail(f"verify_anchored_export row {i}: v")
+            _fail(f"verify_anchored_export row {i}: v")
         cid_v = row.v["chain_id"]
-        if not isinstance(cid_v, JString) or utf8_str(cid_v.v) != expected.chain.chain_id:
-            fail(f"verify_anchored_export row {i}: chain_id")
+        if not isinstance(cid_v, JString) or _unwrap(utf8_str(cid_v.v)) != expected.chain.chain_id:
+            _fail(f"verify_anchored_export row {i}: chain_id")
         seq_v = row.v["sequence"]
         if not isinstance(seq_v, JInt) or seq_v.v != sequence:
-            fail(f"verify_anchored_export row {i}: sequence")
+            _fail(f"verify_anchored_export row {i}: sequence")
         if seq_v.v < 1:
-            fail(f"verify_anchored_export row {i}: sequence positive")
+            _fail(f"verify_anchored_export row {i}: sequence positive")
         prev_raw = _require_b64url_n(row.v.get("previous"), "previous", 32)
         if not _bytes_equal(prev_raw, previous):
-            fail(f"verify_anchored_export row {i}: previous link")
+            _fail(f"verify_anchored_export row {i}: previous link")
         commitment_raw = _require_b64url_n(row.v.get("commitment"), "commitment", 32)
         re_encoded = _canonical_row_bytes(expected.chain.chain_id, seq_v.v, prev_raw, commitment_raw, b)
         if not _bytes_equal(re_encoded, row_bytes):
-            fail(f"verify_anchored_export row {i}: canonical")
-        previous = sha256(ROW_PREFIX, row_bytes)
+            _fail(f"verify_anchored_export row {i}: canonical")
+        previous = _unwrap(sha256(ROW_PREFIX, row_bytes))
         sequence += 1
     if not _bytes_equal(previous, expected.chain.last_hash):
-        fail("verify_anchored_export: head")
+        _fail("verify_anchored_export: head")
     from .facts import AnchoredExportFacts
 
     return AnchoredExportFacts(
@@ -2621,7 +2627,7 @@ class ExpectedExport:
 
 
 def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: ExpectedAnchor, ctx: str, bounds: Bounds | None = None) -> None:
-    require(len(key.public_key) == 32, f"{ctx}: key width")
+    _require(len(key.public_key) == 32, f"{ctx}: key width")
     # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check. When
     # an enclosing export passes its own resolved bounds (cross-vendor re-review F1), prefer it over
     # the nested anchor's bounds so the top-level tightening takes effect.
@@ -2630,61 +2636,61 @@ def _verify_anchor_compact(compact: bytes, key: HistoricalPublicKey, expected: E
     # gates — cross-vendor round 7: the archive path skipped them).
     _vf = _expected_int(key.valid_from, f"{ctx}: valid_from type")
     _vb = _expected_int(key.valid_before, f"{ctx}: valid_before type") if key.valid_before is not None else None
-    _mag = bounds_resolve(b, "integer_magnitude")
+    _mag = _unwrap(bounds_resolve(b, "integer_magnitude"))
     if abs(_vf) > _mag:
-        fail(f"{ctx}: valid_from magnitude")
+        _fail(f"{ctx}: valid_from magnitude")
     if _vb is not None and abs(_vb) > _mag:
-        fail(f"{ctx}: valid_before magnitude")
+        _fail(f"{ctx}: valid_before magnitude")
     if _vb is not None and _vb <= _vf:
-        fail(f"{ctx}: valid_before ordering")
-    seg = parse_compact(compact, b)
+        _fail(f"{ctx}: valid_before ordering")
+    seg = _parse_compact(compact, b)
     kid = _parse_anchor_header(seg, b)
     if kid != key.key_id:
-        fail(f"{ctx}: kid")
+        _fail(f"{ctx}: kid")
     if expected.key_id != key.key_id:
-        fail(f"{ctx}: expected key id")
-    p = json_decode(seg.payload_bytes, b)
+        _fail(f"{ctx}: expected key id")
+    p = _unwrap(json_decode(seg.payload_bytes, b))
     _validate_anchor_payload(p, seg.payload_bytes, b)
     if not isinstance(p, JObject):
-        fail(f"{ctx}: payload object")
+        _fail(f"{ctx}: payload object")
     anchor_id = _require_string_or_uri(p.v.get("anchor_id"), "anchor_id", b)
     if anchor_id != expected.anchor_id:
-        fail(f"{ctx}: anchor_id")
+        _fail(f"{ctx}: anchor_id")
     anchored_at = _require_int(p.v.get("anchored_at"), "anchored_at")
     if anchored_at != _expected_int(
         expected.anchored_at, f"{ctx}: anchored_at type"
     ):
-        fail(f"{ctx}: anchored_at")
+        _fail(f"{ctx}: anchored_at")
     chain_id = _require_string_or_uri(p.v.get("chain_id"), "chain_id", b)
     if chain_id != expected.chain_id:
-        fail(f"{ctx}: chain_id")
+        _fail(f"{ctx}: chain_id")
     sequence = _require_int(p.v.get("sequence"), "sequence")
     if sequence != _expected_int(
         expected.sequence, f"{ctx}: sequence type"
     ):
-        fail(f"{ctx}: sequence")
+        _fail(f"{ctx}: sequence")
     chain_hash = _require_b64url_n(p.v.get("chain_hash"), "chain_hash", 32)
     if not _bytes_equal(chain_hash, expected.chain_hash):
-        fail(f"{ctx}: chain_hash")
+        _fail(f"{ctx}: chain_hash")
     key_fp_raw = _require_b64url_n(p.v.get("key_fingerprint"), "key_fingerprint", 32)
     if not _bytes_equal(key_fp_raw, expected.key_fingerprint):
-        fail(f"{ctx}: key_fingerprint")
+        _fail(f"{ctx}: key_fingerprint")
     if expected.sequence == 0 and not _bytes_equal(expected.chain_hash, DEFAULT_HASH):
-        fail(f"{ctx}: genesis hash")
-    derived_fp = thumbprint_raw(jwk_from_public_key(key.public_key))
+        _fail(f"{ctx}: genesis hash")
+    derived_fp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(key.public_key))))
     if not _bytes_equal(derived_fp, expected.key_fingerprint):
-        fail(f"{ctx}: fingerprint")
+        _fail(f"{ctx}: fingerprint")
     if not _in_window(anchored_at, key):
-        fail(f"{ctx}: window")
-    pk = import_public_key(key.public_key, utf8_str(base64url_encode(derived_fp)))
-    if not ed25519_verify(seg.signing_input, seg.signature, pk):
-        fail(f"{ctx}: signature")
+        _fail(f"{ctx}: window")
+    pk = _import_public_key(key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_fp)))))
+    if not _ed25519_verify(seg.signing_input, seg.signature, pk):
+        _fail(f"{ctx}: signature")
 
 
 def _verify_transition_compact(compact: bytes, current_key: HistoricalPublicKey, next_key: HistoricalPublicKey, expected: ExpectedKeyTransition, ctx: str, bounds: Bounds | None = None) -> None:
-    require(len(current_key.public_key) == 32 and len(next_key.public_key) == 32, f"{ctx}: key width")
+    _require(len(current_key.public_key) == 32 and len(next_key.public_key) == 32, f"{ctx}: key width")
     if _bytes_equal(current_key.public_key, next_key.public_key):
-        fail(f"{ctx}: distinct keys")
+        _fail(f"{ctx}: distinct keys")
     # BAP-09 #10/#11: thread expected.bounds (resolved once) through every bound-sensitive check. When
     # an enclosing export passes its own resolved bounds (cross-vendor re-review F1), prefer it over
     # the nested transition's bounds so the top-level tightening takes effect.
@@ -2695,58 +2701,58 @@ def _verify_transition_compact(compact: bytes, current_key: HistoricalPublicKey,
     _nvf = _expected_int(next_key.valid_from, f"{ctx}: valid_from type")
     _ovb = _expected_int(current_key.valid_before, f"{ctx}: valid_before type") if current_key.valid_before is not None else None
     _nvb = _expected_int(next_key.valid_before, f"{ctx}: valid_before type") if next_key.valid_before is not None else None
-    _mag = bounds_resolve(b, "integer_magnitude")
+    _mag = _unwrap(bounds_resolve(b, "integer_magnitude"))
     if abs(_ovf) > _mag or abs(_nvf) > _mag:
-        fail(f"{ctx}: valid_from magnitude")
+        _fail(f"{ctx}: valid_from magnitude")
     if (_ovb is not None and abs(_ovb) > _mag) or (_nvb is not None and abs(_nvb) > _mag):
-        fail(f"{ctx}: valid_before magnitude")
+        _fail(f"{ctx}: valid_before magnitude")
     if (_ovb is not None and _ovb <= _ovf) or (_nvb is not None and _nvb <= _nvf):
-        fail(f"{ctx}: valid_before ordering")
-    seg = parse_compact(compact, b)
+        _fail(f"{ctx}: valid_before ordering")
+    seg = _parse_compact(compact, b)
     kid = _parse_transition_header(seg, b)
     if kid != current_key.key_id:
-        fail(f"{ctx}: kid")
+        _fail(f"{ctx}: kid")
     if expected.current_key_id != current_key.key_id:
-        fail(f"{ctx}: current key id")
+        _fail(f"{ctx}: current key id")
     if expected.next_key_id != next_key.key_id:
-        fail(f"{ctx}: next key id")
-    p = json_decode(seg.payload_bytes, b)
+        _fail(f"{ctx}: next key id")
+    p = _unwrap(json_decode(seg.payload_bytes, b))
     _validate_transition_payload(p, seg.payload_bytes, b)
     if not isinstance(p, JObject):
-        fail(f"{ctx}: payload object")
+        _fail(f"{ctx}: payload object")
     transition_id = _require_string_or_uri(p.v.get("transition_id"), "transition_id", b)
     if transition_id != expected.transition_id:
-        fail(f"{ctx}: transition_id")
+        _fail(f"{ctx}: transition_id")
     chain_id = _require_string_or_uri(p.v.get("chain_id"), "chain_id", b)
     if chain_id != expected.chain_id:
-        fail(f"{ctx}: chain_id")
+        _fail(f"{ctx}: chain_id")
     effective_at = _require_int(p.v.get("effective_at"), "effective_at")
     if effective_at != _expected_int(
         expected.effective_at, f"{ctx}: effective_at type"
     ):
-        fail(f"{ctx}: effective_at")
+        _fail(f"{ctx}: effective_at")
     from_fp_raw = _require_b64url_n(p.v.get("from_key_fingerprint"), "from_key_fingerprint", 32)
     if not _bytes_equal(from_fp_raw, expected.current_key_fingerprint):
-        fail(f"{ctx}: from fp")
+        _fail(f"{ctx}: from fp")
     to_fp_raw = _require_b64url_n(p.v.get("to_key_fingerprint"), "to_key_fingerprint", 32)
     if not _bytes_equal(to_fp_raw, expected.next_key_fingerprint):
-        fail(f"{ctx}: to fp")
+        _fail(f"{ctx}: to fp")
     to_key_id_v = p.v["to_key_id"]
-    if not isinstance(to_key_id_v, JString) or utf8_str(to_key_id_v.v) != expected.next_key_id:
-        fail(f"{ctx}: to_key_id")
-    derived_from = thumbprint_raw(jwk_from_public_key(current_key.public_key))
+    if not isinstance(to_key_id_v, JString) or _unwrap(utf8_str(to_key_id_v.v)) != expected.next_key_id:
+        _fail(f"{ctx}: to_key_id")
+    derived_from = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(current_key.public_key))))
     if not _bytes_equal(derived_from, expected.current_key_fingerprint):
-        fail(f"{ctx}: current fp")
-    derived_to = thumbprint_raw(jwk_from_public_key(next_key.public_key))
+        _fail(f"{ctx}: current fp")
+    derived_to = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(next_key.public_key))))
     if not _bytes_equal(derived_to, expected.next_key_fingerprint):
-        fail(f"{ctx}: next fp")
+        _fail(f"{ctx}: next fp")
     if not _in_window(effective_at, current_key):
-        fail(f"{ctx}: current window")
+        _fail(f"{ctx}: current window")
     if not _in_window(effective_at, next_key):
-        fail(f"{ctx}: next window")
-    pk = import_public_key(current_key.public_key, utf8_str(base64url_encode(derived_from)))
-    if not ed25519_verify(seg.signing_input, seg.signature, pk):
-        fail(f"{ctx}: signature")
+        _fail(f"{ctx}: next window")
+    pk = _import_public_key(current_key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_from)))))
+    if not _ed25519_verify(seg.signing_input, seg.signature, pk):
+        _fail(f"{ctx}: signature")
 
 
 @dataclass(frozen=True)
@@ -2760,11 +2766,11 @@ class _ParsedArchive:
 
 def _parse_archive(data: bytes, bounds: Bounds) -> _ParsedArchive:
     if not _bytes_equal(data[: len(ARCHIVE_PREFIX)], ARCHIVE_PREFIX):
-        fail("archive: prefix")
+        _fail("archive: prefix")
     cursor = len(ARCHIVE_PREFIX)
-    header_frame = _read_frame(data, cursor, bounds_resolve(bounds, "archive_header_bytes"), "archive header")
+    header_frame = _read_frame(data, cursor, _unwrap(bounds_resolve(bounds, "archive_header_bytes")), "archive header")
     cursor = header_frame[1]
-    header = json_decode(header_frame[0], bounds)
+    header = _unwrap(json_decode(header_frame[0], bounds))
     header = _require_object_exact(
         header,
         ["v", "chain_id", "first_sequence", "last_sequence", "row_count", "transition_count", "previous_hash", "last_hash"],
@@ -2772,37 +2778,37 @@ def _parse_archive(data: bytes, bounds: Bounds) -> _ParsedArchive:
     )
     v_v = header.v["v"]
     if not isinstance(v_v, JInt) or v_v.v != VERSION:
-        fail("archive: header v")
+        _fail("archive: header v")
     tc_v = header.v["transition_count"]
-    if not isinstance(tc_v, JInt) or tc_v.v < 0 or tc_v.v > bounds_resolve(bounds, "key_transitions"):
-        fail("archive: transition_count")
+    if not isinstance(tc_v, JInt) or tc_v.v < 0 or tc_v.v > _unwrap(bounds_resolve(bounds, "key_transitions")):
+        _fail("archive: transition_count")
     rc_v = header.v["row_count"]
-    if not isinstance(rc_v, JInt) or rc_v.v < 1 or rc_v.v > bounds_resolve(bounds, "chain_rows"):
-        fail("archive: row_count")
+    if not isinstance(rc_v, JInt) or rc_v.v < 1 or rc_v.v > _unwrap(bounds_resolve(bounds, "chain_rows")):
+        _fail("archive: row_count")
     fs_v = header.v["first_sequence"]
     ls_v = header.v["last_sequence"]
     if not isinstance(fs_v, JInt) or not isinstance(ls_v, JInt):
-        fail("archive: header sequences")
+        _fail("archive: header sequences")
     if not (fs_v.v > 0 and ls_v.v >= fs_v.v and rc_v.v == ls_v.v - fs_v.v + 1):
-        fail("archive: row range")
+        _fail("archive: row range")
     _require_b64url_n(header.v.get("previous_hash"), "previous_hash", 32)
     _require_b64url_n(header.v.get("last_hash"), "last_hash", 32)
-    start_frame = _read_frame(data, cursor, bounds_resolve(bounds, "anchor_bytes"), "start anchor")
+    start_frame = _read_frame(data, cursor, _unwrap(bounds_resolve(bounds, "anchor_bytes")), "start anchor")
     cursor = start_frame[1]
     transitions: list[bytes] = []
     for i in range(tc_v.v):
-        f = _read_frame(data, cursor, bounds_resolve(bounds, "anchor_bytes"), f"transition {i}")
+        f = _read_frame(data, cursor, _unwrap(bounds_resolve(bounds, "anchor_bytes")), f"transition {i}")
         transitions.append(f[0])
         cursor = f[1]
     rows: list[bytes] = []
     for i in range(rc_v.v):
-        f = _read_frame(data, cursor, bounds_resolve(bounds, "chain_row_bytes"), f"row {i}")
+        f = _read_frame(data, cursor, _unwrap(bounds_resolve(bounds, "chain_row_bytes")), f"row {i}")
         rows.append(f[0])
         cursor = f[1]
-    end_frame = _read_frame(data, cursor, bounds_resolve(bounds, "anchor_bytes"), "end anchor")
+    end_frame = _read_frame(data, cursor, _unwrap(bounds_resolve(bounds, "anchor_bytes")), "end anchor")
     cursor = end_frame[1]
     if cursor != len(data):
-        fail("archive: exact EOF")
+        _fail("archive: exact EOF")
     return _ParsedArchive(
         header_bytes=header_frame[0], start=start_frame[0],
         transitions=tuple(transitions), rows=tuple(rows), end=end_frame[0],
@@ -2811,14 +2817,14 @@ def _parse_archive(data: bytes, bounds: Bounds) -> _ParsedArchive:
 
 def _read_frame(data: bytes, cursor: int, maximum: int, ctx: str) -> tuple[bytes, int]:
     if cursor + 4 > len(data):
-        fail(f"{ctx}: frame length")
+        _fail(f"{ctx}: frame length")
     length = (data[cursor] << 24 | data[cursor + 1] << 16 | data[cursor + 2] << 8 | data[cursor + 3]) & 0xFFFFFFFF
     if length == 0 or length > maximum:
-        fail(f"{ctx}: frame bound")
+        _fail(f"{ctx}: frame bound")
     start = cursor + 4
     end = start + length
     if end > len(data):
-        fail(f"{ctx}: complete frame")
+        _fail(f"{ctx}: complete frame")
     return data[start:end], end
 
 
@@ -2833,9 +2839,9 @@ def _validate_key_path(
     the last transition's next key with a chronologically-non-decreasing anchored_at."""
     if len(transitions) == 0:
         if start.key_id != end.key_id or not _bytes_equal(start.key_fingerprint, end.key_fingerprint):
-            fail("key path: start==end key")
+            _fail("key path: start==end key")
         if not (end.anchored_at >= start.anchored_at):
-            fail("key path: end chronological")
+            _fail("key path: end chronological")
         return
     current_key_id = start.key_id
     current_fp = start.key_fingerprint
@@ -2844,23 +2850,23 @@ def _validate_key_path(
     seen: list[bytes] = [start.key_fingerprint]
     for i, t in enumerate(transitions):
         if t.current_key_id != current_key_id or not _bytes_equal(t.current_key_fingerprint, current_fp):
-            fail(f"key path: transition {i} current key")
+            _fail(f"key path: transition {i} current key")
         # strictly_after?(effective_at, previous_time) — strictly increasing.
         if not (t.effective_at > previous_time):
-            fail(f"key path: transition {i} chronology")
+            _fail(f"key path: transition {i} chronology")
         # No cycle: next_key_fingerprint must not be in seen.
         if any(_bytes_equal(t.next_key_fingerprint, s) for s in seen):
-            fail(f"key path: transition {i} cycle")
+            _fail(f"key path: transition {i} cycle")
         current_key_id = t.next_key_id
         current_fp = t.next_key_fingerprint
         previous_time = t.effective_at
         seen.append(t.next_key_fingerprint)
     # The end anchor must close on the last transition's next key.
     if end.key_id != current_key_id or not _bytes_equal(end.key_fingerprint, current_fp):
-        fail("key path: end key")
+        _fail("key path: end key")
     # chronological_end?(end.anchored_at, previous_time) — >= the last transition's effective_at.
     if not (end.anchored_at >= previous_time):
-        fail("key path: end chronological")
+        _fail("key path: end chronological")
 
 
 def _validate_chunks(chunks: Sequence[bytes], bounds: Bounds = MAXIMUM_BOUNDS) -> None:
@@ -2871,19 +2877,19 @@ def _validate_chunks(chunks: Sequence[bytes], bounds: Bounds = MAXIMUM_BOUNDS) -
     # round 18 reconciled the previously bytearray-tolerant arm to the gate's exact-bytes
     # contract. The round-17 escape class it closed is pinned by the family sweep.)
     if len(chunks) == 0:
-        fail("archive: no chunks")
+        _fail("archive: no chunks")
     # Cross-vendor re-review Finding 2: the reference's validate_chunks guard is
     # `count < archive_chunks` on the recursive clause (start 0), accepting up to archive_chunks
     # INCLUSIVE. Use `>` not `>=`.
-    if len(chunks) > bounds_resolve(bounds, "archive_chunks"):
-        fail("archive: chunk count")
+    if len(chunks) > _unwrap(bounds_resolve(bounds, "archive_chunks")):
+        _fail("archive: chunk count")
     total = 0
     for i, c in enumerate(chunks):
         if len(c) == 0:
-            fail(f"archive: empty chunk {i}")
+            _fail(f"archive: empty chunk {i}")
         total += len(c)
-        if total > bounds_resolve(bounds, "archive_bytes"):
-            fail("archive: chunk bytes")
+        if total > _unwrap(bounds_resolve(bounds, "archive_bytes")):
+            _fail("archive: chunk bytes")
 
 
 def _require_bounds_equal(nested: Bounds | None, top: Bounds, ctx: str) -> None:
@@ -2902,9 +2908,9 @@ def _require_bounds_equal(nested: Bounds | None, top: Bounds, ctx: str) -> None:
         # bounds (cross-vendor finding: map-size gating wrong-rejected identity).
         for _k, _v in top.overrides.items():
             if _v != MAXIMA[_k]:
-                fail(f"{ctx}: nested bounds absent under tightened top")
+                _fail(f"{ctx}: nested bounds absent under tightened top")
         return
-    coerced = coerce_bounds(nested)
+    coerced = _unwrap(coerce_bounds(nested))
     for key in MAXIMA:
-        if bounds_resolve(coerced, key) != bounds_resolve(top, key):
-            fail(f"{ctx}: nested bounds mismatch")
+        if _unwrap(bounds_resolve(coerced, key)) != _unwrap(bounds_resolve(top, key)):
+            _fail(f"{ctx}: nested bounds mismatch")

@@ -27,8 +27,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve
-from .error import fail, invalid_error
+from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
+from .error import InvalidError, Ok, Result, _fail, _invalid_error, _unwrap, err
 
 MAX_INT = 9007199254740991
 MAX_FLOAT = 9007199254740991
@@ -92,20 +92,26 @@ class _Ctx:
         self.nodes = 0
 
 
-def json_decode(src: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Tagged:
+def json_decode(src: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[Tagged]:
     """Decode one complete RFC 8259 value with recursive duplicate rejection + bounds."""
-    if len(src) > bounds_resolve(bounds, "json_bytes"):
-        fail("json: input exceeds json_bytes bound")
-    ctx = _Ctx(src, bounds)
-    _skip_ws(ctx)
-    value = _parse_value(ctx, 0)
-    # REQ1-JSON-single-value: after the value, only JSON whitespace may remain.
-    _skip_ws(ctx)
-    if ctx.pos != len(src):
-        fail("json: trailing bytes")
-    if ctx.nodes > bounds_resolve(bounds, "total_nodes"):
-        fail("json: total_nodes bound exceeded")
-    return value
+    try:
+        if type(src) is not bytes:
+            return err()
+        bounds = _unwrap(coerce_bounds(bounds))
+        if len(src) > _unwrap(bounds_resolve(bounds, "json_bytes")):
+            _fail("json: input exceeds json_bytes bound")
+        ctx = _Ctx(src, bounds)
+        _skip_ws(ctx)
+        value = _parse_value(ctx, 0)
+        # REQ1-JSON-single-value: after the value, only JSON whitespace may remain.
+        _skip_ws(ctx)
+        if ctx.pos != len(src):
+            _fail("json: trailing bytes")
+        if ctx.nodes > _unwrap(bounds_resolve(bounds, "total_nodes")):
+            _fail("json: total_nodes bound exceeded")
+        return Ok(value)
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()
 
 
 def _node(ctx: _Ctx) -> None:
@@ -124,33 +130,33 @@ def _byte_at(src: bytes, pos: int) -> int:
 def _parse_value(ctx: _Ctx, level: int) -> Tagged:
     src = ctx.src
     if ctx.pos >= len(src):
-        fail("json: unexpected end of input")
+        _fail("json: unexpected end of input")
     c = src[ctx.pos]
     if c == 0x22:  # "
-        if level > bounds_resolve(ctx.bounds, "depth"):
-            fail("json: depth bound")
+        if level > _unwrap(bounds_resolve(ctx.bounds, "depth")):
+            _fail("json: depth bound")
         return _parse_string(ctx)
     if c == 0x7B:  # {
-        if level >= bounds_resolve(ctx.bounds, "depth"):
-            fail("json: depth bound")
+        if level >= _unwrap(bounds_resolve(ctx.bounds, "depth")):
+            _fail("json: depth bound")
         return _parse_object(ctx, level + 1)
     if c == 0x5B:  # [
-        if level >= bounds_resolve(ctx.bounds, "depth"):
-            fail("json: depth bound")
+        if level >= _unwrap(bounds_resolve(ctx.bounds, "depth")):
+            _fail("json: depth bound")
         return _parse_array(ctx, level + 1)
     if c == 0x74 or c == 0x66:  # t / f
-        if level > bounds_resolve(ctx.bounds, "depth"):
-            fail("json: depth bound")
+        if level > _unwrap(bounds_resolve(ctx.bounds, "depth")):
+            _fail("json: depth bound")
         return _parse_bool(ctx)
     if c == 0x6E:  # n
-        if level > bounds_resolve(ctx.bounds, "depth"):
-            fail("json: depth bound")
+        if level > _unwrap(bounds_resolve(ctx.bounds, "depth")):
+            _fail("json: depth bound")
         return _parse_null(ctx)
     if c == 0x2D or 0x30 <= c <= 0x39:  # - or digit
-        if level > bounds_resolve(ctx.bounds, "depth"):
-            fail("json: depth bound")
+        if level > _unwrap(bounds_resolve(ctx.bounds, "depth")):
+            _fail("json: depth bound")
         return _parse_number(ctx)
-    raise invalid_error("json: unexpected byte")
+    raise _invalid_error("json: unexpected byte")
 
 
 def _parse_null(ctx: _Ctx) -> JNull:
@@ -173,10 +179,10 @@ def _expect_lit(ctx: _Ctx, lit: bytes) -> None:
     src = ctx.src
     pos = ctx.pos
     if pos + len(lit) > len(src):
-        fail(f"json: expected {lit!r}")  # truncated literal — bounds-check before indexing
+        _fail(f"json: expected {lit!r}")  # truncated literal — bounds-check before indexing
     for i, b in enumerate(lit):
         if src[pos + i] != b:
-            fail(f"json: expected {lit!r}")
+            _fail(f"json: expected {lit!r}")
     ctx.pos += len(lit)
 
 
@@ -191,9 +197,9 @@ def _parse_string(ctx: _Ctx) -> JString:
     try:
         raw.decode("utf-8")
     except UnicodeDecodeError:
-        fail("json: string not valid UTF-8")
-    if len(raw) > bounds_resolve(ctx.bounds, "string_bytes"):
-        fail("json: string_bytes bound")
+        _fail("json: string not valid UTF-8")
+    if len(raw) > _unwrap(bounds_resolve(ctx.bounds, "string_bytes")):
+        _fail("json: string_bytes bound")
     return JString(raw)
 
 
@@ -206,14 +212,14 @@ def _scan_string(ctx: _Ctx, start: int) -> bytes:
     out = bytearray()
     while True:
         if ctx.pos >= len(src):
-            fail("json: unterminated string")
+            _fail("json: unterminated string")
         c = src[ctx.pos]
         if c == 0x22:  # "
             ctx.pos += 1
             return bytes(out)
         if c == 0x5C:  # backslash
             if ctx.pos + 1 >= len(src):
-                fail("json: bad escape")
+                _fail("json: bad escape")
             e = src[ctx.pos + 1]
             ctx.pos += 2
             if e == 0x22:
@@ -240,21 +246,21 @@ def _scan_string(ctx: _Ctx, start: int) -> bytes:
                     # closed as InvalidError, not raise IndexError on src[ctx.pos+1]. The TS sibling
                     # is safe (out-of-range Uint8Array access yields undefined); Python raises.
                     if _byte_at(src, ctx.pos) != 0x5C or _byte_at(src, ctx.pos + 1) != 0x75:
-                        fail("json: unpaired high surrogate")
+                        _fail("json: unpaired high surrogate")
                     ctx.pos += 2
                     lo = _parse_hex4(ctx)
                     if not (0xDC00 <= lo <= 0xDFFF):
-                        fail("json: bad low surrogate")
+                        _fail("json: bad low surrogate")
                     cp = 0x10000 + ((hi - 0xD800) << 10) + (lo - 0xDC00)
                     _encode_utf8(cp, out)
                 elif 0xDC00 <= hi <= 0xDFFF:
-                    fail("json: unpaired low surrogate")
+                    _fail("json: unpaired low surrogate")
                 else:
                     _encode_utf8(hi, out)
             else:
-                fail("json: bad escape")
+                _fail("json: bad escape")
         elif c < 0x20:
-            fail("json: unescaped control byte")
+            _fail("json: unescaped control byte")
         else:
             # Copy raw byte (UTF-8 multi-byte sequences pass through as-is; validity checked at decode).
             out.append(c)
@@ -266,7 +272,7 @@ def _parse_hex4(ctx: _Ctx) -> int:
     v = 0
     for _ in range(4):
         if ctx.pos >= len(src):
-            fail("json: bad \\u escape")
+            _fail("json: bad \\u escape")
         c = src[ctx.pos]
         if 0x30 <= c <= 0x39:
             d = c - 0x30
@@ -275,7 +281,7 @@ def _parse_hex4(ctx: _Ctx) -> int:
         elif 0x61 <= c <= 0x66:
             d = c - 0x61 + 10
         else:
-            fail("json: bad \\u hex")
+            _fail("json: bad \\u hex")
         v = (v << 4) | d
         ctx.pos += 1
     return v
@@ -317,14 +323,14 @@ def _parse_number(ctx: _Ctx) -> Tagged:
                 pos += 1
                 d = _byte_at(src, pos)
         else:
-            fail("json: bad number")
+            _fail("json: bad number")
     is_float = False
     if _byte_at(src, pos) == 0x2E:  # .
         is_float = True
         pos += 1
         f = _byte_at(src, pos)
         if not (0x30 <= f <= 0x39):
-            fail("json: bad fraction")
+            _fail("json: bad fraction")
         fd = _byte_at(src, pos)
         while 0x30 <= fd <= 0x39:
             pos += 1
@@ -338,7 +344,7 @@ def _parse_number(ctx: _Ctx) -> Tagged:
             pos += 1
         e = _byte_at(src, pos)
         if not (0x30 <= e <= 0x39):
-            fail("json: bad exponent")
+            _fail("json: bad exponent")
         ed = _byte_at(src, pos)
         while 0x30 <= ed <= 0x39:
             pos += 1
@@ -346,8 +352,8 @@ def _parse_number(ctx: _Ctx) -> Tagged:
     lexeme_end = pos
     lexeme = src[start:lexeme_end]
     # REQ1-JSON-raw-lexeme: 64-byte ceiling on the lexeme.
-    if len(lexeme) > bounds_resolve(ctx.bounds, "number_lexeme_bytes"):
-        fail("json: number lexeme exceeds bound")
+    if len(lexeme) > _unwrap(bounds_resolve(ctx.bounds, "number_lexeme_bytes")):
+        _fail("json: number lexeme exceeds bound")
     ctx.pos = lexeme_end
     text = lexeme.decode("ascii")
     if is_float:
@@ -357,15 +363,15 @@ def _parse_number(ctx: _Ctx) -> Tagged:
         # bound. The reference (json.ex magnitude_within?) compares the lexeme's significant digits
         # against the maximum's digit string. Mirror that here.
         if not _lexeme_magnitude_within(text, MAX_FLOAT):
-            fail("json: float magnitude bound")
+            _fail("json: float magnitude bound")
         n = float(text)
         # Python floats are always finite here (a non-finite lexeme like "1e400" overflows to inf,
         # which we reject — float_magnitude is the finite bound).
         if _is_inf(n):
-            fail("json: float not finite")
+            _fail("json: float not finite")
         return JFloat(n)
     if not _lexeme_magnitude_within(text, MAX_INT):
-        fail("json: integer magnitude bound")
+        _fail("json: integer magnitude bound")
     n_int = int(text)
     return JInt(n_int)
 
@@ -438,30 +444,30 @@ def _parse_object(ctx: _Ctx, child_level: int) -> JObject:
     while True:
         _skip_ws(ctx)
         if ctx.pos >= len(src) or src[ctx.pos] != 0x22:
-            fail("json: expected member name")
+            _fail("json: expected member name")
         name_bytes = _scan_string(ctx, ctx.pos)
-        if len(name_bytes) > bounds_resolve(ctx.bounds, "key_bytes"):
-            fail("json: key_bytes bound")
+        if len(name_bytes) > _unwrap(bounds_resolve(ctx.bounds, "key_bytes")):
+            _fail("json: key_bytes bound")
         # A member name's bytes MUST be valid UTF-8 (RFC 8259 §2.5 / REQ1-JSON-no-normalization).
         # Validate before decode so a lone 0xff in a name fails closed as InvalidError rather than
         # raising UnicodeDecodeError past the closed-error whitelist (matches _parse_string above).
         try:
             name_str = name_bytes.decode("utf-8")
         except UnicodeDecodeError:
-            fail("json: member name not valid UTF-8")
+            _fail("json: member name not valid UTF-8")
         # REQ1-JSON-no-duplicate: reject before dict insertion.
         if name_str in members:
-            fail("json: duplicate member")
+            _fail("json: duplicate member")
         _skip_ws(ctx)
         if ctx.pos >= len(src) or src[ctx.pos] != 0x3A:
-            fail("json: expected colon")
+            _fail("json: expected colon")
         ctx.pos += 1
         _skip_ws(ctx)
         value = _parse_value(ctx, child_level)
         members[name_str] = value
         count += 1
-        if count > bounds_resolve(ctx.bounds, "object_members"):
-            fail("json: object_members bound")
+        if count > _unwrap(bounds_resolve(ctx.bounds, "object_members")):
+            _fail("json: object_members bound")
         _skip_ws(ctx)
         sep = src[ctx.pos] if ctx.pos < len(src) else -1
         if sep == 0x2C:  # ,
@@ -470,7 +476,7 @@ def _parse_object(ctx: _Ctx, child_level: int) -> JObject:
         if sep == 0x7D:  # }
             ctx.pos += 1
             break
-        fail("json: expected , or }")
+        _fail("json: expected , or }")
     return JObject(members)
 
 
@@ -487,8 +493,8 @@ def _parse_array(ctx: _Ctx, child_level: int) -> JArray:
         _skip_ws(ctx)
         value = _parse_value(ctx, child_level)
         items.append(value)
-        if len(items) > bounds_resolve(ctx.bounds, "array_items"):
-            fail("json: array_items bound")
+        if len(items) > _unwrap(bounds_resolve(ctx.bounds, "array_items")):
+            _fail("json: array_items bound")
         _skip_ws(ctx)
         sep = src[ctx.pos] if ctx.pos < len(src) else -1
         if sep == 0x2C:  # ,
@@ -497,7 +503,7 @@ def _parse_array(ctx: _Ctx, child_level: int) -> JArray:
         if sep == 0x5D:  # ]
             ctx.pos += 1
             break
-        fail("json: expected , or ]")
+        _fail("json: expected , or ]")
     return JArray(tuple(items))
 
 
@@ -510,25 +516,36 @@ def _skip_ws(ctx: _Ctx) -> None:
 # --- UTF-8 <-> str helpers (pure transformations; no I/O) ---
 
 
-def utf8_str(b: bytes) -> str:
-    """Decode UTF-8 bytes to str. Raises on invalid UTF-8 (mirrors the TS fatal TextDecoder)."""
-    return b.decode("utf-8")
+def utf8_str(b: bytes) -> Result[str]:
+    """Decode UTF-8 bytes to ``Ok(str)``; invalid UTF-8 returns a closed rejection."""
+    try:
+        if type(b) is not bytes:
+            return err()
+        return Ok(b.decode("utf-8"))
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()
 
 
-def is_valid_utf8(b: bytes) -> bool:
-    """Return True iff ``b`` is valid UTF-8 (no throw).
+def is_valid_utf8(b: bytes) -> Result[bool]:
+    """Return ``Ok(True)`` for valid UTF-8, ``Ok(False)`` for malformed bytes.
 
-    Cross-vendor (JCS UTF-8): the reference's ``String.valid?`` (jcs.ex:58) rejects invalid UTF-8 at
-    encode. ``utf8_str`` raises ``UnicodeDecodeError`` on invalid bytes, escaping the closed-Result
-    contract; this non-throwing gate lets ``jcs_encode`` fail closed instead.
+    A wrong host type returns the closed ``Err``; no caller-input exception escapes.
     """
     try:
-        b.decode("utf-8")
-    except UnicodeDecodeError:
-        return False
-    return True
+        try:
+            b.decode("utf-8")
+        except UnicodeDecodeError:
+            return Ok(False)
+        return Ok(True)
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()
 
 
-def str_utf8(s: str) -> bytes:
+def str_utf8(s: str) -> Result[bytes]:
     """Encode a str to UTF-8 bytes."""
-    return s.encode("utf-8")
+    try:
+        if type(s) is not str:
+            return err()
+        return Ok(s.encode("utf-8"))
+    except (InvalidError, AttributeError, TypeError, ValueError, KeyError, IndexError, OverflowError, RecursionError):
+        return err()

@@ -1,3 +1,4 @@
+
 import hashlib
 import json
 from dataclasses import fields, replace
@@ -31,7 +32,7 @@ from bounded_authority_verifier import (
     verify_assertion,
     verify_successor,
 )
-from bounded_authority_verifier.error import InvalidError
+from bounded_authority_verifier.error import InvalidError, _unwrap
 
 _CORPUS_ROOT = (
     Path(__file__).resolve().parents[3]
@@ -97,7 +98,7 @@ def _signed(
         profile_digest=producer.profile_digest,
         content_digest=producer.content_digest,
         now=producer.nbf,
-        bounds=bounds_maximum(),
+        bounds=_unwrap(bounds_maximum()),
     )
     return compact.value, expected, producer, signature
 
@@ -109,9 +110,9 @@ def test_content_digest_exact_bytes_domain_and_bounds() -> None:
     assert not content_digest(b"").is_ok
     assert content_digest(b"x" * 65_536).is_ok
     assert not content_digest(b"x" * 65_537).is_ok
-    assert content_digest(b"abcd", bounds_new({"content_bytes": 4})).is_ok
-    assert not content_digest(b"abcde", bounds_new({"content_bytes": 4})).is_ok
-    assert content_digest(b"x", bounds_new({"encoded_segment_bytes": 1})).is_ok
+    assert content_digest(b"abcd", _unwrap(bounds_new({"content_bytes": 4}))).is_ok
+    assert not content_digest(b"abcde", _unwrap(bounds_new({"content_bytes": 4}))).is_ok
+    assert content_digest(b"x", _unwrap(bounds_new({"encoded_segment_bytes": 1}))).is_ok
 
 
 def test_producer_decode_verify_and_assertion_digest() -> None:
@@ -216,13 +217,13 @@ def test_genesis_and_structural_time_are_symmetric_at_producer_and_parser() -> N
     compact, _expected, _producer_value, signature = _signed()
     protected, payload, _ = compact.split(b".")
     claims = json.loads(_decode_segment(payload))
-    claims["prev"] = base64url_encode(b"x" * 32).decode()
+    claims["prev"] = _unwrap(base64url_encode(b"x" * 32)).decode()
     malformed = SigningInput(
         kind="content_assertion",
         protected_segment=protected,
-        payload_segment=base64url_encode(
+        payload_segment=_unwrap(base64url_encode(
             json.dumps(claims, sort_keys=True, separators=(",", ":")).encode()
-        ),
+        )),
     )
     assert not assemble_content_assertion_compact(malformed, signature).is_ok
 
@@ -237,10 +238,10 @@ def test_producer_enforces_tightened_decoded_segment_bound() -> None:
         64,
     )
     assert assertion_signing_input(
-        producer, bounds_new({"decoded_segment_bytes": decoded_size})
+        producer, _unwrap(bounds_new({"decoded_segment_bytes": decoded_size}))
     ).is_ok
     assert not assertion_signing_input(
-        producer, bounds_new({"decoded_segment_bytes": decoded_size - 1})
+        producer, _unwrap(bounds_new({"decoded_segment_bytes": decoded_size - 1}))
     ).is_ok
 
 
@@ -249,7 +250,7 @@ def test_meaningful_signature_tamper_and_foreign_kind_fail_closed() -> None:
     parts = compact.split(b".")
     raw_signature = bytearray(_decode_segment(parts[2]))
     raw_signature[len(raw_signature) // 2] ^= 1
-    tampered = b".".join((parts[0], parts[1], base64url_encode(bytes(raw_signature))))
+    tampered = b".".join((parts[0], parts[1], _unwrap(base64url_encode(bytes(raw_signature)))))
     assert decode_assertion(tampered).is_ok
     assert not verify_assertion(tampered, expected).is_ok
     assert assertion_digest(tampered).is_ok
@@ -282,7 +283,7 @@ def test_successor_allows_expired_predecessor_and_rotated_key() -> None:
     successor_verified = verify_assertion(successor_compact, successor_expected)
     assert successor_verified.is_ok
     assert verify_successor(
-        predecessor_verified.value, successor_verified.value, bounds_maximum()
+        predecessor_verified.value, successor_verified.value, _unwrap(bounds_maximum())
     ).is_ok
 
     failures = (
@@ -293,7 +294,7 @@ def test_successor_allows_expired_predecessor_and_rotated_key() -> None:
         replace(successor_verified.value, jti=predecessor_verified.value.jti),
     )
     assert all(
-        not verify_successor(predecessor_verified.value, value, bounds_maximum()).is_ok
+        not verify_successor(predecessor_verified.value, value, _unwrap(bounds_maximum())).is_ok
         for value in failures
     )
 
@@ -324,15 +325,15 @@ def test_successor_rejects_decoded_partial_and_forged_markers() -> None:
         gen=2,
         prev=facts.value.digest,
     )
-    assert verify_successor(facts.value, successor, bounds_maximum()).is_ok
-    assert not verify_successor(decoded.value, facts.value, bounds_maximum()).is_ok  # type: ignore[arg-type]
-    assert not verify_successor(object(), facts.value, bounds_maximum()).is_ok  # type: ignore[arg-type]
+    assert verify_successor(facts.value, successor, _unwrap(bounds_maximum())).is_ok
+    assert not verify_successor(decoded.value, facts.value, _unwrap(bounds_maximum())).is_ok  # type: ignore[arg-type]
+    assert not verify_successor(object(), facts.value, _unwrap(bounds_maximum())).is_ok  # type: ignore[arg-type]
     for marker, forged in (("verification", "not_evaluated"), ("trust", "evaluated")):
         assert not verify_successor(
-            replace(facts.value, **{marker: forged}), successor, bounds_maximum()
+            replace(facts.value, **{marker: forged}), successor, _unwrap(bounds_maximum())
         ).is_ok
         assert not verify_successor(
-            facts.value, replace(successor, **{marker: forged}), bounds_maximum()
+            facts.value, replace(successor, **{marker: forged}), _unwrap(bounds_maximum())
         ).is_ok
 
 
@@ -350,13 +351,13 @@ def test_successor_revalidates_typed_facts_numeric_boundaries() -> None:
         exp=-9_007_199_254_740_990,
     )
     with pytest.raises(InvalidError):
-        content_assertion_module._facts(negative_magnitude, bounds_maximum())
-    assert not verify_successor(negative_magnitude, facts.value, bounds_maximum()).is_ok
+        content_assertion_module._facts(negative_magnitude, _unwrap(bounds_maximum()))
+    assert not verify_successor(negative_magnitude, facts.value, _unwrap(bounds_maximum())).is_ok
 
     zero_generation_nonzero_prev = replace(facts.value, gen=0, prev=b"x" * 32)
     with pytest.raises(InvalidError):
-        content_assertion_module._facts(zero_generation_nonzero_prev, bounds_maximum())
-    assert not verify_successor(zero_generation_nonzero_prev, facts.value, bounds_maximum()).is_ok
+        content_assertion_module._facts(zero_generation_nonzero_prev, _unwrap(bounds_maximum()))
+    assert not verify_successor(zero_generation_nonzero_prev, facts.value, _unwrap(bounds_maximum())).is_ok
 
 
 def test_wrong_typed_producer_and_expected_fields_return_closed_error() -> None:
@@ -423,7 +424,7 @@ def _corpus_expected(
         profile_digest=_corpus_b64(expected["profile_digest"]),
         content_digest=_corpus_b64(expected["content_digest"]),
         now=expected["now"],
-        bounds=bounds if bounds is not None else bounds_maximum(),
+        bounds=bounds if bounds is not None else _unwrap(bounds_maximum()),
     )  # type: ignore[arg-type]
 
 
@@ -455,7 +456,7 @@ def test_content_assertion_corpus_drives_python_verdicts_and_cross_rejection() -
         bounds_value = None
         try:
             if "bounds" in case:
-                bounds_value = bounds_new(case["bounds"])  # type: ignore[arg-type]
+                bounds_value = _unwrap(bounds_new(case["bounds"]))  # type: ignore[arg-type]
         except InvalidError:
             assert expected_verdicts == {"decode": "invalid", "verify": "invalid"}, case["id"]
             continue
@@ -500,7 +501,7 @@ def test_content_assertion_corpus_producer_and_assembly_match_exact_bytes() -> N
             nbf=claims["nbf"],
             exp=claims["exp"],
         )
-        bounds_value = bounds_new(case.get("bounds", {}))
+        bounds_value = _unwrap(bounds_new(case.get("bounds", {})))
         signing = assertion_signing_input(producer, bounds_value)
         assert signing.is_ok, case["id"]
         assert signing.value.protected_segment == protected, case["id"]
@@ -522,7 +523,7 @@ def test_content_digest_corpus_drives_exact_bytes_and_sidecar_bounds() -> None:
         else:
             content = _corpus_b64(input_value["content_base64url"])
         try:
-            bounds_value = bounds_new(input_value["bounds"])
+            bounds_value = _unwrap(bounds_new(input_value["bounds"]))
         except InvalidError:
             assert case["expected"]["verdict"] == "invalid", case["id"]
             continue
@@ -567,5 +568,5 @@ def test_content_assertion_successor_corpus_separates_artifact_and_relation_verd
             assert predecessor is None or successor is None, case["id"]
             continue
         assert predecessor is not None and successor is not None
-        relation = verify_successor(predecessor, successor, bounds_maximum())
+        relation = verify_successor(predecessor, successor, _unwrap(bounds_maximum()))
         assert relation.is_ok == (case["expected"]["relation"] == "valid"), case["id"]

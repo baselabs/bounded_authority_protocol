@@ -1,3 +1,4 @@
+
 import base64
 import hashlib
 import json
@@ -25,7 +26,7 @@ from bounded_authority_verifier import (
 )
 from bounded_authority_verifier import role_attestation as role_attestation_module
 from bounded_authority_verifier.bounds import Bounds, bounds_new
-from bounded_authority_verifier.error import InvalidError
+from bounded_authority_verifier.error import InvalidError, _unwrap
 
 _CERTIFIED_INDEX_SHA256 = "be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a"
 
@@ -100,7 +101,7 @@ def test_attestation_tightened_size_bounds(surface: str, ceiling: str) -> None:
     else:
         size = max(len(str(claims[key])) for key in ("v", "nbf", "exp"))
     for limit, accepted in ((size, True), (size - 1, False), (1, False)):
-        bounds = bounds_new({ceiling: limit})
+        bounds = _unwrap(bounds_new({ceiling: limit}))
         if surface == "produce":
             result = attestation_signing_input(producer, bounds)
         elif surface == "assemble":
@@ -160,7 +161,7 @@ def _signed_attestation(
         "jti": jti,
         "key_id": subject_key_id,
         "nbf": 1000,
-        "public_key": base64url_encode(subject_public).decode(),
+        "public_key": _unwrap(base64url_encode(subject_public)).decode(),
         "role": "issuer",
         "v": 1,
     }
@@ -170,15 +171,15 @@ def _signed_attestation(
         payload.update(payload_overrides)
     signing_input = SigningInput(
         kind="role_attestation",
-        protected_segment=base64url_encode(
+        protected_segment=_unwrap(base64url_encode(
             json.dumps(header, separators=(",", ":"), sort_keys=True).encode()
-        ),
-        payload_segment=base64url_encode(
+        )),
+        payload_segment=_unwrap(base64url_encode(
             json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
-        ),
+        )),
     )
     signature = attestor_private.sign(_signing_message(signing_input))
-    compact = _signing_message(signing_input) + b"." + base64url_encode(signature)
+    compact = _signing_message(signing_input) + b"." + _unwrap(base64url_encode(signature))
     expected = ExpectedAttestation(
         attestor=TrustedAttestor(
             key_id=attestor_key_id,
@@ -326,8 +327,8 @@ def test_role_attestation_producer_assembles_and_stays_profile_distinct() -> Non
     assert facts.jti == jti
     assert facts.nbf == profile["attestor"]["valid_from"]
     assert facts.exp == profile["attestor"]["valid_before"]
-    assert facts.attestor_key_fingerprint == public_key_thumbprint_raw(attestor_public)
-    assert facts.subject_key_fingerprint == public_key_thumbprint_raw(subject_public)
+    assert facts.attestor_key_fingerprint == _unwrap(public_key_thumbprint_raw(attestor_public))
+    assert facts.subject_key_fingerprint == _unwrap(public_key_thumbprint_raw(subject_public))
     assert facts.verification == "signature_and_window"
     assert facts.trust == "not_evaluated"
 
@@ -420,7 +421,7 @@ def test_attestation_assembly_revalidates() -> None:
             "v": 1,
             "jti": producer.jti,
             "key_id": producer.key_id,
-            "public_key": base64url_encode(subject_public).decode(),
+            "public_key": _unwrap(base64url_encode(subject_public)).decode(),
             "role": "issuer",
             "nbf": 1000,
             "exp": 2000,
@@ -431,7 +432,7 @@ def test_attestation_assembly_revalidates() -> None:
         SigningInput(
             kind="role_attestation",
             protected_segment=signing_input.value.protected_segment,
-            payload_segment=base64url_encode(non_canonical_payload),
+            payload_segment=_unwrap(base64url_encode(non_canonical_payload)),
         ),
         signature,
     ).is_ok
@@ -555,8 +556,8 @@ def test_attestation_base64url_decoded_size_projection() -> None:
 def test_attestation_preflights_overlong_signature_before_decode() -> None:
     _, _, _, compact, expected = _signed_attestation()
     protected, payload, _signature = compact.split(b".")
-    hostile = protected + b"." + payload + b"." + base64url_encode(bytes(201))
-    bounds = bounds_new({"decoded_segment_bytes": 200})
+    hostile = protected + b"." + payload + b"." + _unwrap(base64url_encode(bytes(201)))
+    bounds = _unwrap(bounds_new({"decoded_segment_bytes": 200}))
 
     with pytest.raises(InvalidError):
         role_attestation_module._preflight_attestation_compact(hostile, bounds)

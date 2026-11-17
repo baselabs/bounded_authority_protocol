@@ -16,7 +16,7 @@ import pytest
 
 from bounded_authority_verifier import v1, v2, v3
 from bounded_authority_verifier.base64url import base64url_encode
-from bounded_authority_verifier.error import InvalidError
+from bounded_authority_verifier.error import InvalidError, _unwrap
 from bounded_authority_verifier.json_alg import JArray, JFloat, JInt, JObject, JString, Tagged
 
 _MAJORS: dict[int, Any] = {1: v1, 2: v2, 3: v3}
@@ -28,7 +28,7 @@ _ZERO_SPELLINGS = ["0.0", "-0.0", "0e0", "-0e0", "-0E0", "-0e-5", "0.000", "1e-4
 
 
 def _b64(raw: bytes) -> str:
-    return base64url_encode(raw).decode()
+    return _unwrap(base64url_encode(raw)).decode()
 
 
 def _compact(major: int, selector_text: str) -> bytes:
@@ -127,8 +127,8 @@ def test_decode_accepts_float_zero_range_bound(major: int, kind: str, spelling: 
 def test_range_comparison_treats_signed_zeros_as_equal(major: int, bound: float, target: float) -> None:
     mod = _MAJORS[major]
     args = JObject({"x": JFloat(target)})
-    assert mod.selector_matches(mod.SelLte(("x",), JFloat(bound)), args)
-    assert mod.selector_matches(mod.SelGte(("x",), JFloat(bound)), args)
+    assert _unwrap(mod.selector_matches(mod.SelLte(("x",), JFloat(bound)), args))
+    assert _unwrap(mod.selector_matches(mod.SelGte(("x",), JFloat(bound)), args))
 
 
 # --- producers: grant_signing_input --------------------------------------------------------

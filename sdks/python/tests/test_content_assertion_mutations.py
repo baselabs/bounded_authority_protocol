@@ -28,7 +28,7 @@ from bounded_authority_verifier import (
     bounds_maximum,
     bounds_new,
 )
-from bounded_authority_verifier.error import InvalidError
+from bounded_authority_verifier.error import InvalidError, _unwrap
 
 Probe = Callable[[types.ModuleType], bool]
 
@@ -92,7 +92,7 @@ def _signed(module: types.ModuleType) -> tuple[bytes, Any, Any]:
         profile_digest=producer.profile_digest,
         content_digest=producer.content_digest,
         now=producer.nbf,
-        bounds=bounds_maximum(),
+        bounds=_unwrap(bounds_maximum()),
     )
     facts = module.verify_assertion(compact.value, expected)
     assert facts.is_ok
@@ -125,9 +125,9 @@ def _probe_expected_content(module: types.ModuleType) -> bool:
 def _probe_signature(module: types.ModuleType) -> bool:
     compact, expected, _facts = _signed(module)
     protected, payload, signature = compact.split(b".")
-    raw = bytearray(base64url_decode(signature))
+    raw = bytearray(_unwrap(base64url_decode(signature)))
     raw[len(raw) // 2] ^= 1
-    tampered = b".".join((protected, payload, base64url_encode(bytes(raw))))
+    tampered = b".".join((protected, payload, _unwrap(base64url_encode(bytes(raw)))))
     return not module.verify_assertion(tampered, expected).is_ok
 
 
@@ -158,12 +158,12 @@ def _probe_decoded_segment(module: types.ModuleType) -> bool:
     signing = module.assertion_signing_input(producer)
     assert signing.is_ok
     decoded_size = max(
-        len(base64url_decode(signing.value.protected_segment)),
-        len(base64url_decode(signing.value.payload_segment)),
+        len(_unwrap(base64url_decode(signing.value.protected_segment))),
+        len(_unwrap(base64url_decode(signing.value.payload_segment))),
         64,
     )
     return not module.assertion_signing_input(
-        producer, bounds_new({"decoded_segment_bytes": decoded_size - 1})
+        producer, _unwrap(bounds_new({"decoded_segment_bytes": decoded_size - 1}))
     ).is_ok
 
 
@@ -177,13 +177,13 @@ def _probe_negative_magnitude(module: types.ModuleType) -> bool:
         nbf=-9_007_199_254_740_991,
         exp=-9_007_199_254_740_990,
     )
-    return _rejects(lambda: module._facts(hostile, bounds_maximum()))
+    return _rejects(lambda: module._facts(hostile, _unwrap(bounds_maximum())))
 
 
 def _probe_positive_generation(module: types.ModuleType) -> bool:
     _compact, _expected, facts = _signed(module)
     hostile = replace(facts, gen=0, prev=b"x" * 32)
-    return _rejects(lambda: module._facts(hostile, bounds_maximum()))
+    return _rejects(lambda: module._facts(hostile, _unwrap(bounds_maximum())))
 
 
 def _valid_successor_pair(module: types.ModuleType) -> tuple[Any, Any]:
@@ -195,7 +195,7 @@ def _valid_successor_pair(module: types.ModuleType) -> tuple[Any, Any]:
         gen=2,
         prev=predecessor.digest,
     )
-    assert module.verify_successor(predecessor, successor, bounds_maximum()).is_ok
+    assert module.verify_successor(predecessor, successor, _unwrap(bounds_maximum())).is_ok
     return predecessor, successor
 
 
@@ -203,10 +203,10 @@ def _probe_markers(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return (
         not module.verify_successor(
-            replace(predecessor, verification="not_evaluated"), successor, bounds_maximum()
+            replace(predecessor, verification="not_evaluated"), successor, _unwrap(bounds_maximum())
         ).is_ok
         and not module.verify_successor(
-            predecessor, replace(successor, trust="evaluated"), bounds_maximum()
+            predecessor, replace(successor, trust="evaluated"), _unwrap(bounds_maximum())
         ).is_ok
     )
 
@@ -214,35 +214,35 @@ def _probe_markers(module: types.ModuleType) -> bool:
 def _probe_context(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return not module.verify_successor(
-        predecessor, replace(successor, iss="urn:example:issuer:other"), bounds_maximum()
+        predecessor, replace(successor, iss="urn:example:issuer:other"), _unwrap(bounds_maximum())
     ).is_ok
 
 
 def _probe_generation(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return not module.verify_successor(
-        predecessor, replace(successor, gen=3), bounds_maximum()
+        predecessor, replace(successor, gen=3), _unwrap(bounds_maximum())
     ).is_ok
 
 
 def _probe_predecessor(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return not module.verify_successor(
-        predecessor, replace(successor, prev=b"x" * 32), bounds_maximum()
+        predecessor, replace(successor, prev=b"x" * 32), _unwrap(bounds_maximum())
     ).is_ok
 
 
 def _probe_time(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return not module.verify_successor(
-        predecessor, replace(successor, iat=predecessor.iat - 1), bounds_maximum()
+        predecessor, replace(successor, iat=predecessor.iat - 1), _unwrap(bounds_maximum())
     ).is_ok
 
 
 def _probe_identity(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return not module.verify_successor(
-        predecessor, replace(successor, jti=predecessor.jti), bounds_maximum()
+        predecessor, replace(successor, jti=predecessor.jti), _unwrap(bounds_maximum())
     ).is_ok
 
 
@@ -255,7 +255,7 @@ MUTATIONS: tuple[tuple[str, str, str, Probe], ...] = (
     ),
     (
         "content-size-ceiling",
-        'if not (1 <= len(content) <= bounds_resolve(b, "content_bytes")):',
+        'if not (1 <= len(content) <= _unwrap(bounds_resolve(b, "content_bytes"))):',
         "if not (1 <= len(content)):",
         _probe_content_ceiling,
     ),
@@ -267,7 +267,7 @@ MUTATIONS: tuple[tuple[str, str, str, Probe], ...] = (
     ),
     (
         "meaningful-signature-verification",
-        "if not ed25519_verify(segments.signing_input, segments.signature, key):",
+        "if not _ed25519_verify(segments.signing_input, segments.signature, key):",
         "if False:",
         _probe_signature,
     ),
@@ -285,14 +285,14 @@ MUTATIONS: tuple[tuple[str, str, str, Probe], ...] = (
     ),
     (
         "typed-facts-negative-magnitude",
-        'if abs(value) > bounds_resolve(bounds, "integer_magnitude"):',
-        'if value > bounds_resolve(bounds, "integer_magnitude"):',
+        'if abs(value) > _unwrap(bounds_resolve(bounds, "integer_magnitude")):',
+        'if value > _unwrap(bounds_resolve(bounds, "integer_magnitude")):',
         _probe_negative_magnitude,
     ),
     (
         "typed-facts-positive-generation",
-        'if not (1 <= gen <= bounds_resolve(bounds, "integer_magnitude")):',
-        'if not (gen <= bounds_resolve(bounds, "integer_magnitude")):',
+        'if not (1 <= gen <= _unwrap(bounds_resolve(bounds, "integer_magnitude"))):',
+        'if not (gen <= _unwrap(bounds_resolve(bounds, "integer_magnitude"))):',
         _probe_positive_generation,
     ),
     (

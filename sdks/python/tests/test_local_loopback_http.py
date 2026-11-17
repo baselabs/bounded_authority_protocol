@@ -1,3 +1,4 @@
+
 import base64
 import hashlib
 import json
@@ -31,6 +32,7 @@ from bounded_authority_verifier import (
     proof_signing_input,
     public_key_thumbprint_raw,
 )
+from bounded_authority_verifier.error import _unwrap
 from bounded_authority_verifier.uri import local_loopback_http_uri_normalize, uri_normalize
 
 _CERTIFIED_INDEX_SHA256 = "10fc4cf05affcddc9e6340ff392c247e25ab038cd938f2557829a7ce63b1a5e4"
@@ -89,7 +91,7 @@ def _signing_message(signing_input: SigningInput) -> bytes:
 def test_local_loopback_http_profile_is_byte_distinct_and_nonce_bound() -> None:
     issuer_public, issuer_private = _keypair()
     holder_public, holder_private = _keypair()
-    holder_thumbprint = public_key_thumbprint_raw(holder_public)
+    holder_thumbprint = _unwrap(public_key_thumbprint_raw(holder_public))
 
     grant_input = GrantProducer(
         key_id="issuer-1",
@@ -331,7 +333,7 @@ def test_loopback_profile_binds_only_contract_major_one_grants() -> None:
 
     issuer_public, issuer_private = _keypair()
     holder_public, holder_private = _keypair()
-    holder_thumbprint = public_key_thumbprint_raw(holder_public)
+    holder_thumbprint = _unwrap(public_key_thumbprint_raw(holder_public))
     successor_grant = v2.grant_signing_input(
         v2.GrantProducer(
             key_id="issuer-1",

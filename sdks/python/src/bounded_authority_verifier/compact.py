@@ -11,8 +11,8 @@ from dataclasses import dataclass
 
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
-from .ed25519 import signature_gate
-from .error import InvalidError, Ok, Result, err, fail, require
+from .ed25519 import _signature_gate
+from .error import InvalidError, Ok, Result, _fail, _require, _unwrap, err
 
 _DOT = 0x2E
 
@@ -27,40 +27,40 @@ class CompactSegments:
     signing_input: bytes       # ASCII(protected "." payload) text
 
 
-def parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegments:
+def _parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegments:
     """Parse + bound a compact input into 3 segments. Validates the segment count, bounds, canonical
     base64url of each segment, and decodes protected + payload (signature kept raw after decode)."""
     # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits past
     # MAXIMA, bypassing bounds_new). Mirrors the reference's Bounds.coerce on every entry point.
-    b = coerce_bounds(bounds)
-    if len(data) > bounds_resolve(b, "compact_bytes"):
-        fail("compact: byte bound")
+    b = _unwrap(coerce_bounds(bounds))
+    if len(data) > _unwrap(bounds_resolve(b, "compact_bytes")):
+        _fail("compact: byte bound")
     if len(data) == 0:
-        fail("compact: empty")
+        _fail("compact: empty")
     # Split into exactly 3 segments on '.'.
     dots = [i for i, byte in enumerate(data) if byte == _DOT]
     if len(dots) != 2:
-        fail("compact: three segments")
+        _fail("compact: three segments")
     d0 = dots[0]
     d1 = dots[1]
     if d0 == 0 or d1 == d0 + 1 or d1 == len(data) - 1:
-        fail("compact: empty segment")
+        _fail("compact: empty segment")
     protected_text = data[:d0]
     payload_text = data[d0 + 1:d1]
     signature_text = data[d1 + 1:]
-    if len(protected_text) > bounds_resolve(b, "encoded_segment_bytes"):
-        fail("compact: protected segment bound")
-    if len(payload_text) > bounds_resolve(b, "encoded_segment_bytes"):
-        fail("compact: payload segment bound")
-    protected_bytes = base64url_decode(protected_text, bounds_resolve(b, "decoded_segment_bytes"))
-    payload_bytes = base64url_decode(payload_text, bounds_resolve(b, "decoded_segment_bytes"))
-    signature = base64url_decode(signature_text)
+    if len(protected_text) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")):
+        _fail("compact: protected segment bound")
+    if len(payload_text) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")):
+        _fail("compact: payload segment bound")
+    protected_bytes = _unwrap(base64url_decode(protected_text, _unwrap(bounds_resolve(b, "decoded_segment_bytes"))))
+    payload_bytes = _unwrap(base64url_decode(payload_text, _unwrap(bounds_resolve(b, "decoded_segment_bytes"))))
+    signature = _unwrap(base64url_decode(signature_text))
     # Decoded signature-width gate (runtime.ex:237 parse_grant, :259 parse_proof,
     # boundary_anchor_codec.ex:88, key_transition_codec.ex:120 all enforce byte_size(signature) ==
     # signature_bytes). scan_compact (the ath/hash gate) intentionally does NOT — it mirrors
     # CompactJws.scan (shape+size only); the decoded-width check belongs to the decode path.
-    if len(signature) != bounds_resolve(b, "signature_bytes"):
-        fail("compact: signature width")
+    if len(signature) != _unwrap(bounds_resolve(b, "signature_bytes")):
+        _fail("compact: signature width")
     signing_input = protected_text + bytes([_DOT]) + payload_text
     return CompactSegments(
         protected_segment=protected_text,
@@ -72,33 +72,33 @@ def parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegmen
     )
 
 
-def scan_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
+def _scan_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
     """Faithful port of the reference ``CompactJws.scan`` (compact_jws.ex:16-27): the shape+size gate
     that ``ath``/``hash`` run BEFORE hashing a compact. Validates structure + bounds only — NOT
-    base64url canonicity (canonicity is the full verify path's job via parse_compact). The producer
+    base64url canonicity (canonicity is the full verify path's job via _parse_compact). The producer
     ath (proof signing input) and the verify grant-hash both gate on this so a non-compact grant
     (wrong segment count, oversized, dotted signature) is rejected rather than hashed. Mirrors the
-    Rust scan_compact gate added in the BAP-15 closeout.
+    Rust _scan_compact gate added in the BAP-15 closeout.
     """
-    b = coerce_bounds(bounds)
-    if len(data) > bounds_resolve(b, "compact_bytes"):
-        fail("compact: byte bound")
+    b = _unwrap(coerce_bounds(bounds))
+    if len(data) > _unwrap(bounds_resolve(b, "compact_bytes")):
+        _fail("compact: byte bound")
     if len(data) == 0:
-        fail("compact: empty")
+        _fail("compact: empty")
     dots = [i for i, byte in enumerate(data) if byte == _DOT]
     if len(dots) != 2:
-        fail("compact: three segments")
+        _fail("compact: three segments")
     d0 = dots[0]
     d1 = dots[1]
     if d0 == 0 or d1 == d0 + 1 or d1 == len(data) - 1:
-        fail("compact: empty segment")
-    seg_bytes = bounds_resolve(b, "encoded_segment_bytes")
+        _fail("compact: empty segment")
+    seg_bytes = _unwrap(bounds_resolve(b, "encoded_segment_bytes"))
     if d0 > seg_bytes:
-        fail("compact: protected segment bound")
+        _fail("compact: protected segment bound")
     if d1 - d0 - 1 > seg_bytes:
-        fail("compact: payload segment bound")
+        _fail("compact: payload segment bound")
     if len(data) - d1 - 1 > seg_bytes:
-        fail("compact: signature segment bound")
+        _fail("compact: signature segment bound")
     # signature dot-free: exactly 2 dots guarantees no dot inside the signature segment.
 
 
@@ -133,15 +133,15 @@ def assemble_segments(signing_input: SigningInput, signature: bytes) -> Result[b
     """
     try:
         if signing_input.kind not in _KINDS:
-            fail("assemble_segments: kind closed set")
-        require(len(signature) == 64, "assemble_segments: signature width 64")
+            _fail("assemble_segments: kind closed set")
+        _require(len(signature) == 64, "assemble_segments: signature width 64")
         # Erratum 3 (REQ1/REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer
         # surface — it frames a signature and verifies none — so it refuses a signature that
         # fails the keyless part of rule S1 and emits accepted bytes unchanged. Every Ed25519
         # assembler (contract-majors 1 and 2, local loopback, role attestation, content
         # assertion) assembles through this function.
-        require(signature_gate(signature), "assemble_segments: signature canonicality")
-        sig_b64 = base64url_encode(signature)
+        _require(_signature_gate(signature), "assemble_segments: signature canonicality")
+        sig_b64 = _unwrap(base64url_encode(signature))
         return Ok(
             signing_input.protected_segment
             + bytes([_DOT])
@@ -163,9 +163,9 @@ def assemble_segments_es256(signing_input: SigningInput, signature: bytes) -> Re
     """
     try:
         if signing_input.kind not in ("grant", "proof", "boundary_anchor", "key_transition"):
-            fail("assemble_segments: kind closed set")
-        require(len(signature) == 64, "assemble_segments: signature width 64")
-        sig_b64 = base64url_encode(signature)
+            _fail("assemble_segments: kind closed set")
+        _require(len(signature) == 64, "assemble_segments: signature width 64")
+        sig_b64 = _unwrap(base64url_encode(signature))
         return Ok(
             signing_input.protected_segment
             + bytes([_DOT])

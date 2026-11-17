@@ -7,7 +7,7 @@ defeats, assert the SDK REJECTs it.
 DEFECT-INJECTION BATTERY (8 items — the ADR 0005:240-246 "prove red-when-removed" half). Each
 item below was defect-injected at authoring: the named closure/gate was mechanically removed or
 broken, the named test/gate went RED, and the change was reverted. The record:
-  1. duplicate-reject (REQ1-JSON-no-duplicate): remove the `if name in members: fail(...)` in
+  1. duplicate-reject (REQ1-JSON-no-duplicate): remove the `if name in members: _fail(...)` in
      json_alg.py → "duplicate member at depth 3" goes RED.
   2. __class__/dunder null-prototype (REQ1-SELECTOR-semantic-identity): switch JObject.v to a
      dict-subclass-with-`__getattr__` (the Python defect — attribute collision) →
@@ -20,7 +20,7 @@ broken, the named test/gate went RED, and the change was reverted. The record:
   5. int/float tag distinction: collapse the float decode to JInt in json_alg._parse_number
      (return JInt(int(n)) instead of JFloat(n)) → "integer 1 and float 1.0 distinct identity" +
      "equals selector distinguishes" go RED.
-  6. census two-boundary (ADR 0014 D9): make import_public_key in ed25519.py NOT register the
+  6. census two-boundary (ADR 0014 D9): make _import_public_key in ed25519.py NOT register the
      fingerprint → conformance/run.py census aborts ("declared by a valid verification case but
      never imported at the Ed25519 verify boundary").
   7. purity lint (ADR 0014 D8): inject `datetime.now()` into a src/ module → tools/purity_check.py
@@ -54,8 +54,8 @@ from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 from bounded_authority_verifier import v2, v3
 from bounded_authority_verifier.bounds import Bounds, bounds_new
 from bounded_authority_verifier.compact import assemble_segments_es256
-from bounded_authority_verifier.ed25519 import reset_census, sha256
-from bounded_authority_verifier.error import InvalidError
+from bounded_authority_verifier.ed25519 import _reset_census, sha256
+from bounded_authority_verifier.error import Err, InvalidError, _unwrap
 from bounded_authority_verifier.json_alg import (
     JArray,
     JFloat,
@@ -118,11 +118,7 @@ dec = json_decode
 
 def invalid_json(text: bytes) -> bool:
     """Record a decoder rejection so mutation kills are actual assertion failures."""
-    try:
-        dec(text)
-    except InvalidError:
-        return True
-    return False
+    return isinstance(dec(text), Err)
 
 
 def rejects(label: str):
@@ -147,7 +143,7 @@ def test_duplicate_member_at_depth_3():
 
 
 def test_distinct_members_accepted():
-    v = dec(b'{"a":1,"b":2}')
+    v = _unwrap(dec(b'{"a":1,"b":2}'))
     assert isinstance(v, JObject)
 
 
@@ -157,7 +153,7 @@ def test_distinct_members_accepted():
 # only (never getattr), so __class__ is DATA.
 def test_dunder_member_preserved_as_data():
     """A __class__ key must be stored as ordinary data, not collide with dict.__class__."""
-    v = dec(b'{"__class__":{"evil":1},"ok":2}')
+    v = _unwrap(dec(b'{"__class__":{"evil":1},"ok":2}'))
     assert isinstance(v, JObject)
     # dict[key] subscription (the SDK's only access path) returns the DATA value, not dict.__class__.
     assert "__class__" in v.v
@@ -175,9 +171,9 @@ def test_dunder_does_not_collapse_identity():
     canonicalize identically because the __class__ member would resolve to the type object (or
     vanish), collapsing the distinction.
     """
-    a = dec(b'{"__class__":1,"x":2}')
-    b = dec(b'{"x":2}')
-    assert _to_hex(semantic_identity(a)) != _to_hex(semantic_identity(b))
+    a = _unwrap(dec(b'{"__class__":1,"x":2}'))
+    b = _unwrap(dec(b'{"x":2}'))
+    assert _to_hex(_unwrap(semantic_identity(a))) != _to_hex(_unwrap(semantic_identity(b)))
 
 
 # 3. REQ1-JSON-raw-lexeme — the host defect: float() rounds a long lexeme to a finite value, so a
@@ -199,27 +195,26 @@ def test_trailing_bytes():
 
 
 def test_two_top_level_values():
-    with pytest.raises(InvalidError):
-        dec(b"1 2")
+    assert isinstance(dec(b"1 2"), Err)
 
 
 # 5. int/float tag distinction — the host defect: a naive JSON loader collapses `1` and `1.0` to the
 # same value, so a selector identity comparison that used the raw value would treat them as equal.
 # The SDK's tagged algebra preserves the distinction; the typed projection wraps them differently.
 def test_integer_and_float_distinct_identity():
-    int_one = dec(b"1")
-    float_one = dec(b"1.0")
+    int_one = _unwrap(dec(b"1"))
+    float_one = _unwrap(dec(b"1.0"))
     assert isinstance(int_one, JInt)
     assert isinstance(float_one, JFloat)
-    assert _to_hex(semantic_identity(int_one)) != _to_hex(semantic_identity(float_one))
+    assert _to_hex(_unwrap(semantic_identity(int_one))) != _to_hex(_unwrap(semantic_identity(float_one)))
 
 
 def test_equals_selector_distinguishes_int_from_float():
-    args = dec(b'{"n":1}')  # integer 1
-    sel_int = parse_selector(dec(b'{"kind":"equals","path":["n"],"value":1}'))
-    sel_float = parse_selector(dec(b'{"kind":"equals","path":["n"],"value":1.0}'))
-    assert selector_matches(sel_int, args) is True
-    assert selector_matches(sel_float, args) is False  # float 1.0 != integer 1
+    args = _unwrap(dec(b'{"n":1}'))  # integer 1
+    sel_int = _unwrap(parse_selector(_unwrap(dec(b'{"kind":"equals","path":["n"],"value":1}'))))
+    sel_float = _unwrap(parse_selector(_unwrap(dec(b'{"kind":"equals","path":["n"],"value":1.0}'))))
+    assert _unwrap(selector_matches(sel_int, args)) is True
+    assert _unwrap(selector_matches(sel_float, args)) is False  # float 1.0 != integer 1
 
 
 def test_all_selector_accepts_only_the_three_recognized_member_sets():
@@ -228,7 +223,7 @@ def test_all_selector_accepts_only_the_three_recognized_member_sets():
         b'{"kind":"all","path":false,"value":null}',
         b'{"kind":"all","path":7,"values":"inert"}',
     ):
-        assert isinstance(parse_selector(dec(encoded)), SelAll)
+        assert isinstance(_unwrap(parse_selector(_unwrap(dec(encoded)))), SelAll)
 
     for encoded in (
         b'{"kind":"all","path":[]}',
@@ -237,8 +232,7 @@ def test_all_selector_accepts_only_the_three_recognized_member_sets():
         b'{"kind":"all","path":[],"value":null,"values":[]}',
         b'{"kind":"all","extra":null}',
     ):
-        with pytest.raises(InvalidError):
-            parse_selector(dec(encoded))
+        assert isinstance(parse_selector(_unwrap(dec(encoded))), Err)
 
 
 # 6. JCS float canonicalization (RFC 8785 §3.2.2 / ECMAScript Number.prototype.toString). The host
@@ -265,8 +259,8 @@ def test_all_selector_accepts_only_the_three_recognized_member_sets():
 def test_jcs_float_canonicalization_matches_ecmascript(lexeme, expected):
     from bounded_authority_verifier.jcs import jcs_encode
 
-    v = dec(b'{"x":' + lexeme + b"}")
-    assert jcs_encode(v) == expected
+    v = _unwrap(dec(b'{"x":' + lexeme + b"}"))
+    assert _unwrap(jcs_encode(v)) == expected
 
 
 def test_jcs_astral_codepoint_emits_4_byte_utf8():
@@ -276,8 +270,8 @@ def test_jcs_astral_codepoint_emits_4_byte_utf8():
     from bounded_authority_verifier.jcs import jcs_encode
 
     # U+10000 (𐀀) encoded as a JSON \uXXXX surrogate pair.
-    v = dec(b'"\\ud800\\udc00"')
-    out = jcs_encode(v)
+    v = _unwrap(dec(b'"\\ud800\\udc00"'))
+    out = _unwrap(jcs_encode(v))
     # The string value between the quotes is the raw 4-byte UTF-8 of U+10000: F0 90 80 80.
     assert out == b'"' + bytes([0xF0, 0x90, 0x80, 0x80]) + b'"'
 
@@ -294,15 +288,12 @@ def test_lone_high_surrogate_at_eof_is_invalid_not_indexerror():
     The TS sibling is safe (out-of-range Uint8Array access yields undefined); Python raises.
     Defect: revert json_alg.py to `if src[ctx.pos] != 0x5C ...` (no _byte_at guard) → IndexError.
     """
-    with pytest.raises(InvalidError):
-        json_decode(b'"\\uD800')
-    with pytest.raises(InvalidError):
-        json_decode(b'"\\uD800\\')
+    assert isinstance(json_decode(b'"\\uD800'), Err)
+    assert isinstance(json_decode(b'"\\uD800\\'), Err)
     # Control: a lone high surrogate WITH a closing quote already failed closed; still does.
-    with pytest.raises(InvalidError):
-        json_decode(b'"\\uD800"')
+    assert isinstance(json_decode(b'"\\uD800"'), Err)
     # Control: a valid surrogate pair still succeeds (decodes to U+103FF).
-    assert json_decode(b'"\\uD800\\uDFFF"') == JString(v=bytes([0xF0, 0x90, 0x8F, 0xBF]))
+    assert _unwrap(json_decode(b'"\\uD800\\uDFFF"')) == JString(v=bytes([0xF0, 0x90, 0x8F, 0xBF]))
 
 
 def test_malformed_utf8_member_name_is_invalid():
@@ -311,10 +302,9 @@ def test_malformed_utf8_member_name_is_invalid():
     returns {:error,:invalid} (json.ex rescues). Defect: revert to bare `name_bytes.decode('utf-8')`
     → UnicodeDecodeError.
     """
-    with pytest.raises(InvalidError):
-        json_decode(b'{"\xff":1}')
+    assert isinstance(json_decode(b'{"\xff":1}'), Err)
     # Control: a valid name still decodes.
-    assert json_decode(b'{"a":1}') == JObject(v={"a": JInt(v=1)})
+    assert _unwrap(json_decode(b'{"a":1}')) == JObject(v={"a": JInt(v=1)})
 
 
 def test_float_magnitude_checked_on_raw_lexeme_not_lossy_conversion():
@@ -325,10 +315,10 @@ def test_float_magnitude_checked_on_raw_lexeme_not_lossy_conversion():
     """
     assert invalid_json(b"9007199254740991.0001")
     # Controls: exactly MAX is valid (int); MAX+1 as int is rejected on the raw lexeme too.
-    assert json_decode(b"9007199254740991") == JInt(v=9007199254740991)
+    assert _unwrap(json_decode(b"9007199254740991")) == JInt(v=9007199254740991)
     assert invalid_json(b"9007199254740992")
     # A float strictly under MAX is valid.
-    assert isinstance(json_decode(b"9007199254740990.5"), JFloat)
+    assert isinstance(_unwrap(json_decode(b"9007199254740990.5")), JFloat)
 
 
 def test_malformed_ipv6_literal_rejected():
@@ -365,7 +355,7 @@ def test_jcs_del_emits_raw_byte_matching_reference():
     from bounded_authority_verifier.jcs import jcs_encode
 
     v = JString(v=b"x\x7fy")
-    assert list(jcs_encode(v)) == [34, 120, 127, 121, 34]  # "x<raw DEL>y"
+    assert list(_unwrap(jcs_encode(v))) == [34, 120, 127, 121, 34]  # "x<raw DEL>y"
 
 
 def test_jcs_enforces_per_node_bounds_at_encode():
@@ -378,26 +368,23 @@ def test_jcs_enforces_per_node_bounds_at_encode():
     from bounded_authority_verifier.jcs import jcs_encode
 
     # 257-item array (over array_items=256).
-    with pytest.raises(InvalidError):
-        jcs_encode(JArray(v=tuple(JInt(i) for i in range(257))))
+    assert isinstance(jcs_encode(JArray(v=tuple(JInt(i) for i in range(257)))), Err)
     # Control: 256 items is the boundary and encodes.
-    assert isinstance(jcs_encode(JArray(v=tuple(JInt(i) for i in range(256)))), bytes)
+    assert isinstance(_unwrap(jcs_encode(JArray(v=tuple(JInt(i) for i in range(256))))), bytes)
     # depth-33 nested array (over depth=32).
     deep = JInt(0)
     for _ in range(33):
         deep = JArray(v=(deep,))
-    with pytest.raises(InvalidError):
-        jcs_encode(deep)
+    assert isinstance(jcs_encode(deep), Err)
     # Control: depth-32 encodes.
     deep32 = JInt(0)
     for _ in range(32):
         deep32 = JArray(v=(deep32,))
-    assert isinstance(jcs_encode(deep32), bytes)
+    assert isinstance(_unwrap(jcs_encode(deep32)), bytes)
     # oversized string (over string_bytes=8192).
-    with pytest.raises(InvalidError):
-        jcs_encode(JString(v=b"x" * 8193))
+    assert isinstance(jcs_encode(JString(v=b"x" * 8193)), Err)
     # Control: exactly 8192 bytes encodes.
-    assert isinstance(jcs_encode(JString(v=b"x" * 8192)), bytes)
+    assert isinstance(_unwrap(jcs_encode(JString(v=b"x" * 8192))), bytes)
 
 
 # === FIX-C cross-vendor remediation — v1 façade closed-boundary (defect-injected) ===
@@ -406,8 +393,8 @@ def test_untrusted_key_locator_decodes_only_protected_segment():
     """Cross-vendor #13: untrusted_key_locator MUST decode ONLY the protected segment — the reference
     (v1.ex:21-34) splits on '.' and never decodes payload/signature. A compact with a valid grant
     header but garbage (non-base64url) payload+signature must return the kid (Ok), not reject. The
-    prior implementation called parse_compact (decodes all 3) → wrongly rejected. Defect: revert to
-    parse_compact → the garbage-payload case returns Err.
+    prior implementation called _parse_compact (decodes all 3) → wrongly rejected. Defect: revert to
+    _parse_compact → the garbage-payload case returns Err.
     """
     from bounded_authority_verifier.error import Ok
     from bounded_authority_verifier.v1 import untrusted_key_locator
@@ -427,7 +414,7 @@ def test_check_envelope_rejects_null_trusted_issuer_fail_closed():
     """Cross-vendor #22: a null trusted_issuer must fail closed (return Err), not raise
     AttributeError on the .public_key deref. The _trying wrapper only catches InvalidError, so without
     the guard an AttributeError propagates out of the public API. Defect: revert the
-    `if t is None: fail(...)` guard → AttributeError is raised (not caught).
+    `if t is None: _fail(...)` guard → AttributeError is raised (not caught).
     """
     from bounded_authority_verifier.v1 import ExpectedRequest, check_envelope
 
@@ -452,7 +439,7 @@ def _valid_envelope():
     grant = GrantProducer(
         key_id="issuer-123456", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
         audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
-        holder_thumbprint=_b64url(public_key_thumbprint_raw(holder_pub)),
+        holder_thumbprint=_b64url(_unwrap(public_key_thumbprint_raw(holder_pub))),
         operations=(OperationInput(name="read", selectors=("all",)),),
     )
     gsi = grant_signing_input(grant)
@@ -565,7 +552,7 @@ def _build_archive(
     encoded = encode_consumption_entry(row_entry)
     assert encoded.is_ok, "row encode failed"
     row_bytes = encoded.value.bytes_
-    last_hash = sha256(ROW_PREFIX, row_bytes)
+    last_hash = _unwrap(sha256(ROW_PREFIX, row_bytes))
     start_pub, start_priv = keys[0]
     start_compact = _signed_anchor_compact(
         BoundaryAnchorProducer(
@@ -579,8 +566,8 @@ def _build_archive(
     for i in range(len(keys) - 1):
         cur_pub, cur_priv = keys[i]
         nxt_pub, _ = keys[i + 1]
-        from_fp = public_key_thumbprint_raw(cur_pub)
-        to_fp = public_key_thumbprint_raw(nxt_pub)
+        from_fp = _unwrap(public_key_thumbprint_raw(cur_pub))
+        to_fp = _unwrap(public_key_thumbprint_raw(nxt_pub))
         effective_at = effective_ats[i] if effective_ats is not None else 1500 + 500 * i
         tp = KeyTransitionProducer(
             transition_id=f"urn:example:transition:{i}", chain_id=chain_id, effective_at=effective_at,
@@ -618,11 +605,11 @@ def _build_archive(
     )
     start_anchor = ExpectedAnchor(
         anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id=chain_id, sequence=0,
-        chain_hash=zero_prev, key_id="k0", key_fingerprint=public_key_thumbprint_raw(start_pub),
+        chain_hash=zero_prev, key_id="k0", key_fingerprint=_unwrap(public_key_thumbprint_raw(start_pub)),
     )
     end_anchor = ExpectedAnchor(
         anchor_id="urn:example:anchor:end", anchored_at=end_at, chain_id=chain_id, sequence=1,
-        chain_hash=last_hash, key_id=f"k{len(keys) - 1}", key_fingerprint=public_key_thumbprint_raw(end_pub),
+        chain_hash=last_hash, key_id=f"k{len(keys) - 1}", key_fingerprint=_unwrap(public_key_thumbprint_raw(end_pub)),
     )
     # encode_anchored_export validates inputs (incl. the key path) — for the malformed-path archives
     # (#2 non-monotone / cycle), bypass encode-time validation by hand-assembling the frames.
@@ -636,7 +623,7 @@ def _build_archive(
         digest = enc.value.digest
     else:
         archive = _hand_frame_archive(input_)
-        digest = sha256(archive)
+        digest = _unwrap(sha256(archive))
     expected = ExpectedExport(
         chain=chain, digest=digest, start_anchor=start_anchor, end_anchor=end_anchor,
         transitions=tuple(expected_transitions), object_version="v1",
@@ -666,7 +653,7 @@ def _hand_frame_archive(input_: AnchoredExportInput) -> bytes:
         "transition_count": JInt(v=len(input_.transitions)),
         "v": JInt(v=1),
     }
-    header_bytes = jcs_encode(JObject(v=members))
+    header_bytes = _unwrap(jcs_encode(JObject(v=members)))
 
     def frame(b: bytes) -> bytes:
         return struct.pack(">I", len(b)) + b
@@ -743,23 +730,23 @@ def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
     # the canonical re-encode check is the load-bearing gate (otherwise the hash mismatch rejects
     # first, masking a regression to the canonical check specifically).
     padded = b" " + canonical
-    padded_last_hash = sha256(ROW_PREFIX, padded)
+    padded_last_hash = _unwrap(sha256(ROW_PREFIX, padded))
     padded_chain = ChainInput(
         rows=(padded,), chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1,
         previous_hash=Z32, last_hash=padded_last_hash,
     )
     assert not check_chain(padded_chain, expected_of(padded_chain)).is_ok, "noncanonical (whitespace) row must reject"
     # Defect B: a sequence-0 row (hand-rolled canonical bytes) must reject.
-    seq_zero = jcs_encode(JObject(v={
+    seq_zero = _unwrap(jcs_encode(JObject(v={
         "chain_id": JString(v=b"urn:example:chain"),
         "commitment": JString(v=_b64url(bytes([7] * 32)).encode("ascii")),
         "previous": JString(v=_b64url(Z32).encode("ascii")),
         "sequence": JInt(v=0),
         "v": JInt(v=1),
-    }))
+    })))
     seq_zero_chain = ChainInput(
         rows=(seq_zero,), chain_id="urn:example:chain", first_sequence=0, last_sequence=0, row_count=1,
-        previous_hash=Z32, last_hash=sha256(ROW_PREFIX, seq_zero),
+        previous_hash=Z32, last_hash=_unwrap(sha256(ROW_PREFIX, seq_zero)),
     )
     assert not check_chain(seq_zero_chain, expected_of(seq_zero_chain)).is_ok, "sequence-0 row must reject"
 
@@ -792,8 +779,8 @@ def test_encode_anchored_export_rejects_transition_count_over_bound():
     expected_transitions = tuple(
         ExpectedKeyTransition(
             transition_id=f"urn:example:t:{i}", chain_id="urn:example:chain", effective_at=2000 + i,
-            current_key_id=f"k{i}", current_key_fingerprint=public_key_thumbprint_raw(keys[i][0]),
-            next_key_id=f"k{i + 1}", next_key_fingerprint=public_key_thumbprint_raw(keys[i + 1][0]),
+            current_key_id=f"k{i}", current_key_fingerprint=_unwrap(public_key_thumbprint_raw(keys[i][0])),
+            next_key_id=f"k{i + 1}", next_key_fingerprint=_unwrap(public_key_thumbprint_raw(keys[i + 1][0])),
         )
         for i in range(257)
     )
@@ -806,8 +793,8 @@ def test_encode_anchored_export_rejects_transition_count_over_bound():
         ),
         ExpectedExport(
             chain=chain, digest=bytes(32),
-            start_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain", sequence=0, chain_hash=Z32, key_id="k0", key_fingerprint=public_key_thumbprint_raw(start_pub)),
-            end_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:end", anchored_at=100000, chain_id="urn:example:chain", sequence=1, chain_hash=last_hash, key_id="k257", key_fingerprint=public_key_thumbprint_raw(end_pub)),
+            start_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain", sequence=0, chain_hash=Z32, key_id="k0", key_fingerprint=_unwrap(public_key_thumbprint_raw(start_pub))),
+            end_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:end", anchored_at=100000, chain_id="urn:example:chain", sequence=1, chain_hash=last_hash, key_id="k257", key_fingerprint=_unwrap(public_key_thumbprint_raw(end_pub))),
             transitions=expected_transitions, object_version="v1",
         ),
     )
@@ -834,7 +821,7 @@ def test_verify_anchored_export_accepts_valid_one_key_zero_transition_archive():
     (anchored_export_codec.ex:94-99 validate_historical_key_shapes accepts keys == transitions+1 with
     NO minimum). The SDK previously gated on keys.length < 2 and falsely rejected it. Defect: revert
     to the `< 2` gate → this valid archive returns Err."""
-    reset_census()
+    _reset_census()
     built = _build_archive([_fresh_key()])
     r = verify_anchored_export(
         ArchivedObject(chunks=(built["archive"],), version="v1"),
@@ -850,7 +837,7 @@ def test_verify_anchored_export_rejects_zero_key_chain_fail_closed():
     keys[0] deref. Defect: revert the length-check-before-deref ordering → IndexError propagates."""
     from bounded_authority_verifier.v1 import HistoricalKeyChain
 
-    reset_census()
+    _reset_census()
     built = _build_archive([_fresh_key()])
     empty_chain = HistoricalKeyChain(keys=())
     r = verify_anchored_export(
@@ -864,7 +851,7 @@ def test_verify_anchored_export_rejects_bad_chunk_lists():
     """Cross-vendor #18: verify_anchored_export MUST validate the chunk list BEFORE concatenation
     (anchored_export_codec.ex:333-342 validate_chunks): reject empty chunks, reject chunk count >=
     archive_chunks, reject total > archive_bytes. Defect: revert _validate_chunks → these pass."""
-    reset_census()
+    _reset_census()
     built = _build_archive([_fresh_key()])
     # Empty chunk in the list.
     with_empty = ArchivedObject(chunks=(built["archive"], b""), version="v1")
@@ -887,7 +874,7 @@ def test_verify_anchored_export_rejects_non_monotonic_rollover():
     transitions are built with the actual non-monotonic effective_at sequence (each compact
     individually valid), so the chronology check is the load-bearing gate. Defect: revert
     _validate_key_path + the chronology loop → this archive wrongly verifies."""
-    reset_census()
+    _reset_census()
     a = _fresh_key()
     b = _fresh_key()
     c = _fresh_key()
@@ -908,7 +895,7 @@ def test_verify_anchored_export_rejects_fingerprint_cycle():
     """Cross-vendor #2 (cycle): a key-path where a fingerprint repeats (A→B→A) must reject. Built with
     a REAL repeated key (positions 0 and 2 reuse key A) so each transition (A→B, B→A) is individually
     valid, and the cycle check is the load-bearing gate. Defect: revert _validate_key_path → verifies."""
-    reset_census()
+    _reset_census()
     a = _fresh_key()
     b = _fresh_key()
     cyclic = _build_archive([a, b, a], effective_ats=[1500, 2000], end_anchored_at=3000)
@@ -931,7 +918,7 @@ def test_verify_anchored_export_rejects_fingerprint_cycle():
 # decode_grant(grant, %{kid_bytes: 5}) rejects it). Each test drives one entry point.
 
 # A typed JSON-null cast-arguments value (the Tagged null variant carries no `v`).
-_NULL_ARGS: Tagged = json_decode(b"null")
+_NULL_ARGS: Tagged = _unwrap(json_decode(b"null"))
 
 
 def _signed_grant(kid: str = "issuer-123456"):
@@ -939,7 +926,7 @@ def _signed_grant(kid: str = "issuer-123456"):
     + the issuer key material needed for verify_grant / check_envelope."""
     issuer_pub, issuer_priv = _fresh_key()
     holder_pub, _ = _fresh_key()
-    holder_fp = public_key_thumbprint_raw(holder_pub)
+    holder_fp = _unwrap(public_key_thumbprint_raw(holder_pub))
     grant = GrantProducer(
         key_id=kid, issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
         audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
@@ -981,7 +968,7 @@ def test_decode_grant_honors_caller_bounds():
     # Control: no bounds (MAX) → the 13-byte kid is accepted.
     assert decode_grant(g["compact"]).is_ok, "13-byte kid must be accepted at MAX"
     # Tightened: kid_bytes=5 → the 13-byte kid must be rejected (the reference's valid_key_id? gate).
-    assert not decode_grant(g["compact"], bounds_new({"kid_bytes": 5})).is_ok, "kid_bytes=5 must reject a 13-byte kid"
+    assert not decode_grant(g["compact"], _unwrap(bounds_new({"kid_bytes": 5}))).is_ok, "kid_bytes=5 must reject a 13-byte kid"
 
 
 def test_decode_grant_threads_caller_bounds_into_selector_decode():
@@ -991,7 +978,7 @@ def test_decode_grant_threads_caller_bounds_into_selector_decode():
     the parse_selector(s) call to default bounds → the tightened call returns Ok."""
     issuer_pub, issuer_priv = _fresh_key()
     holder_pub, _ = _fresh_key()
-    holder_fp = public_key_thumbprint_raw(holder_pub)
+    holder_fp = _unwrap(public_key_thumbprint_raw(holder_pub))
     grant = GrantProducer(
         key_id="k1", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
         audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
@@ -1007,14 +994,14 @@ def test_decode_grant_threads_caller_bounds_into_selector_decode():
     # Control: at MAX, a one_of with 2 values is accepted.
     assert decode_grant(compact).is_ok, "one_of with 2 values must be accepted at MAX"
     # Tightened: one_of_values=1 → the 2-value selector must be rejected (parse_selector threads bounds).
-    assert not decode_grant(compact, bounds_new({"one_of_values": 1})).is_ok, "one_of_values=1 must reject a 2-value selector"
+    assert not decode_grant(compact, _unwrap(bounds_new({"one_of_values": 1}))).is_ok, "one_of_values=1 must reject a 2-value selector"
 
 
 def test_verify_grant_honors_caller_bounds():
     """#10/#11: verify_grant MUST thread ExpectedGrant.bounds into _require_kid (valid_key_id?). The
     grant is validly signed, so the only load-bearing gate under the tightening is the kid bound.
     Defect: revert verify_grant's bounds threading → the tightened call returns Ok."""
-    reset_census()
+    _reset_census()
     g = _signed_grant()
     expected_max = ExpectedGrant(
         issuer="https://issuer.example.test", audience="https://resource.example.test",
@@ -1025,7 +1012,7 @@ def test_verify_grant_honors_caller_bounds():
     # Tightened: kid_bytes=5 → rejected via the kid gate (signature would otherwise verify).
     expected_tight = ExpectedGrant(
         issuer="https://issuer.example.test", audience="https://resource.example.test",
-        evaluation_time=1500, clock_skew=60, bounds=bounds_new({"kid_bytes": 5}),
+        evaluation_time=1500, clock_skew=60, bounds=_unwrap(bounds_new({"kid_bytes": 5})),
     )
     assert not verify_grant(g["compact"], g["issuer"], expected_tight).is_ok, "kid_bytes=5 must reject a 13-byte kid"
 
@@ -1034,10 +1021,10 @@ def test_check_envelope_honors_caller_bounds():
     """#10/#11: check_envelope MUST thread ExpectedRequest.bounds into the grant header parse. The
     grant + proof are both validly signed; the only load-bearing gate under the tightening is the
     grant kid bound. Defect: revert check_envelope's bounds threading → the tightened call returns Ok."""
-    reset_census()
+    _reset_census()
     issuer_pub, issuer_priv = _fresh_key()
     holder_pub, holder_priv = _fresh_key()
-    holder_fp = public_key_thumbprint_raw(holder_pub)
+    holder_fp = _unwrap(public_key_thumbprint_raw(holder_pub))
     grant = GrantProducer(
         key_id="issuer-123456", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
         audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
@@ -1066,7 +1053,7 @@ def test_check_envelope_honors_caller_bounds():
         method="POST", target_uri="https://resource.example.test/invoke",
         invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
         cast_arguments=_NULL_ARGS, evaluation_time=1500, clock_skew=60, proof_max_age=300,
-        nonce=NonceNotRequired(), bounds=bounds_new({"kid_bytes": 5}),
+        nonce=NonceNotRequired(), bounds=_unwrap(bounds_new({"kid_bytes": 5})),
     )
     assert not check_envelope(grant_compact, proof_compact, tight).is_ok, "kid_bytes=5 must reject a 13-byte kid"
 
@@ -1075,7 +1062,7 @@ def test_expected_structs_bounds_absent_defaults_to_max():
     """#11 control: bounds absent on every Expected* MUST default to MAX (the conformance runner
     constructs Expected* without bounds; a missing default would break 283/283). The 13-byte kid grant
     verifies at MAX via every entry point that takes an Expected*."""
-    reset_census()
+    _reset_census()
     g = _signed_grant()
     eg = ExpectedGrant(
         issuer="https://issuer.example.test", audience="https://resource.example.test",
@@ -1141,13 +1128,13 @@ def test_check_envelope_rejects_bool_temporal_context():
 
 
 def test_forged_widening_bounds_rejected_at_entry_points():
-    """Cross-vendor F2: a hand-crafted Bounds with a widening override bypasses bounds_new; resolve()
-    trusts it. Every entry point must re-validate (mirrors reference Bounds.coerce). Defect: revert
+    """Cross-vendor F2: a hand-crafted Bounds with a widening override bypasses bounds_new. Resolution
+    and every entry point must re-validate the supplied limits. Defect: revert
     coerce_bounds -> a forged widening is honored."""
-    reset_census()
+    _reset_census()
     g = _signed_grant()
     forged = Bounds({"compact_bytes": 1000000})  # > MAXIMA.compact_bytes (65536)
-    assert forged.resolve("compact_bytes") == 1000000, "control: forged override honored by resolve()"
+    assert isinstance(forged.resolve("compact_bytes"), Err), "resolution rejects forged widening"
     eg = ExpectedGrant(
         issuer="https://issuer.example.test", audience="https://resource.example.test",
         evaluation_time=1500, clock_skew=60, bounds=forged,
@@ -1161,11 +1148,9 @@ def test_jcs_encode_rejects_non_integer_int_tag():
     JInt(1.5) emits b'1.5', JInt(True) emits b'True'."""
     from bounded_authority_verifier.jcs import jcs_encode
 
-    assert jcs_encode(JInt(2)) == b"2", "control: integer int-tag encodes"
-    with pytest.raises(InvalidError):
-        jcs_encode(JInt(1.5))  # type: ignore[arg-type]
-    with pytest.raises(InvalidError):
-        jcs_encode(JInt(True))  # type: ignore[arg-type]
+    assert _unwrap(jcs_encode(JInt(2))) == b"2", "control: integer int-tag encodes"
+    assert isinstance(jcs_encode(JInt(1.5)), Err)  # type: ignore[arg-type]
+    assert isinstance(jcs_encode(JInt(True)), Err)  # type: ignore[arg-type]
 
 
 def test_jcs_encode_rejects_invalid_utf8_string():
@@ -1174,15 +1159,14 @@ def test_jcs_encode_rejects_invalid_utf8_string():
     Defect: remove the is_valid_utf8 gate -> invalid bytes reach utf8_str -> UnicodeDecodeError."""
     from bounded_authority_verifier.jcs import jcs_encode
 
-    with pytest.raises(InvalidError):
-        jcs_encode(JString(b"\x80\x81"))
+    assert isinstance(jcs_encode(JString(b"\x80\x81")), Err)
 
 
 def test_untrusted_key_locator_accepts_empty_payload_signature_segments():
     """Cross-vendor (key-locator empty segments): the reference (v1.ex:24) accepts empty
     payload/signature segments — it decodes ONLY the protected segment. Defect: re-add the empty-
     segment rejection -> RED."""
-    reset_census()
+    _reset_census()
     g = _signed_grant()
     protected_seg = g["compact"].split(b".")[0]
     empty_ps = protected_seg + b".."
@@ -1195,13 +1179,13 @@ def test_verify_anchored_export_rejects_nested_bounds_mismatch():
     """Cross-vendor (nested bounds pinning): the reference pins every nested bounds == top-level
     (anchored_export_codec.ex:352-354). A tightened top + nested default-MAX must reject. Defect:
     remove _require_bounds_equal -> a tightened top silently overrides nested."""
-    reset_census()
+    _reset_census()
     built = _build_archive([_fresh_key()])
     tightened = ExpectedExport(
         chain=built["expected"].chain, start_anchor=built["expected"].start_anchor,
         end_anchor=built["expected"].end_anchor, transitions=built["expected"].transitions,
         digest=built["expected"].digest, object_version=built["expected"].object_version,
-        bounds=bounds_new({"identifier_bytes": 4}),
+        bounds=_unwrap(bounds_new({"identifier_bytes": 4})),
     )
     assert not verify_anchored_export(built["archive"], built["key_chain"], tightened).is_ok, \
         "nested bounds absent under a tightened top must reject (reference pin)"
@@ -1211,20 +1195,20 @@ def test_check_chain_rejects_genesis_previous_hash_mismatch():
     """Cross-vendor F4: genesis chain must not return an unchecked chain.previous_hash as a verified
     fact. The SDK now validates chain.previous_hash == expected.previous_hash in BOTH cases. Defect:
     revert the equality check + return chain.previous_hash -> a forged genesis input flows through."""
-    reset_census()
+    _reset_census()
     zero = bytes(32)
     chain_id = "ba://chain-f4"
-    commitment = sha256(b"commitment-f4")
+    commitment = _unwrap(sha256(b"commitment-f4"))
     row0 = encode_consumption_entry(ConsumptionEntry(chain_id=chain_id, sequence=1, previous_hash=zero, commitment=commitment))
     assert row0.is_ok
-    last_hash = sha256(ROW_PREFIX, row0.value.bytes_)
+    last_hash = _unwrap(sha256(ROW_PREFIX, row0.value.bytes_))
     chain = ChainInput(rows=(row0.value.bytes_,), chain_id=chain_id, first_sequence=1, last_sequence=1,
                        row_count=1, previous_hash=zero, last_hash=last_hash)
     expected = ExpectedChain(chain_id=chain_id, first_sequence=1, last_sequence=1, row_count=1,
                              previous_hash=zero, last_hash=last_hash)
     assert check_chain(chain, expected).is_ok, "control: genesis chain with matching previous_hash verifies"
     forged = ChainInput(rows=chain.rows, chain_id=chain_id, first_sequence=1, last_sequence=1,
-                        row_count=1, previous_hash=sha256(b"forged"), last_hash=last_hash)
+                        row_count=1, previous_hash=_unwrap(sha256(b"forged")), last_hash=last_hash)
     assert not check_chain(forged, expected).is_ok, \
         "genesis chain.previous_hash != expected.previous_hash must reject (F4)"
 
@@ -1233,7 +1217,7 @@ def test_malformed_trusted_issuer_fails_closed():
     """Cross-vendor (fail-closed shallow): a malformed trusted issuer (missing public_key/key_id) must
     fail closed as Err, not raise AttributeError past the Result contract. Defect: revert the shape
     check -> AttributeError."""
-    reset_census()
+    _reset_census()
     g = _signed_grant()
     eg = ExpectedGrant(issuer="https://issuer.example.test", audience="https://resource.example.test",
                        evaluation_time=1500, clock_skew=60)
@@ -1286,7 +1270,7 @@ def test_encode_anchored_export_rejects_when_archive_chunks_exceeded():
             chain=built["chain"], digest=built["digest"],
             start_anchor=built["start_anchor"], end_anchor=built["end_anchor"],
             transitions=built["expected"].transitions, object_version="v1",
-            bounds=bounds_new({"archive_chunks": 5}),
+            bounds=_unwrap(bounds_new({"archive_chunks": 5})),
         ),
     )
     assert not r.is_ok, "6 frames > archive_chunks=5 must reject"
@@ -1397,7 +1381,7 @@ def test_assemble_compact_facade_rejects_noncanonical_transition():
 
 def test_decode_grant_rejects_wrong_signature_width():
     """Reference parse_grant (runtime.ex:237) requires byte_size(signature) == signature_bytes (64).
-    The SDK decode path (parse_compact) now enforces this; a grant compact with a 32-byte signature
+    The SDK decode path (_parse_compact) now enforces this; a grant compact with a 32-byte signature
     rejects where it previously decoded to Ok."""
     g = _signed_grant()
     parts = g["compact"].split(b".")
@@ -1443,8 +1427,8 @@ def _conformant_export():
     )
     assert row_r.is_ok
     row, head = row_r.value.bytes_, row_r.value.hash_
-    fp_a = public_key_thumbprint_raw(_KEY_A)
-    fp_b = public_key_thumbprint_raw(_KEY_B)
+    fp_a = _unwrap(public_key_thumbprint_raw(_KEY_A))
+    fp_b = _unwrap(public_key_thumbprint_raw(_KEY_B))
     start_r = boundary_anchor_signing_input(
         BoundaryAnchorProducer(
             anchor_id="anchor-start", anchored_at=1000, chain_id="chain-x",
@@ -1631,7 +1615,7 @@ def test_encode_parity_tightened_outer_bounds_row_rejects():
     from bounded_authority_verifier.bounds import bounds_new
 
     input_, expected = _conformant_export()
-    tight = bounds_new({"chain_row_bytes": 156})
+    tight = _unwrap(bounds_new({"chain_row_bytes": 156}))
     r = encode_anchored_export(input_, _replace(expected, bounds=tight))
     assert not r.is_ok, "tightened outer bounds must take effect at the encode row walk"
 
@@ -1644,7 +1628,7 @@ def test_encode_parity_nested_anchor_bounds_mismatch_rejects():
     from bounded_authority_verifier.bounds import bounds_new
 
     input_, expected = _conformant_export()
-    tight = bounds_new({"chain_row_bytes": 156})
+    tight = _unwrap(bounds_new({"chain_row_bytes": 156}))
     r = encode_anchored_export(input_, _replace(expected, start_anchor=_replace(expected.start_anchor, bounds=tight)))
     assert not r.is_ok, "nested anchor-bounds mismatch must reject at encode"
 
@@ -1658,7 +1642,7 @@ def test_encode_parity_identity_overrides_are_not_tightening():
     from bounded_authority_verifier.bounds import bounds_new
 
     input_, expected = _conformant_export()
-    identity = bounds_new({"chain_row_bytes": 4096})  # == MAXIMA
+    identity = _unwrap(bounds_new({"chain_row_bytes": 4096}))  # == MAXIMA
     r = encode_anchored_export(input_, _replace(expected, bounds=identity))
     assert r.is_ok, "identity overrides must encode (not tightening)"
 
@@ -1669,7 +1653,7 @@ def test_encode_parity_nested_end_anchor_bounds_mismatch_rejects():
     from bounded_authority_verifier.bounds import bounds_new
 
     input_, expected = _conformant_export()
-    tight = bounds_new({"chain_row_bytes": 156})
+    tight = _unwrap(bounds_new({"chain_row_bytes": 156}))
     r = encode_anchored_export(input_, _replace(expected, end_anchor=_replace(expected.end_anchor, bounds=tight)))
     assert not r.is_ok, "end-anchor nested-bounds mismatch must reject at encode"
 
@@ -1680,7 +1664,7 @@ def test_encode_parity_nested_transition_bounds_mismatch_rejects():
     from bounded_authority_verifier.bounds import bounds_new
 
     input_, expected = _conformant_export()
-    tight = bounds_new({"chain_row_bytes": 156})
+    tight = _unwrap(bounds_new({"chain_row_bytes": 156}))
     r = encode_anchored_export(input_, _replace(expected, transitions=[_replace(expected.transitions[0], bounds=tight)]))
     assert not r.is_ok, "transition nested-bounds mismatch must reject at encode"
 
@@ -1696,13 +1680,13 @@ def test_encode_parity_chain_pin_isolated_rejects():
     # Isolated the diff-review's way: the OUTER stays at maximum (the sibling
     # absent-nested pins pass); ONLY chain.bounds is mismatched (4000 < 4096,
     # row-safe).
-    chain_nested = bounds_new({"chain_row_bytes": 4000})
+    chain_nested = _unwrap(bounds_new({"chain_row_bytes": 4000}))
     r = encode_anchored_export(input_, _replace(expected, chain=_replace(expected.chain, bounds=chain_nested)))
     assert not r.is_ok, "chain nested-bounds mismatch must reject (isolated)"
 
 
 def test_encode_parity_tightened_anchor_bytes_rejects():
-    """Round-2 codex probe: anchor_bytes=1 tightened outer — parse_compact only gates
+    """Round-2 codex probe: anchor_bytes=1 tightened outer — _parse_compact only gates
     compact_bytes, so without the explicit per-anchor ceiling the ~440-byte anchors
     framed fine (the reference gates anchor_bytes at :82/:114)."""
     from dataclasses import replace as _replace
@@ -1710,7 +1694,7 @@ def test_encode_parity_tightened_anchor_bytes_rejects():
     from bounded_authority_verifier.bounds import bounds_new
 
     input_, expected = _conformant_export()
-    tight = bounds_new({"anchor_bytes": 1})
+    tight = _unwrap(bounds_new({"anchor_bytes": 1}))
     r = encode_anchored_export(input_, _replace(expected, bounds=tight))
     assert not r.is_ok, "tightened anchor_bytes must reject the anchor compacts at encode"
 
@@ -1793,7 +1777,7 @@ def test_bounds_magnitude_gate_rejects():
     expected = ExpectedAnchor(
         anchor_id="anchor-mag", anchored_at=1000, chain_id="chain-x",
         sequence=0, chain_hash=_Z32P, key_id="anchor-a",
-        key_fingerprint=public_key_thumbprint_raw(pub), bounds=None,
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)), bounds=None,
     )
     key_kw = {
         "key_id": "anchor-a",
@@ -1838,7 +1822,7 @@ def test_bounds_magnitude_valid_from_half_rejects():
     expected = ExpectedAnchor(
         anchor_id="anchor-mag2", anchored_at=1000, chain_id="chain-x",
         sequence=0, chain_hash=_Z32P, key_id="anchor-a",
-        key_fingerprint=public_key_thumbprint_raw(pub), bounds=None,
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)), bounds=None,
     )
     ok = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=0, valid_before=2000)
     assert verify_historical_anchor(compact, ok, expected).is_ok
@@ -1873,7 +1857,7 @@ def test_bounds_magnitude_non_integral_rejects():
     expected = ExpectedAnchor(
         anchor_id="anchor-int", anchored_at=1000, chain_id="chain-x",
         sequence=0, chain_hash=_Z32P, key_id="anchor-a",
-        key_fingerprint=public_key_thumbprint_raw(pub), bounds=None,
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)), bounds=None,
     )
     for bad_from, bad_before in [(True, None), (0.5, None), (0, 2000.5), (False, None)]:
         key = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=bad_from, valid_before=bad_before)  # type: ignore[arg-type]
@@ -1982,7 +1966,7 @@ def test_bounds_inverted_window_rejects():
     expected = ExpectedAnchor(
         anchor_id="anchor-ord", anchored_at=1000, chain_id="chain-x",
         sequence=0, chain_hash=_Z32P, key_id="anchor-a",
-        key_fingerprint=public_key_thumbprint_raw(pub), bounds=None,
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)), bounds=None,
     )
     ok = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=0, valid_before=2000)
     assert verify_historical_anchor(compact, ok, expected).is_ok
@@ -2014,7 +1998,7 @@ def test_expected_anchor_non_integral_rejects():
     ok = ExpectedAnchor(
         anchor_id="anchor-t", anchored_at=1000, chain_id="chain-x",
         sequence=0, chain_hash=_Z32P, key_id="anchor-a",
-        key_fingerprint=public_key_thumbprint_raw(pub), bounds=None,
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)), bounds=None,
     )
     key = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=0, valid_before=None)
     assert verify_historical_anchor(compact, key, ok).is_ok
@@ -2065,7 +2049,7 @@ def _sweep_valid_args():
 
     issuer_pub, issuer_priv = _fresh_key()
     holder_pub, holder_priv = _fresh_key()
-    holder_fp = public_key_thumbprint_raw(holder_pub)
+    holder_fp = _unwrap(public_key_thumbprint_raw(holder_pub))
     grant = GrantProducer(
         key_id="issuer-123456", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
         audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
@@ -2105,7 +2089,7 @@ def _sweep_valid_args():
     )
     ka_pub, ka_priv = _fresh_key()
     kb_pub, _ = _fresh_key()
-    fp_a, fp_b = public_key_thumbprint_raw(ka_pub), public_key_thumbprint_raw(kb_pub)
+    fp_a, fp_b = _unwrap(public_key_thumbprint_raw(ka_pub)), _unwrap(public_key_thumbprint_raw(kb_pub))
     anchor_prod = BoundaryAnchorProducer(
         anchor_id="a0", anchored_at=1000, chain_id="chain-x", sequence=0,
         chain_hash=Z32, key_id="ka", public_key=ka_pub,
@@ -2197,7 +2181,7 @@ def test_closed_result_family_param_sweep():
                 probe[param] = sentinel
                 cases.append((f"{name}.{param}={sentinel!r}", fn, probe, _sentinel_may_be_ok(kind, sentinel)))
     for label, fn, probe, may_ok in cases:
-        reset_census()
+        _reset_census()
         r = fn(**probe)
         try:
             is_ok = r.is_ok
@@ -2254,7 +2238,7 @@ def test_closed_result_family_field_sweep():
                     probe[param] = mutated
                     cases.append((f"{name}.{param}.{f.name}={sentinel!r}", fn, probe, may_ok))
     for label, fn, probe, may_ok in cases:
-        reset_census()
+        _reset_census()
         r = fn(**probe)
         try:
             is_ok = r.is_ok
@@ -2270,7 +2254,7 @@ def test_request_digest_nonstring_operation_returns_err():
     operation must return Err — pre-fix it raised AttributeError('int' object has no
     attribute 'encode') out of the public façade."""
     for bad in [123, True, None, b"read", 3.5, [], {}]:
-        r = request_digest(bad, json_decode(b"null"))
+        r = request_digest(bad, _unwrap(json_decode(b"null")))
         assert not r.is_ok, f"operation={bad!r} must fail closed"
 
 
@@ -2336,7 +2320,7 @@ def test_verify_export_malformed_expected_rejects_before_hashing(monkeypatch):
                 k.replace("chain_", ""): v for k, v in anchor_and_chain_mutations.items() if k.startswith("chain_")
             }),
         )
-        reset_census()
+        _reset_census()
         return verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected)
 
     malformed_cases = [
@@ -2356,7 +2340,7 @@ def test_verify_export_malformed_expected_rejects_before_hashing(monkeypatch):
 
     # Control: the unmutated expected DOES hash (the digest gate runs) and verifies Ok.
     calls.clear()
-    reset_census()
+    _reset_census()
     r = verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], built["expected"])
     assert r.is_ok
     assert len(calls) > 0, "control: the valid path must actually hash"
@@ -2376,7 +2360,7 @@ def test_verify_export_malformed_expected_transition_verdicts():
         ("current_key_fingerprint width", _replace(t0, current_key_fingerprint=b"\x00" * 31)),
     ]:
         expected = _replace(built["expected"], transitions=[mutated_t])
-        reset_census()
+        _reset_census()
         r = verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected)
         assert not r.is_ok, f"{label}: must reject"
 
@@ -2410,15 +2394,15 @@ def test_assemble_compact_threads_caller_bounds():
     assert control.is_ok, "control: maximum-bounds assembly must succeed"
     n = len(control.value)
     # Tightened compact_bytes just below the assembled size → reject.
-    r = assemble_compact(si.value, sig, bounds=bounds_new({"compact_bytes": n - 1}))
+    r = assemble_compact(si.value, sig, bounds=_unwrap(bounds_new({"compact_bytes": n - 1})))
     assert not r.is_ok, "tightened compact_bytes must reject the assembly"
     # (signature_bytes is a FIXED-WIDTH bound — untightenable by design; the gate exists
     # in the impl for reference fidelity but no leg can exercise it below 64.)
     # Tightened encoded_segment_bytes below the protected segment length → reject.
-    r = assemble_compact(si.value, sig, bounds=bounds_new({"encoded_segment_bytes": len(si.value.protected_segment) - 1}))
+    r = assemble_compact(si.value, sig, bounds=_unwrap(bounds_new({"encoded_segment_bytes": len(si.value.protected_segment) - 1})))
     assert not r.is_ok, "tightened encoded_segment_bytes must reject the protected segment"
     # Tightened kid_bytes below the produced kid ("k1" is 2 bytes; 1 rejects at the re-parse).
-    r = assemble_compact(si.value, sig, bounds=bounds_new({"kid_bytes": 1}))
+    r = assemble_compact(si.value, sig, bounds=_unwrap(bounds_new({"kid_bytes": 1})))
     assert not r.is_ok, "tightened kid_bytes must reject at the kind re-parse"
 
 
@@ -2462,7 +2446,7 @@ def test_round12_14_export_predigest_gates_work_pinned(monkeypatch):
     kc, exp = built["key_chain"], built["expected"]
 
     def verify(o, keys=kc, expected=exp):
-        reset_census()
+        _reset_census()
         return verify_anchored_export(o, keys, expected)
 
     base_obj = ArchivedObject(chunks=(built["archive"],), version="v1")
@@ -2496,7 +2480,7 @@ def test_round12_14_export_predigest_gates_pinned():
     kc, exp = built["key_chain"], built["expected"]
 
     def verify(o=obj("v1"), keys=kc, expected=exp):
-        reset_census()
+        _reset_census()
         return verify_anchored_export(o, keys, expected)
 
     # Control.
@@ -2554,11 +2538,11 @@ def test_range_selectors_are_inclusive():
     """ADR 0028 §1: both range kinds are INCLUSIVE. A traversed value exactly equal to the bound
     satisfies lte and gte alike. Defect: mutate `<=` to `<` (and `>=` to `>`) in
     v2.selector_matches → both boundary assertions go RED."""
-    args = json_decode(b'{"amount":50}')
-    lte = v2.parse_selector(json_decode(b'{"kind":"lte","path":["amount"],"value":50}'))
-    gte = v2.parse_selector(json_decode(b'{"kind":"gte","path":["amount"],"value":50}'))
-    assert v2.selector_matches(lte, args) is True, "boundary-equal satisfies lte (inclusive)"
-    assert v2.selector_matches(gte, args) is True, "boundary-equal satisfies gte (inclusive)"
+    args = _unwrap(json_decode(b'{"amount":50}'))
+    lte = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["amount"],"value":50}'))))
+    gte = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"gte","path":["amount"],"value":50}'))))
+    assert _unwrap(v2.selector_matches(lte, args)) is True, "boundary-equal satisfies lte (inclusive)"
+    assert _unwrap(v2.selector_matches(gte, args)) is True, "boundary-equal satisfies gte (inclusive)"
 
 
 def test_range_selector_direction():
@@ -2566,14 +2550,14 @@ def test_range_selector_direction():
     interchangeable. Defect: swap the SelLte/SelGte dispatch in v2.parse_selector
     (returning SelGte for kind "lte" and SelLte for kind "gte") → every off-bound assertion
     goes RED."""
-    lte = v2.parse_selector(json_decode(b'{"kind":"lte","path":["amount"],"value":5000}'))
-    gte = v2.parse_selector(json_decode(b'{"kind":"gte","path":["amount"],"value":50}'))
-    below = json_decode(b'{"amount":49}')
-    above = json_decode(b'{"amount":5001}')
-    assert v2.selector_matches(lte, below) is True
-    assert v2.selector_matches(lte, above) is False, "5001 must NOT satisfy lte 5000"
-    assert v2.selector_matches(gte, above) is True
-    assert v2.selector_matches(gte, below) is False, "49 must NOT satisfy gte 50"
+    lte = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["amount"],"value":5000}'))))
+    gte = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"gte","path":["amount"],"value":50}'))))
+    below = _unwrap(json_decode(b'{"amount":49}'))
+    above = _unwrap(json_decode(b'{"amount":5001}'))
+    assert _unwrap(v2.selector_matches(lte, below)) is True
+    assert _unwrap(v2.selector_matches(lte, above)) is False, "5001 must NOT satisfy lte 5000"
+    assert _unwrap(v2.selector_matches(gte, above)) is True
+    assert _unwrap(v2.selector_matches(gte, below)) is False, "49 must NOT satisfy gte 50"
 
 
 def test_range_selectors_same_tag_only():
@@ -2582,20 +2566,20 @@ def test_range_selectors_same_tag_only():
     non-numeric operands never match (a missing path fails closed like equals/one_of).
     Defect: collapse the same-tag arms in v2.selector_matches to a plain numeric
     comparison → the cross-tag assertions go RED."""
-    flt_bound = v2.parse_selector(json_decode(b'{"kind":"gte","path":["amount"],"value":-0.5}'))
-    int_bound = v2.parse_selector(json_decode(b'{"kind":"lte","path":["amount"],"value":5000}'))
-    int_target = json_decode(b'{"amount":5}')
-    float_target = json_decode(b'{"amount":5.0}')
-    assert v2.selector_matches(flt_bound, int_target) is False, \
+    flt_bound = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"gte","path":["amount"],"value":-0.5}'))))
+    int_bound = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["amount"],"value":5000}'))))
+    int_target = _unwrap(json_decode(b'{"amount":5}'))
+    float_target = _unwrap(json_decode(b'{"amount":5.0}'))
+    assert _unwrap(v2.selector_matches(flt_bound, int_target)) is False, \
         "float bound vs integer-tagged value is cross-tag — never matches"
-    assert v2.selector_matches(int_bound, float_target) is False, \
+    assert _unwrap(v2.selector_matches(int_bound, float_target)) is False, \
         "integer bound vs float-tagged value is cross-tag — never matches"
     # Controls: same-tag pairs compare by numeric value.
-    assert v2.selector_matches(flt_bound, float_target) is True
-    assert v2.selector_matches(int_bound, int_target) is True
+    assert _unwrap(v2.selector_matches(flt_bound, float_target)) is True
+    assert _unwrap(v2.selector_matches(int_bound, int_target)) is True
     # Non-numeric operand at the path never matches; missing path fails closed.
-    assert v2.selector_matches(int_bound, json_decode(b'{"amount":"75"}')) is False
-    assert v2.selector_matches(int_bound, json_decode(b'{"other":75}')) is False
+    assert _unwrap(v2.selector_matches(int_bound, _unwrap(json_decode(b'{"amount":"75"}')))) is False
+    assert _unwrap(v2.selector_matches(int_bound, _unwrap(json_decode(b'{"other":75}')))) is False
 
 
 def test_non_numeric_bound_rejects_at_decode():
@@ -2609,8 +2593,7 @@ def test_non_numeric_bound_rejects_at_decode():
         b'{"kind":"gte","path":["amount"],"value":[1]}',
         b'{"kind":"lte","path":["amount"],"value":{"n":1}}',
     ):
-        with pytest.raises(InvalidError):
-            v2.parse_selector(json_decode(encoded))
+        assert isinstance(v2.parse_selector(_unwrap(json_decode(encoded))), Err)
 
 
 def test_range_member_set_is_kind_path_value():
@@ -2624,8 +2607,7 @@ def test_range_member_set_is_kind_path_value():
         b'{"kind":"lte","path":[],"value":1}',
         b'{"kind":"gte","path":["a"],"value":1,"extra":2}',
     ):
-        with pytest.raises(InvalidError):
-            v2.parse_selector(json_decode(encoded))
+        assert isinstance(v2.parse_selector(_unwrap(json_decode(encoded))), Err)
 
 
 def test_facades_reject_each_others_major_bytes():
@@ -2634,7 +2616,7 @@ def test_facades_reject_each_others_major_bytes():
     version claim alone, and the v1 façade still rejects the v2-only selector kinds. Defect:
     widen v2's `v != VERSION` grant gate to accept v:1 → the v2-decodes-v1 assertion goes RED."""
     issuer_pub, issuer_priv = _fresh_key()
-    holder_fp = public_key_thumbprint_raw(_fresh_key()[0])
+    holder_fp = _unwrap(public_key_thumbprint_raw(_fresh_key()[0]))
     # One kwarg set per major: the structs are per-façade (the closed-shape gate rejects a v1
     # OperationInput inside a v2 GrantProducer — the gates are module-scoped).
     v1_kwargs: dict = {
@@ -2657,8 +2639,7 @@ def test_facades_reject_each_others_major_bytes():
     assert not v2.decode_grant(v1_compact).is_ok, "v1 bytes (v:1) must reject under the v2 façade"
     assert not decode_grant(v2_compact).is_ok, "v2 bytes (v:2) must reject under the v1 façade"
     # The v1 closed kind set is unchanged: lte rejects under the shared (v1) selector parse.
-    with pytest.raises(InvalidError):
-        parse_selector(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))
+    assert isinstance(parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))), Err)
 
 
 # ---------------------------------------------------------------------------
@@ -2734,7 +2715,7 @@ def _es256_signed_grant() -> dict[str, object]:
     """A real ES256-signed v3 grant (ephemeral keys). Returns the compact + issuer material."""
     issuer_pub, issuer_priv = _fresh_ec_key()
     holder_pub, _ = _fresh_ec_key()
-    holder_fp = v3.public_key_thumbprint_raw(holder_pub)
+    holder_fp = _unwrap(v3.public_key_thumbprint_raw(holder_pub))
     grant = v3.GrantProducer(
         key_id="issuer", issuer="https://issuer.example.test", grant_id="urn:example:grant:v3-p",
         audiences=("https://resource.example.test",), issued_at=1000, not_before=1000,
@@ -2763,9 +2744,9 @@ def test_es256_low_s_enforced():
     genuine (r, s) the re-spelling (r, n-s) also satisfies the verification equation, so a
     verifier without the gate would accept a second, differently-hashing encoding of the same
     signature (malleability). The control (low-S) verifies; the high-S re-spelling of the SAME
-    signature must reject. Defect: remove the `s > _LOW_S_MAX` gate in v3.es256_verify → the
+    signature must reject. Defect: remove the `s > _LOW_S_MAX` gate in v3._es256_verify → the
     high-S assertion goes RED (the backend accepts it)."""
-    reset_census()
+    _reset_census()
     g = _es256_signed_grant()
     assert v3.verify_grant(g["compact"], g["issuer"], _V3_EXPECTED_GRANT).is_ok, \
         "control: the low-S signed grant must verify"
@@ -2786,7 +2767,7 @@ def test_es256_rs_range_checked_before_backend(monkeypatch):
     ZERO crossings of the DER-encode step — the last pure step immediately preceding the
     cryptography verify call (the backend's verify method lives on a Rust-overriding subclass,
     not reliably patchable, so the module-level encode_dss_signature boundary is the
-    observable). Defect: remove the zero/range arms in v3.es256_verify → each crafted case
+    observable). Defect: remove the zero/range arms in v3._es256_verify → each crafted case
     crosses the DER boundary (count 0 → 1) and the count assertions go RED."""
     calls: list[int] = []
     real = v3.encode_dss_signature
@@ -2796,7 +2777,7 @@ def test_es256_rs_range_checked_before_backend(monkeypatch):
         return real(r, s)
 
     monkeypatch.setattr(v3, "encode_dss_signature", counting)
-    reset_census()
+    _reset_census()
     g = _es256_signed_grant()
     # Control: the valid signature crosses the DER boundary exactly once and verifies.
     calls.clear()
@@ -2837,22 +2818,16 @@ def test_es256_ec_jwk_member_set_closed():
         return ("{" + members + "}").encode("ascii")
 
     # Control: the exact four-member set parses.
-    assert isinstance(v3.jwk_from_json(jwk_json("P-256", "EC")), v3.EcPublic)
+    assert isinstance(_unwrap(v3.jwk_from_json(jwk_json("P-256", "EC"))), v3.EcPublic)
     # Wrong crv / kty literals.
-    with pytest.raises(InvalidError):
-        v3.jwk_from_json(jwk_json("P-384", "EC"))
-    with pytest.raises(InvalidError):
-        v3.jwk_from_json(jwk_json("Ed25519", "EC"))
-    with pytest.raises(InvalidError):
-        v3.jwk_from_json(jwk_json("P-256", "OKP"))
+    assert isinstance(v3.jwk_from_json(jwk_json("P-384", "EC")), Err)
+    assert isinstance(v3.jwk_from_json(jwk_json("Ed25519", "EC")), Err)
+    assert isinstance(v3.jwk_from_json(jwk_json("P-256", "OKP")), Err)
     # Extra members — including the private d.
-    with pytest.raises(InvalidError):
-        v3.jwk_from_json(jwk_json("P-256", "EC", extra='"d":"AAAA"'))
-    with pytest.raises(InvalidError):
-        v3.jwk_from_json(jwk_json("P-256", "EC", extra='"kid":"k1"'))
+    assert isinstance(v3.jwk_from_json(jwk_json("P-256", "EC", extra='"d":"AAAA"')), Err)
+    assert isinstance(v3.jwk_from_json(jwk_json("P-256", "EC", extra='"kid":"k1"')), Err)
     # Missing y.
-    with pytest.raises(InvalidError):
-        v3.jwk_from_json(jwk_json("P-256", "EC", drop_y=True))
+    assert isinstance(v3.jwk_from_json(jwk_json("P-256", "EC", drop_y=True)), Err)
 
 
 def _ec_key_with_leading_zero_coordinate() -> bytes:
@@ -2880,12 +2855,11 @@ def test_es256_coordinate_width_and_canonicality():
     x, y = pub[1:33], pub[33:65]
     valid = ('{"crv":"P-256","kty":"EC","x":"' + _b64e(x).decode()
              + '","y":"' + _b64e(y).decode() + '"}').encode("ascii")
-    assert isinstance(v3.jwk_from_json(valid), v3.EcPublic), "control: the 32-byte coordinates parse"
+    assert isinstance(_unwrap(v3.jwk_from_json(valid)), v3.EcPublic), "control: the 32-byte coordinates parse"
     # 33-byte x (leading zero byte, same integer — on-curve): only the width gate rejects.
     wide = ('{"crv":"P-256","kty":"EC","x":"' + _b64e(b"\x00" + x).decode()
             + '","y":"' + _b64e(y).decode() + '"}').encode("ascii")
-    with pytest.raises(InvalidError):
-        v3.jwk_from_json(wide)
+    assert isinstance(v3.jwk_from_json(wide), Err)
     # 31-byte spelling of a leading-zero coordinate (same integer).
     lz = _ec_key_with_leading_zero_coordinate()
     if lz[1] == 0:
@@ -2903,13 +2877,11 @@ def test_es256_coordinate_width_and_canonicality():
     else:
         short = ('{"crv":"P-256","kty":"EC","x":"' + other_b64.decode()
                  + '","y":"' + short_b64.decode() + '"}').encode("ascii")
-    with pytest.raises(InvalidError):
-        v3.jwk_from_json(short)
+    assert isinstance(v3.jwk_from_json(short), Err)
     # Padded base64url coordinate: the shared canonical-decode gate (REQ1-B64-no-padding).
     padded = ('{"crv":"P-256","kty":"EC","x":"' + _b64e(x).decode() + '="'
               + ',"y":"' + _b64e(y).decode() + '"}').encode("ascii")
-    with pytest.raises(InvalidError):
-        v3.jwk_from_json(padded)
+    assert isinstance(v3.jwk_from_json(padded), Err)
 
 
 def test_es256_off_curve_point_rejected():
@@ -2951,7 +2923,7 @@ def test_es256_rejects_prior_major_bytes():
     ES256 grant never passes theirs). Defect: widen v3's `v != VERSION` grant gate to
     `not in (1, 2, VERSION)` → both v3-façade assertions go RED."""
     issuer_pub65, issuer_priv_ec = _fresh_ec_key()
-    holder_fp_ec = v3.public_key_thumbprint_raw(_fresh_ec_key()[0])
+    holder_fp_ec = _unwrap(v3.public_key_thumbprint_raw(_fresh_ec_key()[0]))
     v3_kwargs: dict = {
         "key_id": "issuer", "issuer": "https://issuer.example.test",
         "grant_id": "urn:example:grant:v3-p",
@@ -2969,7 +2941,7 @@ def test_es256_rejects_prior_major_bytes():
     )
     # The v1/v2 grants (Ed25519 keys, per-major structs).
     issuer_pub32, issuer_priv_ed = _fresh_key()
-    holder_fp_ed = public_key_thumbprint_raw(_fresh_key()[0])
+    holder_fp_ed = _unwrap(public_key_thumbprint_raw(_fresh_key()[0]))
     ed_kwargs: dict = {
         "key_id": "issuer", "issuer": "https://issuer.example.test",
         "grant_id": "urn:example:grant:x-3",
@@ -3009,7 +2981,6 @@ def test_es256_rejects_prior_major_bytes():
     # The five-kind selector algebra is v3's too: lte parses under the v3 façade and the v1
     # closed kind set still rejects it.
     assert isinstance(
-        v3.parse_selector(json_decode(b'{"kind":"lte","path":["a"],"value":1}')), v3.SelLte
+        _unwrap(v3.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["a"],"value":1}')))), v3.SelLte
     )
-    with pytest.raises(InvalidError):
-        parse_selector(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))
+    assert isinstance(parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))), Err)

@@ -6,10 +6,10 @@ the role-attestation and content-assertion profiles, the strict Ed25519 helpers,
 primitives. Contract-major 2 is the ``v2`` module and contract-major 3 (ES256) the ``v3`` module;
 import ``v3`` explicitly (``from bounded_authority_verifier import v3``).
 
-There is no ``authorized`` or decision surface. Verification, decode, and producer functions return
-``Result[T] = Ok | Err``, mirroring ``{:ok, value} | {:error, :invalid}``, and so do
-``uri_normalize`` and ``jwk_decode_public``. The other primitives (JSON decoding, JCS, base64url
-decoding, bounds construction, JWK encoding, and the thumbprint functions) raise ``InvalidError``.
+There is no ``authorized`` or decision surface. Every public function, including JSON, JCS,
+base64url, bounds, JWK, thumbprint, and cryptographic primitives, returns
+``Result[T] = Ok | Err``. Caller-input rejection is a closed, value-free ``Err`` rather than
+an escaping exception. Cryptographic predicates return ``Result[bool]``.
 Facts are value-bearing and non-authorizing.
 """
 
@@ -34,7 +34,7 @@ from .content_assertion import (
 )
 from .digest import REQUEST_PREFIX, REQUEST_PREFIX_V2, request_digest_v2, typed_project
 from .ed25519 import acceptable_public_key, sha256, torsion_free, verify_strict
-from .error import Err, InvalidError, Ok, Result, err, fail, ok, require
+from .error import Err, InvalidError, Ok, Result, err, ok
 from .facts import (
     AnchoredExportFacts,
     AnchorFacts,
@@ -200,7 +200,7 @@ __all__ = [
     "ContentAssertion", "ExpectedContentAssertion", "ContentAssertionDecoded",
     "ContentAssertionFacts", "CONTENT_ASSERTION_TYP", "CONTENT_ASSERTION_PROFILE",
     # error + result
-    "InvalidError", "Ok", "Err", "Result", "ok", "err", "fail", "require",
+    "InvalidError", "Ok", "Err", "Result", "ok", "err",
     # tagged algebra types
     "Tagged", "JNull", "JBool", "JInt", "JFloat", "JString", "JArray", "JObject",
     # facts

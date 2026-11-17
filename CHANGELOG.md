@@ -27,6 +27,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- Python verifier primitives now return the closed `Result` type on success and caller-input
+  rejection, including JSON, JCS, base64url, bounds, JWKs, thumbprints, and crypto predicates.
+
 - Python, Rust, and Go verifier facts now use fixed `#Type<redacted>` rendering on every
   default display path, including nested Results and Go formatting flags. Field values remain
   accessible explicitly.

@@ -19,6 +19,7 @@ from pathlib import Path
 from bounded_authority_verifier import content_assertion, role_attestation, v1, v2, v3
 from bounded_authority_verifier.base64url import base64url_decode
 from bounded_authority_verifier.compact import SigningInput
+from bounded_authority_verifier.error import _unwrap
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _CORPUS = _REPO_ROOT / "priv" / "conformance" / "producer-canonicality"
@@ -64,7 +65,7 @@ def _load() -> list[dict]:
 
 def _assemble(case: dict) -> object:
     sig_input = case["input"]
-    signature = base64url_decode(sig_input["signature"].encode())
+    signature = _unwrap(base64url_decode(sig_input["signature"].encode()))
     kind = sig_input.get("kind") or _PROFILE_KINDS[case["profile"]]
     # The segments are base64url TEXT (the assembler re-encodes from raw); pass them through.
     si = SigningInput(
@@ -98,26 +99,26 @@ def _export_expected(case: dict, major: int):
     def anchor(a: dict):
         return v1.ExpectedAnchor(
             anchor_id=a["anchor_id"], anchored_at=a["anchored_at"], chain_id=a["chain_id"],
-            sequence=a["sequence"], chain_hash=base64url_decode(a["chain_hash"].encode()),
-            key_id=a["key_id"], key_fingerprint=base64url_decode(a["key_fingerprint"].encode()),
+            sequence=a["sequence"], chain_hash=_unwrap(base64url_decode(a["chain_hash"].encode())),
+            key_id=a["key_id"], key_fingerprint=_unwrap(base64url_decode(a["key_fingerprint"].encode())),
         )
 
     transitions = tuple(
         v1.ExpectedKeyTransition(
             transition_id=t["transition_id"], chain_id=t["chain_id"], effective_at=t["effective_at"],
             current_key_id=t["current_key_id"],
-            current_key_fingerprint=base64url_decode(t["current_key_fingerprint"].encode()),
+            current_key_fingerprint=_unwrap(base64url_decode(t["current_key_fingerprint"].encode())),
             next_key_id=t["next_key_id"],
-            next_key_fingerprint=base64url_decode(t["next_key_fingerprint"].encode()),
+            next_key_fingerprint=_unwrap(base64url_decode(t["next_key_fingerprint"].encode())),
         ) for t in e["transitions"]
     )
     chain = v1.ExpectedChain(
         chain_id=e["chain"]["chain_id"], first_sequence=e["chain"]["first_sequence"],
         last_sequence=e["chain"]["last_sequence"], row_count=e["chain"]["row_count"],
-        previous_hash=base64url_decode(e["chain"]["previous_hash"].encode()),
-        last_hash=base64url_decode(e["chain"]["last_hash"].encode()),
+        previous_hash=_unwrap(base64url_decode(e["chain"]["previous_hash"].encode())),
+        last_hash=_unwrap(base64url_decode(e["chain"]["last_hash"].encode())),
     )
-    digest = base64url_decode(e["digest"].encode()) if e.get("digest") else _ZERO_DIGEST
+    digest = _unwrap(base64url_decode(e["digest"].encode())) if e.get("digest") else _ZERO_DIGEST
     version = e.get("object_version") or f"v{major}"
     if major == 3:
         # The encode side never reads digest/object_version (the verify side owns them); the
@@ -139,14 +140,14 @@ def _encode(case: dict) -> object:
     sig_input = case["input"]
     e = sig_input["expected"]
     inp = v1.AnchoredExportInput(
-        rows=tuple(base64url_decode(r.encode()) for r in sig_input["rows"]),
+        rows=tuple(_unwrap(base64url_decode(r.encode())) for r in sig_input["rows"]),
         start_anchor=sig_input["start_anchor"].encode(),
         end_anchor=sig_input["end_anchor"].encode(),
         transitions=tuple(t.encode() for t in sig_input["transitions"]),
         chain_id=e["chain"]["chain_id"], first_sequence=e["chain"]["first_sequence"],
         last_sequence=e["chain"]["last_sequence"], row_count=e["chain"]["row_count"],
-        previous_hash=base64url_decode(e["chain"]["previous_hash"].encode()),
-        last_hash=base64url_decode(e["chain"]["last_hash"].encode()),
+        previous_hash=_unwrap(base64url_decode(e["chain"]["previous_hash"].encode())),
+        last_hash=_unwrap(base64url_decode(e["chain"]["last_hash"].encode())),
     )
     major = case["major"]
     if major == 1:

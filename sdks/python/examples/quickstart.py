@@ -42,6 +42,11 @@ def signed(signing_input: SigningInput, key: Ed25519PrivateKey) -> bytes:
     return result.value
 
 
+holder_jwk = jwk_from_public_key(holder_public)
+assert isinstance(holder_jwk, Ok)
+holder_thumbprint = thumbprint(holder_jwk.value)
+assert isinstance(holder_thumbprint, Ok)
+
 # The issuer grants one operation, restricted to one argument value.
 grant_input = grant_signing_input(
     GrantProducer(
@@ -52,7 +57,7 @@ grant_input = grant_signing_input(
         issued_at=1_800_000_000,
         not_before=1_800_000_000,
         expires_at=1_800_003_600,
-        holder_thumbprint=thumbprint(jwk_from_public_key(holder_public)),
+        holder_thumbprint=holder_thumbprint.value,
         operations=[
             OperationInput(
                 name="publish_article",
@@ -65,7 +70,9 @@ assert isinstance(grant_input, Ok)
 grant = signed(grant_input.value, issuer_key)
 
 # The holder binds one request to the grant.
-arguments = json_decode(b'{"section":"science","title":"Tides"}')
+arguments_result = json_decode(b'{"section":"science","title":"Tides"}')
+assert isinstance(arguments_result, Ok)
+arguments = arguments_result.value
 proof_input = proof_signing_input(
     ProofProducer(
         holder_public_key=holder_public,
@@ -104,5 +111,7 @@ facts = result.value
 print(facts.operation, facts.grant_id, facts.authorization)
 
 # The same proof against other arguments fails closed, with no detail.
-other = replace(expected, cast_arguments=json_decode(b'{"section":"sports","title":"Tides"}'))
+other_arguments = json_decode(b'{"section":"sports","title":"Tides"}')
+assert isinstance(other_arguments, Ok)
+other = replace(expected, cast_arguments=other_arguments.value)
 print(isinstance(check_envelope(grant, proof, other), Err))

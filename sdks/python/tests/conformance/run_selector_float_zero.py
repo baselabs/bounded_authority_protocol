@@ -21,7 +21,7 @@ from typing import Any
 
 from bounded_authority_verifier import v1, v2, v3
 from bounded_authority_verifier.base64url import base64url_decode
-from bounded_authority_verifier.error import InvalidError
+from bounded_authority_verifier.error import InvalidError, _unwrap
 from bounded_authority_verifier.json_alg import (
     JArray,
     JObject,
@@ -70,7 +70,7 @@ def _load() -> list[dict]:
 def _string(v: Tagged) -> str:
     if not isinstance(v, JString):
         raise AssertionError("operations_json: expected a string")
-    return utf8_str(v.v)
+    return _unwrap(utf8_str(v.v))
 
 
 def _selector_input(sel: Tagged) -> object:
@@ -96,7 +96,7 @@ def _selector_input(sel: Tagged) -> object:
 
 
 def _operations(mod: Any, operations_json: str) -> tuple[Any, ...]:
-    ops = json_decode(str_utf8(operations_json))
+    ops = _unwrap(json_decode(_unwrap(str_utf8(operations_json))))
     if not isinstance(ops, JArray):
         raise AssertionError("operations_json: array")
     built = []
@@ -128,16 +128,16 @@ def _check_envelope(mod: Any, inp: dict) -> Any:
         raise AssertionError("envelope: this corpus carries no nonce")
     ti = e["trusted_issuer"]
     return mod.check_envelope(
-        str_utf8(inp["grant"]),
-        str_utf8(inp["proof"]),
+        _unwrap(str_utf8(inp["grant"])),
+        _unwrap(str_utf8(inp["proof"])),
         mod.ExpectedRequest(
             trusted_issuer=mod.TrustedIssuer(
-                key_id=ti["key_id"], public_key=base64url_decode(ti["public_key"].encode()),
+                key_id=ti["key_id"], public_key=_unwrap(base64url_decode(ti["public_key"].encode())),
             ),
             issuer=e["issuer"], audience=e["audience"], method=e["method"],
             target_uri=e["target_uri"], invocation_id=e["invocation_id"],
             operation=e["operation"],
-            cast_arguments=json_decode(str_utf8(e["cast_arguments_json"])),
+            cast_arguments=_unwrap(json_decode(_unwrap(str_utf8(e["cast_arguments_json"])))),
             evaluation_time=e["evaluation_time"], clock_skew=e["clock_skew"],
             proof_max_age=e["proof_max_age"], nonce=mod.NonceNotRequired(),
         ),
@@ -151,7 +151,7 @@ def _agrees(case: dict) -> bool:
     expected = case["expected"]
     try:
         if surface == "decode_grant":
-            result = mod.decode_grant(str_utf8(inp["compact"]))
+            result = mod.decode_grant(_unwrap(str_utf8(inp["compact"])))
         elif surface == "grant_signing_input":
             result = _signing_input(mod, inp)
         elif surface == "check_envelope":
@@ -167,8 +167,8 @@ def _agrees(case: dict) -> bool:
     if surface == "decode_grant":
         return bool(result.value.key_id == expected["key_id"])
     if surface == "grant_signing_input":
-        protected = utf8_str(result.value.protected_segment)
-        payload = utf8_str(result.value.payload_segment)
+        protected = _unwrap(utf8_str(result.value.protected_segment))
+        payload = _unwrap(utf8_str(result.value.payload_segment))
         return (
             protected == expected["protected_segment"]
             and payload == expected["payload_segment"]

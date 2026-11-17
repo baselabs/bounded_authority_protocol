@@ -21,6 +21,8 @@ import sys
 from pathlib import Path
 from typing import Any, NoReturn
 
+from bounded_authority_verifier.error import _unwrap
+
 _HERE = Path(__file__).resolve()
 _REPO_ROOT = _HERE.parents[4]
 _SRC = _HERE.parents[2] / "src"
@@ -73,7 +75,7 @@ _RUN_V2 = _load_module("bap_strict_run_v2", "run_v2.py")
 
 
 def _b64d(s: str) -> bytes:
-    return base64url_decode(str_utf8(s))
+    return _unwrap(base64url_decode(_unwrap(str_utf8(s))))
 
 
 def _verdict(expected: dict[str, Any], accepted: bool) -> bool:
@@ -133,15 +135,15 @@ def _run_primitive(case: dict[str, Any]) -> bool:
 
     surface, inp, expected = case["surface"], case["input"], case["expected"]
     if surface == "ed25519.verify_strict":
-        accepted = verify_strict(
+        accepted = _unwrap(verify_strict(
             _b64d(inp["message"]) if inp["message"] else b"",
             _b64d(inp["signature"]),
             _b64d(inp["public_key"]),
-        )
+        ))
     elif surface == "ed25519.acceptable_public_key":
-        accepted = acceptable_public_key(_b64d(inp["public_key"]))
+        accepted = _unwrap(acceptable_public_key(_b64d(inp["public_key"])))
     elif surface == "ed25519.torsion_free":
-        accepted = torsion_free(_b64d(inp["public_key"]))
+        accepted = _unwrap(torsion_free(_b64d(inp["public_key"])))
     else:
         abort(f"{case['id']}: unknown primitive surface {surface}")
     return _verdict(expected, accepted)
@@ -155,7 +157,7 @@ def _run_shaped(case: dict[str, Any]) -> bool:
     if surface == "jwk.decode_public":
         # The shared v1/v2 runners decode the JWK member directly; the strict corpus exercises the
         # SDK's own public decoder so key acceptance is part of the verdict.
-        result = jwk_decode_public(str_utf8(inp["text"]))
+        result = jwk_decode_public(_unwrap(str_utf8(inp["text"])))
         actual: Any = {"public_key": _b64e(result.value)} if result.is_ok else module.INVALID
     else:
         actual = module.dispatch(surface, inp, {})
@@ -227,7 +229,7 @@ def _run_ca1(case: dict[str, Any]) -> bool:
         profile_digest=_b64d(context["profile_digest"]),
         content_digest=_b64d(context["content_digest"]),
         now=context["now"],
-        bounds=bounds_maximum(),
+        bounds=_unwrap(bounds_maximum()),
     )
     compact = case["compact"].encode()
     want = case["expected"]
