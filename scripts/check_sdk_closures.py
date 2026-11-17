@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PYTHON = [
     (
         "json_alg.py",
-        '        if name_str in members:\n            fail("json: duplicate member")\n',
+        '        if name_str in members:\n            _fail("json: duplicate member")\n',
         "",
         "test_duplicate_member_at_depth_3",
     ),
@@ -37,7 +37,7 @@ PYTHON = [
     ),
     (
         "json_alg.py",
-        '    if len(lexeme) > bounds_resolve(ctx.bounds, "number_lexeme_bytes"):',
+        '    if len(lexeme) > _unwrap(bounds_resolve(ctx.bounds, "number_lexeme_bytes")):',
         "    if False:",
         "test_66_byte_number_lexeme",
     ),
