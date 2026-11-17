@@ -1,5 +1,4 @@
 """Specified diagnostic rendering (spec/diagnostic-rendering.md § Diagnostic rendering), including shared container and printable limits."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -18,13 +17,25 @@ def atom(value: str) -> Term:
 
 
 def scalar(value: int | float) -> Term:
-    text = repr(value)
-    if isinstance(value, float) and "e" in text:
-        coefficient, exponent = text.split("e")
-        text = (
-            (coefficient if "." in coefficient else coefficient + ".0") + "e" + str(int(exponent))
-        )
-    return Term("scalar", text)
+    if not isinstance(value, float) or value == 0.0:
+        return Term("scalar", repr(value))
+    # Scalar rendering: shortest digits, then choose the prescribed notation.
+    coefficient, _, exponent_text = repr(abs(value)).partition("e")
+    exponent = int(exponent_text or "0")
+    whole, _, fraction = coefficient.partition(".")
+    digits = whole + fraction
+    point = len(whole) + exponent
+    point -= len(digits) - len(digits.lstrip("0"))
+    digits = digits.lstrip("0").rstrip("0")
+    scientific = digits[0] + "." + (digits[1:] or "0") + "e" + str(point - 1)
+    if point <= 0:
+        fixed = "0." + "0" * -point + digits
+    elif point >= len(digits):
+        fixed = digits + "0" * (point - len(digits)) + ".0"
+    else:
+        fixed = digits[:point] + "." + digits[point:]
+    notation = fixed if abs(value) < 2**53 and len(fixed) <= len(scientific) else scientific
+    return Term("scalar", ("-" if value < 0 else "") + notation)
 
 
 def text(value: str) -> Term:
@@ -48,53 +59,12 @@ def structure(name: str, fields: list[tuple[str, Term]]) -> Term:
 
 
 def _quoted(value: bytes) -> str | None:
-    try:
-        decoded = value.decode("utf-8")
-    except UnicodeDecodeError:
+    # Surrogate escapes retain each invalid byte for prefix scanning and suffix escaping.
+    decoded = value.decode("utf-8", errors="surrogateescape")
+    if not all((32 <= ord(c) <= 127 or 160 <= ord(c) <= 55295 or 57344 <= ord(c) <= 65533 or 65536 <= ord(c) <= 1114111) or c in "\a\b\t\n\v\f\r\x1b" for c in decoded[:4096]):
         return None
-    if not all(
-        (
-            32 <= ord(c) <= 126
-            or 160 <= ord(c) <= 55295
-            or 57344 <= ord(c) <= 65533
-            or 65536 <= ord(c) <= 1114111
-        )
-        or c in "\a\b\t\n\v\f\r\x1b"
-        for c in decoded[:4096]
-    ):
-        return None
-    escapes = {
-        "\a": r"\a",
-        "\b": r"\b",
-        "\t": r"\t",
-        "\n": r"\n",
-        "\v": r"\v",
-        "\f": r"\f",
-        "\r": r"\r",
-        "\x1b": r"\e",
-        '"': r"\"",
-        "\\": r"\\",
-    }
-    invisible = {
-        0xFEFF,
-        0x061C,
-        0x200E,
-        0x200F,
-        0x200C,
-        0x200D,
-        0x034F,
-        0x00A0,
-        0x200B,
-        0x2060,
-        0x2028,
-        0x2029,
-        0x205F,
-        *range(0x2061, 0x2065),
-        *range(0x202A, 0x202F),
-        *range(0x2066, 0x206A),
-        *range(0xFFF9, 0xFFFD),
-        *range(0x2000, 0x200B),
-    }
+    escapes = {"\a": r"\a", "\b": r"\b", "\t": r"\t", "\n": r"\n", "\v": r"\v", "\f": r"\f", "\r": r"\r", "\x1b": r"\e", "\x7f": r"\d", "\0": r"\0", '"': r'\"', "\\": r"\\"}
+    invisible = {0xFEFF, 0x061C, 0x200E, 0x200F, 0x200C, 0x200D, 0x034F, 0x00A0, 0x200B, 0x2060, 0x2028, 0x2029, 0x205F, *range(0x2061, 0x2065), *range(0x202A, 0x202F), *range(0x2066, 0x206A), *range(0xFFF9, 0xFFFD), *range(0x2000, 0x200B)}
     # The specified diagnostic rendering counts interpolation as one printable-limit unit
     # (spec/diagnostic-rendering.md § Diagnostic rendering; decoded-binary-rendering.json).
     pieces: list[str] = []
@@ -104,11 +74,23 @@ def _quoted(value: bytes) -> str | None:
             break
         c = decoded[i]
         i += 1
-        if c == "#" and decoded[i : i + 1] == "{":
+        if c == "#" and decoded[i:i + 1] == "{":
             pieces.append(r"\#{")
             i += 1
         else:
-            pieces.append(escapes.get(c, f"\\u{ord(c):04X}" if ord(c) in invisible else c))
+            codepoint = ord(c)
+            if c in escapes:
+                pieces.append(escapes[c])
+            elif codepoint in invisible:
+                pieces.append(f"\\u{codepoint:04X}")
+            elif codepoint < 32 or 128 <= codepoint < 160:
+                pieces.append(f"\\x{codepoint:02X}")
+            elif codepoint in (0xFFFE, 0xFFFF):
+                pieces.append(f"\\x{{{codepoint:04X}}}")
+            elif 0xDC80 <= codepoint <= 0xDCFF:
+                pieces.append(f"\\x{codepoint - 0xDC00:02X}")
+            else:
+                pieces.append(c)
     return '"' + "".join(pieces) + '"' + (" <> ..." if i < len(decoded) else "")
 
 
@@ -150,10 +132,7 @@ def render(term: Term) -> str:
             return container(value.children, "%" + value.text + "{", "}", True)
         if value.kind == "tuple":
             return container(value.children, "{", "}")
-        keyword = bool(value.children) and all(
-            c.kind == "tuple" and len(c.children) == 2 and c.children[0].kind == "atom"
-            for c in value.children
-        )
+        keyword = bool(value.children) and all(c.kind == "tuple" and len(c.children) == 2 and c.children[0].kind == "atom" for c in value.children)
         return container(value.children, "[", "]", keyword)
 
     return walk(term)
@@ -169,7 +148,6 @@ def string(value: str) -> str:
 
 def tagged(value: object) -> Term:
     from .json_alg import JArray, JBool, JFloat, JInt, JNull, JObject, JString
-
     if isinstance(value, JNull):
         return atom("null")
     if isinstance(value, JBool):
@@ -183,15 +161,12 @@ def tagged(value: object) -> Term:
     if isinstance(value, JArray):
         return tupled(atom("array"), listing([tagged(v) for v in value.v]))
     if isinstance(value, JObject):
-        return tupled(
-            atom("object"), listing([tupled(text(k), tagged(v)) for k, v in value.v.items()])
-        )
+        return tupled(atom("object"), listing([tupled(text(k), tagged(v)) for k, v in value.v.items()]))
     raise TypeError("unsupported decoded algebra")
 
 
 def selector(value: object) -> Term:
     from .json_alg import JArray, JObject, JString
-
     if not isinstance(value, JObject) or not isinstance(value.v["kind"], JString):
         raise TypeError("unsupported decoded selector")
     kind = value.v["kind"].v.decode()

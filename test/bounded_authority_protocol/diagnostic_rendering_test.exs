@@ -124,12 +124,109 @@ defmodule BoundedAuthorityProtocol.DiagnosticRenderingTest do
              ~s([integer: 1, array: [], object: [{"x", {:boolean, true}}]])
   end
 
+  test "float notation follows shortest round-trip digits and the notation boundary" do
+    for {value, expected} <- [
+          {1000.0, "1.0e3"},
+          {0.00012, "1.2e-4"},
+          {1_234_567.5, "1234567.5"},
+          {100.0, "100.0"},
+          {0.1, "0.1"},
+          {9_007_199_254_740_992.0, "9.007199254740992e15"},
+          {9_007_199_254_740_991.0, "9007199254740991.0"},
+          {1.0e16, "1.0e16"},
+          {1.0e22, "1.0e22"},
+          {5.0e-324, "5.0e-324"},
+          {1.797_693_134_862_315_7e308, "1.7976931348623157e308"},
+          {-1.5e-7, "-1.5e-7"},
+          {123_456.0, "123456.0"},
+          {0.0, "0.0"},
+          {-0.0, "-0.0"},
+          {0.0001, "0.0001"},
+          {1.0, "1.0"},
+          {-1000.0, "-1.0e3"}
+        ] do
+      assert render(value) == expected
+    end
+  end
+
+  test "values outside the grammar render as one value-free scalar" do
+    values = [
+      %{"x" => 1},
+      %URI{path: "hidden"},
+      self(),
+      make_ref(),
+      :erlang.list_to_port(~c"#Port<0.0>"),
+      fn -> :hidden end,
+      <<1::size(1)>>,
+      [1 | :tail],
+      [1, 2 | <<0>>],
+      :"",
+      :"has space",
+      :Uppercase,
+      :é,
+      :"a-b",
+      :"a?b",
+      :"a!!"
+    ]
+
+    for value <- values do
+      assert render(value) == "#unrenderable"
+      assert render({value, :all}) == "{#unrenderable, :all}"
+    end
+
+    assert render(:_) == ":_"
+    assert render(:aB_9) == ":aB_9"
+    assert render(:ready?) == ":ready?"
+    assert render(:run!) == ":run!"
+
+    assert render([{:valid, 1}, {:"not valid", 2}]) ==
+             "[{:valid, 1}, {#unrenderable, 2}]"
+
+    assert render([{:"a?b", :Uppercase}]) == "[{#unrenderable, #unrenderable}]"
+    assert render([List.duplicate(:all, 198), %{}]) =~ "], #unrenderable]"
+    assert render(List.duplicate(:all, 200) ++ [:tail] ++ [1 | :tail]) == "#unrenderable"
+  end
+
+  test "recognized structures with missing fields are unrenderable" do
+    for module <- [
+          BoundedAuthorityProtocol.V1.DecodedGrant,
+          BoundedAuthorityProtocol.V2.Operation,
+          BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation,
+          BoundedAuthorityProtocol.V3.DecodedProof
+        ] do
+      assert render(%{__struct__: module}) == "#unrenderable"
+
+      key =
+        if module == BoundedAuthorityProtocol.V2.Operation, do: :selectors, else: :verification
+
+      malformed = module |> struct() |> Map.delete(key)
+      assert render(malformed) == "#unrenderable"
+    end
+  end
+
   for major <- [
         BoundedAuthorityProtocol.V1,
         BoundedAuthorityProtocol.V2,
         BoundedAuthorityProtocol.V3
       ] do
     @major major
+
+    test "#{inspect(major)} malformed proof fields never expose a nonce" do
+      proof = struct(Module.concat(@major, DecodedProof), nonce: "nonce-must-stay-hidden")
+
+      for nonce <- ["nonce-must-stay-hidden", %{"nonce-must-stay-hidden" => 1}, fn -> :secret end] do
+        rendered = inspect(%{proof | holder_public_key: %{"x" => 1}, nonce: nonce})
+        assert rendered =~ "holder_public_key: #unrenderable"
+        assert rendered =~ "nonce: :redacted"
+        refute rendered =~ "nonce-must-stay-hidden"
+        refute rendered =~ "Inspect.Error"
+      end
+
+      assert inspect(%{proof | nonce: nil}) =~ "nonce: nil"
+
+      assert inspect(%{proof | holder_public_key: [1 | :tail]}) =~
+               "holder_public_key: #unrenderable"
+    end
 
     test "#{inspect(major)} operation fields and selectors share the fixed budget" do
       operation =

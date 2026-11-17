@@ -114,6 +114,6 @@ fn decoded_wire_rendering_matches_reference() {
             .unwrap();
             format!("{d:?}")
         };
-        assert_eq!(rendered, row["expected"].as_str().unwrap());
+        assert_eq!(rendered, row["expected"].as_str().unwrap(), "{}", row["id"]);
     }
 }

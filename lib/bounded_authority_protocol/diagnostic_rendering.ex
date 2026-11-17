@@ -49,14 +49,24 @@ defmodule BoundedAuthorityProtocol.DiagnosticRendering do
               BoundedAuthorityProtocol.V2.DecodedProof,
               BoundedAuthorityProtocol.V3.DecodedProof
             ] do
-    <<"Elixir.", name::binary>> = Atom.to_string(module)
-    {["#", name, "<", proof_fields(value, @proof_fields), ">"], budget}
+    case field_values(value, @proof_fields) do
+      {:ok, fields} ->
+        <<"Elixir.", name::binary>> = Atom.to_string(module)
+        {["#", name, "<", proof_fields(fields), ">"], budget}
+
+      :error ->
+        {"#unrenderable", budget}
+    end
   end
 
   defp term(value, budget) when is_list(value) do
-    mode = if keyword?(value), do: :fields, else: :values
-    {document, remaining} = entries(value, budget, mode)
-    {["[", document, "]"], remaining}
+    if proper_list?(value) do
+      mode = if keyword?(value), do: :fields, else: :values
+      {document, remaining} = entries(value, budget, mode)
+      {["[", document, "]"], remaining}
+    else
+      {"#unrenderable", budget}
+    end
   end
 
   defp term(value, budget) when is_tuple(value) do
@@ -76,37 +86,80 @@ defmodule BoundedAuthorityProtocol.DiagnosticRendering do
   defp term(nil, budget), do: {"nil", budget}
   defp term(true, budget), do: {"true", budget}
   defp term(false, budget), do: {"false", budget}
-  defp term(value, budget) when is_atom(value), do: {[":", Atom.to_string(value)], budget}
+
+  defp term(value, budget) when is_atom(value) do
+    name = Atom.to_string(value)
+    document = if identifier?(name), do: [":", name], else: "#unrenderable"
+    {document, budget}
+  end
+
   defp term(value, budget) when is_integer(value), do: {Integer.to_string(value), budget}
 
   defp term(value, budget) when is_float(value) do
     {:erlang.float_to_binary(value, [:short]), budget}
   end
 
+  defp term(_value, budget), do: {"#unrenderable", budget}
+
   defp structure(value, module, keys, budget) do
-    <<"Elixir.", name::binary>> = Atom.to_string(module)
-    {document, remaining} = entries(field_values(value, keys), budget, :fields)
-    {["%", name, "{", document, "}"], remaining}
+    case field_values(value, keys) do
+      {:ok, fields} ->
+        <<"Elixir.", name::binary>> = Atom.to_string(module)
+        {document, remaining} = entries(fields, budget, :fields)
+        {["%", name, "{", document, "}"], remaining}
+
+      :error ->
+        {"#unrenderable", budget}
+    end
   end
 
-  defp field_values(_value, []), do: []
+  defp field_values(_value, []), do: {:ok, []}
 
-  defp field_values(value, [key | keys]),
-    do: [{key, Map.fetch!(value, key)} | field_values(value, keys)]
+  defp field_values(value, [key | keys]) do
+    case value do
+      %{^key => field} ->
+        case field_values(value, keys) do
+          {:ok, fields} -> {:ok, [{key, field} | fields]}
+          :error -> :error
+        end
+
+      _value ->
+        :error
+    end
+  end
+
+  defp proper_list?([]), do: true
+  defp proper_list?([_value | rest]), do: proper_list?(rest)
+  defp proper_list?(_value), do: false
 
   defp keyword?([]), do: true
-  defp keyword?([{key, _value} | rest]) when is_atom(key), do: keyword?(rest)
+
+  defp keyword?([{key, _value} | rest]) when is_atom(key),
+    do: identifier?(Atom.to_string(key)) and keyword?(rest)
+
   defp keyword?(_value), do: false
+
+  defp identifier?(<<first, rest::binary>>) when first in ?a..?z or first == ?_,
+    do: identifier_tail?(rest)
+
+  defp identifier?(_name), do: false
+  defp identifier_tail?(<<>>), do: true
+  defp identifier_tail?(<<suffix>>) when suffix in [??, ?!], do: true
+
+  defp identifier_tail?(<<character, rest::binary>>)
+       when character in ?a..?z or character in ?A..?Z or character in ?0..?9 or character == ?_,
+       do: identifier_tail?(rest)
+
+  defp identifier_tail?(_name), do: false
 
   # Fixed-form proofs have always rendered each visible field independently.
   # Replace a present nonce before rendering, including malformed present values.
-  defp proof_fields(_value, []), do: []
+  defp proof_fields([]), do: []
 
-  defp proof_fields(value, [key | keys]) do
-    field = Map.fetch!(value, key)
+  defp proof_fields([{key, field} | fields]) do
     field = if key == :nonce and field != nil, do: :redacted, else: field
-    separator = if keys == [], do: [], else: ", "
-    [Atom.to_string(key), ": ", render(field), separator, proof_fields(value, keys)]
+    separator = if fields == [], do: [], else: ", "
+    [Atom.to_string(key), ": ", render(field), separator, proof_fields(fields)]
   end
 
   defp entries([], budget, _mode), do: {[], budget}

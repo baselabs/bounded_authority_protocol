@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -60,8 +61,8 @@ func TestDecodedWireRenderingMatchesReference(t *testing.T) {
 		t.Fatal(err)
 	}
 	var rows []struct {
-		Major                   int
-		Kind, Compact, Expected string
+		Major                       int
+		ID, Kind, Compact, Expected string
 	}
 	if err = json.Unmarshal(raw, &rows); err != nil {
 		t.Fatal(err)
@@ -91,7 +92,7 @@ func TestDecodedWireRenderingMatchesReference(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got := fmt.Sprint(value); got != row.Expected {
-			t.Errorf("major %d %s got %s want %s", row.Major, row.Kind, got, row.Expected)
+			t.Errorf("%s major %d %s got %s want %s", row.ID, row.Major, row.Kind, got, row.Expected)
 		}
 	}
 }
@@ -101,7 +102,7 @@ func TestDecodedBinaryNotationMatchesReference(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var rows []struct{ Hex, Expected string }
+	var rows []struct{ ID, Hex, Expected string }
 	if err = json.Unmarshal(raw, &rows); err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +112,30 @@ func TestDecodedBinaryNotationMatchesReference(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got := inspectBinary(raw); got != row.Expected {
-			t.Errorf("binary notation mismatch: got %s want %s", got, row.Expected)
+			t.Errorf("%s binary notation mismatch: got %s want %s", row.ID, got, row.Expected)
+		}
+	}
+}
+
+func TestFloatNotationMatchesSpecifiedFixtureBytes(t *testing.T) {
+	raw, err := os.ReadFile("testdata/decoded-rendering.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gold map[string]string
+	if err = json.Unmarshal(raw, &gold); err != nil {
+		t.Fatal(err)
+	}
+	for key, expected := range gold {
+		if !strings.HasPrefix(key, "float:") {
+			continue
+		}
+		value, err := strconv.ParseFloat(strings.TrimPrefix(key, "float:"), 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := inspectRender(inspectTagged(Float(value))); got != "{:float, "+expected+"}" {
+			t.Errorf("%s got %s want %s", key, got, expected)
 		}
 	}
 }

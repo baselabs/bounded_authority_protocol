@@ -26,25 +26,33 @@ func inspectStruct(name string, fields ...inspectTerm) inspectTerm {
 	return inspectTerm{kind: "struct", text: name, children: fields}
 }
 func inspectQuoted(raw []byte) (string, bool) {
-	if !utf8.Valid(raw) {
-		return "", false
-	}
-	chars := []rune(string(raw))
-	for i, r := range chars {
-		if i == 4096 {
-			break
-		}
-		if !(r >= 32 && r <= 126 || r >= 160 && r <= 55295 || r >= 57344 && r <= 65533 || r >= 65536 && r <= 1114111 || strings.ContainsRune("\a\b\t\n\v\f\r\x1b", r)) {
+	scan := raw
+	for count := 0; count < 4096 && len(scan) > 0; count++ {
+		r, width := utf8.DecodeRune(scan)
+		if r == utf8.RuneError && width == 1 {
 			return "", false
 		}
+		if !(r >= 32 && r <= 127 || r >= 160 && r <= 55295 || r >= 57344 && r <= 65533 || r >= 65536 && r <= 1114111 || strings.ContainsRune("\a\b\t\n\v\f\r\x1b", r)) {
+			return "", false
+		}
+		scan = scan[width:]
 	}
 	var b strings.Builder
 	b.WriteByte('"')
 	i := 0
-	for count := 0; count < 4096 && i < len(chars); count++ {
-		r := chars[i]
-		i++
+	for count := 0; count < 4096 && i < len(raw); count++ {
+		r, width := utf8.DecodeRune(raw[i:])
+		if r == utf8.RuneError && width == 1 {
+			fmt.Fprintf(&b, `\x%02X`, raw[i])
+			i++
+			continue
+		}
+		i += width
 		switch r {
+		case 0:
+			b.WriteString(`\0`)
+		case 127:
+			b.WriteString(`\d`)
 		case '\a':
 			b.WriteString(`\a`)
 		case '\b':
@@ -66,7 +74,7 @@ func inspectQuoted(raw []byte) (string, bool) {
 		case '\\':
 			b.WriteString(`\\`)
 		case '#':
-			if i < len(chars) && chars[i] == '{' {
+			if i < len(raw) && raw[i] == '{' {
 				b.WriteString(`\#{`)
 				i++
 			} else {
@@ -75,13 +83,17 @@ func inspectQuoted(raw []byte) (string, bool) {
 		default:
 			if r == 0xFEFF || r == 0x061C || r == 0x200E || r == 0x200F || r == 0x200C || r == 0x200D || r == 0x034F || r == 0x00A0 || r == 0x200B || r == 0x2060 || r == 0x2028 || r == 0x2029 || r == 0x205F || r >= 0x2061 && r <= 0x2064 || r >= 0x202A && r <= 0x202E || r >= 0x2066 && r <= 0x2069 || r >= 0xFFF9 && r <= 0xFFFC || r >= 0x2000 && r <= 0x200A {
 				fmt.Fprintf(&b, `\u%04X`, r)
+			} else if r < 32 || r >= 128 && r < 160 {
+				fmt.Fprintf(&b, `\x%02X`, r)
+			} else if r == 0xFFFE || r == 0xFFFF {
+				fmt.Fprintf(&b, `\x{%04X}`, r)
 			} else {
 				b.WriteRune(r)
 			}
 		}
 	}
 	b.WriteByte('"')
-	if i < len(chars) {
+	if i < len(raw) {
 		b.WriteString(" <> ...")
 	}
 	return b.String(), true
@@ -163,20 +175,7 @@ func inspectTagged(value Value) inspectTerm {
 		val = inspectInt(int64(v))
 	case Float:
 		tag = "float"
-		s := strconv.FormatFloat(float64(v), 'g', -1, 64)
-		if a := strings.Split(s, "e"); len(a) == 2 {
-			if !strings.Contains(a[0], ".") {
-				a[0] += ".0"
-			}
-			e, _ := strconv.Atoi(a[1])
-			s = a[0] + "e" + strconv.Itoa(e)
-		} else if !strings.Contains(s, ".") {
-			s += ".0"
-		}
-		if v >= 1 && v < 1e16 && float64(int64(v)) == float64(v) || v <= -1 && v > -1e16 && float64(int64(v)) == float64(v) {
-			s = strconv.FormatFloat(float64(v), 'f', 1, 64)
-		}
-		val = inspectTerm{kind: "scalar", text: s}
+		val = inspectTerm{kind: "scalar", text: inspectFloat(float64(v))}
 	case Str:
 		tag = "string"
 		val = inspectText(string(v))
@@ -198,6 +197,40 @@ func inspectTagged(value Value) inspectTerm {
 		return inspectAtom("nil")
 	}
 	return inspectTuple(inspectAtom(tag), val)
+}
+
+// Scalar rendering chooses notation after obtaining the shortest round-trip digits.
+func inspectFloat(value float64) string {
+	if value == 0 {
+		return strconv.FormatFloat(value, 'f', 1, 64)
+	}
+	shortest := strconv.FormatFloat(value, 'e', -1, 64)
+	sign := ""
+	if shortest[0] == '-' {
+		sign, shortest = "-", shortest[1:]
+	}
+	parts := strings.Split(shortest, "e")
+	exponent, _ := strconv.Atoi(parts[1])
+	digits := strings.ReplaceAll(parts[0], ".", "")
+	fraction := digits[1:]
+	if fraction == "" {
+		fraction = "0"
+	}
+	scientific := digits[:1] + "." + fraction + "e" + strconv.Itoa(exponent)
+	point := exponent + 1
+	var fixed string
+	switch {
+	case point <= 0:
+		fixed = "0." + strings.Repeat("0", -point) + digits
+	case point >= len(digits):
+		fixed = digits + strings.Repeat("0", point-len(digits)) + ".0"
+	default:
+		fixed = digits[:point] + "." + digits[point:]
+	}
+	if value > -9007199254740992 && value < 9007199254740992 && len(fixed) <= len(scientific) {
+		return sign + fixed
+	}
+	return sign + scientific
 }
 func inspectMember(value Value, key string) Value {
 	if obj, ok := value.(Obj); ok {

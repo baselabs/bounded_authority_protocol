@@ -84,7 +84,13 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
-- Diagnostic rendering of decoded values is now identical on every supported Elixir version.
+- Decoded diagnostics use identical, fixed-budget rendering on every supported Elixir version
+  and in the Python, Rust, and Go SDKs, including shortest round-trip float notation, DEL,
+  and controls or invalid UTF-8 beyond the printability prefix. Unsupported hand-built Elixir
+  values render as `#unrenderable` without raising or exposing a proof nonce. Redaction binds
+  the `Inspect` protocol; `structs: false` bypasses it and must never be used for logging
+  redacted values. The compiled architecture gate honors absolute build roots and explicit
+  build paths.
 
 - SDK derivation guards also reject implementation-symbol citations, struct patterns outside
   exact rendering fixtures, and reference-authority phrases. The same rules cover top-level

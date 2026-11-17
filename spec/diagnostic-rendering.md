@@ -8,9 +8,17 @@ and the role-attestation and content-assertion sibling profiles.
 ## Diagnostic rendering
 
 Implementations MUST produce the UTF-8 bytes specified below regardless of language version,
-caller display limits, line width, pretty printing, numeric base, or formatting flags.
+caller display limits, line width, pretty printing, numeric base, or formatting flags
+when rendering through the implementation's diagnostic display protocol. In Elixir, this
+contract binds rendering through the `Inspect` protocol. `inspect(value, structs: false)`
+bypasses that protocol and prints raw fields; it MUST NEVER be used to log decoded proofs,
+facts, or other redacted values.
 There are no line breaks or indentation except escaped characters inside quoted strings.
 Names, punctuation, spaces, field order, and ellipses are significant.
+
+An implementation renders the value kinds it exposes according to this contract. An
+implementation exposing only fully redacted facts and decoded content assertions implements
+only the `redacted` forms; it need not expose structural decoded values.
 
 ### Names and field order
 
@@ -68,9 +76,10 @@ list         = "[" sequence of value "]"
 keyword-list = "[" fields "]"
 tuple        = "{" sequence of value "}"
 binary       = "<<" sequence of decimal byte ">>"
+unrenderable = "#unrenderable"
 atom         = ":" key
 value        = struct / list / keyword-list / tuple / binary / quoted-string /
-               decimal-integer / decimal-float / atom / "nil" / "true" / "false"
+               decimal-integer / decimal-float / atom / "nil" / "true" / "false" / unrenderable
 ```
 
 All facts and decoded content assertions use exactly `redacted`, with no fields.
@@ -80,10 +89,22 @@ Other proof fields keep their diagnostic values. Structural decoded grants, oper
 and role attestations use `struct`; their fields are diagnostic data, never trusted inputs.
 The `verification` field remains `:not_evaluated`.
 
-A nonempty list whose every element is a two-element tuple with an atom first element is a
-keyword list: render each pair as a field, without tuple braces or the key's leading colon.
+Atom names and field keys MUST be plain identifiers matching `[a-z_][a-zA-Z0-9_]*[?!]?`.
+The values `nil`, `true`, and `false` retain their own forms. Any value outside the grammar's
+value domain renders as exactly `#unrenderable`: this includes maps, other structs, process
+identifiers, references, functions, ports, non-byte-aligned bitstrings, improper lists (the
+whole list), and atoms without a plain identifier name. Recognized structures missing a
+required field also render as `#unrenderable`. Decoders never produce such values; only
+implementations whose decoded values can be modified by hand need implement this form.
+Rendering MUST be total for every value, and nonce redaction still precedes rendering.
+
+A nonempty proper list whose every element is a two-element tuple with a plain-identifier
+atom first element is a keyword list: render each pair as a field, without tuple braces or
+the key's leading colon.
 The empty list is `[]`. Other lists use ordinary list notation, including string-keyed
-tagged JSON object-member pairs. Empty tuples are `{}`.
+tagged JSON object-member pairs. A non-identifier atom key makes the entire list an ordinary
+list; its pair renders as a tuple with `#unrenderable` for the atom element. Empty tuples
+are `{}`.
 There is no character-list inference. Tags such as `:integer` and `:float` stay distinct.
 
 ### Structural rendering
@@ -99,8 +120,8 @@ passing the remaining budget into its nested value. Continue with the budget ret
 that nested value. Struct fields and keyword pairs each cost one; their keys and the pair's
 implicit two-tuple consume no additional units.
 
-Scalar atoms, booleans, nil, integers, floats, and quoted strings cost nothing beyond the
-unit already charged by their enclosing sequence. A quoted string therefore still renders
+Scalar atoms, booleans, nil, integers, floats, quoted strings, and `#unrenderable` cost nothing
+beyond the unit already charged by their enclosing sequence. A quoted string therefore still renders
 at zero container budget. A nonempty nonprintable binary at zero renders `<<...>>`.
 Empty containers render their empty delimiters even at zero. When the last entry uses the
 last unit and no entries remain, do not append an ellipsis.
@@ -163,7 +184,9 @@ These escapes keep the quoted form free of raw controls and invalid UTF-8.
 The canonical display fixtures are `test/fixtures/sdk_rendering/decoded-rendering.json`,
 `decoded-wire-rendering.json`, and `decoded-binary-rendering.json`. Each SDK carries
 byte-identical copies in its own fixture directory. Their existing expected strings remain
-unchanged. They cover all majors, nested tagged JSON, shared-budget truncation, public-key
+unchanged. Constructed scalar entries with keys prefixed by `float:` use the remainder of
+the key as a decimal binary64 input and the entry value as its expected display bytes.
+The fixtures cover all majors, nested tagged JSON, shared-budget truncation, public-key
 binaries, printable strings, escaping, and redacted values.
 
 Implementations derive their algorithms independently from this contract and these fixture

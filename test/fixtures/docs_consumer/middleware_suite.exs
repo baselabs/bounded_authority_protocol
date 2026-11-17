@@ -9,6 +9,8 @@ for [code] <-
 end
 
 defmodule BapReader.MiddlewareTest do
+  # This fixture is copied to the consumer as middleware_test.exs; root suites must not load it.
+  # credo:disable-for-next-line Credo.Check.Warning.WrongTestFilename
   use ExUnit.Case, async: false
 
   test "every recipe block runs without warnings and the real middleware assigns or halts" do

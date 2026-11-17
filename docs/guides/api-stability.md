@@ -181,7 +181,9 @@ change in any release:
 
 Decoded diagnostics and fully redacted facts follow the
 [diagnostic rendering contract](../../spec/diagnostic-rendering.md), including fixed limits and
-nonce redaction on every supported Elixir version. Other `inspect/2` output may change while
+nonce redaction on every supported Elixir version, when rendered through the `Inspect`
+protocol. `inspect(value, structs: false)` bypasses that protocol and prints raw fields;
+never use it to log decoded proofs, facts, or other redacted values. Other `inspect/2` output may change while
 preserving redaction. The order of keys in maps you did not build and the wording of any message
 the CLI writes to standard error are also not covered.
 

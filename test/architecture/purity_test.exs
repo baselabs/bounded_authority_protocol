@@ -2,7 +2,7 @@ Code.require_file("../../tools/architecture_gate.exs", __DIR__)
 Code.require_file("../../test_support/portable.ex", __DIR__)
 
 defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias BoundedAuthorityProtocol.ArchitectureGate
   alias BoundedAuthorityProtocol.TestSupport.Portable
@@ -15,6 +15,55 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
 
   test "the compiled application has no runtime or OTP-service surface" do
     assert [] == ArchitectureGate.check_compiled(@root)
+  end
+
+  test "compiled lookup honors relative and absolute roots and explicit build paths" do
+    original = for key <- ["MIX_BUILD_ROOT", "MIX_BUILD_PATH"], do: {key, System.get_env(key)}
+
+    on_exit(fn ->
+      for {key, value} <- original do
+        if value == nil, do: System.delete_env(key), else: System.put_env(key, value)
+      end
+    end)
+
+    root = fixture_root!("def read(path), do: File.read!(path)")
+    relative_root = "custom-build"
+    absolute_root = Path.join(root, relative_root)
+    build_path = Path.join(root, "explicit-build")
+
+    for {configured_root, configured_path} <- [
+          {relative_root, nil},
+          {absolute_root, nil},
+          {Path.join(root, "unused-root"), build_path}
+        ] do
+      System.put_env("MIX_BUILD_ROOT", configured_root)
+
+      if configured_path == nil,
+        do: System.delete_env("MIX_BUILD_PATH"),
+        else: System.put_env("MIX_BUILD_PATH", configured_path)
+
+      assert {output, 0} =
+               System.cmd("mix", ["compile", "--force"],
+                 cd: root,
+                 env: [{"MIX_ENV", "prod"}],
+                 stderr_to_stdout: true
+               )
+
+      assert output =~ "Generated bounded_authority_protocol app"
+      violations = ArchitectureGate.check_compiled(root)
+      refute Enum.any?(violations, &(&1.category == :compiled_artifact))
+
+      assert Enum.any?(violations, fn violation ->
+               violation.category == :filesystem and
+                 violation.detail =~ "compiled import File.read!"
+             end)
+    end
+
+    missing = Path.join(root, "missing-build")
+    System.put_env("MIX_BUILD_PATH", missing)
+
+    assert [%{category: :compiled_artifact, path: ^missing}] =
+             ArchitectureGate.check_compiled(root)
   end
 
   # Deletion-invisibility guard (keys-subset-of-present): a pinned module deleted or renamed

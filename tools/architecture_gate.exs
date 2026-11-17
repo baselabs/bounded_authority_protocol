@@ -1164,17 +1164,25 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   def check_compiled(root) do
     build_root = System.get_env("MIX_BUILD_ROOT", "_build")
 
-    root
-    |> Path.expand()
-    |> Path.join(build_root)
-    |> Path.join("*/lib/bounded_authority_protocol/ebin")
-    |> Path.wildcard()
-    |> case do
+    ebin_paths =
+      case System.get_env("MIX_BUILD_PATH") do
+        nil ->
+          build_root
+          |> Path.expand(root)
+          |> Path.join("*/lib/bounded_authority_protocol/ebin")
+          |> Path.wildcard()
+
+        build_path ->
+          path = Path.join(Path.expand(build_path, root), "lib/bounded_authority_protocol/ebin")
+          if File.dir?(path), do: [path], else: []
+      end
+
+    case ebin_paths do
       [] ->
         [
           violation(
             :compiled_artifact,
-            build_root,
+            System.get_env("MIX_BUILD_PATH", build_root),
             "compiled bounded_authority_protocol application is missing"
           )
         ]
@@ -2076,7 +2084,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules(path) when path in @inspect_source_paths, do: ~w(Inspect)
 
   defp approved_source_modules("lib/bounded_authority_protocol/diagnostic_rendering.ex"),
-    do: ~w(Atom Integer Map String Tuple)
+    do: ~w(Atom Integer String Tuple)
 
   defp approved_source_modules(path) when path in @chain_codec_source_paths,
     do: ~w(Access Enum Map String StringOrUri URI)
@@ -2406,7 +2414,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            {:erlang, :iolist_to_binary},
            {"Atom", :to_string},
            {"Integer", :to_string},
-           {"Map", :fetch!},
            {"String", :pad_leading},
            {"Tuple", :to_list}
          ]

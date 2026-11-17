@@ -30,19 +30,52 @@ pub(crate) fn structure(name: String, fields: Vec<(&str, Term)>) -> Term {
             .collect(),
     )
 }
+// Decode only the next scalar; a malformed sequence leaves one raw byte to escape.
+fn next_scalar(raw: &[u8]) -> Option<(char, usize)> {
+    let width = match *raw.first()? {
+        0..=0x7f => 1,
+        0xc2..=0xdf => 2,
+        0xe0..=0xef => 3,
+        0xf0..=0xf4 => 4,
+        _ => return None,
+    };
+    let scalar = std::str::from_utf8(raw.get(..width)?)
+        .ok()?
+        .chars()
+        .next()?;
+    Some((scalar, width))
+}
 fn quoted(raw: &[u8]) -> Option<String> {
-    let text = std::str::from_utf8(raw).ok()?;
-    if !text.chars().take(4096).all(|c| {
-        matches!(c as u32,32..=126|160..=55295|57344..=65533|65536..=1114111)
-            || "\u{7}\u{8}\t\n\u{b}\u{c}\r\u{1b}".contains(c)
-    }) {
-        return None;
+    let mut scan = raw;
+    for _ in 0..4096 {
+        if scan.is_empty() {
+            break;
+        }
+        let (c, width) = next_scalar(scan)?;
+        if !matches!(c as u32,7..=13|27|32..=127|160..=55295|57344..=65533|65536..=1114111) {
+            return None;
+        }
+        scan = &scan[width..];
     }
     let mut out = String::from("\"");
-    let mut chars = text.chars().peekable();
+    let mut rest = raw;
     for _ in 0..4096 {
-        let Some(c) = chars.next() else { break };
+        if rest.is_empty() {
+            break;
+        }
+        if rest.starts_with(b"#{") {
+            rest = &rest[2..];
+            out.push_str("\\#{");
+            continue;
+        }
+        let Some((c, width)) = next_scalar(rest) else {
+            out.push_str(&format!("\\x{:02X}", rest[0]));
+            rest = &rest[1..];
+            continue;
+        };
+        rest = &rest[width..];
         match c {
+            '\0' => out.push_str("\\0"),
             '\u{7}' => out.push_str("\\a"),
             '\u{8}' => out.push_str("\\b"),
             '\t' => out.push_str("\\t"),
@@ -53,21 +86,61 @@ fn quoted(raw: &[u8]) -> Option<String> {
             '\u{1b}' => out.push_str("\\e"),
             '"' => out.push_str("\\\""),
             '\\' => out.push_str("\\\\"),
-            '#' if chars.peek() == Some(&'{') => {
-                chars.next();
-                out.push_str("\\#{");
-            }
+            '\u{7f}' => out.push_str("\\d"),
             c if matches!(c as u32,0xFEFF|0x061C|0x200E|0x200F|0x200C|0x200D|0x034F|0x00A0|0x200B|0x2060|0x2028|0x2029|0x205F|0x2061..=0x2064|0x202A..=0x202E|0x2066..=0x2069|0xFFF9..=0xFFFC|0x2000..=0x200A) => {
                 out.push_str(&format!("\\u{:04X}", c as u32))
             }
+            c if matches!(c as u32,1..=31|128..=159) => {
+                out.push_str(&format!("\\x{:02X}", c as u32))
+            }
+            '\u{fffe}' | '\u{ffff}' => out.push_str(&format!("\\x{{{:04X}}}", c as u32)),
             _ => out.push(c),
         }
     }
     out.push('"');
-    if chars.peek().is_some() {
+    if !rest.is_empty() {
         out.push_str(" <> ...");
     }
     Some(out)
+}
+// Scalar rendering specifies notation separately from the shortest round-trip digits.
+fn float(value: f64) -> String {
+    if value == 0.0 {
+        return if value.is_sign_negative() {
+            "-0.0"
+        } else {
+            "0.0"
+        }
+        .into();
+    }
+    let shortest = format!("{:e}", value.abs());
+    let (coefficient, exponent) = shortest.split_once('e').unwrap();
+    let exponent: i32 = exponent.parse().unwrap();
+    let digits = coefficient.replace('.', "");
+    let scientific = format!(
+        "{}.{}e{exponent}",
+        &digits[..1],
+        if digits.len() == 1 { "0" } else { &digits[1..] }
+    );
+    let point = exponent + 1;
+    let fixed = if point <= 0 {
+        format!("0.{}{digits}", "0".repeat((-point) as usize))
+    } else if point as usize >= digits.len() {
+        format!("{digits}{}.0", "0".repeat(point as usize - digits.len()))
+    } else {
+        let point = point as usize;
+        format!("{}.{}", &digits[..point], &digits[point..])
+    };
+    let notation = if value.abs() < 9007199254740992.0 && fixed.len() <= scientific.len() {
+        fixed
+    } else {
+        scientific
+    };
+    if value.is_sign_negative() {
+        format!("-{notation}")
+    } else {
+        notation
+    }
 }
 pub(crate) fn render(term: &Term) -> String {
     walk(term, &mut 200)
@@ -151,15 +224,7 @@ fn tagged(value: &JsonValue) -> Term {
         JsonValue::Null => return atom("null"),
         JsonValue::Bool(v) => ("boolean", atom(if *v { "true" } else { "false" })),
         JsonValue::Int(v) => ("integer", int(*v)),
-        JsonValue::Float(v) => {
-            let s = format!("{v:?}");
-            let s = if let Some((c, e)) = s.split_once('e') {
-                format!("{}{}e{}", c, if c.contains('.') { "" } else { ".0" }, e)
-            } else {
-                s
-            };
-            ("float", Term::Scalar(s))
-        }
+        JsonValue::Float(v) => ("float", Term::Scalar(float(*v))),
         JsonValue::String(v) => ("string", text(v)),
         JsonValue::Array(v) => ("array", Term::List(v.iter().map(tagged).collect())),
         JsonValue::Object(v) => (
@@ -227,6 +292,22 @@ pub(crate) fn operations(values: &[JsonValue], version: i64) -> Term {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn float_notation_matches_specified_fixture_bytes() {
+        let gold: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/decoded-rendering.json")).unwrap();
+        for (key, expected) in gold.as_object().unwrap() {
+            if let Some(number) = key.strip_prefix("float:") {
+                let value = super::tagged(&crate::json::JsonValue::Float(number.parse().unwrap()));
+                assert_eq!(
+                    super::render(&value),
+                    format!("{{:float, {}}}", expected.as_str().unwrap()),
+                    "{key}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn binary_notation_matches_reference() {
         let rows: serde_json::Value = serde_json::from_str(include_str!(
             "../tests/fixtures/decoded-binary-rendering.json"
@@ -238,7 +319,12 @@ mod tests {
                 .step_by(2)
                 .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
                 .collect();
-            assert_eq!(super::binary(&bytes), row["expected"].as_str().unwrap());
+            assert_eq!(
+                super::binary(&bytes),
+                row["expected"].as_str().unwrap(),
+                "{}",
+                row["id"]
+            );
         }
     }
 }

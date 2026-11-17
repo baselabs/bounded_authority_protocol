@@ -36,7 +36,12 @@ defmodule BoundedAuthorityProtocol.SdkRenderingFixturesTest do
         "content" => inspect(content())
       })
 
-    assert actual == expected
+    floats =
+      for {"float:" <> number = key, _expected} <- expected, into: %{} do
+        {key, BoundedAuthorityProtocol.DiagnosticRendering.render(String.to_float(number))}
+      end
+
+    assert Map.merge(actual, floats) == expected
     assert inspect(attestation(), limit: 0) == expected["attestation"]
     assert inspect(content(), limit: 0) == expected["content"]
   end

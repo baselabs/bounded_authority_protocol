@@ -50,7 +50,9 @@ can affect your code:
    decoded proofs, or a `SigningInput` shows `:redacted` in place of the compact credentials,
    the cast arguments, the nonce, and the signing bytes. If your tests matched on inspected
    output, match on the fields instead. Redaction protects against accidental logging only;
-   reading a field still returns its value.
+   reading a field still returns its value. The diagnostic rendering contract binds the
+   `Inspect` protocol. `inspect(value, structs: false)` bypasses it and prints raw fields;
+   never use it to log decoded proofs, facts, or other redacted values.
 6. **The thumbprint helpers are documented.** `V1.Jwk.public_key_thumbprint_raw/2`,
    `V1.Jwk.thumbprint_raw/2`, `V3.EcJwk.public_key_thumbprint_raw/2`, and
    `V3.EcJwk.thumbprint_raw/2` are now part of the stable surface. Code that already used them

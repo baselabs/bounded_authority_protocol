@@ -193,7 +193,7 @@ def test_real_decoded_compacts_match_independent_reference():
         major = {1: v1, 2: v2, 3: v3}[row["major"]]
         result = getattr(major, f"decode_{row['kind']}")(row["compact"].encode())
         assert isinstance(result, Ok)
-        assert str(result.value) == repr(result.value) == row["expected"]
+        assert str(result.value) == repr(result.value) == row["expected"], row.get("id", row["kind"])
 
 
 def test_decoded_binary_notation_matches_independent_reference():
@@ -206,4 +206,15 @@ def test_decoded_binary_notation_matches_independent_reference():
         (Path(__file__).parent / "fixtures" / "decoded-binary-rendering.json").read_text()
     )
     for row in rows:
-        assert _inspect.binary(bytes.fromhex(row["hex"])) == row["expected"]
+        assert _inspect.binary(bytes.fromhex(row["hex"])) == row["expected"], row.get("id", row["hex"][:32])
+
+
+def test_float_notation_matches_specified_fixture_bytes():
+    import json
+    from pathlib import Path
+
+    from bounded_authority_verifier import _inspect
+    gold = json.loads((Path(__file__).parent / "fixtures" / "decoded-rendering.json").read_text())
+    for key, expected in gold.items():
+        if key.startswith("float:"):
+            assert _inspect.render(_inspect.scalar(float(key[6:]))) == expected, key
