@@ -32,7 +32,7 @@ def _runtime_deps() -> list[str]:
     with open(pyproject, "rb") as f:
         data = tomllib.load(f)
     deps = data.get("project", {}).get("dependencies", [])
-    # Normalize "cryptography>=44.0.0" → "cryptography" (strip version specifiers).
+    # Normalize "cryptography>=50.0.0" → "cryptography" (strip version specifiers).
     names: list[str] = []
     for d in deps:
         # PEP 508: the name is the canonical package name up to the first version comparator,

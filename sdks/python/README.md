@@ -24,8 +24,8 @@ install it from this repository.
 
 - Version `0.1.0`, pre-1.0: the API may change between minor versions.
 - Python **3.10** or later is declared; CI tests Python 3.13.
-- One runtime dependency, [`cryptography`](https://pypi.org/project/cryptography/) `>= 44.0.0`,
-  for Ed25519 and ECDSA P-256 (CI pins 50.0.0). SHA-256 comes from `hashlib`; base64url, JSON
+- One runtime dependency, [`cryptography`](https://pypi.org/project/cryptography/) `>= 50.0.0`,
+  for Ed25519 and ECDSA P-256 (the committed lock selects 50.0.2). SHA-256 comes from `hashlib`; base64url, JSON
   decoding, and JCS canonicalization are implemented in the package.
 - **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
   conforming signer emits, with the same clauses as the Elixir reference, and the certified
@@ -37,6 +37,11 @@ install it from this repository.
   integral selector value (`0.0`, `10.0`), range bounds included. The clauses match the Elixir
   reference, and the certified `bap-selector-float-zero/1` corpus (161 cases) runs with this
   SDK's conformance suite.
+
+The runtime floor is `cryptography` 50.0.0, the first release fixing all advisories
+known on November 16, 2026 (earlier fixes landed in 44.0.1, 46.0.5, 46.0.6, 48.0.1,
+and 49.0.0). CI audits the committed universal lock and a separate lowest-direct
+resolution of every runtime, build, development, and optional dependency declaration.
 
 ## Install from this repository
 

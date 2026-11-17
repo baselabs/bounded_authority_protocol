@@ -30,7 +30,7 @@ signature. No verification verdict changes. See the SDK README.
 ## Runtime posture
 
 - Python 3.10 or later is declared; CI tests Python 3.13.
-- One runtime dependency, `cryptography` `>= 44.0.0` (Ed25519 and ECDSA P-256). Nothing in the
+- One runtime dependency, `cryptography` `>= 50.0.0` (Ed25519 and ECDSA P-256). Nothing in the
   repository pins its exact version for consumers: the development lock file is not committed,
   and CI installs `cryptography` 50.0.0. Pin the version you deploy.
 - Pure functions only: no clock, network, filesystem, or randomness in the library. Time,

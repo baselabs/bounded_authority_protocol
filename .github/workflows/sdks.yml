@@ -13,6 +13,7 @@ on:
       - "conformance/**"
       - "spec/**"
       - "scripts/check_sdk_closures.py"
+      - "scripts/audit_python_floors.py"
       - ".github/dependabot.yml"
       - ".gitignore"
       - ".github/workflows/sdks.yml"
@@ -26,6 +27,7 @@ on:
       - "conformance/**"
       - "spec/**"
       - "scripts/check_sdk_closures.py"
+      - "scripts/audit_python_floors.py"
       - ".github/dependabot.yml"
       - ".gitignore"
       - ".github/workflows/sdks.yml"
@@ -74,6 +76,9 @@ jobs:
           # of one package. pip-audit's native lock reader audits all of them.
           uv export --locked --all-groups --no-emit-project --format pylock.toml --output-file "$audit_dir/pylock.toml"
           uvx --from pip-audit==2.9.0 pip-audit --locked "$audit_dir"
+
+      - name: Python — audit every declared dependency floor
+        run: python scripts/audit_python_floors.py
 
       - name: Python — closure removal must fail
         run: python scripts/check_sdk_closures.py python
