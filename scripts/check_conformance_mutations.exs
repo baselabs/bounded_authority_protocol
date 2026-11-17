@@ -28,8 +28,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
 
   # Each entry carries the full targeted command verbatim. `mix test` commands get
   # `--max-cases 1` appended (serial, deterministic, fastest single-file run); `mix architecture`
-  # does NOT (it proxies args to `elixir scripts/check_architecture.exs`, which exits 2 on any
-  # unknown flag, so appending would make every architecture entry spuriously red).
+  # does NOT (it proxies args to `scripts/check_architecture.exs`, which exits 2 on any unknown
+  # flag, so appending would make every architecture entry spuriously red).
   @mutations [
     # --- v2 range-selector + cross-major activation proofs (BAP-21 / ADR 0030) ----
     %{
@@ -1511,8 +1511,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
   # Returns the full argument list following the executable (hd of mutation.command). `mix test`
   # runs are serialized (`--max-cases 1`) for deterministic, fastest single-file execution.
   # `mix architecture` is returned bare: its alias proxies extra args to
-  # `elixir scripts/check_architecture.exs`, which exits 2 on any unknown flag, so appending
-  # anything would make every architecture entry spuriously red.
+  # `scripts/check_architecture.exs`, which exits 2 on any unknown flag, so appending anything
+  # would make every architecture entry spuriously red.
 
   defp command_args(["mix", "test" | rest]) do
     ["test" | rest] ++ ["--max-cases", "1"]

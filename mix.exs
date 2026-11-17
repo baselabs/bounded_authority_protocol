@@ -320,7 +320,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
     [
       architecture: [
         "compile --warnings-as-errors",
-        "cmd elixir scripts/check_architecture.exs"
+        "run --no-start scripts/check_architecture.exs"
       ],
       audit: [
         "deps.unlock --check-unused",
