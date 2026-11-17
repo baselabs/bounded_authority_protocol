@@ -1,5 +1,5 @@
 [toolchain]
-channel = "1.81"
+channel = "1.88.0"
 profile = "minimal"
 # The fmt + clippy gates (CI and local) need these components on top of the
 # minimal profile; declaring them here makes a fresh `rustup show` self-sufficient.

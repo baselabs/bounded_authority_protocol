@@ -2,7 +2,7 @@
 name = "bounded-authority-protocol"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.81"
+rust-version = "1.88"
 # Never published from this repository (ADR 0015): the crate moves to its own repository
 # when it is first published.
 publish = false
@@ -18,13 +18,12 @@ ed25519-dalek = { version = "2.2", default-features = false }
 # NIST P-256 with SHA-256, verify-only. `default-features = false` matches the
 # ed25519-dalek posture (no `pem`/`pkcs8`/`std`/`serde`); the `ecdsa` feature
 # pulls the arithmetic + digest machinery `es256.rs` uses (VerifyingKey,
-# Signature, verify_prehash, AffinePoint). It reuses the tree's existing
-# sha2 0.10 / digest / subtle versions.
-p256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
-# Exact pin: zeroize is a transitive dep of p256 whose 1.9.x line requires the
-# edition2024 Cargo feature (Rust >= 1.85); this crate's toolchain is pinned
-# 1.81 (rust-toolchain.toml). The =1.8.2 pin keeps the resolver on the line
-# that builds under 1.81. No other dependency changes.
+# Signature, verify_prehash, AffinePoint). The backend uses
+# sha2 0.11 / digest 0.11 machinery internally; the public SHA-256 helpers
+# and ed25519-dalek continue to use sha2 0.10.
+p256 = { version = "0.14", default-features = false, features = ["ecdsa"] }
+# Keep the existing zeroize pin and direct sha2 line: the fixed p256 closure
+# accepts zeroize 1.8.2, and no public hashing API needs a dependency migration.
 zeroize = "=1.8.2"
 sha2 = "0.10"
 ryu-js = "1.0"

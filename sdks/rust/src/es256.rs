@@ -1,6 +1,6 @@
 //! ES256 verify wrapper — the `BAP3-ES256-SHA256` signature backend.
 //!
-//! Thin wrapper over `p256` 0.13 with `default-features = false` +
+//! Thin wrapper over `p256` 0.14 with `default-features = false` +
 //! `features = ["ecdsa"]` (verify-only; no `pem`/`pkcs8`/`std`/`serde`/`jwk`).
 //! Same accepted posture as `ed25519.rs` (design-note D-RISK-2): the backend
 //! carries transitive `unsafe` internally; the crate-level
@@ -27,7 +27,7 @@
 //! 1. [`validate_point`] — the 65-byte form MUST be `0x04 || x || y` with
 //!    both coordinates `< p` (the field prime) and on the curve
 //!    `y^2 = x^3 - 3x + b`. The check is computed through the p256 arithmetic
-//!    layer (`AffinePoint::from_encoded_point`, which parses each coordinate
+//!    layer (`AffinePoint::from_sec1_point`, which parses each coordinate
 //!    via `FieldElement::from_repr` — rejecting `>= p` — and evaluates the
 //!    curve equation), which is deterministic pure arithmetic over the curve
 //!    equation, NOT the signature-verification path. A compressed point, an
@@ -50,8 +50,8 @@
 //! discarded.
 
 use crate::error::{Invalid, Result};
-use p256::elliptic_curve::sec1::FromEncodedPoint;
-use p256::{AffinePoint, EncodedPoint};
+use p256::elliptic_curve::sec1::FromSec1Point;
+use p256::{AffinePoint, Sec1Point};
 
 /// The P-256 group order `n` (SEC 2, `secp256r1`), big-endian:
 /// `0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551`.
@@ -103,13 +103,13 @@ pub(crate) fn validate_point(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Result<()> 
     if public_key[0] != UNCOMPRESSED_PREFIX {
         return Err(Invalid); // compressed or hybrid form — closed out
     }
-    // AffinePoint::from_encoded_point parses each coordinate through
+    // AffinePoint::from_sec1_point parses each coordinate through
     // FieldElement::from_repr (rejecting any value >= p) and evaluates the
     // curve equation y^2 = x^3 - 3x + b; an off-curve or out-of-field point
     // yields the none half of the CtOption. This is the curve arithmetic
     // layer, not the verify path.
-    let encoded = EncodedPoint::from_bytes(public_key.as_slice()).map_err(|_| Invalid)?;
-    let on_curve = AffinePoint::from_encoded_point(&encoded);
+    let encoded = Sec1Point::from_bytes(public_key.as_slice()).map_err(|_| Invalid)?;
+    let on_curve = AffinePoint::from_sec1_point(&encoded);
     if on_curve.is_some().into() {
         Ok(())
     } else {
@@ -183,7 +183,7 @@ pub(crate) fn verify(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use p256::elliptic_curve::sec1::ToEncodedPoint;
+    use p256::elliptic_curve::sec1::ToSec1Point;
 
     /// A public P-256 key and a verifying ES256 signature over a fixed
     /// message, minted once through an independent tool and pinned here as
@@ -348,10 +348,10 @@ mod tests {
     fn encoded_point_round_trip_of_the_base_point() {
         // The arithmetic layer we lean on parses and re-emits the exact
         // 65-byte form — guards against a subtle form-conversion drift.
-        let encoded = EncodedPoint::from_bytes(base_point().as_slice()).unwrap();
-        let affine = AffinePoint::from_encoded_point(&encoded);
+        let encoded = Sec1Point::from_bytes(base_point().as_slice()).unwrap();
+        let affine = AffinePoint::from_sec1_point(&encoded);
         assert!(bool::from(affine.is_some()));
-        let re = affine.unwrap().to_encoded_point(false);
+        let re = affine.unwrap().to_sec1_point(false);
         assert_eq!(re.as_bytes(), base_point().as_slice());
     }
 

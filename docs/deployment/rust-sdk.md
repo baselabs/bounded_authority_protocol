@@ -7,6 +7,9 @@ the local-loopback, role-attestation, and content-assertion sibling profiles. It
 [SDK README](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/rust/README.md)
 has the quickstart and the full API list.
 
+Rust **1.88** or later is required by the locked dependency set (`sha2` 0.11.1
+inside the `p256` 0.14 backend). CI builds on Rust 1.88.0.
+
 ## Not published yet
 
 The crate is not on crates.io, and any crate of this name there is not ours until this page
@@ -56,8 +59,8 @@ Runtime dependencies (`sdks/rust/tools/license_check.sh` checks the license of e
 |---|---|---|
 | `ed25519-dalek` 2.2 (default features off) | BSD-3-Clause | Ed25519 verification |
 | `curve25519-dalek` 4.1 (transitive) | BSD-3-Clause | curve arithmetic |
-| `p256` 0.13 (default features off, `ecdsa`) | Apache-2.0 OR MIT | ECDSA P-256 verification for contract-major 3 |
-| `zeroize` =1.8.2 (transitive of `p256`, pinned exactly because its 1.9 line needs Rust 1.85) | Apache-2.0 OR MIT | memory zeroing |
+| `p256` 0.14 (default features off, `ecdsa`) | Apache-2.0 OR MIT | ECDSA P-256 verification for contract-major 3 |
+| `zeroize` =1.8.2 (transitive of `p256`, retained at the existing verified version) | Apache-2.0 OR MIT | memory zeroing |
 | `sha2` 0.10 | MIT OR Apache-2.0 | SHA-256 |
 | `ryu-js` 1.0 | Apache-2.0 OR BSL-1.0 | ECMAScript float formatting (JCS) |
 | `subtle`, `digest`, `generic-array`, `typenum`, `elliptic-curve`, `crypto-bigint`, and others | MIT, Apache-2.0, or BSD-3-Clause | transitive cryptographic support |

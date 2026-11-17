@@ -1209,7 +1209,7 @@ fn conformance_full_corpus() {
             continue;
         }
         let content =
-            fs::read_to_string(root.join(path)).unwrap_or_else(|e| panic!("read {}: {e}", path));
+            fs::read_to_string(root.join(path)).unwrap_or_else(|e| panic!("read {path}: {e}"));
         let file: serde_json::Value =
             serde_json::from_str(&content).expect("corpus file is valid JSON");
         let cases = file["cases"]

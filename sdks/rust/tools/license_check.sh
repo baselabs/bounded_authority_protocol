@@ -19,12 +19,9 @@
 # evaluated, not leaf-matched). Any leaf not in the allowlist, or any unparseable
 # expression, fails the gate (fail-closed).
 #
-# CLOSURE VARIANCE (observed 2026-08-17): `cargo tree --edges normal` is not a
-# pure function of the manifest+lock — the audited set differs by toolchain and
-# target platform (cargo 1.95/macOS closes at 15 deps, MSRV 1.81/linux at 19,
-# including the curve25519-dalek-derive -> syn -> unicode-ident proc-macro
-# chain). The allowlist must cover the UNION; the enforcing run is the CI job,
-# which sees the larger closure.
+# The runtime closure varies by toolchain and target platform, including
+# proc-macro dependencies. Audit the actual cargo tree on every run rather than
+# relying on a dependency census recorded for an older lock or toolchain.
 #
 # Exits 0 if every runtime dep is permissively licensed, 1 otherwise. Proven
 # red-capable: a fabricated `GPL-3.0` license string is rejected.
@@ -36,7 +33,7 @@ cd "$(dirname "$0")/.."
 # Allowlist (D-RISK-2 verified permissive set). Unicode-DFS-2016 is the
 # pre-2023 Unicode data license; Unicode-3.0 is its OSI-approved (2023-11-17)
 # successor, carried by unicode-ident >= 1.0.15 — a transitive of syn inside
-# the linux/MSRV-1.81 runtime closure (see CLOSURE VARIANCE above).
+# the proc-macro runtime closure on supported targets.
 ALLOW='Apache-2.0 MIT BSD-3-Clause ISC BSD-2-Clause BSD-1-Clause Zlib Unicode-DFS-2016 Unicode-3.0'
 
 # `cargo tree --edges normal --prefix none` lists the runtime closure; pipe both

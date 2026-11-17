@@ -23,15 +23,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    # The Rust SDK's minimum supported Rust is 1.81 (rust-toolchain.toml, Cargo.toml
-    # rust-version). These lines need edition 2024 (Rust >= 1.85; sha2 0.11 needs 1.88), and
-    # p256 0.14 / sha2 0.11 also change the API es256.rs uses. Moving to them is an MSRV
-    # decision, not a Dependabot bump.
+    # MSRV 1.88 supports p256 0.14 and zeroize 1.9; those ignores no longer apply.
+    # Keep the direct sha2 0.10 API alongside ed25519-dalek. p256's separate sha2
+    # 0.11 dependency is already fixed and audited; migrating our hashing API is
+    # a separate dependency change, not part of this advisory repair.
     ignore:
-      - dependency-name: p256
-        versions: [">= 0.14"]
-      - dependency-name: zeroize
-        versions: [">= 1.9"]
       - dependency-name: sha2
         versions: [">= 0.11"]
 

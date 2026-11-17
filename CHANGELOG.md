@@ -2,6 +2,14 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
+## [Unreleased]
+
+### Security
+
+- The unpublished Rust SDK uses `p256` 0.14 and `crypto-bigint` 0.7.11, fixing
+  RUSTSEC-2026-0387. Its minimum Rust version is 1.88, required by the backend's
+  `sha2` 0.11 dependency. The direct `sha2` 0.10 and `zeroize` 1.8.2 pins remain.
+
 ## [1.0.0] — 2026-11-10
 
 ### Changed
@@ -1613,7 +1621,7 @@ several note findings, all in surfaces this program touched. All fixed:
   compile-time `unsafe` half) and the runtime dependency-license allowlist (15 runtime deps, all
   permissive; dev-deps excluded as non-consumer-facing) — both shellcheck-clean and red-capable. The
   `rust-conformance` CI job ([`.github/workflows/sdks.yml`](https://github.com/baselabs/bounded_authority_protocol/blob/main/.github/workflows/sdks.yml)) runs fmt + clippy + the full `cargo test`
-  (unit + permissiveness + 283-vector conformance + census) + purity + license on the MSRV 1.81
+  (unit + permissiveness + 283-vector conformance + census) + purity + license on the MSRV 1.88
   toolchain. The publish guard now scans `sdks/*/Cargo.toml` and blocks `cargo publish` /
   `cargo release publish` / `cargo-release publish` / `crate-ci/cargo-release` (the SDK-graduation decision record). New docs:
   [`sdks/rust/README.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/rust/README.md) and the deployment guide

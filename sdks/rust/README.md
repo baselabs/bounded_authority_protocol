@@ -22,11 +22,11 @@ one it will use, and any crate of that name there is not ours until this page sa
 (ADR 0015). Until then, depend on
 a checkout of this repository.
 
-- Rust **1.81** or later (`rust-version` in `Cargo.toml`; `rust-toolchain.toml` pins 1.81 for
+- Rust **1.88** or later (`rust-version` in `Cargo.toml`; `rust-toolchain.toml` pins 1.88.0 for
   development and CI).
-- Runtime dependencies: `ed25519-dalek` 2.2 (default features off), `p256` 0.13 (ECDSA only, for
-  contract-major 3), `sha2` 0.10, `ryu-js` 1.0, and `zeroize` pinned to exactly 1.8.2 (a
-  dependency of `p256`; its 1.9 line needs Rust 1.85). See the
+- Runtime dependencies: `ed25519-dalek` 2.2 (default features off), `p256` 0.14 (ECDSA only, for
+  contract-major 3), `sha2` 0.10, `ryu-js` 1.0, and `zeroize` pinned to exactly 1.8.2 (the
+  existing verified transitive version). See the
   [deployment notes](../../docs/deployment/rust-sdk.md) for the full tree and its `unsafe` use.
 - `#![forbid(unsafe_code)]` covers this crate's own source.
 - **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
@@ -68,7 +68,7 @@ bounded-authority-protocol = { git = "https://github.com/baselabs/bounded_author
 `cargo test` runs this block as a doctest. It signs with `ed25519-dalek` keys from fixed seeds;
 in production the private keys stay with the issuer and the holder, and the verifier receives
 only public keys. To run it as your own program, put it in `src/main.rs` and add the signer to
-your dependencies (it builds on Rust 1.81):
+your dependencies (it builds on Rust 1.88):
 
 ```toml
 [dependencies]

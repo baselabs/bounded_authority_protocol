@@ -106,19 +106,19 @@ jobs:
 
   # Rust is Node-independent; per ADR 0015 D4 it runs as its OWN job on the same
   # sdks/** + priv/conformance/** trigger (not folded into the Node matrix). The
-  # MSRV (1.81) is pinned by sdks/rust/rust-toolchain.toml; this job installs
+  # MSRV (1.88) is pinned by sdks/rust/rust-toolchain.toml; this job installs
   # that exact toolchain so the MSRV floor is the CI-tested floor.
   rust-conformance:
-    name: Cross-language SDK conformance (Rust MSRV 1.81)
+    name: Cross-language SDK conformance (Rust MSRV 1.88)
     runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install Rust (MSRV 1.81 + rustfmt + clippy)
+      - name: Install Rust (MSRV 1.88.0 + rustfmt + clippy)
         run: |
-          rustup toolchain install 1.81 --profile minimal --component rustfmt --component clippy --no-self-update
-          rustup default 1.81
+          rustup toolchain install 1.88.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup default 1.88.0
 
       - name: fmt
         run: cargo fmt --check

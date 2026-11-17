@@ -610,7 +610,7 @@ mod tests {
 
     #[test]
     fn not_evaluated_renders_as_bare_token() {
-        let debug = format!("{:?}", NotEvaluated);
+        let debug = format!("{NotEvaluated:?}");
         assert_eq!(debug, "NotEvaluated");
         assert_redacted(&debug);
     }

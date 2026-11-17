@@ -16,7 +16,7 @@ identities:
 | Elixir reference | protocol commit `205d1b598f6fc01de4e412798ed1e81578ccc69e` (pre-release source of 1.0.0) | Elixir 1.20.2, Erlang/OTP 29 |
 | TypeScript verifier | `bounded_authority_protocol_typescript` commit `88e86762e908e483ca054e14e6abbd18f3e65e8f` (package version 1.0.0 plus the unreleased erratum 6) | Node 22.23.1, pnpm 10.20.0 |
 | Python SDK | `sdks/python` 0.1.0 at the protocol commit above | CPython 3.13.13, `cryptography` 50.0.2 |
-| Rust SDK | `sdks/rust` 0.1.0 at the protocol commit above | Rust 1.81.0, the crate's declared minimum |
+| Rust SDK | `sdks/rust` 0.1.0 at the protocol commit above | Rust 1.88.0, the crate's declared minimum |
 | Go SDK | `sdks/go` at the protocol commit above | Go 1.25.14, the module's declared floor |
 | Independent Node runners | `conformance/*.mjs` at the protocol commit above | Node 22.23.1 |
 
@@ -69,7 +69,7 @@ per-language permissiveness mutation gate proving its closures red-capable.
 |---|---|---|---|
 | `@bounded-authority-protocol/verifier` | TypeScript, Node >= 22, `node:crypto` only | graduated repository ([baselabs/bounded_authority_protocol_typescript](https://github.com/baselabs/bounded_authority_protocol_typescript)), vendored snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 | `bounded-authority-verifier` | Python >= 3.10, `cryptography` | in-place monorepo corpus, startup digest assertion | **283/283 agreed + census (11 keys)** |
-| `bounded-authority-protocol` | Rust, MSRV 1.81, `ed25519-dalek`+`p256`+`sha2` | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
+| `bounded-authority-protocol` | Rust, MSRV 1.88, `ed25519-dalek`+`p256`+`sha2` | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 | `bounded_authority_protocol_go` | Go 1.25, stdlib only | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 
 The TypeScript verifier is published to npm; the Python, Rust, and Go SDKs are not yet published

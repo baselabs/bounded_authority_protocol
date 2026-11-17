@@ -2719,7 +2719,7 @@ fn check_export_chronology(
     let mut seen: Vec<[u8; 32]> = Vec::with_capacity(keys.len());
     for k in keys {
         let fp = public_key_thumbprint_raw(&k.public_key)?;
-        if seen.iter().any(|s| *s == fp) {
+        if seen.contains(&fp) {
             return Err(Invalid);
         }
         seen.push(fp);
