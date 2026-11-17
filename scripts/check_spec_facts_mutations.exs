@@ -12,14 +12,14 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
   # The v2/v3 legs (2026-09-21) prove the successor-major baselines load-bearing: each was
   # first applied to the real tree, observed RED naming `rule 1b (v2|v3)`, reverted, and
   # observed green before being wired here (the working-loop red proofs; this battery is the
-  # repeatable form). `v3-separator-nul-byte` pins the cd42445 incident class — a literal NUL
+  # repeatable form). `v3-separator-nul-byte` pins the cd42445 incident class: a literal NUL
   # byte where the two-character \0 text belongs.
   #
   # Calibration self-proof (the inverted-assertion leg, documented per doctrine): the entry
   # `bounds-implementation-digit` targets test/spec_facts_test.exs's rule-1 assertion
   # (`value == bounds[field]`). In a throwaway scratch copy that assertion was NEUTERED once
   # (`value == value`) while the source mutation (depth 32 -> 33) was applied; the mutated test
-  # then STAYED GREEN — exactly the condition run_mutation/1 refuses:
+  # then STAYED GREEN, exactly the condition run_mutation/1 refuses:
   #
   #   calibration proof: exit=0 (green = mutation SURVIVED under the neutered assertion)
   #   Result: 1 passed, 1 excluded
@@ -28,7 +28,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
   # (never silent). The assertion was restored; the shipped entry is caught (red). The
   # planted-privacy-canary mutation from the gate's landing is intentionally NOT a battery
   # entry: the canary sweep's red-capability is proven inside the privacy gate's own
-  # calibration tests (it needs the real git worktree, which a scratch copy does not have —
+  # calibration tests (it needs the real git worktree, which a scratch copy does not have,
   # the same reason rule 9 no-ops outside a worktree).
 
   @root Path.expand("..", __DIR__)
@@ -136,7 +136,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
     },
     %{
       # Softening the low-S rule (> to >=) changes both the low-s fact and the rejected-
-      # encoding list — the exact non-malleability drift the baseline exists to catch.
+      # encoding list, the exact non-malleability drift the baseline exists to catch.
       name: "v3-low-s-softening",
       path: "spec/bap-v3.md",
       from: "`s > n/2` — the HIGH-S half",
@@ -163,7 +163,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
       # The cd42445 incident class, pinned: a literal NUL byte where the wire spelling must
       # carry the two-character \0 text. The separator regex does not match the NUL spelling,
       # so the request separator vanishes from the facts and rule 1b (v3) reds. The
-      # replacement byte is built with <<0>> — no escape for tooling to re-interpret.
+      # replacement byte is built with <<0>> (no escape for tooling to re-interpret).
       name: "v3-separator-nul-byte",
       path: "spec/bap-v3.md",
       from: "`BAP3-REQUEST\\0` (`REQ3-SIGNING-digest-prefix`)",

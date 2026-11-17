@@ -441,7 +441,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
 
   test "a 65,537-byte JSON case file is rejected at corpus load by the normative decoder" do
     # Build a raw JSON file exceeding the 65,536-byte ceiling directly (the JCS encoder's own
-    # bounds reject building it through jcs/1 — that is the point: the file is over-limit).
+    # bounds reject building it through jcs/1; that is the point: the file is over-limit).
     oversize = :binary.copy(<<" ">>, @json_bytes_max + 1)
 
     bytes =
@@ -454,7 +454,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
 
   test "an index declaring more than 256 files is rejected by the normative decoder" do
     # Build the files array as a raw JSON string (257 entries) so the JCS encoder's own
-    # array bound does not reject it at construction — the corpus LOADER's Json.decode
+    # array bound does not reject it at construction; the corpus LOADER's Json.decode
     # must be the thing that trips on the 256-item array_items ceiling.
     entries =
       Enum.map_join(1..257, ",", fn i ->
@@ -536,7 +536,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
 
   test "a self-consistent revision sidecar with a wrong shape is rejected" do
     # Wrong shape BUT re-hashed into the index (self-consistent): only the sidecar's closed
-    # shape validation can fail it — an unknown member must not load.
+    # shape validation can fail it; an unknown member must not load.
     wrong =
       jcs(
         {:object,
@@ -1108,7 +1108,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   end
 
   test "a tamper case with a present-but-dangling base_case is rejected (not loaded unaudited)" do
-    # A present tamper block whose base_case does not resolve must FAIL the load — the case cannot
+    # A present tamper block whose base_case does not resolve must FAIL the load; the case cannot
     # be proven a genuine single-byte flip, so it is corruption, not a case to wave through. This
     # matches the independent Node audit (which asserts the base is present) and closes the
     # divergence where the Elixir loader would otherwise load such a case unaudited.
@@ -1185,7 +1185,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   end
 
   test "a VALID.raw-bearing corpus loads and the runner feeds sidecar bytes to the facade" do
-    # A .raw sidecar carrying raw JSON bytes 'false' — fed to json.decode (verdict: invalid because
+    # A .raw sidecar carrying raw JSON bytes 'false', fed to json.decode (verdict: invalid because
     # 'false' alone is valid JSON, but we declare invalid to isolate the load+dispatch path; the
     # point of this test is that the corpus LOADS with a .raw file present and the runner reads it).
     raw_bytes = "{\"raw\":1}"
@@ -1302,7 +1302,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert report.exit_status == 0
   end
 
-  test "a zero-case run is NOT agreement (exit 1) — the empty-corpus vacuous-green floor" do
+  test "a zero-case run is NOT agreement (exit 1): the empty-corpus vacuous-green floor" do
     corpus_map = synthetic_corpus() |> full_corpus_map([])
     {:ok, corpus} = Corpus.load(corpus_map)
     # A structurally-valid corpus that executed zero cases verifies nothing: agreement requires
@@ -1461,7 +1461,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     assert required?.("check_envelope", "invalid_selector")
 
     # invalid_claim is now POPULATED (BAP-05 selector closeout). Its n_a reason had ended in
-    # "re-signing, out of scope" — the same constraint the selector remediation lifted — while the
+    # "re-signing, out of scope" (the same constraint the selector remediation lifted) while the
     # holder (cnf.jkt), grant (ath), and request-argument (ba_req) bindings it covers had no case
     # isolating them: neutralizing any one of the three left the whole corpus green. The cell now
     # carries three one-defect cases, one per binding, each proven red by its own mutation entry.
@@ -1531,7 +1531,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   end
 
   test "the n_a reason object shape with a missing reason is rejected by the loader" do
-    # A malformed n_a object (e.g. empty or wrong key) is NOT a valid not-applicable marker —
+    # A malformed n_a object (e.g. empty or wrong key) is NOT a valid not-applicable marker;
     # it falls through leaf_matches? to the catch-all -> {:error, :invalid}. This keeps the
     # reason obligation machine-enforced: only the exact {"n_a": <string>} shape is honored.
     cases_map = %{"cases/json/trivial.json" => trivial_case_bytes()}
@@ -1550,7 +1550,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   # conformance/grant_proof_independent.mjs:22-41 appear as corpus data. The 6 VALID (idempotent)
   # + 5 normalizable-but-non-idempotent appear as valid uri.normalize cases; the 6 rejected
   # by both implementations appear as invalid_uri. https://[:::]/ is implementation-divergent
-  # (Elixir rejects, Node accepts) and is omitted — recorded in ADR 0005. 17 of 18 ported.
+  # (Elixir rejects, Node accepts) and is omitted, recorded in ADR 0005. 17 of 18 ported.
   test "the corpus subsumes the 17 port-able legacy URI byte-values " do
     legacy_inputs = [
       "https://example.com/",
@@ -1640,7 +1640,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     # - integer_magnitude/float_magnitude: the max+1 literal exceeds the decoder magnitude ceiling.
     # - digest_bytes/public_key_bytes/signature_bytes: fixed-width keys. A fixed-width key cannot be
     #   tightened OR widened, so a max+1 value is a fixed-width CHANGE (invalid_limit), not a
-    #   tightening-contract violation (maximum_plus_one) — those are pinned as invalid_limit-*-above.
+    #   tightening-contract violation (maximum_plus_one); those are pinned as invalid_limit-*-above.
     no_max_plus_one = [
       :integer_magnitude,
       :float_magnitude,
@@ -2274,7 +2274,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
     # Boundary 1: the index's declared census. Boundary 2: a scanner that walks every case input,
     # takes each public_key-bearing member, and derives its suite-native thumbprint (the EC
     # RFC 7638 member-set thumbprint for 65-byte uncompressed-SEC1 keys, the v1 OKP thumbprint
-    # for 32-byte Ed25519 keys — the cross-major artifacts carry real prior-major keys). The
+    # for 32-byte Ed25519 keys, the cross-major artifacts carry real prior-major keys). The
     # two must be equal in BOTH directions: a census key nothing references, or a referenced
     # key the census omits, is a corpus-authoring defect.
     corpus_dir = Path.expand("../../priv/conformance/v3/corpus", __DIR__)

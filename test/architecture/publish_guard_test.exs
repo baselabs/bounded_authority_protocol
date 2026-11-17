@@ -7,7 +7,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
   The broadened scan (workflows + composite actions + SDK shell scripts / Makefiles / justfiles +
   root Makefile/justfile) closes the gap where a registry-publish command hid in an executable
   surface that is not a workflow or manifest. The shell-script scan is scoped to `sdks/`
-  deliberately — the guard and the pre-commit hook carry the publish-command patterns as literal
+  deliberately: the guard and the pre-commit hook carry the publish-command patterns as literal
   data, so a repo-wide `*.sh` scan would self-match them; these tests pin BOTH the reach (a
   publish command in an SDK script/Makefile/composite action is caught) AND the non-self-match.
   """

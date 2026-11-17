@@ -449,7 +449,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
 
   defp rm_rf_tolerant!(path) do
     # Windows: the consumer's _build carries a symlinked priv whose removal reports
-    # "not owner"; the OS temp sweep reclaims the root. Cleanup-only tolerance — never
+    # "not owner"; the OS temp sweep reclaims the root. Cleanup-only tolerance: never
     # masks a verdict (this runs in the after block).
     try do
       File.rm_rf!(path)
@@ -460,7 +460,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
 
   defp unique_tmp_root! do
     # Portable scratch root (tri-platform bar): a unique name plus File.mkdir!/1, which
-    # refuses an existing directory — no `mktemp` subprocess (POSIX-only tool).
+    # refuses an existing directory; it needs no `mktemp` subprocess (a POSIX-only tool).
     root =
       Path.join(
         System.tmp_dir!(),
@@ -1033,7 +1033,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
   end
 
   # The package version derived from mix.exs (works under `elixir script` invocation where
-  # Mix.Project is not alive — the same derivation the supply-chain workflow uses).
+  # Mix.Project is not alive), the same derivation the supply-chain workflow uses.
   defp mix_exs_version do
     root = Path.expand("..", __DIR__)
 

@@ -249,7 +249,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
   end
 
   test "agrees? valid-verdict-where-dispatch-errors returns disagree" do
-    # A json.decode case with malformed input but verdict:valid — dispatch errors, agrees? valid-vs-error.
+    # A json.decode case with malformed input but verdict:valid: dispatch errors, agrees? valid-vs-error.
     result =
       run_one(
         case_obj("mismatch-valid-where-error", "json.decode", "valid", %{"text" => "{bad}"}, %{
@@ -262,7 +262,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
   end
 
   test "agrees? invalid-verdict-where-dispatch-succeeds returns disagree" do
-    # A json.decode case with valid input but verdict:invalid — dispatch succeeds, agrees? invalid-vs-ok.
+    # A json.decode case with valid input but verdict:invalid: dispatch succeeds, agrees? invalid-vs-ok.
     result =
       run_one(
         case_obj(
@@ -278,7 +278,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
   end
 
   test "agrees? valid-verdict-with-field-mismatch returns disagree" do
-    # valid input, valid verdict, but wrong expected value — matches_expected? fails.
+    # valid input, valid verdict, but wrong expected value: matches_expected? fails.
     result =
       run_one(
         case_obj("mismatch-field-value", "json.decode", "valid", %{"text" => "{\"a\":1}"}, %{
@@ -330,7 +330,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
   end
 
   test "Runner builder error branches surface as dispatch-error disagreement" do
-    # A grant_signing_input case missing required fields — builder fails, dispatch errors.
+    # A grant_signing_input case missing required fields: builder fails, dispatch errors.
     result =
       run_one(
         case_obj(
@@ -879,8 +879,8 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     # nonce_matches?(nonce, {:required, expected}) success arm. A genuine agreement:
     # the proof carries a UTF-8 nonce that equals the expected-required nonce, the
     # envelope verifies to {:ok, facts}, expected verdict is "valid", and agreement is
-    # a non-trivial facts comparison. (The prior form used a sha256 nonce — raw bytes
-    # that fail valid_nonce?'s String.valid? bound — and a nonceless proof, so verify
+    # a non-trivial facts comparison. (The prior form used a sha256 nonce (raw bytes
+    # that fail valid_nonce?'s String.valid? bound) and a nonceless proof, so verify
     # returned {:error, :invalid} matching an "invalid" verdict -> agree == true, which
     # defeated the disagreement the test asserted and exercised no nonce-match path.)
     alias BoundedAuthorityProtocol.V1
@@ -968,7 +968,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     # The jcs.encode dispatch is a single `with` chain: input_bytes -> Json.decode -> Jcs.encode.
     # An integer at 2^53+1 (9007199254740993) exceeds the integer_magnitude bound, so Json.decode
     # rejects it and the with-chain returns {:error, :invalid}; against a valid verdict, agree
-    # is false. (Note: this exercises the Json.decode step, not a separate Jcs.encode error arm —
+    # is false. (Note: this exercises the Json.decode step, not a separate Jcs.encode error arm;
     # the dispatch has no distinct JCS error passthrough; any value that decodes under the shared
     # magnitude bound also JCS-encodes.)
     result =
@@ -1355,7 +1355,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     nonce = "nonce-within-bound"
 
     # proof_signing_input threads grant_compact through CompactJws.ath, so it must be a real
-    # signed grant compact — mint one rather than passing a placeholder.
+    # signed grant compact; mint one rather than passing a placeholder.
     grant = %V1.Grant{
       key_id: "issuer",
       issuer: "https://issuer.example.test",
@@ -1453,7 +1453,7 @@ defmodule BoundedAuthorityProtocol.Conformance.RunnerErrorPathsTest do
     # input["nonce"] is a binary but not valid base64url -> proof_nonce's :error -> nil arm.
     # The proof builds with nonce: nil; proof_signing_input succeeds (nil nonce is valid when
     # not required by the envelope). This is the fail-closed normalization replacing the prior
-    # raising Base.url_decode64! — verified non-crashing here.
+    # raising Base.url_decode64!, verified non-crashing here.
     alias BoundedAuthorityProtocol.V1
     {_pub_i, priv_i} = :crypto.generate_key(:eddsa, :ed25519, <<70::256>>)
     {pub_h, _} = :crypto.generate_key(:eddsa, :ed25519, <<74::256>>)

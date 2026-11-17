@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-commit — guard against SDK publish infrastructure landing in the monorepo.
+# pre-commit: guard against SDK publish infrastructure landing in the monorepo.
 #
 # Installed by: sh scripts/install-hooks.sh   (symlinks this into .git/hooks/)
 # Bypass:       git commit --no-verify        (documented deliberate-admin escape)
@@ -8,7 +8,7 @@
 #               job in .github/workflows/sdk-publish-guard.yml uses the same script).
 #
 # What it does: for each staged file that is a workflow or an SDK manifest, run the
-# shared checker against the STAGED blob (git show :<path>) — not the working tree,
+# shared checker against the STAGED blob (git show :<path>), not the working tree,
 # so an un-staged revert does not fool the gate. Fail the commit on the first hit.
 #
 # Honesty limit: this catches publish infrastructure STAGED. It cannot catch a
@@ -41,7 +41,7 @@ fi
 
 status=0
 # Stage the file list into a temp, then iterate. Avoids the here-doc-with-$()
-# pattern (shellcheck SC2094) and — critically — avoids a pipeline, which would
+# pattern (shellcheck SC2094) and, critically, avoids a pipeline, which would
 # run the loop in a subshell and silently drop any failure (a present but
 # ineffective gate).
 tmp="$(mktemp)"

@@ -111,7 +111,7 @@ defmodule BoundedAuthorityProtocol.V2.RuntimeTest do
   test "verify_grant rejects v3-major bytes (no cross-major fallback)" do
     # BAP-22 / ADR 0035 cross-major tripwire, mirroring the v1 test above: a v3 payload
     # (`v: 3`) on an otherwise-v2 artifact is rejected by the closed v2 decode's
-    # `{:integer, 2}` check — the sole rejector — and the real v3 header (`alg: "ES256"`)
+    # `{:integer, 2}` check (the sole rejector) and the real v3 header (`alg: "ES256"`)
     # is rejected by the v2 alg pin. v2 stays byte-frozen past its activation.
     {compact, public} = signed_grant()
 

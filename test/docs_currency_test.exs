@@ -267,7 +267,7 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
            "sdks/README.md must point at the graduated TypeScript repository"
 
     refute readme =~ "[`typescript/`]",
-           "sdks/README.md must not link a typescript/ directory — the SDK graduated (ADR 0015)"
+           "sdks/README.md must not link a typescript/ directory; the SDK graduated (ADR 0015)"
 
     refute readme =~ "@bounded-authority/verifier",
            "sdks/README.md must not cite the retired npm scope"
@@ -290,14 +290,14 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
     end
   end
 
-  test "the supply-chain workflow derives the artifact name — no hardcoded version strings" do
+  test "the supply-chain workflow derives the artifact name: no hardcoded version strings" do
     workflow = File.read!(".github/workflows/supply-chain.yml")
 
     assert workflow =~ "@version",
            "supply-chain.yml must derive the artifact name from mix.exs @version"
 
     refute workflow =~ ~r/bounded_authority_protocol-\d+\.\d+\.\d+\.tar/,
-           "supply-chain.yml contains a hardcoded versioned artifact filename — the quiet-mislabel class"
+           "supply-chain.yml contains a hardcoded versioned artifact filename: the quiet-mislabel class"
   end
 
   test "the derived view's footer names the spec revision" do

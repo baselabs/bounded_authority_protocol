@@ -1,5 +1,5 @@
 #!/bin/sh
-# install-hooks.sh — install this repo's tracked git hooks into .git/hooks/.
+# install-hooks.sh: install this repo's tracked git hooks into .git/hooks/.
 #
 # The hooks live tracked under scripts/hooks/ so they ship with the repo and are
 # reviewable in PRs; git itself never tracks .git/hooks/, so a symlink is the

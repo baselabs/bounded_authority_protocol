@@ -6,7 +6,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
   shipped corpus and tampered copies. The runner recomputes every corpus verdict from scratch
   (node:* only) and checks agreement with the case-declared expectations; this is what makes the
   corpus *normative* (a value that only round-trips the official Elixir implementation is not
-  normative until an independent runner agrees — design note `conformance-contract.md:38-48`).
+  normative until an independent runner agrees; design note `conformance-contract.md:38-48`).
   """
 
   use ExUnit.Case, async: true
@@ -33,7 +33,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
   end
 
   test "published-set sufficiency: a tree containing ONLY the published corpus agrees" do
-    # Copy the corpus alone into an isolated tree and run the runner from there — proving the
+    # Copy the corpus alone into an isolated tree and run the runner from there, proving the
     # published corpus set is self-sufficient (no vectors dir, no schemas, no conformance/ source
     # needed at verify time). The corpus index references only its own cases + .raw sidecars.
     dir =
@@ -275,7 +275,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
 
   # Flip a SECOND byte of the uri.normalize tamper case's verbatim ("ittps..." -> "iutps...") so
   # it no longer equals the base with the single documented flip, then update the file's index
-  # hash so the tamper audit — not the SHA-256 gate — is the check that reds.
+  # hash so the tamper audit (not the SHA-256 gate) is the check that reds.
   defp corrupt_tamper_verbatim(dir) do
     case_path = Path.join(dir, "cases/uri/normalize.json")
     index_path = Path.join(dir, "index.json")

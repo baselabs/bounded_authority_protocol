@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.V3.CoverageCompletionTest do
   @moduledoc """
   Focused coverage completion for the v3 suite's closed-error fallback arms and DER
-  conversion internals — every line here is a fail-closed clause the corpus and unit
+  conversion internals: every line here is a fail-closed clause the corpus and unit
   suite exercise only partially (the arms fire on non-binary inputs, over-long values,
   and long-form DER lengths that the certified cases never carry).
 

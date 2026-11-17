@@ -7,7 +7,7 @@
 // recomputes the surface result and checks agreement with the case-declared
 // expectation. Census: the public keys observed at the node:crypto import boundary
 // must equal the corpus index's `public_key_fingerprints` exactly, both directions,
-// always (hard two-way — a vacuous green is the V4 hole this design exists to kill).
+// always (hard two-way: a vacuous green is the V4 hole this design exists to kill).
 // With `--manifest`, additionally partition + three-partition union equality.
 
 import {
@@ -76,7 +76,7 @@ const FIXED_WIDTH_KEYS = new Set(["digest_bytes", "public_key_bytes", "signature
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const importedPublicKeyFingerprints = new Set();
 // Two-boundary census (design C2): `importedPublicKeyFingerprints` is the discovery-membership set
-// (every key the fixtures carry). `verificationImportedFingerprints` is the SEPARATE truth set —
+// (every key the fixtures carry). `verificationImportedFingerprints` is the SEPARATE truth set:
 // only keys the runner actually fed to node:crypto createPublicKey on a verification surface. The
 // verification-import assertion (main) proves the runner genuinely imported the verification keys,
 // which the membership census alone cannot (finding 4b: a discovery-only census stays green even if
@@ -102,7 +102,7 @@ function assert(condition, message) {
 }
 
 // Parse a scanned JSON string literal via JSON.parse, converting a SyntaxError on genuinely-invalid
-// bytes (a bad escape in an invalid_encoding case) into an InvalidError protocol rejection — never
+// bytes (a bad escape in an invalid_encoding case) into an InvalidError protocol rejection, never
 // an uncaught SyntaxError that would abort the run under the InvalidError whitelist.
 function parseJsonStringLiteral(literal, context) {
   try {
@@ -326,7 +326,7 @@ function parseJsonNoDuplicates(text, context, received = false) {
 // Whole-payload container-nesting depth, mirroring the official `Json.decode` depth gate that every
 // payload/header passes through (json.ex start_container `level <= depth`; depth 32). Counts EMPTY
 // containers (the official rejects a 33-deep empty nest too). `parseCanonicalJson` does not otherwise
-// bound the whole payload — the field validators cover per-field bounds — so this closes the
+// bound the whole payload (the field validators cover per-field bounds), so this closes the
 // whole-payload depth permissiveness: a deep grant/proof payload the official rejects at decode.
 function containerDepth(value) {
   if (value === null || typeof value !== "object") return 0;
@@ -380,7 +380,7 @@ function fingerprint(publicKey) {
 // Census discovery: fingerprint every public-key-labeled field in the corpus case data, mirroring
 // the grant_proof discovery model (isPublicKeyLabel: any *public_key*/holder_public_key/etc. field
 // holding a 32-byte base64url). This makes the runner's observed import-boundary set equal the
-// corpus's FULL declared key set — including invalid_key cases' wrong keys, which the runner reads
+// corpus's FULL declared key set, including invalid_key cases' wrong keys, which the runner reads
 // from case data even though their Ed25519 verification fails. Without this, the observed set
 // (only keys fed to node:crypto verify) would undercount the declared set.
 const PUBLIC_KEY_LABEL = /public.*key|key.*public|verification.*key|holder.*key|issuer.*key/i;
@@ -469,7 +469,7 @@ function jsonDecode(bytes, context, out = undefined) {
   }
 
   function Err(message) {
-    // A malformed-JSON rejection is a protocol INVALID, not a runner bug — InvalidError so the
+    // A malformed-JSON rejection is a protocol INVALID, not a runner bug. Return InvalidError so the
     // dispatch whitelist maps it to INVALID rather than aborting the run.
     return new InvalidError(`${context}: ${message}`);
   }
@@ -498,7 +498,7 @@ function jsonDecode(bytes, context, out = undefined) {
         continue;
       }
       if (ch === 0x22) {
-        // closing quote — the string byte bound applies to the DECODED value's UTF-8 bytes
+        // closing quote: the string byte bound applies to the DECODED value's UTF-8 bytes
         // (excluding the quotes and un-escaped), matching V1.Json's string_bytes ceiling.
         index += 1;
         const parsed = parseJsonStringLiteral(text.slice(start, index), "json string literal");
@@ -531,7 +531,7 @@ function jsonDecode(bytes, context, out = undefined) {
     // Json.decode bounds only containers (json.ex start_container `level <= depth`); a scalar carries
     // no level check, so a 32-deep scalar-inner nest is valid. decodeValue forwards the current
     // container level unincremented; the container it opens asserts its own level and recurses at
-    // depth + 1. (A uniform `depth <= 32` here — root at 1 — wrongly rejected the deepest scalar.)
+    // depth + 1. (A uniform `depth <= 32` here (root at 1) wrongly rejected the deepest scalar.)
     skipWhitespace();
     assert(index < text.length, "json value");
     const ch = text[index];
@@ -579,7 +579,7 @@ function jsonDecode(bytes, context, out = undefined) {
     while (text.length) {
       skipWhitespace();
       const name = decodeString();
-      // Object-name byte ceiling (128) — distinct from the 8192 string-value ceiling decodeString
+      // Object-name byte ceiling (128), distinct from the 8192 string-value ceiling decodeString
       // enforces; the profile bounds object names at 128 bytes (bounds.ex key_bytes).
       assert(Buffer.byteLength(name, "utf8") <= 128, "json object-name byte bound");
       assert(!names.has(name), `json duplicate member ${name}`);
@@ -735,7 +735,7 @@ function removeDotSegments(path) {
 function ipv6Kind(literal) {
   // Returns 6 = valid IPv6, "future" = IPvFuture, null = invalid.
   if (/^[0-9A-Fa-f:.]+$/.test(literal)) {
-    // Structural IPv6 validation via node:net — rejects multiple "::" ellisions, wrong hextet
+    // Structural IPv6 validation via node:net: rejects multiple "::" ellisions, wrong hextet
     // count, and other malformations the crude hex/colon charset check silently accepted.
     return isIP(literal, 6) === 6 ? 6 : null;
   }
@@ -1129,7 +1129,7 @@ function loadCorpus(corpusDir) {
   assert(declaredCaseTotal === index.total_cases, "index total_cases sum");
 
   // Observed files on disk (relative to corpus dir), both directions equality.
-  // `index.json` is the integrity binding itself, not a case file — it is the
+  // `index.json` is the integrity binding itself, not a case file; it is the
   // one file outside the `files` list by design.
   const observedRelPaths = new Set();
   const fileBytes = new Map(); // rel path -> Buffer
@@ -1466,7 +1466,7 @@ function compareField(key, expected, actual) {
 }
 
 // ===========================================================================
-// Surface dispatch — independent recompute of each verdict
+// Surface dispatch: independent recompute of each verdict
 // ===========================================================================
 
 function dispatch(surface, input, raws) {
@@ -1669,7 +1669,7 @@ function buildOperation(op, context) {
 function buildSelector(selector, context) {
   // The facade serializes selectors in their object form: {"kind":"all"},
   // {"kind":"equals","path":[...],"value":...}, {"kind":"one_of",...}. The case
-  // input may give the "all" selector as the bare string "all" — normalize it.
+  // input may give the "all" selector as the bare string "all"; normalize it.
   if (selector === "all") return { kind: "all" };
   if (selector && selector.kind === "all") return { kind: "all" };
   // Erratum 6 (REQ1-SIGNING-integral-float-selector): the producer refuses a selector value holding
@@ -1940,10 +1940,10 @@ function dispatchCheckChain(input) {
     assert(row.sequence === sequence, `check_chain row ${i}: sequence`);
     equalBytes(strictB64(row.previous, 32), previous, `check_chain row ${i}: previous`);
     strictB64(row.commitment, 32);
-    // Hash the CANONICAL re-encode, not the raw row bytes — mirrors ConsumptionChain.parse_row/1,
+    // Hash the CANONICAL re-encode, not the raw row bytes. This mirrors ConsumptionChain.parse_row/1,
     // which returns `encoded.hash` over the JCS re-encode (raw == canonical for accepted rows; the
     // canonical-reencode reject case stays skip-would-accept because disabling the canonical check
-    // leaves the canonical hash — and thus the chain links — intact).
+    // leaves the canonical hash, and thus the chain links, intact).
     previous = sha256(ROW_PREFIX, Buffer.from(canonical(row), "utf8"));
     sequence += 1;
   }
@@ -2011,7 +2011,7 @@ function toTagged(value, float = false) {
 // The official requires every protocol string to be valid UTF-8 (`String.valid?`). A JSON
 // `\uD800` escape survives JSON.parse as a lone surrogate and can survive parseCanonicalJson's
 // round-trip (JSON.stringify re-emits the same escape), so byte-length checks alone do not cover
-// it — the official rejects such a string and this runner must too.
+// it; the official rejects such a string and this runner must too.
 function wellFormedString(value) {
   if (typeof value !== "string") return false;
   return typeof value.isWellFormed === "function"
@@ -2078,7 +2078,7 @@ function validUuid(value) {
 }
 
 // StringOrUri.valid?: either no ':' (a bare string is a StringOrURI), or a valid scheme, RFC 3986
-// URI bytes, AND — when the value carries a `//` authority — a structurally valid authority. The
+// URI bytes, AND, when the value carries a `//` authority, a structurally valid authority. The
 // official's valid_uri? gates on `URI.new(value)` in addition to the byte check; the earlier
 // byte-only mirror accepted `http://a:b` (non-numeric port), `http://[bad` (unterminated IPv6), and
 // `foo://h@o@st` (double `@`), all of which URI.new rejects. Boundary probed exhaustively against
@@ -2098,17 +2098,17 @@ function stringOrUri(value) {
 }
 
 // RFC 3986 authority validation matching URI.new for the cases the profile can produce: at most one
-// `@` (userinfo before it must not reappear in the host), a terminated `[IPv6]` literal, and — for
-// a non-bracketed host — at most one `:` whose suffix is an all-digits-or-empty port. Empty host
+// `@` (userinfo before it must not reappear in the host), a terminated `[IPv6]` literal, and, for
+// a non-bracketed host, at most one `:` whose suffix is an all-digits-or-empty port. Empty host
 // and empty port are both accepted, matching URI.new (`http://:80`, `http://host:`).
 function validUriAuthority(authority) {
   const at = authority.indexOf("@");
   const hostport = at === -1 ? authority : authority.slice(at + 1);
-  if (hostport.includes("@")) return false; // a second `@` lands in the host — invalid.
+  if (hostport.includes("@")) return false; // a second `@` lands in the host: invalid.
   if (hostport.startsWith("[")) {
     const close = hostport.indexOf("]");
     if (close === -1) return false; // unterminated IPv6 literal.
-    // URI.new (Erlang :uri_string) accepts only a valid IPv6 literal in brackets — NOT IPvFuture
+    // URI.new (Erlang :uri_string) accepts only a valid IPv6 literal in brackets, NOT IPvFuture
     // (`[v1.x]`) and not an arbitrary token (`[not:ip:here]`). node:net's isIP is the same test.
     if (isIP(hostport.slice(1, close)) !== 6) return false;
     const suffix = hostport.slice(close + 1);
@@ -2191,8 +2191,8 @@ function validateProofPayloadFields(payload, context) {
 // per-node-type EXACTLY as the official: a SCALAR is valid at `level <= depth`, a CONTAINER at
 // `level < depth`, root value at `level 0` (jcs.ex:28/33/40/49/58 vs 65/77). A uniform
 // `depth > MAXIMA.depth` gate (root at 1) wrongly rejected a scalar at the deepest legal level.
-// This checks the PER-NODE bounds only; the AGGREGATE bounds the official Jcs.encode also applies —
-// total_nodes and jcs_bytes — are NOT enforced here. For selector values (compact-carried) the
+// This checks the PER-NODE bounds only; the AGGREGATE bounds the official Jcs.encode also applies
+// (total_nodes and jcs_bytes) are NOT enforced here. For selector values (compact-carried) the
 // grant payload's total_nodes is enforced on the whole received payload (parseReceivedJson). For the
 // request_digest/check_envelope typed projection (value-carried cast_arguments) total_nodes AND
 // jcs_bytes ARE expressible and are enforced at the `requestDigest` call site (countJsonNodes + the
@@ -2283,14 +2283,14 @@ function containsIntegralFloat(owner, key) {
 // selectors apply CONJUNCTIVELY; `all` matches any root; `equals`/`one_of` require the path to
 // exist, traversing OBJECTS ONLY (never index arrays) and comparing by SEMANTIC IDENTITY. Shape
 // and width are enforced first (closed member set, non-empty bounded path of bounded string
-// segments, bounded one_of values) so a malformed selector REJECTS here rather than being accepted
-// — an independent verifier more permissive than the official would certify a grant the official
+// segments, bounded one_of values) so a malformed selector REJECTS here rather than being accepted;
+// an independent verifier more permissive than the official would certify a grant the official
 // refuses. Per-segment UTF-8 validity and the selector-value JSON bounds ARE mirrored here
 // (wellFormedString / withinJsonBounds). An earlier revision of this comment claimed both were
-// "covered upstream" by parseCanonicalJson's round-trip; that was wrong — a lone surrogate
+// "covered upstream" by parseCanonicalJson's round-trip; that was wrong: a lone surrogate
 // survives the round-trip because JSON.stringify re-emits the same escape.
 //
-// Identity is the JCS of the tagged form — the same tagged projection ba_req uses (arrays
+// Identity is the JCS of the tagged form, the same tagged projection ba_req uses (arrays
 // positional, objects unordered). The integer/float tag comes from each member's raw lexeme (see
 // the typed JSON algebra above), so {:integer, 10} and {:float, 10.0} stay distinct and an
 // integral-float selector value is decided exactly as the official decides it.
@@ -2364,8 +2364,8 @@ function validSelectorShape(selector, context) {
   // `all` FIRST and on ANY of the three closed member sets: the official's `selector/2` matches
   // `{:ok, %{"kind" => {:string, "all"}}}` before the other clauses, and that is an OPEN map
   // pattern, so a selector carrying kind:"all" alongside path/value decodes as :all rather than
-  // being rejected. Requiring members === "kind" here made this runner STRICTER than the official
-  // — the one divergence direction that fails a conforming implementation.
+  // being rejected. Requiring members === "kind" here made this runner STRICTER than the official,
+  // the one divergence direction that fails a conforming implementation.
   // Its inert members still pass the enclosing bounded decoder (spec/bap-v1.md § 12), whose scalar
   // magnitude, string and key bounds withinJsonBounds mirrors; nothing else reads them.
   if (
@@ -2452,7 +2452,7 @@ function dispatchRequestDigest(input) {
   return { digest: requestDigest(operation, input.cast_arguments, isFloatMember(input, "cast_arguments")) };
 }
 
-// --- verify surfaces (Ed25519 via node:crypto — the import boundary) --------
+// --- verify surfaces (Ed25519 via node:crypto, the import boundary) --------
 
 function inWindow(time, key) {
   return (
@@ -2495,7 +2495,7 @@ function dispatchVerifyGrant(input) {
   assert(header.kid === keyId, "verify_grant: kid");
   const payload = decodeGrantPayload(jws.payloadBytes, "verify_grant payload");
   // Closed like the official (runtime.ex `closed_map(payload_members, @grant_payload_keys)`), and
-  // `cnf` with it — this dispatcher reads payload.cnf.jkt below.
+  // `cnf` with it; this dispatcher reads payload.cnf.jkt below.
   exactKeys(
     payload,
     ["aud", "cnf", "exp", "iat", "iss", "jti", "nbf", "operations", "v"],
@@ -2687,7 +2687,7 @@ function dispatchCheckEnvelope(input) {
   }
   // Holder thumbprint must match the grant cnf.jkt. `cnf` is a closed map in the official
   // (runtime.ex `closed_map(confirmation_members, ["jkt"])`), so an extra member there must reject
-  // here too — same nesting depth as the operation object below, same permissiveness class.
+  // here too: same nesting depth as the operation object below, same permissiveness class.
   exactKeys(grantPayload.cnf, ["jkt"], "check_envelope grant cnf");
   assert(grantPayload.cnf.jkt === jwkThumbprint(holderJwk), "check_envelope: holder thumbprint");
   // Grant payload field validation (version / issuer / jti / audiences / times / jkt width) and the
@@ -2845,7 +2845,7 @@ function dispatchVerifyAnchoredExport(input) {
   }
   // Independently verify every archived row (ADR 0004: "and then independently checks every row";
   // REQ1-EXPORT-complete-scan). Mirrors dispatchCheckChain's row loop over the archive's framed
-  // rows against the caller's expected chain boundaries — the per-row commitment/sequence/
+  // rows against the caller's expected chain boundaries: the per-row commitment/sequence/
   // previous-hash chain the overall archive digest cannot express.
   const rowChainId = fetchBinary(chain, "chain_id", "verify_anchored_export chain");
   const rowPreviousHash = b64Field(chain, "previous_hash", "verify_anchored_export chain");
@@ -2941,7 +2941,7 @@ function verifyCensus(index, manifest) {
 
   // Published-mode census: the keys observed at the node:crypto import boundary must equal the
   // index's public_key_fingerprints exactly, both directions (spec: "census: import-boundary set
-  // == index public_key_fingerprints always"). Hard two-way equality — no softness, because a
+  // == index public_key_fingerprints always"). Hard two-way equality: no softness, because a
   // vacuous green (observed != declared, exit 0) is exactly the V4 hole this design exists to kill.
   assert(
     canonical(observed) === canonical(declared),
@@ -3293,7 +3293,7 @@ function main() {
       actual = dispatch(caseObj.surface, caseObj.input ?? {}, raws);
     } catch (error) {
       // ONLY a genuine protocol rejection maps to INVALID. A runner bug (TypeError/ReferenceError/
-      // an uncaught library throw) re-throws and aborts the run nonzero — it must never be laundered
+      // an uncaught library throw) re-throws and aborts the run nonzero; it must never be laundered
       // into agreement on an invalid-expected case.
       if (!(error instanceof InvalidError)) throw error;
       actual = INVALID;
@@ -3310,7 +3310,7 @@ function main() {
   // verification-surface case declares must have been genuinely imported at node:crypto
   // createPublicKey during the run. This defeats a discovery-only census that stays green even if
   // the runner imports nothing. Producer-only keys (raw-thumbprint signing-input surfaces) never
-  // reach createPublicKey and are correctly absent from the expected set — no false red.
+  // reach createPublicKey and are correctly absent from the expected set; no false red.
   const VERIFICATION_SURFACES = new Set([
     "verify_grant",
     "verify_historical_anchor",

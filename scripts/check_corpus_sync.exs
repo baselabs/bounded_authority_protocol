@@ -4,12 +4,12 @@ defmodule BoundedAuthorityProtocol.CorpusSyncGate do
   # Corpus vendored-snapshot sync gate (spec-decoupling L1; ADR 0019 intra-repo drift check,
   # NOT a distribution artifact). The Rust and Go SDKs vendor self-contained corpus snapshots;
   # a byte drift between the certified corpus and either snapshot is exactly the silent-drift
-  # class their startup SHA assertion exists to catch at RUNTIME — this gate catches it at
+  # class their startup SHA assertion exists to catch at RUNTIME; this gate catches it at
   # COMMIT time instead, before a red SDK suite or a confusing rotation. The TypeScript SDK's
   # snapshots moved with its ADR 0015 graduation to
   # baselabs/bounded_authority_protocol_typescript (a corpus rotation is now a snapshot-bump
   # commit in that repository). The Go/Rust runners still read the curated v2 key-census input
-  # monorepo-relative — to be vendored at their own graduations.
+  # monorepo-relative, to be vendored at their own graduations.
 
   def run do
     problems =

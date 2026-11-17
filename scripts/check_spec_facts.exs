@@ -3,12 +3,12 @@ Code.require_file("../tools/architecture_gate.exs", __DIR__)
 
 defmodule BoundedAuthorityProtocol.SpecFactsGate do
   # Spec-facts gate (spec-decoupling L2). Proves the CURRENT authority's normative facts agree
-  # with the live implementation, the conformance corpus, and the requirement map — the drift
+  # with the live implementation, the conformance corpus, and the requirement map, the drift
   # detector the whole migration rests on. Runs GREEN against the OLD authority today (that is
   # the point: the guards are proven against the world they protect before the authority swap);
   # after the swap the same gate runs unchanged against spec/bap-v1.md.
   #
-  # Rules (numbers are stable identifiers; 1 lives in test/spec_facts_test.exs — it needs the
+  # Rules (numbers are stable identifiers; 1 lives in test/spec_facts_test.exs; it needs the
   # compiled Bounds module; 7/8/11 arrive with the IANA templates, the formal models, and the
   # keyword census landings):
   #
@@ -19,7 +19,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   #      a reworded requirement without a baseline bump is silent softening and reds)
   #   5  every map-cited `index.json <surface>.<class>=<count>` re-derives from the live corpus
   #   6  the map's blanket corpus revision integer == revision.json's integer
-  #   9  vendor neutrality: every file this gate and the extractor read is git-tracked — inside
+  #   9  vendor neutrality: every file this gate and the extractor read is git-tracked, inside
   #      the public-surface privacy gate's full-tree canary sweep (ADR 0023 topology; the term
   #      list itself is NEVER tracked, the privacy test's hash-canary scheme is the enforcement)
   #   10 anchor completeness: every markdown table in the authority docs sits inside exactly one
@@ -79,14 +79,14 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   # --- rule 1b: extraction == frozen baseline ---------------------------------
   #
   # Rule 1 has two poles: the test-time Bounds dump equality (test/spec_facts_test.exs) and this
-  # byte equality against the frozen baseline. Any authority edit that changes extracted facts —
-  # a bounds digit, a claim row, a construction byte — reds here until the baseline is
+  # byte equality against the frozen baseline. Any authority edit that changes extracted facts
+  # (a bounds digit, a claim row, a construction byte) reds here until the baseline is
   # deliberately re-frozen. This is also the L3 certification mechanism: after the authority
   # swap, extract(new spec) == baseline-v1.json must hold with an empty delta.
   #
   # The rule is MAJOR-KEYED: majors 2 and 3 (the successor closed profiles) carry their own
   # frozen baselines (spec/facts/baseline-v2.json, baseline-v3.json) over their delta fact
-  # sets — suite identity, domain separators, selector kinds, and the v3 suite rules/constants —
+  # sets (suite identity, domain separators, selector kinds, and the v3 suite rules/constants)
   # so a silent edit of any successor-major normative constant reds exactly as a v1 edit does
   # (ADR 0030's and ADR 0035 §9's named deferral, closed).
 
@@ -105,13 +105,13 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
             []
           else
             [
-              "rule 1b (v#{major}): the extracted facts diverge from spec/facts/baseline-v#{major}.json — re-freeze deliberately (a silent facts change is exactly what this gate exists to catch)"
+              "rule 1b (v#{major}): the extracted facts diverge from spec/facts/baseline-v#{major}.json; re-freeze deliberately (a silent facts change is exactly what this gate exists to catch)"
             ]
           end
 
         _ ->
           [
-            "rule 1b (v#{major}): spec/facts/baseline-v#{major}.json is missing — the frozen extraction is gone"
+            "rule 1b (v#{major}): spec/facts/baseline-v#{major}.json is missing; the frozen extraction is gone"
           ]
       end
     end)
@@ -180,13 +180,13 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
 
       :invalid ->
         [
-          "rule 2: the conformance corpus failed its own integrity load — cannot derive observed member unions"
+          "rule 2: the conformance corpus failed its own integrity load: cannot derive observed member unions"
         ]
     end
   end
 
   # Walks the corpus's valid cases carrying compact JWS inputs and unions the observed member
-  # sets (claims, header members, typ values, selector kinds). Pure parsing — no verification.
+  # sets (claims, header members, typ values, selector kinds). Pure parsing (no verification).
   defp corpus_member_unions do
     map = corpus_file_map()
 
@@ -370,7 +370,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
         only_map = MapSet.difference(map_ids, spec_ids) |> Enum.sort()
 
         [
-          "rule 3: REQ-id sets diverge — spec-only #{inspect(only_spec)}, map-only #{inspect(only_map)}"
+          "rule 3: REQ-id sets diverge: spec-only #{inspect(only_spec)}, map-only #{inspect(only_map)}"
         ]
     end
   end
@@ -420,7 +420,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
           for {id, hash} <- live,
               baseline[id] != hash,
               do:
-                "rule 4: requirement #{id} statement diverges from the frozen baseline (silent softening — bump the baseline deliberately or revert)"
+                "rule 4: requirement #{id} statement diverges from the frozen baseline (silent softening: bump the baseline deliberately or revert)"
 
         diverged
 
@@ -429,7 +429,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
         only_base = Map.keys(baseline) -- Map.keys(live)
 
         [
-          "rule 4: requirement id sets diverge — live-only #{inspect(only_live)}, baseline-only #{inspect(only_base)}"
+          "rule 4: requirement id sets diverge: live-only #{inspect(only_live)}, baseline-only #{inspect(only_base)}"
         ]
     end
   end
@@ -563,7 +563,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   # BAP-12's acceptance criterion mechanized: the machine-readable IANA template sources must
   # agree with docs/design/registries.md EXACTLY (names, statuses, purposes) in both directions.
   # Two documented allowsets cover rows that exist in registries.md without a template by
-  # design: the claim `ba_obo` (reserved, no IANA template — no wire presence) and the typ
+  # design: the claim `ba_obo` (reserved, no IANA template; no wire presence) and the typ
   # `dpop+jwt` (registered by RFC 9449, not by this profile).
 
   @claims_without_templates MapSet.new(["ba_obo"])
@@ -674,7 +674,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   # --- rule 11: RFC-2119 keyword census ---------------------------------------------
   #
   # Every capitalized MUST / MUST NOT / SHOULD / SHOULD NOT / REQUIRED / SHALL / SHALL NOT in
-  # the normative document is either a QUOTED mention (the keyword as a word — excluded), or
+  # the normative document is either a QUOTED mention (the keyword as a word, excluded), or
   # shares its sentence with a `REQ1-*` requirement id, or sits in text carrying an explicit
   # informative marker. A naked keyword in unanchored prose is exactly how a soft requirement
   # smuggles past the requirement map, so it reds with the sentence quoted.
@@ -735,7 +735,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
 
                 [_, companion_rev] ->
                   [
-                    "rule 8: #{file} pins rev #{companion_rev} but the spec is at rev #{spec_rev} — update the companion or the spec, together"
+                    "rule 8: #{file} pins rev #{companion_rev} but the spec is at rev #{spec_rev}; update the companion or the spec, together"
                   ]
 
                 _ ->
@@ -792,12 +792,12 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
       if privacy_present,
         do: [],
         else: [
-          "rule 9: the public-surface privacy gate (ADR 0023 canary sweep) is missing — vendor neutrality is unenforced"
+          "rule 9: the public-surface privacy gate (ADR 0023 canary sweep) is missing; vendor neutrality is unenforced"
         ]
 
     problems ++
       Enum.map(untracked, fn file ->
-        "rule 9: #{file} is not git-tracked — untracked authority files sit outside the privacy gate's full-tree canary sweep"
+        "rule 9: #{file} is not git-tracked; untracked authority files sit outside the privacy gate's full-tree canary sweep"
       end)
   end
 
@@ -832,7 +832,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
     end
   end
 
-  # The first valid verify_anchored_export case's concatenated chunks — real accepted bytes.
+  # The first valid verify_anchored_export case's concatenated chunks, real accepted bytes.
   defp oracle_archive_bytes do
     map = corpus_file_map()
 
@@ -946,7 +946,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
       case Regex.run(~r/\| JSON \| Elixir value \|/, protocol) do
         nil ->
           [
-            "rule 10: the JSON algebra binding table is missing from protocol-v1.md — the typed-projection facts are now unanchored"
+            "rule 10: the JSON algebra binding table is missing from protocol-v1.md; the typed-projection facts are now unanchored"
           ]
 
         _ ->
@@ -964,7 +964,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
                 []
               else
                 [
-                  "rule 10: the JSON algebra table rows no longer match the typed-projection facts — an unanchored normative table diverged"
+                  "rule 10: the JSON algebra table rows no longer match the typed-projection facts; an unanchored normative table diverged"
                 ]
               end
           end
@@ -974,7 +974,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   end
 
   # Both sides normalize to the base type name: the algebra table says "non-integer number"
-  # where the tagged algebra says "{:float, value}" — same fact, different prose.
+  # where the tagged algebra says "{:float, value}", same fact, different prose.
   defp normalize_tag("non-integer number"), do: "float"
 
   defp normalize_tag(tag) do
@@ -1023,7 +1023,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
 
   # Line numbers of the one covered-elsewhere table (the JSON algebra binding table): rows from
   # its header through its last pipe row. Rule 10 verifies this table's coverage separately
-  # against the typed-projection facts, so its rows are not "uncovered" — everything else is.
+  # against the typed-projection facts, so its rows are not "uncovered"; everything else is.
   defp algebra_row_numbers(doc) do
     lines = String.split(doc, "\n")
 

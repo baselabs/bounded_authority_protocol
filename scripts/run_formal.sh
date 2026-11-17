@@ -23,7 +23,7 @@ if ! command -v proverif >/dev/null 2>&1; then
   # The mix-quality invocation is optionally-skippable (the toolchain is opam-local and the
   # dedicated CI formal job is the fail-closed enforcement); a direct invocation fails closed.
   if [ "${BAP_FORMAL_OPTIONAL:-0}" = 1 ]; then
-    echo "run_formal: SKIP — proverif not found (opam pin proverif.2.05); the CI formal-analysis job enforces this run"
+    echo "run_formal: SKIP: proverif not found (opam pin proverif.2.05); the CI formal-analysis job enforces this run"
     exit 0
   fi
   echo "run_formal: proverif not found (opam pin proverif.2.05; ADR 0025)" >&2
@@ -41,13 +41,13 @@ expected=$(grep -E '^RESULT' "$SUMMARY")
 actual=$(cat "$results")
 
 if [ "$expected" != "$actual" ]; then
-  echo "run_formal: FAILED — model output diverges from the frozen summary:" >&2
+  echo "run_formal: FAILED: model output diverges from the frozen summary:" >&2
   printf '%s\n' "$expected" | diff - "$results" >&2 || true
   fail=1
 else
   echo "run_formal: summary ok ($(echo "$actual" | grep -c 'is true')/$(echo "$actual" | wc -l | tr -d ' ') queries true)"
   if echo "$actual" | grep -q 'cannot be proved'; then
-    echo "run_formal: FAILED — at least one query is NOT proved" >&2
+    echo "run_formal: FAILED: at least one query is NOT proved" >&2
     fail=1
   fi
 fi
@@ -64,15 +64,15 @@ missing=0
 model_ids=$(grep -o 'REQ1-[A-Z0-9]*-[a-z0-9-]*' "$MODEL" | sort -u)
 for id in $model_ids; do
   if ! printf '%s\n' "$map_ids" | grep -x "$id" >/dev/null; then
-    echo "run_formal: FAILED — model annotates $id which is not in the requirement map" >&2
+    echo "run_formal: FAILED: model annotates $id which is not in the requirement map" >&2
     missing=1
   fi
 done
-# Exact step-annotation form "(* <id> *)" — declaration prose that merely mentions ids does
+# Exact step-annotation form "(* <id> *)"; declaration prose that merely mentions ids does
 # not satisfy the pin; the annotation must ride a code line.
 for id in $PINNED; do
   if ! grep -q "(\* $id \*)" "$MODEL"; then
-    echo "run_formal: FAILED — pinned annotation $id dropped from the model" >&2
+    echo "run_formal: FAILED: pinned annotation $id dropped from the model" >&2
     missing=1
   fi
 done
@@ -94,11 +94,11 @@ for e in entries:
     if m and m.group(1) == "escalated":
         escalated += 1
 if problems:
-    print("run_formal: FAILED — ledger schema violations:\n  " + "\n  ".join(problems), file=sys.stderr)
+    print("run_formal: FAILED: ledger schema violations:\n  " + "\n  ".join(problems), file=sys.stderr)
     sys.exit(1)
 print(f"run_formal: ledger ok ({len(entries)} findings, all terminally dispositioned, {escalated} escalated)")
 if escalated:
-    print(f"run_formal: *** {escalated} ESCALATED finding(s) — BLOCKS the program done-claim until the owner rules (SECURITY.md routing) ***", file=sys.stderr)
+    print(f"run_formal: *** {escalated} ESCALATED finding(s): BLOCKS the program done-claim until the owner rules (SECURITY.md routing) ***", file=sys.stderr)
 PYEOF
 
 exit $((fail + missing))

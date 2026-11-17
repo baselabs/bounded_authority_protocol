@@ -311,15 +311,15 @@ timestamps per rule 1; all shapes OBSERVED from the proto):
 | Operation | Value members | Digest members |
 |---|---|---|
 | SendMessage / SendStreamingMessage | `tenant`; `message.{messageId, contextId, taskId, role, extensions, referenceTaskIds}`; `configuration.{acceptedOutputModes, returnImmediately, historyLength}` | `message.parts` → digest array (rule 3); `message.metadata`; `metadata`; `configuration.taskPushNotificationConfig` |
-| GetTask | `tenant`, `id`, `historyLength` | — |
-| ListTasks | `tenant`, `contextId`, `status`, `pageSize`, `pageToken`, `historyLength`, `statusTimestampAfter`, `includeArtifacts` | — |
+| GetTask | `tenant`, `id`, `historyLength` | None |
+| ListTasks | `tenant`, `contextId`, `status`, `pageSize`, `pageToken`, `historyLength`, `statusTimestampAfter`, `includeArtifacts` | None |
 | CancelTask | `tenant`, `id` | `metadata` |
-| SubscribeToTask | `tenant`, `id` | — |
+| SubscribeToTask | `tenant`, `id` | None |
 | CreateTaskPushNotificationConfig | `tenant`, `id`, `taskId`, `url`, `token` | `authentication` |
-| GetTaskPushNotificationConfig | `tenant`, `taskId`, `id` | — |
-| ListTaskPushNotificationConfigs | `tenant`, `taskId`, `pageSize`, `pageToken` | — |
-| DeleteTaskPushNotificationConfig | `tenant`, `taskId`, `id` | — |
-| GetExtendedAgentCard | `tenant` | — |
+| GetTaskPushNotificationConfig | `tenant`, `taskId`, `id` | None |
+| ListTaskPushNotificationConfigs | `tenant`, `taskId`, `pageSize`, `pageToken` | None |
+| DeleteTaskPushNotificationConfig | `tenant`, `taskId`, `id` | None |
+| GetExtendedAgentCard | `tenant` | None |
 
 Absent members project as absent per rule 5 (received-serialization presence); the
 projection object's member count stays inside the 64-member ceiling by construction (largest

@@ -1,8 +1,8 @@
 defmodule BoundedAuthorityProtocol.SpecFactsTest do
   # Spec-facts rule 1 (test-time, read-only): the authority's extracted bounds table equals the
   # LIVE Bounds.maximum/0 dump, field for field. Lives as an ExUnit test (not in the gate script)
-  # because it needs the compiled Bounds module. A digit changed on either pole — the spec table
-  # or the implementation — fails here with the divergent pair named.
+  # because it needs the compiled Bounds module. A digit changed on either pole (the spec table
+  # or the implementation) fails here with the divergent pair named.
 
   use ExUnit.Case, async: true
 
@@ -60,7 +60,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsTest do
     extracted = baseline_bounds()
 
     # Every extracted label must be known to the mapping (an unknown label means the spec table
-    # grew a row the gate cannot check — fail loudly, never skip).
+    # grew a row the gate cannot check; fail loudly, never skip).
     unknown_labels = Map.keys(extracted) -- (Map.keys(@label_to_field) ++ [@widths_row])
 
     assert unknown_labels == [],

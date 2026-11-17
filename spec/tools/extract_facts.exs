@@ -114,7 +114,7 @@ defmodule BoundedAuthorityProtocol.ExtractFacts do
         {:ok, regions}
       else
         {:error,
-         "major #{major}: anchor set mismatch: found #{inspect(found)}, expected #{inspect(Enum.sort(keys))} — " <>
+         "major #{major}: anchor set mismatch: found #{inspect(found)}, expected #{inspect(Enum.sort(keys))}; " <>
            "an anchor is missing, duplicated, or unknown"}
       end
     end
@@ -177,7 +177,7 @@ defmodule BoundedAuthorityProtocol.ExtractFacts do
         {:error, "#{file}: no facts anchors found"}
 
       unknown != [] ->
-        {:error, "#{file}: unknown facts anchor(s) #{inspect(Enum.uniq(unknown))} — the major's anchor set is closed"}
+        {:error, "#{file}: unknown facts anchor(s) #{inspect(Enum.uniq(unknown))}; the major's anchor set is closed"}
 
       dupes != [] ->
         {:error, "#{file}: facts anchor(s) #{inspect(Enum.uniq(dupes))} appear more than once"}

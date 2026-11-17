@@ -28,7 +28,7 @@ defmodule BoundedAuthorityProtocol.RenderDerived do
         if current == rendered do
           IO.puts("render_derived: #{@target} matches the rebuild (#{byte_size(rendered)} bytes)")
         else
-          IO.puts(:stderr, "render_derived: #{@target} does NOT match the rebuild — hand edits are forbidden; regenerate with --write")
+          IO.puts(:stderr, "render_derived: #{@target} does NOT match the rebuild; hand edits are forbidden; regenerate with --write")
           System.halt(1)
         end
     end

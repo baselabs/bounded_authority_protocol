@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Corpus re-derivability tool (authoring tooling — NOT a conformance runner).
+// Corpus re-derivability tool (authoring tooling, NOT a conformance runner).
 //
 // The v1 corpus is a frozen, certified artifact: its signed fixtures were minted with ephemeral
 // in-memory Ed25519 keys at authoring time and the original throwaway mint script was removed
@@ -9,11 +9,11 @@
 //
 //   - index.json is rebuilt from the frozen inputs: the cases/** files (per-file SHA-256 +
 //     per-file case counts + the applicability matrix), the revision sidecar, and the curated
-//     inputs this directory ships (n_a cell reasons + the public-key fingerprint census —
+//     inputs this directory ships (n_a cell reasons + the public-key fingerprint census:
 //     prose and census facts that are inputs to the index, not derivable from case bytes).
 //   - revision.json carries the monotone corpus revision; --bump-revision is the amendment
 //     path (rotate the six certified-index-SHA pins in the SAME commit with
-//     scripts/regen_corpus_digests.exs --write — the ADR 0019 atomic-landing template).
+//     scripts/regen_corpus_digests.exs --write, the ADR 0019 atomic-landing template).
 //   - --verify proves the shipped corpus equals the rebuild byte-for-byte (and that every
 //     tamper case's verbatim bytes equal base-with-one-flip re-derived from its base case).
 //

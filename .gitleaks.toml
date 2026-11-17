@@ -621,14 +621,14 @@ regexes = [
   '''^eyJhbGciOiJub25lIiwiandrIjp7ImNydiI6IkVkMjU1MTkiLCJrdHkiOiJPS1AiLCJ4IjoiVzFzN3lFOWZHRE1CYm1kcHFZVndRMWhEQ1h0ek9lUFVEM2ZJZjF0N0ZEayJ9LCJ0eXAiOiJkcG9wK2p3dCJ9\.eyJhdGgiOiJzVjhkZ1ZLcFExTHZpa1lrNmVvOEd2RGZhYkpyMWd0VlhrdkRnazdxLVpZIiwiYmFfaW52IjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwiYmFfb3AiOiJyZWFkIiwiYmFfcmVxIjoidXYyMFBpQzh0UlFvT3k5LWVSbEJGUFFuZ3RpRFhrd19TQ2JiZ3p4akMyZyIsImh0bSI6IlBPU1QiLCJodHUiOiJodHRwczovL3Jlc291cmNlLmV4YW1wbGUudGVzdC9pbnZva2UiLCJpYXQiOjExMDAsImp0aSI6InVybjpleGFtcGxlOnByb29mOjEiLCJ2IjoxfQ\.BUONibEL8cesx2D905h2CwHhL8sdtZ33sABKd7jRl27UdBOo0jpQX9UGl8VLlpEVxSFiZlhBGwNg85VBakhwAw"$''',
 ]
 [[allowlists]]
-description = "v3 ES256 corpus public compact JWS fixtures (machine-minted, certified, no private material - the corpus loader's private-material sweep and the certified mint prove it; path-scoped because enumerating a generated corpus's compacts is unmaintainable)"
+description = "v3 ES256 corpus public compact JWS fixtures (machine-minted, certified, no private material; the corpus loader's private-material sweep and the certified mint prove it; path-scoped because enumerating a generated corpus's compacts is unmaintainable)"
 targetRules = ["jwt", "generic-api-key"]
 paths = [
   '''^priv/conformance/v3/corpus/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
   '''^sdks/(?:go|rust)/conformance/corpus-v3/cases/(?:anchored-export|assemble-compact|boundary-anchor|envelope|grant-decode|grant-verify|key-locator|key-transition|proof-decode|signing-input)/[^/]+\.json$''',
 ]
 [[allowlists]]
-description = "Strict-Ed25519 corpus public key, signature, and compact JWS fixtures (machine-minted from public test keys, certified, no private material - the generator writes public keys, signatures and messages only and the corpus declares private_material_tracked false; path-scoped because enumerating a generated corpus's values is unmaintainable)"
+description = "Strict-Ed25519 corpus public key, signature, and compact JWS fixtures (machine-minted from public test keys, certified, no private material; the generator writes public keys, signatures and messages only and the corpus declares private_material_tracked false; path-scoped because enumerating a generated corpus's values is unmaintainable)"
 targetRules = ["jwt", "generic-api-key"]
 paths = [
   '''^priv/conformance/strict-ed25519/(?:profile\.json|cases/(?:anchored-export|boundary-anchor|ca1|envelope|grant-verify|jcs-utf8|jwk|key-acceptance|key-transition|loopback|primitive|ra1)/[^/]+\.json)$''',

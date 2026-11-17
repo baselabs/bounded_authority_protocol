@@ -96,7 +96,7 @@ defmodule BoundedAuthorityProtocol.BuildExamples do
             render_case(id, title, case_obj)
 
           :error ->
-            raise "cited example case #{inspect(id)} is missing from the corpus — re-pin Appendix A"
+            raise "cited example case #{inspect(id)} is missing from the corpus; re-pin Appendix A"
         end
       end)
 
@@ -153,7 +153,7 @@ defmodule BoundedAuthorityProtocol.BuildExamples do
     if current == rendered do
       IO.puts("build_examples: Appendix A matches the rebuild (#{byte_size(rendered)} bytes)")
     else
-      IO.puts(:stderr, "build_examples: Appendix A does NOT match the rebuild — regenerate with --write or revert the hand edit")
+      IO.puts(:stderr, "build_examples: Appendix A does NOT match the rebuild; regenerate with --write or revert the hand edit")
       System.halt(1)
     end
   end

@@ -1,8 +1,8 @@
 # Role-attestation profile check (BAP-23): certified-corpus verification receipt.
 #
-# Verifies the profile corpus exactly as the ExUnit suite does — the pinned certified index
+# Verifies the profile corpus exactly as the ExUnit suite does: the pinned certified index
 # digest, per-file digests, profile identity/revision/counts, every case's decode/verify
-# verdict, the v1 cross-rejection direction, and the v2/v3 rejection of attestation bytes —
+# verdict, the v1 cross-rejection direction, and the v2/v3 rejection of attestation bytes;
 # then emits a secret-free receipt with source identity. Run via `mix role_attestation.verify`.
 
 # REQ-RA1-CONFORMANCE-certified-pin: every corpus consumer pins the certified digest

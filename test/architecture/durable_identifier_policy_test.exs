@@ -173,7 +173,7 @@ defmodule BoundedAuthorityProtocol.Architecture.DurableIdentifierPolicyTest do
 
   # The map<->fixture gate above cannot see the specs: an id cited in a normative
   # spec but absent from the map/fixture (or vice versa after a spec edit) drifted
-  # silently — found by cross-vendor review of the v2 activation. The specs are the
+  # silently, found by cross-vendor review of the v2 activation. The specs are the
   # upstream of the mapping, so every spec-cited id must be fixture-known.
   test "every requirement id cited in a normative spec is fixture-known" do
     fixture_ids =

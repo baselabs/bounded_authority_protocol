@@ -8,7 +8,7 @@ Schema (checked by scripts/run_formal.sh; an entry violating it fails CI):
 - class: model | spec
 - analysis: <what was investigated>
 - disposition: refuted | documented | escalated
-- resolution: <what closed it; for escalated: owner-routing via SECURITY.md — BLOCKS the
+- resolution: <what closed it; for escalated: owner-routing via SECURITY.md; BLOCKS the
   program done-claim until the owner rules>
 ```
 

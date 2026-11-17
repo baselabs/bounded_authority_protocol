@@ -2,7 +2,7 @@ Code.require_file("../../test_support/portable.ex", __DIR__)
 
 defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   @moduledoc """
-  In-VM `Cli.run/1` unit tests (the 100%-coverage path — `System.cmd` runs earn no coverage)
+  In-VM `Cli.run/1` unit tests (the 100%-coverage path; `System.cmd` runs earn no coverage)
   plus escript integration tests (the built binary driven end-to-end). The CLI does I/O and
   argv parsing only; every judgment delegates to the pure `Corpus`/`Runner`/`Report` core.
   """
@@ -61,7 +61,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   # The pin fails closed on any corpus that is NOT the certified snapshot, and the certified value
   # is NOT caller-overridable (no seam). Proven WITHOUT a seam: a corpus whose index.json carries
   # insignificant trailing whitespace still decodes, verifies, and agrees (integrity is over the
-  # parsed index, not its raw bytes) — but its raw-byte index SHA differs, so it is exactly the
+  # parsed index, not its raw bytes), but its raw-byte index SHA differs, so it is exactly the
   # "not the certified corpus" case a shrunken/regenerated-index corpus embodies. Corpus.load
   # accepts it AND the identity differs AND run/1 exits 1 ⟹ the pin (not integrity) caught it.
 

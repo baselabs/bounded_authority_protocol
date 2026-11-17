@@ -121,7 +121,7 @@ write_generic_key() {
   # FIXED high-entropy canary, not openssl rand: a random 48-hex draw occasionally
   # lands below gitleaks' generic-api-key entropy discriminator (observed 2026-09-17:
   # "missed 1 path group(s)" on an unlucky draw with identical config and gitleaks
-  # 8.30.1) — a probabilistic gate. The literal mixes digits and letters with no long
+  # 8.30.1), a probabilistic gate. The literal mixes digits and letters with no long
   # runs, so the detector fires deterministically.
   value='a3f1c9e7b5d2468f0a1e3c5b7d9f2e4a6c8b0d3f5a7c9e1b3d5f7a9c'
   printf '{"key_fingerprint": "%s"}\n' "$value" > "$target"

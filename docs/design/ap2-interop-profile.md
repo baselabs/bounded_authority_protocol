@@ -149,9 +149,9 @@ share); they differ in textual wrapping only:
 
 | from \ to | bare base64url (AP2) | raw 32 bytes (BAP internal) | `sha-256:` tagged (CAP) |
 |---|---|---|---|
-| bare base64url | — | base64url-decode, verify 32 bytes | prefix the bare string with `sha-256:` |
-| raw 32 bytes | unpadded base64url-encode | — | base64url-encode, then prefix `sha-256:` |
-| tagged | strip the `sha-256:` prefix to obtain the bare base64url string | strip prefix, base64url-decode | — |
+| bare base64url | Unchanged | base64url-decode, verify 32 bytes | prefix the bare string with `sha-256:` |
+| raw 32 bytes | unpadded base64url-encode | Unchanged | base64url-encode, then prefix `sha-256:` |
+| tagged | strip the `sha-256:` prefix to obtain the bare base64url string | strip prefix, base64url-decode | Unchanged |
 
 Every cell is a lossless byte-level conversion; no re-hashing occurs in any direction.
 

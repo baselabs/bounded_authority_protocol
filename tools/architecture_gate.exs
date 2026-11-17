@@ -1213,7 +1213,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       violation(
         :public_surface,
         beam,
-        "pinned module #{beam} is absent from the compiled application — a pinned surface was " <>
+        "pinned module #{beam} is absent from the compiled application; a pinned surface was " <>
           "deleted or renamed without updating the export/dynamic allowance"
       )
     end)

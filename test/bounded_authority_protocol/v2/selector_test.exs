@@ -145,7 +145,7 @@ defmodule BoundedAuthorityProtocol.V2.SelectorTest do
   end
 
   test "crossed interval endpoints are unsatisfiable, never a special error" do
-    # ADR 0028 §7: lo > hi is not a decode error — the conjunction simply never matches.
+    # ADR 0028 §7: lo > hi is not a decode error; the conjunction simply never matches.
     arguments = {:object, [{"amount", {:integer, 75}}]}
 
     assert {:error, :invalid} =

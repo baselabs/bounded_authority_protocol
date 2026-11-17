@@ -129,7 +129,7 @@ defmodule BoundedAuthorityProtocol.SbomCheck do
   end
 
   # The package version derived from mix.exs (works under `elixir script` invocation where
-  # Mix.Project is not alive — the same derivation the supply-chain workflow uses).
+  # Mix.Project is not alive), the same derivation the supply-chain workflow uses.
   defp mix_exs_version do
     root = Path.expand("..", __DIR__)
 

@@ -1,8 +1,8 @@
-; Bounded Authority Protocol v1 — CDDL representation (INFORMATIVE)
+; Bounded Authority Protocol v1: CDDL representation (INFORMATIVE)
 ;
 ; This CDDL summarizes the closed wire objects of the v1 profile for implementer readability.
 ; It is NOT a machine-checked authority: the structural authority is the set of JSON Schemas
-; and the conformance corpus. CDDL cannot express several closed-profile invariants —
+; and the conformance corpus. CDDL cannot express several closed-profile invariants:
 ; duplicate-name rejection at the byte level, exact canonical encodings, raw numeric-lexeme
 ; bounds, the tagged integer/float distinction, and the exact-frame archive layout (binary,
 ; not JSON). Where this file and the corpus disagree, the corpus is right.
@@ -45,7 +45,7 @@ bap-operation = {
 bap-selector = bap-selector-all / bap-selector-equals / bap-selector-one-of
 
 ; `all` accepts any of the three recognized member sets (inert extras allowed); CDDL expresses
-; the closed kinds, not the exact member-set rule — the corpus is the oracle.
+; the closed kinds, not the exact member-set rule; the corpus is the oracle.
 bap-selector-all = { kind: "all" } / { kind: "all", path: bap-path, value: any } / { kind: "all", path: bap-path, values: [any] }
 bap-selector-equals = { kind: "equals", path: bap-path, value: any }
 bap-selector-one-of = { kind: "one_of", path: bap-path, values: [1*256 any] }

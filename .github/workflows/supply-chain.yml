@@ -67,7 +67,7 @@ jobs:
 
       - name: Build exact unpublished archive
         id: archive
-        # Derive the artifact name from mix.exs @version — a hardcoded filename is the
+        # Derive the artifact name from mix.exs @version; a hardcoded filename is the
         # quiet-mislabel class (the docs-currency test pins this derivation).
         run: |
           VERSION="$(grep -m1 '@version ' mix.exs | sed -E 's/.*@version "([^"]+)".*/\1/')"

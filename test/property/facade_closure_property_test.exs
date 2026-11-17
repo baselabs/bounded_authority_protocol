@@ -3,7 +3,7 @@ defmodule BoundedAuthorityProtocol.Property.FacadeClosurePropertyTest do
   Facade closure: EVERY generated input (arbitrary bytes and near-valid mutated inputs) to every
   pure facade function returns {:ok, _} | {:error, :invalid} and NEVER raises. This is the
   fail-closed contract (AGENTS rule 3): the package's pure functions are total on their input
-  domain — no input crashes them.
+  domain; no input crashes them.
   """
 
   use ExUnit.Case, async: true

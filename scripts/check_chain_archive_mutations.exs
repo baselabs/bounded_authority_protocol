@@ -517,7 +517,7 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
 
   # Baseline non-vacuity: before any mutation, the entry's UNMUTATED command must run green in a
   # clean scratch. Without this, a deleted or drifted target test makes `mix test` exit non-zero
-  # and the battery scores the red as "caught" — the deleted-test false-green the 2026-08-20
+  # and the battery scores the red as "caught": the deleted-test false-green the 2026-08-20
   # gate-integrity review named. Cached per unique command so shared targets pay once per run.
   defp baseline_green!(mutation) do
     key = {:baseline_green, mutation.command}

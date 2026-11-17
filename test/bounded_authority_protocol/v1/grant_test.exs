@@ -82,7 +82,7 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
           replace_json(compact, 1, &Map.put(&1, "extra", true)),
           # R-BAP-2 / BAP-17: a reserved-but-inactive grant claim (`ba_offline`, the offline
           # floor-limit object) is rejected by the closed v1 payload set exactly like any other
-          # unlisted member — a verifier that predates the claim denies a grant carrying it.
+          # unlisted member; a verifier that predates the claim denies a grant carrying it.
           # This is the reference-implementation tripwire against silently admitting the reserved
           # name; activation is a successor contract-major (ADR 0016).
           replace_json(
@@ -149,7 +149,7 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
     # BAP-21 / ADR 0030 cross-major tripwire: the v2 successor major self-declares with
     # payload `v: 2`; the closed v1 decode (`{:integer, 1}` check) is the sole rejector on
     # an otherwise-identical payload, mirroring the BAP-20 reserved-kind tripwire above.
-    # v1 stays byte-frozen — this pins the frozen behavior against the new major's existence.
+    # v1 stays byte-frozen; this pins the frozen behavior against the new major's existence.
     # BAP-22 / ADR 0035 extends the tripwire to the v3 successor major the same way: `v: 3`
     # on an otherwise-v1 payload is rejected by the same sole check.
     fixture = fixture!()

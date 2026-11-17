@@ -3,13 +3,13 @@ Code.require_file("mutation_gate_support.exs", __DIR__)
 defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
   alias BoundedAuthorityProtocol.MutationGateSupport
 
-  # BAP-05 Task 6 — conformance mutation battery (gate-integrity layer).
+  # BAP-05 Task 6: conformance mutation battery (gate-integrity layer).
   #
   # Mirrors scripts/check_chain_archive_mutations.exs: for each entry, isolate a scratch copy of
   # the repo, apply exactly one source mutation at a one-match anchor, run the targeted test
   # command, and raise `mutation survived` when a test that should go red stays green instead. A
   # vacuous battery (an anchor that matches nothing, or a mutation no test catches) is precisely
-  # the quiet class the conformance design exists to kill — every entry below is a load-bearing
+  # the quiet class the conformance design exists to kill; every entry below is a load-bearing
   # check wired to a specific red.
   #
   # Calibration self-proof: the entry `calibration-case-id-removal` is a real caught mutation
@@ -22,7 +22,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
   #   calibration proof: status=0 (0 = green = mutation SURVIVED under inverted assertion)
   #   Result: 1 passed, 35 excluded
   #
-  # A green target under mutation is exactly the condition run_mutation/1 refuses — it raises
+  # A green target under mutation is exactly the condition run_mutation/1 refuses; it raises
   # `** (RuntimeError) mutation survived: calibration-case-id-removal` (never silent). The
   # assertion was restored; the shipped entry is caught (red) and the battery is green end-to-end.
 
@@ -31,7 +31,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
   # Each entry carries the full targeted command verbatim. `mix test` commands get
   # `--max-cases 1` appended (serial, deterministic, fastest single-file run); `mix architecture`
   # does NOT (it proxies args to `elixir scripts/check_architecture.exs`, which exits 2 on any
-  # unknown flag — so appending would make every architecture entry spuriously red).
+  # unknown flag, so appending would make every architecture entry spuriously red).
   @mutations [
     # --- v2 range-selector + cross-major activation proofs (BAP-21 / ADR 0030) ----
     %{
@@ -56,7 +56,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     },
     %{
       # Kind swap: decoding lte as gte and gte as lte (both clauses swapped, so
-      # range-bearing grants still decode — evaluated under the flipped kind)
+      # range-bearing grants still decode, evaluated under the flipped kind)
       # flips the exceeded/unmet reject cases.
       name: "v2-selector-kinds-swapped",
       path: "lib/bounded_authority_protocol/v2/runtime.ex",
@@ -79,7 +79,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     },
     %{
       # Cross-major downgrade: the v2 grant decode accepting v:1 reddens the cross-major
-      # corpus cases (a v1 grant must stay invalid under v2 — no downgrade path).
+      # corpus cases (a v1 grant must stay invalid under v2; no downgrade path).
       name: "v2-cross-major-grant-v-accepted",
       path: "lib/bounded_authority_protocol/v2/runtime.ex",
       from:
@@ -110,7 +110,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     },
     %{
       # Kind swap: decoding lte as gte and gte as lte (both clauses swapped, so
-      # range-bearing grants still decode — evaluated under the flipped kind)
+      # range-bearing grants still decode, evaluated under the flipped kind)
       # flips the exceeded/unmet reject cases.
       name: "v2-selector-kinds-swapped",
       path: "lib/bounded_authority_protocol/v2/runtime.ex",
@@ -133,7 +133,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     },
     %{
       # Cross-major downgrade: the v2 grant decode accepting v:1 reddens the cross-major
-      # corpus cases (a v1 grant must stay invalid under v2 — no downgrade path).
+      # corpus cases (a v1 grant must stay invalid under v2; no downgrade path).
       name: "v2-cross-major-grant-v-accepted",
       path: "lib/bounded_authority_protocol/v2/runtime.ex",
       from:
@@ -154,7 +154,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     # --- v3 ES256 suite activation proofs (BAP-22 / ADR 0035) ------------------
     %{
       # Canonicality: dropping the low-S half-order rule lets the high-S corpus case
-      # (a genuinely verifying high-S signature — backend malleability, probe-observed)
+      # (a genuinely verifying high-S signature: backend malleability, probe-observed)
       # pass precheck and verify, so verify-grant-v3-invalid-signature-high-s agrees as
       # valid, disagreeing with the corpus.
       name: "v3-signature-low-s-removed",
@@ -512,7 +512,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # function-scoped alias) references the bare `Cli` root, which is not approved for v1.ex, so
       # node_violations fires `forbidden module/call Cli` (:unapproved_runtime). Planted as a USED
       # call in a function body (compiles clean, no unused-attribute warning), so the ARCHITECTURE
-      # GATE — not the compiler — is what reds (plan-review F6). Proves the carve-out is unreachable
+      # GATE (not the compiler) is what reds (plan-review F6). Proves the carve-out is unreachable
       # from the protocol core.
       name: "cli-reachability",
       path: "lib/bounded_authority_protocol/v1.ex",
@@ -528,7 +528,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # allow; conformance_cli_leak? closes it for the fully-qualified form from outside conformance/.
       # Planted as a USED call so the GATE (not the compiler) is what reds. Guard-family sibling of
       # the bare-alias entry (the same carve-out reachable two ways); both node_violations
-      # passthroughs — the alias case and the MFA/mfa_category case — are swept.
+      # passthroughs (the alias case and the MFA/mfa_category case) are swept.
       name: "cli-reachability-fq",
       path: "lib/bounded_authority_protocol/v1.ex",
       from: "  def untrusted_key_locator(compact, limits) when is_binary(compact) do\n",
@@ -704,10 +704,10 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     # --- runner reject-vs-error typing (InvalidError whitelist) ---------------
     %{
       # A runner BUG (a non-InvalidError throw) on an INVALID-only path must ABORT the run, never be
-      # laundered into agreement. The plant fires ONLY when Ed25519 verification FAILS — the
+      # laundered into agreement. The plant fires ONLY when Ed25519 verification FAILS; the
       # verify-grant invalid_key case reaches it; every valid case passes the assert. A regression
       # from the InvalidError whitelist back to a blanket `catch { actual = INVALID }` would SWALLOW
-      # the ReferenceError to INVALID (the case is invalid-expected) and stay GREEN — which is
+      # the ReferenceError to INVALID (the case is invalid-expected) and stay GREEN, which is
       # exactly the vacuity this entry catches (design C1; plan-review F2 invalid-only calibration).
       name: "runner-reject-typing",
       path: "conformance/corpus_independent.mjs",
@@ -722,7 +722,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     # --- two-boundary census: verification-import truth -----------------------
     %{
       # Deleting the real createPublicKey verification-import tracking makes the two-boundary census
-      # unable to prove the runner ACTUALLY imported the verification keys — the verification-import
+      # unable to prove the runner ACTUALLY imported the verification keys; the verification-import
       # assertion reds (a valid verification key was never imported at node:crypto). Defeats finding
       # 4b's discovery-only-census vacuity (a census that stays green even if nothing is imported).
       name: "census-verification-import",
@@ -737,8 +737,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     # --- Task 2: tamper target resolution (audit binds to the addressed bytes) -
     %{
       # The compact-target audit must resolve input.compact, NOT default to input.text. This
-      # mutation makes the "compact" target fall back to text resolution — the exact bug the
-      # `target` field exists to prevent — so a compact-target tamper case (which carries no
+      # mutation makes the "compact" target fall back to text resolution, the exact bug the
+      # `target` field exists to prevent, so a compact-target tamper case (which carries no
       # input.text) fails to resolve, the verbatim-vs-derived audit mismatches, and the corpus
       # fails to load. The positive compact-target test asserts {:ok, _}; under the mutation the
       # load returns {:error, :invalid} and the test goes red. Proves target resolution is
@@ -847,7 +847,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     },
     %{
       # The Node tamper audit's extended-target resolution must bind "compact" to input.compact
-      # (not fall back to input.text). This mutation resolves the compact target via input.text —
+      # (not fall back to input.text). This mutation resolves the compact target via input.text;
       # the real compact-target tamper cases (verify-grant/anchor/transition/proof signature-byte
       # tampers) carry no input.text, so the audit throws at load and the runner exits nonzero,
       # reddening the agreement test. Proves the independent Node extended-target resolution is
@@ -865,8 +865,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Loosening the object-name (key) byte ceiling in the Node decoder lets
       # json-decode-key_bytes-maximum-plus-one (a 129-byte key) decode as valid -> it agrees valid,
-      # disagreeing with the corpus (which declares it invalid). Proves the key_bytes limit — added
-      # to the Node runner this slice — is load-bearing.
+      # disagreeing with the corpus (which declares it invalid). Proves the key_bytes limit (added
+      # to the Node runner this slice) is load-bearing.
       name: "json-decode-key-bytes-loosen",
       path: "conformance/corpus_independent.mjs",
       from:
@@ -879,8 +879,8 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     },
     %{
       # Loosening the string-value byte ceiling lets json-decode-string_bytes-maximum-plus-one (an
-      # 8193-byte string value) decode as valid -> disagreement. Proves the string_bytes limit — now
-      # measured on the DECODED value's UTF-8 bytes (not the quoted literal) this slice — is
+      # 8193-byte string value) decode as valid -> disagreement. Proves the string_bytes limit (now
+      # measured on the DECODED value's UTF-8 bytes (not the quoted literal) this slice) is
       # load-bearing at the boundary.
       name: "json-decode-string-bytes-loosen",
       path: "conformance/corpus_independent.mjs",
@@ -928,7 +928,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     },
     %{
       # Grant binding (`ath`): without it a proof minted over one grant is replayable against a
-      # different grant held by the same holder — scope widening. Isolated by
+      # different grant held by the same holder: scope widening. Isolated by
       # check-envelope-invalid-claim-grant-binding.
       name: "check-envelope-ath-binding-removal",
       path: "lib/bounded_authority_protocol/v1/runtime.ex",
@@ -939,7 +939,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     },
     %{
       # Request-argument binding (`ba_req`): without it a proof is replayable with different cast
-      # arguments — argument substitution. Isolated by
+      # arguments: argument substitution. Isolated by
       # check-envelope-invalid-claim-request-arguments.
       name: "check-envelope-request-digest-binding-removal",
       path: "lib/bounded_authority_protocol/v1/runtime.ex",
@@ -951,7 +951,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # Operation binding (`ba_op`): the request digest is computed over the SERVER-derived
       # expected.operation, never over proof.ba_op, so this line is the ONLY constraint on the
-      # holder-signed ba_op claim — it is NOT subsumed by ba_req. Without it a dishonest producer
+      # holder-signed ba_op claim; it is NOT subsumed by ba_req. Without it a dishonest producer
       # signs ba_op "write" alongside a ba_req over "read" and the false claim rides into
       # EnvelopeFacts.operation unchecked. Isolated by
       # check-envelope-invalid-claim-operation-binding, whose proof is exactly that shape (the
@@ -972,7 +972,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       # prove: with the mutation applied the runner reports
       # `agreed=219 disagreed=1 ... disagreements: check-envelope-invalid-selector-empty-path`.
       # TARGET: this mutates the NODE runner, so it targets the Node runner test. cli_test:42 is
-      # structurally blind here — that test runs the official Elixir CLI against the corpus's
+      # structurally blind here; that test runs the official Elixir CLI against the corpus's
       # expected verdicts and never executes corpus_independent.mjs (proven: this entry SURVIVED
       # while pointed at cli_test:42, and is caught pointed here).
       name: "check-envelope-node-selector-path-validation-removal",
@@ -1066,7 +1066,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
     %{
       # The official matches `all` on an OPEN pattern, so kind:"all" decodes as :all on ANY of the
       # three closed member sets. Requiring members === "kind" makes the runner STRICTER than the
-      # official — it would reject a conforming grant. The valid fixture
+      # official; it would reject a conforming grant. The valid fixture
       # check-envelope-valid-selector-all-with-extra-members flips to invalid under this mutation.
       name: "node-selector-all-open-pattern-removal",
       path: "conformance/corpus_independent.mjs",
@@ -1283,12 +1283,12 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
          "independent runner agrees on every shipped corpus case (repo mode)"}
     },
     %{
-      # jsonDecode per-node-type depth — the guard-family sibling of withinJsonBounds and the ACTUAL
+      # jsonDecode per-node-type depth, the guard-family sibling of withinJsonBounds and the ACTUAL
       # C4 content. The official Json.decode bounds only CONTAINERS (start_container level <= depth),
       # never scalars, so a 32-deep scalar-inner nest is valid. Re-introducing a per-SCALAR depth
       # check in decodeValue (the pre-fix bug) rejects that scalar at depth 33 -> ONLY
       # json-decode-exact-bound-depth-scalar-inner disagrees (the pre-existing empty-inner exact-bound
-      # case never reaches a scalar at the boundary, so it does NOT catch this — which is exactly why
+      # case never reaches a scalar at the boundary, so it does NOT catch this, which is exactly why
       # the scalar-inner case was added). The too-STRICT direction that silently fails a conforming
       # verifier. (The container-entry offset is separately guarded by the empty-inner differential.)
       name: "runner-jsondecode-scalar-depth",
@@ -1487,7 +1487,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
 
   # Baseline non-vacuity: before any mutation, the entry's UNMUTATED command must run green in a
   # clean scratch. Without this, a deleted or drifted target test makes `mix test` exit non-zero
-  # ("did not match any file"/"no tests executed") and the battery scores the red as "caught" —
+  # ("did not match any file"/"no tests executed") and the battery scores the red as "caught":
   # the deleted-test false-green the 2026-08-20 gate-integrity review named. Cached per unique
   # command so shared targets pay the baseline once per battery run.
   defp baseline_green!(mutation) do
@@ -1532,7 +1532,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
   # Returns the full argument list following the executable (hd of mutation.command). `mix test`
   # runs are serialized (`--max-cases 1`) for deterministic, fastest single-file execution.
   # `mix architecture` is returned bare: its alias proxies extra args to
-  # `elixir scripts/check_architecture.exs`, which exits 2 on any unknown flag — so appending
+  # `elixir scripts/check_architecture.exs`, which exits 2 on any unknown flag, so appending
   # anything would make every architecture entry spuriously red.
 
   # Name-resolved test targeting: line pins drifted three separate times (edits anywhere

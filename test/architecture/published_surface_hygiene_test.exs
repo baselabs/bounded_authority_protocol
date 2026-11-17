@@ -7,8 +7,8 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
   alias BoundedAuthorityProtocol.TestSupport.Portable
 
   # Published-surface hygiene gate (2026-09-14): the Hex package and its rendered docs must
-  # carry no internal authoring-tooling vocabulary. The class escaped once — the changelog and
-  # four ADRs shipped naming local harness paths and AI-vendor review peers — and was
+  # carry no internal authoring-tooling vocabulary. The class escaped once (the changelog and
+  # four ADRs shipped naming local harness paths and AI-vendor review peers) and was
   # neutralized before the next release; this gate makes the class red-capable instead of a
   # one-time sweep. The scanned set mirrors the mix.exs package `files` boundary (ROADMAP is outside that
   # boundary and is asserted absent from the scan). Explicit authoring-tool names are banned.

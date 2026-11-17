@@ -1,5 +1,5 @@
 (*************************************************************************)
-(* BAP v1 core — formal model of the stateless verification algebra.     *)
+(* BAP v1 core: formal model of the stateless verification algebra.     *)
 (* Pinned to spec/bap-v1.md rev 3 (Doc-Revision; spec-facts rule 8).     *)
 (* Rev 3 (erratum 6) restricts selector values, which this model treats *)
 (* as opaque terms; no process, query, or result changes.                *)
@@ -48,7 +48,7 @@ fun proofCompact(bitstring, bitstring): bitstring [data].
 (* REQ1-SIGNING-digest-prefix: the request digest covers the pair
    [operation, typed(cast_arguments)]. The typed projection is a free
    constructor: distinct (operation, arguments) pairs are distinct terms,
-   and h is one-way — the injectivity lemma P2 rests on. *)
+   and h is one-way. The injectivity lemma P2 rests on these properties. *)
 fun typed(bitstring, bitstring): bitstring [data].
 fun requestDigest(bitstring, bitstring): digest. (* REQ1-SIGNING-digest-prefix *)
 
@@ -64,7 +64,7 @@ fun proofPayload(bitstring, bitstring, digest, digest): bitstring [data].
 fun ctx(bitstring, bitstring, bitstring, bitstring, bitstring): bitstring [data]. (* REQ1-VERIFY-time-bounds *)
 
 (* REQ1-VERIFY-facts-redacted (P4): the verifier's output constructor takes
-   ONLY the declared fields — the grant digest, the proof id, and the
+   ONLY the declared fields: the grant digest, the proof id, and the
    holder thumbprint. Anything else can appear in the output only if it
    were an argument to this constructor; it is not. *)
 fun facts(digest, bitstring, digest): bitstring [data]. (* REQ1-VERIFY-facts-redacted *)
@@ -79,7 +79,7 @@ event verifierAcceptReq(digest, digest).
 event verifierAcceptCtx(bitstring, bitstring).
 
 (* P4 probe: the server-derived cast arguments are private to the verifier
-   (they never appear on the network in this model — the runtime derives
+   (they never appear on the network in this model; the runtime derives
    them out-of-band; the attacker model records this). *)
 free castArgs: bitstring [private].
 
@@ -137,7 +137,7 @@ let holder(skH: skey, authChan: channel, expectedCtx: bitstring,
 
 (* The malicious-holder / network-attacker signing oracle: a DIFFERENT key
    the attacker fully controls. Proofs signed here are well-formed under
-   pkA — the confusion P1 must reject (the grant names jkt(pkH)). *)
+   pkA, the confusion P1 must reject (the grant names jkt(pkH)). *)
 let attackerOracle(skA: skey) =
   in(pub, pp: bitstring);
   out(pub, proofCompact(pp, sign(pp, skA))).

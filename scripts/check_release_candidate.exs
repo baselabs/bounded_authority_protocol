@@ -7,16 +7,16 @@
 # (the original overclaim defeated by the design's adversarial pass, Challenge 3).
 #
 # Isolation strategy: each copy gets its own `deps.get` + `hex.build`, so the two
-# builds share no compiled artifacts and no fetched deps — the cache isolation that
+# builds share no compiled artifacts and no fetched deps, the cache isolation that
 # makes the gate meaningful. The developer's `_build`/`deps` are NEVER mutated (the
 # earlier purge-in-place approach was redesigned after the closeout correctness lens
 # found it left the tree degraded and depended on a best-effort restore that could
 # fail silently); building in copies sidesteps both.
 #
 # Honest scope (verified via the red-capable proof at authoring): `mix hex.build`
-# packages SOURCE files (the `files:` list — lib/, priv/, docs, metadata), not
+# packages SOURCE files (the `files:` list: lib/, priv/, docs, metadata), not
 # compiled BEAMs. The two builds therefore package the SAME source tree, and the
-# gate's value is REGRESSION DETECTION — it catches the moment a future change
+# gate's value is REGRESSION DETECTION: it catches the moment a future change
 # introduces a non-deterministic packaged input (a generated file embedding a build
 # path or timestamp, a dep that writes into a packaged dir, a metadata field that
 # varies per build). The fresh-copy + fresh-deps.get ensures the second build
@@ -31,7 +31,7 @@
 #
 # Wired into `mix quality` via the `release.candidate` alias (mix.exs). The SHA-256
 # printed on success is the candidate-evidence yardstick (same yardstick the
-# supply-chain workflow's `SHA256SUMS` uses) — recorded locally, NOT an authority
+# supply-chain workflow's `SHA256SUMS` uses), recorded locally, NOT an authority
 # shape (AGENTS rule 1: no `receipt`/`decision`).
 
 defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
@@ -48,7 +48,7 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
       # Isolation strategy (reconciled closeout F1+F2): build in two fresh COPIES of the
       # source tree, so the developer's _build/deps are never mutated and no restore is
       # needed. Each copy gets its own deps.get + hex.build, so the two builds share no
-      # compiled artifacts and no fetched deps — the cache isolation that makes the gate
+      # compiled artifacts and no fetched deps, the cache isolation that makes the gate
       # meaningful. The earlier purge-in-place approach (deps.clean + rm -rf _build)
       # left the dev's tree degraded (no _build, including dialyzer PLTs) and depended on
       # a best-effort restore that could fail silently; copying avoids both.
@@ -99,7 +99,7 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
 
   defp assert_mix_lock_present!(source_root) do
     unless File.regular?(Path.join(source_root, "mix.lock")) do
-      fail!("mix.lock is missing — reproducibility cannot be checked without a locked dep set")
+      fail!("mix.lock is missing; reproducibility cannot be checked without a locked dep set")
     end
   end
 

@@ -106,7 +106,7 @@ raise "no valid cases exercised the CDDL (#{failures.join('; ')})" if checked.ze
 #
 # A PINNED list: each exemplar's violation is expressible in CDDL (a regexp or a closed member
 # set the CDDL types). If the corpus evolves and renames one, this leg fails loudly instead of
-# going vacuous — the pinned list is the non-vacuity proof.
+# going vacuous; the pinned list is the non-vacuity proof.
 
 REJECT_EXEMPLARS = {
   # htm carries a space (0x20 outside the printable-token range the CDDL regexp pins).
@@ -123,7 +123,7 @@ by_id = cases.to_h { |c| [c["id"], c] }
 
 REJECT_EXEMPLARS.each do |id, target|
   c = by_id[id]
-  raise "reject exemplar #{id} missing from the corpus — re-pin the coherence leg" unless c
+  raise "reject exemplar #{id} missing from the corpus; re-pin the coherence leg" unless c
 
   parts = compact_parts(c["input"]["compact"])
   raise "reject exemplar #{id} carries no decodable compact" unless parts

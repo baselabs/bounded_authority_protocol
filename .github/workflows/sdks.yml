@@ -62,14 +62,14 @@ jobs:
       # carries its CI, conformance, and npm releases now.
 
       # --- Python SDK gate ---
-      - name: Python — install
+      - name: "Python: install"
         run: |
           python -m pip install uv==0.11.20
           uv sync --locked
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
         working-directory: sdks/python
 
-      - name: Python — audit the locked dependency set
+      - name: "Python: audit the locked dependency set"
         working-directory: sdks/python
         run: |
           audit_dir=$(mktemp -d)
@@ -79,41 +79,41 @@ jobs:
           uv export --locked --all-groups --no-emit-project --format pylock.toml --output-file "$audit_dir/pylock.toml"
           uvx --from pip-audit==2.9.0 pip-audit --locked "$audit_dir"
 
-      - name: Python — audit every declared dependency floor
+      - name: "Python: audit every declared dependency floor"
         run: python scripts/audit_python_floors.py
 
-      - name: Python — closure removal must fail
+      - name: "Python: closure removal must fail"
         run: python scripts/check_sdk_closures.py python
 
-      - name: Python — typecheck (mypy --strict)
+      - name: "Python: typecheck (mypy --strict)"
         run: mypy src/
         working-directory: sdks/python
 
-      - name: Python — lint
+      - name: "Python: lint"
         run: ruff check src/ tests/ tools/ examples/
         working-directory: sdks/python
 
-      - name: Python — purity check
+      - name: "Python: purity check"
         run: python tools/purity_check.py
         working-directory: sdks/python
 
-      - name: Python — license check
+      - name: "Python: license check"
         run: python tools/license_check.py
         working-directory: sdks/python
 
-      - name: Python — unit + permissiveness tests
+      - name: "Python: unit + permissiveness tests"
         run: python -m pytest tests/ -q
         working-directory: sdks/python
 
-      - name: Python — conformance (283 + census)
+      - name: "Python: conformance (283 + census)"
         run: python tests/conformance/run.py
         working-directory: sdks/python
 
-      - name: Python — v2 conformance (268 + census)
+      - name: "Python: v2 conformance (268 + census)"
         run: python tests/conformance/run_v2.py
         working-directory: sdks/python
 
-      - name: Python — v3 conformance (292 + census)
+      - name: "Python: v3 conformance (292 + census)"
         run: python tests/conformance/run_v3.py
         working-directory: sdks/python
 
@@ -134,12 +134,12 @@ jobs:
           rustup toolchain install 1.88.0 --profile minimal --component rustfmt --component clippy --no-self-update
           rustup default 1.88.0
 
-      - name: Rust — audit Cargo.lock
+      - name: "Rust: audit Cargo.lock"
         run: |
           cargo install cargo-audit --version 0.22.2 --locked
           cargo audit --file sdks/rust/Cargo.lock
 
-      - name: Rust — closure removal must fail
+      - name: "Rust: closure removal must fail"
         run: python3 scripts/check_sdk_closures.py rust
 
       - name: fmt
@@ -186,7 +186,7 @@ jobs:
         with:
           go-version: "1.25"
 
-      - name: Go — closure removal must fail
+      - name: "Go: closure removal must fail"
         run: python3 scripts/check_sdk_closures.py go
 
       - name: gofmt

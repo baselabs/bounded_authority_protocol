@@ -1,5 +1,5 @@
 #!/bin/sh
-# check_sdk_publish_infra.sh — single source of truth for the SDK publish guard.
+# check_sdk_publish_infra.sh: single source of truth for the SDK publish guard.
 #
 # Called by scripts/hooks/pre-commit (on staged blobs via stdin) and by the
 # .github/workflows/sdk-publish-guard.yml CI job (on checked-out files via stdin).
@@ -12,13 +12,13 @@
 #
 # What it blocks, and why (ADR 0015 Decision 5): no SDK publishes from this
 # monorepo. Each SDK graduates to its own per-SDK repo on first publication. This
-# script catches the ENABLING change — registry-publish commands, registry-publish
+# script catches the ENABLING change: registry-publish commands, registry-publish
 # GitHub Actions, and npm publish lifecycle hooks committed to manifests or
 # workflows. Scope is SDK-only per ADR 0015; the Elixir package is not scanned
 # here (its publish path, if any, is a separate decision under BAP-07).
 #
 # Honesty limit: this catches publish infrastructure STAGED/COMMITTED. It cannot
-# catch a literal ad-hoc 'npm publish' typed at a working tree — that is a runtime
+# catch a literal ad-hoc 'npm publish' typed at a working tree; that is a runtime
 # act no commit gate sees. CI on main is the hard gate for committed infrastructure;
 # the local hook is honor-system for contributors. The deliberate-admin bypass is
 # 'git commit --no-verify' (documented in CONTRIBUTING.md).
@@ -39,7 +39,7 @@ fi
 #
 # Executable surfaces where a registry-publish command can hide (a workflow `run:`
 # step is not the only place): GitHub workflows AND composite actions; any shell
-# script, Makefile, or justfile UNDER sdks/ (an SDK release script — the review's
+# script, Makefile, or justfile UNDER sdks/ (an SDK release script, the review's
 # `sdks/typescript/scripts/release.sh` gap); and a repo-root Makefile/justfile (a
 # top-level target that publishes an SDK). NOTE the shell-script scan is scoped to
 # `sdks/` deliberately: this guard script and scripts/hooks/pre-commit both carry the
@@ -62,12 +62,12 @@ status=0
 # Read stdin once; the two checks below both read from this variable.
 content="$(cat)"
 
-# Registry-publish CLI commands — matched with a REGEX (grep -E) that tolerates flags and args
+# Registry-publish CLI commands, matched with a REGEX (grep -E) that tolerates flags and args
 # between the tool and the publish subcommand: `cargo +stable publish`, `npm --access public
 # publish`, `yarn -s publish` all count. The tool boundary is start-of-line, whitespace, OR a
 # path separator, so a path-qualified command (`/usr/local/bin/npm publish`,
 # `./node_modules/.bin/npm publish`) is caught, while an alnum/`-`/`.` run before the tool is NOT a
-# boundary (so `foocargo` and `cargo-release` are not read as `cargo` — the latter's contiguous
+# boundary (so `foocargo` and `cargo-release` are not read as `cargo`; the latter's contiguous
 # form is caught by the fixed list below). The subcommand is token-bounded (leading boundary +
 # trailing space/EOL) so `npm run publish-docs` (token `publish-docs`, not `publish`) does NOT
 # match.
@@ -86,7 +86,7 @@ JS-DevTools/npm-publish
 JS-DevTools/action-publish
 crate-ci/cargo-release'
 
-# npm publish lifecycle hooks + publishConfig — publish infrastructure specific to
+# npm publish lifecycle hooks + publishConfig: publish infrastructure specific to
 # SDK manifests. Checked on manifests only (meaningless in a workflow).
 manifest_keys='prepublishOnly
 prepack
@@ -96,7 +96,7 @@ publishConfig'
 # Publish CLI subcommands (regex, flag-tolerant): every scanned surface.
 for re in "$cli_publish_re" "$twine_upload_re"; do
   if printf '%s' "$content" 2>/dev/null | grep -qE -- "$re"; then
-    printf '%s: registry-publish command — SDKs must not publish from the monorepo (ADR 0015)\n' \
+    printf '%s: registry-publish command: SDKs must not publish from the monorepo (ADR 0015)\n' \
       "$path" >&2
     status=1
   fi
@@ -106,7 +106,7 @@ done
 while IFS= read -r cmd; do
   [ -n "$cmd" ] || continue
   if printf '%s' "$content" 2>/dev/null | grep -qF -- "$cmd"; then
-    printf '%s: publish signal "%s" — SDKs must not publish from the monorepo (ADR 0015)\n' \
+    printf '%s: publish signal "%s": SDKs must not publish from the monorepo (ADR 0015)\n' \
       "$path" "$cmd" >&2
     status=1
   fi
@@ -119,7 +119,7 @@ if [ "$is_sdk_manifest" = 1 ]; then
   while IFS= read -r key; do
     [ -n "$key" ] || continue
     if printf '%s' "$content" 2>/dev/null | grep -qF -- "$key"; then
-      printf '%s: publish lifecycle key "%s" — SDKs must not publish from the monorepo (ADR 0015)\n' \
+      printf '%s: publish lifecycle key "%s": SDKs must not publish from the monorepo (ADR 0015)\n' \
         "$path" "$key" >&2
       status=1
     fi

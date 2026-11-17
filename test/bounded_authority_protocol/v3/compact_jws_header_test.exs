@@ -3,7 +3,7 @@ defmodule BoundedAuthorityProtocol.V3.CompactJwsHeaderTest do
   Header-shape closure legs for `V3.CompactJws.assemble/3`: the per-kind exact-header
   walk's reject arms (wrong member set, wrong typ, undecodable JWK) and the unknown-kind
   fallthrough. The signing-input builders produce only conforming headers, so these arms
-  are reachable only through direct assembly with hand-built segments — exactly the
+  are reachable only through direct assembly with hand-built segments, exactly the
   producer-side closed set the corpus pins verify-side.
   """
 
