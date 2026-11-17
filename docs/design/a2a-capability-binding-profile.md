@@ -5,7 +5,7 @@ analysis over the binding-layer fork, then independent adversarial review of bot
 and this specification (two review rounds each; every finding adjudicated against first-hand
 sources and repaired). This document changes no wire format, public API, verifier behavior, or
 package dependency. It is the A2A counterpart of the [AP2 interop profile](ap2-interop-profile.md)'s
-§6 open question, decided through the same method; it composes with — does not replace — A2A's
+§6 transport question, now resolved in this design; it composes with A2A's
 authentication surfaces.
 
 Evidence classes at load-bearing claims:
@@ -386,11 +386,15 @@ rule.
   human principal on whose behalf the client acts is the reserved on-behalf-of surface; both it
   and the delegation names stay at the reserved-registry-row level, enumerated only by §14's
   gate sentence.
-- **UCP.** Outside this binding decision's scope; a separately-owned open
-  question whose precondition is pinning and reading a UCP source first. Nothing in this
-  profile designs a UCP riding point. That question is now closed: the riding point is
-  transport-composed,
-  and this profile covers UCP's A2A transport as-is for deployments speaking A2A 1.0.
+- **UCP.** The riding point is transport-composed, not a separate BAP layer. This profile
+  covers UCP over A2A for deployments speaking the pinned A2A 1.0 shape, including the
+  `A2A-Extensions` opt-in and canonical method names. The UCP source examined at
+  [`d3ccb55c43d0d801f4f8616e877599e2bd12c6ae`](https://github.com/Universal-Commerce-Protocol/ucp/tree/d3ccb55c43d0d801f4f8616e877599e2bd12c6ae)
+  instead used `X-A2A-Extensions` and `message/send`; those spellings do not negotiate this
+  profile. UCP over MCP belongs to the MCP extension's open message-binding design. A
+  UCP-REST vocabulary and projection are not defined here; Embedded transport has no
+  per-request HTTP target and is outside this profile. None of this establishes working
+  UCP interoperability.
 
 ## 13. Verification posture and vectors
 
@@ -423,8 +427,8 @@ existing reserved registry rows. Compliance read of this document:
 
 ## 15. Open questions
 
-1. A venue-facing A2A extension document (the `.mdx` analog of the MCP extension drafts) — owner-gated,
-   not part of this decision's scope; this repository's design spec is the current deliverable.
+1. Hosting or submitting the existing [venue-facing A2A extension draft](../extensions/a2a-capability-binding.mdx)
+   remains owner-gated. The draft exists; venue acceptance and implementation are not claimed.
 2. Eventual IANA registration of the carriage header names (template path per A2A §14.2) —
    outside this slice; coordinates with the BAP-12 row's claims/media-type filings, which are
    separate registries.

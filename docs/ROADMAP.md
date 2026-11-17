@@ -14,13 +14,16 @@ specifications under [`spec/`](../spec/), and the [errata registry](errata.md).
 - **Verifiers in other languages:** TypeScript is published on npm. Python, Rust, and Go live
   under [`sdks/`](../sdks/) and pass every corpus; each moves to its own repository when it is
   first published.
+- **Transport design:** the [A2A capability-binding profile](design/a2a-capability-binding-profile.md#5-carriage)
+  defines `BA-Grant` and `BA-Proof` HTTP carriage and the corresponding gRPC metadata. Reuse
+  that carriage rather than introducing a separate BAP-over-HTTP binding. The profile is
+  design-only; it does not establish runtime interoperability.
 
 ## Later
 
 Candidates, not commitments; each lands as its own minor release under the governance rules:
 
 - `Json.from_term/2`, converting already-parsed Elixir terms into the tagged JSON form;
-- an HTTP transport binding that names the headers carrying a grant and a proof;
 - first publication of the Python, Rust, and Go verifiers;
 - the standards submissions prepared under [`standards/`](standards/) and
   [`extensions/`](extensions/), when a venue accepts the work.

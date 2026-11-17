@@ -16,8 +16,8 @@ Evidence classes at each load-bearing claim:
 
 ## 0. Scope and framing
 
-This profile specifies how the published Bounded Authority Protocol (contract-majors 1 and 2, as
-of 0.4.2) composes with the published AP2 text (v0.2 at `e1ea56d`) at the agent-authorization
+This profile specifies how the published Bounded Authority Protocol (contract-majors 1, 2,
+and 3) composes with the pinned AP2 text (v0.2 at `e1ea56d`) at the agent-authorization
 layer. The framing is the owner's settled sentence: BAP is **"a different answer at the same
 layer as AP2's agent authorization framework, composable with it"** — never "a deeper layer
 under AP2 with no overlap."
@@ -29,7 +29,7 @@ claim:
 - that an AP2-conforming agent can consume a BAP grant + proof (unverified);
 - that either protocol's verifier accepts the other's credential or proof bytes;
 - that BAP verification yields an authorization decision, receipt, or any runtime guarantee;
-- that any host-protocol riding question (§6) is resolved.
+- that a designed host-protocol binding (§6) has been implemented or independently verified.
 
 This is the mapping note's honesty discipline
 (`docs/extensions/ap2-mandate-mapping.md`, shipped in 0.4.2), extended from the credential-model
@@ -77,24 +77,23 @@ in `checkout_mandate.md` and `agent_authorization.md`; SDK `ec_key_to_jwk` emits
 hop's `cnf.jwk` (`sdjwt/chain.py`). BAP contract-majors 1 and 2 are Ed25519-only
 (`BAP1-Ed25519-SHA256`, `BAP2-Ed25519-SHA256`; the proof JWK is exactly the Ed25519 OKP form,
 `spec/bap-v1.md` `REQ1-HEADER-proof-jwk`; `cnf` is `{jkt: thumbprint}`,
-`REQ1-HEADER-thumbprint`). One holder key therefore cannot serve both sides today — the mapping
-note's stated composition seam.
+`REQ1-HEADER-thumbprint`). An Ed25519 holder key cannot serve AP2's P-256 holder role.
+Contract-major 3 supplies the ES256 bridge below; this limitation applies to majors 1 and 2,
+not every published BAP suite.
 
-**The bridge.** An ES256 contract-major suite is the chosen bridge, under the charter's
-major-bound naming: `BAP<n>-ES256-SHA256` with `BAP<n>-*` domain separators, where the suite's
-own specification fixes `n` (contract-major 3, [`spec/bap-v3.md`](../../spec/bap-v3.md)). This
-profile describes the bridge contract; the suite's specification, corpus, and implementation
-build it. The suite gives BAP:
+**The bridge.** Contract-major 3 is the shipped `BAP3-ES256-SHA256` suite with `BAP3-*`
+domain separators ([specification](../../spec/bap-v3.md),
+[Elixir facade](../../lib/bounded_authority_protocol/v3.ex)). It provides:
 
 - ECDSA over P-256 with SHA-256 per RFC 7518 §3.4, over the exact RFC 7515 signing input;
 - a proof-key JWK shape `{kty: "EC", crv: "P-256", x, y}` and an RFC 7638 thumbprint over the
   required EC members, so BAP `cnf.jkt` and AP2 `cnf.jwk` are two spellings of one key identity;
 - its own certified corpus and cross-major rejection per the charter's activation checklist.
 
-With the suite in place, the **same EC P-256 holder key pair** can be the AP2 agent key (a
-`cnf.jwk` value) and the BAP proof key. The owner decision of 2026-09-20 that the TypeScript
-signer adopts the ES256 suite makes the bridge two-sided on the producing side as well (DERIVED:
-program record).
+The **same EC P-256 holder key pair** can be the AP2 agent key (a `cnf.jwk` value) and the
+contract-major 3 BAP proof key. BAP's [EC JWK codec](../../lib/bounded_authority_protocol/v3/ec_jwk.ex)
+defines the public-key and thumbprint encoding. This key-material correspondence does not
+demonstrate an AP2 agent consuming BAP credentials.
 
 **Honest bounds of the bridge.** Key-material correspondence is not credential-byte
 compatibility: AP2 `cnf` carries the full `jwk` object, BAP `cnf` carries the `jkt` thumbprint;
@@ -272,16 +271,18 @@ checked against the published algebra):
 {"kind": "equals", "path": ["payment_amount", "currency"], "value": "USD"}
 ```
 
-Range selectors require a contract-major 2 grant (v1 grants carry no `lte`/`gte`; the mapping
+Range selectors require a contract-major 2 or 3 grant (v1 grants carry no `lte`/`gte`; the mapping
 note states the same for the constraint correspondence). A v1-only composition can express the
 `equals`/`one_of` rows but not the amount-range row.
 
 ## 6. Element 4 — Where a BAP proof rides in A2A and UCP
 
-**Open by design.** BAP has no A2A binding today, and this profile does not create one: whether
-and how a BAP grant + proof rides in A2A agent delegations is a separate design decision, to be
-taken through the project's design method. The dependency is recorded here so that decision
-inherits a settled base and no unstated assumption.
+The accepted [A2A capability-binding profile](a2a-capability-binding-profile.md) defines
+discovery and negotiation at the A2A layer, with `BA-Grant` and `BA-Proof` HTTP headers
+(lowercase metadata on gRPC). It binds each transport request and the bounded per-operation
+projection. It covers a direct issuer/holder/verifier hop, not portable delegation. The
+[venue-facing extension draft](../extensions/a2a-capability-binding.mdx) exists, but neither
+document claims a working A2A implementation or cross-protocol interoperability.
 
 What this profile can state structurally (all OBSERVED or cited-to-published):
 
@@ -297,14 +298,14 @@ What this profile can state structurally (all OBSERVED or cited-to-published):
   request-level binding or the reverse.
 - In UCP terms, AP2's own composition point is the Checkout object (the merchant-signed
   `checkout_jwt` MUST be the UCP Checkout when used with UCP — `checkout_mandate.md`, OBSERVED).
-  A BAP proof's UCP riding point is not designed anywhere in this repository's published text.
+  BAP's UCP riding point is transport-composed: the A2A profile applies to deployments speaking
+  its pinned A2A 1.0 shape; UCP over MCP stays within the MCP extension's still-open message
+  binding; a UCP-REST operation vocabulary and projection are not defined here; Embedded
+  transport is outside the HTTP proof profile. See the [A2A profile's UCP boundary](a2a-capability-binding-profile.md#12-delegation-routing-and-ucp).
 
-**Element-4 output:** a recorded dependency and open question for the A2A-binding decision,
-plus the binding-surface separation above as the constraint any answer must respect. Nothing
-here settles that question. Both have since been settled: the A2A binding by the [A2A
-capability-binding profile](a2a-capability-binding-profile.md), and BAP's UCP riding point by
-a transport-composed design (this profile's §6 separation is the constraint both
-respected).
+**Element-4 output:** a designed A2A carriage and a transport-composed UCP posture, with
+separate AP2 and BAP proof-binding surfaces. A design is not implementation evidence, and
+neither protocol's proof substitutes for the other's.
 
 ## 7. Element 5 — Receipt correspondence
 
@@ -339,8 +340,8 @@ returns the 22 schema JSON files). OBSERVED. Upstream vector offers sit in AP2 P
   content never projects), and the digest-spelling map's conversions.
 - No interop claim will rest on self-round-trips (repository workflow rule; the
   no-self-round-trip discipline the mapping note carries). A cross-protocol conformance claim
-  would require an independent implementation exercising both sides — impossible until the
-  ES256 suite exists and pointless to assert before that.
+  would require an independent implementation exercising both sides. The shipped ES256 suite
+  supplies the key-material bridge, not that evidence.
 - Contributing vectors upstream to AP2 requires the Google CLA and is the owner's call; nothing
   in this program assumes it.
 
@@ -348,12 +349,13 @@ returns the 22 schema JSON files). OBSERVED. Upstream vector offers sit in AP2 P
 
 Questions this profile leaves to their owning decisions:
 
-1. **The A2A binding** (§6); this profile records constraints, not answers.
-2. **The ES256 suite** — its specification fixes the major number, the JWK/thumbprint encodings, corpus
-   identity, and the SDK/signer cohort sweep; §3 describes the bridge contract only.
-3. **The projection vectors** (§8).
-4. **`execution_date_epoch` normalization** (§5.2) — INFERRED until a runtime design owns the
+The A2A binding is designed (§6), and ES256 is shipped as contract-major 3 (§3). The remaining
+implementation dependencies are:
+
+1. **The projection vectors** (§8).
+2. **`execution_date_epoch` normalization** (§5.2), which remains INFERRED until a runtime design owns the
    conversion.
+3. **Independent cross-protocol execution evidence**, beyond the BAP suite corpora.
 
 ## 10. Disclosure-gate compliance
 
@@ -366,9 +368,7 @@ existing reserved registry rows. Compliance read of this document against the ac
   designed, specified, or promised.
 - Budget material cites the [successor-major charter](successor-major-charter.md) § 5 budget posture, the charter's published selector-expressiveness text; no
   `ba+budget-window` shape is designed (that posture defers it).
-- The ES256 suite is described in its bridge role only, deferring all design to its own
-  specification.
-  No public announcement is made here beyond what the mapping note already states as fact (the
-  suite difference).
+- The shipped ES256 suite is described in its bridge role only; its specification defines its
+  closed wire contract. No AP2 runtime compatibility follows from sharing a key type.
 - No forward promise of submission, upstream contribution, or runtime compatibility appears
   (§0's honesty list governs the whole document).

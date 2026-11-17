@@ -34,6 +34,10 @@ agent authorization framework — composable with it, not nested under it. Both 
 permission to a holder key with per-presentation proof-of-possession; they differ in constraint
 language, verifier state, proof binding surface, output, and signature suite, as mapped below.
 
+The [A2A capability-binding design](../design/a2a-capability-binding-profile.md) now fixes
+`BA-Grant`/`BA-Proof` carriage, negotiation, and request projection for direct A2A requests.
+It does not implement an AP2 agent, delegation, or cross-protocol credential acceptance.
+
 ## The structural correspondence
 
 Both AP2 and the Bounded Authority Protocol encode *issuer-signed authorization credentials that a
@@ -61,8 +65,8 @@ evaluation** — the verifier treats them as failing
 (`docs/ap2/agent_authorization.md` § Verification and Processing Rules). The Bounded Authority
 Protocol's selector algebra is a **closed kind set** — contract-major 1 recognizes `all`, `equals`,
 and `one_of`; contract-major 2 adds the per-request range kinds `lte` and `gte`
-([`spec/bap-v2.md`](../../spec/bap-v2.md); ADR 0028; activated
-by ADR 0030, released in 0.4.0) — and unknown kinds,
+([`spec/bap-v2.md`](../../spec/bap-v2.md), released in 0.4.0), also carried by contract-major 3.
+Unknown kinds,
 members, and encodings fail closed. Both protocols fail closed on the unrecognized; they differ in
 who may extend the recognized set (anyone, via a new AP2 constraint type; only a new BAP
 contract-major).
@@ -81,8 +85,8 @@ For the Payment Mandate constraints specifically (`docs/ap2/payment_mandate.md`)
   Bounded Authority Protocol's public verifier is stateless by construction: no verifier can check a
   cumulative bound from grant bytes and request context alone. Budget enforcement routes to the
   issuer-attestation / runtime-accounting posture
-  ([successor-major charter](../design/successor-major-charter.md) § Selector expressiveness;
-  ADR 0029). This is a real structural disagreement between
+  ([successor-major charter](../design/successor-major-charter.md) § Selector expressiveness).
+  This is a real structural disagreement between
   the two protocols, recorded on purpose rather than papered over.
 
 ## Other structural differences a reviewer will meet
@@ -91,15 +95,16 @@ For the Payment Mandate constraints specifically (`docs/ap2/payment_mandate.md`)
   scheme such as ECDSA and forbids deterministic signatures such as Ed25519 there
   (`docs/ap2/specification.md` § Payment Mandate); on the holder side, AP2's agent key material is
   profiled as EC P-256 with ES256 throughout — the open mandate's `cnf.jwk` and the SD-JWT /
-  key-binding algorithm values (`docs/ap2/agent_authorization.md`) — while every Bounded Authority
-  Protocol suite to date is Ed25519 (`BAP1-`/`BAP2-Ed25519-SHA256`). One holder key therefore
-  cannot serve both sides today, and credential-level byte interoperability is not claimed. The
-  suite difference is a composition seam, named here so a reviewer does not have to find it.
+  key-binding algorithm values (`docs/ap2/agent_authorization.md`). BAP contract-majors 1 and 2
+  use Ed25519; [contract-major 3](../../spec/bap-v3.md) uses ES256/P-256. The same P-256 holder
+  key can therefore serve AP2 and BAP major 3, with BAP's `cnf.jkt` derived from the public JWK
+  rather than AP2's embedded `cnf.jwk`. Sharing key material does not make SD-JWT mandates and
+  compact BAP grants interchangeable.
 - **Proof binding surface.** AP2's key-binding hop binds the mandate content, `aud`, `nonce`,
   `iat`, and a hash of the preceding SD-JWT (`sd_hash`, or `issuer_jwt_hash` in the SDK's
   delegation chain) — no DPoP / RFC 9421-style binding of an HTTP method, URI, or request body
   exists anywhere in AP2 v0.2. A Bounded Authority Protocol proof binds `htm`, `htu`, `ba_inv`,
-  and `ba_op` over server-derived typed request arguments. A composition must not assume either
+  `ba_op`, and the `ba_req` digest over server-derived typed request arguments. A composition must not assume either
   binding surface enforces the other's.
 - **Selective disclosure.** AP2 mandates are SD-JWT VCs: constraint content may be hidden behind
   disclosure hashes and revealed per presentation, with the agent choosing disclosures to maximize
@@ -108,15 +113,24 @@ For the Payment Mandate constraints specifically (`docs/ap2/payment_mandate.md`)
   every selector is evaluated on every verification. A composition inherits AP2's partial-disclosure
   semantics on the AP2 side only.
 
-## The host-protocol question (open)
+## Host-protocol composition
 
 AP2 targets A2A, MCP, and UCP as host protocols, so the capability-authorization extension's
 mandate correspondence is relevant at multiple layers. The Bounded Authority Protocol's charter
 venue strategy names the MCP `ext-auth` repository as its first venue — and MCP is one of AP2's
 named hosts — so an MCP-layer correspondence (BAP grants presented at MCP tool/resource invocations,
 AP2 mandates securing the payment/checkout step an MCP tool triggers) is directly in scope. The
-A2A and UCP layers are additional correspondences (BAP grants carried in A2A agent delegations; AP2
-mandates composed with UCP checkout flows), not mutually exclusive with the MCP one.
+A2A and UCP correspondences are not mutually exclusive with the MCP one. The accepted
+[A2A profile](../design/a2a-capability-binding-profile.md#5-carriage) specifies `BA-Grant` and
+`BA-Proof` HTTP headers and lowercase gRPC metadata, with A2A extension negotiation and a
+bounded request projection. It is a single-holder request binding, not grant forwarding or
+portable delegation. Its [extension draft](a2a-capability-binding.mdx) is written but unimplemented.
+
+UCP composition follows the selected transport: A2A-1.0-speaking deployments use that A2A
+design; the MCP message binding remains open; UCP-REST operation vocabulary and projection
+are not defined here; Embedded transport is outside the HTTP proof profile. The
+[A2A profile's UCP boundary](../design/a2a-capability-binding-profile.md#12-delegation-routing-and-ucp)
+records the pinned UCP/A2A version mismatch. This is a composition design, not runtime evidence.
 
 Resolving the primary target is a content decision for the extension's eventual submission, shaped
 by where adoption is real; this note maps the correspondences without prejudging the venue split.
@@ -125,11 +139,11 @@ The structural mapping above holds at whichever host layer an adopter composes A
 ## Honesty line
 
 Every correspondence above is a **structural** mapping of the published Bounded Authority Protocol
-mechanism (contract-majors 1 and 2) to AP2's VDC mandate model (v0.2). This note does **not** claim:
+mechanism (contract-majors 1, 2, and 3) to AP2's VDC mandate model (v0.2). This note does **not** claim:
 
 - that an AP2-conforming agent can consume a BAP grant + proof (unverified);
-- that either protocol's verifier accepts the other's credential or proof bytes (the signature-suite
-  difference above is one reason it does not);
+- that either protocol's verifier accepts the other's credential or proof bytes, even when
+  both use ES256;
 - that Bounded Authority Protocol verification yields an authorization decision or receipt — it
   yields facts marked `not_evaluated`, by design;
 - that the host-protocol question (which host layer among A2A, MCP, and UCP is primary) is resolved.

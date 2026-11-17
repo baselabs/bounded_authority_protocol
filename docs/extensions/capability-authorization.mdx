@@ -202,12 +202,19 @@ value set). V1 does **not** include inequality or range selectors, so a v1 capab
 v1-only deployment range bounds are the deployment's responsibility (e.g. a separate policy check
 the server applies after verification), not the capability algebra's. The protocol's contract-major
 2 adds the per-request range kinds `lte` and `gte` (same-tag numeric operands, inclusive comparison)
-([v2 profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v2.md);
-ADR 0030);
+([v2 profile](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v2.md));
 a future revision of this extension may bind v2 grants — this draft does not. Cumulative budgets
 remain outside the selector algebra in both majors — a stateless verifier cannot check a cumulative
 bound — and route to the issuer-attestation / runtime-accounting posture
-(ADR 0029).
+([successor-major charter](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/successor-major-charter.md)).
+
+**AP2 composition:** BAP is a different answer at the same agent-authorization layer as AP2,
+and composes with it. Both use issuer-signed, holder-key-bound credentials, but their
+constraint languages, proof bindings, and verifier outputs differ. The
+[AP2 mandate mapping](ap2-mandate-mapping.md) records those correspondences, including the
+shipped ES256 bridge in BAP contract-major 3 and the designed A2A `BA-Grant`/`BA-Proof`
+carriage. The A2A design does not settle this MCP draft's open message binding, and neither
+document establishes an AP2 agent consuming BAP credentials.
 
 ## 6. Security considerations
 
