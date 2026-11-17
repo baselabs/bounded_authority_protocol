@@ -197,7 +197,9 @@ def test_integer_and_float_distinct_identity():
     float_one = _unwrap(dec(b"1.0"))
     assert isinstance(int_one, JInt)
     assert isinstance(float_one, JFloat)
-    assert _to_hex(_unwrap(semantic_identity(int_one))) != _to_hex(_unwrap(semantic_identity(float_one)))
+    assert _to_hex(_unwrap(semantic_identity(int_one))) != _to_hex(
+        _unwrap(semantic_identity(float_one))
+    )
 
 
 def test_equals_selector_distinguishes_int_from_float():
@@ -269,6 +271,7 @@ def test_jcs_astral_codepoint_emits_4_byte_utf8():
 # REQ1-JSON-jcs-exact, REQ1-VERIFY-revalidate). Removing the fix makes its test red
 # (ADR 0014 D5-D7). The differential run records discovery, not normative authority.
 
+
 def test_lone_high_surrogate_at_eof_is_invalid_not_indexerror():
     """Claude opus cross-vendor finding: a lone high-surrogate \\uXXXX escape at end-of-buffer
     (b'\"\\\\uD800') must fail closed as InvalidError, not raise IndexError on src[ctx.pos+1].
@@ -323,7 +326,9 @@ def test_malformed_ipv6_literal_rejected():
     assert isinstance(uri_normalize(b"https://[gggg]/"), Err)
     # An embedded IPv4 address occupies only the final 32 bits
     # (RFC 3986 §3.2.2; spec/bap-v1.md §13, REQ1-URI-reject-list).
-    assert isinstance(uri_normalize(b"https://[1.2.3.4:5::6]/"), Err), "non-tail IPv4 group must reject"
+    assert isinstance(uri_normalize(b"https://[1.2.3.4:5::6]/"), Err), (
+        "non-tail IPv4 group must reject"
+    )
     # Controls: valid IPv6 literals still normalize.
     assert uri_normalize(b"https://[::1]/").is_ok
     assert uri_normalize(b"https://[2001:db8::1]/").is_ok
@@ -376,6 +381,7 @@ def test_jcs_enforces_per_node_bounds_at_encode():
 
 # === FIX-C cross-vendor remediation — v1 façade closed-boundary (defect-injected) ===
 
+
 def test_untrusted_key_locator_decodes_only_protected_segment():
     """Cross-vendor #13: untrusted_key_locator MUST decode ONLY the protected segment
     (spec/bap-v1.md §18, REQ1-LOCATOR-opaque-payload). A compact with a valid grant
@@ -407,12 +413,24 @@ def test_check_envelope_rejects_null_trusted_issuer_fail_closed():
 
     junk = b"aaa.bbb.ccc"
     # Must return Err (fail-closed); without the guard this raises AttributeError.
-    r = check_envelope(junk, junk, ExpectedRequest(
-        trusted_issuer=None,  # type: ignore[arg-type]
-        issuer="x", audience="x", method="GET", target_uri="https://x.example/",
-        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
-        cast_arguments={"t": "null", "v": None}, evaluation_time=100, clock_skew=0,
-        proof_max_age=300, nonce=("not_required",)))
+    r = check_envelope(
+        junk,
+        junk,
+        ExpectedRequest(
+            trusted_issuer=None,  # type: ignore[arg-type]
+            issuer="x",
+            audience="x",
+            method="GET",
+            target_uri="https://x.example/",
+            invocation_id="550e8400-e29b-41d4-a716-446655440000",
+            operation="read",
+            cast_arguments={"t": "null", "v": None},
+            evaluation_time=100,
+            clock_skew=0,
+            proof_max_age=300,
+            nonce=("not_required",),
+        ),
+    )
     assert not r.is_ok
 
 
@@ -424,25 +442,38 @@ def _valid_envelope():
     issuer_pub, issuer_priv = _fresh_key()
     holder_pub, holder_priv = _fresh_key()
     grant = GrantProducer(
-        key_id="issuer-123456", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
-        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        key_id="issuer-123456",
+        issuer="https://issuer.example.test",
+        grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",),
+        issued_at=1000,
+        not_before=1000,
+        expires_at=2000,
         holder_thumbprint=_b64url(_unwrap(public_key_thumbprint_raw(holder_pub))),
         operations=(OperationInput(name="read", selectors=("all",)),),
     )
     gsi = grant_signing_input(grant)
     assert gsi.is_ok
-    gmsg = f"{gsi.value.protected_segment.decode('ascii')}.{gsi.value.payload_segment.decode('ascii')}".encode("ascii")
+    gmsg = f"{gsi.value.protected_segment.decode('ascii')}.{gsi.value.payload_segment.decode('ascii')}".encode(
+        "ascii"
+    )
     grant_compact = _must_assemble(gsi.value, issuer_priv.sign(gmsg))
     return grant_compact, _signed_proof(grant_compact, holder_pub, holder_priv), issuer_pub
 
 
 def _envelope_expectation(issuer_pub: bytes, **overrides):
     base = {
-        "issuer": "https://issuer.example.test", "audience": "https://resource.example.test",
-        "method": "POST", "target_uri": "https://resource.example.test/invoke",
-        "invocation_id": "550e8400-e29b-41d4-a716-446655440000", "operation": "read",
-        "cast_arguments": _NULL_ARGS, "evaluation_time": 1500, "clock_skew": 60,
-        "proof_max_age": 300, "nonce": NonceNotRequired(),
+        "issuer": "https://issuer.example.test",
+        "audience": "https://resource.example.test",
+        "method": "POST",
+        "target_uri": "https://resource.example.test/invoke",
+        "invocation_id": "550e8400-e29b-41d4-a716-446655440000",
+        "operation": "read",
+        "cast_arguments": _NULL_ARGS,
+        "evaluation_time": 1500,
+        "clock_skew": 60,
+        "proof_max_age": 300,
+        "nonce": NonceNotRequired(),
     }
     return ExpectedRequest(
         trusted_issuer=TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
@@ -470,7 +501,9 @@ def test_check_envelope_rejects_fractional_and_zero_temporal_context():
     assert not call(proof_max_age=0).is_ok
     # The guards also fire when the compacts are junk (they run before parsing).
     junk = b"aaa.bbb.ccc"
-    assert not check_envelope(junk, junk, _envelope_expectation(issuer_pub, evaluation_time=150.5)).is_ok
+    assert not check_envelope(
+        junk, junk, _envelope_expectation(issuer_pub, evaluation_time=150.5)
+    ).is_ok
 
 
 # Each closure was verified divergent against the running reference verifier, then corrected
@@ -490,8 +523,11 @@ def _fresh_key() -> tuple[bytes, Ed25519PrivateKey]:
 # y = 2 (canonical, not small order) and S = L - 1.
 _GATE_PASSING_SIG = bytearray(64)
 _GATE_PASSING_SIG[1] = 2
-_GATE_PASSING_SIG[32:] = (0x1000000000000000000000000000000014DEF9DEA2F79CD65812631A5CF5D3ED - 1).to_bytes(32, "little")
+_GATE_PASSING_SIG[32:] = (
+    0x1000000000000000000000000000000014DEF9DEA2F79CD65812631A5CF5D3ED - 1
+).to_bytes(32, "little")
 _GATE_PASSING_SIG = bytes(_GATE_PASSING_SIG)
+
 
 def _must_assemble(si: SigningInput, sig: bytes, es256: bool = False) -> bytes:
     """Unwrap the low-level assembler's Result in test helpers (failure is a test-setup bug). Uses
@@ -509,7 +545,9 @@ def _b64url(b: bytes) -> str:
 def _signed_anchor_compact(anchor: BoundaryAnchorProducer, priv: Ed25519PrivateKey) -> bytes:
     si = boundary_anchor_signing_input(anchor)
     assert si.is_ok, "anchor signing input failed"
-    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
+    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode(
+        "ascii"
+    )
     sig = priv.sign(message)
     return _must_assemble(si.value, sig)
 
@@ -529,7 +567,9 @@ def _build_archive(
     chronology/cycle gate fires."""
     chain_id = "urn:example:chain"
     zero_prev = Z32
-    row_entry = ConsumptionEntry(chain_id=chain_id, sequence=1, previous_hash=zero_prev, commitment=bytes([7] * 32))
+    row_entry = ConsumptionEntry(
+        chain_id=chain_id, sequence=1, previous_hash=zero_prev, commitment=bytes([7] * 32)
+    )
     encoded = encode_consumption_entry(row_entry)
     assert encoded.is_ok, "row encode failed"
     row_bytes = encoded.value.bytes_
@@ -537,8 +577,13 @@ def _build_archive(
     start_pub, start_priv = keys[0]
     start_compact = _signed_anchor_compact(
         BoundaryAnchorProducer(
-            anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id=chain_id, sequence=0,
-            chain_hash=zero_prev, key_id="k0", public_key=start_pub,
+            anchor_id="urn:example:anchor:start",
+            anchored_at=1000,
+            chain_id=chain_id,
+            sequence=0,
+            chain_hash=zero_prev,
+            key_id="k0",
+            public_key=start_pub,
         ),
         start_priv,
     )
@@ -551,54 +596,103 @@ def _build_archive(
         to_fp = _unwrap(public_key_thumbprint_raw(nxt_pub))
         effective_at = effective_ats[i] if effective_ats is not None else 1500 + 500 * i
         tp = KeyTransitionProducer(
-            transition_id=f"urn:example:transition:{i}", chain_id=chain_id, effective_at=effective_at,
-            current_key_id=f"k{i}", current_public_key=cur_pub,
-            next_key_id=f"k{i + 1}", next_public_key=nxt_pub,
+            transition_id=f"urn:example:transition:{i}",
+            chain_id=chain_id,
+            effective_at=effective_at,
+            current_key_id=f"k{i}",
+            current_public_key=cur_pub,
+            next_key_id=f"k{i + 1}",
+            next_public_key=nxt_pub,
         )
         si = key_transition_signing_input(tp)
         assert si.is_ok, "transition signing input failed"
-        message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
+        message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode(
+            "ascii"
+        )
         sig = cur_priv.sign(message)
         transitions.append(_must_assemble(si.value, sig))
-        expected_transitions.append(ExpectedKeyTransition(
-            transition_id=f"urn:example:transition:{i}", chain_id=chain_id, effective_at=effective_at,
-            current_key_id=f"k{i}", current_key_fingerprint=from_fp,
-            next_key_id=f"k{i + 1}", next_key_fingerprint=to_fp,
-        ))
+        expected_transitions.append(
+            ExpectedKeyTransition(
+                transition_id=f"urn:example:transition:{i}",
+                chain_id=chain_id,
+                effective_at=effective_at,
+                current_key_id=f"k{i}",
+                current_key_fingerprint=from_fp,
+                next_key_id=f"k{i + 1}",
+                next_key_fingerprint=to_fp,
+            )
+        )
     end_pub, end_priv = keys[-1]
     last_effective_at = expected_transitions[-1].effective_at if expected_transitions else 1000
-    end_at = end_anchored_at if end_anchored_at is not None else max(last_effective_at + 1, 1000 + 500 * len(keys))
+    end_at = (
+        end_anchored_at
+        if end_anchored_at is not None
+        else max(last_effective_at + 1, 1000 + 500 * len(keys))
+    )
     end_compact = _signed_anchor_compact(
         BoundaryAnchorProducer(
-            anchor_id="urn:example:anchor:end", anchored_at=end_at, chain_id=chain_id, sequence=1,
-            chain_hash=last_hash, key_id=f"k{len(keys) - 1}", public_key=end_pub,
+            anchor_id="urn:example:anchor:end",
+            anchored_at=end_at,
+            chain_id=chain_id,
+            sequence=1,
+            chain_hash=last_hash,
+            key_id=f"k{len(keys) - 1}",
+            public_key=end_pub,
         ),
         end_priv,
     )
     chain = ExpectedChain(
-        chain_id=chain_id, first_sequence=1, last_sequence=1, row_count=1,
-        previous_hash=zero_prev, last_hash=last_hash,
+        chain_id=chain_id,
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=zero_prev,
+        last_hash=last_hash,
     )
     input_ = AnchoredExportInput(
-        rows=(row_bytes,), start_anchor=start_compact, end_anchor=end_compact,
-        transitions=tuple(transitions), chain_id=chain_id, first_sequence=1, last_sequence=1, row_count=1,
-        previous_hash=zero_prev, last_hash=last_hash,
+        rows=(row_bytes,),
+        start_anchor=start_compact,
+        end_anchor=end_compact,
+        transitions=tuple(transitions),
+        chain_id=chain_id,
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=zero_prev,
+        last_hash=last_hash,
     )
     start_anchor = ExpectedAnchor(
-        anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id=chain_id, sequence=0,
-        chain_hash=zero_prev, key_id="k0", key_fingerprint=_unwrap(public_key_thumbprint_raw(start_pub)),
+        anchor_id="urn:example:anchor:start",
+        anchored_at=1000,
+        chain_id=chain_id,
+        sequence=0,
+        chain_hash=zero_prev,
+        key_id="k0",
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(start_pub)),
     )
     end_anchor = ExpectedAnchor(
-        anchor_id="urn:example:anchor:end", anchored_at=end_at, chain_id=chain_id, sequence=1,
-        chain_hash=last_hash, key_id=f"k{len(keys) - 1}", key_fingerprint=_unwrap(public_key_thumbprint_raw(end_pub)),
+        anchor_id="urn:example:anchor:end",
+        anchored_at=end_at,
+        chain_id=chain_id,
+        sequence=1,
+        chain_hash=last_hash,
+        key_id=f"k{len(keys) - 1}",
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(end_pub)),
     )
     # encode_anchored_export validates inputs (incl. the key path) — for the malformed-path archives
     # (#2 non-monotone / cycle), bypass encode-time validation by hand-assembling the frames.
     if effective_ats is None:
-        enc = encode_anchored_export(input_, ExpectedExport(
-            chain=chain, digest=bytes(32), start_anchor=start_anchor, end_anchor=end_anchor,
-            transitions=tuple(expected_transitions), object_version="v1",
-        ))
+        enc = encode_anchored_export(
+            input_,
+            ExpectedExport(
+                chain=chain,
+                digest=bytes(32),
+                start_anchor=start_anchor,
+                end_anchor=end_anchor,
+                transitions=tuple(expected_transitions),
+                object_version="v1",
+            ),
+        )
         assert enc.is_ok, "archive encode failed"
         archive = enc.value.archive
         digest = enc.value.digest
@@ -606,15 +700,28 @@ def _build_archive(
         archive = _hand_frame_archive(input_)
         digest = _unwrap(sha256(archive))
     expected = ExpectedExport(
-        chain=chain, digest=digest, start_anchor=start_anchor, end_anchor=end_anchor,
-        transitions=tuple(expected_transitions), object_version="v1",
+        chain=chain,
+        digest=digest,
+        start_anchor=start_anchor,
+        end_anchor=end_anchor,
+        transitions=tuple(expected_transitions),
+        object_version="v1",
     )
     key_chain = HistoricalKeyChain(
-        keys=tuple(HistoricalPublicKey(key_id=f"k{i}", public_key=pub, valid_from=0, valid_before=None) for i, (pub, _) in enumerate(keys))
+        keys=tuple(
+            HistoricalPublicKey(key_id=f"k{i}", public_key=pub, valid_from=0, valid_before=None)
+            for i, (pub, _) in enumerate(keys)
+        )
     )
     return {
-        "archive": archive, "digest": digest, "expected": expected, "key_chain": key_chain,
-        "input": input_, "chain": chain, "start_anchor": start_anchor, "end_anchor": end_anchor,
+        "archive": archive,
+        "digest": digest,
+        "expected": expected,
+        "key_chain": key_chain,
+        "input": input_,
+        "chain": chain,
+        "start_anchor": start_anchor,
+        "end_anchor": end_anchor,
         "expected_transitions": expected_transitions,
     }
 
@@ -651,13 +758,23 @@ def test_encode_consumption_entry_rejects_genesis_row_with_nonzero_previous_hash
     not the all-zero hash (spec/bap-v1.md §15, Consumption rows). Defect: revert
     the genesis check → Ok."""
     nonzero = bytes([9] * 32)
-    r = encode_consumption_entry(ConsumptionEntry(
-        chain_id="urn:example:chain", sequence=1, previous_hash=nonzero, commitment=bytes(32),
-    ))
+    r = encode_consumption_entry(
+        ConsumptionEntry(
+            chain_id="urn:example:chain",
+            sequence=1,
+            previous_hash=nonzero,
+            commitment=bytes(32),
+        )
+    )
     assert not r.is_ok, "sequence-1 with non-zero previous_hash must reject"
-    ok = encode_consumption_entry(ConsumptionEntry(
-        chain_id="urn:example:chain", sequence=1, previous_hash=Z32, commitment=bytes(32),
-    ))
+    ok = encode_consumption_entry(
+        ConsumptionEntry(
+            chain_id="urn:example:chain",
+            sequence=1,
+            previous_hash=Z32,
+            commitment=bytes(32),
+        )
+    )
     assert ok.is_ok
 
 
@@ -667,15 +784,29 @@ def test_boundary_anchor_signing_input_rejects_genesis_anchor_with_nonzero_chain
     Defect: revert the genesis check → Ok."""
     pub, _ = _fresh_key()
     nonzero = bytes([9] * 32)
-    r = boundary_anchor_signing_input(BoundaryAnchorProducer(
-        anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain",
-        sequence=0, chain_hash=nonzero, key_id="k0", public_key=pub,
-    ))
+    r = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="urn:example:anchor:start",
+            anchored_at=1000,
+            chain_id="urn:example:chain",
+            sequence=0,
+            chain_hash=nonzero,
+            key_id="k0",
+            public_key=pub,
+        )
+    )
     assert not r.is_ok, "sequence-0 with non-zero chain_hash must reject"
-    ok = boundary_anchor_signing_input(BoundaryAnchorProducer(
-        anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain",
-        sequence=0, chain_hash=Z32, key_id="k0", public_key=pub,
-    ))
+    ok = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="urn:example:anchor:start",
+            anchored_at=1000,
+            chain_id="urn:example:chain",
+            sequence=0,
+            chain_hash=Z32,
+            key_id="k0",
+            public_key=pub,
+        )
+    )
     assert ok.is_ok
 
 
@@ -689,20 +820,33 @@ def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
 
     def expected_of(chain: ChainInput) -> ExpectedChain:
         return ExpectedChain(
-            chain_id=chain.chain_id, first_sequence=chain.first_sequence,
-            last_sequence=chain.last_sequence, row_count=chain.row_count,
-            previous_hash=chain.previous_hash, last_hash=chain.last_hash,
+            chain_id=chain.chain_id,
+            first_sequence=chain.first_sequence,
+            last_sequence=chain.last_sequence,
+            row_count=chain.row_count,
+            previous_hash=chain.previous_hash,
+            last_hash=chain.last_hash,
         )
 
-    enc = encode_consumption_entry(ConsumptionEntry(
-        chain_id="urn:example:chain", sequence=1, previous_hash=Z32, commitment=bytes([7] * 32),
-    ))
+    enc = encode_consumption_entry(
+        ConsumptionEntry(
+            chain_id="urn:example:chain",
+            sequence=1,
+            previous_hash=Z32,
+            commitment=bytes([7] * 32),
+        )
+    )
     assert enc.is_ok
     canonical = enc.value.bytes_
     last_hash = enc.value.hash_
     good_chain = ChainInput(
-        rows=(canonical,), chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1,
-        previous_hash=Z32, last_hash=last_hash,
+        rows=(canonical,),
+        chain_id="urn:example:chain",
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=Z32,
+        last_hash=last_hash,
     )
     # Control: the canonical row verifies.
     assert check_chain(good_chain, expected_of(good_chain)).is_ok
@@ -713,23 +857,43 @@ def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
     padded = b" " + canonical
     padded_last_hash = _unwrap(sha256(ROW_PREFIX, padded))
     padded_chain = ChainInput(
-        rows=(padded,), chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1,
-        previous_hash=Z32, last_hash=padded_last_hash,
+        rows=(padded,),
+        chain_id="urn:example:chain",
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=Z32,
+        last_hash=padded_last_hash,
     )
-    assert not check_chain(padded_chain, expected_of(padded_chain)).is_ok, "noncanonical (whitespace) row must reject"
+    assert not check_chain(padded_chain, expected_of(padded_chain)).is_ok, (
+        "noncanonical (whitespace) row must reject"
+    )
     # Defect B: a sequence-0 row (hand-rolled canonical bytes) must reject.
-    seq_zero = _unwrap(jcs_encode(JObject(v={
-        "chain_id": JString(v=b"urn:example:chain"),
-        "commitment": JString(v=_b64url(bytes([7] * 32)).encode("ascii")),
-        "previous": JString(v=_b64url(Z32).encode("ascii")),
-        "sequence": JInt(v=0),
-        "v": JInt(v=1),
-    })))
-    seq_zero_chain = ChainInput(
-        rows=(seq_zero,), chain_id="urn:example:chain", first_sequence=0, last_sequence=0, row_count=1,
-        previous_hash=Z32, last_hash=_unwrap(sha256(ROW_PREFIX, seq_zero)),
+    seq_zero = _unwrap(
+        jcs_encode(
+            JObject(
+                v={
+                    "chain_id": JString(v=b"urn:example:chain"),
+                    "commitment": JString(v=_b64url(bytes([7] * 32)).encode("ascii")),
+                    "previous": JString(v=_b64url(Z32).encode("ascii")),
+                    "sequence": JInt(v=0),
+                    "v": JInt(v=1),
+                }
+            )
+        )
     )
-    assert not check_chain(seq_zero_chain, expected_of(seq_zero_chain)).is_ok, "sequence-0 row must reject"
+    seq_zero_chain = ChainInput(
+        rows=(seq_zero,),
+        chain_id="urn:example:chain",
+        first_sequence=0,
+        last_sequence=0,
+        row_count=1,
+        previous_hash=Z32,
+        last_hash=_unwrap(sha256(ROW_PREFIX, seq_zero)),
+    )
+    assert not check_chain(seq_zero_chain, expected_of(seq_zero_chain)).is_ok, (
+        "sequence-0 row must reject"
+    )
 
 
 def test_encode_anchored_export_rejects_transition_count_over_bound():
@@ -742,41 +906,95 @@ def test_encode_anchored_export_rejects_transition_count_over_bound():
     load-bearing gate (otherwise transitions=() makes count-mismatch fire first). The 258-key path is
     chronology-clean (distinct keys, strictly-increasing effective_at, no fingerprint cycle)."""
     keys = [_fresh_key() for _ in range(258)]
-    row_entry = ConsumptionEntry(chain_id="urn:example:chain", sequence=1, previous_hash=Z32, commitment=bytes(32))
+    row_entry = ConsumptionEntry(
+        chain_id="urn:example:chain", sequence=1, previous_hash=Z32, commitment=bytes(32)
+    )
     encoded = encode_consumption_entry(row_entry)
     assert encoded.is_ok
     row_bytes = encoded.value.bytes_
     last_hash = encoded.value.hash_
     start_pub, start_priv = keys[0]
     end_pub, end_priv = keys[257]
-    start_compact = _signed_anchor_compact(BoundaryAnchorProducer(
-        anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain",
-        sequence=0, chain_hash=Z32, key_id="k0", public_key=start_pub,
-    ), start_priv)
-    end_compact = _signed_anchor_compact(BoundaryAnchorProducer(
-        anchor_id="urn:example:anchor:end", anchored_at=100000, chain_id="urn:example:chain",
-        sequence=1, chain_hash=last_hash, key_id="k257", public_key=end_pub,
-    ), end_priv)
+    start_compact = _signed_anchor_compact(
+        BoundaryAnchorProducer(
+            anchor_id="urn:example:anchor:start",
+            anchored_at=1000,
+            chain_id="urn:example:chain",
+            sequence=0,
+            chain_hash=Z32,
+            key_id="k0",
+            public_key=start_pub,
+        ),
+        start_priv,
+    )
+    end_compact = _signed_anchor_compact(
+        BoundaryAnchorProducer(
+            anchor_id="urn:example:anchor:end",
+            anchored_at=100000,
+            chain_id="urn:example:chain",
+            sequence=1,
+            chain_hash=last_hash,
+            key_id="k257",
+            public_key=end_pub,
+        ),
+        end_priv,
+    )
     expected_transitions = tuple(
         ExpectedKeyTransition(
-            transition_id=f"urn:example:t:{i}", chain_id="urn:example:chain", effective_at=2000 + i,
-            current_key_id=f"k{i}", current_key_fingerprint=_unwrap(public_key_thumbprint_raw(keys[i][0])),
-            next_key_id=f"k{i + 1}", next_key_fingerprint=_unwrap(public_key_thumbprint_raw(keys[i + 1][0])),
+            transition_id=f"urn:example:t:{i}",
+            chain_id="urn:example:chain",
+            effective_at=2000 + i,
+            current_key_id=f"k{i}",
+            current_key_fingerprint=_unwrap(public_key_thumbprint_raw(keys[i][0])),
+            next_key_id=f"k{i + 1}",
+            next_key_fingerprint=_unwrap(public_key_thumbprint_raw(keys[i + 1][0])),
         )
         for i in range(257)
     )
-    chain = ExpectedChain(chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1, previous_hash=Z32, last_hash=last_hash)
+    chain = ExpectedChain(
+        chain_id="urn:example:chain",
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=Z32,
+        last_hash=last_hash,
+    )
     r = encode_anchored_export(
         AnchoredExportInput(
-            rows=(row_bytes,), start_anchor=start_compact, end_anchor=end_compact,
-            transitions=tuple(b"x" for _ in range(257)), chain_id="urn:example:chain",
-            first_sequence=1, last_sequence=1, row_count=1, previous_hash=Z32, last_hash=last_hash,
+            rows=(row_bytes,),
+            start_anchor=start_compact,
+            end_anchor=end_compact,
+            transitions=tuple(b"x" for _ in range(257)),
+            chain_id="urn:example:chain",
+            first_sequence=1,
+            last_sequence=1,
+            row_count=1,
+            previous_hash=Z32,
+            last_hash=last_hash,
         ),
         ExpectedExport(
-            chain=chain, digest=bytes(32),
-            start_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain", sequence=0, chain_hash=Z32, key_id="k0", key_fingerprint=_unwrap(public_key_thumbprint_raw(start_pub))),
-            end_anchor=ExpectedAnchor(anchor_id="urn:example:anchor:end", anchored_at=100000, chain_id="urn:example:chain", sequence=1, chain_hash=last_hash, key_id="k257", key_fingerprint=_unwrap(public_key_thumbprint_raw(end_pub))),
-            transitions=expected_transitions, object_version="v1",
+            chain=chain,
+            digest=bytes(32),
+            start_anchor=ExpectedAnchor(
+                anchor_id="urn:example:anchor:start",
+                anchored_at=1000,
+                chain_id="urn:example:chain",
+                sequence=0,
+                chain_hash=Z32,
+                key_id="k0",
+                key_fingerprint=_unwrap(public_key_thumbprint_raw(start_pub)),
+            ),
+            end_anchor=ExpectedAnchor(
+                anchor_id="urn:example:anchor:end",
+                anchored_at=100000,
+                chain_id="urn:example:chain",
+                sequence=1,
+                chain_hash=last_hash,
+                key_id="k257",
+                key_fingerprint=_unwrap(public_key_thumbprint_raw(end_pub)),
+            ),
+            transitions=expected_transitions,
+            object_version="v1",
         ),
     )
     assert not r.is_ok, "257 transitions must reject (over the key_transitions=256 bound)"
@@ -789,9 +1007,12 @@ def test_encode_anchored_export_rejects_misbound_start_anchor():
     pub, priv = _fresh_key()
     built = _build_archive([(pub, priv)])
     bad_expected = ExpectedExport(
-        chain=built["chain"], digest=built["digest"],
+        chain=built["chain"],
+        digest=built["digest"],
         start_anchor=ExpectedAnchor(**{**built["start_anchor"].__dict__, "sequence": 5}),
-        end_anchor=built["end_anchor"], transitions=built["expected"].transitions, object_version="v1",
+        end_anchor=built["end_anchor"],
+        transitions=built["expected"].transitions,
+        object_version="v1",
     )
     r = encode_anchored_export(built["input"], bad_expected)
     assert not r.is_ok, "start anchor sequence != first_sequence-1 must reject"
@@ -805,7 +1026,8 @@ def test_verify_anchored_export_accepts_valid_one_key_zero_transition_archive():
     built = _build_archive([_fresh_key()])
     r = verify_anchored_export(
         ArchivedObject(chunks=(built["archive"],), version="v1"),
-        built["key_chain"], built["expected"],
+        built["key_chain"],
+        built["expected"],
     )
     assert r.is_ok, "a valid 1-key/0-transition archive must verify"
     assert r.value.transition_count == 0
@@ -822,7 +1044,8 @@ def test_verify_anchored_export_rejects_zero_key_chain_fail_closed():
     empty_chain = HistoricalKeyChain(keys=())
     r = verify_anchored_export(
         ArchivedObject(chunks=(built["archive"],), version="v1"),
-        empty_chain, built["expected"],
+        empty_chain,
+        built["expected"],
     )
     assert not r.is_ok, "zero-key chain must reject (keys != transitions+1), fail closed"
 
@@ -835,13 +1058,21 @@ def test_verify_anchored_export_rejects_bad_chunk_lists():
     built = _build_archive([_fresh_key()])
     # Empty chunk in the list.
     with_empty = ArchivedObject(chunks=(built["archive"], b""), version="v1")
-    assert not verify_anchored_export(with_empty, built["key_chain"], built["expected"]).is_ok, "empty chunk must reject"
+    assert not verify_anchored_export(with_empty, built["key_chain"], built["expected"]).is_ok, (
+        "empty chunk must reject"
+    )
     # The archive_chunks ceiling is inclusive at 65796 chunks; 65797 exceeds it
     # (spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only).
     too_many = ArchivedObject(chunks=tuple(b"\x01" for _ in range(65797)), version="v1")
-    assert not verify_anchored_export(too_many, built["key_chain"], built["expected"]).is_ok, "chunk count over bound must reject"
+    assert not verify_anchored_export(too_many, built["key_chain"], built["expected"]).is_ok, (
+        "chunk count over bound must reject"
+    )
     # Control: a single-chunk split of the valid archive still verifies.
-    assert verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], built["expected"]).is_ok
+    assert verify_anchored_export(
+        ArchivedObject(chunks=(built["archive"],), version="v1"),
+        built["key_chain"],
+        built["expected"],
+    ).is_ok
 
 
 def test_verify_anchored_export_rejects_non_monotonic_rollover():
@@ -855,15 +1086,27 @@ def test_verify_anchored_export_rejects_non_monotonic_rollover():
     b = _fresh_key()
     c = _fresh_key()
     valid = _build_archive([a, b, c])
-    assert verify_anchored_export(ArchivedObject(chunks=(valid["archive"],), version="v1"), valid["key_chain"], valid["expected"]).is_ok, "control: valid 3-key archive verifies"
+    assert verify_anchored_export(
+        ArchivedObject(chunks=(valid["archive"],), version="v1"),
+        valid["key_chain"],
+        valid["expected"],
+    ).is_ok, "control: valid 3-key archive verifies"
     # transition[1].effective_at (1400) < transition[0].effective_at (1500): each compact is validly
     # signed with its own effective_at, so _verify_transition_compact passes; only chronology rejects.
     non_mono = _build_archive([a, b, c], effective_ats=[1500, 1400], end_anchored_at=2000)
-    assert not verify_anchored_export(ArchivedObject(chunks=(non_mono["archive"],), version="v1"), non_mono["key_chain"], non_mono["expected"]).is_ok, "non-monotonic effective_at must reject"
+    assert not verify_anchored_export(
+        ArchivedObject(chunks=(non_mono["archive"],), version="v1"),
+        non_mono["key_chain"],
+        non_mono["expected"],
+    ).is_ok, "non-monotonic effective_at must reject"
     # Equal consecutive transition times reject (spec/bap-v1.md §15, Authenticated key
     # transitions). Each compact is individually valid; the chronology check rejects.
     equal_at = _build_archive([a, b, c], effective_ats=[1500, 1500], end_anchored_at=2000)
-    assert not verify_anchored_export(ArchivedObject(chunks=(equal_at["archive"],), version="v1"), equal_at["key_chain"], equal_at["expected"]).is_ok, "equal consecutive effective_at must reject (strict >)"
+    assert not verify_anchored_export(
+        ArchivedObject(chunks=(equal_at["archive"],), version="v1"),
+        equal_at["key_chain"],
+        equal_at["expected"],
+    ).is_ok, "equal consecutive effective_at must reject (strict >)"
 
 
 def test_verify_anchored_export_rejects_fingerprint_cycle():
@@ -874,7 +1117,11 @@ def test_verify_anchored_export_rejects_fingerprint_cycle():
     a = _fresh_key()
     b = _fresh_key()
     cyclic = _build_archive([a, b, a], effective_ats=[1500, 2000], end_anchored_at=3000)
-    assert not verify_anchored_export(ArchivedObject(chunks=(cyclic["archive"],), version="v1"), cyclic["key_chain"], cyclic["expected"]).is_ok, "fingerprint cycle A→B→A must reject"
+    assert not verify_anchored_export(
+        ArchivedObject(chunks=(cyclic["archive"],), version="v1"),
+        cyclic["key_chain"],
+        cyclic["expected"],
+    ).is_ok, "fingerprint cycle A→B→A must reject"
 
 
 # Caller-tightened bounds apply to every nested parse and contextual check
@@ -893,20 +1140,29 @@ def _signed_grant(kid: str = "issuer-123456"):
     holder_pub, _ = _fresh_key()
     holder_fp = _unwrap(public_key_thumbprint_raw(holder_pub))
     grant = GrantProducer(
-        key_id=kid, issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
-        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        key_id=kid,
+        issuer="https://issuer.example.test",
+        grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",),
+        issued_at=1000,
+        not_before=1000,
+        expires_at=2000,
         holder_thumbprint=_b64url(holder_fp),
         operations=(OperationInput(name="read", selectors=("all",)),),
     )
     si = grant_signing_input(grant)
     assert si.is_ok, "grant signing input failed"
-    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
+    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode(
+        "ascii"
+    )
     sig = issuer_priv.sign(message)
     return {
         "compact": _must_assemble(si.value, sig),
         "issuer": TrustedIssuer(key_id=kid, public_key=issuer_pub),
-        "issuer_pub": issuer_pub, "issuer_priv": issuer_priv,
-        "holder_pub": holder_pub, "holder_fp": holder_fp,
+        "issuer_pub": issuer_pub,
+        "issuer_priv": issuer_priv,
+        "holder_pub": holder_pub,
+        "holder_fp": holder_fp,
     }
 
 
@@ -914,13 +1170,20 @@ def _signed_proof(grant_compact: bytes, holder_pub: bytes, holder_priv: Ed25519P
     """Build a valid proof binding to the grant (holder signs). Drives the check_envelope path."""
     proof = ProofProducer(
         holder_public_key=holder_pub,
-        proof_id="urn:example:proof:1", method="POST", target_uri="https://resource.example.test/invoke",
-        issued_at=1400, invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
-        grant_compact=grant_compact, cast_arguments=_NULL_ARGS,
+        proof_id="urn:example:proof:1",
+        method="POST",
+        target_uri="https://resource.example.test/invoke",
+        issued_at=1400,
+        invocation_id="550e8400-e29b-41d4-a716-446655440000",
+        operation="read",
+        grant_compact=grant_compact,
+        cast_arguments=_NULL_ARGS,
     )
     si = proof_signing_input(proof)
     assert si.is_ok, "proof signing input failed"
-    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
+    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode(
+        "ascii"
+    )
     sig = holder_priv.sign(message)
     return _must_assemble(si.value, sig)
 
@@ -935,7 +1198,9 @@ def test_decode_grant_honors_caller_bounds():
     assert decode_grant(g["compact"]).is_ok, "13-byte kid must be accepted at MAX"
     # A 13-byte key ID exceeds a tightened 5-byte ceiling
     # (spec/bap-v1.md §10, REQ1-HEADER-kid-bytes; §17, REQ1-BOUNDS-tighten-only).
-    assert not decode_grant(g["compact"], _unwrap(bounds_new({"kid_bytes": 5}))).is_ok, "kid_bytes=5 must reject a 13-byte kid"
+    assert not decode_grant(g["compact"], _unwrap(bounds_new({"kid_bytes": 5}))).is_ok, (
+        "kid_bytes=5 must reject a 13-byte kid"
+    )
 
 
 def test_decode_grant_threads_caller_bounds_into_selector_decode():
@@ -947,21 +1212,33 @@ def test_decode_grant_threads_caller_bounds_into_selector_decode():
     holder_pub, _ = _fresh_key()
     holder_fp = _unwrap(public_key_thumbprint_raw(holder_pub))
     grant = GrantProducer(
-        key_id="k1", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
-        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        key_id="k1",
+        issuer="https://issuer.example.test",
+        grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",),
+        issued_at=1000,
+        not_before=1000,
+        expires_at=2000,
         holder_thumbprint=_b64url(holder_fp),
-        operations=(OperationInput(name="read", selectors=(
-            {"kind": "one_of", "path": ("x",), "values": (JInt(v=1), JInt(v=2))},
-        ),),),
+        operations=(
+            OperationInput(
+                name="read",
+                selectors=({"kind": "one_of", "path": ("x",), "values": (JInt(v=1), JInt(v=2))},),
+            ),
+        ),
     )
     si = grant_signing_input(grant)
     assert si.is_ok, "grant signing input failed"
-    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode("ascii")
+    message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode(
+        "ascii"
+    )
     compact = _must_assemble(si.value, issuer_priv.sign(message))
     # Control: at MAX, a one_of with 2 values is accepted.
     assert decode_grant(compact).is_ok, "one_of with 2 values must be accepted at MAX"
     # Tightened: one_of_values=1 → the 2-value selector must be rejected (parse_selector threads bounds).
-    assert not decode_grant(compact, _unwrap(bounds_new({"one_of_values": 1}))).is_ok, "one_of_values=1 must reject a 2-value selector"
+    assert not decode_grant(compact, _unwrap(bounds_new({"one_of_values": 1}))).is_ok, (
+        "one_of_values=1 must reject a 2-value selector"
+    )
 
 
 def test_verify_grant_honors_caller_bounds():
@@ -972,17 +1249,26 @@ def test_verify_grant_honors_caller_bounds():
     _reset_census()
     g = _signed_grant()
     expected_max = ExpectedGrant(
-        issuer="https://issuer.example.test", audience="https://resource.example.test",
-        evaluation_time=1500, clock_skew=60,
+        issuer="https://issuer.example.test",
+        audience="https://resource.example.test",
+        evaluation_time=1500,
+        clock_skew=60,
     )
     # Control: no bounds (MAX) → verifies.
-    assert verify_grant(g["compact"], g["issuer"], expected_max).is_ok, "13-byte kid must verify at MAX"
+    assert verify_grant(g["compact"], g["issuer"], expected_max).is_ok, (
+        "13-byte kid must verify at MAX"
+    )
     # Tightened: kid_bytes=5 → rejected via the kid gate (signature would otherwise verify).
     expected_tight = ExpectedGrant(
-        issuer="https://issuer.example.test", audience="https://resource.example.test",
-        evaluation_time=1500, clock_skew=60, bounds=_unwrap(bounds_new({"kid_bytes": 5})),
+        issuer="https://issuer.example.test",
+        audience="https://resource.example.test",
+        evaluation_time=1500,
+        clock_skew=60,
+        bounds=_unwrap(bounds_new({"kid_bytes": 5})),
     )
-    assert not verify_grant(g["compact"], g["issuer"], expected_tight).is_ok, "kid_bytes=5 must reject a 13-byte kid"
+    assert not verify_grant(g["compact"], g["issuer"], expected_tight).is_ok, (
+        "kid_bytes=5 must reject a 13-byte kid"
+    )
 
 
 def test_check_envelope_honors_caller_bounds():
@@ -994,36 +1280,60 @@ def test_check_envelope_honors_caller_bounds():
     holder_pub, holder_priv = _fresh_key()
     holder_fp = _unwrap(public_key_thumbprint_raw(holder_pub))
     grant = GrantProducer(
-        key_id="issuer-123456", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
-        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        key_id="issuer-123456",
+        issuer="https://issuer.example.test",
+        grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",),
+        issued_at=1000,
+        not_before=1000,
+        expires_at=2000,
         holder_thumbprint=_b64url(holder_fp),
         operations=(OperationInput(name="read", selectors=("all",)),),
     )
     gsi = grant_signing_input(grant)
     assert gsi.is_ok
-    gmsg = f"{gsi.value.protected_segment.decode('ascii')}.{gsi.value.payload_segment.decode('ascii')}".encode("ascii")
+    gmsg = f"{gsi.value.protected_segment.decode('ascii')}.{gsi.value.payload_segment.decode('ascii')}".encode(
+        "ascii"
+    )
     grant_compact = _must_assemble(gsi.value, issuer_priv.sign(gmsg))
     proof_compact = _signed_proof(grant_compact, holder_pub, holder_priv)
     base = ExpectedRequest(
         trusted_issuer=TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
-        issuer="https://issuer.example.test", audience="https://resource.example.test",
-        method="POST", target_uri="https://resource.example.test/invoke",
-        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
-        cast_arguments=_NULL_ARGS, evaluation_time=1500, clock_skew=60, proof_max_age=300,
+        issuer="https://issuer.example.test",
+        audience="https://resource.example.test",
+        method="POST",
+        target_uri="https://resource.example.test/invoke",
+        invocation_id="550e8400-e29b-41d4-a716-446655440000",
+        operation="read",
+        cast_arguments=_NULL_ARGS,
+        evaluation_time=1500,
+        clock_skew=60,
+        proof_max_age=300,
         nonce=NonceNotRequired(),
     )
     # Control: no bounds (MAX) → envelope verifies.
-    assert check_envelope(grant_compact, proof_compact, base).is_ok, "13-byte kid must verify at MAX"
+    assert check_envelope(grant_compact, proof_compact, base).is_ok, (
+        "13-byte kid must verify at MAX"
+    )
     # Tightened: kid_bytes=5 → rejected via the grant kid gate.
     tight = ExpectedRequest(
         trusted_issuer=TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
-        issuer="https://issuer.example.test", audience="https://resource.example.test",
-        method="POST", target_uri="https://resource.example.test/invoke",
-        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
-        cast_arguments=_NULL_ARGS, evaluation_time=1500, clock_skew=60, proof_max_age=300,
-        nonce=NonceNotRequired(), bounds=_unwrap(bounds_new({"kid_bytes": 5})),
+        issuer="https://issuer.example.test",
+        audience="https://resource.example.test",
+        method="POST",
+        target_uri="https://resource.example.test/invoke",
+        invocation_id="550e8400-e29b-41d4-a716-446655440000",
+        operation="read",
+        cast_arguments=_NULL_ARGS,
+        evaluation_time=1500,
+        clock_skew=60,
+        proof_max_age=300,
+        nonce=NonceNotRequired(),
+        bounds=_unwrap(bounds_new({"kid_bytes": 5})),
     )
-    assert not check_envelope(grant_compact, proof_compact, tight).is_ok, "kid_bytes=5 must reject a 13-byte kid"
+    assert not check_envelope(grant_compact, proof_compact, tight).is_ok, (
+        "kid_bytes=5 must reject a 13-byte kid"
+    )
 
 
 def test_expected_structs_bounds_absent_defaults_to_max():
@@ -1033,12 +1343,13 @@ def test_expected_structs_bounds_absent_defaults_to_max():
     _reset_census()
     g = _signed_grant()
     eg = ExpectedGrant(
-        issuer="https://issuer.example.test", audience="https://resource.example.test",
-        evaluation_time=1500, clock_skew=60,
+        issuer="https://issuer.example.test",
+        audience="https://resource.example.test",
+        evaluation_time=1500,
+        clock_skew=60,
     )
     assert verify_grant(g["compact"], g["issuer"], eg).is_ok
     assert decode_grant(g["compact"]).is_ok
-
 
 
 def test_assemble_segments_and_request_digest_return_result_contract():
@@ -1104,10 +1415,15 @@ def test_forged_widening_bounds_rejected_at_entry_points():
     forged = Bounds({"compact_bytes": 1000000})  # > MAXIMA.compact_bytes (65536)
     assert isinstance(forged.resolve("compact_bytes"), Err), "resolution rejects forged widening"
     eg = ExpectedGrant(
-        issuer="https://issuer.example.test", audience="https://resource.example.test",
-        evaluation_time=1500, clock_skew=60, bounds=forged,
+        issuer="https://issuer.example.test",
+        audience="https://resource.example.test",
+        evaluation_time=1500,
+        clock_skew=60,
+        bounds=forged,
     )
-    assert not verify_grant(g["compact"], g["issuer"], eg).is_ok, "forged widening bounds must reject"
+    assert not verify_grant(g["compact"], g["issuer"], eg).is_ok, (
+        "forged widening bounds must reject"
+    )
 
 
 def test_jcs_encode_rejects_non_integer_int_tag():
@@ -1139,7 +1455,9 @@ def test_untrusted_key_locator_accepts_empty_payload_signature_segments():
     protected_seg = g["compact"].split(b".")[0]
     empty_ps = protected_seg + b".."
     r = untrusted_key_locator(empty_ps)
-    assert r.is_ok, "empty payload+signature segments must be accepted (REQ1-LOCATOR-opaque-payload)"
+    assert r.is_ok, (
+        "empty payload+signature segments must be accepted (REQ1-LOCATOR-opaque-payload)"
+    )
     assert r.value.key_id == g["issuer"].key_id
 
 
@@ -1150,13 +1468,17 @@ def test_verify_anchored_export_rejects_nested_bounds_mismatch():
     _reset_census()
     built = _build_archive([_fresh_key()])
     tightened = ExpectedExport(
-        chain=built["expected"].chain, start_anchor=built["expected"].start_anchor,
-        end_anchor=built["expected"].end_anchor, transitions=built["expected"].transitions,
-        digest=built["expected"].digest, object_version=built["expected"].object_version,
+        chain=built["expected"].chain,
+        start_anchor=built["expected"].start_anchor,
+        end_anchor=built["expected"].end_anchor,
+        transitions=built["expected"].transitions,
+        digest=built["expected"].digest,
+        object_version=built["expected"].object_version,
         bounds=_unwrap(bounds_new({"identifier_bytes": 4})),
     )
-    assert not verify_anchored_export(built["archive"], built["key_chain"], tightened).is_ok, \
+    assert not verify_anchored_export(built["archive"], built["key_chain"], tightened).is_ok, (
         "nested bounds absent under a tightened top must reject (REQ1-VERIFY-revalidate)"
+    )
 
 
 def test_check_chain_rejects_genesis_previous_hash_mismatch():
@@ -1167,18 +1489,43 @@ def test_check_chain_rejects_genesis_previous_hash_mismatch():
     zero = bytes(32)
     chain_id = "ba://chain-f4"
     commitment = _unwrap(sha256(b"commitment-f4"))
-    row0 = encode_consumption_entry(ConsumptionEntry(chain_id=chain_id, sequence=1, previous_hash=zero, commitment=commitment))
+    row0 = encode_consumption_entry(
+        ConsumptionEntry(chain_id=chain_id, sequence=1, previous_hash=zero, commitment=commitment)
+    )
     assert row0.is_ok
     last_hash = _unwrap(sha256(ROW_PREFIX, row0.value.bytes_))
-    chain = ChainInput(rows=(row0.value.bytes_,), chain_id=chain_id, first_sequence=1, last_sequence=1,
-                       row_count=1, previous_hash=zero, last_hash=last_hash)
-    expected = ExpectedChain(chain_id=chain_id, first_sequence=1, last_sequence=1, row_count=1,
-                             previous_hash=zero, last_hash=last_hash)
-    assert check_chain(chain, expected).is_ok, "control: genesis chain with matching previous_hash verifies"
-    forged = ChainInput(rows=chain.rows, chain_id=chain_id, first_sequence=1, last_sequence=1,
-                        row_count=1, previous_hash=_unwrap(sha256(b"forged")), last_hash=last_hash)
-    assert not check_chain(forged, expected).is_ok, \
+    chain = ChainInput(
+        rows=(row0.value.bytes_,),
+        chain_id=chain_id,
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=zero,
+        last_hash=last_hash,
+    )
+    expected = ExpectedChain(
+        chain_id=chain_id,
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=zero,
+        last_hash=last_hash,
+    )
+    assert check_chain(chain, expected).is_ok, (
+        "control: genesis chain with matching previous_hash verifies"
+    )
+    forged = ChainInput(
+        rows=chain.rows,
+        chain_id=chain_id,
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=_unwrap(sha256(b"forged")),
+        last_hash=last_hash,
+    )
+    assert not check_chain(forged, expected).is_ok, (
         "genesis chain.previous_hash != expected.previous_hash must reject (F4)"
+    )
 
 
 def test_malformed_trusted_issuer_fails_closed():
@@ -1187,17 +1534,34 @@ def test_malformed_trusted_issuer_fails_closed():
     check -> AttributeError."""
     _reset_census()
     g = _signed_grant()
-    eg = ExpectedGrant(issuer="https://issuer.example.test", audience="https://resource.example.test",
-                       evaluation_time=1500, clock_skew=60)
+    eg = ExpectedGrant(
+        issuer="https://issuer.example.test",
+        audience="https://resource.example.test",
+        evaluation_time=1500,
+        clock_skew=60,
+    )
     # A TrustedIssuer missing public_key/key_id: must return Err, not raise.
     bad = TrustedIssuer.__new__(TrustedIssuer)  # bypass __init__ -> no attributes
-    assert not verify_grant(g["compact"], bad, eg).is_ok, "malformed trusted issuer must fail closed"
-    er = ExpectedRequest(trusted_issuer=bad, issuer="https://issuer.example.test",
-                         audience="https://resource.example.test", method="POST",
-                         target_uri="https://resource.example.test/invoke", invocation_id="i",
-                         operation="read", cast_arguments=JNull(),  # type: ignore[arg-type]
-                         evaluation_time=1500, clock_skew=60, proof_max_age=300, nonce=NonceNotRequired())
-    assert not check_envelope(g["compact"], g["compact"], er).is_ok, "malformed trusted issuer must fail closed (check_envelope)"
+    assert not verify_grant(g["compact"], bad, eg).is_ok, (
+        "malformed trusted issuer must fail closed"
+    )
+    er = ExpectedRequest(
+        trusted_issuer=bad,
+        issuer="https://issuer.example.test",
+        audience="https://resource.example.test",
+        method="POST",
+        target_uri="https://resource.example.test/invoke",
+        invocation_id="i",
+        operation="read",
+        cast_arguments=JNull(),  # type: ignore[arg-type]
+        evaluation_time=1500,
+        clock_skew=60,
+        proof_max_age=300,
+        nonce=NonceNotRequired(),
+    )
+    assert not check_envelope(g["compact"], g["compact"], er).is_ok, (
+        "malformed trusted issuer must fail closed (check_envelope)"
+    )
 
 
 # === BAP-09 derisk: cross-vendor reference-divergence tripwires (TS/Python derisk, pre-BAP-07) ===
@@ -1217,8 +1581,12 @@ def test_proof_signing_input_rejects_malformed_grant_compact():
     pub = _fresh_key()[0]
     proof = ProofProducer(
         holder_public_key=pub,
-        proof_id="urn:example:proof:1", method="POST", target_uri="https://resource.example.test/invoke",
-        issued_at=1400, invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
+        proof_id="urn:example:proof:1",
+        method="POST",
+        target_uri="https://resource.example.test/invoke",
+        issued_at=1400,
+        invocation_id="550e8400-e29b-41d4-a716-446655440000",
+        operation="read",
         grant_compact=b"aaa.bbb",  # one dot — not a 3-segment compact
         cast_arguments=JNull(),
     )
@@ -1235,9 +1603,12 @@ def test_encode_anchored_export_rejects_when_archive_chunks_exceeded():
     r = encode_anchored_export(
         built["input"],
         ExpectedExport(
-            chain=built["chain"], digest=built["digest"],
-            start_anchor=built["start_anchor"], end_anchor=built["end_anchor"],
-            transitions=built["expected"].transitions, object_version="v1",
+            chain=built["chain"],
+            digest=built["digest"],
+            start_anchor=built["start_anchor"],
+            end_anchor=built["end_anchor"],
+            transitions=built["expected"].transitions,
+            object_version="v1",
             bounds=_unwrap(bounds_new({"archive_chunks": 5})),
         ),
     )
@@ -1250,16 +1621,33 @@ def test_assemble_compact_facade_rejects_invalid_signing_input():
     REQ1-VERIFY-revalidate). It must NOT assemble a mislabeled or malformed compact."""
     sig = _GATE_PASSING_SIG
     # kind/typ mismatch: grant kind but a proof (dpop+jwt) protected header.
-    r = assemble_compact(SigningInput(kind="grant", protected_segment=_DERISK_PROOF_PROTECTED, payload_segment=b"e30"), sig)
+    r = assemble_compact(
+        SigningInput(
+            kind="grant", protected_segment=_DERISK_PROOF_PROTECTED, payload_segment=b"e30"
+        ),
+        sig,
+    )
     assert not r.is_ok, "kind/typ mismatch must reject"
     # oversized protected segment (> encoded_segment_bytes=32768).
-    r = assemble_compact(SigningInput(kind="grant", protected_segment=b"A" * 32769, payload_segment=b"e30"), sig)
+    r = assemble_compact(
+        SigningInput(kind="grant", protected_segment=b"A" * 32769, payload_segment=b"e30"), sig
+    )
     assert not r.is_ok, "oversized protected segment must reject"
     # non-base64url payload segment.
-    r = assemble_compact(SigningInput(kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=b"not-valid!@#"), sig)
+    r = assemble_compact(
+        SigningInput(
+            kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=b"not-valid!@#"
+        ),
+        sig,
+    )
     assert not r.is_ok, "non-base64url payload must reject"
     # structurally-invalid grant payload (empty object) — the per-kind re-parse rejects it.
-    r = assemble_compact(SigningInput(kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=b"e30"), sig)
+    r = assemble_compact(
+        SigningInput(
+            kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=b"e30"
+        ),
+        sig,
+    )
     assert not r.is_ok, "malformed grant payload must reject (re-parse)"
 
 
@@ -1274,7 +1662,9 @@ def test_assemble_compact_facade_rejects_numeric_iss():
     )
     payload_segment = base64.urlsafe_b64encode(json_payload).rstrip(b"=")
     r = assemble_compact(
-        SigningInput(kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=payload_segment),
+        SigningInput(
+            kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=payload_segment
+        ),
         _GATE_PASSING_SIG,
     )
     assert not r.is_ok, "numeric iss must reject (field re-parse)"
@@ -1296,20 +1686,39 @@ def test_assemble_compact_facade_rejects_noncanonical_anchor():
         return base64.urlsafe_b64encode(body.encode("utf-8")).rstrip(b"=")
 
     pub = _fresh_key()[0]
-    si = boundary_anchor_signing_input(BoundaryAnchorProducer(
-        anchor_id="urn:example:anchor:start", anchored_at=1000, chain_id="urn:example:chain",
-        sequence=0, chain_hash=Z32, key_id="archive-a", public_key=pub,
-    ))
+    si = boundary_anchor_signing_input(
+        BoundaryAnchorProducer(
+            anchor_id="urn:example:anchor:start",
+            anchored_at=1000,
+            chain_id="urn:example:chain",
+            sequence=0,
+            chain_hash=Z32,
+            key_id="archive-a",
+            public_key=pub,
+        )
+    )
     assert si.is_ok, "anchor signing input failed"
     canon_header, canon_payload = si.value.protected_segment, si.value.payload_segment
     sig = _GATE_PASSING_SIG
     # Non-canonical protected header, canonical payload → reject (header canonical check).
     r = assemble_compact(
-        SigningInput(kind="boundary_anchor", protected_segment=_reorder(canon_header), payload_segment=canon_payload), sig)
+        SigningInput(
+            kind="boundary_anchor",
+            protected_segment=_reorder(canon_header),
+            payload_segment=canon_payload,
+        ),
+        sig,
+    )
     assert not r.is_ok, "non-canonical anchor header must reject"
     # Canonical header, non-canonical payload → reject (payload canonical check).
     r = assemble_compact(
-        SigningInput(kind="boundary_anchor", protected_segment=canon_header, payload_segment=_reorder(canon_payload)), sig)
+        SigningInput(
+            kind="boundary_anchor",
+            protected_segment=canon_header,
+            payload_segment=_reorder(canon_payload),
+        ),
+        sig,
+    )
     assert not r.is_ok, "non-canonical anchor payload must reject"
 
 
@@ -1329,21 +1738,39 @@ def test_assemble_compact_facade_rejects_noncanonical_transition():
 
     cur_pub = _fresh_key()[0]
     nxt_pub = _fresh_key()[0]
-    si = key_transition_signing_input(KeyTransitionProducer(
-        transition_id="urn:example:transition:a-b", chain_id="urn:example:chain", effective_at=1500,
-        current_key_id="anchor-a", current_public_key=cur_pub,
-        next_key_id="anchor-b", next_public_key=nxt_pub,
-    ))
+    si = key_transition_signing_input(
+        KeyTransitionProducer(
+            transition_id="urn:example:transition:a-b",
+            chain_id="urn:example:chain",
+            effective_at=1500,
+            current_key_id="anchor-a",
+            current_public_key=cur_pub,
+            next_key_id="anchor-b",
+            next_public_key=nxt_pub,
+        )
+    )
     assert si.is_ok, "transition signing input failed"
     canon_header, canon_payload = si.value.protected_segment, si.value.payload_segment
     sig = _GATE_PASSING_SIG
     # Non-canonical protected header, canonical payload → reject (header canonical check).
     r = assemble_compact(
-        SigningInput(kind="key_transition", protected_segment=_reorder(canon_header), payload_segment=canon_payload), sig)
+        SigningInput(
+            kind="key_transition",
+            protected_segment=_reorder(canon_header),
+            payload_segment=canon_payload,
+        ),
+        sig,
+    )
     assert not r.is_ok, "non-canonical transition header must reject"
     # Canonical header, non-canonical payload → reject (payload canonical check).
     r = assemble_compact(
-        SigningInput(kind="key_transition", protected_segment=canon_header, payload_segment=_reorder(canon_payload)), sig)
+        SigningInput(
+            kind="key_transition",
+            protected_segment=canon_header,
+            payload_segment=_reorder(canon_payload),
+        ),
+        sig,
+    )
     assert not r.is_ok, "non-canonical transition payload must reject"
 
 
@@ -1358,8 +1785,6 @@ def test_decode_grant_rejects_wrong_signature_width():
     assert not r.is_ok, "wrong-width signature must reject"
 
 
-
-
 # ============================================================================
 # Encode-path validation parity (spec/bap-v1.md §15 (archives) encode):
 # the row chain re-check + gated parses + full matches for both anchors and
@@ -1367,12 +1792,15 @@ def test_decode_grant_rejects_wrong_signature_width():
 # by neutralizing the encode wiring — the pre-parity state — in the task log).
 # ============================================================================
 
+
 def _seeded_public_key(label: bytes) -> bytes:
     """A real Ed25519 public key derived from a fixed seed. The fixtures below used to be the filler
     patterns 0x07.. and 0x08.. (not curve points); strict key acceptance now refuses filler bytes at the
     producers, so a filler key would reject at the key and silently stop testing the guard under test."""
     return (
-        Ed25519PrivateKey.from_private_bytes(hashlib.sha256(b"permissiveness-fixture-" + label).digest())
+        Ed25519PrivateKey.from_private_bytes(
+            hashlib.sha256(b"permissiveness-fixture-" + label).digest()
+        )
         .public_key()
         .public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     )
@@ -1391,7 +1819,9 @@ def _b64e(raw: bytes) -> bytes:
 
 def _conformant_export():
     row_r = encode_consumption_entry(
-        ConsumptionEntry(chain_id="chain-x", sequence=1, previous_hash=_Z32P, commitment=bytes([5]) * 32)
+        ConsumptionEntry(
+            chain_id="chain-x", sequence=1, previous_hash=_Z32P, commitment=bytes([5]) * 32
+        )
     )
     assert row_r.is_ok
     row, head = row_r.value.bytes_, row_r.value.hash_
@@ -1399,57 +1829,96 @@ def _conformant_export():
     fp_b = _unwrap(public_key_thumbprint_raw(_KEY_B))
     start_r = boundary_anchor_signing_input(
         BoundaryAnchorProducer(
-            anchor_id="anchor-start", anchored_at=1000, chain_id="chain-x",
-            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=_KEY_A,
+            anchor_id="anchor-start",
+            anchored_at=1000,
+            chain_id="chain-x",
+            sequence=0,
+            chain_hash=_Z32P,
+            key_id="anchor-a",
+            public_key=_KEY_A,
         )
     )
     assert start_r.is_ok
     start = assemble_compact(start_r.value, _SIG64).value
     end_r = boundary_anchor_signing_input(
         BoundaryAnchorProducer(
-            anchor_id="anchor-end", anchored_at=1600, chain_id="chain-x",
-            sequence=1, chain_hash=head, key_id="anchor-b", public_key=_KEY_B,
+            anchor_id="anchor-end",
+            anchored_at=1600,
+            chain_id="chain-x",
+            sequence=1,
+            chain_hash=head,
+            key_id="anchor-b",
+            public_key=_KEY_B,
         )
     )
     assert end_r.is_ok
     end = assemble_compact(end_r.value, _SIG64).value
     t_r = key_transition_signing_input(
         KeyTransitionProducer(
-            transition_id="transition-1", chain_id="chain-x", effective_at=1500,
-            current_key_id="anchor-a", current_public_key=_KEY_A,
-            next_key_id="anchor-b", next_public_key=_KEY_B,
+            transition_id="transition-1",
+            chain_id="chain-x",
+            effective_at=1500,
+            current_key_id="anchor-a",
+            current_public_key=_KEY_A,
+            next_key_id="anchor-b",
+            next_public_key=_KEY_B,
         )
     )
     assert t_r.is_ok
     t = assemble_compact(t_r.value, _SIG64).value
     chain = ExpectedChain(
-        chain_id="chain-x", first_sequence=1, last_sequence=1, row_count=1,
-        previous_hash=_Z32P, last_hash=head,
+        chain_id="chain-x",
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=_Z32P,
+        last_hash=head,
     )
     expected = ExpectedExport(
         chain=chain,
         digest=_Z32P,
         start_anchor=ExpectedAnchor(
-            anchor_id="anchor-start", anchored_at=1000, chain_id="chain-x",
-            sequence=0, chain_hash=_Z32P, key_id="anchor-a", key_fingerprint=fp_a,
+            anchor_id="anchor-start",
+            anchored_at=1000,
+            chain_id="chain-x",
+            sequence=0,
+            chain_hash=_Z32P,
+            key_id="anchor-a",
+            key_fingerprint=fp_a,
         ),
         end_anchor=ExpectedAnchor(
-            anchor_id="anchor-end", anchored_at=1600, chain_id="chain-x",
-            sequence=1, chain_hash=head, key_id="anchor-b", key_fingerprint=fp_b,
+            anchor_id="anchor-end",
+            anchored_at=1600,
+            chain_id="chain-x",
+            sequence=1,
+            chain_hash=head,
+            key_id="anchor-b",
+            key_fingerprint=fp_b,
         ),
         transitions=[
             ExpectedKeyTransition(
-                transition_id="transition-1", chain_id="chain-x", effective_at=1500,
-                current_key_id="anchor-a", current_key_fingerprint=fp_a,
-                next_key_id="anchor-b", next_key_fingerprint=fp_b,
+                transition_id="transition-1",
+                chain_id="chain-x",
+                effective_at=1500,
+                current_key_id="anchor-a",
+                current_key_fingerprint=fp_a,
+                next_key_id="anchor-b",
+                next_key_fingerprint=fp_b,
             )
         ],
         object_version="v1",
     )
     input_ = AnchoredExportInput(
-        rows=[row], start_anchor=start, end_anchor=end, transitions=[t],
-        chain_id="chain-x", first_sequence=1, last_sequence=1,
-        row_count=1, previous_hash=_Z32P, last_hash=head,
+        rows=[row],
+        start_anchor=start,
+        end_anchor=end,
+        transitions=[t],
+        chain_id="chain-x",
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=_Z32P,
+        last_hash=head,
     )
     return input_, expected
 
@@ -1482,26 +1951,40 @@ def test_encode_parity_start_anchor_mismatch_rejects():
     input_, expected = _conformant_export()
     wrong = boundary_anchor_signing_input(
         BoundaryAnchorProducer(
-            anchor_id="anchor-WRONG", anchored_at=1000, chain_id="chain-x",
-            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=_KEY_A,
+            anchor_id="anchor-WRONG",
+            anchored_at=1000,
+            chain_id="chain-x",
+            sequence=0,
+            chain_hash=_Z32P,
+            key_id="anchor-a",
+            public_key=_KEY_A,
         )
     )
     from dataclasses import replace
 
-    _expect_encode_err(replace(input_, start_anchor=assemble_compact(wrong.value, _SIG64).value), expected)
+    _expect_encode_err(
+        replace(input_, start_anchor=assemble_compact(wrong.value, _SIG64).value), expected
+    )
 
 
 def test_encode_parity_end_anchor_mismatch_rejects():
     input_, expected = _conformant_export()
     wrong = boundary_anchor_signing_input(
         BoundaryAnchorProducer(
-            anchor_id="anchor-WRONG", anchored_at=1600, chain_id="chain-x",
-            sequence=1, chain_hash=expected.chain.last_hash, key_id="anchor-b", public_key=_KEY_B,
+            anchor_id="anchor-WRONG",
+            anchored_at=1600,
+            chain_id="chain-x",
+            sequence=1,
+            chain_hash=expected.chain.last_hash,
+            key_id="anchor-b",
+            public_key=_KEY_B,
         )
     )
     from dataclasses import replace
 
-    _expect_encode_err(replace(input_, end_anchor=assemble_compact(wrong.value, _SIG64).value), expected)
+    _expect_encode_err(
+        replace(input_, end_anchor=assemble_compact(wrong.value, _SIG64).value), expected
+    )
 
 
 def _swap_segment(compact: bytes, index: int, replacement_b64: bytes) -> bytes:
@@ -1516,9 +1999,11 @@ def _reversed_payload(compact: bytes) -> bytes:
     segs = compact.split(b".")
     pad = b"=" * (-len(segs[1]) % 4)
     obj = _json.loads(base64.urlsafe_b64decode(segs[1] + pad).decode("utf-8"))
-    body = "{" + ",".join(
-        _json.dumps(k) + ":" + _json.dumps(obj[k]) for k in reversed(list(obj.keys()))
-    ) + "}"
+    body = (
+        "{"
+        + ",".join(_json.dumps(k) + ":" + _json.dumps(obj[k]) for k in reversed(list(obj.keys())))
+        + "}"
+    )
     return b".".join([segs[0], _b64e(body.encode("utf-8")), segs[2]])
 
 
@@ -1542,9 +2027,13 @@ def test_encode_parity_transition_mismatch_rejects():
     input_, expected = _conformant_export()
     wrong = key_transition_signing_input(
         KeyTransitionProducer(
-            transition_id="transition-1", chain_id="chain-x", effective_at=1501,
-            current_key_id="anchor-a", current_public_key=_KEY_A,
-            next_key_id="anchor-b", next_public_key=_KEY_B,
+            transition_id="transition-1",
+            chain_id="chain-x",
+            effective_at=1501,
+            current_key_id="anchor-a",
+            current_public_key=_KEY_A,
+            next_key_id="anchor-b",
+            next_public_key=_KEY_B,
         )
     )
     from dataclasses import replace
@@ -1596,7 +2085,9 @@ def test_encode_parity_nested_anchor_bounds_mismatch_rejects():
 
     input_, expected = _conformant_export()
     tight = _unwrap(bounds_new({"chain_row_bytes": 156}))
-    r = encode_anchored_export(input_, _replace(expected, start_anchor=_replace(expected.start_anchor, bounds=tight)))
+    r = encode_anchored_export(
+        input_, _replace(expected, start_anchor=_replace(expected.start_anchor, bounds=tight))
+    )
     assert not r.is_ok, "nested anchor-bounds mismatch must reject at encode"
 
 
@@ -1621,7 +2112,9 @@ def test_encode_parity_nested_end_anchor_bounds_mismatch_rejects():
 
     input_, expected = _conformant_export()
     tight = _unwrap(bounds_new({"chain_row_bytes": 156}))
-    r = encode_anchored_export(input_, _replace(expected, end_anchor=_replace(expected.end_anchor, bounds=tight)))
+    r = encode_anchored_export(
+        input_, _replace(expected, end_anchor=_replace(expected.end_anchor, bounds=tight))
+    )
     assert not r.is_ok, "end-anchor nested-bounds mismatch must reject at encode"
 
 
@@ -1632,7 +2125,9 @@ def test_encode_parity_nested_transition_bounds_mismatch_rejects():
 
     input_, expected = _conformant_export()
     tight = _unwrap(bounds_new({"chain_row_bytes": 156}))
-    r = encode_anchored_export(input_, _replace(expected, transitions=[_replace(expected.transitions[0], bounds=tight)]))
+    r = encode_anchored_export(
+        input_, _replace(expected, transitions=[_replace(expected.transitions[0], bounds=tight)])
+    )
     assert not r.is_ok, "transition nested-bounds mismatch must reject at encode"
 
 
@@ -1648,7 +2143,9 @@ def test_encode_parity_chain_pin_isolated_rejects():
     # absent-nested pins pass); ONLY chain.bounds is mismatched (4000 < 4096,
     # row-safe).
     chain_nested = _unwrap(bounds_new({"chain_row_bytes": 4000}))
-    r = encode_anchored_export(input_, _replace(expected, chain=_replace(expected.chain, bounds=chain_nested)))
+    r = encode_anchored_export(
+        input_, _replace(expected, chain=_replace(expected.chain, bounds=chain_nested))
+    )
     assert not r.is_ok, "chain nested-bounds mismatch must reject (isolated)"
 
 
@@ -1701,8 +2198,12 @@ def test_verify_parity_expected_anchor_chain_id_rejects():
     obj = ArchivedObject(chunks=chunks, version="v1")
     keys = HistoricalKeyChain(
         keys=[
-            HistoricalPublicKey(key_id="anchor-a", public_key=_KEY_A, valid_from=900, valid_before=None),
-            HistoricalPublicKey(key_id="anchor-b", public_key=_KEY_B, valid_from=1400, valid_before=None),
+            HistoricalPublicKey(
+                key_id="anchor-a", public_key=_KEY_A, valid_from=900, valid_before=None
+            ),
+            HistoricalPublicKey(
+                key_id="anchor-b", public_key=_KEY_B, valid_from=1400, valid_before=None
+            ),
         ]
     )
     v_expected = ExpectedExport(
@@ -1731,8 +2232,13 @@ def test_bounds_magnitude_gate_rejects():
     pub = priv.public_key().public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
     si = boundary_anchor_signing_input(
         BoundaryAnchorProducer(
-            anchor_id="anchor-mag", anchored_at=1000, chain_id="chain-x",
-            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=pub,
+            anchor_id="anchor-mag",
+            anchored_at=1000,
+            chain_id="chain-x",
+            sequence=0,
+            chain_hash=_Z32P,
+            key_id="anchor-a",
+            public_key=pub,
         )
     )
     assert si.is_ok
@@ -1741,9 +2247,14 @@ def test_bounds_magnitude_gate_rejects():
     from bounded_authority_verifier.jwk import public_key_thumbprint_raw
 
     expected = ExpectedAnchor(
-        anchor_id="anchor-mag", anchored_at=1000, chain_id="chain-x",
-        sequence=0, chain_hash=_Z32P, key_id="anchor-a",
-        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)), bounds=None,
+        anchor_id="anchor-mag",
+        anchored_at=1000,
+        chain_id="chain-x",
+        sequence=0,
+        chain_hash=_Z32P,
+        key_id="anchor-a",
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)),
+        bounds=None,
     )
     key_kw = {
         "key_id": "anchor-a",
@@ -1754,13 +2265,17 @@ def test_bounds_magnitude_gate_rejects():
     from bounded_authority_verifier.v1 import HistoricalPublicKey
 
     # Control: normal windows verify Ok (the real signature).
-    ok_key = HistoricalPublicKey(valid_before=2000, **{k: v for k, v in key_kw.items() if k != "valid_before"})
+    ok_key = HistoricalPublicKey(
+        valid_before=2000, **{k: v for k, v in key_kw.items() if k != "valid_before"}
+    )
     compact = si.value.protected_segment + b"." + si.value.payload_segment + b"." + _b64e(sig)
     assert verify_historical_anchor(compact, ok_key, expected).is_ok
     # Huge bounded valid_before (2^62): membership holds; the magnitude gate fires.
     from bounded_authority_verifier.v1 import HistoricalPublicKey as HPK
 
-    bad_key = HPK(valid_before=4611686018427387904, **{k: v for k, v in key_kw.items() if k != "valid_before"})
+    bad_key = HPK(
+        valid_before=4611686018427387904, **{k: v for k, v in key_kw.items() if k != "valid_before"}
+    )
     assert not verify_historical_anchor(compact, bad_key, expected).is_ok
 
 
@@ -1777,8 +2292,13 @@ def test_bounds_magnitude_valid_from_half_rejects():
     pub = priv.public_key().public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
     si = boundary_anchor_signing_input(
         BoundaryAnchorProducer(
-            anchor_id="anchor-mag2", anchored_at=1000, chain_id="chain-x",
-            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=pub,
+            anchor_id="anchor-mag2",
+            anchored_at=1000,
+            chain_id="chain-x",
+            sequence=0,
+            chain_hash=_Z32P,
+            key_id="anchor-a",
+            public_key=pub,
         )
     )
     assert si.is_ok
@@ -1786,9 +2306,14 @@ def test_bounds_magnitude_valid_from_half_rejects():
     sig = priv.sign(msg)
     compact = si.value.protected_segment + b"." + si.value.payload_segment + b"." + _b64e(sig)
     expected = ExpectedAnchor(
-        anchor_id="anchor-mag2", anchored_at=1000, chain_id="chain-x",
-        sequence=0, chain_hash=_Z32P, key_id="anchor-a",
-        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)), bounds=None,
+        anchor_id="anchor-mag2",
+        anchored_at=1000,
+        chain_id="chain-x",
+        sequence=0,
+        chain_hash=_Z32P,
+        key_id="anchor-a",
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)),
+        bounds=None,
     )
     ok = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=0, valid_before=2000)
     assert verify_historical_anchor(compact, ok, expected).is_ok
@@ -1812,8 +2337,13 @@ def test_bounds_magnitude_non_integral_rejects():
     pub = priv.public_key().public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
     si = boundary_anchor_signing_input(
         BoundaryAnchorProducer(
-            anchor_id="anchor-int", anchored_at=1000, chain_id="chain-x",
-            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=pub,
+            anchor_id="anchor-int",
+            anchored_at=1000,
+            chain_id="chain-x",
+            sequence=0,
+            chain_hash=_Z32P,
+            key_id="anchor-a",
+            public_key=pub,
         )
     )
     assert si.is_ok
@@ -1821,12 +2351,19 @@ def test_bounds_magnitude_non_integral_rejects():
     sig = priv.sign(msg)
     compact = si.value.protected_segment + b"." + si.value.payload_segment + b"." + _b64e(sig)
     expected = ExpectedAnchor(
-        anchor_id="anchor-int", anchored_at=1000, chain_id="chain-x",
-        sequence=0, chain_hash=_Z32P, key_id="anchor-a",
-        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)), bounds=None,
+        anchor_id="anchor-int",
+        anchored_at=1000,
+        chain_id="chain-x",
+        sequence=0,
+        chain_hash=_Z32P,
+        key_id="anchor-a",
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)),
+        bounds=None,
     )
     for bad_from, bad_before in [(True, None), (0.5, None), (0, 2000.5), (False, None)]:
-        key = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=bad_from, valid_before=bad_before)  # type: ignore[arg-type]
+        key = HistoricalPublicKey(
+            key_id="anchor-a", public_key=pub, valid_from=bad_from, valid_before=bad_before
+        )  # type: ignore[arg-type]
         assert not verify_historical_anchor(compact, key, expected).is_ok, (bad_from, bad_before)
 
 
@@ -1844,13 +2381,22 @@ def test_archive_verify_key_validity_guards():
     import json as _json
     from pathlib import Path
 
-    corpus = Path(__file__).resolve().parents[1] / "conformance" / "priv" / "conformance" / "v1" / "corpus" / "cases" / "anchored-export" / "verify.json"
+    corpus = (
+        Path(__file__).resolve().parents[1]
+        / "conformance"
+        / "priv"
+        / "conformance"
+        / "v1"
+        / "corpus"
+        / "cases"
+        / "anchored-export"
+        / "verify.json"
+    )
     cases = _json.loads(corpus.read_text())["cases"]
     c = next(x for x in cases if x["class"] == "valid")
     inp = c["input"]
     chunks = [
-        __import__("base64").urlsafe_b64decode(ch + "=" * (-len(ch) % 4))
-        for ch in inp["chunks"]
+        __import__("base64").urlsafe_b64decode(ch + "=" * (-len(ch) % 4)) for ch in inp["chunks"]
     ]
     obj = ArchivedObject(chunks=chunks, version=inp["version"])
 
@@ -1859,8 +2405,10 @@ def test_archive_verify_key_validity_guards():
 
         raw = base64.urlsafe_b64decode(v["public_key"] + "=" * (-len(v["public_key"]) % 4))
         return HistoricalPublicKey(
-            key_id=v["key_id"], public_key=raw,
-            valid_from=v["valid_from"], valid_before=v.get("valid_before"),
+            key_id=v["key_id"],
+            public_key=raw,
+            valid_from=v["valid_from"],
+            valid_before=v.get("valid_before"),
         )
 
     keys_ok = HistoricalKeyChain(keys=[mk_key(k) for k in inp["keys"]])
@@ -1868,28 +2416,53 @@ def test_archive_verify_key_validity_guards():
     ec = e["chain"]
     exp = ExpectedExport(
         chain=ExpectedChain(
-            chain_id=ec["chain_id"], first_sequence=ec["first_sequence"],
-            last_sequence=ec["last_sequence"], row_count=ec["row_count"],
-            previous_hash=b64_32_ea(ec, "previous_hash"), last_hash=b64_32_ea(ec, "last_hash"), bounds=None),
+            chain_id=ec["chain_id"],
+            first_sequence=ec["first_sequence"],
+            last_sequence=ec["last_sequence"],
+            row_count=ec["row_count"],
+            previous_hash=b64_32_ea(ec, "previous_hash"),
+            last_hash=b64_32_ea(ec, "last_hash"),
+            bounds=None,
+        ),
         digest=b64_32_ea(e, "digest"),
-        start_anchor=ExpectedAnchor(anchor_id=e["start_anchor"]["anchor_id"], anchored_at=e["start_anchor"]["anchored_at"],
-            chain_id=e["start_anchor"]["chain_id"], sequence=e["start_anchor"]["sequence"],
-            chain_hash=b64_32_ea(e["start_anchor"], "chain_hash"), key_id=e["start_anchor"]["key_id"],
-            key_fingerprint=b64_32_ea(e["start_anchor"], "key_fingerprint"), bounds=None),
-        end_anchor=ExpectedAnchor(anchor_id=e["end_anchor"]["anchor_id"], anchored_at=e["end_anchor"]["anchored_at"],
-            chain_id=e["end_anchor"]["chain_id"], sequence=e["end_anchor"]["sequence"],
-            chain_hash=b64_32_ea(e["end_anchor"], "chain_hash"), key_id=e["end_anchor"]["key_id"],
-            key_fingerprint=b64_32_ea(e["end_anchor"], "key_fingerprint"), bounds=None),
+        start_anchor=ExpectedAnchor(
+            anchor_id=e["start_anchor"]["anchor_id"],
+            anchored_at=e["start_anchor"]["anchored_at"],
+            chain_id=e["start_anchor"]["chain_id"],
+            sequence=e["start_anchor"]["sequence"],
+            chain_hash=b64_32_ea(e["start_anchor"], "chain_hash"),
+            key_id=e["start_anchor"]["key_id"],
+            key_fingerprint=b64_32_ea(e["start_anchor"], "key_fingerprint"),
+            bounds=None,
+        ),
+        end_anchor=ExpectedAnchor(
+            anchor_id=e["end_anchor"]["anchor_id"],
+            anchored_at=e["end_anchor"]["anchored_at"],
+            chain_id=e["end_anchor"]["chain_id"],
+            sequence=e["end_anchor"]["sequence"],
+            chain_hash=b64_32_ea(e["end_anchor"], "chain_hash"),
+            key_id=e["end_anchor"]["key_id"],
+            key_fingerprint=b64_32_ea(e["end_anchor"], "key_fingerprint"),
+            bounds=None,
+        ),
         transitions=[],
-        object_version=e["object_version"], bounds=None)
+        object_version=e["object_version"],
+        bounds=None,
+    )
     # transitions: reuse the same builder if present
     for t in e.get("transitions", []):
-        exp.transitions.append(ExpectedKeyTransition(
-            chain_id=t["chain_id"], current_key_id=t["current_key_id"],
-            current_key_fingerprint=b64_32_ea(t, "current_key_fingerprint"),
-            effective_at=t["effective_at"], next_key_id=t["next_key_id"],
-            next_key_fingerprint=b64_32_ea(t, "next_key_fingerprint"),
-            transition_id=t["transition_id"], bounds=None))
+        exp.transitions.append(
+            ExpectedKeyTransition(
+                chain_id=t["chain_id"],
+                current_key_id=t["current_key_id"],
+                current_key_fingerprint=b64_32_ea(t, "current_key_fingerprint"),
+                effective_at=t["effective_at"],
+                next_key_id=t["next_key_id"],
+                next_key_fingerprint=b64_32_ea(t, "next_key_fingerprint"),
+                transition_id=t["transition_id"],
+                bounds=None,
+            )
+        )
     # Control: the corpus archive verifies Ok.
     assert verify_anchored_export(obj, keys_ok, exp).is_ok
     # Fractional valid_from on the first key -> fail closed at the archive path.
@@ -1897,12 +2470,22 @@ def test_archive_verify_key_validity_guards():
     # replacing exactly one entry — a corpus reshape changes the count here and
     # trips this assert, not a silent vacuity (the closing cross-vendor note).
     assert len(keys_ok.keys) == len(exp.transitions) + 1
-    bad0 = HistoricalPublicKey(key_id=keys_ok.keys[0].key_id, public_key=keys_ok.keys[0].public_key, valid_from=0.5, valid_before=keys_ok.keys[0].valid_before)  # type: ignore[arg-type]
+    bad0 = HistoricalPublicKey(
+        key_id=keys_ok.keys[0].key_id,
+        public_key=keys_ok.keys[0].public_key,
+        valid_from=0.5,
+        valid_before=keys_ok.keys[0].valid_before,
+    )  # type: ignore[arg-type]
     chain0 = [bad0 if i == 0 else k for i, k in enumerate(keys_ok.keys)]
     assert not verify_anchored_export(obj, HistoricalKeyChain(keys=chain0), exp).is_ok
     # Huge bounded valid_before (2^62) on the last key -> fail closed.
     last = keys_ok.keys[-1]
-    bad1 = HistoricalPublicKey(key_id=last.key_id, public_key=last.public_key, valid_from=last.valid_from, valid_before=4611686018427387904)
+    bad1 = HistoricalPublicKey(
+        key_id=last.key_id,
+        public_key=last.public_key,
+        valid_from=last.valid_from,
+        valid_before=4611686018427387904,
+    )
     chain1 = [bad1 if i == len(keys_ok.keys) - 1 else k for i, k in enumerate(keys_ok.keys)]
     assert not verify_anchored_export(obj, HistoricalKeyChain(keys=chain1), exp).is_ok
 
@@ -1921,8 +2504,13 @@ def test_bounds_inverted_window_rejects():
     pub = priv.public_key().public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
     si = boundary_anchor_signing_input(
         BoundaryAnchorProducer(
-            anchor_id="anchor-ord", anchored_at=1000, chain_id="chain-x",
-            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=pub,
+            anchor_id="anchor-ord",
+            anchored_at=1000,
+            chain_id="chain-x",
+            sequence=0,
+            chain_hash=_Z32P,
+            key_id="anchor-a",
+            public_key=pub,
         )
     )
     assert si.is_ok
@@ -1930,9 +2518,14 @@ def test_bounds_inverted_window_rejects():
     sig = priv.sign(msg)
     compact = si.value.protected_segment + b"." + si.value.payload_segment + b"." + _b64e(sig)
     expected = ExpectedAnchor(
-        anchor_id="anchor-ord", anchored_at=1000, chain_id="chain-x",
-        sequence=0, chain_hash=_Z32P, key_id="anchor-a",
-        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)), bounds=None,
+        anchor_id="anchor-ord",
+        anchored_at=1000,
+        chain_id="chain-x",
+        sequence=0,
+        chain_hash=_Z32P,
+        key_id="anchor-a",
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)),
+        bounds=None,
     )
     ok = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=0, valid_before=2000)
     assert verify_historical_anchor(compact, ok, expected).is_ok
@@ -1953,8 +2546,13 @@ def test_expected_anchor_non_integral_rejects():
     pub = priv.public_key().public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
     si = boundary_anchor_signing_input(
         BoundaryAnchorProducer(
-            anchor_id="anchor-t", anchored_at=1000, chain_id="chain-x",
-            sequence=0, chain_hash=_Z32P, key_id="anchor-a", public_key=pub,
+            anchor_id="anchor-t",
+            anchored_at=1000,
+            chain_id="chain-x",
+            sequence=0,
+            chain_hash=_Z32P,
+            key_id="anchor-a",
+            public_key=pub,
         )
     )
     assert si.is_ok
@@ -1962,9 +2560,14 @@ def test_expected_anchor_non_integral_rejects():
     sig = priv.sign(msg)
     compact = si.value.protected_segment + b"." + si.value.payload_segment + b"." + _b64e(sig)
     ok = ExpectedAnchor(
-        anchor_id="anchor-t", anchored_at=1000, chain_id="chain-x",
-        sequence=0, chain_hash=_Z32P, key_id="anchor-a",
-        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)), bounds=None,
+        anchor_id="anchor-t",
+        anchored_at=1000,
+        chain_id="chain-x",
+        sequence=0,
+        chain_hash=_Z32P,
+        key_id="anchor-a",
+        key_fingerprint=_unwrap(public_key_thumbprint_raw(pub)),
+        bounds=None,
     )
     key = HistoricalPublicKey(key_id="anchor-a", public_key=pub, valid_from=0, valid_before=None)
     assert verify_historical_anchor(compact, key, ok).is_ok
@@ -2017,56 +2620,101 @@ def _sweep_valid_args():
     holder_pub, holder_priv = _fresh_key()
     holder_fp = _unwrap(public_key_thumbprint_raw(holder_pub))
     grant = GrantProducer(
-        key_id="issuer-123456", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
-        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        key_id="issuer-123456",
+        issuer="https://issuer.example.test",
+        grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",),
+        issued_at=1000,
+        not_before=1000,
+        expires_at=2000,
         holder_thumbprint=_b64url(holder_fp),
         operations=(OperationInput(name="read", selectors=("all",)),),
     )
     gsi = grant_signing_input(grant).value
     gc = _must_assemble(gsi, issuer_priv.sign(gsi.protected_segment + b"." + gsi.payload_segment))
     proof = ProofProducer(
-        holder_public_key=holder_pub, proof_id="urn:example:proof:1", method="POST",
-        target_uri="https://resource.example.test/invoke", issued_at=1400,
-        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
-        grant_compact=gc, cast_arguments=_NULL_ARGS,
+        holder_public_key=holder_pub,
+        proof_id="urn:example:proof:1",
+        method="POST",
+        target_uri="https://resource.example.test/invoke",
+        issued_at=1400,
+        invocation_id="550e8400-e29b-41d4-a716-446655440000",
+        operation="read",
+        grant_compact=gc,
+        cast_arguments=_NULL_ARGS,
     )
     psi = proof_signing_input(proof).value
     pc = _must_assemble(psi, holder_priv.sign(psi.protected_segment + b"." + psi.payload_segment))
     base_req = ExpectedRequest(
         trusted_issuer=TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
-        issuer="https://issuer.example.test", audience="https://resource.example.test",
-        method="POST", target_uri="https://resource.example.test/invoke",
-        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
-        cast_arguments=_NULL_ARGS, evaluation_time=1500, clock_skew=60, proof_max_age=300,
+        issuer="https://issuer.example.test",
+        audience="https://resource.example.test",
+        method="POST",
+        target_uri="https://resource.example.test/invoke",
+        invocation_id="550e8400-e29b-41d4-a716-446655440000",
+        operation="read",
+        cast_arguments=_NULL_ARGS,
+        evaluation_time=1500,
+        clock_skew=60,
+        proof_max_age=300,
         nonce=NonceNotRequired(),
     )
-    enc = encode_consumption_entry(ConsumptionEntry(
-        chain_id="urn:example:chain", sequence=1, previous_hash=Z32, commitment=bytes([7] * 32),
-    ))
+    enc = encode_consumption_entry(
+        ConsumptionEntry(
+            chain_id="urn:example:chain",
+            sequence=1,
+            previous_hash=Z32,
+            commitment=bytes([7] * 32),
+        )
+    )
     assert enc.is_ok
     row, head = enc.value.bytes_, enc.value.hash_
     good_chain = ChainInput(
-        rows=(row,), chain_id="urn:example:chain", first_sequence=1, last_sequence=1,
-        row_count=1, previous_hash=Z32, last_hash=head,
+        rows=(row,),
+        chain_id="urn:example:chain",
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=Z32,
+        last_hash=head,
     )
     expected_chain = ExpectedChain(
-        chain_id="urn:example:chain", first_sequence=1, last_sequence=1, row_count=1,
-        previous_hash=Z32, last_hash=head,
+        chain_id="urn:example:chain",
+        first_sequence=1,
+        last_sequence=1,
+        row_count=1,
+        previous_hash=Z32,
+        last_hash=head,
     )
     ka_pub, ka_priv = _fresh_key()
     kb_pub, _ = _fresh_key()
-    fp_a, fp_b = _unwrap(public_key_thumbprint_raw(ka_pub)), _unwrap(public_key_thumbprint_raw(kb_pub))
+    fp_a, fp_b = (
+        _unwrap(public_key_thumbprint_raw(ka_pub)),
+        _unwrap(public_key_thumbprint_raw(kb_pub)),
+    )
     anchor_prod = BoundaryAnchorProducer(
-        anchor_id="a0", anchored_at=1000, chain_id="chain-x", sequence=0,
-        chain_hash=Z32, key_id="ka", public_key=ka_pub,
+        anchor_id="a0",
+        anchored_at=1000,
+        chain_id="chain-x",
+        sequence=0,
+        chain_hash=Z32,
+        key_id="ka",
+        public_key=ka_pub,
     )
     start_compact = _signed_anchor_compact(anchor_prod, ka_priv)
     t_prod = KeyTransitionProducer(
-        transition_id="t1", chain_id="chain-x", effective_at=1500,
-        current_key_id="ka", current_public_key=ka_pub, next_key_id="kb", next_public_key=kb_pub,
+        transition_id="t1",
+        chain_id="chain-x",
+        effective_at=1500,
+        current_key_id="ka",
+        current_public_key=ka_pub,
+        next_key_id="kb",
+        next_public_key=kb_pub,
     )
     tsi = key_transition_signing_input(t_prod).value
-    t_compact = _must_assemble(tsi, ka_priv.sign(tsi.protected_segment + b"." + tsi.payload_segment))
+    t_compact = _must_assemble(
+        tsi, ka_priv.sign(tsi.protected_segment + b"." + tsi.payload_segment)
+    )
     ce = _conformant_export()
     built = _build_archive([_fresh_key()])
     return {
@@ -2075,48 +2723,112 @@ def _sweep_valid_args():
         "decode_proof": (decode_proof, {"compact": pc}, {"compact": "bytes"}),
         "verify_grant": (
             verify_grant,
-            {"compact": gc, "trusted": TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
-             "expected": ExpectedGrant(issuer="https://issuer.example.test", audience="https://resource.example.test", evaluation_time=1500, clock_skew=60)},
+            {
+                "compact": gc,
+                "trusted": TrustedIssuer(key_id="issuer-123456", public_key=issuer_pub),
+                "expected": ExpectedGrant(
+                    issuer="https://issuer.example.test",
+                    audience="https://resource.example.test",
+                    evaluation_time=1500,
+                    clock_skew=60,
+                ),
+            },
             {"compact": "bytes", "trusted": "struct", "expected": "struct"},
         ),
-        "check_envelope": (check_envelope, {"grant_compact": gc, "proof_compact": pc, "expected": base_req},
-                           {"grant_compact": "bytes", "proof_compact": "bytes", "expected": "struct"}),
-        "request_digest": (request_digest, {"operation": "read", "cast_arguments": _NULL_ARGS},
-                           {"operation": "str", "cast_arguments": "tagged"}),
+        "check_envelope": (
+            check_envelope,
+            {"grant_compact": gc, "proof_compact": pc, "expected": base_req},
+            {"grant_compact": "bytes", "proof_compact": "bytes", "expected": "struct"},
+        ),
+        "request_digest": (
+            request_digest,
+            {"operation": "read", "cast_arguments": _NULL_ARGS},
+            {"operation": "str", "cast_arguments": "tagged"},
+        ),
         "encode_consumption_entry": (
             encode_consumption_entry,
-            {"entry": ConsumptionEntry(chain_id="chain-x", sequence=1, previous_hash=Z32, commitment=bytes([7] * 32))},
+            {
+                "entry": ConsumptionEntry(
+                    chain_id="chain-x", sequence=1, previous_hash=Z32, commitment=bytes([7] * 32)
+                )
+            },
             {"entry": "struct"},
         ),
-        "check_chain": (check_chain, {"chain": good_chain, "expected": expected_chain},
-                        {"chain": "struct", "expected": "struct"}),
+        "check_chain": (
+            check_chain,
+            {"chain": good_chain, "expected": expected_chain},
+            {"chain": "struct", "expected": "struct"},
+        ),
         "grant_signing_input": (grant_signing_input, {"grant": grant}, {"grant": "struct"}),
         "proof_signing_input": (proof_signing_input, {"proof": proof}, {"proof": "struct"}),
-        "assemble_compact": (assemble_compact, {"input_": gsi, "signature": b"\x05" * 64},
-                             {"input_": "struct", "signature": "bytes"}),
-        "boundary_anchor_signing_input": (boundary_anchor_signing_input, {"anchor": anchor_prod}, {"anchor": "struct"}),
-        "key_transition_signing_input": (key_transition_signing_input, {"t": t_prod}, {"t": "struct"}),
-        "encode_anchored_export": (encode_anchored_export, {"input_": ce[0], "expected": ce[1]},
-                                   {"input_": "struct", "expected": "struct"}),
+        "assemble_compact": (
+            assemble_compact,
+            {"input_": gsi, "signature": b"\x05" * 64},
+            {"input_": "struct", "signature": "bytes"},
+        ),
+        "boundary_anchor_signing_input": (
+            boundary_anchor_signing_input,
+            {"anchor": anchor_prod},
+            {"anchor": "struct"},
+        ),
+        "key_transition_signing_input": (
+            key_transition_signing_input,
+            {"t": t_prod},
+            {"t": "struct"},
+        ),
+        "encode_anchored_export": (
+            encode_anchored_export,
+            {"input_": ce[0], "expected": ce[1]},
+            {"input_": "struct", "expected": "struct"},
+        ),
         "verify_historical_anchor": (
             verify_historical_anchor,
-            {"compact": start_compact,
-             "key": HistoricalPublicKey(key_id="ka", public_key=ka_pub, valid_from=0, valid_before=None),
-             "expected": ExpectedAnchor(anchor_id="a0", anchored_at=1000, chain_id="chain-x", sequence=0, chain_hash=Z32, key_id="ka", key_fingerprint=fp_a)},
+            {
+                "compact": start_compact,
+                "key": HistoricalPublicKey(
+                    key_id="ka", public_key=ka_pub, valid_from=0, valid_before=None
+                ),
+                "expected": ExpectedAnchor(
+                    anchor_id="a0",
+                    anchored_at=1000,
+                    chain_id="chain-x",
+                    sequence=0,
+                    chain_hash=Z32,
+                    key_id="ka",
+                    key_fingerprint=fp_a,
+                ),
+            },
             {"compact": "bytes", "key": "struct", "expected": "struct"},
         ),
         "verify_key_transition": (
             verify_key_transition,
-            {"compact": t_compact,
-             "old_key": HistoricalPublicKey(key_id="ka", public_key=ka_pub, valid_from=0, valid_before=None),
-             "new_key": HistoricalPublicKey(key_id="kb", public_key=kb_pub, valid_from=1500, valid_before=None),
-             "expected": ExpectedKeyTransition(transition_id="t1", chain_id="chain-x", effective_at=1500, current_key_id="ka", current_key_fingerprint=fp_a, next_key_id="kb", next_key_fingerprint=fp_b)},
+            {
+                "compact": t_compact,
+                "old_key": HistoricalPublicKey(
+                    key_id="ka", public_key=ka_pub, valid_from=0, valid_before=None
+                ),
+                "new_key": HistoricalPublicKey(
+                    key_id="kb", public_key=kb_pub, valid_from=1500, valid_before=None
+                ),
+                "expected": ExpectedKeyTransition(
+                    transition_id="t1",
+                    chain_id="chain-x",
+                    effective_at=1500,
+                    current_key_id="ka",
+                    current_key_fingerprint=fp_a,
+                    next_key_id="kb",
+                    next_key_fingerprint=fp_b,
+                ),
+            },
             {"compact": "bytes", "old_key": "struct", "new_key": "struct", "expected": "struct"},
         ),
         "verify_anchored_export": (
             verify_anchored_export,
-            {"archived": ArchivedObject(chunks=(built["archive"],), version="v1"),
-             "key_chain": built["key_chain"], "expected": built["expected"]},
+            {
+                "archived": ArchivedObject(chunks=(built["archive"],), version="v1"),
+                "key_chain": built["key_chain"],
+                "expected": built["expected"],
+            },
             {"archived": "struct", "key_chain": "struct", "expected": "struct"},
         ),
     }
@@ -2145,7 +2857,9 @@ def test_closed_result_family_param_sweep():
             for sentinel in _SWEEP_SENTINELS:
                 probe = dict(kwargs)
                 probe[param] = sentinel
-                cases.append((f"{name}.{param}={sentinel!r}", fn, probe, _sentinel_may_be_ok(kind, sentinel)))
+                cases.append(
+                    (f"{name}.{param}={sentinel!r}", fn, probe, _sentinel_may_be_ok(kind, sentinel))
+                )
     for label, fn, probe, may_ok in cases:
         _reset_census()
         r = fn(**probe)
@@ -2153,7 +2867,9 @@ def test_closed_result_family_param_sweep():
             is_ok = r.is_ok
         except AttributeError:
             is_ok = None
-        assert is_ok is not None, f"{label}: raised out of the closed Result surface (pre-fix escape)"
+        assert is_ok is not None, (
+            f"{label}: raised out of the closed Result surface (pre-fix escape)"
+        )
         if not may_ok:
             assert not is_ok, f"{label}: wrong-typed input must fail closed, got Ok"
 
@@ -2210,7 +2926,9 @@ def test_closed_result_family_field_sweep():
             is_ok = r.is_ok
         except AttributeError:
             is_ok = None
-        assert is_ok is not None, f"{label}: raised out of the closed Result surface (pre-fix escape)"
+        assert is_ok is not None, (
+            f"{label}: raised out of the closed Result surface (pre-fix escape)"
+        )
         if not may_ok:
             assert not is_ok, f"{label}: wrong-typed field must fail closed, got Ok"
 
@@ -2268,20 +2986,32 @@ def test_verify_export_malformed_expected_rejects_before_hashing(monkeypatch):
 
         expected = _replace(
             built["expected"],
-            start_anchor=_replace(built["expected"].start_anchor, **{
-                k: v for k, v in anchor_and_chain_mutations.items() if not k.startswith("chain_")
-            }),
-            chain=_replace(built["expected"].chain, **{
-                k.replace("chain_", ""): v for k, v in anchor_and_chain_mutations.items() if k.startswith("chain_")
-            }),
+            start_anchor=_replace(
+                built["expected"].start_anchor,
+                **{
+                    k: v
+                    for k, v in anchor_and_chain_mutations.items()
+                    if not k.startswith("chain_")
+                },
+            ),
+            chain=_replace(
+                built["expected"].chain,
+                **{
+                    k.replace("chain_", ""): v
+                    for k, v in anchor_and_chain_mutations.items()
+                    if k.startswith("chain_")
+                },
+            ),
         )
         _reset_census()
-        return verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected)
+        return verify_anchored_export(
+            ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected
+        )
 
     malformed_cases = [
         ("anchor_id over identifier_bytes", {"anchor_id": "x" * 600}),
         ("anchor key_id charset", {"key_id": "bad key!"}),
-        ("anchored_at over magnitude", {"anchored_at": 10 ** 16}),
+        ("anchored_at over magnitude", {"anchored_at": 10**16}),
         ("anchor sequence negative", {"sequence": -1}),
         ("key_fingerprint width", {"key_fingerprint": b"\x00" * 31}),
         ("chain row_count zero", {"chain_row_count": 0}),
@@ -2291,12 +3021,18 @@ def test_verify_export_malformed_expected_rejects_before_hashing(monkeypatch):
         calls.clear()
         r = verify_with(**mutations)
         assert not r.is_ok, f"{label}: must reject"
-        assert calls == [], f"{label}: rejected only AFTER hashing the chunks ({len(calls)} sha256 calls) — the clause-3 hoist is missing"
+        assert calls == [], (
+            f"{label}: rejected only AFTER hashing the chunks ({len(calls)} sha256 calls) — the clause-3 hoist is missing"
+        )
 
     # Control: the unmutated expected DOES hash (the digest gate runs) and verifies Ok.
     calls.clear()
     _reset_census()
-    r = verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], built["expected"])
+    r = verify_anchored_export(
+        ArchivedObject(chunks=(built["archive"],), version="v1"),
+        built["key_chain"],
+        built["expected"],
+    )
     assert r.is_ok
     assert len(calls) > 0, "control: the valid path must actually hash"
 
@@ -2310,13 +3046,15 @@ def test_verify_export_malformed_expected_transition_verdicts():
     t0 = built["expected"].transitions[0]
     for label, mutated_t in [
         ("transition_id over identifier_bytes", _replace(t0, transition_id="x" * 600)),
-        ("effective_at over magnitude", _replace(t0, effective_at=10 ** 16)),
+        ("effective_at over magnitude", _replace(t0, effective_at=10**16)),
         ("current_key_id charset", _replace(t0, current_key_id="bad key!")),
         ("current_key_fingerprint width", _replace(t0, current_key_fingerprint=b"\x00" * 31)),
     ]:
         expected = _replace(built["expected"], transitions=[mutated_t])
         _reset_census()
-        r = verify_anchored_export(ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected)
+        r = verify_anchored_export(
+            ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected
+        )
         assert not r.is_ok, f"{label}: must reject"
 
 
@@ -2327,8 +3065,13 @@ def test_verify_export_malformed_expected_transition_verdicts():
 
 def test_assemble_compact_threads_caller_bounds():
     grant = GrantProducer(
-        key_id="k1", issuer="https://issuer.example.test", grant_id="urn:example:grant:1",
-        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000, expires_at=2000,
+        key_id="k1",
+        issuer="https://issuer.example.test",
+        grant_id="urn:example:grant:1",
+        audiences=("https://resource.example.test",),
+        issued_at=1000,
+        not_before=1000,
+        expires_at=2000,
         holder_thumbprint=_b64url(bytes([1] * 32)),
         operations=(OperationInput(name="read", selectors=("all",)),),
     )
@@ -2345,7 +3088,11 @@ def test_assemble_compact_threads_caller_bounds():
     # (signature_bytes is a FIXED-WIDTH bound — untightenable by design; the gate exists
     # as a fixed-width invariant; no valid bounds can lower it below 64.)
     # Tightened encoded_segment_bytes below the protected segment length → reject.
-    r = assemble_compact(si.value, sig, bounds=_unwrap(bounds_new({"encoded_segment_bytes": len(si.value.protected_segment) - 1})))
+    r = assemble_compact(
+        si.value,
+        sig,
+        bounds=_unwrap(bounds_new({"encoded_segment_bytes": len(si.value.protected_segment) - 1})),
+    )
     assert not r.is_ok, "tightened encoded_segment_bytes must reject the protected segment"
     # Tightened kid_bytes below the produced kid ("k1" is 2 bytes; 1 rejects at the re-parse).
     r = assemble_compact(si.value, sig, bounds=_unwrap(bounds_new({"kid_bytes": 1})))
@@ -2397,25 +3144,44 @@ def test_round12_14_export_predigest_gates_work_pinned(monkeypatch):
 
     base_obj = ArchivedObject(chunks=(built["archive"],), version="v1")
     assert verify(base_obj).is_ok, "control"
-    extra = HistoricalPublicKey(key_id="k-x", public_key=_fresh_key()[0], valid_from=0, valid_before=None)
+    extra = HistoricalPublicKey(
+        key_id="k-x", public_key=_fresh_key()[0], valid_from=0, valid_before=None
+    )
     bad_charset = _replace(kc.keys[0], key_id="bad key!")
-    huge = _replace(kc.keys[1], valid_before=10 ** 16)
+    huge = _replace(kc.keys[1], valid_before=10**16)
     long_version = "x" * 600
     cases = [
-        ("version shape (both equal, over bound)",
-         lambda: verify(ArchivedObject(chunks=(built["archive"],), version=long_version),
-                        expected=_replace(exp, object_version=long_version))),
-        ("version equality", lambda: verify(ArchivedObject(chunks=(built["archive"],), version="v2"))),
-        ("key count (extra unused key)",
-         lambda: verify(base_obj, keys=HistoricalKeyChain(keys=kc.keys + (extra,)))),
-        ("key charset", lambda: verify(base_obj, keys=HistoricalKeyChain(keys=(bad_charset,) + kc.keys[1:]))),
-        ("key magnitude", lambda: verify(base_obj, keys=HistoricalKeyChain(keys=kc.keys[:1] + (huge,)))),
+        (
+            "version shape (both equal, over bound)",
+            lambda: verify(
+                ArchivedObject(chunks=(built["archive"],), version=long_version),
+                expected=_replace(exp, object_version=long_version),
+            ),
+        ),
+        (
+            "version equality",
+            lambda: verify(ArchivedObject(chunks=(built["archive"],), version="v2")),
+        ),
+        (
+            "key count (extra unused key)",
+            lambda: verify(base_obj, keys=HistoricalKeyChain(keys=kc.keys + (extra,))),
+        ),
+        (
+            "key charset",
+            lambda: verify(base_obj, keys=HistoricalKeyChain(keys=(bad_charset,) + kc.keys[1:])),
+        ),
+        (
+            "key magnitude",
+            lambda: verify(base_obj, keys=HistoricalKeyChain(keys=kc.keys[:1] + (huge,))),
+        ),
     ]
     for label, run in cases:
         calls.clear()
         r = run()
         assert not r.is_ok, f"{label}: must reject"
-        assert calls == [], f"{label}: rejected only AFTER hashing ({len(calls)} calls) — the pre-digest gate is missing or unthreaded"
+        assert calls == [], (
+            f"{label}: rejected only AFTER hashing ({len(calls)} calls) — the pre-digest gate is missing or unthreaded"
+        )
 
 
 def test_round12_14_export_predigest_gates_pinned():
@@ -2433,22 +3199,28 @@ def test_round12_14_export_predigest_gates_pinned():
     assert verify().is_ok
     # R12/R13: version SHAPE — both versions identical but over object_version_bytes.
     long_version = "x" * 600
-    assert not verify(o=obj(long_version), expected=_replace(exp, object_version=long_version)).is_ok, \
-        "an over-bound object version (both sides equal) must reject at the shape gate"
+    assert not verify(
+        o=obj(long_version), expected=_replace(exp, object_version=long_version)
+    ).is_ok, "an over-bound object version (both sides equal) must reject at the shape gate"
     # R13/R14: version EQUALITY — shape-fine, values differ.
     assert not verify(o=obj("v2")).is_ok, "a version mismatch must reject at the equality gate"
     # R13: strict pre-digest key-count — an extra valid-but-unused key.
-    extra = HistoricalPublicKey(key_id="k-x", public_key=_fresh_key()[0], valid_from=0, valid_before=None)
-    assert not verify(keys=HistoricalKeyChain(keys=kc.keys + (extra,))).is_ok, \
+    extra = HistoricalPublicKey(
+        key_id="k-x", public_key=_fresh_key()[0], valid_from=0, valid_before=None
+    )
+    assert not verify(keys=HistoricalKeyChain(keys=kc.keys + (extra,))).is_ok, (
         "keys != transitions + 1 must reject pre-digest even when every used key verifies"
+    )
     # R15: key-window key_id charset class, pre-hash.
     bad_charset = _replace(kc.keys[0], key_id="bad key!")
-    assert not verify(keys=HistoricalKeyChain(keys=(bad_charset,) + kc.keys[1:])).is_ok, \
+    assert not verify(keys=HistoricalKeyChain(keys=(bad_charset,) + kc.keys[1:])).is_ok, (
         "a non-ASCII-unreserved key-window key_id must reject pre-hash"
+    )
     # R14: key-window magnitude, pre-hash.
-    huge = _replace(kc.keys[1], valid_before=10 ** 16)
-    assert not verify(keys=HistoricalKeyChain(keys=kc.keys[:1] + (huge,))).is_ok, \
+    huge = _replace(kc.keys[1], valid_before=10**16)
+    assert not verify(keys=HistoricalKeyChain(keys=kc.keys[:1] + (huge,))).is_ok, (
         "an over-magnitude valid_before must reject pre-hash"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2485,10 +3257,18 @@ def test_range_selectors_are_inclusive():
     satisfies lte and gte alike. Defect: mutate `<=` to `<` (and `>=` to `>`) in
     v2.selector_matches → both boundary assertions go RED."""
     args = _unwrap(json_decode(b'{"amount":50}'))
-    lte = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["amount"],"value":50}'))))
-    gte = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"gte","path":["amount"],"value":50}'))))
-    assert _unwrap(v2.selector_matches(lte, args)) is True, "boundary-equal satisfies lte (inclusive)"
-    assert _unwrap(v2.selector_matches(gte, args)) is True, "boundary-equal satisfies gte (inclusive)"
+    lte = _unwrap(
+        v2.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["amount"],"value":50}')))
+    )
+    gte = _unwrap(
+        v2.parse_selector(_unwrap(json_decode(b'{"kind":"gte","path":["amount"],"value":50}')))
+    )
+    assert _unwrap(v2.selector_matches(lte, args)) is True, (
+        "boundary-equal satisfies lte (inclusive)"
+    )
+    assert _unwrap(v2.selector_matches(gte, args)) is True, (
+        "boundary-equal satisfies gte (inclusive)"
+    )
 
 
 def test_range_selector_direction():
@@ -2496,8 +3276,12 @@ def test_range_selector_direction():
     interchangeable. Defect: swap the SelLte/SelGte dispatch in v2.parse_selector
     (returning SelGte for kind "lte" and SelLte for kind "gte") → every off-bound assertion
     goes RED."""
-    lte = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["amount"],"value":5000}'))))
-    gte = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"gte","path":["amount"],"value":50}'))))
+    lte = _unwrap(
+        v2.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["amount"],"value":5000}')))
+    )
+    gte = _unwrap(
+        v2.parse_selector(_unwrap(json_decode(b'{"kind":"gte","path":["amount"],"value":50}')))
+    )
     below = _unwrap(json_decode(b'{"amount":49}'))
     above = _unwrap(json_decode(b'{"amount":5001}'))
     assert _unwrap(v2.selector_matches(lte, below)) is True
@@ -2512,19 +3296,27 @@ def test_range_selectors_same_tag_only():
     non-numeric operands never match (a missing path fails closed like equals/one_of).
     Defect: collapse the same-tag arms in v2.selector_matches to a plain numeric
     comparison → the cross-tag assertions go RED."""
-    flt_bound = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"gte","path":["amount"],"value":-0.5}'))))
-    int_bound = _unwrap(v2.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["amount"],"value":5000}'))))
+    flt_bound = _unwrap(
+        v2.parse_selector(_unwrap(json_decode(b'{"kind":"gte","path":["amount"],"value":-0.5}')))
+    )
+    int_bound = _unwrap(
+        v2.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["amount"],"value":5000}')))
+    )
     int_target = _unwrap(json_decode(b'{"amount":5}'))
     float_target = _unwrap(json_decode(b'{"amount":5.0}'))
-    assert _unwrap(v2.selector_matches(flt_bound, int_target)) is False, \
+    assert _unwrap(v2.selector_matches(flt_bound, int_target)) is False, (
         "float bound vs integer-tagged value is cross-tag — never matches"
-    assert _unwrap(v2.selector_matches(int_bound, float_target)) is False, \
+    )
+    assert _unwrap(v2.selector_matches(int_bound, float_target)) is False, (
         "integer bound vs float-tagged value is cross-tag — never matches"
+    )
     # Controls: same-tag pairs compare by numeric value.
     assert _unwrap(v2.selector_matches(flt_bound, float_target)) is True
     assert _unwrap(v2.selector_matches(int_bound, int_target)) is True
     # Non-numeric operand at the path never matches; missing path fails closed.
-    assert _unwrap(v2.selector_matches(int_bound, _unwrap(json_decode(b'{"amount":"75"}')))) is False
+    assert (
+        _unwrap(v2.selector_matches(int_bound, _unwrap(json_decode(b'{"amount":"75"}')))) is False
+    )
     assert _unwrap(v2.selector_matches(int_bound, _unwrap(json_decode(b'{"other":75}')))) is False
 
 
@@ -2566,26 +3358,37 @@ def test_facades_reject_each_others_major_bytes():
     # One kwarg set per major: the structs are per-façade (the closed-shape gate rejects a v1
     # OperationInput inside a v2 GrantProducer — the gates are module-scoped).
     v1_kwargs: dict = {
-        "key_id": "issuer-123456", "issuer": "https://issuer.example.test", "grant_id": "urn:example:grant:x-1",
-        "audiences": ("https://resource.example.test",), "issued_at": 1000, "not_before": 1000, "expires_at": 2000,
+        "key_id": "issuer-123456",
+        "issuer": "https://issuer.example.test",
+        "grant_id": "urn:example:grant:x-1",
+        "audiences": ("https://resource.example.test",),
+        "issued_at": 1000,
+        "not_before": 1000,
+        "expires_at": 2000,
         "holder_thumbprint": _b64url(holder_fp),
         "operations": (OperationInput(name="read", selectors=("all",)),),
     }
     v2_kwargs = {**v1_kwargs, "operations": (v2.OperationInput(name="read", selectors=("all",)),)}
     v1_si = grant_signing_input(GrantProducer(**v1_kwargs))
     assert v1_si.is_ok
-    v1_compact = _must_assemble(v1_si.value, issuer_priv.sign(
-        v1_si.value.protected_segment + b"." + v1_si.value.payload_segment))
+    v1_compact = _must_assemble(
+        v1_si.value,
+        issuer_priv.sign(v1_si.value.protected_segment + b"." + v1_si.value.payload_segment),
+    )
     v2_si = v2.grant_signing_input(v2.GrantProducer(**v2_kwargs))
     assert v2_si.is_ok
-    v2_compact = _must_assemble(v2_si.value, issuer_priv.sign(
-        v2_si.value.protected_segment + b"." + v2_si.value.payload_segment))
+    v2_compact = _must_assemble(
+        v2_si.value,
+        issuer_priv.sign(v2_si.value.protected_segment + b"." + v2_si.value.payload_segment),
+    )
     assert decode_grant(v1_compact).is_ok, "control: the v1 grant decodes under v1"
     assert v2.decode_grant(v2_compact).is_ok, "control: the v2 grant decodes under v2"
     assert not v2.decode_grant(v1_compact).is_ok, "v1 bytes (v:1) must reject under the v2 façade"
     assert not decode_grant(v2_compact).is_ok, "v2 bytes (v:2) must reject under the v1 façade"
     # The v1 closed kind set is unchanged: lte rejects under the shared (v1) selector parse.
-    assert isinstance(parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))), Err)
+    assert isinstance(
+        parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))), Err
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2663,9 +3466,14 @@ def _es256_signed_grant() -> dict[str, object]:
     holder_pub, _ = _fresh_ec_key()
     holder_fp = _unwrap(v3.public_key_thumbprint_raw(holder_pub))
     grant = v3.GrantProducer(
-        key_id="issuer", issuer="https://issuer.example.test", grant_id="urn:example:grant:v3-p",
-        audiences=("https://resource.example.test",), issued_at=1000, not_before=1000,
-        expires_at=2000, holder_thumbprint=_b64url(holder_fp),
+        key_id="issuer",
+        issuer="https://issuer.example.test",
+        grant_id="urn:example:grant:v3-p",
+        audiences=("https://resource.example.test",),
+        issued_at=1000,
+        not_before=1000,
+        expires_at=2000,
+        holder_thumbprint=_b64url(holder_fp),
         operations=(v3.OperationInput(name="read", selectors=("all",)),),
     )
     si = v3.grant_signing_input(grant)
@@ -2680,8 +3488,10 @@ def _es256_signed_grant() -> dict[str, object]:
 
 
 _V3_EXPECTED_GRANT = v3.ExpectedGrant(
-    issuer="https://issuer.example.test", audience="https://resource.example.test",
-    evaluation_time=1500, clock_skew=60,
+    issuer="https://issuer.example.test",
+    audience="https://resource.example.test",
+    evaluation_time=1500,
+    clock_skew=60,
 )
 
 
@@ -2694,8 +3504,9 @@ def test_es256_low_s_enforced():
     high-S assertion goes RED (the backend accepts it)."""
     _reset_census()
     g = _es256_signed_grant()
-    assert v3.verify_grant(g["compact"], g["issuer"], _V3_EXPECTED_GRANT).is_ok, \
+    assert v3.verify_grant(g["compact"], g["issuer"], _V3_EXPECTED_GRANT).is_ok, (
         "control: the low-S signed grant must verify"
+    )
     raw = base64.urlsafe_b64decode(g["signature"] + b"=" * (-len(g["signature"]) % 4))
     assert len(raw) == 64
     s = int.from_bytes(raw[32:], "big")
@@ -2740,9 +3551,13 @@ def test_es256_rs_range_checked_before_backend(monkeypatch):
     }
     for label, raw in crafted.items():
         calls.clear()
-        result = v3.verify_grant(_resign_compact(g["compact"], raw), g["issuer"], _V3_EXPECTED_GRANT)
+        result = v3.verify_grant(
+            _resign_compact(g["compact"], raw), g["issuer"], _V3_EXPECTED_GRANT
+        )
         assert not result.is_ok, f"{label}: must reject"
-        assert calls == [], f"{label}: rejected only AFTER the DER-encode/backend boundary — the range gate is missing"
+        assert calls == [], (
+            f"{label}: rejected only AFTER the DER-encode/backend boundary — the range gate is missing"
+        )
 
 
 def test_es256_ec_jwk_member_set_closed():
@@ -2760,7 +3575,7 @@ def test_es256_ec_jwk_member_set_closed():
         if not drop_y:
             members += f',"y":"{y.decode()}"'
         if extra:
-            members += f',{extra}'
+            members += f",{extra}"
         return ("{" + members + "}").encode("ascii")
 
     # Control: the exact four-member set parses.
@@ -2799,12 +3614,20 @@ def test_es256_coordinate_width_and_canonicality():
     coordinate-width gate in v3._ec_public_from_tagged → the 33-byte and 31-byte arms go RED."""
     pub, _ = _fresh_ec_key()
     x, y = pub[1:33], pub[33:65]
-    valid = ('{"crv":"P-256","kty":"EC","x":"' + _b64e(x).decode()
-             + '","y":"' + _b64e(y).decode() + '"}').encode("ascii")
-    assert isinstance(_unwrap(v3.jwk_from_json(valid)), v3.EcPublic), "control: the 32-byte coordinates parse"
+    valid = (
+        '{"crv":"P-256","kty":"EC","x":"' + _b64e(x).decode() + '","y":"' + _b64e(y).decode() + '"}'
+    ).encode("ascii")
+    assert isinstance(_unwrap(v3.jwk_from_json(valid)), v3.EcPublic), (
+        "control: the 32-byte coordinates parse"
+    )
     # 33-byte x (leading zero byte, same integer — on-curve): only the width gate rejects.
-    wide = ('{"crv":"P-256","kty":"EC","x":"' + _b64e(b"\x00" + x).decode()
-            + '","y":"' + _b64e(y).decode() + '"}').encode("ascii")
+    wide = (
+        '{"crv":"P-256","kty":"EC","x":"'
+        + _b64e(b"\x00" + x).decode()
+        + '","y":"'
+        + _b64e(y).decode()
+        + '"}'
+    ).encode("ascii")
     assert isinstance(v3.jwk_from_json(wide), Err)
     # 31-byte spelling of a leading-zero coordinate (same integer).
     lz = _ec_key_with_leading_zero_coordinate()
@@ -2818,15 +3641,31 @@ def test_es256_coordinate_width_and_canonicality():
     short_b64 = _b64e(short_coord[1:])
     other_b64 = _b64e(other)
     if which == "x":
-        short = ('{"crv":"P-256","kty":"EC","x":"' + short_b64.decode()
-                 + '","y":"' + other_b64.decode() + '"}').encode("ascii")
+        short = (
+            '{"crv":"P-256","kty":"EC","x":"'
+            + short_b64.decode()
+            + '","y":"'
+            + other_b64.decode()
+            + '"}'
+        ).encode("ascii")
     else:
-        short = ('{"crv":"P-256","kty":"EC","x":"' + other_b64.decode()
-                 + '","y":"' + short_b64.decode() + '"}').encode("ascii")
+        short = (
+            '{"crv":"P-256","kty":"EC","x":"'
+            + other_b64.decode()
+            + '","y":"'
+            + short_b64.decode()
+            + '"}'
+        ).encode("ascii")
     assert isinstance(v3.jwk_from_json(short), Err)
     # Padded base64url coordinate: the shared canonical-decode gate (REQ1-B64-no-padding).
-    padded = ('{"crv":"P-256","kty":"EC","x":"' + _b64e(x).decode() + '="'
-              + ',"y":"' + _b64e(y).decode() + '"}').encode("ascii")
+    padded = (
+        '{"crv":"P-256","kty":"EC","x":"'
+        + _b64e(x).decode()
+        + '="'
+        + ',"y":"'
+        + _b64e(y).decode()
+        + '"}'
+    ).encode("ascii")
     assert isinstance(v3.jwk_from_json(padded), Err)
 
 
@@ -2839,10 +3678,14 @@ def test_es256_off_curve_point_rejected():
     holder_pub, holder_priv = _fresh_ec_key()
     proof = v3.ProofProducer(
         holder_public_key=holder_pub,
-        proof_id="urn:example:proof:v3-p", method="POST",
-        target_uri="https://resource.example.test/invoke", issued_at=1400,
-        invocation_id="550e8400-e29b-41d4-a716-446655440000", operation="read",
-        grant_compact=b"aaa.bbb.ccc", cast_arguments=_NULL_ARGS,
+        proof_id="urn:example:proof:v3-p",
+        method="POST",
+        target_uri="https://resource.example.test/invoke",
+        issued_at=1400,
+        invocation_id="550e8400-e29b-41d4-a716-446655440000",
+        operation="read",
+        grant_compact=b"aaa.bbb.ccc",
+        cast_arguments=_NULL_ARGS,
     )
     si = v3.proof_signing_input(proof)
     assert si.is_ok, "v3 proof signing input failed"
@@ -2853,10 +3696,17 @@ def test_es256_off_curve_point_rejected():
     x, y = holder_pub[1:33], holder_pub[33:65]
     yi = int.from_bytes(y, "big")
     bad_y = yi + 1 if yi + 1 < v3.P256_P else yi - 1
-    assert not v3._point_on_curve(int.from_bytes(x, "big"), bad_y), "self-check: the crafted point is off-curve"
+    assert not v3._point_on_curve(int.from_bytes(x, "big"), bad_y), (
+        "self-check: the crafted point is off-curve"
+    )
     bad_b64 = _b64e(bad_y.to_bytes(32, "big"))
-    bad_header = (b'{"alg":"ES256","jwk":{"crv":"P-256","kty":"EC","x":"'
-                  + _b64e(x) + b'","y":"' + bad_b64 + b'"},"typ":"dpop+jwt"}')
+    bad_header = (
+        b'{"alg":"ES256","jwk":{"crv":"P-256","kty":"EC","x":"'
+        + _b64e(x)
+        + b'","y":"'
+        + bad_b64
+        + b'"},"typ":"dpop+jwt"}'
+    )
     parts = compact.split(b".")
     bad_compact = b".".join([_b64e(bad_header), parts[1], parts[2]])
     assert not v3.decode_proof(bad_compact).is_ok, "an off-curve proof JWK must reject at decode"
@@ -2871,10 +3721,13 @@ def test_es256_rejects_prior_major_bytes():
     issuer_pub65, issuer_priv_ec = _fresh_ec_key()
     holder_fp_ec = _unwrap(v3.public_key_thumbprint_raw(_fresh_ec_key()[0]))
     v3_kwargs: dict = {
-        "key_id": "issuer", "issuer": "https://issuer.example.test",
+        "key_id": "issuer",
+        "issuer": "https://issuer.example.test",
         "grant_id": "urn:example:grant:v3-p",
-        "audiences": ("https://resource.example.test",), "issued_at": 1000,
-        "not_before": 1000, "expires_at": 2000,
+        "audiences": ("https://resource.example.test",),
+        "issued_at": 1000,
+        "not_before": 1000,
+        "expires_at": 2000,
         "holder_thumbprint": _b64url(holder_fp_ec),
         "operations": (v3.OperationInput(name="read", selectors=("all",)),),
     }
@@ -2882,38 +3735,58 @@ def test_es256_rejects_prior_major_bytes():
     assert v3_si.is_ok
     v3_compact = _must_assemble(
         v3_si.value,
-        _ec_sign_low_s(issuer_priv_ec, v3_si.value.protected_segment + b"." + v3_si.value.payload_segment),
+        _ec_sign_low_s(
+            issuer_priv_ec, v3_si.value.protected_segment + b"." + v3_si.value.payload_segment
+        ),
         es256=True,
     )
     # The v1/v2 grants (Ed25519 keys, per-major structs).
     issuer_pub32, issuer_priv_ed = _fresh_key()
     holder_fp_ed = _unwrap(public_key_thumbprint_raw(_fresh_key()[0]))
     ed_kwargs: dict = {
-        "key_id": "issuer", "issuer": "https://issuer.example.test",
+        "key_id": "issuer",
+        "issuer": "https://issuer.example.test",
         "grant_id": "urn:example:grant:x-3",
-        "audiences": ("https://resource.example.test",), "issued_at": 1000,
-        "not_before": 1000, "expires_at": 2000,
+        "audiences": ("https://resource.example.test",),
+        "issued_at": 1000,
+        "not_before": 1000,
+        "expires_at": 2000,
         "holder_thumbprint": _b64url(holder_fp_ed),
         "operations": (OperationInput(name="read", selectors=("all",)),),
     }
     v1_si = grant_signing_input(GrantProducer(**ed_kwargs))
     assert v1_si.is_ok
     v1_compact = _must_assemble(
-        v1_si.value, issuer_priv_ed.sign(v1_si.value.protected_segment + b"." + v1_si.value.payload_segment))
-    v2_si = v2.grant_signing_input(v2.GrantProducer(**{**ed_kwargs, "operations": (
-        v2.OperationInput(name="read", selectors=("all",)),)}))
+        v1_si.value,
+        issuer_priv_ed.sign(v1_si.value.protected_segment + b"." + v1_si.value.payload_segment),
+    )
+    v2_si = v2.grant_signing_input(
+        v2.GrantProducer(
+            **{**ed_kwargs, "operations": (v2.OperationInput(name="read", selectors=("all",)),)}
+        )
+    )
     assert v2_si.is_ok
     v2_compact = _must_assemble(
-        v2_si.value, issuer_priv_ed.sign(v2_si.value.protected_segment + b"." + v2_si.value.payload_segment))
+        v2_si.value,
+        issuer_priv_ed.sign(v2_si.value.protected_segment + b"." + v2_si.value.payload_segment),
+    )
     # Controls: each major decodes under its own façade.
     assert v3.decode_grant(v3_compact).is_ok, "control: the v3 grant decodes under v3"
     assert decode_grant(v1_compact).is_ok, "control: the v1 grant decodes under v1"
     assert v2.decode_grant(v2_compact).is_ok, "control: the v2 grant decodes under v2"
     # Cross-major rejections, all six directions.
-    assert not v3.decode_grant(v1_compact).is_ok, "v1 bytes (v:1, EdDSA) must reject under the v3 façade"
-    assert not v3.decode_grant(v2_compact).is_ok, "v2 bytes (v:2, EdDSA) must reject under the v3 façade"
-    assert not decode_grant(v3_compact).is_ok, "v3 bytes (v:3, ES256) must reject under the v1 façade"
-    assert not v2.decode_grant(v3_compact).is_ok, "v3 bytes (v:3, ES256) must reject under the v2 façade"
+    assert not v3.decode_grant(v1_compact).is_ok, (
+        "v1 bytes (v:1, EdDSA) must reject under the v3 façade"
+    )
+    assert not v3.decode_grant(v2_compact).is_ok, (
+        "v2 bytes (v:2, EdDSA) must reject under the v3 façade"
+    )
+    assert not decode_grant(v3_compact).is_ok, (
+        "v3 bytes (v:3, ES256) must reject under the v1 façade"
+    )
+    assert not v2.decode_grant(v3_compact).is_ok, (
+        "v3 bytes (v:3, ES256) must reject under the v2 façade"
+    )
     # The VERSION gate is load-bearing independent of the alg gate: an ES256-header grant whose
     # payload carries v:1 / v:2 (hand-spelled; decode does not verify signatures) rejects on the
     # version claim alone.
@@ -2921,12 +3794,18 @@ def test_es256_rejects_prior_major_bytes():
     payload = base64.urlsafe_b64decode(parts[1] + b"=" * (-len(parts[1]) % 4))
     assert payload.endswith(b'"v":3}'), "self-check: the canonical payload carries v last"
     for prior_major in (b"1", b"2"):
-        mixed = b".".join([parts[0], _b64e(payload[: -len(b'"v":3}')] + b'"v":' + prior_major + b"}"), parts[2]])
-        assert not v3.decode_grant(mixed).is_ok, \
+        mixed = b".".join(
+            [parts[0], _b64e(payload[: -len(b'"v":3}')] + b'"v":' + prior_major + b"}"), parts[2]]
+        )
+        assert not v3.decode_grant(mixed).is_ok, (
             f"an ES256 grant carrying v:{prior_major.decode()} must reject under the v3 façade (version gate)"
+        )
     # The five-kind selector algebra is v3's too: lte parses under the v3 façade and the v1
     # closed kind set still rejects it.
     assert isinstance(
-        _unwrap(v3.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["a"],"value":1}')))), v3.SelLte
+        _unwrap(v3.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["a"],"value":1}')))),
+        v3.SelLte,
     )
-    assert isinstance(parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))), Err)
+    assert isinstance(
+        parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))), Err
+    )

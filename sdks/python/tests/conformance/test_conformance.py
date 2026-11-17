@@ -20,7 +20,7 @@ def _load_run_module():
 
 
 def test_conformance_283_cases_agree():
-    """All 283 published vectors agree + the two-boundary census is equal."""
+    """All 283 published vectors agree + the input and verify-import census checks pass."""
     run = _load_run_module()
     result = run.run_all()
     assert result["fail"] == 0, (

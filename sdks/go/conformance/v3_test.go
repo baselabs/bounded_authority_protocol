@@ -222,20 +222,16 @@ func TestEcdsaConformance(t *testing.T) {
 			if t.Run(c.ID, func(t *testing.T) {
 				c.Actual = map[string]any{}
 				es256RunCase(t, c)
-				execution.Record(c.ID, lf.path, c.Actual)
+				execution.Record(t, c.ID, lf.path, c.Actual)
 			}) {
 				agreed++ // counts AGREED subtests, not merely executed ones
 			}
 		}
 	}
 	execution.Finish()
-	// v3 key census (the v1/v2 runners' census adapted to the EC suite): the
-	// DECLARED census is an index input from the curated generator, and keys
-	// may emit no case — the case-byte discovery is a strict subset by design.
-	// The two-way equality leg is curated == index (both directions); the
-	// case-byte walk is the fail-closed subset leg; and every key a VALID
-	// verification-surface case declares must be imported at the SDK verify
-	// boundary.
+	// Case-input discovery must be a subset of the index's declared keys;
+	// every valid verification case's key must reach the SDK import boundary.
+	// Curated/index equality is checked by corpus.generators and its mutation control.
 	declared := idx.PublicKeyFingerprints
 	if !es256SortedUniqueStrings(declared) {
 		t.Fatalf("census: index public_key_fingerprints not sorted/unique")
@@ -611,6 +607,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		})
 		es256CheckVerdict(t, c, err)
 		if err == nil {
+			if got.Version() != 3 || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: verify_grant fact mismatch", c.ID)
+			}
 			c.Actual["grant_id"] = got.GrantID()
 			c.Actual["issuer"] = got.Issuer()
 		}
@@ -646,7 +645,11 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 			Nonce:          es256NonceMode(t, exp),
 		})
 		es256CheckVerdict(t, c, err)
-		_ = got
+		if err == nil {
+			if got.Version() != 3 || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: check_envelope fact mismatch", c.ID)
+			}
+		}
 	case "encode_consumption_entry":
 		got, err := es256Profile.EncodeConsumptionEntry(v.ConsumptionEntry{
 			ChainID:      rawStringField(t, c.Input, "chain_id"),
@@ -692,6 +695,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		es256CheckVerdict(t, c, err)
 		if err == nil {
 			c.Actual["chain_id"] = got.ChainID()
+			if got.ChainID() != rawStringField(t, c.Input, "chain_id") || got.RowCount() != es256RawInt(t, c.Input, "row_count") || got.Trust() != v.TrustNotEvaluated {
+				t.Fatalf("case %s: check_chain fact mismatch", c.ID)
+			}
 		}
 		if c.Expected["chain_id"] != nil && got.ChainID() != rawStringField(t, c.Expected, "chain_id") {
 			t.Fatalf("case %s: chain id %s", c.ID, got.ChainID())
@@ -704,6 +710,11 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		es256CheckVerdict(t, c, err)
 		if err == nil {
 			c.Actual["anchor_id"] = got.AnchorID()
+			exp := es256SubObject(t, c.Input, "expected")
+			chainHash, fingerprint := got.ChainHash(), got.KeyFingerprint()
+			if got.AnchorID() != rawStringField(t, exp, "anchor_id") || got.Sequence() != es256RawInt(t, exp, "sequence") || v.Base64urlEncode(chainHash[:]) != rawStringField(t, exp, "chain_hash") || v.Base64urlEncode(fingerprint[:]) != rawStringField(t, exp, "key_fingerprint") || got.Trust() != v.TrustNotEvaluated {
+				t.Fatalf("case %s: verify_historical_anchor fact mismatch", c.ID)
+			}
 		}
 		if c.Expected["anchor_id"] != nil && got.AnchorID() != rawStringField(t, c.Expected, "anchor_id") {
 			t.Fatalf("case %s: anchor id %s", c.ID, got.AnchorID())
@@ -720,6 +731,11 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		es256CheckVerdict(t, c, err)
 		if err == nil {
 			c.Actual["transition_id"] = got.TransitionID()
+			exp := es256SubObject(t, c.Input, "expected")
+			current, nextFingerprint := got.FromFingerprint(), got.ToFingerprint()
+			if got.TransitionID() != rawStringField(t, exp, "transition_id") || v.Base64urlEncode(current[:]) != rawStringField(t, exp, "current_key_fingerprint") || v.Base64urlEncode(nextFingerprint[:]) != rawStringField(t, exp, "next_key_fingerprint") || got.Trust() != v.TrustNotEvaluated {
+				t.Fatalf("case %s: verify_key_transition fact mismatch", c.ID)
+			}
 		}
 		if c.Expected["transition_id"] != nil && got.TransitionID() != rawStringField(t, c.Expected, "transition_id") {
 			t.Fatalf("case %s: transition id %s", c.ID, got.TransitionID())
@@ -748,6 +764,9 @@ func es256RunCase(t *testing.T, c es256CorpusCase) {
 		es256CheckVerdict(t, c, err)
 		if err == nil {
 			c.Actual["chain_id"] = got.ChainID()
+			if got.ChainID() != expected.Chain.ChainID || got.RowCount() != expected.Chain.RowCount || got.Trust() != v.TrustNotEvaluated || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: verify_anchored_export fact mismatch", c.ID)
+			}
 		}
 		if c.Expected["chain_id"] != nil && got.ChainID() != rawStringField(t, c.Expected, "chain_id") {
 			t.Fatalf("case %s: chain id %s", c.ID, got.ChainID())

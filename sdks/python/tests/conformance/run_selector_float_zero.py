@@ -54,7 +54,11 @@ def _load() -> list[dict]:
     if got != CERTIFIED_INDEX_SHA256:
         raise AssertionError(f"index.json SHA-256 mismatch: {got}")
     index = json.loads(index_bytes)
-    if index["profile"] != PROFILE_IDENTITY or index["revision"] != REVISION or index["total_cases"] != TOTAL_CASES:
+    if (
+        index["profile"] != PROFILE_IDENTITY
+        or index["revision"] != REVISION
+        or index["total_cases"] != TOTAL_CASES
+    ):
         raise AssertionError("corpus identity mismatch")
     cases: list[dict] = []
     for entry in index["files"]:
@@ -110,21 +114,29 @@ def _operations(mod: Any, operations_json: str) -> tuple[Any, ...]:
             raise AssertionError("operations_json: operation object")
         selectors = op.v["selectors"]
         assert isinstance(selectors, JArray)
-        built.append(mod.OperationInput(
-            name=_string(op.v["name"]),
-            selectors=tuple(_selector_input(s) for s in selectors.v),
-        ))
+        built.append(
+            mod.OperationInput(
+                name=_string(op.v["name"]),
+                selectors=tuple(_selector_input(s) for s in selectors.v),
+            )
+        )
     return tuple(built)
 
 
 def _signing_input(mod: Any, inp: dict) -> Any:
-    return mod.grant_signing_input(mod.GrantProducer(
-        key_id=inp["key_id"], issuer=inp["issuer"], grant_id=inp["grant_id"],
-        audiences=tuple(inp["audiences"]), issued_at=inp["issued_at"],
-        not_before=inp["not_before"], expires_at=inp["expires_at"],
-        holder_thumbprint=inp["holder_thumbprint"],
-        operations=_operations(mod, inp["operations_json"]),
-    ))
+    return mod.grant_signing_input(
+        mod.GrantProducer(
+            key_id=inp["key_id"],
+            issuer=inp["issuer"],
+            grant_id=inp["grant_id"],
+            audiences=tuple(inp["audiences"]),
+            issued_at=inp["issued_at"],
+            not_before=inp["not_before"],
+            expires_at=inp["expires_at"],
+            holder_thumbprint=inp["holder_thumbprint"],
+            operations=_operations(mod, inp["operations_json"]),
+        )
+    )
 
 
 def _check_envelope(mod: Any, inp: dict) -> Any:
@@ -137,14 +149,20 @@ def _check_envelope(mod: Any, inp: dict) -> Any:
         _unwrap(str_utf8(inp["proof"])),
         mod.ExpectedRequest(
             trusted_issuer=mod.TrustedIssuer(
-                key_id=ti["key_id"], public_key=_unwrap(base64url_decode(ti["public_key"].encode())),
+                key_id=ti["key_id"],
+                public_key=_unwrap(base64url_decode(ti["public_key"].encode())),
             ),
-            issuer=e["issuer"], audience=e["audience"], method=e["method"],
-            target_uri=e["target_uri"], invocation_id=e["invocation_id"],
+            issuer=e["issuer"],
+            audience=e["audience"],
+            method=e["method"],
+            target_uri=e["target_uri"],
+            invocation_id=e["invocation_id"],
             operation=e["operation"],
             cast_arguments=_unwrap(json_decode(_unwrap(str_utf8(e["cast_arguments_json"])))),
-            evaluation_time=e["evaluation_time"], clock_skew=e["clock_skew"],
-            proof_max_age=e["proof_max_age"], nonce=mod.NonceNotRequired(),
+            evaluation_time=e["evaluation_time"],
+            clock_skew=e["clock_skew"],
+            proof_max_age=e["proof_max_age"],
+            nonce=mod.NonceNotRequired(),
         ),
     )
 
@@ -172,9 +190,10 @@ def _compute(case: dict) -> dict:
     if surface == "grant_signing_input":
         protected = _unwrap(utf8_str(result.value.protected_segment))
         payload = _unwrap(utf8_str(result.value.payload_segment))
-        actual.update(protected_segment=protected, payload_segment=payload, message=f"{protected}.{payload}")
+        actual.update(
+            protected_segment=protected, payload_segment=payload, message=f"{protected}.{payload}"
+        )
     return actual
-
 
 
 def run_all() -> dict:
@@ -193,14 +212,22 @@ def run_all() -> dict:
         else:
             rejected += 1
     execution.finish()
-    return {"pass": rejected + accepted, "fail": len(failures), "total": len(cases),
-            "failures": failures, "rejected": rejected, "accepted": accepted}
+    return {
+        "pass": rejected + accepted,
+        "fail": len(failures),
+        "total": len(cases),
+        "failures": failures,
+        "rejected": rejected,
+        "accepted": accepted,
+    }
 
 
 if __name__ == "__main__":
     summary = run_all()
-    print(f"selector-float-zero: {summary['pass']}/{summary['total']} cases agree "
-          f"({summary['rejected']} rejected, {summary['accepted']} accepted)")
+    print(
+        f"selector-float-zero: {summary['pass']}/{summary['total']} cases agree "
+        f"({summary['rejected']} rejected, {summary['accepted']} accepted)"
+    )
     for failure in summary["failures"]:
         print(f"  - {failure}")
     raise SystemExit(1 if summary["fail"] else 0)

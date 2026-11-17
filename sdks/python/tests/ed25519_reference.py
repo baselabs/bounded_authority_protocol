@@ -132,9 +132,11 @@ def sign_for_encoded_key(
     callers loop over ``r_scalar`` until the cofactorless equation holds (``verifies``).
     """
     a = secret_scalar(seed)
-    r = r_scalar if r_scalar is not None else int.from_bytes(
-        hashlib.sha512(prefix(seed) + message).digest(), "little"
-    ) % L
+    r = (
+        r_scalar
+        if r_scalar is not None
+        else int.from_bytes(hashlib.sha512(prefix(seed) + message).digest(), "little") % L
+    )
     r_enc = encode(mul(r, BASE))
     k = challenge(r_enc, key_encoding, message)
     s = (r + k * a) % L

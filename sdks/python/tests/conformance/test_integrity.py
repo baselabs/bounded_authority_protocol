@@ -8,7 +8,9 @@ import pytest
 
 
 def runner():
-    spec = importlib.util.spec_from_file_location("integrity_runner", Path(__file__).with_name("run.py"))
+    spec = importlib.util.spec_from_file_location(
+        "integrity_runner", Path(__file__).with_name("run.py")
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

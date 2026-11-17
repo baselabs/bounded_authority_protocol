@@ -27,7 +27,9 @@ def _classify(byte: int) -> int:
 def base64url_decode(data: bytes, max_decoded_bytes: int | None = None) -> Result[bytes]:
     try:
         data = _bytes(data)
-        if max_decoded_bytes is not None and (type(max_decoded_bytes) is not int or max_decoded_bytes < 0):
+        if max_decoded_bytes is not None and (
+            type(max_decoded_bytes) is not int or max_decoded_bytes < 0
+        ):
             return err()
         n = len(data)
         # REQ1-B64-length: length mod 4 == 1 is structurally invalid.

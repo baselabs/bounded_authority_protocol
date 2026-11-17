@@ -454,7 +454,7 @@ func TestCertifiedRoleAttestationCorpusDrivesGoVerdicts(t *testing.T) {
 		}
 		_, decodeErr := DecodeAttestation(attestationCase.Compact, nil)
 		_, verifyErr := VerifyAttestation(attestationCase.Compact, caseExpected)
-		execution.Record(attestationCase.ID, "attestation-cases.json", map[string]any{"decode": decodeErr == nil, "verify": verifyErr == nil})
+		execution.Record(t, attestationCase.ID, "attestation-cases.json", map[string]any{"decode": decodeErr == nil, "verify": verifyErr == nil})
 		if _, err := DecodeAttestation(attestationCase.Compact, nil); (err == nil) != attestationCase.Decode {
 			t.Fatalf("%s decode mismatch: %v", attestationCase.ID, err)
 		}

@@ -155,7 +155,12 @@ def acceptable_public_key(raw_key: bytes) -> bool:
         key = _bytes(raw_key)
     except InvalidError:
         return False
-    return len(key) == 32 and _canonical(key) and key not in _SMALL_ORDER and _decode_point(key) is not None
+    return (
+        len(key) == 32
+        and _canonical(key)
+        and key not in _SMALL_ORDER
+        and _decode_point(key) is not None
+    )
 
 
 def torsion_free(raw_key: bytes) -> bool:
@@ -169,8 +174,9 @@ def torsion_free(raw_key: bytes) -> bool:
     point = _decode_point(key)
     return point is not None and _is_identity(_multiply(_L, point))
 
+
 # Census tracking: every key imported via import_public_key is recorded here, so the conformance
-# runner can assert discovery == verify-import == index public_key_fingerprints (both directions).
+# runner can check declared discovery and that valid verification keys reach this boundary.
 _census_fingerprints: set[str] = set()
 
 
@@ -210,7 +216,6 @@ def _ed25519_verify(message: bytes, signature: bytes, public_key: Ed25519PublicK
         return True
     except InvalidSignature:
         return False
-
 
 
 def verify_strict(message: bytes, signature: bytes, public_key: bytes) -> bool:

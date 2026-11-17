@@ -12,19 +12,35 @@ from bounded_authority_verifier import Ok
 from bounded_authority_verifier import facts as facts_module
 
 FACTS_TYPES = (
-    facts_module.GrantFacts, facts_module.EnvelopeFacts, facts_module.ChainFacts,
-    facts_module.AnchorFacts, facts_module.KeyTransitionFacts, facts_module.AnchoredExportFacts,
-    facts_module.AttestationFacts, facts_module.ContentAssertionFacts,
+    facts_module.GrantFacts,
+    facts_module.EnvelopeFacts,
+    facts_module.ChainFacts,
+    facts_module.AnchorFacts,
+    facts_module.KeyTransitionFacts,
+    facts_module.AnchoredExportFacts,
+    facts_module.AttestationFacts,
+    facts_module.ContentAssertionFacts,
 )
-CASES = [(kind, major) for kind in FACTS_TYPES for major in
-         ((1,) if kind in (facts_module.AttestationFacts, facts_module.ContentAssertionFacts) else (1, 2, 3))]
+CASES = [
+    (kind, major)
+    for kind in FACTS_TYPES
+    for major in (
+        (1,)
+        if kind in (facts_module.AttestationFacts, facts_module.ContentAssertionFacts)
+        else (1, 2, 3)
+    )
+]
 
 
 def _facts(kind, major):
     values = {
-        name: major if name == "version" else b"caller-bytes-7f3a"
-        if inspect.signature(kind).parameters[name].annotation == "bytes" else 987654321
-        if inspect.signature(kind).parameters[name].annotation == "int" else "caller-text-7f3a"
+        name: major
+        if name == "version"
+        else b"caller-bytes-7f3a"
+        if inspect.signature(kind).parameters[name].annotation == "bytes"
+        else 987654321
+        if inspect.signature(kind).parameters[name].annotation == "int"
+        else "caller-text-7f3a"
         for name in inspect.signature(kind).parameters
     }
     return kind(**values), values
@@ -33,7 +49,13 @@ def _facts(kind, major):
 @pytest.mark.parametrize("kind,major", CASES)
 def test_facts_rendering_is_fixed_and_value_free(kind, major):
     facts, values = _facts(kind, major)
-    profile = "RoleAttestation.V1" if kind is facts_module.AttestationFacts else "ContentAssertion.V1" if kind is facts_module.ContentAssertionFacts else f"V{major}"
+    profile = (
+        "RoleAttestation.V1"
+        if kind is facts_module.AttestationFacts
+        else "ContentAssertion.V1"
+        if kind is facts_module.ContentAssertionFacts
+        else f"V{major}"
+    )
     expected = f"#BoundedAuthorityProtocol.{profile}.{kind.__name__}<redacted>"
     for rendered in (repr(facts), str(facts), f"{facts}", f"{facts!r}"):
         assert rendered == expected
@@ -59,11 +81,24 @@ def _getstate(value):
     return value.__getstate__()
 
 
-OPERATIONS = [asdict, fields, vars, json.dumps, copy.copy, copy.deepcopy,
-              _reduce, _reduce_ex, _getstate]
-OPERATIONS += [pytest.param(lambda value, protocol=protocol: pickle.dumps(value, protocol=protocol),
-                            id=f"pickle-{protocol}")
-               for protocol in range(pickle.HIGHEST_PROTOCOL + 1)]
+OPERATIONS = [
+    asdict,
+    fields,
+    vars,
+    json.dumps,
+    copy.copy,
+    copy.deepcopy,
+    _reduce,
+    _reduce_ex,
+    _getstate,
+]
+OPERATIONS += [
+    pytest.param(
+        lambda value, protocol=protocol: pickle.dumps(value, protocol=protocol),
+        id=f"pickle-{protocol}",
+    )
+    for protocol in range(pickle.HIGHEST_PROTOCOL + 1)
+]
 
 
 @pytest.mark.parametrize("kind,major", CASES)

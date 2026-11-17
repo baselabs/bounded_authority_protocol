@@ -47,7 +47,11 @@ def _load() -> list[dict]:
     if got != CERTIFIED_INDEX_SHA256:
         raise AssertionError(f"index.json SHA-256 mismatch: {got}")
     index = json.loads(index_bytes)
-    if index["profile"] != PROFILE_IDENTITY or index["revision"] != REVISION or index["total_cases"] != TOTAL_CASES:
+    if (
+        index["profile"] != PROFILE_IDENTITY
+        or index["revision"] != REVISION
+        or index["total_cases"] != TOTAL_CASES
+    ):
         raise AssertionError("corpus identity mismatch")
     cases: list[dict] = []
     counted = 0
@@ -103,23 +107,34 @@ def _export_expected(case: dict, major: int):
 
     def anchor(a: dict):
         return v1.ExpectedAnchor(
-            anchor_id=a["anchor_id"], anchored_at=a["anchored_at"], chain_id=a["chain_id"],
-            sequence=a["sequence"], chain_hash=_unwrap(base64url_decode(a["chain_hash"].encode())),
-            key_id=a["key_id"], key_fingerprint=_unwrap(base64url_decode(a["key_fingerprint"].encode())),
+            anchor_id=a["anchor_id"],
+            anchored_at=a["anchored_at"],
+            chain_id=a["chain_id"],
+            sequence=a["sequence"],
+            chain_hash=_unwrap(base64url_decode(a["chain_hash"].encode())),
+            key_id=a["key_id"],
+            key_fingerprint=_unwrap(base64url_decode(a["key_fingerprint"].encode())),
         )
 
     transitions = tuple(
         v1.ExpectedKeyTransition(
-            transition_id=t["transition_id"], chain_id=t["chain_id"], effective_at=t["effective_at"],
+            transition_id=t["transition_id"],
+            chain_id=t["chain_id"],
+            effective_at=t["effective_at"],
             current_key_id=t["current_key_id"],
-            current_key_fingerprint=_unwrap(base64url_decode(t["current_key_fingerprint"].encode())),
+            current_key_fingerprint=_unwrap(
+                base64url_decode(t["current_key_fingerprint"].encode())
+            ),
             next_key_id=t["next_key_id"],
             next_key_fingerprint=_unwrap(base64url_decode(t["next_key_fingerprint"].encode())),
-        ) for t in e["transitions"]
+        )
+        for t in e["transitions"]
     )
     chain = v1.ExpectedChain(
-        chain_id=e["chain"]["chain_id"], first_sequence=e["chain"]["first_sequence"],
-        last_sequence=e["chain"]["last_sequence"], row_count=e["chain"]["row_count"],
+        chain_id=e["chain"]["chain_id"],
+        first_sequence=e["chain"]["first_sequence"],
+        last_sequence=e["chain"]["last_sequence"],
+        row_count=e["chain"]["row_count"],
         previous_hash=_unwrap(base64url_decode(e["chain"]["previous_hash"].encode())),
         last_hash=_unwrap(base64url_decode(e["chain"]["last_hash"].encode())),
     )
@@ -130,13 +145,19 @@ def _export_expected(case: dict, major: int):
         # struct requires them, so v3 cases (whose expected context carries neither) take the
         # same placeholders as v2.
         return v3.ExpectedExport(
-            chain=chain, digest=digest, object_version=version,
-            start_anchor=anchor(e["start_anchor"]), end_anchor=anchor(e["end_anchor"]),
+            chain=chain,
+            digest=digest,
+            object_version=version,
+            start_anchor=anchor(e["start_anchor"]),
+            end_anchor=anchor(e["end_anchor"]),
             transitions=transitions,
         )
     return v1.ExpectedExport(
-        chain=chain, digest=digest, object_version=version,
-        start_anchor=anchor(e["start_anchor"]), end_anchor=anchor(e["end_anchor"]),
+        chain=chain,
+        digest=digest,
+        object_version=version,
+        start_anchor=anchor(e["start_anchor"]),
+        end_anchor=anchor(e["end_anchor"]),
         transitions=transitions,
     )
 
@@ -149,8 +170,10 @@ def _encode(case: dict) -> object:
         start_anchor=sig_input["start_anchor"].encode(),
         end_anchor=sig_input["end_anchor"].encode(),
         transitions=tuple(t.encode() for t in sig_input["transitions"]),
-        chain_id=e["chain"]["chain_id"], first_sequence=e["chain"]["first_sequence"],
-        last_sequence=e["chain"]["last_sequence"], row_count=e["chain"]["row_count"],
+        chain_id=e["chain"]["chain_id"],
+        first_sequence=e["chain"]["first_sequence"],
+        last_sequence=e["chain"]["last_sequence"],
+        row_count=e["chain"]["row_count"],
         previous_hash=_unwrap(base64url_decode(e["chain"]["previous_hash"].encode())),
         last_hash=_unwrap(base64url_decode(e["chain"]["last_hash"].encode())),
     )
@@ -173,9 +196,17 @@ def run_all() -> dict:
         if case["surface"] == "assemble_compact":
             result = _assemble(case)
             ok = result.is_ok
-            execution.record(case["id"], {"verdict": "valid", "compact": bytes(result.value).decode()} if ok else {"verdict": "invalid"}, case["_file"])
+            execution.record(
+                case["id"],
+                {"verdict": "valid", "compact": bytes(result.value).decode()}
+                if ok
+                else {"verdict": "invalid"},
+                case["_file"],
+            )
             if ok != want_valid:
-                failures.append(f"{case['id']}: expected {case['expected']['verdict']}, got ok={ok}")
+                failures.append(
+                    f"{case['id']}: expected {case['expected']['verdict']}, got ok={ok}"
+                )
                 continue
             if ok and bytes(result.value) != case["expected"]["compact"].encode():
                 failures.append(f"{case['id']}: assembled bytes differ from the certified compact")
@@ -185,10 +216,14 @@ def run_all() -> dict:
             ok = result.is_ok
             execution.record(case["id"], {"verdict": "valid" if ok else "invalid"}, case["_file"])
             if ok != want_valid:
-                failures.append(f"{case['id']}: expected {case['expected']['verdict']}, got ok={ok}")
+                failures.append(
+                    f"{case['id']}: expected {case['expected']['verdict']}, got ok={ok}"
+                )
                 continue
             if ok:
-                failures.append(f"{case['id']}: accepted export-encode case without a certified artifact")
+                failures.append(
+                    f"{case['id']}: accepted export-encode case without a certified artifact"
+                )
                 continue
         if want_valid:
             accepted += 1
@@ -196,8 +231,14 @@ def run_all() -> dict:
             refused += 1
         passed += 1
     execution.finish()
-    return {"pass": passed, "fail": len(failures), "total": len(cases), "failures": failures,
-            "refused": refused, "accepted": accepted}
+    return {
+        "pass": passed,
+        "fail": len(failures),
+        "total": len(cases),
+        "failures": failures,
+        "refused": refused,
+        "accepted": accepted,
+    }
 
 
 if __name__ == "__main__":

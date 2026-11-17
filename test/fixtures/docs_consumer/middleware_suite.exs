@@ -1,3 +1,6 @@
+# This consumer fixture is explicitly loaded, rather than discovered as a root test.
+# credo:disable-for-this-file Credo.Check.Warning.WrongTestFilename
+
 # Compile the exact documented modules before compiling tests that call them.
 for [code] <-
       Regex.scan(~r/^```elixir\n(.*?)^```$/ms, File.read!("recipes.md"), capture: :all_but_first),

@@ -1,4 +1,5 @@
 """Host subclasses and callbacks cannot change protocol limits or immutable values."""
+
 import ast
 from collections.abc import Mapping
 from pathlib import Path
@@ -17,8 +18,14 @@ class Wide(Bounds):
         return bap.Ok(10**12)
 
 
-@pytest.mark.parametrize("entry", [coerce_bounds, lambda b: bounds_resolve(b, "depth"),
-                                  lambda b: bap.json_decode(b"[" * 1100 + b"0" + b"]" * 1100, b)])
+@pytest.mark.parametrize(
+    "entry",
+    [
+        coerce_bounds,
+        lambda b: bounds_resolve(b, "depth"),
+        lambda b: bap.json_decode(b"[" * 1100 + b"0" + b"]" * 1100, b),
+    ],
+)
 def test_bounds_subclasses_are_rejected(entry):
     assert isinstance(entry(Wide()), bap.Err)
 
@@ -74,9 +81,16 @@ class LyingDict(dict):
         raise RuntimeError("caller items")
 
 
-@pytest.mark.parametrize("value", [bap.JInt(LyingInt(10**30)), bap.JFloat(LyingFloat("inf")),
-                                    bap.JFloat(LyingFloat("nan")), bap.JArray(LyingList([bap.JNull()] * 257)),
-                                    bap.JObject(LyingDict({str(i): bap.JNull() for i in range(65)}))])
+@pytest.mark.parametrize(
+    "value",
+    [
+        bap.JInt(LyingInt(10**30)),
+        bap.JFloat(LyingFloat("inf")),
+        bap.JFloat(LyingFloat("nan")),
+        bap.JArray(LyingList([bap.JNull()] * 257)),
+        bap.JObject(LyingDict({str(i): bap.JNull() for i in range(65)})),
+    ],
+)
 def test_tagged_checks_underlying_values(value):
     assert isinstance(bap.jcs_encode(value), bap.Err)
     assert isinstance(bap.typed_project(value), bap.Err)
@@ -85,8 +99,12 @@ def test_tagged_checks_underlying_values(value):
 @pytest.mark.parametrize("selector", [v3.SelLte, v3.SelGte])
 def test_numeric_selectors_reject_infinite_subclasses(selector):
     value = bap.JFloat(LyingFloat("inf"))
-    assert isinstance(v3.selector_matches(selector(("n",), value), bap.JObject({"n": bap.JFloat(1.0)})), bap.Err)
-    assert isinstance(v3.selector_matches(selector(("n",), bap.JFloat(1.0)), bap.JObject({"n": value})), bap.Err)
+    assert isinstance(
+        v3.selector_matches(selector(("n",), value), bap.JObject({"n": bap.JFloat(1.0)})), bap.Err
+    )
+    assert isinstance(
+        v3.selector_matches(selector(("n",), bap.JFloat(1.0)), bap.JObject({"n": value})), bap.Err
+    )
 
 
 class RaisingMapping(Mapping):
@@ -131,6 +149,7 @@ def test_facade_struct_subclasses_do_not_dispatch_properties(major):
             raise RuntimeError("caller getter")
 
     from bounded_authority_verifier.error import InvalidError
+
     with pytest.raises(InvalidError):
         _normalize_arg(HostIssuer("kid", b"x" * 32), major.TrustedIssuer)
 
@@ -154,8 +173,17 @@ def test_bounds_cannot_be_reinitialized():
 
 
 def test_facts_cannot_be_reinitialized():
-    values = {"version": 1, "issuer": "original", "grant_id": "id", "issuer_key_fingerprint": b"x" * 32,
-              "holder_thumbprint": b"y" * 32, "matched_audience": "aud", "issued_at": 1, "not_before": 1, "expires_at": 2}
+    values = {
+        "version": 1,
+        "issuer": "original",
+        "grant_id": "id",
+        "issuer_key_fingerprint": b"x" * 32,
+        "holder_thumbprint": b"y" * 32,
+        "matched_audience": "aud",
+        "issued_at": 1,
+        "not_before": 1,
+        "expires_at": 2,
+    }
     facts = GrantFacts(**values)
     with pytest.raises(TypeError):
         facts.__init__(**dict(values, issuer="changed"))
@@ -165,8 +193,14 @@ def test_facts_cannot_be_reinitialized():
 def test_json_decode_copies_input_once():
     source = Path(bap.__file__).parent / "json_alg.py"
     tree = ast.parse(source.read_text())
-    decode = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "json_decode")
-    copies = [n for n in ast.walk(decode) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "_bytes"]
+    decode = next(
+        n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "json_decode"
+    )
+    copies = [
+        n
+        for n in ast.walk(decode)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "_bytes"
+    ]
     assert len(copies) == 1
 
 
@@ -213,6 +247,7 @@ def test_all_public_struct_types_reject_subclass_dispatch(major):
 
     from bounded_authority_verifier.error import InvalidError
     from bounded_authority_verifier.facts import _Facts
+
     for kind in vars(major).values():
         if not isinstance(kind, type) or not (is_dataclass(kind) or issubclass(kind, _Facts)):
             continue
@@ -232,8 +267,12 @@ def test_float_with_only_overridden_gt_cannot_reach_numeric_comparison(selector)
             return False
 
     value = bap.JFloat(F("inf"))
-    assert isinstance(v3.selector_matches(selector(("n",), value), bap.JObject({"n": bap.JFloat(1.0)})), bap.Err)
-    assert isinstance(v3.selector_matches(selector(("n",), bap.JFloat(1.0)), bap.JObject({"n": value})), bap.Err)
+    assert isinstance(
+        v3.selector_matches(selector(("n",), value), bap.JObject({"n": bap.JFloat(1.0)})), bap.Err
+    )
+    assert isinstance(
+        v3.selector_matches(selector(("n",), bap.JFloat(1.0)), bap.JObject({"n": value})), bap.Err
+    )
 
 
 def test_readme_documents_bounds_contract_changes():
@@ -248,16 +287,27 @@ def test_external_mapping_callbacks_close_in_bounds_and_all_producers(failure):
         def items(self):
             if failure == "items":
                 raise RuntimeError("caller items")
+
             def members():
                 raise RuntimeError("caller iterator")
                 yield
+
             return members()
 
     value = External()
     assert isinstance(bap.bounds_new(value), bap.Err)
     for major in (v1, v2, v3):
-        grant = major.GrantProducer("kid", "issuer", "id", ("aud",), 1, 1, 2, "A" * 43,
-                                    (major.OperationInput("read", (value,)),))
+        grant = major.GrantProducer(
+            "kid",
+            "issuer",
+            "id",
+            ("aud",),
+            1,
+            1,
+            2,
+            "A" * 43,
+            (major.OperationInput("read", (value,)),),
+        )
         assert isinstance(major.grant_signing_input(grant), bap.Err)
 
 
@@ -265,21 +315,27 @@ def test_native_container_callbacks_are_never_dispatched():
     class NativeList(list):
         def __len__(self):
             raise RuntimeError("caller length")
+
         def __iter__(self):
             raise RuntimeError("caller iterator")
+
     class NativeDict(dict):
         def items(self):
             raise RuntimeError("caller items")
+
         def __len__(self):
             raise RuntimeError("caller length")
+
         def __iter__(self):
             raise RuntimeError("caller iterator")
+
     assert bap.jcs_encode(bap.JArray(NativeList([bap.JNull()]))) == bap.Ok(b"[null]")
     assert bap.jcs_encode(bap.JObject(NativeDict(a=bap.JNull()))) == bap.Ok(b'{"a":null}')
 
 
 def test_bounds_invalid_constructor_keeps_only_an_invalid_marker():
     from bounded_authority_verifier.bounds import MAXIMA
+
     value = Bounds({"depth": 0})
     assert value.overrides == {}
     assert isinstance(value.resolve("depth"), bap.Err)
@@ -294,12 +350,15 @@ def test_other_public_sdk_structs_reject_subclass_dispatch(module):
 
     from bounded_authority_verifier.error import InvalidError
     from bounded_authority_verifier.facts import _Facts
+
     source = importlib.import_module("bounded_authority_verifier." + module)
     for kind in vars(source).values():
         if not isinstance(kind, type) or not (is_dataclass(kind) or issubclass(kind, _Facts)):
             continue
+
         class Host(kind):
             def __getattribute__(self, name):
                 raise RuntimeError("caller getter")
+
         with pytest.raises(InvalidError):
             _normalize_arg(object.__new__(Host), kind)

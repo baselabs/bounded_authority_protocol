@@ -229,7 +229,7 @@ func TestCertifiedContentAssertionCorpusIntegrityAndVerdicts(t *testing.T) {
 		if err == nil {
 			outcome["digest"] = Base64urlEncode(got[:])
 		}
-		execution.Record(c.ID, "digest-cases.json", outcome)
+		execution.Record(t, c.ID, "digest-cases.json", outcome)
 		if (err == nil) != (c.Expected.Verdict == "valid") {
 			t.Errorf("%s digest verdict mismatch", c.ID)
 			continue
@@ -283,7 +283,7 @@ func TestCertifiedContentAssertionCorpusIntegrityAndVerdicts(t *testing.T) {
 			}
 			return "invalid"
 		}
-		execution.Record(c.ID, c.File, map[string]any{"decode": word(decodeOK), "verify": word(verifyOK)})
+		execution.Record(t, c.ID, c.File, map[string]any{"decode": word(decodeOK), "verify": word(verifyOK)})
 		if decodeOK != (c.Expected.Decode == "valid") {
 			t.Errorf("%s decode=%t want=%s", c.ID, decodeOK, c.Expected.Decode)
 		}
@@ -344,7 +344,7 @@ func recordContentAssertionSuccessors(t *testing.T, execution *corpuscheck.Run) 
 			return "invalid"
 		}
 		if !predecessorOK || !successorOK {
-			execution.Record(c.ID, "successor-cases.json", map[string]any{"predecessor": word(predecessorOK), "successor": word(successorOK), "relation": "not_run"})
+			execution.Record(t, c.ID, "successor-cases.json", map[string]any{"predecessor": word(predecessorOK), "successor": word(successorOK), "relation": "not_run"})
 			continue
 		}
 		overridesOK := true
@@ -367,7 +367,7 @@ func recordContentAssertionSuccessors(t *testing.T, execution *corpuscheck.Run) 
 		}
 		bounds := BoundsMaximum()
 		relationOK := overridesOK && VerifyContentAssertionSuccessor(predecessor, successor, &bounds) == nil
-		execution.Record(c.ID, "successor-cases.json", map[string]any{"predecessor": word(predecessorOK), "successor": word(successorOK), "relation": word(relationOK)})
+		execution.Record(t, c.ID, "successor-cases.json", map[string]any{"predecessor": word(predecessorOK), "successor": word(successorOK), "relation": word(relationOK)})
 		if relationOK != (c.Expected.Relation == "valid") {
 			t.Errorf("%s relation=%t want=%s", c.ID, relationOK, c.Expected.Relation)
 		}

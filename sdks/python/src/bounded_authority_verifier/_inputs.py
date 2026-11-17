@@ -62,7 +62,10 @@ def _normalize_arg(value: object, annotation: object, depth: int = 0) -> Any:
         if type(value) in (JNull, JBool, JInt, JFloat, JString, JArray, JObject):
             return _normalize_tagged(value)
         if issubclass(type(value), (list, tuple)):
-            return tuple(_normalize_arg(v, object, depth + 1) for v in _sequence(cast(list[Any] | tuple[Any, ...], value)))
+            return tuple(
+                _normalize_arg(v, object, depth + 1)
+                for v in _sequence(cast(list[Any] | tuple[Any, ...], value))
+            )
         return {_text(k): _normalize_arg(v, object, depth + 1) for k, v in _mapping_items(value)}
     if annotation is type(None):
         if value is not None:
@@ -96,8 +99,16 @@ def _normalize_arg(value: object, annotation: object, depth: int = 0) -> Any:
                 _fail()
             missing = object()
             members = {}
-            hints = get_type_hints(annotation.__init__) if issubclass(annotation, _Facts) else get_type_hints(annotation)
-            init_names = {f.name for f in fields(annotation) if f.init} if is_dataclass(annotation) else set(hints)
+            hints = (
+                get_type_hints(annotation.__init__)
+                if issubclass(annotation, _Facts)
+                else get_type_hints(annotation)
+            )
+            init_names = (
+                {f.name for f in fields(annotation) if f.init}
+                if is_dataclass(annotation)
+                else set(hints)
+            )
             for name, sub in hints.items():
                 if name == "return":
                     continue
@@ -111,6 +122,7 @@ def _normalize_arg(value: object, annotation: object, depth: int = 0) -> Any:
     origin = get_origin(annotation)
     if origin is Union or isinstance(annotation, types.UnionType):
         from .error import InvalidError
+
         for sub in get_args(annotation):
             try:
                 return _normalize_arg(value, sub, depth)
@@ -121,16 +133,26 @@ def _normalize_arg(value: object, annotation: object, depth: int = 0) -> Any:
         if not issubclass(type(value), (list, tuple)):
             _fail()
         sub = get_args(annotation)[0]
-        return tuple(_normalize_arg(member, sub, depth + 1) for member in _sequence(cast(list[Any] | tuple[Any, ...], value)))
+        return tuple(
+            _normalize_arg(member, sub, depth + 1)
+            for member in _sequence(cast(list[Any] | tuple[Any, ...], value))
+        )
     if origin is Mapping:
         key_type, value_type = get_args(annotation)
-        return {_normalize_arg(k, key_type, depth + 1): _normalize_arg(v, value_type, depth + 1) for k, v in _mapping_items(value)}
+        return {
+            _normalize_arg(k, key_type, depth + 1): _normalize_arg(v, value_type, depth + 1)
+            for k, v in _mapping_items(value)
+        }
     raise TypeError(f"unsupported input annotation: {annotation!r}")
 
 
 def _sequence(value: list[Any] | tuple[Any, ...]) -> tuple[Any, ...]:
     """Snapshot native containers without calling subclass iteration or length methods."""
-    iterator = list.__iter__(cast(list[Any], value)) if issubclass(type(value), list) else tuple.__iter__(cast(tuple[Any, ...], value))
+    iterator = (
+        list.__iter__(cast(list[Any], value))
+        if issubclass(type(value), list)
+        else tuple.__iter__(cast(tuple[Any, ...], value))
+    )
     return tuple(iterator)
 
 

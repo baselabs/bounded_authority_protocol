@@ -43,6 +43,7 @@ def _runtime_deps() -> list[str]:
         names.append(m.group(1) if m else d.strip())
     return names
 
+
 # The allowlist of SPDX-compatible licenses (AGENTS rule 10). ``cryptography`` is Apache-2.0 OR BSD-3-Clause.
 ALLOWED_LICENSES = {
     "Apache Software License",
@@ -68,13 +69,17 @@ def _license_terms(dist_name: str) -> list[str]:
     try:
         dist = distribution(dist_name)
     except PackageNotFoundError:
-        print(f"license: {dist_name} not installed (run `uv pip install -e .` first)", file=sys.stderr)
+        print(
+            f"license: {dist_name} not installed (run `uv pip install -e .` first)", file=sys.stderr
+        )
         return []
     # Modern packages (PEP 639) use License-Expression (SPDX); legacy use License + Classifier.
     license_expression = dist.metadata.get("License-Expression")
     terms = dist.metadata.get_all("License") or []
     classifiers = dist.metadata.get_all("Classifier") or []
-    license_classifiers = [c.split("::")[-1].strip() for c in classifiers if c.startswith("License ::")]
+    license_classifiers = [
+        c.split("::")[-1].strip() for c in classifiers if c.startswith("License ::")
+    ]
     out: list[str] = []
     if license_expression:
         out.append(license_expression)
@@ -95,9 +100,13 @@ def main() -> int:
             violations.append(f"{dep}: no license metadata found")
             continue
         # Accept if ANY declared license is in the allowlist.
-        accepted = any(any(allowed.lower() in lic.lower() for allowed in ALLOWED_LICENSES) for lic in licenses)
+        accepted = any(
+            any(allowed.lower() in lic.lower() for allowed in ALLOWED_LICENSES) for lic in licenses
+        )
         if not accepted:
-            violations.append(f"{dep}: license {licenses} not in the allowlist {sorted(ALLOWED_LICENSES)}")
+            violations.append(
+                f"{dep}: license {licenses} not in the allowlist {sorted(ALLOWED_LICENSES)}"
+            )
             continue
         if dep in KNOWN_GOOD and KNOWN_GOOD[dep].lower() not in " ".join(licenses).lower():
             violations.append(f"{dep}: expected {KNOWN_GOOD[dep]}, got {licenses}")
@@ -106,7 +115,10 @@ def main() -> int:
     if violations:
         for v in violations:
             print(f"license: {v}", file=sys.stderr)
-        print(f"\nlicense: {len(violations)} violation(s) — all runtime deps must be Apache-2.0/BSD/MIT/ISC", file=sys.stderr)
+        print(
+            f"\nlicense: {len(violations)} violation(s) — all runtime deps must be Apache-2.0/BSD/MIT/ISC",
+            file=sys.stderr,
+        )
         return 1
     print("license: PASS (all runtime deps allowlisted)")
     return 0

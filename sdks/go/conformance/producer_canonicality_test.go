@@ -304,7 +304,7 @@ func TestProducerCanonicalityCorpus(t *testing.T) {
 			if err == nil {
 				actual["compact"] = compact
 			}
-			execution.Record(c.ID, c.File, actual)
+			execution.Record(t, c.ID, c.File, actual)
 			ok = err == nil
 			if ok != wantValid {
 				t.Fatalf("%s (%s): expected verdict %s, got ok=%v err=%v", c.ID, c.Class, c.Expected.Verdict, ok, err)
@@ -314,7 +314,7 @@ func TestProducerCanonicalityCorpus(t *testing.T) {
 			}
 		} else {
 			err := pcEncode(c)
-			execution.Record(c.ID, c.File, map[string]any{"verdict": corpuscheck.Verdict(err)})
+			execution.Record(t, c.ID, c.File, map[string]any{"verdict": corpuscheck.Verdict(err)})
 			ok = err == nil
 			if ok != wantValid {
 				t.Fatalf("%s (%s): expected verdict %s, got ok=%v err=%v", c.ID, c.Class, c.Expected.Verdict, ok, err)

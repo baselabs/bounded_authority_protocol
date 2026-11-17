@@ -1,7 +1,6 @@
 // Package conformance is the BAP-16 acceptance runner: it executes the
-// vendored 283-case corpus against the public SDK surface only (the Rust
-// run.rs pattern — no internal library symbols), SHA-binds the vendored
-// index.json at startup, verifies every case file against the index's
+// vendored 283-case corpus against the public SDK surface only, SHA-binds the
+// vendored index.json at startup, verifies every case file against the index's
 // per-file SHA-256, and asserts the two-boundary key census against the
 // index's public_key_fingerprints.
 package conformance
@@ -210,7 +209,7 @@ func TestConformance(t *testing.T) {
 			if t.Run(c.ID, func(t *testing.T) {
 				c.Actual = map[string]any{}
 				runCase(t, c)
-				execution.Record(c.ID, lf.path, c.Actual)
+				execution.Record(t, c.ID, lf.path, c.Actual)
 			}) {
 				agreed++ // counts AGREED subtests, not merely executed ones
 			}
@@ -502,6 +501,9 @@ func runCase(t *testing.T, c corpusCase) {
 		})
 		checkVerdict(t, c, err)
 		if err == nil {
+			if got.Version() != 1 || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: verify_grant fact mismatch", c.ID)
+			}
 			c.Actual["grant_id"] = got.GrantID()
 			c.Actual["issuer"] = got.Issuer()
 		}
@@ -537,7 +539,11 @@ func runCase(t *testing.T, c corpusCase) {
 			Nonce:          nonceMode(t, exp),
 		})
 		checkVerdict(t, c, err)
-		_ = got
+		if err == nil {
+			if got.Version() != 1 || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: check_envelope fact mismatch", c.ID)
+			}
+		}
 	case "encode_consumption_entry":
 		got, err := v.EncodeConsumptionEntry(v.ConsumptionEntry{
 			ChainID:      rawString(t, c.Input, "chain_id"),
@@ -580,6 +586,9 @@ func runCase(t *testing.T, c corpusCase) {
 		checkVerdict(t, c, err)
 		if err == nil {
 			c.Actual["chain_id"] = got.ChainID()
+			if got.ChainID() != rawString(t, c.Input, "chain_id") || got.RowCount() != rawInt(t, c.Input, "row_count") || got.Trust() != v.TrustNotEvaluated {
+				t.Fatalf("case %s: check_chain fact mismatch", c.ID)
+			}
 		}
 	case "verify_historical_anchor":
 		key := subObject(t, c.Input, "key")
@@ -589,6 +598,11 @@ func runCase(t *testing.T, c corpusCase) {
 		checkVerdict(t, c, err)
 		if err == nil {
 			c.Actual["anchor_id"] = got.AnchorID()
+			exp := subObject(t, c.Input, "expected")
+			chainHash, fingerprint := got.ChainHash(), got.KeyFingerprint()
+			if got.AnchorID() != rawString(t, exp, "anchor_id") || got.Sequence() != rawInt(t, exp, "sequence") || v.Base64urlEncode(chainHash[:]) != rawString(t, exp, "chain_hash") || v.Base64urlEncode(fingerprint[:]) != rawString(t, exp, "key_fingerprint") || got.Trust() != v.TrustNotEvaluated {
+				t.Fatalf("case %s: verify_historical_anchor fact mismatch", c.ID)
+			}
 		}
 	case "verify_key_transition":
 		cur := subObject(t, c.Input, "current_key")
@@ -602,6 +616,11 @@ func runCase(t *testing.T, c corpusCase) {
 		checkVerdict(t, c, err)
 		if err == nil {
 			c.Actual["transition_id"] = got.TransitionID()
+			exp := subObject(t, c.Input, "expected")
+			current, nextFingerprint := got.FromFingerprint(), got.ToFingerprint()
+			if got.TransitionID() != rawString(t, exp, "transition_id") || v.Base64urlEncode(current[:]) != rawString(t, exp, "current_key_fingerprint") || v.Base64urlEncode(nextFingerprint[:]) != rawString(t, exp, "next_key_fingerprint") || got.Trust() != v.TrustNotEvaluated {
+				t.Fatalf("case %s: verify_key_transition fact mismatch", c.ID)
+			}
 		}
 	case "encode_anchored_export":
 		input, expected := exportEncodeInput(t, c)
@@ -627,6 +646,9 @@ func runCase(t *testing.T, c corpusCase) {
 		checkVerdict(t, c, err)
 		if err == nil {
 			c.Actual["chain_id"] = got.ChainID()
+			if got.ChainID() != expected.Chain.ChainID || got.RowCount() != expected.Chain.RowCount || got.Trust() != v.TrustNotEvaluated || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: verify_anchored_export fact mismatch", c.ID)
+			}
 		}
 	default:
 		t.Fatalf("case %s: unknown surface %s", c.ID, c.Surface)

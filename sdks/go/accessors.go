@@ -371,6 +371,22 @@ func (facts AnchorFacts) AnchoredAt() int64 {
 	return facts.data().AnchoredAt
 }
 
+// ChainHash returns the authenticated ChainHash digest (spec/bap-v1.md §16).
+func (facts AnchorFacts) ChainHash() [32]byte {
+	if facts.data == nil {
+		return [32]byte{}
+	}
+	return facts.data().ChainHash
+}
+
+// KeyFingerprint returns the authenticated KeyFingerprint digest (spec/bap-v1.md §16).
+func (facts AnchorFacts) KeyFingerprint() [32]byte {
+	if facts.data == nil {
+		return [32]byte{}
+	}
+	return facts.data().KeyFingerprint
+}
+
 // Trust returns the decoded or verified Trust value.
 func (facts AnchorFacts) Trust() Trust {
 	if facts.data == nil {

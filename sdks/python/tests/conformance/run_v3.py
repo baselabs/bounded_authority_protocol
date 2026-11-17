@@ -5,7 +5,7 @@ Loads the published v3 corpus from ``priv/conformance/v3/corpus/`, recomputes EV
 scratch by calling the v3 SDK façade (``bounded_authority_verifier.v3``), and asserts agreement on
 all 292 cases. Asserts the ``index.json`` SHA-256 at startup (ADR 0014 D4: the SDK binds to the
 exact corpus it was certified against). Runs the two-boundary key census (discovery ⊆ declared,
-curated == index two-way, verify-import ⊇ expected-verify-keys) over the ES256 verify boundary.
+verify-import ⊇ expected-verify-keys) over the ES256 verify boundary.
 
 Corpus integrity beyond the index pin: every raw sidecar's recorded SHA-256 is verified, the
 revision sidecar's SHA-256 + closed shape + monotone integer revision are verified, the loaded
@@ -30,8 +30,7 @@ from typing import Any, NoReturn
 
 from bounded_authority_verifier.error import _unwrap
 
-# Locate the package + corpus. The runner is invoked from sdks/python/, so the repo root is two
-# levels up; the package is importable from src/.
+# Locate the package and corpus inside the SDK root, three parents above this file.
 _HERE = Path(__file__).resolve()
 _CORPUS_ROOT = _HERE.parents[2] / "conformance"
 _SRC = _HERE.parents[2] / "src"
@@ -145,7 +144,9 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes
 # ---- tamper application (mirrors the corpus tamper_target_bytes discipline) ----
 
 
-def apply_tamper(base_input: dict[str, Any], tamper: dict[str, Any], raws: dict[str, bytes]) -> dict[str, Any]:
+def apply_tamper(
+    base_input: dict[str, Any], tamper: dict[str, Any], raws: dict[str, bytes]
+) -> dict[str, Any]:
     target = tamper.get("target")
     xor = tamper.get("xor", 0)
     byte_index = tamper["byte_index"]
@@ -325,15 +326,19 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
             "message": f"{_unwrap(utf8_str(r.value.protected_segment))}.{_unwrap(utf8_str(r.value.payload_segment))}",
         }
     if surface == "boundary_anchor_signing_input":
-        r = _run_thunk(lambda: v3.boundary_anchor_signing_input(v3.BoundaryAnchorProducer(
-            anchor_id=fetch_binary(inp, "anchor_id", "boundary_anchor_signing_input"),
-            anchored_at=int_field(inp, "anchored_at", "boundary_anchor_signing_input"),
-            chain_id=fetch_binary(inp, "chain_id", "boundary_anchor_signing_input"),
-            sequence=int_field(inp, "sequence", "boundary_anchor_signing_input"),
-            chain_hash=b64_field(inp, "chain_hash", "boundary_anchor_signing_input"),
-            key_id=fetch_binary(inp, "key_id", "boundary_anchor_signing_input"),
-            public_key=b64_field(inp, "public_key", "boundary_anchor_signing_input"),
-        )))
+        r = _run_thunk(
+            lambda: v3.boundary_anchor_signing_input(
+                v3.BoundaryAnchorProducer(
+                    anchor_id=fetch_binary(inp, "anchor_id", "boundary_anchor_signing_input"),
+                    anchored_at=int_field(inp, "anchored_at", "boundary_anchor_signing_input"),
+                    chain_id=fetch_binary(inp, "chain_id", "boundary_anchor_signing_input"),
+                    sequence=int_field(inp, "sequence", "boundary_anchor_signing_input"),
+                    chain_hash=b64_field(inp, "chain_hash", "boundary_anchor_signing_input"),
+                    key_id=fetch_binary(inp, "key_id", "boundary_anchor_signing_input"),
+                    public_key=b64_field(inp, "public_key", "boundary_anchor_signing_input"),
+                )
+            )
+        )
         if r is INVALID or not r.is_ok:
             return INVALID
         return {
@@ -342,15 +347,27 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
             "message": f"{_unwrap(utf8_str(r.value.protected_segment))}.{_unwrap(utf8_str(r.value.payload_segment))}",
         }
     if surface == "key_transition_signing_input":
-        r = _run_thunk(lambda: v3.key_transition_signing_input(v3.KeyTransitionProducer(
-            transition_id=fetch_binary(inp, "transition_id", "key_transition_signing_input"),
-            chain_id=fetch_binary(inp, "chain_id", "key_transition_signing_input"),
-            effective_at=int_field(inp, "effective_at", "key_transition_signing_input"),
-            current_key_id=fetch_binary(inp, "current_key_id", "key_transition_signing_input"),
-            current_public_key=b64_field(inp, "current_public_key", "key_transition_signing_input"),
-            next_key_id=fetch_binary(inp, "next_key_id", "key_transition_signing_input"),
-            next_public_key=b64_field(inp, "next_public_key", "key_transition_signing_input"),
-        )))
+        r = _run_thunk(
+            lambda: v3.key_transition_signing_input(
+                v3.KeyTransitionProducer(
+                    transition_id=fetch_binary(
+                        inp, "transition_id", "key_transition_signing_input"
+                    ),
+                    chain_id=fetch_binary(inp, "chain_id", "key_transition_signing_input"),
+                    effective_at=int_field(inp, "effective_at", "key_transition_signing_input"),
+                    current_key_id=fetch_binary(
+                        inp, "current_key_id", "key_transition_signing_input"
+                    ),
+                    current_public_key=b64_field(
+                        inp, "current_public_key", "key_transition_signing_input"
+                    ),
+                    next_key_id=fetch_binary(inp, "next_key_id", "key_transition_signing_input"),
+                    next_public_key=b64_field(
+                        inp, "next_public_key", "key_transition_signing_input"
+                    ),
+                )
+            )
+        )
         if r is INVALID or not r.is_ok:
             return INVALID
         return {
@@ -360,14 +377,20 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         }
     if surface == "assemble_compact":
         kind = fetch_binary(inp, "kind", "assemble_compact")
-        r = _run_thunk(lambda: v3.assemble_compact(
-            v3.SigningInput(
-                kind=kind,
-                protected_segment=_unwrap(str_utf8(fetch_binary(inp, "protected_segment", "assemble_compact"))),
-                payload_segment=_unwrap(str_utf8(fetch_binary(inp, "payload_segment", "assemble_compact"))),
-            ),
-            b64_field(inp, "signature", "assemble_compact"),
-        ))
+        r = _run_thunk(
+            lambda: v3.assemble_compact(
+                v3.SigningInput(
+                    kind=kind,
+                    protected_segment=_unwrap(
+                        str_utf8(fetch_binary(inp, "protected_segment", "assemble_compact"))
+                    ),
+                    payload_segment=_unwrap(
+                        str_utf8(fetch_binary(inp, "payload_segment", "assemble_compact"))
+                    ),
+                ),
+                b64_field(inp, "signature", "assemble_compact"),
+            )
+        )
         return INVALID if (r is INVALID or not r.is_ok) else {"compact": _unwrap(utf8_str(r.value))}
     if surface == "decode_grant":
         compact = _unwrap(str_utf8(fetch_binary(inp, "compact", "decode_grant")))
@@ -382,12 +405,16 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
             return INVALID
         return {"proof_id": r.value.proof_id}
     if surface == "encode_consumption_entry":
-        r = _run_thunk(lambda: v3.encode_consumption_entry(v3.ConsumptionEntry(
-            chain_id=fetch_binary(inp, "chain_id", "encode_consumption_entry"),
-            sequence=int_field(inp, "sequence", "encode_consumption_entry"),
-            previous_hash=b64_field(inp, "previous_hash", "encode_consumption_entry"),
-            commitment=b64_field(inp, "commitment", "encode_consumption_entry"),
-        )))
+        r = _run_thunk(
+            lambda: v3.encode_consumption_entry(
+                v3.ConsumptionEntry(
+                    chain_id=fetch_binary(inp, "chain_id", "encode_consumption_entry"),
+                    sequence=int_field(inp, "sequence", "encode_consumption_entry"),
+                    previous_hash=b64_field(inp, "previous_hash", "encode_consumption_entry"),
+                    commitment=b64_field(inp, "commitment", "encode_consumption_entry"),
+                )
+            )
+        )
         if r is INVALID or not r.is_ok:
             return INVALID
         # The v3 corpus encodes the canonical row bytes in the verdict as unpadded base64url
@@ -405,13 +432,20 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
             last_hash=b64_field(inp, "last_hash", "check_chain"),
         )
         chain = v3.ChainInput(
-            rows=rows, chain_id=expected.chain_id, first_sequence=expected.first_sequence,
-            last_sequence=expected.last_sequence, row_count=expected.row_count,
-            previous_hash=expected.previous_hash, last_hash=expected.last_hash,
+            rows=rows,
+            chain_id=expected.chain_id,
+            first_sequence=expected.first_sequence,
+            last_sequence=expected.last_sequence,
+            row_count=expected.row_count,
+            previous_hash=expected.previous_hash,
+            last_hash=expected.last_hash,
         )
         r = _run_thunk(lambda: v3.check_chain(chain, expected))
         if r is INVALID or not r.is_ok:
             return INVALID
+        assert r.value.chain_id == expected.chain_id, "check_chain: chain_id fact"
+        assert r.value.row_count == expected.row_count, "check_chain: row_count fact"
+        assert r.value.trust == "not_evaluated"
         # The v3 valid verdicts carry fact fields (the v1 corpus carried bare verdicts here).
         return {"chain_id": r.value.chain_id}
     if surface == "request_digest":
@@ -420,75 +454,117 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         r = _run_thunk(lambda: v3.request_digest(operation, cast_args))
         return INVALID if (r is INVALID or not r.is_ok) else {"digest": _b64e(r.value)}
     if surface == "verify_grant":
-        r = _run_thunk(lambda: v3.verify_grant(
-            _unwrap(str_utf8(fetch_binary(inp, "compact", "verify_grant"))),
-            v3.TrustedIssuer(
-                key_id=fetch_binary(inp, "key_id", "verify_grant"),
-                public_key=b64_field(inp, "public_key", "verify_grant"),
-            ),
-            v3.ExpectedGrant(
-                issuer=fetch_binary(inp, "issuer", "verify_grant"),
-                audience=fetch_binary(inp, "audience", "verify_grant"),
-                evaluation_time=int_field(inp, "evaluation_time", "verify_grant"),
-                clock_skew=int_field(inp, "clock_skew", "verify_grant"),
-            ),
-        ))
+        r = _run_thunk(
+            lambda: v3.verify_grant(
+                _unwrap(str_utf8(fetch_binary(inp, "compact", "verify_grant"))),
+                v3.TrustedIssuer(
+                    key_id=fetch_binary(inp, "key_id", "verify_grant"),
+                    public_key=b64_field(inp, "public_key", "verify_grant"),
+                ),
+                v3.ExpectedGrant(
+                    issuer=fetch_binary(inp, "issuer", "verify_grant"),
+                    audience=fetch_binary(inp, "audience", "verify_grant"),
+                    evaluation_time=int_field(inp, "evaluation_time", "verify_grant"),
+                    clock_skew=int_field(inp, "clock_skew", "verify_grant"),
+                ),
+            )
+        )
         if r is INVALID or not r.is_ok:
             return INVALID
+        assert r.value.version == 3, "verify_grant: version fact"
+        assert r.value.authorization == "not_evaluated"
         f = r.value
         return {
-            "version": f.version, "issuer": f.issuer, "grant_id": f.grant_id,
+            "version": f.version,
+            "issuer": f.issuer,
+            "grant_id": f.grant_id,
             "issuer_key_fingerprint": _b64e(f.issuer_key_fingerprint),
             "holder_thumbprint": _b64e(f.holder_thumbprint),
             "matched_audience": f.matched_audience,
-            "issued_at": f.issued_at, "not_before": f.not_before, "expires_at": f.expires_at,
+            "issued_at": f.issued_at,
+            "not_before": f.not_before,
+            "expires_at": f.expires_at,
             "authorization": f.authorization,
         }
     if surface == "verify_historical_anchor":
         key = _build_historical_key(inp.get("key") or {}, "verify_historical_anchor key")
-        expected = _build_expected_anchor(inp.get("expected") or {}, "verify_historical_anchor expected")
-        r = _run_thunk(lambda: v3.verify_historical_anchor(
-            _unwrap(str_utf8(fetch_binary(inp, "compact", "verify_historical_anchor"))), key, expected))
+        expected = _build_expected_anchor(
+            inp.get("expected") or {}, "verify_historical_anchor expected"
+        )
+        r = _run_thunk(
+            lambda: v3.verify_historical_anchor(
+                _unwrap(str_utf8(fetch_binary(inp, "compact", "verify_historical_anchor"))),
+                key,
+                expected,
+            )
+        )
         if r is INVALID or not r.is_ok:
             return INVALID
+        assert r.value.anchor_id == expected.anchor_id, "anchor: anchor_id fact"
+        assert r.value.sequence == expected.sequence, "anchor: sequence fact"
+        assert r.value.chain_hash == expected.chain_hash, "anchor: chain_hash fact"
+        assert r.value.key_fingerprint == expected.key_fingerprint, "anchor: key_fingerprint fact"
+        assert r.value.trust == "not_evaluated"
         return {"anchor_id": r.value.anchor_id}
     if surface == "verify_key_transition":
-        current = _build_historical_key(inp.get("current_key") or {}, "verify_key_transition current")
+        current = _build_historical_key(
+            inp.get("current_key") or {}, "verify_key_transition current"
+        )
         nxt = _build_historical_key(inp.get("next_key") or {}, "verify_key_transition next")
-        expected = _build_expected_transition(inp.get("expected") or {}, "verify_key_transition expected")
-        r = _run_thunk(lambda: v3.verify_key_transition(
-            _unwrap(str_utf8(fetch_binary(inp, "compact", "verify_key_transition"))), current, nxt, expected))
+        expected = _build_expected_transition(
+            inp.get("expected") or {}, "verify_key_transition expected"
+        )
+        r = _run_thunk(
+            lambda: v3.verify_key_transition(
+                _unwrap(str_utf8(fetch_binary(inp, "compact", "verify_key_transition"))),
+                current,
+                nxt,
+                expected,
+            )
+        )
         if r is INVALID or not r.is_ok:
             return INVALID
+        assert r.value.transition_id == expected.transition_id, "transition: transition_id fact"
+        assert r.value.current_key_fingerprint == expected.current_key_fingerprint, (
+            "transition: current fingerprint fact"
+        )
+        assert r.value.next_key_fingerprint == expected.next_key_fingerprint, (
+            "transition: next fingerprint fact"
+        )
+        assert r.value.trust == "not_evaluated"
         return {"transition_id": r.value.transition_id}
     if surface == "check_envelope":
         expected = inp.get("expected") or {}
         ti = expected.get("trusted_issuer") or {}
         cast_args = _js_to_tagged(expected["cast_arguments"])
         nonce = _build_nonce(expected.get("nonce"))
-        r = _run_thunk(lambda: v3.check_envelope(
-            _unwrap(str_utf8(fetch_binary(inp, "grant", "check_envelope"))),
-            _unwrap(str_utf8(fetch_binary(inp, "proof", "check_envelope"))),
-            v3.ExpectedRequest(
-                trusted_issuer=v3.TrustedIssuer(
-                    key_id=fetch_binary(ti, "key_id", "check_envelope"),
-                    public_key=b64_field(ti, "public_key", "check_envelope"),
+        r = _run_thunk(
+            lambda: v3.check_envelope(
+                _unwrap(str_utf8(fetch_binary(inp, "grant", "check_envelope"))),
+                _unwrap(str_utf8(fetch_binary(inp, "proof", "check_envelope"))),
+                v3.ExpectedRequest(
+                    trusted_issuer=v3.TrustedIssuer(
+                        key_id=fetch_binary(ti, "key_id", "check_envelope"),
+                        public_key=b64_field(ti, "public_key", "check_envelope"),
+                    ),
+                    issuer=fetch_binary(expected, "issuer", "check_envelope"),
+                    audience=fetch_binary(expected, "audience", "check_envelope"),
+                    method=fetch_binary(expected, "method", "check_envelope"),
+                    target_uri=fetch_binary(expected, "target_uri", "check_envelope"),
+                    invocation_id=fetch_binary(expected, "invocation_id", "check_envelope"),
+                    operation=fetch_binary(expected, "operation", "check_envelope"),
+                    cast_arguments=cast_args,
+                    evaluation_time=int_field(expected, "evaluation_time", "check_envelope"),
+                    clock_skew=int_field(expected, "clock_skew", "check_envelope"),
+                    proof_max_age=int_field(expected, "proof_max_age", "check_envelope"),
+                    nonce=nonce,
                 ),
-                issuer=fetch_binary(expected, "issuer", "check_envelope"),
-                audience=fetch_binary(expected, "audience", "check_envelope"),
-                method=fetch_binary(expected, "method", "check_envelope"),
-                target_uri=fetch_binary(expected, "target_uri", "check_envelope"),
-                invocation_id=fetch_binary(expected, "invocation_id", "check_envelope"),
-                operation=fetch_binary(expected, "operation", "check_envelope"),
-                cast_arguments=cast_args,
-                evaluation_time=int_field(expected, "evaluation_time", "check_envelope"),
-                clock_skew=int_field(expected, "clock_skew", "check_envelope"),
-                proof_max_age=int_field(expected, "proof_max_age", "check_envelope"),
-                nonce=nonce,
-            ),
-        ))
+            )
+        )
         if r is INVALID or not r.is_ok:
             return INVALID
+        assert r.value.version == 3, "check_envelope: version fact"
+        assert r.value.authorization == "not_evaluated"
         return {}
     if surface == "encode_anchored_export":
         rows = tuple(byte_list(inp, "rows", "encode_anchored_export"))
@@ -498,31 +574,51 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         # asserted in the verdict); the runner must not require them on this surface.
         full_expected = _build_export_expected(inp, for_encode=True)
         chain = full_expected.chain
-        r = _run_thunk(lambda: v3.encode_anchored_export(
-            v3.AnchoredExportInput(
-                rows=rows,
-                start_anchor=_unwrap(str_utf8(fetch_binary(inp, "start_anchor", "encode_anchored_export"))),
-                end_anchor=_unwrap(str_utf8(fetch_binary(inp, "end_anchor", "encode_anchored_export"))),
-                transitions=transitions,
-                chain_id=chain.chain_id, first_sequence=chain.first_sequence,
-                last_sequence=chain.last_sequence, row_count=chain.row_count,
-                previous_hash=chain.previous_hash, last_hash=chain.last_hash,
-            ),
-            full_expected,
-        ))
+        r = _run_thunk(
+            lambda: v3.encode_anchored_export(
+                v3.AnchoredExportInput(
+                    rows=rows,
+                    start_anchor=_unwrap(
+                        str_utf8(fetch_binary(inp, "start_anchor", "encode_anchored_export"))
+                    ),
+                    end_anchor=_unwrap(
+                        str_utf8(fetch_binary(inp, "end_anchor", "encode_anchored_export"))
+                    ),
+                    transitions=transitions,
+                    chain_id=chain.chain_id,
+                    first_sequence=chain.first_sequence,
+                    last_sequence=chain.last_sequence,
+                    row_count=chain.row_count,
+                    previous_hash=chain.previous_hash,
+                    last_hash=chain.last_hash,
+                ),
+                full_expected,
+            )
+        )
         if r is INVALID or not r.is_ok:
             return INVALID
         return {"digest": _b64e(r.value.digest), "byte_count": len(r.value.archive)}
     if surface == "verify_anchored_export":
         chunks = tuple(byte_list(inp, "chunks", "verify_anchored_export"))
         version = fetch_binary(inp, "version", "verify_anchored_export")
-        keys = tuple(_build_historical_key(k, f"verify_anchored_export key {i}") for i, k in enumerate(inp.get("keys") or []))
+        keys = tuple(
+            _build_historical_key(k, f"verify_anchored_export key {i}")
+            for i, k in enumerate(inp.get("keys") or [])
+        )
         expected = _build_export_expected(inp)
-        r = _run_thunk(lambda: v3.verify_anchored_export(
-            v3.ArchivedObject(chunks=chunks, version=version),
-            v3.HistoricalKeyChain(keys=keys), expected))
+        r = _run_thunk(
+            lambda: v3.verify_anchored_export(
+                v3.ArchivedObject(chunks=chunks, version=version),
+                v3.HistoricalKeyChain(keys=keys),
+                expected,
+            )
+        )
         if r is INVALID or not r.is_ok:
             return INVALID
+        assert r.value.chain_id == expected.chain.chain_id, "export: chain_id fact"
+        assert r.value.row_count == expected.chain.row_count, "export: row_count fact"
+        assert r.value.trust == "not_evaluated"
+        assert r.value.authorization == "not_evaluated"
         return {"chain_id": r.value.chain_id}
     abort(f"unknown surface: {surface}")
 
@@ -572,16 +668,20 @@ def _build_historical_key(k: dict[str, Any], ctx: str) -> v3.HistoricalPublicKey
 
 def _build_expected_anchor(e: dict[str, Any], ctx: str) -> v3.ExpectedAnchor:
     return v3.ExpectedAnchor(
-        anchor_id=fetch_binary(e, "anchor_id", ctx), anchored_at=int_field(e, "anchored_at", ctx),
-        chain_id=fetch_binary(e, "chain_id", ctx), sequence=int_field(e, "sequence", ctx),
-        chain_hash=b64_field(e, "chain_hash", ctx), key_id=fetch_binary(e, "key_id", ctx),
+        anchor_id=fetch_binary(e, "anchor_id", ctx),
+        anchored_at=int_field(e, "anchored_at", ctx),
+        chain_id=fetch_binary(e, "chain_id", ctx),
+        sequence=int_field(e, "sequence", ctx),
+        chain_hash=b64_field(e, "chain_hash", ctx),
+        key_id=fetch_binary(e, "key_id", ctx),
         key_fingerprint=b64_field(e, "key_fingerprint", ctx),
     )
 
 
 def _build_expected_transition(e: dict[str, Any], ctx: str) -> v3.ExpectedKeyTransition:
     return v3.ExpectedKeyTransition(
-        transition_id=fetch_binary(e, "transition_id", ctx), chain_id=fetch_binary(e, "chain_id", ctx),
+        transition_id=fetch_binary(e, "transition_id", ctx),
+        chain_id=fetch_binary(e, "chain_id", ctx),
         effective_at=int_field(e, "effective_at", ctx),
         current_key_id=fetch_binary(e, "current_key_id", ctx),
         current_key_fingerprint=b64_field(e, "current_key_fingerprint", ctx),
@@ -628,7 +728,9 @@ def _build_export_expected(inp: dict[str, Any], for_encode: bool = False) -> v3.
         # Encode placeholders: the digest is an OUTPUT of encode (asserted in the verdict), and
         # object_version is not an encode input. The encode path never reads either field.
         digest=b64_field(expected, "digest", "export") if digest_raw is not None else bytes(32),
-        start_anchor=_build_expected_anchor(expected.get("start_anchor") or {}, "export start_anchor"),
+        start_anchor=_build_expected_anchor(
+            expected.get("start_anchor") or {}, "export start_anchor"
+        ),
         end_anchor=_build_expected_anchor(expected.get("end_anchor") or {}, "export end_anchor"),
         transitions=tuple(
             _build_expected_transition(t, "export transition")
@@ -736,11 +838,19 @@ def _canonical_json(v: Any) -> str:
 
 # ---- census: discovery is a subset of the declared index; verify-import covers valid cases ----
 
-_PUBLIC_KEY_LABEL = re.compile(r"public.*key|key.*public|verification.*key|holder.*key|issuer.*key", re.IGNORECASE)
+_PUBLIC_KEY_LABEL = re.compile(
+    r"public.*key|key.*public|verification.*key|holder.*key|issuer.*key", re.IGNORECASE
+)
 _PUBLIC_KEY_DENY = re.compile(r"fingerprint|thumbprint|digest|hash", re.IGNORECASE)
-_VERIFICATION_SURFACES = frozenset({
-    "verify_grant", "verify_historical_anchor", "verify_key_transition", "check_envelope", "verify_anchored_export",
-})
+_VERIFICATION_SURFACES = frozenset(
+    {
+        "verify_grant",
+        "verify_historical_anchor",
+        "verify_key_transition",
+        "check_envelope",
+        "verify_anchored_export",
+    }
+)
 _RAW_KEY_RE = re.compile(r"^[A-Za-z0-9_-]{87}$")
 
 
@@ -768,7 +878,17 @@ def _collect_case_keys(value: Any, target: set[str]) -> None:
         if _is_census_key_label(key):
             raw = _decode_census_raw_key(child)
             if raw is not None:
-                target.add(_b64e(_unwrap(sha256(_unwrap(v3.thumbprint_preimage(_unwrap(v3.jwk_from_public_key(raw))))))))
+                target.add(
+                    _b64e(
+                        _unwrap(
+                            sha256(
+                                _unwrap(
+                                    v3.thumbprint_preimage(_unwrap(v3.jwk_from_public_key(raw)))
+                                )
+                            )
+                        )
+                    )
+                )
         _collect_case_keys(child, target)
 
 
@@ -784,17 +904,16 @@ def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
         _collect_case_keys(c["input"], discovery)
     undeclared = sorted(discovery - declared_set)
     if undeclared:
-        abort(
-            "census: case inputs carry undeclared keys\n"
-            f"  undeclared=[{','.join(undeclared)}]"
-        )
+        abort(f"census: case inputs carry undeclared keys\n  undeclared=[{','.join(undeclared)}]")
     verify_import = sorted(_imported_fingerprints())
     expected_verify: set[str] = set()
     for c in cases:
         if c.get("class") == "valid" and c["surface"] in _VERIFICATION_SURFACES:
             _collect_case_keys(c["input"], expected_verify)
     if len(expected_verify) == 0:
-        abort("census: no valid verification-surface keys discovered (corpus lost its verify cases)")
+        abort(
+            "census: no valid verification-surface keys discovered (corpus lost its verify cases)"
+        )
     for fp in expected_verify:
         if fp not in verify_import:
             abort(
@@ -858,14 +977,18 @@ def audit_tampers(cases: list[dict[str, Any]], raws: dict[str, bytes]) -> int:
                 verbatim_list = c["input"].get(key)
                 base_list = base["input"].get(key)
                 if (
-                    isinstance(derived_list, list) and isinstance(base_list, list)
-                    and i < len(derived_list) and i < len(base_list)
+                    isinstance(derived_list, list)
+                    and isinstance(base_list, list)
+                    and i < len(derived_list)
+                    and i < len(base_list)
                     and derived_list[i] == base_list[i]
                 ):
                     abort(f"{c['id']}: tamper target {target} unchanged in the derived input")
                 if (
-                    isinstance(verbatim_list, list) and isinstance(base_list, list)
-                    and i < len(verbatim_list) and i < len(base_list)
+                    isinstance(verbatim_list, list)
+                    and isinstance(base_list, list)
+                    and i < len(verbatim_list)
+                    and i < len(base_list)
                     and verbatim_list[i] == base_list[i]
                 ):
                     abort(f"{c['id']}: tamper target {target} unchanged in the verbatim input")
@@ -901,7 +1024,14 @@ def run_all() -> dict[str, Any]:
             failures.append(c["id"])
     run_census(index, cases)
     execution.finish()
-    return {"pass": passed, "fail": failed, "total": len(cases), "index": index, "cases": cases, "failures": failures}
+    return {
+        "pass": passed,
+        "fail": failed,
+        "total": len(cases),
+        "index": index,
+        "cases": cases,
+        "failures": failures,
+    }
 
 
 def run_census_standalone() -> None:
@@ -910,12 +1040,16 @@ def run_census_standalone() -> None:
     total = result["total"]
     passed = result["pass"]
     failed = result["fail"]
-    print(f"census: ran {total} cases ({passed} agree, {failed} disagree) to populate the verify-import boundary")
+    print(
+        f"census: ran {total} cases ({passed} agree, {failed} disagree) to populate the verify-import boundary"
+    )
     fp_count = len(index["public_key_fingerprints"])
-    print(f"census: index public_key_fingerprints ({fp_count} keys, two-way); discovery ⊆ declared; verify-import ⊇ expected-verify-keys")
+    print(
+        f"census: index public_key_fingerprints ({fp_count} keys); discovery ⊆ declared; verify-import ⊇ expected-verify-keys"
+    )
     if failed > 0:
         raise SystemExit(1)
-    print("census: PASS (two-way equal + fail-closed legs)")
+    print("census: PASS (discovery declared; valid verification keys imported)")
 
 
 def main() -> None:
@@ -926,13 +1060,15 @@ def main() -> None:
     index = result["index"]
     print(f"conformance: {passed}/{total} cases agree")
     fp_count = len(index["public_key_fingerprints"])
-    print(f"census: index public_key_fingerprints ({fp_count} keys, two-way); discovery ⊆ declared; verify-import ⊇ expected-verify-keys")
+    print(
+        f"census: index public_key_fingerprints ({fp_count} keys); discovery ⊆ declared; verify-import ⊇ expected-verify-keys"
+    )
     if failed > 0:
         print(f"\n{failed} FAILURE(S):", file=sys.stderr)
         for fid in result["failures"]:
             print(f"  - {fid}", file=sys.stderr)
         raise SystemExit(1)
-    print("conformance: PASS (all cases agree + census two-way equal)")
+    print("conformance: PASS (all cases agree + census input and import checks)")
 
 
 if __name__ == "__main__":

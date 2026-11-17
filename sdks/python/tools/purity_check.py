@@ -58,6 +58,7 @@ FORBIDDEN_CALLS: dict[str, str] = {
 SDK_DIR = Path(__file__).resolve().parent.parent
 SRC_DIR = SDK_DIR / "src" / "bounded_authority_verifier"
 
+# fmt: off
 # BEGIN DERIVATION RULES
 # ADR 0014 D5: identical rules travel with each independently publishable SDK.
 # Split and escaped literals keep this checker inside its own scan boundary.
@@ -106,6 +107,7 @@ def derivation_violations(root: Path, top_level_only: bool = False, fixture_dire
                     violations.append(f"{relative}:{lineno}: {message}")
     return violations
 # END DERIVATION RULES
+# fmt: on
 
 
 class PurityChecker(ast.NodeVisitor):
@@ -122,9 +124,13 @@ class PurityChecker(ast.NodeVisitor):
             full = alias.name
             # Match the longest forbidden prefix (e.g. urllib.request over urllib).
             if full in FORBIDDEN_IMPORTS:
-                self._violation(node.lineno, f"forbidden import: {full} ({FORBIDDEN_IMPORTS[full]})")
+                self._violation(
+                    node.lineno, f"forbidden import: {full} ({FORBIDDEN_IMPORTS[full]})"
+                )
             elif root in FORBIDDEN_IMPORTS:
-                self._violation(node.lineno, f"forbidden import: {root} ({FORBIDDEN_IMPORTS[root]})")
+                self._violation(
+                    node.lineno, f"forbidden import: {root} ({FORBIDDEN_IMPORTS[root]})"
+                )
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
@@ -132,15 +138,21 @@ class PurityChecker(ast.NodeVisitor):
             root = node.module.split(".")[0]
             full = node.module
             if full in FORBIDDEN_IMPORTS:
-                self._violation(node.lineno, f"forbidden import: {full} ({FORBIDDEN_IMPORTS[full]})")
+                self._violation(
+                    node.lineno, f"forbidden import: {full} ({FORBIDDEN_IMPORTS[full]})"
+                )
             elif root in FORBIDDEN_IMPORTS:
-                self._violation(node.lineno, f"forbidden import: {root} ({FORBIDDEN_IMPORTS[root]})")
+                self._violation(
+                    node.lineno, f"forbidden import: {root} ({FORBIDDEN_IMPORTS[root]})"
+                )
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
         # Bare name calls: open(...), input(...).
         if isinstance(node.func, ast.Name) and node.func.id in FORBIDDEN_CALLS:
-            self._violation(node.lineno, f"forbidden call: {node.func.id} ({FORBIDDEN_CALLS[node.func.id]})")
+            self._violation(
+                node.lineno, f"forbidden call: {node.func.id} ({FORBIDDEN_CALLS[node.func.id]})"
+            )
         # Attribute calls: os.environ (a Subscript/Attribute access, handled below), os.system(...).
         if isinstance(node.func, ast.Attribute):
             qual = _qualified_name(node.func)
@@ -148,7 +160,9 @@ class PurityChecker(ast.NodeVisitor):
                 self._violation(node.lineno, f"forbidden call: {qual} ({FORBIDDEN_ATTR[qual]})")
             # datetime.now(), time.time(), random.* — the clock/RNG family via attribute call.
             if _is_clock_rng_call(node.func):
-                self._violation(node.lineno, f"forbidden call: {_qualified_name(node.func)} (clock/RNG)")
+                self._violation(
+                    node.lineno, f"forbidden call: {_qualified_name(node.func)} (clock/RNG)"
+                )
         self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:

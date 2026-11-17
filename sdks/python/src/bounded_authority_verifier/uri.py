@@ -40,7 +40,9 @@ def local_loopback_http_uri_normalize(
 ) -> Result[bytes]:
     try:
         data = _bytes(data)
-        return Ok(_unwrap(str_utf8(_normalize_local_loopback_http(data, _unwrap(coerce_bounds(bounds))))))
+        return Ok(
+            _unwrap(str_utf8(_normalize_local_loopback_http(data, _unwrap(coerce_bounds(bounds)))))
+        )
     except InvalidError:
         return err()
 
@@ -65,7 +67,11 @@ def _normalize_local_loopback_http(data: bytes, bounds: Bounds) -> str:
     raw_port = authority_match.group(2)
     if raw_port is not None:
         significant = raw_port.lstrip(b"0")
-        if len(significant) == 0 or len(significant) > 5 or (len(significant) == 5 and significant > b"65535"):
+        if (
+            len(significant) == 0
+            or len(significant) > 5
+            or (len(significant) == 5 and significant > b"65535")
+        ):
             _fail("uri: port")
         port_number = int(significant)
         if port_number < 1 or port_number > 65535:
@@ -138,7 +144,11 @@ def _normalize(data: bytes, bounds: Bounds) -> str:
         if not re.match(rb"^\d+$", port):
             _fail("uri: port")
         significant = port.lstrip(b"0")
-        if not significant or len(significant) > 5 or (len(significant) == 5 and significant > b"65535"):
+        if (
+            not significant
+            or len(significant) > 5
+            or (len(significant) == 5 and significant > b"65535")
+        ):
             _fail("uri: port range")
         port_number = int(significant)
         if port_number < 1 or port_number > 65535:

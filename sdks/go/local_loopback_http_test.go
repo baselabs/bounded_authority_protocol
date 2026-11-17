@@ -140,7 +140,7 @@ func TestCertifiedLocalLoopbackCorpusDrivesGoVerdicts(t *testing.T) {
 		if err == nil {
 			outcome["normalized"] = actual
 		}
-		execution.Record(uriCase.ID, "profile.json", outcome)
+		execution.Record(t, uriCase.ID, "profile.json", outcome)
 		if (err == nil) != uriCase.Valid {
 			t.Fatalf("%s validity mismatch: %v", uriCase.ID, err)
 		}
@@ -316,7 +316,7 @@ func TestCertifiedLocalLoopbackCorpusDrivesGoVerdicts(t *testing.T) {
 		_, localErr := DecodeLocalLoopbackHTTPProof(proofCase.Compact, nil)
 		_, standardErr := DecodeProof(proofCase.Compact, nil)
 		_, envelopeErr := CheckLocalLoopbackHTTPEnvelope(Credentials{Grant: profile.GrantCompact, Proof: proofCase.Compact}, caseExpected)
-		execution.Record(proofCase.ID, "proof-cases.json", map[string]any{"decode_local": localErr == nil, "decode_standard": standardErr == nil, "envelope_local": envelopeErr == nil})
+		execution.Record(t, proofCase.ID, "proof-cases.json", map[string]any{"decode_local": localErr == nil, "decode_standard": standardErr == nil, "envelope_local": envelopeErr == nil})
 		if _, err := DecodeLocalLoopbackHTTPProof(proofCase.Compact, nil); (err == nil) != proofCase.DecodeLocal {
 			t.Fatalf("%s local decode mismatch: %v", proofCase.ID, err)
 		}

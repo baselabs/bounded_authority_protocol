@@ -1644,13 +1644,15 @@ func (Profile) VerifyHistoricalAnchor(compact string, key HistoricalPublicKey, e
 		return AnchorFacts{}, ErrInvalid
 	}
 	return AnchorFacts{data: privateValue(&anchorFactsData{
-		Version:    2,
-		AnchorID:   claims.AnchorID,
-		ChainID:    claims.ChainID,
-		KeyID:      key.KeyID,
-		Sequence:   claims.Sequence,
-		AnchoredAt: claims.AnchoredAt,
-		Trust:      TrustNotEvaluated,
+		ChainHash:      claims.ChainHash,
+		KeyFingerprint: claims.KeyFingerprint,
+		Version:        2,
+		AnchorID:       claims.AnchorID,
+		ChainID:        claims.ChainID,
+		KeyID:          key.KeyID,
+		Sequence:       claims.Sequence,
+		AnchoredAt:     claims.AnchoredAt,
+		Trust:          TrustNotEvaluated,
 	})}, nil
 }
 

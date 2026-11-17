@@ -1,4 +1,3 @@
-
 import base64
 import hashlib
 import json
@@ -194,7 +193,8 @@ def test_local_loopback_http_profile_is_byte_distinct_and_nonce_bound() -> None:
 
 def test_certified_local_loopback_corpus_drives_python_verdicts() -> None:
     root = (
-        Path(__file__).resolve().parents[1] / "conformance"
+        Path(__file__).resolve().parents[1]
+        / "conformance"
         / "priv/conformance/application-profiles/local-loopback-http/v1"
     )
     execution = CorpusRun(root, _CERTIFIED_INDEX_SHA256)
@@ -213,7 +213,14 @@ def test_certified_local_loopback_corpus_drives_python_verdicts() -> None:
     assert len(profile["uri_cases"]) == index["uri_cases"]
     for uri_case in profile["uri_cases"]:
         result = local_loopback_http_uri_normalize(uri_case["input"].encode())
-        execution.record(uri_case["id"], {"valid": result.is_ok, **({"normalized": result.value.decode()} if result.is_ok else {})}, "profile.json")
+        execution.record(
+            uri_case["id"],
+            {
+                "valid": result.is_ok,
+                **({"normalized": result.value.decode()} if result.is_ok else {}),
+            },
+            "profile.json",
+        )
         assert result.is_ok == uri_case["valid"], uri_case["id"]
         if result.is_ok:
             assert result.value.decode() == uri_case["normalized"], uri_case["id"]
@@ -310,11 +317,17 @@ def test_certified_local_loopback_corpus_drives_python_verdicts() -> None:
             )
         if "invocation_id" in overrides:
             case_expected = replace(case_expected, invocation_id=overrides["invocation_id"])
-        execution.record(proof_case["id"], {
-            "decode_local": decode_local_loopback_http_proof(compact).is_ok,
-            "decode_standard": decode_proof(compact).is_ok,
-            "envelope_local": check_local_loopback_http_envelope(grant, compact, case_expected).is_ok,
-        }, "proof-cases.json")
+        execution.record(
+            proof_case["id"],
+            {
+                "decode_local": decode_local_loopback_http_proof(compact).is_ok,
+                "decode_standard": decode_proof(compact).is_ok,
+                "envelope_local": check_local_loopback_http_envelope(
+                    grant, compact, case_expected
+                ).is_ok,
+            },
+            "proof-cases.json",
+        )
         assert decode_local_loopback_http_proof(compact).is_ok == proof_case["decode_local"], (
             proof_case["id"]
         )

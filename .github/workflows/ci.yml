@@ -131,8 +131,9 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
-      # mix quality includes corpus sync against a Hex unpack, all generator --verify
-      # modes, verdict digests, and the distribution mutation controls (ADR 0049 D6).
+      # mix quality includes Hex corpus sync, generator --verify, verdict digests,
+      # and distribution mutations. Focused tests use separate VMs, preserving
+      # the full test --cover --seed 42 run (ADR 0049 D6).
       - name: Run complete quality gate
         run: mix quality
 

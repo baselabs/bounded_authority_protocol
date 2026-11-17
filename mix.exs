@@ -366,7 +366,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       "corpus.digests": ["run --no-start scripts/regen_corpus_digests.exs"],
       "corpus.verdicts": [
         "run --no-start scripts/regen_verdict_digests.exs",
-        "test test/conformance/verdict_digests_test.exs test/conformance/verdict_digest_gate_test.exs"
+        "cmd mix test test/conformance/verdict_digests_test.exs test/conformance/verdict_digest_gate_test.exs"
       ],
       "corpus.generators": [
         "cmd node conformance/generators/build_corpus.mjs --verify --major 1",
@@ -378,7 +378,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "cmd python3 scripts/build_content_assertion_corpus.py --verify"
       ],
       "corpus.distribution.mutations": [
-        "test test/corpus_tooling_test.exs",
+        "cmd mix test test/corpus_tooling_test.exs",
         "cmd python3 scripts/check_corpus_distribution_mutations.py"
       ],
       "corpus.sync": ["run --no-start scripts/check_corpus_sync.exs"],

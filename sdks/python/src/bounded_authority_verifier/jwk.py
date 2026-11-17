@@ -30,7 +30,7 @@ from .json_alg import JObject, JString, Tagged, json_decode, str_utf8, utf8_str
 class OkpPublic:
     crv: str  # always "Ed25519"
     kty: str  # always "OKP"
-    x: str    # base64url of the 32 raw bytes
+    x: str  # base64url of the 32 raw bytes
 
 
 def jwk_encode_public(raw_key: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
@@ -88,9 +88,11 @@ def jwk_from_public_key(raw_key: bytes) -> Result[OkpPublic]:
         raw_key = _bytes(raw_key)
         _require(len(raw_key) == 32, "jwk: public key width")
         _require(acceptable_public_key(raw_key), "jwk: key not acceptable")
-        return Ok(OkpPublic(
-            crv="Ed25519", kty="OKP", x=_unwrap(utf8_str(_unwrap(base64url_encode(raw_key))))
-        ))
+        return Ok(
+            OkpPublic(
+                crv="Ed25519", kty="OKP", x=_unwrap(utf8_str(_unwrap(base64url_encode(raw_key))))
+            )
+        )
     except InvalidError:
         return err()
 
@@ -101,7 +103,10 @@ def thumbprint_preimage(jwk: OkpPublic) -> Result[bytes]:
     Fallible: an ``x`` that does not decode to an acceptable key is the closed invalid value."""
     try:
         jwk = _normalize_arg(jwk, OkpPublic)
-        _require(acceptable_public_key(_unwrap(base64url_decode(_unwrap(str_utf8(jwk.x))))), "jwk: key not acceptable")
+        _require(
+            acceptable_public_key(_unwrap(base64url_decode(_unwrap(str_utf8(jwk.x))))),
+            "jwk: key not acceptable",
+        )
         return Ok(_thumbprint_preimage_unchecked(jwk))
     except InvalidError:
         return err()
@@ -120,7 +125,13 @@ def thumbprint(jwk: OkpPublic) -> Result[str]:
     """Thumbprint as base64url SHA-256 of the preimage."""
     try:
         jwk = _normalize_arg(jwk, OkpPublic)
-        return Ok(_unwrap(utf8_str(_unwrap(base64url_encode(_unwrap(sha256(_unwrap(thumbprint_preimage(jwk)))))))))
+        return Ok(
+            _unwrap(
+                utf8_str(
+                    _unwrap(base64url_encode(_unwrap(sha256(_unwrap(thumbprint_preimage(jwk))))))
+                )
+            )
+        )
     except InvalidError:
         return err()
 
@@ -151,7 +162,9 @@ def thumbprint_digest_unchecked(raw_key: bytes) -> Result[bytes]:
     try:
         raw_key = _bytes(raw_key)
         _require(len(raw_key) == 32, "jwk: public key width")
-        jwk = OkpPublic(crv="Ed25519", kty="OKP", x=_unwrap(utf8_str(_unwrap(base64url_encode(raw_key)))))
+        jwk = OkpPublic(
+            crv="Ed25519", kty="OKP", x=_unwrap(utf8_str(_unwrap(base64url_encode(raw_key))))
+        )
         return Ok(_unwrap(sha256(_thumbprint_preimage_unchecked(jwk))))
     except InvalidError:
         return err()

@@ -20,12 +20,12 @@ _DOT = 0x2E
 
 @dataclass(frozen=True)
 class CompactSegments:
-    protected_segment: bytes   # the raw base64url TEXT (not decoded)
+    protected_segment: bytes  # the raw base64url TEXT (not decoded)
     payload_segment: bytes
-    signature: bytes           # decoded raw bytes (64 for Ed25519)
-    protected_bytes: bytes     # decoded
-    payload_bytes: bytes       # decoded
-    signing_input: bytes       # ASCII(protected "." payload) text
+    signature: bytes  # decoded raw bytes (64 for Ed25519)
+    protected_bytes: bytes  # decoded
+    payload_bytes: bytes  # decoded
+    signing_input: bytes  # ASCII(protected "." payload) text
 
 
 def _parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegments:
@@ -48,14 +48,18 @@ def _parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegme
     if d0 == 0 or d1 == d0 + 1 or d1 == len(data) - 1:
         _fail("compact: empty segment")
     protected_text = data[:d0]
-    payload_text = data[d0 + 1:d1]
-    signature_text = data[d1 + 1:]
+    payload_text = data[d0 + 1 : d1]
+    signature_text = data[d1 + 1 :]
     if len(protected_text) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")):
         _fail("compact: protected segment bound")
     if len(payload_text) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")):
         _fail("compact: payload segment bound")
-    protected_bytes = _unwrap(base64url_decode(protected_text, _unwrap(bounds_resolve(b, "decoded_segment_bytes"))))
-    payload_bytes = _unwrap(base64url_decode(payload_text, _unwrap(bounds_resolve(b, "decoded_segment_bytes"))))
+    protected_bytes = _unwrap(
+        base64url_decode(protected_text, _unwrap(bounds_resolve(b, "decoded_segment_bytes")))
+    )
+    payload_bytes = _unwrap(
+        base64url_decode(payload_text, _unwrap(bounds_resolve(b, "decoded_segment_bytes")))
+    )
     signature = _unwrap(base64url_decode(signature_text))
     # spec/bap-v1.md §14 and §16 require the fixed decoded signature width.
     # The hash-only scan checks compact shape and size; decode checks the width.
@@ -104,7 +108,7 @@ def _scan_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
 class SigningInput:
     kind: str  # Closed profile-specific kind; see _KINDS.
     protected_segment: bytes  # base64url text
-    payload_segment: bytes    # base64url text
+    payload_segment: bytes  # base64url text
 
 
 _KINDS = (

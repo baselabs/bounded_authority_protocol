@@ -257,5 +257,4 @@ jobs:
         name: Cache the module zip verifier
         run: go mod download golang.org/x/mod@v0.29.0
       - run: python3 scripts/check_sdk_distribution.py ${{ matrix.sdk }}
-      - if: matrix.sdk != 'python'
-        run: python3 scripts/check_sdk_corpus_mutations.py ${{ matrix.sdk }}
+      - run: python3 scripts/check_sdk_corpus_mutations.py ${{ matrix.sdk }}

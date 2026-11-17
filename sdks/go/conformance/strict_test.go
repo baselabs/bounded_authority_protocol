@@ -140,7 +140,7 @@ func TestStrictEd25519Corpus(t *testing.T) {
 	for _, ref := range refs {
 		ref := ref
 		ref.Actual = map[string]any{}
-		if t.Run(ref.head.ID, func(t *testing.T) { runStrictCase(t, ref); execution.Record(ref.head.ID, ref.file, ref.Actual) }) {
+		if t.Run(ref.head.ID, func(t *testing.T) { runStrictCase(t, ref); execution.Record(t, ref.head.ID, ref.file, ref.Actual) }) {
 			agreed++
 		}
 	}
@@ -354,6 +354,9 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 		})
 		checkVerdict(t, c, err)
 		if err == nil {
+			if got.Version() != ref.head.Major || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: verify_grant fact mismatch", c.ID)
+			}
 			c.Actual["grant_id"] = got.GrantID()
 			c.Actual["issuer"] = got.Issuer()
 		}
@@ -366,7 +369,7 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 	case "check_envelope":
 		exp := subObject(t, c.Input, "expected")
 		ti := subObject(t, exp, "trusted_issuer")
-		_, err := api.checkEnvelope(v.Credentials{
+		got, err := api.checkEnvelope(v.Credentials{
 			Grant: rawString(t, c.Input, "grant"),
 			Proof: rawString(t, c.Input, "proof"),
 		}, v.ExpectedRequest{
@@ -387,6 +390,11 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 			Nonce:          nonceMode(t, exp),
 		})
 		checkVerdict(t, c, err)
+		if err == nil {
+			if got.Version() != ref.head.Major || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: check_envelope fact mismatch", c.ID)
+			}
+		}
 	case "verify_historical_anchor":
 		key := subObject(t, c.Input, "key")
 		got, err := api.anchor(rawString(t, c.Input, "compact"),
@@ -395,6 +403,11 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 		checkVerdict(t, c, err)
 		if err == nil {
 			c.Actual["anchor_id"] = got.AnchorID()
+			exp := subObject(t, c.Input, "expected")
+			chainHash, fingerprint := got.ChainHash(), got.KeyFingerprint()
+			if got.AnchorID() != rawString(t, exp, "anchor_id") || got.Sequence() != rawInt(t, exp, "sequence") || v.Base64urlEncode(chainHash[:]) != rawString(t, exp, "chain_hash") || v.Base64urlEncode(fingerprint[:]) != rawString(t, exp, "key_fingerprint") || got.Trust() != v.TrustNotEvaluated {
+				t.Fatalf("case %s: verify_historical_anchor fact mismatch", c.ID)
+			}
 		}
 	case "verify_key_transition":
 		cur := subObject(t, c.Input, "current_key")
@@ -406,6 +419,11 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 		checkVerdict(t, c, err)
 		if err == nil {
 			c.Actual["transition_id"] = got.TransitionID()
+			exp := subObject(t, c.Input, "expected")
+			current, nextFingerprint := got.FromFingerprint(), got.ToFingerprint()
+			if got.TransitionID() != rawString(t, exp, "transition_id") || v.Base64urlEncode(current[:]) != rawString(t, exp, "current_key_fingerprint") || v.Base64urlEncode(nextFingerprint[:]) != rawString(t, exp, "next_key_fingerprint") || got.Trust() != v.TrustNotEvaluated {
+				t.Fatalf("case %s: verify_key_transition fact mismatch", c.ID)
+			}
 		}
 	case "verify_anchored_export":
 		obj, keys, expected := exportVerifyInput(t, c)
@@ -413,6 +431,9 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 		checkVerdict(t, c, err)
 		if err == nil {
 			c.Actual["chain_id"] = got.ChainID()
+			if got.ChainID() != expected.Chain.ChainID || got.RowCount() != expected.Chain.RowCount || got.Trust() != v.TrustNotEvaluated || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: verify_anchored_export fact mismatch", c.ID)
+			}
 		}
 	default:
 		t.Fatalf("case %s: unknown strict surface %s", c.ID, c.Surface)

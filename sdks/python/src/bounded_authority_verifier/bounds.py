@@ -17,53 +17,57 @@ from .error import InvalidError, Ok, Result, _fail, err
 
 # The original 38-row table comes from spec/bap-v1.md. ``content_bytes`` is the ADR 0018
 # amendment defined by spec/bap-content-assertion-v1.md; existing profile meanings are unchanged.
-MAXIMA: Mapping[str, int] = MappingProxyType({
-    "compact_bytes": 65536,
-    "encoded_segment_bytes": 32768,
-    "decoded_segment_bytes": 24576,
-    "json_bytes": 65536,
-    "depth": 32,
-    "object_members": 64,
-    "array_items": 256,
-    "total_nodes": 4096,
-    "string_bytes": 8192,
-    "key_bytes": 128,
-    "number_lexeme_bytes": 64,
-    "integer_magnitude": 9007199254740991,
-    "float_magnitude": 9007199254740991,
-    "kid_bytes": 128,
-    "jcs_bytes": 65536,
-    "uri_bytes": 8192,
-    "identifier_bytes": 512,
-    "nonce_bytes": 512,
-    "method_bytes": 32,
-    "operation_bytes": 128,
-    "audiences": 64,
-    "operations": 64,
-    "selectors": 64,
-    "path_segments": 32,
-    "one_of_values": 256,
-    "public_key_bytes": 32,
-    "signature_bytes": 64,
-    "digest_bytes": 32,
-    "clock_skew": 60,
-    "proof_max_age": 300,
-    "chain_row_bytes": 4096,
-    "chain_rows": 65536,
-    "anchor_bytes": 8192,
-    "archive_header_bytes": 8192,
-    "archive_chunks": 65796,
-    "archive_bytes": 270820384,
-    "object_version_bytes": 512,
-    "key_transitions": 256,
-    "content_bytes": 65536,
-})
+MAXIMA: Mapping[str, int] = MappingProxyType(
+    {
+        "compact_bytes": 65536,
+        "encoded_segment_bytes": 32768,
+        "decoded_segment_bytes": 24576,
+        "json_bytes": 65536,
+        "depth": 32,
+        "object_members": 64,
+        "array_items": 256,
+        "total_nodes": 4096,
+        "string_bytes": 8192,
+        "key_bytes": 128,
+        "number_lexeme_bytes": 64,
+        "integer_magnitude": 9007199254740991,
+        "float_magnitude": 9007199254740991,
+        "kid_bytes": 128,
+        "jcs_bytes": 65536,
+        "uri_bytes": 8192,
+        "identifier_bytes": 512,
+        "nonce_bytes": 512,
+        "method_bytes": 32,
+        "operation_bytes": 128,
+        "audiences": 64,
+        "operations": 64,
+        "selectors": 64,
+        "path_segments": 32,
+        "one_of_values": 256,
+        "public_key_bytes": 32,
+        "signature_bytes": 64,
+        "digest_bytes": 32,
+        "clock_skew": 60,
+        "proof_max_age": 300,
+        "chain_row_bytes": 4096,
+        "chain_rows": 65536,
+        "anchor_bytes": 8192,
+        "archive_header_bytes": 8192,
+        "archive_chunks": 65796,
+        "archive_bytes": 270820384,
+        "object_version_bytes": 512,
+        "key_transitions": 256,
+        "content_bytes": 65536,
+    }
+)
 
 MaximaKey = str
 """A key into the MAXIMA table (a string, since Python's type system treats it lexically)."""
 
 # The fixed-width keys (REQ1-BOUNDS-fixed-widths, L395) — cannot be tightened or widened.
-FIXED_WIDTH_KEYS: frozenset[str] = frozenset({"digest_bytes", "public_key_bytes", "signature_bytes"})
+FIXED_WIDTH_KEYS: frozenset[str] = frozenset(
+    {"digest_bytes", "public_key_bytes", "signature_bytes"}
+)
 
 
 class Bounds:
@@ -83,7 +87,11 @@ class Bounds:
             validated: dict[str, int] = {}
             if overrides is not None:
                 for key, value in _mapping_items(overrides):
-                    if not issubclass(type(key), str) or not issubclass(type(value), int) or type(value) is bool:
+                    if (
+                        not issubclass(type(key), str)
+                        or not issubclass(type(value), int)
+                        or type(value) is bool
+                    ):
                         _fail()
                     key = str.__str__(cast(str, key))
                     value = int.__int__(cast(int, value))

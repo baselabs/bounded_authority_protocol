@@ -88,7 +88,12 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int)
         # spec/bap-v1.md §8 preserves the integer tag. Python bool is an int
         # subclass, so it must be excluded along with other noninteger values.
         mag = _unwrap(bounds_resolve(bounds, "integer_magnitude"))
-        if isinstance(value.v, bool) or not isinstance(value.v, int) or level > depth or abs(value.v) > mag:
+        if (
+            isinstance(value.v, bool)
+            or not isinstance(value.v, int)
+            or level > depth
+            or abs(value.v) > mag
+        ):
             _fail("jcs: integer bound")
         out += _unwrap(str_utf8(_format_int(value.v)))
         return _next_node(nodes, bounds)
@@ -101,7 +106,11 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int)
     if isinstance(value, JString):
         # Programmatically constructed strings must satisfy the same UTF-8 and
         # byte bounds as decoded strings (spec/bap-v1.md §8).
-        if level > depth or len(value.v) > _unwrap(bounds_resolve(bounds, "string_bytes")) or not _unwrap(is_valid_utf8(value.v)):
+        if (
+            level > depth
+            or len(value.v) > _unwrap(bounds_resolve(bounds, "string_bytes"))
+            or not _unwrap(is_valid_utf8(value.v))
+        ):
             _fail("jcs: string bound")
         _escape_string(value.v, out)
         return _next_node(nodes, bounds)

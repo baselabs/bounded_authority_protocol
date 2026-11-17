@@ -64,7 +64,9 @@ def integrity(root, pin):
     index = json.loads(raw)
     paths = [entry["path"] for entry in index["files"]]
     assert len(paths) == len(set(paths)), "duplicate indexed paths"
-    assert all(p != "index.json" and not Path(p).is_absolute() and ".." not in Path(p).parts for p in paths), "unsafe indexed path"
+    assert all(
+        p != "index.json" and not Path(p).is_absolute() and ".." not in Path(p).parts for p in paths
+    ), "unsafe indexed path"
     assert not any(p.is_symlink() for p in root.rglob("*")), "nonregular corpus input"
     present = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()}
     assert present == {"index.json", *paths}, "corpus file set mismatch"
@@ -73,7 +75,9 @@ def integrity(root, pin):
         path = entry["path"]
         body = (root / path).read_bytes()
         field = "sha256_base64url" if "sha256_base64url" in entry else "sha256"
-        actual = b64digest(body) if field == "sha256_base64url" else hashlib.sha256(body).hexdigest()
+        actual = (
+            b64digest(body) if field == "sha256_base64url" else hashlib.sha256(body).hexdigest()
+        )
         assert actual == entry[field], f"{path}: file SHA mismatch"
         if path.endswith(".raw") or path == "revision.json":
             assert entry.get("cases", 0) == 0, "sidecar declares cases"
@@ -85,7 +89,20 @@ def integrity(root, pin):
         cases.extend((path, case) for case in members)
     ids = [case["id"] for _, case in cases]
     assert len(ids) == len(set(ids)), "duplicate case IDs"
-    total = index.get("total_cases", sum(index.get(k, 0) for k in ("uri_cases", "proof_cases", "attestation_cases", "digest_cases", "assertion_cases", "successor_cases")))
+    total = index.get(
+        "total_cases",
+        sum(
+            index.get(k, 0)
+            for k in (
+                "uri_cases",
+                "proof_cases",
+                "attestation_cases",
+                "digest_cases",
+                "assertion_cases",
+                "successor_cases",
+            )
+        ),
+    )
     assert len(cases) == total, "total case count mismatch"
     return index, cases
 
@@ -111,14 +128,24 @@ class CorpusRun:
     def finish(self):
         assert self.executed.keys() == self.declared.keys(), "execution completeness: skipped cases"
         pairs = [[case["id"], self.executed[case["id"]]] for _, case in self.cases]
-        digest = b64digest(b"[" + b",".join(b"[" + canonical(pair[0]) + b"," + canonical(pair[1]) + b"]" for pair in pairs) + b"]")
+        digest = b64digest(
+            b"["
+            + b",".join(
+                b"[" + canonical(pair[0]) + b"," + canonical(pair[1]) + b"]" for pair in pairs
+            )
+            + b"]"
+        )
         manifest = json.loads((ROOT / "verdict-digests.json").read_bytes())
         assert manifest["format"] == "bap-corpus-verdict-digests/1"
         key = self.root.relative_to(ROOT).as_posix()
         expected = manifest["corpora"][key]
-        assert expected["index_sha256_base64url"] == b64digest((self.root / "index.json").read_bytes())
+        assert expected["index_sha256_base64url"] == b64digest(
+            (self.root / "index.json").read_bytes()
+        )
         assert expected["case_count"] == len(pairs)
-        assert expected["verdict_digest_sha256_base64url"] == digest, f"{key}: computed verdict digest mismatch"
+        assert expected["verdict_digest_sha256_base64url"] == digest, (
+            f"{key}: computed verdict digest mismatch"
+        )
         print(f"{key}: {len(pairs)} cases, verdict digest {digest}")
         return digest
 
@@ -127,6 +154,9 @@ def computed(expected, actual, invalid):
     if actual is invalid:
         return {"verdict": "invalid"}
     assert isinstance(actual, dict), "missing computed verdict"
-    actual = {k: base64.urlsafe_b64encode(v).rstrip(b"=").decode() if isinstance(v, bytes) else v for k, v in actual.items()}
+    actual = {
+        k: base64.urlsafe_b64encode(v).rstrip(b"=").decode() if isinstance(v, bytes) else v
+        for k, v in actual.items()
+    }
     value = {"verdict": "valid", **actual}
     return {k: value[k] for k in expected if k in value}

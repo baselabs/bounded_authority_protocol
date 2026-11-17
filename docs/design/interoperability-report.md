@@ -107,14 +107,15 @@ SHA-256: contract-major 2 (`priv/conformance/v2/corpus`, 268 cases, index
 |---|---|---|
 | Elixir reference CLI | **268/268 agreed**, 0 disagreed | **292/292 agreed**, 0 disagreed |
 | TypeScript | **268/268 agreed**, census two-way (17 keys) | **292/292 agreed**, census two-way (11 keys) |
-| Python | **268/268 agreed**, census two-way (17 keys) | **292/292 agreed**, census two-way (11 keys) |
+| Python | **268/268 agreed**, discovered keys declared; valid verification keys imported | **292/292 agreed**, discovered keys declared; valid verification keys imported |
 | Rust | **268/268 agreed**, census 17/17 | **292/292 agreed**, census 11/11 |
 | Go | **268/268 agreed**, every discovered key among the 17 declared | **292/292 agreed**, every discovered key among the 11 declared |
 
-The census for these majors compares the curated key inputs with the index fingerprints in both
-directions and requires every discovered key to be declared; the Go runner checks the discovered
-subset against the declared set. Each runner asserts its corpus index digest before executing any
-case.
+`mix corpus.generators` compares the rebuilt indexes, including their curated key fingerprints,
+with the certified indexes; distribution mutations prove that curated-input drift fails. Python
+and Go require every discovered key to be declared and every valid verification case's key to
+reach the SDK import boundary. Rust additionally compares imported keys with declared fingerprints
+in both directions. Each runner asserts its corpus index digest before executing any case.
 
 ### Role-attestation sibling profile
 

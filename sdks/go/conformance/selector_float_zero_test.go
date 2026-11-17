@@ -346,7 +346,7 @@ func TestSelectorFloatZeroCorpus(t *testing.T) {
 		}
 		c.Actual = map[string]any{}
 		ok, why := sfzRun(t, c)
-		execution.Record(c.ID, c.File, c.Actual)
+		execution.Record(t, c.ID, c.File, c.Actual)
 		if !ok {
 			disagreed = append(disagreed, c.ID+" ("+c.Construction+"; "+why+")")
 			continue

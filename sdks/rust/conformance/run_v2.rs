@@ -13,11 +13,11 @@
 //!    the version-neutral primitives (`base64url`/`json`/`jcs`/`uri`/`bounds`/
 //!    `jwk`) through the shared modules exactly as the v1 runner does.
 //! 3. **Runs the two-boundary key census** against the v2 index's 17 declared
-//!    `public_key_fingerprints` (curated-inputs-v2.json), both directions.
+//!    `public_key_fingerprints`, both directions at the SDK import boundary.
 //! 4. Asserts `agreed == total_cases (268)` and `disagreed == 0`.
 //!
-//! Derivation hygiene mirrors the v1 runner (ADR 0014 §D5): derived from the
-//! v1 runner, ADR 0028, and the corpus alone. The corpus is the falsifier.
+//! Derived from spec/bap-v2.md and the certified corpus alone. The corpus is
+//! the falsifier.
 
 #![forbid(unsafe_code)]
 
@@ -661,7 +661,18 @@ fn d_check_chain(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     save(
         case,
         census,
-        result.map(|facts| json!({"chain_id":facts.chain_id})),
+        result.map(|facts| {
+            assert_eq!(
+                facts.chain_id, expected.chain_id,
+                "check_chain: chain_id fact"
+            );
+            assert_eq!(
+                facts.row_count, expected.row_count,
+                "check_chain: row_count fact"
+            );
+            assert_eq!(facts.trust, NotEvaluated);
+            json!({"chain_id":facts.chain_id})
+        }),
     )
 }
 
@@ -687,12 +698,16 @@ fn d_verify_grant(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
     save(
         case,
         census,
-        result.map(|facts| json!({"grant_id":facts.grant_id,"issuer":facts.issuer})),
+        result.map(|facts| {
+            assert_eq!(facts.version, 2, "verify_grant: version fact");
+            assert_eq!(facts.authorization, NotEvaluated);
+            json!({"grant_id":facts.grant_id,"issuer":facts.issuer})
+        }),
     )
 }
 
 /// Builds the (Credentials, ExpectedRequest) pair for one envelope case
-/// (mirrors the Façade C harness `envelope_fixture_for`).
+/// Values come from the indexed envelope case inputs and expected context.
 fn envelope_fixture(
     case: &serde_json::Value,
     census: &mut KeyCensus,
@@ -747,6 +762,8 @@ fn d_check_envelope(case: &serde_json::Value, census: &mut KeyCensus) -> bool {
         census,
         result.map(|facts| {
             assert_eq!(facts.authorization, NotEvaluated);
+            assert_eq!(facts.grant.authorization, NotEvaluated);
+            assert_eq!(facts.grant.version, 2, "check_envelope: grant version fact");
             json!({})
         }),
     )
@@ -762,7 +779,23 @@ fn d_verify_historical_anchor(case: &serde_json::Value, census: &mut KeyCensus) 
     save(
         case,
         census,
-        result.map(|facts| json!({"anchor_id":facts.anchor_id})),
+        result.map(|facts| {
+            assert_eq!(
+                facts.anchor_id, expected.anchor_id,
+                "anchor: anchor_id fact"
+            );
+            assert_eq!(facts.sequence, expected.sequence, "anchor: sequence fact");
+            assert_eq!(
+                facts.chain_hash, expected.chain_hash,
+                "anchor: chain_hash fact"
+            );
+            assert_eq!(
+                facts.key_fingerprint, expected.key_fingerprint,
+                "anchor: key_fingerprint fact"
+            );
+            assert_eq!(facts.trust, NotEvaluated);
+            json!({"anchor_id":facts.anchor_id})
+        }),
     )
 }
 
@@ -778,7 +811,22 @@ fn d_verify_key_transition(case: &serde_json::Value, census: &mut KeyCensus) -> 
     save(
         case,
         census,
-        result.map(|facts| json!({"transition_id":facts.transition_id})),
+        result.map(|facts| {
+            assert_eq!(
+                facts.transition_id, expected.transition_id,
+                "transition: transition_id fact"
+            );
+            assert_eq!(
+                facts.current_key_fingerprint, expected.current_key_fingerprint,
+                "transition: current fingerprint fact"
+            );
+            assert_eq!(
+                facts.next_key_fingerprint, expected.next_key_fingerprint,
+                "transition: next fingerprint fact"
+            );
+            assert_eq!(facts.trust, NotEvaluated);
+            json!({"transition_id":facts.transition_id})
+        }),
     )
 }
 
@@ -853,7 +901,19 @@ fn d_verify_anchored_export(case: &serde_json::Value, census: &mut KeyCensus) ->
     save(
         case,
         census,
-        result.map(|facts| json!({"chain_id":facts.chain_id})),
+        result.map(|facts| {
+            assert_eq!(
+                facts.chain_id, expected.chain.chain_id,
+                "export: chain_id fact"
+            );
+            assert_eq!(
+                facts.row_count, expected.chain.row_count,
+                "export: row_count fact"
+            );
+            assert_eq!(facts.trust, NotEvaluated);
+            assert_eq!(facts.authorization, NotEvaluated);
+            json!({"chain_id":facts.chain_id})
+        }),
     )
 }
 

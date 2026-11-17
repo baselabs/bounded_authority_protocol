@@ -94,13 +94,15 @@ type AnchorFacts struct {
 }
 
 type anchorFactsData struct {
-	Version    int
-	AnchorID   string
-	ChainID    string
-	KeyID      string
-	Sequence   int64
-	AnchoredAt int64
-	Trust      Trust
+	ChainHash      [32]byte
+	KeyFingerprint [32]byte
+	Version        int
+	AnchorID       string
+	ChainID        string
+	KeyID          string
+	Sequence       int64
+	AnchoredAt     int64
+	Trust          Trust
 }
 
 // KeyTransitionFacts is the historical key-transition verification result.

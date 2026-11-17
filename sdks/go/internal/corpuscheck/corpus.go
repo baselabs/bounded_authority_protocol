@@ -174,15 +174,15 @@ func New(t *testing.T, root, tree, pin string) *Run {
 	}
 	return &Run{t: t, root: root, tree: tree, Cases: cases, actual: map[string]map[string]any{}}
 }
-func (r *Run) Record(id, file string, actual map[string]any) {
-	r.t.Helper()
+func (r *Run) Record(t *testing.T, id, file string, actual map[string]any) {
+	t.Helper()
 	if _, ok := r.actual[id]; ok {
-		r.t.Fatal("duplicate executed ID")
+		t.Fatal("duplicate executed ID")
 	}
 	for _, c := range r.Cases {
 		if c.Value["id"] == id {
 			if file != c.File {
-				r.t.Fatal("wrong declaring file")
+				t.Fatal("wrong declaring file")
 			}
 			projection := map[string]any{}
 			for key := range Outcome(c.Value) {
@@ -194,7 +194,7 @@ func (r *Run) Record(id, file string, actual map[string]any) {
 			return
 		}
 	}
-	r.t.Fatal("unknown executed ID")
+	t.Fatal("unknown executed ID")
 }
 func Verdict(err error) string {
 	if err != nil {

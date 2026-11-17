@@ -66,18 +66,40 @@ def main():
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         module.boundary(sdk)
-        injected = sdk / 'src/parent_read.py'
-        injected.write_text('open("../../priv/conformance/v1/corpus/index.json")\n')
-        try:
+        # Source strings, chained joins, API traversal, and packaging must all
+        # fail before execution; nested source paths cannot change the base.
+        for name, relative, source in [
+            ('relative literal', 'src/parent_read.py', 'open("../../priv/conformance/v1/corpus/index.json")'),
+            ('formatted literal', 'tests/parent_read.rs', 'format!("{}/../../priv/conformance/index.json", root);'),
+            ('Rust chained joins', 'examples/parent_read.rs', 'root.join("..").join("..");'),
+            ('Go join arguments', 'tests/parent_read.go', 'filepath.Join("..", "..", "priv")'),
+            ('Python parents index', 'src/parent_read.py', 'Path(__file__).parents[9] / "priv"'),
+            ('Python parent chain', 'examples/parent_read.py', 'Path(__file__).parent.parent.parent.parent / "priv"'),
+            ('Rust parent chain', 'src/parent_read.rs', 'Path::parent(root).unwrap().parent().unwrap();'),
+            ('Rust method parents', 'tests/parent_read.rs', 'root.parent().unwrap().parent().unwrap();'),
+            ('Go parent API', 'src/parent_read.go', 'filepath.Dir(filepath.Dir(root))'),
+            ('packaging literal', 'boundary.toml', 'include = ["../priv/conformance"]'),
+            ('unquoted packaging path', 'MANIFEST.in', 'include ../../priv/conformance/index.json'),
+            ('Windows literal', 'src/parent_read.py', r'open("..\\..\\priv\\index.json")'),
+            ('escaped component', 'tests/parent_read.go', r'filepath.Join("\x2e\x2e", "priv")'),
+            ('raw literal', 'src/parent_read.rs', 'r#"../../priv/index.json"#;'),
+            ('multiline parent chain', 'src/parent_read.py', '(Path(__file__)\n .parent\n .parent\n .parent\n .parent)'),
+            ('root-relative ambiguity', 'src/deep/nested/parent_read.py', 'open("../../priv/index.json")'),
+        ]:
+            injected = sdk / relative
+            injected.parent.mkdir(parents=True, exist_ok=True)
+            injected.write_text(source + '\n')
+            try:
+                module.boundary(sdk)
+            except RuntimeError as error:
+                assert 'parent-path read or link leaves SDK' in str(error)
+                print(f'RED {name}: {error}', flush=True)
+            else:
+                raise AssertionError(f'{name}: parent-path source read survived')
+            finally:
+                injected.unlink()
             module.boundary(sdk)
-        except RuntimeError as error:
-            assert 'parent-path read or link leaves SDK' in str(error)
-            print(f'RED: {error}', flush=True)
-        else:
-            raise AssertionError('parent-path source read survived')
-        injected.unlink()
-        module.boundary(sdk)
-        print('GREEN: restored source boundary', flush=True)
+            print(f'GREEN: restored {name}', flush=True)
         tree = temp / 'generator'
         shutil.copytree(ROOT / 'conformance/generators', tree / 'conformance/generators')
         shutil.copytree(ROOT / 'priv/conformance/v1/corpus', tree / 'priv/conformance/v1/corpus')

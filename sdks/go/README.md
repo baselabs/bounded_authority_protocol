@@ -218,7 +218,8 @@ chain, anchor, transition, export, attestation, and content-assertion facts carr
 Contract-majors retain their `V1`, `V2`, or `V3` namespace; sibling facts use
 `RoleAttestation.V1` and `ContentAssertion.V1`. `MarshalJSON`, `MarshalText`, and `GobEncode`
 return `ErrInvalid` without encoded field values. Read individual values through named accessor
-methods, for example `facts.GrantID()` and `facts.Operation()`. Facts store their values behind
+methods, for example `facts.GrantID()` and `facts.Operation()`. Anchor facts expose the
+authenticated `ChainHash()` and `KeyFingerprint()` digests as 32-byte values. Facts store their values behind
 an unexported closure; slice accessors return copies. A zero value has zero-valued accessors.
 
 All formatting verbs, flags, pointer forms, and nested containers preserve redaction. Go's

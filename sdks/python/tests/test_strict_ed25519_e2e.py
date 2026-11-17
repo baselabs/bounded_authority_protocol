@@ -184,7 +184,9 @@ def test_check_envelope_rejects_identity_holder_key_forgery_with_positive_contro
     assert not result.is_ok, "a proof forged under the identity holder key must be rejected"
 
 
-def test_check_envelope_rejects_identity_holder_key_forgery_second_major_with_positive_control() -> None:
+def test_check_envelope_rejects_identity_holder_key_forgery_second_major_with_positive_control() -> (
+    None
+):
     holder_pub, holder_priv = _real_key()
     grant, proof, issuer_pub = _envelope_with_holder_signature(v2, 2, holder_pub, holder_priv.sign)
     control = v2.check_envelope(grant, proof, _expected_request(v2, issuer_pub))
@@ -222,7 +224,10 @@ def _ra_payload(subject_key: bytes) -> dict:
 def _ra_expected(attestor_key: bytes, subject_key: bytes):
     return v1_ra.ExpectedAttestation(
         attestor=v1_ra.TrustedAttestor(
-            key_id=ATTESTOR_KID, public_key=attestor_key, valid_from=1735689000, valid_before=1735694000
+            key_id=ATTESTOR_KID,
+            public_key=attestor_key,
+            valid_from=1735689000,
+            valid_before=1735694000,
         ),
         subject_key_id="subject-key-1",
         subject_public_key=subject_key,
@@ -250,8 +255,13 @@ def test_role_attestation_refuses_a_weak_subject_key_in_payload_and_in_the_produ
         assert not v1_ra.decode_attestation(compact).is_ok, weak.hex()
         assert not v1_ra.verify_attestation(compact, _ra_expected(attestor_pub, weak)).is_ok
         producer = v1_ra.AttestationProducer(
-            attestor_key_id=ATTESTOR_KID, jti="urn:example:attestation:ra-1", key_id="subject-key-1",
-            public_key=weak, role="issuer", nbf=1735689600, exp=1735693200,
+            attestor_key_id=ATTESTOR_KID,
+            jti="urn:example:attestation:ra-1",
+            key_id="subject-key-1",
+            public_key=weak,
+            role="issuer",
+            nbf=1735689600,
+            exp=1735693200,
         )
         assert not v1_ra.attestation_signing_input(producer).is_ok
 
@@ -260,8 +270,13 @@ def test_role_attestation_refuses_a_weak_subject_key_in_payload_and_in_the_produ
     compact = _compact(header, payload, attestor_priv.sign(_signing_input(header, payload)))
     assert v1_ra.decode_attestation(compact).is_ok, "positive control: a real subject key decodes"
     producer = v1_ra.AttestationProducer(
-        attestor_key_id=ATTESTOR_KID, jti="urn:example:attestation:ra-1", key_id="subject-key-1",
-        public_key=good_pub, role="issuer", nbf=1735689600, exp=1735693200,
+        attestor_key_id=ATTESTOR_KID,
+        jti="urn:example:attestation:ra-1",
+        key_id="subject-key-1",
+        public_key=good_pub,
+        role="issuer",
+        nbf=1735689600,
+        exp=1735693200,
     )
     assert v1_ra.attestation_signing_input(producer).is_ok
 
@@ -305,4 +320,6 @@ def test_verify_grant_rejects_a_scalar_above_the_group_order() -> None:
     malleated = signature[:32] + (s + ref.L).to_bytes(32, "little")
     trusted = v1.TrustedIssuer(key_id="issuer", public_key=issuer_pub)
     assert v1.verify_grant(_compact(header, payload, signature), trusted, _expected_grant(v1)).is_ok
-    assert not v1.verify_grant(_compact(header, payload, malleated), trusted, _expected_grant(v1)).is_ok
+    assert not v1.verify_grant(
+        _compact(header, payload, malleated), trusted, _expected_grant(v1)
+    ).is_ok

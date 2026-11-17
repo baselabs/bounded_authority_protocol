@@ -73,4 +73,37 @@ defmodule BoundedAuthorityProtocol.Conformance.VerdictDigestsTest do
       )
     end
   end
+
+  test "computed content outcomes fail closed on missing content and malformed context" do
+    root = "priv/conformance/attestation-profiles/content-assertion/v1"
+
+    files =
+      Map.new(Path.wildcard("#{root}/**/*") |> Enum.filter(&File.regular?/1), fn path ->
+        {Path.relative_to(path, root), File.read!(path)}
+      end)
+
+    {:ok, corpus} = Corpus.load_any(files)
+
+    cases = [
+      %{
+        "id" => "missing-content",
+        "kind" => "digest",
+        "input" => %{"content_file" => "missing.raw"}
+      },
+      %{"id" => "malformed-limits", "kind" => "assertion", "bounds" => false},
+      %{
+        "id" => "malformed-context",
+        "kind" => "assertion",
+        "expected_overrides" => false
+      }
+    ]
+
+    assert Runner.computed(%{corpus | cases: [{"malformed.json", cases}]}) == [
+             {"missing-content", "malformed.json", %{"verdict" => "invalid"}},
+             {"malformed-limits", "malformed.json",
+              %{"decode" => "invalid", "verify" => "invalid"}},
+             {"malformed-context", "malformed.json",
+              %{"decode" => "invalid", "verify" => "invalid"}}
+           ]
+  end
 end

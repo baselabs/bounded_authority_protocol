@@ -1,4 +1,3 @@
-
 import base64
 import hashlib
 import json
@@ -54,7 +53,8 @@ def test_attestation_tightened_size_bounds(surface: str, ceiling: str) -> None:
     root = _corpus_root()
     profile = json.loads((root / "profile.json").read_text())
     case = next(
-        case for case in json.loads((root / "attestation-cases.json").read_text())
+        case
+        for case in json.loads((root / "attestation-cases.json").read_text())
         if case["id"] == "issuer-valid"
     )
     compact = case["compact"].encode()
@@ -106,7 +106,9 @@ def test_attestation_tightened_size_bounds(surface: str, ceiling: str) -> None:
         if surface == "produce":
             result = attestation_signing_input(producer, bounds)
         elif surface == "assemble":
-            result = assemble_attestation_compact(signing_input, _b64url(signature.decode()), bounds)
+            result = assemble_attestation_compact(
+                signing_input, _b64url(signature.decode()), bounds
+            )
         elif surface == "decode":
             result = decode_attestation(compact, bounds)
         else:
@@ -116,7 +118,8 @@ def test_attestation_tightened_size_bounds(surface: str, ceiling: str) -> None:
 
 def _corpus_root() -> Path:
     return (
-        Path(__file__).resolve().parents[1] / "conformance"
+        Path(__file__).resolve().parents[1]
+        / "conformance"
         / "priv/conformance/attestation-profiles/role-attestation/v1"
     )
 
@@ -172,12 +175,12 @@ def _signed_attestation(
         payload.update(payload_overrides)
     signing_input = SigningInput(
         kind="role_attestation",
-        protected_segment=_unwrap(base64url_encode(
-            json.dumps(header, separators=(",", ":"), sort_keys=True).encode()
-        )),
-        payload_segment=_unwrap(base64url_encode(
-            json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
-        )),
+        protected_segment=_unwrap(
+            base64url_encode(json.dumps(header, separators=(",", ":"), sort_keys=True).encode())
+        ),
+        payload_segment=_unwrap(
+            base64url_encode(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode())
+        ),
     )
     signature = attestor_private.sign(_signing_message(signing_input))
     compact = _signing_message(signing_input) + b"." + _unwrap(base64url_encode(signature))
@@ -204,9 +207,7 @@ def _apply_overrides(
     if "now" in overrides:
         expected = replace(expected, now=overrides["now"])
     if "subject_public_key" in overrides:
-        expected = replace(
-            expected, subject_public_key=_b64url(overrides["subject_public_key"])
-        )
+        expected = replace(expected, subject_public_key=_b64url(overrides["subject_public_key"]))
     if "subject_key_id" in overrides:
         expected = replace(expected, subject_key_id=overrides["subject_key_id"])
     if "attestor_public_key" in overrides:
@@ -251,8 +252,14 @@ def test_certified_role_attestation_corpus_drives_python_verdicts() -> None:
     for case in cases:
         compact = case["compact"].encode()
         case_expected = _apply_overrides(expected, case.get("expected_overrides", {}))
-        execution.record(case["id"], {"decode": decode_attestation(compact).is_ok,
-                                      "verify": verify_attestation(compact, case_expected).is_ok}, "attestation-cases.json")
+        execution.record(
+            case["id"],
+            {
+                "decode": decode_attestation(compact).is_ok,
+                "verify": verify_attestation(compact, case_expected).is_ok,
+            },
+            "attestation-cases.json",
+        )
         assert decode_attestation(compact).is_ok == case["decode"], case["id"]
         assert verify_attestation(compact, case_expected).is_ok == case["verify"], case["id"]
         # Cross-profile rejection, this direction: the v1 grant decoder accepts ONLY the case the
@@ -542,9 +549,7 @@ def test_attestation_unknown_bound_fails_closed_across_all_surfaces() -> None:
     assert not attestation_signing_input(producer, malformed_bounds).is_ok
     assert not assemble_attestation_compact(signing_input, signature, malformed_bounds).is_ok
     assert not decode_attestation(compact, malformed_bounds).is_ok
-    assert not verify_attestation(
-        compact, replace(expected, bounds=malformed_bounds)
-    ).is_ok
+    assert not verify_attestation(compact, replace(expected, bounds=malformed_bounds)).is_ok
 
 
 def test_attestation_base64url_decoded_size_projection() -> None:

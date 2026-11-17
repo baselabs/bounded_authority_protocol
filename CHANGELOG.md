@@ -6,6 +6,13 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Reserve `mix quality`'s in-VM test task for the complete seeded coverage suite; run
+  focused corpus tests in separate VMs and guard the recursive alias tree.
+- Restore input-derived SDK fact assertions for all three contract-majors, including Go
+  anchor hash and key-fingerprint accessors. Report corpus ID errors on the active Go subtest.
+- Apply the configured Python formatter across the SDK without changing protocol behavior.
+- Reject unproven SDK parent-path strings and traversal APIs, with exact local exceptions
+  and mutation controls for boundary escapes, wrong facts, and duplicate subtest execution.
 - Make Python, Rust, and Go SDK roots self-contained with whole Hex corpus snapshots. Package
   tests exercise copied-alone roots, unpacked Python sdists and Rust crates, and Go module zips;
   Python wheels remain runtime-only.

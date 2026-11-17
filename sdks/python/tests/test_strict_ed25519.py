@@ -424,7 +424,9 @@ def test_unchecked_thumbprint_is_a_pure_hash_available_for_weak_keys() -> None:
             sort_keys=True,
         ).encode()
         assert _unwrap(thumbprint_digest_unchecked(raw)) == hashlib.sha256(preimage).digest()
-    assert _unwrap(thumbprint_digest_unchecked(honest)) == _unwrap(public_key_thumbprint_raw(honest))
+    assert _unwrap(thumbprint_digest_unchecked(honest)) == _unwrap(
+        public_key_thumbprint_raw(honest)
+    )
     assert isinstance(thumbprint_digest_unchecked(honest[:31]), Err)
 
 
@@ -443,9 +445,12 @@ def test_thumbprint_digest_unchecked_is_never_called_from_src() -> None:
         }
         for node in ast.walk(tree):
             name = (
-                node.id if isinstance(node, ast.Name)
-                else node.attr if isinstance(node, ast.Attribute)
-                else node.name if isinstance(node, ast.alias)
+                node.id
+                if isinstance(node, ast.Name)
+                else node.attr
+                if isinstance(node, ast.Attribute)
+                else node.name
+                if isinstance(node, ast.alias)
                 else None
             )
             if name == "thumbprint_digest_unchecked":

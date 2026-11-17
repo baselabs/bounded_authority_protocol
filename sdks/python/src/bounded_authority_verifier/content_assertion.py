@@ -419,7 +419,9 @@ def verify_assertion(
         if not nbf <= expected.now < exp:
             _fail("content assertion: current window")
         fingerprint = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(attestor.public_key))))
-        key = _import_public_key(attestor.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(fingerprint)))))
+        key = _import_public_key(
+            attestor.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(fingerprint))))
+        )
         if not _ed25519_verify(segments.signing_input, segments.signature, key):
             _fail("content assertion: signature")
         return ContentAssertionFacts(

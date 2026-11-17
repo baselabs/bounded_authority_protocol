@@ -34,8 +34,9 @@ def _b64(raw: bytes) -> str:
 def _compact(major: int, selector_text: str) -> bytes:
     """A grant compact whose single selector is spliced in as raw JSON text, so the number
     LEXEME is exactly the one under test. decode_grant does not verify the signature."""
-    header = json.dumps({"alg": _ALG[major], "kid": "issuer", "typ": "ba+cap"},
-                        separators=(",", ":")).encode()
+    header = json.dumps(
+        {"alg": _ALG[major], "kid": "issuer", "typ": "ba+cap"}, separators=(",", ":")
+    ).encode()
     payload = (
         '{"aud":["https://resource.example.test"],"cnf":{"jkt":"' + _JKT + '"},'
         '"exp":2000,"iat":1000,"iss":"https://issuer.example.test",'
@@ -124,7 +125,9 @@ def test_decode_accepts_float_zero_range_bound(major: int, kind: str, spelling: 
 
 @pytest.mark.parametrize("major", [2, 3])
 @pytest.mark.parametrize(("bound", "target"), [(0.0, -0.0), (-0.0, 0.0)])
-def test_range_comparison_treats_signed_zeros_as_equal(major: int, bound: float, target: float) -> None:
+def test_range_comparison_treats_signed_zeros_as_equal(
+    major: int, bound: float, target: float
+) -> None:
     mod = _MAJORS[major]
     args = JObject({"x": JFloat(target)})
     assert _unwrap(mod.selector_matches(mod.SelLte(("x",), JFloat(bound)), args))
@@ -137,9 +140,14 @@ def test_range_comparison_treats_signed_zeros_as_equal(major: int, bound: float,
 def _signs(major: int, selector: object) -> bool:
     mod = _MAJORS[major]
     producer = mod.GrantProducer(
-        key_id="issuer", issuer="https://issuer.example.test",
-        grant_id="urn:example:grant:float-zero", audiences=("https://resource.example.test",),
-        issued_at=1000, not_before=1000, expires_at=2000, holder_thumbprint=_JKT,
+        key_id="issuer",
+        issuer="https://issuer.example.test",
+        grant_id="urn:example:grant:float-zero",
+        audiences=("https://resource.example.test",),
+        issued_at=1000,
+        not_before=1000,
+        expires_at=2000,
+        holder_thumbprint=_JKT,
         operations=(mod.OperationInput(name="transfer", selectors=(selector,)),),
     )
     try:
@@ -207,5 +215,7 @@ def test_producer_signs_integers_and_nonintegral_floats(major: int, selector: ob
 @pytest.mark.parametrize("major", [2, 3])
 @pytest.mark.parametrize("kind", ["lte", "gte"])
 @pytest.mark.parametrize("bound", [JFloat(0.5), JFloat(-2.25), JInt(0), JInt(10)])
-def test_producer_signs_integer_and_nonintegral_range_bounds(major: int, kind: str, bound: Tagged) -> None:
+def test_producer_signs_integer_and_nonintegral_range_bounds(
+    major: int, kind: str, bound: Tagged
+) -> None:
     assert _signs(major, {"kind": kind, "path": ("x",), "value": bound})

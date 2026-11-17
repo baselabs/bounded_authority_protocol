@@ -393,7 +393,7 @@ def _lexeme_magnitude_within(text: str, maximum: int) -> bool:
             break
     if e_pos != -1:
         mantissa = unsigned[:e_pos]
-        exponent = int(unsigned[e_pos + 1:])
+        exponent = int(unsigned[e_pos + 1 :])
     else:
         mantissa = unsigned
         exponent = 0
@@ -551,7 +551,9 @@ def _normalize_tagged(value: object, bounds: Bounds = MAXIMUM_BOUNDS) -> Tagged:
     def walk(node: object, level: int) -> Tagged:
         nonlocal nodes
         nodes += 1
-        if level > _unwrap(bounds_resolve(b, "depth")) or nodes > _unwrap(bounds_resolve(b, "total_nodes")):
+        if level > _unwrap(bounds_resolve(b, "depth")) or nodes > _unwrap(
+            bounds_resolve(b, "total_nodes")
+        ):
             _fail()
         if type(node) is JNull:
             return JNull()
@@ -575,7 +577,11 @@ def _normalize_tagged(value: object, bounds: Bounds = MAXIMUM_BOUNDS) -> Tagged:
             if not issubclass(type(member), float):
                 _fail()
             member = float.__float__(cast(float, member))
-            if not (-_unwrap(bounds_resolve(b, "float_magnitude")) <= member <= _unwrap(bounds_resolve(b, "float_magnitude"))):
+            if not (
+                -_unwrap(bounds_resolve(b, "float_magnitude"))
+                <= member
+                <= _unwrap(bounds_resolve(b, "float_magnitude"))
+            ):
                 _fail()
             return JFloat(float.__float__(member))
         if isinstance(node, JString):
@@ -588,14 +594,18 @@ def _normalize_tagged(value: object, bounds: Bounds = MAXIMUM_BOUNDS) -> Tagged:
             if not issubclass(type(member), (list, tuple)):
                 _fail()
             member = _sequence(cast(list[Tagged] | tuple[Tagged, ...], member))
-            if len(member) > _unwrap(bounds_resolve(b, "array_items")) or level >= _unwrap(bounds_resolve(b, "depth")):
+            if len(member) > _unwrap(bounds_resolve(b, "array_items")) or level >= _unwrap(
+                bounds_resolve(b, "depth")
+            ):
                 _fail()
             return JArray(tuple(walk(child, level + 1) for child in member))
         if isinstance(node, JObject):
             if not issubclass(type(member), dict):
                 _fail()
             member = dict.copy(cast(dict[str, Tagged], member))
-            if len(member) > _unwrap(bounds_resolve(b, "object_members")) or level >= _unwrap(bounds_resolve(b, "depth")):
+            if len(member) > _unwrap(bounds_resolve(b, "object_members")) or level >= _unwrap(
+                bounds_resolve(b, "depth")
+            ):
                 _fail()
             out = {}
             for key, child in member.items():

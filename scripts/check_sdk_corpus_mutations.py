@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove the native Rust and Go corpus gates fail closed in isolated SDK trees."""
+"""Prove SDK corpus gates and value-bearing facts fail closed in isolated trees."""
 from __future__ import annotations
 
 import argparse
@@ -19,17 +19,91 @@ def invoke(argv, root, env, red=None):
     else:
         assert result.returncode != 0 and red in result.stdout, result.stdout
         print(f'RED {root.name}: {red}', flush=True)
+    return result.stdout
+
+
+def fact_mutations(sdk, root, env):
+    """Change an SDK fact, without changing the case, verdict, or runner."""
+    if sdk == 'python':
+        source = ROOT / 'sdks/python'
+        invoke(['uv', 'sync', '--locked'], source, env)
+        python = str(source / '.venv/bin/python')
+        env = {**env, 'PYTHONPATH': str(root / 'src'), 'PYTHONDONTWRITEBYTECODE': '1'}
+        path = root / 'src/bounded_authority_verifier/facts.py'
+        original = path.read_text()
+        mutated = original.replace('return self._row_count', 'return self._row_count + 1', 1)
+        runners = [[python, f'tests/conformance/{name}.py'] for name in ['run', 'run_v2', 'run_v3']]
+        message = 'check_chain: row_count fact'
+    elif sdk == 'go':
+        path = root / 'accessors.go'
+        original = path.read_text()
+        mutated = original.replace('return facts.data().RowCount', 'return facts.data().RowCount + 1', 1)
+        runners = [['go', 'test', './conformance', '-run', f'^{name}$', '-count=1'] for name in ['TestConformance', 'TestEcdsaConformance']]
+        message = 'check_chain fact mismatch'
+    else:
+        for major in [1, 2, 3]:
+            path = root / f'src/v{major}.rs'
+            original = path.read_text()
+            anchor = 'row_count: parsed.len() as i64,'
+            assert original.count(anchor) == 1
+            argv = ['cargo', 'test', '--locked', '--test', 'conformance' + (f'_v{major}' if major > 1 else '')]
+            invoke(argv, root, env)
+            try:
+                path.write_text(original.replace(anchor, 'row_count: parsed.len() as i64 + 1,'))
+                invoke(argv, root, env, 'row_count fact')
+            finally:
+                path.write_text(original)
+            invoke(argv, root, env)
+            print(f'GREEN rust: restored v{major} row_count fact', flush=True)
+        return
+    assert mutated != original, f'{sdk}: fact mutation anchor absent'
+    for argv in runners:
+        invoke(argv, root, env)
+        try:
+            path.write_text(mutated)
+            invoke(argv, root, env, message)
+        finally:
+            path.write_text(original)
+        invoke(argv, root, env)
+        print(f'GREEN {sdk}: restored row_count fact ({argv})', flush=True)
+
+
+def go_subtest_mutations(root, env):
+    for name, anchor, call, test in [
+        ('run_test.go', 'execution.Record(t, c.ID, lf.path, c.Actual)', 'execution.Record(t, c.ID, lf.path, c.Actual)', 'TestConformance'),
+        ('strict_test.go', 'execution.Record(t, ref.head.ID, ref.file, ref.Actual)', 'execution.Record(t, ref.head.ID, ref.file, ref.Actual)', 'TestStrictEd25519Corpus'),
+    ]:
+        path = root / 'conformance' / name
+        original = path.read_text()
+        assert original.count(anchor) == 1
+        argv = ['go', 'test', './conformance', '-run', f'^{test}$', '-count=1']
+        try:
+            path.write_text(original.replace(anchor, anchor + '; ' + call))
+            output = invoke(argv, root, env, 'duplicate executed ID')
+            assert f'--- FAIL: {test}/' in output, output
+            assert 'subtest may have called FailNow on a parent test' not in output, output
+            print(f'RED go: {test} duplicate fails on the active subtest', flush=True)
+        finally:
+            path.write_text(original)
+        invoke(argv, root, env)
+        print(f'GREEN go: restored {test} duplicate control', flush=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('sdk', choices=['rust', 'go'])
+    parser.add_argument('sdk', choices=['rust', 'go', 'python'])
     sdk = parser.parse_args().sdk
     with tempfile.TemporaryDirectory(prefix='bap-native-corpus-mutations-') as directory:
         temp = Path(directory)
         root = temp / sdk
-        shutil.copytree(ROOT / 'sdks' / sdk, root, ignore=shutil.ignore_patterns('target', '.venv', '__pycache__'))
+        shutil.copytree(ROOT / 'sdks' / sdk, root, ignore=shutil.ignore_patterns('target', '.venv', '__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache'))
         env = {**os.environ, 'CARGO_TARGET_DIR': str(temp / 'target')}
+        fact_mutations(sdk, root, env)
+        if sdk == 'python':
+            print('python: fact mutations: PASS', flush=True)
+            return
+        if sdk == 'go':
+            go_subtest_mutations(root, env)
         argv = ['cargo', 'test', '--locked', '--test', 'conformance'] if sdk == 'rust' else ['go', 'test', './conformance', '-run', '^TestConformance$', '-count=1']
         invoke(argv, root, env)
         corpus = root / 'conformance/priv/conformance/v1/corpus'

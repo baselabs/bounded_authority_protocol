@@ -150,7 +150,9 @@ def _probe_assembly_kind(module: types.ModuleType) -> bool:
         protected_segment=signing.value.protected_segment,
         payload_segment=signing.value.payload_segment,
     )
-    return not module.assemble_content_assertion_compact(wrong_kind, _gate_passing_signature()).is_ok
+    return not module.assemble_content_assertion_compact(
+        wrong_kind, _gate_passing_signature()
+    ).is_ok
 
 
 def _probe_decoded_segment(module: types.ModuleType) -> bool:
@@ -203,7 +205,9 @@ def _probe_markers(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return (
         not module.verify_successor(
-            _replace_facts(predecessor, verification="not_evaluated"), successor, _unwrap(bounds_maximum())
+            _replace_facts(predecessor, verification="not_evaluated"),
+            successor,
+            _unwrap(bounds_maximum()),
         ).is_ok
         and not module.verify_successor(
             predecessor, _replace_facts(successor, trust="evaluated"), _unwrap(bounds_maximum())
@@ -214,7 +218,9 @@ def _probe_markers(module: types.ModuleType) -> bool:
 def _probe_context(module: types.ModuleType) -> bool:
     predecessor, successor = _valid_successor_pair(module)
     return not module.verify_successor(
-        predecessor, _replace_facts(successor, iss="urn:example:issuer:other"), _unwrap(bounds_maximum())
+        predecessor,
+        _replace_facts(successor, iss="urn:example:issuer:other"),
+        _unwrap(bounds_maximum()),
     ).is_ok
 
 
@@ -348,4 +354,10 @@ def test_content_assertion_guard_mutation_is_killed(
 
 def _replace_facts(facts, **changes):
     import inspect
-    return type(facts)(**{name: changes.get(name, getattr(facts, name)) for name in inspect.signature(type(facts)).parameters})
+
+    return type(facts)(
+        **{
+            name: changes.get(name, getattr(facts, name))
+            for name in inspect.signature(type(facts)).parameters
+        }
+    )

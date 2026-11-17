@@ -326,13 +326,15 @@ func VerifyHistoricalAnchor(compact string, key HistoricalPublicKey, expected Ex
 		return AnchorFacts{}, ErrInvalid
 	}
 	return AnchorFacts{data: privateValue(&anchorFactsData{
-		Version:    1,
-		AnchorID:   claims.AnchorID,
-		ChainID:    claims.ChainID,
-		KeyID:      key.KeyID,
-		Sequence:   claims.Sequence,
-		AnchoredAt: claims.AnchoredAt,
-		Trust:      TrustNotEvaluated,
+		ChainHash:      claims.ChainHash,
+		KeyFingerprint: claims.KeyFingerprint,
+		Version:        1,
+		AnchorID:       claims.AnchorID,
+		ChainID:        claims.ChainID,
+		KeyID:          key.KeyID,
+		Sequence:       claims.Sequence,
+		AnchoredAt:     claims.AnchoredAt,
+		Trust:          TrustNotEvaluated,
 	})}, nil
 }
 

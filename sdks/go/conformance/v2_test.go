@@ -218,20 +218,16 @@ func TestConformance(t *testing.T) {
 			if t.Run(c.ID, func(t *testing.T) {
 				c.Actual = map[string]any{}
 				runCase(t, c)
-				execution.Record(c.ID, lf.path, c.Actual)
+				execution.Record(t, c.ID, lf.path, c.Actual)
 			}) {
 				agreed++ // counts AGREED subtests, not merely executed ones
 			}
 		}
 	}
 	execution.Finish()
-	// Successor-major key census (the v1 runner's census adapted to the v2
-	// corpus shape): the DECLARED census is an index input from the curated
-	// generator, and one curated key emits no case — the case-byte discovery
-	// is a strict subset by design. The two-way equality leg is therefore
-	// curated == index (both directions); the case-byte walk is the
-	// fail-closed subset leg; and every key a VALID verification-surface
-	// case declares must be imported at the SDK verify boundary.
+	// Case-input discovery must be a subset of the index's declared keys;
+	// every valid verification case's key must reach the SDK import boundary.
+	// Curated/index equality is checked by corpus.generators and its mutation control.
 	declared := idx.PublicKeyFingerprints
 	if !sortedUniqueStrings(declared) {
 		t.Fatalf("census: index public_key_fingerprints not sorted/unique")
@@ -598,6 +594,9 @@ func runCase(t *testing.T, c corpusCase) {
 		})
 		checkVerdict(t, c, err)
 		if err == nil {
+			if got.Version() != 2 || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: verify_grant fact mismatch", c.ID)
+			}
 			c.Actual["grant_id"] = got.GrantID()
 			c.Actual["issuer"] = got.Issuer()
 		}
@@ -633,7 +632,11 @@ func runCase(t *testing.T, c corpusCase) {
 			Nonce:          nonceMode(t, exp),
 		})
 		checkVerdict(t, c, err)
-		_ = got
+		if err == nil {
+			if got.Version() != 2 || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: check_envelope fact mismatch", c.ID)
+			}
+		}
 	case "encode_consumption_entry":
 		got, err := profile.EncodeConsumptionEntry(v.ConsumptionEntry{
 			ChainID:      rawString(t, c.Input, "chain_id"),
@@ -676,6 +679,9 @@ func runCase(t *testing.T, c corpusCase) {
 		checkVerdict(t, c, err)
 		if err == nil {
 			c.Actual["chain_id"] = got.ChainID()
+			if got.ChainID() != rawString(t, c.Input, "chain_id") || got.RowCount() != rawInt(t, c.Input, "row_count") || got.Trust() != v.TrustNotEvaluated {
+				t.Fatalf("case %s: check_chain fact mismatch", c.ID)
+			}
 		}
 	case "verify_historical_anchor":
 		key := subObject(t, c.Input, "key")
@@ -685,6 +691,11 @@ func runCase(t *testing.T, c corpusCase) {
 		checkVerdict(t, c, err)
 		if err == nil {
 			c.Actual["anchor_id"] = got.AnchorID()
+			exp := subObject(t, c.Input, "expected")
+			chainHash, fingerprint := got.ChainHash(), got.KeyFingerprint()
+			if got.AnchorID() != rawString(t, exp, "anchor_id") || got.Sequence() != rawInt(t, exp, "sequence") || v.Base64urlEncode(chainHash[:]) != rawString(t, exp, "chain_hash") || v.Base64urlEncode(fingerprint[:]) != rawString(t, exp, "key_fingerprint") || got.Trust() != v.TrustNotEvaluated {
+				t.Fatalf("case %s: verify_historical_anchor fact mismatch", c.ID)
+			}
 		}
 	case "verify_key_transition":
 		cur := subObject(t, c.Input, "current_key")
@@ -698,6 +709,11 @@ func runCase(t *testing.T, c corpusCase) {
 		checkVerdict(t, c, err)
 		if err == nil {
 			c.Actual["transition_id"] = got.TransitionID()
+			exp := subObject(t, c.Input, "expected")
+			current, nextFingerprint := got.FromFingerprint(), got.ToFingerprint()
+			if got.TransitionID() != rawString(t, exp, "transition_id") || v.Base64urlEncode(current[:]) != rawString(t, exp, "current_key_fingerprint") || v.Base64urlEncode(nextFingerprint[:]) != rawString(t, exp, "next_key_fingerprint") || got.Trust() != v.TrustNotEvaluated {
+				t.Fatalf("case %s: verify_key_transition fact mismatch", c.ID)
+			}
 		}
 	case "encode_anchored_export":
 		input, expected := exportEncodeInput(t, c)
@@ -723,6 +739,9 @@ func runCase(t *testing.T, c corpusCase) {
 		checkVerdict(t, c, err)
 		if err == nil {
 			c.Actual["chain_id"] = got.ChainID()
+			if got.ChainID() != expected.Chain.ChainID || got.RowCount() != expected.Chain.RowCount || got.Trust() != v.TrustNotEvaluated || got.Authorization() != v.AuthorizationNotEvaluated {
+				t.Fatalf("case %s: verify_anchored_export fact mismatch", c.ID)
+			}
 		}
 	default:
 		t.Fatalf("case %s: unknown surface %s", c.ID, c.Surface)

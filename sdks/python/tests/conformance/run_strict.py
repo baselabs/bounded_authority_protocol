@@ -175,7 +175,9 @@ def _b64e(raw: bytes) -> str:
 def _run_loopback(case: dict[str, Any]) -> dict[str, Any]:
     issuer, request = case["issuer"], case["request"]
     expected = ExpectedRequest(
-        trusted_issuer=TrustedIssuer(key_id=issuer["key_id"], public_key=_b64d(issuer["public_key"])),
+        trusted_issuer=TrustedIssuer(
+            key_id=issuer["key_id"], public_key=_b64d(issuer["public_key"])
+        ),
         issuer=issuer["issuer"],
         audience=issuer["audience"],
         method=request["method"],
@@ -192,7 +194,9 @@ def _run_loopback(case: dict[str, Any]) -> dict[str, Any]:
     return {
         "decode_local": decode_local_loopback_http_proof(compact).is_ok,
         "decode_standard": decode_proof(compact).is_ok,
-        "envelope_local": check_local_loopback_http_envelope(case["grant"].encode(), compact, expected).is_ok,
+        "envelope_local": check_local_loopback_http_envelope(
+            case["grant"].encode(), compact, expected
+        ).is_ok,
     }
 
 
@@ -210,8 +214,10 @@ def _run_ra1(case: dict[str, Any]) -> dict[str, Any]:
         now=case["now"],
     )
     compact = case["compact"].encode()
-    return {"decode": decode_attestation(compact).is_ok,
-            "verify": verify_attestation(compact, expected).is_ok}
+    return {
+        "decode": decode_attestation(compact).is_ok,
+        "verify": verify_attestation(compact, expected).is_ok,
+    }
 
 
 def _run_ca1(case: dict[str, Any]) -> dict[str, Any]:
@@ -233,8 +239,10 @@ def _run_ca1(case: dict[str, Any]) -> dict[str, Any]:
         bounds=_unwrap(bounds_maximum()),
     )
     compact = case["compact"].encode()
-    return {"decode": "valid" if decode_assertion(compact).is_ok else "invalid",
-            "verify": "valid" if verify_assertion(compact, expected).is_ok else "invalid"}
+    return {
+        "decode": "valid" if decode_assertion(compact).is_ok else "invalid",
+        "verify": "valid" if verify_assertion(compact, expected).is_ok else "invalid",
+    }
 
 
 def run_case(case: dict[str, Any]) -> dict[str, Any]:

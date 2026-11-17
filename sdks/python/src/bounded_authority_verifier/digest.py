@@ -53,7 +53,6 @@ def typed_project(value: Tagged) -> Result[Tagged]:
         return err()
 
 
-
 def _typed_project(value: Tagged) -> Tagged:
     if isinstance(value, JNull):
         return JArray((JString(_unwrap(str_utf8("null"))),))
@@ -66,14 +65,18 @@ def _typed_project(value: Tagged) -> Tagged:
     if isinstance(value, JString):
         return JArray((JString(_unwrap(str_utf8("string"))), JString(value.v)))
     if isinstance(value, JArray):
-        return JArray((JString(_unwrap(str_utf8("array"))), JArray(tuple(_typed_project(i) for i in value.v))))
+        return JArray(
+            (JString(_unwrap(str_utf8("array"))), JArray(tuple(_typed_project(i) for i in value.v)))
+        )
     if isinstance(value, JObject):
         out = {k: _typed_project(v) for k, v in value.v.items()}
         return JArray((JString(_unwrap(str_utf8("object"))), JObject(out)))
     raise _invalid_error("typed: unknown tag")  # unreachable — the algebra is closed
 
 
-def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
+def request_digest(
+    operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS
+) -> Result[bytes]:
     """``request_digest(operation, cast_arguments, bounds?)``. Returns the raw 32-byte digest.
 
     ``operation`` is validated printable ASCII 1..128.
@@ -86,7 +89,9 @@ def request_digest(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXI
         return err()
 
 
-def request_digest_v2(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
+def request_digest_v2(
+    operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS
+) -> Result[bytes]:
     """The v2-profile request digest (BAP2-REQUEST\\0 separator, identical projection + bounds)."""
     try:
         operation = _text(operation)
@@ -132,9 +137,9 @@ def _within_tagged_bounds(v: Tagged, level: int, bounds: Bounds) -> bool:
     if isinstance(v, (JNull, JBool)):
         return level <= _unwrap(bounds_resolve(bounds, "depth"))
     if isinstance(v, JInt):
-        return level <= _unwrap(bounds_resolve(bounds, "depth")) and abs(v.v) <= _unwrap(bounds_resolve(
-            bounds, "integer_magnitude"
-        ))
+        return level <= _unwrap(bounds_resolve(bounds, "depth")) and abs(v.v) <= _unwrap(
+            bounds_resolve(bounds, "integer_magnitude")
+        )
     if isinstance(v, JFloat):
         return (
             level <= _unwrap(bounds_resolve(bounds, "depth"))
@@ -143,9 +148,9 @@ def _within_tagged_bounds(v: Tagged, level: int, bounds: Bounds) -> bool:
             and abs(v.v) <= _unwrap(bounds_resolve(bounds, "float_magnitude"))
         )
     if isinstance(v, JString):
-        return level <= _unwrap(bounds_resolve(bounds, "depth")) and len(v.v) <= _unwrap(bounds_resolve(
-            bounds, "string_bytes"
-        ))
+        return level <= _unwrap(bounds_resolve(bounds, "depth")) and len(v.v) <= _unwrap(
+            bounds_resolve(bounds, "string_bytes")
+        )
     if isinstance(v, JArray):
         return (
             level < _unwrap(bounds_resolve(bounds, "depth"))
@@ -170,7 +175,9 @@ def _count_tagged_nodes(v: Tagged) -> int:
     return 1
 
 
-def request_digest_b64url(operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[str]:
+def request_digest_b64url(
+    operation: str, cast_arguments: Tagged, bounds: Bounds = MAXIMUM_BOUNDS
+) -> Result[str]:
     """base64url-encoded form (for comparison against proof.ba_req which is base64url).
 
     Returns Ok<str> | Err (cross-vendor #21 + the bounds-ignored note: bounds threaded into the digest).

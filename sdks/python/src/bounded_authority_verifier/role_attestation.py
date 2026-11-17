@@ -88,7 +88,7 @@ class AttestationProducer:
     jti: str
     key_id: str
     public_key: bytes  # raw 32
-    role: str          # "issuer" | "holder"
+    role: str  # "issuer" | "holder"
     nbf: int
     exp: int
 
@@ -165,7 +165,7 @@ def _is_string_or_uri(s: str) -> bool:
         return False
     if s.count("#") > 1:
         return False
-    rest = s[colon + 1:]
+    rest = s[colon + 1 :]
     if not rest.startswith("//"):
         # RFC 3986 §§3.2.2-3.3 reserves raw brackets for an IP-literal authority host. Percent-encoded
         # brackets remain ordinary URI bytes, and colon-free plain strings use the branch above.
@@ -183,7 +183,7 @@ def _is_string_or_uri(s: str) -> bool:
 def _valid_uri_authority(authority: str) -> bool:
     at = authority.find("@")
     userinfo = "" if at == -1 else authority[:at]
-    hostport = authority if at == -1 else authority[at + 1:]
+    hostport = authority if at == -1 else authority[at + 1 :]
     if "@" in hostport or "[" in userinfo or "]" in userinfo:
         return False  # a second @ lands in the host — invalid.
     if hostport.startswith("["):
@@ -192,14 +192,14 @@ def _valid_uri_authority(authority: str) -> bool:
             return False  # unterminated IPv6 literal.
         if not _is_ipv6(hostport[1:close]):
             return False
-        suffix = hostport[close + 1:]
+        suffix = hostport[close + 1 :]
         return suffix == "" or re.fullmatch(r":\d*", suffix) is not None
     if "[" in hostport or "]" in hostport:
         return False  # stray bracket in host.
     if hostport.count(":") > 1:
         return False  # host/port ambiguity.
     sep = hostport.rfind(":")
-    return sep == -1 or re.fullmatch(r"\d*", hostport[sep + 1:]) is not None
+    return sep == -1 or re.fullmatch(r"\d*", hostport[sep + 1 :]) is not None
 
 
 def _is_ipv6(literal: str) -> bool:
@@ -564,9 +564,7 @@ def _attestation_signing_input_body(
         payload_segment
     ) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")):
         _fail("attestation_signing_input: encoded segment bound")
-    compact_size = (
-        len(protected_segment) + 1 + len(payload_segment) + 1 + _SIGNATURE_SEGMENT_BYTES
-    )
+    compact_size = len(protected_segment) + 1 + len(payload_segment) + 1 + _SIGNATURE_SEGMENT_BYTES
     if compact_size > _unwrap(bounds_resolve(b, "compact_bytes")):
         _fail("attestation_signing_input: compact_bytes")
     if compact_size > _unwrap(bounds_resolve(b, "anchor_bytes")):
@@ -589,9 +587,9 @@ def assemble_attestation_compact(
         b = _coerce_attestation_bounds(bounds)
         if input_.kind != "role_attestation":
             _fail("assemble_attestation_compact: kind")
-        if len(input_.protected_segment) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")) or len(
-            input_.payload_segment
-        ) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")):
+        if len(input_.protected_segment) > _unwrap(
+            bounds_resolve(b, "encoded_segment_bytes")
+        ) or len(input_.payload_segment) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")):
             _fail("assemble_attestation_compact: segment bound")
         assembled = assemble_segments(input_, signature)
         if not isinstance(assembled, Ok):
@@ -654,7 +652,10 @@ def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> A
     magnitude = _unwrap(bounds_resolve(b, "integer_magnitude"))
     # Fail-closed shallow context checks (a malformed context struct is a closed Invalid, never an
     # AttributeError past the Result contract — mirrors the v1 verify_grant pattern).
-    if not isinstance(getattr(attestor, "public_key", None), bytes) or len(attestor.public_key) != 32:
+    if (
+        not isinstance(getattr(attestor, "public_key", None), bytes)
+        or len(attestor.public_key) != 32
+    ):
         _fail("verify_attestation: attestor key width")
     if not isinstance(getattr(attestor, "key_id", None), str):
         _fail("verify_attestation: attestor key id")
@@ -672,9 +673,10 @@ def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> A
         _fail("verify_attestation: attestor valid_before magnitude")
     if not isinstance(getattr(expected, "subject_key_id", None), str):
         _fail("verify_attestation: subject key id")
-    if not isinstance(getattr(expected, "subject_public_key", None), bytes) or len(
-        expected.subject_public_key
-    ) != 32:
+    if (
+        not isinstance(getattr(expected, "subject_public_key", None), bytes)
+        or len(expected.subject_public_key) != 32
+    ):
         _fail("verify_attestation: subject key width")
     if not acceptable_public_key(expected.subject_public_key):
         _fail("verify_attestation: subject key not acceptable")
@@ -692,15 +694,21 @@ def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> A
     #    (REQ-RA1-VERIFY-attestor-signature).
     if kid != attestor.key_id:
         _fail("verify_attestation: kid exact")
-    attestor_fingerprint = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(attestor.public_key))))
-    key = _import_public_key(attestor.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(attestor_fingerprint)))))
+    attestor_fingerprint = _unwrap(
+        thumbprint_raw(_unwrap(jwk_from_public_key(attestor.public_key)))
+    )
+    key = _import_public_key(
+        attestor.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(attestor_fingerprint))))
+    )
     if not _ed25519_verify(seg.signing_input, seg.signature, key):
         _fail("verify_attestation: signature")
     # 3. the payload subject binding equals the expected subject binding (key_id equality + raw
     #    public_key byte-equality) (REQ-RA1-VERIFY-subject-binding).
     key_id = _require_kid_value(p.v.get("key_id"), "key_id", "attestation payload", b)
     subject_key = _require_b64url_n(p.v.get("public_key"), "public_key", 32)
-    if key_id != expected.subject_key_id or not _bytes_equal(subject_key, expected.subject_public_key):
+    if key_id != expected.subject_key_id or not _bytes_equal(
+        subject_key, expected.subject_public_key
+    ):
         _fail("verify_attestation: subject binding")
     # 4. the attestor and the subject are distinct (REQ-RA1-VERIFY-no-self-attestation).
     subject_fingerprint = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(subject_key))))
