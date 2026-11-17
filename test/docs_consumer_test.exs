@@ -71,7 +71,7 @@ defmodule BoundedAuthorityProtocol.DocsConsumerTest do
       File.cp!(Path.join(package, "docs/guides/recipes.md"), Path.join(consumer, "recipes.md"))
 
       File.cp!(
-        Path.join(root, "test/fixtures/docs_consumer/middleware_test.exs"),
+        Path.join(root, "test/fixtures/docs_consumer/middleware_suite.exs"),
         Path.join(consumer, "test/middleware_test.exs")
       )
 

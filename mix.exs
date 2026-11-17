@@ -28,6 +28,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
           "proof-of-possession authority.",
       source_url: @source_url,
       homepage_url: @source_url,
+      # Files under test/fixtures/ belong to generated consumer projects, not this suite.
+      test_ignore_filters: [&String.starts_with?(&1, "test/fixtures/")],
       test_coverage: [
         summary: [threshold: 100],
         ignore_modules: [BoundedAuthorityProtocol.Conformance.Cli.Main]

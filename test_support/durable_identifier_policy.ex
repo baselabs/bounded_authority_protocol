@@ -33,7 +33,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        "test/bounded_authority_protocol/inspect_redaction_test.exs",
                        "test/docs_currency_test.exs",
                        # The documentation consumer invokes the documented contract-major 1 API.
-                       "test/fixtures/docs_consumer/middleware_test.exs",
+                       "test/fixtures/docs_consumer/middleware_suite.exs",
                        "test/spec_facts_test.exs"
                      ])
   @local_loopback_profile_paths MapSet.new([
