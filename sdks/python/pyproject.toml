@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ruff==0.17.5", "mypy==2.4.1", "pytest==9.1.1"]
+dev = ["ruff==0.17.5", "mypy==2.4.1", "pytest==9.2.0"]
 
 [project.urls]
 Homepage = "https://github.com/baselabs/bounded_authority_protocol"
