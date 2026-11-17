@@ -71,3 +71,12 @@ manifest is stale. The manifest is a JCS object without a trailing newline, matc
 corpus JSON convention. Its format is `bap-corpus-verdict-digests/1`; each corpus entry
 binds its index SHA-256, case count, and expected verdict digest. The nine existing index
 pins and all frozen input bytes remain unchanged.
+
+## SDK distribution boundary
+
+Dependency manifests and lockfiles are parsed to reject local dependency paths that resolve
+outside the SDK root. The source traversal scan is an early lint with counted, individually
+reviewed exceptions; it cannot prove what arbitrary executable code will read. The binding
+self-containment guarantee is the copied-alone isolated package run, including the unpacked
+Python sdist, Rust crate, and Go module zip. Every SDK suite must pass with only its own tree
+available. Mutation controls exercise manifest escapes and representative source-lint bypasses.

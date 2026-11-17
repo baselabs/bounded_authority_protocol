@@ -453,7 +453,8 @@ def _valid_envelope():
         operations=(OperationInput(name="read", selectors=("all",)),),
     )
     gsi = grant_signing_input(grant)
-    assert gsi.is_ok
+    if not (gsi.is_ok):
+        raise AssertionError("test support invariant: gsi.is_ok")
     gmsg = f"{gsi.value.protected_segment.decode('ascii')}.{gsi.value.payload_segment.decode('ascii')}".encode(
         "ascii"
     )
@@ -534,7 +535,8 @@ def _must_assemble(si: SigningInput, sig: bytes, es256: bool = False) -> bytes:
     assemble_segments (not the validating façade) so permissiveness cases can build compacts freely
     and then prove the VERIFY path (or the façade) rejects them."""
     c = assemble_segments_es256(si, sig) if es256 else assemble_segments(si, sig)
-    assert c.is_ok, "assemble_segments failed in test helper"
+    if not (c.is_ok):
+        raise AssertionError("assemble_segments failed in test helper")
     return c.value
 
 
@@ -544,7 +546,8 @@ def _b64url(b: bytes) -> str:
 
 def _signed_anchor_compact(anchor: BoundaryAnchorProducer, priv: Ed25519PrivateKey) -> bytes:
     si = boundary_anchor_signing_input(anchor)
-    assert si.is_ok, "anchor signing input failed"
+    if not (si.is_ok):
+        raise AssertionError("anchor signing input failed")
     message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode(
         "ascii"
     )
@@ -571,7 +574,8 @@ def _build_archive(
         chain_id=chain_id, sequence=1, previous_hash=zero_prev, commitment=bytes([7] * 32)
     )
     encoded = encode_consumption_entry(row_entry)
-    assert encoded.is_ok, "row encode failed"
+    if not (encoded.is_ok):
+        raise AssertionError("row encode failed")
     row_bytes = encoded.value.bytes_
     last_hash = _unwrap(sha256(ROW_PREFIX, row_bytes))
     start_pub, start_priv = keys[0]
@@ -605,7 +609,8 @@ def _build_archive(
             next_public_key=nxt_pub,
         )
         si = key_transition_signing_input(tp)
-        assert si.is_ok, "transition signing input failed"
+        if not (si.is_ok):
+            raise AssertionError("transition signing input failed")
         message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode(
             "ascii"
         )
@@ -693,7 +698,8 @@ def _build_archive(
                 object_version="v1",
             ),
         )
-        assert enc.is_ok, "archive encode failed"
+        if not (enc.is_ok):
+            raise AssertionError("archive encode failed")
         archive = enc.value.archive
         digest = enc.value.digest
     else:
@@ -1151,7 +1157,8 @@ def _signed_grant(kid: str = "issuer-123456"):
         operations=(OperationInput(name="read", selectors=("all",)),),
     )
     si = grant_signing_input(grant)
-    assert si.is_ok, "grant signing input failed"
+    if not (si.is_ok):
+        raise AssertionError("grant signing input failed")
     message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode(
         "ascii"
     )
@@ -1180,7 +1187,8 @@ def _signed_proof(grant_compact: bytes, holder_pub: bytes, holder_priv: Ed25519P
         cast_arguments=_NULL_ARGS,
     )
     si = proof_signing_input(proof)
-    assert si.is_ok, "proof signing input failed"
+    if not (si.is_ok):
+        raise AssertionError("proof signing input failed")
     message = f"{si.value.protected_segment.decode('ascii')}.{si.value.payload_segment.decode('ascii')}".encode(
         "ascii"
     )
@@ -1823,7 +1831,8 @@ def _conformant_export():
             chain_id="chain-x", sequence=1, previous_hash=_Z32P, commitment=bytes([5]) * 32
         )
     )
-    assert row_r.is_ok
+    if not (row_r.is_ok):
+        raise AssertionError("test support invariant: row_r.is_ok")
     row, head = row_r.value.bytes_, row_r.value.hash_
     fp_a = _unwrap(public_key_thumbprint_raw(_KEY_A))
     fp_b = _unwrap(public_key_thumbprint_raw(_KEY_B))
@@ -1838,7 +1847,8 @@ def _conformant_export():
             public_key=_KEY_A,
         )
     )
-    assert start_r.is_ok
+    if not (start_r.is_ok):
+        raise AssertionError("test support invariant: start_r.is_ok")
     start = assemble_compact(start_r.value, _SIG64).value
     end_r = boundary_anchor_signing_input(
         BoundaryAnchorProducer(
@@ -1851,7 +1861,8 @@ def _conformant_export():
             public_key=_KEY_B,
         )
     )
-    assert end_r.is_ok
+    if not (end_r.is_ok):
+        raise AssertionError("test support invariant: end_r.is_ok")
     end = assemble_compact(end_r.value, _SIG64).value
     t_r = key_transition_signing_input(
         KeyTransitionProducer(
@@ -1864,7 +1875,8 @@ def _conformant_export():
             next_public_key=_KEY_B,
         )
     )
-    assert t_r.is_ok
+    if not (t_r.is_ok):
+        raise AssertionError("test support invariant: t_r.is_ok")
     t = assemble_compact(t_r.value, _SIG64).value
     chain = ExpectedChain(
         chain_id="chain-x",
@@ -1925,7 +1937,8 @@ def _conformant_export():
 
 def _expect_encode_err(input_, expected):
     r = encode_anchored_export(input_, expected)
-    assert not r.is_ok, "encode must reject"
+    if r.is_ok:
+        raise AssertionError("encode must reject")
 
 
 def test_encode_parity_control_encodes():
@@ -2667,7 +2680,8 @@ def _sweep_valid_args():
             commitment=bytes([7] * 32),
         )
     )
-    assert enc.is_ok
+    if not (enc.is_ok):
+        raise AssertionError("test support invariant: enc.is_ok")
     row, head = enc.value.bytes_, enc.value.hash_
     good_chain = ChainInput(
         rows=(row,),
@@ -3455,7 +3469,8 @@ def _ec_sign_low_s(priv: _ecdsa.EllipticCurvePrivateKey, message: bytes) -> byte
 def _resign_compact(compact: bytes, raw_signature: bytes) -> bytes:
     """Replace the third (signature) segment of a compact with raw 64-byte r||s bytes."""
     parts = compact.split(b".")
-    assert len(parts) == 3
+    if len(parts) != 3:
+        raise AssertionError("test support invariant: len(parts) == 3")
     parts[2] = _b64e(raw_signature)
     return b".".join(parts)
 
@@ -3477,7 +3492,8 @@ def _es256_signed_grant() -> dict[str, object]:
         operations=(v3.OperationInput(name="read", selectors=("all",)),),
     )
     si = v3.grant_signing_input(grant)
-    assert si.is_ok, "v3 grant signing input failed"
+    if not (si.is_ok):
+        raise AssertionError("v3 grant signing input failed")
     message = si.value.protected_segment + b"." + si.value.payload_segment
     compact = _must_assemble(si.value, _ec_sign_low_s(issuer_priv, message), es256=True)
     return {

@@ -107,15 +107,17 @@ SHA-256: contract-major 2 (`priv/conformance/v2/corpus`, 268 cases, index
 |---|---|---|
 | Elixir reference CLI | **268/268 agreed**, 0 disagreed | **292/292 agreed**, 0 disagreed |
 | TypeScript | **268/268 agreed**, census two-way (17 keys) | **292/292 agreed**, census two-way (11 keys) |
-| Python | **268/268 agreed**, discovered keys declared; valid verification keys imported | **292/292 agreed**, discovered keys declared; valid verification keys imported |
+| Python | **268/268 agreed**, census two-way (17 keys) | **292/292 agreed**, census two-way (11 keys) |
 | Rust | **268/268 agreed**, census 17/17 | **292/292 agreed**, census 11/11 |
-| Go | **268/268 agreed**, every discovered key among the 17 declared | **292/292 agreed**, every discovered key among the 11 declared |
+| Go | **268/268 agreed**, census two-way (17 keys) | **292/292 agreed**, census two-way (11 keys) |
 
 `mix corpus.generators` compares the rebuilt indexes, including their curated key fingerprints,
-with the certified indexes; distribution mutations prove that curated-input drift fails. Python
-and Go require every discovered key to be declared and every valid verification case's key to
-reach the SDK import boundary. Rust additionally compares imported keys with declared fingerprints
-in both directions. Each runner asserts its corpus index digest before executing any case.
+with the certified indexes; distribution mutations prove that curated-input drift fails. Every SDK
+compares the input-boundary imported keys with declared fingerprints in both directions, including
+producer-only keys and declared rejected import attempts. Python additionally checks actual
+cryptographic verification imports: every valid verification case's key must reach that boundary,
+and no undeclared key may reach it. Each runner asserts its corpus index digest before executing
+any case.
 
 ### Role-attestation sibling profile
 
@@ -217,7 +219,7 @@ oracle for their verdicts):
    every byte with an actual Hex unpack; runners hash every input and their computed outcomes
    in index order. [Outcome projections](corpus-verdict-digests.md) define the shared digest.
 3. A run reports per-case agreement plus the two-boundary key census
-   (discovered == verify-imported == index fingerprint set); any disagreement, crash, or
+   (input-imported == index fingerprint set, plus valid-case cryptographic imports); any disagreement, crash, or
    census asymmetry fails the run.
 4. Every implementation additionally ships a permissiveness mutation battery: the guard
    families that keep it from being MORE permissive than the reference are each proven

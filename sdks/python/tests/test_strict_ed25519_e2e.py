@@ -135,7 +135,8 @@ def _proof_payload_from_producer(module, grant_compact: bytes, holder_pub: bytes
         cast_arguments=JNull(),
     )
     signing_input = module.proof_signing_input(producer)
-    assert signing_input.is_ok
+    if not (signing_input.is_ok):
+        raise AssertionError("test support invariant: signing_input.is_ok")
     payload_segment = signing_input.value.payload_segment.decode("ascii")
     return json.loads(base64.urlsafe_b64decode(payload_segment + "=" * (-len(payload_segment) % 4)))
 

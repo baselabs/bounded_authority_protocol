@@ -40,6 +40,11 @@ _PROFILE_KINDS = {
 }
 
 
+def require(condition, message):
+    if not condition:
+        raise AssertionError(message)
+
+
 def _load() -> list[dict]:
     integrity(_CORPUS, CERTIFIED_INDEX_SHA256)
     index_bytes = (_CORPUS / "index.json").read_bytes()
@@ -245,5 +250,5 @@ if __name__ == "__main__":
     result = run_all()
     for failure in result["failures"]:
         print(failure)
-    assert result["fail"] == 0, "producer-canonicality disagreements"
+    require(result["fail"] == 0, "producer-canonicality disagreements")
     print(f"producer-canonicality: {result['pass']}/{result['total']} cases agree")

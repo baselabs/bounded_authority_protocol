@@ -81,11 +81,13 @@ def _signed(
     public, private = _keypair()
     producer = producer or _producer(attestor_key_id=key_id)
     signing = assertion_signing_input(producer)
-    assert signing.is_ok
+    if not (signing.is_ok):
+        raise AssertionError("test support invariant: signing.is_ok")
     message = signing.value.protected_segment + b"." + signing.value.payload_segment
     signature = private.sign(message)
     compact = assemble_content_assertion_compact(signing.value, signature)
-    assert compact.is_ok
+    if not (compact.is_ok):
+        raise AssertionError("test support invariant: compact.is_ok")
     expected = ExpectedContentAssertion(
         attestor=HistoricalPublicKey(
             key_id=key_id,
@@ -407,7 +409,8 @@ def _corpus_expected(
 ) -> ExpectedContentAssertion:
     expected = dict(profile["expected"])  # type: ignore[arg-type]
     attestors = profile["attestors"]
-    assert isinstance(attestors, dict)
+    if not (isinstance(attestors, dict)):
+        raise AssertionError("test support invariant: isinstance(attestors, dict)")
     attestor = dict(attestors[attestor_name])
     for key, value in (overrides or {}).items():
         if key.startswith("attestor_"):
@@ -550,7 +553,8 @@ def _verified_corpus_artifact(
         return None
     facts = result.value
     overrides = artifact.get("facts_overrides", {})
-    assert isinstance(overrides, dict)
+    if not (isinstance(overrides, dict)):
+        raise AssertionError("test support invariant: isinstance(overrides, dict)")
     normalized = dict(overrides)
     for key in ("digest", "profile_digest", "content_digest", "prev", "attestor_key_fingerprint"):
         if key in normalized:

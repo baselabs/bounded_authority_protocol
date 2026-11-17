@@ -47,6 +47,11 @@ TOTAL_CASES = 161
 _MAJORS: dict[int, Any] = {1: v1, 2: v2, 3: v3}
 
 
+def require(condition, message):
+    if not condition:
+        raise AssertionError(message)
+
+
 def _load() -> list[dict]:
     integrity(_CORPUS, CERTIFIED_INDEX_SHA256)
     index_bytes = (_CORPUS / "index.json").read_bytes()
@@ -113,7 +118,9 @@ def _operations(mod: Any, operations_json: str) -> tuple[Any, ...]:
         if not isinstance(op, JObject) or not isinstance(op.v.get("selectors"), JArray):
             raise AssertionError("operations_json: operation object")
         selectors = op.v["selectors"]
-        assert isinstance(selectors, JArray)
+        require(
+            isinstance(selectors, JArray), "conformance invariant: isinstance(selectors, JArray)"
+        )
         built.append(
             mod.OperationInput(
                 name=_string(op.v["name"]),

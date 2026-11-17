@@ -6,6 +6,15 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Parse SDK dependency paths in manifests and lockfiles, widen the early source traversal lint,
+  and require each reviewed exception to match exactly one occurrence. Isolated package runs
+  remain the binding self-containment gate.
+- Check Rust strict-profile facts, enforce exact SDK key censuses in every major, and keep Python
+  runner and integrity checks active under optimization. Cover each fact class and undeclared
+  imports with isolated, automatically cleaned mutation controls.
+- Inspect composite quality commands, run scripts, and project-local Mix tasks for hidden
+  in-VM test invocations.
+
 - Reserve `mix quality`'s in-VM test task for the complete seeded coverage suite; run
   focused corpus tests in separate VMs and guard the recursive alias tree.
 - Restore input-derived SDK fact assertions for all three contract-majors, including Go

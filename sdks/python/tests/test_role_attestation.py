@@ -202,8 +202,10 @@ def _apply_overrides(
     expected: ExpectedAttestation, overrides: dict[str, object]
 ) -> ExpectedAttestation:
     keys = set(overrides)
-    assert keys <= _SINGLE_OVERRIDES, overrides
-    assert keys == _PAIR_OVERRIDE or len(keys) <= 1, overrides
+    if not (keys <= _SINGLE_OVERRIDES):
+        raise AssertionError(overrides)
+    if keys != _PAIR_OVERRIDE and len(keys) > 1:
+        raise AssertionError(overrides)
     if "now" in overrides:
         expected = replace(expected, now=overrides["now"])
     if "subject_public_key" in overrides:

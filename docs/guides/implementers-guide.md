@@ -71,20 +71,21 @@ repository's drift gate cross-checks this guide's table against it (see §7).
 
 ## 4. The two-boundary key census
 
-The runner fingerprints key-bearing case inputs at DISCOVERY and records keys actually passed
-to the cryptographic import boundary at VERIFY-IMPORT. It requires every discovered key to be
-declared and every valid verification case's key to reach that boundary:
+The runner fingerprints public keys as case inputs cross its SDK input boundary, including
+producer-only keys and rejected import attempts named by the corpus. The imported set must equal
+`index.public_key_fingerprints` exactly, in both directions. It separately records actual
+cryptographic verification imports:
 
 ```
-discovered ⊆ index.public_key_fingerprints
-valid-verification-case-keys ⊆ verify-imported
+input-imported == index.public_key_fingerprints
+valid-verification-case-keys ⊆ verify-imported ⊆ index.public_key_fingerprints
 ```
 
-An empty valid-verification key set fails. Some runners additionally assert equality with the
-declared set; Python and Go allow unused declared keys in the later contract-majors. Curated
-key inputs are checked against the certified indexes by `mix corpus.generators`, with a
-distribution mutation control proving rejection of drift. These checks catch undeclared case
-keys and a runner that never imports the keys required by its valid verification cases.
+Both an undeclared imported key and a declared key that never crosses the input boundary fail.
+An empty valid-verification key set fails too. The second check prevents a runner from merely
+collecting fixture keys while bypassing cryptographic verification. Curated key inputs are
+also checked against the certified indexes by `mix corpus.generators`; mutation controls prove
+rejection of undeclared imports and curated-input drift.
 
 ## 5. Corpus formats
 

@@ -4,7 +4,7 @@
 Loads the published v3 corpus from ``priv/conformance/v3/corpus/`, recomputes EVERY verdict from
 scratch by calling the v3 SDK façade (``bounded_authority_verifier.v3``), and asserts agreement on
 all 292 cases. Asserts the ``index.json`` SHA-256 at startup (ADR 0014 D4: the SDK binds to the
-exact corpus it was certified against). Runs the two-boundary key census (discovery ⊆ declared,
+exact corpus it was certified against). Runs the two-boundary key census (imported == declared,
 verify-import ⊇ expected-verify-keys) over the ES256 verify boundary.
 
 Corpus integrity beyond the index pin: every raw sidecar's recorded SHA-256 is verified, the
@@ -57,12 +57,14 @@ from bounded_authority_verifier.json_alg import (  # noqa: E402
 )
 from bounded_authority_verifier.uri import uri_normalize  # noqa: E402
 from bounded_authority_verifier.v3 import _imported_fingerprints, _reset_census  # noqa: E402
-from corpus_support import CorpusRun, computed, integrity  # noqa: E402
+from corpus_support import CorpusRun, collect_input_keys, computed, integrity  # noqa: E402
 
 CORPUS_DIR = _CORPUS_ROOT / "priv" / "conformance" / "v3" / "corpus"
 # The certified index.json SHA-256 (ADR 0014 D4). The complete Hex corpus tree
 # is vendored inside this SDK; an input mismatch fails closed (ADR 0049).
 CERTIFIED_INDEX_SHA = "a5c8075e7534345c3bb6611d0b40292904bcfa3af0702e07ae014fa66926433c"
+
+_input_fingerprints: set[str] = set()
 
 INVALID = object()  # sentinel: any genuine protocol rejection maps to this
 
@@ -248,6 +250,13 @@ def _run_thunk(fn):
 
 
 def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
+    collect_input_keys(inp, _input_fingerprints, major=3)
+    if surface.startswith("jwk.") and isinstance(inp.get("text"), str):
+        # Text-form keys cross the input boundary only after JWK decoding succeeds.
+        key = _run_thunk(lambda: _unwrap(v3.jwk_decode_public(_unwrap(str_utf8(inp["text"])))))
+        if key is not INVALID:
+            collect_input_keys({"public_key": _b64e(key)}, _input_fingerprints, major=3)
+
     if surface == "json.decode":
         b = input_bytes(inp, raws, "json.decode")
         v = _run_thunk(lambda: _unwrap(json_decode(b)))
@@ -443,9 +452,12 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         r = _run_thunk(lambda: v3.check_chain(chain, expected))
         if r is INVALID or not r.is_ok:
             return INVALID
-        assert r.value.chain_id == expected.chain_id, "check_chain: chain_id fact"
-        assert r.value.row_count == expected.row_count, "check_chain: row_count fact"
-        assert r.value.trust == "not_evaluated"
+        if r.value.chain_id != expected.chain_id:
+            abort("check_chain: chain_id fact")
+        if r.value.row_count != expected.row_count:
+            abort("check_chain: row_count fact")
+        if r.value.trust != "not_evaluated":
+            abort("conformance invariant: r.value.trust == 'not_evaluated'")
         # The v3 valid verdicts carry fact fields (the v1 corpus carried bare verdicts here).
         return {"chain_id": r.value.chain_id}
     if surface == "request_digest":
@@ -471,8 +483,10 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         )
         if r is INVALID or not r.is_ok:
             return INVALID
-        assert r.value.version == 3, "verify_grant: version fact"
-        assert r.value.authorization == "not_evaluated"
+        if r.value.version != 3:
+            abort("verify_grant: version fact")
+        if r.value.authorization != "not_evaluated":
+            abort("conformance invariant: r.value.authorization == 'not_evaluated'")
         f = r.value
         return {
             "version": f.version,
@@ -500,11 +514,16 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         )
         if r is INVALID or not r.is_ok:
             return INVALID
-        assert r.value.anchor_id == expected.anchor_id, "anchor: anchor_id fact"
-        assert r.value.sequence == expected.sequence, "anchor: sequence fact"
-        assert r.value.chain_hash == expected.chain_hash, "anchor: chain_hash fact"
-        assert r.value.key_fingerprint == expected.key_fingerprint, "anchor: key_fingerprint fact"
-        assert r.value.trust == "not_evaluated"
+        if r.value.anchor_id != expected.anchor_id:
+            abort("anchor: anchor_id fact")
+        if r.value.sequence != expected.sequence:
+            abort("anchor: sequence fact")
+        if r.value.chain_hash != expected.chain_hash:
+            abort("anchor: chain_hash fact")
+        if r.value.key_fingerprint != expected.key_fingerprint:
+            abort("anchor: key_fingerprint fact")
+        if r.value.trust != "not_evaluated":
+            abort("conformance invariant: r.value.trust == 'not_evaluated'")
         return {"anchor_id": r.value.anchor_id}
     if surface == "verify_key_transition":
         current = _build_historical_key(
@@ -524,14 +543,14 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         )
         if r is INVALID or not r.is_ok:
             return INVALID
-        assert r.value.transition_id == expected.transition_id, "transition: transition_id fact"
-        assert r.value.current_key_fingerprint == expected.current_key_fingerprint, (
-            "transition: current fingerprint fact"
-        )
-        assert r.value.next_key_fingerprint == expected.next_key_fingerprint, (
-            "transition: next fingerprint fact"
-        )
-        assert r.value.trust == "not_evaluated"
+        if r.value.transition_id != expected.transition_id:
+            abort("transition: transition_id fact")
+        if r.value.current_key_fingerprint != expected.current_key_fingerprint:
+            abort("transition: current fingerprint fact")
+        if r.value.next_key_fingerprint != expected.next_key_fingerprint:
+            abort("transition: next fingerprint fact")
+        if r.value.trust != "not_evaluated":
+            abort("conformance invariant: r.value.trust == 'not_evaluated'")
         return {"transition_id": r.value.transition_id}
     if surface == "check_envelope":
         expected = inp.get("expected") or {}
@@ -563,8 +582,10 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         )
         if r is INVALID or not r.is_ok:
             return INVALID
-        assert r.value.version == 3, "check_envelope: version fact"
-        assert r.value.authorization == "not_evaluated"
+        if r.value.version != 3:
+            abort("check_envelope: version fact")
+        if r.value.authorization != "not_evaluated":
+            abort("conformance invariant: r.value.authorization == 'not_evaluated'")
         return {}
     if surface == "encode_anchored_export":
         rows = tuple(byte_list(inp, "rows", "encode_anchored_export"))
@@ -615,10 +636,14 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         )
         if r is INVALID or not r.is_ok:
             return INVALID
-        assert r.value.chain_id == expected.chain.chain_id, "export: chain_id fact"
-        assert r.value.row_count == expected.chain.row_count, "export: row_count fact"
-        assert r.value.trust == "not_evaluated"
-        assert r.value.authorization == "not_evaluated"
+        if r.value.chain_id != expected.chain.chain_id:
+            abort("export: chain_id fact")
+        if r.value.row_count != expected.chain.row_count:
+            abort("export: row_count fact")
+        if r.value.trust != "not_evaluated":
+            abort("conformance invariant: r.value.trust == 'not_evaluated'")
+        if r.value.authorization != "not_evaluated":
+            abort("conformance invariant: r.value.authorization == 'not_evaluated'")
         return {"chain_id": r.value.chain_id}
     abort(f"unknown surface: {surface}")
 
@@ -836,12 +861,8 @@ def _canonical_json(v: Any) -> str:
     return str(v)
 
 
-# ---- census: discovery is a subset of the declared index; verify-import covers valid cases ----
+# ---- census: input imports equal the declared index; verify-import covers valid cases ----
 
-_PUBLIC_KEY_LABEL = re.compile(
-    r"public.*key|key.*public|verification.*key|holder.*key|issuer.*key", re.IGNORECASE
-)
-_PUBLIC_KEY_DENY = re.compile(r"fingerprint|thumbprint|digest|hash", re.IGNORECASE)
 _VERIFICATION_SURFACES = frozenset(
     {
         "verify_grant",
@@ -851,45 +872,10 @@ _VERIFICATION_SURFACES = frozenset(
         "verify_anchored_export",
     }
 )
-_RAW_KEY_RE = re.compile(r"^[A-Za-z0-9_-]{87}$")
-
-
-def _is_census_key_label(key: str) -> bool:
-    if _PUBLIC_KEY_DENY.search(key):
-        return False
-    return _PUBLIC_KEY_LABEL.search(key) is not None
-
-
-def _decode_census_raw_key(value: Any) -> bytes | None:
-    if isinstance(value, str) and _RAW_KEY_RE.match(value):
-        b = _b64d(value)
-        return b if len(b) == 65 else None
-    return None
 
 
 def _collect_case_keys(value: Any, target: set[str]) -> None:
-    if isinstance(value, list):
-        for item in value:
-            _collect_case_keys(item, target)
-        return
-    if not isinstance(value, dict):
-        return
-    for key, child in value.items():
-        if _is_census_key_label(key):
-            raw = _decode_census_raw_key(child)
-            if raw is not None:
-                target.add(
-                    _b64e(
-                        _unwrap(
-                            sha256(
-                                _unwrap(
-                                    v3.thumbprint_preimage(_unwrap(v3.jwk_from_public_key(raw)))
-                                )
-                            )
-                        )
-                    )
-                )
-        _collect_case_keys(child, target)
+    collect_input_keys(value, target, major=3)
 
 
 def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
@@ -897,15 +883,14 @@ def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
     declared_sorted = sorted(set(declared))
     if declared != declared_sorted:
         abort("census: index public_key_fingerprints not sorted/unique")
+    imported = set(_input_fingerprints)
     declared_set = set(declared)
-    # The case-byte subset leg: every key embedded in a case input must be declared.
-    discovery: set[str] = set()
-    for c in cases:
-        _collect_case_keys(c["input"], discovery)
-    undeclared = sorted(discovery - declared_set)
-    if undeclared:
-        abort(f"census: case inputs carry undeclared keys\n  undeclared=[{','.join(undeclared)}]")
-    verify_import = sorted(_imported_fingerprints())
+    extra, missing = sorted(imported - declared_set), sorted(declared_set - imported)
+    if extra or missing:
+        abort(f"census: imported != declared; extra={extra}; missing={missing}")
+    verify_import = set(_imported_fingerprints())
+    if verify_import - declared_set:
+        abort(f"census: undeclared verification imports: {sorted(verify_import - declared_set)}")
     expected_verify: set[str] = set()
     for c in cases:
         if c.get("class") == "valid" and c["surface"] in _VERIFICATION_SURFACES:
@@ -1004,6 +989,7 @@ def run_all() -> dict[str, Any]:
     audit_tampers(cases, raws)
     execution = CorpusRun(CORPUS_DIR, CERTIFIED_INDEX_SHA)
     _reset_census()
+    _input_fingerprints.clear()
     passed = 0
     failed = 0
     failures: list[str] = []
@@ -1045,11 +1031,11 @@ def run_census_standalone() -> None:
     )
     fp_count = len(index["public_key_fingerprints"])
     print(
-        f"census: index public_key_fingerprints ({fp_count} keys); discovery ⊆ declared; verify-import ⊇ expected-verify-keys"
+        f"census: index public_key_fingerprints ({fp_count} keys); imported == declared; verify-import ⊇ expected-verify-keys"
     )
     if failed > 0:
         raise SystemExit(1)
-    print("census: PASS (discovery declared; valid verification keys imported)")
+    print("census: PASS (imports equal index; valid verification keys imported)")
 
 
 def main() -> None:
@@ -1061,7 +1047,7 @@ def main() -> None:
     print(f"conformance: {passed}/{total} cases agree")
     fp_count = len(index["public_key_fingerprints"])
     print(
-        f"census: index public_key_fingerprints ({fp_count} keys); discovery ⊆ declared; verify-import ⊇ expected-verify-keys"
+        f"census: index public_key_fingerprints ({fp_count} keys); imported == declared; verify-import ⊇ expected-verify-keys"
     )
     if failed > 0:
         print(f"\n{failed} FAILURE(S):", file=sys.stderr)

@@ -51,6 +51,13 @@ func es256CensusKey(b64 string) {
 	if err != nil {
 		return // never imported at the boundary
 	}
+	// Cross-major cases import Ed25519 bytes; RFC 7638 names those attempts as OKP.
+	if len(raw) == 32 {
+		preimage := []byte(`{"crv":"Ed25519","kty":"OKP","x":"` + v.Base64urlEncode(raw) + `"}`)
+		tp := sha256.Sum256(preimage)
+		es256Census[v.Base64urlEncode(tp[:])] = true
+		return
+	}
 	tp, err := es256Profile.PublicKeyThumbprintRaw(raw, nil)
 	if err != nil {
 		return // rejected before the crypto boundary (e.g. wrong width/form)
@@ -210,6 +217,8 @@ type es256CorpusCase struct {
 }
 
 func TestEcdsaConformance(t *testing.T) {
+	// Shared input builders also serve other corpora; each census covers this run alone.
+	clear(es256Census)
 	execution := corpuscheck.New(t, es256CorpusDir, "priv/conformance", es256CertifiedIndexSHA256)
 	idx, files := es256LoadCorpus(t)
 	agreed := 0
@@ -229,9 +238,7 @@ func TestEcdsaConformance(t *testing.T) {
 		}
 	}
 	execution.Finish()
-	// Case-input discovery must be a subset of the index's declared keys;
-	// every valid verification case's key must reach the SDK import boundary.
-	// Curated/index equality is checked by corpus.generators and its mutation control.
+	// Imported public keys must equal the declared set in both directions.
 	declared := idx.PublicKeyFingerprints
 	if !es256SortedUniqueStrings(declared) {
 		t.Fatalf("census: index public_key_fingerprints not sorted/unique")
@@ -239,6 +246,16 @@ func TestEcdsaConformance(t *testing.T) {
 	declaredSet := make(map[string]bool, len(declared))
 	for _, fp := range declared {
 		declaredSet[fp] = true
+	}
+	for fp := range es256Census {
+		if !declaredSet[fp] {
+			t.Fatalf("census: undeclared imported key %s", fp)
+		}
+	}
+	for fp := range declaredSet {
+		if !es256Census[fp] {
+			t.Fatalf("census: declared key never imported %s", fp)
+		}
 	}
 	// subset leg: every key embedded in a case input must be declared
 	discovery := map[string]bool{}
@@ -333,6 +350,17 @@ func es256CollectCaseKeys(t *testing.T, m map[string]json.RawMessage, target map
 // facade. Any disagreement is fatal.
 func es256RunCase(t *testing.T, c es256CorpusCase) {
 	t.Helper()
+	// JWK text contributes a key only after the public decoder accepts it.
+	if raw, ok := c.Input["text"]; ok && strings.HasPrefix(c.Surface, "jwk.") {
+		var text string
+		if err := json.Unmarshal(raw, &text); err != nil {
+			t.Fatal(err)
+		}
+		if key, err := es256Profile.JwkDecodePublic([]byte(text), nil); err == nil {
+			es256CensusKey(v.Base64urlEncode(key))
+		}
+	}
+
 	if os.Getenv("BAP_TRACE_ES256") != "" {
 		fmt.Fprintf(os.Stderr, "TRACE v3 case %s (%s)\n", c.ID, c.Surface)
 	}

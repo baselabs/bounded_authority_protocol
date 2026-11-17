@@ -14,7 +14,8 @@ _RUN_PY = Path(__file__).resolve().parent / "run_selector_float_zero.py"
 
 def _load_run_module():
     spec = importlib.util.spec_from_file_location("bap_selector_float_zero_run", _RUN_PY)
-    assert spec is not None and spec.loader is not None
+    if not (spec is not None and spec.loader is not None):
+        raise AssertionError("test support invariant: spec is not None and spec.loader is not None")
     mod = importlib.util.module_from_spec(spec)
     sys.modules["bap_selector_float_zero_run"] = mod
     spec.loader.exec_module(mod)

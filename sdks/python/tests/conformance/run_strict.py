@@ -65,7 +65,8 @@ def abort(msg: str) -> NoReturn:
 
 def _load_module(name: str, filename: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, _HERE.parent / filename)
-    assert spec is not None and spec.loader is not None
+    if not (spec is not None and spec.loader is not None):
+        abort("conformance invariant: spec is not None and spec.loader is not None")
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     spec.loader.exec_module(module)

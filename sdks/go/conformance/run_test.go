@@ -197,6 +197,8 @@ type loadedFile struct {
 }
 
 func TestConformance(t *testing.T) {
+	// Shared input builders also serve other corpora; each census covers this run alone.
+	clear(census)
 	execution := corpuscheck.New(t, corpusDir, "priv/conformance", certifiedIndexSHA256)
 	idx, files := loadCorpus(t)
 	agreed := 0
@@ -216,13 +218,19 @@ func TestConformance(t *testing.T) {
 		}
 	}
 	execution.Finish()
-	// Two-boundary key census: observed import-boundary set == index set.
-	if len(census) != len(idx.PublicKeyFingerprints) {
-		t.Fatalf("key census: observed %d keys, index declares %d", len(census), len(idx.PublicKeyFingerprints))
-	}
+	// Exact input-boundary census, including invalid and producer-only keys.
+	declaredSet := make(map[string]bool)
 	for _, fp := range idx.PublicKeyFingerprints {
+		declaredSet[fp] = true
+	}
+	for fp := range census {
+		if !declaredSet[fp] {
+			t.Fatalf("census: undeclared imported key %s", fp)
+		}
+	}
+	for fp := range declaredSet {
 		if !census[fp] {
-			t.Fatalf("key census: index fingerprint %s never imported at the SDK boundary", fp)
+			t.Fatalf("census: declared key never imported %s", fp)
 		}
 	}
 	t.Logf("agreed=%d disagreed=0 census=%d", agreed, len(census))
@@ -233,6 +241,17 @@ func TestConformance(t *testing.T) {
 // disagreement is fatal; agreed cases fall through.
 func runCase(t *testing.T, c corpusCase) {
 	t.Helper()
+	// JWK text contributes a key only after the public decoder accepts it.
+	if raw, ok := c.Input["text"]; ok && strings.HasPrefix(c.Surface, "jwk.") {
+		var text string
+		if err := json.Unmarshal(raw, &text); err != nil {
+			t.Fatal(err)
+		}
+		if key, err := v.JwkDecodePublic([]byte(text), nil); err == nil {
+			censusKey(v.Base64urlEncode(key))
+		}
+	}
+
 	if os.Getenv("BAP_TRACE") != "" {
 		fmt.Fprintf(os.Stderr, "TRACE case %s (%s)\n", c.ID, c.Surface)
 	}

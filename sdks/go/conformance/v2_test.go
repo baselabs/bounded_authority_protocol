@@ -59,14 +59,11 @@ func censusKey(b64 string) {
 	if err != nil {
 		return // never imported at the boundary
 	}
-	if len(raw) != 32 {
-		return // rejected before the crypto boundary (e.g. short key)
-	}
 	tp := rawThumbprint(raw)
 	census[v.Base64urlEncode(tp[:])] = true
 }
 
-// rawThumbprint is the RFC 7638 thumbprint of a raw 32-byte key by plain hashing, with NO key
+// rawThumbprint names Ed25519 input bytes, including rejected import attempts, by plain hashing, with NO key
 // acceptance: the census must record every key the corpus names, weak ones included, so it cannot
 // use the checked (fallible) PublicKeyThumbprintRaw (finding 10a).
 func rawThumbprint(raw []byte) [32]byte {
@@ -206,6 +203,8 @@ type loadedFile struct {
 }
 
 func TestConformance(t *testing.T) {
+	// Shared input builders also serve other corpora; each census covers this run alone.
+	clear(census)
 	execution := corpuscheck.New(t, corpusDir, "priv/conformance", certifiedIndexSHA256)
 	idx, files := loadCorpus(t)
 	agreed := 0
@@ -225,9 +224,7 @@ func TestConformance(t *testing.T) {
 		}
 	}
 	execution.Finish()
-	// Case-input discovery must be a subset of the index's declared keys;
-	// every valid verification case's key must reach the SDK import boundary.
-	// Curated/index equality is checked by corpus.generators and its mutation control.
+	// Imported public keys must equal the declared set in both directions.
 	declared := idx.PublicKeyFingerprints
 	if !sortedUniqueStrings(declared) {
 		t.Fatalf("census: index public_key_fingerprints not sorted/unique")
@@ -235,6 +232,16 @@ func TestConformance(t *testing.T) {
 	declaredSet := make(map[string]bool, len(declared))
 	for _, fp := range declared {
 		declaredSet[fp] = true
+	}
+	for fp := range census {
+		if !declaredSet[fp] {
+			t.Fatalf("census: undeclared imported key %s", fp)
+		}
+	}
+	for fp := range declaredSet {
+		if !census[fp] {
+			t.Fatalf("census: declared key never imported %s", fp)
+		}
 	}
 	// subset leg: every key embedded in a case input must be declared
 	discovery := map[string]bool{}
@@ -326,6 +333,17 @@ func collectCaseKeys(t *testing.T, m map[string]json.RawMessage, target map[stri
 // dispatches to the V2 façade. Any disagreement is fatal.
 func runCase(t *testing.T, c corpusCase) {
 	t.Helper()
+	// JWK text contributes a key only after the public decoder accepts it.
+	if raw, ok := c.Input["text"]; ok && strings.HasPrefix(c.Surface, "jwk.") {
+		var text string
+		if err := json.Unmarshal(raw, &text); err != nil {
+			t.Fatal(err)
+		}
+		if key, err := v.JwkDecodePublic([]byte(text), nil); err == nil {
+			censusKey(v.Base64urlEncode(key))
+		}
+	}
+
 	if os.Getenv("BAP_TRACE") != "" {
 		fmt.Fprintf(os.Stderr, "TRACE case %s (%s)\n", c.ID, c.Surface)
 	}

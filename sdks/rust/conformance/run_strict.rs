@@ -341,7 +341,12 @@ fn run_shaped(case: &Value, major: i64) -> Value {
                 bap::verify_grant(compact, &issuer, &expected)
             };
             result_value(result.map(|facts| {
-                assert_eq!(facts.authorization, bap::facts::NotEvaluated);
+                assert_eq!(facts.version, major, "verify_grant: version fact");
+                assert_eq!(
+                    facts.authorization,
+                    bap::facts::NotEvaluated,
+                    "authorization fact"
+                );
                 json!({"grant_id":facts.grant_id,"issuer":facts.issuer})
             }))
         }
@@ -364,7 +369,15 @@ fn run_shaped(case: &Value, major: i64) -> Value {
             } else {
                 bap::check_envelope(&creds, &expected)
             };
-            result_value(result.map(|_facts| json!({})))
+            result_value(result.map(|facts| {
+                assert_eq!(facts.grant.version, major, "check_envelope: version fact");
+                assert_eq!(
+                    facts.authorization,
+                    bap::facts::NotEvaluated,
+                    "authorization fact"
+                );
+                json!({})
+            }))
         }
         "verify_historical_anchor" => {
             let Some(key) = historical_key(&input["key"]) else {
@@ -377,7 +390,23 @@ fn run_shaped(case: &Value, major: i64) -> Value {
             } else {
                 bap::verify_historical_anchor(compact, &key, &expected)
             };
-            result_value(result.map(|facts| json!({"anchor_id":facts.anchor_id})))
+            result_value(result.map(|facts| {
+                assert_eq!(
+                    facts.anchor_id, expected.anchor_id,
+                    "anchor: anchor_id fact"
+                );
+                assert_eq!(facts.sequence, expected.sequence, "anchor: sequence fact");
+                assert_eq!(
+                    facts.chain_hash, expected.chain_hash,
+                    "anchor: chain_hash fact"
+                );
+                assert_eq!(
+                    facts.key_fingerprint, expected.key_fingerprint,
+                    "anchor: key_fingerprint fact"
+                );
+                assert_eq!(facts.trust, bap::facts::NotEvaluated, "trust fact");
+                json!({"anchor_id":facts.anchor_id})
+            }))
         }
         "verify_key_transition" => {
             let (Some(current), Some(next)) = (
@@ -393,7 +422,22 @@ fn run_shaped(case: &Value, major: i64) -> Value {
             } else {
                 bap::verify_key_transition(compact, &current, &next, &expected)
             };
-            result_value(result.map(|facts| json!({"transition_id":facts.transition_id})))
+            result_value(result.map(|facts| {
+                assert_eq!(
+                    facts.transition_id, expected.transition_id,
+                    "transition: transition_id fact"
+                );
+                assert_eq!(
+                    facts.current_key_fingerprint, expected.current_key_fingerprint,
+                    "transition: current fingerprint fact"
+                );
+                assert_eq!(
+                    facts.next_key_fingerprint, expected.next_key_fingerprint,
+                    "transition: next fingerprint fact"
+                );
+                assert_eq!(facts.trust, bap::facts::NotEvaluated, "trust fact");
+                json!({"transition_id":facts.transition_id})
+            }))
         }
         "verify_anchored_export" => {
             let chunks: Vec<Vec<u8>> = input["chunks"]
@@ -422,7 +466,23 @@ fn run_shaped(case: &Value, major: i64) -> Value {
             } else {
                 bap::verify_anchored_export(&obj, &keys, &expected)
             };
-            result_value(result.map(|facts| json!({"chain_id":facts.chain_id})))
+            result_value(result.map(|facts| {
+                assert_eq!(
+                    facts.chain_id, expected.chain.chain_id,
+                    "export: chain_id fact"
+                );
+                assert_eq!(
+                    facts.row_count, expected.chain.row_count,
+                    "export: row_count fact"
+                );
+                assert_eq!(facts.trust, bap::facts::NotEvaluated, "trust fact");
+                assert_eq!(
+                    facts.authorization,
+                    bap::facts::NotEvaluated,
+                    "authorization fact"
+                );
+                json!({"chain_id":facts.chain_id})
+            }))
         }
         other => panic!("case {}: unknown strict surface {other}", case["id"]),
     }

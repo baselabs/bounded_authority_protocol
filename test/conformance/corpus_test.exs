@@ -22,8 +22,6 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Jcs
   alias BoundedAuthorityProtocol.V1.Json
-  alias BoundedAuthorityProtocol.V1.Jwk
-  alias BoundedAuthorityProtocol.V3.EcJwk
   alias JSONSchex.Draft202012.Schemas, as: Draft202012Schemas
 
   @json_bytes_max 65_536
@@ -2268,76 +2266,70 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
       0x20, 0xFF::256>>
   end
 
-  # --- v3 suite fingerprint census (two-boundary: index vs case bytes) -------
+  # The input boundary includes rejected imports and keys used only by producers.
+  for major <- [1, 2, 3] do
+    @major major
+    test "the v#{major} key census equals the case-input boundary in both directions" do
+      corpus_dir = Path.expand("../../priv/conformance/v#{@major}/corpus", __DIR__)
+      index = corpus_dir |> Path.join("index.json") |> File.read!() |> Jason.decode!()
 
-  test "the v3 index public-key fingerprint census equals the set derivable from the case bytes" do
-    # Boundary 1: the index's declared census. Boundary 2: a scanner that walks every case input,
-    # takes each public_key-bearing member, and derives its suite-native thumbprint (the EC
-    # RFC 7638 member-set thumbprint for 65-byte uncompressed-SEC1 keys, the v1 OKP thumbprint
-    # for 32-byte Ed25519 keys, the cross-major artifacts carry real prior-major keys). The
-    # two must be equal in BOTH directions: a census key nothing references, or a referenced
-    # key the census omits, is a corpus-authoring defect.
-    corpus_dir = Path.expand("../../priv/conformance/v3/corpus", __DIR__)
-    index = corpus_dir |> Path.join("index.json") |> File.read!() |> Jason.decode!()
+      imported =
+        index["files"]
+        |> Enum.filter(&String.ends_with?(&1["path"], ".json"))
+        |> Enum.flat_map(fn entry ->
+          corpus_dir
+          |> Path.join(entry["path"])
+          |> File.read!()
+          |> Jason.decode!()
+          |> Map.get("cases", [])
+          |> Enum.flat_map(&collect_public_keys(&1["input"], @major))
+        end)
+        |> MapSet.new()
 
-    derived =
-      corpus_dir
-      |> Portable.ls_r()
-      |> Enum.filter(&String.ends_with?(&1, ".json"))
-      |> Enum.flat_map(fn path ->
-        path
-        |> File.read!()
-        |> Jason.decode!()
-        |> case do
-          %{"cases" => cases} -> cases
-          _ -> []
-        end
-        |> Enum.flat_map(&collect_public_keys(&1["input"]))
-      end)
-      |> MapSet.new()
-
-    declared = index |> Map.fetch!("public_key_fingerprints") |> MapSet.new()
-
-    assert MapSet.equal?(declared, derived)
-  end
-
-  defp collect_public_keys(value), do: collect_public_keys(value, [])
-
-  defp collect_public_keys(%{"public_key" => encoded} = map, acc) when is_binary(encoded) do
-    case Base.url_decode64(encoded, padding: false) do
-      {:ok, pub} when byte_size(pub) == 65 ->
-        case EcJwk.public_key_thumbprint_raw(pub, %{}) do
-          {:ok, raw} ->
-            collect_public_keys(Map.delete(map, "public_key"), [
-              Base.url_encode64(raw, padding: false) | acc
-            ])
-
-          _error ->
-            collect_public_keys(Map.delete(map, "public_key"), acc)
-        end
-
-      # The census names every 32-byte key, weak or not, through the unchecked digest: the
-      # checked thumbprint refuses a small-order or non-canonical key, and silently skipping
-      # such a key here would hide it from the census instead of failing the comparison.
-      {:ok, pub} when byte_size(pub) == 32 ->
-        {:ok, raw} = Jwk.thumbprint_digest_unchecked(pub)
-
-        collect_public_keys(Map.delete(map, "public_key"), [
-          Base.url_encode64(raw, padding: false) | acc
-        ])
-
-      _error ->
-        collect_public_keys(Map.delete(map, "public_key"), acc)
+      declared = Map.fetch!(index, "public_key_fingerprints")
+      assert declared == Enum.sort(Enum.uniq(declared))
+      assert MapSet.difference(imported, MapSet.new(declared)) == MapSet.new()
+      assert MapSet.difference(MapSet.new(declared), imported) == MapSet.new()
     end
   end
 
-  defp collect_public_keys(map, acc) when is_map(map) do
-    Enum.reduce(map, acc, fn {_k, v}, inner -> collect_public_keys(v, inner) end)
+  defp collect_public_keys(value, major) when is_map(value) do
+    Enum.flat_map(value, fn {label, child} ->
+      keys =
+        if is_binary(child) and
+             Regex.match?(
+               ~r/public.*key|key.*public|verification.*key|holder.*key|issuer.*key/i,
+               label
+             ) and
+             not Regex.match?(~r/fingerprint|thumbprint|digest|hash/i, label),
+           do: fingerprint_input(child, major),
+           else: []
+
+      keys ++ collect_public_keys(child, major)
+    end)
   end
 
-  defp collect_public_keys(list, acc) when is_list(list) do
-    Enum.reduce(list, acc, &collect_public_keys/2)
-  end
+  defp collect_public_keys(value, major) when is_list(value),
+    do: Enum.flat_map(value, &collect_public_keys(&1, major))
 
-  defp collect_public_keys(_scalar, acc), do: acc
+  defp collect_public_keys(_value, _major), do: []
+
+  defp fingerprint_input(encoded, major) when is_binary(encoded) do
+    case Base.url_decode64(encoded, padding: false) do
+      {:ok, <<4, x::binary-size(32), y::binary-size(32)>>} when major == 3 ->
+        preimage =
+          ~s({"crv":"P-256","kty":"EC","x":"#{Base.url_encode64(x, padding: false)}","y":"#{Base.url_encode64(y, padding: false)}"})
+
+        [Base.url_encode64(:crypto.hash(:sha256, preimage), padding: false)]
+
+      {:ok, raw} when byte_size(raw) == 32 or (major == 2 and byte_size(raw) > 0) ->
+        preimage =
+          ~s({"crv":"Ed25519","kty":"OKP","x":"#{Base.url_encode64(raw, padding: false)}"})
+
+        [Base.url_encode64(:crypto.hash(:sha256, preimage), padding: false)]
+
+      _ ->
+        []
+    end
+  end
 end

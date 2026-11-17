@@ -36,7 +36,8 @@ Probe = Callable[[types.ModuleType], bool]
 def _mutant(name: str, needle: str, replacement: str) -> types.ModuleType:
     path = Path(content_assertion.__file__)
     source = path.read_text()
-    assert source.count(needle) == 1, f"{name}: mutation target must occur exactly once"
+    if source.count(needle) != 1:
+        raise AssertionError(f"{name}: mutation target must occur exactly once")
     changed = source.replace(needle, replacement, 1)
     module_name = f"bounded_authority_verifier._content_assertion_mutant_{name.replace('-', '_')}"
     module = types.ModuleType(module_name)
@@ -74,10 +75,12 @@ def _signed(module: types.ModuleType) -> tuple[bytes, Any, Any]:
     )
     producer = _producer(module)
     signing = module.assertion_signing_input(producer)
-    assert signing.is_ok
+    if not (signing.is_ok):
+        raise AssertionError("test support invariant: signing.is_ok")
     signature = private.sign(signing.value.protected_segment + b"." + signing.value.payload_segment)
     compact = module.assemble_content_assertion_compact(signing.value, signature)
-    assert compact.is_ok
+    if not (compact.is_ok):
+        raise AssertionError("test support invariant: compact.is_ok")
     expected = module.ExpectedContentAssertion(
         attestor=HistoricalPublicKey(
             key_id=producer.attestor_key_id,
@@ -95,7 +98,8 @@ def _signed(module: types.ModuleType) -> tuple[bytes, Any, Any]:
         bounds=_unwrap(bounds_maximum()),
     )
     facts = module.verify_assertion(compact.value, expected)
-    assert facts.is_ok
+    if not (facts.is_ok):
+        raise AssertionError("test support invariant: facts.is_ok")
     return compact.value, expected, facts.value
 
 
@@ -144,7 +148,8 @@ def _gate_passing_signature() -> bytes:
 
 def _probe_assembly_kind(module: types.ModuleType) -> bool:
     signing = module.assertion_signing_input(_producer(module))
-    assert signing.is_ok
+    if not (signing.is_ok):
+        raise AssertionError("test support invariant: signing.is_ok")
     wrong_kind = SigningInput(
         kind="role_attestation",
         protected_segment=signing.value.protected_segment,
@@ -158,7 +163,8 @@ def _probe_assembly_kind(module: types.ModuleType) -> bool:
 def _probe_decoded_segment(module: types.ModuleType) -> bool:
     producer = _producer(module)
     signing = module.assertion_signing_input(producer)
-    assert signing.is_ok
+    if not (signing.is_ok):
+        raise AssertionError("test support invariant: signing.is_ok")
     decoded_size = max(
         len(_unwrap(base64url_decode(signing.value.protected_segment))),
         len(_unwrap(base64url_decode(signing.value.payload_segment))),
@@ -197,7 +203,10 @@ def _valid_successor_pair(module: types.ModuleType) -> tuple[Any, Any]:
         gen=2,
         prev=predecessor.digest,
     )
-    assert module.verify_successor(predecessor, successor, _unwrap(bounds_maximum())).is_ok
+    if not (module.verify_successor(predecessor, successor, _unwrap(bounds_maximum())).is_ok):
+        raise AssertionError(
+            "test support invariant: module.verify_successor(predecessor, successor, _unwrap(bounds_maximum())).is_ok"
+        )
     return predecessor, successor
 
 
