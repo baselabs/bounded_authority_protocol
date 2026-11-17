@@ -108,3 +108,10 @@ value with no trailing content, the integer and float distinction), a test build
 the closure exists to reject and proves the closure catches it. This applies the
 ADR 0005 independent-runner
 discipline per language, covering a class the corpus has no cases for.
+
+CI also runs `python scripts/check_sdk_closures.py python` (or `rust` or `go`) from the
+repository root. After a green baseline, it removes each closure independently in a temporary
+SDK copy and requires its named test to fail an assertion. Compilation errors, missing tests,
+and unrelated failures fail the gate. Numeric byte limits and exact magnitude limits are
+removed separately; Rust's tagged-value construction guards are also tested. Temporary copies
+and build outputs are removed on exit.

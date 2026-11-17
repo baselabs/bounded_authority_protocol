@@ -9,6 +9,12 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - The unpublished Rust SDK uses `p256` 0.14 and `crypto-bigint` 0.7.11, fixing
   RUSTSEC-2026-0387. Its minimum Rust version is 1.88, required by the backend's
   `sha2` 0.11 dependency. The direct `sha2` 0.10 and `zeroize` 1.8.2 pins remain.
+- SDK CI audits the Rust lock, the committed Python lock (including development tools), and
+  every Go module with pinned scanners. Python installs the same locked dependency set it audits.
+  Go's module scan uses a patched supported toolchain; conformance still tests the Go 1.25 floor.
+- SDK CI independently removes each parser closure after a green permissiveness baseline and
+  requires the corresponding test to fail, including separate raw-number byte and magnitude
+  limits. Build failures and missing tests cannot satisfy the gate.
 
 ## [1.0.0] — 2026-11-10
 

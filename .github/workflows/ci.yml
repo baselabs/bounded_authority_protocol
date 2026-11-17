@@ -105,8 +105,8 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          # Active LTS (Node 20 reached end-of-life 2026-04). The independent Node second-
-          # implementation runners in `mix quality` run on this toolchain. Pinned exactly (the
+          # The independent Node second-implementation runners in `mix quality` use this
+          # exact toolchain, matching .tool-versions. Pinned exactly (the
           # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
           # small-order inputs differs across Node releases, so a floating major would make the
           # runners' ungated behavior depend on the runner image (ADR 0040).

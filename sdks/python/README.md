@@ -256,8 +256,9 @@ reserving replay, and deciding belong to the host: a facts value is evidence, no
 ## Development
 
 ```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -e . ruff mypy pytest
+python -m pip install uv==0.11.20
+uv sync --locked
+. .venv/bin/activate
 ruff check src/ tests/ tools/ examples/
 mypy src/                          # strict
 python tools/purity_check.py       # no I/O, clock, randomness, or network in src/
@@ -266,6 +267,11 @@ python -m pytest tests/
 python tests/conformance/run.py && python tests/conformance/run_v2.py
 python tests/conformance/run_v3.py && python tests/conformance/run_strict.py
 ```
+
+CI audits all dependencies in the committed `uv.lock` with pinned `pip-audit` and runs the
+permissiveness suite again with each closure independently removed. From the repository root,
+run `sdks/python/.venv/bin/python scripts/check_sdk_closures.py python`. Each named test must fail
+an assertion after its closure is removed; build or collection errors fail the gate.
 
 Deployment notes: [`docs/deployment/python-sdk.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/python-sdk.md).
 

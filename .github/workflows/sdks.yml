@@ -1,22 +1,33 @@
 name: SDK conformance
 
-# Cross-language verifier SDK gate (ADR 0014 D8). Runs on push/PR touching sdks/** or
-# priv/conformance/**, plus manual dispatch and a daily schedule (catches upstream crypto-runtime
-# drift). NOT part of the Elixir `mix quality` battery — the SDK suites run in their own job to
-# avoid runner starvation during the quality gate.
+# Cross-language verifier SDK gate (ADR 0014 D8). Runs on push/PR touching SDKs,
+# normative specifications, corpus inputs, or the gate itself, plus manual dispatch
+# and a daily schedule (catches upstream crypto-runtime drift). The SDK suites
+# run separately from the Elixir `mix quality` battery.
 
 on:
   pull_request:
     paths:
       - "sdks/**"
       - "priv/conformance/**"
+      - "conformance/**"
+      - "spec/**"
+      - "scripts/check_sdk_closures.py"
+      - ".github/dependabot.yml"
+      - ".gitignore"
       - ".github/workflows/sdks.yml"
   push:
     branches:
       - main
+      - "kci/**"
     paths:
       - "sdks/**"
       - "priv/conformance/**"
+      - "conformance/**"
+      - "spec/**"
+      - "scripts/check_sdk_closures.py"
+      - ".github/dependabot.yml"
+      - ".gitignore"
       - ".github/workflows/sdks.yml"
   workflow_dispatch:
   schedule:
@@ -31,25 +42,11 @@ concurrency:
 
 jobs:
   sdks-conformance:
-    name: Cross-language SDK conformance (Node ${{ matrix.node }})
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      # The SDK targets Node >= 22 (the active LTS line; Node 20 reached end-of-life 2026-04).
-      # Verify against both the active LTS (22) and the current release line (24) so a runtime
-      # regression on either is caught. The Python steps re-run per Node version — they do not
-      # depend on Node (<1s of waste) and keeping a single self-contained job is clearer than a
-      # two-job split for this surface size.
-      matrix:
-        node: ["22.23.1", "24.19.0"]
+    name: Cross-language SDK conformance (Python)
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ matrix.node }}
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -63,14 +60,23 @@ jobs:
       # --- Python SDK gate ---
       - name: Python — install
         run: |
-          python -m pip install --upgrade pip
-          # Pinned toolchain (cross-vendor #23): a floating `pip install cryptography ruff mypy
-          # pytest` lets the security/conformance gate's executable supply chain change without a
-          # repository diff. Pin to the exact versions the gate is verified against; bumping any of
-          # these is a deliberate, reviewed change.
-          pip install cryptography==50.0.0 ruff==0.16.2 mypy==2.3.0 pytest==9.1.1
-          pip install -e . --no-deps
+          python -m pip install uv==0.11.20
+          uv sync --locked
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
         working-directory: sdks/python
+
+      - name: Python — audit the locked dependency set
+        working-directory: sdks/python
+        run: |
+          audit_dir=$(mktemp -d)
+          trap 'rm -rf "$audit_dir"' EXIT
+          # PEP 751 keeps every platform/Python variant, including multiple locked versions
+          # of one package. pip-audit's native lock reader audits all of them.
+          uv export --locked --all-groups --no-emit-project --format pylock.toml --output-file "$audit_dir/pylock.toml"
+          uvx --from pip-audit==2.9.0 pip-audit --locked "$audit_dir"
+
+      - name: Python — closure removal must fail
+        run: python scripts/check_sdk_closures.py python
 
       - name: Python — typecheck (mypy --strict)
         run: mypy src/
@@ -104,13 +110,14 @@ jobs:
         run: python tests/conformance/run_v3.py
         working-directory: sdks/python
 
-  # Rust is Node-independent; per ADR 0015 D4 it runs as its OWN job on the same
-  # sdks/** + priv/conformance/** trigger (not folded into the Node matrix). The
-  # MSRV (1.88) is pinned by sdks/rust/rust-toolchain.toml; this job installs
+  # TypeScript runs in its graduated repository. The independent Node runner stays
+  # pinned to 22.23.1 in ci.yml and supply-chain.yml, matching .tool-versions and
+  # its strict-Ed25519 backend evidence; SDK jobs here have no Node dependency.
+  # The Rust MSRV (1.88) is pinned by sdks/rust/rust-toolchain.toml; this job installs
   # that exact toolchain so the MSRV floor is the CI-tested floor.
   rust-conformance:
     name: Cross-language SDK conformance (Rust MSRV 1.88)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -119,6 +126,14 @@ jobs:
         run: |
           rustup toolchain install 1.88.0 --profile minimal --component rustfmt --component clippy --no-self-update
           rustup default 1.88.0
+
+      - name: Rust — audit Cargo.lock
+        run: |
+          cargo install cargo-audit --version 0.22.2 --locked
+          cargo audit --file sdks/rust/Cargo.lock
+
+      - name: Rust — closure removal must fail
+        run: python3 scripts/check_sdk_closures.py rust
 
       - name: fmt
         run: cargo fmt --check
@@ -145,8 +160,7 @@ jobs:
         run: sh tools/license_check.sh
         working-directory: sdks/rust
 
-  # Go is Node-independent; per ADR 0015 D4 it runs as its OWN job on the same
-  # sdks/** + priv/conformance/** trigger. The go.mod floor (1.25) is the
+  # Go runs as its own job on the same SDK/spec/corpus trigger. The go.mod floor (1.25) is the
   # CI-tested floor: this job installs exactly 1.25, mirroring the Rust MSRV
   # pattern. Zero runtime dependencies means no go.sum to lock; `go vet` +
   # `go test ./...` cover the library unit suite, the permissiveness
@@ -155,7 +169,7 @@ jobs:
   # against the vendored, startup-SHA-bound corpus snapshot.
   go-conformance:
     name: Cross-language SDK conformance (Go 1.25)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -164,6 +178,9 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.25"
+
+      - name: Go — closure removal must fail
+        run: python3 scripts/check_sdk_closures.py go
 
       - name: gofmt
         run: test -z "$(gofmt -l .)"
@@ -183,4 +200,22 @@ jobs:
 
       - name: license check
         run: sh tools/license_check.sh
+        working-directory: sdks/go
+
+  # Audit the complete module set, including stdlib, on a supported patched toolchain.
+  # The separate conformance job above still proves the declared Go 1.25 floor.
+  go-advisories:
+    name: Go module advisories
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up patched Go for the advisory scan
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.4"
+
+      - name: Audit every module, including packages without reachable symbols
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 -scan=module
         working-directory: sdks/go

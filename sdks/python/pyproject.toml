@@ -24,6 +24,9 @@ dependencies = [
   "cryptography>=44.0.0",
 ]
 
+[dependency-groups]
+dev = ["ruff==0.16.2", "mypy==2.3.0", "pytest==9.1.1"]
+
 [project.urls]
 Homepage = "https://github.com/baselabs/bounded_authority_protocol"
 Repository = "https://github.com/baselabs/bounded_authority_protocol"

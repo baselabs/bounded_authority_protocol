@@ -25,7 +25,8 @@ from a checkout of this repository.
 
 - Go **1.25** or later (`go.mod`). CI installs Go with `actions/setup-go` and
   `go-version: "1.25"`, which selects a 1.25.x release (the runner's cached one when present).
-  Development here uses Go 1.25.14.
+  The module advisory scan separately uses patched Go 1.27.4 and checks the complete module
+  set, including the standard library, with `govulncheck` 1.1.4.
 - **No third-party dependencies**: only the standard library (`crypto/ed25519`, `crypto/ecdsa`,
   `crypto/elliptic`, `crypto/sha256`, `crypto/subtle`, `math/big`, and pure parsing and
   formatting packages). `tools/license_check.sh` asserts the module graph stays empty.
@@ -242,6 +243,9 @@ verification path.
 
 ```bash
 go test ./...
+# From the repository root: independently remove each closure and require its test to fail
+python3 scripts/check_sdk_closures.py go
+# From sdks/go:
 go test -v ./conformance/ | grep agreed
 # agreed=283 disagreed=0 census=11
 # strict corpus: agreed=2410/2410

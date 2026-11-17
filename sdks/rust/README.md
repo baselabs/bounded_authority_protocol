@@ -239,6 +239,9 @@ closure exists to reject and proves the closure catches it.
 
 ```bash
 cargo test --locked
+# From the repository root: independently remove each closure and require its test to fail
+python3 scripts/check_sdk_closures.py rust
+# From sdks/rust:
 # A runner's summary line is visible only with --nocapture:
 cargo test --locked --test conformance -- --nocapture
 # conformance: agreed=283 disagreed=0 total=283 surfaces=28 census=11/11

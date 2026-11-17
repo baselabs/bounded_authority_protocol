@@ -88,6 +88,15 @@ func TestPermissiveRawLexeme(t *testing.T) {
 	}
 }
 
+// Exact raw magnitude checks must precede lossy host conversion.
+func TestPermissiveRawMagnitude(t *testing.T) {
+	for _, text := range []string{"9007199254740992", "9007199254740991.0001"} {
+		if _, err := v.JsonDecode([]byte(text), nil); err == nil {
+			t.Fatalf("raw magnitude must reject %s", text)
+		}
+	}
+}
+
 // ---- (c) single-value + trailing rejection (REQ1-JSON-single-value) ----
 
 func TestPermissiveSingleValue(t *testing.T) {
@@ -143,6 +152,10 @@ func TestPermissiveSourceOrderPreserved(t *testing.T) {
 	val, err := v.JsonDecode([]byte(`{"b":1,"a":2}`), nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+	obj, ok := val.(v.Obj)
+	if !ok || len(obj) != 2 || obj[0].Key != "b" || obj[1].Key != "a" {
+		t.Fatal("decoded object must preserve source member order")
 	}
 	enc, err := v.JcsEncode(val, nil)
 	if err != nil {
