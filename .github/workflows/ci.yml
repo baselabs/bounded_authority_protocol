@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - "kci/**"
     paths-ignore:
       - "**/*.md"
       - "docs/**"
