@@ -383,12 +383,24 @@ pub(crate) fn operations(values: &[JsonValue], version: i64) -> Term<'_> {
         Term::Operations(values, version)
     }
 }
+// Test fixtures resolve from the crate root, so the path never leaves the SDK.
+#[cfg(test)]
+macro_rules! fixture {
+    ($name:literal) => {
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/",
+            $name
+        ))
+    };
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn float_notation_matches_specified_fixture_bytes() {
         let gold: serde_json::Value =
-            serde_json::from_str(include_str!("../tests/fixtures/decoded-rendering.json")).unwrap();
+            serde_json::from_str(fixture!("decoded-rendering.json")).unwrap();
         for (key, expected) in gold.as_object().unwrap() {
             if let Some(number) = key.strip_prefix("float:") {
                 let number = crate::json::JsonValue::Float(number.parse().unwrap());
@@ -404,10 +416,8 @@ mod tests {
 
     #[test]
     fn binary_notation_matches_reference() {
-        let rows: serde_json::Value = serde_json::from_str(include_str!(
-            "../tests/fixtures/decoded-binary-rendering.json"
-        ))
-        .unwrap();
+        let rows: serde_json::Value =
+            serde_json::from_str(fixture!("decoded-binary-rendering.json")).unwrap();
         for row in rows.as_array().unwrap() {
             let hex = row["hex"].as_str().unwrap();
             let bytes: Vec<u8> = (0..hex.len())
@@ -491,7 +501,7 @@ mod hand_built_tests {
             ("selectors", JsonValue::Int(1)),
         ]);
         let gold: serde_json::Value =
-            serde_json::from_str(include_str!("../tests/fixtures/decoded-rendering.json")).unwrap();
+            serde_json::from_str(fixture!("decoded-rendering.json")).unwrap();
         assert_eq!(
             render(&operations(&[op], 1)),
             gold["handbuilt:operation"].as_str().unwrap()

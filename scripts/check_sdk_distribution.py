@@ -41,8 +41,6 @@ BOUNDARY_EXCEPTIONS = {
         'RFC 3986 URI normalization input or token; never used as a filesystem path.',
     ('python/src/bounded_authority_verifier/uri.py', "python:inp.startswith(b'../')", 1):
         'RFC 3986 URI normalization input or token; never used as a filesystem path.',
-    ('rust/src/inspect.rs', '"../tests/fixtures/decoded-binary-rendering.json"', 1):
-        'Compile-time include is relative to this source file and targets a file inside the SDK root.',
     ('rust/src/lib.rs', '#[doc = include_str!("../README.md")]', 1):
         'Compile-time include is relative to this source file and targets a file inside the SDK root.',
     ('rust/src/uri.rs', 'else if input == b"." || input == b".." {', 1):
