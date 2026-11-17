@@ -215,8 +215,16 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     commands = Enum.map(steps, &(&1["run"] || ""))
     assert "mix deps.get --check-locked" in commands
     docs = Enum.find_index(commands, &(&1 == "mix docs"))
-    build = Enum.find_index(commands, &(&1 == "mix hex.build"))
-    inspect_package = Enum.find_index(commands, &String.contains?(&1, "inspect_publish_package"))
+
+    build =
+      Enum.find_index(commands, &(&1 == ~s(mix hex.build --output "$RUNNER_TEMP/package.tar")))
+
+    inspect_package =
+      Enum.find_index(
+        commands,
+        &(&1 == ~s(mix run --no-start scripts/check_package.exs "$RUNNER_TEMP/package.tar"))
+      )
+
     assert is_integer(docs) and is_integer(build) and is_integer(inspect_package)
     assert docs < build and build < inspect_package and inspect_package < length(steps) - 1
   end
@@ -231,7 +239,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     archive = Enum.find_index(steps, &String.contains?(&1["run"] || "", "mix hex.build"))
 
     inspect_package =
-      Enum.find_index(steps, &String.contains?(&1["run"] || "", "inspect_publish_package"))
+      Enum.find_index(steps, &String.contains?(&1["run"] || "", "check_package.exs"))
 
     assert quality != nil and archive != nil and quality < archive
     assert is_integer(inspect_package) and archive < inspect_package

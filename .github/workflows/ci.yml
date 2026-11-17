@@ -234,8 +234,8 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           mix hex.build --output "artifacts/bounded_authority_protocol-$VERSION.tar"
 
-      - name: Inspect the archive used for attestation
-        run: mix run --no-start scripts/inspect_publish_package.exs "artifacts/bounded_authority_protocol-$VERSION.tar"
+      - name: Check the archive used for attestation
+        run: mix run --no-start scripts/check_package.exs "artifacts/bounded_authority_protocol-$VERSION.tar"
 
       - name: Record archive checksum
         working-directory: artifacts

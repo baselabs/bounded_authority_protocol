@@ -380,23 +380,22 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "usage-rules.md"
                   ])
 
-  def run! do
+  # With no argument, build a fresh archive from this checkout and check it. With one archive
+  # path, check that already-built archive instead: the one CI attests, or the one a
+  # publication is about to upload.
+  def run!(argv) do
     source_root = Path.expand("..", __DIR__)
     scratch_root = unique_tmp_root!()
     package_root = Path.join(scratch_root, "package")
-
-    archive_path =
-      Path.join(scratch_root, "bounded_authority_protocol-#{mix_exs_version()}.tar")
-
     consumer_root = Path.join(scratch_root, "consumer")
 
     try do
-      run!("mix", ["hex.build", "--output", archive_path], source_root, [])
-      assert_regular_nonempty!(archive_path)
+      archive_path = archive!(argv, source_root, scratch_root)
 
       Hex.Tar.unpack!(archive_path, package_root)
 
       check_exact_files!(package_root)
+      check_source_bytes!(package_root, source_root)
       check_metadata!(package_root)
       compile_package!(package_root)
       check_architecture!(package_root)
@@ -407,6 +406,24 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       rm_rf_tolerant!(scratch_root)
     end
   end
+
+  defp archive!([], source_root, scratch_root) do
+    archive_path =
+      Path.join(scratch_root, "bounded_authority_protocol-#{mix_exs_version()}.tar")
+
+    run!("mix", ["hex.build", "--output", archive_path], source_root, [])
+    assert_regular_nonempty!(archive_path)
+    archive_path
+  end
+
+  defp archive!([archive_path], _source_root, _scratch_root) do
+    archive_path = Path.expand(archive_path)
+    assert_regular_nonempty!(archive_path)
+    archive_path
+  end
+
+  defp archive!(_argv, _source_root, _scratch_root),
+    do: fail!("usage: scripts/check_package.exs [ARCHIVE]")
 
   defp wipe_build!(root) do
     build = BoundedAuthorityProtocol.BuildPath.isolated(root, "prod")
@@ -488,6 +505,23 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
           "unexpected=#{inspect(unexpected)}"
       )
     end
+  end
+
+  # Every packed source file is byte-identical to this checkout, so the archive is this commit.
+  defp check_source_bytes!(package_root, source_root) do
+    @expected_files
+    |> MapSet.delete("hex_metadata.config")
+    |> Enum.each(fn path ->
+      case File.read(Path.join(source_root, path)) do
+        {:ok, bytes} ->
+          unless File.read!(Path.join(package_root, path)) == bytes do
+            fail!("package file differs from the source tree: #{path}")
+          end
+
+        {:error, _reason} ->
+          fail!("source file is missing: #{path}")
+      end
+    end)
   end
 
   defp check_metadata!(package_root) do
@@ -1066,4 +1100,4 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
   defp fail!(message), do: raise("package check failed: #{message}")
 end
 
-BoundedAuthorityProtocol.PackageCheck.run!()
+BoundedAuthorityProtocol.PackageCheck.run!(System.argv())
