@@ -14,6 +14,12 @@ Evidence classes at each load-bearing claim:
 - **DERIVED** — restated from a program record or handoff; not re-verified for this document.
 - **INFERRED** — a design recommendation of this profile, not verifiable against any source.
 
+The AP2 observations retain that pinned source and date. The BAP updates below follow the
+shipped [contract-major 3 facade](../../lib/bounded_authority_protocol/v3.ex),
+[EC JWK codec](../../lib/bounded_authority_protocol/v3/ec_jwk.ex),
+[selector producers](../../lib/bounded_authority_protocol/v2/runtime.ex), and the accepted
+[A2A binding design](a2a-capability-binding-profile.md). They are not a new AP2 execution result.
+
 ## 0. Scope and framing
 
 This profile specifies how the published Bounded Authority Protocol (contract-majors 1, 2,
@@ -105,7 +111,7 @@ rainbow-table resistance (deterministic signatures leak enumerable content hashe
 Attacks, both OBSERVED) — the ES256 suite choice for BAP is independent of that AP2-internal
 rationale and must be justified in its own specification on BAP's own terms.
 
-**Two suite profiles, one suite name.** The bridge does not make Ed25519 BAP credentials
+**Separate suites.** The bridge does not make Ed25519 BAP credentials
 interoperable with AP2, nor ES256 a requirement for BAP generally: `BAP1-`/`BAP2-Ed25519-SHA256`
 remain frozen and complete, and the ES256 suite is an additional contract-major under the
 charter's succession discipline.
@@ -182,9 +188,10 @@ The evidence chain (all OBSERVED first-hand unless noted):
    `REQ2-SELECTOR-range-same-tag`): an integer-tagged value never matches a float-tagged bound,
    and vice versa. A float projection would therefore make every range selector unsatisfiable
    against schema-conformant integer-tagged mandate content — a dead projection, silently.
-   V2's own text closes the escape: an integral-valued float canonicalizes back integer-tagged
-   ("float-tagged bounds are wire-distinguishable only when non-integral"), so the only stable
-   operand domain for money is integer.
+   BAP producers refuse integral float-tagged selector bounds because JCS would re-tag them
+   as integers (erratum 6). Verification still accepts float-tagged range bounds in non-JCS
+   payloads; the same-tag rule still applies. This projection therefore keeps the AP2 amount
+   domain integer-tagged and introduces no float-to-integer coercion.
 5. The sole float-permissive money field, `budget.max` (typed `"number"`), is deliberately
    outside the projection anyway: budgets have no selector correspondence in any major (the [successor-major charter](successor-major-charter.md) § 5 budget posture, the
    citable posture). Notably the SDK reads `budget.max` as MAJOR units —
