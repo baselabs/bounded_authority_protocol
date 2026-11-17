@@ -24,9 +24,8 @@ a checkout of this repository.
 
 - Rust **1.88** or later (`rust-version` in `Cargo.toml`; `rust-toolchain.toml` pins 1.88.0 for
   development and CI).
-- Runtime dependencies: `ed25519-dalek` 2.2 (default features off), `p256` 0.14 (ECDSA only, for
-  contract-major 3), `sha2` 0.10, `ryu-js` 1.0, and `zeroize` pinned to exactly 1.8.2 (the
-  existing verified transitive version). See the
+- Runtime dependencies: `ed25519-dalek` 3.0 (default features off), `p256` 0.14 (ECDSA only, for
+  contract-major 3), `sha2` 0.11 and `ryu-js` 1.0. `zeroize` is a transitive dependency. See the
   [deployment notes](../../docs/deployment/rust-sdk.md) for the full tree and its `unsafe` use.
 - `#![forbid(unsafe_code)]` covers this crate's own source.
 - **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
@@ -38,6 +37,10 @@ a checkout of this repository.
   refuses any float-tagged integral selector value, with the same clauses as the Elixir
   reference. The certified `bap-selector-float-zero/1` corpus (161 cases) runs with this SDK's
   conformance suite.
+
+The unpublished SDK ships the committed `Cargo.lock`; CI audits that exact resolved set.
+The dependency MSRVs top out at Rust 1.88 (`sha2` 0.11.1). Use `--locked` when building or
+testing this checkout. A consuming application maintains and audits its own lockfile.
 
 ## Install from a checkout
 
@@ -73,7 +76,7 @@ your dependencies (it builds on Rust 1.88):
 ```toml
 [dependencies]
 bounded-authority-protocol = { path = "../bounded_authority_protocol/sdks/rust" }
-ed25519-dalek = { version = "2.2", default-features = false }
+ed25519-dalek = { version = "3.0", default-features = false }
 ```
 
 ```rust

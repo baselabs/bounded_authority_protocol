@@ -16,7 +16,7 @@ limitations under the License.
 ---
 
 This crate vendors no third-party source. Runtime dependencies
-(ed25519-dalek, p256, sha2, ryu-js, and the exact-pinned zeroize) and
+(ed25519-dalek, p256, sha2, and ryu-js) and
 their transitive dependencies are consumed from crates.io at build time
 under their respective licenses (BSD-3-Clause, Apache-2.0/MIT,
 Apache-2.0/BSL-1.0). All are permissive and enumerated by the repository

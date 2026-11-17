@@ -13,19 +13,15 @@ keywords = ["authentication", "authorization", "dpop", "ed25519", "security"]
 categories = ["cryptography", "authentication"]
 
 [dependencies]
-ed25519-dalek = { version = "2.2", default-features = false }
+ed25519-dalek = { version = "3.0", default-features = false }
 # The v3 ES256 backend (contract-major 3, `BAP3-ES256-SHA256`): ECDSA over
 # NIST P-256 with SHA-256, verify-only. `default-features = false` matches the
 # ed25519-dalek posture (no `pem`/`pkcs8`/`std`/`serde`); the `ecdsa` feature
 # pulls the arithmetic + digest machinery `es256.rs` uses (VerifyingKey,
-# Signature, verify_prehash, AffinePoint). The backend uses
-# sha2 0.11 / digest 0.11 machinery internally; the public SHA-256 helpers
-# and ed25519-dalek continue to use sha2 0.10.
+# Signature, verify, AffinePoint). All cryptographic dependencies use the
+# RustCrypto sha2 0.11 / digest 0.11 / signature 3 generation.
 p256 = { version = "0.14", default-features = false, features = ["ecdsa"] }
-# Keep the existing zeroize pin and direct sha2 line: the fixed p256 closure
-# accepts zeroize 1.8.2, and no public hashing API needs a dependency migration.
-zeroize = "=1.8.2"
-sha2 = "0.10"
+sha2 = "0.11"
 ryu-js = "1.0"
 
 [dev-dependencies]

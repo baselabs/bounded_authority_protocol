@@ -8,7 +8,7 @@ the local-loopback, role-attestation, and content-assertion sibling profiles. It
 has the quickstart and the full API list.
 
 Rust **1.88** or later is required by the locked dependency set (`sha2` 0.11.1
-inside the `p256` 0.14 backend). CI builds on Rust 1.88.0.
+shared by the Ed25519 and `p256` 0.14 backends). CI builds on Rust 1.88.0.
 
 ## Not published yet
 
@@ -57,13 +57,13 @@ Runtime dependencies (`sdks/rust/tools/license_check.sh` checks the license of e
 
 | Crate | License | Role |
 |---|---|---|
-| `ed25519-dalek` 2.2 (default features off) | BSD-3-Clause | Ed25519 verification |
-| `curve25519-dalek` 4.1 (transitive) | BSD-3-Clause | curve arithmetic |
+| `ed25519-dalek` 3.0 (default features off) | BSD-3-Clause | Ed25519 verification |
+| `curve25519-dalek` 5.0 (transitive) | BSD-3-Clause | curve arithmetic |
 | `p256` 0.14 (default features off, `ecdsa`) | Apache-2.0 OR MIT | ECDSA P-256 verification for contract-major 3 |
-| `zeroize` =1.8.2 (transitive of `p256`, retained at the existing verified version) | Apache-2.0 OR MIT | memory zeroing |
-| `sha2` 0.10 | MIT OR Apache-2.0 | SHA-256 |
+| `zeroize` 1.8.2 (transitive; no direct pin) | Apache-2.0 OR MIT | memory zeroing |
+| `sha2` 0.11 | MIT OR Apache-2.0 | SHA-256 |
 | `ryu-js` 1.0 | Apache-2.0 OR BSL-1.0 | ECMAScript float formatting (JCS) |
-| `subtle`, `digest`, `generic-array`, `typenum`, `elliptic-curve`, `crypto-bigint`, and others | MIT, Apache-2.0, or BSD-3-Clause | transitive cryptographic support |
+| `ctutils`, `digest`, `hybrid-array`, `typenum`, `elliptic-curve`, `crypto-bigint`, and others | MIT, Apache-2.0, or BSD-3-Clause | transitive cryptographic support |
 
 **Backend selection.** `default-features = false` on `ed25519-dalek` does not choose the
 `curve25519-dalek` backend. `curve25519-dalek` picks it in its build script: on 64-bit
@@ -72,13 +72,10 @@ Runtime dependencies (`sdks/rust/tools/license_check.sh` checks the license of e
 `aarch64`, it builds only the portable `serial` backend. To compile only `serial` on `x86_64`,
 build with `RUSTFLAGS='--cfg curve25519_dalek_backend="serial"'`.
 
-**Unsafe code.** `#![forbid(unsafe_code)]` covers this crate's own source only. A source scan
-of the locked dependency versions (October 14, 2026) finds `unsafe` blocks, functions, or
-impls in `curve25519-dalek`, `sha2`, `generic-array`, `cpufeatures`, `libc` (pulled in by
-`cpufeatures` on some targets), `crypto-bigint`, `subtle`, `zeroize`, `block-buffer`,
-`base16ct`, `rand_core`, and `ryu-js`. `p256`, `ecdsa`, `elliptic-curve`, `primeorder`, `sec1`,
-`der`, `ff`, `ed25519`, and `ed25519-dalek` declare `#![forbid(unsafe_code)]`. Using vetted
-cryptographic implementations is the reason for that trade.
+**Unsafe code.** `#![forbid(unsafe_code)]` covers this crate's own source only. The cryptographic backends and their transitive dependencies may use `unsafe`
+for arithmetic, processor intrinsics, and memory handling; the crate's prohibition does not
+extend into dependencies. Using reviewed cryptographic implementations is the reason for
+that trade. The committed lock identifies the precise versions to review for a deployment.
 
 ## AWS Lambda (`provided.al2023`)
 

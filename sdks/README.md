@@ -20,7 +20,7 @@ CI job reject registry-publish setup here.
   `bounded_authority_verifier`). Python 3.10 or later; one dependency, `cryptography`, for
   Ed25519 and ECDSA P-256.
 - **[`rust/`](rust/)**: `bounded-authority-protocol` (planned crates.io name). Rust 1.88 or
-  later; `ed25519-dalek`, `p256`, `sha2`, `ryu-js`, and an exact `zeroize` pin. See the
+  later; `ed25519-dalek`, `p256`, `sha2`, and `ryu-js` (with transitive `zeroize`). See the
   [deployment notes](../docs/deployment/rust-sdk.md) for AWS Lambda and PostgreSQL.
 - **[`go/`](go/)**: module path `github.com/baselabs/bounded_authority_protocol_go`. Go 1.25 or
   later; standard library only (`crypto/ed25519`, `crypto/ecdsa`, `crypto/elliptic`,

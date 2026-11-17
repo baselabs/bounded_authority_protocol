@@ -41,7 +41,7 @@
 //!    only this profile check admits one.
 //! 3. Only then the backend: `VerifyingKey::from_sec1_bytes` (on-curve
 //!    re-validation, inherent), `Signature::from_slice` (canonical-scalar
-//!    re-validation, inherent), and `verify_prehash` over SHA-256 of the
+//!    re-validation, inherent), and `verify` (which hashes with SHA-256) over the
 //!    exact RFC 7515 signing input.
 //!
 //! Every backend rejection or exception collapses to exactly `Err(Invalid)`

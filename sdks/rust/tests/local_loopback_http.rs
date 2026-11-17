@@ -65,7 +65,10 @@ fn certified_local_loopback_corpus_drives_rust_verdicts() {
     };
     let index_bytes = fs::read(root.join("index.json")).unwrap();
     assert_eq!(
-        format!("{:x}", Sha256::digest(&index_bytes)),
+        Sha256::digest(&index_bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>(),
         CERTIFIED_INDEX_SHA256
     );
     let index: Value = serde_json::from_slice(&index_bytes).unwrap();
@@ -87,7 +90,10 @@ fn certified_local_loopback_corpus_drives_rust_verdicts() {
     );
     for file in index["files"].as_array().unwrap() {
         let path = file["path"].as_str().unwrap();
-        let digest = format!("{:x}", Sha256::digest(fs::read(root.join(path)).unwrap()));
+        let digest = Sha256::digest(fs::read(root.join(path)).unwrap())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
         assert_eq!(digest, file["sha256"].as_str().unwrap(), "{path}");
     }
 

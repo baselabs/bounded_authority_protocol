@@ -299,7 +299,10 @@ fn certified_role_attestation_corpus_drives_rust_verdicts() {
     // the exact two-file set BEFORE trusting the per-file digests.
     let index_bytes = read_file("index.json");
     assert_eq!(
-        format!("{:x}", Sha256::digest(&index_bytes)),
+        Sha256::digest(&index_bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>(),
         CERTIFIED_INDEX_SHA256
     );
     let index: Value = serde_json::from_slice(&index_bytes).unwrap();
@@ -317,7 +320,10 @@ fn certified_role_attestation_corpus_drives_rust_verdicts() {
     );
     for file in index["files"].as_array().unwrap() {
         let path = file["path"].as_str().unwrap();
-        let digest = format!("{:x}", Sha256::digest(read_file(path)));
+        let digest = Sha256::digest(read_file(path))
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
         assert_eq!(digest, file["sha256"].as_str().unwrap(), "{path}");
     }
 

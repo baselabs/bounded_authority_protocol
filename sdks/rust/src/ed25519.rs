@@ -1,6 +1,6 @@
 //! Ed25519 verify wrapper — the `BAP1-Ed25519-SHA256` signature backend.
 //!
-//! Thin wrapper over `ed25519-dalek` 2.2 with `default-features = false` (the
+//! Thin wrapper over `ed25519-dalek` 3.0 with `default-features = false` (the
 //! serial verify backend — no `fast`/`asm`/`pkcs8`/`pem`/`rand_core` features;
 //! verify-only). Per design-note D-RISK-2, the accepted posture is that
 //! `curve25519-dalek` / `ed25519-dalek` carry transitive `unsafe` internally;
@@ -164,8 +164,8 @@ pub(crate) fn signature_gate(signature: &[u8; 64]) -> bool {
 /// - a signature that does not verify against the key and message;
 /// - any internal error inside the backend.
 ///
-/// `Signature::from_bytes` on a `[u8; 64]` is structurally infallible (every
-/// 64-byte pattern is a syntactically valid signature encoding); an invalid
+/// `Signature::from_slice` checks the byte width (already fixed here); every
+/// 64-byte pattern is a syntactically valid signature encoding; an invalid
 /// signature is rejected by `verify`, not by construction.
 pub(crate) fn verify(public_key: &[u8; 32], message: &[u8], signature: &[u8; 64]) -> Result<()> {
     if !strict_gate(signature, public_key) {
@@ -174,9 +174,9 @@ pub(crate) fn verify(public_key: &[u8; 32], message: &[u8], signature: &[u8; 64]
     // REQ1-SIGNING-backend-reject: any backend error -> Invalid. Some 32-byte
     // patterns are not valid Edwards-Y points; from_bytes returns a
     // PointDecompression error which we collapse to Invalid.
-    let vk = VerifyingKey::from_bytes(public_key).map_err(|_| Invalid)?;
-    // Canonical-encoding infallible constructor on the fixed 64-byte array.
-    let sig = Signature::from_bytes(signature);
+    let vk = VerifyingKey::try_from(public_key.as_slice()).map_err(|_| Invalid)?;
+    // Dalek 3 constructors check the input widths; the explicit gate above owns canonicality.
+    let sig = Signature::from_slice(signature).map_err(|_| Invalid)?;
     // The actual Ed25519 verification; any failure (or internal backend error)
     // -> Invalid. The error's diagnostic detail is deliberately discarded.
     vk.verify(message, &sig).map_err(|_| Invalid)
