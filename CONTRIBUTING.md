@@ -66,9 +66,10 @@ Existing checkouts must rerun `sh scripts/install-hooks.sh` after updating the h
 
 Contributors and agents never publish, tag a version, deploy or dispatch a workflow. The
 maintainers' release operator dispatches `publish.yml` for Hex and `pages.yml` for the static
-site, both from `main`; neither workflow starts on a push. Publication requires a successful
-`qualified` check for the exact commit, rejects an existing registry version or origin tag,
-and inspects the newly built archive before publishing. The registry credential belongs only
+site, both from `main`; neither workflow starts on a push, and only the maintainers' accounts
+can run either. The default-branch ruleset admits only commits whose `qualified` job passed.
+Publication rejects an existing registry version or origin tag and inspects the newly built
+archive before publishing. The registry credential belongs only
 to the `publish` environment and the publication step. The operator verifies publication and
 creates the version tag on the published commit.
 

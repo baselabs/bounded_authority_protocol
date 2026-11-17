@@ -33,8 +33,8 @@ from `main` to publish the Hex package after qualification. It rejects an alread
 or tagged version, builds docs and the archive without a cache, and checks package identity,
 file inventory and source bytes before publication. Contributors and agents do not publish,
 tag or dispatch. The operator verifies the published release and tags its exact commit.
-[pages.yml](../.github/workflows/pages.yml) is also dispatch-only from `main` and retains its
-`github-pages` environment.
+[pages.yml](../.github/workflows/pages.yml) is also dispatch-only from `main`, limited to the
+same maintainer accounts, and retains its `github-pages` environment.
 
 An attested candidate is not a registry release. See the [security policy](../SECURITY.md)
 for vulnerability reporting and the supported release line.

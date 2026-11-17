@@ -159,9 +159,12 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     end
   end
 
-  test "Pages deploys only when dispatched from the default branch" do
+  test "Pages deploys only when a maintainer dispatches it from the default branch" do
     pages = read(".github/workflows/pages.yml")
     assert pages["on"] == %{"workflow_dispatch" => nil}
+    publish = read(".github/workflows/publish.yml")
+    assert pages["jobs"]["build"]["if"] == publish["jobs"]["publish"]["if"]
+    assert pages["jobs"]["deploy"]["needs"] == "build"
     assert_default_branch_first(pages["jobs"]["build"])
     assert pages["jobs"]["deploy"]["environment"]["name"] == "github-pages"
   end
@@ -170,7 +173,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     path = ".github/workflows/publish.yml"
     workflow = read(path)
     assert workflow["on"] == %{"workflow_dispatch" => nil}
-    assert workflow["permissions"] == %{"contents" => "read", "checks" => "read"}
+    assert workflow["permissions"] == %{"contents" => "read"}
     [job] = Map.values(workflow["jobs"])
     assert job["environment"] == "publish"
 
@@ -198,12 +201,6 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
       refute uses?(step, "actions/cache")
       refute Map.has_key?(step["with"] || %{}, "cache")
     end
-
-    check = Enum.find(steps, &String.contains?(&1["run"] || "", "/check-runs"))
-    assert check["env"]["GH_TOKEN"] == "${{ github.token }}"
-    assert check["run"] =~ ~s(.name == "qualified")
-    assert check["run"] =~ ~s(.conclusion == "success")
-    assert check["run"] =~ "exit 1"
 
     version_guard = Enum.find(steps, &String.contains?(&1["run"] || "", "git ls-remote"))
     assert version_guard["run"] =~ "@version"

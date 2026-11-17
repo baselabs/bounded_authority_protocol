@@ -1,13 +1,13 @@
 name: Publish Hex package
 
 # The maintainers' release operator dispatches publication after the version
-# commit has landed on main through a successful qualification run.
+# commit has landed on main. The default-branch ruleset admits only a commit whose
+# qualified job passed, so the head of main is already qualified.
 on:
   workflow_dispatch:
 
 permissions:
   contents: read
-  checks: read
 
 concurrency:
   group: publish
@@ -33,17 +33,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Require a successful qualified check for this commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          checks="$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?per_page=100" \
-            --jq '.check_runs[] | select(.name == "qualified" and .status == "completed" and .conclusion == "success") | .id')"
-          if [ -z "$checks" ]; then
-            echo "This commit has no successful qualified check-run." >&2
-            exit 1
-          fi
 
       - name: Refuse a published or tagged version
         run: |

@@ -11,8 +11,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
   default branch on every run, enforce measured job timeouts, discard checkout credentials,
   install exact toolchains from `.tool-versions`, and refuse unlocked dependency changes.
 - Restrict Hex publication and Pages deployment to maintainer-dispatched workflows from
-  `main`. Publication requires the commit's successful qualification, rejects published or
-  tagged versions, and inspects package identity and contents; the SDK publication guard
+  `main` by the maintainers' accounts. Publication rejects published or tagged versions and
+  inspects package identity and contents; the SDK publication guard
   permits only the Hex command in that single workflow.
 
 - Run every check in one CI workflow run. SDK conformance, the SDK publish guard, dependency
