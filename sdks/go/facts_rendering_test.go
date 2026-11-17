@@ -108,7 +108,7 @@ func TestEveryFmtFallbackKeepsFactsOpaque(t *testing.T) {
 				struct{ Value any }{value.Elem().Interface()}, struct{ value any }{value.Elem().Interface()},
 				&struct{ Value any }{value.Interface()}, []any{value.Elem().Interface()},
 				map[string]any{"facts": value.Interface()}} {
-				for _, verb := range []string{"v", "s", "q", "x", "X", "d", "p", "T", "Z"} {
+				for _, verb := range []string{"v", "s", "q", "x", "X", "d", "p", "T", "b", "c", "o", "O", "U", "t", "e", "E", "f", "F", "g", "G", "w", "%", "Z"} {
 					for _, flags := range []string{"", "+", "#", " ", "0", "-", "+#020.3"} {
 						format := "%" + flags + verb
 						got := fmt.Sprintf(format, input)

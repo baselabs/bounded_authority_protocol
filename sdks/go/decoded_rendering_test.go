@@ -34,7 +34,7 @@ func TestDecodedRenderingMatchesReference(t *testing.T) {
 		}
 		for _, value := range []any{proof, &proof, content, &content} {
 			for _, nested := range []any{value, struct{ value any }{value}, []any{value}} {
-				for _, verb := range []string{"%v", "%+v", "%#v", "%s", "%q", "%x", "%X", "%d", "%p", "%T", "%Z"} {
+				for _, verb := range []string{"%v", "%+v", "%#v", "%s", "%q", "%x", "%X", "%d", "%p", "%T", "%b", "%c", "%o", "%O", "%U", "%t", "%e", "%E", "%f", "%F", "%g", "%G", "%w", "%%", "%Z"} {
 					if got := fmt.Sprintf(verb, nested); strings.Contains(got, "hidden-") {
 						t.Fatalf("%s leaks %s", verb, got)
 					}
