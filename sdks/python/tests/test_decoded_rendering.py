@@ -60,7 +60,7 @@ def test_each_decoded_surface_matches_reference_golden(major):
 
     from bounded_authority_verifier import JArray, JObject, JString
     from bounded_authority_verifier.facts import AttestationDecoded, GrantDecoded
-    gold = json.loads((Path(__file__).parents[2] / "decoded-rendering.json").read_text())
+    gold = json.loads((Path(__file__).parent / "fixtures" / "decoded-rendering.json").read_text())
     grant = GrantDecoded(major, "kid", "issuer", "grant", ("aud",), 1, 2, 3, bytes(32),
                          (JObject({"name": JString(b"read"), "selectors": JArray((JObject({"kind": JString(b"all")}),))}),))
     decoded = ProofDecoded(major, "proof", "POST", "https://example.test/", 1, "hidden-nonce", "invocation", "read", bytes(32), bytes(32), bytes(32), bytes(32))
@@ -74,7 +74,7 @@ def test_real_decoded_compacts_match_independent_reference():
     from pathlib import Path
 
     from bounded_authority_verifier import Ok, v1, v2, v3
-    rows = json.loads((Path(__file__).parents[2] / "decoded-wire-rendering.json").read_text())
+    rows = json.loads((Path(__file__).parent / "fixtures" / "decoded-wire-rendering.json").read_text())
     for row in rows:
         major = {1: v1, 2: v2, 3: v3}[row["major"]]
         result = getattr(major, f'decode_{row["kind"]}')(row["compact"].encode())
@@ -87,6 +87,6 @@ def test_decoded_binary_notation_matches_independent_reference():
     from pathlib import Path
 
     from bounded_authority_verifier import _inspect
-    rows = json.loads((Path(__file__).parents[2] / "decoded-binary-rendering.json").read_text())
+    rows = json.loads((Path(__file__).parent / "fixtures" / "decoded-binary-rendering.json").read_text())
     for row in rows:
         assert _inspect.binary(bytes.fromhex(row["hex"])) == row["expected"]

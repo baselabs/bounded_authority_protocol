@@ -46,6 +46,39 @@ for f in "$src_dir"/*.rs; do
   fi
 done
 
+sdk_dir=$(cd "$(dirname "$0")/.." && pwd)
+
+# ADR 0014 D5(b): source citations are forbidden throughout authored SDK files,
+# including tests, tools, docs, and this checker. Prune generated state only.
+# Split/escaped patterns keep the checker inside its own scanned boundary.
+if ! python3 - "$sdk_dir" <<'PYSCAN'
+import os
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+pattern = re.compile(
+    rb"lib/" rb"bounded_authority_protocol|\b[A-Za-z0-9_][A-Za-z0-9_./\\-]*[.]exs?\b"
+)
+generated = {".git", "target", "__pycache__"}
+violations = 0
+for directory, dirs, files in os.walk(root):
+    dirs[:] = sorted(name for name in dirs if name not in generated)
+    for name in sorted(files):
+        path = Path(directory) / name
+        for lineno, line in enumerate(path.read_bytes().splitlines(), 1):
+            if pattern.search(line):
+                print(f"purity_check: {path.relative_to(root)}:{lineno}: reference source citation", file=sys.stderr)
+                violations += 1
+if violations:
+    sys.exit(1)
+print("purity_check: OK - no reference source citations in SDK.")
+PYSCAN
+then
+  status=1
+fi
+
 if [ "$status" -ne 0 ]; then
   exit 1
 fi

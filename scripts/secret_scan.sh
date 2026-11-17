@@ -466,6 +466,10 @@ sdks/rust/conformance/corpus-producer-canonicality/cases/es256-export-encode/pro
 priv/conformance/selector-float-zero/cases/envelope/probe.json
 sdks/go/conformance/corpus-selector-float-zero/cases/grant-decode/probe.json
 sdks/rust/conformance/corpus-selector-float-zero/cases/grant-signing-input/probe.json
+test/fixtures/sdk_rendering/decoded-wire-rendering.json
+sdks/python/tests/fixtures/decoded-wire-rendering.json
+sdks/rust/tests/fixtures/decoded-wire-rendering.json
+sdks/go/testdata/decoded-wire-rendering.json
 EOF
   python3 - "$config" "$generic_paths_file" "$jwt_paths_file" <<'PY'
 import re

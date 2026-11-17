@@ -7,7 +7,7 @@ use bounded_authority_protocol::{
 #[test]
 fn decoded_rendering_matches_reference() {
     let gold: serde_json::Value =
-        serde_json::from_str(include_str!("../../decoded-rendering.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/decoded-rendering.json")).unwrap();
     for version in 1..=3 {
         let grant = GrantDecoded {
             version,
@@ -90,7 +90,7 @@ fn decoded_rendering_matches_reference() {
 fn decoded_wire_rendering_matches_reference() {
     use bounded_authority_protocol::{bounds::Bounds, v1, v2, v3};
     let rows: serde_json::Value =
-        serde_json::from_str(include_str!("../../decoded-wire-rendering.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/decoded-wire-rendering.json")).unwrap();
     let b = Bounds::maximum();
     for row in rows.as_array().unwrap() {
         let compact = row["compact"].as_str().unwrap().as_bytes();

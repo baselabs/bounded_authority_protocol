@@ -12,7 +12,7 @@ import (
 )
 
 func TestDecodedRenderingMatchesReference(t *testing.T) {
-	raw, err := os.ReadFile("../decoded-rendering.json")
+	raw, err := os.ReadFile("testdata/decoded-rendering.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestDecodedRenderingMatchesReference(t *testing.T) {
 }
 
 func TestDecodedWireRenderingMatchesReference(t *testing.T) {
-	raw, err := os.ReadFile("../decoded-wire-rendering.json")
+	raw, err := os.ReadFile("testdata/decoded-wire-rendering.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestDecodedWireRenderingMatchesReference(t *testing.T) {
 }
 
 func TestDecodedBinaryNotationMatchesReference(t *testing.T) {
-	raw, err := os.ReadFile("../decoded-binary-rendering.json")
+	raw, err := os.ReadFile("testdata/decoded-binary-rendering.json")
 	if err != nil {
 		t.Fatal(err)
 	}

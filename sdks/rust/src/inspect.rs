@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn binary_notation_matches_reference() {
         let rows: serde_json::Value =
-            serde_json::from_str(include_str!("../../decoded-binary-rendering.json")).unwrap();
+            serde_json::from_str(include_str!("../tests/fixtures/decoded-binary-rendering.json")).unwrap();
         for row in rows.as_array().unwrap() {
             let hex = row["hex"].as_str().unwrap();
             let bytes: Vec<u8> = (0..hex.len())

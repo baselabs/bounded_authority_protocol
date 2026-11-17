@@ -13,6 +13,8 @@ forbidden import or call. Exits 1 on any violation.
 from __future__ import annotations
 
 import ast
+import os
+import re
 import sys
 from pathlib import Path
 
@@ -53,7 +55,30 @@ FORBIDDEN_CALLS: dict[str, str] = {
     "breakpoint": "breakpoint (debugger)",
 }
 
-SRC_DIR = Path(__file__).resolve().parent.parent / "src" / "bounded_authority_verifier"
+SDK_DIR = Path(__file__).resolve().parent.parent
+SRC_DIR = SDK_DIR / "src" / "bounded_authority_verifier"
+
+# Scan authored files across the entire SDK, including this tool. Only generated
+# dependency/build/cache directories are pruned. Split/escaped patterns do not
+# contain the citations they detect (ADR 0014 D5(b)).
+REFERENCE_PATH = re.compile(
+    rb"lib/" rb"bounded_authority_protocol|\b[A-Za-z0-9_][A-Za-z0-9_./\\-]*[.]exs?\b"
+)
+GENERATED_DIRS = {
+    ".git", ".venv", "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache",
+}
+
+
+def derivation_violations() -> list[str]:
+    violations = []
+    for directory, dirs, files in os.walk(SDK_DIR):
+        dirs[:] = sorted(name for name in dirs if name not in GENERATED_DIRS)
+        for name in sorted(files):
+            path = Path(directory) / name
+            for lineno, line in enumerate(path.read_bytes().splitlines(), 1):
+                if REFERENCE_PATH.search(line):
+                    violations.append(f"{path.relative_to(SDK_DIR)}:{lineno}: reference source citation")
+    return violations
 
 
 class PurityChecker(ast.NodeVisitor):
@@ -137,7 +162,7 @@ def main() -> int:
     if not SRC_DIR.is_dir():
         print(f"purity: source dir not found: {SRC_DIR}", file=sys.stderr)
         return 1
-    total_violations: list[str] = []
+    total_violations = derivation_violations()
     for py in sorted(SRC_DIR.rglob("*.py")):
         try:
             tree = ast.parse(py.read_text("utf8"), filename=str(py))
@@ -150,9 +175,9 @@ def main() -> int:
     if total_violations:
         for v in total_violations:
             print(f"purity: {v}", file=sys.stderr)
-        print(f"\npurity: {len(total_violations)} violation(s) in src/ — the verify path must be pure", file=sys.stderr)
+        print(f"\npurity: {len(total_violations)} purity/derivation violation(s)", file=sys.stderr)
         return 1
-    print("purity: PASS (no I/O/clock/RNG/network in src/)")
+    print("purity: PASS (no I/O/clock/RNG/network in src/; no reference source citations in SDK)")
     return 0
 
 

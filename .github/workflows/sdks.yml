@@ -9,6 +9,7 @@ on:
   pull_request:
     paths:
       - "sdks/**"
+      - "test/fixtures/sdk_rendering/**"
       - "priv/conformance/**"
       - "conformance/**"
       - "spec/**"
@@ -23,6 +24,7 @@ on:
       - "kci/**"
     paths:
       - "sdks/**"
+      - "test/fixtures/sdk_rendering/**"
       - "priv/conformance/**"
       - "conformance/**"
       - "spec/**"
