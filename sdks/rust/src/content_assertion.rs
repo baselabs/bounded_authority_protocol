@@ -67,7 +67,7 @@ pub struct DecodedContentAssertion {
     pub verification: NotEvaluated,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ContentAssertionFacts {
     pub version: i64,
     pub attestor_key_id: String,
@@ -642,4 +642,10 @@ fn signing_input_bytes(protected: &[u8], payload: &[u8]) -> Vec<u8> {
 
 fn b64_string(bytes: &[u8]) -> Result<String> {
     String::from_utf8(base64url_encode(bytes)).map_err(|_| Invalid)
+}
+
+impl std::fmt::Debug for ContentAssertionFacts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("#ContentAssertionFacts<redacted>")
+    }
 }

@@ -14,12 +14,10 @@
 //!
 //! # Redaction contract (load-bearing)
 //!
-//! Every facts struct derives **only** [`Debug`], [`Clone`], and [`PartialEq`].
-//! It deliberately does NOT derive `serde::Serialize`, `serde::Deserialize`,
-//! or `std::fmt::Display`, and it implements no generic encoder, string,
-//! enumeration, collection, or access protocol. This makes the facts impossible
-//! to turn into a credential-shaped value: there is no `to_string`, no
-//! `serialize`, and no `as_bytes`.
+//! Every facts struct implements fixed `Debug` output: `#Type<redacted>`,
+//! including alternate, width, and precision formatting. No field is inspected.
+//! Facts derive [`Clone`] and [`PartialEq`], but never `serde::Serialize`,
+//! `serde::Deserialize`, or `std::fmt::Display`; there is no generic encoder.
 //!
 //! No facts field holds a raw Ed25519 signature, a JWK container, a nonce, the
 //! raw `cast_arguments`, or selector values. The `[u8; 32]` fields below are
@@ -87,7 +85,7 @@ pub struct SignatureAndWindow;
 /// It MUST NOT carry the raw signature, the issuer JWK, a nonce, the
 /// operations' selector values, or any caller argument
 /// (`REQ1-VERIFY-facts-not-credentials`).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct GrantFacts {
     /// The grant `v` claim (integral contract-major; v1 == `1`).
     pub version: i64,
@@ -127,7 +125,7 @@ pub struct GrantFacts {
 /// received grant compact, `ba_req` over the request-digest preimage). It MUST
 /// NOT carry the raw proof signature, the proof JWK, a nonce, selector values,
 /// or the raw `cast_arguments`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct EnvelopeFacts {
     /// The re-verified grant facts (the envelope re-runs grant verification on
     /// the raw grant compact before binding the proof).
@@ -170,7 +168,7 @@ pub struct EnvelopeFacts {
 ///
 /// Chain facts carry `trust` only — they make no `authorization` field part of
 /// their public shape (`REQ1-CHAIN-facts-shape`).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct ChainFacts {
     /// The verified chain identity (`chain_id`).
     pub chain_id: String,
@@ -199,7 +197,7 @@ pub struct ChainFacts {
 /// the RFC 7638 fingerprint derived from the raw Ed25519 public key"
 /// (ADR 0004 § Boundary anchors). These verified values are echoed in the
 /// facts. Anchor facts carry `trust` only (`REQ1-CHAIN-facts-shape`).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct AnchorFacts {
     /// The anchor `anchor_id`.
     pub anchor_id: String,
@@ -228,7 +226,7 @@ pub struct AnchorFacts {
 /// chain identities, effective time, current fingerprint, next key ID, and next
 /// fingerprint" (ADR 0004 § Authenticated key transitions). Transition facts
 /// carry `trust` only (`REQ1-CHAIN-facts-shape`).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct KeyTransitionFacts {
     /// The transition `transition_id`.
     pub transition_id: String,
@@ -259,7 +257,7 @@ pub struct KeyTransitionFacts {
 /// version one" (ADR 0004 § Anchored export); verification also independently
 /// recomputes the complete-archive SHA-256 and compares the out-of-band
 /// object-store version.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct AnchoredExportFacts {
     /// The verified chain identity.
     pub chain_id: String,
@@ -302,7 +300,7 @@ pub struct AnchoredExportFacts {
 /// an authorization: facts carry no raw key material, no signature, and no
 /// decision (`REQ-RA1-VERIFY-facts-non-authorizing`,
 /// `REQ-RA1-SECURITY-not-authority`).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct AttestationFacts {
     /// The attestor key id (the protected-header `kid`, matched to the
     /// caller's trusted attestor key id).
@@ -329,279 +327,54 @@ pub struct AttestationFacts {
     pub trust: NotEvaluated,
 }
 
+impl std::fmt::Debug for GrantFacts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("#GrantFacts<redacted>")
+    }
+}
+
+impl std::fmt::Debug for EnvelopeFacts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("#EnvelopeFacts<redacted>")
+    }
+}
+
+impl std::fmt::Debug for ChainFacts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("#ChainFacts<redacted>")
+    }
+}
+
+impl std::fmt::Debug for AnchorFacts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("#AnchorFacts<redacted>")
+    }
+}
+
+impl std::fmt::Debug for KeyTransitionFacts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("#KeyTransitionFacts<redacted>")
+    }
+}
+
+impl std::fmt::Debug for AnchoredExportFacts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("#AnchoredExportFacts<redacted>")
+    }
+}
+
+impl std::fmt::Debug for AttestationFacts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("#AttestationFacts<redacted>")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// Forbidden substrings that MUST NOT appear in any facts Debug output.
-    /// Each catches a class of credential-shaped leak: a raw signature, a JWK
-    /// container, a nonce, a private exponent label, a secret, or the raw
-    /// caller arguments. None of these fragments appears in any legitimate
-    /// field name on the six facts structs.
-    const FORBIDDEN: &[&str] = &[
-        "signature",
-        "jwk",
-        "nonce",
-        "private",
-        "secret",
-        "arguments",
-    ];
-
-    /// Detects a JWK private-exponent `d` member in Debug output.
-    ///
-    /// The plan specifies forbidding the substring `" d"` (the JWK private
-    /// field). A literal `" d"` match is too broad: it collides with the
-    /// contracted `digest` field, whose Debug rendering is `], digest:` — the
-    /// `, d` of `, digest:` matches `" d"` even though `digest` is a public
-    /// SHA-256 hash (the opposite of private material). This refines the check
-    /// to the actual JWK-`d` leak signatures: `d` as a standalone struct field
-    /// (`d:` preceded by a space, brace, or comma) or as a JSON map key
-    /// (`"d"`). The legitimate `digest:` field is `d` followed by `i`, so it
-    /// does not match.
-    fn leaks_jwk_private_d(debug: &str) -> bool {
-        // Struct-field form: `d:` as a complete field name (a boundary char
-        // then `d` then `:`/`=`). Catches `Jwk { x: .., d: .. }`-style leaks.
-        // Byte walk is ASCII-boundary safe (`d`, `:`, `=` are all ASCII).
-        let bytes = debug.as_bytes();
-        let mut prev = b'\n';
-        for i in 0..bytes.len() {
-            let cur = bytes[i];
-            if cur == b'd' {
-                let next = bytes.get(i + 1).copied().unwrap_or(b'\0');
-                let prev_is_boundary = matches!(prev, b' ' | b'{' | b',');
-                if prev_is_boundary && matches!(next, b':' | b'=') {
-                    return true;
-                }
-            }
-            prev = cur;
-        }
-        // JSON map-key form: `"d"` (a quoted `d` member, e.g. a leaked
-        // serde_json::Value JWK).
-        debug.contains("\"d\"")
-    }
-
-    /// Asserts no forbidden substring and no JWK-private-`d` leak appears in
-    /// the Debug rendering.
-    fn assert_redacted(debug: &str) {
-        for &needle in FORBIDDEN {
-            assert!(
-                !debug.contains(needle),
-                "redaction violation: Debug output contains forbidden substring {needle:?}\n{debug}"
-            );
-        }
-        assert!(
-            !leaks_jwk_private_d(debug),
-            "redaction violation: Debug output leaks a JWK private-exponent `d` member\n{debug}"
-        );
-    }
-
     fn zero32() -> [u8; 32] {
-        [0u8; 32]
-    }
-
-    // ==========================================================================
-    // Redaction Debug-property test (red-first): each facts struct's Debug
-    // output is free of signature / jwk / nonce / private / secret / arguments.
-    // ==========================================================================
-
-    #[test]
-    fn grant_facts_debug_is_redacted() {
-        let facts = GrantFacts {
-            version: 1,
-            issuer: "https://issuer.example.test".to_string(),
-            grant_id: "urn:example:grant:1".to_string(),
-            issuer_key_fingerprint: zero32(),
-            holder_thumbprint: zero32(),
-            matched_audience: "https://resource.example.test".to_string(),
-            iat: 1000,
-            nbf: 1000,
-            exp: 2000,
-            authorization: NotEvaluated,
-        };
-        let debug = format!("{facts:?}");
-        assert!(debug.contains("GrantFacts"));
-        assert!(debug.contains("NotEvaluated"));
-        assert_redacted(&debug);
-    }
-
-    #[test]
-    fn envelope_facts_debug_is_redacted() {
-        let grant = GrantFacts {
-            version: 1,
-            issuer: "https://issuer.example.test".to_string(),
-            grant_id: "urn:example:grant:1".to_string(),
-            issuer_key_fingerprint: zero32(),
-            holder_thumbprint: zero32(),
-            matched_audience: "https://resource.example.test".to_string(),
-            iat: 1000,
-            nbf: 1000,
-            exp: 2000,
-            authorization: NotEvaluated,
-        };
-        let facts = EnvelopeFacts {
-            grant,
-            proof_id: "urn:example:proof:1".to_string(),
-            invocation_id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
-            operation: "read".to_string(),
-            normalized_uri: "https://resource.example.test/invoke".to_string(),
-            grant_hash: zero32(),
-            request_hash: zero32(),
-            proof_iat: 1100,
-            authorization: NotEvaluated,
-        };
-        let debug = format!("{facts:?}");
-        assert!(debug.contains("EnvelopeFacts"));
-        assert!(debug.contains("proof_iat"));
-        assert_redacted(&debug);
-    }
-
-    #[test]
-    fn chain_facts_debug_is_redacted() {
-        let facts = ChainFacts {
-            chain_id: "urn:example:chain".to_string(),
-            row_count: 2,
-            first_sequence: 1,
-            last_sequence: 2,
-            previous_hash: zero32(),
-            head_hash: zero32(),
-            trust: NotEvaluated,
-        };
-        let debug = format!("{facts:?}");
-        assert!(debug.contains("ChainFacts"));
-        assert_redacted(&debug);
-    }
-
-    #[test]
-    fn anchor_facts_debug_is_redacted() {
-        let facts = AnchorFacts {
-            anchor_id: "urn:example:anchor:start".to_string(),
-            anchored_at: 1000,
-            chain_id: "urn:example:chain".to_string(),
-            sequence: 0,
-            chain_hash: zero32(),
-            key_fingerprint: zero32(),
-            key_id: "archive-a".to_string(),
-            trust: NotEvaluated,
-        };
-        let debug = format!("{facts:?}");
-        assert!(debug.contains("AnchorFacts"));
-        assert_redacted(&debug);
-    }
-
-    #[test]
-    fn key_transition_facts_debug_is_redacted() {
-        let facts = KeyTransitionFacts {
-            transition_id: "urn:example:transition:a-b".to_string(),
-            chain_id: "urn:example:chain".to_string(),
-            effective_at: 1500,
-            current_key_fingerprint: zero32(),
-            current_key_id: "archive-a".to_string(),
-            next_key_fingerprint: zero32(),
-            next_key_id: "archive-b".to_string(),
-            trust: NotEvaluated,
-        };
-        let debug = format!("{facts:?}");
-        assert!(debug.contains("KeyTransitionFacts"));
-        assert_redacted(&debug);
-    }
-
-    #[test]
-    fn anchored_export_facts_debug_is_redacted() {
-        let facts = AnchoredExportFacts {
-            chain_id: "urn:example:chain".to_string(),
-            first_sequence: 1,
-            last_sequence: 1,
-            row_count: 1,
-            transition_count: 1,
-            previous_hash: zero32(),
-            head_hash: zero32(),
-            digest: zero32(),
-            object_version: "v1".to_string(),
-            trust: NotEvaluated,
-            authorization: NotEvaluated,
-        };
-        let debug = format!("{facts:?}");
-        assert!(debug.contains("AnchoredExportFacts"));
-        // AnchoredExportFacts is the ONLY chain-family fact carrying both
-        // markers — confirm both field names render.
-        assert!(debug.contains("trust"));
-        assert!(debug.contains("authorization"));
-        assert_redacted(&debug);
-    }
-
-    // ==========================================================================
-    // Red-capability proof: a `raw_signature` field on a facts-shaped struct
-    // WOULD trip the gate. This proves the redaction assertion is capable of
-    // catching a planted signature field without ever adding one to the real
-    // structs (which must stay signature-free).
-    // ==========================================================================
-
-    #[test]
-    fn red_capability_a_signature_field_would_be_caught() {
-        // A throwaway struct mirroring the facts shape but carrying the
-        // forbidden raw-signature field. If anyone ever adds such a field to a
-        // real facts struct, this is exactly the assertion that goes red.
-        #[derive(Debug)]
-        #[allow(dead_code)]
-        struct LeakyFacts {
-            grant_id: String,
-            raw_signature: [u8; 64],
-            authorization: NotEvaluated,
-        }
-        let leaky = LeakyFacts {
-            grant_id: "urn:example:grant:1".to_string(),
-            raw_signature: [0u8; 64],
-            authorization: NotEvaluated,
-        };
-        let debug = format!("{leaky:?}");
-        // The Debug output DOES contain "signature" — proving the
-        // `assert_redacted` gate above would fail closed on this struct.
-        assert!(
-            debug.contains("signature"),
-            "red-capability check broken: signature field not rendered"
-        );
-        // And the redaction gate rejects it (this is the red state).
-        let mut tripped = None;
-        for &needle in FORBIDDEN {
-            if debug.contains(needle) {
-                tripped = Some(needle);
-                break;
-            }
-        }
-        assert_eq!(tripped, Some("signature"));
-    }
-
-    #[test]
-    fn red_capability_a_jwk_private_d_field_would_be_caught() {
-        // Proves the refined JWK-private-`d` detector is red-capable: a field
-        // literally named `d` (the JWK private-exponent member) renders as
-        // `d:` and IS caught, while the contracted `digest:` field is NOT
-        // (its `d` is followed by `i`, so it is not a standalone `d` field).
-        #[derive(Debug)]
-        #[allow(dead_code)]
-        struct LeakyJwk {
-            x: [u8; 32],
-            d: [u8; 32],
-        }
-        let leaky = LeakyJwk {
-            x: [0u8; 32],
-            d: [1u8; 32],
-        };
-        let debug = format!("{leaky:?}");
-        assert!(leaks_jwk_private_d(&debug), "d-field detector missed `d:`");
-
-        // The benign mirror: a `digest` field must NOT trip the detector.
-        #[derive(Debug)]
-        #[allow(dead_code)]
-        struct CleanFacts {
-            digest: [u8; 32],
-        }
-        let clean = CleanFacts { digest: [0u8; 32] };
-        let clean_debug = format!("{clean:?}");
-        assert!(
-            !leaks_jwk_private_d(&clean_debug),
-            "d-field detector false-positive on `digest:`\n{clean_debug}"
-        );
+        [0; 32]
     }
 
     // ==========================================================================
@@ -612,7 +385,6 @@ mod tests {
     fn not_evaluated_renders_as_bare_token() {
         let debug = format!("{NotEvaluated:?}");
         assert_eq!(debug, "NotEvaluated");
-        assert_redacted(&debug);
     }
 
     #[test]

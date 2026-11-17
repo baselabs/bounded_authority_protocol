@@ -217,8 +217,10 @@ cannot fail. A `nil` `*Bounds` means the profile maxima; build tighter limits wi
 digests, times, and counts, never raw signatures, keys, nonces, or arguments. `GrantFacts`,
 `EnvelopeFacts`, and `AnchoredExportFacts` carry `Authorization: AuthorizationNotEvaluated`; the
 chain, anchor, transition, export, attestation, and content-assertion facts carry
-`Trust: TrustNotEvaluated`. There is no `Authorized` or decision field. The facts types have no
-redacted `String` method yet, so `fmt` prints their fields; log the fields you need by name.
+`Trust: TrustNotEvaluated`. There is no `Authorized` or decision field. The facts types implement `String`, `GoString`, and
+`Format`: values and pointers always render as `#Type<redacted>` (for example,
+`#GrantFacts<redacted>`), including `%v`, `%+v`, and `%#v`. Read individual fields explicitly
+when needed.
 
 ## Strict Ed25519
 

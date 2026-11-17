@@ -1,13 +1,17 @@
 package verifier
 
+import (
+	"fmt"
+	"io"
+)
+
 // Verified facts (spec/bap-v1.md § Public verification contract). Facts
 // are value-bearing and redacted: they contain only their exact documented
 // fields, no raw credentials, signatures, JWK containers, nonces, request
 // argument values, or selector values. They carry no JSON, string, or generic
 // encoder and are not credentials (REQ1-VERIFY-facts-redacted,
-// REQ1-VERIFY-facts-not-credentials). Go cannot seal %+v formatting the way
-// the Elixir seals Inspect; the redaction contract is the closed field set
-// itself.
+// REQ1-VERIFY-facts-not-credentials). String, GoString, and Format always
+// emit the fixed #Type<redacted> rendering, including flags and precision.
 
 // Authorization is the fixed non-authorizing marker on GrantFacts,
 // EnvelopeFacts, and AnchoredExportFacts. Only NotEvaluated exists.
@@ -116,4 +120,92 @@ type AnchoredExportFacts struct {
 type KeyLocator struct {
 	KeyID string
 	Trust Trust
+}
+
+// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
+func (GrantFacts) String() string { return "#GrantFacts<redacted>" }
+
+// GoString returns the same fixed rendering for Go syntax formatting.
+func (GrantFacts) GoString() string { return "#GrantFacts<redacted>" }
+
+// Format keeps every formatting verb, flag, width, and precision value-free.
+func (GrantFacts) Format(state fmt.State, _ rune) {
+	_, _ = io.WriteString(state, "#GrantFacts<redacted>")
+}
+
+// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
+func (EnvelopeFacts) String() string { return "#EnvelopeFacts<redacted>" }
+
+// GoString returns the same fixed rendering for Go syntax formatting.
+func (EnvelopeFacts) GoString() string { return "#EnvelopeFacts<redacted>" }
+
+// Format keeps every formatting verb, flag, width, and precision value-free.
+func (EnvelopeFacts) Format(state fmt.State, _ rune) {
+	_, _ = io.WriteString(state, "#EnvelopeFacts<redacted>")
+}
+
+// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
+func (ChainFacts) String() string { return "#ChainFacts<redacted>" }
+
+// GoString returns the same fixed rendering for Go syntax formatting.
+func (ChainFacts) GoString() string { return "#ChainFacts<redacted>" }
+
+// Format keeps every formatting verb, flag, width, and precision value-free.
+func (ChainFacts) Format(state fmt.State, _ rune) {
+	_, _ = io.WriteString(state, "#ChainFacts<redacted>")
+}
+
+// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
+func (AnchorFacts) String() string { return "#AnchorFacts<redacted>" }
+
+// GoString returns the same fixed rendering for Go syntax formatting.
+func (AnchorFacts) GoString() string { return "#AnchorFacts<redacted>" }
+
+// Format keeps every formatting verb, flag, width, and precision value-free.
+func (AnchorFacts) Format(state fmt.State, _ rune) {
+	_, _ = io.WriteString(state, "#AnchorFacts<redacted>")
+}
+
+// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
+func (KeyTransitionFacts) String() string { return "#KeyTransitionFacts<redacted>" }
+
+// GoString returns the same fixed rendering for Go syntax formatting.
+func (KeyTransitionFacts) GoString() string { return "#KeyTransitionFacts<redacted>" }
+
+// Format keeps every formatting verb, flag, width, and precision value-free.
+func (KeyTransitionFacts) Format(state fmt.State, _ rune) {
+	_, _ = io.WriteString(state, "#KeyTransitionFacts<redacted>")
+}
+
+// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
+func (AnchoredExportFacts) String() string { return "#AnchoredExportFacts<redacted>" }
+
+// GoString returns the same fixed rendering for Go syntax formatting.
+func (AnchoredExportFacts) GoString() string { return "#AnchoredExportFacts<redacted>" }
+
+// Format keeps every formatting verb, flag, width, and precision value-free.
+func (AnchoredExportFacts) Format(state fmt.State, _ rune) {
+	_, _ = io.WriteString(state, "#AnchoredExportFacts<redacted>")
+}
+
+// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
+func (AttestationFacts) String() string { return "#AttestationFacts<redacted>" }
+
+// GoString returns the same fixed rendering for Go syntax formatting.
+func (AttestationFacts) GoString() string { return "#AttestationFacts<redacted>" }
+
+// Format keeps every formatting verb, flag, width, and precision value-free.
+func (AttestationFacts) Format(state fmt.State, _ rune) {
+	_, _ = io.WriteString(state, "#AttestationFacts<redacted>")
+}
+
+// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
+func (ContentAssertionFacts) String() string { return "#ContentAssertionFacts<redacted>" }
+
+// GoString returns the same fixed rendering for Go syntax formatting.
+func (ContentAssertionFacts) GoString() string { return "#ContentAssertionFacts<redacted>" }
+
+// Format keeps every formatting verb, flag, width, and precision value-free.
+func (ContentAssertionFacts) Format(state fmt.State, _ rune) {
+	_, _ = io.WriteString(state, "#ContentAssertionFacts<redacted>")
 }

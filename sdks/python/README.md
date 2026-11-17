@@ -222,9 +222,9 @@ key functions raise for a key that fails `acceptable_public_key`). `verify_stric
 `AnchoredExportFacts`, `AttestationFacts`, and `ContentAssertionFacts` are frozen dataclasses
 holding identifiers, digests, times, and counts, never raw signatures, keys, nonces, or
 arguments. Their `authorization` or `trust` field is `"not_evaluated"`; there is no `allowed`,
-`authorized`, or decision field. Their `repr` is the default dataclass `repr`, which prints
-every field; the fixed redacted rendering the specification calls for is not implemented yet,
-so log the fields you need by name.
+`authorized`, or decision field. Their `repr` and `str` always render as `#Type<redacted>` (for example,
+`#GrantFacts<redacted>`), including when nested in a Result or container.
+Read individual fields explicitly when needed.
 
 ## Strict Ed25519
 

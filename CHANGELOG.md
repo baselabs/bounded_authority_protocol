@@ -23,6 +23,15 @@ All notable changes to `bounded_authority_protocol` are documented here.
   exclude exactly those tests with an explicit reason and reject the CI full-history flag.
 
 ## [1.0.0] (2026-11-10)
+## Unreleased
+
+### Fixed
+
+- Python, Rust, and Go verifier facts now use fixed `#Type<redacted>` rendering on every
+  default display path, including nested Results and Go formatting flags. Field values remain
+  accessible explicitly.
+
+## [1.0.0] — 2026-11-10
 
 ### Changed
 

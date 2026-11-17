@@ -218,10 +218,10 @@ keys, nonces, or arguments. `GrantFacts` and `EnvelopeFacts` carry
 `authorization: NotEvaluated`; `ChainFacts`, `AnchorFacts`, and `KeyTransitionFacts` carry
 `trust: NotEvaluated`; `AnchoredExportFacts` carries both; `AttestationFacts` and
 `ContentAssertionFacts` carry `verification: SignatureAndWindow` and `trust: NotEvaluated`.
-Every facts type derives `Debug`, `Clone`, and `PartialEq` (`ContentAssertionFacts` also `Eq`),
-and none implements `Display` or `Serialize`. The derived `Debug` prints every field; the
-fixed redacted rendering the specification calls for is not implemented yet, so log the fields
-you need by name.
+Every facts type derives `Clone` and `PartialEq` (`ContentAssertionFacts` also `Eq`),
+and none implements `Display` or `Serialize`. `Debug` always renders as `#Type<redacted>`
+(for example, `#GrantFacts<redacted>`), including alternate formatting and nested Results.
+Read individual fields explicitly when needed.
 
 ## Strict Ed25519
 

@@ -30,6 +30,12 @@ class GrantFacts:
     expires_at: int
     authorization: str = "not_evaluated"
 
+    def __repr__(self) -> str:
+        return "#GrantFacts<redacted>"
+
+    def __str__(self) -> str:
+        return "#GrantFacts<redacted>"
+
 
 @dataclass(frozen=True)
 class EnvelopeFacts:
@@ -54,6 +60,12 @@ class EnvelopeFacts:
     proof_issued_at: int
     authorization: str = "not_evaluated"
 
+    def __repr__(self) -> str:
+        return "#EnvelopeFacts<redacted>"
+
+    def __str__(self) -> str:
+        return "#EnvelopeFacts<redacted>"
+
 
 @dataclass(frozen=True)
 class ChainFacts:
@@ -71,6 +83,12 @@ class ChainFacts:
     last_hash: bytes
     verification: str = "boundary_consistent"
     trust: str = "not_evaluated"
+
+    def __repr__(self) -> str:
+        return "#ChainFacts<redacted>"
+
+    def __str__(self) -> str:
+        return "#ChainFacts<redacted>"
 
 
 @dataclass(frozen=True)
@@ -91,6 +109,12 @@ class AnchorFacts:
     verification: str = "signature_and_window"
     trust: str = "not_evaluated"
 
+    def __repr__(self) -> str:
+        return "#AnchorFacts<redacted>"
+
+    def __str__(self) -> str:
+        return "#AnchorFacts<redacted>"
+
 
 @dataclass(frozen=True)
 class KeyTransitionFacts:
@@ -108,6 +132,12 @@ class KeyTransitionFacts:
     next_key_fingerprint: bytes
     verification: str = "authenticated_transition"
     trust: str = "not_evaluated"
+
+    def __repr__(self) -> str:
+        return "#KeyTransitionFacts<redacted>"
+
+    def __str__(self) -> str:
+        return "#KeyTransitionFacts<redacted>"
 
 
 @dataclass(frozen=True)
@@ -136,6 +166,12 @@ class AnchoredExportFacts:
     verification: str = "anchored_export"
     trust: str = "not_evaluated"
     authorization: str = "not_evaluated"
+
+    def __repr__(self) -> str:
+        return "#AnchoredExportFacts<redacted>"
+
+    def __str__(self) -> str:
+        return "#AnchoredExportFacts<redacted>"
 
 
 @dataclass(frozen=True)
@@ -208,6 +244,12 @@ class AttestationFacts:
     verification: str = "signature_and_window"
     trust: str = "not_evaluated"
 
+    def __repr__(self) -> str:
+        return "#AttestationFacts<redacted>"
+
+    def __str__(self) -> str:
+        return "#AttestationFacts<redacted>"
+
 
 @dataclass(frozen=True)
 class ContentAssertionDecoded:
@@ -256,3 +298,9 @@ class ContentAssertionFacts:
     digest: bytes
     verification: str = "signature_and_window"
     trust: str = "not_evaluated"
+
+    def __repr__(self) -> str:
+        return "#ContentAssertionFacts<redacted>"
+
+    def __str__(self) -> str:
+        return "#ContentAssertionFacts<redacted>"

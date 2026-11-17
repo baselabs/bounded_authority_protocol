@@ -53,9 +53,6 @@ comments cross-reference the Elixir reference implementation for traceability.
   float-tagged zero inside an `equals` value or `one_of` member on every contract-major, and the
   grant producer refuses a float-tagged integral selector value; each SDK runs the certified
   `bap-selector-float-zero/1` corpus (161 cases).
-- **Facts rendering.** The specification requires facts to have a fixed redacted rendering.
-  The Python `repr`, the Rust derived `Debug`, and Go's `fmt` formatting print every field.
-  Facts never hold secrets, but log the fields you need by name.
 - **Python `v3` export.** `bounded_authority_verifier.v3` is not listed in the package's
   `__all__`; import it explicitly.
 
