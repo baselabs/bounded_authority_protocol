@@ -28,10 +28,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
   # (never silent). The assertion was restored; the shipped entry is caught (red). The
   # planted-privacy-canary mutation from the gate's landing is intentionally NOT a battery
   # entry: the canary sweep's red-capability is proven inside the privacy gate's own
-  # calibration tests (it needs the real git worktree, which a scratch copy does not have,
-  # the same reason rule 9 no-ops outside a worktree).
-
-  @root Path.expand("..", __DIR__)
+  # calibration tests.
 
   @mutations [
     %{
@@ -139,8 +136,8 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
       # encoding list, the exact non-malleability drift the baseline exists to catch.
       name: "v3-low-s-softening",
       path: "spec/bap-v3.md",
-      from: "`s > n/2` — the HIGH-S half",
-      to: "`s ≥ n/2` — the HIGH-S half",
+      from: "`s > n/2`, the HIGH-S half",
+      to: "`s ≥ n/2`, the HIGH-S half",
       command: ["mix", "run", "--no-start", "scripts/check_spec_facts.exs"]
     },
     %{
@@ -206,47 +203,22 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
     )
   end
 
-  # Each run's own temporary directory, beside its scratch copy: tests that use fixed names
-  # under System.tmp_dir!/0 would otherwise collide when one test file runs in two copies at once.
-  defp private_tmp!(scratch) do
-    path = scratch <> ".tmp"
-    File.mkdir_p!(path)
-    path
-  end
-
   defp run_mutation(mutation) do
     baseline_green!(mutation)
 
-    scratch =
-      Path.join(
-        System.tmp_dir!(),
-        "spec-facts-mutation-#{System.pid()}-#{mutation.name}-#{System.unique_integer([:positive, :monotonic])}"
+    {output, status} =
+      MutationGateSupport.run_in_scratch!(
+        "spec-facts-mutation-#{mutation.name}",
+        @copy_paths,
+        {mutation.path, mutation.from, mutation.to},
+        argv(mutation)
       )
 
-    File.mkdir!(scratch)
-
-    try do
-      Enum.each(@copy_paths, &copy_path(&1, scratch))
-      File.ln_s!(Path.join(@root, "deps"), Path.join(scratch, "deps"))
-      copy_build(scratch)
-      mutate_once!(Path.join(scratch, mutation.path), mutation.from, mutation.to)
-
-      {output, status} =
-        System.cmd(hd(command_for(mutation)), command_args(command_for(mutation)),
-          cd: scratch,
-          env: [{"MIX_ENV", "test"}, {"TMPDIR", private_tmp!(scratch)}],
-          stderr_to_stdout: true
-        )
-
-      if status == 0 do
-        raise "mutation survived: #{mutation.name}\n#{output}"
-      end
-
-      IO.puts("mutation caught: #{mutation.name}")
-    after
-      File.rm_rf!(scratch)
-      File.rm_rf!(scratch <> ".tmp")
+    if status == 0 do
+      raise "mutation survived: #{mutation.name}\n#{output}"
     end
+
+    IO.puts("mutation caught: #{mutation.name}")
   end
 
   # Baseline non-vacuity: before any mutation, the entry's UNMUTATED command must run green in a
@@ -256,39 +228,28 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
     key = {:baseline_green, mutation.name}
 
     if :persistent_term.get(key, nil) != :ok do
-      scratch =
-        Path.join(
-          System.tmp_dir!(),
-          "spec-facts-baseline-#{System.pid()}-#{System.unique_integer([:positive, :monotonic])}"
+      {output, status} =
+        MutationGateSupport.run_in_scratch!(
+          "spec-facts-baseline",
+          @copy_paths,
+          nil,
+          argv(mutation)
         )
 
-      File.mkdir!(scratch)
-
-      try do
-        Enum.each(@copy_paths, &copy_path(&1, scratch))
-        File.ln_s!(Path.join(@root, "deps"), Path.join(scratch, "deps"))
-        copy_build(scratch)
-
-        {output, status} =
-          System.cmd(hd(command_for(mutation)), command_args(command_for(mutation)),
-            cd: scratch,
-            env: [{"MIX_ENV", "test"}, {"TMPDIR", private_tmp!(scratch)}],
-            stderr_to_stdout: true
-          )
-
-        if status != 0 do
-          raise "baseline not green for #{mutation.name}: the unmutated target command exited " <>
-                  "#{status}, so a post-mutation red cannot be attributed to the mutation\n#{output}"
-        end
-
-        :persistent_term.put(key, :ok)
-      after
-        File.rm_rf!(scratch)
-        File.rm_rf!(scratch <> ".tmp")
+      if status != 0 do
+        raise "baseline not green for #{mutation.name}: the unmutated target command exited " <>
+                "#{status}, so a post-mutation red cannot be attributed to the mutation\n#{output}"
       end
+
+      :persistent_term.put(key, :ok)
     end
 
     :ok
+  end
+
+  defp argv(mutation) do
+    command = command_for(mutation)
+    [hd(command) | command_args(command)]
   end
 
   # Name-resolved test targeting: line pins drifted three separate times (edits anywhere
@@ -315,39 +276,6 @@ defmodule BoundedAuthorityProtocol.SpecFactsMutationGate do
 
   defp command_args(["mix", "test" | rest]), do: ["test" | rest] ++ ["--max-cases", "1"]
   defp command_args(["mix", "run" | rest]), do: ["run" | rest]
-
-  defp copy_path(relative, scratch) do
-    source = Path.join(@root, relative)
-    target = Path.join(scratch, relative)
-    File.mkdir_p!(Path.dirname(target))
-    {:ok, _copied} = File.cp_r(source, target)
-  end
-
-  defp copy_build(scratch) do
-    source = Path.join(@root, "_build/test")
-
-    if File.dir?(source) do
-      target = Path.join(scratch, "_build/test")
-      File.mkdir_p!(Path.dirname(target))
-      {:ok, _copied} = File.cp_r(source, target)
-    end
-  end
-
-  defp mutate_once!(path, source, replacement) do
-    contents = File.read!(path)
-
-    if count(contents, source) != 1 do
-      raise "mutation anchor is not exact: #{path}"
-    end
-
-    File.write!(path, String.replace(contents, source, replacement))
-  end
-
-  defp count(contents, source) do
-    contents
-    |> :binary.matches(source)
-    |> length()
-  end
 end
 
 BoundedAuthorityProtocol.SpecFactsMutationGate.run()

@@ -3,8 +3,6 @@ Code.require_file("mutation_gate_support.exs", __DIR__)
 defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
   alias BoundedAuthorityProtocol.MutationGateSupport
 
-  @root Path.expand("..", __DIR__)
-
   @mutations [
     %{
       name: "canonical-row-equality",
@@ -472,47 +470,22 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
     )
   end
 
-  # Each run's own temporary directory, beside its scratch copy: tests that use fixed names
-  # under System.tmp_dir!/0 would otherwise collide when one test file runs in two copies at once.
-  defp private_tmp!(scratch) do
-    path = scratch <> ".tmp"
-    File.mkdir_p!(path)
-    path
-  end
-
   defp run_mutation(mutation) do
     baseline_green!(mutation)
 
-    scratch =
-      Path.join(
-        System.tmp_dir!(),
-        "chain_archive-mutation-#{mutation.name}-#{System.unique_integer([:positive, :monotonic])}"
+    {output, status} =
+      MutationGateSupport.run_in_scratch!(
+        "chain_archive-mutation-#{mutation.name}",
+        @copy_paths,
+        {mutation.path, mutation.from, mutation.to},
+        argv(mutation)
       )
 
-    File.mkdir_p!(scratch)
-
-    try do
-      Enum.each(@copy_paths, &copy_path(&1, scratch))
-      File.ln_s!(Path.join(@root, "deps"), Path.join(scratch, "deps"))
-      copy_build(scratch)
-      mutate_once!(Path.join(scratch, mutation.path), mutation.from, mutation.to)
-
-      {output, status} =
-        System.cmd(hd(mutation.command), tl(mutation.command) ++ ["--max-cases", "1"],
-          cd: scratch,
-          env: [{"MIX_ENV", "test"}, {"TMPDIR", private_tmp!(scratch)}],
-          stderr_to_stdout: true
-        )
-
-      if status == 0 do
-        raise "mutation survived: #{mutation.name}\n#{output}"
-      end
-
-      IO.puts("mutation caught: #{mutation.name}")
-    after
-      File.rm_rf!(scratch)
-      File.rm_rf!(scratch <> ".tmp")
+    if status == 0 do
+      raise "mutation survived: #{mutation.name}\n#{output}"
     end
+
+    IO.puts("mutation caught: #{mutation.name}")
   end
 
   # Baseline non-vacuity: before any mutation, the entry's UNMUTATED command must run green in a
@@ -523,73 +496,26 @@ defmodule BoundedAuthorityProtocol.ChainArchiveMutationGate do
     key = {:baseline_green, mutation.command}
 
     if :persistent_term.get(key, nil) != :ok do
-      scratch =
-        Path.join(
-          System.tmp_dir!(),
-          "chain_archive-baseline-#{System.unique_integer([:positive, :monotonic])}"
+      {output, status} =
+        MutationGateSupport.run_in_scratch!(
+          "chain_archive-baseline",
+          @copy_paths,
+          nil,
+          argv(mutation)
         )
 
-      File.mkdir_p!(scratch)
-
-      try do
-        Enum.each(@copy_paths, &copy_path(&1, scratch))
-        File.ln_s!(Path.join(@root, "deps"), Path.join(scratch, "deps"))
-        copy_build(scratch)
-
-        {output, status} =
-          System.cmd(hd(mutation.command), tl(mutation.command) ++ ["--max-cases", "1"],
-            cd: scratch,
-            env: [{"MIX_ENV", "test"}, {"TMPDIR", private_tmp!(scratch)}],
-            stderr_to_stdout: true
-          )
-
-        if status != 0 do
-          raise "baseline not green for #{mutation.name}: the unmutated target command exited " <>
-                  "#{status}, so a post-mutation red cannot be attributed to the mutation\n#{output}"
-        end
-
-        :persistent_term.put(key, :ok)
-      after
-        File.rm_rf!(scratch)
-        File.rm_rf!(scratch <> ".tmp")
+      if status != 0 do
+        raise "baseline not green for #{mutation.name}: the unmutated target command exited " <>
+                "#{status}, so a post-mutation red cannot be attributed to the mutation\n#{output}"
       end
+
+      :persistent_term.put(key, :ok)
     end
 
     :ok
   end
 
-  defp copy_path(relative, scratch) do
-    source = Path.join(@root, relative)
-    target = Path.join(scratch, relative)
-    File.mkdir_p!(Path.dirname(target))
-    {:ok, _copied} = File.cp_r(source, target)
-  end
-
-  defp copy_build(scratch) do
-    source = Path.join(@root, "_build/test")
-
-    if File.dir?(source) do
-      target = Path.join(scratch, "_build/test")
-      File.mkdir_p!(Path.dirname(target))
-      {:ok, _copied} = File.cp_r(source, target)
-    end
-  end
-
-  defp mutate_once!(path, source, replacement) do
-    contents = File.read!(path)
-
-    if count(contents, source) != 1 do
-      raise "mutation anchor is not exact: #{path}"
-    end
-
-    File.write!(path, String.replace(contents, source, replacement))
-  end
-
-  defp count(contents, source) do
-    contents
-    |> :binary.matches(source)
-    |> length()
-  end
+  defp argv(mutation), do: mutation.command ++ ["--max-cases", "1"]
 end
 
 BoundedAuthorityProtocol.ChainArchiveMutationGate.run()
