@@ -17,7 +17,10 @@ defmodule BoundedAuthorityProtocol.SdkDerivationTest do
 
     test "#{sdk} derivation guard scans the entire SDK including itself" do
       root =
-        Path.join(System.tmp_dir!(), "bap-derivation-#{@sdk}-#{System.unique_integer([:positive])}")
+        Path.join(
+          System.tmp_dir!(),
+          "bap-derivation-#{@sdk}-#{System.unique_integer([:positive])}"
+        )
 
       on_exit(fn -> File.rm_rf!(root) end)
       checker = Path.join(root, "tools/#{@checker}")
@@ -27,22 +30,40 @@ defmodule BoundedAuthorityProtocol.SdkDerivationTest do
       File.mkdir_p!(Path.dirname(source))
       File.write!(source, "#{@comment} Pure source fixture\n")
       readme = Path.join(root, "README.md")
-      File.write!(readme, "BoundedAuthorityProtocol is the contract namespace (ex. in diagnostics).\n")
+
+      File.write!(
+        readme,
+        "BoundedAuthorityProtocol is the contract namespace (ex. in diagnostics).\n"
+      )
 
       assert {_, 0} = run(@command, checker)
 
-      paths = [@source, "tests/citation.txt", "tools/citation.txt", "docs/citation.md",
-        "README.md", ".hidden/citation", "tools/#{@checker}"]
+      paths = [
+        @source,
+        "tests/citation.txt",
+        "tools/citation.txt",
+        "docs/citation.md",
+        "README.md",
+        ".hidden/citation",
+        "tools/#{@checker}"
+      ]
 
       for path <- paths,
-          citation <- ["lib/bounded_authority_protocol/v1/grant.ex", "grant.ex", "check.exs", "mix.exs"] do
+          citation <- [
+            "lib/bounded_authority_protocol/v1/grant.ex",
+            "grant.ex",
+            "check.exs",
+            "mix.exs"
+          ] do
         target = Path.join(root, path)
         File.mkdir_p!(Path.dirname(target))
         original = File.read(target)
-        contents = case original do
-          {:ok, contents} -> contents
-          {:error, :enoent} -> ""
-        end
+
+        contents =
+          case original do
+            {:ok, contents} -> contents
+            {:error, :enoent} -> ""
+          end
 
         try do
           File.write!(target, contents <> "\n#{@comment} #{citation}\n")

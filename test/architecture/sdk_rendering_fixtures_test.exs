@@ -43,8 +43,8 @@ defmodule BoundedAuthorityProtocol.SdkRenderingFixturesTest do
 
       result =
         case row["kind"] do
-          "grant" -> major.decode_grant(row["compact"])
-          "proof" -> major.decode_proof(row["compact"])
+          "grant" -> major.decode_grant(row["compact"], %{})
+          "proof" -> major.decode_proof(row["compact"], %{})
         end
 
       assert {:ok, decoded} = result
