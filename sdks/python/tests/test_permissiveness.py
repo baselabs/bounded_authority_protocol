@@ -55,7 +55,7 @@ from bounded_authority_verifier import v2, v3
 from bounded_authority_verifier.bounds import Bounds, bounds_new
 from bounded_authority_verifier.compact import assemble_segments_es256
 from bounded_authority_verifier.ed25519 import _reset_census, sha256
-from bounded_authority_verifier.error import Err, InvalidError, _unwrap
+from bounded_authority_verifier.error import Err, _unwrap
 from bounded_authority_verifier.json_alg import (
     JArray,
     JFloat,
@@ -119,15 +119,6 @@ dec = json_decode
 def invalid_json(text: bytes) -> bool:
     """Record a decoder rejection so mutation kills are actual assertion failures."""
     return isinstance(dec(text), Err)
-
-
-def rejects(label: str):
-    """Decorator: the body must raise InvalidError."""
-
-    def deco(fn):
-        return pytest.mark.raises(InvalidError)(fn)
-
-    return deco
 
 
 def _to_hex(b: bytes) -> str:

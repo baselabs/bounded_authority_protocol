@@ -39,11 +39,9 @@ its source and conformance runners no longer live here.
 All four are pure verification libraries (no I/O, clock, randomness, or network in the library).
 Their verification facades return facts or a single value-free rejection, never an authorization
 decision. Facts exclude raw credentials and secrets; field-redacted display is a separate
-requirement, with the current rendering limitations listed below.
+requirement.
 Their behavior is defined by the specifications and the corpora; the in-repository SDKs' source
 comments cite the tracked normative specifications and independent conformance corpora.
-ADR 0014 records the packaging and support
-decisions.
 
 ## Known gaps
 

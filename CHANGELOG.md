@@ -4,27 +4,6 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
-### Security
-
-- The unpublished Rust SDK uses `p256` 0.14 and `crypto-bigint` 0.7.11, fixing
-  RUSTSEC-2026-0387. Its minimum Rust version is 1.88, required by the backend's
-  `sha2` 0.11 dependency. Ed25519 uses stable `ed25519-dalek` 3.0 and direct `sha2`
-  0.11, sharing one RustCrypto generation with P-256. The unused direct `zeroize` pin is removed.
-- SDK CI audits the Rust lock, the committed Python lock (including development tools), and
-  every Go module with pinned scanners. Python requires `cryptography` 50.0.0 or later and
-  audits both its lock and lowest direct runtime, build, and development dependencies.
-  Go's module scan uses a patched supported toolchain; conformance still tests the Go 1.25 floor.
-- SDK CI independently removes each parser closure after a green permissiveness baseline and
-  requires the corresponding test to fail, including separate raw-number byte and magnitude
-  limits. Only assertion failures qualify; crashes, build failures, and missing tests fail the gate.
-- Corpus rotation updates only CLI and SDK consumer pins. Independent preservation pins and
-  published digest quotations are checked separately and require manual updates.
-- Complete-history invariants run in CI with a full checkout; shallow development snapshots
-  exclude exactly those tests with an explicit reason and reject the CI full-history flag.
-
-## [1.0.0] (2026-11-10)
-## Unreleased
-
 ### Changed
 
 - **Breaking changes to the unpublished Python SDK:** protocol primitives now return the
@@ -56,7 +35,6 @@ All notable changes to `bounded_authority_protocol` are documented here.
   directly; read Go's `Version()` accessor. Verifiers populate the major automatically.
 - Go facts refuse JSON, text, and gob serialization with `ErrInvalid`. Migration: read
   explicitly named accessors instead of passing facts to a generic encoder.
-
 - **Breaking change in the unpublished Go SDK:** facts, decoded proofs, and decoded content
   assertions keep values behind private closure storage and expose read-only accessor methods.
   Migration: replace `facts.GrantID` with `facts.GrantID()` (likewise every other field),
@@ -90,7 +68,25 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Python JSON decoding copies caller input once. Immutable bytes pass between primitives without
   repeated copies.
 
-## [1.0.0] — 2026-11-10
+### Security
+
+- The unpublished Rust SDK uses `p256` 0.14 and `crypto-bigint` 0.7.11, fixing
+  RUSTSEC-2026-0387. Its minimum Rust version is 1.88, required by the backend's
+  `sha2` 0.11 dependency. Ed25519 uses stable `ed25519-dalek` 3.0 and direct `sha2`
+  0.11, sharing one RustCrypto generation with P-256. The unused direct `zeroize` pin is removed.
+- SDK CI audits the Rust lock, the committed Python lock (including development tools), and
+  every Go module with pinned scanners. Python requires `cryptography` 50.0.0 or later and
+  audits both its lock and lowest direct runtime, build, and development dependencies.
+  Go's module scan uses a patched supported toolchain; conformance still tests the Go 1.25 floor.
+- SDK CI independently removes each parser closure after a green permissiveness baseline and
+  requires the corresponding test to fail, including separate raw-number byte and magnitude
+  limits. Only assertion failures qualify; crashes, build failures, and missing tests fail the gate.
+- Corpus rotation updates only CLI and SDK consumer pins. Independent preservation pins and
+  published digest quotations are checked separately and require manual updates.
+- Complete-history invariants run in CI with a full checkout; shallow development snapshots
+  exclude exactly those tests with an explicit reason and reject the CI full-history flag.
+
+## [1.0.0] (2026-11-10)
 
 ### Changed
 
