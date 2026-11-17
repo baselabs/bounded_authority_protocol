@@ -1,3 +1,5 @@
+Code.require_file("../tools/build_path.exs", __DIR__)
+
 defmodule BoundedAuthorityProtocol.MutationGateSupport do
   @moduledoc false
 
@@ -81,7 +83,7 @@ defmodule BoundedAuthorityProtocol.MutationGateSupport do
   checkout and returns `{output, status}`.
 
   The scratch is a detached worktree of HEAD named after `label`; each of `overlay_paths` is
-  replaced by its working-tree copy, `deps` links to this checkout's, and `_build/test` is copied
+  replaced by its working-tree copy, `deps` links to this checkout's, and the resolved test build is copied into an isolated build path
   so the run does not recompile from nothing. `mutation`, when given as `{path, from, to}`, is
   applied before the command runs and must match exactly once.
   """
@@ -98,7 +100,7 @@ defmodule BoundedAuthorityProtocol.MutationGateSupport do
     try do
       Enum.each(overlay_paths, &overlay!(&1, scratch))
       File.ln_s!(Path.join(@root, "deps"), Path.join(scratch, "deps"))
-      copy_build!(scratch)
+      build_path = copy_build!(scratch)
       File.mkdir_p!(private_tmp)
 
       with {path, from, to} <- mutation do
@@ -109,7 +111,7 @@ defmodule BoundedAuthorityProtocol.MutationGateSupport do
 
       System.cmd(executable, arguments,
         cd: scratch,
-        env: [{"MIX_ENV", "test"}, {"TMPDIR", private_tmp}],
+        env: [{"MIX_ENV", "test"}, {"MIX_BUILD_PATH", build_path}, {"TMPDIR", private_tmp}],
         stderr_to_stdout: true
       )
     after
@@ -142,13 +144,15 @@ defmodule BoundedAuthorityProtocol.MutationGateSupport do
   end
 
   defp copy_build!(scratch) do
-    source = Path.join(@root, "_build/test")
+    source = BoundedAuthorityProtocol.BuildPath.resolve(@root, "test")
+    target = BoundedAuthorityProtocol.BuildPath.isolated(scratch, "test")
 
     if File.dir?(source) do
-      target = Path.join(scratch, "_build/test")
       File.mkdir_p!(Path.dirname(target))
       File.cp_r!(source, target)
     end
+
+    target
   end
 
   defp mutate_once!(path, source, replacement) do

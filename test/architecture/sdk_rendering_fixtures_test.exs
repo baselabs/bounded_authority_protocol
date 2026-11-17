@@ -33,7 +33,11 @@ defmodule BoundedAuthorityProtocol.SdkRenderingFixturesTest do
     actual =
       Map.merge(actual, %{
         "attestation" => inspect(attestation()),
-        "content" => inspect(content())
+        "content" => inspect(content()),
+        "handbuilt:operation" =>
+          BoundedAuthorityProtocol.DiagnosticRendering.render([
+            %BoundedAuthorityProtocol.V1.Operation{name: %{}, selectors: 1}
+          ])
       })
 
     floats =

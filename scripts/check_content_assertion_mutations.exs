@@ -1,3 +1,5 @@
+Code.require_file("../tools/build_path.exs", __DIR__)
+
 # Each mutant is compiled only in a fresh VM's memory. The checkout and loaded
 # application of the parent process remain unchanged; no application copy is made.
 source = File.read!("lib/bounded_authority_protocol/content_assertion/v1/codec.ex")
@@ -34,7 +36,12 @@ mutations = [
   {"facts-digest-width", "digest?(f.digest)", "true"}
 ]
 
-paths = Path.wildcard("_build/test/lib/*/ebin")
+paths =
+  Path.expand("..", __DIR__)
+  |> BoundedAuthorityProtocol.BuildPath.resolve("test")
+  |> Path.join("lib/*/ebin")
+  |> Path.wildcard()
+
 args = Enum.flat_map(paths, &["-pa", &1])
 
 run = fn changed, label, expected_exit ->

@@ -6,10 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestDecodedRenderingMatchesReference(t *testing.T) {
@@ -137,5 +139,89 @@ func TestFloatNotationMatchesSpecifiedFixtureBytes(t *testing.T) {
 		if got := inspectRender(inspectTagged(Float(value))); got != "{:float, "+expected+"}" {
 			t.Errorf("%s got %s want %s", key, got, expected)
 		}
+	}
+}
+
+func TestHandBuiltDecodedValuesAreTotal(t *testing.T) {
+	raw, err := os.ReadFile("testdata/decoded-rendering.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gold map[string]string
+	if err := json.Unmarshal(raw, &gold); err != nil {
+		t.Fatal(err)
+	}
+	operation := inspectStruct("BoundedAuthorityProtocol.V1.Operation", inspectField("name", inspectTerm{kind: "unrenderable"}), inspectField("selectors", inspectInt(1)))
+	if got := inspectRender(inspectListing([]inspectTerm{operation})); got != gold["handbuilt:operation"] {
+		t.Fatal(got)
+	}
+
+	for _, kind := range []string{"x\ny", "\xff", "", "Upper", "a-b", "a?b", "é"} {
+		selector := Obj{{Key: "kind", Val: Str(kind)}, {Key: "path", Val: Arr{}}, {Key: "value", Val: Int(1)}}
+		if got := inspectRender(inspectSelector(selector)); got != "{#unrenderable, [], {:integer, 1}}" {
+			t.Fatalf("%q: %s", kind, got)
+		}
+	}
+	malformed := []Value{nil, (*Int)(nil), Int(1), Obj{}, Obj{{Key: "kind", Val: Int(1)}}, Obj{{Key: "kind", Val: Str("eq")}},
+		Obj{{Key: "kind", Val: Str("eq")}, {Key: "path", Val: Int(1)}, {Key: "value", Val: Int(1)}},
+		Obj{{Key: "kind", Val: Str("eq")}, {Key: "path", Val: Arr{Int(1)}}, {Key: "value", Val: Int(1)}},
+		Obj{{Key: "kind", Val: Str("eq")}, {Key: "path", Val: Arr{}}},
+		Obj{{Key: "kind", Val: Str("one_of")}, {Key: "path", Val: Arr{}}, {Key: "values", Val: Int(1)}}}
+	for _, value := range malformed {
+		if got := inspectRender(inspectSelector(value)); got != "#unrenderable" {
+			t.Fatal(got)
+		}
+	}
+	for _, kind := range []string{"_", "ready?", "run!", "aB_9"} {
+		if got := inspectRender(inspectAtom(kind)); got != ":"+kind {
+			t.Fatal(got)
+		}
+	}
+	for _, value := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
+		if got := inspectRender(inspectTagged(Arr{Float(value)})); got != "{:array, [float: #unrenderable]}" {
+			t.Fatal(got)
+		}
+	}
+	for _, value := range []Value{nil, (*Int)(nil), (*Obj)(nil)} {
+		if got := inspectRender(inspectTagged(value)); got != "#unrenderable" {
+			t.Fatal(got)
+		}
+	}
+	cycle := make(Arr, 1)
+	cycle[0] = cycle
+	if got := inspectRender(inspectTagged(cycle)); !strings.Contains(got, "...") {
+		t.Fatal(got)
+	}
+	bad := "x\ny\xff"
+	for major := 1; major <= 3; major++ {
+		grant := GrantDecoded{Version: major, KeyID: bad, Issuer: bad, GrantID: bad, Audiences: []string{bad}, Verification: DecodeStatus(123), Operations: []OperationDef{{Name: bad, Selectors: malformed}}}
+		proof := ProofDecoded{data: privateValue(&proofDecodedData{Version: major, ProofID: bad, Method: bad, TargetURI: bad, InvocationID: bad, Operation: bad, Nonce: "hidden", HasNonce: true, HolderPublicKey: []byte{255}})}
+		attestation := AttestationDecoded{AttestorKeyID: bad, Jti: bad, KeyID: bad, Role: bad, Verification: DecodeStatus(123)}
+		for _, value := range []any{grant, proof, attestation, GrantDecoded{}, ProofDecoded{}} {
+			for _, verb := range []string{"%v", "%+v", "%#v", "%s"} {
+				got := fmt.Sprintf(verb, value)
+				if !utf8.ValidString(got) || strings.ContainsAny(got, "\n\r\x00") || strings.Contains(got, "hidden") {
+					t.Fatalf("%s: %q", verb, got)
+				}
+			}
+		}
+		if !strings.Contains(grant.String(), "verification: #unrenderable") || !strings.Contains(attestation.String(), "verification: #unrenderable") {
+			t.Fatal("off-domain status")
+		}
+	}
+}
+
+func TestLargeDiagnosticConversionIsBounded(t *testing.T) {
+	value := append([]byte{255}, make([]byte, 4*1024*1024)...)
+	expected := "<<255, " + strings.TrimSuffix(strings.Repeat("0, ", 199), ", ") + ", ...>>"
+	if got := inspectBinary(value); got != expected || got != inspectBinary(value[:201]) {
+		t.Fatal(got)
+	}
+	text := strings.Repeat("😀", 1024*1024)
+	if got := inspectText(text); len(got.raw) > 16384 {
+		t.Fatal(len(got.raw))
+	}
+	if got := inspectString(strings.Repeat("😀", 4096)); got != "\""+strings.Repeat("😀", 4096)+"\"" {
+		t.Fatal("scalar boundary")
 	}
 }

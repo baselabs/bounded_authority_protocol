@@ -863,6 +863,9 @@ pub struct AttestationDecoded {
 
 impl std::fmt::Debug for GrantDecoded {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if !(1..=3).contains(&self.version) {
+            return f.write_str("#unrenderable");
+        }
         use crate::inspect::{atom, int, operations, raw, render, structure, text, Term};
         f.write_str(&render(&structure(
             format!("BoundedAuthorityProtocol.V{}.DecodedGrant", self.version),
@@ -871,10 +874,7 @@ impl std::fmt::Debug for GrantDecoded {
                 ("key_id", text(&self.key_id)),
                 ("issuer", text(&self.issuer)),
                 ("grant_id", text(&self.grant_id)),
-                (
-                    "audiences",
-                    Term::List(self.audiences.iter().map(|v| text(v)).collect()),
-                ),
+                ("audiences", Term::Texts(&self.audiences)),
                 ("issued_at", int(self.issued_at)),
                 ("not_before", int(self.not_before)),
                 ("expires_at", int(self.expires_at)),
@@ -887,6 +887,9 @@ impl std::fmt::Debug for GrantDecoded {
 }
 impl std::fmt::Debug for ProofDecoded {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if !(1..=3).contains(&self.version) {
+            return f.write_str("#unrenderable");
+        }
         use crate::inspect::{binary, string};
         write!(f,"#BoundedAuthorityProtocol.V{}.DecodedProof<version: {}, proof_id: {}, method: {}, target_uri: {}, issued_at: {}, nonce: {}, invocation_id: {}, operation: {}, grant_hash: {}, request_hash: {}, holder_public_key: {}, holder_thumbprint: {}, verification: :not_evaluated>",self.version,self.version,string(&self.proof_id),string(&self.method),string(&self.target_uri),self.issued_at,if self.nonce.is_some(){":redacted"}else{"nil"},string(&self.invocation_id),string(&self.operation),binary(&self.grant_hash),binary(&self.request_hash),binary(&self.holder_public_key),binary(&self.holder_thumbprint))
     }

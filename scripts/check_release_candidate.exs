@@ -1,3 +1,5 @@
+Code.require_file("../tools/build_path.exs", __DIR__)
+
 # Release-candidate reproducibility gate (BAP-06).
 #
 # Builds the unpublished candidate archive TWICE, each in a fresh COPY of the source
@@ -106,11 +108,13 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
   # Copy the source tree into dest, excluding build artifacts, fetched deps, editor/tool
   # state, and generated output. What remains is exactly the source a reproducible build
   # starts from: lib, priv, docs, scripts, tools, mix.exs, mix.lock, and the metadata/docs.
-  @copy_excludes ~w(_build deps .git .zcode artifacts cover doc graphify-out
+  @copy_excludes ~w(deps .git .zcode artifacts cover doc graphify-out
                     bounded_authority_conformance conformance compliance erl_crash.dump)
 
   defp copy_source_tree!(source, dest) do
     File.mkdir_p!(dest)
+
+    builds = BoundedAuthorityProtocol.BuildPath.storage_roots(source)
 
     source
     |> File.ls!()
@@ -120,8 +124,25 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
       # (it preserves symlinks rather than following them). The earlier case-on-
       # File.lstat form was dead code: File.lstat returns {:ok, %File.Stat{}},
       # not {:regular, _}/{:symlink, _}, so every branch fell through here anyway.
-      File.cp_r!(Path.join(source, entry), Path.join(dest, entry))
+      copy_source_path!(Path.join(source, entry), Path.join(dest, entry), builds)
     end)
+  end
+
+  defp copy_source_path!(source, target, builds) do
+    cond do
+      source in builds ->
+        :ok
+
+      Enum.any?(builds, &String.starts_with?(&1, source <> "/")) ->
+        File.mkdir_p!(target)
+
+        Enum.each(File.ls!(source), fn entry ->
+          copy_source_path!(Path.join(source, entry), Path.join(target, entry), builds)
+        end)
+
+      true ->
+        File.cp_r!(source, target)
+    end
   end
 
   defp build_in!(copy_root, output) do
@@ -166,6 +187,9 @@ defmodule BoundedAuthorityProtocol.ReleaseCandidateCheck do
   defp run!(command, arguments, directory) do
     case System.cmd(command, arguments,
            cd: directory,
+           env: [
+             {"MIX_BUILD_PATH", BoundedAuthorityProtocol.BuildPath.isolated(directory, "prod")}
+           ],
            stderr_to_stdout: true,
            into: IO.stream(:stdio, :line)
          ) do

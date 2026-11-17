@@ -1,3 +1,5 @@
+Code.require_file("build_path.exs", __DIR__)
+
 defmodule BoundedAuthorityProtocol.ArchitectureGate do
   @moduledoc false
 
@@ -1161,28 +1163,17 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     |> Enum.sort_by(&{&1.category, &1.path, &1.detail})
   end
 
-  def check_compiled(root) do
-    build_root = System.get_env("MIX_BUILD_ROOT", "_build")
-
-    ebin_paths =
-      case System.get_env("MIX_BUILD_PATH") do
-        nil ->
-          build_root
-          |> Path.expand(root)
-          |> Path.join("*/lib/bounded_authority_protocol/ebin")
-          |> Path.wildcard()
-
-        build_path ->
-          path = Path.join(Path.expand(build_path, root), "lib/bounded_authority_protocol/ebin")
-          if File.dir?(path), do: [path], else: []
-      end
+  def check_compiled(root, environment \\ nil) do
+    build_path = BoundedAuthorityProtocol.BuildPath.resolve(root, environment)
+    path = Path.join(build_path, "lib/bounded_authority_protocol/ebin")
+    ebin_paths = if File.dir?(path), do: [path], else: []
 
     case ebin_paths do
       [] ->
         [
           violation(
             :compiled_artifact,
-            System.get_env("MIX_BUILD_PATH", build_root),
+            build_path,
             "compiled bounded_authority_protocol application is missing"
           )
         ]

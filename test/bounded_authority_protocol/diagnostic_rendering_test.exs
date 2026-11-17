@@ -47,6 +47,13 @@ defmodule BoundedAuthorityProtocol.DiagnosticRenderingTest do
     assert render([<<0, 1>>, :all]) == "[<<0, 1>>, :all]"
   end
 
+  test "multi-megabyte invalid binaries use only the capped byte prefix" do
+    value = <<255>> <> :binary.copy(<<0>>, 4 * 1024 * 1024)
+    expected = "<<255, " <> Enum.join(List.duplicate("0", 199), ", ") <> ", ...>>"
+    assert render(value) == expected
+    assert render(binary_part(value, 0, 201)) == expected
+  end
+
   test "printable limits count Unicode scalars rather than bytes or escaped characters" do
     for size <- [4095, 4096] do
       for character <- ["x", "é", "😀", "\n"] do
@@ -162,6 +169,7 @@ defmodule BoundedAuthorityProtocol.DiagnosticRenderingTest do
       [1, 2 | <<0>>],
       :"",
       :"has space",
+      :"x\ny",
       :Uppercase,
       :é,
       :"a-b",
@@ -185,6 +193,33 @@ defmodule BoundedAuthorityProtocol.DiagnosticRenderingTest do
     assert render([{:"a?b", :Uppercase}]) == "[{#unrenderable, #unrenderable}]"
     assert render([List.duplicate(:all, 198), %{}]) =~ "], #unrenderable]"
     assert render(List.duplicate(:all, 200) ++ [:tail] ++ [1 | :tail]) == "#unrenderable"
+  end
+
+  test "every structural field accepts an off-domain value without Inspect fallback" do
+    modules =
+      for major <- [
+            BoundedAuthorityProtocol.V1,
+            BoundedAuthorityProtocol.V2,
+            BoundedAuthorityProtocol.V3
+          ],
+          kind <- [DecodedGrant, Operation, DecodedProof],
+          do: Module.concat(major, kind)
+
+    for module <- [BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation | modules] do
+      value = struct(module)
+
+      for field <- Map.keys(Map.from_struct(value)), field != :nonce do
+        changed = Map.put(value, field, %{"hidden" => 1})
+
+        changed =
+          if Map.has_key?(changed, :nonce), do: Map.put(changed, :nonce, "hidden"), else: changed
+
+        output = inspect(changed)
+        assert output =~ "#{field}: #unrenderable"
+        refute output =~ "hidden"
+        refute output =~ "Inspect.Error"
+      end
+    end
   end
 
   test "recognized structures with missing fields are unrenderable" do

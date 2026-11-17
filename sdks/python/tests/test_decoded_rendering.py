@@ -218,3 +218,112 @@ def test_float_notation_matches_specified_fixture_bytes():
     for key, expected in gold.items():
         if key.startswith("float:"):
             assert _inspect.render(_inspect.scalar(float(key[6:]))) == expected, key
+
+
+def test_hand_built_selectors_and_nested_values_are_total():
+    from bounded_authority_verifier import _inspect as display
+    from bounded_authority_verifier.json_alg import JArray, JFloat, JInt, JObject, JString
+
+    for kind in [b"x\ny", b"\xff", b"", b"Upper", b"a-b", b"a?b", "é".encode()]:
+        value = JObject({"kind": JString(kind), "path": JArray(()), "value": JInt(1)})
+        assert display.render(display.selector(value)) == "{#unrenderable, [], {:integer, 1}}"
+    malformed = [JInt(1), JObject({}), JObject({"kind": JInt(1)}),
+                 JObject({"kind": JString(b"eq")}),
+                 JObject({"kind": JString(b"eq"), "path": JInt(1), "value": JInt(1)}),
+                 JObject({"kind": JString(b"eq"), "path": JArray((JInt(1),)), "value": JInt(1)}),
+                 JObject({"kind": JString(b"eq"), "path": JArray(())}),
+                 JObject({"kind": JString(b"one_of"), "path": JArray(()), "values": JInt(1)})]
+    for value in malformed:
+        assert display.render(display.selector(value)) == "#unrenderable"
+    for kind in ["_", "ready?", "run!", "aB_9"]:
+        assert display.render(display.atom(kind)) == ":" + kind
+    for value in [float("nan"), float("inf"), -float("inf")]:
+        assert display.render(display.tagged(JArray((JFloat(value),)))) == "{:array, [float: #unrenderable]}"
+    assert display.render(display.tagged(JString(b"\xff"))) == "{:string, <<255>>}"
+    assert display.render(display.operations((JObject({}),), 1)) == "[#unrenderable]"
+    operation = JObject({"name": JObject({}), "selectors": JInt(1)})
+    import json
+    from pathlib import Path
+    gold = json.loads((Path(__file__).with_name("fixtures") / "decoded-rendering.json").read_text())
+    assert display.render(display.operations((operation,), 1)) == gold["handbuilt:operation"]
+    cycle = []
+    cycle.append(cycle)
+    assert "..." in display.render(display.native(cycle))
+    nested = JInt(1)
+    for _ in range(1000):
+        nested = JArray((nested,))
+    assert "..." in display.render(display.tagged(nested))
+
+
+def test_hand_built_public_fields_never_raise_or_emit_controls():
+    from dataclasses import replace
+
+    from bounded_authority_verifier.facts import AttestationDecoded, GrantDecoded
+
+    grant = GrantDecoded(1, "kid", "issuer", "grant", ("aud",), 1, 2, 3, bytes(32), ())
+    attestation = AttestationDecoded("attestor", "jti", "subject", bytes(32), "issuer", 1, 2)
+    for original in [grant, attestation]:
+        for field in fields(original):
+            changed = replace(original, **{field.name: {"hidden": 1}})
+            assert "#unrenderable" in repr(changed)
+        for field in fields(original):
+            if isinstance(getattr(original, field.name), str):
+                changed = replace(original, **{field.name: "x\ny\udcff"})
+                output = repr(changed)
+                assert "\n" not in output
+                output.encode("utf-8", errors="strict")
+    original = proof()
+    kwargs = {slot.removeprefix("_"): getattr(original, slot) for slot in original.__slots__}
+    for name in kwargs:
+        changed = ProofDecoded(**(kwargs | {name: {"hidden": 1}}))
+        output = repr(changed)
+        assert ("nonce: :redacted" if name == "nonce" else "#unrenderable") in output
+        assert "hidden" not in output
+    assert repr(GrantDecoded(0, "", "", "", (), 0, 0, 0, b"", ())) == "#unrenderable"
+
+
+def test_large_binary_and_string_expansion_is_bounded():
+    from bounded_authority_verifier import _inspect as display
+
+    value = b"\xff" + bytes(4 * 1024 * 1024)
+    expected = "<<255, " + ", ".join(["0"] * 199) + ", ...>>"
+    assert display.binary(value) == display.binary(value[:201]) == expected
+    assert len(display.raw(value).raw) <= 16384
+    assert len(display.text("😀" * (1024 * 1024)).raw) <= 16384
+    assert display.string("😀" * 4096) == '"' + "😀" * 4096 + '"'
+
+
+def test_diagnostics_do_not_call_off_domain_display_hooks_or_integer_limits():
+    from dataclasses import replace
+
+    from bounded_authority_verifier import _inspect as display
+    from bounded_authority_verifier.facts import GrantDecoded
+
+    class OffDomain:
+        @property
+        def __class__(self):
+            raise AssertionError("class hook")
+
+        def __repr__(self):
+            raise AssertionError("display hook")
+
+    class Text(str):
+        def __getitem__(self, index):
+            raise AssertionError("slice hook")
+
+        def encode(self, *args, **kwargs):
+            raise AssertionError("encoding hook")
+
+    grant = GrantDecoded(1, "kid", "issuer", "grant", (), 0, 0, 0, b"", ())
+    assert "key_id: #unrenderable" in repr(replace(grant, key_id=OffDomain()))
+    assert display.string(Text("x\ny")) == '"x\\ny"'
+    assert display.render(display.scalar(10**5000)) == "1" + "0" * 5000
+
+
+def test_native_tuple_fields_keep_tuple_shape_without_expanding_before_the_cap():
+    from bounded_authority_verifier import _inspect as display
+
+    assert display.render(display.native((1, 2))) == "{1, 2}"
+    value = [tuple(range(1024 * 1024))]
+    expected = "[{" + ", ".join(str(i) for i in range(199)) + ", ...}]"
+    assert display.render(display.native(value)) == expected

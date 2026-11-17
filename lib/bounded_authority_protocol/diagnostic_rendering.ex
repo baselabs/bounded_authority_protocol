@@ -78,7 +78,7 @@ defmodule BoundedAuthorityProtocol.DiagnosticRendering do
     if printable?(value, @printable_limit) do
       {quoted(value, @printable_limit), budget}
     else
-      {document, remaining} = entries(:binary.bin_to_list(value), budget, :values)
+      {document, remaining} = entries(binary_entries(value, budget), budget, :values)
       {["<<", document, ">>"], remaining}
     end
   end
@@ -100,6 +100,12 @@ defmodule BoundedAuthorityProtocol.DiagnosticRendering do
   end
 
   defp term(_value, budget), do: {"#unrenderable", budget}
+
+  # One extra byte lets entries/3 emit its existing ellipsis without expanding the tail.
+  defp binary_entries(value, budget) when byte_size(value) > budget,
+    do: :binary.bin_to_list(value, 0, budget + 1)
+
+  defp binary_entries(value, _budget), do: :binary.bin_to_list(value)
 
   defp structure(value, module, keys, budget) do
     case field_values(value, keys) do

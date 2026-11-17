@@ -3,8 +3,6 @@ Code.require_file("../tools/architecture_gate.exs", __DIR__)
 defmodule BoundedAuthorityProtocol.PackageCheck do
   @moduledoc false
 
-  alias BoundedAuthorityProtocol.ArchitectureGate
-
   @expected_files MapSet.new([
                     ".formatter.exs",
                     "CHANGELOG.md",
@@ -411,12 +409,9 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
   end
 
   defp wipe_build!(root) do
-    build = Path.join(root, "_build")
+    build = BoundedAuthorityProtocol.BuildPath.isolated(root, "prod")
 
-    root
-    |> File.ls!()
-    |> Enum.filter(&(&1 == "_build"))
-    |> Enum.each(fn _ ->
+    if File.dir?(build) do
       build
       |> ls_r_with_symlinks()
       |> Enum.filter(fn path ->
@@ -428,7 +423,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
       |> Enum.each(&File.rm/1)
 
       rm_rf_tolerant!(build)
-    end)
+    end
   end
 
   defp ls_r_with_symlinks(path) do
@@ -540,10 +535,18 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
   end
 
   defp check_architecture!(package_root) do
-    case ArchitectureGate.check(package_root) do
+    gate = Path.expand("../tools/architecture_gate.exs", __DIR__)
+
+    code = """
+    Code.require_file(#{inspect(gate)})
+    alias BoundedAuthorityProtocol.ArchitectureGate
+    case ArchitectureGate.check(File.cwd!()) do
       [] -> :ok
-      violations -> fail!(ArchitectureGate.format(violations))
+      violations -> raise ArchitectureGate.format(violations)
     end
+    """
+
+    run!("mix", ["run", "--no-start", "-e", code], package_root, [{"MIX_ENV", "prod"}])
   end
 
   defp compile_consumer!(consumer_root, package_root, source_root) do
@@ -1007,9 +1010,16 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
   end
 
   defp run!(command, arguments, directory, environment) do
+    source_root = Path.expand("..", __DIR__)
+
+    build_path =
+      if directory == source_root,
+        do: BoundedAuthorityProtocol.BuildPath.resolve(directory),
+        else: BoundedAuthorityProtocol.BuildPath.isolated(directory, "prod")
+
     options = [
       cd: directory,
-      env: environment,
+      env: [{"MIX_BUILD_PATH", build_path} | environment],
       into: IO.stream(:stdio, :line),
       stderr_to_stdout: true
     ]

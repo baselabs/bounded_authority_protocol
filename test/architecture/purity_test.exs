@@ -50,7 +50,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
                )
 
       assert output =~ "Generated bounded_authority_protocol app"
-      violations = ArchitectureGate.check_compiled(root)
+      violations = ArchitectureGate.check_compiled(root, "prod")
       refute Enum.any?(violations, &(&1.category == :compiled_artifact))
 
       assert Enum.any?(violations, fn violation ->
@@ -63,7 +63,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     System.put_env("MIX_BUILD_PATH", missing)
 
     assert [%{category: :compiled_artifact, path: ^missing}] =
-             ArchitectureGate.check_compiled(root)
+             ArchitectureGate.check_compiled(root, "prod")
   end
 
   # Deletion-invisibility guard (keys-subset-of-present): a pinned module deleted or renamed
@@ -338,37 +338,37 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
                stderr_to_stdout: true
              )
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
              violation.category == :filesystem and
                violation.detail =~ "compiled import File.read!"
            end)
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
              violation.category == :network and
                violation.detail =~ "compiled import :diameter.add_transport"
            end)
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
              violation.category == :unapproved_runtime and
                violation.detail =~ "compiled external function MysteryRuntime.perform/1"
            end)
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
              violation.category == :randomness and
                violation.detail =~ "compiled import :crypto.strong_rand_bytes/1"
            end)
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
              violation.category == :dynamic_dispatch and
                violation.detail == "compiled variable function invocation"
            end)
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
              violation.category == :process and
                violation.detail == "compiled mailbox receive"
            end)
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
              violation.category == :unapproved_runtime and
                violation.detail == "compiled module load hook"
            end)
@@ -401,7 +401,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
                stderr_to_stdout: true
              )
 
-    violations = ArchitectureGate.check_compiled(root)
+    violations = ArchitectureGate.check_compiled(root, "prod")
 
     assert Enum.any?(violations, &(&1.detail == "compiled mailbox receive"))
     assert Enum.any?(violations, &(&1.detail == "compiled variable function invocation"))
@@ -423,7 +423,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
              )
 
     refute Enum.any?(
-             ArchitectureGate.check_compiled(root),
+             ArchitectureGate.check_compiled(root, "prod"),
              &(&1.category == :dynamic_dispatch)
            )
 
@@ -449,7 +449,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
                stderr_to_stdout: true
              )
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
              violation.category == :dynamic_dispatch and
                violation.detail =~ "compiled dynamic-call allowance" and
                violation.detail =~ "{:new, 1}"
@@ -474,7 +474,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
                stderr_to_stdout: true
              )
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
              violation.category == :dynamic_dispatch and
                violation.detail =~ "compiled dynamic-call allowance" and
                violation.detail =~ "{:fixed, 1}"
@@ -547,7 +547,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
              )
 
     refute Enum.any?(
-             ArchitectureGate.check_compiled(root),
+             ArchitectureGate.check_compiled(root, "prod"),
              &(&1.category == :public_surface)
            )
 
@@ -572,7 +572,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
                stderr_to_stdout: true
              )
 
-    assert Enum.any?(ArchitectureGate.check_compiled(root), fn violation ->
+    assert Enum.any?(ArchitectureGate.check_compiled(root, "prod"), fn violation ->
              violation.category == :public_surface and
                violation.detail =~ "unexpected_export"
            end)

@@ -117,3 +117,64 @@ fn decoded_wire_rendering_matches_reference() {
         assert_eq!(rendered, row["expected"].as_str().unwrap(), "{}", row["id"]);
     }
 }
+
+#[test]
+fn hand_built_public_fields_escape_controls_and_keep_nonce_redacted() {
+    let bad = "x\ny\u{7f}".to_string();
+    for version in 1..=3 {
+        let grant = GrantDecoded {
+            operations: vec![JsonValue::Object(vec![
+                ("name".into(), JsonValue::String(bad.clone())),
+                (
+                    "selectors".into(),
+                    JsonValue::Array(vec![JsonValue::Object(vec![])]),
+                ),
+            ])],
+            key_id: bad.clone(),
+            version,
+            issuer: bad.clone(),
+            grant_id: bad.clone(),
+            audiences: vec![bad.clone()],
+            holder_thumbprint: [255; 32],
+            issued_at: i64::MIN,
+            not_before: 0,
+            expires_at: i64::MAX,
+            verification: NotEvaluated,
+        };
+        let proof = ProofDecoded {
+            version,
+            holder_public_key: vec![255],
+            key_id: bad.clone(),
+            proof_id: bad.clone(),
+            method: bad.clone(),
+            target_uri: bad.clone(),
+            invocation_id: bad.clone(),
+            operation: bad.clone(),
+            grant_hash: [255; 32],
+            request_hash: [255; 32],
+            issued_at: i64::MIN,
+            holder_thumbprint: [255; 32],
+            nonce: Some("hidden".into()),
+            verification: NotEvaluated,
+        };
+        let attestation = AttestationDecoded {
+            attestor_key_id: bad.clone(),
+            jti: bad.clone(),
+            key_id: bad.clone(),
+            public_key: [255; 32],
+            role: Role::Issuer,
+            nbf: i64::MIN,
+            exp: i64::MAX,
+            verification: NotEvaluated,
+        };
+        for value in [&grant as &dyn std::fmt::Debug, &proof, &attestation] {
+            for output in [format!("{value:?}"), format!("{value:#?}")] {
+                assert!(!output.contains(['\n', '\r', '\0']));
+                assert!(!output.contains("hidden"));
+                assert!(output.contains("\\n"));
+            }
+        }
+        assert!(format!("{grant:?}").contains("selectors: [#unrenderable]"));
+        assert!(format!("{proof:?}").contains("nonce: :redacted"));
+    }
+}

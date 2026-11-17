@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import NoReturn
 
 from . import _inspect
-from .json_alg import JArray, JObject, JString
+from .json_alg import JObject
 
 
 class _Facts:
@@ -38,20 +38,9 @@ class _Facts:
 
 
 class GrantFacts(_Facts):
-    "GrantFacts (spec/bap-v1.md): version, issuer, grant_id, issuer-key fingerprint (raw 32),\nholder thumbprint (raw 32), matched audience, grant times, authorization=not_evaluated."
+    'GrantFacts (spec/bap-v1.md): version, issuer, grant_id, issuer-key fingerprint (raw 32),\nholder thumbprint (raw 32), matched audience, grant times, authorization=not_evaluated.'
 
-    __slots__ = (
-        "_version",
-        "_issuer",
-        "_grant_id",
-        "_issuer_key_fingerprint",
-        "_holder_thumbprint",
-        "_matched_audience",
-        "_issued_at",
-        "_not_before",
-        "_expires_at",
-        "_authorization",
-    )
+    __slots__ = ('_version', '_issuer', '_grant_id', '_issuer_key_fingerprint', '_holder_thumbprint', '_matched_audience', '_issued_at', '_not_before', '_expires_at', '_authorization')
     _version: int
     _issuer: str
     _grant_id: str
@@ -74,7 +63,7 @@ class GrantFacts(_Facts):
         issued_at: int,
         not_before: int,
         expires_at: int,
-        authorization: str = "not_evaluated",
+        authorization: str = 'not_evaluated',
     ) -> None:
         if hasattr(self, "_version"):
             raise TypeError("Facts cannot be initialized twice")
@@ -140,68 +129,19 @@ class GrantFacts(_Facts):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, GrantFacts) and (
-            self._version,
-            self._issuer,
-            self._grant_id,
-            self._issuer_key_fingerprint,
-            self._holder_thumbprint,
-            self._matched_audience,
-            self._issued_at,
-            self._not_before,
-            self._expires_at,
-            self._authorization,
+            self._version, self._issuer, self._grant_id, self._issuer_key_fingerprint, self._holder_thumbprint, self._matched_audience, self._issued_at, self._not_before, self._expires_at, self._authorization,
         ) == (
-            other._version,
-            other._issuer,
-            other._grant_id,
-            other._issuer_key_fingerprint,
-            other._holder_thumbprint,
-            other._matched_audience,
-            other._issued_at,
-            other._not_before,
-            other._expires_at,
-            other._authorization,
+            other._version, other._issuer, other._grant_id, other._issuer_key_fingerprint, other._holder_thumbprint, other._matched_audience, other._issued_at, other._not_before, other._expires_at, other._authorization,
         )
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                self._version,
-                self._issuer,
-                self._grant_id,
-                self._issuer_key_fingerprint,
-                self._holder_thumbprint,
-                self._matched_audience,
-                self._issued_at,
-                self._not_before,
-                self._expires_at,
-                self._authorization,
-            )
-        )
+        return hash((self._version, self._issuer, self._grant_id, self._issuer_key_fingerprint, self._holder_thumbprint, self._matched_audience, self._issued_at, self._not_before, self._expires_at, self._authorization,))
 
 
 class EnvelopeFacts(_Facts):
-    "EnvelopeFacts (spec/bap-v1.md): GrantFacts + proof_id, invocation_id, operation, uri,\ngrant hash (ath raw 32), request hash (ba_req raw 32), proof issued_at."
+    'EnvelopeFacts (spec/bap-v1.md): GrantFacts + proof_id, invocation_id, operation, uri,\ngrant hash (ath raw 32), request hash (ba_req raw 32), proof issued_at.'
 
-    __slots__ = (
-        "_version",
-        "_issuer",
-        "_grant_id",
-        "_issuer_key_fingerprint",
-        "_holder_thumbprint",
-        "_matched_audience",
-        "_grant_issued_at",
-        "_grant_not_before",
-        "_grant_expires_at",
-        "_proof_id",
-        "_invocation_id",
-        "_operation",
-        "_uri",
-        "_grant_hash",
-        "_request_hash",
-        "_proof_issued_at",
-        "_authorization",
-    )
+    __slots__ = ('_version', '_issuer', '_grant_id', '_issuer_key_fingerprint', '_holder_thumbprint', '_matched_audience', '_grant_issued_at', '_grant_not_before', '_grant_expires_at', '_proof_id', '_invocation_id', '_operation', '_uri', '_grant_hash', '_request_hash', '_proof_issued_at', '_authorization')
     _version: int
     _issuer: str
     _grant_id: str
@@ -238,7 +178,7 @@ class EnvelopeFacts(_Facts):
         grant_hash: bytes,
         request_hash: bytes,
         proof_issued_at: int,
-        authorization: str = "not_evaluated",
+        authorization: str = 'not_evaluated',
     ) -> None:
         if hasattr(self, "_version"):
             raise TypeError("Facts cannot be initialized twice")
@@ -339,81 +279,19 @@ class EnvelopeFacts(_Facts):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, EnvelopeFacts) and (
-            self._version,
-            self._issuer,
-            self._grant_id,
-            self._issuer_key_fingerprint,
-            self._holder_thumbprint,
-            self._matched_audience,
-            self._grant_issued_at,
-            self._grant_not_before,
-            self._grant_expires_at,
-            self._proof_id,
-            self._invocation_id,
-            self._operation,
-            self._uri,
-            self._grant_hash,
-            self._request_hash,
-            self._proof_issued_at,
-            self._authorization,
+            self._version, self._issuer, self._grant_id, self._issuer_key_fingerprint, self._holder_thumbprint, self._matched_audience, self._grant_issued_at, self._grant_not_before, self._grant_expires_at, self._proof_id, self._invocation_id, self._operation, self._uri, self._grant_hash, self._request_hash, self._proof_issued_at, self._authorization,
         ) == (
-            other._version,
-            other._issuer,
-            other._grant_id,
-            other._issuer_key_fingerprint,
-            other._holder_thumbprint,
-            other._matched_audience,
-            other._grant_issued_at,
-            other._grant_not_before,
-            other._grant_expires_at,
-            other._proof_id,
-            other._invocation_id,
-            other._operation,
-            other._uri,
-            other._grant_hash,
-            other._request_hash,
-            other._proof_issued_at,
-            other._authorization,
+            other._version, other._issuer, other._grant_id, other._issuer_key_fingerprint, other._holder_thumbprint, other._matched_audience, other._grant_issued_at, other._grant_not_before, other._grant_expires_at, other._proof_id, other._invocation_id, other._operation, other._uri, other._grant_hash, other._request_hash, other._proof_issued_at, other._authorization,
         )
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                self._version,
-                self._issuer,
-                self._grant_id,
-                self._issuer_key_fingerprint,
-                self._holder_thumbprint,
-                self._matched_audience,
-                self._grant_issued_at,
-                self._grant_not_before,
-                self._grant_expires_at,
-                self._proof_id,
-                self._invocation_id,
-                self._operation,
-                self._uri,
-                self._grant_hash,
-                self._request_hash,
-                self._proof_issued_at,
-                self._authorization,
-            )
-        )
+        return hash((self._version, self._issuer, self._grant_id, self._issuer_key_fingerprint, self._holder_thumbprint, self._matched_audience, self._grant_issued_at, self._grant_not_before, self._grant_expires_at, self._proof_id, self._invocation_id, self._operation, self._uri, self._grant_hash, self._request_hash, self._proof_issued_at, self._authorization,))
 
 
 class ChainFacts(_Facts):
-    "Consumption-row facts with trust=not_evaluated.\n\nFields follow spec/bap-v1.md §16."
+    'Consumption-row facts with trust=not_evaluated.\n\nFields follow spec/bap-v1.md §16.'
 
-    __slots__ = (
-        "_version",
-        "_chain_id",
-        "_first_sequence",
-        "_last_sequence",
-        "_row_count",
-        "_previous_hash",
-        "_last_hash",
-        "_verification",
-        "_trust",
-    )
+    __slots__ = ('_version', '_chain_id', '_first_sequence', '_last_sequence', '_row_count', '_previous_hash', '_last_hash', '_verification', '_trust')
     _version: int
     _chain_id: str
     _first_sequence: int
@@ -433,8 +311,8 @@ class ChainFacts(_Facts):
         row_count: int,
         previous_hash: bytes,
         last_hash: bytes,
-        verification: str = "boundary_consistent",
-        trust: str = "not_evaluated",
+        verification: str = 'boundary_consistent',
+        trust: str = 'not_evaluated',
     ) -> None:
         if hasattr(self, "_version"):
             raise TypeError("Facts cannot be initialized twice")
@@ -495,57 +373,19 @@ class ChainFacts(_Facts):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, ChainFacts) and (
-            self._version,
-            self._chain_id,
-            self._first_sequence,
-            self._last_sequence,
-            self._row_count,
-            self._previous_hash,
-            self._last_hash,
-            self._verification,
-            self._trust,
+            self._version, self._chain_id, self._first_sequence, self._last_sequence, self._row_count, self._previous_hash, self._last_hash, self._verification, self._trust,
         ) == (
-            other._version,
-            other._chain_id,
-            other._first_sequence,
-            other._last_sequence,
-            other._row_count,
-            other._previous_hash,
-            other._last_hash,
-            other._verification,
-            other._trust,
+            other._version, other._chain_id, other._first_sequence, other._last_sequence, other._row_count, other._previous_hash, other._last_hash, other._verification, other._trust,
         )
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                self._version,
-                self._chain_id,
-                self._first_sequence,
-                self._last_sequence,
-                self._row_count,
-                self._previous_hash,
-                self._last_hash,
-                self._verification,
-                self._trust,
-            )
-        )
+        return hash((self._version, self._chain_id, self._first_sequence, self._last_sequence, self._row_count, self._previous_hash, self._last_hash, self._verification, self._trust,))
 
 
 class AnchorFacts(_Facts):
-    "Boundary-anchor facts with trust=not_evaluated.\n\nFields follow spec/bap-v1.md §16: the key binding\nis its fingerprint, without a key identifier."
+    'Boundary-anchor facts with trust=not_evaluated.\n\nFields follow spec/bap-v1.md §16: the key binding\nis its fingerprint, without a key identifier.'
 
-    __slots__ = (
-        "_version",
-        "_anchor_id",
-        "_anchored_at",
-        "_chain_id",
-        "_sequence",
-        "_chain_hash",
-        "_key_fingerprint",
-        "_verification",
-        "_trust",
-    )
+    __slots__ = ('_version', '_anchor_id', '_anchored_at', '_chain_id', '_sequence', '_chain_hash', '_key_fingerprint', '_verification', '_trust')
     _version: int
     _anchor_id: str
     _anchored_at: int
@@ -565,8 +405,8 @@ class AnchorFacts(_Facts):
         sequence: int,
         chain_hash: bytes,
         key_fingerprint: bytes,
-        verification: str = "signature_and_window",
-        trust: str = "not_evaluated",
+        verification: str = 'signature_and_window',
+        trust: str = 'not_evaluated',
     ) -> None:
         if hasattr(self, "_version"):
             raise TypeError("Facts cannot be initialized twice")
@@ -627,56 +467,19 @@ class AnchorFacts(_Facts):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, AnchorFacts) and (
-            self._version,
-            self._anchor_id,
-            self._anchored_at,
-            self._chain_id,
-            self._sequence,
-            self._chain_hash,
-            self._key_fingerprint,
-            self._verification,
-            self._trust,
+            self._version, self._anchor_id, self._anchored_at, self._chain_id, self._sequence, self._chain_hash, self._key_fingerprint, self._verification, self._trust,
         ) == (
-            other._version,
-            other._anchor_id,
-            other._anchored_at,
-            other._chain_id,
-            other._sequence,
-            other._chain_hash,
-            other._key_fingerprint,
-            other._verification,
-            other._trust,
+            other._version, other._anchor_id, other._anchored_at, other._chain_id, other._sequence, other._chain_hash, other._key_fingerprint, other._verification, other._trust,
         )
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                self._version,
-                self._anchor_id,
-                self._anchored_at,
-                self._chain_id,
-                self._sequence,
-                self._chain_hash,
-                self._key_fingerprint,
-                self._verification,
-                self._trust,
-            )
-        )
+        return hash((self._version, self._anchor_id, self._anchored_at, self._chain_id, self._sequence, self._chain_hash, self._key_fingerprint, self._verification, self._trust,))
 
 
 class KeyTransitionFacts(_Facts):
-    "Authenticated key-transition facts with trust=not_evaluated.\n\nFields follow spec/bap-v1.md §16: key bindings\nare current and next fingerprints, without key identifiers."
+    'Authenticated key-transition facts with trust=not_evaluated.\n\nFields follow spec/bap-v1.md §16: key bindings\nare current and next fingerprints, without key identifiers.'
 
-    __slots__ = (
-        "_version",
-        "_transition_id",
-        "_chain_id",
-        "_effective_at",
-        "_current_key_fingerprint",
-        "_next_key_fingerprint",
-        "_verification",
-        "_trust",
-    )
+    __slots__ = ('_version', '_transition_id', '_chain_id', '_effective_at', '_current_key_fingerprint', '_next_key_fingerprint', '_verification', '_trust')
     _version: int
     _transition_id: str
     _chain_id: str
@@ -694,8 +497,8 @@ class KeyTransitionFacts(_Facts):
         effective_at: int,
         current_key_fingerprint: bytes,
         next_key_fingerprint: bytes,
-        verification: str = "authenticated_transition",
-        trust: str = "not_evaluated",
+        verification: str = 'authenticated_transition',
+        trust: str = 'not_evaluated',
     ) -> None:
         if hasattr(self, "_version"):
             raise TypeError("Facts cannot be initialized twice")
@@ -751,64 +554,19 @@ class KeyTransitionFacts(_Facts):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, KeyTransitionFacts) and (
-            self._version,
-            self._transition_id,
-            self._chain_id,
-            self._effective_at,
-            self._current_key_fingerprint,
-            self._next_key_fingerprint,
-            self._verification,
-            self._trust,
+            self._version, self._transition_id, self._chain_id, self._effective_at, self._current_key_fingerprint, self._next_key_fingerprint, self._verification, self._trust,
         ) == (
-            other._version,
-            other._transition_id,
-            other._chain_id,
-            other._effective_at,
-            other._current_key_fingerprint,
-            other._next_key_fingerprint,
-            other._verification,
-            other._trust,
+            other._version, other._transition_id, other._chain_id, other._effective_at, other._current_key_fingerprint, other._next_key_fingerprint, other._verification, other._trust,
         )
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                self._version,
-                self._transition_id,
-                self._chain_id,
-                self._effective_at,
-                self._current_key_fingerprint,
-                self._next_key_fingerprint,
-                self._verification,
-                self._trust,
-            )
-        )
+        return hash((self._version, self._transition_id, self._chain_id, self._effective_at, self._current_key_fingerprint, self._next_key_fingerprint, self._verification, self._trust,))
 
 
 class AnchoredExportFacts(_Facts):
-    "Anchored-export facts carrying both trust and authorization=not_evaluated.\n\nFields follow spec/bap-v1.md §16."
+    'Anchored-export facts carrying both trust and authorization=not_evaluated.\n\nFields follow spec/bap-v1.md §16.'
 
-    __slots__ = (
-        "_version",
-        "_chain_id",
-        "_first_sequence",
-        "_last_sequence",
-        "_row_count",
-        "_previous_hash",
-        "_last_hash",
-        "_digest",
-        "_start_anchor_id",
-        "_start_anchored_at",
-        "_start_key_fingerprint",
-        "_end_anchor_id",
-        "_end_anchored_at",
-        "_end_key_fingerprint",
-        "_transition_count",
-        "_object_version",
-        "_verification",
-        "_trust",
-        "_authorization",
-    )
+    __slots__ = ('_version', '_chain_id', '_first_sequence', '_last_sequence', '_row_count', '_previous_hash', '_last_hash', '_digest', '_start_anchor_id', '_start_anchored_at', '_start_key_fingerprint', '_end_anchor_id', '_end_anchored_at', '_end_key_fingerprint', '_transition_count', '_object_version', '_verification', '_trust', '_authorization')
     _version: int
     _chain_id: str
     _first_sequence: int
@@ -847,9 +605,9 @@ class AnchoredExportFacts(_Facts):
         end_key_fingerprint: bytes,
         transition_count: int,
         object_version: str,
-        verification: str = "anchored_export",
-        trust: str = "not_evaluated",
-        authorization: str = "not_evaluated",
+        verification: str = 'anchored_export',
+        trust: str = 'not_evaluated',
+        authorization: str = 'not_evaluated',
     ) -> None:
         if hasattr(self, "_version"):
             raise TypeError("Facts cannot be initialized twice")
@@ -960,71 +718,13 @@ class AnchoredExportFacts(_Facts):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, AnchoredExportFacts) and (
-            self._version,
-            self._chain_id,
-            self._first_sequence,
-            self._last_sequence,
-            self._row_count,
-            self._previous_hash,
-            self._last_hash,
-            self._digest,
-            self._start_anchor_id,
-            self._start_anchored_at,
-            self._start_key_fingerprint,
-            self._end_anchor_id,
-            self._end_anchored_at,
-            self._end_key_fingerprint,
-            self._transition_count,
-            self._object_version,
-            self._verification,
-            self._trust,
-            self._authorization,
+            self._version, self._chain_id, self._first_sequence, self._last_sequence, self._row_count, self._previous_hash, self._last_hash, self._digest, self._start_anchor_id, self._start_anchored_at, self._start_key_fingerprint, self._end_anchor_id, self._end_anchored_at, self._end_key_fingerprint, self._transition_count, self._object_version, self._verification, self._trust, self._authorization,
         ) == (
-            other._version,
-            other._chain_id,
-            other._first_sequence,
-            other._last_sequence,
-            other._row_count,
-            other._previous_hash,
-            other._last_hash,
-            other._digest,
-            other._start_anchor_id,
-            other._start_anchored_at,
-            other._start_key_fingerprint,
-            other._end_anchor_id,
-            other._end_anchored_at,
-            other._end_key_fingerprint,
-            other._transition_count,
-            other._object_version,
-            other._verification,
-            other._trust,
-            other._authorization,
+            other._version, other._chain_id, other._first_sequence, other._last_sequence, other._row_count, other._previous_hash, other._last_hash, other._digest, other._start_anchor_id, other._start_anchored_at, other._start_key_fingerprint, other._end_anchor_id, other._end_anchored_at, other._end_key_fingerprint, other._transition_count, other._object_version, other._verification, other._trust, other._authorization,
         )
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                self._version,
-                self._chain_id,
-                self._first_sequence,
-                self._last_sequence,
-                self._row_count,
-                self._previous_hash,
-                self._last_hash,
-                self._digest,
-                self._start_anchor_id,
-                self._start_anchored_at,
-                self._start_key_fingerprint,
-                self._end_anchor_id,
-                self._end_anchored_at,
-                self._end_key_fingerprint,
-                self._transition_count,
-                self._object_version,
-                self._verification,
-                self._trust,
-                self._authorization,
-            )
-        )
+        return hash((self._version, self._chain_id, self._first_sequence, self._last_sequence, self._row_count, self._previous_hash, self._last_hash, self._digest, self._start_anchor_id, self._start_anchored_at, self._start_key_fingerprint, self._end_anchor_id, self._end_anchored_at, self._end_key_fingerprint, self._transition_count, self._object_version, self._verification, self._trust, self._authorization,))
 
 
 @dataclass(frozen=True)
@@ -1044,40 +744,17 @@ class GrantDecoded:
     verification: str = "not_evaluated"
 
     def __repr__(self) -> str:
-        operations = []
-        for operation in self.operations:
-            name, selectors = operation.v["name"], operation.v["selectors"]
-            assert isinstance(name, JString) and isinstance(selectors, JArray)
-            operations.append(
-                _inspect.structure(
-                    f"BoundedAuthorityProtocol.V{self.version}.Operation",
-                    [
-                        ("name", _inspect.raw(name.v)),
-                        (
-                            "selectors",
-                            _inspect.listing([_inspect.selector(s) for s in selectors.v]),
-                        ),
-                    ],
-                )
-            )
-        return _inspect.render(
-            _inspect.structure(
-                f"BoundedAuthorityProtocol.V{self.version}.DecodedGrant",
-                [
-                    ("version", _inspect.scalar(self.version)),
-                    ("key_id", _inspect.text(self.key_id)),
-                    ("issuer", _inspect.text(self.issuer)),
-                    ("grant_id", _inspect.text(self.grant_id)),
-                    ("audiences", _inspect.listing([_inspect.text(v) for v in self.audiences])),
-                    ("issued_at", _inspect.scalar(self.issued_at)),
-                    ("not_before", _inspect.scalar(self.not_before)),
-                    ("expires_at", _inspect.scalar(self.expires_at)),
-                    ("holder_thumbprint", _inspect.raw(self.holder_thumbprint)),
-                    ("operations", _inspect.listing(operations)),
-                    ("verification", _inspect.atom("not_evaluated")),
-                ],
-            )
-        )
+        if type(self.version) is not int or self.version not in (1, 2, 3):
+            return "#unrenderable"
+        operations = _inspect.operations(self.operations, self.version)
+        return _inspect.render(_inspect.structure(f"BoundedAuthorityProtocol.V{self.version}.DecodedGrant", [
+            ("version", _inspect.scalar(self.version)), ("key_id", _inspect.text(self.key_id)),
+            ("issuer", _inspect.text(self.issuer)), ("grant_id", _inspect.text(self.grant_id)),
+            ("audiences", _inspect.mapped_listing(self.audiences, _inspect.text)),
+            ("issued_at", _inspect.scalar(self.issued_at)), ("not_before", _inspect.scalar(self.not_before)),
+            ("expires_at", _inspect.scalar(self.expires_at)), ("holder_thumbprint", _inspect.raw(self.holder_thumbprint)),
+            ("operations", operations), ("verification", _inspect.atom(self.verification)),
+        ]))
 
     __str__ = __repr__
 
@@ -1085,21 +762,7 @@ class GrantDecoded:
 class ProofDecoded(_Facts):
     """Unverified decoded values; generic enumeration and reduction are refused."""
 
-    __slots__ = (
-        "_version",
-        "_proof_id",
-        "_method",
-        "_target_uri",
-        "_issued_at",
-        "_nonce",
-        "_invocation_id",
-        "_operation",
-        "_grant_hash",
-        "_request_hash",
-        "_holder_public_key",
-        "_holder_thumbprint",
-        "_verification",
-    )
+    __slots__ = ('_version', '_proof_id', '_method', '_target_uri', '_issued_at', '_nonce', '_invocation_id', '_operation', '_grant_hash', '_request_hash', '_holder_public_key', '_holder_thumbprint', '_verification')
     _version: int
     _proof_id: str
     _method: str
@@ -1199,50 +862,27 @@ class ProofDecoded(_Facts):
         return self._verification
 
     def __repr__(self) -> str:
+        if type(self.version) is not int or self.version not in (1, 2, 3):
+            return "#unrenderable"
         return (
             f"#BoundedAuthorityProtocol.V{self.version}.DecodedProof<"
-            + "version: "
-            + str(self.version)
-            + ", "
-            + "proof_id: "
-            + _inspect.string(self.proof_id)
-            + ", "
-            + "method: "
-            + _inspect.string(self.method)
-            + ", "
-            + "target_uri: "
-            + _inspect.string(self.target_uri)
-            + ", "
-            + "issued_at: "
-            + str(self.issued_at)
-            + ", "
-            + "nonce: "
-            + ("nil" if self.nonce is None else ":redacted")
-            + ", "
-            + "invocation_id: "
-            + _inspect.string(self.invocation_id)
-            + ", "
-            + "operation: "
-            + _inspect.string(self.operation)
-            + ", "
-            + "grant_hash: "
-            + _inspect.binary(self.grant_hash)
-            + ", "
-            + "request_hash: "
-            + _inspect.binary(self.request_hash)
-            + ", "
-            + "holder_public_key: "
-            + _inspect.binary(self.holder_public_key)
-            + ", "
-            + "holder_thumbprint: "
-            + _inspect.binary(self.holder_thumbprint)
-            + ", "
-            + "verification: "
-            + ":not_evaluated"
-            + ">"
+            + "version: " + str(self.version) + ", "
+            + "proof_id: " + _inspect.string(self.proof_id) + ", "
+            + "method: " + _inspect.string(self.method) + ", "
+            + "target_uri: " + _inspect.string(self.target_uri) + ", "
+            + "issued_at: " + _inspect.render(_inspect.scalar(self.issued_at)) + ", "
+            + "nonce: " + ("nil" if self.nonce is None else ":redacted") + ", "
+            + "invocation_id: " + _inspect.string(self.invocation_id) + ", "
+            + "operation: " + _inspect.string(self.operation) + ", "
+            + "grant_hash: " + _inspect.binary(self.grant_hash) + ", "
+            + "request_hash: " + _inspect.binary(self.request_hash) + ", "
+            + "holder_public_key: " + _inspect.binary(self.holder_public_key) + ", "
+            + "holder_thumbprint: " + _inspect.binary(self.holder_thumbprint) + ", "
+            + "verification: " + _inspect.render(_inspect.atom(self.verification)) + ">"
         )
 
     __str__ = __repr__
+
 
 
 @dataclass(frozen=True)
@@ -1272,41 +912,21 @@ class AttestationDecoded:
     verification: str = "not_evaluated"
 
     def __repr__(self) -> str:
-        return _inspect.render(
-            _inspect.structure(
-                "BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation",
-                [
-                    ("version", _inspect.scalar(1)),
-                    ("attestor_key_id", _inspect.text(self.attestor_key_id)),
-                    ("jti", _inspect.text(self.jti)),
-                    ("key_id", _inspect.text(self.subject_key_id)),
-                    ("public_key", _inspect.raw(self.public_key)),
-                    ("role", _inspect.text(self.role)),
-                    ("nbf", _inspect.scalar(self.nbf)),
-                    ("exp", _inspect.scalar(self.exp)),
-                    ("verification", _inspect.atom("not_evaluated")),
-                ],
-            )
-        )
+        return _inspect.render(_inspect.structure("BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation", [
+            ("version", _inspect.scalar(1)), ("attestor_key_id", _inspect.text(self.attestor_key_id)),
+            ("jti", _inspect.text(self.jti)), ("key_id", _inspect.text(self.subject_key_id)),
+            ("public_key", _inspect.raw(self.public_key)), ("role", _inspect.text(self.role)),
+            ("nbf", _inspect.scalar(self.nbf)), ("exp", _inspect.scalar(self.exp)),
+            ("verification", _inspect.atom(self.verification)),
+        ]))
 
     __str__ = __repr__
 
 
 class AttestationFacts(_Facts):
-    "AttestationFacts (spec/bap-role-attestation-v1.md §3): value-bearing, redacted,\nnon-authorizing. Fingerprints are RFC 7638 Ed25519 thumbprints (raw 32) — never a hash of\nraw key bytes. No raw key material, no signature, no decision (REQ-RA1-VERIFY-facts,\nREQ-RA1-VERIFY-facts-non-authorizing)."
+    'AttestationFacts (spec/bap-role-attestation-v1.md §3): value-bearing, redacted,\nnon-authorizing. Fingerprints are RFC 7638 Ed25519 thumbprints (raw 32) — never a hash of\nraw key bytes. No raw key material, no signature, no decision (REQ-RA1-VERIFY-facts,\nREQ-RA1-VERIFY-facts-non-authorizing).'
 
-    __slots__ = (
-        "_attestor_key_id",
-        "_attestor_key_fingerprint",
-        "_subject_key_id",
-        "_subject_key_fingerprint",
-        "_role",
-        "_jti",
-        "_nbf",
-        "_exp",
-        "_verification",
-        "_trust",
-    )
+    __slots__ = ('_attestor_key_id', '_attestor_key_fingerprint', '_subject_key_id', '_subject_key_fingerprint', '_role', '_jti', '_nbf', '_exp', '_verification', '_trust')
     _attestor_key_id: str
     _attestor_key_fingerprint: bytes
     _subject_key_id: str
@@ -1328,8 +948,8 @@ class AttestationFacts(_Facts):
         jti: str,
         nbf: int,
         exp: int,
-        verification: str = "signature_and_window",
-        trust: str = "not_evaluated",
+        verification: str = 'signature_and_window',
+        trust: str = 'not_evaluated',
     ) -> None:
         if hasattr(self, "_attestor_key_id"):
             raise TypeError("Facts cannot be initialized twice")
@@ -1391,66 +1011,19 @@ class AttestationFacts(_Facts):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, AttestationFacts) and (
-            self._attestor_key_id,
-            self._attestor_key_fingerprint,
-            self._subject_key_id,
-            self._subject_key_fingerprint,
-            self._role,
-            self._jti,
-            self._nbf,
-            self._exp,
-            self._verification,
-            self._trust,
+            self._attestor_key_id, self._attestor_key_fingerprint, self._subject_key_id, self._subject_key_fingerprint, self._role, self._jti, self._nbf, self._exp, self._verification, self._trust,
         ) == (
-            other._attestor_key_id,
-            other._attestor_key_fingerprint,
-            other._subject_key_id,
-            other._subject_key_fingerprint,
-            other._role,
-            other._jti,
-            other._nbf,
-            other._exp,
-            other._verification,
-            other._trust,
+            other._attestor_key_id, other._attestor_key_fingerprint, other._subject_key_id, other._subject_key_fingerprint, other._role, other._jti, other._nbf, other._exp, other._verification, other._trust,
         )
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                self._attestor_key_id,
-                self._attestor_key_fingerprint,
-                self._subject_key_id,
-                self._subject_key_fingerprint,
-                self._role,
-                self._jti,
-                self._nbf,
-                self._exp,
-                self._verification,
-                self._trust,
-            )
-        )
+        return hash((self._attestor_key_id, self._attestor_key_fingerprint, self._subject_key_id, self._subject_key_fingerprint, self._role, self._jti, self._nbf, self._exp, self._verification, self._trust,))
 
 
 class ContentAssertionDecoded(_Facts):
     """Unverified decoded values; generic enumeration and reduction are refused."""
 
-    __slots__ = (
-        "_version",
-        "_attestor_key_id",
-        "_jti",
-        "_iss",
-        "_aud",
-        "_sub",
-        "_profile",
-        "_profile_digest",
-        "_content_digest",
-        "_gen",
-        "_prev",
-        "_iat",
-        "_nbf",
-        "_exp",
-        "_verification",
-    )
+    __slots__ = ('_version', '_attestor_key_id', '_jti', '_iss', '_aud', '_sub', '_profile', '_profile_digest', '_content_digest', '_gen', '_prev', '_iat', '_nbf', '_exp', '_verification')
     _version: int
     _attestor_key_id: str
     _jti: str
@@ -1569,29 +1142,11 @@ class ContentAssertionDecoded(_Facts):
     __str__ = __repr__
 
 
-class ContentAssertionFacts(_Facts):
-    "Verified, value-bearing, redacted content-assertion facts.\n\nThis value remains non-authorizing and caller-provenanced. It contains no raw public key,\nsignature, decision, or authorization marker."
 
-    __slots__ = (
-        "_version",
-        "_attestor_key_id",
-        "_attestor_key_fingerprint",
-        "_jti",
-        "_iss",
-        "_aud",
-        "_sub",
-        "_profile",
-        "_profile_digest",
-        "_content_digest",
-        "_gen",
-        "_prev",
-        "_iat",
-        "_nbf",
-        "_exp",
-        "_digest",
-        "_verification",
-        "_trust",
-    )
+class ContentAssertionFacts(_Facts):
+    'Verified, value-bearing, redacted content-assertion facts.\n\nThis value remains non-authorizing and caller-provenanced. It contains no raw public key,\nsignature, decision, or authorization marker.'
+
+    __slots__ = ('_version', '_attestor_key_id', '_attestor_key_fingerprint', '_jti', '_iss', '_aud', '_sub', '_profile', '_profile_digest', '_content_digest', '_gen', '_prev', '_iat', '_nbf', '_exp', '_digest', '_verification', '_trust')
     _version: int
     _attestor_key_id: str
     _attestor_key_fingerprint: bytes
@@ -1629,8 +1184,8 @@ class ContentAssertionFacts(_Facts):
         nbf: int,
         exp: int,
         digest: bytes,
-        verification: str = "signature_and_window",
-        trust: str = "not_evaluated",
+        verification: str = 'signature_and_window',
+        trust: str = 'not_evaluated',
     ) -> None:
         if hasattr(self, "_version"):
             raise TypeError("Facts cannot be initialized twice")
@@ -1732,65 +1287,10 @@ class ContentAssertionFacts(_Facts):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, ContentAssertionFacts) and (
-            self._version,
-            self._attestor_key_id,
-            self._attestor_key_fingerprint,
-            self._jti,
-            self._iss,
-            self._aud,
-            self._sub,
-            self._profile,
-            self._profile_digest,
-            self._content_digest,
-            self._gen,
-            self._prev,
-            self._iat,
-            self._nbf,
-            self._exp,
-            self._digest,
-            self._verification,
-            self._trust,
+            self._version, self._attestor_key_id, self._attestor_key_fingerprint, self._jti, self._iss, self._aud, self._sub, self._profile, self._profile_digest, self._content_digest, self._gen, self._prev, self._iat, self._nbf, self._exp, self._digest, self._verification, self._trust,
         ) == (
-            other._version,
-            other._attestor_key_id,
-            other._attestor_key_fingerprint,
-            other._jti,
-            other._iss,
-            other._aud,
-            other._sub,
-            other._profile,
-            other._profile_digest,
-            other._content_digest,
-            other._gen,
-            other._prev,
-            other._iat,
-            other._nbf,
-            other._exp,
-            other._digest,
-            other._verification,
-            other._trust,
+            other._version, other._attestor_key_id, other._attestor_key_fingerprint, other._jti, other._iss, other._aud, other._sub, other._profile, other._profile_digest, other._content_digest, other._gen, other._prev, other._iat, other._nbf, other._exp, other._digest, other._verification, other._trust,
         )
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                self._version,
-                self._attestor_key_id,
-                self._attestor_key_fingerprint,
-                self._jti,
-                self._iss,
-                self._aud,
-                self._sub,
-                self._profile,
-                self._profile_digest,
-                self._content_digest,
-                self._gen,
-                self._prev,
-                self._iat,
-                self._nbf,
-                self._exp,
-                self._digest,
-                self._verification,
-                self._trust,
-            )
-        )
+        return hash((self._version, self._attestor_key_id, self._attestor_key_fingerprint, self._jti, self._iss, self._aud, self._sub, self._profile, self._profile_digest, self._content_digest, self._gen, self._prev, self._iat, self._nbf, self._exp, self._digest, self._verification, self._trust,))

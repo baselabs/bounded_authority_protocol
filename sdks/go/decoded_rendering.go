@@ -2,6 +2,7 @@ package verifier
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -10,15 +11,44 @@ import (
 type inspectTerm struct {
 	kind, text string
 	raw        []byte
+	more       bool
+	values     []Value
+	members    Obj
+	texts      []string
+	operations []OperationDef
+	version    int
 	children   []inspectTerm
 }
 
-func inspectAtom(v string) inspectTerm { return inspectTerm{kind: "atom", text: v} }
+func inspectIdentifier(v string) bool {
+	if len(v) == 0 || !(v[0] >= 'a' && v[0] <= 'z' || v[0] == '_') {
+		return false
+	}
+	tail := v[1:]
+	if len(tail) > 0 && (tail[len(tail)-1] == '?' || tail[len(tail)-1] == '!') {
+		tail = tail[:len(tail)-1]
+	}
+	for i := 0; i < len(tail); i++ {
+		c := tail[i]
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+func inspectAtom(v string) inspectTerm {
+	if !inspectIdentifier(v) {
+		return inspectTerm{kind: "unrenderable"}
+	}
+	return inspectTerm{kind: "atom", text: v}
+}
 func inspectInt(v int64) inspectTerm {
 	return inspectTerm{kind: "scalar", text: strconv.FormatInt(v, 10)}
 }
-func inspectRaw(v []byte) inspectTerm                  { return inspectTerm{kind: "binary", raw: v} }
-func inspectText(v string) inspectTerm                 { return inspectRaw([]byte(v)) }
+func inspectRaw(v []byte) inspectTerm { return inspectTerm{kind: "binary", raw: v} }
+func inspectText(v string) inspectTerm {
+	return inspectTerm{kind: "binary", raw: []byte(v[:min(len(v), 16384)]), more: len(v) > 16384}
+}
 func inspectTuple(v ...inspectTerm) inspectTerm        { return inspectTerm{kind: "tuple", children: v} }
 func inspectListing(v []inspectTerm) inspectTerm       { return inspectTerm{kind: "list", children: v} }
 func inspectField(k string, v inspectTerm) inspectTerm { return inspectTuple(inspectAtom(k), v) }
@@ -100,7 +130,7 @@ func inspectQuoted(raw []byte) (string, bool) {
 }
 func inspectRender(term inspectTerm) string { remaining := 200; return inspectWalk(term, &remaining) }
 func inspectContainer(values []inspectTerm, left, right string, keyword bool, remaining *int) string {
-	parts := make([]string, 0, len(values))
+	parts := make([]string, 0, min(len(values), *remaining)+1)
 	for _, value := range values {
 		if *remaining <= 0 {
 			parts = append(parts, "...")
@@ -115,8 +145,27 @@ func inspectContainer(values []inspectTerm, left, right string, keyword bool, re
 	}
 	return left + strings.Join(parts, ", ") + right
 }
+func inspectSequence(length int, get func(int) inspectTerm, left, right string, keyword bool, remaining *int) string {
+	parts := make([]string, 0, min(length, *remaining)+1)
+	for i := 0; i < length; i++ {
+		if *remaining == 0 {
+			parts = append(parts, "...")
+			break
+		}
+		*remaining--
+		v := get(i)
+		if keyword {
+			parts = append(parts, v.children[0].text+": "+inspectWalk(v.children[1], remaining))
+		} else {
+			parts = append(parts, inspectWalk(v, remaining))
+		}
+	}
+	return left + strings.Join(parts, ", ") + right
+}
 func inspectWalk(term inspectTerm, remaining *int) string {
 	switch term.kind {
+	case "unrenderable":
+		return "#unrenderable"
 	case "atom":
 		if term.text == "true" || term.text == "false" || term.text == "nil" {
 			return term.text
@@ -126,6 +175,9 @@ func inspectWalk(term inspectTerm, remaining *int) string {
 		return term.text
 	case "binary":
 		if quoted, ok := inspectQuoted(term.raw); ok {
+			if term.more && !strings.HasSuffix(quoted, " <> ...") {
+				quoted += " <> ..."
+			}
 			return quoted
 		}
 		count := len(term.raw)
@@ -136,7 +188,7 @@ func inspectWalk(term inspectTerm, remaining *int) string {
 		for i, v := range term.raw[:count] {
 			parts[i] = strconv.Itoa(int(v))
 		}
-		if count < len(term.raw) {
+		if term.more || count < len(term.raw) {
 			parts = append(parts, "...")
 		}
 		*remaining -= len(term.raw)
@@ -144,6 +196,32 @@ func inspectWalk(term inspectTerm, remaining *int) string {
 			*remaining = 0
 		}
 		return "<<" + strings.Join(parts, ", ") + ">>"
+	case "array":
+		keyword := len(term.values) > 0
+		for _, v := range term.values {
+			switch v.(type) {
+			case Bool, Int, Float, Str, Arr, Obj:
+			default:
+				keyword = false
+			}
+		}
+		return inspectSequence(len(term.values), func(i int) inspectTerm { return inspectTagged(term.values[i]) }, "[", "]", keyword, remaining)
+	case "object":
+		return inspectSequence(len(term.members), func(i int) inspectTerm {
+			m := term.members[i]
+			return inspectTuple(inspectText(m.Key), inspectTagged(m.Val))
+		}, "[", "]", false, remaining)
+	case "path":
+		return inspectSequence(len(term.values), func(i int) inspectTerm { return inspectOrdinary(term.values[i]) }, "[", "]", false, remaining)
+	case "selectors":
+		return inspectSequence(len(term.values), func(i int) inspectTerm { return inspectSelector(term.values[i]) }, "[", "]", false, remaining)
+	case "texts":
+		return inspectSequence(len(term.texts), func(i int) inspectTerm { return inspectText(term.texts[i]) }, "[", "]", false, remaining)
+	case "operations":
+		return inspectSequence(len(term.operations), func(i int) inspectTerm {
+			op := term.operations[i]
+			return inspectStruct(fmt.Sprintf("BoundedAuthorityProtocol.V%d.Operation", term.version), inspectField("name", inspectText(op.Name)), inspectField("selectors", inspectTerm{kind: "selectors", values: op.Selectors}))
+		}, "[", "]", false, remaining)
 	case "struct":
 		return inspectContainer(term.children, "%"+term.text+"{", "}", true, remaining)
 	case "tuple":
@@ -181,26 +259,22 @@ func inspectTagged(value Value) inspectTerm {
 		val = inspectText(string(v))
 	case Arr:
 		tag = "array"
-		members := make([]inspectTerm, len(v))
-		for i, c := range v {
-			members[i] = inspectTagged(c)
-		}
-		val = inspectListing(members)
+		val = inspectTerm{kind: "array", values: v}
 	case Obj:
 		tag = "object"
-		members := make([]inspectTerm, len(v))
-		for i, c := range v {
-			members[i] = inspectTuple(inspectText(c.Key), inspectTagged(c.Val))
-		}
-		val = inspectListing(members)
+		val = inspectTerm{kind: "object", members: v}
 	default:
-		return inspectAtom("nil")
+		return inspectTerm{kind: "unrenderable"}
 	}
+
 	return inspectTuple(inspectAtom(tag), val)
 }
 
 // Scalar rendering chooses notation after obtaining the shortest round-trip digits.
 func inspectFloat(value float64) string {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return "#unrenderable"
+	}
 	if value == 0 {
 		return strconv.FormatFloat(value, 'f', 1, 64)
 	}
@@ -240,61 +314,93 @@ func inspectMember(value Value, key string) Value {
 			}
 		}
 	}
-	return Null{}
+	return nil
+}
+func inspectOrdinary(value Value) inspectTerm {
+	switch v := value.(type) {
+	case Null:
+		return inspectAtom("nil")
+	case Bool:
+		return inspectAtom(strconv.FormatBool(bool(v)))
+	case Int:
+		return inspectInt(int64(v))
+	case Float:
+		return inspectTerm{kind: "scalar", text: inspectFloat(float64(v))}
+	case Str:
+		return inspectText(string(v))
+	case Arr:
+		return inspectTerm{kind: "path", values: v}
+	default:
+		return inspectTerm{kind: "unrenderable"}
+	}
 }
 func inspectSelector(value Value) inspectTerm {
-	kind, _ := inspectMember(value, "kind").(Str)
+	kind, ok := inspectMember(value, "kind").(Str)
+	if !ok {
+		return inspectTerm{kind: "unrenderable"}
+	}
 	if kind == "all" {
 		return inspectAtom("all")
 	}
-	path, _ := inspectMember(value, "path").(Arr)
-	names := make([]inspectTerm, len(path))
-	for i, v := range path {
-		s, _ := v.(Str)
-		names[i] = inspectText(string(s))
+	path, ok := inspectMember(value, "path").(Arr)
+	if !ok {
+		return inspectTerm{kind: "unrenderable"}
 	}
-	operand := inspectTagged(inspectMember(value, "value"))
-	if kind == "one_of" {
-		members, _ := inspectMember(value, "values").(Arr)
-		parts := make([]inspectTerm, len(members))
-		for i, v := range members {
-			parts[i] = inspectTagged(v)
+	for _, v := range path {
+		if _, ok := v.(Str); !ok {
+			return inspectTerm{kind: "unrenderable"}
 		}
-		operand = inspectListing(parts)
 	}
-	return inspectTuple(inspectAtom(string(kind)), inspectListing(names), operand)
+	var operand inspectTerm
+	if kind == "one_of" {
+		members, ok := inspectMember(value, "values").(Arr)
+		if !ok {
+			return inspectTerm{kind: "unrenderable"}
+		}
+		operand = inspectTerm{kind: "array", values: members}
+	} else {
+		member := inspectMember(value, "value")
+		if member == nil {
+			return inspectTerm{kind: "unrenderable"}
+		}
+		operand = inspectTagged(member)
+	}
+	return inspectTuple(inspectAtom(string(kind)), inspectTerm{kind: "path", values: path}, operand)
+}
+
+func inspectDecodeStatus(v DecodeStatus) inspectTerm {
+	if v != DecodeVerificationNotEvaluated {
+		return inspectTerm{kind: "unrenderable"}
+	}
+	return inspectAtom("not_evaluated")
 }
 
 // String matches the structural decoded-grant diagnostic notation.
 func (d GrantDecoded) String() string {
-	audiences := make([]inspectTerm, len(d.Audiences))
-	for i, a := range d.Audiences {
-		audiences[i] = inspectText(a)
+	if d.Version < 1 || d.Version > 3 {
+		return "#unrenderable"
 	}
-	operations := make([]inspectTerm, len(d.Operations))
-	for i, op := range d.Operations {
-		selectors := make([]inspectTerm, len(op.Selectors))
-		for j, s := range op.Selectors {
-			selectors[j] = inspectSelector(s)
-		}
-		operations[i] = inspectStruct(fmt.Sprintf("BoundedAuthorityProtocol.V%d.Operation", d.Version), inspectField("name", inspectText(op.Name)), inspectField("selectors", inspectListing(selectors)))
-	}
+	audiences := inspectTerm{kind: "texts", texts: d.Audiences}
+	operations := inspectTerm{kind: "operations", operations: d.Operations, version: d.Version}
 	return inspectRender(inspectStruct(fmt.Sprintf("BoundedAuthorityProtocol.V%d.DecodedGrant", d.Version),
 		inspectField("version", inspectInt(int64(d.Version))), inspectField("key_id", inspectText(d.KeyID)), inspectField("issuer", inspectText(d.Issuer)), inspectField("grant_id", inspectText(d.GrantID)),
-		inspectField("audiences", inspectListing(audiences)), inspectField("issued_at", inspectInt(d.IssuedAt)), inspectField("not_before", inspectInt(d.NotBefore)), inspectField("expires_at", inspectInt(d.ExpiresAt)),
-		inspectField("holder_thumbprint", inspectRaw(d.HolderThumbprint[:])), inspectField("operations", inspectListing(operations)), inspectField("verification", inspectAtom("not_evaluated"))))
+		inspectField("audiences", audiences), inspectField("issued_at", inspectInt(d.IssuedAt)), inspectField("not_before", inspectInt(d.NotBefore)), inspectField("expires_at", inspectInt(d.ExpiresAt)),
+		inspectField("holder_thumbprint", inspectRaw(d.HolderThumbprint[:])), inspectField("operations", operations), inspectField("verification", inspectDecodeStatus(d.Verification))))
 }
 func (d GrantDecoded) GoString() string           { return d.String() }
 func (d GrantDecoded) Format(s fmt.State, _ rune) { _, _ = s.Write([]byte(d.String())) }
 
 // String redacts only the optional nonce, matching decoded proof inspection.
 func (d ProofDecoded) String() string {
+	if d.Version() < 1 || d.Version() > 3 {
+		return "#unrenderable"
+	}
 	nonce := "nil"
 	if d.HasNonce() {
 		nonce = ":redacted"
 	}
 	gh, rh, hp := d.GrantHash(), d.RequestHash(), d.HolderThumbprint()
-	return fmt.Sprintf("#BoundedAuthorityProtocol.V%d.DecodedProof<version: %d, proof_id: %s, method: %s, target_uri: %s, issued_at: %d, nonce: %s, invocation_id: %s, operation: %s, grant_hash: %s, request_hash: %s, holder_public_key: %s, holder_thumbprint: %s, verification: :not_evaluated>", d.Version(), d.Version(), inspectString(d.ProofID()), inspectString(d.Method()), inspectString(d.TargetURI()), d.IssuedAt(), nonce, inspectString(d.InvocationID()), inspectString(d.Operation()), inspectBinary(gh[:]), inspectBinary(rh[:]), inspectBinary(d.HolderPublicKey()), inspectBinary(hp[:]))
+	return fmt.Sprintf("#BoundedAuthorityProtocol.V%d.DecodedProof<version: %d, proof_id: %s, method: %s, target_uri: %s, issued_at: %d, nonce: %s, invocation_id: %s, operation: %s, grant_hash: %s, request_hash: %s, holder_public_key: %s, holder_thumbprint: %s, verification: %s>", d.Version(), d.Version(), inspectString(d.ProofID()), inspectString(d.Method()), inspectString(d.TargetURI()), d.IssuedAt(), nonce, inspectString(d.InvocationID()), inspectString(d.Operation()), inspectBinary(gh[:]), inspectBinary(rh[:]), inspectBinary(d.data().HolderPublicKey), inspectBinary(hp[:]), inspectRender(inspectDecodeStatus(d.Verification())))
 }
 func (d ProofDecoded) GoString() string           { return d.String() }
 func (d ProofDecoded) Format(s fmt.State, _ rune) { _, _ = s.Write([]byte(d.String())) }
@@ -304,8 +410,8 @@ func (ProofDecoded) GobEncode() ([]byte, error)   { return nil, ErrInvalid }
 
 func (d AttestationDecoded) String() string {
 	return inspectRender(inspectStruct("BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation",
-		inspectField("version", inspectInt(1)), inspectField("attestor_key_id", inspectText(d.AttestorKeyID)), inspectField("jti", inspectText(d.Jti)), inspectField("key_id", inspectText(d.KeyID)),
-		inspectField("public_key", inspectRaw(d.PublicKey[:])), inspectField("role", inspectText(d.Role)), inspectField("nbf", inspectInt(d.Nbf)), inspectField("exp", inspectInt(d.Exp)), inspectField("verification", inspectAtom("not_evaluated"))))
+		inspectField("version", inspectInt(int64(d.Version))), inspectField("attestor_key_id", inspectText(d.AttestorKeyID)), inspectField("jti", inspectText(d.Jti)), inspectField("key_id", inspectText(d.KeyID)),
+		inspectField("public_key", inspectRaw(d.PublicKey[:])), inspectField("role", inspectText(d.Role)), inspectField("nbf", inspectInt(d.Nbf)), inspectField("exp", inspectInt(d.Exp)), inspectField("verification", inspectDecodeStatus(d.Verification))))
 }
 func (d AttestationDecoded) GoString() string           { return d.String() }
 func (d AttestationDecoded) Format(s fmt.State, _ rune) { _, _ = s.Write([]byte(d.String())) }
