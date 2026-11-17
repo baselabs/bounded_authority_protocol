@@ -32,7 +32,8 @@ if [ -z "$path" ]; then
 fi
 
 # Classify by path to decide which pattern set applies. A file that is neither a
-# scanned executable surface nor an SDK manifest is not scanned — exit 0 immediately.
+# scanned executable surface nor an SDK manifest is not scanned. Drain its stdin
+# before returning so the staged-blob producer does not receive a broken pipe.
 # Scanned surfaces run the publish-command check; only manifests add the
 # publish-lifecycle-key check.
 #
@@ -53,7 +54,7 @@ case "$path" in
   Makefile | makefile | justfile | Justfile) ;;
   sdks/*/package.json | sdks/*/pyproject.toml | sdks/*/setup.py | sdks/*/setup.cfg | sdks/*/Cargo.toml)
     is_sdk_manifest=1 ;;
-  *) exit 0 ;;
+  *) cat >/dev/null; exit 0 ;;
 esac
 
 status=0
