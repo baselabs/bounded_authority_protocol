@@ -1,3 +1,5 @@
+Code.require_file("../../test_support/git_history.ex", __DIR__)
+
 defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
   @moduledoc false
   use ExUnit.Case, async: true
@@ -21,7 +23,7 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
       refute historical in entries
     end
 
-    assert scan(".") == []
+    assert scan(".", BoundedAuthorityProtocol.TestSupport.GitHistory.complete!(".")) == []
   end
 
   test "a formerly tracked path is a finding when tracked again" do
@@ -109,6 +111,21 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     assert scan(repo) != []
   end
 
+  test "a shallow snapshot still finds deleted paths in its complete ancestry" do
+    source = repo!()
+    put!(source, ".kimosabe/removed.txt", "public canary\n")
+    commit!(source)
+    git!(source, ["rm", ".kimosabe/removed.txt"])
+    commit!(source)
+    shallow = source <> "-shallow"
+    on_exit(fn -> File.rm_rf!(shallow) end)
+    git!(source, ["clone", "--depth=1", "--no-local", source, shallow])
+
+    completed = BoundedAuthorityProtocol.TestSupport.GitHistory.complete!(shallow, source)
+    assert scan(shallow, completed) == [:historical_path, :historical_path]
+    assert String.trim(git!(shallow, ["rev-parse", "--is-shallow-repository"])) == "true"
+  end
+
   test "unavailable history and Git errors fail closed" do
     repo = repo!()
     head = git!(repo, ["rev-parse", "HEAD"]) |> String.trim()
@@ -125,8 +142,10 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
 
   # Read the index, never the contents of a tracked file. History is HEAD ancestry,
   # including both parents of merges; unrelated refs are an owner audit.
-  def scan(repo) do
-    unless String.trim(git!(repo, ["rev-parse", "--is-shallow-repository"])) == "false" do
+  def scan(repo, history_repo \\ nil) do
+    history_repo = history_repo || repo
+
+    unless String.trim(git!(history_repo, ["rev-parse", "--is-shallow-repository"])) == "false" do
       raise "full history is required"
     end
 
@@ -137,7 +156,7 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
       |> Enum.map(fn _path -> :tracked_path end)
 
     history =
-      git!(repo, [
+      git!(history_repo, [
         "log",
         "--format=",
         "--name-only",
