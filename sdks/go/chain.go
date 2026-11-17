@@ -209,6 +209,7 @@ func CheckChain(input ChainInput, expected ExpectedChain) (f ChainFacts, err err
 		return ChainFacts{}, ErrInvalid // caller head binding
 	}
 	return ChainFacts{
+		Version:       1,
 		ChainID:       expected.ChainID,
 		FirstSequence: expected.FirstSequence,
 		LastSequence:  expected.LastSequence,

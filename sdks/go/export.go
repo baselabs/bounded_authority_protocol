@@ -371,6 +371,7 @@ func verifyAnchoredExportCore(obj ArchivedObject, keys HistoricalKeyChain, expec
 		return AnchoredExportFacts{}, ErrInvalid
 	}
 	return AnchoredExportFacts{
+		Version:         1,
 		ChainID:         expected.Chain.ChainID,
 		FirstSequence:   expected.Chain.FirstSequence,
 		LastSequence:    expected.Chain.LastSequence,

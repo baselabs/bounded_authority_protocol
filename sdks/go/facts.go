@@ -8,7 +8,8 @@ import "fmt"
 // argument values, or selector values. They carry no JSON or generic
 // encoder and are not credentials (REQ1-VERIFY-facts-redacted,
 // REQ1-VERIFY-facts-not-credentials). String, GoString, and Format always
-// emit the fixed #Type<redacted> rendering, including flags and precision.
+// emit the exact full Elixir module rendering, including flags and precision.
+// JSON, text, and gob encoders return ErrInvalid without field values.
 
 // Authorization is the fixed non-authorizing marker on GrantFacts,
 // EnvelopeFacts, and AnchoredExportFacts. Only NotEvaluated exists.
@@ -65,6 +66,7 @@ type EnvelopeFacts struct {
 // identifiers, times, counts, hashes, and performed-verification labels only
 // (REQ1-CHAIN-facts-shape).
 type ChainFacts struct {
+	Version       int
 	ChainID       string
 	FirstSequence int64
 	LastSequence  int64
@@ -76,6 +78,7 @@ type ChainFacts struct {
 
 // AnchorFacts is the historical boundary-anchor verification result.
 type AnchorFacts struct {
+	Version    int
 	AnchorID   string
 	ChainID    string
 	KeyID      string
@@ -86,6 +89,7 @@ type AnchorFacts struct {
 
 // KeyTransitionFacts is the historical key-transition verification result.
 type KeyTransitionFacts struct {
+	Version         int
 	TransitionID    string
 	ChainID         string
 	EffectiveAt     int64
@@ -99,6 +103,7 @@ type KeyTransitionFacts struct {
 // the performed cryptographic checks and never carries rows, commitments,
 // compacts, archive bytes, or the object-store version.
 type AnchoredExportFacts struct {
+	Version         int
 	ChainID         string
 	FirstSequence   int64
 	LastSequence    int64
@@ -119,90 +124,220 @@ type KeyLocator struct {
 	Trust Trust
 }
 
-// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
-func (GrantFacts) String() string { return "#GrantFacts<redacted>" }
-
-// GoString returns the same fixed rendering for Go syntax formatting.
-func (GrantFacts) GoString() string { return "#GrantFacts<redacted>" }
-
-// Format keeps every formatting verb, flag, width, and precision value-free.
-func (GrantFacts) Format(state fmt.State, _ rune) {
-	_, _ = state.Write([]byte("#GrantFacts<redacted>"))
+// String returns the exact fixed rendering for the verified profile.
+func (facts GrantFacts) String() string {
+	switch facts.Version {
+	case 2:
+		return "#BoundedAuthorityProtocol.V2.GrantFacts<redacted>"
+	case 3:
+		return "#BoundedAuthorityProtocol.V3.GrantFacts<redacted>"
+	default:
+		return "#BoundedAuthorityProtocol.V1.GrantFacts<redacted>"
+	}
 }
 
-// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
-func (EnvelopeFacts) String() string { return "#EnvelopeFacts<redacted>" }
+// GoString returns the fixed rendering for Go syntax formatting.
+func (facts GrantFacts) GoString() string { return facts.String() }
 
-// GoString returns the same fixed rendering for Go syntax formatting.
-func (EnvelopeFacts) GoString() string { return "#EnvelopeFacts<redacted>" }
-
-// Format keeps every formatting verb, flag, width, and precision value-free.
-func (EnvelopeFacts) Format(state fmt.State, _ rune) {
-	_, _ = state.Write([]byte("#EnvelopeFacts<redacted>"))
+// Format refuses field rendering for every verb, flag, width, and precision.
+func (facts GrantFacts) Format(state fmt.State, _ rune) {
+	_, _ = state.Write([]byte(facts.String()))
 }
 
-// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
-func (ChainFacts) String() string { return "#ChainFacts<redacted>" }
+// MarshalJSON refuses generic serialization of verified facts.
+func (GrantFacts) MarshalJSON() ([]byte, error) { return nil, ErrInvalid }
 
-// GoString returns the same fixed rendering for Go syntax formatting.
-func (ChainFacts) GoString() string { return "#ChainFacts<redacted>" }
+// MarshalText refuses generic serialization of verified facts.
+func (GrantFacts) MarshalText() ([]byte, error) { return nil, ErrInvalid }
 
-// Format keeps every formatting verb, flag, width, and precision value-free.
-func (ChainFacts) Format(state fmt.State, _ rune) {
-	_, _ = state.Write([]byte("#ChainFacts<redacted>"))
+// GobEncode refuses generic serialization of verified facts.
+func (GrantFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
+
+// String returns the exact fixed rendering for the verified profile.
+func (facts EnvelopeFacts) String() string {
+	switch facts.Version {
+	case 2:
+		return "#BoundedAuthorityProtocol.V2.EnvelopeFacts<redacted>"
+	case 3:
+		return "#BoundedAuthorityProtocol.V3.EnvelopeFacts<redacted>"
+	default:
+		return "#BoundedAuthorityProtocol.V1.EnvelopeFacts<redacted>"
+	}
 }
 
-// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
-func (AnchorFacts) String() string { return "#AnchorFacts<redacted>" }
+// GoString returns the fixed rendering for Go syntax formatting.
+func (facts EnvelopeFacts) GoString() string { return facts.String() }
 
-// GoString returns the same fixed rendering for Go syntax formatting.
-func (AnchorFacts) GoString() string { return "#AnchorFacts<redacted>" }
-
-// Format keeps every formatting verb, flag, width, and precision value-free.
-func (AnchorFacts) Format(state fmt.State, _ rune) {
-	_, _ = state.Write([]byte("#AnchorFacts<redacted>"))
+// Format refuses field rendering for every verb, flag, width, and precision.
+func (facts EnvelopeFacts) Format(state fmt.State, _ rune) {
+	_, _ = state.Write([]byte(facts.String()))
 }
 
-// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
-func (KeyTransitionFacts) String() string { return "#KeyTransitionFacts<redacted>" }
+// MarshalJSON refuses generic serialization of verified facts.
+func (EnvelopeFacts) MarshalJSON() ([]byte, error) { return nil, ErrInvalid }
 
-// GoString returns the same fixed rendering for Go syntax formatting.
-func (KeyTransitionFacts) GoString() string { return "#KeyTransitionFacts<redacted>" }
+// MarshalText refuses generic serialization of verified facts.
+func (EnvelopeFacts) MarshalText() ([]byte, error) { return nil, ErrInvalid }
 
-// Format keeps every formatting verb, flag, width, and precision value-free.
-func (KeyTransitionFacts) Format(state fmt.State, _ rune) {
-	_, _ = state.Write([]byte("#KeyTransitionFacts<redacted>"))
+// GobEncode refuses generic serialization of verified facts.
+func (EnvelopeFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
+
+// String returns the exact fixed rendering for the verified profile.
+func (facts ChainFacts) String() string {
+	switch facts.Version {
+	case 2:
+		return "#BoundedAuthorityProtocol.V2.ChainFacts<redacted>"
+	case 3:
+		return "#BoundedAuthorityProtocol.V3.ChainFacts<redacted>"
+	default:
+		return "#BoundedAuthorityProtocol.V1.ChainFacts<redacted>"
+	}
 }
 
-// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
-func (AnchoredExportFacts) String() string { return "#AnchoredExportFacts<redacted>" }
+// GoString returns the fixed rendering for Go syntax formatting.
+func (facts ChainFacts) GoString() string { return facts.String() }
 
-// GoString returns the same fixed rendering for Go syntax formatting.
-func (AnchoredExportFacts) GoString() string { return "#AnchoredExportFacts<redacted>" }
-
-// Format keeps every formatting verb, flag, width, and precision value-free.
-func (AnchoredExportFacts) Format(state fmt.State, _ rune) {
-	_, _ = state.Write([]byte("#AnchoredExportFacts<redacted>"))
+// Format refuses field rendering for every verb, flag, width, and precision.
+func (facts ChainFacts) Format(state fmt.State, _ rune) {
+	_, _ = state.Write([]byte(facts.String()))
 }
 
-// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
-func (AttestationFacts) String() string { return "#AttestationFacts<redacted>" }
+// MarshalJSON refuses generic serialization of verified facts.
+func (ChainFacts) MarshalJSON() ([]byte, error) { return nil, ErrInvalid }
 
-// GoString returns the same fixed rendering for Go syntax formatting.
-func (AttestationFacts) GoString() string { return "#AttestationFacts<redacted>" }
+// MarshalText refuses generic serialization of verified facts.
+func (ChainFacts) MarshalText() ([]byte, error) { return nil, ErrInvalid }
 
-// Format keeps every formatting verb, flag, width, and precision value-free.
-func (AttestationFacts) Format(state fmt.State, _ rune) {
-	_, _ = state.Write([]byte("#AttestationFacts<redacted>"))
+// GobEncode refuses generic serialization of verified facts.
+func (ChainFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
+
+// String returns the exact fixed rendering for the verified profile.
+func (facts AnchorFacts) String() string {
+	switch facts.Version {
+	case 2:
+		return "#BoundedAuthorityProtocol.V2.AnchorFacts<redacted>"
+	case 3:
+		return "#BoundedAuthorityProtocol.V3.AnchorFacts<redacted>"
+	default:
+		return "#BoundedAuthorityProtocol.V1.AnchorFacts<redacted>"
+	}
 }
 
-// String returns the fixed redacted rendering (REQ1-VERIFY-facts-redacted).
-func (ContentAssertionFacts) String() string { return "#ContentAssertionFacts<redacted>" }
+// GoString returns the fixed rendering for Go syntax formatting.
+func (facts AnchorFacts) GoString() string { return facts.String() }
 
-// GoString returns the same fixed rendering for Go syntax formatting.
-func (ContentAssertionFacts) GoString() string { return "#ContentAssertionFacts<redacted>" }
-
-// Format keeps every formatting verb, flag, width, and precision value-free.
-func (ContentAssertionFacts) Format(state fmt.State, _ rune) {
-	_, _ = state.Write([]byte("#ContentAssertionFacts<redacted>"))
+// Format refuses field rendering for every verb, flag, width, and precision.
+func (facts AnchorFacts) Format(state fmt.State, _ rune) {
+	_, _ = state.Write([]byte(facts.String()))
 }
+
+// MarshalJSON refuses generic serialization of verified facts.
+func (AnchorFacts) MarshalJSON() ([]byte, error) { return nil, ErrInvalid }
+
+// MarshalText refuses generic serialization of verified facts.
+func (AnchorFacts) MarshalText() ([]byte, error) { return nil, ErrInvalid }
+
+// GobEncode refuses generic serialization of verified facts.
+func (AnchorFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
+
+// String returns the exact fixed rendering for the verified profile.
+func (facts KeyTransitionFacts) String() string {
+	switch facts.Version {
+	case 2:
+		return "#BoundedAuthorityProtocol.V2.KeyTransitionFacts<redacted>"
+	case 3:
+		return "#BoundedAuthorityProtocol.V3.KeyTransitionFacts<redacted>"
+	default:
+		return "#BoundedAuthorityProtocol.V1.KeyTransitionFacts<redacted>"
+	}
+}
+
+// GoString returns the fixed rendering for Go syntax formatting.
+func (facts KeyTransitionFacts) GoString() string { return facts.String() }
+
+// Format refuses field rendering for every verb, flag, width, and precision.
+func (facts KeyTransitionFacts) Format(state fmt.State, _ rune) {
+	_, _ = state.Write([]byte(facts.String()))
+}
+
+// MarshalJSON refuses generic serialization of verified facts.
+func (KeyTransitionFacts) MarshalJSON() ([]byte, error) { return nil, ErrInvalid }
+
+// MarshalText refuses generic serialization of verified facts.
+func (KeyTransitionFacts) MarshalText() ([]byte, error) { return nil, ErrInvalid }
+
+// GobEncode refuses generic serialization of verified facts.
+func (KeyTransitionFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
+
+// String returns the exact fixed rendering for the verified profile.
+func (facts AnchoredExportFacts) String() string {
+	switch facts.Version {
+	case 2:
+		return "#BoundedAuthorityProtocol.V2.AnchoredExportFacts<redacted>"
+	case 3:
+		return "#BoundedAuthorityProtocol.V3.AnchoredExportFacts<redacted>"
+	default:
+		return "#BoundedAuthorityProtocol.V1.AnchoredExportFacts<redacted>"
+	}
+}
+
+// GoString returns the fixed rendering for Go syntax formatting.
+func (facts AnchoredExportFacts) GoString() string { return facts.String() }
+
+// Format refuses field rendering for every verb, flag, width, and precision.
+func (facts AnchoredExportFacts) Format(state fmt.State, _ rune) {
+	_, _ = state.Write([]byte(facts.String()))
+}
+
+// MarshalJSON refuses generic serialization of verified facts.
+func (AnchoredExportFacts) MarshalJSON() ([]byte, error) { return nil, ErrInvalid }
+
+// MarshalText refuses generic serialization of verified facts.
+func (AnchoredExportFacts) MarshalText() ([]byte, error) { return nil, ErrInvalid }
+
+// GobEncode refuses generic serialization of verified facts.
+func (AnchoredExportFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
+
+// String returns the exact fixed rendering for the verified profile.
+func (facts AttestationFacts) String() string {
+	return "#BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts<redacted>"
+}
+
+// GoString returns the fixed rendering for Go syntax formatting.
+func (facts AttestationFacts) GoString() string { return facts.String() }
+
+// Format refuses field rendering for every verb, flag, width, and precision.
+func (facts AttestationFacts) Format(state fmt.State, _ rune) {
+	_, _ = state.Write([]byte(facts.String()))
+}
+
+// MarshalJSON refuses generic serialization of verified facts.
+func (AttestationFacts) MarshalJSON() ([]byte, error) { return nil, ErrInvalid }
+
+// MarshalText refuses generic serialization of verified facts.
+func (AttestationFacts) MarshalText() ([]byte, error) { return nil, ErrInvalid }
+
+// GobEncode refuses generic serialization of verified facts.
+func (AttestationFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
+
+// String returns the exact fixed rendering for the verified profile.
+func (facts ContentAssertionFacts) String() string {
+	return "#BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts<redacted>"
+}
+
+// GoString returns the fixed rendering for Go syntax formatting.
+func (facts ContentAssertionFacts) GoString() string { return facts.String() }
+
+// Format refuses field rendering for every verb, flag, width, and precision.
+func (facts ContentAssertionFacts) Format(state fmt.State, _ rune) {
+	_, _ = state.Write([]byte(facts.String()))
+}
+
+// MarshalJSON refuses generic serialization of verified facts.
+func (ContentAssertionFacts) MarshalJSON() ([]byte, error) { return nil, ErrInvalid }
+
+// MarshalText refuses generic serialization of verified facts.
+func (ContentAssertionFacts) MarshalText() ([]byte, error) { return nil, ErrInvalid }
+
+// GobEncode refuses generic serialization of verified facts.
+func (ContentAssertionFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }

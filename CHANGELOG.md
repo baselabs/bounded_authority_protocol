@@ -48,12 +48,15 @@ All notable changes to `bounded_authority_protocol` are documented here.
   dataclasses, and refuse generic enumeration, copying, and pickling. Migration: read named
   properties and explicitly construct any new facts object; replace `asdict`, `fields`,
   `vars`, `dataclasses.replace`, copy reduction, and pickle use.
-- Python and Rust facts render the exact full Elixir module name, preserving each
+- Python, Rust, and Go facts render the exact full Elixir module name, preserving each
   contract-major and sibling namespace. Migration: update display assertions such as
   `#GrantFacts<redacted>` to `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`.
-- Rust diagnostic facts now retain the contract-major in `version`.
+- Rust and Go diagnostic facts now retain the contract-major in `version` / `Version`.
   Migration: set that field when constructing chain, anchor, transition, or export facts
   directly. Verifiers populate it automatically.
+- Go facts refuse JSON, text, and gob serialization with `ErrInvalid`. Migration: read
+  explicitly named fields instead of passing facts to a generic encoder. Go's `fmt`
+  limitation for unexported containing fields is documented in the SDK README.
 
 ### Fixed
 

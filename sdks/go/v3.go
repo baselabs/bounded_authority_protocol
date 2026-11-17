@@ -1800,6 +1800,7 @@ func (EcdsaProfile) CheckChain(input ChainInput, expected ExpectedChain) (f Chai
 		return ChainFacts{}, ErrInvalid // caller head binding
 	}
 	return ChainFacts{
+		Version:       3,
 		ChainID:       expected.ChainID,
 		FirstSequence: expected.FirstSequence,
 		LastSequence:  expected.LastSequence,
@@ -2070,6 +2071,7 @@ func (EcdsaProfile) VerifyHistoricalAnchor(compact string, key HistoricalPublicK
 		return AnchorFacts{}, ErrInvalid
 	}
 	return AnchorFacts{
+		Version:    3,
 		AnchorID:   claims.AnchorID,
 		ChainID:    claims.ChainID,
 		KeyID:      key.KeyID,
@@ -2166,6 +2168,7 @@ func (EcdsaProfile) VerifyKeyTransition(compact string, currentKey, nextKey Hist
 		return KeyTransitionFacts{}, ErrInvalid
 	}
 	return KeyTransitionFacts{
+		Version:         3,
 		TransitionID:    claims.TransitionID,
 		ChainID:         claims.ChainID,
 		EffectiveAt:     claims.EffectiveAt,
@@ -2462,6 +2465,7 @@ func (EcdsaProfile) verifyAnchoredExportCore(obj ArchivedObject, keys Historical
 		return AnchoredExportFacts{}, ErrInvalid
 	}
 	return AnchoredExportFacts{
+		Version:         3,
 		ChainID:         expected.Chain.ChainID,
 		FirstSequence:   expected.Chain.FirstSequence,
 		LastSequence:    expected.Chain.LastSequence,

@@ -1390,6 +1390,7 @@ func (Profile) CheckChain(input ChainInput, expected ExpectedChain) (f ChainFact
 		return ChainFacts{}, ErrInvalid // caller head binding
 	}
 	return ChainFacts{
+		Version:       2,
 		ChainID:       expected.ChainID,
 		FirstSequence: expected.FirstSequence,
 		LastSequence:  expected.LastSequence,
@@ -1640,6 +1641,7 @@ func (Profile) VerifyHistoricalAnchor(compact string, key HistoricalPublicKey, e
 		return AnchorFacts{}, ErrInvalid
 	}
 	return AnchorFacts{
+		Version:    2,
 		AnchorID:   claims.AnchorID,
 		ChainID:    claims.ChainID,
 		KeyID:      key.KeyID,
@@ -1736,6 +1738,7 @@ func (Profile) VerifyKeyTransition(compact string, currentKey, nextKey Historica
 		return KeyTransitionFacts{}, ErrInvalid
 	}
 	return KeyTransitionFacts{
+		Version:         2,
 		TransitionID:    claims.TransitionID,
 		ChainID:         claims.ChainID,
 		EffectiveAt:     claims.EffectiveAt,
@@ -1932,6 +1935,7 @@ func (Profile) verifyAnchoredExportCore(obj ArchivedObject, keys HistoricalKeyCh
 		return AnchoredExportFacts{}, ErrInvalid
 	}
 	return AnchoredExportFacts{
+		Version:         2,
 		ChainID:         expected.Chain.ChainID,
 		FirstSequence:   expected.Chain.FirstSequence,
 		LastSequence:    expected.Chain.LastSequence,

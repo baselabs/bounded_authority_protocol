@@ -326,6 +326,7 @@ func VerifyHistoricalAnchor(compact string, key HistoricalPublicKey, expected Ex
 		return AnchorFacts{}, ErrInvalid
 	}
 	return AnchorFacts{
+		Version:    1,
 		AnchorID:   claims.AnchorID,
 		ChainID:    claims.ChainID,
 		KeyID:      key.KeyID,
@@ -429,6 +430,7 @@ func VerifyKeyTransition(compact string, currentKey, nextKey HistoricalPublicKey
 		return KeyTransitionFacts{}, ErrInvalid
 	}
 	return KeyTransitionFacts{
+		Version:         1,
 		TransitionID:    claims.TransitionID,
 		ChainID:         claims.ChainID,
 		EffectiveAt:     claims.EffectiveAt,

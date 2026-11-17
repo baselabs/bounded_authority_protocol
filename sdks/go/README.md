@@ -218,9 +218,15 @@ digests, times, and counts, never raw signatures, keys, nonces, or arguments. `G
 `EnvelopeFacts`, and `AnchoredExportFacts` carry `Authorization: AuthorizationNotEvaluated`; the
 chain, anchor, transition, export, attestation, and content-assertion facts carry
 `Trust: TrustNotEvaluated`. There is no `Authorized` or decision field. The facts types implement `String`, `GoString`, and
-`Format`: values and pointers always render as `#Type<redacted>` (for example,
-`#GrantFacts<redacted>`), including `%v`, `%+v`, and `%#v`. Read individual fields explicitly
-when needed.
+`Format`: values and pointers match the full Elixir rendering (for example,
+`#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`), including `%v`, `%+v`, and `%#v`.
+Contract-majors retain their `V1`, `V2`, or `V3` namespace; sibling facts use
+`RoleAttestation.V1` and `ContentAssertion.V1`. `MarshalJSON`, `MarshalText`, and `GobEncode`
+return `ErrInvalid` without encoded field values. Read individual fields explicitly.
+
+Go's `fmt` cannot call formatting methods through an unexported field of a containing
+struct, so formatting such a container can expose facts fields. Keep facts in exported
+fields when formatting containers, or format the facts value directly.
 
 ## Strict Ed25519
 
