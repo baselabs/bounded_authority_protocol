@@ -21,6 +21,7 @@ on:
   push:
     branches:
       - main
+      - "kci/**"
   workflow_dispatch:
 
 permissions:
@@ -33,7 +34,7 @@ concurrency:
 jobs:
   guard:
     name: No SDK publish infrastructure in monorepo
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

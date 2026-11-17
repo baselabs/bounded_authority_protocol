@@ -5,14 +5,17 @@ on:
     branches:
       - main
       - "kci/**"
+    tags:
+      - "v*"
   workflow_dispatch:
   schedule:
     - cron: "17 5 * * 1"
 
+env:
+  BAP_REQUIRE_FULL_HISTORY: "1"
+
 permissions:
   contents: read
-  id-token: write
-  attestations: write
 
 concurrency:
   group: supply-chain-${{ github.ref }}
@@ -20,7 +23,9 @@ concurrency:
 
 jobs:
   package:
-    name: Build and attest CI package
+    name: Build CI package
+    outputs:
+      version: ${{ steps.archive.outputs.version }}
     runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
     steps:
       - name: Check out source
@@ -54,32 +59,30 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      # ci.yml runs this same gate on main and kci pushes. Manual, scheduled and
+      # release-tag runs have no matching CI invocation, so they retain the gate.
       - name: Run complete quality gate
+        if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
         run: mix quality
 
+      - name: Generate package SBOMs
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+        run: mix sbom.generate && mix sbom.check
+
       - name: Build exact unpublished archive
+        id: archive
         # Derive the artifact name from mix.exs @version — a hardcoded filename is the
         # quiet-mislabel class (the docs-currency test pins this derivation).
         run: |
           VERSION="$(grep -m1 '@version ' mix.exs | sed -E 's/.*@version "([^"]+)".*/\1/')"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           mix hex.build --output "artifacts/bounded_authority_protocol-$VERSION.tar"
 
       - name: Record archive checksum
         working-directory: artifacts
         run: |
           sha256sum "bounded_authority_protocol-$VERSION.tar" > SHA256SUMS
-
-      - name: Attest build provenance
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
-        with:
-          subject-path: artifacts/bounded_authority_protocol-${{ env.VERSION }}.tar
-
-      - name: Attest release SBOM
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
-        with:
-          subject-path: artifacts/bounded_authority_protocol-${{ env.VERSION }}.tar
-          sbom-path: artifacts/release.cdx.json
 
       - name: Upload CI package evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -92,3 +95,32 @@ jobs:
             artifacts/SHA256SUMS
           if-no-files-found: error
           retention-days: 30
+
+  attest:
+    name: Attest trusted package
+    needs: package
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ vars.BASELABS_RUNNER || 'ubuntu-24.04' }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ needs.package.outputs.version }}
+    steps:
+      - name: Download checked package evidence
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: bounded-authority-protocol-${{ github.sha }}
+          path: artifacts
+
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: artifacts/bounded_authority_protocol-${{ env.VERSION }}.tar
+
+      - name: Attest release SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: artifacts/bounded_authority_protocol-${{ env.VERSION }}.tar
+          sbom-path: artifacts/release.cdx.json

@@ -12,26 +12,13 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
 
-  - package-ecosystem: npm
-    directory: /sdks/typescript
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
-
   - package-ecosystem: cargo
     directory: /sdks/rust
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    # MSRV 1.88 supports p256 0.14 and zeroize 1.9; those ignores no longer apply.
-    # Keep the direct sha2 0.10 API alongside ed25519-dalek. p256's separate sha2
-    # 0.11 dependency is already fixed and audited; migrating our hashing API is
-    # a separate dependency change, not part of this advisory repair.
-    ignore:
-      - dependency-name: sha2
-        versions: [">= 0.11"]
 
-  - package-ecosystem: pip
+  - package-ecosystem: uv
     directory: /sdks/python
     schedule:
       interval: weekly
