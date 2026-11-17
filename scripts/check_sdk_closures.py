@@ -299,8 +299,11 @@ def run(sdk: str) -> None:
                     f"test {test} ... FAILED" in result.stdout
                     and "test result: FAILED" in result.stdout
                     and "could not compile" not in result.stdout
+                    and len(re.findall(r"(?m)^thread .* panicked at", result.stdout))
+                    == 1
                     and re.search(
-                        r"panicked at[^\n]*\nassertion [`\x27]?", result.stdout
+                        r"panicked at[^\n]*\nassertion (?:failed:|[`\x27][^`\x27\n]+[`\x27] failed)",
+                        result.stdout,
                     )
                     is not None
                 )
