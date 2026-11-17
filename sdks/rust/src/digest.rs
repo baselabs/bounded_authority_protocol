@@ -227,7 +227,7 @@ fn validate_bounds(value: &JsonValue, depth: u64, bounds: &Bounds, nodes: &mut u
         JsonValue::String(s) if s.len() as u64 > bounds.string_bytes() => {
             return Err(Invalid);
         }
-        // Other strings / Null / Bool / Int / Float need no further structural check.
+        // No other structural bound applies at this node.
         _ => {}
     }
     Ok(())
