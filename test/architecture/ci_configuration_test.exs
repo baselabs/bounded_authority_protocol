@@ -85,6 +85,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     refute Map.has_key?(Enum.at(steps, quality), "if"), "mix quality must run on every event"
 
     [attest] = Map.values(read(".github/workflows/supply-chain.yml")["jobs"])
+
     assert [%{"with" => %{"name" => name}}] =
              Enum.filter(attest["steps"], &uses?(&1, "actions/download-artifact@"))
 
