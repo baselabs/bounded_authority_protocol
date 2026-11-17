@@ -1,3 +1,3 @@
-# The only code owners. The `main` ruleset requires review from an owner for
-# every pull request; no other identity owns any path.
+# Code owners for every path. GitHub requests their review on each pull request.
+# Whether a review is required is set by the repository rulesets, not by this file.
 * @palermo-git @corepay
