@@ -2,7 +2,7 @@
 # BAP-15 Task 16 — enforce the runtime dependency-license allowlist.
 #
 # AGENTS rule 10 + ADR 0014 D8: every dependency a CONSUMER inherits must carry
-# a permissive license. This mirrors the Elixir prod-only gate
+# a permissive license under ADR 0014 D8. This is the SDK dependency gate
 # (the repository license check audits production dependencies): only the
 # `[dependencies]` closure (cargo `kind=normal`) is audited, because
 # `[dev-dependencies]` (serde/serde_json — the conformance runner's test-time

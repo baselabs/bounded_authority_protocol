@@ -281,9 +281,8 @@ def _ipv6_side_length(side: bytes) -> int | None:
     for i, group in enumerate(groups):
         is_last = i == len(groups) - 1
         if b"." in group:
-            # An IPv4-style group is valid ONLY in the tail position (reference ipv6_groups_length
-            # checks non-last groups as hex-only via valid_hex_group?). A non-tail IPv4 group is a
-            # malformed literal the reference rejects.
+            # An embedded IPv4 address occupies only the final 32 bits
+            # (RFC 3986 §3.2.2; spec/bap-v1.md §13, REQ1-URI-reject-list).
             if not is_last or not _is_canonical_ipv4(group):
                 return None
             total += 2

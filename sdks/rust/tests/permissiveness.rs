@@ -337,40 +337,10 @@ fn base64url_non_canonical_pad_bits_rejected() {
     assert_eq!(base64url_decode(b"AAA"), Ok(vec![0x00, 0x00]));
 }
 
-// =============================================================================
-// Decode-path conformance — canonical form + decoded signature width
-// (spec/bap-v1.md §15 (anchors) / spec/bap-v1.md §15 (transitions) /
-// spec/bap-v1.md §16)
-// =============================================================================
-//
-// Two conformance closures the corpus does not express (it is frozen; the
-// drifted-accept classes below have no vector) and the shared validators own:
-//
-// (a) CANONICAL FORM — the reference anchor/transition codecs require the
-//     protected AND payload segments to equal their exact JCS re-encoding
-//     (spec/bap-v1.md §15 (anchors) + :118-119; spec/bap-v1.md §15 (transitions)
-//     + :151-152). The Rust validators checked only the closed member set, so a
-//     member-REORDERED (non-canonical) segment with valid fields was accepted.
-//     RED-capable mutation: drop the `jcs_encode(value) == bytes` equality in
-//     `validate_anchor_header` / `validate_anchor_payload` /
-//     `validate_transition_header` / `validate_transition_payload` → the
-//     corresponding test goes RED. Exercised through `assemble_compact`, which
-//     validates structure WITHOUT cryptographic verification (no key argument),
-//     so a dummy 64-byte signature reaches the checks; every verify/encode path
-//     rides the same validators via `decode_anchor_parts`/`decode_transition_parts`.
-//
-// (b) DECODED SIGNATURE WIDTH — the reference gates byte_size(signature) == 64
-//     at DECODE (spec/bap-v1.md §16 parse_grant + :259 parse_proof;
-//     spec/bap-v1.md §15 (anchors); spec/bap-v1.md §15 (transitions)). The Rust
-//     `decode_grant`/`decode_proof` accepted any width (verify checked later),
-//     and `encode_anchored_export`'s start-anchor parse (v1.rs:1387) never
-//     width-checked at all. RED-capable mutation: delete the width clause in
-//     `decode_grant_parts` / `decode_proof_parts` / `decode_anchor_parts` → the
-//     corresponding test goes RED. (The transition width clause in
-//     `decode_transition_parts` was verdict-inert placement parity at
-//     bap-18; the encode-parity slice made it publicly reachable (encode
-//     parses caller transitions) and it carries its own leg:
-//     `encode_transition_signature_width_rejected`.)
+// Anchor and transition payloads must equal their JCS encoding, and decoded
+// signatures must have the fixed 64-byte width (spec/bap-v1.md §§15,17,
+// REQ1-BOUNDS-fixed-widths). Removing the corresponding canonicality or width
+// check makes its named regression test red.
 
 use bounded_authority_protocol::types::{
     AnchoredExportInput, ArchivedObject, BoundaryAnchor, ExpectedAnchor, ExpectedAnchoredExport,
@@ -682,20 +652,9 @@ fn signature_width_export_encode_start_anchor_rejected() {
     );
 }
 
-// =============================================================================
-// Canonical-EXCLUSION pinning — grant/proof compacts have NO canonical-form gate
-// =============================================================================
-//
-// The reference parse_grant/parse_proof (spec/bap-v1.md §16) gate the
-// decoded
-// signature width but impose NO Jcs.encode byte-equality on grant/proof
-// segments (REQ1-SIGNING-any-order; canonical-form is an anchor/transition
-// codec property only). These legs PIN that exclusion: a member-reordered
-// grant/proof compact with valid fields MUST still decode Ok. RED-capable
-// mutation: add a `jcs_encode(value) == bytes` check to
-// `validate_grant_header`/`validate_grant_payload` (or the proof validators) —
-// an over-rejection divergence from the reference that would otherwise land
-// silently green (no other leg covers the exclusion).
+// Grant and proof segments allow any member order (spec/bap-v1.md §§7,16,
+// REQ1-SIGNING-any-order). Adding a canonical-byte equality requirement makes
+// these acceptance assertions red.
 
 #[test]
 fn canonical_exclusion_grant_reorder_still_decodes() {
@@ -717,8 +676,8 @@ fn canonical_exclusion_grant_reorder_still_decodes() {
         }],
     };
     let produced = grant_signing_input(&grant, &max()).expect("grant signing input ok");
-    // Member-reordered (non-canonical) header AND payload still decode Ok — the
-    // reference imposes no canonical-form gate on grant compacts.
+    // Grant member order may differ from JCS order
+    // (spec/bap-v1.md §7, REQ1-SIGNING-any-order).
     let r = decode_grant(
         &compact_with_signature(
             &reversed_segment(&produced.protected_segment),
@@ -729,7 +688,7 @@ fn canonical_exclusion_grant_reorder_still_decodes() {
     );
     assert!(
         r.is_ok(),
-        "non-canonical grant must still decode (reference has no canonical gate)"
+        "non-canonical grant must still decode (REQ1-SIGNING-any-order)"
     );
 }
 
@@ -761,20 +720,13 @@ fn canonical_exclusion_proof_reorder_still_decodes() {
     );
     assert!(
         r.is_ok(),
-        "non-canonical proof must still decode (reference has no canonical gate)"
+        "non-canonical proof must still decode (REQ1-SIGNING-any-order)"
     );
 }
 
-// =============================================================================
-// Encode-path validation parity — the reference producer's full contract
-// (spec/bap-v1.md §15 (archives) encode: expected-side consistency, row chain
-// re-check, gated parses + 7-field matches, key-path walk). One red-capable
-// leg per NEW clause/call-site; each names its red mutation. Match legs (5,6,9)
-// tamper ONE side only; expected↔chain and key-path legs (1,2,3,12,13,14,15)
-// tamper BOTH sides to the same off-value so the targeted clause is the sole
-// rejector. Non-canonical legs (7,10) hand-assemble (assemble_compact re-parses
-// and would reject the reorder).
-// =============================================================================
+// Archive encoding revalidates caller context, chain rows, canonical anchors,
+// transitions, and the expected key path (spec/bap-v1.md §§15-16,
+// REQ1-VERIFY-revalidate). Each test names the clause its mutation removes.
 
 use bounded_authority_protocol::jwk::public_key_thumbprint_raw;
 use bounded_authority_protocol::types::{ChainInput, ConsumptionEntry, ExpectedKeyTransition};
@@ -1011,13 +963,8 @@ fn encode_expected_chain_id_drift_rejected() {
 fn encode_expected_start_hash_binding_rejected() {
     let mut f = conformant_export();
     let wrong = [9u8; 32];
-    // Two-sided ANCHOR tamper: the signed start anchor AND expected carry the
-    // wrong hash (the match passes); chain.previous_hash stays all-zero so the
-    // genesis/check_chain clauses stay satisfied — only the binding fires.
-    // Hand-modified payload (the producer rightly refuses a sequence-0 anchor
-    // with a non-zero chain hash; the DECODER carries no such rule — the
-    // encode-side binding under test is what rejects it, mirroring how the
-    // reference's validate_expected_export sees it before any parse).
+    // Reject inconsistent expected chain bindings before parsing
+    // (spec/bap-v1.md §16, REQ1-EXPORT-input-shape).
     let segs: Vec<&[u8]> = f.input.start_anchor.split(|&b| b == b'.').collect();
     let payload_json =
         json_decode(&base64url_decode(segs[1]).expect("payload"), &max()).expect("payload parses");
@@ -2714,13 +2661,10 @@ fn corpus_anchor_triple() -> (Vec<u8>, HistoricalPublicKey, ExpectedAnchor) {
 
 #[test]
 fn bounds_rust_archive_key_window_guards() {
-    // The archive-path key-window loop (round 9's before-hashing validation).
-    // Honest red-capability: the loop is BACKSTOPPED by delegation — the inner
-    // path calls the gated public verify_historical_anchor/verify_key_transition
-    // — so removing the loop alone leaves this leg green (probe-verified). What
-    // the loop adds is the WORK ORDER (rejection before archive hashing, the
-    // reference's :91 ordering); this leg pins the loop's presence on the
-    // tampered-window corpus archive with an Ok control, jointly.
+    // Historical key windows are checked before archive hashing
+    // (spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate, REQ1-BOUNDS-ordering).
+    // The inner signature verifiers also reject invalid windows, so deleting this
+    // loop alone does not change the verdict; this test pins the invalid inputs.
     let f = corpus_export_verify_fixture();
     assert!(verify_anchored_export(&f.obj, &f.keys, &f.expected).is_ok());
     // Fractional/bool endpoints and inverted windows reject at the archive entry.
@@ -2733,22 +2677,10 @@ fn bounds_rust_archive_key_window_guards() {
     assert!(verify_anchored_export(&f.obj, &keys2, &f.expected).is_err());
 }
 
-// =============================================================================
-// The pre-digest expected-struct validation hoist (ADR 0017 clause 3 /
-// exception 2, closed 2026-08-18). The reference validates the expected
-// struct (chain + BOTH anchors' identity/binding well-formedness +
-// transitions, ContextValidation) BEFORE validate_chunks/hash_chunks
-// (spec/bap-v1.md §15 (archives)); the SDK ran only the static bindings
-// pre-digest. VERDICT-INVARIANT by subsumption (post-digest equality
-// against bounded parsed values rejects every malformed expected) — the
-// observable is the WORK, and a tests/-outside test cannot intercept a
-// static call, so the behavioral proof (sha256 call-count == 0 on
-// malformed expected) lives in the Python battery and is normative for
-// the inter-SDK clause; here the order is pinned STRUCTURALLY (the
-// hoisted block must precede the hasher in src/v1.rs) plus the
-// verdict-matrix regression pins below. Mutation (revert the hoist):
-// the marker comment disappears → the order pin goes RED.
-// =============================================================================
+// Check expected-context well-formedness before hashing archive chunks
+// (spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate, REQ1-BOUNDS-ordering).
+// The structural marker below must precede hashing; removing the hoist marker
+// makes the ordering assertion red.
 
 #[test]
 fn expected_struct_gates_precede_archive_digest_structural_pin() {
@@ -2764,7 +2696,7 @@ fn expected_struct_gates_precede_archive_digest_structural_pin() {
         .expect("the export digest call site moved — update this pin deliberately");
     assert!(
         hoist < digest,
-        "the expected-struct well-formedness gates must run BEFORE the archive digest (reference ordering)"
+        "the expected-struct well-formedness gates must run BEFORE the archive digest (REQ1-BOUNDS-ordering)"
     );
 }
 
@@ -2814,19 +2746,9 @@ fn verify_export_malformed_expected_verdict_matrix() {
     );
 }
 
-// =============================================================================
-// The assemble_compact caller-bounds threading (ADR 0018's named divergence,
-// closed 2026-08-18). The reference takes limits at assemble (spec/bap-v1.md §16
-// → compact assembly — encoded segment bounds, signature width ≤
-// signature_bytes, compact_bytes, and the kind re-parse, all against
-// Bounds.coerce(limits)); the SDK hardcoded maximum. Maintainer direction
-// 2026-08-18: thread caller-tightenable bounds.
-//
-// RED-CAPABILITY: pre-fix this test did not COMPILE — assemble_compact took no
-// bounds parameter (the arity IS the API-shape red; recorded in the landing).
-// With the parameter present but unthreaded (revert the internals to maximum),
-// the tightened cases return Ok and the assertions go RED.
-// =============================================================================
+// Apply caller-tightened segment and compact ceilings during assembly
+// (spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate, REQ1-BOUNDS-tighten-only).
+// Removing bounds threading makes the tightened-input assertions red.
 
 #[test]
 fn assemble_compact_threads_caller_bounds() {

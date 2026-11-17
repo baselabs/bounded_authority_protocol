@@ -226,12 +226,9 @@ def test_all_selector_accepts_only_the_three_recognized_member_sets():
         assert isinstance(parse_selector(_unwrap(dec(encoded))), Err)
 
 
-# 6. JCS float canonicalization (RFC 8785 §3.2.2 / ECMAScript Number.prototype.toString). The host
-# defect: Python repr(1.0)=="1.0" but ECMAScript emits "1"; repr(1e-7)=="1e-07" but ECMAScript emits
-# "1e-7". A wrong float serialization makes a Python verifier compute a different request digest
-# (ba_req) than an Elixir/TS signer for any float-valued cast_argument — a cross-implementation
-# divergence the corpus cannot express (its digest cases are integer-only). These cases pin the
-# ECMAScript serialization; removing the _format_float normalization → they go RED.
+# RFC 8785 §3.2.2.3 requires ECMAScript float serialization. These cases
+# pin its exponent thresholds and the resulting request-digest bytes
+# (spec/bap-v1.md §8, REQ1-JSON-jcs-exact).
 @pytest.mark.parametrize(
     "lexeme,expected",
     [
@@ -267,11 +264,10 @@ def test_jcs_astral_codepoint_emits_4_byte_utf8():
     assert out == b'"' + bytes([0xF0, 0x90, 0x80, 0x80]) + b'"'
 
 
-# === BAP-09 cross-vendor remediation — fail-closed + reference-parity closures (defect-injected) ===
-# Each closure below was verified divergent against the RUNNING Elixir reference, fixed to match the
-# reference verdict, then proven red-capable by mechanically removing/breaking the fix and watching
-# the named test go RED. The reference verdict is the contract (AGENTS rule 7); RFC 8785 is cited
-# only where the reference agrees with it.
+# Each closure below was verified divergent against the running reference verifier, then
+# corrected under spec/bap-v1.md §§7-8 and §16 (REQ1-JSON-raw-lexeme,
+# REQ1-JSON-jcs-exact, REQ1-VERIFY-revalidate). Removing the fix makes its test red
+# (ADR 0014 D5-D7). The differential run records discovery, not normative authority.
 
 def test_lone_high_surrogate_at_eof_is_invalid_not_indexerror():
     """Claude opus cross-vendor finding: a lone high-surrogate \\uXXXX escape at end-of-buffer
@@ -289,8 +285,8 @@ def test_lone_high_surrogate_at_eof_is_invalid_not_indexerror():
 
 def test_malformed_utf8_member_name_is_invalid():
     """Cross-vendor #14: an object member name with invalid UTF-8 bytes (e.g. 0xff) must fail closed
-    as InvalidError, not raise UnicodeDecodeError past the closed-error whitelist. The reference
-    returns {:error,:invalid} (spec/bap-v1.md §8 rescues). Defect: revert to bare `name_bytes.decode('utf-8')`
+    as InvalidError, not raise UnicodeDecodeError past the closed-error whitelist
+    (spec/bap-v1.md §§8,16, REQ1-VERIFY-return-shape). Defect: revert to bare `name_bytes.decode('utf-8')`
     → UnicodeDecodeError.
     """
     assert isinstance(json_decode(b'{"\xff":1}'), Err)
@@ -300,8 +296,8 @@ def test_malformed_utf8_member_name_is_invalid():
 
 def test_float_magnitude_checked_on_raw_lexeme_not_lossy_conversion():
     """Cross-vendor #7: a float lexeme whose value exceeds the maximum but rounds to it under
-    float() (9007199254740991.0001 → 9007199254740991.0) MUST be rejected. The reference checks the
-    raw lexeme by decimal arithmetic (spec/bap-v1.md §8 magnitude_within?). Defect: revert to the post-
+    float() (9007199254740991.0001 → 9007199254740991.0) MUST be rejected by exact
+    decimal comparison (spec/bap-v1.md §7, REQ1-JSON-raw-lexeme). Defect: revert to the post-
     conversion `abs(n) > MAX_FLOAT` check → this lexeme is accepted (lossy).
     """
     assert invalid_json(b"9007199254740991.0001")
@@ -314,7 +310,7 @@ def test_float_magnitude_checked_on_raw_lexeme_not_lossy_conversion():
 
 def test_malformed_ipv6_literal_rejected():
     """Cross-vendor #6: a structurally-invalid IPv6 literal (e.g. [:::]) must be rejected, not
-    normalized. The contract (spec/bap-v1.md §13 valid_ipv6_literal?) validates group count + compression
+    normalized. The contract (spec/bap-v1.md §13; RFC 3986 §3.2.2) validates group count + compression
     rules; the prior implementation only checked the character class. Defect: revert _ipv6_kind to
     the regex-only branch → [:::] normalizes to Ok.
     """
@@ -325,8 +321,8 @@ def test_malformed_ipv6_literal_rejected():
     assert isinstance(uri_normalize(b"https://[1:2:3:4:5:6:7:8:9]/"), Err)
     assert isinstance(uri_normalize(b"https://[1::2::3]/"), Err)
     assert isinstance(uri_normalize(b"https://[gggg]/"), Err)
-    # Cross-vendor re-review Finding 1: a non-tail IPv4-style group must reject (the reference's
-    # ipv6_groups_length checks non-last groups as hex-only). The prior fix accepted this.
+    # An embedded IPv4 address occupies only the final 32 bits
+    # (RFC 3986 §3.2.2; spec/bap-v1.md §13, REQ1-URI-reject-list).
     assert isinstance(uri_normalize(b"https://[1.2.3.4:5::6]/"), Err), "non-tail IPv4 group must reject"
     # Controls: valid IPv6 literals still normalize.
     assert uri_normalize(b"https://[::1]/").is_ok
@@ -353,7 +349,7 @@ def test_jcs_enforces_per_node_bounds_at_encode():
     """Cross-vendor #9: the JCS encoder MUST enforce per-node resource bounds DURING encode (mirrors
     spec/bap-v1.md §8 encode_value), not only the final jcs_bytes total. A 257-item array (array_items
     bound 256), a depth-33 nested array (depth bound 32), and an 8193-byte string (string_bytes bound
-    8192) must all reject — the reference rejects each. Defect: revert _emit to the boundless
+    8192) must all reject (spec/bap-v1.md §17, REQ1-BOUNDS-ordering). Defect: revert _emit to the boundless
     recurse (no level/nodes/length checks) → all three encode successfully.
     """
     from bounded_authority_verifier.jcs import jcs_encode
@@ -381,8 +377,8 @@ def test_jcs_enforces_per_node_bounds_at_encode():
 # === FIX-C cross-vendor remediation — v1 façade closed-boundary (defect-injected) ===
 
 def test_untrusted_key_locator_decodes_only_protected_segment():
-    """Cross-vendor #13: untrusted_key_locator MUST decode ONLY the protected segment — the reference
-    (spec/bap-v1.md §18) splits on '.' and never decodes payload/signature. A compact with a valid grant
+    """Cross-vendor #13: untrusted_key_locator MUST decode ONLY the protected segment
+    (spec/bap-v1.md §18, REQ1-LOCATOR-opaque-payload). A compact with a valid grant
     header but garbage (non-base64url) payload+signature must return the kid (Ok), not reject. The
     prior implementation called _parse_compact (decodes all 3) → wrongly rejected. Defect: revert to
     _parse_compact → the garbage-payload case returns Err.
@@ -394,9 +390,9 @@ def test_untrusted_key_locator_decodes_only_protected_segment():
     # Garbage payload + signature (non-base64url bytes).
     r = untrusted_key_locator(protected + b".!!.!!!")
     assert isinstance(r, Ok) and r.value.key_id == "k1"
-    # Valid-base64 non-JSON payload + signature — reference also returns Ok.
+    # Payload and signature remain opaque (spec/bap-v1.md §18, REQ1-LOCATOR-opaque-payload).
     assert isinstance(untrusted_key_locator(protected + b".YWFh.YmJi"), Ok)
-    # 2- and 4-segment inputs reject (reference requires exactly 3).
+    # Require three segments (spec/bap-v1.md §18, REQ1-LOCATOR-three-segments).
     assert not untrusted_key_locator(protected + b".!!").is_ok
     assert not untrusted_key_locator(protected + b".!!.!!.!!").is_ok
 
@@ -455,8 +451,8 @@ def _envelope_expectation(issuer_pub: bytes, **overrides):
 
 
 def test_check_envelope_rejects_fractional_and_zero_temporal_context():
-    """Cross-vendor #19: the reference requires is_integer(evaluation_time), is_integer(clock_skew),
-    and proof_max_age > 0 (strictly positive). A range-only `< 0` check accepts fractional times and
+    """Cross-vendor #19: temporal context requires integer evaluation_time and clock_skew,
+    and proof_max_age > 0 (spec/bap-v1.md §16, REQ1-VERIFY-time-bounds). A range-only `< 0` check accepts fractional times and
     proof_max_age=0. These guards fire before grant parsing. Defect: revert the isinstance/`<= 0`
     guards -> a valid grant under a fractional eval time would wrongly verify.
 
@@ -477,16 +473,10 @@ def test_check_envelope_rejects_fractional_and_zero_temporal_context():
     assert not check_envelope(junk, junk, _envelope_expectation(issuer_pub, evaluation_time=150.5)).is_ok
 
 
-# === BAP-09 #2/#3/#15/#16/#17/#18 cross-vendor remediation — chain/archive verify + encode paths ===
-# Each closure was verified divergent against the RUNNING Elixir reference (the verification agents
-# confirmed precise behaviors), fixed to match the reference verdict, then proven red-capable by
-# mechanically reverting the named fix and watching the test go RED. The reference bytes are the
-# contract (AGENTS rule 7).
-#
-# The SDK is verify-only (public keys; AGENTS rule 6), so to build red-capable deny cases for the
-# archive path we mint throwaway Ed25519 keys via `cryptography`, sign anchors/transitions through the
-# SDK's own producers, assemble archives via encode_anchored_export, and then mutate one variable per
-# finding. The producer/encode tests (#16, #17) need no signatures.
+# Each closure was verified divergent against the running reference verifier, then corrected
+# under spec/bap-v1.md §§15-17 (REQ1-EXPORT-input-shape, REQ1-VERIFY-revalidate,
+# REQ1-BOUNDS-ordering). Removing each fix makes its test red (ADR 0014 D5-D7).
+# The differential run records discovery, not normative authority.
 
 
 def _fresh_key() -> tuple[bytes, Ed25519PrivateKey]:
@@ -658,7 +648,7 @@ def _hand_frame_archive(input_: AnchoredExportInput) -> bytes:
 
 def test_encode_consumption_entry_rejects_genesis_row_with_nonzero_previous_hash():
     """Cross-vendor #16: encode_consumption_entry MUST reject a sequence-1 row whose previous_hash is
-    not the all-zero hash (spec/bap-v1.md §15 (rows) validate_entry genesis invariant). Defect: revert
+    not the all-zero hash (spec/bap-v1.md §15, Consumption rows). Defect: revert
     the genesis check → Ok."""
     nonzero = bytes([9] * 32)
     r = encode_consumption_entry(ConsumptionEntry(
@@ -673,7 +663,7 @@ def test_encode_consumption_entry_rejects_genesis_row_with_nonzero_previous_hash
 
 def test_boundary_anchor_signing_input_rejects_genesis_anchor_with_nonzero_chain_hash():
     """Cross-vendor #16: boundary_anchor_signing_input MUST reject a sequence-0 (genesis) anchor whose
-    chain_hash is not the all-zero hash (spec/bap-v1.md §15 (anchors) valid_anchor_binding?).
+    chain_hash is not the all-zero hash (spec/bap-v1.md §15, Boundary anchors).
     Defect: revert the genesis check → Ok."""
     pub, _ = _fresh_key()
     nonzero = bytes([9] * 32)
@@ -691,7 +681,7 @@ def test_boundary_anchor_signing_input_rejects_genesis_anchor_with_nonzero_chain
 
 def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
     """Cross-vendor #15: check_chain MUST re-encode each row canonically and require byte-equality
-    (spec/bap-v1.md §15 (rows) parse_row), and reject sequence 0 (spec/bap-v1.md §15 (rows) value > 0).
+    and reject sequence zero (spec/bap-v1.md §15, Consumption rows).
     Defect A: revert the canonical check → a whitespace-padded row passes. Defect B: revert the
     sequence-positive check → a sequence-0 row passes."""
     from bounded_authority_verifier.jcs import jcs_encode
@@ -809,8 +799,7 @@ def test_encode_anchored_export_rejects_misbound_start_anchor():
 
 def test_verify_anchored_export_accepts_valid_one_key_zero_transition_archive():
     """Cross-vendor #3: a valid 1-key / 0-transition archive MUST verify
-    (spec/bap-v1.md §15 (archives) validate_historical_key_shapes accepts keys == transitions+1 with
-    NO minimum). The SDK previously gated on keys.length < 2 and falsely rejected it. Defect: revert
+    (spec/bap-v1.md §15, Authenticated key transitions, permits keys == transitions+1). The SDK previously gated on keys.length < 2 and falsely rejected it. Defect: revert
     to the `< 2` gate → this valid archive returns Err."""
     _reset_census()
     built = _build_archive([_fresh_key()])
@@ -840,19 +829,15 @@ def test_verify_anchored_export_rejects_zero_key_chain_fail_closed():
 
 def test_verify_anchored_export_rejects_bad_chunk_lists():
     """Cross-vendor #18: verify_anchored_export MUST validate the chunk list BEFORE concatenation
-    (spec/bap-v1.md §15 (archives) validate_chunks): reject empty chunks, reject chunk count >=
-    archive_chunks, reject total > archive_bytes. Defect: revert _validate_chunks → these pass."""
+    (spec/bap-v1.md §§16-17, REQ1-EXPORT-input-shape, REQ1-BOUNDS-tighten-only): reject
+    empty chunks, chunk count > archive_chunks, and total > archive_bytes. Defect: revert _validate_chunks → these pass."""
     _reset_census()
     built = _build_archive([_fresh_key()])
     # Empty chunk in the list.
     with_empty = ArchivedObject(chunks=(built["archive"], b""), version="v1")
     assert not verify_anchored_export(with_empty, built["key_chain"], built["expected"]).is_ok, "empty chunk must reject"
-    # Too many chunks: archive_chunks bound is 65796 and the reference accepts UP TO 65796 inclusive
-    # (validate_chunks guard `count < archive_chunks` on the recursive clause, start 0). The count
-    # guard itself fires only at 65797 (> archive_chunks). At exactly 65796 one-byte chunks the count
-    # guard PASSES (65796 > 65796 is false), so a rejection there is the digest check, not the count
-    # guard — vacuous w.r.t. the closure it claims to prove. Feed 65797 so the count guard is the
-    # falsifier.
+    # The archive_chunks ceiling is inclusive at 65796 chunks; 65797 exceeds it
+    # (spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only).
     too_many = ArchivedObject(chunks=tuple(b"\x01" for _ in range(65797)), version="v1")
     assert not verify_anchored_export(too_many, built["key_chain"], built["expected"]).is_ok, "chunk count over bound must reject"
     # Control: a single-chunk split of the valid archive still verifies.
@@ -875,10 +860,8 @@ def test_verify_anchored_export_rejects_non_monotonic_rollover():
     # signed with its own effective_at, so _verify_transition_compact passes; only chronology rejects.
     non_mono = _build_archive([a, b, c], effective_ats=[1500, 1400], end_anchored_at=2000)
     assert not verify_anchored_export(ArchivedObject(chunks=(non_mono["archive"],), version="v1"), non_mono["key_chain"], non_mono["expected"]).is_ok, "non-monotonic effective_at must reject"
-    # Strict-`>` boundary: EQUAL consecutive effective_at must also reject (strictly_after? is `>`,
-    # not `>=`; spec/bap-v1.md §15 (archives)). Each compact is individually valid; only the
-    # strict
-    # chronology check rejects.
+    # Equal consecutive transition times reject (spec/bap-v1.md §15, Authenticated key
+    # transitions). Each compact is individually valid; the chronology check rejects.
     equal_at = _build_archive([a, b, c], effective_ats=[1500, 1500], end_anchored_at=2000)
     assert not verify_anchored_export(ArchivedObject(chunks=(equal_at["archive"],), version="v1"), equal_at["key_chain"], equal_at["expected"]).is_ok, "equal consecutive effective_at must reject (strict >)"
 
@@ -894,22 +877,10 @@ def test_verify_anchored_export_rejects_fingerprint_cycle():
     assert not verify_anchored_export(ArchivedObject(chunks=(cyclic["archive"],), version="v1"), cyclic["key_chain"], cyclic["expected"]).is_ok, "fingerprint cycle A→B→A must reject"
 
 
-# === BAP-09 #10/#11 cross-vendor remediation — caller-supplied bounds threaded through verify/decode ===
-# The reference resolves Bounds.coerce(expected.bounds) once per entry point and threads the result
-# into EVERY bound-sensitive check (spec/bap-v1.md §16; spec/bap-v1.md §15
-# Consumption rows check_chain;
-# spec/bap-v1.md §15 (archives)): valid_key_id?(kid, bounds.kid_bytes), Json.decode(bytes,
-# bounds),
-# valid_identifier?(iss/grant_id, bounds), decode_audiences(aud, bounds), operations(ops, bounds),
-# validate_chunks / parse_archive frame reads, etc. The SDK previously passed bounds ONLY to
-# parse_compact and hardcoded MAXIMUM_BOUNDS in every subsequent validator, so a caller tightening had
-# no effect. Each test below proves a tightening now rejects at the named gate. Defect: revert the
-# threading (any helper back to MAXIMUM_BOUNDS, or the bounds param removed) → the named deny goes
-# GREEN (Err→Ok regression), proving the test is red-capable.
-#
-# The falsifiable case: a grant whose kid is 13 bytes ("issuer-123456") is valid at MAX (kid_bytes
-# 128), but MUST be rejected under bounds_new({"kid_bytes": 5}) via valid_key_id? (the reference's
-# decode_grant(grant, %{kid_bytes: 5}) rejects it). Each test drives one entry point.
+# Caller-tightened bounds apply to every nested parse and contextual check
+# (spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only). These tests drive each public
+# boundary with limits that reject a value accepted at the profile maxima.
+# Removing bounds threading makes the corresponding deny assertion red.
 
 # A typed JSON-null cast-arguments value (the Tagged null variant carries no `v`).
 _NULL_ARGS: Tagged = _unwrap(json_decode(b"null"))
@@ -955,19 +926,21 @@ def _signed_proof(grant_compact: bytes, holder_pub: bytes, holder_priv: Ed25519P
 
 
 def test_decode_grant_honors_caller_bounds():
-    """#10/#11: decode_grant MUST thread caller-supplied bounds into _require_kid (valid_key_id?). A
+    """#10/#11: decode_grant MUST thread caller-supplied bounds into key-ID validation
+    (spec/bap-v1.md §10, REQ1-HEADER-kid-bytes). A
     grant with a 13-byte kid is accepted at MAX, rejected under kid_bytes=5. Defect: revert
     _require_kid to MAXIMUM_BOUNDS → the tightened call returns Ok."""
     g = _signed_grant()
     # Control: no bounds (MAX) → the 13-byte kid is accepted.
     assert decode_grant(g["compact"]).is_ok, "13-byte kid must be accepted at MAX"
-    # Tightened: kid_bytes=5 → the 13-byte kid must be rejected (the reference's valid_key_id? gate).
+    # A 13-byte key ID exceeds a tightened 5-byte ceiling
+    # (spec/bap-v1.md §10, REQ1-HEADER-kid-bytes; §17, REQ1-BOUNDS-tighten-only).
     assert not decode_grant(g["compact"], _unwrap(bounds_new({"kid_bytes": 5}))).is_ok, "kid_bytes=5 must reject a 13-byte kid"
 
 
 def test_decode_grant_threads_caller_bounds_into_selector_decode():
-    """#10 delta-review F1: decode_grant MUST thread caller bounds into parse_selector (the reference's
-    selector/2 enforces one_of_values, path_segments, selector value node bounds). A grant with a
+    """#10 delta-review F1: decode_grant MUST enforce caller bounds during selector decoding
+    (spec/bap-v1.md §§12,17, REQ1-SELECTOR-one-of-size, REQ1-BOUNDS-tighten-only). A grant with a
     one_of selector of 2 values is accepted at MAX, rejected under one_of_values=1. Defect: revert
     the parse_selector(s) call to default bounds → the tightened call returns Ok."""
     issuer_pub, issuer_priv = _fresh_key()
@@ -992,7 +965,8 @@ def test_decode_grant_threads_caller_bounds_into_selector_decode():
 
 
 def test_verify_grant_honors_caller_bounds():
-    """#10/#11: verify_grant MUST thread ExpectedGrant.bounds into _require_kid (valid_key_id?). The
+    """#10/#11: verify_grant MUST thread ExpectedGrant.bounds into key-ID validation
+    (spec/bap-v1.md §10, REQ1-HEADER-kid-bytes). The
     grant is validly signed, so the only load-bearing gate under the tightening is the kid bound.
     Defect: revert verify_grant's bounds threading → the tightened call returns Ok."""
     _reset_census()
@@ -1070,7 +1044,7 @@ def test_expected_structs_bounds_absent_defaults_to_max():
 def test_assemble_segments_and_request_digest_return_result_contract():
     """The low-level assembler (assemble_segments) + request_digest return Ok/Err (the Result
     contract), not raw values + throw. Invalid inputs return Err; a minimal well-shaped input
-    returns Ok. Mirrors the Elixir {:ok,_}|{:error,:invalid}. The PUBLIC assemble_compact façade
+    returns Ok. See spec/bap-v1.md §16, REQ1-VERIFY-return-shape. The PUBLIC assemble_compact façade
     adds per-kind content validation (tested separately)."""
     # assemble_segments: bad kind -> Err (not raise).
     bad = assemble_segments(
@@ -1100,8 +1074,8 @@ def test_assemble_segments_and_request_digest_return_result_contract():
 
 def test_check_envelope_rejects_bool_temporal_context():
     """Cross-vendor re-review F4: Python's isinstance(True, int) is True, so a bool-typed
-    evaluation_time/clock_skew/proof_max_age passed the isinstance(x, int) check. The reference
-    requires is_integer; booleans are not integers. Defect: revert _is_int to isinstance(x, int) ->
+    evaluation_time/clock_skew/proof_max_age passed the isinstance(x, int) check.
+    Temporal context excludes booleans (spec/bap-v1.md §16, REQ1-VERIFY-revalidate). Defect: revert _is_int to isinstance(x, int) ->
     bool values pass the guard.
 
     Real envelope with a passing integer control (see ``_valid_envelope``): a bool 1 would otherwise
@@ -1138,7 +1112,7 @@ def test_forged_widening_bounds_rejected_at_entry_points():
 
 def test_jcs_encode_rejects_non_integer_int_tag():
     """Cross-vendor F3: a non-integer int-tag value (1.5) or a bool must fail closed at jcs_encode
-    (reference guard `when is_integer(value)`, spec/bap-v1.md §8). Defect: remove the isinstance check ->
+    (spec/bap-v1.md §7, REQ1-JSON-number-bounds). Defect: remove the isinstance check ->
     JInt(1.5) emits b'1.5', JInt(True) emits b'True'."""
     from bounded_authority_verifier.jcs import jcs_encode
 
@@ -1149,7 +1123,7 @@ def test_jcs_encode_rejects_non_integer_int_tag():
 
 def test_jcs_encode_rejects_invalid_utf8_string():
     """Cross-vendor (JCS UTF-8): a programmatically-built JString with invalid UTF-8 must fail closed
-    (reference String.valid?, spec/bap-v1.md §8), not raise UnicodeDecodeError past the Result contract.
+    (spec/bap-v1.md §7, REQ1-JSON-no-normalization), not raise UnicodeDecodeError past the Result contract.
     Defect: remove the is_valid_utf8 gate -> invalid bytes reach utf8_str -> UnicodeDecodeError."""
     from bounded_authority_verifier.jcs import jcs_encode
 
@@ -1165,13 +1139,13 @@ def test_untrusted_key_locator_accepts_empty_payload_signature_segments():
     protected_seg = g["compact"].split(b".")[0]
     empty_ps = protected_seg + b".."
     r = untrusted_key_locator(empty_ps)
-    assert r.is_ok, "empty payload+signature segments must be accepted (reference decodes protected only)"
+    assert r.is_ok, "empty payload+signature segments must be accepted (REQ1-LOCATOR-opaque-payload)"
     assert r.value.key_id == g["issuer"].key_id
 
 
 def test_verify_anchored_export_rejects_nested_bounds_mismatch():
-    """Cross-vendor (nested bounds pinning): the reference pins every nested bounds == top-level
-    (spec/bap-v1.md §15 (archives)). A tightened top + nested default-MAX must reject. Defect:
+    """Cross-vendor (nested bounds pinning): nested bounds must resolve to the outer limits
+    (spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate, REQ1-BOUNDS-tighten-only). A tightened top + nested default-MAX must reject. Defect:
     remove _require_bounds_equal -> a tightened top silently overrides nested."""
     _reset_census()
     built = _build_archive([_fresh_key()])
@@ -1182,7 +1156,7 @@ def test_verify_anchored_export_rejects_nested_bounds_mismatch():
         bounds=_unwrap(bounds_new({"identifier_bytes": 4})),
     )
     assert not verify_anchored_export(built["archive"], built["key_chain"], tightened).is_ok, \
-        "nested bounds absent under a tightened top must reject (reference pin)"
+        "nested bounds absent under a tightened top must reject (REQ1-VERIFY-revalidate)"
 
 
 def test_check_chain_rejects_genesis_previous_hash_mismatch():
@@ -1254,7 +1228,7 @@ def test_proof_signing_input_rejects_malformed_grant_compact():
 
 def test_encode_anchored_export_rejects_when_archive_chunks_exceeded():
     """#4: encode_anchored_export MUST enforce archive_chunks (frame count) during encode
-    (spec/bap-v1.md §15 (archives) validate_chunks), not only archive_bytes. A 2-key archive frames
+    (spec/bap-v1.md §§16-17, REQ1-EXPORT-input-shape, REQ1-BOUNDS-tighten-only). A 2-key archive frames
     into 6 chunks (prefix+header+start+transition+row+end); tightening archive_chunks to 5 rejects
     even though archive_bytes is still ample."""
     built = _build_archive([_fresh_key(), _fresh_key()])  # 1 transition + 1 row → 6 frames
@@ -1272,8 +1246,8 @@ def test_encode_anchored_export_rejects_when_archive_chunks_exceeded():
 
 def test_assemble_compact_facade_rejects_invalid_signing_input():
     """#11: the public assemble_compact façade MUST validate the signing input (kind↔typ, segment
-    bounds, base64url payload) and re-parse the composed compact per kind (spec/bap-v1.md §16
-    validate_assembled_compact). It must NOT assemble a mislabeled or malformed compact."""
+    bounds, base64url payload) and reparse the composed kind (spec/bap-v1.md §16,
+    REQ1-VERIFY-revalidate). It must NOT assemble a mislabeled or malformed compact."""
     sig = _GATE_PASSING_SIG
     # kind/typ mismatch: grant kind but a proof (dpop+jwt) protected header.
     r = assemble_compact(SigningInput(kind="grant", protected_segment=_DERISK_PROOF_PROTECTED, payload_segment=b"e30"), sig)
@@ -1374,7 +1348,7 @@ def test_assemble_compact_facade_rejects_noncanonical_transition():
 
 
 def test_decode_grant_rejects_wrong_signature_width():
-    """Reference parse_grant (spec/bap-v1.md §16) requires byte_size(signature) == signature_bytes (64).
+    """Decode requires a 64-byte signature (spec/bap-v1.md §17, REQ1-BOUNDS-fixed-widths).
     The SDK decode path (_parse_compact) now enforces this; a grant compact with a 32-byte signature
     rejects where it previously decoded to Ok."""
     g = _signed_grant()
@@ -1601,9 +1575,8 @@ def test_encode_parity_transition_width_rejects():
 
 def test_encode_parity_tightened_outer_bounds_row_rejects():
     """Correctness-lens F1: the encode row re-check must run under the caller's OUTER
-    bounds (the reference threads %{expected.chain | bounds: bounds}); a tightened outer
-    with the chain's nested bounds absent is the reference's nested-bounds pin rejecting
-    (spec/bap-v1.md §15 (archives)). A 157-byte row under chain_row_bytes=156 -> Err."""
+    bounds. Nested and outer bounds must resolve equally
+    (spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate, REQ1-BOUNDS-tighten-only). A 157-byte row under chain_row_bytes=156 -> Err."""
     from dataclasses import replace as _replace
 
     from bounded_authority_verifier.bounds import bounds_new
@@ -1615,8 +1588,8 @@ def test_encode_parity_tightened_outer_bounds_row_rejects():
 
 
 def test_encode_parity_nested_anchor_bounds_mismatch_rejects():
-    """The reference pins ALL FOUR nested bounds to the outer (spec/bap-v1.md §15 (archives),
-    :404-406); this leg pins the anchor sweep beyond the F1 chain pin."""
+    """All nested bounds must resolve to the outer limits, including anchors
+    (spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate, REQ1-BOUNDS-tighten-only)."""
     from dataclasses import replace as _replace
 
     from bounded_authority_verifier.bounds import bounds_new
@@ -1628,9 +1601,9 @@ def test_encode_parity_nested_anchor_bounds_mismatch_rejects():
 
 
 def test_encode_parity_identity_overrides_are_not_tightening():
-    """An outer bounds built from an explicit MAXIMUM value is an identity override: the
-    reference merges it into the full maximum struct and accepts absent nested bounds
-    (struct equality); map-size gating wrong-rejected this (cross-vendor)."""
+    """An override equal to a maximum does not tighten the effective limits
+    (spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only). Absent nested bounds also
+    resolve to maxima; checking the override count would wrongly reject them."""
     from dataclasses import replace as _replace
 
     from bounded_authority_verifier.bounds import bounds_new
@@ -1682,7 +1655,7 @@ def test_encode_parity_chain_pin_isolated_rejects():
 def test_encode_parity_tightened_anchor_bytes_rejects():
     """Round-2 codex probe: anchor_bytes=1 tightened outer — _parse_compact only gates
     compact_bytes, so without the explicit per-anchor ceiling the ~440-byte anchors
-    framed fine (the reference gates anchor_bytes at :82/:114)."""
+    framed fine (spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only)."""
     from dataclasses import replace as _replace
 
     from bounded_authority_verifier.bounds import bounds_new
@@ -1705,9 +1678,8 @@ def test_encode_parity_expected_bool_rejected():
 
 
 def test_verify_parity_expected_anchor_chain_id_rejects():
-    """Round-2: the static expected↔chain bindings at verify (the reference enforces
-    the six at :362-371 via :92/:387); a caller-inconsistent expected end-anchor
-    chain_id rejects before any parse."""
+    """A caller-inconsistent expected end-anchor chain_id rejects before parsing
+    (spec/bap-v1.md §16, REQ1-EXPORT-input-shape, REQ1-VERIFY-revalidate)."""
     from dataclasses import replace as _replace
 
     from bounded_authority_verifier.v1 import (
@@ -2271,20 +2243,9 @@ def test_encode_consumption_entry_wrong_typed_fields_return_err():
         assert not r.is_ok, f"{bad!r} must fail closed"
 
 
-# ---------------------------------------------------------------------------
-# The pre-digest expected-struct validation hoist (ADR 0017 clause 3 / exception 2,
-# closed 2026-08-18). The reference validates the expected struct (chain + BOTH anchors'
-# identity/binding well-formedness + transitions, ContextValidation.expected_chain/
-# expected_anchor/expected_transition) BEFORE validate_chunks/hash_chunks
-# (spec/bap-v1.md §15 (archives)); the SDKs ran only the static bindings pre-digest and
-# left the well-formedness gates post-digest. VERDICT-INVARIANT by subsumption (post-digest
-# equality against bounded parsed values rejects every malformed expected) — the observable
-# is the WORK: a malformed expected struct must reject WITHOUT hashing the archive chunks.
-#
-# RED-CAPABILITY: pre-fix, the sha256 monkeypatch count for each malformed case was > 0
-# (the chunk digest ran before any anchor-identity rejection) — the count == 0 assertion is
-# the red run. Verdict-matrix cases pin the semantics against regressions.
-# ---------------------------------------------------------------------------
+# Validate expected chain, anchor, and transition context before archive hashing
+# (spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate, REQ1-BOUNDS-ordering).
+# The zero-hash-work assertion proves this ordering; removing the hoist makes it red.
 
 
 def test_verify_export_malformed_expected_rejects_before_hashing(monkeypatch):
@@ -2359,19 +2320,9 @@ def test_verify_export_malformed_expected_transition_verdicts():
         assert not r.is_ok, f"{label}: must reject"
 
 
-# ---------------------------------------------------------------------------
-# The assemble_compact caller-bounds threading (ADR 0018's named divergence,
-# closed 2026-08-18). The reference takes limits at assemble (spec/bap-v1.md §16
-# →
-# compact assembly — encoded segment bounds, signature width ≤ signature_bytes,
-# compact_bytes, and the kind re-parse, all against Bounds.coerce(limits)); the SDKs
-# hardcoded maximum. Maintainer direction 2026-08-18: thread caller-tightenable bounds.
-#
-# RED-CAPABILITY: pre-fix, assemble_compact took no bounds parameter at all — this test
-# failed with TypeError on the kwarg (the API-shape red); with the parameter present but
-# unthreaded (revert to MAXIMUM_BOUNDS internally), the three tightened cases return Ok
-# and the assertions go RED.
-# ---------------------------------------------------------------------------
+# Apply caller-tightened segment and compact limits during assembly and the kind
+# reparse (spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate, REQ1-BOUNDS-tighten-only).
+# Removing bounds threading makes the tightened-input assertions red.
 
 
 def test_assemble_compact_threads_caller_bounds():
@@ -2392,7 +2343,7 @@ def test_assemble_compact_threads_caller_bounds():
     r = assemble_compact(si.value, sig, bounds=_unwrap(bounds_new({"compact_bytes": n - 1})))
     assert not r.is_ok, "tightened compact_bytes must reject the assembly"
     # (signature_bytes is a FIXED-WIDTH bound — untightenable by design; the gate exists
-    # in the impl for reference fidelity but no leg can exercise it below 64.)
+    # as a fixed-width invariant; no valid bounds can lower it below 64.)
     # Tightened encoded_segment_bytes below the protected segment length → reject.
     r = assemble_compact(si.value, sig, bounds=_unwrap(bounds_new({"encoded_segment_bytes": len(si.value.protected_segment) - 1})))
     assert not r.is_ok, "tightened encoded_segment_bytes must reject the protected segment"

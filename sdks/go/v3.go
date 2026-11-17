@@ -12,8 +12,8 @@ import (
 // The contract-major-3 ES256 profile (spec/bap-v3.md, suite BAP3-ES256-SHA256,
 // activated by ADR 0035). Re-derived from the normative sources alone —
 // spec/bap-v3.md, the v1 sections it incorporates with the §2 substitutions,
-// and the v2 §4 selector algebra — with no reading of the Elixir v3
-// implementation (ADR 0014 D5). Structurally this file mirrors its v1/v2
+// and the v2 §4 selector algebra. Derived from the spec and certified corpus,
+// not from any sibling-SDK or reference source (ADR 0014 D5). This file mirrors its v1/v2
 // counterparts member for member; the profile differences are exactly:
 //
 //   - every versioned payload carries "v":3 and this major rejects v1/v2
@@ -1575,13 +1575,9 @@ func (EcdsaProfile) AssembleCompact(si SigningInput, signature []byte, bounds *B
 	return compact, nil
 }
 
-// reparseAnchorPayload runs the full closed anchor-claims decode on an
-// assembled payload — assembly must reject a well-formed signing input whose
-// payload members violate this major's profile, not merely decode as JSON.
-// It mirrors the v1 BoundaryAnchorCodec.parse: the closed member set, the
-// genesis rule (sequence 0 carries the all-zero chain hash), and the
-// canonical-payload check (the received segment is the JCS re-encoding of
-// the decoded value).
+// reparseAnchorPayload enforces the closed canonical anchor payload and the
+// sequence-zero/all-zero-hash rule (spec/bap-v1.md §15, Boundary anchors;
+// §16, REQ1-VERIFY-revalidate, incorporated by this major's §2 substitutions).
 func (EcdsaProfile) reparseAnchorPayload(p compactParts, b Bounds) error {
 	payload, err := JsonDecode(p.Payload, &b)
 	if err != nil {

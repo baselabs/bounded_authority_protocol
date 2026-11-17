@@ -33,13 +33,13 @@ a checkout of this repository.
   [deployment notes](../../docs/deployment/rust-sdk.md) for the full tree and its `unsafe` use.
 - `#![forbid(unsafe_code)]` covers this crate's own source.
 - **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
-  conforming signer emits, with the same clauses as the Elixir reference, and the certified
+  conforming signer emits under spec/bap-v1.md §16 and spec/bap-v3.md §3.2. The certified
   `bap-producer-canonicality/1` corpus (75 cases) runs with this SDK's conformance suite.
 - **Erratum 6 (selector float zero) is implemented.** Grant decode on every contract-major
   rejects an `equals` value or `one_of` member holding a float-tagged zero at any depth, of any
   sign or spelling (range bounds and inert `all` members are unchanged), and the grant producer
-  refuses any float-tagged integral selector value, with the same clauses as the Elixir
-  reference. The certified `bap-selector-float-zero/1` corpus (161 cases) runs with this SDK's
+  refuses any float-tagged integral selector value (spec/bap-v1.md §12,
+  REQ1-SIGNING-integral-float-selector; spec/bap-v2.md §4; spec/bap-v3.md §4). The certified `bap-selector-float-zero/1` corpus (161 cases) runs with this SDK's
   conformance suite.
 
 The unpublished SDK ships the committed `Cargo.lock`; CI audits that exact resolved set.
@@ -219,7 +219,7 @@ keys, nonces, or arguments. `GrantFacts` and `EnvelopeFacts` carry
 `trust: NotEvaluated`; `AnchoredExportFacts` carries both; `AttestationFacts` and
 `ContentAssertionFacts` carry `verification: SignatureAndWindow` and `trust: NotEvaluated`.
 Every facts type derives `Clone` and `PartialEq` (`ContentAssertionFacts` also `Eq`),
-and none implements `Display` or `Serialize`. `Debug` matches the full Elixir rendering (for example,
+and none implements `Display` or `Serialize`. `Debug` matches the specified diagnostic rendering (for example,
 `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`), including alternate formatting and
 nested Results. Each contract-major retains its `V1`, `V2`, or `V3` namespace; sibling facts
 use `RoleAttestation.V1` and `ContentAssertion.V1`.
@@ -285,7 +285,7 @@ Deployment notes, including AWS Lambda and PostgreSQL: see
 
 Apache License 2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
 
-Decoded diagnostics match the Elixir inspection notation. `GrantDecoded` includes ordered
+Decoded diagnostics match the specified inspection notation. `GrantDecoded` includes ordered
 `operations`; `ProofDecoded` includes `version` and `holder_public_key` and redacts its optional
 nonce in `Debug`. `DecodedContentAssertion` renders fully redacted. No decoded type implements
 serde serialization. Read named fields explicitly.

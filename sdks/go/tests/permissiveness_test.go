@@ -1018,13 +1018,9 @@ func loadKindCompact(t *testing.T, surface, id string) string {
 	return ""
 }
 
-// (n-f) assembly revalidation: AssembleCompact must re-parse the payload
-// through this major's closed decoders — a well-formed signing input whose
-// payload members violate the profile ({"aud":"a"} decodes as JSON but is no
-// grant/anchor/transition payload) must be rejected. Removing the
-// decodeGrantPayload / reparse{Anchor,Transition}Payload calls in v2.go's
-// AssembleCompact reddens exactly this leg. Mirrors the Elixir reference's
-// validate_assembled_compact (spec/bap-v1.md §16).
+// Assembly revalidates the complete declared header and payload kind
+// (spec/bap-v1.md §16, REQ1-VERIFY-revalidate). Removing the corresponding
+// reparse makes these deny assertions red.
 func TestPermissiveSuccessorAssemblyRevalidates(t *testing.T) {
 	forged := []byte(`{"aud":"a"}`)
 	sig := make([]byte, 64)
@@ -1074,11 +1070,8 @@ func TestPermissiveSuccessorAssemblyRevalidates(t *testing.T) {
 		}
 	}
 
-	// Genesis leg: a JCS-canonical, closed-member anchor payload with
-	// sequence 0 and a NON-zero chain hash — the reference's
-	// BoundaryAnchorCodec.parse genesis binding (spec/bap-v1.md §15 (anchors)).
-	// Removing the sequence-0/zero-hash check in reparseAnchorPayload reddens
-	// exactly this leg.
+	// Sequence zero requires the all-zero chain hash (spec/bap-v1.md §15,
+	// Boundary anchors). Removing the genesis check makes this assertion red.
 	anchorObj, ok := func() (v.Obj, bool) {
 		raw, err := v.JsonDecode(anchorPayload, nil)
 		if err != nil {

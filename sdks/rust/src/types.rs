@@ -221,12 +221,9 @@ pub struct Credentials {
 // Untrusted key locator
 // ============================================================================
 
-/// The non-authorizing locator result: a `kid` hint plus `trust: not_evaluated`.
-///
-/// `untrusted_key_locator` "returns only `{:ok, %KeyLocator{kid: kid, trust:
-/// :not_evaluated}}`" (`spec/bap-v1.md` lines 433–435). It does not select
-/// a key, decode claims, verify, evaluate trust, or authorize
-/// (`REQ1-LOCATOR-not-authority`). Sourced from `key-locator/untrusted.json`.
+/// An untrusted key-ID hint with trust not evaluated (spec/bap-v1.md §18,
+/// REQ1-LOCATOR-not-authority, REQ1-LOCATOR-no-value-leak).
+/// Sourced from the key-locator/untrusted.json corpus surface.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyLocator {
     /// The grant protected-header `kid` hint (NOT a trust selector).
@@ -285,7 +282,7 @@ pub struct GrantDecoded {
 /// `proof-decode/decode.json` `expected` pins only `proof_id`; the remaining
 /// fields are the decoded proof claims. `nonce` is surfaced as an `Option`
 /// because a proof MAY carry one (decode reflects what was decoded; the
-/// diagnostic rendering redacts the nonce, matching the reference decode view).
+/// specified diagnostic rendering redacts the nonce, ADR 0014 D3).
 #[derive(Clone, PartialEq)]
 pub struct ProofDecoded {
     /// Contract-major of the proof.
@@ -361,7 +358,7 @@ pub struct ExpectedChain {
     /// Raw 32-byte caller head (corpus `last_hash`).
     pub head_hash: [u8; 32],
     /// Caller-tightened bounds (None = the profile maximum; a present value
-    /// must coerce-equal the outer bounds — the reference's nested pin).
+    /// must resolve to the outer limits, spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate).
     pub bounds: Option<Bounds>,
 }
 
@@ -504,7 +501,7 @@ pub struct ExpectedAnchor {
     /// Expected anchor sequence.
     pub sequence: i64,
     /// Caller-tightened bounds (None = the profile maximum; a present value
-    /// must coerce-equal the outer bounds — the reference's nested pin).
+    /// must resolve to the outer limits, spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate).
     pub bounds: Option<Bounds>,
 }
 
@@ -529,7 +526,7 @@ pub struct ExpectedKeyTransition {
     /// Expected `transition_id`.
     pub transition_id: String,
     /// Caller-tightened bounds (None = the profile maximum; a present value
-    /// must coerce-equal the outer bounds — the reference's nested pin).
+    /// must resolve to the outer limits, spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate).
     pub bounds: Option<Bounds>,
 }
 
@@ -537,15 +534,8 @@ pub struct ExpectedKeyTransition {
 // Anchored export
 // ============================================================================
 
-/// The retrieved archived object an anchored-export verification binds.
-///
-/// "`anchored export verification accepts only %ArchivedObject{chunks:
-/// raw_binary_chunks, version: version}`" (`spec/bap-v1.md` lines
-/// 450–452). `chunks` is the bounded nonempty proper flat chunk list (each
-/// `base64url`-decoded from `anchored-export/verify.json` `input.chunks`);
-/// `version` is the observed object-store version, compared for exact equality
-/// against the caller-supplied expected version
-/// (`REQ1-EXPORT-version-exact`). Commitment preimages stay opaque/private.
+/// Raw archive chunks and exact object-store version supplied by the caller
+/// (spec/bap-v1.md §16, REQ1-EXPORT-input-shape, REQ1-EXPORT-version-exact).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArchivedObject {
     /// Raw binary archive chunks (the framed concatenation).
@@ -594,7 +584,7 @@ pub struct ExpectedExport {
     /// Expected object-store version.
     pub object_version: String,
     /// Caller-tightened bounds (None = the profile maximum; a present value
-    /// must coerce-equal the outer bounds — the reference's nested pin).
+    /// must resolve to the outer limits, spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate).
     pub bounds: Option<Bounds>,
 }
 
@@ -619,7 +609,7 @@ pub struct ExpectedAnchoredExport {
     /// Expected object-store version (`REQ1-EXPORT-version-exact`).
     pub object_version: String,
     /// Caller-tightened bounds (None = the profile maximum; a present value
-    /// must coerce-equal the outer bounds — the reference's nested pin).
+    /// must resolve to the outer limits, spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate).
     pub bounds: Option<Bounds>,
 }
 
@@ -765,7 +755,8 @@ pub struct LocalLoopbackHttpProofInput {
 /// The attested role: exactly `"issuer"` or `"holder"` on the wire
 /// (`REQ-RA1-CLAIM-role-closed-set`).
 ///
-/// The Rust spelling of the reference's role binary — a two-value closed set,
+/// The role is a two-value closed set (spec/bap-role-attestation-v1.md §2,
+/// REQ-RA1-CLAIM-role-closed-set),
 /// so every other string is structurally unrepresentable at the producer
 /// boundary and rejected at the decode boundary. A `holder` attestation is
 /// admission control and defense-in-depth only; per-grant holder standing

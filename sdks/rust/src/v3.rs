@@ -21,8 +21,8 @@
 //! Derivation hygiene mirrors the v1/v2 façades (ADR 0014 D5): derived from
 //! `spec/bap-v3.md`, `spec/bap-v1.md` (incorporated with the §2
 //! substitutions), `spec/bap-v2.md` §4, and the certified v3 conformance
-//! corpus (`conformance/corpus-v3/`) — NOT from the Elixir v3 implementation
-//! or any sibling-SDK source. `REQ1-*`/`REQ2-*` citations below name the
+//! corpus (`conformance/corpus-v3/`). Derived from the spec and certified corpus,
+//! not from any sibling-SDK or reference source (ADR 0014 D5). `REQ1-*`/`REQ2-*` citations below name the
 //! incorporated requirement of the same name; v3 carries them as
 //! `REQ3-*` (spec/bap-v3.md §6).
 //!
@@ -846,17 +846,11 @@ pub fn check_envelope(
     })
 }
 
-// ============================================================================
-// scan_compact — faithful port of the reference CompactJws.scan (ath hash gate)
-// ============================================================================
+// scan_compact: bounded shape scan before hashing (spec/bap-v1.md §14).
 
-/// Compact structure and size scan: the compact MUST be ≤
-/// `compact_bytes` and split into exactly three non-empty segments (split on
-/// `.`), the protected and payload each ≤ `encoded_segment_bytes`, and the
-/// signature non-empty, ≤ `encoded_segment_bytes`, and dot-free. Unlike
-/// [`compact::parse_compact`], this does NOT require the segments be
-/// canonical base64url — the reference's scan gates hashing (`ath`/`hash`),
-/// not verification, so a non-canonical segment like `a!a` passes.
+/// Bound the whole compact and each of its three nonempty segments before hashing
+/// (spec/bap-v1.md §§11,17, REQ1-CLAIM-ath, REQ1-BOUNDS-ordering; incorporated
+/// by spec/bap-v3.md §2). Decode separately checks segment canonicality.
 fn scan_compact(compact: &[u8], bounds: &Bounds) -> Result<()> {
     if compact.len() as u64 > bounds.compact_bytes() {
         return Err(Invalid);
@@ -905,12 +899,10 @@ pub fn assemble_compact(
     {
         return Err(Invalid);
     }
-    // (signature_bytes needs no gate: it is a FIXED-WIDTH key rejected at
-    // Bounds construction unless 64 — the reference's assemble-time check is
-    // subsumed; the v3 raw r||s spelling is the same 64-byte width.)
-    // Erratum 3 (REQ3-SIGNING-producer-canonical): assembly is a producer surface — it frames
-    // a signature and verifies none — so it refuses a raw r||s outside 0 < r < n,
-    // 0 < s <= floor(n/2) (validate_rs_range owns the rule) and emits accepted bytes unchanged.
+    // Signature width is fixed at 64 bytes (spec/bap-v3.md §5,
+    // REQ3-BOUNDS-fixed-widths). Reject out-of-range or high-S signatures,
+    // then emit accepted bytes unchanged (spec/bap-v3.md §3.2,
+    // REQ3-SIGNING-producer-canonical).
     es256::validate_rs_range(signature)?;
     let compact = compact::compose_compact(input, signature)?;
     if compact.len() as u64 > bounds.compact_bytes() {
@@ -1076,11 +1068,9 @@ pub fn proof_signing_input(proof: &ProofInput, bounds: &Bounds) -> Result<Produc
         return Err(Invalid);
     }
 
-    // ath = base64url(SHA-256(grant_compact ASCII bytes)) — REQ1-CLAIM-ath.
-    // Gate SHA-256 on the reference `CompactJws.scan`: total <= compact_bytes
-    // AND three non-empty segments each <= encoded_segment_bytes (signature
-    // dot-free). The scan does NOT require base64url canonicity — it gates
-    // hashing, not verification.
+    // Hash the complete received grant after bounded structural scanning
+    // (spec/bap-v1.md §§11,17, REQ1-CLAIM-ath, REQ1-BOUNDS-ordering;
+    // incorporated by spec/bap-v3.md §2).
     scan_compact(proof.grant_compact.as_slice(), bounds)?;
     let mut ath_hasher = Sha256::new();
     ath_hasher.update(&proof.grant_compact);
@@ -1825,7 +1815,8 @@ pub fn verify_key_transition(
 /// last_hash, last_sequence, previous_hash, row_count, transition_count,
 /// v:3` (member names derived first-hand from the v3 corpus header frame).
 ///
-/// Mirrors the reference producer's FULL validation contract: expected-side
+/// Apply spec/bap-v1.md §§15-16 (REQ1-VERIFY-revalidate), incorporated by
+/// spec/bap-v3.md §2: expected-side
 /// consistency (the chain_id binding of both anchors and every transition;
 /// the start/end sequence + hash bindings to the chain), a full
 /// [`check_chain`] re-check of the rows, gated parses + 7-field matches for
@@ -2228,9 +2219,9 @@ pub fn verify_anchored_export(
 ) -> Result<AnchoredExportFacts> {
     let bounds = resolve_bounds(expected.bounds.as_ref());
 
-    // Expected-struct well-formedness BEFORE the digest (the reference
-    // ordering: chain + both anchors + transitions validated before key
-    // shapes, chunks, and hashing).
+    // Validate expected chain, anchors, transitions, and key context before hashing
+    // (spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate, REQ1-BOUNDS-ordering;
+    // incorporated by spec/bap-v3.md §2).
     {
         // The count ceiling BEFORE the hoisted per-element walk.
         if expected.transitions.len() as u64 > bounds.key_transitions() {
@@ -3615,10 +3606,9 @@ fn validate_authority_port(value: &str) -> Result<()> {
     Ok(())
 }
 
-/// `uri_bytes?/1`: every byte is alphanumeric, one of the URI punctuation
-/// bytes `-._~:/?#[]@!$&'()*+,;=`, or part of a well-formed `%HH`
-/// percent-escape. Rejects `{`, whitespace, control, non-ASCII, and a bare
-/// `%` / `%G`.
+/// Validate URI bytes and percent escapes (spec/bap-v1.md §11; RFC 3986 §2;
+/// incorporated by spec/bap-v3.md §2). Reject braces, whitespace, control bytes,
+/// non-ASCII bytes, and malformed escapes.
 fn validate_uri_bytes(bytes: &[u8]) -> Result<()> {
     const URI_PUNCT: &[u8] = b"-._~:/?#[]@!$&'()*+,;=";
     let mut i = 0;

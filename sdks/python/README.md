@@ -33,14 +33,14 @@ install it from this repository.
   for Ed25519 and ECDSA P-256 (the committed lock selects 50.0.2). SHA-256 comes from `hashlib`; base64url, JSON
   decoding, and JCS canonicalization are implemented in the package.
 - **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
-  conforming signer emits, with the same clauses as the Elixir reference, and the certified
+  conforming signer emits under spec/bap-v1.md §16 and spec/bap-v3.md §3.2. The certified
   `bap-producer-canonicality/1` corpus (75 cases) runs with this SDK's conformance suite.
 - **Erratum 6 (selector float zero) is implemented.** Grant decode on contract-majors 1, 2 and 3
   rejects an `equals` value or `one_of` member holding a float-tagged zero at any depth
   (`0.0`, `-0.0`, `-0e0`, `1e-400`); range bounds and inert `all` members are unchanged, and
   range comparison treats -0.0 and 0.0 as equal. `grant_signing_input` refuses any float-tagged
-  integral selector value (`0.0`, `10.0`), range bounds included. The clauses match the Elixir
-  reference, and the certified `bap-selector-float-zero/1` corpus (161 cases) runs with this
+  integral selector value (`0.0`, `10.0`), range bounds included (spec/bap-v1.md §12,
+  REQ1-SIGNING-integral-float-selector; spec/bap-v2.md §4; spec/bap-v3.md §4). The certified `bap-selector-float-zero/1` corpus (161 cases) runs with this
   SDK's conformance suite.
 
 The runtime floor is `cryptography` 50.0.0, the first release fixing all advisories
@@ -245,7 +245,7 @@ Bounds, facts, and redacted decoded values refuse a second initialization.
 objects with read-only properties holding identifiers, digests, times, and counts, never raw
 signatures, keys, nonces, or arguments. Their `authorization` or `trust` field is
 `"not_evaluated"`; there is no `allowed`, `authorized`, or decision field. Their `repr` and
-`str` match the full Elixir rendering, for example
+`str` match the specified diagnostic rendering, for example
 `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>` and
 `#BoundedAuthorityProtocol.V2.GrantFacts<redacted>`, including nested Results and containers.
 Sibling profiles use `RoleAttestation.V1` and `ContentAssertion.V1`. Facts refuse
@@ -253,7 +253,7 @@ Sibling profiles use `RoleAttestation.V1` and `ContentAssertion.V1`. Facts refus
 copy reduction. Read named properties explicitly; construct a new facts object explicitly
 when a copy is needed.
 
-**Decoded diagnostics.** All four decoded types render the Elixir inspection notation, including
+**Decoded diagnostics.** All four decoded types render the specified inspection notation, including
 the contract-major. `GrantDecoded` includes `version` and ordered `operations`; `ProofDecoded`
 now carries all decoded claims and the holder public key, but hides the optional nonce in
 `repr` and `str`. `ProofDecoded` and `ContentAssertionDecoded` are slotted values with read-only

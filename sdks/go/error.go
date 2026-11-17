@@ -1,10 +1,8 @@
 // Package verifier is a typed Go verifier for the Bounded Authority Protocol
 // frozen v1 profile (suite BAP1-Ed25519-SHA256).
 //
-// It reimplements the profile from the published spec (spec/bap-v1.md),
-// the governing ADRs, and the published conformance corpus alone — with no
-// code-level derivation from the Elixir reference or the sibling SDKs
-// (ADR 0014 D5).
+// Derived from the spec and certified corpus, not from any sibling-SDK or
+// reference source (ADR 0014 D5).
 //
 // Verification is not authority: a successful result proves only that
 // caller-supplied bytes satisfy caller-supplied trusted inputs and expected

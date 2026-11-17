@@ -54,11 +54,9 @@ func resolveExportBounds(expected *ExpectedAnchoredExport) (Bounds, error) {
 	return outer, nil
 }
 
-// validateExpectedAnchoredExport is the clause-3 pre-digest hoist: the
-// complete expected-context well-formedness suite runs BEFORE any archive
-// hashing, mirroring the reference's validate_expected_anchored_export →
-// ContextValidation sequence. Malformed caller metadata rejects with zero
-// hash work.
+// Validate complete expected context before archive hashing so malformed caller
+// metadata rejects without hash work (spec/bap-v1.md §§16-17,
+// REQ1-VERIFY-revalidate, REQ1-BOUNDS-ordering).
 func validateExpectedAnchoredExport(expected *ExpectedAnchoredExport, obj ArchivedObject, keys HistoricalKeyChain, b Bounds) error {
 	// chain: identifier, positive range, count coherence, hash widths, genesis
 	if !validStringOrURI(expected.Chain.ChainID, b.IdentifierBytes) {
@@ -84,9 +82,9 @@ func validateExpectedAnchoredExport(expected *ExpectedAnchoredExport, obj Archiv
 	if err := validateExpectedAnchorTuple(expected.EndAnchor, expected.Chain.LastSequence, false, b); err != nil {
 		return ErrInvalid
 	}
-	// cross-binding (cross-vendor F2): the anchors attest THE chain's
-	// boundaries — same chain identity, start binds the caller predecessor,
-	// end binds the caller head (the reference enforces all four)
+	// Both anchors bind the expected chain identity; the start binds the caller
+	// predecessor and the end binds the caller head (spec/bap-v1.md §16,
+	// REQ1-EXPORT-input-shape).
 	if expected.StartAnchor.ChainID != expected.Chain.ChainID || expected.EndAnchor.ChainID != expected.Chain.ChainID ||
 		expected.StartAnchor.ChainHash != expected.Chain.PreviousHash || expected.EndAnchor.ChainHash != expected.Chain.LastHash {
 		return ErrInvalid
@@ -404,11 +402,9 @@ func VerifyAnchoredExport(obj ArchivedObject, keys HistoricalKeyChain, expected 
 	return verifyAnchoredExportCore(obj, keys, expected, archiveDigest)
 }
 
-// EncodeAnchoredExport mirrors the reference producer's full contract
-// (amendment #2 parity): expected-side consistency, row chain re-check,
-// gated parses + 7-field matches for both anchors and every transition, the
-// key-path walk with NON-STRICT end-anchor chronology, and the archive
-// aggregate bounds.
+// EncodeAnchoredExport revalidates expected context, rows, anchors, transitions,
+// and the key path before constructing the archive (spec/bap-v1.md §§15-16,
+// REQ1-VERIFY-revalidate). It is a producer and verifies no signature.
 func EncodeAnchoredExport(input AnchoredExportInput, expected ExpectedAnchoredExport) (out EncodedExport, err error) {
 	defer closedResult(&err)
 	b, err := resolveExportBounds(&expected)

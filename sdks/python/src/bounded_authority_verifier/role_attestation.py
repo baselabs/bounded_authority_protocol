@@ -10,8 +10,8 @@ machinery) and is parsed by no contract-major profile; this profile rejects ever
 Four public functions, each returning ``Result[T] = Ok | Err`` (the ``{:ok, value} | {:error,
 :invalid}`` mirror). No ``authorized`` / ``decision`` surface (AGENTS rule 1); no signer, no private
 key, no signing callback (REQ-RA1-API-no-signer). Wire format derived from spec/bap-role-attestation-v1.md
-+ the certified corpus alone (the ADR 0014 derivation bar — no code-level derivation from the Elixir
-reference); the corpus is the byte-level arbiter.
++ the certified corpus alone. Derived from the spec and certified corpus, not from
+any sibling-SDK or reference source (ADR 0014 D5). The corpus is the byte-level arbiter.
 
 The dispatch structs here are frozen dataclasses mirroring the SDK's established shapes: ``bytes``
 for raw-32 key fields, ``int`` / ``str`` for scalars, ``int | None`` for the unbounded attestor
@@ -167,7 +167,7 @@ def _is_string_or_uri(s: str) -> bool:
         return False
     rest = s[colon + 1:]
     if not rest.startswith("//"):
-        # Elixir URI.new reserves raw brackets for an IP-literal authority host. Percent-encoded
+        # RFC 3986 §§3.2.2-3.3 reserves raw brackets for an IP-literal authority host. Percent-encoded
         # brackets remain ordinary URI bytes, and colon-free plain strings use the branch above.
         return "[" not in rest and "]" not in rest
     hierarchical = rest[2:]
@@ -598,9 +598,9 @@ def assemble_attestation_compact(
             _fail("assemble_attestation_compact: signing input")
         compact = assembled.value
         _preflight_attestation_compact(compact, b)
-        # Full attestation re-parse (validate_assembled_compact → decode_attestation: closed sets,
-        # member rules, canonical segments, segment + signature width) — the assembler must not
-        # mint bytes its own consumer (verify) would reject (REQ-RA1-API-symmetry).
+        # Reparse closed members, canonical segments, and signature width before returning
+        # the compact (spec/bap-role-attestation-v1.md §4,
+        # REQ-RA1-API-assembly-revalidate, REQ-RA1-API-symmetry).
         r = decode_attestation(compact, b)
         if not r.is_ok:
             _fail("assemble_attestation_compact: re-parse")
@@ -663,10 +663,9 @@ def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> A
     valid_before = getattr(attestor, "valid_before", None)
     if valid_before is not None and not _is_int(valid_before):
         _fail("verify_attestation: attestor valid_before")
-    # Attestor-window endpoints are magnitude-bounded caller input — the HistoricalPublicKey
-    # gates the Elixir reference (ContextValidation.historical_key) and the Rust leg apply.
-    # Containment alone is trivially satisfied by an out-of-magnitude window, so nothing
-    # downstream rejects it (cross-vendor review 2026-09-22).
+    # Attestor-window endpoints are magnitude-bounded caller input
+    # (spec/bap-role-attestation-v1.md §3, REQ-RA1-VERIFY-caller-supplied).
+    # Containment alone would accept an out-of-magnitude window.
     if abs(attestor.valid_from) > magnitude:
         _fail("verify_attestation: attestor valid_from magnitude")
     if valid_before is not None and abs(valid_before) > magnitude:

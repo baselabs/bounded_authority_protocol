@@ -738,7 +738,7 @@ func checkEnvelopeFor(creds Credentials, expected ExpectedRequest, profile proof
 	// 6. nonce mode
 	if expected.Nonce.required {
 		if proof.Nonce == nil || subtle.ConstantTimeCompare([]byte(*proof.Nonce), []byte(expected.Nonce.nonce)) != 1 {
-			return EnvelopeFacts{}, ErrInvalid // constant-time (parity with the reference's secure_equal)
+			return EnvelopeFacts{}, ErrInvalid // constant-time (spec/bap-v1.md §16, REQ1-VERIFY-envelope-binding)
 		}
 	} else if proof.Nonce != nil {
 		return EnvelopeFacts{}, ErrInvalid // must be absent

@@ -15,8 +15,7 @@ PERMISSIVENESS CLOSURES (the load-bearing host-runtime discipline):
    (which silently last-wins duplicates). [REQ1-JSON-no-duplicate]
  - null-prototype / dunder: decoded objects are plain ``dict`` read ONLY by ``dict[key]``
    subscription (never ``getattr``), so a ``__class__`` / ``__proto__`` key is DATA, not an attribute
-   collision. [REQ1-SELECTOR-semantic-identity — Python's risk is dunder/attribute collision, NOT
-   prototype absorption; the mechanism differs from the TS ``Object.create(null)`` closure]
+   collision. [spec/bap-v1.md §12, REQ1-SELECTOR-semantic-identity]
  - single-value: trailing bytes after the top-level value reject. [REQ1-JSON-single-value]
  - raw-lexeme: numbers scanned before conversion; magnitude + byte ceiling enforced on the lexeme.
    [REQ1-JSON-raw-lexeme]
@@ -124,7 +123,7 @@ def _byte_at(src: bytes, pos: int) -> int:
     return src[pos] if pos < len(src) else -1
 
 
-# Per-node-type depth gate (mirrors the official Jcs.encode/Json.decode model): root value at level 0;
+# Per-node depth limits (spec/bap-v1.md §17, REQ1-BOUNDS-ordering): root value at level 0;
 # a SCALAR is valid at level <= depth; a CONTAINER is valid at level < depth (its children sit at
 # level+1). A uniform `level > depth` gate wrongly accepts a container at the deepest legal scalar
 # level.
@@ -406,7 +405,7 @@ def _lexeme_magnitude_within(text: str, maximum: int) -> bool:
     if digits == "":
         return True  # value is zero
     maximum_digits = str(maximum)
-    # Effective integer-position of the last significant digit (reference's integer_length).
+    # Effective integer-position of the last significant digit (spec/bap-v1.md §7, REQ1-JSON-raw-lexeme).
     integer_length = len(digits) + exponent - len(fraction_digits)
     if integer_length < len(maximum_digits):
         return True

@@ -16,9 +16,8 @@
 //! the signature is base64url-encoded. [`parse_compact`] is the inverse
 //! structural split, enforcing exactly three non-empty canonical segments.
 //!
-//! Derived first-hand from `spec/bap-v1.md` § Signing and digest inputs
-//! (lines 246–261) and RFC 7515 §7.1 — NOT from any sibling-SDK or Elixir
-//! source (ADR 0014 D5).
+//! Derived from the spec and certified corpus, not from any sibling-SDK or
+//! reference source (ADR 0014 D5). See spec/bap-v1.md §14 and RFC 7515 §7.1.
 
 // `assemble_compact` is `pub` (re-exported at the crate root by the Façade A
 // `pub use compact::assemble_compact;` in lib.rs) and `parse_compact` is
@@ -31,7 +30,7 @@ use crate::types::SigningInput;
 /// Compose the 3-segment compact serialization from a signing input + raw
 /// signature — the internal composer. The public [`crate::assemble_compact`]
 /// (re-exported from the v1 façade) wraps this with per-kind content validation
-/// (the reference `validate_assembled_compact`, spec/bap-v1.md §16).
+/// (spec/bap-v1.md §16, REQ1-VERIFY-revalidate).
 ///
 /// Returns
 /// `protected_segment || "." || payload_segment || "." || base64url(signature)`.
@@ -68,7 +67,7 @@ pub(crate) fn compose_compact(input: &SigningInput, signature: &[u8; 64]) -> Res
 /// [`base64url_decode`] / [`crate::json::json_decode`] as needed. The
 /// signature-segment width (must decode to 64 bytes) is NOT enforced here —
 /// that is the decode path's responsibility (each `decode_*_parts` fn in
-/// [`crate::v1`] gates it, mirroring the reference codecs); this parser only
+/// [`crate::v1`] gates it under spec/bap-v1.md §17, REQ1-BOUNDS-fixed-widths); this parser only
 /// asserts the `REQ1-SIGNING-exact-input` shape.
 ///
 /// Rejects (`Invalid`): more or fewer than three segments, an empty segment
@@ -157,12 +156,8 @@ mod tests {
 
     #[test]
     fn assemble_rejects_non_canonical_or_empty_segment() {
-        // validate_assembled_compact (spec/bap-v1.md §16): the
-        // composed
-        // compact must be three canonical base64url segments. A caller-supplied
-        // protected segment carrying standard-alphabet `+` (NOT base64url) or an
-        // empty segment is rejected, not composed into a malformed compact.
-        // RED-capable: removing the `parse_compact(&out)?` call makes these accept.
+        // The public facade revalidates the declared kind
+        // (spec/bap-v1.md §16, REQ1-VERIFY-revalidate).
         let sig_raw = [0u8; 64];
         let bad = SigningInput {
             kind: SigningKind::Grant,

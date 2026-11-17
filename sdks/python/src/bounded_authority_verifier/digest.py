@@ -128,7 +128,7 @@ def _request_digest_with_prefix(
 
 
 def _within_tagged_bounds(v: Tagged, level: int, bounds: Bounds) -> bool:
-    """Per-node-type bounds gate over the tagged algebra (mirrors the official Jcs.encode per-node gate)."""
+    """Apply per-node tagged-algebra limits (spec/bap-v1.md §17, REQ1-BOUNDS-ordering)."""
     if isinstance(v, (JNull, JBool)):
         return level <= _unwrap(bounds_resolve(bounds, "depth"))
     if isinstance(v, JInt):

@@ -1,10 +1,10 @@
 //! JWK encode/decode + the RFC 7638 thumbprint family for the fixed
 //! Ed25519/OKP profile.
 //!
-//! Derived first-hand from `spec/bap-v1.md` § Protected headers
-//! (lines 152–163), RFC 7638 §3.2 (canonical hash), and RFC 8037
-//! (EdDSA/OKP in JOSE) — NOT from any sibling-SDK or Elixir source
-//! (ADR 0014 D5).
+//! The normative authorities are `spec/bap-v1.md` §10 (Protected headers),
+//! RFC 7638 §3.2 (canonical hash), and RFC 8037 (EdDSA/OKP in JOSE).
+//! Derived from the spec and certified corpus, not from any sibling-SDK or
+//! reference source (ADR 0014 D5).
 //!
 //! The proof JWK is exactly `{crv: "Ed25519", kty: "OKP",
 //! x: canonical_base64url_32_bytes}` in any member order

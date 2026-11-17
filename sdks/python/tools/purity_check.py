@@ -58,27 +58,54 @@ FORBIDDEN_CALLS: dict[str, str] = {
 SDK_DIR = Path(__file__).resolve().parent.parent
 SRC_DIR = SDK_DIR / "src" / "bounded_authority_verifier"
 
-# Scan authored files across the entire SDK, including this tool. Only generated
-# dependency/build/cache directories are pruned. Split/escaped patterns do not
-# contain the citations they detect (ADR 0014 D5(b)).
-REFERENCE_PATH = re.compile(
-    rb"lib/" rb"bounded_authority_protocol|\b[A-Za-z0-9_][A-Za-z0-9_./\\-]*[.]exs?\b"
-)
+# BEGIN DERIVATION RULES
+# ADR 0014 D5: identical rules travel with each independently publishable SDK.
+# Split and escaped literals keep this checker inside its own scan boundary.
+DERIVATION_PATTERNS = [
+    ("reference source citation", re.compile(
+        rb"lib[/\\]" rb"bounded_authority_protocol|\b[A-Za-z0-9_][A-Za-z0-9_./\\-]*[.]exs?\b",
+        re.IGNORECASE,
+    )),
+    ("reference function citation", re.compile(
+        rb"(?<![A-Za-z0-9_./\\:-])(?:[A-Z][A-Za-z0-9_]*(?:[.][A-Z][A-Za-z0-9_]*)*"
+        rb"[.][a-z_][A-Za-z0-9_]*[?!]?|[a-z_][A-Za-z0-9_]*[?!])/[0-9]+"
+        rb"(?![A-Za-z0-9_/\\-]|[.][A-Za-z0-9_])",
+    )),
+    ("reference struct citation", re.compile(rb"%[A-Z][A-Za-z0-9_.]*[{]")),
+    ("reference authority phrase", re.compile(
+        rb"\bel" rb"ixir\s+" rb"reference\b|\breference\s+" rb"implementation\b",
+        re.IGNORECASE,
+    )),
+]
 GENERATED_DIRS = {
     ".git", ".venv", "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache",
+    "target", "dist", "build", "node_modules",
 }
+RENDERING_NAMES = (
+    "decoded-rendering.json", "decoded-wire-rendering.json", "decoded-binary-rendering.json",
+)
 
 
-def derivation_violations() -> list[str]:
+def derivation_violations(root: Path, top_level_only: bool = False, fixture_directory: str = "tests/fixtures") -> list[str]:
+    rendering_fixtures = {f"{fixture_directory}/{name}" for name in RENDERING_NAMES}
     violations = []
-    for directory, dirs, files in os.walk(SDK_DIR):
-        dirs[:] = sorted(name for name in dirs if name not in GENERATED_DIRS)
+    for directory, dirs, files in os.walk(root):
+        dirs[:] = [] if top_level_only else sorted(
+            name for name in dirs if name not in GENERATED_DIRS and not name.endswith(".egg-info")
+        )
         for name in sorted(files):
             path = Path(directory) / name
-            for lineno, line in enumerate(path.read_bytes().splitlines(), 1):
-                if REFERENCE_PATH.search(line):
-                    violations.append(f"{path.relative_to(SDK_DIR)}:{lineno}: reference source citation")
+            relative = path.relative_to(root).as_posix()
+            data = path.read_bytes()
+            # Scan whole files so whitespace cannot hide a phrase across lines.
+            for message, pattern in DERIVATION_PATTERNS:
+                if message == "reference struct citation" and relative in rendering_fixtures:
+                    continue
+                for match in pattern.finditer(data):
+                    lineno = data.count(b"\n", 0, match.start()) + 1
+                    violations.append(f"{relative}:{lineno}: {message}")
     return violations
+# END DERIVATION RULES
 
 
 class PurityChecker(ast.NodeVisitor):
@@ -159,10 +186,15 @@ def _qualified_name(node: ast.expr) -> str:
 
 
 def main() -> int:
+    if len(sys.argv) == 3 and sys.argv[1] == "--derivation-top-level":
+        violations = derivation_violations(Path(sys.argv[2]), top_level_only=True)
+        for violation in violations:
+            print(f"purity: {violation}", file=sys.stderr)
+        return int(bool(violations))
     if not SRC_DIR.is_dir():
         print(f"purity: source dir not found: {SRC_DIR}", file=sys.stderr)
         return 1
-    total_violations = derivation_violations()
+    total_violations = derivation_violations(SDK_DIR)
     for py in sorted(SRC_DIR.rglob("*.py")):
         try:
             tree = ast.parse(py.read_text("utf8"), filename=str(py))

@@ -566,12 +566,9 @@ def test_attestation_preflights_overlong_signature_before_decode() -> None:
 
 
 def test_attestation_verify_bounds_attestor_window_magnitudes() -> None:
-    # Cross-vendor review leg (2026-09-22, claude peer over 639d74e..e5cd033): the attestor
-    # context's window endpoints are magnitude-bounded caller input — the same
-    # HistoricalPublicKey gates the Elixir reference (ContextValidation.historical_key) and the
-    # Rust leg (role_attestation.rs) apply. A context with valid_from below or valid_before
-    # above the integer magnitude ceiling must fail closed here too: containment alone is
-    # trivially satisfied by those windows, so nothing downstream rejects them.
+    # Window endpoints are magnitude-bounded caller input; containment alone would
+    # accept an out-of-magnitude window (spec/bap-role-attestation-v1.md §3,
+    # REQ-RA1-VERIFY-caller-supplied; spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only).
     subject_public, _ = _keypair()
     attestor_public, attestor_private = _keypair()
     producer = AttestationProducer(

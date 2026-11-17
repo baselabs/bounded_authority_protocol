@@ -2,7 +2,7 @@
 """Dependency-license checker for ``bounded_authority_verifier`` (ADR 0014 D8).
 
 Enumerates the SDK's runtime dependency tree and fails if any package license is outside the
-Apache-2.0/BSD/MIT/ISC-compatible allowlist (AGENTS rule 10) — the analog of the Elixir
+Apache-2.0/BSD/MIT/ISC-compatible allowlist (ADR 0014 D8), enforcing
 the repository dependency-license check for the SDK tree. The ``cryptography`` Apache-2.0/BSD claim is
 verified by this gate, not by author assertion.
 

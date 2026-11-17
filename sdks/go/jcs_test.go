@@ -56,7 +56,7 @@ func TestJcsEncodeBasics(t *testing.T) {
 // jcs-encode-float-* on the reachable e<-6 side). The e>=21 side is
 // unreachable from magnitude-bound-compliant floats (the largest allowed
 // float has decimal exponent ~15.95) — the branch exists because the spec
-// documents both thresholds, matching the reference.
+// documents both thresholds (spec/bap-v1.md §8, REQ1-JSON-jcs-exact).
 func TestJcsEncodeFloats(t *testing.T) {
 	cases := []struct {
 		in   float64

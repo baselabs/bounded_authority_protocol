@@ -554,12 +554,10 @@ func TestCertifiedRoleAttestationCorpusDrivesGoVerdicts(t *testing.T) {
 	}
 }
 
-// Cross-vendor review leg (2026-09-22, claude peer over 639d74e..e5cd033): the attestor
-// context's window endpoints are magnitude-bounded caller input — the same
-// HistoricalPublicKey gates the Elixir reference (ContextValidation.historical_key) and the
-// Rust leg apply. A context with ValidFrom below or ValidBefore above the integer magnitude
-// ceiling must fail closed here too: containment alone is trivially satisfied by those
-// windows, so nothing downstream rejects them.
+// Historical key-window endpoints are magnitude-bounded caller input
+// (spec/bap-role-attestation-v1.md §3, REQ-RA1-VERIFY-caller-supplied;
+// spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only). Containment alone would
+// accept an out-of-magnitude window.
 func TestRoleAttestationAttestorWindowMagnitude(t *testing.T) {
 	t.Parallel()
 	attestorPublic, attestorPrivate, err := ed25519.GenerateKey(rand.Reader)

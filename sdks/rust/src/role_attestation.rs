@@ -35,8 +35,9 @@
 //! contract), ADR 0036, and the certified corpus under
 //! `priv/conformance/attestation-profiles/role-attestation/v1/` (the corpus is
 //! the falsifier; the payload member order below is derived by
-//! base64url-decoding the corpus `payload_segment` first-hand) — NOT from any
-//! Elixir or sibling-SDK source (ADR 0014 D5). The shared BAP1 validation
+//! base64url-decoding the corpus `payload_segment` first-hand).
+//! Derived from the spec and certified corpus, not from any sibling-SDK or
+//! reference source (ADR 0014 D5). The shared BAP1 validation
 //! helpers mirror the v1 façade's own private set (each façade carries its
 //! copy — the v2/v3 precedent).
 
@@ -220,8 +221,7 @@ pub fn decode_attestation(compact: &[u8], bounds: &Bounds) -> Result<Attestation
 }
 
 // ============================================================================
-// verify_attestation — attestation verification (§4 surface 4, the citation
-// symbol `RoleAttestation.V1.verify_attestation/2`)
+// verify_attestation: spec/bap-role-attestation-v1.md §4, REQ-RA1-API-complete.
 // ============================================================================
 
 /// Verify a role-attestation compact against caller-supplied trusted inputs
@@ -780,9 +780,8 @@ fn validate_authority_port(value: &str) -> Result<()> {
     let after_scheme_host = match after_scheme.strip_prefix("//") {
         Some(rest) => rest,
         None => {
-            // `URI.new/1` rejects square brackets outside an authority's
-            // IP-literal host; every other opaque/path-rootless shape has no
-            // host or port structure to validate here.
+            // Raw square brackets belong only to an IP-literal authority host
+            // (RFC 3986 §§3.2.2-3.3).
             if after_scheme.contains(['[', ']']) {
                 return Err(Invalid);
             }

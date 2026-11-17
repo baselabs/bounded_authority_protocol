@@ -359,11 +359,10 @@ func KeyTransitionSigningInput(t KeyTransition, bounds *Bounds) (si SigningInput
 	return SigningInput{Kind: KindKeyTransition, Protected: protected, Payload: payload}, nil
 }
 
-// AssembleCompact assembles a compact JWS from a signing input and a 64-byte
-// signature, threading the caller's tightening-only bounds through the
-// reference's assemble gates: encoded-segment bounds on both segments, the
-// compact-bytes ceiling on the assembled output, and the kind-specific
-// re-parse (ADR 0018 decision 4). A nil bounds is the profile maximum.
+// AssembleCompact assembles JWS from signing input and an external 64-byte
+// signature. Revalidate kind, segment limits, and compact size under caller bounds
+// (spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate, REQ1-BOUNDS-tighten-only).
+// Nil bounds use the profile maxima.
 func AssembleCompact(si SigningInput, signature []byte, bounds *Bounds) (compact string, err error) {
 	return assembleCompactFor(si, signature, bounds, proofProfileStandard)
 }

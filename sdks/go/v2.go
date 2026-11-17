@@ -1166,12 +1166,9 @@ func (Profile) AssembleCompact(si SigningInput, signature []byte, bounds *Bounds
 	return compact, nil
 }
 
-// reparseAnchorPayload runs the full closed anchor-claims decode on an
-// assembled payload — assembly must reject a well-formed signing input whose
-// payload members violate this major's profile, not merely decode as JSON.
-// It mirrors BoundaryAnchorCodec.parse: the closed member set, the genesis
-// rule (sequence 0 carries the all-zero chain hash), and the canonical-payload
-// check (the received segment is the JCS re-encoding of the decoded value).
+// reparseAnchorPayload enforces the closed canonical anchor payload and the
+// sequence-zero/all-zero-hash rule (spec/bap-v1.md §15, Boundary anchors;
+// §16, REQ1-VERIFY-revalidate, incorporated by this major's §2 substitutions).
 func (Profile) reparseAnchorPayload(p compactParts, b Bounds) error {
 	payload, err := JsonDecode(p.Payload, &b)
 	if err != nil {

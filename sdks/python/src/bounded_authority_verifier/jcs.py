@@ -9,8 +9,8 @@ thresholds, lowercase ``e``).
 Number formatting (RFC 8785 §3.2.2): the shortest representation. Python's ``repr(float)`` produces
 the shortest round-tripping decimal (PEP 3101 / ``repr`` semantics match the ECMAScript shortest
 algorithm for binary64); integers emit as bare integers. The tagged algebra's int/float distinction
-is preserved at the TAG layer — the serialization is byte-identical for equal numeric value, matching
-the Elixir JCS.
+is preserved at the TAG layer; equal numeric values serialize identically
+(spec/bap-v1.md §8, REQ1-JSON-jcs-exact).
 """
 
 from __future__ import annotations
@@ -46,7 +46,8 @@ _SHORT_ESCAPES: dict[int, bytes] = {
 
 def jcs_encode(value: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
     # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits past
-    # MAXIMA, bypassing bounds_new). Mirrors the reference's Bounds.coerce.
+    # MAXIMA, bypassing bounds_new). Revalidate caller bounds
+    # (spec/bap-v1.md §16, REQ1-VERIFY-revalidate).
     try:
         value = _normalize_tagged(value, bounds)
         b = _unwrap(coerce_bounds(bounds))
@@ -63,12 +64,12 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int)
     """Emit one tagged value as RFC 8785 bytes, enforcing every per-node resource bound DURING
     encode (spec/bap-v1.md §8). Returns the updated node count.
 
-    Per-node invariants (the reference enforces these at encode, not just on the final byte total):
+    Per-node invariants apply during emission (spec/bap-v1.md §17, REQ1-BOUNDS-ordering):
       scalars (null/bool/int/float/string): level <= depth (NOT <); int/float magnitude;
-        string byte_size <= string_bytes; one node each.
+        string byte length <= string_bytes; one node each.
       array: level < depth (children sit at level+1); length <= array_items; one node for the
         container, then each child.
-      object: level < depth; length <= object_members; each key byte_size <= key_bytes; one node for
+      object: level < depth; length <= object_members; each key byte length <= key_bytes; one node for
         the container, then each child.
       total_nodes: incremented at every node, checked <= bounds.total_nodes.
     """

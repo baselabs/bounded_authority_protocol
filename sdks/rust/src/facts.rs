@@ -14,7 +14,7 @@
 //!
 //! # Redaction contract (load-bearing)
 //!
-//! Every facts struct implements the fixed full Elixir module rendering, for example
+//! Every facts struct implements the specified diagnostic rendering (ADR 0014 D3), for example
 //! `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`, including alternate, width,
 //! and precision formatting. Only the contract-major selects the constant text.
 //! Facts derive [`Clone`] and [`PartialEq`], but never `serde::Serialize`,

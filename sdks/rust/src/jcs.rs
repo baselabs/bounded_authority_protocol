@@ -5,8 +5,9 @@
 //! the v1 profile is computed over JCS bytes, so a single byte of divergence
 //! here silently breaks (or silently accepts) a credential. The encoder is
 //! derived first-hand from RFC 8785 (§3.2.2.2 strings, §3.2.2.3 numbers) +
-//! ECMA-262 §6.1.6.1.20 `Number::toString` + `spec/bap-v1.md` § JCS, NOT
-//! from any sibling-SDK or Elixir source (ADR 0014 D5).
+//! ECMA-262 §6.1.6.1.20 `Number::toString` + `spec/bap-v1.md` § JCS, the normative sources.
+//! Derived from the spec and certified corpus, not from any sibling-SDK or
+//! reference source (ADR 0014 D5).
 //!
 //! Rules enforced:
 //! - **Strings** (`REQ1-JSON-jcs-exact`, RFC 8785 §3.2.2.2): the escape
@@ -21,8 +22,7 @@
 //! - **Numbers — integers**: plain decimal text, no exponent.
 //! - **Numbers — floats** (RFC 8785 §3.2.2.3, delegated to ECMA-262
 //!   `Number::toString`): shortest round-trip text via `ryu-js` (the
-//!   ECMAScript-flavored Ryu that RFC 8785 §3.2.2.3 names as a reference
-//!   implementation). `-0.0` serializes as `0` (the sign of zero is dropped);
+//!   ECMAScript-flavored Ryu that RFC 8785 §3.2.2.3 names for number serialization). `-0.0` serializes as `0` (the sign of zero is dropped);
 //!   the `e < -6` → scientific / `e >= 21` → scientific / otherwise fixed
 //!   thresholds are ryu-js's own.
 //! - **Non-finite floats** (RFC 8785 §3.2.2.3 + AGENTS rule 3): `NaN`, `+Inf`,
@@ -120,10 +120,8 @@ fn encode_value(
             encode_float(*f, out)?;
         }
         JsonValue::String(s) => {
-            // byte_size bound (spec/bap-v1.md §8). A Rust
-            // `String` is valid
-            // UTF-8 by construction, so the reference's String.valid? check is
-            // structurally guaranteed here.
+            // Rust strings satisfy the UTF-8 requirement by construction
+            // (spec/bap-v1.md §7, REQ1-JSON-no-normalization).
             if s.len() as u64 > bounds.string_bytes() {
                 return Err(Invalid);
             }
@@ -133,8 +131,8 @@ fn encode_value(
             if depth > bounds.depth() {
                 return Err(Invalid);
             }
-            // item-count bound (spec/bap-v1.md §8
-            // length_bounded?).
+            // Enforce array item ceilings before recursing
+            // (spec/bap-v1.md §17, REQ1-BOUNDS-ordering).
             if items.len() as u64 > bounds.array_items() {
                 return Err(Invalid);
             }
@@ -155,16 +153,9 @@ fn encode_value(
             if members.len() as u64 > bounds.object_members() {
                 return Err(Invalid);
             }
-            // Per-member key-width bound (spec/bap-v1.md §8 JSON decoding and canonical
-            // serialization) AND duplicate-key
-            // rejection (spec/bap-v1.md §8): a hand-built
-            // Object can carry
-            // duplicate names (the Vec carrier allows it); the reference rejects
-            // any object whose member-name set is smaller than its length.
-            // BTreeSet (deterministic): a std hash-set's RandomState reads OS
-            // entropy to seed its hasher — a randomness boundary the lib path
-            // forbids and the reference (Elixir MapSet) does not have. BTreeSet
-            // has none, with the same insert-returns-bool semantics.
+            // Check member-name byte ceilings and reject duplicates, including in hand-built
+            // objects (spec/bap-v1.md §§7,17, REQ1-JSON-no-duplicate, REQ1-BOUNDS-ordering).
+            // BTreeSet has deterministic insertion and does not read entropy.
             let mut seen = std::collections::BTreeSet::new();
             for (k, _) in members {
                 if k.len() as u64 > bounds.key_bytes() || !seen.insert(k.as_str()) {

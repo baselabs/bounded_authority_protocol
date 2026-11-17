@@ -561,9 +561,8 @@ func normalizeIPv6(lit string) (string, error) {
 		}
 	}
 	normalizeGroup := func(g string) string {
-		// downcase-only: the reference's normal form preserves per-group digit
-		// width (no leading-zero stripping), so `2001:0db8::1` is its own
-		// normal form
+		// Lowercase the IPv6 spelling while preserving per-group digit widths
+		// (spec/bap-v1.md §13, REQ1-URI-pre-normalized).
 		return lowerHexStr(g)
 	}
 	var out strings.Builder
@@ -582,10 +581,9 @@ func normalizeIPv6(lit string) (string, error) {
 		}
 		out.WriteString(normalizeGroup(g))
 	}
-	// an embedded IPv4 tail renders in its original dotted form (the
-	// reference normal form preserves it) while counting as two groups: cut
-	// back to the SECOND-to-last colon (the two expanded hextet entries) and
-	// append the original dotted text
+	// An embedded IPv4 tail retains its dotted spelling and occupies the final
+	// 32 bits (RFC 3986 §3.2.2; spec/bap-v1.md §13). Replace the final two
+	// expanded hextets with the original dotted text.
 	if headIPv4 != "" && !hasElision {
 		if s, ok := replaceLastTwoGroups(out.String(), headIPv4); ok {
 			out.Reset()

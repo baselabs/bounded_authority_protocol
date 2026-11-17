@@ -119,13 +119,10 @@ func validateSelector(v Value, bounds *Bounds) error {
 	return nil
 }
 
-// Erratum 6, the selector float-zero soundness repair (spec/bap-v1.md § 7 and § 12, bap-v2.md
-// and bap-v3.md § 4). RFC 8785 writes a float-tagged zero as "0", which decodes integer-tagged,
-// so a grant whose equals/one_of operand holds one cannot survive a canonical round trip with its
-// tag intact. Verification rejects it; producers refuse every float-tagged integral operand,
-// whose JCS bytes would likewise change its tag. Both rules are keyed on the decoded value,
-// never the lexeme. The Elixir reference is V1.Selector.float_zero_free?/1 and
-// integral_float_free?/1.
+// Reject decoded float zero at any depth in equals and one_of values, and
+// refuse integral float selector values at production (spec/bap-v1.md §12,
+// REQ1-SELECTOR-float-zero, REQ1-SIGNING-integral-float-selector).
+// The checks use the decoded value rather than its lexeme.
 
 // selectorFloatZeroFree is the verification rule (contract-majors 1, 2 and 3): no equals value
 // or one_of member holds a float-tagged zero, of either sign, at any depth. Range bounds compare

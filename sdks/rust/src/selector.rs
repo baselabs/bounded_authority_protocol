@@ -25,8 +25,8 @@
 //! objects as unordered key/value sets. No selector grants business
 //! authorization (`REQ1-SELECTOR-not-authorization`).
 //!
-//! Derived first-hand from `spec/bap-v1.md` § Selector algebra — NOT from
-//! any sibling-SDK or Elixir source (ADR 0014 D5).
+//! Derived from the spec and certified corpus, not from any sibling-SDK or
+//! reference source (ADR 0014 D5). See spec/bap-v1.md §12.
 
 // `evaluate` / `semantic_identity` are `pub(crate)` and are wired by the v1
 // façade: `evaluate` is called by `check_envelope` (Task 12) for every selector
@@ -452,9 +452,8 @@ fn traverse<'a>(root: &'a JsonValue, path: &[String]) -> Result<&'a JsonValue> {
 /// duplicate-free, but a hand-built one (a direct caller's `cast_arguments`)
 /// may not be, and find-first-match equality on a dup-bearing object is unsound.
 fn unique_keys(members: &[(String, JsonValue)]) -> bool {
-    // BTreeSet (deterministic): a std hash-set's RandomState reads OS entropy
-    // (a randomness boundary the lib path forbids; the reference's MapSet has
-    // none). BTreeSet has none, with the same insert-returns-bool semantics.
+    // BTreeSet avoids entropy reads while checking duplicate names
+    // (spec/bap-v1.md §7, REQ1-JSON-no-duplicate; ADR 0014 D8).
     let mut seen = std::collections::BTreeSet::new();
     members.iter().all(|(k, _)| seen.insert(k.as_str()))
 }
@@ -472,11 +471,9 @@ pub(crate) fn semantic_identity(a: &JsonValue, b: &JsonValue) -> bool {
             x.len() == y.len() && x.iter().zip(y).all(|(xi, yi)| semantic_identity(xi, yi))
         }
         (JsonValue::Object(x), JsonValue::Object(y)) => {
-            // Unordered key/value sets. Both MUST be duplicate-free (reference
-            // spec/bap-v1.md §12 unique_object?): a hand-built Object CAN carry
-            // duplicate names (the Vec carrier allows it), and find-first-match
-            // equality on a dup-bearing object is unsound — {a:1,a:1} would
-            // otherwise equal {a:1,b:2}. Reject any dup-bearing object outright.
+            // Unordered key/value identity requires duplicate-free objects
+            // (spec/bap-v1.md §12, REQ1-SELECTOR-semantic-identity). Rejecting duplicates
+            // avoids unsound find-first-match comparisons on hand-built objects.
             if !unique_keys(x) || !unique_keys(y) {
                 return false;
             }
@@ -931,12 +928,9 @@ mod tests {
 
     #[test]
     fn dup_bearing_objects_are_not_semantically_equal() {
-        // The bypass the unique_keys check defeats (spec/bap-v1.md §12
-        // unique_object?): WITHOUT it, find-first-match equality makes
-        // {a:1,a:1} (dup, len 2) wrongly equal {a:1,b:2} (len 2) — both x-keys
-        // ("a","a") find a match in y. unique_keys rejects the dup-bearing
-        // object outright (RED-capable: removing the unique_keys guard makes
-        // the first assertion fail).
+        // Duplicate-free unordered object identity is required
+        // (spec/bap-v1.md §12, REQ1-SELECTOR-semantic-identity). Removing the
+        // unique_keys check makes the duplicate-object equality assertion red.
         let dup_x = JsonValue::Object(vec![
             ("a".to_string(), JsonValue::Int(1)),
             ("a".to_string(), JsonValue::Int(1)),

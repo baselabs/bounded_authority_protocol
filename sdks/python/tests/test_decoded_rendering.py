@@ -1,4 +1,4 @@
-"""Decoded diagnostics retain the reference notation without exporting redacted members."""
+"""Decoded diagnostics retain the specified diagnostic rendering (ADR 0014 D3) without exporting redacted members."""
 import copy
 import pickle
 from dataclasses import asdict, fields

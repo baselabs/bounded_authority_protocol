@@ -32,7 +32,8 @@ def _parse_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> CompactSegme
     """Parse + bound a compact input into 3 segments. Validates the segment count, bounds, canonical
     base64url of each segment, and decodes protected + payload (signature kept raw after decode)."""
     # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits past
-    # MAXIMA, bypassing bounds_new). Mirrors the reference's Bounds.coerce on every entry point.
+    # MAXIMA, bypassing bounds_new). Revalidate at each public boundary
+    # (spec/bap-v1.md §16, REQ1-VERIFY-revalidate).
     b = _unwrap(coerce_bounds(bounds))
     if len(data) > _unwrap(bounds_resolve(b, "compact_bytes")):
         _fail("compact: byte bound")
@@ -149,10 +150,10 @@ def assemble_segments(signing_input: SigningInput, signature: bytes) -> Result[b
 
 
 def assemble_segments_es256(signing_input: SigningInput, signature: bytes) -> Result[bytes]:
-    """The ES256 counterpart of ``assemble_segments`` (mirrors the reference's separate
-    V3.CompactJws assembler: the standard kind closed set + 64-byte width, then the same byte
-    assembly). The canonical-signature gate is the v3 façade's, as it is the reference
-    runtime's: a raw r || s is big-endian and low-S, never little-endian R || S.
+    """The ES256 counterpart of ``assemble_segments``: a closed kind set, 64-byte width,
+    and compact assembly (spec/bap-v3.md §3.2, REQ3-SIGNING-raw-rs).
+    The v3 facade applies REQ3-SIGNING-producer-canonical before composition.
+    Raw r || s is big-endian and low-S.
 
     REQ1-VERIFY-no-signer-callback: takes a signature, never a key.
     """

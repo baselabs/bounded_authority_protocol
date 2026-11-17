@@ -89,7 +89,7 @@ def _invalid_error(message: str = "invalid") -> InvalidError:
 
 
 def _require(condition: object, message: str = "requirement failed") -> None:
-    """The precondition helper (mirrors the TS ``assert``). Raise InvalidError when false.
+    """Raise the closed InvalidError when a precondition fails (spec/bap-v1.md §16).
 
     Named ``require`` rather than ``assert`` so it does not shadow the Python keyword.
     """

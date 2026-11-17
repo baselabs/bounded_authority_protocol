@@ -1,4 +1,4 @@
-"""Exact reference rendering and refusal of generic facts enumeration."""
+"""Specified diagnostic rendering (ADR 0014 D3) and refusal of generic facts enumeration."""
 
 import copy
 import inspect

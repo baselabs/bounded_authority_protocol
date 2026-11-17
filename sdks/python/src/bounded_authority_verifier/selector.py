@@ -149,8 +149,8 @@ def _float_zero_free(value: Tagged) -> bool:
     """Erratum 6, verification (REQ1/REQ2/REQ3-SELECTOR-float-zero): an ``equals`` value or
     ``one_of`` member is admissible only when it holds no float-tagged zero at any depth. Keyed
     on the decoded value, so every spelling of zero (``0.0``, ``-0e0``, ``1e-400``, ...) is
-    covered. Range bounds and inert ``all`` members are not checked. Mirrors the Elixir
-    reference ``Selector._float_zero_free?/1``."""
+    covered. Range bounds and inert ``all`` members are not checked
+    (spec/bap-v1.md §12, REQ1-SELECTOR-float-zero)."""
     return _no_float_where(value, lambda x: x == 0.0)
 
 
@@ -158,7 +158,8 @@ def _integral_float_free(value: Tagged) -> bool:
     """Erratum 6, producers (REQ1/REQ2/REQ3-SIGNING-integral-float-selector): RFC 8785 writes an
     integral float as integer text, which decodes integer-tagged, so a producer refuses any
     float-tagged integral selector value (``0.0``, ``-0.0``, ``10.0``) rather than sign a value
-    whose tag the wire changes. Mirrors the Elixir reference ``Selector._integral_float_free?/1``."""
+    whose tag the wire changes (spec/bap-v1.md §12,
+    REQ1-SIGNING-integral-float-selector)."""
     return _no_float_where(value, float.is_integer)
 
 

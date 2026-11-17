@@ -63,7 +63,7 @@ def _with_s(signature: bytes, s: int) -> bytes:
     return signature[:32] + s.to_bytes(32, "little")
 
 
-# --- the reference itself is anchored to the backend, so the derived sets mean something ---
+# --- The independent arithmetic oracle agrees with the backend (spec/bap-v1.md §14.1) ---
 
 
 def test_reference_derives_eight_distinct_points_and_agrees_with_the_backend() -> None:

@@ -38,7 +38,14 @@ defmodule BoundedAuthorityProtocol.SdkRenderingFixturesTest do
   end
 
   test "wire fixtures match reference decoding and inspection for every row" do
-    for row <- fixture!("decoded-wire-rendering.json") do
+    rows = fixture!("decoded-wire-rendering.json")
+    expected_pairs = for {version, _} <- @majors, kind <- ~w(grant proof), do: {version, kind}
+    actual_pairs = Enum.map(rows, &{&1["major"], &1["kind"]})
+
+    assert MapSet.new(actual_pairs) == MapSet.new(expected_pairs),
+           "wire fixture must cover every major and kind"
+
+    for row <- rows do
       major = Map.fetch!(Map.new(@majors), row["major"])
 
       result =
@@ -53,12 +60,30 @@ defmodule BoundedAuthorityProtocol.SdkRenderingFixturesTest do
   end
 
   test "binary fixtures match reference inspection for every row" do
-    for row <- fixture!("decoded-binary-rendering.json") do
+    rows = fixture!("decoded-binary-rendering.json")
+    assert is_list(rows) and rows != [], "binary fixture must be non-empty"
+
+    for row <- rows do
       assert inspect(Base.decode16!(row["hex"], case: :mixed)) == row["expected"]
     end
   end
 
   test "every SDK carries byte-identical copies of every canonical fixture" do
+    assert Enum.sort(File.ls!(@canonical)) == Enum.sort(@names),
+           "canonical directory must contain exactly the three fixture names"
+
+    for directory <- @copies do
+      names =
+        @root
+        |> Path.join(directory)
+        |> Path.join("decoded-*rendering*.json")
+        |> Path.wildcard()
+        |> Enum.map(&Path.basename/1)
+
+      assert Enum.sort(names) == Enum.sort(@names),
+             "#{directory} must contain exactly the three rendering fixture names"
+    end
+
     for name <- @names do
       refute File.exists?(Path.join([@root, "sdks", name]))
     end

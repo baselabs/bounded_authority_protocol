@@ -36,7 +36,7 @@ from a checkout of this repository.
   formatting packages). `tools/license_check.sh` asserts the module graph stays empty.
 - **64-bit platforms only**: the bounds hold 9,007,199,254,740,991 in an `int`.
 - **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
-  conforming signer emits, with the same clauses as the Elixir reference, and the certified
+  conforming signer emits under spec/bap-v1.md §16 and spec/bap-v3.md §3.2. The certified
   `bap-producer-canonicality/1` corpus (75 cases) runs with this SDK's conformance suite.
 - **Erratum 6 (selector float-zero) is implemented.** Grant decode for contract-majors 1, 2,
   and 3 rejects an `equals` value or `one_of` member holding a float-tagged zero at any depth
@@ -218,7 +218,7 @@ digests, times, and counts, never raw signatures, keys, nonces, or arguments. `G
 `EnvelopeFacts`, and `AnchoredExportFacts` carry `Authorization() == AuthorizationNotEvaluated`; the
 chain, anchor, transition, export, attestation, and content-assertion facts carry
 `Trust() == TrustNotEvaluated`. There is no `Authorized` or decision field. The facts types implement `String`, `GoString`, and
-`Format`: values and pointers match the full Elixir rendering (for example,
+`Format`: values and pointers match the specified diagnostic rendering (for example,
 `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`), including `%v`, `%+v`, and `%#v`.
 Contract-majors retain their `V1`, `V2`, or `V3` namespace; sibling facts use
 `RoleAttestation.V1` and `ContentAssertion.V1`. `MarshalJSON`, `MarshalText`, and `GobEncode`
@@ -232,7 +232,7 @@ sees only the private closure, never the stored values. It may print pointer or 
 metadata instead of the fixed rendering. Facts are no longer comparable with `==`;
 compare the named values that matter to the caller.
 
-**Decoded diagnostics.** Grants and role attestations use the Elixir structural inspection
+**Decoded diagnostics.** Grants and role attestations use the specified inspection
 notation. Proofs expose named accessors and redact their nonce; content assertions expose
 named accessors and render fully redacted. Both refuse JSON, text, and gob encoding.
 Decoded proofs now include `GrantHash()`, `RequestHash()`, `HolderPublicKey()`, and

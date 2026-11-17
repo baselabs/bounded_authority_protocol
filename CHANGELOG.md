@@ -59,6 +59,11 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- SDK derivation guards also reject implementation-symbol citations, struct patterns outside
+  exact rendering fixtures, and reference-authority phrases. The same rules cover top-level
+  SDK documentation, with consistent generated-directory exclusions. Rendering fixture gates
+  require every major and kind, nonempty binary rows, and exact fixture inventories.
+
 - SDK rendering fixtures live inside each SDK, with canonical bytes and Elixir inspection
   provenance enforced by repository tests. SDK purity checks reject reference source citations
   throughout source, tests, tools, and documentation.

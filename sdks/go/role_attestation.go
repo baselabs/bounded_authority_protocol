@@ -535,10 +535,10 @@ func VerifyAttestation(compact string, expected ExpectedAttestation) (f Attestat
 	if expected.Now > int64(b.IntegerMagnitude) || expected.Now < -int64(b.IntegerMagnitude) {
 		return AttestationFacts{}, ErrInvalid
 	}
-	// Attestor-window endpoints are magnitude-bounded caller input — the same
-	// HistoricalPublicKey gates the Elixir reference and the Rust leg apply.
-	// Containment alone is trivially satisfied by an out-of-magnitude window,
-	// so nothing downstream rejects it (cross-vendor review 2026-09-22).
+	// Historical key-window endpoints are magnitude-bounded caller input
+	// (spec/bap-role-attestation-v1.md §3, REQ-RA1-VERIFY-caller-supplied;
+	// spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only). Containment alone would
+	// accept an out-of-magnitude window.
 	if expected.Attestor.ValidFrom > int64(b.IntegerMagnitude) || expected.Attestor.ValidFrom < -int64(b.IntegerMagnitude) {
 		return AttestationFacts{}, ErrInvalid
 	}

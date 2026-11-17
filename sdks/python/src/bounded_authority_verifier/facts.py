@@ -900,10 +900,9 @@ class KeyLocator:
 class AttestationDecoded:
     """Decode surface — structural role-attestation facts (verification=not_evaluated).
 
-    ``public_key`` is the raw 32-byte subject public key exactly as it rides the payload claim —
-    the member shape the Elixir ``DecodedAttestation``, Go ``AttestationDecoded``, and Rust
-    ``AttestationDecoded`` decode surfaces all carry (cross-vendor review 2026-09-22 alignment;
-    derived digests belong to the facts surface, not decode).
+    ``public_key`` is the raw 32-byte subject public key as specified in
+    spec/bap-role-attestation-v1.md §2 (REQ-RA1-CLAIM-public-key).
+    Derived digests belong to the facts surface, not decode.
     """
 
     attestor_key_id: str

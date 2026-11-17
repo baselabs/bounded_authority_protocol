@@ -185,7 +185,7 @@ def _reset_census() -> None:
 def _import_public_key(raw_key: bytes, fingerprint: str) -> Ed25519PublicKey:
     """Import a raw 32-byte Ed25519 public key, recording the fingerprint for the census.
 
-    Throws InvalidError on a malformed key. Mirrors the TS ``createPublicKey`` boundary.
+    Reject malformed keys under spec/bap-v1.md §14, REQ1-KEY-ed25519-acceptable.
     """
     _require(len(raw_key) == 32, "ed25519: public key must be 32 bytes")
     _require(acceptable_public_key(raw_key), "ed25519: public key not acceptable")
