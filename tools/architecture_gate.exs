@@ -733,6 +733,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   # Exported but outside the stable surface: internal modules a caller can still reach, and
   # undocumented helpers inside stable modules.
   @excluded_surface ~w(
+    BoundedAuthorityProtocol.DiagnosticRendering
     BoundedAuthorityProtocol.V1.Runtime
     BoundedAuthorityProtocol.V2.Runtime
     BoundedAuthorityProtocol.V3.Runtime
@@ -996,7 +997,17 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "lib/bounded_authority_protocol/v3/proof.ex"
   ]
 
-  @inspect_source_paths @fact_source_paths ++ @redacted_input_source_paths
+  @structural_inspect_source_paths [
+    "lib/bounded_authority_protocol/v1/decoded_grant.ex",
+    "lib/bounded_authority_protocol/v1/operation.ex",
+    "lib/bounded_authority_protocol/v2/decoded_grant.ex",
+    "lib/bounded_authority_protocol/v2/operation.ex",
+    "lib/bounded_authority_protocol/v3/decoded_grant.ex",
+    "lib/bounded_authority_protocol/v3/operation.ex",
+    "lib/bounded_authority_protocol/role_attestation/v1/decoded_attestation.ex"
+  ]
+  @inspect_source_paths @fact_source_paths ++
+                          @redacted_input_source_paths ++ @structural_inspect_source_paths
 
   @chain_codec_source_paths [
     "lib/bounded_authority_protocol/v1/anchored_export_codec.ex",
@@ -1150,16 +1161,19 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   end
 
   def check_compiled(root) do
+    build_root = System.get_env("MIX_BUILD_ROOT", "_build")
+
     root
     |> Path.expand()
-    |> Path.join("_build/*/lib/bounded_authority_protocol/ebin")
+    |> Path.join(build_root)
+    |> Path.join("*/lib/bounded_authority_protocol/ebin")
     |> Path.wildcard()
     |> case do
       [] ->
         [
           violation(
             :compiled_artifact,
-            "_build",
+            build_root,
             "compiled bounded_authority_protocol application is missing"
           )
         ]
@@ -2060,6 +2074,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp approved_source_modules(path) when path in @inspect_source_paths, do: ~w(Inspect)
 
+  defp approved_source_modules("lib/bounded_authority_protocol/diagnostic_rendering.ex"),
+    do: ~w(Atom Integer Map String Tuple)
+
   defp approved_source_modules(path) when path in @chain_codec_source_paths,
     do: ~w(Access Enum Map String StringOrUri URI)
 
@@ -2375,6 +2392,23 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_call?(path, "Inspect.Algebra", :string)
        when path in @inspect_source_paths,
        do: true
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/diagnostic_rendering.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {:binary, :bin_to_list},
+           {:erlang, :float_to_binary},
+           {:erlang, :iolist_to_binary},
+           {"Atom", :to_string},
+           {"Integer", :to_string},
+           {"Map", :fetch!},
+           {"String", :pad_leading},
+           {"Tuple", :to_list}
+         ]
 
   defp approved_source_call?(
          "lib/bounded_authority_protocol/role_attestation/v1/codec.ex",
@@ -2770,6 +2804,16 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
   defp approved_compiled_import?(beam, module, function) do
     {module, function} in case beam do
+      "Elixir.BoundedAuthorityProtocol.DiagnosticRendering.beam" ->
+        [
+          {:binary, :bin_to_list},
+          {:erlang, :atom_to_binary},
+          {:erlang, :float_to_binary},
+          {:erlang, :iolist_to_binary},
+          {:erlang, :tuple_to_list},
+          {String, :pad_leading}
+        ]
+
       "Elixir.BoundedAuthorityProtocol.V1.AnchoredExportCodec.beam" ->
         [
           {Access, :get},

@@ -282,7 +282,7 @@ pub struct GrantDecoded {
 /// `proof-decode/decode.json` `expected` pins only `proof_id`; the remaining
 /// fields are the decoded proof claims. `nonce` is surfaced as an `Option`
 /// because a proof MAY carry one (decode reflects what was decoded; the
-/// specified diagnostic rendering redacts the nonce, ADR 0014 D3).
+/// specified diagnostic rendering redacts the nonce, spec/diagnostic-rendering.md § Diagnostic rendering).
 #[derive(Clone, PartialEq)]
 pub struct ProofDecoded {
     /// Contract-major of the proof.

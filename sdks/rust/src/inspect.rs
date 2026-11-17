@@ -1,4 +1,4 @@
-//! Specified diagnostic rendering (ADR 0014 D3), including shared container and printable limits.
+//! Specified diagnostic rendering (spec/diagnostic-rendering.md § Diagnostic rendering), including shared container and printable limits.
 use crate::json::JsonValue;
 
 pub(crate) enum Term {

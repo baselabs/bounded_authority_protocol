@@ -5,6 +5,9 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
   @requirement_surfaces ~w(B64 BOUNDS CHAIN CLAIM CORE CORPUS DIGEST EVO EXPORT HEADER HOST JSON KEY LOCATOR SCHEMA SELECTOR SIGNING URI VERIFY)
   @wire_domains ~w(BAP1-CONTENT BAP1-ARCHIVE BAP1-CHAIN BAP1-GRANT BAP1-PROOF BAP1-REQUEST BAP2-ARCHIVE BAP2-CHAIN BAP2-REQUEST BAP3-ARCHIVE BAP3-CHAIN BAP3-REQUEST)
   @external_v1_paths MapSet.new([
+                       # Shared rendering covers every accepted contract-major.
+                       "lib/bounded_authority_protocol/diagnostic_rendering.ex",
+                       "test/bounded_authority_protocol/diagnostic_rendering_test.exs",
                        "lib/bounded_authority_protocol/conformance/corpus.ex",
                        "lib/bounded_authority_protocol/conformance/report.ex",
                        "lib/bounded_authority_protocol/conformance/runner.ex",
@@ -200,7 +203,13 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
     {output, 0} =
       System.cmd("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"])
 
-    String.split(output, <<0>>, trim: true)
+    # The index still names unstaged deletions, including the old half of a rename.
+    {deleted, 0} = System.cmd("git", ["ls-files", "-z", "--deleted"])
+    deleted = MapSet.new(String.split(deleted, <<0>>, trim: true))
+
+    output
+    |> String.split(<<0>>, trim: true)
+    |> Enum.reject(&MapSet.member?(deleted, &1))
   end
 
   defp under_root?(path, root), do: path == root or String.starts_with?(path, root <> "/")

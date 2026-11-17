@@ -159,6 +159,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       source_url: @source_url,
       # The API stability page names the excluded internals; they are hidden, so never link them.
       skip_code_autolink_to: [
+        "BoundedAuthorityProtocol.DiagnosticRendering",
         "BoundedAuthorityProtocol.V1.Runtime",
         "BoundedAuthorityProtocol.V2.Runtime",
         "BoundedAuthorityProtocol.V3.Runtime",
@@ -209,6 +210,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "spec/bap-local-loopback-http-v1.md",
         "spec/bap-role-attestation-v1.md",
         "spec/bap-content-assertion-v1.md",
+        "spec/diagnostic-rendering.md",
         "docs/design/conformance-contract.md",
         "docs/design/requirement-map.md",
         "docs/design/local-loopback-http-requirement-map.md",

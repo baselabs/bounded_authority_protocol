@@ -163,6 +163,7 @@ change in any release:
 
 - `BoundedAuthorityProtocol.V1.Runtime`, `BoundedAuthorityProtocol.V2.Runtime`,
   `BoundedAuthorityProtocol.V3.Runtime`, and every other `Runtime` module;
+- `BoundedAuthorityProtocol.DiagnosticRendering`, the internal diagnostic formatter;
 - `BoundedAuthorityProtocol.Conformance.Corpus`, `BoundedAuthorityProtocol.Conformance.Runner`,
   and `BoundedAuthorityProtocol.Conformance.Report`, the CLI's internals;
 - `BoundedAuthorityProtocol.Conformance.Cli.Main`, the escript entry point;
@@ -178,9 +179,11 @@ change in any release:
     `BoundedAuthorityProtocol.V3.Selector.match_all/3`, `BoundedAuthorityProtocol.V3.Selector.semantic_equal?/2`;
 - every function or module marked `@doc false` or `@moduledoc false`.
 
-Also not covered: the text of `inspect/2` output (it redacts credentials, arguments, and nonces,
-and its exact form may change), the order of keys in maps you did not build, and the wording of
-any message the CLI writes to standard error.
+Decoded diagnostics and fully redacted facts follow the
+[diagnostic rendering contract](../../spec/diagnostic-rendering.md), including fixed limits and
+nonce redaction on every supported Elixir version. Other `inspect/2` output may change while
+preserving redaction. The order of keys in maps you did not build and the wording of any message
+the CLI writes to standard error are also not covered.
 
 ## What never changes
 

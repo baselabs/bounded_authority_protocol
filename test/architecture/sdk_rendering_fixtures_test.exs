@@ -25,7 +25,9 @@ defmodule BoundedAuthorityProtocol.SdkRenderingFixturesTest do
             {"proof", proof(major, version)}
           ],
           into: %{} do
-        {kind <> Integer.to_string(version), inspect(value)}
+        rendered = inspect(value)
+        assert inspect(value, limit: 5, printable_limit: 0) == rendered
+        {kind <> Integer.to_string(version), rendered}
       end
 
     actual =
@@ -35,6 +37,8 @@ defmodule BoundedAuthorityProtocol.SdkRenderingFixturesTest do
       })
 
     assert actual == expected
+    assert inspect(attestation(), limit: 0) == expected["attestation"]
+    assert inspect(content(), limit: 0) == expected["content"]
   end
 
   test "wire fixtures match reference decoding and inspection for every row" do
@@ -56,6 +60,10 @@ defmodule BoundedAuthorityProtocol.SdkRenderingFixturesTest do
 
       assert {:ok, decoded} = result
       assert inspect(decoded) == row["expected"]
+      assert inspect(decoded, limit: 5) == row["expected"]
+
+      assert inspect(decoded, limit: 0, printable_limit: 0, width: 1, pretty: true) ==
+               row["expected"]
     end
   end
 
@@ -64,7 +72,8 @@ defmodule BoundedAuthorityProtocol.SdkRenderingFixturesTest do
     assert is_list(rows) and rows != [], "binary fixture must be non-empty"
 
     for row <- rows do
-      assert inspect(Base.decode16!(row["hex"], case: :mixed)) == row["expected"]
+      binary = Base.decode16!(row["hex"], case: :mixed)
+      assert BoundedAuthorityProtocol.DiagnosticRendering.render(binary) == row["expected"]
     end
   end
 

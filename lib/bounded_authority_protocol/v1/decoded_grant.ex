@@ -59,3 +59,8 @@ defmodule BoundedAuthorityProtocol.V1.DecodedGrant do
           verification: :not_evaluated
         }
 end
+
+defimpl Inspect, for: BoundedAuthorityProtocol.V1.DecodedGrant do
+  def inspect(value, _options),
+    do: Inspect.Algebra.string(BoundedAuthorityProtocol.DiagnosticRendering.render(value))
+end

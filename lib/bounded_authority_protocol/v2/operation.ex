@@ -19,3 +19,8 @@ defmodule BoundedAuthorityProtocol.V2.Operation do
   @typedoc "One named operation and its selectors."
   @type t :: %__MODULE__{name: binary(), selectors: [Selector.t()]}
 end
+
+defimpl Inspect, for: BoundedAuthorityProtocol.V2.Operation do
+  def inspect(value, _options),
+    do: Inspect.Algebra.string(BoundedAuthorityProtocol.DiagnosticRendering.render(value))
+end

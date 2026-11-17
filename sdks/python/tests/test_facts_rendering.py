@@ -1,4 +1,4 @@
-"""Specified diagnostic rendering (ADR 0014 D3) and refusal of generic facts enumeration."""
+"""Specified diagnostic rendering (spec/diagnostic-rendering.md § Diagnostic rendering) and refusal of generic facts enumeration."""
 
 import copy
 import inspect

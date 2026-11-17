@@ -40,6 +40,8 @@ All four are pure verification libraries (no I/O, clock, randomness, or network 
 Their verification facades return facts or a single value-free rejection, never an authorization
 decision. Facts exclude raw credentials and secrets; field-redacted display is a separate
 requirement.
+Decoded diagnostics and redacted facts follow the
+[diagnostic rendering contract](../spec/diagnostic-rendering.md#diagnostic-rendering).
 Their behavior is defined by the specifications and the corpora; the in-repository SDKs' source
 comments cite the tracked normative specifications and independent conformance corpora.
 

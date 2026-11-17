@@ -14,6 +14,10 @@ Each released protocol major ships language-neutral JSON fixtures containing:
 Fixtures contain public keys only, no private key/seed, and no production values. Their schema and
 ordering are versioned with the protocol major.
 
+Decoded diagnostics and fully redacted facts follow the normative
+[diagnostic rendering contract](../../spec/diagnostic-rendering.md#diagnostic-rendering), with
+exact byte equality against the shared rendering fixtures on every supported toolchain.
+
 Every Draft 2020-12 schema validates against the canonical meta-schema with an independent
 validator. Schemas remain structural companions: JSON Schema string length counts code points,
 while annotated `x-bap-maximum-utf8-bytes` limits count bytes. Duplicate names, raw numeric

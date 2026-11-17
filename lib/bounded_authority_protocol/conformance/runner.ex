@@ -688,7 +688,11 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
   end
 
   defp successor_relation({:ok, previous}, {:ok, next}, predecessor, successor, limits) do
-    with {:ok, previous} <- override_facts(previous, Map.get(predecessor, "facts_overrides", %{})),
+    with {:ok, previous} <-
+           override_facts(
+             previous,
+             Map.get(predecessor, "facts_overrides", %{})
+           ),
          {:ok, next} <- override_facts(next, Map.get(successor, "facts_overrides", %{})) do
       {:ok,
        verdict_name(

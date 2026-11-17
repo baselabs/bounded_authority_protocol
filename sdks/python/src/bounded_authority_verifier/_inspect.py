@@ -1,4 +1,4 @@
-"""Specified diagnostic rendering (ADR 0014 D3), including shared container and printable limits."""
+"""Specified diagnostic rendering (spec/diagnostic-rendering.md § Diagnostic rendering), including shared container and printable limits."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -54,7 +54,7 @@ def _quoted(value: bytes) -> str | None:
     escapes = {"\a": r"\a", "\b": r"\b", "\t": r"\t", "\n": r"\n", "\v": r"\v", "\f": r"\f", "\r": r"\r", "\x1b": r"\e", '"': r'\"', "\\": r"\\"}
     invisible = {0xFEFF, 0x061C, 0x200E, 0x200F, 0x200C, 0x200D, 0x034F, 0x00A0, 0x200B, 0x2060, 0x2028, 0x2029, 0x205F, *range(0x2061, 0x2065), *range(0x202A, 0x202F), *range(0x2066, 0x206A), *range(0xFFF9, 0xFFFD), *range(0x2000, 0x200B)}
     # The specified diagnostic rendering counts interpolation as one printable-limit unit
-    # (ADR 0014 D3; decoded-binary-rendering.json).
+    # (spec/diagnostic-rendering.md § Diagnostic rendering; decoded-binary-rendering.json).
     pieces: list[str] = []
     i = 0
     for _ in range(4096):

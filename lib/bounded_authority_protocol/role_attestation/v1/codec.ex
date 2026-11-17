@@ -120,7 +120,11 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.Codec do
          :ok <- validate_subject(expected.subject_key_id, expected.subject_public_key, bounds),
          :ok <- validate_now(expected.now, bounds),
          {:ok, parsed} <- parse(compact, bounds),
-         {:ok, attestor_fingerprint} <- Jwk.public_key_thumbprint_raw(attestor.public_key, bounds),
+         {:ok, attestor_fingerprint} <-
+           Jwk.public_key_thumbprint_raw(
+             attestor.public_key,
+             bounds
+           ),
          {:ok, subject_fingerprint} <-
            Jwk.public_key_thumbprint_raw(expected.subject_public_key, bounds),
          true <- parsed.attestor_key_id == attestor.key_id,

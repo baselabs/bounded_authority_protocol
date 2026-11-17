@@ -10,9 +10,9 @@ latest results.
 
 Like this package, each is a pure verification library: no I/O, clock, randomness, or network,
 and no authorization decision. Verification returns facts or one value-free rejection. Facts
-exclude raw credentials and secrets; that is distinct from field-redacted display. Check the
-[SDK logging notes](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/README.md#known-gaps)
-for the current language-specific rendering limitations before logging facts.
+exclude raw credentials and secrets; that is distinct from field-redacted display. Decoded
+diagnostics and redacted facts use the exact
+[diagnostic rendering contract](../../spec/diagnostic-rendering.md).
 
 | Language | Package | Status | Runtime | Notes |
 |---|---|---|---|---|

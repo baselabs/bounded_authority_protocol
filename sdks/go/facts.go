@@ -8,7 +8,7 @@ import "fmt"
 // argument values, or selector values. They carry no JSON or generic
 // encoder and are not credentials (REQ1-VERIFY-facts-redacted,
 // REQ1-VERIFY-facts-not-credentials). String, GoString, and Format always
-// emit the specified diagnostic rendering (ADR 0014 D3), including flags and precision.
+// emit the specified diagnostic rendering (spec/diagnostic-rendering.md § Diagnostic rendering), including flags and precision.
 // JSON, text, and gob encoders return ErrInvalid without field values.
 
 // Authorization is the fixed non-authorizing marker on GrantFacts,

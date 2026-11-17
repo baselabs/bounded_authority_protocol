@@ -59,6 +59,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- Diagnostic rendering of decoded values is now identical on every supported Elixir version.
+
 - SDK derivation guards also reject implementation-symbol citations, struct patterns outside
   exact rendering fixtures, and reference-authority phrases. The same rules cover top-level
   SDK documentation, with consistent generated-directory exclusions. Rendering fixture gates

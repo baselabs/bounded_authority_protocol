@@ -43,3 +43,8 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation do
           verification: :not_evaluated
         }
 end
+
+defimpl Inspect, for: BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation do
+  def inspect(value, _options),
+    do: Inspect.Algebra.string(BoundedAuthorityProtocol.DiagnosticRendering.render(value))
+end
