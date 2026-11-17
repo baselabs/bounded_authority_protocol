@@ -4,9 +4,9 @@ Reading order for the published documentation set:
 
 1. [Getting started](getting-started.md): from zero to a verified request, then rejection
    handling, issuer-key rotation, and testing your integration.
-2. The Livebooks: the [protocol walkthrough](../livebooks/bap-walkthrough.livemd),
-   [service integration](../livebooks/service-integration.livemd), and
-   [chains and archives](../livebooks/chains-and-archives.livemd).
+2. The Livebooks: the [protocol walkthrough](../notebooks/bap-walkthrough.livemd),
+   [service integration](../notebooks/service-integration.livemd), and
+   [chains and archives](../notebooks/chains-and-archives.livemd).
 3. [Choosing a profile](choosing-a-profile.md): which contract-major or sibling profile to use.
 4. [Recipes](recipes.md): Plug and Phoenix integration, selectors per contract-major, ES256 keys
    in a KMS or HSM, issuer key rotation, nonce modes, and running every packaged corpus.

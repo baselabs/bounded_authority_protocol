@@ -4,7 +4,7 @@
 [![HexDocs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/bounded_authority_protocol)
 [![CI](https://github.com/baselabs/bounded_authority_protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/baselabs/bounded_authority_protocol/actions/workflows/ci.yml)
 [![License](https://img.shields.io/hexpm/l/bounded_authority_protocol.svg)](LICENSE)
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fmain%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd)
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fmain%2Fdocs%2Fnotebooks%2Fbap-walkthrough.livemd)
 
 The open wire profile, verifier, and conformance suite of the Bounded Authority Protocol: an
 issuer signs a **capability grant** that names exactly which operations a holder may invoke, with
@@ -164,9 +164,9 @@ TypeScript, Python, Rust, and Go verifiers pass the same corpora
 ## Documentation
 
 [Getting started](docs/guides/getting-started.md), the [cheatsheet](docs/guides/cheatsheet.cheatmd),
-and three Livebooks: the [walkthrough](docs/livebooks/bap-walkthrough.livemd),
-[service integration](docs/livebooks/service-integration.livemd), and
-[chains and archives](docs/livebooks/chains-and-archives.livemd). Then the guides:
+and three Livebooks: the [walkthrough](docs/notebooks/bap-walkthrough.livemd),
+[service integration](docs/notebooks/service-integration.livemd), and
+[chains and archives](docs/notebooks/chains-and-archives.livemd). Then the guides:
 [Recipes](docs/guides/recipes.md), [Evidence](docs/guides/evidence.md),
 [Troubleshooting](docs/guides/troubleshooting.md), [Upgrading](docs/guides/upgrading.md), the
 [glossary](docs/guides/glossary.md), the [FAQ](docs/guides/faq.md), the

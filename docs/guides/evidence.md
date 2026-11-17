@@ -104,7 +104,7 @@ key history (`HistoricalKeyChain`), and an `ExpectedAnchoredExport` built from t
 records. It checks every byte to the exact end of the object, the digest, the object version,
 the chain, every anchor, and every transition.
 
-The [chains and archives Livebook](../livebooks/chains-and-archives.livemd) builds all four
+The [chains and archives Livebook](../notebooks/chains-and-archives.livemd) builds all four
 formats end to end with ephemeral keys and shows the attacks each one refuses: a dropped,
 reordered, or edited row, a truncated head, an anchor outside its key's window, a transition
 signed by the wrong key, a trailing byte, another object version, and a missing key in the

@@ -305,27 +305,33 @@ never silently overstated as `populated`.
 
 ## Coverage summary
 
-- **93 requirement ids** total: 83 `REQ1-*` (spec/bap-v1.md) + 10 `REQ1-EVO-*` (standards-track.md).
-  Six of the 83 (the four strict-Ed25519 `SIGNING` rows, `REQ1-KEY-ed25519-acceptable`, and
+- **152 requirement ids** across all three contract-majors: 95 for contract-major 1,
+  30 for contract-major 2, and 27 for contract-major 3, counted from the requirement columns above.
+- **Contract-major 1:** 85 `REQ1-*` (spec/bap-v1.md) + 10 `REQ1-EVO-*` (standards-track.md).
+  Six of the 85 (the four strict-Ed25519 `SIGNING` rows, `REQ1-KEY-ed25519-acceptable`, and
   `REQ1-HOST-ed25519-torsion-free`) were added by erratum 2
   and map to populated cells of the additive strict-Ed25519 corpus; one
   (`REQ1-SIGNING-ed25519-producer-canonical`) was added by erratum 3 and maps to populated cells of
-  the additive producer-canonicality corpus.
-- **v2:** 28 `REQ2-*` ids over `spec/bap-v2.md` (22 at activation plus the
+  the additive producer-canonicality corpus. Erratum 6 adds two requirements, float-zero
+  decode rejection and integral-float producer refusal, mapped to the selector float-zero corpus.
+- **v2:** 30 `REQ2-*` ids over `spec/bap-v2.md` (22 at activation plus the
   five strict-Ed25519 ids of erratum 2, which map to the strict corpus's `major: 2` cells, and the
-  producer-canonicality id of erratum 3, which maps to that corpus's `major: 2` cells); the
-  other 22 map to populated v2 corpus cells except the signed-zero row (input-algebra impossibility) and the
-  attenuation row (delegation is not active in major 2), both recorded above. Corpus: `bounded-authority-protocol-v2-conformance-corpus-index` (268 cases, 28
+  producer-canonicality id of erratum 3, and two new ids from erratum 6). The selector float-zero
+  corpus also supplies the previously missing signed-zero range controls. The attenuation row
+  remains a gap because delegation is not active in major 2; every other row has populated
+  corpus cells. Base corpus: `bounded-authority-protocol-v2-conformance-corpus-index` (268 cases, 28
   surfaces, 16 classes).
-- **v3:** 24 `REQ3-*` ids over `spec/bap-v3.md`; 23 map to populated
+- **v3:** 27 `REQ3-*` ids over `spec/bap-v3.md`; the original 23 map to populated
   v3 corpus cells and `REQ3-SIGNING-producer-canonical` (erratum 3) to the producer-canonicality
-  corpus. The earlier `REQ3-SIGNING-range` red-proof adjudication is withdrawn: its clauses are
+  corpus. Erratum 6 adds three ids for float-zero decode rejection, signed-zero range
+  comparison, and integral-float producer refusal, all mapped to the selector float-zero corpus.
+  The earlier `REQ3-SIGNING-range` red-proof adjudication is withdrawn: its clauses are
   backend-coincident at verify, and the producer surfaces now isolate each of them, so
   `v3-signature-range-removed`, `-r-positive-removed`, and `-s-positive-removed` run red. Corpus:
   `bounded-authority-protocol-v3-conformance-corpus-index` (292 cases, 28 surfaces,
   16 classes).
-- **MUST/MUST NOT requirements mapped to populated cells:** all spec `REQ1-*` map to ≥1
-  populated conformance cell. One profile-level invariant (`REQ1-CORE-reject-unlisted`) is recorded as
+- **MUST/MUST NOT requirements mapped to populated cells:** 84 of the 85 spec `REQ1-*` ids
+  map to at least one populated conformance cell. One profile-level invariant (`REQ1-CORE-reject-unlisted`) is recorded as
   a `gap` with its input-algebra reason (it is the rationale for the per-surface closed-set MUSTs, each
   of which maps to populated rejection cells — the rule is proven by that union).
 - **Evolution-contract `REQ1-EVO-*` gaps:** 8 of 10 are `gap` (governance/process invariants the v1

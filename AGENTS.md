@@ -4,11 +4,9 @@
 
 - Status: [`docs/ROADMAP.md`](docs/ROADMAP.md) and [`CHANGELOG.md`](CHANGELOG.md).
 - Wire formats and verification: the normative specs under [`spec/`](spec/), the protocol
-  charter, threat model and conformance contract under [`docs/design/`](docs/design/), and the
-  local decision records under `.kimosabe/adr/` (gitignored; never packaged or published).
-- Verifier SDKs: [`sdks/README.md`](sdks/README.md), ADR 0014 and ADR 0015.
-- Earlier state narratives and superseded instructions:
-  [`docs/reference/agent-history.md`](docs/reference/agent-history.md).
+  charter, threat model and conformance contract under [`docs/design/`](docs/design/), and
+  the published [governance policy](docs/governance.md).
+- Verifier SDKs and their publication boundary: [`sdks/README.md`](sdks/README.md).
 
 ## What this is
 
@@ -23,7 +21,7 @@ grant operational authority by itself.
 ## Publication
 
 - Cross-language verifier SDKs under `sdks/` are unpublished. Each graduates to its own
-  repository on first publication (ADR 0015); the `sdk-publish-guard` pre-commit hook and CI job
+  repository on first publication; the `sdk-publish-guard` pre-commit hook and CI job
   reject registry-publish infrastructure in this repository. The TypeScript verifier graduated to
   [`baselabs/bounded_authority_protocol_typescript`](https://github.com/baselabs/bounded_authority_protocol_typescript);
   a corpus rotation is a snapshot-bump commit there.
@@ -70,10 +68,8 @@ grant operational authority by itself.
   [`baselabs/bounded_authority_report_adapter`](https://github.com/baselabs/bounded_authority_report_adapter)
   (public Hex package `bounded_authority_report_adapter`; one-directional — it depends on this
   package, which never depends on it)
-- Private runtime consumer: `baselabs/bounded_authority` (a private commercial application; it
-  must never be published as a public Hex package, and any private-Hex release requires
-  a paid subscription plus fresh owner approval
-  for that exact release)
+- Stateful runtime consumers own operational authorization and live state; this package
+  supplies only pure verification.
 - Product consumers: private; their repository identities and deployment topology are not part of
   this public protocol's documentation or history
 

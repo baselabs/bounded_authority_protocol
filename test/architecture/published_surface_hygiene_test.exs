@@ -52,7 +52,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "docs/guides/getting-started.md",
     "docs/guides/implementers-guide.md",
     "docs/guides/upgrading.md",
-    "docs/livebooks/bap-walkthrough.livemd",
+    "docs/notebooks/bap-walkthrough.livemd",
     "docs/guides/choosing-a-profile.md",
     "docs/guides/recipes.md",
     "docs/guides/evidence.md",
@@ -62,8 +62,8 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "docs/guides/glossary.md",
     "docs/guides/faq.md",
     "docs/guides/cheatsheet.cheatmd",
-    "docs/livebooks/service-integration.livemd",
-    "docs/livebooks/chains-and-archives.livemd",
+    "docs/notebooks/service-integration.livemd",
+    "docs/notebooks/chains-and-archives.livemd",
     "docs/design/conformance-contract.md",
     "docs/design/interoperability-report.md",
     "docs/design/protocol-charter.md",
@@ -160,7 +160,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
   # Prose names the wire contract "contract-major N" and the package "package 1.x" or a release
   # number. A bare "v1" in guide prose is ambiguous between the two, so it is refused outside
   # code, inline code, and link targets.
-  @guide_prose ["README.md", "usage-rules.md", "docs/guides", "docs/livebooks"]
+  @guide_prose ["README.md", "usage-rules.md", "docs/guides", "docs/notebooks"]
 
   test "guide prose never says a bare v1, v2, or v3" do
     violations =

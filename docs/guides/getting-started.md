@@ -331,15 +331,15 @@ The same steps apply to the other namespaces, each with its own specification an
 
 Each namespace rejects the others' bytes. Select one explicitly; never infer a profile from the
 input or retry another after a rejection. The
-[Livebook walkthrough](../livebooks/bap-walkthrough.livemd) runs every one of them.
+[Livebook walkthrough](../notebooks/bap-walkthrough.livemd) runs every one of them.
 
 ## Where to go next
 
 - [Recipes](recipes.md): Plug and Phoenix integration, selectors per contract-major, ES256 keys
   in a KMS or HSM, key rotation, nonces, and running every corpus.
-- The Livebooks: the [protocol walkthrough](../livebooks/bap-walkthrough.livemd) runs every
-  profile with the attacks each one rejects, [service integration](../livebooks/service-integration.livemd)
-  covers rotation, nonces, and time, and [chains and archives](../livebooks/chains-and-archives.livemd)
+- The Livebooks: the [protocol walkthrough](../notebooks/bap-walkthrough.livemd) runs every
+  profile with the attacks each one rejects, [service integration](../notebooks/service-integration.livemd)
+  covers rotation, nonces, and time, and [chains and archives](../notebooks/chains-and-archives.livemd)
   builds the evidence formats.
 - [Choosing a profile](choosing-a-profile.md) and the [cheatsheet](cheatsheet.cheatmd).
 - [Usage rules](../../usage-rules.md): what a consuming host must do.

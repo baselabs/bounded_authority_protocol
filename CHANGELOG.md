@@ -1009,7 +1009,7 @@ several note findings, all in surfaces this program touched. All fixed:
 
 ### Added — the Livebook walkthrough (no wire change)
 
-- **`docs/livebooks/bap-walkthrough.livemd`**: the end-to-end produce → assemble → verify →
+- **`docs/notebooks/bap-walkthrough.livemd`**: the end-to-end produce → assemble → verify →
   reject notebook. It mints its OWN ephemeral Ed25519 keys at runtime via `:crypto` (zero
   tracked private material — critical rule 6; the package accepts public keys only and the
   notebook does the signing), builds a grant and proof through the deterministic producers,
@@ -1321,9 +1321,6 @@ several note findings, all in surfaces this program touched. All fixed:
 
 - Public documentation and reachable Git history no longer identify private product repositories
   or their deployment topology. The public-history boundary decision record records the durable boundary and the all-ref rewrite.
-- `bounded_authority` is explicitly a private commercial application: it must never be published
-  to public Hex, is not currently distributed through private Hex, and any future private-Hex
-  release requires both a paid subscription and fresh owner approval for that exact release.
 
 ### Fixed — v1 selector contract reconciliation
 

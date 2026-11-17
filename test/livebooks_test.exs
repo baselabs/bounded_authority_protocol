@@ -2,7 +2,7 @@ Code.require_file("../test_support/livebook_harness.ex", __DIR__)
 
 defmodule BoundedAuthorityProtocol.LivebooksTest do
   @moduledoc """
-  Runs every notebook under docs/livebooks against this checkout with the shared harness
+  Runs every notebook under docs/notebooks against this checkout with the shared harness
   (test_support/livebook_harness.ex), which checks each code cell against the value its prose
   states. The package gate (`mix package.check`, part of `mix quality`) runs the same harness
   against the notebooks inside the unpacked release archive.
@@ -12,7 +12,7 @@ defmodule BoundedAuthorityProtocol.LivebooksTest do
 
   alias BoundedAuthorityProtocol.TestSupport.LivebookHarness
 
-  @directory Path.expand("../docs/livebooks", __DIR__)
+  @directory Path.expand("../docs/notebooks", __DIR__)
   @notebooks @directory |> Path.join("*.livemd") |> Path.wildcard() |> Enum.sort()
   @strict_ed25519 Path.expand("../priv/conformance/strict-ed25519/cases/primitive", __DIR__)
 

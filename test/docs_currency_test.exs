@@ -129,7 +129,7 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
       {"README install", "README.md", "{:bounded_authority_protocol, \"#{requirement}\"}"},
       {"getting-started install", "docs/guides/getting-started.md",
        "{:bounded_authority_protocol, \"#{requirement}\"}"},
-      {"Livebook install", "docs/livebooks/bap-walkthrough.livemd",
+      {"Livebook install", "docs/notebooks/bap-walkthrough.livemd",
        "{:bounded_authority_protocol, \"#{requirement}\"}"},
       {"security support", "SECURITY.md", "`#{series}.x` source release line is supported"},
       {"security current", "SECURITY.md",
@@ -165,7 +165,7 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
     "docs/guides/upgrading.md",
     "docs/guides/implementers-guide.md",
     "docs/design/interoperability-report.md",
-    "docs/livebooks/bap-walkthrough.livemd",
+    "docs/notebooks/bap-walkthrough.livemd",
     "lib/bounded_authority_protocol/v1.ex",
     "lib/bounded_authority_protocol/v3.ex"
   ]
@@ -195,11 +195,24 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
 
   defp unreleased_marker_errors(version, ahead?, read) do
     marker = "(unreleased, planned for #{version})"
-    {listing, 0} = System.cmd("git", ["ls-files", "--", "*.md", "*.livemd", "lib/*.ex"])
+    {listing, 0} =
+      System.cmd("git", [
+        "ls-files",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+        "--",
+        "*.md",
+        "*.livemd",
+        "lib/*.ex"
+      ])
 
     surfaces =
       listing
       |> String.split("\n", trim: true)
+      # A remote source snapshot may retain HEAD's index while removing a tracked document.
+      # Scan the files that exist; the required release surfaces below remain mandatory.
+      |> Enum.filter(&File.regular?/1)
       |> Enum.concat(@marked_surfaces)
       |> Enum.uniq()
       |> Enum.reject(&(&1 in ["CHANGELOG.md", "docs/ROADMAP.md", "AGENTS.md"]))
@@ -228,7 +241,7 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
         path <- [
           "README.md",
           "docs/guides/getting-started.md",
-          "docs/livebooks/bap-walkthrough.livemd"
+          "docs/notebooks/bap-walkthrough.livemd"
         ] do
       refute File.read!(path) =~
                ~r/bounded_authority_protocol,[\s\S]{0,120}tag: "v#{Regex.escape(version)}"/,
@@ -327,6 +340,47 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
     assert report =~ "#{index["uri_cases"]}/#{index["uri_cases"]} URI cases"
     assert report =~ "#{index["proof_cases"]}/#{index["proof_cases"]} proof cases"
     assert report =~ index["profile"]
+  end
+
+  test "the requirement-map summary counts its mapped identifiers and the normative specs" do
+    map = File.read!("docs/design/requirement-map.md")
+
+    mapped =
+      for "| REQ" <> _rest = row <- String.split(map, "\n"),
+          id <- requirement_ids(row |> String.split("|") |> Enum.at(1)),
+          uniq: true,
+          do: id
+
+    assert map =~ "**#{length(mapped)} requirement ids** across all three contract-majors"
+
+    for major <- 1..3 do
+      prefix = "REQ#{major}-"
+      ids = Enum.filter(mapped, &String.starts_with?(&1, prefix))
+      evolution = Enum.filter(ids, &String.starts_with?(&1, prefix <> "EVO-"))
+      profile = ids -- evolution
+
+      spec =
+        "spec/bap-v#{major}.md"
+        |> File.read!()
+        |> requirement_ids()
+        |> Enum.filter(&String.starts_with?(&1, prefix))
+
+      assert MapSet.new(ids) == MapSet.new(spec ++ evolution)
+
+      if major == 1 do
+        assert map =~ "#{length(profile)} `REQ1-*` (spec/bap-v1.md)"
+        assert map =~ "#{length(evolution)} `REQ1-EVO-*` (standards-track.md)"
+      else
+        assert map =~ "**v#{major}:** #{length(ids)} `REQ#{major}-*` ids"
+      end
+    end
+  end
+
+  defp requirement_ids(text) do
+    ~r/\bREQ[123]-[A-Z0-9]+-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\b/
+    |> Regex.scan(text)
+    |> Enum.map(&hd/1)
+    |> Enum.uniq()
   end
 
   test "the spec pins its Doc-Revision and the companions agree" do

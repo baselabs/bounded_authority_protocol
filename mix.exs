@@ -125,9 +125,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/guides/glossary.md",
         "docs/guides/faq.md",
         "docs/guides/cheatsheet.cheatmd",
-        "docs/livebooks/bap-walkthrough.livemd",
-        "docs/livebooks/service-integration.livemd",
-        "docs/livebooks/chains-and-archives.livemd",
+        "docs/notebooks/bap-walkthrough.livemd",
+        "docs/notebooks/service-integration.livemd",
+        "docs/notebooks/chains-and-archives.livemd",
         "docs/design/conformance-contract.md",
         "docs/design/interoperability-report.md",
         "docs/design/protocol-charter.md",
@@ -183,9 +183,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
       extras: [
         {"README.md", [title: "Overview"]},
         "docs/guides/getting-started.md",
-        {"docs/livebooks/bap-walkthrough.livemd", [title: "Livebook: protocol walkthrough"]},
-        {"docs/livebooks/service-integration.livemd", [title: "Livebook: service integration"]},
-        {"docs/livebooks/chains-and-archives.livemd", [title: "Livebook: chains and archives"]},
+        {"docs/notebooks/bap-walkthrough.livemd", [title: "Livebook: protocol walkthrough"]},
+        {"docs/notebooks/service-integration.livemd", [title: "Livebook: service integration"]},
+        {"docs/notebooks/chains-and-archives.livemd", [title: "Livebook: chains and archives"]},
         {"docs/guides/cheatsheet.cheatmd", [title: "Cheatsheet"]},
         "docs/guides/choosing-a-profile.md",
         "docs/guides/recipes.md",
@@ -227,7 +227,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "Start here": [
           "README.md",
           "docs/guides/getting-started.md",
-          ~r"^docs/livebooks/",
+          ~r"^docs/notebooks/",
           "docs/guides/cheatsheet.cheatmd"
         ],
         Guides: [
