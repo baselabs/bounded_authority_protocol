@@ -2,6 +2,7 @@
 config = Mix.Project.config()
 name = to_string(Keyword.fetch!(config, :app))
 version = Keyword.fetch!(config, :version)
+
 archive_path =
   case System.argv() do
     [] -> "#{name}-#{version}.tar"

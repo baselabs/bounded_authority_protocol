@@ -204,8 +204,10 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
 
     version_guard = Enum.find(steps, &String.contains?(&1["run"] || "", "git ls-remote"))
     assert version_guard["run"] =~ "@version"
+
     assert version_guard["run"] =~
              "https://hex.pm/api/packages/bounded_authority_protocol/releases/"
+
     assert version_guard["run"] =~ "200)"
     assert version_guard["run"] =~ "404)"
     assert version_guard["run"] =~ "refs/tags/v$version"
@@ -313,7 +315,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
           stderr_to_stdout: true
         )
 
-      assert (status == 0) == (ref == "refs/heads/main")
+      assert {ref, status == 0} == {ref, ref == "refs/heads/main"}
     end
   end
 end
