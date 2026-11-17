@@ -16,8 +16,12 @@ Before submitting a change:
 1. open a design discussion before protocol, cryptography, canonicalization, or conformance changes;
 2. add allow, deny, malformed-input, and mutation-red tests;
 3. update normative vectors and obtain independent exact-byte verification when wire bytes change;
-4. fetch with `mix deps.get --check-locked`; the qualification run executes `mix quality`;
+4. fetch with `mix deps.get --check-locked`; run the quality stages that cover your change;
 5. update the changelog and every affected contract document.
+
+CI runs `mix quality.source`, `mix quality.corpus`, `mix quality.tests`,
+`mix quality.conformance`, `mix quality.mutations` and `mix quality.package` as separate jobs.
+`mix quality` runs them all locally.
 
 Application-profile changes also update their normative specification, certified corpus and digest,
 every implementation (Elixir, the three SDKs here, and the TypeScript verifier in its own
@@ -31,7 +35,7 @@ The declared Elixir range is `~> 1.18` (1.18/1.19/1.20) and the supported Erlang
 package, so consumers enforce their own. The mix.exs range, the config set, `.tool-versions`, and
 the CI lanes move together in one commit. Primary CI toolchains are exact versions in
 `.tool-versions`; strict installation and installed-version checks refuse drift. The Linux
-qualification run covers each supported Erlang/OTP major plus the complete-quality lane;
+qualification run covers each supported Erlang/OTP major plus all six quality stages;
 the older compatibility lanes retain exact version literals. Windows developers use WSL2 (clone
 inside the WSL filesystem, not under `/mnt/c`), which is the Linux path; no native-Windows developer
 path is maintained. The full quality battery is

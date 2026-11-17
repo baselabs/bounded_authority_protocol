@@ -6,6 +6,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Split CI quality into six stage jobs with 90-minute limits, preserve the complete local
+  `mix quality` gate, require every stage before attestation, and apply the maintainer
+  condition to every Pages job.
 - Qualify commits only on `kci/**` pushes, with a final `qualified` job requiring every
   check and attestation to succeed before `main` moves. Review dependencies against the
   default branch on every run, enforce measured job timeouts, discard checkout credentials,
@@ -17,7 +20,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 - Run every check in one CI workflow run. SDK conformance, the SDK publish guard, dependency
   review and attestation are reusable workflows called from `ci.yml`, without path filters, so
-  the run that qualifies a landing covers all of them. The complete quality job builds the
+  the run that qualifies a landing covers all of them. The package job builds the
   package archive that the supply-chain workflow attests, and attestations still name
   `supply-chain.yml` as their signer. Every job runs on a GitHub-hosted runner.
 - Parse SDK dependency paths in manifests and lockfiles, widen the early source traversal lint,

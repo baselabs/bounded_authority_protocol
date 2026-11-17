@@ -97,7 +97,8 @@ jobs:
         working-directory: sdks/python
 
   # TypeScript runs in its graduated repository. The independent Node runner reads
-  # .tool-versions in ci.yml's quality job, matching
+  # .tool-versions in ci.yml's quality-corpus, quality-tests, quality-conformance and
+  # quality-mutations jobs, matching
   # its strict-Ed25519 backend evidence; SDK jobs here have no Node dependency.
   # The Rust MSRV (1.88) is pinned by sdks/rust/rust-toolchain.toml; this job installs
   # that exact toolchain so the MSRV floor is the CI-tested floor.

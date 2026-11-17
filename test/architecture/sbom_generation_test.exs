@@ -12,13 +12,13 @@ defmodule BoundedAuthorityProtocol.Architecture.SbomGenerationTest do
       |> File.read!()
       |> YamlElixir.read_from_string!()
 
-    steps = workflow["jobs"]["quality"]["steps"]
-    quality = Enum.find(steps, &(&1["name"] == "Run complete quality gate"))
-    assert quality["run"] == "mix quality"
+    steps = workflow["jobs"]["package"]["steps"]
+    quality = Enum.find(steps, &(&1["run"] == "mix quality.package"))
+    assert quality["run"] == "mix quality.package"
     refute Enum.any?(steps, &String.contains?(&1["run"] || "", "sbom.cyclonedx"))
 
     aliases = Mix.Project.config()[:aliases]
-    assert "audit" in aliases[:quality]
+    assert "audit" in aliases[:"quality.package"]
     assert "sbom.generate" in aliases[:audit]
 
     assert Enum.filter(aliases[:"sbom.generate"], &is_binary/1) == [

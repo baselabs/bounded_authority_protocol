@@ -56,6 +56,12 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "license.check": :test,
         "package.check": :test,
         quality: :test,
+        "quality.source": :test,
+        "quality.corpus": :test,
+        "quality.tests": :test,
+        "quality.conformance": :test,
+        "quality.mutations": :test,
+        "quality.package": :test,
         "privacy.hooks": :test,
         "release.candidate": :test,
         secrets: :test,
@@ -404,39 +410,57 @@ defmodule BoundedAuthorityProtocol.MixProject do
       "sbom.check": [
         "cmd elixir scripts/check_sbom.exs artifacts/release.cdx.json artifacts/tooling.cdx.json"
       ],
-      quality: [
+      "quality.source": [
         "format --check-formatted",
         "compile --warnings-as-errors",
         "architecture",
         "secrets",
         "privacy.hooks",
-        "corpus.sync",
-        "corpus.digests",
-        "corpus.verdicts",
-        "corpus.generators",
-        "corpus.distribution.mutations",
         "spec.facts",
         "spec.examples",
         "spec.render",
         "formal",
         "credo --strict",
-        "verification.performance",
-        "chain_archive.performance",
-        "test --cover --seed 42",
         "dialyzer",
         "docs --warnings-as-errors",
-        "docs.links",
-        "audit",
-        "package.check",
-        "release.candidate",
-        "chain_archive.mutations",
-        "conformance.mutations",
+        "docs.links"
+      ],
+      "quality.corpus": [
+        "corpus.sync",
+        "corpus.digests",
+        "corpus.verdicts",
+        "corpus.generators",
+        "corpus.distribution.mutations"
+      ],
+      "quality.tests": [
+        "verification.performance",
+        "chain_archive.performance",
+        "test --cover --seed 42"
+      ],
+      "quality.conformance": [
         "conformance.verify",
         "local_loopback_http.verify",
         "role_attestation.verify",
         "content_assertion.verify",
+        "conformance.mutations"
+      ],
+      "quality.mutations": [
+        "chain_archive.mutations",
         "content_assertion.mutations",
         "spec_facts.mutations"
+      ],
+      "quality.package": [
+        "audit",
+        "package.check",
+        "release.candidate"
+      ],
+      quality: [
+        "quality.source",
+        "quality.corpus",
+        "quality.tests",
+        "quality.conformance",
+        "quality.mutations",
+        "quality.package"
       ]
     ]
   end

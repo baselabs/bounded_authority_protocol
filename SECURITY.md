@@ -50,10 +50,10 @@ published, deployment-decided contract-major overlap. A verdict never changes si
 
 ## Supply-chain verification
 
-Every CI run builds the package archive in its complete quality job, after the full quality gate
-has passed in that job, with a SHA-256 checksum and release and tooling CycloneDX SBOM documents.
-In that same `kci/<sha>` qualification run, CI calls the supply-chain workflow, which signs
-separate build-provenance and SBOM attestations for that archive. Verify the exact source commit,
+Every CI run builds the package archive in its package job, with a SHA-256 checksum and release
+and tooling CycloneDX SBOM documents. In that same `kci/<sha>` qualification run, after every
+quality stage job has passed, CI calls the supply-chain workflow, which signs separate
+build-provenance and SBOM attestations for that archive. Verify the exact source commit,
 which must be on `main` before release; the attestation's source ref is the qualification branch.
 A downloaded archive can be verified with:
 

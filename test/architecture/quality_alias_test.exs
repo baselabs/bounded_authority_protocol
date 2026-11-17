@@ -1,10 +1,77 @@
 defmodule BoundedAuthorityProtocol.QualityAliasTest do
   use ExUnit.Case, async: true
 
-  @full_suite {[:quality], "test --cover --seed 42"}
+  @full_suite {[:quality, :"quality.tests"], "test --cover --seed 42"}
+  @fixture_suite {[:quality], "test --cover --seed 42"}
+  @quality_stages ~w(quality.source quality.corpus quality.tests quality.conformance quality.mutations quality.package)
+  @quality_commands [
+    "format --check-formatted",
+    "compile --warnings-as-errors",
+    "architecture",
+    "secrets",
+    "privacy.hooks",
+    "corpus.sync",
+    "corpus.digests",
+    "corpus.verdicts",
+    "corpus.generators",
+    "corpus.distribution.mutations",
+    "spec.facts",
+    "spec.examples",
+    "spec.render",
+    "formal",
+    "credo --strict",
+    "verification.performance",
+    "chain_archive.performance",
+    "test --cover --seed 42",
+    "dialyzer",
+    "docs --warnings-as-errors",
+    "docs.links",
+    "audit",
+    "package.check",
+    "release.candidate",
+    "chain_archive.mutations",
+    "conformance.mutations",
+    "conformance.verify",
+    "local_loopback_http.verify",
+    "role_attestation.verify",
+    "content_assertion.verify",
+    "content_assertion.mutations",
+    "spec_facts.mutations"
+  ]
 
   test "quality reserves the in-VM test task for the seeded coverage suite" do
     assert in_vm_tests(Mix.Project.config()[:aliases], project_sources()) == [@full_suite]
+  end
+
+  test "quality composes each CI stage and preserves every original command exactly once" do
+    aliases = Mix.Project.config()[:aliases]
+    assert aliases[:quality] == @quality_stages
+
+    commands =
+      Enum.flat_map(@quality_stages, &Keyword.fetch!(aliases, String.to_existing_atom(&1)))
+
+    assert length(commands) == 32
+    assert Enum.frequencies(commands) == Enum.frequencies(@quality_commands)
+
+    for stage <- @quality_stages do
+      assert BoundedAuthorityProtocol.MixProject.cli()[:preferred_envs][
+               String.to_existing_atom(stage)
+             ] == :test
+    end
+  end
+
+  test "each CI stage reserves in-VM tests for the one seeded coverage suite" do
+    aliases = Mix.Project.config()[:aliases]
+    sources = project_sources()
+
+    for stage <- @quality_stages do
+      expected =
+        if stage == "quality.tests",
+          do: [{[:"quality.tests"], "test --cover --seed 42"}],
+          else: []
+
+      assert in_vm_tests(aliases, sources, stage) == expected, stage
+    end
   end
 
   test "the guard rejects the pre-fix aliases, including transitive invocations" do
@@ -22,7 +89,7 @@ defmodule BoundedAuthorityProtocol.QualityAliasTest do
              {[:quality, :"corpus.verdicts"], "test test/conformance/" <> _},
              {[:quality, :distribution, :"corpus.distribution.mutations"],
               "test test/corpus_tooling_test.exs"},
-             @full_suite
+             @fixture_suite
            ] = in_vm_tests(aliases, %{"scripts/regen_verdict_digests.exs" => ":ok"})
 
     fixed =
@@ -34,7 +101,7 @@ defmodule BoundedAuthorityProtocol.QualityAliasTest do
          end)}
       end
 
-    assert in_vm_tests(fixed, %{"scripts/regen_verdict_digests.exs" => ":ok"}) == [@full_suite]
+    assert in_vm_tests(fixed, %{"scripts/regen_verdict_digests.exs" => ":ok"}) == [@fixture_suite]
   end
 
   test "composite tasks cannot hide in-VM test invocations" do
@@ -43,10 +110,10 @@ defmodule BoundedAuthorityProtocol.QualityAliasTest do
       nested: ["test hidden.exs"]
     ]
 
-    assert [{[:quality, :nested], "test hidden.exs"}, @full_suite] = in_vm_tests(aliases)
+    assert [{[:quality, :nested], "test hidden.exs"}, @fixture_suite] = in_vm_tests(aliases)
 
     assert in_vm_tests(Keyword.put(aliases, :nested, ["cmd mix test hidden.exs"])) == [
-             @full_suite
+             @fixture_suite
            ]
   end
 
@@ -59,10 +126,10 @@ defmodule BoundedAuthorityProtocol.QualityAliasTest do
       aliases = [quality: ["run --no-start scripts/check.exs", "test --cover --seed 42"]]
       sources = %{"scripts/check.exs" => call}
 
-      assert [{[:quality, "scripts/check.exs"], "test (" <> _}, @full_suite] =
+      assert [{[:quality, "scripts/check.exs"], "test (" <> _}, @fixture_suite] =
                in_vm_tests(aliases, sources)
 
-      assert in_vm_tests(aliases, %{"scripts/check.exs" => ":ok"}) == [@full_suite]
+      assert in_vm_tests(aliases, %{"scripts/check.exs" => ":ok"}) == [@fixture_suite]
     end
   end
 
@@ -77,12 +144,12 @@ defmodule BoundedAuthorityProtocol.QualityAliasTest do
       aliases = [quality: ["hidden", "test --cover --seed 42"]]
       sources = %{file => "defmodule Mix.Tasks.Hidden do\ndef run(_), do: #{call}\nend"}
 
-      assert [{[:quality, "hidden", ^file], "test (" <> _}, @full_suite] =
+      assert [{[:quality, "hidden", ^file], "test (" <> _}, @fixture_suite] =
                in_vm_tests(aliases, sources)
 
       assert in_vm_tests(aliases, %{
                file => "defmodule Mix.Tasks.Hidden do\ndef run(_), do: :ok\nend"
-             }) == [@full_suite]
+             }) == [@fixture_suite]
     end
 
     sources = %{
@@ -91,7 +158,7 @@ defmodule BoundedAuthorityProtocol.QualityAliasTest do
       "scripts/probe.exs" => ~s|Mix.Task.rerun("test", [])|
     }
 
-    assert [{_, "test (" <> _}, @full_suite] =
+    assert [{_, "test (" <> _}, @fixture_suite] =
              in_vm_tests([quality: ["hidden", "test --cover --seed 42"]], sources)
   end
 
@@ -108,9 +175,9 @@ defmodule BoundedAuthorityProtocol.QualityAliasTest do
     |> Map.new(&{&1, File.read!(&1)})
   end
 
-  defp in_vm_tests(aliases, sources \\ %{}) do
+  defp in_vm_tests(aliases, sources \\ %{}, task \\ "quality") do
     graph = %{aliases: Map.new(aliases), sources: sources, tasks: local_tasks(sources)}
-    expand("quality", graph, [])
+    expand(task, graph, [])
   end
 
   defp local_tasks(sources) do

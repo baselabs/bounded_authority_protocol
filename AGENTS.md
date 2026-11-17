@@ -91,8 +91,9 @@ qualification run: CI starts only on a push to a `kci/<sha>` branch, and `main` 
 exact commit only when the run's last job, `qualified`, is green. Pull requests get no CI run of
 their own; the landing run qualifies them.
 
-- CI runs `mix quality` (package, purity, documentation, advisory, license, SBOM and
-  unpacked-consumer checks). Run the parts that cover your change.
+- CI runs `mix quality.source`, `mix quality.corpus`, `mix quality.tests`,
+  `mix quality.conformance`, `mix quality.mutations` and `mix quality.package` as separate
+  jobs. `mix quality` runs them all locally. Run the parts that cover your change.
 - Contributors and agents never publish, tag a version, deploy or dispatch a workflow.
   `publish.yml` publishes the Hex package and `pages.yml` deploys the site; the maintainers'
   release operator dispatches both from `main`.

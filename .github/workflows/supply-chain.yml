@@ -1,6 +1,6 @@
 name: Supply chain
 
-# Attests the package that CI's complete quality job built and checked earlier in the same run.
+# Attests the package that CI's package job built and checked earlier in the same run.
 # CI calls this workflow inside every kci/<sha> qualification run. It is reusable so that
 # every attestation names it as the signer:
 # `gh attestation verify --signer-workflow .../.github/workflows/supply-chain.yml`.
@@ -8,7 +8,7 @@ on:
   workflow_call:
     inputs:
       version:
-        description: Package version that the quality job derived from mix.exs @version.
+        description: Package version that the package job derived from mix.exs @version.
         required: true
         type: string
 

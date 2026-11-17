@@ -42,6 +42,7 @@ jobs:
 
   deploy:
     name: Deploy to GitHub Pages
+    if: contains(fromJSON('["corepay","palermo-git"]'), github.actor) && contains(fromJSON('["corepay","palermo-git"]'), github.triggering_actor)
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 5 # 5-minute floor; slowest green 12 sec, run 36384325895.

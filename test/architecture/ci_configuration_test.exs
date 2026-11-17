@@ -4,6 +4,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
   # A public repository: every job runs on a GitHub-hosted runner, never a self-hosted one.
   @runner "ubuntu-24.04"
   @gate ".github/workflows/ci.yml"
+  @quality_jobs ~w(quality-source quality-corpus quality-tests quality-conformance quality-mutations package)
   # Maintainers dispatch publication and site deployment only after landing.
   @not_gates [".github/workflows/pages.yml", ".github/workflows/publish.yml"]
 
@@ -19,18 +20,21 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     end
   end
 
-  test "every executable job has a timeout and every checkout discards credentials" do
+  test "every executable job has a 5 to 90 minute timeout and every checkout discards credentials" do
     for path <- workflows(), {name, job} <- read(path)["jobs"] do
       if Map.has_key?(job, "steps") do
         timeout = job["timeout-minutes"]
 
         if is_integer(timeout) do
           assert timeout >= 5, "#{path} job #{name} must have a timeout with a 5-minute floor"
+          assert timeout <= 90, "#{path} job #{name} must not exceed 90 minutes"
         else
           assert timeout == "${{ matrix.timeout }}", "#{path} job #{name} has no timeout"
 
           for entry <- job["strategy"]["matrix"]["include"] do
-            assert is_integer(entry["timeout"]) and entry["timeout"] >= 5
+            assert is_integer(entry["timeout"]) and entry["timeout"] >= 5 and
+                     entry["timeout"] <= 90,
+                   "#{path} job #{name} matrix timeouts must be 5 to 90 minutes"
           end
         end
       else
@@ -108,9 +112,10 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
       assert checkout["with"]["fetch-depth"] == 0
     end
 
-    refute Map.has_key?(ci["jobs"]["quality"], "permissions")
-
-    refute Enum.any?(ci["jobs"]["quality"]["steps"], &uses?(&1, "actions/attest@"))
+    for name <- @quality_jobs do
+      refute Map.has_key?(ci["jobs"][name], "permissions")
+      refute Enum.any?(ci["jobs"][name]["steps"], &uses?(&1, "actions/attest@"))
+    end
 
     attest = ci["jobs"]["attest"]
     assert attest["uses"] == "./.github/workflows/supply-chain.yml"
@@ -148,14 +153,48 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
              {"1.19.5", "28.5.0.3"}
            ]
 
-    quality_steps = ci["jobs"]["quality"]["steps"]
-    node = Enum.find(quality_steps, &uses?(&1, "actions/setup-node@"))
-    go = Enum.find(quality_steps, &uses?(&1, "actions/setup-go@"))
-    assert node["with"]["node-version-file"] == ".tool-versions"
-    assert go["with"]["go-version-file"] == ".tool-versions"
+    for {_name, job} <- ci["jobs"], steps = job["steps"] || [], step <- steps do
+      if uses?(step, "actions/setup-node@") do
+        assert step["with"]["node-version-file"] == ".tool-versions"
+        assert Enum.any?(steps, &(&1["run"] == "bash scripts/ci_tool_versions.sh nodejs"))
+      end
 
-    for step <- quality_steps, String.contains?(step["run"] || "", "mix deps.get") do
-      assert step["run"] == "mix deps.get --check-locked"
+      if uses?(step, "actions/setup-go@") do
+        assert step["with"]["go-version-file"] == ".tool-versions"
+        assert Enum.any?(steps, &(&1["run"] == "bash scripts/ci_tool_versions.sh golang"))
+      end
+
+      if uses?(step, "actions/setup-python@") do
+        assert step["with"]["python-version"] == "${{ steps.python.outputs.python }}"
+
+        assert Enum.any?(
+                 steps,
+                 &(&1["id"] == "python" and
+                     &1["run"] == "bash scripts/ci_tool_versions.sh read python")
+               )
+
+        assert Enum.any?(steps, &(&1["run"] == "bash scripts/ci_tool_versions.sh python"))
+      end
+
+      if String.contains?(step["run"] || "", "mix deps.get") do
+        assert step["run"] == "mix deps.get --check-locked"
+      end
+    end
+  end
+
+  test "each quality job runs exactly its own unconditional stage" do
+    jobs = read(@gate)["jobs"]
+
+    assert Enum.sort(Enum.filter(Map.keys(jobs), &String.starts_with?(&1, "quality-"))) ==
+             Enum.sort(@quality_jobs -- ["package"])
+
+    for name <- @quality_jobs do
+      stage = String.replace_prefix(name, "quality-", "")
+      steps = jobs[name]["steps"]
+      assert [step] = Enum.filter(steps, &String.starts_with?(&1["run"] || "", "mix quality"))
+      assert step["run"] == "mix quality.#{stage}"
+      refute Map.has_key?(step, "if")
+      assert Enum.count(steps, &(&1["run"] == "mix deps.get --check-locked")) == 1
     end
   end
 
@@ -164,6 +203,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     assert pages["on"] == %{"workflow_dispatch" => nil}
     publish = read(".github/workflows/publish.yml")
     assert pages["jobs"]["build"]["if"] == publish["jobs"]["publish"]["if"]
+    assert pages["jobs"]["deploy"]["if"] == pages["jobs"]["build"]["if"]
     assert pages["jobs"]["deploy"]["needs"] == "build"
     assert_default_branch_first(pages["jobs"]["build"])
     assert pages["jobs"]["deploy"]["environment"]["name"] == "github-pages"
@@ -229,13 +269,15 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     assert docs < build and build < inspect_package and inspect_package < length(steps) - 1
   end
 
-  test "the attested package passed the complete quality gate in the job that built it" do
+  test "the attested package passed every quality stage and its archive was checked" do
     ci = read(@gate)
-    assert ci["jobs"]["attest"]["needs"] == "quality"
-    assert ci["jobs"]["attest"]["with"]["version"] == "${{ needs.quality.outputs.version }}"
+    assert MapSet.new(ci["jobs"]["attest"]["needs"]) == MapSet.new(@quality_jobs)
+    assert ci["jobs"]["attest"]["with"]["version"] == "${{ needs.package.outputs.version }}"
 
-    steps = ci["jobs"]["quality"]["steps"]
-    quality = Enum.find_index(steps, &(&1["run"] == "mix quality"))
+    package = ci["jobs"]["package"]
+    assert package["outputs"]["version"] == "${{ steps.archive.outputs.version }}"
+    steps = package["steps"]
+    quality = Enum.find_index(steps, &(&1["run"] == "mix quality.package"))
     archive = Enum.find_index(steps, &String.contains?(&1["run"] || "", "mix hex.build"))
 
     inspect_package =
@@ -243,7 +285,9 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
 
     assert quality != nil and archive != nil and quality < archive
     assert is_integer(inspect_package) and archive < inspect_package
-    refute Map.has_key?(Enum.at(steps, quality), "if"), "mix quality must run on every event"
+
+    refute Map.has_key?(Enum.at(steps, quality), "if"),
+           "mix quality.package must run on every event"
 
     [attest] = Map.values(read(".github/workflows/supply-chain.yml")["jobs"])
 

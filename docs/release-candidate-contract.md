@@ -11,8 +11,11 @@ operational authority or replace a deployment's authorization checks.
 
 ## Candidate verification
 
-[CI](../.github/workflows/ci.yml) builds an unpublished Hex archive in its complete quality job,
-with its SHA-256 checksum and release and tooling CycloneDX documents. In the same
+[CI](../.github/workflows/ci.yml) runs `mix quality.source`, `mix quality.corpus`,
+`mix quality.tests`, `mix quality.conformance`, `mix quality.mutations` and
+`mix quality.package` as separate jobs. `mix quality` runs them all locally. The package job
+builds an unpublished Hex archive with its SHA-256 checksum and release and tooling CycloneDX
+documents. Attestation requires every quality stage to pass. In the same
 `kci/<sha>` qualification run, the
 [supply-chain workflow](../.github/workflows/supply-chain.yml) signs separate build-provenance
 and SBOM attestations for that archive. Verify by source commit, because the attestation names

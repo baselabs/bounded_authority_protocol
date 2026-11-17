@@ -144,12 +144,10 @@ jobs:
       - name: Run tests and coverage
         run: mix test --cover
 
-  quality:
-    name: Complete quality and package boundary
-    outputs:
-      version: ${{ steps.archive.outputs.version }}
+  quality-source:
+    name: "Quality: source, static analysis and docs"
     runs-on: ubuntu-24.04
-    timeout-minutes: 102 # 2x slowest green 51.0 min, run 44095313459.
+    timeout-minutes: 90 # no green run yet
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -167,8 +165,52 @@ jobs:
         run: bash scripts/ci_tool_versions.sh beam
 
       - name: Pin the Hex client
-        # The Hex version is written into the archive metadata; .hex-version keeps CI, the
-        # attestation and a local release build on the same client.
+        run: mix local.hex "$(cat .hex-version)" --force
+
+      - name: Install verified Gitleaks 8.30.1
+        run: |
+          scripts/install_gitleaks.sh "$RUNNER_TEMP/gitleaks-bin"
+          echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
+
+      - name: Read Python version
+        id: python
+        run: bash scripts/ci_tool_versions.sh read python
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ steps.python.outputs.python }}
+
+      - name: Refuse Python version drift
+        run: bash scripts/ci_tool_versions.sh python
+
+      - name: Install dependencies
+        run: mix deps.get --check-locked
+
+      - name: Run source quality stage
+        run: mix quality.source
+
+  quality-corpus:
+    name: "Quality: corpus and distribution"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90 # no green run yet
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Refuse BEAM version drift
+        run: bash scripts/ci_tool_versions.sh beam
+
+      - name: Pin the Hex client
         run: mix local.hex "$(cat .hex-version)" --force
 
       - name: Set up Node
@@ -183,11 +225,6 @@ jobs:
 
       - name: Refuse Node version drift
         run: bash scripts/ci_tool_versions.sh nodejs
-
-      - name: Install verified Gitleaks 8.30.1
-        run: |
-          scripts/install_gitleaks.sh "$RUNNER_TEMP/gitleaks-bin"
-          echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
 
       - name: Read Python version
         id: python
@@ -216,14 +253,185 @@ jobs:
       - name: Install dependencies
         run: mix deps.get --check-locked
 
-      # mix quality includes Hex corpus sync, generator --verify, verdict digests,
-      # and distribution mutations. Focused tests use separate VMs, preserving
-      # the full test --cover --seed 42 run (ADR 0049 D6).
-      - name: Run complete quality gate
-        run: mix quality
+      # Corpus sync, generator --verify, verdict digests and distribution mutations.
+      # Focused tests use separate VMs, preserving the full test --cover --seed 42
+      # run in quality-tests (ADR 0049 D6).
+      - name: Run corpus quality stage
+        run: mix quality.corpus
 
-      # The archive the supply-chain workflow attests is built here, after the complete gate
-      # (which also generates and checks the SBOMs) passed in this same job.
+  quality-tests:
+    name: "Quality: seeded coverage suite and performance"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90 # no green run yet
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Refuse BEAM version drift
+        run: bash scripts/ci_tool_versions.sh beam
+
+      - name: Pin the Hex client
+        run: mix local.hex "$(cat .hex-version)" --force
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The independent Node second-implementation runners in `mix quality` use this
+          # exact toolchain, matching .tool-versions. Pinned exactly (the
+          # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
+          # small-order inputs differs across Node releases, so a floating major would make the
+          # runners' ungated behavior depend on the runner image (ADR 0040).
+          node-version-file: .tool-versions
+
+      - name: Refuse Node version drift
+        run: bash scripts/ci_tool_versions.sh nodejs
+
+      - name: Read Python version
+        id: python
+        run: bash scripts/ci_tool_versions.sh read python
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ steps.python.outputs.python }}
+
+      - name: Refuse Python version drift
+        run: bash scripts/ci_tool_versions.sh python
+
+      - name: Install dependencies
+        run: mix deps.get --check-locked
+
+      - name: Run tests quality stage
+        run: mix quality.tests
+
+  quality-conformance:
+    name: "Quality: conformance verification and mutations"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90 # no green run yet
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Refuse BEAM version drift
+        run: bash scripts/ci_tool_versions.sh beam
+
+      - name: Pin the Hex client
+        run: mix local.hex "$(cat .hex-version)" --force
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The independent Node second-implementation runners in `mix quality` use this
+          # exact toolchain, matching .tool-versions. Pinned exactly (the
+          # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
+          # small-order inputs differs across Node releases, so a floating major would make the
+          # runners' ungated behavior depend on the runner image (ADR 0040).
+          node-version-file: .tool-versions
+
+      - name: Refuse Node version drift
+        run: bash scripts/ci_tool_versions.sh nodejs
+
+      - name: Install dependencies
+        run: mix deps.get --check-locked
+
+      - name: Run conformance quality stage
+        run: mix quality.conformance
+
+  quality-mutations:
+    name: "Quality: archive, assertion and spec mutations"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90 # no green run yet
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Refuse BEAM version drift
+        run: bash scripts/ci_tool_versions.sh beam
+
+      - name: Pin the Hex client
+        run: mix local.hex "$(cat .hex-version)" --force
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The independent Node second-implementation runners in `mix quality` use this
+          # exact toolchain, matching .tool-versions. Pinned exactly (the
+          # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
+          # small-order inputs differs across Node releases, so a floating major would make the
+          # runners' ungated behavior depend on the runner image (ADR 0040).
+          node-version-file: .tool-versions
+
+      - name: Refuse Node version drift
+        run: bash scripts/ci_tool_versions.sh nodejs
+
+      - name: Install dependencies
+        run: mix deps.get --check-locked
+
+      - name: Run mutations quality stage
+        run: mix quality.mutations
+
+  package:
+    name: "Package boundary and attested archive"
+    outputs:
+      version: ${{ steps.archive.outputs.version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90 # no green run yet
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Refuse BEAM version drift
+        run: bash scripts/ci_tool_versions.sh beam
+
+      - name: Pin the Hex client
+        # The Hex version is written into the archive metadata; .hex-version keeps CI, the
+        # attestation and a local release build on the same client.
+        run: mix local.hex "$(cat .hex-version)" --force
+
+      - name: Install dependencies
+        run: mix deps.get --check-locked
+
+      - name: Run package quality stage
+        run: mix quality.package
+
+      # The package job builds the archive after its stage generates and checks the SBOMs.
+      # Attest needs every quality job before attesting this archive in the same run.
       - name: Build exact unpublished archive
         id: archive
         # Derive the artifact name from mix.exs @version; a hardcoded filename is the
@@ -371,15 +579,15 @@ jobs:
 
   attest:
     name: Supply chain
-    needs: quality
-    # Attestation is part of qualification, after the complete quality gate.
+    needs: [quality-source, quality-corpus, quality-tests, quality-conformance, quality-mutations, package]
+    # Attestation is part of qualification, after every quality stage job.
     permissions:
       contents: read
       id-token: write
       attestations: write
     uses: ./.github/workflows/supply-chain.yml
     with:
-      version: ${{ needs.quality.outputs.version }}
+      version: ${{ needs.package.outputs.version }}
 
   qualified:
     name: qualified
@@ -388,7 +596,12 @@ jobs:
       - secret-scan
       - workflow-syntax
       - compatibility
-      - quality
+      - quality-source
+      - quality-corpus
+      - quality-tests
+      - quality-conformance
+      - quality-mutations
+      - package
       - spec-render
       - cddl-coherence
       - formal-analysis
