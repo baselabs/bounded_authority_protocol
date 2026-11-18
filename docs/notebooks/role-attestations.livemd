@@ -2,14 +2,24 @@
 
 # Role attestations
 
-[Run the 1.0.0 release walkthrough in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
-For this focused journey, download this `.livemd` file and use **Open → Import from file** in Livebook.
-The focused file is new since 1.0.0; the release launch above opens the released walkthrough.
+Download this `.livemd` file, open it in [Livebook](https://livebook.dev), and choose
+**Open → Import from file**, then **Run all**. Use Elixir 1.18 or later and OTP 27 or later
+with access to public Hex. No secrets or external services are needed.
 
-Bind a public subject key to a role inside an attestor window, then refuse self-attestation, expiry, and cross-profile inputs.
+Bind a subject public key to an issuer role. Verify its attestor window and subject binding,
+then refuse self-attestation, expiry, an overlong window, and cross-profile bytes.
 
-Run every cell in order. Keys are generated only in memory; persisted outputs contain no keys,
-signatures, credentials, or nonces. Verification leaves trust and execution policy with the host.
+The host chooses the attestor it trusts and the role it requires. Attestation facts report
+`trust: :not_evaluated`; they do not grant authority or reserve replay. Keys stay in memory,
+and this notebook starts no processes and creates no files.
+
+[Open the original 1.0.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
+That immutable release has the earlier walkthrough; import this file for the steps below.
+
+## Setup
+
+Install the exact published package. Fixed evaluation times keep the results reproducible;
+only safe semantic values are persisted, never keys, signatures, tokens, or nonces.
 
 ```elixir
 Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
@@ -21,183 +31,195 @@ Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
 :ok
 ```
 
-The cell returns `:ok`.
+## Generate attestor and subject keys
 
-## Demonstration inputs
+Generate distinct Ed25519 keys for the attestor and subject. A role binding needs no grant
+or request proof.
 
 ```elixir
-notebook_value = (
-  {issuer_public, issuer_private} = :crypto.generate_key(:eddsa, :ed25519)
-  {holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
+alias BoundedAuthorityProtocol.RoleAttestation.V1, as: RoleAttestationV1
+alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
 
-  {:ok, holder_thumbprint} =
-    BoundedAuthorityProtocol.V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
+{attestor_public, attestor_private} = :crypto.generate_key(:eddsa, :ed25519)
+{subject_public, _subject_private} = :crypto.generate_key(:eddsa, :ed25519)
 
-  {byte_size(issuer_public), byte_size(holder_thumbprint)}
-
-  alias BoundedAuthorityProtocol.V1.{Grant, Operation}
-
-  grant = %Grant{
-    key_id: "issuer-1",
-    issuer: "https://issuer.example",
-    grant_id: "grant-2026-001",
-    audiences: ["https://service.example"],
-    issued_at: 1_800_000_000,
-    not_before: 1_800_000_000,
-    expires_at: 1_800_003_600,
-    holder_thumbprint: holder_thumbprint,
-    operations: [
-      %Operation{
-        name: "read_record",
-        selectors: [
-          {:equals, ["record", "region"], {:string, "us-east"}},
-          {:one_of, ["record", "tier"], [{:string, "gold"}, {:string, "platinum"}]},
-          :all
-        ]
-      }
-    ]
-  }
-
-  {:ok, signing_input} = BoundedAuthorityProtocol.V1.grant_signing_input(grant, %{})
-  issuer_signature = :crypto.sign(:eddsa, :none, signing_input.message, [issuer_private, :ed25519])
-  {:ok, grant_compact} = BoundedAuthorityProtocol.V1.assemble_compact(signing_input, issuer_signature)
-
-  grant_compact
-
-  now = 1_800_001_000
-  :demo_ready
-)
-true = notebook_value === (
-  :demo_ready
-)
-notebook_value
+now = 1_800_001_000
+:keys_ready
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-:demo_ready
+:keys_ready
 ```
 
-The cell returns `:demo_ready`.
+## Build and sign the attestation
 
-## Produce and verify a role attestation
-
-A role attestation is a standalone compact JWS (`typ: "ba+role-attestation"`), bound to no
-grant, in which an attestor key binds a subject key to the `issuer` or `holder` role for a window
-inside the attestor key's own validity. As with every sibling profile, selection is explicit: no
-contract-major parses these bytes, and the profile parses none of theirs.
+The attestor signs a standalone `ba+role-attestation` JWS. Its payload names the subject key,
+role, identifier, and validity window.
 
 ```elixir
-notebook_value = (
-  alias BoundedAuthorityProtocol.RoleAttestation.V1, as: RoleAttestationV1
-  alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
+attestation = %RoleAttestationV1.RoleAttestation{
+  attestor_key_id: "authority-attestor-1",
+  jti: "urn:example:attestation:2026-001",
+  key_id: "issuer-key-1",
+  public_key: subject_public,
+  role: "issuer",
+  nbf: now,
+  exp: now + 3_600
+}
 
-  {attestor_public, attestor_private} = :crypto.generate_key(:eddsa, :ed25519)
-  {subject_public, _subject_private} = :crypto.generate_key(:eddsa, :ed25519)
+{:ok, attestation_input} = RoleAttestationV1.attestation_signing_input(attestation, %{})
 
-  attestation = %RoleAttestationV1.RoleAttestation{
-    attestor_key_id: "authority-attestor-1",
-    jti: "urn:example:attestation:2026-001",
-    key_id: "holder-key-1",
-    public_key: subject_public,
-    role: "issuer",
-    nbf: now,
-    exp: now + 3_600
-  }
+attestation_signature =
+  :crypto.sign(:eddsa, :none, attestation_input.message, [attestor_private, :ed25519])
 
-  {:ok, attestation_input} = RoleAttestationV1.attestation_signing_input(attestation, %{})
+{:ok, attestation_compact} =
+  RoleAttestationV1.assemble_compact(attestation_input, attestation_signature)
 
-  attestation_signature =
-    :crypto.sign(:eddsa, :none, attestation_input.message, [attestor_private, :ed25519])
-
-  {:ok, attestation_compact} =
-    RoleAttestationV1.assemble_compact(attestation_input, attestation_signature)
-
-  expected_attestation = %RoleAttestationV1.ExpectedAttestation{
-    attestor: %HistoricalPublicKey{
-      key_id: "authority-attestor-1",
-      public_key: attestor_public,
-      valid_from: now - 600,
-      valid_before: now + 7_200
-    },
-    subject_key_id: "holder-key-1",
-    subject_public_key: subject_public,
-    now: now + 60,
-    bounds: %{}
-  }
-
-  {:ok, attestation_facts} =
-    RoleAttestationV1.verify_attestation(attestation_compact, expected_attestation)
-
-  Map.take(Map.from_struct(attestation_facts), [:attestor_key_id, :subject_key_id, :role, :trust])
-)
-true = notebook_value === (
-  %{attestor_key_id: "authority-attestor-1", subject_key_id: "holder-key-1", role: "issuer", trust: :not_evaluated}
-)
-notebook_value
+:attestation_signed
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-%{attestor_key_id: "authority-attestor-1", subject_key_id: "holder-key-1", role: "issuer", trust: :not_evaluated}
+:attestation_signed
 ```
 
-The cell returns `%{attestor_key_id: "authority-attestor-1", subject_key_id: "holder-key-1", role: "issuer", trust: :not_evaluated}`.
-The facts say `trust: :not_evaluated` and carry no authorization marker at all.
+## Verify the subject binding and window
 
-## Role-attestation attacks fail closed
+Supply the expected subject independently and an already-trusted historical attestor key.
+The attestation window must fit entirely inside that key window.
 
 ```elixir
-notebook_value = (
-  # A true self-attestation: the payload binds the attestor's own key id and key material, and
-  # the expected subject matches it, so every binding check passes and only the structural
-  # self-attestation rejection can fire.
-  self_attestation = %{attestation | key_id: "authority-attestor-1", public_key: attestor_public}
+expected_attestation = %RoleAttestationV1.ExpectedAttestation{
+  attestor: %HistoricalPublicKey{
+    key_id: "authority-attestor-1",
+    public_key: attestor_public,
+    valid_from: now - 600,
+    valid_before: now + 7_200
+  },
+  subject_key_id: "issuer-key-1",
+  subject_public_key: subject_public,
+  now: now + 60,
+  bounds: %{}
+}
 
-  {:ok, self_input} = RoleAttestationV1.attestation_signing_input(self_attestation, %{})
-  self_signature = :crypto.sign(:eddsa, :none, self_input.message, [attestor_private, :ed25519])
-  {:ok, self_compact} = RoleAttestationV1.assemble_compact(self_input, self_signature)
+{:ok, attestation_facts} =
+  RoleAttestationV1.verify_attestation(attestation_compact, expected_attestation)
 
-  %{
-    self_attested:
-      RoleAttestationV1.verify_attestation(self_compact, %{
-        expected_attestation
-        | subject_key_id: "authority-attestor-1",
-          subject_public_key: attestor_public
-      }),
-    # now == exp: the acceptance window is the half-open [nbf, exp).
-    now_at_exp:
-      RoleAttestationV1.verify_attestation(attestation_compact, %{
-        expected_attestation
-        | now: now + 3_600
-      }),
-    # The attestation outlives the attestor key's own validity window.
-    outliving_window:
-      RoleAttestationV1.verify_attestation(attestation_compact, %{
-        expected_attestation
-        | attestor: %{expected_attestation.attestor | valid_before: now + 1_800}
-      }),
-    # Cross-profile, both directions.
-    attestation_through_major_one:
-      BoundedAuthorityProtocol.V1.decode_grant(attestation_compact, %{}),
-    grant_through_attestation: RoleAttestationV1.decode_attestation(grant_compact, %{})
-  }
-)
-true = notebook_value === (
-  %{self_attested: {:error, :invalid}, now_at_exp: {:error, :invalid}, outliving_window: {:error, :invalid}, attestation_through_major_one: {:error, :invalid}, grant_through_attestation: {:error, :invalid}}
-)
-notebook_value
+Map.take(attestation_facts, [:attestor_key_id, :subject_key_id, :role, :trust])
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-%{self_attested: {:error, :invalid}, now_at_exp: {:error, :invalid}, outliving_window: {:error, :invalid}, attestation_through_major_one: {:error, :invalid}, grant_through_attestation: {:error, :invalid}}
+%{attestor_key_id: "authority-attestor-1", subject_key_id: "issuer-key-1", role: "issuer", trust: :not_evaluated}
 ```
 
-The cell returns `%{self_attested: {:error, :invalid}, now_at_exp: {:error, :invalid}, outliving_window: {:error, :invalid}, attestation_through_major_one: {:error, :invalid}, grant_through_attestation: {:error, :invalid}}`.
+## Refuse a true self-attestation
 
-A role attestation is evidence of a binding, not an authorization: which attestor to trust,
-which role a consumer requires, and replay reservation stay with the caller.
+Sign a binding to the attestor itself and make the expected subject match. The refusal then
+comes from the structural self-attestation rule, rather than a subject mismatch.
+
+```elixir
+# A true self-attestation: the payload binds the attestor's own key id and key material, and
+# the expected subject matches it, so every binding check passes and only the structural
+# self-attestation rejection can fire.
+self_attestation = %{attestation | key_id: "authority-attestor-1", public_key: attestor_public}
+
+{:ok, self_input} = RoleAttestationV1.attestation_signing_input(self_attestation, %{})
+self_signature = :crypto.sign(:eddsa, :none, self_input.message, [attestor_private, :ed25519])
+{:ok, self_compact} = RoleAttestationV1.assemble_compact(self_input, self_signature)
+
+{:error, :invalid} =
+  RoleAttestationV1.verify_attestation(self_compact, %{
+    expected_attestation
+    | subject_key_id: "authority-attestor-1",
+      subject_public_key: attestor_public
+  })
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:error, :invalid}
+```
+
+## Refuse expired or outliving attestations
+
+The acceptance interval is half-open: evaluation at `exp` fails. An otherwise current
+attestation also fails when it outlives its attestor key.
+
+```elixir
+{:error, :invalid} =
+  RoleAttestationV1.verify_attestation(attestation_compact, %{
+    expected_attestation
+    | now: now + 3_600
+  })
+
+{:error, :invalid} =
+  RoleAttestationV1.verify_attestation(attestation_compact, %{
+    expected_attestation
+    | attestor: %{expected_attestation.attestor | valid_before: now + 1_800}
+  })
+
+[:expired, :outliving_attestor]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[:expired, :outliving_attestor]
+```
+
+## Refuse a different subject
+
+A signature from a trusted attestor does not permit substituting a subject. The expected key id
+and public key both bind the statement to the subject the host intended.
+
+```elixir
+{:error, :invalid} =
+  RoleAttestationV1.verify_attestation(attestation_compact, %{
+    expected_attestation
+    | subject_key_id: "other-subject"
+  })
+
+{:error, :invalid} =
+  RoleAttestationV1.verify_attestation(attestation_compact, %{
+    expected_attestation
+    | subject_public_key: attestor_public
+  })
+
+[:subject_key_id, :subject_public_key]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[:subject_key_id, :subject_public_key]
+```
+
+## Refuse cross-profile decoding
+
+These bytes decode as a role attestation but never as a grant or content assertion. Selecting
+a profile remains an explicit host choice.
+
+```elixir
+{:ok, _decoded} = RoleAttestationV1.decode_attestation(attestation_compact, %{})
+{:error, :invalid} = BoundedAuthorityProtocol.V1.decode_grant(attestation_compact, %{})
+
+{:error, :invalid} =
+  BoundedAuthorityProtocol.ContentAssertion.V1.decode_assertion(attestation_compact, %{})
+
+[:grant_profile, :content_profile]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[:grant_profile, :content_profile]
+```
+
+See [trusted keys and rotation](../guides/trusted-keys-and-rotation.md) for trust installation
+and the [role-attestation specification](../../spec/bap-role-attestation-v1.md) for the profile.

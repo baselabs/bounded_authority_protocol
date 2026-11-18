@@ -2,14 +2,24 @@
 
 # Contract-major 3 ES256 grants and proofs
 
-[Run the 1.0.0 release walkthrough in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
-For this focused journey, download this `.livemd` file and use **Open → Import from file** in Livebook.
-The focused file is new since 1.0.0; the release launch above opens the released walkthrough.
+Download this `.livemd` file, open it in [Livebook](https://livebook.dev), and choose
+**Open → Import from file**, then **Run all**. Use Elixir 1.18 or later and OTP 27 or later
+with access to public Hex. No secrets or external services are needed.
 
-Convert DER signatures to low-S raw signatures, verify a contract-major 3 envelope, and refuse high-S signatures, wrong holders, and cross-major bytes.
+Sign a compute-job grant and proof with P-256. Convert DER signatures to low-S raw form,
+verify the envelope, and refuse high-S signatures, another holder, and cross-major inputs.
 
-Run every cell in order. Keys are generated only in memory; persisted outputs contain no keys,
-signatures, credentials, or nonces. Verification leaves trust and execution policy with the host.
+The signer owns conversion and normalization; assembly refuses noncanonical signatures.
+The host supplies trusted public keys and context and owns replay, revocation, and the decision.
+The generated keys stay in memory; this notebook starts no services and creates no files.
+
+[Open the original 1.0.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
+That immutable release has the earlier walkthrough; import this file for the steps below.
+
+## Setup
+
+Install the exact published package. Fixed evaluation times keep the results reproducible;
+only safe semantic values are persisted, never keys, signatures, tokens, or nonces.
 
 ```elixir
 Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
@@ -21,249 +31,170 @@ Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
 :ok
 ```
 
-The cell returns `:ok`.
+## Generate P-256 keys and convert signatures
 
-## Demonstration inputs
+OTP returns DER ECDSA signatures. Convert to raw `r || s`, normalize low S, and only then
+assemble a compact JWS. The holder thumbprint uses the EC JWK construction.
 
 ```elixir
-notebook_value = (
-  {issuer_public, issuer_private} = :crypto.generate_key(:eddsa, :ed25519)
-  {holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
+alias BoundedAuthorityProtocol.Es256
+alias BoundedAuthorityProtocol.V3
+alias BoundedAuthorityProtocol.V3.EcJwk
 
-  {:ok, holder_thumbprint} =
-    BoundedAuthorityProtocol.V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
+{es_issuer_public, es_issuer_private} = :crypto.generate_key(:ecdh, :prime256v1)
+{es_holder_public, es_holder_private} = :crypto.generate_key(:ecdh, :prime256v1)
 
-  {byte_size(issuer_public), byte_size(holder_thumbprint)}
+es256_sign = fn message, private_key ->
+  der = :crypto.sign(:ecdsa, :sha256, message, [private_key, :prime256v1])
+  {:ok, raw} = Es256.der_to_raw(der)
+  {:ok, low_s} = Es256.normalize_low_s(raw)
+  low_s
+end
 
-  alias BoundedAuthorityProtocol.V1.{Grant, Operation}
+{:ok, es_holder_thumbprint} = EcJwk.public_key_thumbprint_raw(es_holder_public, %{})
 
-  grant = %Grant{
-    key_id: "issuer-1",
-    issuer: "https://issuer.example",
-    grant_id: "grant-2026-001",
-    audiences: ["https://service.example"],
-    issued_at: 1_800_000_000,
-    not_before: 1_800_000_000,
-    expires_at: 1_800_003_600,
-    holder_thumbprint: holder_thumbprint,
-    operations: [
-      %Operation{
-        name: "read_record",
-        selectors: [
-          {:equals, ["record", "region"], {:string, "us-east"}},
-          {:one_of, ["record", "tier"], [{:string, "gold"}, {:string, "platinum"}]},
-          :all
-        ]
-      }
-    ]
-  }
-
-  {:ok, signing_input} = BoundedAuthorityProtocol.V1.grant_signing_input(grant, %{})
-  issuer_signature = :crypto.sign(:eddsa, :none, signing_input.message, [issuer_private, :ed25519])
-  {:ok, grant_compact} = BoundedAuthorityProtocol.V1.assemble_compact(signing_input, issuer_signature)
-
-  grant_compact
-
-  alias BoundedAuthorityProtocol.V1.Proof
-
-  now = 1_800_001_000
-
-  proof = %Proof{
-    holder_public_key: holder_public,
-    proof_id: "proof-2026-001",
-    method: "GET",
-    target_uri: "https://service.example/records/1",
-    issued_at: now,
-    nonce: nil,
-    invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120002",
-    operation: "read_record",
-    grant_compact: grant_compact,
-    cast_arguments:
-      {:object,
-       [
-         {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
-       ]}
-  }
-
-  {:ok, proof_input} = BoundedAuthorityProtocol.V1.proof_signing_input(proof, %{})
-  holder_signature = :crypto.sign(:eddsa, :none, proof_input.message, [holder_private, :ed25519])
-  {:ok, proof_compact} = BoundedAuthorityProtocol.V1.assemble_compact(proof_input, holder_signature)
-
-  proof_compact
-
-  alias BoundedAuthorityProtocol.V1.{TrustedIssuer, ExpectedGrant}
-
-  trusted = %TrustedIssuer{key_id: "issuer-1", public_key: issuer_public}
-
-  expected_grant = %ExpectedGrant{
-    issuer: "https://issuer.example",
-    audience: "https://service.example",
-    evaluation_time: now,
-    clock_skew: 60,
-    bounds: %{}
-  }
-
-  {:ok, grant_facts} = BoundedAuthorityProtocol.V1.verify_grant(grant_compact, trusted, expected_grant)
-
-  Map.take(Map.from_struct(grant_facts), [:issuer, :grant_id, :authorization])
-
-  alias BoundedAuthorityProtocol.V1.{Credentials, ExpectedRequest}
-
-  credentials = %Credentials{grant: grant_compact, proof: proof_compact}
-
-  expected_request = %ExpectedRequest{
-    trusted_issuer: trusted,
-    issuer: "https://issuer.example",
-    audience: "https://service.example",
-    method: "GET",
-    target_uri: "https://service.example/records/1",
-    invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120002",
-    operation: "read_record",
-    cast_arguments:
-      {:object,
-       [
-         {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
-       ]},
-    evaluation_time: now,
-    clock_skew: 60,
-    proof_max_age: 300,
-    nonce: :not_required,
-    bounds: %{}
-  }
-
-  {:ok, envelope_facts} = BoundedAuthorityProtocol.V1.check_envelope(credentials, expected_request)
-
-  Map.take(Map.from_struct(envelope_facts), [:operation, :authorization])
-
-  :demo_ready
-)
-true = notebook_value === (
-  :demo_ready
-)
-notebook_value
+now = 1_800_001_000
+:es256_signer_ready
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-:demo_ready
+:es256_signer_ready
 ```
 
-The cell returns `:demo_ready`.
+## Build and sign the grant
 
-## Contract-major 3: ES256 grants and proofs
-
-Contract-major 3 (`BoundedAuthorityProtocol.V3`,
-[specification](https://hexdocs.pm/bounded_authority_protocol/bap-v3.html)) is the
-`BAP3-ES256-SHA256` suite: ECDSA over P-256 with SHA-256. Grants and proofs carry `v: 3` and
-`alg: "ES256"`, the holder key travels as an EC JWK, and a signature is the raw 64-byte `r || s`
-form of RFC 7518 § 3.4 with `s` in the low half (`s <= n/2`). `BoundedAuthorityProtocol.V3` has
-its own grant and proof producers; the trusted-issuer, expected-context, and credentials structs
-are the ones the demonstration setup used.
-
-`:crypto`, like most KMS and HSM interfaces, returns an ECDSA signature in DER and may return
-either `s`. The signer converts it with `BoundedAuthorityProtocol.Es256.der_to_raw/1` and then
-`BoundedAuthorityProtocol.Es256.normalize_low_s/1` before assembly. Assembly itself never
-normalizes; it refuses a high-S signature.
+The issuer permits a batch job using at most eight GPU hours. Contract-major 3 has its own
+producers and inherits the range selectors of contract-major 2.
 
 ```elixir
-notebook_value = (
-  alias BoundedAuthorityProtocol.Es256
-  alias BoundedAuthorityProtocol.V3
-  alias BoundedAuthorityProtocol.V3.EcJwk
+es_grant = %V3.Grant{
+  key_id: "es-issuer-1",
+  issuer: "https://issuer.example",
+  grant_id: "grant-2026-es-001",
+  audiences: ["https://service.example"],
+  issued_at: 1_800_000_000,
+  not_before: 1_800_000_000,
+  expires_at: 1_800_003_600,
+  holder_thumbprint: es_holder_thumbprint,
+  operations: [
+    %V3.Operation{
+      name: "start_job",
+      selectors: [
+        {:equals, ["job", "queue"], {:string, "batch"}},
+        {:lte, ["job", "gpu_hours"], {:integer, 8}}
+      ]
+    }
+  ]
+}
 
-  {es_issuer_public, es_issuer_private} = :crypto.generate_key(:ecdh, :prime256v1)
-  {es_holder_public, es_holder_private} = :crypto.generate_key(:ecdh, :prime256v1)
+{:ok, es_grant_input} = V3.grant_signing_input(es_grant, %{})
 
-  es256_sign = fn message, private_key ->
-    der = :crypto.sign(:ecdsa, :sha256, message, [private_key, :prime256v1])
-    {:ok, raw} = Es256.der_to_raw(der)
-    {:ok, low_s} = Es256.normalize_low_s(raw)
-    low_s
-  end
+{:ok, es_grant_compact} =
+  V3.assemble_compact(es_grant_input, es256_sign.(es_grant_input.message, es_issuer_private))
 
-  {:ok, es_holder_thumbprint} = EcJwk.public_key_thumbprint_raw(es_holder_public, %{})
+:grant_signed
+```
 
-  es_grant = %V3.Grant{
-    key_id: "es-issuer-1",
-    issuer: "https://issuer.example",
-    grant_id: "grant-2026-es-001",
-    audiences: ["https://service.example"],
-    issued_at: 1_800_000_000,
-    not_before: 1_800_000_000,
-    expires_at: 1_800_003_600,
-    holder_thumbprint: es_holder_thumbprint,
-    operations: [
-      %V3.Operation{
-        name: "start_job",
-        selectors: [
-          {:equals, ["job", "queue"], {:string, "batch"}},
-          {:lte, ["job", "gpu_hours"], {:integer, 8}}
-        ]
-      }
-    ]
-  }
+<!-- livebook:{"output":true} -->
 
-  {:ok, es_grant_input} = V3.grant_signing_input(es_grant, %{})
+```
+:grant_signed
+```
 
-  {:ok, es_grant_compact} =
-    V3.assemble_compact(es_grant_input, es256_sign.(es_grant_input.message, es_issuer_private))
+## Build and sign the proof
 
-  es_arguments =
-    {:object,
-     [{"job", {:object, [{"queue", {:string, "batch"}}, {"gpu_hours", {:integer, 4}}]}}]}
+Bind the job arguments and the exact grant bytes to this invocation. Only the low-S raw
+signature enters assembly.
 
-  es_proof = %V3.Proof{
-    holder_public_key: es_holder_public,
-    proof_id: "proof-2026-es-001",
-    method: "POST",
-    target_uri: "https://service.example/jobs",
-    issued_at: now,
-    nonce: nil,
-    invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120004",
-    operation: "start_job",
-    grant_compact: es_grant_compact,
-    cast_arguments: es_arguments
-  }
+```elixir
+es_arguments =
+  {:object, [{"job", {:object, [{"queue", {:string, "batch"}}, {"gpu_hours", {:integer, 4}}]}}]}
 
-  {:ok, es_proof_input} = V3.proof_signing_input(es_proof, %{})
-  es_proof_signature = es256_sign.(es_proof_input.message, es_holder_private)
-  {:ok, es_proof_compact} = V3.assemble_compact(es_proof_input, es_proof_signature)
+es_proof = %V3.Proof{
+  holder_public_key: es_holder_public,
+  proof_id: "proof-2026-es-001",
+  method: "POST",
+  target_uri: "https://service.example/jobs",
+  issued_at: now,
+  nonce: nil,
+  invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120004",
+  operation: "start_job",
+  grant_compact: es_grant_compact,
+  cast_arguments: es_arguments
+}
 
-  es_trusted = %TrustedIssuer{key_id: "es-issuer-1", public_key: es_issuer_public}
-  es_credentials = %Credentials{grant: es_grant_compact, proof: es_proof_compact}
+{:ok, es_proof_input} = V3.proof_signing_input(es_proof, %{})
+es_proof_signature = es256_sign.(es_proof_input.message, es_holder_private)
+{:ok, es_proof_compact} = V3.assemble_compact(es_proof_input, es_proof_signature)
 
-  es_expected = %ExpectedRequest{
-    trusted_issuer: es_trusted,
-    issuer: "https://issuer.example",
-    audience: "https://service.example",
-    method: "POST",
-    target_uri: "https://service.example/jobs",
-    invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120004",
-    operation: "start_job",
-    cast_arguments: es_arguments,
-    evaluation_time: now,
-    clock_skew: 60,
-    proof_max_age: 300,
-    nonce: :not_required,
-    bounds: %{}
-  }
+:proof_signed
+```
 
-  {:ok, es_grant_facts} = V3.verify_grant(es_grant_compact, es_trusted, expected_grant)
-  {:ok, es_envelope_facts} = V3.check_envelope(es_credentials, es_expected)
+<!-- livebook:{"output":true} -->
 
-  %{
-    grant: Map.take(Map.from_struct(es_grant_facts), [:version, :grant_id, :authorization]),
-    envelope: Map.take(Map.from_struct(es_envelope_facts), [:operation, :authorization])
-  }
-)
-true = notebook_value === (
-  %{
-    grant: %{version: 3, grant_id: "grant-2026-es-001", authorization: :not_evaluated},
-    envelope: %{operation: "start_job", authorization: :not_evaluated}
-  }
-)
-notebook_value
+```
+:proof_signed
+```
+
+## Supply trusted keys and expected context
+
+Use the shared expected-context structs from the contract-major 1 namespace. Select the
+contract-major 3 verifier explicitly; never probe profiles until one accepts.
+
+```elixir
+alias BoundedAuthorityProtocol.V1.{Credentials, ExpectedGrant, ExpectedRequest, TrustedIssuer}
+
+es_trusted = %TrustedIssuer{key_id: "es-issuer-1", public_key: es_issuer_public}
+es_credentials = %Credentials{grant: es_grant_compact, proof: es_proof_compact}
+
+es_expected = %ExpectedRequest{
+  trusted_issuer: es_trusted,
+  issuer: "https://issuer.example",
+  audience: "https://service.example",
+  method: "POST",
+  target_uri: "https://service.example/jobs",
+  invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120004",
+  operation: "start_job",
+  cast_arguments: es_arguments,
+  evaluation_time: now,
+  clock_skew: 60,
+  proof_max_age: 300,
+  nonce: :not_required,
+  bounds: %{}
+}
+
+expected_grant = %ExpectedGrant{
+  issuer: "https://issuer.example",
+  audience: "https://service.example",
+  evaluation_time: now,
+  clock_skew: 60,
+  bounds: %{}
+}
+
+:expected_context_ready
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:expected_context_ready
+```
+
+## Verify the grant and envelope
+
+Both verifiers use only public keys. Show the version and operation while keeping random
+signatures and thumbprints out of persisted output.
+
+```elixir
+{:ok, es_grant_facts} = V3.verify_grant(es_grant_compact, es_trusted, expected_grant)
+{:ok, es_envelope_facts} = V3.check_envelope(es_credentials, es_expected)
+
+%{
+  grant: Map.take(es_grant_facts, [:version, :grant_id, :authorization]),
+  envelope: Map.take(es_envelope_facts, [:operation, :authorization])
+}
 ```
 
 <!-- livebook:{"output":true} -->
@@ -275,137 +206,97 @@ notebook_value
 }
 ```
 
-## ES256 attacks fail closed
+## Refuse the high-S twin
 
-ECDSA signatures are malleable: if `(r, s)` verifies, so does `(r, n - s)`. Contract-major 3
-accepts only the low-`s` member of each pair (`REQ3-SIGNING-low-s`). Below, the backend alone
-accepts the high-S twin of the holder signature, and `check_envelope` refuses it. The `Es256`
-helpers turn the twin's DER form back into the original low-S signature, which is what a signer
-does with whatever its KMS or HSM returns.
-
-Each contract-major parses only its own bytes (`REQ3-CORE-cross-major-reject`). Decoding takes no
-key, so the cross-major attempts below use `decode_grant` and `decode_proof`: the contract-major 3
-decoders refuse the grant and proof of the contract-major 1 envelope from the demonstration setup, and the
-contract-major 1 and 2 decoders refuse the contract-major 3 grant and proof. The
-`same_major_decodes` entries show each set of bytes decoding under its own major, so the
-refusals come from the major check alone. The last attempt presents the contract-major 3 grant
-with a proof signed by a key the grant does not name.
+ECDSA also verifies `(r, n - s)` in the backend. Demonstrate that fact, recover the original
+low-S signature, and show that assembly and envelope verification both refuse the high-S twin.
 
 ```elixir
-notebook_value = (
-  # The P-256 group order (contract-major 3 specification § 3.2):
-  n = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+# The P-256 group order (contract-major 3 specification § 3.2):
+n = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
 
-  <<es_r::256, es_s::256>> = es_proof_signature
-  high_s_signature = <<es_r::256, n - es_s::256>>
+<<es_r::256, es_s::256>> = es_proof_signature
+high_s_signature = <<es_r::256, n - es_s::256>>
 
-  high_s_proof =
-    es_proof_input.message <> "." <> Base.url_encode64(high_s_signature, padding: false)
+high_s_proof =
+  es_proof_input.message <> "." <> Base.url_encode64(high_s_signature, padding: false)
 
-  # The backend verifies DER, so frame the twin as a DER ECDSA-Sig-Value
-  # (SEQUENCE { INTEGER r, INTEGER s }; a leading zero byte keeps an INTEGER positive):
-  der_integer = fn integer ->
-    bytes = :binary.encode_unsigned(integer)
-    bytes = if :binary.first(bytes) >= 0x80, do: <<0>> <> bytes, else: bytes
-    <<0x02, byte_size(bytes)>> <> bytes
-  end
+# The backend verifies DER, so frame the twin as a DER ECDSA-Sig-Value
+# (SEQUENCE { INTEGER r, INTEGER s }; a leading zero byte keeps an INTEGER positive):
+der_integer = fn integer ->
+  bytes = :binary.encode_unsigned(integer)
+  bytes = if :binary.first(bytes) >= 0x80, do: <<0>> <> bytes, else: bytes
+  <<0x02, byte_size(bytes)>> <> bytes
+end
 
-  high_s_body = der_integer.(es_r) <> der_integer.(n - es_s)
-  high_s_der = <<0x30, byte_size(high_s_body)>> <> high_s_body
+high_s_body = der_integer.(es_r) <> der_integer.(n - es_s)
+high_s_der = <<0x30, byte_size(high_s_body)>> <> high_s_body
 
-  backend_accepts_high_s_twin =
-    :crypto.verify(:ecdsa, :sha256, es_proof_input.message, high_s_der, [
-      es_holder_public,
-      :prime256v1
-    ])
+true =
+  :crypto.verify(:ecdsa, :sha256, es_proof_input.message, high_s_der, [
+    es_holder_public,
+    :prime256v1
+  ])
 
-  # A different P-256 key presents the same grant with a correctly signed proof of its own:
-  {other_public, other_private} = :crypto.generate_key(:ecdh, :prime256v1)
-  {:ok, other_input} = V3.proof_signing_input(%{es_proof | holder_public_key: other_public}, %{})
+{:ok, raw_twin} = Es256.der_to_raw(high_s_der)
+{:ok, ^es_proof_signature} = Es256.normalize_low_s(raw_twin)
+{:error, :invalid} = V3.assemble_compact(es_proof_input, high_s_signature)
 
-  {:ok, other_proof} =
-    V3.assemble_compact(other_input, es256_sign.(other_input.message, other_private))
+{:error, :invalid} =
+  V3.check_envelope(%{es_credentials | proof: high_s_proof}, es_expected)
 
-  decodes? = &match?({:ok, _decoded}, &1)
-
-  %{
-    backend_accepts_high_s_twin: backend_accepts_high_s_twin,
-    helpers_recover_low_s:
-      with({:ok, raw} <- Es256.der_to_raw(high_s_der), do: Es256.normalize_low_s(raw)) ==
-        {:ok, es_proof_signature},
-    same_major_decodes: %{
-      major_one_grant: decodes?.(BoundedAuthorityProtocol.V1.decode_grant(grant_compact, %{})),
-      major_one_proof: decodes?.(BoundedAuthorityProtocol.V1.decode_proof(proof_compact, %{})),
-      major_three_grant: decodes?.(V3.decode_grant(es_grant_compact, %{})),
-      major_three_proof: decodes?.(V3.decode_proof(es_proof_compact, %{}))
-    },
-    rejections: %{
-      high_s:
-        V3.check_envelope(%Credentials{grant: es_grant_compact, proof: high_s_proof}, es_expected),
-      major_one_grant_through_major_three: V3.decode_grant(grant_compact, %{}),
-      major_one_proof_through_major_three: V3.decode_proof(proof_compact, %{}),
-      major_three_grant_through_major_one:
-        BoundedAuthorityProtocol.V1.decode_grant(es_grant_compact, %{}),
-      major_three_proof_through_major_one:
-        BoundedAuthorityProtocol.V1.decode_proof(es_proof_compact, %{}),
-      major_three_grant_through_major_two:
-        BoundedAuthorityProtocol.V2.decode_grant(es_grant_compact, %{}),
-      major_three_proof_through_major_two:
-        BoundedAuthorityProtocol.V2.decode_proof(es_proof_compact, %{}),
-      wrong_holder_key:
-        V3.check_envelope(%Credentials{grant: es_grant_compact, proof: other_proof}, es_expected)
-    }
-  }
-)
-true = notebook_value === (
-  %{
-    backend_accepts_high_s_twin: true,
-    helpers_recover_low_s: true,
-    same_major_decodes: %{
-      major_one_grant: true,
-      major_one_proof: true,
-      major_three_grant: true,
-      major_three_proof: true
-    },
-    rejections: %{
-      high_s: {:error, :invalid},
-      major_one_grant_through_major_three: {:error, :invalid},
-      major_one_proof_through_major_three: {:error, :invalid},
-      major_three_grant_through_major_one: {:error, :invalid},
-      major_three_proof_through_major_one: {:error, :invalid},
-      major_three_grant_through_major_two: {:error, :invalid},
-      major_three_proof_through_major_two: {:error, :invalid},
-      wrong_holder_key: {:error, :invalid}
-    }
-  }
-)
-notebook_value
+:high_s_refused
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-%{
-  backend_accepts_high_s_twin: true,
-  helpers_recover_low_s: true,
-  same_major_decodes: %{
-    major_one_grant: true,
-    major_one_proof: true,
-    major_three_grant: true,
-    major_three_proof: true
-  },
-  rejections: %{
-    high_s: {:error, :invalid},
-    major_one_grant_through_major_three: {:error, :invalid},
-    major_one_proof_through_major_three: {:error, :invalid},
-    major_three_grant_through_major_one: {:error, :invalid},
-    major_three_proof_through_major_one: {:error, :invalid},
-    major_three_grant_through_major_two: {:error, :invalid},
-    major_three_proof_through_major_two: {:error, :invalid},
-    wrong_holder_key: {:error, :invalid}
-  }
-}
+:high_s_refused
 ```
 
-The high-S proof was framed by hand. A contract-major 3 verifier rejects it whatever produced
-it, and a conforming signer never emits it.
+## Refuse another holder
+
+This proof has a valid P-256 signature of its own, but the grant names a different holder
+thumbprint. Signature validity cannot replace holder binding.
+
+```elixir
+{other_public, other_private} = :crypto.generate_key(:ecdh, :prime256v1)
+{:ok, other_input} = V3.proof_signing_input(%{es_proof | holder_public_key: other_public}, %{})
+
+{:ok, other_proof} =
+  V3.assemble_compact(other_input, es256_sign.(other_input.message, other_private))
+
+{:error, :invalid} =
+  V3.check_envelope(%{es_credentials | proof: other_proof}, es_expected)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:error, :invalid}
+```
+
+## Refuse cross-major bytes
+
+First decode these bytes under their own contract-major. Contract-majors 1 and 2 must refuse
+both the grant and proof without attempting a fallback.
+
+```elixir
+{:ok, _grant} = V3.decode_grant(es_grant_compact, %{})
+{:ok, _proof} = V3.decode_proof(es_proof_compact, %{})
+{:error, :invalid} = BoundedAuthorityProtocol.V1.decode_grant(es_grant_compact, %{})
+{:error, :invalid} = BoundedAuthorityProtocol.V1.decode_proof(es_proof_compact, %{})
+{:error, :invalid} = BoundedAuthorityProtocol.V2.decode_grant(es_grant_compact, %{})
+{:error, :invalid} = BoundedAuthorityProtocol.V2.decode_proof(es_proof_compact, %{})
+
+[:major_one_grant, :major_one_proof, :major_two_grant, :major_two_proof]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[:major_one_grant, :major_one_proof, :major_two_grant, :major_two_proof]
+```
+
+See [choosing a profile](../guides/choosing-a-profile.md) and the
+[ES256 specification](../../spec/bap-v3.md) for the suite and canonical signature rules.

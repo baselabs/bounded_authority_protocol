@@ -2,12 +2,24 @@
 
 # Core envelope verification
 
-[Run the 1.0.0 release notebook in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
+Download this `.livemd` file, open it in [Livebook](https://livebook.dev), and choose
+**Open → Import from file**, then **Run all**. Use Elixir 1.18 or later and OTP 27 or later
+with access to public Hex. No secrets or external services are needed.
 
-Produce a contract-major 1 grant and holder proof, verify the envelope, and refuse changed bytes, arguments, and stale proofs.
+Build a contract-major 1 grant and holder proof for reading a record, verify their request
+binding, and refuse changed bytes, disallowed arguments, and stale proofs.
 
-Run every cell in order. Keys are generated only in memory; persisted outputs contain no keys,
-signatures, credentials, or nonces. Verification leaves trust and execution policy with the host.
+The host supplies trusted issuer keys and request context. Verification produces facts, not
+execution authority; revocation, replay reservation, and the final decision belong to the host.
+Demonstration keys stay in memory. This notebook starts no processes and creates no files.
+
+[Open the original 1.0.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
+That immutable release has the earlier walkthrough; import this file for the steps below.
+
+## Setup
+
+Install the exact published package. Fixed evaluation times keep the results reproducible;
+only safe semantic values are persisted, never keys, signatures, tokens, or nonces.
 
 ```elixir
 Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
@@ -19,24 +31,19 @@ Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
 :ok
 ```
 
-The cell returns `:ok`.
+## Generate issuer and holder keys
 
-## Ephemeral keys
+Generate two independent Ed25519 keys. The grant identifies its holder by the raw RFC 7638
+thumbprint, not by private key material.
 
 ```elixir
-notebook_value = (
-  {issuer_public, issuer_private} = :crypto.generate_key(:eddsa, :ed25519)
-  {holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
+{issuer_public, issuer_private} = :crypto.generate_key(:eddsa, :ed25519)
+{holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
 
-  {:ok, holder_thumbprint} =
-    BoundedAuthorityProtocol.V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
+{:ok, holder_thumbprint} =
+  BoundedAuthorityProtocol.V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
 
-  {byte_size(issuer_public), byte_size(holder_thumbprint)}
-)
-true = notebook_value === (
-  {32, 32}
-)
-notebook_value
+{byte_size(issuer_public), byte_size(holder_thumbprint)}
 ```
 
 <!-- livebook:{"output":true} -->
@@ -45,128 +52,112 @@ notebook_value
 {32, 32}
 ```
 
-The cell returns `{32, 32}`: a raw 32-byte Ed25519 public key, and the raw 32-byte RFC 7638
-thumbprint of the holder key that the grant will name.
+## Build and sign the grant
 
-## Build and sign a grant
+The issuer permits one operation under conjunctive selectors. Sign the exact JWS input with
+`:crypto`; the protocol producer receives only the resulting signature.
 
 ```elixir
-notebook_value = (
-  alias BoundedAuthorityProtocol.V1.{Grant, Operation}
+alias BoundedAuthorityProtocol.V1.{Grant, Operation}
 
-  grant = %Grant{
-    key_id: "issuer-1",
-    issuer: "https://issuer.example",
-    grant_id: "grant-2026-001",
-    audiences: ["https://service.example"],
-    issued_at: 1_800_000_000,
-    not_before: 1_800_000_000,
-    expires_at: 1_800_003_600,
-    holder_thumbprint: holder_thumbprint,
-    operations: [
-      %Operation{
-        name: "read_record",
-        selectors: [
-          {:equals, ["record", "region"], {:string, "us-east"}},
-          {:one_of, ["record", "tier"], [{:string, "gold"}, {:string, "platinum"}]},
-          :all
-        ]
-      }
-    ]
-  }
+grant = %Grant{
+  key_id: "issuer-1",
+  issuer: "https://issuer.example",
+  grant_id: "grant-2026-001",
+  audiences: ["https://service.example"],
+  issued_at: 1_800_000_000,
+  not_before: 1_800_000_000,
+  expires_at: 1_800_003_600,
+  holder_thumbprint: holder_thumbprint,
+  operations: [
+    %Operation{
+      name: "read_record",
+      selectors: [
+        {:equals, ["record", "region"], {:string, "us-east"}},
+        {:one_of, ["record", "tier"], [{:string, "gold"}, {:string, "platinum"}]},
+        :all
+      ]
+    }
+  ]
+}
 
-  {:ok, signing_input} = BoundedAuthorityProtocol.V1.grant_signing_input(grant, %{})
-  issuer_signature = :crypto.sign(:eddsa, :none, signing_input.message, [issuer_private, :ed25519])
-  {:ok, grant_compact} = BoundedAuthorityProtocol.V1.assemble_compact(signing_input, issuer_signature)
+{:ok, signing_input} = BoundedAuthorityProtocol.V1.grant_signing_input(grant, %{})
+issuer_signature = :crypto.sign(:eddsa, :none, signing_input.message, [issuer_private, :ed25519])
 
-  grant_compact
-)
-true = match?("eyJ" <> _, notebook_value)
-:compact_assembled
+{:ok, grant_compact} =
+  BoundedAuthorityProtocol.V1.assemble_compact(signing_input, issuer_signature)
+
+:grant_signed
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-:compact_assembled
+:grant_signed
 ```
-
-The generated compact begins with its encoded protected header: a compact JWS whose first segment is the base64url form of
-the protected header `{"alg":"EdDSA",…}`. The signature is fresh on every run.
 
 ## Build and sign the holder proof
 
-The proof binds this grant (through `ath`, the digest of the exact grant compact bytes), this
-request (through the server-derived operation and typed arguments), and this context.
+Bind the exact grant compact bytes, method, target, invocation, operation, and tagged arguments.
+The holder signs this input with the key the grant names.
 
 ```elixir
-notebook_value = (
-  alias BoundedAuthorityProtocol.V1.Proof
+alias BoundedAuthorityProtocol.V1.Proof
 
-  now = 1_800_001_000
+now = 1_800_001_000
 
-  proof = %Proof{
-    holder_public_key: holder_public,
-    proof_id: "proof-2026-001",
-    method: "GET",
-    target_uri: "https://service.example/records/1",
-    issued_at: now,
-    nonce: nil,
-    invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120002",
-    operation: "read_record",
-    grant_compact: grant_compact,
-    cast_arguments:
-      {:object,
-       [
-         {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
-       ]}
-  }
+proof = %Proof{
+  holder_public_key: holder_public,
+  proof_id: "proof-2026-001",
+  method: "GET",
+  target_uri: "https://service.example/records/1",
+  issued_at: now,
+  nonce: nil,
+  invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120002",
+  operation: "read_record",
+  grant_compact: grant_compact,
+  cast_arguments:
+    {:object,
+     [
+       {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
+     ]}
+}
 
-  {:ok, proof_input} = BoundedAuthorityProtocol.V1.proof_signing_input(proof, %{})
-  holder_signature = :crypto.sign(:eddsa, :none, proof_input.message, [holder_private, :ed25519])
-  {:ok, proof_compact} = BoundedAuthorityProtocol.V1.assemble_compact(proof_input, holder_signature)
+{:ok, proof_input} = BoundedAuthorityProtocol.V1.proof_signing_input(proof, %{})
+holder_signature = :crypto.sign(:eddsa, :none, proof_input.message, [holder_private, :ed25519])
+{:ok, proof_compact} = BoundedAuthorityProtocol.V1.assemble_compact(proof_input, holder_signature)
 
-  proof_compact
-)
-true = match?("eyJ" <> _, notebook_value)
-:compact_assembled
+:proof_signed
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-:compact_assembled
+:proof_signed
 ```
-
-The generated compact begins with its encoded protected header: the proof is a compact JWS of type `dpop+jwt`.
 
 ## Verify the grant
 
-The verifier holds no state and reads no clock. The caller supplies the trusted key, the
-expected context, and the evaluation time.
+Supply an already-trusted issuer key, expected audience, and evaluation time. Project only safe
+identifiers and the explicit non-authorization marker from the returned facts.
 
 ```elixir
-notebook_value = (
-  alias BoundedAuthorityProtocol.V1.{TrustedIssuer, ExpectedGrant}
+alias BoundedAuthorityProtocol.V1.{TrustedIssuer, ExpectedGrant}
 
-  trusted = %TrustedIssuer{key_id: "issuer-1", public_key: issuer_public}
+trusted = %TrustedIssuer{key_id: "issuer-1", public_key: issuer_public}
 
-  expected_grant = %ExpectedGrant{
-    issuer: "https://issuer.example",
-    audience: "https://service.example",
-    evaluation_time: now,
-    clock_skew: 60,
-    bounds: %{}
-  }
+expected_grant = %ExpectedGrant{
+  issuer: "https://issuer.example",
+  audience: "https://service.example",
+  evaluation_time: now,
+  clock_skew: 60,
+  bounds: %{}
+}
 
-  {:ok, grant_facts} = BoundedAuthorityProtocol.V1.verify_grant(grant_compact, trusted, expected_grant)
+{:ok, grant_facts} =
+  BoundedAuthorityProtocol.V1.verify_grant(grant_compact, trusted, expected_grant)
 
-  Map.take(Map.from_struct(grant_facts), [:issuer, :grant_id, :authorization])
-)
-true = notebook_value === (
-  %{issuer: "https://issuer.example", grant_id: "grant-2026-001", authorization: :not_evaluated}
-)
-notebook_value
+Map.take(grant_facts, [:issuer, :grant_id, :authorization])
 ```
 
 <!-- livebook:{"output":true} -->
@@ -175,46 +166,39 @@ notebook_value
 %{issuer: "https://issuer.example", grant_id: "grant-2026-001", authorization: :not_evaluated}
 ```
 
-The cell returns `%{issuer: "https://issuer.example", grant_id: "grant-2026-001", authorization: :not_evaluated}`.
-Facts carry identifiers, digests, and times, never keys or signatures, and
-`authorization: :not_evaluated` says that deciding is still your job.
+## Verify the envelope
 
-## Verify the full envelope
+Derive the expected request from the host request boundary. Envelope verification rechecks the
+grant, holder signature, request binding, freshness, and every selector.
 
 ```elixir
-notebook_value = (
-  alias BoundedAuthorityProtocol.V1.{Credentials, ExpectedRequest}
+alias BoundedAuthorityProtocol.V1.{Credentials, ExpectedRequest}
 
-  credentials = %Credentials{grant: grant_compact, proof: proof_compact}
+credentials = %Credentials{grant: grant_compact, proof: proof_compact}
 
-  expected_request = %ExpectedRequest{
-    trusted_issuer: trusted,
-    issuer: "https://issuer.example",
-    audience: "https://service.example",
-    method: "GET",
-    target_uri: "https://service.example/records/1",
-    invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120002",
-    operation: "read_record",
-    cast_arguments:
-      {:object,
-       [
-         {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
-       ]},
-    evaluation_time: now,
-    clock_skew: 60,
-    proof_max_age: 300,
-    nonce: :not_required,
-    bounds: %{}
-  }
+expected_request = %ExpectedRequest{
+  trusted_issuer: trusted,
+  issuer: "https://issuer.example",
+  audience: "https://service.example",
+  method: "GET",
+  target_uri: "https://service.example/records/1",
+  invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120002",
+  operation: "read_record",
+  cast_arguments:
+    {:object,
+     [
+       {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
+     ]},
+  evaluation_time: now,
+  clock_skew: 60,
+  proof_max_age: 300,
+  nonce: :not_required,
+  bounds: %{}
+}
 
-  {:ok, envelope_facts} = BoundedAuthorityProtocol.V1.check_envelope(credentials, expected_request)
+{:ok, envelope_facts} = BoundedAuthorityProtocol.V1.check_envelope(credentials, expected_request)
 
-  Map.take(Map.from_struct(envelope_facts), [:operation, :authorization])
-)
-true = notebook_value === (
-  %{operation: "read_record", authorization: :not_evaluated}
-)
-notebook_value
+Map.take(envelope_facts, [:operation, :authorization])
 ```
 
 <!-- livebook:{"output":true} -->
@@ -223,62 +207,96 @@ notebook_value
 %{operation: "read_record", authorization: :not_evaluated}
 ```
 
-The cell returns `%{operation: "read_record", authorization: :not_evaluated}`. The facts struct
-has redacted ordinary inspection. Never serialize it or log raw request bindings; the
-explicit projection above shows only the operation and the non-authorization marker.
+## Refuse a changed signature
 
-## Every attack fails closed
+Flip a bit in the decoded signature and re-encode it canonically. The grant fails even though
+its header and payload are unchanged.
 
 ```elixir
-notebook_value = (
-  # A changed byte in the grant signature:
-  tampered =
-    grant_compact
-    |> String.split(".")
-    |> List.update_at(2, fn segment ->
-      i = div(String.length(segment), 2)
-      <<head::binary-size(^i), byte, tail::binary>> = segment
-      head <> <<Bitwise.bxor(byte, 1)>> <> tail
-    end)
-    |> Enum.join(".")
+[header, payload, encoded_signature] = String.split(grant_compact, ".")
+<<first, rest::binary>> = Base.url_decode64!(encoded_signature, padding: false)
+changed_signature = Base.url_encode64(<<Bitwise.bxor(first, 1), rest::binary>>, padding: false)
+tampered = Enum.join([header, payload, changed_signature], ".")
 
-  # The same proof against different arguments (the tier selector disallows "bronze"):
-  wrong_args = %ExpectedRequest{
-    expected_request
-    | cast_arguments:
-        {:object,
-         [
-           {"record", {:object, [{"tier", {:string, "bronze"}}, {"region", {:string, "us-east"}}]}}
-         ]}
-  }
-
-  # A stale proof, outside the maximum age plus the clock skew:
-  stale = %ExpectedRequest{expected_request | evaluation_time: now + 361}
-
-  %{
-    tampered_grant:
-      BoundedAuthorityProtocol.V1.check_envelope(
-        %Credentials{grant: tampered, proof: proof_compact},
-        expected_request
-      ),
-    selector_disallowed: BoundedAuthorityProtocol.V1.check_envelope(credentials, wrong_args),
-    stale_proof: BoundedAuthorityProtocol.V1.check_envelope(credentials, stale)
-  }
-)
-true = notebook_value === (
-  %{tampered_grant: {:error, :invalid}, selector_disallowed: {:error, :invalid}, stale_proof: {:error, :invalid}}
-)
-notebook_value
+{:error, :invalid} =
+  BoundedAuthorityProtocol.V1.check_envelope(%{credentials | grant: tampered}, expected_request)
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-%{tampered_grant: {:error, :invalid}, selector_disallowed: {:error, :invalid}, stale_proof: {:error, :invalid}}
+{:error, :invalid}
 ```
 
-The cell returns `%{tampered_grant: {:error, :invalid}, selector_disallowed: {:error, :invalid}, stale_proof: {:error, :invalid}}`.
-Each attack gets exactly `{:error, :invalid}`: no partial information and no exception. The error
-never says which check failed; the
-[troubleshooting guide](https://hexdocs.pm/bounded_authority_protocol/troubleshooting.html)
-walks through diagnosing a rejection from your own inputs.
+## Refuse changed request arguments
+
+A valid proof cannot be reused for a different request body. The signed request digest must
+match the host-derived tagged arguments.
+
+```elixir
+wrong_arguments =
+  {:object,
+   [{"record", {:object, [{"tier", {:string, "bronze"}}, {"region", {:string, "us-east"}}]}}]}
+
+{:error, :invalid} =
+  BoundedAuthorityProtocol.V1.check_envelope(credentials, %{
+    expected_request
+    | cast_arguments: wrong_arguments
+  })
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:error, :invalid}
+```
+
+## Refuse a matching proof outside the selectors
+
+Sign a fresh proof for the disallowed arguments so its request binding is correct. This
+refusal isolates selector enforcement from the previous digest mismatch.
+
+```elixir
+{:ok, disallowed_input} =
+  BoundedAuthorityProtocol.V1.proof_signing_input(%{proof | cast_arguments: wrong_arguments}, %{})
+
+disallowed_signature =
+  :crypto.sign(:eddsa, :none, disallowed_input.message, [holder_private, :ed25519])
+
+{:ok, disallowed_proof} =
+  BoundedAuthorityProtocol.V1.assemble_compact(disallowed_input, disallowed_signature)
+
+{:error, :invalid} =
+  BoundedAuthorityProtocol.V1.check_envelope(%{credentials | proof: disallowed_proof}, %{
+    expected_request
+    | cast_arguments: wrong_arguments
+  })
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:error, :invalid}
+```
+
+## Refuse a stale proof
+
+The proof is too old after its maximum age plus skew, while the grant is still live. The closed
+error exposes no details to the caller.
+
+```elixir
+{:error, :invalid} =
+  BoundedAuthorityProtocol.V1.check_envelope(credentials, %{
+    expected_request
+    | evaluation_time: now + 361
+  })
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:error, :invalid}
+```
+
+Continue with [service integration](service-integration.livemd) for host-owned trust rotation
+and replay retention, or [troubleshooting](../guides/troubleshooting.md) for diagnosing refusals.

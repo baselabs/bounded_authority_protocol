@@ -2,14 +2,24 @@
 
 # Content assertions and lineage
 
-[Run the 1.0.0 release walkthrough in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
-For this focused journey, download this `.livemd` file and use **Open → Import from file** in Livebook.
-The focused file is new since 1.0.0; the release launch above opens the released walkthrough.
+Download this `.livemd` file, open it in [Livebook](https://livebook.dev), and choose
+**Open → Import from file**, then **Run all**. Use Elixir 1.18 or later and OTP 27 or later
+with access to public Hex. No secrets or external services are needed.
 
-Hash exact content bytes, verify two signed generations, and check their pairwise lineage. Durable high-water state remains the host’s responsibility.
+Hash exact document bytes, verify two signed generations, and check their pairwise lineage.
+Refuse changed content, expiry, reversed lineage, and another profile.
 
-Run every cell in order. Keys are generated only in memory; persisted outputs contain no keys,
-signatures, credentials, or nonces. Verification leaves trust and execution policy with the host.
+The host chooses trusted attestors, content semantics, and the semantic profile digest.
+Pairwise consistency does not establish the latest generation: durable high-water state,
+current trust, and replay handling stay with the host. No processes or files are created.
+
+[Open the original 1.0.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
+That immutable release has the earlier walkthrough; import this file for the steps below.
+
+## Setup
+
+Install the exact published package. Fixed evaluation times keep the results reproducible;
+only safe semantic values are persisted, never keys, signatures, tokens, or nonces.
 
 ```elixir
 Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
@@ -21,100 +31,117 @@ Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
 :ok
 ```
 
-The cell returns `:ok`.
+## Generate the content attestor key
 
-## Demonstration inputs
+This standalone profile needs one attestor key, not a grant or holder proof. Keep its private
+half outside all protocol calls.
 
 ```elixir
-notebook_value = (
-  now = 1_800_001_000
-  alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
-  alias BoundedAuthorityProtocol.RoleAttestation.V1, as: RoleAttestationV1
-  :demo_ready
-)
-true = notebook_value === (
-  :demo_ready
-)
-notebook_value
+alias BoundedAuthorityProtocol.ContentAssertion.V1, as: ContentAssertionV1
+alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
+
+{content_attestor_public, content_attestor_private} = :crypto.generate_key(:eddsa, :ed25519)
+
+now = 1_800_001_000
+:attestor_ready
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-:demo_ready
+:attestor_ready
 ```
 
-The cell returns `:demo_ready`.
+## Hash exact content and pin the profile
 
-## Produce and verify a content assertion
-
-A content assertion is a second sibling attestation profile: a standalone compact JWS
-(`typ: "ba+content-assertion"`) that binds the digest of exact external content bytes to an
-issuer, audience, lineage subject, semantic profile, validity window, and predecessor. The
-package hashes the bytes you pass and never parses them; what the content means stays with you.
+The content digest includes every supplied byte. The separate semantic-profile digest pins
+the schema the host selected; the package neither fetches nor interprets that schema.
 
 ```elixir
-notebook_value = (
-  alias BoundedAuthorityProtocol.ContentAssertion.V1, as: ContentAssertionV1
+content_bytes = ~s({"document":"example","revision":1})
+{:ok, content_digest} = ContentAssertionV1.content_digest(content_bytes, %{})
 
-  {content_attestor_public, content_attestor_private} = :crypto.generate_key(:eddsa, :ed25519)
+# The semantic profile's identity is a caller-pinned opaque 32-byte digest:
+profile_digest = :crypto.hash(:sha256, "urn:example:profile:document/1 schema bytes")
 
-  content_bytes = ~s({"document":"example","revision":1})
-  {:ok, content_digest} = ContentAssertionV1.content_digest(content_bytes, %{})
+%{
+  content_digest_bytes: byte_size(content_digest),
+  profile_digest_bytes: byte_size(profile_digest)
+}
+```
 
-  # The semantic profile's identity is a caller-pinned opaque 32-byte digest:
-  profile_digest = :crypto.hash(:sha256, "urn:example:profile:document/1 schema bytes")
+<!-- livebook:{"output":true} -->
 
-  assertion = %ContentAssertionV1.ContentAssertion{
-    attestor_key_id: "content-attestor-1",
-    jti: "urn:example:assertion:2026-001",
-    iss: "urn:example:issuer",
-    aud: "urn:example:audience",
-    sub: "urn:example:lineage:document-1",
-    profile: "urn:example:profile:document/1",
-    profile_digest: profile_digest,
-    content_digest: content_digest,
-    gen: 1,
-    prev: <<0::256>>,
-    iat: now,
-    nbf: now,
-    exp: now + 3_600
-  }
+```
+%{content_digest_bytes: 32, profile_digest_bytes: 32}
+```
 
-  {:ok, assertion_input} = ContentAssertionV1.assertion_signing_input(assertion, %{})
+## Build and sign generation one
 
-  assertion_signature =
-    :crypto.sign(:eddsa, :none, assertion_input.message, [content_attestor_private, :ed25519])
+Generation one uses the all-zero predecessor digest. Its signed context binds issuer, audience,
+lineage subject, profile, content digest, and validity window.
 
-  {:ok, assertion_compact} =
-    ContentAssertionV1.assemble_compact(assertion_input, assertion_signature)
+```elixir
+assertion = %ContentAssertionV1.ContentAssertion{
+  attestor_key_id: "content-attestor-1",
+  jti: "urn:example:assertion:2026-001",
+  iss: "urn:example:issuer",
+  aud: "urn:example:audience",
+  sub: "urn:example:lineage:document-1",
+  profile: "urn:example:profile:document/1",
+  profile_digest: profile_digest,
+  content_digest: content_digest,
+  gen: 1,
+  prev: <<0::256>>,
+  iat: now,
+  nbf: now,
+  exp: now + 3_600
+}
 
-  expected_assertion = %ContentAssertionV1.ExpectedContentAssertion{
-    attestor: %HistoricalPublicKey{
-      key_id: "content-attestor-1",
-      public_key: content_attestor_public,
-      valid_from: now - 600,
-      valid_before: now + 7_200
-    },
-    issuer: "urn:example:issuer",
-    audience: "urn:example:audience",
-    subject: "urn:example:lineage:document-1",
-    profile: "urn:example:profile:document/1",
-    profile_digest: profile_digest,
-    content_digest: content_digest,
-    now: now + 60,
-    bounds: %{}
-  }
+{:ok, assertion_input} = ContentAssertionV1.assertion_signing_input(assertion, %{})
 
-  {:ok, assertion_facts} =
-    ContentAssertionV1.verify_assertion(assertion_compact, expected_assertion)
+assertion_signature =
+  :crypto.sign(:eddsa, :none, assertion_input.message, [content_attestor_private, :ed25519])
 
-  Map.take(Map.from_struct(assertion_facts), [:attestor_key_id, :sub, :gen, :verification, :trust])
-)
-true = notebook_value === (
-  %{attestor_key_id: "content-attestor-1", sub: "urn:example:lineage:document-1", gen: 1, verification: :signature_and_window, trust: :not_evaluated}
-)
-notebook_value
+{:ok, assertion_compact} =
+  ContentAssertionV1.assemble_compact(assertion_input, assertion_signature)
+
+:generation_one_signed
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:generation_one_signed
+```
+
+## Verify generation one
+
+Supply the expected content digest and context from host-owned inputs. The attestor validity
+window must contain the whole assertion window.
+
+```elixir
+expected_assertion = %ContentAssertionV1.ExpectedContentAssertion{
+  attestor: %HistoricalPublicKey{
+    key_id: "content-attestor-1",
+    public_key: content_attestor_public,
+    valid_from: now - 600,
+    valid_before: now + 7_200
+  },
+  issuer: "urn:example:issuer",
+  audience: "urn:example:audience",
+  subject: "urn:example:lineage:document-1",
+  profile: "urn:example:profile:document/1",
+  profile_digest: profile_digest,
+  content_digest: content_digest,
+  now: now + 60,
+  bounds: %{}
+}
+
+{:ok, assertion_facts} =
+  ContentAssertionV1.verify_assertion(assertion_compact, expected_assertion)
+
+Map.take(assertion_facts, [:attestor_key_id, :sub, :gen, :verification, :trust])
 ```
 
 <!-- livebook:{"output":true} -->
@@ -123,39 +150,71 @@ notebook_value
 %{attestor_key_id: "content-attestor-1", sub: "urn:example:lineage:document-1", gen: 1, verification: :signature_and_window, trust: :not_evaluated}
 ```
 
-The cell returns `%{attestor_key_id: "content-attestor-1", sub: "urn:example:lineage:document-1", gen: 1, verification: :signature_and_window, trust: :not_evaluated}`.
+## Build and sign generation two
 
-Generation 2 names generation 1 by the SHA-256 of its exact compact bytes. The pairwise check
-compares two verified facts values; it keeps no history of its own.
+Hash the revised document and name generation one by the digest of its exact signed compact
+bytes. A changed document requires its own expected content digest.
 
 ```elixir
-notebook_value = (
-  successor = %{
-    assertion
-    | jti: "urn:example:assertion:2026-002",
-      gen: 2,
-      prev: assertion_facts.digest,
-      iat: now + 120,
-      nbf: now + 120
-  }
+successor_bytes = ~s({"document":"example","revision":2})
+{:ok, successor_digest} = ContentAssertionV1.content_digest(successor_bytes, %{})
 
-  {:ok, successor_input} = ContentAssertionV1.assertion_signing_input(successor, %{})
+successor = %{
+  assertion
+  | jti: "urn:example:assertion:2026-002",
+    gen: 2,
+    content_digest: successor_digest,
+    prev: assertion_facts.digest,
+    iat: now + 120,
+    nbf: now + 120
+}
 
-  successor_signature =
-    :crypto.sign(:eddsa, :none, successor_input.message, [content_attestor_private, :ed25519])
+{:ok, successor_input} = ContentAssertionV1.assertion_signing_input(successor, %{})
 
-  {:ok, successor_compact} =
-    ContentAssertionV1.assemble_compact(successor_input, successor_signature)
+successor_signature =
+  :crypto.sign(:eddsa, :none, successor_input.message, [content_attestor_private, :ed25519])
 
-  {:ok, successor_facts} =
-    ContentAssertionV1.verify_assertion(successor_compact, %{expected_assertion | now: now + 180})
+{:ok, successor_compact} =
+  ContentAssertionV1.assemble_compact(successor_input, successor_signature)
 
-  ContentAssertionV1.verify_successor(assertion_facts, successor_facts, %{})
-)
-true = notebook_value === (
-  :ok
-)
-notebook_value
+:generation_two_signed
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:generation_two_signed
+```
+
+## Verify generation two
+
+Verify the successor signature, revised content digest, and complete context before comparing
+lineage. Merely decoding a generation would not establish these facts.
+
+```elixir
+{:ok, successor_facts} =
+  ContentAssertionV1.verify_assertion(successor_compact, %{
+    expected_assertion
+    | content_digest: successor_digest,
+      now: now + 180
+  })
+
+Map.take(successor_facts, [:sub, :gen, :verification, :trust])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{sub: "urn:example:lineage:document-1", gen: 2, verification: :signature_and_window, trust: :not_evaluated}
+```
+
+## Check the successor relationship
+
+The pairwise check requires the same lineage context, a forward generation, and the exact
+predecessor digest. It returns `:ok`, not a new facts value or an authority decision.
+
+```elixir
+:ok = ContentAssertionV1.verify_successor(assertion_facts, successor_facts, %{})
 ```
 
 <!-- livebook:{"output":true} -->
@@ -164,55 +223,56 @@ notebook_value
 :ok
 ```
 
-The cell returns `:ok`: generation 2 follows generation 1.
+## Refuse changed content and expiry
 
-## Content-assertion attacks fail closed
+A trailing space changes the content digest even if a parser would ignore it. Evaluation
+exactly at expiry also fails.
 
 ```elixir
-notebook_value = (
-  {:ok, changed_digest} = ContentAssertionV1.content_digest(content_bytes <> " ", %{})
+{:ok, changed_digest} = ContentAssertionV1.content_digest(content_bytes <> " ", %{})
 
-  %{
-    # One changed content byte changes the digest the verifier requires:
-    changed_content:
-      ContentAssertionV1.verify_assertion(assertion_compact, %{
-        expected_assertion
-        | content_digest: changed_digest
-      }),
-    # now == exp: the acceptance window is the half-open [nbf, exp).
-    now_at_exp:
-      ContentAssertionV1.verify_assertion(assertion_compact, %{expected_assertion | now: now + 3_600}),
-    # Lineage runs forward only:
-    reversed_lineage: ContentAssertionV1.verify_successor(successor_facts, assertion_facts, %{}),
-    # Other profiles refuse content-assertion bytes:
-    assertion_through_role: RoleAttestationV1.decode_attestation(assertion_compact, %{}),
-    assertion_through_major_one: BoundedAuthorityProtocol.V1.decode_grant(assertion_compact, %{})
-  }
-)
-true = notebook_value === (
-  %{
-    changed_content: {:error, :invalid},
-    now_at_exp: {:error, :invalid},
-    reversed_lineage: {:error, :invalid},
-    assertion_through_role: {:error, :invalid},
-    assertion_through_major_one: {:error, :invalid}
-  }
-)
-notebook_value
+{:error, :invalid} =
+  ContentAssertionV1.verify_assertion(assertion_compact, %{
+    expected_assertion
+    | content_digest: changed_digest
+  })
+
+{:error, :invalid} =
+  ContentAssertionV1.verify_assertion(assertion_compact, %{
+    expected_assertion
+    | now: now + 3_600
+  })
+
+[:changed_content, :expired]
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-%{
-  changed_content: {:error, :invalid},
-  now_at_exp: {:error, :invalid},
-  reversed_lineage: {:error, :invalid},
-  assertion_through_role: {:error, :invalid},
-  assertion_through_major_one: {:error, :invalid}
-}
+[:changed_content, :expired]
 ```
 
-A content assertion proves that a key you trust signed this exact digest and context. It does
-not prove that the content is true, that the key is still trusted, or that you hold the latest
-generation. Trusted keys, durable lineage state, and replay handling stay with the caller.
+## Refuse reversed lineage and cross-profile bytes
+
+Both generations were verified, but their order cannot be reversed. A content assertion also
+cannot be decoded as a role attestation or a grant.
+
+```elixir
+{:error, :invalid} = ContentAssertionV1.verify_successor(successor_facts, assertion_facts, %{})
+
+{:error, :invalid} =
+  BoundedAuthorityProtocol.RoleAttestation.V1.decode_attestation(assertion_compact, %{})
+
+{:error, :invalid} = BoundedAuthorityProtocol.V1.decode_grant(assertion_compact, %{})
+
+[:reversed_lineage, :role_profile, :grant_profile]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[:reversed_lineage, :role_profile, :grant_profile]
+```
+
+See [operations](../guides/operations.md) for durable lineage state. An assertion proves a
+trusted key signed the expected bytes and context; it does not prove the content is true.

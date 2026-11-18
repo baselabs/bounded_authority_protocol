@@ -2,14 +2,26 @@
 
 # Advanced: strict Ed25519
 
-[Run the 1.0.0 release walkthrough in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
-For this focused journey, download this `.livemd` file and use **Open → Import from file** in Livebook.
-The focused file is new since 1.0.0; the release launch above opens the released walkthrough.
+Download this `.livemd` file, open it in [Livebook](https://livebook.dev), and choose
+**Open → Import from file**, then **Run all**. Use Elixir 1.18 or later and OTP 27 or later
+with access to public Hex. No secrets or external services are needed.
 
-Compare strict verification with backend behavior using the certified forgery controls and the host enrollment subgroup check.
+Verify an honest signature, reject certified key-only forgeries and an out-of-range scalar,
+then compare protocol key acceptance with the stricter host enrollment subgroup check.
 
-Run every cell in order. Keys are generated only in memory; persisted outputs contain no keys,
-signatures, credentials, or nonces. Verification leaves trust and execution policy with the host.
+Rule S1 rejects noncanonical and small-order keys and signature points and requires `S < L`.
+It deliberately omits subgroup checking on the verification path. The host calls
+`torsion_free?/1` at enrollment and trust installation. These checks establish neither trust
+nor authority. Generated keys stay in memory; corpus files are read from the installed package.
+No processes, tables, or files are created.
+
+[Open the original 1.0.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
+That immutable release has the earlier walkthrough; import this file for the steps below.
+
+## Setup
+
+Install the exact published package. Fixed evaluation times keep the results reproducible;
+only safe semantic values are persisted, never keys, signatures, tokens, or nonces.
 
 ```elixir
 Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
@@ -21,417 +33,264 @@ Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
 :ok
 ```
 
-The cell returns `:ok`.
+## Generate an honest primitive signature
 
-## Demonstration inputs
+Sign a fixed message with an ephemeral Ed25519 key. This primitive control needs no grant,
+holder proof, audience, or request context.
 
 ```elixir
-notebook_value = (
-  {issuer_public, issuer_private} = :crypto.generate_key(:eddsa, :ed25519)
-  {holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
+alias BoundedAuthorityProtocol.Ed25519
 
-  {:ok, holder_thumbprint} =
-    BoundedAuthorityProtocol.V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
+{public_key, private_key} = :crypto.generate_key(:eddsa, :ed25519)
+message = "strict Ed25519 integration control"
+signature = :crypto.sign(:eddsa, :none, message, [private_key, :ed25519])
 
-  {byte_size(issuer_public), byte_size(holder_thumbprint)}
-
-  alias BoundedAuthorityProtocol.V1.{Grant, Operation}
-
-  grant = %Grant{
-    key_id: "issuer-1",
-    issuer: "https://issuer.example",
-    grant_id: "grant-2026-001",
-    audiences: ["https://service.example"],
-    issued_at: 1_800_000_000,
-    not_before: 1_800_000_000,
-    expires_at: 1_800_003_600,
-    holder_thumbprint: holder_thumbprint,
-    operations: [
-      %Operation{
-        name: "read_record",
-        selectors: [
-          {:equals, ["record", "region"], {:string, "us-east"}},
-          {:one_of, ["record", "tier"], [{:string, "gold"}, {:string, "platinum"}]},
-          :all
-        ]
-      }
-    ]
-  }
-
-  {:ok, signing_input} = BoundedAuthorityProtocol.V1.grant_signing_input(grant, %{})
-  issuer_signature = :crypto.sign(:eddsa, :none, signing_input.message, [issuer_private, :ed25519])
-  {:ok, grant_compact} = BoundedAuthorityProtocol.V1.assemble_compact(signing_input, issuer_signature)
-
-  grant_compact
-
-  alias BoundedAuthorityProtocol.V1.Proof
-
-  now = 1_800_001_000
-
-  proof = %Proof{
-    holder_public_key: holder_public,
-    proof_id: "proof-2026-001",
-    method: "GET",
-    target_uri: "https://service.example/records/1",
-    issued_at: now,
-    nonce: nil,
-    invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120002",
-    operation: "read_record",
-    grant_compact: grant_compact,
-    cast_arguments:
-      {:object,
-       [
-         {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
-       ]}
-  }
-
-  {:ok, proof_input} = BoundedAuthorityProtocol.V1.proof_signing_input(proof, %{})
-  holder_signature = :crypto.sign(:eddsa, :none, proof_input.message, [holder_private, :ed25519])
-  {:ok, proof_compact} = BoundedAuthorityProtocol.V1.assemble_compact(proof_input, holder_signature)
-
-  proof_compact
-
-  alias BoundedAuthorityProtocol.V1.{TrustedIssuer, ExpectedGrant}
-
-  trusted = %TrustedIssuer{key_id: "issuer-1", public_key: issuer_public}
-
-  expected_grant = %ExpectedGrant{
-    issuer: "https://issuer.example",
-    audience: "https://service.example",
-    evaluation_time: now,
-    clock_skew: 60,
-    bounds: %{}
-  }
-
-  {:ok, grant_facts} = BoundedAuthorityProtocol.V1.verify_grant(grant_compact, trusted, expected_grant)
-
-  Map.take(Map.from_struct(grant_facts), [:issuer, :grant_id, :authorization])
-
-  alias BoundedAuthorityProtocol.V1.{Credentials, ExpectedRequest}
-
-  credentials = %Credentials{grant: grant_compact, proof: proof_compact}
-
-  expected_request = %ExpectedRequest{
-    trusted_issuer: trusted,
-    issuer: "https://issuer.example",
-    audience: "https://service.example",
-    method: "GET",
-    target_uri: "https://service.example/records/1",
-    invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120002",
-    operation: "read_record",
-    cast_arguments:
-      {:object,
-       [
-         {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
-       ]},
-    evaluation_time: now,
-    clock_skew: 60,
-    proof_max_age: 300,
-    nonce: :not_required,
-    bounds: %{}
-  }
-
-  {:ok, envelope_facts} = BoundedAuthorityProtocol.V1.check_envelope(credentials, expected_request)
-
-  Map.take(Map.from_struct(envelope_facts), [:operation, :authorization])
-
-  :demo_ready
-)
-true = notebook_value === (
-  :demo_ready
-)
-notebook_value
+%{public_key_bytes: byte_size(public_key), signature_bytes: byte_size(signature)}
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-:demo_ready
+%{public_key_bytes: 32, signature_bytes: 64}
 ```
 
-The cell returns `:demo_ready`.
+## Verify the honest signature and enrollment key
 
-## Strict Ed25519 verification
-
-Every Ed25519 signature the protocol verifies is checked under one strict rule, rule S1
-([specification § 14.1](https://hexdocs.pm/bounded_authority_protocol/bap-v1.html#strict-ed25519)).
-Before any backend call, the public key `A` and the signature's point `R` must be canonical
-encodings (the encoded `y` is below `p = 2^255 - 19`, and the sign bit is clear when `x = 0`) and
-must not be one of the eight points of small order, and the scalar `S` must be below `L`, the
-prime order of the base point `B`. Only then does the cofactorless equation
-`encode([S]B - [k]A) == R` run, compared byte for byte.
-
-`BoundedAuthorityProtocol.Ed25519` owns the rule:
-
-- `verify_strict/3` checks a signature under rule S1.
-- `acceptable_public_key?/1` is the check every key passes before it enters a verification
-  input.
-- `torsion_free?/1` is the stricter host check for key enrollment and trust install.
-
-The honest issuer key and grant signature from the demonstration setup pass all three:
+The generated key is canonical, acceptable, and torsion free. Strict verification also
+requires the signature equation to hold for this exact message.
 
 ```elixir
-notebook_value = (
-  alias BoundedAuthorityProtocol.Ed25519
+true = Ed25519.acceptable_public_key?(public_key)
+true = Ed25519.torsion_free?(public_key)
+true = Ed25519.verify_strict(message, signature, public_key)
 
-  %{
-    verify_strict: Ed25519.verify_strict(signing_input.message, issuer_signature, issuer_public),
-    acceptable_public_key?: Ed25519.acceptable_public_key?(issuer_public),
-    torsion_free?: Ed25519.torsion_free?(issuer_public)
-  }
-)
-true = notebook_value === (
-  %{verify_strict: true, acceptable_public_key?: true, torsion_free?: true}
-)
-notebook_value
+:honest_signature_verified
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-%{verify_strict: true, acceptable_public_key?: true, torsion_free?: true}
+:honest_signature_verified
 ```
 
-The cell returns `%{verify_strict: true, acceptable_public_key?: true, torsion_free?: true}`.
+## Load certified forgery controls
 
-## Forged Ed25519 keys and signatures fail closed
-
-The byte values below come from the certified strict-Ed25519 corpus that ships inside the
-package (`priv/conformance/strict-ed25519`, profile `bap-strict-ed25519/1`). Corpus cases
-`key-only-v1-identity-a-basepoint-r-s1-*` carry a forgery that needs no secret: `R` is the base
-point `B` and `S = 1`. Under a key that encodes the identity point, `[k]A` is the identity, so
-`[1]B - [k]A = B = R` for every message, and the corpus records that the bare cofactorless
-equation accepts it. We attach that signature to our own grant from the demonstration setup and trust two
-encodings of the identity point: the canonical one, which is of small order, and `y = p + 1`,
-which is not canonical (corpus cases `key-only-v1-y-p-plus-1-prime-r-*`, same signature). The
-`:crypto` backend alone accepts the forgery under both keys. `verify_grant` refuses both keys at
-trusted-issuer validation, before it looks at the signature, because neither passes
-`acceptable_public_key?/1`; `verify_strict/3` refuses the signature under each key too.
-
-The third attack adds `L` to the `S` of the honest holder signature from the demonstration setup (corpus
-construction `s-plus-l`). Both scalars give the same point, `[S + L]B = [S]B`, so only a range
-check tells them apart. The backend enforces `S < L` as well (RFC 8032 § 5.1.7), so this one is
-refused twice: by rule S1 before the backend call, and by the backend.
+The shipped corpus supplies an identity-point key, its noncanonical encoding, and the
+key-only signature `R = B, S = 1`. The group order `L` is used for the scalar control.
 
 ```elixir
-notebook_value = (
-  # The prime order of the base point (specification § 14.1, RFC 8032):
-  l = 2 ** 252 + 27_742_317_777_372_353_535_851_937_790_883_648_493
+# The prime order of the base point (specification § 14.1, RFC 8032):
+l = 2 ** 252 + 27_742_317_777_372_353_535_851_937_790_883_648_493
 
-  # Corpus case key-only-v1-identity-a-basepoint-r-s1-0: R = B, then S = 1 (little-endian).
-  key_only_forgery =
-    Base.decode16!(
-      "5866666666666666666666666666666666666666666666666666666666666666" <>
-        "0100000000000000000000000000000000000000000000000000000000000000",
-      case: :lower
-    )
+# Corpus case key-only-v1-identity-a-basepoint-r-s1-0: R = B, then S = 1 (little-endian).
+key_only_forgery =
+  Base.decode16!(
+    "5866666666666666666666666666666666666666666666666666666666666666" <>
+      "0100000000000000000000000000000000000000000000000000000000000000",
+    case: :lower
+  )
 
-  # Corpus key small-order-0: the identity point, of order 1.
-  small_order_key =
-    Base.decode16!("0100000000000000000000000000000000000000000000000000000000000000",
-      case: :lower
-    )
+# Corpus key small-order-0: the identity point, of order 1.
+small_order_key =
+  Base.decode16!("0100000000000000000000000000000000000000000000000000000000000000",
+    case: :lower
+  )
 
-  # Corpus key y-p-plus-1 (case key-only-v1-y-p-plus-1-prime-r-0): y = p + 1, a non-canonical
-  # encoding of the same identity point.
-  noncanonical_key =
-    Base.decode16!("eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-      case: :lower
-    )
+# Corpus key y-p-plus-1 (case key-only-v1-y-p-plus-1-prime-r-0): y = p + 1, a non-canonical
+# encoding of the same identity point.
+noncanonical_key =
+  Base.decode16!("eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+    case: :lower
+  )
 
-  forged_grant =
-    signing_input.message <> "." <> Base.url_encode64(key_only_forgery, padding: false)
-
-  <<holder_r::binary-size(32), holder_s::little-size(256)>> = holder_signature
-  s_plus_l_signature = holder_r <> <<holder_s + l::little-size(256)>>
-
-  s_plus_l_proof =
-    proof_input.message <> "." <> Base.url_encode64(s_plus_l_signature, padding: false)
-
-  trusting = fn public_key -> %TrustedIssuer{key_id: "issuer-1", public_key: public_key} end
-
-  backend_verify = fn message, signature, public_key ->
-    :crypto.verify(:eddsa, :none, message, signature, [public_key, :ed25519])
-  end
-
-  %{
-    backend: %{
-      accepts_key_only_forgery: %{
-        small_order_key: backend_verify.(signing_input.message, key_only_forgery, small_order_key),
-        noncanonical_key: backend_verify.(signing_input.message, key_only_forgery, noncanonical_key)
-      },
-      accepts_s_plus_l: backend_verify.(proof_input.message, s_plus_l_signature, holder_public)
-    },
-    primitives: %{
-      small_order_key_acceptable?: Ed25519.acceptable_public_key?(small_order_key),
-      noncanonical_key_acceptable?: Ed25519.acceptable_public_key?(noncanonical_key),
-      forgery_under_small_order_key:
-        Ed25519.verify_strict(signing_input.message, key_only_forgery, small_order_key),
-      forgery_under_noncanonical_key:
-        Ed25519.verify_strict(signing_input.message, key_only_forgery, noncanonical_key),
-      s_plus_l: Ed25519.verify_strict(proof_input.message, s_plus_l_signature, holder_public)
-    },
-    verification: %{
-      small_order_key:
-        BoundedAuthorityProtocol.V1.verify_grant(
-          forged_grant,
-          trusting.(small_order_key),
-          expected_grant
-        ),
-      noncanonical_key:
-        BoundedAuthorityProtocol.V1.verify_grant(
-          forged_grant,
-          trusting.(noncanonical_key),
-          expected_grant
-        ),
-      s_plus_l:
-        BoundedAuthorityProtocol.V1.check_envelope(
-          %Credentials{grant: grant_compact, proof: s_plus_l_proof},
-          expected_request
-        )
-    }
-  }
-)
-true = notebook_value === (
-  %{
-    backend: %{
-      accepts_key_only_forgery: %{small_order_key: true, noncanonical_key: true},
-      accepts_s_plus_l: false
-    },
-    primitives: %{
-      small_order_key_acceptable?: false,
-      noncanonical_key_acceptable?: false,
-      forgery_under_small_order_key: false,
-      forgery_under_noncanonical_key: false,
-      s_plus_l: false
-    },
-    verification: %{
-      small_order_key: {:error, :invalid},
-      noncanonical_key: {:error, :invalid},
-      s_plus_l: {:error, :invalid}
-    }
-  }
-)
-notebook_value
+:forgery_controls_loaded
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-%{
-  backend: %{
-    accepts_key_only_forgery: %{small_order_key: true, noncanonical_key: true},
-    accepts_s_plus_l: false
-  },
-  primitives: %{
-    small_order_key_acceptable?: false,
-    noncanonical_key_acceptable?: false,
-    forgery_under_small_order_key: false,
-    forgery_under_noncanonical_key: false,
-    s_plus_l: false
-  },
-  verification: %{
-    small_order_key: {:error, :invalid},
-    noncanonical_key: {:error, :invalid},
-    s_plus_l: {:error, :invalid}
-  }
+:forgery_controls_loaded
+```
+
+## Refuse key-only forgeries before the backend
+
+The bare backend accepts the certified key-only signature under either identity encoding.
+Strict verification and key acceptance refuse both. A mathematically valid backend equation
+alone is not the protocol’s acceptance rule.
+
+```elixir
+true = :crypto.verify(:eddsa, :none, message, key_only_forgery, [small_order_key, :ed25519])
+true = :crypto.verify(:eddsa, :none, message, key_only_forgery, [noncanonical_key, :ed25519])
+
+false = Ed25519.acceptable_public_key?(small_order_key)
+false = Ed25519.acceptable_public_key?(noncanonical_key)
+false = Ed25519.verify_strict(message, key_only_forgery, small_order_key)
+false = Ed25519.verify_strict(message, key_only_forgery, noncanonical_key)
+
+[:small_order_key, :noncanonical_key]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[:small_order_key, :noncanonical_key]
+```
+
+## Refuse a scalar at or above the group order
+
+Adding `L` to an honest `S` preserves its curve point. Strict verification and the backend
+both refuse the resulting noncanonical signature.
+
+```elixir
+<<r::binary-size(32), s::little-size(256)>> = signature
+s_plus_l_signature = r <> <<s + l::little-size(256)>>
+
+false = Ed25519.verify_strict(message, s_plus_l_signature, public_key)
+false = :crypto.verify(:eddsa, :none, message, s_plus_l_signature, [public_key, :ed25519])
+
+:scalar_overflow_refused
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:scalar_overflow_refused
+```
+
+## Read the installed certified grant corpus
+
+Read public conformance data from the package installation, not this checkout. The following
+steps use its complete signed controls to exercise `verify_grant/3` as well as the primitives.
+
+```elixir
+alias BoundedAuthorityProtocol.V1
+alias BoundedAuthorityProtocol.V1.{ExpectedGrant, TrustedIssuer}
+
+corpus_cases =
+  :bounded_authority_protocol
+  |> Application.app_dir(
+    "priv/conformance/strict-ed25519/cases/grant-verify/grant-verify-01.json"
+  )
+  |> File.read!()
+  |> JSON.decode!()
+  |> Map.fetch!("cases")
+  |> Map.new(&{&1["id"], &1["input"]})
+
+:certified_corpus_loaded
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:certified_corpus_loaded
+```
+
+## Verify the honest corpus grant
+
+Use the corpus’s explicit issuer key and expected context. This control establishes that the
+fixture path, decoding, and grant verification work before the refusal cases.
+
+```elixir
+honest = Map.fetch!(corpus_cases, "grant-verify-v1-issuer-honest")
+
+expected = %ExpectedGrant{
+  issuer: honest["issuer"],
+  audience: honest["audience"],
+  evaluation_time: honest["evaluation_time"],
+  clock_skew: honest["clock_skew"],
+  bounds: %{}
 }
-```
 
-The backend alone accepts the key-only forgery under both identity-point keys; the package
-refuses all three attacks.
+trusted = %TrustedIssuer{
+  key_id: honest["key_id"],
+  public_key: Base.url_decode64!(honest["public_key"], padding: false)
+}
 
-The corpus also carries complete signed grants for each clause of the rule. The next cell reads
-six of them from the installed package and runs each through `verify_grant`: the honest control,
-an isolated forgery under an order-8 key, an isolated forgery under `y = p`, an honest key that
-signed with `R` at the identity point, the `S + L` signature, and a key with a torsion component.
-
-```elixir
-notebook_value = (
-  corpus_cases =
-    :bounded_authority_protocol
-    |> Application.app_dir("priv/conformance/strict-ed25519/cases/grant-verify/grant-verify-01.json")
-    |> File.read!()
-    |> JSON.decode!()
-    |> Map.fetch!("cases")
-    |> Map.new(&{&1["id"], &1["input"]})
-
-  run_corpus_case = fn id ->
-    input = Map.fetch!(corpus_cases, id)
-    public_key = Base.url_decode64!(input["public_key"], padding: false)
-
-    verdict =
-      BoundedAuthorityProtocol.V1.verify_grant(
-        input["compact"],
-        %TrustedIssuer{key_id: input["key_id"], public_key: public_key},
-        %ExpectedGrant{
-          issuer: input["issuer"],
-          audience: input["audience"],
-          evaluation_time: input["evaluation_time"],
-          clock_skew: input["clock_skew"],
-          bounds: %{}
-        }
-      )
-
-    %{
-      verify_grant: with({:ok, facts} <- verdict, do: {:ok, facts.grant_id}),
-      acceptable_public_key?: Ed25519.acceptable_public_key?(public_key),
-      torsion_free?: Ed25519.torsion_free?(public_key)
-    }
-  end
-
-  for id <- [
-        "grant-verify-v1-issuer-honest",
-        "grant-verify-v1-issuer-iso-small-order-a-1",
-        "grant-verify-v1-issuer-iso-noncanonical-a-y-p-plus-0",
-        "grant-verify-v1-issuer-honest-a-identity-r",
-        "grant-verify-v1-issuer-s-plus-l",
-        "grant-verify-v1-issuer-mixed-a-mixed-r-both"
-      ],
-      do: {id, run_corpus_case.(id)}
-)
-true = notebook_value === (
-  [
-    {"grant-verify-v1-issuer-honest",
-     %{verify_grant: {:ok, "urn:example:grant:1"}, acceptable_public_key?: true, torsion_free?: true}},
-    {"grant-verify-v1-issuer-iso-small-order-a-1",
-     %{verify_grant: {:error, :invalid}, acceptable_public_key?: false, torsion_free?: false}},
-    {"grant-verify-v1-issuer-iso-noncanonical-a-y-p-plus-0",
-     %{verify_grant: {:error, :invalid}, acceptable_public_key?: false, torsion_free?: false}},
-    {"grant-verify-v1-issuer-honest-a-identity-r",
-     %{verify_grant: {:error, :invalid}, acceptable_public_key?: true, torsion_free?: true}},
-    {"grant-verify-v1-issuer-s-plus-l",
-     %{verify_grant: {:error, :invalid}, acceptable_public_key?: true, torsion_free?: true}},
-    {"grant-verify-v1-issuer-mixed-a-mixed-r-both",
-     %{verify_grant: {:ok, "urn:example:grant:1"}, acceptable_public_key?: true, torsion_free?: false}}
-  ]
-)
-notebook_value
+{:ok, honest_facts} = V1.verify_grant(honest["compact"], trusted, expected)
+Map.take(honest_facts, [:grant_id, :authorization])
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-[
-  {"grant-verify-v1-issuer-honest",
-   %{verify_grant: {:ok, "urn:example:grant:1"}, acceptable_public_key?: true, torsion_free?: true}},
-  {"grant-verify-v1-issuer-iso-small-order-a-1",
-   %{verify_grant: {:error, :invalid}, acceptable_public_key?: false, torsion_free?: false}},
-  {"grant-verify-v1-issuer-iso-noncanonical-a-y-p-plus-0",
-   %{verify_grant: {:error, :invalid}, acceptable_public_key?: false, torsion_free?: false}},
-  {"grant-verify-v1-issuer-honest-a-identity-r",
-   %{verify_grant: {:error, :invalid}, acceptable_public_key?: true, torsion_free?: true}},
-  {"grant-verify-v1-issuer-s-plus-l",
-   %{verify_grant: {:error, :invalid}, acceptable_public_key?: true, torsion_free?: true}},
-  {"grant-verify-v1-issuer-mixed-a-mixed-r-both",
-   %{verify_grant: {:ok, "urn:example:grant:1"}, acceptable_public_key?: true, torsion_free?: false}}
-]
+%{grant_id: "urn:example:grant:1", authorization: :not_evaluated}
 ```
 
-Every forgery returns the single closed error, `{:error, :invalid}`. The last case is the one
-rule S1 accepts on purpose. Its key is an honest key plus a small torsion component: canonical,
-not of small order, and on the curve, so it is acceptable, and its signature satisfies the
-cofactorless equation. Verification performs no subgroup check. One secret can sign under its
-honest key and up to seven torsioned variants of it, each with its own thumbprint. A host
-therefore calls `torsion_free?/1` on a key at enrollment, at trust install, and before any
-deny-list or revocation comparison, and refuses the key at each of those points.
+## Refuse certified grant forgeries
+
+Each case isolates a clause: a small-order key, a noncanonical key, a small-order signature
+point under an honest key, or an out-of-range scalar. All return the same closed error.
+
+```elixir
+verify_case = fn id ->
+  input = Map.fetch!(corpus_cases, id)
+
+  key = %TrustedIssuer{
+    key_id: input["key_id"],
+    public_key: Base.url_decode64!(input["public_key"], padding: false)
+  }
+
+  context = %ExpectedGrant{
+    issuer: input["issuer"],
+    audience: input["audience"],
+    evaluation_time: input["evaluation_time"],
+    clock_skew: input["clock_skew"],
+    bounds: %{}
+  }
+
+  V1.verify_grant(input["compact"], key, context)
+end
+
+{:error, :invalid} = verify_case.("grant-verify-v1-issuer-iso-small-order-a-1")
+{:error, :invalid} = verify_case.("grant-verify-v1-issuer-iso-noncanonical-a-y-p-plus-0")
+{:error, :invalid} = verify_case.("grant-verify-v1-issuer-honest-a-identity-r")
+{:error, :invalid} = verify_case.("grant-verify-v1-issuer-s-plus-l")
+
+[:small_order_key, :noncanonical_key, :identity_signature_point, :scalar_overflow]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[:small_order_key, :noncanonical_key, :identity_signature_point, :scalar_overflow]
+```
+
+## Keep host enrollment stricter than verification
+
+The mixed-torsion corpus key is acceptable under rule S1 and has a valid signature. It fails
+the host’s subgroup check, which prevents treating torsioned variants of one secret as
+independent identities at enrollment, trust install, and revocation comparison.
+
+```elixir
+mixed = Map.fetch!(corpus_cases, "grant-verify-v1-issuer-mixed-a-mixed-r-both")
+mixed_public = Base.url_decode64!(mixed["public_key"], padding: false)
+
+mixed_expected = %ExpectedGrant{
+  issuer: mixed["issuer"],
+  audience: mixed["audience"],
+  evaluation_time: mixed["evaluation_time"],
+  clock_skew: mixed["clock_skew"],
+  bounds: %{}
+}
+
+true = Ed25519.acceptable_public_key?(mixed_public)
+false = Ed25519.torsion_free?(mixed_public)
+
+{:ok, mixed_facts} =
+  V1.verify_grant(
+    mixed["compact"],
+    %TrustedIssuer{key_id: mixed["key_id"], public_key: mixed_public},
+    mixed_expected
+  )
+
+%{grant_id: mixed_facts.grant_id, protocol: :verified, enrollment: :refused}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{grant_id: "urn:example:grant:1", protocol: :verified, enrollment: :refused}
+```
+
+See [trusted keys and rotation](../guides/trusted-keys-and-rotation.md) and
+[the strict Ed25519 rule](../../spec/bap-v1.md#strict-ed25519) for the host boundary.

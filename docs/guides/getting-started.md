@@ -369,6 +369,9 @@ Each namespace rejects the others' bytes. Select one explicitly; never infer a p
 input or retry another after a rejection. The
 [notebook collection](notebooks.md) covers each namespace in a focused journey.
 The core walkthrough covers contract-major 1; contract-major 2 ranges and contract-major 3 ES256 have their own notebooks.
+Each file has setup instructions, one explained step per code cell, and safe persisted outputs.
+Import the current file into Livebook and choose **Run all**; the release launch links open
+the earlier notebooks preserved at the immutable 1.0.0 tag.
 
 ## Where to go next
 

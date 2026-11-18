@@ -93,6 +93,7 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
 
   test "every notebook installs the exact registry version and is directly linked" do
     version = Mix.Project.config()[:version]
+    index = File.read!("docs/guides/notebooks.md")
 
     for {name, entry} <- LivebookCheck.registry!(File.cwd!()) do
       path = "docs/notebooks/#{name}"
@@ -106,6 +107,34 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
 
       native_cells = for {"elixir", code} <- Documentation.blocks(source), do: code
       assert length(native_cells) == entry["outputs"]
+
+      row =
+        index
+        |> String.split("\n")
+        |> Enum.find(&String.contains?(&1, "(../notebooks/#{name})"))
+
+      assert row, "#{name}: missing notebook index row"
+      assert String.ends_with?(row, "| #{entry["outputs"]} |"), "#{name}: stale output count"
+    end
+  end
+
+  test "each notebook step has a heading, explanation, and one executable cell" do
+    for {name, _entry} <- LivebookCheck.registry!(File.cwd!()) do
+      source = File.read!("docs/notebooks/#{name}")
+      [introduction | steps] = String.split(source, ~r/^## /m)
+      refute Enum.any?(Documentation.blocks(introduction), &(elem(&1, 0) == "elixir"))
+      assert steps != []
+
+      for step <- steps do
+        [heading, body] = String.split(step, "\n", parts: 2)
+        location = "#{name}: #{heading}"
+
+        assert [{"elixir", _code}] =
+                 Enum.filter(Documentation.blocks(body), &(elem(&1, 0) == "elixir"))
+
+        [explanation | _] = String.split(body, "```elixir", parts: 2)
+        refute String.trim(explanation) == "", "#{location}: explain the step before the cell"
+      end
     end
   end
 

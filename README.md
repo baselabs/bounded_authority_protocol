@@ -195,6 +195,12 @@ verdict digests bind each runner to the same frozen cases. See the
 
 ### Notebook journeys
 
+Each notebook introduces one step per code cell, matches success and refusal results, and
+persists only safe semantic outputs. Download a file and import it into Livebook, then choose
+**Run all**. The launch links open the earlier notebooks at the immutable 1.0.0 release tag;
+import the current files for the steps below. The [notebook index](docs/guides/notebooks.md)
+lists each journey and its checked output count.
+
 - [Core envelope verification](docs/notebooks/bap-walkthrough.livemd)
 - [Contract-major 2 ranges](docs/notebooks/v2-ranges.livemd)
 - [Contract-major 3 ES256](docs/notebooks/v3-es256.livemd)

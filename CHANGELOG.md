@@ -10,6 +10,10 @@ All notable changes to `bounded_authority_protocol` are documented here.
   persisted semantic outputs, documentation currency, and native SDK docs, and run every
   notebook unchanged against the exact Hex release after each upload.
   Clarify result families, host responsibilities, SDK installs, and migration paths.
+  Rewrite all nine notebooks as explained steps with formatted plain code, direct result
+  matches, and safe persisted outputs. Remove unrelated envelope setup from focused journeys,
+  demonstrate selector refusal with a correctly bound proof, and enforce cell style and
+  notebook-index output counts in tests.
 
 - Split CI quality into six stage jobs with measured limits, preserve the complete local
   `mix quality` gate, require every stage before attestation, and apply the maintainer

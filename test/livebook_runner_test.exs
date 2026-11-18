@@ -9,6 +9,30 @@ defmodule BoundedAuthorityProtocol.LivebookRunnerTest do
     end
   end
 
+  test "every cell is formatted plain code with its own persisted output" do
+    for {name, entry} <- LivebookCheck.registry!(File.cwd!()),
+        cell <- File.read!("docs/notebooks/#{name}") |> LivebookCheck.parse!(entry["outputs"]) do
+      location = "docs/notebooks/#{name}:#{cell.line}"
+      assert cell.code == IO.iodata_to_binary(Code.format_string!(cell.code)), location
+
+      expressions =
+        case Code.string_to_quoted!(cell.code) do
+          {:__block__, _, expressions} -> expressions
+          expression -> [expression]
+        end
+
+      for expression <- expressions do
+        refute match?({:=, _, [_, {:__block__, _, _}]}, expression),
+               "#{location}: put the calls at the top level"
+
+        refute match?({:=, _, [true, {operator, _, _}]} when operator in [:==, :===], expression),
+               "#{location}: match the call result instead of restating its output"
+      end
+
+      refute String.trim(cell.expected) == "", "#{location}: persist a nonempty result"
+    end
+  end
+
   test "unlisted files and registry entries without files are refused" do
     root = Path.join(System.tmp_dir!(), "bap-registry-#{System.unique_integer([:positive])}")
     directory = Path.join(root, "docs/notebooks")
