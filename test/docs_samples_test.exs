@@ -1,3 +1,5 @@
+Code.require_file("../test_support/documentation.ex", __DIR__)
+
 defmodule BoundedAuthorityProtocol.DocsSamplesTest do
   @moduledoc """
   Runs the README quickstart and protocol-only guide blocks in order against this package,

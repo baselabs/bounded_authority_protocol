@@ -86,7 +86,7 @@ impl SigningKind {
 /// (`REQ1-SIGNING-exact-input`) plus the [`SigningKind`] the façade
 /// uses to validate the protected-header `typ`. The segments are
 /// already-canonical base64url ASCII bytes;
-/// [`crate::compact::assemble_compact`] passes them through VERBATIM and
+/// [`crate::v1::assemble_compact`] passes them through VERBATIM and
 /// appends the base64url-encoded signature — the composer does not re-encode or
 /// re-validate the segments (`REQ1-SIGNING-any-order`: a correctly signed
 /// closed JSON object may use any member order, so the producer's deterministic
@@ -639,7 +639,7 @@ pub struct AnchoredExportEncoded {
 ///
 /// `REQ1-SIGNING-exact-input`: the message that was signed is
 /// `ASCII(base64url(protected) || "." || base64url(payload))` — no bytes precede
-/// or follow. [`crate::compact::assemble_compact`] appends the `.` + signature
+/// or follow. [`crate::v1::assemble_compact`] appends the `.` + signature
 /// segment separately. The corpus pins all three byte-exact
 /// (`REQ1-SIGNING-deterministic-produce`).
 #[derive(Debug, Clone, PartialEq, Eq)]

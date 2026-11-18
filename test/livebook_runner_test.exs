@@ -1,3 +1,7 @@
+System.put_env("BAP_LIVEBOOK_NO_MAIN", "1")
+Code.require_file("../scripts/check_livebooks.exs", __DIR__)
+System.delete_env("BAP_LIVEBOOK_NO_MAIN")
+
 defmodule BoundedAuthorityProtocol.LivebookRunnerTest do
   use ExUnit.Case, async: false
   alias BoundedAuthorityProtocol.LivebookCheck

@@ -10,7 +10,7 @@
 //! (accepting `alg:"none"`, an unknown claim, or a private JWK member) is an
 //! algorithm-confusion / unknown-claim acceptance; a single wrong signing-input
 //! byte is a wrong signature. Every reject collapses to exactly
-//! [`Invalid`](crate::Invalid) (`REQ1-VERIFY-return-shape`) with no value leak
+//! [`Invalid`] (`REQ1-VERIFY-return-shape`) with no value leak
 //! (`REQ1-LOCATOR-no-value-leak`). Decode results carry
 //! `verification: NotEvaluated` (`REQ1-VERIFY-decode-not-evaluated`); the
 //! locator carries `trust: NotEvaluated` (`REQ1-LOCATOR-not-authority`).
@@ -144,7 +144,7 @@ pub fn untrusted_key_locator(compact: &[u8], bounds: &Bounds) -> Result<KeyLocat
 /// protected header is validated against the grant closed set
 /// (`REQ1-HEADER-closed-set`); the payload claims against the grant claim table
 /// (`REQ1-CLAIM-closed-set`). All three compact segments MUST be non-empty
-/// canonical base64url (via [`compact::parse_compact`]).
+/// canonical base64url (via `compact::parse_compact`).
 pub fn decode_grant(compact: &[u8], bounds: &Bounds) -> Result<GrantDecoded> {
     let g = decode_grant_parts(compact, bounds)?;
     Ok(GrantDecoded {
@@ -225,7 +225,7 @@ fn decode_proof_for(
 
 /// Verify a grant compact against a trusted issuer and caller expectation.
 ///
-/// Decodes the compact (reusing [`decode_grant_parts`]), then enforces
+/// Decodes the compact (reusing `decode_grant_parts`), then enforces
 /// `REQ1-VERIFY-grant-exact` (exact key id, issuer, audience), verifies the
 /// Ed25519 signature over the exact RFC 7515 two-segment signing input
 /// (`REQ1-SIGNING-exact-input`, `REQ1-SIGNING-backend-reject`), and checks the
@@ -336,7 +336,7 @@ pub fn verify_grant(
 /// `ba_inv` invocation, `ba_op` operation (which MUST name a grant operation),
 /// the proof time window (`REQ1-VERIFY-time-bounds`), the nonce mode
 /// (`REQ1-VERIFY-nonce-mode`), and every selector of the matched grant
-/// operation via [`selector::evaluate`].
+/// operation via `selector::evaluate`.
 ///
 /// Returns [`EnvelopeFacts`] embedding the re-verified [`GrantFacts`] plus the
 /// proof identity, the normalized URI, the raw grant/request hashes, the proof
@@ -1025,7 +1025,7 @@ pub fn key_transition_signing_input(
 // certifies a relinked, shortened, or omitted archive. Every invariant —
 // canonical re-encode, genesis binding, predecessor links, and the caller
 // head/predecessor/sequence/count boundaries — collapses to exactly
-// [`Invalid`](crate::Invalid) on any mismatch (`REQ1-VERIFY-return-shape`).
+// [`Invalid`] on any mismatch (`REQ1-VERIFY-return-shape`).
 // [`ChainFacts`] carries `trust: NotEvaluated` and makes no `authorization`
 // field part of its shape (`REQ1-CHAIN-facts-shape`,
 // `REQ1-CHAIN-facts-not-evaluated`). A self-consistent chain does NOT certify
@@ -2812,7 +2812,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 /// segments stay completely opaque (`REQ1-LOCATOR-opaque-payload`): they may be
 /// empty (the `header..` form) and are never decoded.
 ///
-/// This is deliberately distinct from [`compact::parse_compact`], which
+/// This is deliberately distinct from `compact::parse_compact`, which
 /// validates every segment as non-empty canonical base64url (the contract
 /// decode_grant/decode_proof require, since they must decode the payload).
 fn split_three_segments(compact: &[u8]) -> Result<(&[u8], &[u8], &[u8])> {

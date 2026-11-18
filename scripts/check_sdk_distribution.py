@@ -125,6 +125,8 @@ BOUNDARY_EXCEPTIONS = {
         '__file__-anchored traversal stops at the SDK root or a directory beneath it.',
     ('python/tests/test_decoded_rendering.py', "python:Path(__file__).parent / 'fixtures'", 1):
         '__file__-anchored traversal stops at the SDK root or a directory beneath it.',
+    ('python/tests/test_documentation.py', 'python:Path(__file__).resolve().parents[1]', 1):
+        '__file__-anchored traversal stops at the SDK root or a directory beneath it.',
     ('python/tests/test_host_boundaries.py', "python:Path(bap.__file__).parent / 'json_alg.py'", 1):
         'The imported SDK module lives in src/bounded_authority_verifier; its directory stays in the SDK.',
     ('python/tests/test_host_boundaries.py', "python:(Path(__file__).parents[1] / 'README.md').read_text()", 1):

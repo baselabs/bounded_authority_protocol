@@ -1,5 +1,5 @@
 //! JSON Canonicalization Scheme (RFC 8785) encoder over the tagged
-//! [`JsonValue`](crate::json::JsonValue) algebra.
+//! [`JsonValue`] algebra.
 //!
 //! Canonicalization IS the wire contract: every signature and request digest in
 //! the v1 profile is computed over JCS bytes, so a single byte of divergence

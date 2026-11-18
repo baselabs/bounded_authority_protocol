@@ -11,7 +11,15 @@
     "outputs": 10,
     "release_launch": "bap-walkthrough.livemd"
   },
+  "es256-signing.livemd": {
+    "outputs": 9,
+    "release_launch": "bap-walkthrough.livemd"
+  },
   "local-loopback.livemd": {
+    "outputs": 7,
+    "release_launch": "bap-walkthrough.livemd"
+  },
+  "range-selectors.livemd": {
     "outputs": 7,
     "release_launch": "bap-walkthrough.livemd"
   },
@@ -25,14 +33,6 @@
   },
   "strict-crypto.livemd": {
     "outputs": 10,
-    "release_launch": "bap-walkthrough.livemd"
-  },
-  "v2-ranges.livemd": {
-    "outputs": 7,
-    "release_launch": "bap-walkthrough.livemd"
-  },
-  "v3-es256.livemd": {
-    "outputs": 9,
     "release_launch": "bap-walkthrough.livemd"
   }
 }

@@ -202,8 +202,8 @@ import the current files for the steps below. The [notebook index](docs/guides/n
 lists each journey and its checked output count.
 
 - [Core envelope verification](docs/notebooks/bap-walkthrough.livemd)
-- [Contract-major 2 ranges](docs/notebooks/v2-ranges.livemd)
-- [Contract-major 3 ES256](docs/notebooks/v3-es256.livemd)
+- [Contract-major 2 ranges](docs/notebooks/range-selectors.livemd)
+- [Contract-major 3 ES256](docs/notebooks/es256-signing.livemd)
 - [Service integration](docs/notebooks/service-integration.livemd)
 - [Local loopback](docs/notebooks/local-loopback.livemd)
 - [Role attestations](docs/notebooks/role-attestations.livemd)

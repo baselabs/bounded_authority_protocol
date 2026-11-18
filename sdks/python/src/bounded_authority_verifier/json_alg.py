@@ -39,8 +39,6 @@ MAX_FLOAT = 9007199254740991
 class JNull:
     """The tagged JSON null value."""
 
-    pass
-
 
 @dataclass(frozen=True)
 class JBool:

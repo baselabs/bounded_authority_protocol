@@ -19,5 +19,5 @@ alias BoundedAuthorityProtocol.V1
 integer_digest != float_digest
 ```
 
-The value is `true`. The [contract-major 2 notebook](../notebooks/v2-ranges.livemd) executes both inclusive
+The value is `true`. The [contract-major 2 notebook](../notebooks/range-selectors.livemd) executes both inclusive
 boundaries, a tag mismatch with a correctly signed proof, and invalid selector producers.

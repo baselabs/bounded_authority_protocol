@@ -49,8 +49,8 @@ func inspectRaw(v []byte) inspectTerm { return inspectTerm{kind: "binary", raw: 
 func inspectText(v string) inspectTerm {
 	return inspectTerm{kind: "binary", raw: []byte(v[:min(len(v), 16384)]), more: len(v) > 16384}
 }
-func inspectTuple(v ...inspectTerm) inspectTerm { return inspectTerm{kind: "tuple", children: v} }
-func inspectListing(v []inspectTerm) inspectTerm { return inspectTerm{kind: "list", children: v} }
+func inspectTuple(v ...inspectTerm) inspectTerm        { return inspectTerm{kind: "tuple", children: v} }
+func inspectListing(v []inspectTerm) inspectTerm       { return inspectTerm{kind: "list", children: v} }
 func inspectField(k string, v inspectTerm) inspectTerm { return inspectTuple(inspectAtom(k), v) }
 func inspectStruct(name string, fields ...inspectTerm) inspectTerm {
 	return inspectTerm{kind: "struct", text: name, children: fields}
@@ -238,7 +238,7 @@ func inspectWalk(term inspectTerm, remaining *int) string {
 	}
 }
 func inspectBinary(raw []byte) string { return inspectRender(inspectRaw(raw)) }
-func inspectString(v string) string { return inspectRender(inspectText(v)) }
+func inspectString(v string) string   { return inspectRender(inspectText(v)) }
 func inspectTagged(value Value) inspectTerm {
 	var tag string
 	var val inspectTerm

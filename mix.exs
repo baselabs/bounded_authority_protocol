@@ -166,8 +166,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/notebooks/local-loopback.livemd",
         "docs/notebooks/role-attestations.livemd",
         "docs/notebooks/strict-crypto.livemd",
-        "docs/notebooks/v2-ranges.livemd",
-        "docs/notebooks/v3-es256.livemd",
+        "docs/notebooks/range-selectors.livemd",
+        "docs/notebooks/es256-signing.livemd",
         "docs/deployment/go-sdk.md",
         "docs/deployment/python-sdk.md",
         "docs/deployment/rust-sdk.md",
@@ -256,8 +256,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/notebooks/role-attestations.livemd",
         "docs/notebooks/service-integration.livemd",
         "docs/notebooks/strict-crypto.livemd",
-        "docs/notebooks/v2-ranges.livemd",
-        "docs/notebooks/v3-es256.livemd",
+        "docs/notebooks/range-selectors.livemd",
+        "docs/notebooks/es256-signing.livemd",
         "docs/guides/cheatsheet.cheatmd",
         "docs/guides/api-stability.md",
         "docs/guides/glossary.md",
@@ -338,8 +338,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
           "docs/notebooks/role-attestations.livemd",
           "docs/notebooks/service-integration.livemd",
           "docs/notebooks/strict-crypto.livemd",
-          "docs/notebooks/v2-ranges.livemd",
-          "docs/notebooks/v3-es256.livemd"
+          "docs/notebooks/range-selectors.livemd",
+          "docs/notebooks/es256-signing.livemd"
         ],
         Reference: [
           "docs/guides/cheatsheet.cheatmd",

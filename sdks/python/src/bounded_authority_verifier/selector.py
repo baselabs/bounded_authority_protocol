@@ -35,7 +35,6 @@ _SELECTOR_MEMBER_SETS = {
 @dataclass(frozen=True)
 class SelAll:
     """A selector that accepts every argument value at its path."""
-    pass
 
 
 @dataclass(frozen=True)

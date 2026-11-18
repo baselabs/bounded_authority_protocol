@@ -387,8 +387,8 @@ the earlier notebooks preserved at the immutable 1.0.0 tag.
 ### Notebook journeys
 
 - [Core envelope verification](../notebooks/bap-walkthrough.livemd)
-- [Contract-major 2 ranges](../notebooks/v2-ranges.livemd)
-- [Contract-major 3 ES256](../notebooks/v3-es256.livemd)
+- [Contract-major 2 ranges](../notebooks/range-selectors.livemd)
+- [Contract-major 3 ES256](../notebooks/es256-signing.livemd)
 - [Service integration](../notebooks/service-integration.livemd)
 - [Local loopback](../notebooks/local-loopback.livemd)
 - [Role attestations](../notebooks/role-attestations.livemd)

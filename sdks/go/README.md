@@ -315,7 +315,7 @@ Deployment notes: [`docs/deployment/go-sdk.md`](https://github.com/baselabs/boun
 
 These SDKs are unpublished at version 0.1.0; there is no earlier supported registry major.
 When moving from an older source commit, apply these changes recorded in the monorepo
-[CHANGELOG](../../CHANGELOG.md). The quickstart uses the current forms.
+[CHANGELOG](https://github.com/baselabs/bounded_authority_protocol/blob/main/CHANGELOG.md). The quickstart uses the current forms.
 
 | Earlier usage | Current usage |
 |---|---|

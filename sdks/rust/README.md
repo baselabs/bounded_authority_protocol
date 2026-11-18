@@ -49,7 +49,7 @@ testing this checkout. A consuming application maintains and audits its own lock
 ## Install from a checkout
 
 Start from an empty directory and choose either the [complete path manifest or the
-complete Git manifest](../../docs/deployment/rust-sdk.md#not-published-yet), both pinned to a
+complete Git manifest](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/rust-sdk.md#not-published-yet), both pinned to a
 selected full source commit. CI executes both installs as independent consumer projects.
 
 ## Quickstart
@@ -276,7 +276,7 @@ Deployment notes, including AWS Lambda and PostgreSQL: see
 
 These SDKs are unpublished at version 0.1.0; there is no earlier supported registry major.
 When moving from an older source commit, apply these changes recorded in the monorepo
-[CHANGELOG](../../CHANGELOG.md). The quickstart uses the current forms.
+[CHANGELOG](https://github.com/baselabs/bounded_authority_protocol/blob/main/CHANGELOG.md). The quickstart uses the current forms.
 
 | Earlier usage | Current usage |
 |---|---|

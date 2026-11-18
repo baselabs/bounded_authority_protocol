@@ -1,3 +1,5 @@
+Code.require_file("../test_support/documentation.ex", __DIR__)
+
 defmodule BoundedAuthorityProtocol.DocsConsumerTest do
   use ExUnit.Case, async: false
 

@@ -1,3 +1,8 @@
+Code.require_file("../test_support/documentation.ex", __DIR__)
+System.put_env("BAP_LIVEBOOK_NO_MAIN", "1")
+Code.require_file("../scripts/check_livebooks.exs", __DIR__)
+System.delete_env("BAP_LIVEBOOK_NO_MAIN")
+
 defmodule BoundedAuthorityProtocol.DocumentationContractTest do
   use ExUnit.Case, async: false
 
@@ -166,7 +171,8 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
     end
 
     runner = File.read!("scripts/check_sdk_install.py")
-    assert runner =~ ~s(["path", "git"])
+    assert runner =~ ~s{[("path", None)] if sdk == "rust"}
+    assert runner =~ ~s(os.environ["GITHUB_SHA"])
     assert runner =~ "tomllib.loads(manifest)"
     assert runner =~ "direct_url.json"
   end
@@ -223,9 +229,11 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
         {{^name, ^arity}, alternatives} = List.keyfind(specs, {name, arity}, 0)
 
         signature =
-          alternatives
-          |> Enum.map(&(Code.Typespec.spec_to_quoted(name, &1) |> Macro.to_string()))
-          |> Enum.join("\n")
+          Enum.map_join(
+            alternatives,
+            "\n",
+            &(Code.Typespec.spec_to_quoted(name, &1) |> Macro.to_string())
+          )
 
         cond do
           module == BoundedAuthorityProtocol.V1.Bounds and name == :maximum ->
@@ -354,27 +362,30 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
   defp link_errors(path, href) do
     uri = URI.parse(href)
 
-    if uri.scheme || uri.host || String.starts_with?(href, "/") do
-      []
-    else
-      target =
-        if uri.path in [nil, ""],
-          do: path,
-          else: Path.expand(URI.decode(uri.path), Path.dirname(Path.expand(path)))
+    if uri.scheme || uri.host || String.starts_with?(href, "/"),
+      do: [],
+      else: relative_link_errors(path, href, uri)
+  end
 
-      cond do
-        not File.exists?(target) ->
-          ["#{path}: missing relative link #{href}"]
+  defp relative_link_errors(path, href, uri) do
+    target =
+      if uri.path in [nil, ""],
+        do: path,
+        else: Path.expand(URI.decode(uri.path), Path.dirname(Path.expand(path)))
 
-        uri.fragment && Path.extname(target) in [".md", ".cheatmd", ".livemd"] &&
-            URI.decode(uri.fragment) not in anchors(target) ->
-          ["#{path}: missing anchor #{href}"]
-
-        true ->
-          []
-      end
+    cond do
+      not File.exists?(target) -> ["#{path}: missing relative link #{href}"]
+      missing_anchor?(target, uri.fragment) -> ["#{path}: missing anchor #{href}"]
+      true -> []
     end
   end
+
+  defp missing_anchor?(_target, nil), do: false
+
+  defp missing_anchor?(target, fragment),
+    do:
+      Path.extname(target) in [".md", ".cheatmd", ".livemd"] and
+        URI.decode(fragment) not in anchors(target)
 
   defp anchors(path) do
     source = File.read!(path)

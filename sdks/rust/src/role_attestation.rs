@@ -18,7 +18,7 @@
 //! [`verify_attestation`] (the citation symbol). The package owns no signer
 //! and accepts no private key or signing callback — only external signature
 //! bytes (`REQ-RA1-API-no-signer`). Every failure collapses to exactly
-//! [`Invalid`](crate::Invalid) (`REQ-RA1-API-return-shape`); profile selection
+//! [`Invalid`] (`REQ-RA1-API-return-shape`); profile selection
 //! is trusted caller code and is never inferred from bytes, context, or a
 //! failed verification (`REQ-RA1-CORE-no-inference-fallback`).
 //!
