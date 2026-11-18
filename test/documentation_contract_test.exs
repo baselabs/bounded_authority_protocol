@@ -142,19 +142,29 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
     assert runner =~ "direct_url.json"
   end
 
-  test "both notebook modes gate qualification under their required job names" do
+  test "local notebooks qualify; published notebooks run after upload without a key" do
     jobs = YamlElixir.read_from_file!(".github/workflows/ci.yml")["jobs"]
+    local = jobs["livebooks-local"]
+    assert "livebooks-local" in jobs["qualified"]["needs"]
+    assert local["runs-on"] == "ubuntu-24.04"
+    assert Enum.any?(local["steps"], &(&1["run"] == "elixir scripts/check_livebooks.exs --local"))
 
-    for mode <- ["local", "published"] do
-      name = "livebooks-#{mode}"
-      assert name in jobs["qualified"]["needs"]
-      assert jobs[name]["runs-on"] == "ubuntu-24.04"
+    # Qualification never installs this package from Hex: a version commit names a
+    # version Hex does not serve yet, so it could never land.
+    refute File.read!(".github/workflows/ci.yml") =~ "--published"
 
-      assert Enum.any?(
-               jobs[name]["steps"],
-               &(&1["run"] == "elixir scripts/check_livebooks.exs --#{mode}")
-             )
-    end
+    publish = YamlElixir.read_from_file!(".github/workflows/publish.yml")["jobs"]
+    published = publish["published-livebooks"]
+    assert published["needs"] == "publish"
+    assert published["if"] == publish["publish"]["if"]
+    assert published["runs-on"] == "ubuntu-24.04"
+    refute Map.has_key?(published, "environment")
+    refute inspect(published) =~ "secrets."
+
+    assert Enum.any?(
+             published["steps"],
+             &(&1["run"] == "elixir scripts/check_livebooks.exs --published")
+           )
   end
 
   test "result-family descriptions follow the compiled public specifications" do
@@ -252,9 +262,10 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
       refute text =~ "prints every field"
     end
 
-    versions = File.read!(".tool-versions")
-    [_, go] = Regex.run(~r/^golang_sdk (\S+)$/m, versions)
-    assert File.read!("sdks/go/README.md") =~ "Go **#{go}**"
+    [_, go] = Regex.run(~r/^go (\d+\.\d+)$/m, File.read!("sdks/go/go.mod"))
+    go_readme = File.read!("sdks/go/README.md")
+    assert go_readme =~ "Go **#{go}** or later"
+    assert go_readme =~ "exactly Go **#{go}.0**"
     refute File.read!("sdks/README.md") =~ "## Known gaps"
     assert File.read!("docs/deployment/typescript-sdk.md") =~ "bap-selector-float-zero/1"
     assert File.read!("docs/deployment/typescript-sdk.md") =~ "161"

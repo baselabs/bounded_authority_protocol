@@ -1,10 +1,22 @@
 #!/bin/bash
-# CI-only runtime checks. Primary versions come from .tool-versions; compatibility
-# floors are explicit workflow arguments, with Rust also bound to its SDK manifest.
+# CI-only runtime checks. Primary versions come from .tool-versions. SDK floors come
+# from their manifests: the Rust MSRV from rust-toolchain.toml (also pinned in
+# .tool-versions) and the Go floor from the go directive of sdks/go/go.mod.
 set -euo pipefail
 
 declared() {
   awk -v tool="$1" '$1 == tool {print $2; found++} END {if (found != 1) exit 1}' .tool-versions
+}
+
+# A go directive without a patch level (`go 1.25`) names the .0 release as the floor.
+go_floor() {
+  floor="$(awk '$1 == "go" {print $2; exit}' sdks/go/go.mod)"
+  case "$floor" in
+    '') printf 'sdks/go/go.mod declares no go directive\n' >&2; exit 1 ;;
+    *.*.*) ;;
+    *) floor="$floor.0" ;;
+  esac
+  printf '%s\n' "$floor"
 }
 
 same() {
@@ -18,7 +30,11 @@ case "$1" in
   read)
     shift
     for tool in "$@"; do
-      printf '%s=%s\n' "$tool" "$(declared "$tool")" >> "$GITHUB_OUTPUT"
+      case "$tool" in
+        golang_floor) value="$(go_floor)" ;;
+        *) value="$(declared "$tool")" ;;
+      esac
+      printf '%s=%s\n' "$tool" "$value" >> "$GITHUB_OUTPUT"
     done
     ;;
   beam)
@@ -38,6 +54,7 @@ case "$1" in
   nodejs) same Node "$(declared nodejs)" "$(node -p 'process.versions.node')" ;;
   ruby) same Ruby "$(declared ruby)" "$(ruby -e 'print RUBY_VERSION')" ;;
   golang) same Go "${2:-$(declared golang)}" "$(GOTOOLCHAIN=local go env GOVERSION | sed 's/^go//')" ;;
+  golang-floor) same 'Go floor' "$(go_floor)" "$(GOTOOLCHAIN=local go env GOVERSION | sed 's/^go//')" ;;
   ocaml) same OCaml "$(declared ocaml)" "$(opam exec -- ocamlc -version)" ;;
   rust)
     expected="$(sed -n 's/^channel = "\([^"]*\)"/\1/p' sdks/rust/rust-toolchain.toml)"

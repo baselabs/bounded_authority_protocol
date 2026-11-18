@@ -26,7 +26,7 @@ jobs:
 
       - name: Read Python version
         id: python
-        run: bash scripts/ci_tool_versions.sh read python rust golang_sdk
+        run: bash scripts/ci_tool_versions.sh read python rust golang_floor
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -117,7 +117,7 @@ jobs:
 
       - name: Read Python version
         id: python
-        run: bash scripts/ci_tool_versions.sh read python rust golang_sdk
+        run: bash scripts/ci_tool_versions.sh read python rust golang_floor
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -178,8 +178,8 @@ jobs:
         working-directory: sdks/rust
 
   # Go runs as its own job in the same call. The go.mod floor (1.25) is the
-  # CI-tested floor: this job installs exactly 1.25.0, mirroring the Rust MSRV
-  # pattern. Zero runtime dependencies means no go.sum to lock; `go vet` +
+  # CI-tested floor: this job installs exactly its .0 release, mirroring the Rust
+  # MSRV pattern. Zero runtime dependencies means no go.sum to lock; `go vet` +
   # `go test ./...` cover the library unit suite, the permissiveness
   # mutation-gate battery (incl. the white-box work-pin legs), and the
   # conformance runner that asserts agreed=283 disagreed=0 + the key census
@@ -196,7 +196,7 @@ jobs:
 
       - name: Read Python version
         id: python
-        run: bash scripts/ci_tool_versions.sh read python rust golang_sdk
+        run: bash scripts/ci_tool_versions.sh read python rust golang_floor
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -209,11 +209,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ steps.python.outputs.golang_sdk }}
+          go-version: ${{ steps.python.outputs.golang_floor }}
           cache: false
 
       - name: Refuse Go floor drift
-        run: bash scripts/ci_tool_versions.sh golang ${{ steps.python.outputs.golang_sdk }}
+        run: bash scripts/ci_tool_versions.sh golang-floor
 
       - name: "Go: closure removal must fail"
         run: python3 scripts/check_sdk_closures.py go
@@ -286,7 +286,7 @@ jobs:
           persist-credentials: false
       - name: Read Python version
         id: python
-        run: bash scripts/ci_tool_versions.sh read python rust golang_sdk
+        run: bash scripts/ci_tool_versions.sh read python rust golang_floor
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -306,11 +306,11 @@ jobs:
       - if: matrix.sdk == 'go'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ steps.python.outputs.golang_sdk }}
+          go-version: ${{ steps.python.outputs.golang_floor }}
           cache: false
       - if: matrix.sdk == 'go'
         name: Refuse Go floor drift
-        run: bash scripts/ci_tool_versions.sh golang ${{ steps.python.outputs.golang_sdk }}
+        run: bash scripts/ci_tool_versions.sh golang-floor
       - if: matrix.sdk == 'go'
         name: Cache the module zip verifier
         run: go mod download golang.org/x/mod@v0.29.0

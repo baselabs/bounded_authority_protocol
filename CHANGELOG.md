@@ -6,8 +6,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
-- Reorganize integrator guides and focused notebooks; gate fresh local and exact published-Hex
-  notebook execution, persisted semantic outputs, documentation currency, and native SDK docs.
+- Reorganize integrator guides and focused notebooks; gate fresh local notebook execution,
+  persisted semantic outputs, documentation currency, and native SDK docs, and run every
+  notebook unchanged against the exact Hex release after each upload.
   Clarify result families, host responsibilities, SDK installs, and migration paths.
 
 - Split CI quality into six stage jobs with measured limits, preserve the complete local

@@ -214,7 +214,9 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     workflow = read(path)
     assert workflow["on"] == %{"workflow_dispatch" => nil}
     assert workflow["permissions"] == %{"contents" => "read"}
-    [job] = Map.values(workflow["jobs"])
+    # The keyed upload job, then the keyless read-back of the published notebooks.
+    assert Enum.sort(Map.keys(workflow["jobs"])) == ["publish", "published-livebooks"]
+    job = workflow["jobs"]["publish"]
     assert job["environment"] == "publish"
 
     assert job["if"] ==

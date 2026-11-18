@@ -2,7 +2,9 @@
 
 Every notebook installs exactly `bounded_authority_protocol` 1.0.0, generates its own
 demonstration keys, asserts success and refusal, and persists only safe semantic outputs.
-The runner executes each in a fresh VM in both local-checkout and published-Hex modes.
+Qualification runs each in a fresh VM against this checkout (`--local`). The publication
+workflow runs them unchanged against the exact Hex release right after each upload
+(`--published`), in a job that holds no key.
 
 | Journey | Focus |
 |---|---|
