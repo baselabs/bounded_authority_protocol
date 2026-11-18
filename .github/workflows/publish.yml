@@ -49,6 +49,11 @@ jobs:
       - name: Refuse Python version drift
         run: bash scripts/ci_tool_versions.sh python
 
+      - name: Refuse a package name the registry has never had
+        env:
+          PACKAGE: bounded_authority_protocol
+        run: python3 scripts/check_hex_release.py name
+
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
@@ -77,9 +82,6 @@ jobs:
               "PACKAGE_ARCHIVE=#{System.fetch_env!("GITHUB_WORKSPACE")}/artifacts/#{package}-#{version}.tar\n" <>
               "DOCS_ARCHIVE=#{System.fetch_env!("RUNNER_TEMP")}/hex-docs.tar.gz\n", [:append])
           '
-
-      - name: Refuse a package name the registry has never had
-        run: python3 scripts/check_hex_release.py name
 
       - name: Refuse an existing version tag
         run: |
@@ -129,10 +131,8 @@ jobs:
           cp "$RUNNER_TEMP/qualification-evidence/tooling.cdx.json" artifacts/
           (cd artifacts && sha256sum --check SHA256SUMS)
 
-      - name: Prepare isolated upload and inspect any existing release bytes
+      - name: Prepare upload and inspect any existing release bytes
         run: |
-          mkdir "$RUNNER_TEMP/hex-upload"
-          cp scripts/publish_hex.exs "$RUNNER_TEMP/hex-upload/publish_hex.exs"
           sha256sum "$PACKAGE_ARCHIVE" "$DOCS_ARCHIVE" > "$RUNNER_TEMP/hex-publish.sha256"
           python3 scripts/check_hex_release.py prepare
 
@@ -150,14 +150,15 @@ jobs:
 
       - name: Upload only the missing inspected package and documentation
         id: upload
-        working-directory: ${{ runner.temp }}/hex-upload
+        working-directory: ${{ runner.temp }}
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
         run: |
           test -n "$HEX_API_KEY"
           test ! -e mix.exs
           sha256sum --check "$RUNNER_TEMP/hex-publish.sha256"
-          mix run --no-mix-exs --no-start publish_hex.exs
+          mix run --no-mix-exs --no-start "$GITHUB_WORKSPACE/scripts/publish_hex_artifacts.exs" \
+            "$PACKAGE" "$VERSION" "$PACKAGE_ARCHIVE" "$DOCS_ARCHIVE"
 
       - name: Read back both uploads and refuse a held or differing release
         env:
@@ -167,7 +168,7 @@ jobs:
       - name: Remove publication scratch
         if: always()
         run: |
-          rm -rf "$RUNNER_TEMP/hex-upload" "$RUNNER_TEMP/qualification-evidence"
+          rm -rf "$RUNNER_TEMP/qualification-evidence"
           rm -f "$RUNNER_TEMP/qualification-evidence.zip" "$RUNNER_TEMP/hex-publish.sha256" \
             "$RUNNER_TEMP/hex-docs.tar.gz"
 
