@@ -225,7 +225,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     assert_default_branch_first(job)
     refute Map.has_key?(workflow, "env")
     refute Map.has_key?(job, "env")
-    assert job["timeout-minutes"] == 90
+    assert job["timeout-minutes"] == 5
   end
 
   test "the attested package passed every quality stage and its archive was checked" do

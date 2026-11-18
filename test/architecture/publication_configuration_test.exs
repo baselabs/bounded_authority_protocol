@@ -12,7 +12,7 @@ defmodule BoundedAuthorityProtocol.PublicationConfigurationTest do
     assert workflow["on"] == %{"workflow_dispatch" => nil}
     assert workflow["permissions"] == %{"contents" => "read"}
     assert job["environment"] == "publish"
-    assert job["timeout-minutes"] == 90
+    assert job["timeout-minutes"] == 5
     assert hd(steps)["name"] == "Require the default branch"
     assert hd(steps)["run"] =~ ~s("refs/heads/$DEFAULT_BRANCH")
 
