@@ -17,6 +17,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - `mix docs.links` checks every local `src` as well as every `href` in the built HexDocs,
   requires scripts, stylesheets, images and the EPUB to exist, and exempts only
   `docs_config.js`, which HexDocs serves per package.
+- The documented SDK Git installs run twice in CI: at the pinned commit the guides name, and
+  with that pin replaced by the commit under test.
 
 - Split CI quality into six stage jobs with measured limits, preserve the complete local
   `mix quality` gate, require every stage before attestation, and apply the maintainer
