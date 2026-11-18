@@ -19,10 +19,13 @@ documents. Attestation requires every quality stage to pass. In the same
 `kci/<sha>` qualification run, the
 [supply-chain workflow](../.github/workflows/supply-chain.yml) signs separate build-provenance
 and SBOM attestations for that archive. Verify by source commit, because the attestation names
-the qualification branch. The commit must be on `main` before release. To compare a candidate
-with those artifacts:
+the qualification branch. The commit must be on `main` before release. Consumers download
+the archive, `SHA256SUMS`, `release.cdx.json` and `tooling.cdx.json` from this repository's
+GitHub release `v<version>`. To compare a candidate with those release files:
 
 ```bash
+gh release download v<version> --repo baselabs/bounded_authority_protocol \
+  --pattern '*.tar' --pattern SHA256SUMS --pattern '*.cdx.json'
 sha256sum --check SHA256SUMS
 gh attestation verify bounded_authority_protocol-<version>.tar \
   --repo baselabs/bounded_authority_protocol \
@@ -32,10 +35,16 @@ gh attestation verify bounded_authority_protocol-<version>.tar \
 ```
 
 The maintainers' release operator dispatches [publish.yml](../.github/workflows/publish.yml)
-from `main` to publish the Hex package after qualification. It rejects an already published
-or tagged version, builds docs and the archive without a cache, and checks package identity,
-file inventory and source bytes before publication. Contributors and agents do not publish,
-tag or dispatch. The operator verifies the published release and tags its exact commit.
+from `main` to publish the Hex package after qualification. It refuses a package name Hex has
+never had, a tagged or retired version, or existing package or documentation bytes that differ.
+It builds HTML docs and the archive without a cache, checks package identity, file inventory
+and source bytes, and verifies the archive's qualification attestation before uploading.
+Only the upload step holds the registry key, from a directory with no `mix.exs`.
+A held upload is incomplete: after approval on Hex, another dispatch on the same commit
+uploads only what is missing and reads both uploads back. It never replaces a package.
+Contributors and agents do not publish, tag or dispatch. After the read-back, the operator
+tags the exact commit and creates its GitHub release with the archive, checksum and SBOMs.
+No workflow creates a GitHub release or runs on a tag.
 [pages.yml](../.github/workflows/pages.yml) is also dispatch-only from `main`, limited to the
 same maintainer accounts, and retains its `github-pages` environment.
 

@@ -55,9 +55,15 @@ and tooling CycloneDX SBOM documents. In that same `kci/<sha>` qualification run
 quality stage job has passed, CI calls the supply-chain workflow, which signs separate
 build-provenance and SBOM attestations for that archive. Verify the exact source commit,
 which must be on `main` before release; the attestation's source ref is the qualification branch.
-A downloaded archive can be verified with:
+Download the archive, `SHA256SUMS`, `release.cdx.json` and `tooling.cdx.json` from the
+GitHub release `v<version>` in this repository. Publication verifies that its newly built
+archive matches the qualification attestation, then reads both package and documentation
+bytes back from Hex. After that read-back, the release operator tags the exact commit and
+attaches these files to the GitHub release. Verify the downloaded archive with:
 
 ```bash
+gh release download v<version> --repo baselabs/bounded_authority_protocol \
+  --pattern '*.tar' --pattern SHA256SUMS --pattern '*.cdx.json'
 sha256sum --check SHA256SUMS
 gh attestation verify bounded_authority_protocol-<version>.tar \
   --repo baselabs/bounded_authority_protocol \

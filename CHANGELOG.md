@@ -2,6 +2,16 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- Publish only inspected, qualification-attested archives from an isolated Hex upload
+  process. Resume held package and documentation uploads by exact bytes, refuse new names
+  and retired versions, and deliver the archive, checksum and SBOMs through GitHub releases.
+- Disable implicit qualification cache writers, enforce the Pages deploy ref guard, and
+  use the complete attestation action permissions and release pin comments.
+
 ## [1.1.0] (2026-11-18)
 
 ### Added

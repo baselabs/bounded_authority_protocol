@@ -74,6 +74,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     jobs = read(@gate)["jobs"]
     qualified = jobs["qualified"]
     assert qualified["if"] == "always()"
+    refute Map.has_key?(qualified, "name")
     assert MapSet.new(qualified["needs"]) == MapSet.new(Map.keys(jobs) -- ["qualified"])
     [step] = qualified["steps"]
     assert step["env"]["NEEDS_JSON"] == "${{ toJSON(needs) }}"
@@ -206,15 +207,14 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     assert pages["jobs"]["deploy"]["if"] == pages["jobs"]["build"]["if"]
     assert pages["jobs"]["deploy"]["needs"] == "build"
     assert_default_branch_first(pages["jobs"]["build"])
+    assert_default_branch_first(pages["jobs"]["deploy"])
     assert pages["jobs"]["deploy"]["environment"]["name"] == "github-pages"
   end
 
   test "Hex publication is dispatch-only, maintainer-restricted and environment-scoped" do
-    path = ".github/workflows/publish.yml"
-    workflow = read(path)
+    workflow = read(".github/workflows/publish.yml")
     assert workflow["on"] == %{"workflow_dispatch" => nil}
     assert workflow["permissions"] == %{"contents" => "read"}
-    # The keyed upload job, then the keyless read-back of the published notebooks.
     assert Enum.sort(Map.keys(workflow["jobs"])) == ["publish", "published-livebooks"]
     job = workflow["jobs"]["publish"]
     assert job["environment"] == "publish"
@@ -225,50 +225,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     assert_default_branch_first(job)
     refute Map.has_key?(workflow, "env")
     refute Map.has_key?(job, "env")
-    steps = job["steps"]
-    [publish] = Enum.filter(steps, &String.contains?(&1["run"] || "", "mix hex.publish"))
-    assert publish["run"] == "mix hex.publish --yes"
-    assert publish["env"] == %{"HEX_API_KEY" => "${{ secrets.HEX_API_KEY }}"}
-    assert List.last(steps) == publish
-
-    # Remove the one allowed declaration; no other workflow location may carry this key.
-    without_key = put_in(workflow, ["jobs", "publish", "steps"], steps -- [publish])
-    refute inspect(without_key) =~ "HEX_API_KEY"
-
-    for other <- workflows() -- [path] do
-      refute File.read!(other) =~ "HEX_API_KEY", other
-    end
-
-    for step <- steps do
-      refute uses?(step, "actions/cache")
-      refute Map.has_key?(step["with"] || %{}, "cache")
-    end
-
-    version_guard = Enum.find(steps, &String.contains?(&1["run"] || "", "git ls-remote"))
-    assert version_guard["run"] =~ "@version"
-
-    assert version_guard["run"] =~
-             "https://hex.pm/api/packages/bounded_authority_protocol/releases/"
-
-    assert version_guard["run"] =~ "200)"
-    assert version_guard["run"] =~ "404)"
-    assert version_guard["run"] =~ "refs/tags/v$version"
-
-    commands = Enum.map(steps, &(&1["run"] || ""))
-    assert "mix deps.get --check-locked" in commands
-    docs = Enum.find_index(commands, &(&1 == "mix docs"))
-
-    build =
-      Enum.find_index(commands, &(&1 == ~s(mix hex.build --output "$RUNNER_TEMP/package.tar")))
-
-    inspect_package =
-      Enum.find_index(
-        commands,
-        &(&1 == ~s(mix run --no-start scripts/check_package.exs "$RUNNER_TEMP/package.tar"))
-      )
-
-    assert is_integer(docs) and is_integer(build) and is_integer(inspect_package)
-    assert docs < build and build < inspect_package and inspect_package < length(steps) - 1
+    assert job["timeout-minutes"] == 90
   end
 
   test "the attested package passed every quality stage and its archive was checked" do

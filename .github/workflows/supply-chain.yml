@@ -24,6 +24,7 @@ jobs:
       contents: read
       id-token: write
       attestations: write
+      artifact-metadata: write
     env:
       VERSION: ${{ inputs.version }}
     steps:
@@ -34,12 +35,12 @@ jobs:
           path: artifacts
 
       - name: Attest build provenance
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: artifacts/bounded_authority_protocol-${{ env.VERSION }}.tar
 
       - name: Attest release SBOM
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: artifacts/bounded_authority_protocol-${{ env.VERSION }}.tar
           sbom-path: artifacts/release.cdx.json
