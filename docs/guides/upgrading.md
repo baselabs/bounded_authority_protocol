@@ -11,13 +11,13 @@ from a 0.x release to 1.0, then the extra steps for older starting points. The
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 1.0"}]
+  [{:bounded_authority_protocol, "~> 1.1"}]
 end
 ```
 
-`~> 1.0` admits every 1.x release. A 0.x requirement such as `~> 0.9.1` never selects 1.0, so
-the change is explicit. Then run `mix deps.update bounded_authority_protocol` and the packaged
-corpora ([Recipes](recipes.md#run-every-packaged-corpus)).
+`~> 1.1` admits every 1.x release at or above 1.1.0. A 0.x requirement such as `~> 0.9.1`
+never selects 1.x, so the change is explicit. Then run `mix deps.update bounded_authority_protocol`
+and the packaged corpora ([Recipes](recipes.md#run-every-packaged-corpus)).
 
 ## What changes in 1.0
 

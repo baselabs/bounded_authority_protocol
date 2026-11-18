@@ -9,23 +9,23 @@
   },
   "content-lineage.livemd": {
     "outputs": 10,
-    "release_launch": "bap-walkthrough.livemd"
+    "release_launch": "content-lineage.livemd"
   },
   "es256-signing.livemd": {
     "outputs": 9,
-    "release_launch": "bap-walkthrough.livemd"
+    "release_launch": "es256-signing.livemd"
   },
   "local-loopback.livemd": {
     "outputs": 7,
-    "release_launch": "bap-walkthrough.livemd"
+    "release_launch": "local-loopback.livemd"
   },
   "range-selectors.livemd": {
     "outputs": 7,
-    "release_launch": "bap-walkthrough.livemd"
+    "release_launch": "range-selectors.livemd"
   },
   "role-attestations.livemd": {
     "outputs": 8,
-    "release_launch": "bap-walkthrough.livemd"
+    "release_launch": "role-attestations.livemd"
   },
   "service-integration.livemd": {
     "outputs": 16,
@@ -33,6 +33,6 @@
   },
   "strict-crypto.livemd": {
     "outputs": 10,
-    "release_launch": "bap-walkthrough.livemd"
+    "release_launch": "strict-crypto.livemd"
   }
 }

@@ -4,7 +4,7 @@
 [![HexDocs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/bounded_authority_protocol)
 [![CI](https://github.com/baselabs/bounded_authority_protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/baselabs/bounded_authority_protocol/actions/workflows/ci.yml)
 [![License](https://img.shields.io/hexpm/l/bounded_authority_protocol.svg)](LICENSE)
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd)
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.1.0%2Fdocs%2Fnotebooks%2Fbap-walkthrough.livemd)
 
 The open wire profile, verifier, and conformance suite of the Bounded Authority Protocol: an
 issuer signs a **capability grant** that names exactly which operations a holder may invoke, with
@@ -38,7 +38,7 @@ release carries several profiles.
 
 | What | Version | Namespace | Suite | Specification |
 |---|---|---|---|---|
-| Hex package | 1.0.0 | `BoundedAuthorityProtocol` | | [Changelog](CHANGELOG.md) |
+| Hex package | 1.1.0 | `BoundedAuthorityProtocol` | | [Changelog](CHANGELOG.md) |
 | Contract-major 1 | frozen | `BoundedAuthorityProtocol.V1` | `BAP1-Ed25519-SHA256` | [spec](spec/bap-v1.md) |
 | Contract-major 2 | frozen | `BoundedAuthorityProtocol.V2` | `BAP2-Ed25519-SHA256` | [spec](spec/bap-v2.md) |
 | Contract-major 3 | frozen | `BoundedAuthorityProtocol.V3` | `BAP3-ES256-SHA256` | [spec](spec/bap-v3.md) |
@@ -53,7 +53,7 @@ See [Choosing a profile](docs/guides/choosing-a-profile.md) and
 
 ```elixir
 def deps do
-  [{:bounded_authority_protocol, "~> 1.0"}]
+  [{:bounded_authority_protocol, "~> 1.1"}]
 end
 ```
 
@@ -172,7 +172,7 @@ Every certified corpus ships under `priv/conformance`, with a CLI that exits `0`
 complete agreement. Contract-major 1's corpus alone has 283 cases across 28 surfaces:
 
 ```bash
-mix escript.install hex bounded_authority_protocol 1.0.0
+mix escript.install hex bounded_authority_protocol 1.1.0
 bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus
 ```
 
@@ -197,9 +197,9 @@ verdict digests bind each runner to the same frozen cases. See the
 
 Each notebook introduces one step per code cell, matches success and refusal results, and
 persists only safe semantic outputs. Download a file and import it into Livebook, then choose
-**Run all**. The launch links open the earlier notebooks at the immutable 1.0.0 release tag;
-import the current files for the steps below. The [notebook index](docs/guides/notebooks.md)
-lists each journey and its checked output count.
+**Run all**. The launch links open each journey under `docs/notebooks/` at the immutable
+1.1.0 release tag. The [notebook index](docs/guides/notebooks.md) lists each journey and its
+checked output count.
 
 - [Core envelope verification](docs/notebooks/bap-walkthrough.livemd)
 - [Contract-major 2 ranges](docs/notebooks/range-selectors.livemd)

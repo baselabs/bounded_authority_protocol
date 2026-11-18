@@ -72,8 +72,20 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
   end
 
   @tag :git_history
-  test "release launch URLs decode to notebook files present at their immutable Git ref" do
+  test "release launch URLs name notebooks present at their release tag or candidate HEAD" do
     version = Mix.Project.config()[:version]
+    tag = "refs/tags/v#{version}"
+
+    # Publication refuses an existing tag; before publication HEAD is the tree it will name.
+    {_output, tag_status} = System.cmd("git", ["rev-parse", "-q", "--verify", "#{tag}^{commit}"])
+
+    {source_ref, source_case} =
+      if tag_status == 0 do
+        {tag, "release tag v#{version}"}
+      else
+        {"HEAD", "untagged release candidate v#{version} at HEAD"}
+      end
+
     paths = ["README.md" | Path.wildcard("docs/notebooks/**/*.livemd")]
 
     for path <- paths do
@@ -87,11 +99,19 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
         assert ["", "baselabs", "bounded_authority_protocol", "blob", ref | file] =
                  String.split(uri.path, "/")
 
-        assert ref == "v#{version}"
+        assert ref == "v#{version}", "#{path}: expected v#{version} URL for #{source_case}"
         target = Enum.join(file, "/")
-        assert Path.extname(target) == ".livemd"
-        {output, status} = System.cmd("git", ["cat-file", "-e", "#{ref}:#{target}"])
-        assert status == 0, "#{path}: missing import #{ref}:#{target}: #{output}"
+        assert Path.extname(target) == ".livemd", "#{path}: non-notebook URL for #{source_case}"
+
+        if Path.extname(path) == ".livemd" do
+          assert target == path, "#{path}: launch must name its own notebook for #{source_case}"
+        end
+
+        {output, status} =
+          System.cmd("git", ["cat-file", "-e", "#{source_ref}:#{target}"], stderr_to_stdout: true)
+
+        assert status == 0,
+               "#{path}: missing import #{source_ref}:#{target} (#{source_case}): #{output}"
       end
     end
   end
@@ -103,6 +123,7 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
     for {name, entry} <- LivebookCheck.registry!(File.cwd!()) do
       path = "docs/notebooks/#{name}"
       source = File.read!(path)
+      assert entry["release_launch"] == name
       assert source =~ ~s|Mix.install([{:bounded_authority_protocol, "== #{version}"}])|
       assert source =~ ~s(<!-- livebook:{"persist_outputs":true} -->)
       assert LivebookCheck.parse!(source, entry["outputs"]) != []

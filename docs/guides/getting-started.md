@@ -34,7 +34,7 @@ Mix prints the created files and `Your Mix project was created successfully.` Op
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 1.0"}]
+  [{:bounded_authority_protocol, "~> 1.1"}]
 end
 ```
 
@@ -324,7 +324,7 @@ usage error). Install it once and run it against a packaged corpus from your pro
 `mix deps.get`:
 
 ```sh
-mix escript.install hex bounded_authority_protocol 1.0.0
+mix escript.install hex bounded_authority_protocol 1.1.0
 bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus
 ```
 
@@ -370,8 +370,8 @@ input or retry another after a rejection. The
 [notebook collection](notebooks.md) covers each namespace in a focused journey.
 The core walkthrough covers contract-major 1; contract-major 2 ranges and contract-major 3 ES256 have their own notebooks.
 Each file has setup instructions, one explained step per code cell, and safe persisted outputs.
-Import the current file into Livebook and choose **Run all**; the release launch links open
-the earlier notebooks preserved at the immutable 1.0.0 tag.
+Import a file into Livebook and choose **Run all**; the release launch links open each journey
+under `docs/notebooks/` at the immutable 1.1.0 tag.
 
 ## Where to go next
 

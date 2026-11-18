@@ -5,7 +5,7 @@ matches assert success and refusal; every cell has a nonempty persisted output c
 the runner. The output count includes setup. No notebook starts a process, opens a listener,
 creates an ETS table, or writes a file; demonstration keys remain in memory.
 
-Every notebook installs exactly `bounded_authority_protocol` 1.0.0, generates its own
+Every notebook installs exactly `bounded_authority_protocol` 1.1.0, generates its own
 demonstration keys, asserts success and refusal, and persists only safe semantic outputs.
 Qualification runs each in a fresh VM against this checkout (`--local`). The publication
 workflow runs them unchanged against the exact Hex release right after each upload
@@ -24,5 +24,5 @@ workflow runs them unchanged against the exact Hex release right after each uplo
 | [Advanced strict crypto](../notebooks/strict-crypto.livemd) | Certified Ed25519 forgery controls and enrollment subgroup checks | 10 |
 
 Import a current `.livemd` file into Livebook and choose **Run all** to use these steps.
-The launch links preserve the earlier notebooks at the immutable 1.0.0 release tag. That
-release has no focused range notebook; use the current file for contract-major 2 ranges.
+The launch links open each journey's own file under `docs/notebooks/` at the immutable 1.1.0
+release tag, including the focused contract-major 2 range notebook.

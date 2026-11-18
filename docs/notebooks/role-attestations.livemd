@@ -13,8 +13,8 @@ The host chooses the attestor it trusts and the role it requires. Attestation fa
 `trust: :not_evaluated`; they do not grant authority or reserve replay. Keys stay in memory,
 and this notebook starts no processes and creates no files.
 
-[Open the original 1.0.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
-That immutable release has the earlier walkthrough; import this file for the steps below.
+[Open this 1.1.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.1.0%2Fdocs%2Fnotebooks%2Frole-attestations.livemd).
+The launch opens this journey at its immutable release tag.
 
 ## Setup
 
@@ -22,7 +22,7 @@ Install the exact published package. Fixed evaluation times keep the results rep
 only safe semantic values are persisted, never keys, signatures, tokens, or nonces.
 
 ```elixir
-Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
+Mix.install([{:bounded_authority_protocol, "== 1.1.0"}])
 ```
 
 <!-- livebook:{"output":true} -->

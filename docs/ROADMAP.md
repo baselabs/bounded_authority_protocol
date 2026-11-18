@@ -6,7 +6,7 @@ specifications under [`spec/`](../spec/), and the [errata registry](errata.md).
 
 ## Where things stand
 
-- **Shipped:** package 1.0.0 with contract-majors 1, 2, and 3; the local-loopback HTTP,
+- **Shipped:** package 1.1.0 with contract-majors 1, 2, and 3; the local-loopback HTTP,
   role-attestation, and content-assertion sibling profiles; strict Ed25519 verification
   (erratum 2); producer signature canonicality (erratum 3); the selector float-zero soundness
   repair (erratum 6); and their certified corpora. The public API follows the 1.x stability

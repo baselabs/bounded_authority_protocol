@@ -13,8 +13,8 @@ The host supplies trusted issuer keys and request context. Verification produces
 execution authority; revocation, replay reservation, and the final decision belong to the host.
 Demonstration keys stay in memory. This notebook starts no processes and creates no files.
 
-[Open the original 1.0.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
-That immutable release has the earlier walkthrough; import this file for the steps below.
+[Open this 1.1.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.1.0%2Fdocs%2Fnotebooks%2Fbap-walkthrough.livemd).
+The launch opens this journey at its immutable release tag.
 
 ## Setup
 
@@ -22,7 +22,7 @@ Install the exact published package. Fixed evaluation times keep the results rep
 only safe semantic values are persisted, never keys, signatures, tokens, or nonces.
 
 ```elixir
-Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
+Mix.install([{:bounded_authority_protocol, "== 1.1.0"}])
 ```
 
 <!-- livebook:{"output":true} -->

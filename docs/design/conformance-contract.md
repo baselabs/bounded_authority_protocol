@@ -227,10 +227,10 @@ pins it. The spec subsection documents both thresholds and the reference impleme
 ## Corpus distribution and computed verdict binding
 
 A Hex build carries the complete `priv/conformance/` tree, including all nine certified
-corpora and the sibling `verdict-digests.json` manifest. The manifest is an unreleased addition
-after Hex 1.0.0; it will ship with the next release. Each in-tree SDK vendors that exact
-tree at `conformance/priv/conformance/` beneath its own root. The package census, unpacked
-Hex inventory, and every SDK snapshot must agree in both directions, including missing trees.
+corpora and the sibling `verdict-digests.json` manifest, introduced in 1.1.0. Each in-tree SDK
+vendors that exact tree at `conformance/priv/conformance/` beneath its own root. The package
+census, unpacked Hex inventory, and every SDK snapshot must agree in both directions, including
+missing trees.
 
 The [verdict digest contract](corpus-verdict-digests.md) defines index ordering and outcome
 projections for cases with and without `expected`. Each runner records actual results by

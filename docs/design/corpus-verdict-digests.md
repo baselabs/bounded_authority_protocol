@@ -7,9 +7,8 @@ sibling `verdict-digests.json` manifest. A corpus directory still contains exact
 its own index names, plus its index. The sibling manifest does not alter that rule or the
 CLI 1.x report contract.
 
-The manifest is an unreleased addition after Hex 1.0.0. Until the next Hex release ships
-it, the in-tree snapshots match the unpacked Hex package built from this commit. Frozen
-case bytes and all nine certified index digests remain unchanged.
+The manifest was introduced in 1.1.0. The in-tree snapshots match the unpacked Hex package
+built from this commit. Frozen case bytes and all nine certified index digests remain unchanged.
 
 ## Ordering
 

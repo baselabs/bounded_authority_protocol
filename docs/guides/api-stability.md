@@ -31,8 +31,8 @@ normative text):
 
 A soundness repair is the one way a verdict changes inside a contract-major: it changes verdicts
 only from accept to reject, only on inputs no conforming producer emits, and it is recorded in
-the [errata registry](../errata.md). Pin the minor-bounded requirement (`~> 1.0` admits every 1.x
-release) and run the packaged corpora after each upgrade
+the [errata registry](../errata.md). Use the major-bounded requirement `~> 1.1`, which admits
+every 1.x release at or above 1.1.0, and run the packaged corpora after each upgrade
 ([Recipes](recipes.md#run-every-packaged-corpus)).
 
 Within a contract-major, the accepted bytes and verdicts never change except through such a

@@ -259,7 +259,7 @@ verification path.
 from this commit's `priv/conformance/` tree. It includes all nine certified corpora, schemas, focused vectors,
 and `verdict-digests.json`. Every test input is inside this SDK root; copying this directory
 alone is sufficient to run the suite.
-The manifest is an unreleased addition after Hex 1.0.0 and will ship in the next Hex release.
+The manifest was introduced in 1.1.0.
 
 | Corpus | Cases |
 |---|---:|

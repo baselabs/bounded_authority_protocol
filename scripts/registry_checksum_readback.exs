@@ -1,8 +1,8 @@
 # Release read-back: the Hex registry checksum of a published release must equal the SHA-256 the
 # supply-chain workflow attested for that release's archive (its SHA256SUMS artifact).
 #
-#   mix run --no-start scripts/registry_checksum_readback.exs -- --version 1.0.0 \
-#     --sums path/to/SHA256SUMS [--tarball path/to/bounded_authority_protocol-1.0.0.tar]
+#   mix run --no-start scripts/registry_checksum_readback.exs -- --version 1.1.0 \
+#     --sums path/to/SHA256SUMS [--tarball path/to/bounded_authority_protocol-1.1.0.tar]
 #   mix run --no-start scripts/registry_checksum_readback.exs -- --self-check
 #
 # The registry checksum is the release API's `checksum` (SHA-256 of the whole package tarball,

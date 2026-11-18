@@ -2,10 +2,21 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
-## [Unreleased]
+## [1.1.0] (2026-11-18)
+
+### Added
+
+- A documented, byte-exact diagnostic rendering stability guarantee through the `Inspect`
+  protocol for decoded diagnostics and fully redacted facts, with fixed limits and nonce
+  redaction across supported Elixir versions. See the
+  [diagnostic rendering contract](spec/diagnostic-rendering.md).
+- `Inspect` implementations for the V1, V2, and V3 decoded grants and operations, and
+  `RoleAttestation.V1.DecodedAttestation`, following that rendering contract.
 
 ### Changed
 
+- Package 1.1.0 is a minor release for these additive diagnostic rendering guarantees and
+  implementations. Public functions, typespecs, documented errors, and wire formats are unchanged.
 - Reorganize integrator guides and focused notebooks; gate fresh local notebook execution,
   persisted semantic outputs, documentation currency, and native SDK docs, and run every
   notebook unchanged against the exact Hex release after each upload.
