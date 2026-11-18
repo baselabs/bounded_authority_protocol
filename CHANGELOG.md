@@ -14,6 +14,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
   matches, and safe persisted outputs. Remove unrelated envelope setup from focused journeys,
   demonstrate selector refusal with a correctly bound proof, and enforce cell style and
   notebook-index output counts in tests.
+- `mix docs.links` checks every local `src` as well as every `href` in the built HexDocs,
+  requires scripts, stylesheets, images and the EPUB to exist, and exempts only
+  `docs_config.js`, which HexDocs serves per package.
 
 - Split CI quality into six stage jobs with measured limits, preserve the complete local
   `mix quality` gate, require every stage before attestation, and apply the maintainer
