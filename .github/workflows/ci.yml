@@ -316,7 +316,7 @@ jobs:
   quality-conformance:
     name: "Quality: conformance verification and mutations"
     runs-on: ubuntu-24.04
-    timeout-minutes: 28 # 2x slowest green 13.7 min, run 44200170042.
+    timeout-minutes: 40 # 2x slowest green 20.0 min, run 44308562166.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -402,7 +402,7 @@ jobs:
     outputs:
       version: ${{ steps.archive.outputs.version }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 90 # expanded documentation checks; no green run yet
+    timeout-minutes: 7 # 2x green 3.3 min, run 44308562166.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -592,7 +592,7 @@ jobs:
   livebooks-local:
     name: livebooks-local
     runs-on: ubuntu-24.04
-    timeout-minutes: 90 # no green run yet
+    timeout-minutes: 5 # 5-minute floor; green 0.9 min, run 44308562166.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
