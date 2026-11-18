@@ -102,6 +102,8 @@ unpadded base64url SHA-256 of those UTF-8 bytes, and verified facts carry the ra
 digest (`REQ3-HEADER-digest-width`, incorporated). BAP `cnf.jkt` and AP2 `cnf.jwk` are two
 spellings of one key identity (the AP2 interop profile §3 bridge).
 
+<a id="signatures"></a>
+
 ### 3.2 Signatures
 
 The wire signature is the RFC 7518 §3.4 raw form: exactly 64 bytes, `r || s`, two fixed-width

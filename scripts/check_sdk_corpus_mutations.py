@@ -100,7 +100,7 @@ def fact_mutations(sdk, root, env):
     # Expand it only in this temporary SDK to return a distinguishable corrupt marker.
     facts = root / 'src/facts.rs'
     marker = replace_once(facts.read_text(), 'pub struct NotEvaluated;',
-        'pub struct CorruptibleNotEvaluated(pub bool);\npub type NotEvaluated = CorruptibleNotEvaluated;\n#[allow(non_upper_case_globals)]\npub const NotEvaluated: NotEvaluated = CorruptibleNotEvaluated(false);')
+        'pub struct CorruptibleNotEvaluated(pub bool);\n/// Mutation-only alias for the corruptible marker.\npub type NotEvaluated = CorruptibleNotEvaluated;\n/// Mutation-only uncorrupted marker value.\n#[allow(non_upper_case_globals)]\npub const NotEvaluated: NotEvaluated = CorruptibleNotEvaluated(false);')
     start = original.index('Ok(GrantFacts {')
     contents = original[:start] + original[start:].replace('authorization: NotEvaluated,', 'authorization: crate::facts::CorruptibleNotEvaluated(true),', 1)
     mutation(root, env, {facts: marker, path: contents}, runners, 'CorruptibleNotEvaluated(true)', 'authorization marker')

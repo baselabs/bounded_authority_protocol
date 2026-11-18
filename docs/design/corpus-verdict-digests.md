@@ -41,7 +41,7 @@ inputs or modifiers. In particular, `expected_overrides`, `compact`, `constructi
 | `v1/corpus` | All 28 surfaces | `expected` verbatim | [BAP1 §16, Public verification contract](../../spec/bap-v1.md#verification) and the indexed surface case schemas |
 | `v2/corpus` | All surfaces | `expected` verbatim | [BAP2 §6](../../spec/bap-v2.md#6-conformance-corpus) and the indexed surface case schemas |
 | `v3/corpus` | All surfaces | `expected` verbatim | [BAP3 §7](../../spec/bap-v3.md#7-conformance-corpus) and the indexed surface case schemas |
-| `producer-canonicality` | Compact assembly and anchored-export encoding | `expected` verbatim | [BAP3 §3.2 and §7](../../spec/bap-v3.md#32-signatures) and indexed `profile.json` |
+| `producer-canonicality` | Compact assembly and anchored-export encoding | `expected` verbatim | [BAP3 §3.2 and §7](../../spec/bap-v3.md#signatures) and indexed `profile.json` |
 | `selector-float-zero` | Grant decode, signing input, envelope | `expected` verbatim | [BAP2 §4 and §6](../../spec/bap-v2.md#4-selector-algebra) and indexed `profile.json` |
 | `application-profiles/local-loopback-http/v1` | URI normalization (`uri_cases`) | `valid`; also `normalized` exactly when `valid` is true | [Local loopback HTTP §3](../../spec/bap-local-loopback-http-v1.md#3-target-uri) and [§6](../../spec/bap-local-loopback-http-v1.md#6-conformance-and-release) |
 | `application-profiles/local-loopback-http/v1` | Proof decode and envelope (`proof-cases.json`) | `decode_local`, `decode_standard`, `envelope_local` | [Local loopback HTTP §6](../../spec/bap-local-loopback-http-v1.md#6-conformance-and-release) and the indexed proof case schema |

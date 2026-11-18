@@ -12,7 +12,7 @@ has the quickstart and the full API list.
 The module has no tagged version and the Go module proxy does not serve it, so `go get` fails.
 It moves to its own repository when it is first published.
 Use the [empty-project, selected-commit install and executed
-quickstart](../../sdks/go/README.md#install-from-a-checkout). It fetches an exact commit, verifies
+quickstart](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/go/README.md#install-from-a-checkout). It fetches an exact commit, verifies
 the checkout identity, declares the module replacement, and runs the success/refusal example.
 Without a published version, that full commit is the deployment identity.
 
@@ -78,5 +78,5 @@ protect that boundary. See the [verdict digest contract](../design/corpus-verdic
 
 ## Migration
 
-Follow the [before/after source-snapshot migration](../../sdks/go/README.md#migration-from-earlier-source-snapshots)
+Follow the [before/after source-snapshot migration](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/go/README.md#migration-from-earlier-source-snapshots)
 before adopting a newer commit. There is no published earlier SDK major to migrate from.

@@ -13,7 +13,7 @@ has the quickstart and the full API list.
 The package is not on PyPI, and any package of this name there is not ours until this page
 says otherwise. It moves to its own repository when it is first published.
 Start in an empty directory and use the [complete pinned install and executed
-quickstart](../../sdks/python/README.md#install-from-a-pinned-source). It creates a virtual
+quickstart](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/python/README.md#install-from-a-pinned-source). It creates a virtual
 environment, installs the selected full Git commit and verifies a grant and proof before
 showing an argument-mismatch refusal. The source commit is the unpublished deployment identity.
 
@@ -83,5 +83,5 @@ protect that boundary. See the [verdict digest contract](../design/corpus-verdic
 
 ## Migration
 
-Follow the [before/after source-snapshot migration](../../sdks/python/README.md#migration-from-earlier-source-snapshots)
+Follow the [before/after source-snapshot migration](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/python/README.md#migration-from-earlier-source-snapshots)
 before adopting a newer commit. There is no published earlier SDK major to migrate from.

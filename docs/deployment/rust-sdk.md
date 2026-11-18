@@ -65,7 +65,7 @@ bounded-authority-protocol = { git = "https://github.com/baselabs/bounded_author
 ed25519-dalek = { version = "3.0", default-features = false }
 ```
 
-For either setup, save the [SDK README quickstart](../../sdks/rust/README.md#quickstart)
+For either setup, save the [SDK README quickstart](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/rust/README.md#quickstart)
 as `src/main.rs`, run `cargo generate-lockfile`, then `cargo run --locked`.
 Keep the generated application `Cargo.lock` and audit it. The quickstart verifies a grant
 and holder proof and demonstrates a wrong-arguments refusal.
@@ -170,5 +170,5 @@ protect that boundary. See the [verdict digest contract](../design/corpus-verdic
 
 ## Migration
 
-Follow the [before/after source-snapshot migration](../../sdks/rust/README.md#migration-from-earlier-source-snapshots)
+Follow the [before/after source-snapshot migration](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/rust/README.md#migration-from-earlier-source-snapshots)
 before adopting a newer commit. There is no published earlier SDK major to migrate from.
