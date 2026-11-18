@@ -115,12 +115,27 @@ _OPERATION_PRINTABLE = re.compile(r"^[\x20-\x7e]+$")
 
 @dataclass(frozen=True)
 class TrustedIssuer:
+    """An already-trusted issuer key selected by the caller; decoding never establishes trust.
+
+    Fields:
+        key_id: str.
+        public_key: bytes.
+    """
     key_id: str
     public_key: bytes  # raw 32
 
 
 @dataclass(frozen=True)
 class ExpectedGrant:
+    """Caller-derived issuer, audience, evaluation time and allowed skew for grant verification.
+
+    Fields:
+        issuer: str.
+        audience: str.
+        evaluation_time: int.
+        clock_skew: int.
+        bounds: Bounds | None.
+    """
     issuer: str
     audience: str
     evaluation_time: int
@@ -130,6 +145,14 @@ class ExpectedGrant:
 
 @dataclass(frozen=True)
 class HistoricalPublicKey:
+    """An already-trusted historical public key with an inclusive start and exclusive end.
+
+    Fields:
+        key_id: str.
+        public_key: bytes.
+        valid_from: int.
+        valid_before: int | None.
+    """
     key_id: str
     public_key: bytes  # raw 32
     valid_from: int
@@ -138,6 +161,18 @@ class HistoricalPublicKey:
 
 @dataclass(frozen=True)
 class ExpectedAnchor:
+    """Expected chain boundary and key identity for a historical anchor.
+
+    Fields:
+        anchor_id: str.
+        anchored_at: int.
+        chain_id: str.
+        sequence: int.
+        chain_hash: bytes.
+        key_id: str.
+        key_fingerprint: bytes.
+        bounds: Bounds | None.
+    """
     anchor_id: str
     anchored_at: int
     chain_id: str
@@ -150,6 +185,18 @@ class ExpectedAnchor:
 
 @dataclass(frozen=True)
 class ExpectedKeyTransition:
+    """Expected chain and old/new key identities for a signed key transition.
+
+    Fields:
+        transition_id: str.
+        chain_id: str.
+        effective_at: int.
+        current_key_id: str.
+        current_key_fingerprint: bytes.
+        next_key_id: str.
+        next_key_fingerprint: bytes.
+        bounds: Bounds | None.
+    """
     transition_id: str
     chain_id: str
     effective_at: int
@@ -162,6 +209,14 @@ class ExpectedKeyTransition:
 
 @dataclass(frozen=True)
 class ConsumptionEntry:
+    """Caller-supplied chain row fields; encoding does not write or reserve a consumption.
+
+    Fields:
+        chain_id: str.
+        sequence: int.
+        previous_hash: bytes.
+        commitment: bytes.
+    """
     chain_id: str
     sequence: int
     previous_hash: bytes  # raw 32
@@ -170,6 +225,17 @@ class ConsumptionEntry:
 
 @dataclass(frozen=True)
 class ChainInput:
+    """Canonical row bytes and their claimed chain boundary, before verification.
+
+    Fields:
+        rows: tuple[bytes, ...].
+        chain_id: str.
+        first_sequence: int.
+        last_sequence: int.
+        row_count: int.
+        previous_hash: bytes.
+        last_hash: bytes.
+    """
     rows: tuple[bytes, ...]  # raw canonical row bytes
     chain_id: str
     first_sequence: int
@@ -181,6 +247,17 @@ class ChainInput:
 
 @dataclass(frozen=True)
 class ExpectedChain:
+    """Caller-owned expected chain identity, sequence interval and terminal hash.
+
+    Fields:
+        chain_id: str.
+        first_sequence: int.
+        last_sequence: int.
+        row_count: int.
+        previous_hash: bytes.
+        last_hash: bytes.
+        bounds: Bounds | None.
+    """
     chain_id: str
     first_sequence: int
     last_sequence: int
@@ -192,17 +269,45 @@ class ExpectedChain:
 
 @dataclass(frozen=True)
 class NonceRequired:
+    """Require an exact nonce value selected by the host; presence alone is insufficient.
+
+    Fields:
+        value: str.
+        kind: str.
+    """
     value: str
     kind: str = field(default="required", init=False)
 
 
 @dataclass(frozen=True)
 class NonceNotRequired:
+    """Explicitly choose the no-nonce policy; this does not disable replay checks in the host.
+
+    Fields:
+        kind: str.
+    """
     kind: str = field(default="not_required", init=False)
 
 
 @dataclass(frozen=True)
 class ExpectedRequest:
+    """Complete caller-derived request context; verified facts never authorize its execution.
+
+    Fields:
+        trusted_issuer: TrustedIssuer.
+        issuer: str.
+        audience: str.
+        method: str.
+        target_uri: str.
+        invocation_id: str.
+        operation: str.
+        cast_arguments: Tagged.
+        evaluation_time: int.
+        clock_skew: int.
+        proof_max_age: int.
+        nonce: NonceNotRequired | NonceRequired.
+        bounds: Bounds | None.
+    """
     trusted_issuer: TrustedIssuer
     issuer: str
     audience: str
@@ -224,12 +329,31 @@ SelectorInput = str | Mapping[str, object]
 
 @dataclass(frozen=True)
 class OperationInput:
+    """An operation name and tagged selectors that constrain its arguments.
+
+    Fields:
+        name: str.
+        selectors: Sequence[SelectorInput].
+    """
     name: str
     selectors: Sequence[SelectorInput]
 
 
 @dataclass(frozen=True)
 class GrantProducer:
+    """Validated unsigned grant claims; obtaining signing bytes does not issue authority.
+
+    Fields:
+        key_id: str.
+        issuer: str.
+        grant_id: str.
+        audiences: Sequence[str].
+        issued_at: int.
+        not_before: int.
+        expires_at: int.
+        holder_thumbprint: str.
+        operations: Sequence[OperationInput].
+    """
     key_id: str
     issuer: str
     grant_id: str
@@ -243,6 +367,20 @@ class GrantProducer:
 
 @dataclass(frozen=True)
 class ProofProducer:
+    """Unsigned holder proof bound to one grant and canonical request.
+
+    Fields:
+        holder_public_key: bytes.
+        proof_id: str.
+        method: str.
+        target_uri: str.
+        issued_at: int.
+        invocation_id: str.
+        operation: str.
+        grant_compact: bytes.
+        cast_arguments: Tagged.
+        nonce: str | None.
+    """
     holder_public_key: bytes  # raw 32
     proof_id: str
     method: str
@@ -257,6 +395,17 @@ class ProofProducer:
 
 @dataclass(frozen=True)
 class BoundaryAnchorProducer:
+    """Unsigned historical chain-boundary claims; signing remains caller-owned.
+
+    Fields:
+        anchor_id: str.
+        anchored_at: int.
+        chain_id: str.
+        sequence: int.
+        chain_hash: bytes.
+        key_id: str.
+        public_key: bytes.
+    """
     anchor_id: str
     anchored_at: int
     chain_id: str
@@ -268,6 +417,17 @@ class BoundaryAnchorProducer:
 
 @dataclass(frozen=True)
 class KeyTransitionProducer:
+    """Unsigned chain key-transition claims; this value cannot install a trusted key.
+
+    Fields:
+        transition_id: str.
+        chain_id: str.
+        effective_at: int.
+        current_key_id: str.
+        current_public_key: bytes.
+        next_key_id: str.
+        next_public_key: bytes.
+    """
     transition_id: str
     chain_id: str
     effective_at: int
@@ -279,6 +439,20 @@ class KeyTransitionProducer:
 
 @dataclass(frozen=True)
 class AnchoredExportInput:
+    """Caller-supplied canonical archive components and boundary evidence.
+
+    Fields:
+        rows: tuple[bytes, ...].
+        start_anchor: bytes.
+        end_anchor: bytes.
+        transitions: tuple[bytes, ...].
+        chain_id: str.
+        first_sequence: int.
+        last_sequence: int.
+        row_count: int.
+        previous_hash: bytes.
+        last_hash: bytes.
+    """
     rows: tuple[bytes, ...]
     start_anchor: bytes
     end_anchor: bytes
@@ -293,23 +467,46 @@ class AnchoredExportInput:
 
 @dataclass(frozen=True)
 class ArchivedObject:
+    """Immutable object identity and version carried by an anchored export.
+
+    Fields:
+        chunks: tuple[bytes, ...].
+        version: str.
+    """
     chunks: tuple[bytes, ...]
     version: str
 
 
 @dataclass(frozen=True)
 class HistoricalKeyChain:
+    """Caller-supplied initial historical key and its signed transition sequence.
+
+    Fields:
+        keys: tuple[HistoricalPublicKey, ...].
+    """
     keys: tuple[HistoricalPublicKey, ...]
 
 
 @dataclass(frozen=True)
 class EncodedConsumptionEntry:
+    """Canonical row bytes and their hash, without any persistence side effect.
+
+    Fields:
+        bytes_: bytes.
+        hash_: bytes.
+    """
     bytes_: bytes
     hash_: bytes
 
 
 @dataclass(frozen=True)
 class EncodedAnchoredExport:
+    """Canonical archive bytes and their digest, without any archive writes.
+
+    Fields:
+        archive: bytes.
+        digest: bytes.
+    """
     archive: bytes
     digest: bytes
 
@@ -887,6 +1084,7 @@ def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
 # 1. untrusted_key_locator (spec/bap-v1.md § Untrusted key locator).
 @_closed_shape
 def untrusted_key_locator(compact: bytes, bounds: Bounds | None = None) -> Result[KeyLocator]:
+    """Extract an untrusted key identifier for lookup; the result never selects a trusted key."""
     return _trying(lambda: _untrusted_key_locator_body(compact, bounds))
 
 
@@ -938,6 +1136,7 @@ def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLoc
 # 2. decode_grant (REQ1-VERIFY-decode-not-evaluated).
 @_closed_shape
 def decode_grant(compact: bytes, bounds: Bounds | None = None) -> Result[GrantDecoded]:
+    """Decode canonical grant bytes without signature verification or establishing trust."""
     return _trying(lambda: _decode_grant_body(compact, bounds))
 
 
@@ -981,6 +1180,7 @@ def _decode_grant_body(compact: bytes, bounds: Bounds | None) -> GrantDecoded:
 # 3. decode_proof.
 @_closed_shape
 def decode_proof(compact: bytes, bounds: Bounds | None = None) -> Result[ProofDecoded]:
+    """Decode canonical proof bytes without signature verification; diagnostic rendering redacts its nonce."""
     return _trying(lambda: _decode_proof_body(compact, bounds, "standard"))
 
 
@@ -988,6 +1188,7 @@ def decode_proof(compact: bytes, bounds: Bounds | None = None) -> Result[ProofDe
 def decode_local_loopback_http_proof(
     compact: bytes, bounds: Bounds | None = None
 ) -> Result[ProofDecoded]:
+    """Decode the explicit loopback proof profile without establishing trust."""
     return _trying(lambda: _decode_proof_body(compact, bounds, "local_loopback_http"))
 
 
@@ -1031,6 +1232,7 @@ def _decode_proof_body(
 def verify_grant(
     compact: bytes, trusted: TrustedIssuer, expected: ExpectedGrant
 ) -> Result[GrantFacts]:
+    """Verify canonical grant bytes against an already-trusted issuer and explicit expected context."""
     return _trying(lambda: _verify_grant_body(compact, trusted, expected))
 
 
@@ -1111,6 +1313,7 @@ def _verify_grant_body(
 def check_envelope(
     grant_compact: bytes, proof_compact: bytes, expected: ExpectedRequest
 ) -> Result[EnvelopeFacts]:
+    """Verify a grant and holder proof against the exact caller-derived request; return facts, never permission."""
     return _trying(lambda: _check_envelope_body(grant_compact, proof_compact, expected, "standard"))
 
 
@@ -1118,6 +1321,7 @@ def check_envelope(
 def check_local_loopback_http_envelope(
     grant_compact: bytes, proof_compact: bytes, expected: ExpectedRequest
 ) -> Result[EnvelopeFacts]:
+    """Verify the explicitly selected loopback envelope and its exact required server nonce."""
     return _trying(
         lambda: _check_envelope_body(grant_compact, proof_compact, expected, "local_loopback_http")
     )
@@ -1305,6 +1509,7 @@ def _check_envelope_body(
 def request_digest(
     operation: str, cast_arguments: Tagged, bounds: Bounds | None = None
 ) -> Result[bytes]:
+    """Hash the canonical tagged arguments and request binding with the selected contract-major."""
     return _trying(
         lambda: _unwrap(
             compute_request_digest(
@@ -1319,6 +1524,7 @@ def request_digest(
 def encode_consumption_entry(
     entry: ConsumptionEntry, bounds: Bounds | None = None
 ) -> Result[EncodedConsumptionEntry]:
+    """Encode one canonical consumption row and compute its link hash; write nothing."""
     return _trying(lambda: _encode_consumption_entry_body(entry, bounds))
 
 
@@ -1386,6 +1592,7 @@ def _canonical_row_bytes(
 # 8. check_chain (ADR 0004 § Consumption rows; REQ1-CHAIN-raw-rows-bounds).
 @_closed_shape
 def check_chain(chain: ChainInput, expected: ExpectedChain) -> Result[ChainFacts]:
+    """Verify canonical rows and their expected hash-chain boundary without live state."""
     return _trying(lambda: _check_chain_body(chain, expected))
 
 
@@ -1481,6 +1688,7 @@ def _check_chain_body(chain: ChainInput, expected: ExpectedChain) -> ChainFacts:
 # 9. grant_signing_input (the deterministic producer; REQ1-SIGNING-deterministic-produce).
 @_closed_shape
 def grant_signing_input(grant: GrantProducer, bounds: Bounds | None = None) -> Result[SigningInput]:
+    """Validate grant claims and return exact JWS signing bytes; no private key enters the verifier."""
     return _trying(lambda: _grant_signing_input_body(grant, bounds))
 
 
@@ -1649,6 +1857,7 @@ def _check_node(v: Tagged, depth: int, b: Bounds) -> None:
 # 10. proof_signing_input (REQ1-SIGNING-deterministic-produce).
 @_closed_shape
 def proof_signing_input(proof: ProofProducer, bounds: Bounds | None = None) -> Result[SigningInput]:
+    """Validate proof claims and return the canonical JWS signing input for the caller to sign."""
     return _trying(lambda: _proof_signing_input_body(proof, bounds, "standard"))
 
 
@@ -1656,6 +1865,7 @@ def proof_signing_input(proof: ProofProducer, bounds: Bounds | None = None) -> R
 def local_loopback_http_proof_signing_input(
     proof: ProofProducer, bounds: Bounds | None = None
 ) -> Result[SigningInput]:
+    """Produce signing bytes for the explicit loopback profile with its required nonce."""
     return _trying(lambda: _proof_signing_input_body(proof, bounds, "local_loopback_http"))
 
 
@@ -1763,6 +1973,7 @@ def _jwk_to_tagged(jwk: OkpPublic) -> Tagged:
 def assemble_compact(
     input_: SigningInput, signature: bytes, bounds: Bounds | None = None
 ) -> Result[bytes]:
+    """Assemble canonical JWS segments and a canonical signature; this does not verify the signature."""
     return _assemble_compact_for(input_, signature, bounds, "standard")
 
 
@@ -1770,6 +1981,7 @@ def assemble_compact(
 def assemble_local_loopback_http_compact(
     input_: SigningInput, signature: bytes, bounds: Bounds | None = None
 ) -> Result[bytes]:
+    """Assemble the loopback proof compact, refusing noncanonical producer signatures."""
     return _assemble_compact_for(input_, signature, bounds, "local_loopback_http")
 
 
@@ -1832,6 +2044,7 @@ def _assemble_compact_for(
 def boundary_anchor_signing_input(
     anchor: BoundaryAnchorProducer, bounds: Bounds | None = None
 ) -> Result[SigningInput]:
+    """Validate a historical chain anchor and produce its exact signing input."""
     return _trying(lambda: _boundary_anchor_signing_input_body(anchor, bounds))
 
 
@@ -1906,6 +2119,7 @@ def _boundary_anchor_signing_input_body(
 def key_transition_signing_input(
     t: KeyTransitionProducer, bounds: Bounds | None = None
 ) -> Result[SigningInput]:
+    """Validate a chain key transition and produce its exact signing input."""
     return _trying(lambda: _key_transition_signing_input_body(t, bounds))
 
 
@@ -1979,6 +2193,7 @@ def _key_transition_signing_input_body(
 def encode_anchored_export(
     input_: AnchoredExportInput, expected: ExpectedExport
 ) -> Result[EncodedAnchoredExport]:
+    """Encode an anchored archive from caller-supplied evidence without filesystem access."""
     return _trying(lambda: _encode_anchored_export_body(input_, expected))
 
 
@@ -2246,6 +2461,7 @@ def _frame(data: bytes) -> bytes:
 def verify_historical_anchor(
     compact: bytes, key: HistoricalPublicKey, expected: ExpectedAnchor
 ) -> Result[AnchorFacts]:
+    """Verify an anchor against an already-trusted historical key and expected boundary."""
     return _trying(lambda: _verify_historical_anchor_body(compact, key, expected))
 
 
@@ -2336,6 +2552,7 @@ def verify_key_transition(
     new_key: HistoricalPublicKey,
     expected: ExpectedKeyTransition,
 ) -> Result[KeyTransitionFacts]:
+    """Verify a signed transition against caller-trusted historical key context."""
     return _trying(lambda: _verify_key_transition_body(compact, old_key, new_key, expected))
 
 
@@ -2445,6 +2662,7 @@ def _verify_key_transition_body(
 def verify_anchored_export(
     archived: ArchivedObject, key_chain: HistoricalKeyChain, expected: ExpectedExport
 ) -> Result[AnchoredExportFacts]:
+    """Verify canonical archive bytes, chain and historical evidence; return facts without authorization."""
     return _trying(lambda: _verify_anchored_export_body(archived, key_chain, expected))
 
 
@@ -2788,6 +3006,17 @@ def _verify_anchored_export_body(
 # ExpectedExport (the verify_anchored_export expected-context struct).
 @dataclass(frozen=True)
 class ExpectedExport:
+    """Expected archive and chain context including caller-trusted historical keys.
+
+    Fields:
+        chain: ExpectedChain.
+        digest: bytes.
+        start_anchor: ExpectedAnchor.
+        end_anchor: ExpectedAnchor.
+        transitions: tuple[ExpectedKeyTransition, ...].
+        object_version: str.
+        bounds: Bounds | None.
+    """
     chain: ExpectedChain
     digest: bytes  # raw 32
     start_anchor: ExpectedAnchor

@@ -80,7 +80,7 @@ the independent Python verifier.
 | `CONFORMANCE-pin`, `CONFORMANCE-cases` | Certified index/file hashes, exact case census, independent bytes/verdicts, and named red-capable mutation receipts. | local corpus and guard checks passed |
 | `CONFORMANCE-sdks` | Elixir reference and independent Python/Rust/Go/TypeScript implementations against the same frozen corpus; graduated snapshot coordinated at freeze. | all five passed the frozen corpus before release |
 | `CONFORMANCE-receipts` | Real companion-signer issuance plus independent non-Elixir consumption and content-digest equality against exact immutable candidate. | receipts retained against the built 0.7.0 package |
-| `IANA-template` | Matching registry and RFC 6838 source/rendered template; specification requests registration without claiming filing. | source-reviewed; filing gated |
+| `IANA-template` | Matching registry and RFC 6838 source/rendered template; specification requests registration without claiming completed registration. | source-reviewed; IANA registration submission gated |
 | `RELEASE-immutable` | Exact reviewed source, package/checksum, corpus, full final gate, companion admission policy, and owner approval for exact publication. | released in 0.7.0 under owner approval |
 
 A structural traceability check only establishes that requirements have entries.

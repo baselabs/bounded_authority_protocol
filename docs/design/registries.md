@@ -102,12 +102,13 @@ MUST NOT be used by deployments.
 
 ## IANA
 
-`ba_inv`, `ba_op`, `ba_req` (JWT Claims registry) and the `ba+*` media-type suffix values are
-filed at first external submission. Until then this document is the
+The `ba_inv`, `ba_op`, and `ba_req` JWT claims and the corresponding `application/ba-*+jwt`
+media types have prepared IANA registration templates. Submission to IANA is gated by the
+profile's external-submission preconditions. Until registration, this document is the
 authoritative namespace and the `ba_`/`ba+` prefixes are the collision-avoidance convention.
 
 The media-type column names the RFC 6838 registration (or reservation) associated with each
 value, using a related but distinct namespace from the wire `typ` itself; the wire values are
-unchanged. The ready-to-file human-readable registrations are the [JWT claims](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/iana/jwt-claims.md) and
+unchanged. The human-readable registration templates are the [JWT claims](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/iana/jwt-claims.md) and
 [media types](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/iana/media-types.md); machine-readable JSON sources live beside each document in the
 source archive.

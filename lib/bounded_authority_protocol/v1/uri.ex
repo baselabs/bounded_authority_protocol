@@ -9,7 +9,16 @@ defmodule BoundedAuthorityProtocol.V1.Uri do
   @unreserved ~c"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
   @sub_delims ~c"!$&'()*+,;="
 
-  @doc "Normalizes one bounded hierarchical HTTPS target URI."
+  @doc """
+  Normalizes one bounded hierarchical HTTPS target URI.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.Uri.normalize("https://example.com/items", %{})
+      {:ok, "https://example.com/items"}
+      iex> BoundedAuthorityProtocol.V1.Uri.normalize("http://example.com/items", %{})
+      {:error, :invalid}
+  """
   @spec normalize(binary(), Bounds.t() | map()) :: {:ok, binary()} | {:error, :invalid}
   def normalize(uri, limits) when is_binary(uri) do
     with {:ok, bounds} <- Bounds.coerce(limits),

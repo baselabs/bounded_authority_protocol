@@ -1,7 +1,7 @@
-# Ready-to-file JWT Claims Registry entries
+# Prepared JWT Claims Registry entries
 
 Rendered from `jwt-claims.json` (the machine-readable source; rule 7 of the spec-facts
-gate proves the source agrees with `docs/design/registries.md` exactly). Filing is
+gate proves the source agrees with `docs/design/registries.md` exactly). Submission to IANA for registration is
 externally gated.
 
 ## Claim Name: `ba_inv` (active)
@@ -28,7 +28,7 @@ externally gated.
 - **Change Controller:** IETF
 - **Reference:** spec/bap-v1.md (Bounded Authority Protocol v1 Wire Profile), typ registry section
 
-  (Reserved by this profile; NOT filed with IANA until its activating
+  (Reserved by this profile; NOT submitted to IANA for registration until its activating
   contract-major.)
 
 ## Claim Name: `ba_offline` (reserved)
@@ -37,7 +37,7 @@ externally gated.
 - **Change Controller:** IETF
 - **Reference:** spec/bap-v1.md (Bounded Authority Protocol v1 Wire Profile), typ registry section
 
-  (Reserved by this profile; NOT filed with IANA until its activating
+  (Reserved by this profile; NOT submitted to IANA for registration until its activating
   contract-major.)
 
 ## Claim Name: `ba_sut` (reserved)
@@ -46,5 +46,5 @@ externally gated.
 - **Change Controller:** IETF
 - **Reference:** spec/bap-v1.md (Bounded Authority Protocol v1 Wire Profile), typ registry section
 
-  (Reserved by this profile; NOT filed with IANA until its activating
+  (Reserved by this profile; NOT submitted to IANA for registration until its activating
   contract-major.)

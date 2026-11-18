@@ -36,7 +36,7 @@ corpus, index, and verdicts are unchanged.
 | `CONFORMANCE-complete`, `CONFORMANCE-sdks`, `CONFORMANCE-no-drift` | certified profile index plus Elixir/TypeScript/Python/Rust/Go consumers; unchanged complete 283-case BAP1 suite is a release blocker | populated |
 | `CONFORMANCE-real-network`, `HOST-direct-target`, `HOST-one-profile` | `mix local_loopback_http.verify`: real `127.0.0.1` and `::1` HTTP listeners, fresh in-memory keys, direct listener/request target derivation, secret-free receipt | populated |
 | `SECURITY-honest-scope` | normative security section, README, and threat model state that loopback HTTP is neither TLS nor process isolation | populated |
-| `IANA-template` | exact active registry entry plus machine-readable and rendered RFC 6838 templates; filing remains externally gated | populated |
+| `IANA-template` | exact active registry entry plus machine-readable and rendered RFC 6838 templates; submission to IANA for registration remains externally gated | populated |
 | `HOST-replay-trust` | Public verifier checks the required nonce but owns no state. BA-37 must prove reservation before effect in the adopting authority runtime. | downstream gate |
 | `RELEASE-immutable` | Requires the exact reviewed package and corpus identity to be published before BA-37 adopts it. Publication is not authorized by design approval. | release gate |
 

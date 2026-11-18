@@ -5,3 +5,5 @@ python 3.13.18
 ruby 3.3.13
 golang 1.27.4
 ocaml 5.1.1
+rust 1.88.0
+golang_sdk 1.25.0

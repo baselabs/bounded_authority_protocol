@@ -367,17 +367,28 @@ The same steps apply to the other namespaces, each with its own specification an
 
 Each namespace rejects the others' bytes. Select one explicitly; never infer a profile from the
 input or retry another after a rejection. The
-[Livebook walkthrough](../notebooks/bap-walkthrough.livemd) runs every one of them.
+[notebook collection](notebooks.md) covers each namespace in a focused journey.
+The core walkthrough covers contract-major 1; contract-major 2 ranges and contract-major 3 ES256 have their own notebooks.
 
 ## Where to go next
 
 - [Recipes](recipes.md): Plug and Phoenix integration, selectors per contract-major, ES256 keys
   in a KMS or HSM, key rotation, nonces, and running every corpus.
-- The Livebooks: the [protocol walkthrough](../notebooks/bap-walkthrough.livemd) runs every
-  profile with the attacks each one rejects, [service integration](../notebooks/service-integration.livemd)
-  covers rotation, nonces, and time, and [chains and archives](../notebooks/chains-and-archives.livemd)
-  builds the evidence formats.
+- [Focused notebooks](notebooks.md): core envelopes, contract-major 2 ranges, contract-major 3 ES256, host integration,
+  local loopback, role attestations, content lineage, chains/archives, and advanced strict crypto.
 - [Choosing a profile](choosing-a-profile.md) and the [cheatsheet](cheatsheet.cheatmd).
 - [Usage rules](../../usage-rules.md): what a consuming host must do.
 - [Upgrading](upgrading.md) and [API stability and versioning](api-stability.md).
 - The [implementer's guide](implementers-guide.md): building a verifier in another language.
+
+### Notebook journeys
+
+- [Core envelope verification](../notebooks/bap-walkthrough.livemd)
+- [Contract-major 2 ranges](../notebooks/v2-ranges.livemd)
+- [Contract-major 3 ES256](../notebooks/v3-es256.livemd)
+- [Service integration](../notebooks/service-integration.livemd)
+- [Local loopback](../notebooks/local-loopback.livemd)
+- [Role attestations](../notebooks/role-attestations.livemd)
+- [Content lineage](../notebooks/content-lineage.livemd)
+- [Chains and archives](../notebooks/chains-and-archives.livemd)
+- [Advanced strict crypto](../notebooks/strict-crypto.livemd)

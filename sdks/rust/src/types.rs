@@ -736,15 +736,25 @@ pub struct ProofInput {
 /// keep these bytes outside the standard `dpop+jwt` verifier namespace.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LocalLoopbackHttpProofInput {
+    /// The proof id value carried by this protocol structure.
     pub proof_id: String,
+    /// The method value carried by this protocol structure.
     pub method: String,
+    /// The target uri value carried by this protocol structure.
     pub target_uri: String,
+    /// The invocation id value carried by this protocol structure.
     pub invocation_id: String,
+    /// The operation value carried by this protocol structure.
     pub operation: String,
+    /// The cast arguments value carried by this protocol structure.
     pub cast_arguments: JsonValue,
+    /// The grant compact value carried by this protocol structure.
     pub grant_compact: Vec<u8>,
+    /// The holder public key value carried by this protocol structure.
     pub holder_public_key: [u8; 32],
+    /// Signed issuance time in Unix seconds.
     pub issued_at: i64,
+    /// The nonce value carried by this protocol structure.
     pub nonce: String,
 }
 

@@ -6,7 +6,11 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
-- Split CI quality into six stage jobs with 90-minute limits, preserve the complete local
+- Reorganize integrator guides and focused notebooks; gate fresh local and exact published-Hex
+  notebook execution, persisted semantic outputs, documentation currency, and native SDK docs.
+  Clarify result families, host responsibilities, SDK installs, and migration paths.
+
+- Split CI quality into six stage jobs with measured limits, preserve the complete local
   `mix quality` gate, require every stage before attestation, and apply the maintainer
   condition to every Pages job.
 - Qualify commits only on `kci/**` pushes, with a final `qualified` job requiring every
@@ -645,7 +649,7 @@ found by the profile corpus's ES256 confusion case.
   (registries, requirement map, standards track, governance, threat model, errata,
   interoperability report, protocol charter, conformance contract), and the package
   essentials. Removed from the published set while remaining tracked in the repository: the
-  IANA pre-filing registration drafts (`docs/design/iana/`), the AP2 and A2A interop design
+  IANA prepared registration drafts (`docs/design/iana/`), the AP2 and A2A interop design
   profiles, the successor-major activation checklist, and the superseded 0.1.0
   release-candidate contract. The BAP-17 offline requirements input moved out of the tracked
   tree into local untracked storage (the offline floor-limit decision record remains the mechanism of record). No code,
@@ -986,7 +990,7 @@ found by the profile corpus's ES256 confusion case.
   8 proof cases, exact `profile.json` + `proof-cases.json` set).
 - Update the README, security and usage policies, contributor guidance, installation/upgrading/
   implementer guides, all SDK guides, ExDoc extras, and the runnable Livebook. The package now
-  ships the curated guides, Livebook, and ready-to-file IANA registration sources alongside the
+  ships the curated guides, Livebook, and prepared IANA registration sources alongside the
   normative profile and corpus.
 
 ### Compatibility and distribution
@@ -1309,16 +1313,16 @@ several note findings, all in surfaces this program touched. All fixed:
 
 ### Added: IANA registration templates and spec-facts rule 7 (no wire change)
 
-- **`docs/design/iana/`**: the machine-readable registration sources and rendered ready-to-file
+- **`docs/design/iana/`**: the machine-readable registration sources and rendered prepared
   markdown for the profile's IANA entries. JSON Web Token Claims Registry (its published
-  four-field format, Specification Required): `ba_inv`, `ba_op`, `ba_req` ready to file;
-  `ba_dlg`, `ba_offline`, `ba_sut` reserved-marked and NOT filed. Media types (RFC 6838
+  four-field format, Specification Required): `ba_inv`, `ba_op`, `ba_req` ready for IANA registration submission;
+  `ba_dlg`, `ba_offline`, `ba_sut` reserved-marked and not submitted to IANA for registration. Media types (RFC 6838
   section 5.6 field template, LIMITED USE): `application/ba-cap+jwt`,
-  `application/ba-chain-anchor+jwt`, `application/ba-key-transition+jwt` ready to file;
+  `application/ba-chain-anchor+jwt`, `application/ba-key-transition+jwt` ready for IANA registration submission;
   `application/ba-cap-delegated+jwt`, `application/ba-suite-attestation+jwt` reserved. The
   drafted `ba+*` wire `typ` values are NOT registrable as-is (`+cap` is not a registered
   structured suffix; `+jwt` is). **The wire `typ` values are unchanged**; the media-type
-  namespace is distinct. Filing is externally gated (the BAP-08 official-submission
+  namespace is distinct. Submission to IANA for registration is externally gated (the BAP-08 official-submission
   preconditions); the templates make in-repo readiness verifiable.
 - **Spec §IANA considerations** (section 20): the registration requests, the reserved names,
   and the namespace distinction, per RFC 8126 guidance (read first-hand).

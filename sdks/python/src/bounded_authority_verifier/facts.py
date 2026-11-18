@@ -91,42 +91,52 @@ class GrantFacts(_Facts):
 
     @property
     def version(self) -> int:
+        """Contract-major or sibling-profile version carried by this value."""
         return self._version
 
     @property
     def issuer(self) -> str:
+        """Signed issuer identifier."""
         return self._issuer
 
     @property
     def grant_id(self) -> str:
+        """Signed grant identifier."""
         return self._grant_id
 
     @property
     def issuer_key_fingerprint(self) -> bytes:
+        """Raw SHA-256 fingerprint of the verified issuer public key."""
         return self._issuer_key_fingerprint
 
     @property
     def holder_thumbprint(self) -> bytes:
+        """Raw RFC 7638 thumbprint of the bound holder public key."""
         return self._holder_thumbprint
 
     @property
     def matched_audience(self) -> str:
+        """Caller-supplied audience matched by verification."""
         return self._matched_audience
 
     @property
     def issued_at(self) -> int:
+        """Signed issuance time in Unix seconds."""
         return self._issued_at
 
     @property
     def not_before(self) -> int:
+        """Inclusive validity-window start in Unix seconds."""
         return self._not_before
 
     @property
     def expires_at(self) -> int:
+        """Exclusive validity-window end in Unix seconds."""
         return self._expires_at
 
     @property
     def authorization(self) -> str:
+        """Fixed not_evaluated marker; successful verification grants no authority."""
         return self._authorization
 
     def __repr__(self) -> str:
@@ -262,70 +272,87 @@ class EnvelopeFacts(_Facts):
 
     @property
     def version(self) -> int:
+        """Contract-major or sibling-profile version carried by this value."""
         return self._version
 
     @property
     def issuer(self) -> str:
+        """Signed issuer identifier."""
         return self._issuer
 
     @property
     def grant_id(self) -> str:
+        """Signed grant identifier."""
         return self._grant_id
 
     @property
     def issuer_key_fingerprint(self) -> bytes:
+        """Raw SHA-256 fingerprint of the verified issuer public key."""
         return self._issuer_key_fingerprint
 
     @property
     def holder_thumbprint(self) -> bytes:
+        """Raw RFC 7638 thumbprint of the bound holder public key."""
         return self._holder_thumbprint
 
     @property
     def matched_audience(self) -> str:
+        """Caller-supplied audience matched by verification."""
         return self._matched_audience
 
     @property
     def grant_issued_at(self) -> int:
+        """The grant issued at carried by this value."""
         return self._grant_issued_at
 
     @property
     def grant_not_before(self) -> int:
+        """The grant not before carried by this value."""
         return self._grant_not_before
 
     @property
     def grant_expires_at(self) -> int:
+        """The grant expires at carried by this value."""
         return self._grant_expires_at
 
     @property
     def proof_id(self) -> str:
+        """The proof id carried by this value."""
         return self._proof_id
 
     @property
     def invocation_id(self) -> str:
+        """The invocation id carried by this value."""
         return self._invocation_id
 
     @property
     def operation(self) -> str:
+        """The operation carried by this value."""
         return self._operation
 
     @property
     def uri(self) -> str:
+        """Normalized request target verified against the expected context."""
         return self._uri
 
     @property
     def grant_hash(self) -> bytes:
+        """SHA-256 digest of the exact grant compact bytes."""
         return self._grant_hash
 
     @property
     def request_hash(self) -> bytes:
+        """Domain-separated digest of the operation and tagged request arguments."""
         return self._request_hash
 
     @property
     def proof_issued_at(self) -> int:
+        """The proof issued at carried by this value."""
         return self._proof_issued_at
 
     @property
     def authorization(self) -> str:
+        """Fixed not_evaluated marker; successful verification grants no authority."""
         return self._authorization
 
     def __repr__(self) -> str:
@@ -450,38 +477,47 @@ class ChainFacts(_Facts):
 
     @property
     def version(self) -> int:
+        """Contract-major or sibling-profile version carried by this value."""
         return self._version
 
     @property
     def chain_id(self) -> str:
+        """The chain id carried by this value."""
         return self._chain_id
 
     @property
     def first_sequence(self) -> int:
+        """The first sequence carried by this value."""
         return self._first_sequence
 
     @property
     def last_sequence(self) -> int:
+        """The last sequence carried by this value."""
         return self._last_sequence
 
     @property
     def row_count(self) -> int:
+        """The row count carried by this value."""
         return self._row_count
 
     @property
     def previous_hash(self) -> bytes:
+        """The previous hash carried by this value."""
         return self._previous_hash
 
     @property
     def last_hash(self) -> bytes:
+        """The last hash carried by this value."""
         return self._last_hash
 
     @property
     def verification(self) -> str:
+        """Checks completed for this value; decoding alone establishes no signature validity."""
         return self._verification
 
     @property
     def trust(self) -> str:
+        """Fixed not_evaluated marker; trust remains the caller's responsibility."""
         return self._trust
 
     def __repr__(self) -> str:
@@ -582,38 +618,47 @@ class AnchorFacts(_Facts):
 
     @property
     def version(self) -> int:
+        """Contract-major or sibling-profile version carried by this value."""
         return self._version
 
     @property
     def anchor_id(self) -> str:
+        """The anchor id carried by this value."""
         return self._anchor_id
 
     @property
     def anchored_at(self) -> int:
+        """The anchored at carried by this value."""
         return self._anchored_at
 
     @property
     def chain_id(self) -> str:
+        """The chain id carried by this value."""
         return self._chain_id
 
     @property
     def sequence(self) -> int:
+        """The sequence carried by this value."""
         return self._sequence
 
     @property
     def chain_hash(self) -> bytes:
+        """The chain hash carried by this value."""
         return self._chain_hash
 
     @property
     def key_fingerprint(self) -> bytes:
+        """The key fingerprint carried by this value."""
         return self._key_fingerprint
 
     @property
     def verification(self) -> str:
+        """Checks completed for this value; decoding alone establishes no signature validity."""
         return self._verification
 
     @property
     def trust(self) -> str:
+        """Fixed not_evaluated marker; trust remains the caller's responsibility."""
         return self._trust
 
     def __repr__(self) -> str:
@@ -710,34 +755,42 @@ class KeyTransitionFacts(_Facts):
 
     @property
     def version(self) -> int:
+        """Contract-major or sibling-profile version carried by this value."""
         return self._version
 
     @property
     def transition_id(self) -> str:
+        """The transition id carried by this value."""
         return self._transition_id
 
     @property
     def chain_id(self) -> str:
+        """The chain id carried by this value."""
         return self._chain_id
 
     @property
     def effective_at(self) -> int:
+        """The effective at carried by this value."""
         return self._effective_at
 
     @property
     def current_key_fingerprint(self) -> bytes:
+        """The current key fingerprint carried by this value."""
         return self._current_key_fingerprint
 
     @property
     def next_key_fingerprint(self) -> bytes:
+        """The next key fingerprint carried by this value."""
         return self._next_key_fingerprint
 
     @property
     def verification(self) -> str:
+        """Checks completed for this value; decoding alone establishes no signature validity."""
         return self._verification
 
     @property
     def trust(self) -> str:
+        """Fixed not_evaluated marker; trust remains the caller's responsibility."""
         return self._trust
 
     def __repr__(self) -> str:
@@ -875,78 +928,97 @@ class AnchoredExportFacts(_Facts):
 
     @property
     def version(self) -> int:
+        """Contract-major or sibling-profile version carried by this value."""
         return self._version
 
     @property
     def chain_id(self) -> str:
+        """The chain id carried by this value."""
         return self._chain_id
 
     @property
     def first_sequence(self) -> int:
+        """The first sequence carried by this value."""
         return self._first_sequence
 
     @property
     def last_sequence(self) -> int:
+        """The last sequence carried by this value."""
         return self._last_sequence
 
     @property
     def row_count(self) -> int:
+        """The row count carried by this value."""
         return self._row_count
 
     @property
     def previous_hash(self) -> bytes:
+        """The previous hash carried by this value."""
         return self._previous_hash
 
     @property
     def last_hash(self) -> bytes:
+        """The last hash carried by this value."""
         return self._last_hash
 
     @property
     def digest(self) -> bytes:
+        """Digest of the exact canonical evidence bytes."""
         return self._digest
 
     @property
     def start_anchor_id(self) -> str:
+        """The start anchor id carried by this value."""
         return self._start_anchor_id
 
     @property
     def start_anchored_at(self) -> int:
+        """The start anchored at carried by this value."""
         return self._start_anchored_at
 
     @property
     def start_key_fingerprint(self) -> bytes:
+        """The start key fingerprint carried by this value."""
         return self._start_key_fingerprint
 
     @property
     def end_anchor_id(self) -> str:
+        """The end anchor id carried by this value."""
         return self._end_anchor_id
 
     @property
     def end_anchored_at(self) -> int:
+        """The end anchored at carried by this value."""
         return self._end_anchored_at
 
     @property
     def end_key_fingerprint(self) -> bytes:
+        """The end key fingerprint carried by this value."""
         return self._end_key_fingerprint
 
     @property
     def transition_count(self) -> int:
+        """The transition count carried by this value."""
         return self._transition_count
 
     @property
     def object_version(self) -> str:
+        """Caller-supplied immutable archive object version."""
         return self._object_version
 
     @property
     def verification(self) -> str:
+        """Checks completed for this value; decoding alone establishes no signature validity."""
         return self._verification
 
     @property
     def trust(self) -> str:
+        """Fixed not_evaluated marker; trust remains the caller's responsibility."""
         return self._trust
 
     @property
     def authorization(self) -> str:
+        """Fixed not_evaluated marker; successful verification grants no authority."""
         return self._authorization
 
     def __repr__(self) -> str:
@@ -1135,54 +1207,67 @@ class ProofDecoded(_Facts):
 
     @property
     def version(self) -> int:
+        """Contract-major or sibling-profile version carried by this value."""
         return self._version
 
     @property
     def proof_id(self) -> str:
+        """The proof id carried by this value."""
         return self._proof_id
 
     @property
     def method(self) -> str:
+        """The method carried by this value."""
         return self._method
 
     @property
     def target_uri(self) -> str:
+        """The target uri carried by this value."""
         return self._target_uri
 
     @property
     def issued_at(self) -> int:
+        """Signed issuance time in Unix seconds."""
         return self._issued_at
 
     @property
     def nonce(self) -> str | None:
+        """Exact signed nonce when present, otherwise None."""
         return self._nonce
 
     @property
     def invocation_id(self) -> str:
+        """The invocation id carried by this value."""
         return self._invocation_id
 
     @property
     def operation(self) -> str:
+        """The operation carried by this value."""
         return self._operation
 
     @property
     def grant_hash(self) -> bytes:
+        """SHA-256 digest of the exact grant compact bytes."""
         return self._grant_hash
 
     @property
     def request_hash(self) -> bytes:
+        """Domain-separated digest of the operation and tagged request arguments."""
         return self._request_hash
 
     @property
     def holder_public_key(self) -> bytes:
+        """Public key carried by the proof; decoding alone does not establish trust."""
         return self._holder_public_key
 
     @property
     def holder_thumbprint(self) -> bytes:
+        """Raw RFC 7638 thumbprint of the bound holder public key."""
         return self._holder_thumbprint
 
     @property
     def verification(self) -> str:
+        """Checks completed for this value; decoding alone establishes no signature validity."""
         return self._verification
 
     def __repr__(self) -> str:
@@ -1335,42 +1420,52 @@ class AttestationFacts(_Facts):
 
     @property
     def attestor_key_id(self) -> str:
+        """The attestor key id carried by this value."""
         return self._attestor_key_id
 
     @property
     def attestor_key_fingerprint(self) -> bytes:
+        """The attestor key fingerprint carried by this value."""
         return self._attestor_key_fingerprint
 
     @property
     def subject_key_id(self) -> str:
+        """The subject key id carried by this value."""
         return self._subject_key_id
 
     @property
     def subject_key_fingerprint(self) -> bytes:
+        """The subject key fingerprint carried by this value."""
         return self._subject_key_fingerprint
 
     @property
     def role(self) -> str:
+        """Exact attested role; it does not select a trusted key."""
         return self._role
 
     @property
     def jti(self) -> str:
+        """Signed assertion or attestation identifier."""
         return self._jti
 
     @property
     def nbf(self) -> int:
+        """Inclusive validity-window start in Unix seconds."""
         return self._nbf
 
     @property
     def exp(self) -> int:
+        """Exclusive validity-window end in Unix seconds."""
         return self._exp
 
     @property
     def verification(self) -> str:
+        """Checks completed for this value; decoding alone establishes no signature validity."""
         return self._verification
 
     @property
     def trust(self) -> str:
+        """Fixed not_evaluated marker; trust remains the caller's responsibility."""
         return self._trust
 
     def __repr__(self) -> str:
@@ -1494,62 +1589,77 @@ class ContentAssertionDecoded(_Facts):
 
     @property
     def version(self) -> int:
+        """Contract-major or sibling-profile version carried by this value."""
         return self._version
 
     @property
     def attestor_key_id(self) -> str:
+        """The attestor key id carried by this value."""
         return self._attestor_key_id
 
     @property
     def jti(self) -> str:
+        """Signed assertion or attestation identifier."""
         return self._jti
 
     @property
     def iss(self) -> str:
+        """Signed issuer identifier."""
         return self._iss
 
     @property
     def aud(self) -> str:
+        """Signed audience identifier."""
         return self._aud
 
     @property
     def sub(self) -> str:
+        """Signed lineage subject identifier."""
         return self._sub
 
     @property
     def profile(self) -> str:
+        """The profile carried by this value."""
         return self._profile
 
     @property
     def profile_digest(self) -> bytes:
+        """Raw SHA-256 digest identifying the semantic profile."""
         return self._profile_digest
 
     @property
     def content_digest(self) -> bytes:
+        """Domain-separated digest of the external content bytes."""
         return self._content_digest
 
     @property
     def gen(self) -> int:
+        """Positive lineage generation; the first generation is one."""
         return self._gen
 
     @property
     def prev(self) -> bytes:
+        """Predecessor assertion digest; zero bytes for generation one."""
         return self._prev
 
     @property
     def iat(self) -> int:
+        """Signed issuance time in Unix seconds."""
         return self._iat
 
     @property
     def nbf(self) -> int:
+        """Inclusive validity-window start in Unix seconds."""
         return self._nbf
 
     @property
     def exp(self) -> int:
+        """Exclusive validity-window end in Unix seconds."""
         return self._exp
 
     @property
     def verification(self) -> str:
+        """Checks completed for this value; decoding alone establishes no signature validity."""
         return self._verification
 
     def __repr__(self) -> str:
@@ -1644,74 +1754,92 @@ class ContentAssertionFacts(_Facts):
 
     @property
     def version(self) -> int:
+        """Contract-major or sibling-profile version carried by this value."""
         return self._version
 
     @property
     def attestor_key_id(self) -> str:
+        """The attestor key id carried by this value."""
         return self._attestor_key_id
 
     @property
     def attestor_key_fingerprint(self) -> bytes:
+        """The attestor key fingerprint carried by this value."""
         return self._attestor_key_fingerprint
 
     @property
     def jti(self) -> str:
+        """Signed assertion or attestation identifier."""
         return self._jti
 
     @property
     def iss(self) -> str:
+        """Signed issuer identifier."""
         return self._iss
 
     @property
     def aud(self) -> str:
+        """Signed audience identifier."""
         return self._aud
 
     @property
     def sub(self) -> str:
+        """Signed lineage subject identifier."""
         return self._sub
 
     @property
     def profile(self) -> str:
+        """The profile carried by this value."""
         return self._profile
 
     @property
     def profile_digest(self) -> bytes:
+        """Raw SHA-256 digest identifying the semantic profile."""
         return self._profile_digest
 
     @property
     def content_digest(self) -> bytes:
+        """Domain-separated digest of the external content bytes."""
         return self._content_digest
 
     @property
     def gen(self) -> int:
+        """Positive lineage generation; the first generation is one."""
         return self._gen
 
     @property
     def prev(self) -> bytes:
+        """Predecessor assertion digest; zero bytes for generation one."""
         return self._prev
 
     @property
     def iat(self) -> int:
+        """Signed issuance time in Unix seconds."""
         return self._iat
 
     @property
     def nbf(self) -> int:
+        """Inclusive validity-window start in Unix seconds."""
         return self._nbf
 
     @property
     def exp(self) -> int:
+        """Exclusive validity-window end in Unix seconds."""
         return self._exp
 
     @property
     def digest(self) -> bytes:
+        """Digest of the exact canonical evidence bytes."""
         return self._digest
 
     @property
     def verification(self) -> str:
+        """Checks completed for this value; decoding alone establishes no signature validity."""
         return self._verification
 
     @property
     def trust(self) -> str:
+        """Fixed not_evaluated marker; trust remains the caller's responsibility."""
         return self._trust
 
     def __repr__(self) -> str:

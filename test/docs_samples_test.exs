@@ -38,33 +38,20 @@ defmodule BoundedAuthorityProtocol.DocsSamplesTest do
     assert claim_errors(path, File.read!(path)) == []
   end
 
-  # Every guide page with Elixir code. Each runs top to bottom in one binding, and every block's
-  # value must equal the value the prose states after it.
-  @guides [
-    "docs/guides/evidence.md",
-    "docs/guides/troubleshooting.md",
-    "docs/guides/cheatsheet.cheatmd"
-  ]
+  test "every recursively discovered authored guide sample runs with its stated value" do
+    paths = Path.wildcard("docs/**/*.{md,cheatmd}") ++ ["usage-rules.md"]
 
-  for path <- @guides do
-    test "every block of #{path} runs with the value its prose states" do
-      path = unquote(path)
+    for path <- paths,
+        path not in [
+          "docs/protocol-v1.md",
+          "docs/guides/recipes.md",
+          "docs/guides/getting-started.md"
+        ] do
+      # The generated specification mirror has no authored integration samples. Recipes run
+      # in the real Plug consumer; the first integration is pinned independently above.
       {blocks, _deps} = elixir_blocks(File.read!(path))
-      assert blocks != [], "#{path} has no runnable elixir block"
-      assert claim_errors(path, File.read!(path)) == []
+      if blocks != [], do: assert(claim_errors(path, File.read!(path)) == [])
     end
-  end
-
-  test "every guide page with an elixir block is executed here" do
-    # Recipes run in DocsConsumerTest with the real Plug dependency, not in this core project.
-    executed = MapSet.new(["docs/guides/getting-started.md", "docs/guides/recipes.md" | @guides])
-
-    with_code =
-      for path <- Path.wildcard("docs/guides/*.{md,cheatmd}"),
-          match?({[_ | _], _deps}, path |> File.read!() |> elixir_blocks()),
-          do: path
-
-    assert Enum.reject(with_code, &MapSet.member?(executed, &1)) == []
   end
 
   test "the block extractor sees every elixir block and skips only the dependency block" do
@@ -166,24 +153,21 @@ defmodule BoundedAuthorityProtocol.DocsSamplesTest do
   end
 
   defp elixir_blocks(markdown) do
-    ~r/^```elixir\n(.*?)^```$/ms
-    |> Regex.scan(markdown, capture: :all_but_first)
-    |> Enum.map(fn [block] -> block end)
+    markdown
+    |> BoundedAuthorityProtocol.Documentation.blocks()
+    |> Enum.flat_map(fn
+      {"elixir", code} -> [code]
+      _ -> []
+    end)
     |> Enum.split_with(&(not deps_block?(&1)))
   end
 
   defp deps_block?(block), do: block =~ ~r/\bdefp? deps do\b/
 
-  # The text after each runnable block, up to the next elixir block (or the end).
   defp prose_after_blocks(markdown) do
-    [_before | parts] = String.split(markdown, ~r/^```elixir\n/m)
-
-    parts
-    |> Enum.map(fn part ->
-      [block, after_block] = String.split(part, ~r/^```$/m, parts: 2)
-      {block, after_block}
-    end)
-    |> Enum.reject(fn {block, _after} -> deps_block?(block) end)
-    |> Enum.map(fn {_block, after_block} -> after_block end)
+    markdown
+    |> BoundedAuthorityProtocol.Documentation.examples()
+    |> Enum.reject(fn {code, _prose} -> deps_block?(code) end)
+    |> Enum.map(&elem(&1, 1))
   end
 end

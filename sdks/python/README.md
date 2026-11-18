@@ -50,15 +50,19 @@ resolution of every runtime, build, development, and optional dependency declara
 
 ## Install from a pinned source
 
-Obtain this SDK directory from a pinned monorepo commit. From the SDK root, install the
-locked development environment:
+From an empty directory, install the selected source commit in a virtual environment.
+This SDK is unpublished; the full commit is its deployment identity.
+
+<!-- sdk-install:python -->
 
 ```bash
-uv sync --locked
+python3 -m venv venv
+venv/bin/python -m pip install "bounded-authority-verifier @ git+https://github.com/baselabs/bounded_authority_protocol.git@c8b3bab8e4caf0b7f93e6f240570673534c331e2#subdirectory=sdks/python"
 ```
 
-The commit identifies the unpublished SDK you deployed. The source distribution carries
-its tests and all their inputs; the wheel carries the runtime package.
+Save the following quickstart as `quickstart.py` and run `venv/bin/python quickstart.py`.
+CI executes this install and that example in a fresh directory. For SDK development in a
+checkout, `uv sync --locked` installs the committed development lock.
 
 ## Quickstart
 
@@ -345,6 +349,26 @@ permissiveness suite again with each closure independently removed. The monorepo
 an assertion after its closure is removed; build or collection errors fail the gate.
 
 Deployment notes: [`docs/deployment/python-sdk.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/python-sdk.md).
+
+## Migration from earlier source snapshots
+
+These SDKs are unpublished at version 0.1.0; there is no earlier supported registry major.
+When moving from an older source commit, apply these changes recorded in the monorepo
+[CHANGELOG](../../CHANGELOG.md). The quickstart uses the current forms.
+
+| Earlier usage | Current usage |
+|---|---|
+| `value = json_decode(raw)`; catch invalid-input exceptions | Match `Ok(value)` / `Err(InvalidError())`; read `result.value` only after matching. This applies to UTF-8, JSON, JCS, base64url, URI, JWK, digests, selectors, compact and bounds primitives. |
+| Unwrap `verify_strict(...)` | Use its plain boolean, as for `acceptable_public_key` and `torsion_free`; invalid input is `False`. |
+| `if result:` | `if isinstance(result, Ok):` or `result.is_ok`; implicit truth tests raise `TypeError`. |
+| Import `fail`, `require`, `unwrap`, or `invalid_error` | Match the public Result; those validation helpers are private. |
+| Pass arbitrary objects as byte/text input | Pass `bytes`, `bytearray` or `memoryview` (copied), or valid Unicode text. Released views and wrong types reject. |
+| `asdict(facts)`, `vars(facts)`, `replace(facts, ...)`, pickle or copy reduction | Read `facts.grant_id` or another named property; explicitly construct an application projection. Facts and redacted decoded values are slotted and read-only. |
+| Subclass `Bounds` or a façade input | Construct the exact SDK class. Native scalar/container subclasses keep builtin data semantics. |
+| `MAXIMA["depth"] = 8`; rely on `Bounds(...)` raising | `bounds_new({"depth": 8})` and match the Result; `MAXIMA` is read-only and invalid direct construction is unusable. |
+| Reinitialize facts, bounds, or redacted decoded objects | Construct a new value once; repeated initialization is refused. |
+| Assert `#GrantFacts<redacted>` | Assert the full namespace, for example `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`. |
+| Assume decoded grants omit operations or proofs omit claims | Read `version`, `operations` and the named proof claims; proof nonce rendering stays redacted. |
 
 ## License
 

@@ -1,13 +1,13 @@
 # SEP-DRAFT: Capability-Authorization Extension
 
-**Type:** Extensions Track · **Status:** draft (pre-submission; not yet filed as a SEP in the
+**Type:** Extensions Track · **Status:** draft (pre-submission; not yet submitted as a SEP in the
 `modelcontextprotocol/modelcontextprotocol` repository) · **Target venue:** MCP experimental-extension
 track ([SEP-2133](https://modelcontextprotocol.io/seps/2133-extensions) § Experimental Extensions),
 with the official `ext-auth` track as a gated follow-on.
 
 > This is a project-tracked draft from the
 > [Bounded Authority Protocol](https://github.com/baselabs/bounded_authority_protocol). It is not a
-> submitted SEP. Filing it as an Extensions-Track SEP in the main MCP repository is gated on the
+> submitted SEP. Submitting it as an Extensions-Track SEP in the main MCP repository is gated on the
 > external dependencies in § Reference Implementation and § Submission gates.
 
 ## Preamble
@@ -117,8 +117,8 @@ This draft is **pre-submission**: no reference implementation in an official MCP
 "Maintainers are under no obligation to implement any extension or accept contributed
 implementations," so the reference implementation is a negotiation with the
 `modelcontextprotocol` SDK maintainers (e.g. the TypeScript or Python MCP SDKs), not a repository the
-extension author provisions. This SEP is not filed until that reference implementation exists;
-filing is gated on it.
+extension author provisions. This SEP is not submitted until that reference implementation exists;
+submission is gated on it.
 
 ## Submission gates (external, recorded honestly)
 

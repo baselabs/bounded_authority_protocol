@@ -42,8 +42,11 @@ defmodule BoundedAuthorityProtocol.DocsConsumerTest do
       command!("mix", fetch_args, consumer)
       assert iex == "iex -S mix"
 
-      blocks = Regex.scan(~r/^```elixir\n(.*?)^```$/ms, guide, capture: :all_but_first)
-      code = for [block] <- blocks, not String.starts_with?(block, "defp deps"), do: block
+      code =
+        for {"elixir", block} <- BoundedAuthorityProtocol.Documentation.blocks(guide),
+            not String.starts_with?(block, "defp deps"),
+            do: block
+
       assert length(code) == 9
 
       File.write!(
@@ -68,7 +71,14 @@ defmodule BoundedAuthorityProtocol.DocsConsumerTest do
       )
 
       command!("mix", fetch_args, consumer)
-      File.cp!(Path.join(package, "docs/guides/recipes.md"), Path.join(consumer, "recipes.md"))
+
+      examples =
+        package
+        |> Path.join("docs/guides/recipes.md")
+        |> File.read!()
+        |> BoundedAuthorityProtocol.Documentation.examples()
+
+      File.write!(Path.join(consumer, "recipes.etf"), :erlang.term_to_binary(examples))
 
       File.cp!(
         Path.join(root, "test/fixtures/docs_consumer/middleware_suite.exs"),

@@ -152,11 +152,28 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
 
   @fixed_width_keys [:digest_bytes, :public_key_bytes, :signature_bytes]
 
-  @doc "Returns the immutable v1 profile maxima."
+  @doc """
+  Returns the immutable v1 profile maxima.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.Bounds.maximum().depth
+      32
+  """
   @spec maximum() :: t()
   def maximum, do: struct!(__MODULE__, @maximum)
 
-  @doc "Builds bounds from a map of caller-supplied tightening overrides."
+  @doc """
+  Builds bounds from a map of caller-supplied tightening overrides.
+
+  ## Examples
+
+      iex> {:ok, bounds} = BoundedAuthorityProtocol.V1.Bounds.new(%{depth: 8})
+      iex> bounds.depth
+      8
+      iex> BoundedAuthorityProtocol.V1.Bounds.new(%{depth: 0})
+      {:error, :invalid}
+  """
   @spec new(map()) :: {:ok, t()} | {:error, :invalid}
   def new(overrides \\ %{})
 
@@ -175,6 +192,12 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
   overrides, returning the complete struct. Every key must name a known bound, every value must
   be a positive integer no larger than its profile maximum, and the fixed widths cannot change;
   anything else returns `{:error, :invalid}`.
+
+  ## Examples
+
+      iex> {:ok, bounds} = BoundedAuthorityProtocol.V1.Bounds.coerce(%{depth: 8})
+      iex> BoundedAuthorityProtocol.V1.Bounds.coerce(bounds) == {:ok, bounds}
+      true
   """
   @spec coerce(t() | map()) :: {:ok, t()} | {:error, :invalid}
   def coerce(%__MODULE__{} = bounds) do

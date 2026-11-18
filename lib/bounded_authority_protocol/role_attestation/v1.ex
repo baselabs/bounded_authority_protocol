@@ -45,12 +45,26 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1 do
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.SigningInput
 
-  @doc "Builds the deterministic role-attestation signing input."
+  @doc """
+  Builds the deterministic role-attestation signing input.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.RoleAttestation.V1.attestation_signing_input(%{}, %{})
+      {:error, :invalid}
+  """
   @spec attestation_signing_input(RoleAttestation.t(), Bounds.t() | map()) ::
           {:ok, SigningInput.t()} | {:error, :invalid}
   defdelegate attestation_signing_input(attestation, limits), to: Codec, as: :signing_input
 
-  @doc "Assembles a role attestation at profile maxima."
+  @doc """
+  Assembles a role attestation at profile maxima.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.RoleAttestation.V1.assemble_compact(%{}, "")
+      {:error, :invalid}
+  """
   @spec assemble_compact(SigningInput.t(), binary()) :: {:ok, binary()} | {:error, :invalid}
   def assemble_compact(signing_input, signature),
     do: assemble_compact(signing_input, signature, %{})
@@ -62,19 +76,38 @@ defmodule BoundedAuthorityProtocol.RoleAttestation.V1 do
   signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
   order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
   signature bytes it accepts.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.RoleAttestation.V1.assemble_compact(%{}, "", %{})
+      {:error, :invalid}
   """
   @spec assemble_compact(SigningInput.t(), binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
   def assemble_compact(signing_input, signature, limits),
     do: Codec.assemble(signing_input, signature, limits)
 
-  @doc "Boundedly decodes a role attestation without evaluating trust."
+  @doc """
+  Boundedly decodes a role attestation without evaluating trust.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.RoleAttestation.V1.decode_attestation("not.a.compact", %{})
+      {:error, :invalid}
+  """
   @spec decode_attestation(binary(), Bounds.t() | map()) ::
           {:ok, BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation.t()}
           | {:error, :invalid}
   defdelegate decode_attestation(compact, limits), to: Codec, as: :decode
 
-  @doc "Verifies a role attestation against caller-supplied attestor trust, subject binding, and now."
+  @doc """
+  Verifies a role attestation against caller-supplied attestor trust, subject binding, and now.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.RoleAttestation.V1.verify_attestation("not.a.compact", %{})
+      {:error, :invalid}
+  """
   @spec verify_attestation(binary(), ExpectedAttestation.t()) ::
           {:ok, BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts.t()}
           | {:error, :invalid}

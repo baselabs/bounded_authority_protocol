@@ -48,27 +48,18 @@ testing this checkout. A consuming application maintains and audits its own lock
 
 ## Install from a checkout
 
-Copy this SDK directory into your application's `vendor/bap/` directory and use a local
-Cargo path dependency, or pin this repository's Git commit in your dependency declaration.
-The SDK root is the complete crate, including its tests and inputs.
-
-```toml
-[dependencies]
-bounded-authority-protocol = { path = "vendor/bap" }
-```
+Start from an empty directory and choose either the [complete path manifest or the
+complete Git manifest](../../docs/deployment/rust-sdk.md#not-published-yet), both pinned to a
+selected full source commit. CI executes both installs as independent consumer projects.
 
 ## Quickstart
 
-`cargo test` runs this block as a doctest. It signs with `ed25519-dalek` keys from fixed seeds;
-in production the private keys stay with the issuer and the holder, and the verifier receives
-only public keys. To run it as your own program, put it in `src/main.rs` and add the signer to
-your dependencies (it builds on Rust 1.88):
+Save the following as `src/main.rs` in either consumer, then run `cargo generate-lockfile`
+and `cargo run --locked`. The manifests include `ed25519-dalek` for this demonstration's
+caller-owned signer. `cargo test` also executes this block as a native doctest.
 
-```toml
-[dependencies]
-bounded-authority-protocol = { path = "vendor/bap" }
-ed25519-dalek = { version = "3.0", default-features = false }
-```
+The example signs with keys from fixed demonstration seeds. Production private keys stay with
+the issuer and holder; the verifier receives public keys only.
 
 ```rust
 use bounded_authority_protocol::types::{
@@ -280,6 +271,19 @@ sh tools/purity_check.sh && sh tools/license_check.sh
 
 Deployment notes, including AWS Lambda and PostgreSQL: see
 [`docs/deployment/rust-sdk.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/rust-sdk.md).
+
+## Migration from earlier source snapshots
+
+These SDKs are unpublished at version 0.1.0; there is no earlier supported registry major.
+When moving from an older source commit, apply these changes recorded in the monorepo
+[CHANGELOG](../../CHANGELOG.md). The quickstart uses the current forms.
+
+| Earlier usage | Current usage |
+|---|---|
+| Construct chain, anchor, transition or export facts without a major | Set `version` explicitly in direct struct construction. Verifiers populate it automatically. |
+| Match `#GrantFacts<redacted>` | Match the full namespace, for example `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`. Sibling profiles retain their own namespaces. |
+| Construct decoded grants without operations | Include `operations`; decoded proofs also require `version` and `holder_public_key`. Prefer obtaining diagnostics from decoding. |
+| Log a decoded proof's nonce through generic debugging | Use its specified diagnostic rendering, which redacts the nonce; read named fields only for explicit host logic. |
 
 ## License
 

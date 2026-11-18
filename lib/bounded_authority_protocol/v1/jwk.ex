@@ -15,7 +15,19 @@ defmodule BoundedAuthorityProtocol.V1.Jwk do
 
   @public_key_bytes 32
 
-  @doc "Encodes one acceptable raw 32-byte Ed25519 public key as the canonical public OKP JWK."
+  @doc """
+  Encodes one acceptable raw 32-byte Ed25519 public key as the canonical public OKP JWK.
+
+  ## Examples
+
+      iex> {public, _private} = :crypto.generate_key(:eddsa, :ed25519); :ok
+      :ok
+      iex> {:ok, jwk} = BoundedAuthorityProtocol.V1.Jwk.encode_public(public, %{})
+      iex> is_binary(jwk)
+      true
+      iex> BoundedAuthorityProtocol.V1.Jwk.encode_public("", %{})
+      {:error, :invalid}
+  """
   @spec encode_public(binary(), Bounds.t() | map()) :: {:ok, binary()} | {:error, :invalid}
   def encode_public(public_key, limits) when is_binary(public_key) do
     with {:ok, bounds} <- Bounds.coerce(limits),
@@ -31,7 +43,20 @@ defmodule BoundedAuthorityProtocol.V1.Jwk do
 
   def encode_public(_public_key, _limits), do: {:error, :invalid}
 
-  @doc "Decodes an exact public Ed25519 OKP JWK carrying an acceptable key."
+  @doc """
+  Decodes an exact public Ed25519 OKP JWK carrying an acceptable key.
+
+  ## Examples
+
+      iex> {public, _private} = :crypto.generate_key(:eddsa, :ed25519); :ok
+      :ok
+      iex> {:ok, jwk} = BoundedAuthorityProtocol.V1.Jwk.encode_public(public, %{})
+      iex> {:ok, decoded} = BoundedAuthorityProtocol.V1.Jwk.decode_public(jwk, %{})
+      iex> decoded == public
+      true
+      iex> BoundedAuthorityProtocol.V1.Jwk.decode_public("{}", %{})
+      {:error, :invalid}
+  """
   @spec decode_public(binary(), Bounds.t() | map()) :: {:ok, binary()} | {:error, :invalid}
   def decode_public(jwk, limits) when is_binary(jwk) do
     with {:ok, bounds} <- Bounds.coerce(limits),
@@ -51,7 +76,20 @@ defmodule BoundedAuthorityProtocol.V1.Jwk do
 
   def decode_public(_jwk, _limits), do: {:error, :invalid}
 
-  @doc "Returns the exact RFC 7638 public OKP thumbprint preimage."
+  @doc """
+  Returns the exact RFC 7638 public OKP thumbprint preimage.
+
+  ## Examples
+
+      iex> {public, _private} = :crypto.generate_key(:eddsa, :ed25519); :ok
+      :ok
+      iex> {:ok, jwk} = BoundedAuthorityProtocol.V1.Jwk.encode_public(public, %{})
+      iex> {:ok, preimage} = BoundedAuthorityProtocol.V1.Jwk.thumbprint_preimage(jwk, %{})
+      iex> preimage == jwk
+      true
+      iex> BoundedAuthorityProtocol.V1.Jwk.thumbprint_preimage("{}", %{})
+      {:error, :invalid}
+  """
   @spec thumbprint_preimage(binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
   def thumbprint_preimage(jwk, limits) do
@@ -60,7 +98,20 @@ defmodule BoundedAuthorityProtocol.V1.Jwk do
     end
   end
 
-  @doc "Returns the canonical base64url RFC 7638 thumbprint."
+  @doc """
+  Returns the canonical base64url RFC 7638 thumbprint.
+
+  ## Examples
+
+      iex> {public, _private} = :crypto.generate_key(:eddsa, :ed25519); :ok
+      :ok
+      iex> {:ok, jwk} = BoundedAuthorityProtocol.V1.Jwk.encode_public(public, %{})
+      iex> {:ok, thumbprint} = BoundedAuthorityProtocol.V1.Jwk.thumbprint(jwk, %{})
+      iex> byte_size(thumbprint)
+      43
+      iex> BoundedAuthorityProtocol.V1.Jwk.thumbprint("{}", %{})
+      {:error, :invalid}
+  """
   @spec thumbprint(binary(), Bounds.t() | map()) :: {:ok, binary()} | {:error, :invalid}
   def thumbprint(jwk, limits) do
     with {:ok, digest} <- thumbprint_raw(jwk, limits) do

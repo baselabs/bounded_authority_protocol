@@ -49,7 +49,7 @@ Decoded diagnostics and redacted facts follow the
 Their behavior is defined by the specifications and the corpora; the in-repository SDKs' source
 comments cite the tracked normative specifications and independent conformance corpora.
 
-## Known gaps
+## Implemented corrections and import notes
 
 - **Erratum 3 (producer canonicality) is implemented in all three** (compact assembly for every
   profile and anchored-export encoding refuse a signature no conforming signer emits, and each

@@ -52,18 +52,41 @@ defmodule BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1 do
   alias BoundedAuthorityProtocol.V1.Runtime
   alias BoundedAuthorityProtocol.V1.SigningInput
 
-  @doc "Normalizes one bounded local-loopback HTTP target URI without DNS or network access."
+  @doc """
+  Normalizes one bounded local-loopback HTTP target URI without DNS or network access.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.normalize_uri("http://127.0.0.1:8080/items", %{})
+      {:ok, "http://127.0.0.1:8080/items"}
+      iex> BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.normalize_uri("http://localhost:8080/items", %{})
+      {:error, :invalid}
+  """
   @spec normalize_uri(binary(), Bounds.t() | map()) :: {:ok, binary()} | {:error, :invalid}
   defdelegate normalize_uri(uri, limits), to: Uri, as: :normalize
 
-  @doc "Builds the deterministic byte-distinct local-loopback proof signing input."
+  @doc """
+  Builds the deterministic byte-distinct local-loopback proof signing input.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.proof_signing_input(%{}, %{})
+      {:error, :invalid}
+  """
   @spec proof_signing_input(Proof.t(), Bounds.t() | map()) ::
           {:ok, SigningInput.t()} | {:error, :invalid}
   defdelegate proof_signing_input(proof, limits),
     to: Runtime,
     as: :local_loopback_proof_signing_input
 
-  @doc "Assembles a local-loopback proof at profile maxima."
+  @doc """
+  Assembles a local-loopback proof at profile maxima.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.assemble_compact(%{}, "")
+      {:error, :invalid}
+  """
   @spec assemble_compact(SigningInput.t(), binary()) :: {:ok, binary()} | {:error, :invalid}
   def assemble_compact(signing_input, signature),
     do: assemble_compact(signing_input, signature, %{})
@@ -75,17 +98,36 @@ defmodule BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1 do
   signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
   order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
   signature bytes it accepts.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.assemble_compact(%{}, "", %{})
+      {:error, :invalid}
   """
   @spec assemble_compact(SigningInput.t(), binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
   def assemble_compact(signing_input, signature, limits),
     do: Runtime.assemble_local_loopback_compact(signing_input, signature, limits)
 
-  @doc "Boundedly decodes a local-loopback proof without evaluating trust."
+  @doc """
+  Boundedly decodes a local-loopback proof without evaluating trust.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.decode_proof("not.a.compact", %{})
+      {:error, :invalid}
+  """
   @spec decode_proof(binary(), Bounds.t() | map()) :: {:ok, DecodedProof.t()} | {:error, :invalid}
   defdelegate decode_proof(compact, limits), to: Runtime, as: :decode_local_loopback_proof
 
-  @doc "Verifies a raw grant and local-loopback proof against server-derived context."
+  @doc """
+  Verifies a raw grant and local-loopback proof against server-derived context.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1.check_envelope(%{}, %{})
+      {:error, :invalid}
+  """
   @spec check_envelope(Credentials.t(), ExpectedRequest.t()) ::
           {:ok, EnvelopeFacts.t()} | {:error, :invalid}
   defdelegate check_envelope(credentials, expected_request),

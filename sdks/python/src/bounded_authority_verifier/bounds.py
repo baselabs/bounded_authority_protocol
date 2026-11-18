@@ -112,9 +112,11 @@ class Bounds:
 
     @property
     def overrides(self) -> Mapping[str, int]:
+        """Read-only explicit tightenings; validate the Bounds result before using it."""
         return self._overrides if self._overrides is not None else MappingProxyType({})
 
     def resolve(self, key: str) -> Result[int]:
+        """Resolve one named limit as Ok(value), or return the closed invalid result."""
         return bounds_resolve(self, key)
 
 
@@ -123,10 +125,14 @@ MAXIMUM_BOUNDS = Bounds()
 
 
 def bounds_maximum() -> Result[Bounds]:
+    """Return the fixed protocol maxima as an immutable Bounds result."""
+
     return Ok(MAXIMUM_BOUNDS)
 
 
 def bounds_resolve(b: object, key: str) -> Result[int]:
+    """Resolve a validated limit without widening any protocol maximum."""
+
     try:
         key = _text(key)
         if type(b) is not Bounds or key not in MAXIMA or getattr(b, "_overrides", None) is None:

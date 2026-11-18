@@ -49,8 +49,8 @@ func inspectRaw(v []byte) inspectTerm { return inspectTerm{kind: "binary", raw: 
 func inspectText(v string) inspectTerm {
 	return inspectTerm{kind: "binary", raw: []byte(v[:min(len(v), 16384)]), more: len(v) > 16384}
 }
-func inspectTuple(v ...inspectTerm) inspectTerm        { return inspectTerm{kind: "tuple", children: v} }
-func inspectListing(v []inspectTerm) inspectTerm       { return inspectTerm{kind: "list", children: v} }
+func inspectTuple(v ...inspectTerm) inspectTerm { return inspectTerm{kind: "tuple", children: v} }
+func inspectListing(v []inspectTerm) inspectTerm { return inspectTerm{kind: "list", children: v} }
 func inspectField(k string, v inspectTerm) inspectTerm { return inspectTuple(inspectAtom(k), v) }
 func inspectStruct(name string, fields ...inspectTerm) inspectTerm {
 	return inspectTerm{kind: "struct", text: name, children: fields}
@@ -238,7 +238,7 @@ func inspectWalk(term inspectTerm, remaining *int) string {
 	}
 }
 func inspectBinary(raw []byte) string { return inspectRender(inspectRaw(raw)) }
-func inspectString(v string) string   { return inspectRender(inspectText(v)) }
+func inspectString(v string) string { return inspectRender(inspectText(v)) }
 func inspectTagged(value Value) inspectTerm {
 	var tag string
 	var val inspectTerm
@@ -387,7 +387,11 @@ func (d GrantDecoded) String() string {
 		inspectField("audiences", audiences), inspectField("issued_at", inspectInt(d.IssuedAt)), inspectField("not_before", inspectInt(d.NotBefore)), inspectField("expires_at", inspectInt(d.ExpiresAt)),
 		inspectField("holder_thumbprint", inspectRaw(d.HolderThumbprint[:])), inspectField("operations", operations), inspectField("verification", inspectDecodeStatus(d.Verification))))
 }
-func (d GrantDecoded) GoString() string           { return d.String() }
+
+// GoString uses the same diagnostic rendering for the Go-syntax formatting verb.
+func (d GrantDecoded) GoString() string { return d.String() }
+
+// Format uses the specified diagnostic rendering for every formatting verb and flag.
 func (d GrantDecoded) Format(s fmt.State, _ rune) { _, _ = s.Write([]byte(d.String())) }
 
 // String redacts only the optional nonce, matching decoded proof inspection.
@@ -402,25 +406,51 @@ func (d ProofDecoded) String() string {
 	gh, rh, hp := d.GrantHash(), d.RequestHash(), d.HolderThumbprint()
 	return fmt.Sprintf("#BoundedAuthorityProtocol.V%d.DecodedProof<version: %d, proof_id: %s, method: %s, target_uri: %s, issued_at: %d, nonce: %s, invocation_id: %s, operation: %s, grant_hash: %s, request_hash: %s, holder_public_key: %s, holder_thumbprint: %s, verification: %s>", d.Version(), d.Version(), inspectString(d.ProofID()), inspectString(d.Method()), inspectString(d.TargetURI()), d.IssuedAt(), nonce, inspectString(d.InvocationID()), inspectString(d.Operation()), inspectBinary(gh[:]), inspectBinary(rh[:]), inspectBinary(d.data().HolderPublicKey), inspectBinary(hp[:]), inspectRender(inspectDecodeStatus(d.Verification())))
 }
-func (d ProofDecoded) GoString() string           { return d.String() }
-func (d ProofDecoded) Format(s fmt.State, _ rune) { _, _ = s.Write([]byte(d.String())) }
-func (ProofDecoded) MarshalJSON() ([]byte, error) { return nil, ErrInvalid }
-func (ProofDecoded) MarshalText() ([]byte, error) { return nil, ErrInvalid }
-func (ProofDecoded) GobEncode() ([]byte, error)   { return nil, ErrInvalid }
 
+// GoString uses the same diagnostic rendering for the Go-syntax formatting verb.
+func (d ProofDecoded) GoString() string { return d.String() }
+
+// Format uses the specified diagnostic rendering for every formatting verb and flag.
+func (d ProofDecoded) Format(s fmt.State, _ rune) { _, _ = s.Write([]byte(d.String())) }
+
+// MarshalJSON refuses generic JSON export with ErrInvalid; project named accessors explicitly.
+func (ProofDecoded) MarshalJSON() ([]byte, error) { return nil, ErrInvalid }
+
+// MarshalText refuses generic text export with ErrInvalid; project named accessors explicitly.
+func (ProofDecoded) MarshalText() ([]byte, error) { return nil, ErrInvalid }
+
+// GobEncode refuses gob export with ErrInvalid; project named accessors explicitly.
+func (ProofDecoded) GobEncode() ([]byte, error) { return nil, ErrInvalid }
+
+// String returns the specified diagnostic rendering; redacted fields remain hidden.
 func (d AttestationDecoded) String() string {
 	return inspectRender(inspectStruct("BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation",
 		inspectField("version", inspectInt(int64(d.Version))), inspectField("attestor_key_id", inspectText(d.AttestorKeyID)), inspectField("jti", inspectText(d.Jti)), inspectField("key_id", inspectText(d.KeyID)),
 		inspectField("public_key", inspectRaw(d.PublicKey[:])), inspectField("role", inspectText(d.Role)), inspectField("nbf", inspectInt(d.Nbf)), inspectField("exp", inspectInt(d.Exp)), inspectField("verification", inspectDecodeStatus(d.Verification))))
 }
-func (d AttestationDecoded) GoString() string           { return d.String() }
+
+// GoString uses the same diagnostic rendering for the Go-syntax formatting verb.
+func (d AttestationDecoded) GoString() string { return d.String() }
+
+// Format uses the specified diagnostic rendering for every formatting verb and flag.
 func (d AttestationDecoded) Format(s fmt.State, _ rune) { _, _ = s.Write([]byte(d.String())) }
 
+// String returns the specified diagnostic rendering; redacted fields remain hidden.
 func (DecodedContentAssertion) String() string {
 	return "#BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion<redacted>"
 }
-func (d DecodedContentAssertion) GoString() string           { return d.String() }
+
+// GoString uses the same diagnostic rendering for the Go-syntax formatting verb.
+func (d DecodedContentAssertion) GoString() string { return d.String() }
+
+// Format uses the specified diagnostic rendering for every formatting verb and flag.
 func (d DecodedContentAssertion) Format(s fmt.State, _ rune) { _, _ = s.Write([]byte(d.String())) }
+
+// MarshalJSON refuses generic JSON export with ErrInvalid; project named accessors explicitly.
 func (DecodedContentAssertion) MarshalJSON() ([]byte, error) { return nil, ErrInvalid }
+
+// MarshalText refuses generic text export with ErrInvalid; project named accessors explicitly.
 func (DecodedContentAssertion) MarshalText() ([]byte, error) { return nil, ErrInvalid }
-func (DecodedContentAssertion) GobEncode() ([]byte, error)   { return nil, ErrInvalid }
+
+// GobEncode refuses gob export with ErrInvalid; project named accessors explicitly.
+func (DecodedContentAssertion) GobEncode() ([]byte, error) { return nil, ErrInvalid }

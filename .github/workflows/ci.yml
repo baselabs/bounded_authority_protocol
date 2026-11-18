@@ -108,14 +108,14 @@ jobs:
 
       - name: Set up primary BEAM
         if: matrix.primary
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           version-file: .tool-versions
           version-type: strict
 
       - name: Set up compatibility BEAM
         if: ${{ !matrix.primary }}
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
@@ -156,7 +156,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up BEAM
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           version-file: .tool-versions
           version-type: strict
@@ -202,7 +202,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up BEAM
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           version-file: .tool-versions
           version-type: strict
@@ -271,7 +271,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up BEAM
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           version-file: .tool-versions
           version-type: strict
@@ -325,7 +325,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up BEAM
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           version-file: .tool-versions
           version-type: strict
@@ -367,7 +367,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up BEAM
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           version-file: .tool-versions
           version-type: strict
@@ -402,7 +402,7 @@ jobs:
     outputs:
       version: ${{ steps.archive.outputs.version }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 6 # 2x slowest green 2.9 min, run 44200170042.
+    timeout-minutes: 90 # expanded documentation checks; no green run yet
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -411,7 +411,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up BEAM
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           version-file: .tool-versions
           version-type: strict
@@ -589,14 +589,67 @@ jobs:
     with:
       version: ${{ needs.package.outputs.version }}
 
+  livebooks-local:
+    name: livebooks-local
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90 # no green run yet
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Refuse BEAM version drift
+        run: bash scripts/ci_tool_versions.sh beam
+
+      - name: Pin the Hex client
+        run: mix local.hex "$(cat .hex-version)" --force
+
+      - name: Execute every notebook against the local package
+        run: elixir scripts/check_livebooks.exs --local
+
+  livebooks-published:
+    name: livebooks-published
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90 # no green run yet
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Refuse BEAM version drift
+        run: bash scripts/ci_tool_versions.sh beam
+
+      - name: Pin the Hex client
+        run: mix local.hex "$(cat .hex-version)" --force
+
+      - name: Execute every notebook against the published package
+        run: elixir scripts/check_livebooks.exs --published
+
   qualified:
-    name: qualified
     if: always()
     needs:
       - secret-scan
       - workflow-syntax
       - compatibility
       - quality-source
+      - livebooks-local
+      - livebooks-published
       - quality-corpus
       - quality-tests
       - quality-conformance

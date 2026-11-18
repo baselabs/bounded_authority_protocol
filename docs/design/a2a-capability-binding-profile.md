@@ -430,7 +430,7 @@ existing reserved registry rows. Compliance read of this document:
 1. Hosting or submitting the existing [venue-facing A2A extension draft](../extensions/a2a-capability-binding.mdx)
    remains owner-gated. The draft exists; venue acceptance and implementation are not claimed.
 2. Eventual IANA registration of the carriage header names (template path per A2A §14.2),
-   outside this slice; coordinates with the BAP-12 row's claims/media-type filings, which are
+   outside this slice; coordinates with the BAP-12 row's claims/media-type registration submissions, which are
    separate registries.
 3. Projection and `htu` conformance vectors (§13).
 4. Real-substrate runtime evidence (an actual A2A server verifying a proof), a future

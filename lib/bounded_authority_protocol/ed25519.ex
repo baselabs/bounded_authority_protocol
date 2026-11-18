@@ -72,6 +72,11 @@ defmodule BoundedAuthorityProtocol.Ed25519 do
   Returns `true` only for a 64-byte signature and a 32-byte key that pass the canonical,
   small-order and scalar-range checks and then the cofactorless equation. Any other input,
   including non-binary or wrong-size input, returns `false`; the function never raises.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.Ed25519.verify_strict("message", <<0::512>>, <<0::256>>)
+      false
   """
   @spec verify_strict(binary(), binary(), binary()) :: boolean()
   def verify_strict(message, signature, public_key)
@@ -88,6 +93,11 @@ defmodule BoundedAuthorityProtocol.Ed25519 do
 
   The key must be canonical, must not be one of the eight small-order encodings, and must
   decode to a point on the curve. Any other input returns `false`.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.Ed25519.acceptable_public_key?(<<0::256>>)
+      false
   """
   @spec acceptable_public_key?(binary()) :: boolean()
   def acceptable_public_key?(<<_::binary-size(32)>> = public_key) do
@@ -103,6 +113,11 @@ defmodule BoundedAuthorityProtocol.Ed25519 do
   A host calls this at key enrollment, at trust install, and before any deny-list or
   revocation comparison. It runs one full scalar multiplication in pure integer arithmetic
   (about 0.45 ms), so it never belongs on the per-signature verification path.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.Ed25519.torsion_free?(<<0::256>>)
+      false
   """
   @spec torsion_free?(binary()) :: boolean()
   def torsion_free?(<<_::binary-size(32)>> = public_key) do

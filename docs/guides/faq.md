@@ -14,7 +14,9 @@ credentials, use the [troubleshooting checklist](troubleshooting.md), which comp
 claims with your expectations.
 
 This is the credential-verifier error contract. Public crypto predicates return booleans instead;
-the [API stability page](api-stability.md) distinguishes each function family's result shape.
+`ContentAssertion.V1.verify_successor/3` returns `:ok` or `{:error, :invalid}`;
+`Bounds.maximum/0` returns bounds directly. `Conformance.Cli.run/1` returns exit status
+`0`, `1`, or `2`. The [API stability page](api-stability.md) distinguishes each function family's result shape.
 
 ### Why does the package not sign anything?
 

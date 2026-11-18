@@ -37,31 +37,63 @@ MAX_FLOAT = 9007199254740991
 
 @dataclass(frozen=True)
 class JNull:
+    """The tagged JSON null value."""
+
     pass
 
 
 @dataclass(frozen=True)
 class JBool:
+    """A tagged JSON boolean, distinct from an integer.
+
+    Fields:
+        v: bool.
+    """
+
     v: bool
 
 
 @dataclass(frozen=True)
 class JInt:
+    """A tagged JSON integer bounded by the profile's integer magnitude.
+
+    Fields:
+        v: int.
+    """
+
     v: int
 
 
 @dataclass(frozen=True)
 class JFloat:
+    """A tagged JSON float; integer and float tags remain distinct.
+
+    Fields:
+        v: float.
+    """
+
     v: float
 
 
 @dataclass(frozen=True)
 class JString:
+    """A tagged JSON string carrying validated UTF-8 bytes.
+
+    Fields:
+        v: bytes.
+    """
+
     v: bytes  # the raw UTF-8 bytes of the decoded string
 
 
 @dataclass(frozen=True)
 class JArray:
+    """An ordered sequence of tagged JSON values.
+
+    Fields:
+        v: tuple[Tagged, ...].
+    """
+
     v: tuple[Tagged, ...]
 
 
@@ -70,6 +102,12 @@ class JObject:
     # Plain dict (NOT a subclass) keyed by the decoded string; insertion order preserved (dict
     # iteration order = insertion order in Python 3.7+). Members are accessed ONLY by dict[key]
     # subscription throughout the SDK — never getattr — so __class__/__proto__ keys are data.
+    """An ordered collection of UTF-8 member names and tagged values.
+
+    Fields:
+        v: dict[str, Tagged].
+    """
+
     v: dict[str, Tagged]
 
 
@@ -516,6 +554,8 @@ def _skip_ws(ctx: _Ctx) -> None:
 
 
 def utf8_str(b: bytes) -> Result[str]:
+    """Decode validated UTF-8 bytes to text; malformed input returns Err."""
+
     try:
         b = _bytes(b)
         return Ok(_decode_utf8(b))
@@ -524,6 +564,8 @@ def utf8_str(b: bytes) -> Result[str]:
 
 
 def is_valid_utf8(b: bytes) -> Result[bool]:
+    """Return whether bytes form valid UTF-8, without Unicode normalization."""
+
     try:
         b = _bytes(b)
         try:
@@ -536,6 +578,8 @@ def is_valid_utf8(b: bytes) -> Result[bool]:
 
 
 def str_utf8(s: str) -> Result[bytes]:
+    """Encode text as UTF-8 bytes; invalid Unicode returns Err."""
+
     try:
         s = _text(s)
         return Ok(s.encode("utf-8"))

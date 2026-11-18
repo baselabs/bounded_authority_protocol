@@ -1,0 +1,194 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Local-loopback HTTP proofs
+
+[Run the 1.0.0 release walkthrough in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
+For this focused journey, download this `.livemd` file and use **Open → Import from file** in Livebook.
+The focused file is new since 1.0.0; the release launch above opens the released walkthrough.
+
+Select the local application profile explicitly. Verify a literal-loopback target and refuse wrong nonces and cross-profile inputs.
+
+Run every cell in order. Keys are generated only in memory; persisted outputs contain no keys,
+signatures, credentials, or nonces. Verification leaves trust and execution policy with the host.
+
+```elixir
+Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+The cell returns `:ok`.
+
+## Demonstration inputs
+
+```elixir
+notebook_value = (
+  {issuer_public, issuer_private} = :crypto.generate_key(:eddsa, :ed25519)
+  {holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
+
+  {:ok, holder_thumbprint} =
+    BoundedAuthorityProtocol.V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
+
+  {byte_size(issuer_public), byte_size(holder_thumbprint)}
+
+  alias BoundedAuthorityProtocol.V1.{Grant, Operation}
+
+  grant = %Grant{
+    key_id: "issuer-1",
+    issuer: "https://issuer.example",
+    grant_id: "grant-2026-001",
+    audiences: ["https://service.example"],
+    issued_at: 1_800_000_000,
+    not_before: 1_800_000_000,
+    expires_at: 1_800_003_600,
+    holder_thumbprint: holder_thumbprint,
+    operations: [
+      %Operation{
+        name: "read_record",
+        selectors: [
+          {:equals, ["record", "region"], {:string, "us-east"}},
+          {:one_of, ["record", "tier"], [{:string, "gold"}, {:string, "platinum"}]},
+          :all
+        ]
+      }
+    ]
+  }
+
+  {:ok, signing_input} = BoundedAuthorityProtocol.V1.grant_signing_input(grant, %{})
+  issuer_signature = :crypto.sign(:eddsa, :none, signing_input.message, [issuer_private, :ed25519])
+  {:ok, grant_compact} = BoundedAuthorityProtocol.V1.assemble_compact(signing_input, issuer_signature)
+
+  grant_compact
+
+  alias BoundedAuthorityProtocol.V1.{Proof, Credentials, ExpectedRequest, TrustedIssuer}
+  now = 1_800_001_000
+  trusted = %TrustedIssuer{key_id: "issuer-1", public_key: issuer_public}
+  :demo_ready
+)
+true = notebook_value === (
+  :demo_ready
+)
+notebook_value
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:demo_ready
+```
+
+The cell returns `:demo_ready`.
+
+## Produce and verify the local-loopback application proof
+
+The local-development profile is byte-distinct from standard `dpop+jwt`. It accepts only
+canonical literal-loopback HTTP targets and requires a server nonce. The target below stands for
+a target derived directly from the listener; never substitute `localhost`, a forwarding header,
+or a client-asserted authority.
+
+```elixir
+notebook_value = (
+  alias BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1, as: LocalLoopback
+
+  loopback_target = "http://127.0.0.1:4000/invoke"
+  loopback_nonce = "challenge-loopback-001"
+
+  {:ok, ^loopback_target} = LocalLoopback.normalize_uri(loopback_target, %{})
+
+  loopback_proof = %Proof{
+    holder_public_key: holder_public,
+    proof_id: "proof-loopback-2026-001",
+    method: "POST",
+    target_uri: loopback_target,
+    issued_at: now,
+    nonce: loopback_nonce,
+    invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120003",
+    operation: "read_record",
+    grant_compact: grant_compact,
+    cast_arguments:
+      {:object,
+       [
+         {"record", {:object, [{"tier", {:string, "gold"}}, {"region", {:string, "us-east"}}]}}
+       ]}
+  }
+
+  {:ok, loopback_input} = LocalLoopback.proof_signing_input(loopback_proof, %{})
+
+  loopback_signature =
+    :crypto.sign(:eddsa, :none, loopback_input.message, [holder_private, :ed25519])
+
+  {:ok, loopback_compact} =
+    LocalLoopback.assemble_compact(loopback_input, loopback_signature)
+
+  loopback_credentials = %Credentials{grant: grant_compact, proof: loopback_compact}
+
+  loopback_expected = %ExpectedRequest{
+    trusted_issuer: trusted,
+    issuer: "https://issuer.example",
+    audience: "https://service.example",
+    method: "POST",
+    target_uri: loopback_target,
+    invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120003",
+    operation: "read_record",
+    cast_arguments: loopback_proof.cast_arguments,
+    evaluation_time: now,
+    clock_skew: 60,
+    proof_max_age: 300,
+    nonce: {:required, loopback_nonce},
+    bounds: %{}
+  }
+
+  {:ok, loopback_facts} =
+    LocalLoopback.check_envelope(loopback_credentials, loopback_expected)
+
+  Map.take(Map.from_struct(loopback_facts), [:target_uri, :operation, :authorization])
+)
+true = notebook_value === (
+  %{target_uri: "http://127.0.0.1:4000/invoke", operation: "read_record", authorization: :not_evaluated}
+)
+notebook_value
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{target_uri: "http://127.0.0.1:4000/invoke", operation: "read_record", authorization: :not_evaluated}
+```
+
+The cell returns `%{target_uri: "http://127.0.0.1:4000/invoke", operation: "read_record", authorization: :not_evaluated}`.
+
+## Cross-profile, wrong-nonce, and hostname attempts fail closed
+
+```elixir
+notebook_value = (
+  %{
+    wrong_nonce:
+      LocalLoopback.check_envelope(
+        loopback_credentials,
+        %{loopback_expected | nonce: {:required, "wrong-nonce"}}
+      ),
+    standard_profile:
+      BoundedAuthorityProtocol.V1.check_envelope(loopback_credentials, loopback_expected),
+    hostname: LocalLoopback.normalize_uri("http://localhost:4000/invoke", %{})
+  }
+)
+true = notebook_value === (
+  %{wrong_nonce: {:error, :invalid}, standard_profile: {:error, :invalid}, hostname: {:error, :invalid}}
+)
+notebook_value
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{wrong_nonce: {:error, :invalid}, standard_profile: {:error, :invalid}, hostname: {:error, :invalid}}
+```
+
+The cell returns `%{wrong_nonce: {:error, :invalid}, standard_profile: {:error, :invalid}, hostname: {:error, :invalid}}`.
+A host selects one profile and never retries another after a failure. This notebook exercises the
+pure profile functions only. Loopback HTTP is not TLS, and it does not isolate one local process
+from another.

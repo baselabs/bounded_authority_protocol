@@ -1,0 +1,38 @@
+{
+  "bap-walkthrough.livemd": {
+    "outputs": 7,
+    "release_launch": "bap-walkthrough.livemd"
+  },
+  "chains-and-archives.livemd": {
+    "outputs": 9,
+    "release_launch": "chains-and-archives.livemd"
+  },
+  "content-lineage.livemd": {
+    "outputs": 5,
+    "release_launch": "bap-walkthrough.livemd"
+  },
+  "local-loopback.livemd": {
+    "outputs": 4,
+    "release_launch": "bap-walkthrough.livemd"
+  },
+  "role-attestations.livemd": {
+    "outputs": 4,
+    "release_launch": "bap-walkthrough.livemd"
+  },
+  "service-integration.livemd": {
+    "outputs": 10,
+    "release_launch": "service-integration.livemd"
+  },
+  "strict-crypto.livemd": {
+    "outputs": 5,
+    "release_launch": "bap-walkthrough.livemd"
+  },
+  "v2-ranges.livemd": {
+    "outputs": 4,
+    "release_launch": "bap-walkthrough.livemd"
+  },
+  "v3-es256.livemd": {
+    "outputs": 4,
+    "release_launch": "bap-walkthrough.livemd"
+  }
+}

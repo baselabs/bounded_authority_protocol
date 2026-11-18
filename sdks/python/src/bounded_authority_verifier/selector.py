@@ -34,17 +34,30 @@ _SELECTOR_MEMBER_SETS = {
 
 @dataclass(frozen=True)
 class SelAll:
+    """A selector that accepts every argument value at its path."""
     pass
 
 
 @dataclass(frozen=True)
 class SelEquals:
+    """A selector requiring exact tagged-JSON equality at its path.
+
+    Fields:
+        path: tuple[str, ...].
+        value: Tagged.
+    """
     path: tuple[str, ...]
     value: Tagged
 
 
 @dataclass(frozen=True)
 class SelOneOf:
+    """A selector accepting a value from an explicit set of tagged values.
+
+    Fields:
+        path: tuple[str, ...].
+        values: tuple[Tagged, ...].
+    """
     path: tuple[str, ...]
     values: tuple[Tagged, ...]
 

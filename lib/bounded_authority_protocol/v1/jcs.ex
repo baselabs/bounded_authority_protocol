@@ -6,7 +6,14 @@ defmodule BoundedAuthorityProtocol.V1.Jcs do
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Violation
 
-  @doc "Encodes one tagged JSON value as bounded RFC 8785 bytes."
+  @doc """
+  Encodes one tagged JSON value as bounded RFC 8785 bytes.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.Jcs.encode({:object, [{"b", {:integer, 2}}, {"a", {:integer, 1}}]}, %{})
+      {:ok, ~s({"a":1,"b":2})}
+  """
   @spec encode(BoundedAuthorityProtocol.V1.Json.value(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
   def encode(value, limits) do

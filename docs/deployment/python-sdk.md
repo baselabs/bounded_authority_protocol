@@ -12,15 +12,10 @@ has the quickstart and the full API list.
 
 The package is not on PyPI, and any package of this name there is not ours until this page
 says otherwise. It moves to its own repository when it is first published.
-Until then, install it from
-this repository at a pinned commit:
-
-```bash
-pip install "bounded-authority-verifier @ git+https://github.com/baselabs/bounded_authority_protocol@<commit>#subdirectory=sdks/python"
-```
-
-or from a local checkout with `pip install ./bounded_authority_protocol/sdks/python`. Without a
-published version, the commit is the identity of what you deployed.
+Start in an empty directory and use the [complete pinned install and executed
+quickstart](../../sdks/python/README.md#install-from-a-pinned-source). It creates a virtual
+environment, installs the selected full Git commit and verifies a grant and proof before
+showing an argument-mismatch refusal. The source commit is the unpublished deployment identity.
 
 Erratum 3 (producer canonicality) is implemented: `assemble_compact`,
 `encode_anchored_export` (and their `v2` and `v3` forms), `assemble_local_loopback_http_compact`,
@@ -36,8 +31,9 @@ signature. No verification verdict changes. See the SDK README.
   you deploy.
 - Pure functions only: no clock, network, filesystem, or randomness in the library. Time,
   trusted keys, and expected context are explicit inputs.
-- Type-annotated throughout (`mypy --strict` clean). Facts are frozen dataclasses; their `repr`
-  prints every field (no redacted rendering yet), so log the fields you need by name.
+- Type-annotated throughout (`mypy --strict` clean). Facts are slotted value
+  objects with read-only properties and redacted `repr` / `str`, as the SDK README specifies.
+  Read named properties for explicit application projections; generic dataclass export is refused.
 
 ## Deployment targets
 
@@ -84,3 +80,8 @@ normative terms.
 Tests and corpus inputs are self-contained under the SDK root. The complete Hex corpus tree
 is vendored at `conformance/priv/conformance/`; copied-alone and unpacked-package checks
 protect that boundary. See the [verdict digest contract](../design/corpus-verdict-digests.md).
+
+## Migration
+
+Follow the [before/after source-snapshot migration](../../sdks/python/README.md#migration-from-earlier-source-snapshots)
+before adopting a newer commit. There is no published earlier SDK major to migrate from.

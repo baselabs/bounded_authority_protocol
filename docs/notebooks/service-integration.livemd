@@ -1,12 +1,25 @@
-# Bounded Authority Protocol: service integration
+<!-- livebook:{"persist_outputs":true} -->
+
+# Service integration
+
+[Run the 1.0.0 release notebook in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fservice-integration.livemd).
+
+Trusted inputs and host responsibilities stay explicit throughout this journey.
+
+Run every cell in order. Keys are generated only in memory; persisted outputs contain no keys,
+signatures, credentials, or nonces. Verification leaves trust and execution policy with the host.
 
 ```elixir
-Mix.install([
-  {:bounded_authority_protocol, "~> 1.0"}
-])
+Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
 ```
 
-## What this notebook covers
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+The cell returns `:ok`.
 
 The [walkthrough](https://hexdocs.pm/bounded_authority_protocol/bap-walkthrough.html) shows one
 grant and one proof verifying. A service that accepts them in production needs a little more
@@ -24,7 +37,7 @@ and 3 have the same function names and shapes. After each cell, the text states 
 cell returns, and the package's test suite runs this notebook and checks each of those
 statements.
 
-## 1. An issuer with two keys
+## An issuer with two keys
 
 The host keeps its own trusted-key set: a map from key id to the raw public key it already
 trusts, loaded from configuration or a key-distribution endpoint it authenticates. During a
@@ -32,49 +45,61 @@ rotation the issuer signs new grants with its new key while grants signed with t
 still live, so the set holds both.
 
 ```elixir
-alias BoundedAuthorityProtocol.V1
-alias BoundedAuthorityProtocol.V1.{Grant, Operation, TrustedIssuer, ExpectedGrant}
+notebook_value = (
+  alias BoundedAuthorityProtocol.V1
+  alias BoundedAuthorityProtocol.V1.{Grant, Operation, TrustedIssuer, ExpectedGrant}
 
-{old_public, old_private} = :crypto.generate_key(:eddsa, :ed25519)
-{new_public, new_private} = :crypto.generate_key(:eddsa, :ed25519)
-{holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
-{:ok, holder_thumbprint} = V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
+  {old_public, old_private} = :crypto.generate_key(:eddsa, :ed25519)
+  {new_public, new_private} = :crypto.generate_key(:eddsa, :ed25519)
+  {holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
+  {:ok, holder_thumbprint} = V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
 
-trusted_keys = %{"issuer-2026-04" => old_public, "issuer-2026-10" => new_public}
+  trusted_keys = %{"issuer-2026-04" => old_public, "issuer-2026-10" => new_public}
 
-sign_grant = fn key_id, private_key, grant_id ->
-  grant = %Grant{
-    key_id: key_id,
-    issuer: "https://issuer.example",
-    grant_id: grant_id,
-    audiences: ["https://builds.example"],
-    issued_at: 1_800_000_000,
-    not_before: 1_800_000_000,
-    expires_at: 1_800_086_400,
-    holder_thumbprint: holder_thumbprint,
-    operations: [
-      %Operation{
-        name: "trigger_build",
-        selectors: [{:one_of, ["branch"], [{:string, "main"}, {:string, "release"}]}]
-      }
-    ]
-  }
+  sign_grant = fn key_id, private_key, grant_id ->
+    grant = %Grant{
+      key_id: key_id,
+      issuer: "https://issuer.example",
+      grant_id: grant_id,
+      audiences: ["https://builds.example"],
+      issued_at: 1_800_000_000,
+      not_before: 1_800_000_000,
+      expires_at: 1_800_086_400,
+      holder_thumbprint: holder_thumbprint,
+      operations: [
+        %Operation{
+          name: "trigger_build",
+          selectors: [{:one_of, ["branch"], [{:string, "main"}, {:string, "release"}]}]
+        }
+      ]
+    }
 
-  {:ok, input} = V1.grant_signing_input(grant, %{})
-  signature = :crypto.sign(:eddsa, :none, input.message, [private_key, :ed25519])
-  {:ok, compact} = V1.assemble_compact(input, signature)
-  compact
-end
+    {:ok, input} = V1.grant_signing_input(grant, %{})
+    signature = :crypto.sign(:eddsa, :none, input.message, [private_key, :ed25519])
+    {:ok, compact} = V1.assemble_compact(input, signature)
+    compact
+  end
 
-old_grant = sign_grant.("issuer-2026-04", old_private, "grant-build-001")
-new_grant = sign_grant.("issuer-2026-10", new_private, "grant-build-002")
+  old_grant = sign_grant.("issuer-2026-04", old_private, "grant-build-001")
+  new_grant = sign_grant.("issuer-2026-10", new_private, "grant-build-002")
 
-map_size(trusted_keys)
+  map_size(trusted_keys)
+)
+true = notebook_value === (
+  2
+)
+notebook_value
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+2
 ```
 
 The cell returns `2`: both keys are trusted during the rotation.
 
-## 2. Select the key from your own set
+## Select the key from your own set
 
 `untrusted_key_locator/2` reads only the grant's protected header and returns its `kid`. The
 `kid` is a lookup hint chosen by whoever produced the bytes, so the host uses it only to pick a
@@ -82,45 +107,54 @@ key from its own set. If the hint names no trusted key, the host refuses before 
 If it names a trusted key, the signature still has to verify under exactly that key.
 
 ```elixir
-expected_grant = %ExpectedGrant{
-  issuer: "https://issuer.example",
-  audience: "https://builds.example",
-  evaluation_time: 1_800_001_000,
-  clock_skew: 60,
-  bounds: %{}
-}
+notebook_value = (
+  expected_grant = %ExpectedGrant{
+    issuer: "https://issuer.example",
+    audience: "https://builds.example",
+    evaluation_time: 1_800_001_000,
+    clock_skew: 60,
+    bounds: %{}
+  }
 
-verify_with = fn compact, keys ->
-  with {:ok, locator} <- V1.untrusted_key_locator(compact, %{}),
-       {:ok, public_key} <- Map.fetch(keys, locator.kid),
-       trusted = %TrustedIssuer{key_id: locator.kid, public_key: public_key},
-       {:ok, facts} <- V1.verify_grant(compact, trusted, expected_grant) do
-    {:ok, facts.grant_id}
-  else
-    :error -> {:error, :unknown_key}
-    {:error, :invalid} -> {:error, :invalid}
+  verify_with = fn compact, keys ->
+    with {:ok, locator} <- V1.untrusted_key_locator(compact, %{}),
+         {:ok, public_key} <- Map.fetch(keys, locator.kid),
+         trusted = %TrustedIssuer{key_id: locator.kid, public_key: public_key},
+         {:ok, facts} <- V1.verify_grant(compact, trusted, expected_grant) do
+      {:ok, facts.grant_id}
+    else
+      :error -> {:error, :unknown_key}
+      {:error, :invalid} -> {:error, :invalid}
+    end
   end
-end
 
-# A grant signed by the old key but labeled with the new key's id:
-mislabeled = sign_grant.("issuer-2026-10", old_private, "grant-build-003")
+  # A grant signed by the old key but labeled with the new key's id:
+  mislabeled = sign_grant.("issuer-2026-10", old_private, "grant-build-003")
 
-# After the rotation completes, the host drops the old key from its set:
-after_rotation = Map.delete(trusted_keys, "issuer-2026-04")
+  # After the rotation completes, the host drops the old key from its set:
+  after_rotation = Map.delete(trusted_keys, "issuer-2026-04")
 
-%{
-  old_key: verify_with.(old_grant, trusted_keys),
-  new_key: verify_with.(new_grant, trusted_keys),
-  mislabeled: verify_with.(mislabeled, trusted_keys),
-  old_key_after_rotation: verify_with.(old_grant, after_rotation)
-}
+  %{
+    old_key: verify_with.(old_grant, trusted_keys),
+    new_key: verify_with.(new_grant, trusted_keys),
+    mislabeled: verify_with.(mislabeled, trusted_keys),
+    old_key_after_rotation: verify_with.(old_grant, after_rotation)
+  }
+)
+true = notebook_value === (
+  %{
+    old_key: {:ok, "grant-build-001"},
+    new_key: {:ok, "grant-build-002"},
+    mislabeled: {:error, :invalid},
+    old_key_after_rotation: {:error, :unknown_key}
+  }
+)
+notebook_value
 ```
 
-The cell returns:
+<!-- livebook:{"output":true} -->
 
-<!-- livebook:{"force_markdown":true} -->
-
-```elixir
+```
 %{
   old_key: {:ok, "grant-build-001"},
   new_key: {:ok, "grant-build-002"},
@@ -133,71 +167,83 @@ The `kid` never makes a key trusted: the mislabeled grant names a trusted key id
 because the old key's signature does not verify under the new key. `{:error, :unknown_key}` is
 the host's own result, not the package's; the package only ever returns `{:error, :invalid}`.
 
-## 3. A proof helper
+## A proof helper
 
 The remaining sections present proofs under different conditions. This helper signs one holder
 proof for the new grant; the service-side expectation below is what the service derives from
 the request it received.
 
 ```elixir
-alias BoundedAuthorityProtocol.V1.{Proof, Credentials, ExpectedRequest}
+notebook_value = (
+  alias BoundedAuthorityProtocol.V1.{Proof, Credentials, ExpectedRequest}
 
-arguments = {:object, [{"branch", {:string, "main"}}, {"clean", {:boolean, true}}]}
-issued_at = 1_800_001_000
+  arguments = {:object, [{"branch", {:string, "main"}}, {"clean", {:boolean, true}}]}
+  issued_at = 1_800_001_000
 
-sign_proof = fn overrides ->
-  proof =
-    struct!(
-      %Proof{
-        holder_public_key: holder_public,
-        proof_id: "proof-build-001",
-        method: "POST",
-        target_uri: "https://builds.example/pipelines/42/runs",
-        issued_at: issued_at,
-        nonce: nil,
-        invocation_id: "0f8fad5b-d9cb-469f-a165-70867728950e",
-        operation: "trigger_build",
-        grant_compact: new_grant,
-        cast_arguments: arguments
-      },
-      overrides
-    )
+  sign_proof = fn overrides ->
+    proof =
+      struct!(
+        %Proof{
+          holder_public_key: holder_public,
+          proof_id: "proof-build-001",
+          method: "POST",
+          target_uri: "https://builds.example/pipelines/42/runs",
+          issued_at: issued_at,
+          nonce: nil,
+          invocation_id: "0f8fad5b-d9cb-469f-a165-70867728950e",
+          operation: "trigger_build",
+          grant_compact: new_grant,
+          cast_arguments: arguments
+        },
+        overrides
+      )
 
-  {:ok, input} = V1.proof_signing_input(proof, %{})
-  signature = :crypto.sign(:eddsa, :none, input.message, [holder_private, :ed25519])
-  {:ok, compact} = V1.assemble_compact(input, signature)
-  %Credentials{grant: new_grant, proof: compact}
-end
-
-expected = %ExpectedRequest{
-  trusted_issuer: %TrustedIssuer{key_id: "issuer-2026-10", public_key: new_public},
-  issuer: "https://issuer.example",
-  audience: "https://builds.example",
-  method: "POST",
-  target_uri: "https://builds.example/pipelines/42/runs",
-  invocation_id: "0f8fad5b-d9cb-469f-a165-70867728950e",
-  operation: "trigger_build",
-  cast_arguments: arguments,
-  evaluation_time: issued_at,
-  clock_skew: 60,
-  proof_max_age: 300,
-  nonce: :not_required,
-  bounds: %{}
-}
-
-verdict = fn credentials, expected ->
-  case V1.check_envelope(credentials, expected) do
-    {:ok, facts} -> {:ok, facts.operation}
-    {:error, :invalid} -> {:error, :invalid}
+    {:ok, input} = V1.proof_signing_input(proof, %{})
+    signature = :crypto.sign(:eddsa, :none, input.message, [holder_private, :ed25519])
+    {:ok, compact} = V1.assemble_compact(input, signature)
+    %Credentials{grant: new_grant, proof: compact}
   end
-end
 
-verdict.(sign_proof.([]), expected)
+  expected = %ExpectedRequest{
+    trusted_issuer: %TrustedIssuer{key_id: "issuer-2026-10", public_key: new_public},
+    issuer: "https://issuer.example",
+    audience: "https://builds.example",
+    method: "POST",
+    target_uri: "https://builds.example/pipelines/42/runs",
+    invocation_id: "0f8fad5b-d9cb-469f-a165-70867728950e",
+    operation: "trigger_build",
+    cast_arguments: arguments,
+    evaluation_time: issued_at,
+    clock_skew: 60,
+    proof_max_age: 300,
+    nonce: :not_required,
+    bounds: %{}
+  }
+
+  verdict = fn credentials, expected ->
+    case V1.check_envelope(credentials, expected) do
+      {:ok, facts} -> {:ok, facts.operation}
+      {:error, :invalid} -> {:error, :invalid}
+    end
+  end
+
+  verdict.(sign_proof.([]), expected)
+)
+true = notebook_value === (
+  {:ok, "trigger_build"}
+)
+notebook_value
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, "trigger_build"}
 ```
 
 The cell returns `{:ok, "trigger_build"}`.
 
-## 4. Nonce modes
+## Nonce modes
 
 `ExpectedRequest.nonce` is either `:not_required` or `{:required, nonce}`. A service that wants
 freshness beyond the time window issues a nonce (for example in a challenge response), remembers
@@ -207,28 +253,38 @@ must carry the one you issued. The local-loopback profile
 (`BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1`) always requires one.
 
 ```elixir
-issued_nonce = "challenge-7f3a91"
+notebook_value = (
+  issued_nonce = "challenge-7f3a91"
 
-%{
-  not_required_without_nonce: verdict.(sign_proof.([]), expected),
-  not_required_with_nonce: verdict.(sign_proof.(nonce: issued_nonce), expected),
-  required_with_issued_nonce:
-    verdict.(sign_proof.(nonce: issued_nonce), %{expected | nonce: {:required, issued_nonce}}),
-  required_with_other_nonce:
-    verdict.(sign_proof.(nonce: "challenge-000000"), %{
-      expected
-      | nonce: {:required, issued_nonce}
-    }),
-  required_without_nonce:
-    verdict.(sign_proof.([]), %{expected | nonce: {:required, issued_nonce}})
-}
+  %{
+    not_required_without_nonce: verdict.(sign_proof.([]), expected),
+    not_required_with_nonce: verdict.(sign_proof.(nonce: issued_nonce), expected),
+    required_with_issued_nonce:
+      verdict.(sign_proof.(nonce: issued_nonce), %{expected | nonce: {:required, issued_nonce}}),
+    required_with_other_nonce:
+      verdict.(sign_proof.(nonce: "challenge-000000"), %{
+        expected
+        | nonce: {:required, issued_nonce}
+      }),
+    required_without_nonce:
+      verdict.(sign_proof.([]), %{expected | nonce: {:required, issued_nonce}})
+  }
+)
+true = notebook_value === (
+  %{
+    not_required_without_nonce: {:ok, "trigger_build"},
+    not_required_with_nonce: {:error, :invalid},
+    required_with_issued_nonce: {:ok, "trigger_build"},
+    required_with_other_nonce: {:error, :invalid},
+    required_without_nonce: {:error, :invalid}
+  }
+)
+notebook_value
 ```
 
-The cell returns:
+<!-- livebook:{"output":true} -->
 
-<!-- livebook:{"force_markdown":true} -->
-
-```elixir
+```
 %{
   not_required_without_nonce: {:ok, "trigger_build"},
   not_required_with_nonce: {:error, :invalid},
@@ -241,7 +297,7 @@ The cell returns:
 A nonce is single-use correlation the service owns: issue it, scope it to this verifier, and
 retire it after one successful verification.
 
-## 5. Clock skew and proof maximum age
+## Clock skew and proof maximum age
 
 Every time is Unix seconds, and the verifier reads no clock: `evaluation_time` is your clock
 reading. A proof issued at `iat` verifies while
@@ -249,25 +305,37 @@ reading. A proof issued at `iat` verifies while
 60 seconds and `proof_max_age` at most 300; an expectation above either limit is itself invalid.
 
 ```elixir
-credentials = sign_proof.([])
-at = fn seconds -> verdict.(credentials, %{expected | evaluation_time: issued_at + seconds}) end
+notebook_value = (
+  credentials = sign_proof.([])
+  at = fn seconds -> verdict.(credentials, %{expected | evaluation_time: issued_at + seconds}) end
 
-%{
-  sixty_one_seconds_early: at.(-61),
-  sixty_seconds_early: at.(-60),
-  at_issue: at.(0),
-  at_max_age_plus_skew: at.(360),
-  one_second_later: at.(361),
-  skew_above_limit: verdict.(credentials, %{expected | clock_skew: 61}),
-  max_age_above_limit: verdict.(credentials, %{expected | proof_max_age: 301})
-}
+  %{
+    sixty_one_seconds_early: at.(-61),
+    sixty_seconds_early: at.(-60),
+    at_issue: at.(0),
+    at_max_age_plus_skew: at.(360),
+    one_second_later: at.(361),
+    skew_above_limit: verdict.(credentials, %{expected | clock_skew: 61}),
+    max_age_above_limit: verdict.(credentials, %{expected | proof_max_age: 301})
+  }
+)
+true = notebook_value === (
+  %{
+    sixty_one_seconds_early: {:error, :invalid},
+    sixty_seconds_early: {:ok, "trigger_build"},
+    at_issue: {:ok, "trigger_build"},
+    at_max_age_plus_skew: {:ok, "trigger_build"},
+    one_second_later: {:error, :invalid},
+    skew_above_limit: {:error, :invalid},
+    max_age_above_limit: {:error, :invalid}
+  }
+)
+notebook_value
 ```
 
-The cell returns:
+<!-- livebook:{"output":true} -->
 
-<!-- livebook:{"force_markdown":true} -->
-
-```elixir
+```
 %{
   sixty_one_seconds_early: {:error, :invalid},
   sixty_seconds_early: {:ok, "trigger_build"},
@@ -282,7 +350,7 @@ The cell returns:
 Pass `System.os_time(:second)` as `evaluation_time` in a service. A millisecond reading falls
 outside every window, and a `DateTime` or a float is an invalid input.
 
-## 6. Diagnosing a rejection
+## Diagnosing a rejection
 
 `{:error, :invalid}` carries no reason, by design: a reason would tell an attacker which check to
 work on. To diagnose a rejection in your own service, decode the credentials without verifying
@@ -293,35 +361,47 @@ The service below derived the method from a framework that lower-cases it, and b
 URI from a `Host` header with an upper-case letter. Both differ from the bytes the holder signed.
 
 ```elixir
-derived = %{expected | method: "post", target_uri: "https://Builds.example/pipelines/42/runs"}
+notebook_value = (
+  derived = %{expected | method: "post", target_uri: "https://Builds.example/pipelines/42/runs"}
 
-diagnose = fn %Credentials{grant: grant, proof: proof}, %ExpectedRequest{} = expected ->
-  {:ok, decoded_grant} = V1.decode_grant(grant, %{})
-  {:ok, decoded_proof} = V1.decode_proof(proof, %{})
-  {:ok, digest} = V1.request_digest(expected.operation, expected.cast_arguments, %{})
+  diagnose = fn %Credentials{grant: grant, proof: proof}, %ExpectedRequest{} = expected ->
+    {:ok, decoded_grant} = V1.decode_grant(grant, %{})
+    {:ok, decoded_proof} = V1.decode_proof(proof, %{})
+    {:ok, digest} = V1.request_digest(expected.operation, expected.cast_arguments, %{})
 
-  checks = [
-    issuer: decoded_grant.issuer == expected.issuer,
-    audience: expected.audience in decoded_grant.audiences,
-    key_id: decoded_grant.key_id == expected.trusted_issuer.key_id,
-    method: decoded_proof.method == expected.method,
-    target_uri: decoded_proof.target_uri == expected.target_uri,
-    invocation_id: decoded_proof.invocation_id == expected.invocation_id,
-    operation: decoded_proof.operation == expected.operation,
-    cast_arguments: Base.url_encode64(decoded_proof.request_hash, padding: false) == digest,
-    nonce:
-      (expected.nonce == :not_required and decoded_proof.nonce == nil) or
-        expected.nonce == {:required, decoded_proof.nonce},
-    proof_window:
-      expected.evaluation_time >= decoded_proof.issued_at - expected.clock_skew and
-        expected.evaluation_time <=
-          decoded_proof.issued_at + expected.proof_max_age + expected.clock_skew
-  ]
+    checks = [
+      issuer: decoded_grant.issuer == expected.issuer,
+      audience: expected.audience in decoded_grant.audiences,
+      key_id: decoded_grant.key_id == expected.trusted_issuer.key_id,
+      method: decoded_proof.method == expected.method,
+      target_uri: decoded_proof.target_uri == expected.target_uri,
+      invocation_id: decoded_proof.invocation_id == expected.invocation_id,
+      operation: decoded_proof.operation == expected.operation,
+      cast_arguments: Base.url_encode64(decoded_proof.request_hash, padding: false) == digest,
+      nonce:
+        (expected.nonce == :not_required and decoded_proof.nonce == nil) or
+          expected.nonce == {:required, decoded_proof.nonce},
+      proof_window:
+        expected.evaluation_time >= decoded_proof.issued_at - expected.clock_skew and
+          expected.evaluation_time <=
+            decoded_proof.issued_at + expected.proof_max_age + expected.clock_skew
+    ]
 
-  for {field, false} <- checks, do: field
-end
+    for {field, false} <- checks, do: field
+  end
 
-%{verdict: verdict.(credentials, derived), mismatches: diagnose.(credentials, derived)}
+  %{verdict: verdict.(credentials, derived), mismatches: diagnose.(credentials, derived)}
+)
+true = notebook_value === (
+  %{verdict: {:error, :invalid}, mismatches: [:method, :target_uri]}
+)
+notebook_value
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{verdict: {:error, :invalid}, mismatches: [:method, :target_uri]}
 ```
 
 The cell returns `%{verdict: {:error, :invalid}, mismatches: [:method, :target_uri]}`.
@@ -332,22 +412,46 @@ the full checklist by stage, including selectors, limits, and key acceptance. Wi
 corrected, the same credentials verify:
 
 ```elixir
-verdict.(credentials, %{derived | method: "POST", target_uri: expected.target_uri})
+notebook_value = (
+  verdict.(credentials, %{derived | method: "POST", target_uri: expected.target_uri})
+)
+true = notebook_value === (
+  {:ok, "trigger_build"}
+)
+notebook_value
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, "trigger_build"}
 ```
 
 The cell returns `{:ok, "trigger_build"}`.
 
-## 7. What the host still owns
+## What the host still owns
 
 A successful `check_envelope/2` proves that the bytes satisfy the inputs you supplied. It does
 not reserve the invocation, check revocation, or decide anything. Verification is stateless, so
 the same envelope verifies again on a second presentation:
 
 ```elixir
-first = V1.check_envelope(credentials, expected)
-second = V1.check_envelope(credentials, expected)
+notebook_value = (
+  first = V1.check_envelope(credentials, expected)
+  second = V1.check_envelope(credentials, expected)
 
-{elem(first, 0), elem(second, 0)}
+  {elem(first, 0), elem(second, 0)}
+)
+true = notebook_value === (
+  {:ok, :ok}
+)
+notebook_value
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, :ok}
 ```
 
 The cell returns `{:ok, :ok}`. Replay defense is the host's job. Reserve the issuer/grant/invocation
@@ -361,35 +465,47 @@ This sequential map sketch demonstrates retention and ordering, not a production
 service must make reservation atomic, survive restarts, and prevent duplicate effects on retry.
 
 ```elixir
-accept = fn credentials, expected, reserved ->
-  case V1.check_envelope(credentials, expected) do
-    {:ok, facts} ->
-      key = {facts.issuer, facts.grant_id, facts.invocation_id}
-      reserved = Map.reject(reserved, fn {_key, until} -> until <= expected.evaluation_time end)
+notebook_value = (
+  accept = fn credentials, expected, reserved ->
+    case V1.check_envelope(credentials, expected) do
+      {:ok, facts} ->
+        key = {facts.issuer, facts.grant_id, facts.invocation_id}
+        reserved = Map.reject(reserved, fn {_key, until} -> until <= expected.evaluation_time end)
 
-      if Map.has_key?(reserved, key) do
-        {{:rejected, :replayed}, reserved}
-      else
-        until = facts.expires_at + expected.clock_skew
-        {{:accepted, facts.operation}, Map.put(reserved, key, until)}
-      end
+        if Map.has_key?(reserved, key) do
+          {{:rejected, :replayed}, reserved}
+        else
+          until = facts.expires_at + expected.clock_skew
+          {{:accepted, facts.operation}, Map.put(reserved, key, until)}
+        end
 
-    {:error, :invalid} ->
-      {{:rejected, :invalid}, reserved}
+      {:error, :invalid} ->
+        {{:rejected, :invalid}, reserved}
+    end
   end
-end
 
-{first_result, reserved} = accept.(credentials, expected, %{})
-{second_result, reserved} = accept.(credentials, expected, reserved)
+  {first_result, reserved} = accept.(credentials, expected, %{})
+  {second_result, reserved} = accept.(credentials, expected, reserved)
 
-# The first proof is too old, but the grant remains live and the holder can sign again.
-later = %{expected | evaluation_time: issued_at + 400}
-fresh = sign_proof.(proof_id: "proof-build-002", issued_at: later.evaluation_time)
-{:error, :invalid} = V1.check_envelope(credentials, later)
-{:ok, fresh_facts} = V1.check_envelope(fresh, later)
-{fresh_result, _reserved} = accept.(fresh, later, reserved)
+  # The first proof is too old, but the grant remains live and the holder can sign again.
+  later = %{expected | evaluation_time: issued_at + 400}
+  fresh = sign_proof.(proof_id: "proof-build-002", issued_at: later.evaluation_time)
+  {:error, :invalid} = V1.check_envelope(credentials, later)
+  {:ok, fresh_facts} = V1.check_envelope(fresh, later)
+  {fresh_result, _reserved} = accept.(fresh, later, reserved)
 
-[first_result, second_result, {fresh_facts.operation, fresh_result}]
+  [first_result, second_result, {fresh_facts.operation, fresh_result}]
+)
+true = notebook_value === (
+  [{:accepted, "trigger_build"}, {:rejected, :replayed}, {"trigger_build", {:rejected, :replayed}}]
+)
+notebook_value
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{:accepted, "trigger_build"}, {:rejected, :replayed}, {"trigger_build", {:rejected, :replayed}}]
 ```
 
 The cell returns `[{:accepted, "trigger_build"}, {:rejected, :replayed}, {"trigger_build", {:rejected, :replayed}}]`.
@@ -405,7 +521,7 @@ The host also owns:
 - **the authorization decision**: facts carry `authorization: :not_evaluated`, and whether this
   verified operation may run now is a business decision the host makes after verification.
 
-## 8. Signing in production
+## Signing in production
 
 This notebook signs with `:crypto` and in-memory keys. In production the issuer's private key
 stays in a KMS or HSM and the holder's in its own key store. The package computes the exact

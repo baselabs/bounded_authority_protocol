@@ -27,8 +27,7 @@ moves to its own repository when it is first published
 with its self-contained tests and corpus inputs. Until then, use it
 from a checkout of this repository.
 
-- Go **1.25** or later (`go.mod`). CI installs Go with `actions/setup-go` and
-  `go-version: "1.25"`, which selects a 1.25.x release (the runner's cached one when present).
+- Go **1.25** or later (`go.mod`). CI installs exactly Go **1.25.0** for the declared floor.
   The module advisory scan separately uses patched Go 1.27.4 and checks the complete module
   set, including the standard library, with `govulncheck` 1.1.4.
 - **No third-party dependencies**: only the standard library (`crypto/ed25519`, `crypto/ecdsa`,
@@ -47,16 +46,25 @@ from a checkout of this repository.
 
 ## Install from a checkout
 
-Copy this SDK directory into your application's `vendor/bap/` directory and configure a
-local module replacement to that directory. Pin the source commit in your dependency record.
-The SDK root is the complete module, including its tests and inputs. Its import path is
-`verifier "github.com/baselabs/bounded_authority_protocol_go"`.
+From an empty directory, fetch this selected commit and declare a local module replacement.
+The full source commit is the identity of this unpublished SDK.
 
-From this SDK directory, the quickstart is executable as a checked example:
+<!-- sdk-install:go -->
 
 ```bash
-go test -run Example .
+git init upstream
+git -C upstream remote add origin https://github.com/baselabs/bounded_authority_protocol.git
+git -C upstream fetch --depth 1 origin c8b3bab8e4caf0b7f93e6f240570673534c331e2
+git -C upstream checkout --detach FETCH_HEAD
+test "$(git -C upstream rev-parse HEAD)" = "c8b3bab8e4caf0b7f93e6f240570673534c331e2"
+go mod init example.com/bap-consumer
+go mod edit -require=github.com/baselabs/bounded_authority_protocol_go@v0.0.0
+go mod edit -replace=github.com/baselabs/bounded_authority_protocol_go=./upstream/sdks/go
 ```
+
+Save the quickstart below as `quickstart_test.go`, then run `go test -v .`.
+CI executes these commands and that example in an empty project. The SDK root includes its
+complete tests and conformance inputs.
 
 ## Quickstart
 
@@ -302,6 +310,20 @@ sh tools/purity_check.sh && sh tools/license_check.sh
 ```
 
 Deployment notes: [`docs/deployment/go-sdk.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/go-sdk.md).
+
+## Migration from earlier source snapshots
+
+These SDKs are unpublished at version 0.1.0; there is no earlier supported registry major.
+When moving from an older source commit, apply these changes recorded in the monorepo
+[CHANGELOG](../../CHANGELOG.md). The quickstart uses the current forms.
+
+| Earlier usage | Current usage |
+|---|---|
+| `facts.GrantID` and direct facts literals/assignments | Obtain facts from verification and read `facts.GrantID()`. Every value uses read-only accessors; slices are copies. |
+| `a == b` for facts | Compare the specific accessor results needed by the application; closure-backed values are not comparable. |
+| Generic JSON, text or gob serialization | Read named accessors into an explicit application projection. Generic exports return `ErrInvalid`. |
+| Omit diagnostic major or match `#GrantFacts<redacted>` | Read `facts.Version()` and expect full namespaces such as `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`. |
+| Read a subset of decoded proof fields | Use the hash, holder-key and thumbprint accessors; every formatting fallback still redacts the nonce. |
 
 ## License
 

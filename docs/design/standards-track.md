@@ -156,14 +156,13 @@ missing corpus case, and the mapping exposes which.
 
 ## Registrations
 
-The protocol's claim names (`ba_inv`, `ba_op`, `ba_req`) and `typ` values (`ba+cap`, `ba+loopback-proof`, `ba+chain-anchor`,
-`ba+key-transition`, `ba+role-attestation`, `ba+content-assertion`) are currently unregistered. For the standards track they
-are registered with IANA using the JWT Claims registry and media-type suffix conventions,
-respectively, both for collision safety and because registration is the visible signal of a
-standards posture rather than a vendor format. Registration templates are prepared and are filed
-at first external submission. Until filing, the `ba_` and `ba+` prefixes are
-the collision-avoidance namespace, and the [registries](registries.md) document is authoritative
-for every name this protocol uses or reserves.
+The protocol's JWT claim names (`ba_inv`, `ba_op`, `ba_req`) and corresponding
+`application/ba-*+jwt` media types are currently unregistered. The prepared templates target
+IANA's JWT Claims and Media Types registries. The media-type names are distinct from the wire
+`typ` values; registration does not change the signed bytes. Registration submissions follow
+the profile's external-submission preconditions. Until registration, the `ba_` and `ba+`
+prefixes are the collision-avoidance convention, and the [registries](registries.md) document
+is authoritative for every name this protocol uses or reserves.
 
 ## Delegation with attenuation
 

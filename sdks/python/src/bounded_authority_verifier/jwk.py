@@ -28,6 +28,13 @@ from .json_alg import JObject, JString, Tagged, json_decode, str_utf8, utf8_str
 
 @dataclass(frozen=True)
 class OkpPublic:
+    """An Ed25519 public JWK; contains public bytes only.
+
+    Fields:
+        crv: str.
+        kty: str.
+        x: str.
+    """
     crv: str  # always "Ed25519"
     kty: str  # always "OKP"
     x: str  # base64url of the 32 raw bytes
@@ -84,6 +91,7 @@ def jwk_decode_public(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[by
 
 
 def jwk_from_public_key(raw_key: bytes) -> Result[OkpPublic]:
+    """Validate raw Ed25519 public bytes and return their public JWK."""
     try:
         raw_key = _bytes(raw_key)
         _require(len(raw_key) == 32, "jwk: public key width")

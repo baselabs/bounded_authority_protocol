@@ -1,0 +1,12 @@
+{
+  "docs/ROADMAP.md": "Maintainer planning status; not part of the shipped integrator contract.",
+  "docs/protocol-v1.md": "Generated mirror of spec/bap-v1.md; the normative specification is included once.",
+  "docs/reference/maintainer-checks.md": "Local maintainer policy setup; public contributor instructions are in CONTRIBUTING.md.",
+  "docs/release-candidate-contract.md": "Maintainer qualification procedure; not an integrator API.",
+  "docs/extensions/a2a-capability-binding.mdx": "External proposal in MDX, not an implemented package profile or ExDoc Markdown.",
+  "docs/extensions/capability-authorization.mdx": "External proposal in MDX, not an implemented package profile or ExDoc Markdown.",
+  "docs/extensions/ap2-mandate-mapping.md": "External ecosystem proposal; not an implemented verifier profile.",
+  "docs/extensions/mcp-sep-capability-authorization.md": "External ecosystem proposal; not an implemented verifier profile.",
+  "docs/design/a2a-capability-binding-profile.md": "Unimplemented ecosystem proposal; not a supported integration journey.",
+  "docs/design/ap2-interop-profile.md": "Unimplemented ecosystem proposal; not a supported integration journey."
+}

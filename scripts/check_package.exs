@@ -15,6 +15,36 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/protocol-v1.md",
                     "docs/errata.md",
                     "docs/governance.md",
+                    "docs/guides/notebooks.md",
+                    "docs/guides/grants-and-holder-proofs.md",
+                    "docs/guides/trusted-keys-and-rotation.md",
+                    "docs/guides/tagged-arguments-and-selectors.md",
+                    "docs/guides/nonce-and-time-policy.md",
+                    "docs/guides/facts-and-authorization.md",
+                    "docs/guides/framework-integration.md",
+                    "docs/guides/integration-security.md",
+                    "docs/guides/operations.md",
+                    "docs/guides/observability.md",
+                    "docs/guides/errors.md",
+                    "docs/guides/testing-your-integration.md",
+                    "docs/notebooks/content-lineage.livemd",
+                    "docs/notebooks/local-loopback.livemd",
+                    "docs/notebooks/role-attestations.livemd",
+                    "docs/notebooks/strict-crypto.livemd",
+                    "docs/notebooks/v2-ranges.livemd",
+                    "docs/notebooks/v3-es256.livemd",
+                    "docs/deployment/go-sdk.md",
+                    "docs/deployment/python-sdk.md",
+                    "docs/deployment/rust-sdk.md",
+                    "docs/deployment/typescript-sdk.md",
+                    "docs/design/iana/README.md",
+                    "docs/design/iana/jwt-claims.md",
+                    "docs/design/iana/media-types.md",
+                    "docs/design/iana/jwt-claims.json",
+                    "docs/design/iana/media-types.json",
+                    "docs/design/successor-major-charter.md",
+                    "docs/standards/submissions.md",
+                    "docs/notebooks/registry.json",
                     "docs/guides/README.md",
                     "docs/guides/getting-started.md",
                     "docs/guides/implementers-guide.md",
@@ -961,23 +991,18 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
         "BoundedAuthorityProtocolConsumer.chain_archive_contract?() do " <>
         "System.halt(1) end"
 
-    # The PACKAGED notebooks run against the unpacked package, with every cell checked against
-    # the value its prose states; only each notebook's Mix.install setup cell is swapped for
-    # this consumer's path dependency. The harness halts the VM non-zero on any mismatch.
-    harness = Path.join(source_root, "test_support/livebook_harness.ex")
-    notebooks = Path.join(package_root, "docs/notebooks")
-
-    livebook_code =
-      "Code.require_file(#{inspect(harness)}); " <>
-        "BoundedAuthorityProtocol.TestSupport.LivebookHarness.gate!(#{inspect(notebooks)})"
-
-    check_code = check_code <> "; " <> livebook_code
-
     run!(
       "mix",
       ["do", "compile", "--warnings-as-errors", "+", "run", "--no-start", "-e", check_code],
       consumer_root,
       environment
+    )
+
+    run!(
+      "elixir",
+      [Path.join(source_root, "scripts/check_livebooks.exs"), "--local"],
+      package_root,
+      [{"MIX_ENV", "dev"}]
     )
 
     # BAP-05 published-set sufficiency: build the packaged escript and run it against the

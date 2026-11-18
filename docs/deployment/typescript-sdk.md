@@ -44,10 +44,15 @@ its own.
 ## Corpus updates
 
 The SDK vendors certified snapshots of the v1, v2, and v3 corpora and the local-loopback,
-role-attestation, content-assertion, and strict-Ed25519 corpora, runs them in CI, and asserts
+role-attestation, content-assertion, producer-canonicality, selector-float-zero, and strict-Ed25519 corpora, runs them in CI, and asserts
 each `index.json` SHA-256 at load. When this repository rotates a corpus, the SDK repository
 takes a snapshot-bump commit, and the load-time check fails on any drift.
 
 Erratum 3 (producer canonicality) is implemented since release 0.8.0: compact assembly and
 anchored-export encoding (for every profile it implements) refuse a non-canonical signature,
 and the package runs the `bap-producer-canonicality/1` corpus. No verification verdict changes.
+
+Erratum 6 (selector float zero) is covered by the certified
+`bap-selector-float-zero/1` corpus (161 cases). It covers float-tagged zero rejection on grant
+decode and integral-float selector refusal in grant signing-input producers. Keep this corpus
+with the other certified snapshots when updating the verifier.

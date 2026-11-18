@@ -4,7 +4,7 @@
 [![HexDocs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/bounded_authority_protocol)
 [![CI](https://github.com/baselabs/bounded_authority_protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/baselabs/bounded_authority_protocol/actions/workflows/ci.yml)
 [![License](https://img.shields.io/hexpm/l/bounded_authority_protocol.svg)](LICENSE)
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fmain%2Fdocs%2Fnotebooks%2Fbap-walkthrough.livemd)
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd)
 
 The open wire profile, verifier, and conformance suite of the Bounded Authority Protocol: an
 issuer signs a **capability grant** that names exactly which operations a holder may invoke, with
@@ -14,10 +14,22 @@ the exact bytes and returns redacted facts. It never returns an authorization de
 The package is pure and deterministic, with no private-key access or custody, clock reads, I/O,
 or runtime dependencies. Already-trusted public keys and time are explicit caller inputs.
 Credential validation failures use the single value-free `{:error, :invalid}`; crypto predicates
-return booleans. The wire profile is closed, with no
+return booleans. `ContentAssertion.V1.verify_successor/3` returns `:ok` or
+`{:error, :invalid}`. `Bounds.maximum/0` returns its struct directly;
+`Conformance.Cli.run/1` returns the integer exit status `0`, `1`, or `2`. See the
+[result matrix](docs/guides/api-stability.md#result-families). The wire profile is closed, with no
 permissive mode. It builds on compact JWS, DPoP, JCS, and JWK thumbprints
 ([RFC 7515](https://www.rfc-editor.org/rfc/rfc7515), [9449](https://www.rfc-editor.org/rfc/rfc9449),
 [8785](https://www.rfc-editor.org/rfc/rfc8785), [7638](https://www.rfc-editor.org/rfc/rfc7638)).
+
+## When to use it
+
+Use this package to verify holder-bound grants, exact-request proofs, or signed evidence under
+public keys and expectations your host already trusts. It supplies canonical producers and
+closed verification profiles for hosts in any domain.
+
+Do not use a verifier result as an authorization decision, a replay store, trusted-key discovery,
+revocation service, private-key signer, or evidence-retention service. Those are host responsibilities.
 
 ## Versions
 
@@ -175,14 +187,23 @@ verdict digests bind each runner to the same frozen cases. See the
 
 ## Documentation
 
-[Getting started](docs/guides/getting-started.md), the [cheatsheet](docs/guides/cheatsheet.cheatmd),
-and three Livebooks: the [walkthrough](docs/notebooks/bap-walkthrough.livemd),
-[service integration](docs/notebooks/service-integration.livemd), and
-[chains and archives](docs/notebooks/chains-and-archives.livemd). Then the guides:
-[Recipes](docs/guides/recipes.md), [Evidence](docs/guides/evidence.md),
-[Troubleshooting](docs/guides/troubleshooting.md), [Upgrading](docs/guides/upgrading.md), the
-[glossary](docs/guides/glossary.md), the [FAQ](docs/guides/faq.md), the
-[threat model](docs/design/threat-model.md), and [governance](docs/governance.md).
+1. Start: [getting started](docs/guides/getting-started.md), [choosing a profile](docs/guides/choosing-a-profile.md), [notebook index](docs/guides/notebooks.md).
+2. Concepts: [grants and proofs](docs/guides/grants-and-holder-proofs.md), [trusted keys](docs/guides/trusted-keys-and-rotation.md), [tagged arguments](docs/guides/tagged-arguments-and-selectors.md), [nonce and time](docs/guides/nonce-and-time-policy.md), [facts and authorization](docs/guides/facts-and-authorization.md).
+3. Integrate and operate: [hosts and frameworks](docs/guides/framework-integration.md), [security](docs/guides/integration-security.md), [operations](docs/guides/operations.md), [observability](docs/guides/observability.md), [errors](docs/guides/errors.md), [recipes](docs/guides/recipes.md), [testing](docs/guides/testing-your-integration.md).
+4. Reference: [cheatsheet](docs/guides/cheatsheet.cheatmd), [API and result matrix](docs/guides/api-stability.md), [glossary](docs/guides/glossary.md), [FAQ](docs/guides/faq.md), [upgrading](docs/guides/upgrading.md), [other languages](docs/guides/other-languages.md), [usage rules](usage-rules.md).
+5. Implementers: [implementer's guide](docs/guides/implementers-guide.md), [specifications](spec/bap-v1.md), [conformance](docs/design/conformance-contract.md), [interoperability](docs/design/interoperability-report.md).
+
+### Notebook journeys
+
+- [Core envelope verification](docs/notebooks/bap-walkthrough.livemd)
+- [Contract-major 2 ranges](docs/notebooks/v2-ranges.livemd)
+- [Contract-major 3 ES256](docs/notebooks/v3-es256.livemd)
+- [Service integration](docs/notebooks/service-integration.livemd)
+- [Local loopback](docs/notebooks/local-loopback.livemd)
+- [Role attestations](docs/notebooks/role-attestations.livemd)
+- [Content lineage](docs/notebooks/content-lineage.livemd)
+- [Chains and archives](docs/notebooks/chains-and-archives.livemd)
+- [Advanced strict crypto](docs/notebooks/strict-crypto.livemd)
 
 ## Security
 

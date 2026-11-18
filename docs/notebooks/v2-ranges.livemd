@@ -1,0 +1,107 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Contract-major 2 inclusive ranges
+
+[Run the 1.0.0 release walkthrough in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.0.0%2Fdocs%2Flivebooks%2Fbap-walkthrough.livemd).
+For this focused journey, download this `.livemd` file and use **Open → Import from file**.
+This file is new since 1.0.0; the released walkthrough does not exercise contract-major 2 ranges.
+
+Integer and float tags are distinct even when their numeric values coincide. Each refusal
+below has a freshly signed proof matching the supplied arguments, so the selector is what fails.
+
+```elixir
+Mix.install([{:bounded_authority_protocol, "== 1.0.0"}])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+## Build a bounded contract-major 2 grant
+
+```elixir
+alias BoundedAuthorityProtocol.V2
+alias BoundedAuthorityProtocol.V1.{Credentials, ExpectedRequest, TrustedIssuer}
+{issuer_public, issuer_private} = :crypto.generate_key(:eddsa, :ed25519)
+{holder_public, holder_private} = :crypto.generate_key(:eddsa, :ed25519)
+{:ok, thumbprint} = BoundedAuthorityProtocol.V1.Jwk.public_key_thumbprint_raw(holder_public, %{})
+now = 1_800_000_100
+sign = fn input, key ->
+  signature = :crypto.sign(:eddsa, :none, input.message, [key, :ed25519])
+  {:ok, compact} = V2.assemble_compact(input, signature)
+  compact
+end
+grant = %V2.Grant{
+  key_id: "issuer-1", issuer: "https://issuer.example", grant_id: "range-1",
+  audiences: ["https://compute.example"], issued_at: now, not_before: now,
+  expires_at: now + 3_600, holder_thumbprint: thumbprint,
+  operations: [%V2.Operation{name: "allocate_workers", selectors: [
+    {:gte, ["workers"], {:integer, 1}}, {:lte, ["workers"], {:integer, 8}}
+  ]}]
+}
+{:ok, input} = V2.grant_signing_input(grant, %{})
+compact = sign.(input, issuer_private)
+true = is_binary(compact)
+:range_grant_assembled
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:range_grant_assembled
+```
+
+## Inclusive boundaries and tag mismatch
+
+```elixir
+check = fn tagged ->
+  arguments = {:object, [{"workers", tagged}]}
+  proof = %V2.Proof{
+    holder_public_key: holder_public, proof_id: "range-proof", method: "POST",
+    target_uri: "https://compute.example/jobs", issued_at: now, nonce: nil,
+    invocation_id: "7d444840-9dc0-11ed-a8fc-0242ac120002", operation: "allocate_workers",
+    grant_compact: compact, cast_arguments: arguments
+  }
+  {:ok, proof_input} = V2.proof_signing_input(proof, %{})
+  credentials = %Credentials{grant: compact, proof: sign.(proof_input, holder_private)}
+  expected = %ExpectedRequest{
+    trusted_issuer: %TrustedIssuer{key_id: "issuer-1", public_key: issuer_public},
+    issuer: "https://issuer.example", audience: "https://compute.example", method: "POST",
+    target_uri: proof.target_uri, invocation_id: proof.invocation_id, operation: proof.operation,
+    cast_arguments: arguments, evaluation_time: now, clock_skew: 0,
+    proof_max_age: 300, nonce: :not_required, bounds: %{}
+  }
+  case V2.check_envelope(credentials, expected) do
+    {:ok, facts} -> {:ok, facts.authorization}
+    error -> error
+  end
+end
+results = Enum.map([{:integer, 1}, {:integer, 8}, {:integer, 0}, {:integer, 9}, {:float, 1.0}], check)
+[{:ok, :not_evaluated}, {:ok, :not_evaluated}, {:error, :invalid}, {:error, :invalid}, {:error, :invalid}] = results
+results
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{:ok, :not_evaluated}, {:ok, :not_evaluated}, {:error, :invalid}, {:error, :invalid}, {:error, :invalid}]
+```
+
+## Invalid selectors never produce signing bytes
+
+```elixir
+results = for selector <- [{:lte, ["workers"], {:string, "8"}}, {:gte, [], {:integer, 1}}] do
+  operation = %V2.Operation{name: "allocate_workers", selectors: [selector]}
+  V2.grant_signing_input(%{grant | operations: [operation]}, %{})
+end
+[{:error, :invalid}, {:error, :invalid}] = results
+results
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{:error, :invalid}, {:error, :invalid}]
+```

@@ -112,7 +112,9 @@ diagnose = fn %Credentials{grant: grant, proof: proof}, %ExpectedRequest{} = exp
       cast_arguments: Base.url_encode64(decoded_proof.request_hash, padding: false) == digest,
       proof_age:
         window <= decoded_proof.issued_at and decoded_proof.issued_at <= expected.evaluation_time + expected.clock_skew,
-      nonce: (decoded_proof.nonce == nil) == (expected.nonce == :not_required)
+      nonce:
+        (expected.nonce == :not_required and decoded_proof.nonce == nil) or
+          expected.nonce == {:required, decoded_proof.nonce}
     ]
 
     for {field, false} <- checks, do: field
@@ -140,6 +142,21 @@ Three common mistakes, each found by the helper:
 The value is `[[:method], [:grant_window, :proof_age], [:target_uri]]`: a lowercase method, an
 evaluation time in milliseconds, and a target URI that is not in normalized form. Each of them
 makes `check_envelope/2` return `{:error, :invalid}`.
+
+## Wrong nonce value
+
+A nonce can be present on both sides and still differ. This example signs a proof with one
+challenge and requires another; the helper must identify `:nonce` and the verifier must refuse.
+
+```elixir
+{:ok, nonce_input} = V1.proof_signing_input(%{proof | nonce: "challenge-issued"}, %{})
+nonce_credentials = %{credentials | proof: sign.(nonce_input, holder_private)}
+nonce_expected = %{expected | nonce: {:required, "challenge-other"}}
+{:error, :invalid} = V1.check_envelope(nonce_credentials, nonce_expected)
+diagnose.(nonce_credentials, nonce_expected)
+```
+
+The value is `[:nonce]`.
 
 ## The checklist
 

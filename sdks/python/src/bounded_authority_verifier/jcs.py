@@ -48,6 +48,7 @@ def jcs_encode(value: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
     # Cross-vendor F2: re-validate caller-supplied bounds (a hand-crafted Bounds can widen limits past
     # MAXIMA, bypassing bounds_new). Revalidate caller bounds
     # (spec/bap-v1.md §16, REQ1-VERIFY-revalidate).
+    """Encode tagged JSON using canonical JCS bytes, or return the closed invalid result."""
     try:
         value = _normalize_tagged(value, bounds)
         b = _unwrap(coerce_bounds(bounds))

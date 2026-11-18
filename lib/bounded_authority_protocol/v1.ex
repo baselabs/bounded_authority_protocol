@@ -83,6 +83,11 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   The complete compact input is bounded. Payload and signature segments are not decoded,
   interpreted, or independently size-checked.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.untrusted_key_locator("", %{})
+      {:error, :invalid}
   """
   @spec untrusted_key_locator(binary(), Bounds.t() | map()) ::
           {:ok, KeyLocator.t()} | {:error, :invalid}
@@ -112,6 +117,16 @@ defmodule BoundedAuthorityProtocol.V1 do
   issuer key, then call `assemble_compact/2`. Returns `{:error, :invalid}` when a field is out
   of profile (for example an empty audience list, an expiry not after the start, or a selector
   outside the closed set) or over `limits`.
+
+  ## Examples
+
+      iex> alias BoundedAuthorityProtocol.V1, as: Profile
+      iex> grant = %Profile.Grant{key_id: "issuer-1", issuer: "issuer", grant_id: "grant-1", audiences: ["worker"], issued_at: 100, not_before: 100, expires_at: 200, holder_thumbprint: <<0::256>>, operations: [%Profile.Operation{name: "read", selectors: [:all]}]}
+      iex> {:ok, input} = BoundedAuthorityProtocol.V1.grant_signing_input(grant, %{})
+      iex> is_binary(input.message) and byte_size(input.message) > 0
+      true
+      iex> BoundedAuthorityProtocol.V1.grant_signing_input(%{grant | operations: []}, %{})
+      {:error, :invalid}
   """
   @spec grant_signing_input(Grant.t(), Bounds.t() | map()) ::
           {:ok, SigningInput.t()} | {:error, :invalid}
@@ -125,6 +140,11 @@ defmodule BoundedAuthorityProtocol.V1 do
   `cast_arguments`, the issue time, and the optional nonce. Returns
   `{:ok, %BoundedAuthorityProtocol.V1.SigningInput{}}` or `{:error, :invalid}`; the holder
   public key must pass `BoundedAuthorityProtocol.Ed25519.acceptable_public_key?/1`.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.proof_signing_input(%{}, %{})
+      {:error, :invalid}
   """
   @spec proof_signing_input(Proof.t(), Bounds.t() | map()) ::
           {:ok, SigningInput.t()} | {:error, :invalid}
@@ -135,6 +155,15 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   Returns `{:ok, %BoundedAuthorityProtocol.V1.EncodedConsumptionEntry{bytes: row, hash: hash}}`
   with the exact canonical row bytes and their domain-separated hash, or `{:error, :invalid}`.
+
+  ## Examples
+
+      iex> row = %BoundedAuthorityProtocol.V1.ConsumptionEntry{chain_id: "chain-1", sequence: 1, previous_hash: <<0::256>>, commitment: <<1::256>>}
+      iex> {:ok, encoded} = BoundedAuthorityProtocol.V1.encode_consumption_entry(row, %{})
+      iex> byte_size(encoded.hash)
+      32
+      iex> BoundedAuthorityProtocol.V1.encode_consumption_entry(%{row | sequence: 0}, %{})
+      {:error, :invalid}
   """
   @spec encode_consumption_entry(ConsumptionEntry.t(), Bounds.t() | map()) ::
           {:ok, EncodedConsumptionEntry.t()} | {:error, :invalid}
@@ -148,6 +177,11 @@ defmodule BoundedAuthorityProtocol.V1 do
   Returns `{:ok, %BoundedAuthorityProtocol.V1.ChainFacts{}}` or `{:error, :invalid}`. A
   consistent chain proves consistency only; it cannot show that a validly shortened history
   omitted nothing (usage rule 11).
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.check_chain(%{}, %{})
+      {:error, :invalid}
   """
   @spec check_chain(ChainInput.t(), ExpectedChain.t()) ::
           {:ok, ChainFacts.t()} | {:error, :invalid}
@@ -158,6 +192,11 @@ defmodule BoundedAuthorityProtocol.V1 do
   `BoundedAuthorityProtocol.V1.BoundaryAnchor`.
 
   Returns `{:ok, %BoundedAuthorityProtocol.V1.SigningInput{}}` or `{:error, :invalid}`.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.boundary_anchor_signing_input(%{}, %{})
+      {:error, :invalid}
   """
   @spec boundary_anchor_signing_input(BoundaryAnchor.t(), Bounds.t() | map()) ::
           {:ok, SigningInput.t()} | {:error, :invalid}
@@ -169,6 +208,11 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   Returns `{:ok, %BoundedAuthorityProtocol.V1.SigningInput{}}` or `{:error, :invalid}`; both
   keys must pass `BoundedAuthorityProtocol.Ed25519.acceptable_public_key?/1`.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.key_transition_signing_input(%{}, %{})
+      {:error, :invalid}
   """
   @spec key_transition_signing_input(KeyTransition.t(), Bounds.t() | map()) ::
           {:ok, SigningInput.t()} | {:error, :invalid}
@@ -185,6 +229,11 @@ defmodule BoundedAuthorityProtocol.V1 do
   signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
   order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
   signature bytes it accepts.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.encode_anchored_export(%{}, %{})
+      {:error, :invalid}
   """
   @spec encode_anchored_export(AnchoredExportInput.t(), ExpectedExport.t()) ::
           {:ok, EncodedAnchoredExport.t()} | {:error, :invalid}
@@ -193,6 +242,11 @@ defmodule BoundedAuthorityProtocol.V1 do
   @doc """
   Assembles the compact JWS from a signing input and a raw 64-byte Ed25519 signature, at the
   profile maxima. Same as `assemble_compact/3` with `%{}` limits.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.assemble_compact(%{}, "")
+      {:error, :invalid}
   """
   @spec assemble_compact(SigningInput.t(), binary()) ::
           {:ok, binary()} | {:error, :invalid}
@@ -213,6 +267,11 @@ defmodule BoundedAuthorityProtocol.V1 do
   signature that no conforming signer emits: an Ed25519 signature whose `S` is not below the group
   order or whose `R` is non-canonical or of small order (erratum 3). It never rewrites the
   signature bytes it accepts.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.assemble_compact(%{}, "", %{})
+      {:error, :invalid}
   """
   @spec assemble_compact(SigningInput.t(), binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
@@ -224,6 +283,11 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   Returns `{:ok, %BoundedAuthorityProtocol.V1.DecodedGrant{verification: :not_evaluated}}` or
   `{:error, :invalid}`. Use it to diagnose a rejection, never to make a decision.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.decode_grant("not.a.compact", %{})
+      {:error, :invalid}
   """
   @spec decode_grant(binary(), Bounds.t() | map()) :: {:ok, DecodedGrant.t()} | {:error, :invalid}
   defdelegate decode_grant(compact, limits), to: Runtime
@@ -233,6 +297,11 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   Returns `{:ok, %BoundedAuthorityProtocol.V1.DecodedProof{verification: :not_evaluated}}` or
   `{:error, :invalid}`. Use it to diagnose a rejection, never to make a decision.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.decode_proof("not.a.compact", %{})
+      {:error, :invalid}
   """
   @spec decode_proof(binary(), Bounds.t() | map()) :: {:ok, DecodedProof.t()} | {:error, :invalid}
   defdelegate decode_proof(compact, limits), to: Runtime
@@ -247,6 +316,11 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   Returns `{:ok, %BoundedAuthorityProtocol.V1.GrantFacts{authorization: :not_evaluated}}` or
   `{:error, :invalid}`.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.verify_grant("not.a.compact", %{}, %{})
+      {:error, :invalid}
   """
   @spec verify_grant(binary(), TrustedIssuer.t(), ExpectedGrant.t()) ::
           {:ok, GrantFacts.t()} | {:error, :invalid}
@@ -259,6 +333,11 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   Returns `{:ok, %BoundedAuthorityProtocol.V1.AnchorFacts{trust: :not_evaluated}}` or
   `{:error, :invalid}`.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.verify_historical_anchor("not.a.compact", %{}, %{})
+      {:error, :invalid}
   """
   @spec verify_historical_anchor(binary(), HistoricalPublicKey.t(), ExpectedAnchor.t()) ::
           {:ok, AnchorFacts.t()} | {:error, :invalid}
@@ -271,6 +350,11 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   Returns `{:ok, %BoundedAuthorityProtocol.V1.KeyTransitionFacts{trust: :not_evaluated}}` or
   `{:error, :invalid}`.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.verify_key_transition("not.a.compact", %{}, %{}, %{})
+      {:error, :invalid}
   """
   @spec verify_key_transition(
           binary(),
@@ -289,6 +373,11 @@ defmodule BoundedAuthorityProtocol.V1 do
   Returns `{:ok, %BoundedAuthorityProtocol.V1.AnchoredExportFacts{authorization: :not_evaluated}}`
   or `{:error, :invalid}`. Supply the expectations from your own records, never from the
   archive being verified (usage rule 10).
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.verify_anchored_export(%{}, %{}, %{})
+      {:error, :invalid}
   """
   @spec verify_anchored_export(
           ArchivedObject.t(),
@@ -311,6 +400,11 @@ defmodule BoundedAuthorityProtocol.V1 do
   names, every binding is compared, and the arguments must satisfy every selector of the
   operation. Returns `{:ok, %BoundedAuthorityProtocol.V1.EnvelopeFacts{authorization: :not_evaluated}}`
   or `{:error, :invalid}`. Replay reservation of the invocation id stays with the caller.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.check_envelope(%{}, %{})
+      {:error, :invalid}
   """
   @spec check_envelope(Credentials.t(), ExpectedRequest.t()) ::
           {:ok, EnvelopeFacts.t()} | {:error, :invalid}
@@ -322,6 +416,13 @@ defmodule BoundedAuthorityProtocol.V1 do
 
   Integer and float arguments stay distinct: `{:integer, 1}` and `{:float, 1.0}` digest
   differently.
+
+  ## Examples
+
+      iex> {:ok, integer} = BoundedAuthorityProtocol.V1.request_digest("read", {:integer, 1}, %{})
+      iex> {:ok, float} = BoundedAuthorityProtocol.V1.request_digest("read", {:float, 1.0}, %{})
+      iex> integer != float and byte_size(integer) == 43
+      true
   """
   @spec request_digest(binary(), Json.value(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}

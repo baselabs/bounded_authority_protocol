@@ -18,6 +18,7 @@
 //! and `torsion_free` return `bool`; `base64url_encode` returns bytes).
 
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
 
 pub mod base64url;
 pub mod bounds;

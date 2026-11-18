@@ -498,6 +498,7 @@ def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
 def attestation_signing_input(
     attestation: AttestationProducer, bounds: Bounds | None = None
 ) -> Result[SigningInput]:
+    """Validate role-attestation claims and return canonical signing bytes."""
     return _trying(lambda: _attestation_signing_input_body(attestation, bounds))
 
 
@@ -583,6 +584,7 @@ def _attestation_signing_input_body(
 def assemble_attestation_compact(
     input_: SigningInput, signature: bytes, bounds: Bounds | None = None
 ) -> Result[bytes]:
+    """Assemble a canonical role attestation; signing and trusted-key installation remain caller-owned."""
     def body() -> bytes:
         b = _coerce_attestation_bounds(bounds)
         if input_.kind != "role_attestation":
@@ -610,6 +612,7 @@ def assemble_attestation_compact(
 # 3. attestation decoding (structural; verification=not_evaluated).
 @_closed_shape
 def decode_attestation(compact: bytes, bounds: Bounds | None = None) -> Result[AttestationDecoded]:
+    """Decode role-attestation claims without establishing trust in the attestor."""
     return _trying(lambda: _decode_attestation_body(compact, bounds))
 
 
@@ -643,6 +646,7 @@ def _decode_attestation_body(compact: bytes, bounds: Bounds | None) -> Attestati
 # verify_attestation/2 — compact + expected context).
 @_closed_shape
 def verify_attestation(compact: bytes, expected: ExpectedAttestation) -> Result[AttestationFacts]:
+    """Verify a role attestation against explicit trusted key, role and time context."""
     return _trying(lambda: _verify_attestation_body(compact, expected))
 
 

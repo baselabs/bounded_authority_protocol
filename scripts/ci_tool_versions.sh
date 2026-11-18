@@ -41,7 +41,7 @@ case "$1" in
   ocaml) same OCaml "$(declared ocaml)" "$(opam exec -- ocamlc -version)" ;;
   rust)
     expected="$(sed -n 's/^channel = "\([^"]*\)"/\1/p' sdks/rust/rust-toolchain.toml)"
-    same 'Rust MSRV' 1.88.0 "$expected"
+    same 'Rust MSRV' "$(declared rust)" "$expected"
     same Rust "$expected" "$(rustc --version | awk '{print $2}')"
     ;;
   *) printf 'Unknown CI toolchain: %s\n' "$1" >&2; exit 1 ;;

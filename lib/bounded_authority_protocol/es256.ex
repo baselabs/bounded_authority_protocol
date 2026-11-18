@@ -45,6 +45,13 @@ defmodule BoundedAuthorityProtocol.Es256 do
   Returns whether a raw 64-byte signature `r || s` is canonical: `0 < r < n` and
   `0 < s <= floor(n / 2)`. Any other input, including non-binary or wrong-size input, returns
   `false`.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.Es256.canonical_signature?(<<1::256, 1::256>>)
+      true
+      iex> BoundedAuthorityProtocol.Es256.canonical_signature?(<<0::512>>)
+      false
   """
   @spec canonical_signature?(binary()) :: boolean()
   def canonical_signature?(<<r::binary-@scalar_bytes, s::binary-@scalar_bytes>>) do
@@ -59,6 +66,11 @@ defmodule BoundedAuthorityProtocol.Es256 do
   Returns whether a 65-byte uncompressed SEC1 public key `0x04 || x || y` may enter a
   verification input: both coordinates are field elements (`< p`) and the point is on the
   curve. Any other input returns `false`.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.Es256.acceptable_public_key?(<<0::256>>)
+      false
   """
   @spec acceptable_public_key?(binary()) :: boolean()
   def acceptable_public_key?(<<4, x::unsigned-big-256, y::unsigned-big-256>>) do
@@ -75,6 +87,11 @@ defmodule BoundedAuthorityProtocol.Es256 do
   The backend runs only on a binary message, a canonical signature, and an on-curve key with
   coordinates below `p` (P-256 has prime order, so every such point is a valid public key):
   the inputs on which a backend raises never reach it.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.Es256.verify_strict("message", <<0::512>>, <<0::256>>)
+      false
   """
   @spec verify_strict(binary(), binary(), binary()) :: boolean()
   def verify_strict(message, signature, public_key) when is_binary(message) do
@@ -96,6 +113,13 @@ defmodule BoundedAuthorityProtocol.Es256 do
 
   Returns `{:error, :invalid}` unless `0 < r < n` and `0 < s < n`. This is a producer utility
   for the signer; the protocol's producer surfaces never apply it.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.Es256.normalize_low_s(<<1::256, 1::256>>)
+      {:ok, <<1::256, 1::256>>}
+      iex> BoundedAuthorityProtocol.Es256.normalize_low_s(<<0::512>>)
+      {:error, :invalid}
   """
   @spec normalize_low_s(binary()) :: {:ok, binary()} | {:error, :invalid}
   def normalize_low_s(<<r::unsigned-big-256, s::unsigned-big-256>>)
@@ -116,6 +140,13 @@ defmodule BoundedAuthorityProtocol.Es256 do
   set), and no trailing bytes. Both scalars must lie in `0 < r < n` and `0 < s < n`. The output
   is not low-S normalized; pass it to `normalize_low_s/1`. Any other input returns
   `{:error, :invalid}`.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.Es256.der_to_raw(<<48, 6, 2, 1, 1, 2, 1, 1>>)
+      {:ok, <<1::256, 1::256>>}
+      iex> BoundedAuthorityProtocol.Es256.der_to_raw(<<48, 0>>)
+      {:error, :invalid}
   """
   @spec der_to_raw(binary()) :: {:ok, binary()} | {:error, :invalid}
   def der_to_raw(<<0x30, length, content::binary-size(length)>>) do

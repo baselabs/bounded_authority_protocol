@@ -20,6 +20,16 @@ _DOT = 0x2E
 
 @dataclass(frozen=True)
 class CompactSegments:
+    """The three encoded JWS segments, before signature verification.
+
+    Fields:
+        protected_segment: bytes.
+        payload_segment: bytes.
+        signature: bytes.
+        protected_bytes: bytes.
+        payload_bytes: bytes.
+        signing_input: bytes.
+    """
     protected_segment: bytes  # the raw base64url TEXT (not decoded)
     payload_segment: bytes
     signature: bytes  # decoded raw bytes (64 for Ed25519)
@@ -106,6 +116,13 @@ def _scan_compact(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> None:
 
 @dataclass(frozen=True)
 class SigningInput:
+    """Canonical protected and payload segments to be signed by the caller.
+
+    Fields:
+        kind: str.
+        protected_segment: bytes.
+        payload_segment: bytes.
+    """
     kind: str  # Closed profile-specific kind; see _KINDS.
     protected_segment: bytes  # base64url text
     payload_segment: bytes  # base64url text

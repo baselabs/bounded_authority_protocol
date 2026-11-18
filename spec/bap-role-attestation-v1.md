@@ -171,8 +171,8 @@ identities, never a path or mutable Git dependency (`REQ-RA1-RELEASE-immutable`)
 ## 7. IANA considerations
 
 IANA is asked to register `application/ba-role-attestation+jwt` using the RFC 6838 field
-template under LIMITED USE. The ready-to-file source and rendered form live in
-`docs/design/iana/media-types.json` and `docs/design/iana/media-types.md`. Filing remains
+template under LIMITED USE. The prepared registration source and rendered form live in
+`docs/design/iana/media-types.json` and `docs/design/iana/media-types.md`. Submission to IANA for registration remains
 gated on the protocol's first external submission; this profile and its protected
 `ba+role-attestation` wire `typ` do not claim an existing registration
 (`REQ-RA1-IANA-template`).

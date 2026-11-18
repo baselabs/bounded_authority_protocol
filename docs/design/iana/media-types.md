@@ -1,8 +1,8 @@
-# Ready-to-file media type registrations
+# Prepared media type registrations
 
 Rendered from `media-types.json` (RFC 6838 section 5.6 field order). The wire `typ`
 header values are unchanged; the media-type namespace is distinct from the wire `typ`.
-Filing is externally gated.
+Submission to IANA for registration is externally gated.
 
 ## application/ba-cap+jwt (active)
 
@@ -130,7 +130,7 @@ Filing is externally gated.
 - **Change controller:** Bounded Authority Protocol maintainers
 - **Wire `typ`:** `ba+cap-delegated`
 
-  (Reserved for a successor contract-major; NOT filed.)
+  (Reserved for a successor contract-major; NOT submitted to IANA for registration.)
 
 ## application/ba-suite-attestation+jwt (reserved)
 
@@ -150,4 +150,4 @@ Filing is externally gated.
 - **Change controller:** Bounded Authority Protocol maintainers
 - **Wire `typ`:** `ba+suite-attestation`
 
-  (Reserved for a successor contract-major; NOT filed.)
+  (Reserved for a successor contract-major; NOT submitted to IANA for registration.)

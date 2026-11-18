@@ -1,16 +1,16 @@
-# IANA registration templates (ready-to-file sources)
+# IANA registration templates
 
-This directory holds the machine-readable sources and rendered ready-to-file markdown for the
-IANA registrations named by the specification's IANA considerations section. **Filing is
+This directory holds machine-readable sources and rendered Markdown templates for the IANA
+registrations named by the specification's IANA considerations section. **Registration submission is
 externally gated** (the BAP-08 official-submission preconditions). These templates make the
 package readiness verifiable in-repo; they make no submission claim.
 
 Contents:
 
 - `jwt-claims.json` is the machine-readable source for the JSON Web Token Claims Registry
-  entries. `active` entries are ready to file (Claim Name / Description / Change Controller /
+  entries. `active` entries are ready for registration submission (Claim Name / Description / Change Controller /
   Reference, per that registry's published format and its Specification Required policy).
-  `reserved` entries are NOT filed: they are the profile's reserved names, recorded here so the
+  `reserved` entries are NOT submitted for registration: they are the profile's reserved names, recorded here so the
   registries document and the templates cannot drift apart (the spec-facts gate's rule 7
   enforces the exact match). `ba_obo` is reserved in the registries document WITHOUT an IANA
   template by design (an issuer-asserted principal identifier with no wire presence in any
@@ -21,7 +21,7 @@ Contents:
   media types register under the `application/ba-<name>+jwt` forms below. **The wire `typ`
   header values are unchanged**. There is no wire change; the media-type name and the wire `typ` are
   related but distinct namespaces.
-- `jwt-claims.md` / `media-types.md` provide the rendered ready-to-file forms.
+- `jwt-claims.md` / `media-types.md` provide the rendered registration forms.
 
 Regeneration: the markdown renders are derived from the JSON sources by hand-authoring rules
 (one line/section per source field); the spec-facts gate (rule 7) proves the SOURCES agree with

@@ -14,18 +14,61 @@ shared by the Ed25519 and `p256` 0.14 backends). CI builds on Rust 1.88.0.
 
 The crate is not on crates.io, and any crate of this name there is not ours until this page
 says otherwise. It moves to its own repository when it is first published.
-Until then, depend on this
-repository by path or by Git commit:
+Choose one of these complete manifests. Each is a separate `Cargo.toml`, with one
+declaration per dependency. Both consumer setups run in GitHub CI.
 
-```toml
-[dependencies]
-bounded-authority-protocol = { path = "../bounded_authority_protocol/sdks/rust" }
-# or
-bounded-authority-protocol = { git = "https://github.com/baselabs/bounded_authority_protocol", rev = "<commit>" }
+### Path consumer
+
+From an empty directory, fetch and verify the selected source commit:
+
+<!-- sdk-install:rust -->
+
+```bash
+git init upstream
+git -C upstream remote add origin https://github.com/baselabs/bounded_authority_protocol.git
+git -C upstream fetch --depth 1 origin c8b3bab8e4caf0b7f93e6f240570673534c331e2
+git -C upstream checkout --detach FETCH_HEAD
+test "$(git -C upstream rev-parse HEAD)" = "c8b3bab8e4caf0b7f93e6f240570673534c331e2"
+mkdir src
 ```
 
-The path form expects this repository cloned next to your crate. Pin a commit: without a
-published version, the commit is the identity of what you deployed.
+Save this as `Cargo.toml`:
+
+<!-- sdk-manifest:path -->
+
+```toml
+[package]
+name = "bap-consumer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bounded-authority-protocol = { path = "upstream/sdks/rust" }
+ed25519-dalek = { version = "3.0", default-features = false }
+```
+
+### Git consumer
+
+From another empty directory, create `src/` and save this independent `Cargo.toml`.
+Cargo fetches the selected commit itself:
+
+<!-- sdk-manifest:git -->
+
+```toml
+[package]
+name = "bap-consumer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bounded-authority-protocol = { git = "https://github.com/baselabs/bounded_authority_protocol.git", rev = "c8b3bab8e4caf0b7f93e6f240570673534c331e2" }
+ed25519-dalek = { version = "3.0", default-features = false }
+```
+
+For either setup, save the [SDK README quickstart](../../sdks/rust/README.md#quickstart)
+as `src/main.rs`, run `cargo generate-lockfile`, then `cargo run --locked`.
+Keep the generated application `Cargo.lock` and audit it. The quickstart verifies a grant
+and holder proof and demonstrates a wrong-arguments refusal.
 
 Erratum 3 (producer canonicality) is implemented: `assemble_compact`,
 `encode_anchored_export` (and their `v2` and `v3` forms), `assemble_local_loopback_http_compact`,
@@ -124,3 +167,8 @@ A verifier result is one input to that decision, never the decision itself
 Tests and corpus inputs are self-contained under the SDK root. The complete Hex corpus tree
 is vendored at `conformance/priv/conformance/`; copied-alone and unpacked-package checks
 protect that boundary. See the [verdict digest contract](../design/corpus-verdict-digests.md).
+
+## Migration
+
+Follow the [before/after source-snapshot migration](../../sdks/rust/README.md#migration-from-earlier-source-snapshots)
+before adopting a newer commit. There is no published earlier SDK major to migrate from.

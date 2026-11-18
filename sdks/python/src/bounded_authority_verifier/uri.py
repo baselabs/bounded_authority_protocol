@@ -28,6 +28,7 @@ _IPV4_OCTET = re.compile(rb"^(?:0|[1-9]\d{0,2})$")
 
 
 def uri_normalize(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]:
+    """Normalize the standard-profile HTTPS URI without network access."""
     try:
         data = _bytes(data)
         return Ok(_unwrap(str_utf8(_normalize(data, _unwrap(coerce_bounds(bounds))))))
@@ -38,6 +39,7 @@ def uri_normalize(data: bytes, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[bytes]
 def local_loopback_http_uri_normalize(
     data: bytes, bounds: Bounds = MAXIMUM_BOUNDS
 ) -> Result[bytes]:
+    """Normalize an explicitly selected literal-loopback HTTP URI; never retry HTTPS input here."""
     try:
         data = _bytes(data)
         return Ok(

@@ -10,7 +10,16 @@ defmodule BoundedAuthorityProtocol.V1.Base64Url do
 
   alias BoundedAuthorityProtocol.V1.Bounds
 
-  @doc "Decodes a bounded canonical base64url segment."
+  @doc """
+  Decodes a bounded canonical base64url segment.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.Base64Url.decode("aGk", %{})
+      {:ok, "hi"}
+      iex> BoundedAuthorityProtocol.V1.Base64Url.decode("aGk=")
+      {:error, :invalid}
+  """
   @spec decode(binary(), Bounds.t() | map()) :: {:ok, binary()} | {:error, :invalid}
   def decode(segment, limits \\ %{})
 

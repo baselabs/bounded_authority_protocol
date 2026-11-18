@@ -200,3 +200,21 @@ Whatever the package version:
 - the package performs no I/O, reads no clock, and has no private-key access or custody. Trusted
   public keys and time are explicit inputs. The conformance CLI's documented file reads are
   outside that pure boundary.
+
+## Result families
+
+| Family | Success | Refusal | Boundary |
+|---|---|---|---|
+| Contract-major producers, assembly, decoders, credential and evidence verifiers | `{:ok, value}` | `{:error, :invalid}` | contract-major 1, contract-major 2, contract-major 3 |
+| Sibling-profile producers, assembly, decoders and verifiers | `{:ok, value}` | `{:error, :invalid}` | Local loopback, role attestations, content assertions |
+| Content digests and assertion digests | `{:ok, digest}` | `{:error, :invalid}` | No content interpretation or trust selection |
+| `ContentAssertion.V1.verify_successor/3` | `:ok` | `{:error, :invalid}` | Consistency of supplied facts, no provenance verification |
+| `Ed25519.verify_strict/3`, `acceptable_public_key?/1`, `torsion_free?/1` | `true` | `false` | Signature/key predicates |
+| `Es256.verify_strict/3`, `acceptable_public_key?/1`, `canonical_signature?/1` | `true` | `false` | Signature/key predicates |
+| `Es256.der_to_raw/1`, `normalize_low_s/1` | `{:ok, raw_signature}` | `{:error, :invalid}` | Conversion/normalization, no trust |
+| JSON, JCS, base64url, URI and JWK primitives; bounds construction/coercion | `{:ok, value}` | `{:error, :invalid}` | Bounded protocol data |
+| `Bounds.maximum/0` | bounds struct | none | Immutable profile maxima |
+| `Conformance.Cli.run/1` | `0` | `1` or `2` | Offline CLI; see [errors](errors.md) |
+
+The public function doctests execute these shapes; a currency test binds this matrix and the
+entry-page descriptions to every visible function's actual specification and executed examples.

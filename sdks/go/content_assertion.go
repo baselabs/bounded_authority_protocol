@@ -7,6 +7,7 @@ import (
 
 const contentAssertionType = "ba+content-assertion"
 
+// ContentAssertion contains unsigned content-lineage claims for caller-owned signing.
 type ContentAssertion struct {
 	AttestorKeyID string
 	Jti           string
@@ -37,6 +38,7 @@ type ExpectedContentAssertion struct {
 	Bounds        *Bounds
 }
 
+// DecodedContentAssertion contains canonical decoded claims without verified trust; its display is redacted.
 type DecodedContentAssertion struct {
 	data func() *decodedContentAssertionData
 }
@@ -101,6 +103,7 @@ type contentAssertionClaims struct {
 	Exp           int64
 }
 
+// ContentDigest hashes nonempty bounded content with the content-assertion domain separator.
 func ContentDigest(content []byte, bounds *Bounds) (digest [32]byte, err error) {
 	defer closedResult(&err)
 	b, err := resolveBounds(bounds)
@@ -114,6 +117,7 @@ func ContentDigest(content []byte, bounds *Bounds) (digest [32]byte, err error) 
 	return digest, nil
 }
 
+// AssertionSigningInput validates content-lineage claims and returns exact canonical JWS signing bytes.
 func AssertionSigningInput(a ContentAssertion, bounds *Bounds) (si SigningInput, err error) {
 	defer closedResult(&err)
 	b, err := resolveBounds(bounds)
@@ -143,6 +147,7 @@ func AssertionSigningInput(a ContentAssertion, bounds *Bounds) (si SigningInput,
 	return SigningInput{Kind: KindContentAssertion, Protected: protected, Payload: payload}, nil
 }
 
+// AssembleContentAssertionCompact frames canonical signing segments and signature without verifying it.
 func AssembleContentAssertionCompact(si SigningInput, signature []byte, bounds *Bounds) (compact string, err error) {
 	defer closedResult(&err)
 	if si.Kind != KindContentAssertion {
@@ -167,6 +172,7 @@ func AssembleContentAssertionCompact(si SigningInput, signature []byte, bounds *
 	return compact, nil
 }
 
+// DecodeContentAssertion decodes canonical assertion claims without verifying the signature.
 func DecodeContentAssertion(compact string, bounds *Bounds) (decoded DecodedContentAssertion, err error) {
 	defer closedResult(&err)
 	b, err := resolveBounds(bounds)
@@ -183,6 +189,7 @@ func DecodeContentAssertion(compact string, bounds *Bounds) (decoded DecodedCont
 		Iat: c.Iat, Nbf: c.Nbf, Exp: c.Exp, Verification: DecodeVerificationNotEvaluated})}, nil
 }
 
+// AssertionDigest validates canonical assertion bytes and hashes the exact compact representation.
 func AssertionDigest(compact string, bounds *Bounds) (digest [32]byte, err error) {
 	defer closedResult(&err)
 	b, err := resolveBounds(bounds)
@@ -195,6 +202,7 @@ func AssertionDigest(compact string, bounds *Bounds) (digest [32]byte, err error
 	return sha256.Sum256([]byte(compact)), nil
 }
 
+// VerifyContentAssertion checks the signature, time and exact caller-trusted content/profile context.
 func VerifyContentAssertion(compact string, expected ExpectedContentAssertion) (facts ContentAssertionFacts, err error) {
 	defer closedResult(&err)
 	if expected.Bounds == nil {
@@ -230,6 +238,7 @@ func VerifyContentAssertion(compact string, expected ExpectedContentAssertion) (
 	})}, nil
 }
 
+// VerifyContentAssertionSuccessor checks consecutive verified generations and their exact digest link.
 func VerifyContentAssertionSuccessor(predecessor, successor ContentAssertionFacts, bounds *Bounds) (err error) {
 	defer closedResult(&err)
 	if bounds == nil {

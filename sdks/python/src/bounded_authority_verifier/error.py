@@ -37,6 +37,7 @@ class Ok(Generic[T]):
 
     @property
     def is_ok(self) -> bool:
+        """Whether this is the Ok variant; Result refuses implicit truth testing."""
         return True
 
 
@@ -51,6 +52,7 @@ class Err:
 
     @property
     def is_ok(self) -> bool:
+        """Whether this is the Ok variant; Result refuses implicit truth testing."""
         return False
 
 
@@ -59,10 +61,12 @@ Result = Ok[T] | Err
 
 
 def ok(value: T) -> Ok[T]:
+    """Wrap a successful value in Ok; inspect the result explicitly instead of truth-testing it."""
     return Ok(value)
 
 
 def err() -> Err:
+    """Return the closed, value-free invalid result."""
     return Err(InvalidError())
 
 

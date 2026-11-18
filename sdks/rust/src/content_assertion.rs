@@ -18,74 +18,133 @@ use sha2::{Digest, Sha256};
 const TYP_CONTENT_ASSERTION: &str = "ba+content-assertion";
 const SIGNATURE_SEGMENT_BYTES: usize = 86;
 
+/// Unsigned content-lineage claims. Signing and content storage belong to the caller.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContentAssertionInput {
+    /// Identifier of the attestor public key.
     pub attestor_key_id: String,
+    /// Unique signed assertion identifier.
     pub jti: String,
+    /// Signed issuer identifier.
     pub iss: String,
+    /// Signed audience identifier.
     pub aud: String,
+    /// Signed subject identifier.
     pub sub: String,
+    /// Exact assertion profile identifier.
     pub profile: String,
+    /// Raw SHA-256 digest identifying the expected profile.
     pub profile_digest: [u8; 32],
+    /// Domain-separated digest of the content bytes.
     pub content_digest: [u8; 32],
+    /// Positive lineage generation; the first generation is one.
     pub generation: i64,
+    /// Predecessor assertion digest; all zero bytes for generation one.
     pub previous: [u8; 32],
+    /// Signed issuance time in Unix seconds.
     pub issued_at: i64,
+    /// Inclusive validity-window start in Unix seconds.
     pub not_before: i64,
+    /// Exclusive validity-window end in Unix seconds.
     pub expires_at: i64,
 }
 
+/// Caller-trusted attestor and exact expected profile, content, subject and evaluation time.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExpectedContentAssertion {
+    /// Already-trusted historical attestor key selected by the caller.
     pub attestor: HistoricalPublicKey,
+    /// Expected issuer identifier supplied by the caller.
     pub issuer: String,
+    /// Expected audience identifier supplied by the caller.
     pub audience: String,
+    /// Expected subject identifier supplied by the caller.
     pub subject: String,
+    /// Exact assertion profile identifier.
     pub profile: String,
+    /// Raw SHA-256 digest identifying the expected profile.
     pub profile_digest: [u8; 32],
+    /// Domain-separated digest of the content bytes.
     pub content_digest: [u8; 32],
+    /// Caller-supplied evaluation time in Unix seconds.
     pub now: i64,
+    /// Explicit bounded-work limits; callers may tighten protocol maxima.
     pub bounds: Bounds,
 }
 
+/// Canonical decoded claims with no signature verification or trust established.
 #[derive(Clone, PartialEq, Eq)]
 pub struct DecodedContentAssertion {
+    /// Contract-major or sibling-profile version; not a package version.
     pub version: i64,
+    /// Identifier of the attestor public key.
     pub attestor_key_id: String,
+    /// Unique signed assertion identifier.
     pub jti: String,
+    /// Signed issuer identifier.
     pub iss: String,
+    /// Signed audience identifier.
     pub aud: String,
+    /// Signed subject identifier.
     pub sub: String,
+    /// Exact assertion profile identifier.
     pub profile: String,
+    /// Raw SHA-256 digest identifying the expected profile.
     pub profile_digest: [u8; 32],
+    /// Domain-separated digest of the content bytes.
     pub content_digest: [u8; 32],
+    /// Positive lineage generation; the first generation is one.
     pub generation: i64,
+    /// Predecessor assertion digest; all zero bytes for generation one.
     pub previous: [u8; 32],
+    /// Signed issuance time in Unix seconds.
     pub issued_at: i64,
+    /// Inclusive validity-window start in Unix seconds.
     pub not_before: i64,
+    /// Exclusive validity-window end in Unix seconds.
     pub expires_at: i64,
+    /// Checks completed by this operation; decoding alone does not verify.
     pub verification: NotEvaluated,
 }
 
+/// Verified signature and time-window facts. Trust and authorization remain caller decisions.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ContentAssertionFacts {
+    /// Contract-major or sibling-profile version; not a package version.
     pub version: i64,
+    /// Identifier of the attestor public key.
     pub attestor_key_id: String,
+    /// Raw SHA-256 thumbprint of the attestor public key.
     pub attestor_key_fingerprint: [u8; 32],
+    /// Unique signed assertion identifier.
     pub jti: String,
+    /// Signed issuer identifier.
     pub iss: String,
+    /// Signed audience identifier.
     pub aud: String,
+    /// Signed subject identifier.
     pub sub: String,
+    /// Exact assertion profile identifier.
     pub profile: String,
+    /// Raw SHA-256 digest identifying the expected profile.
     pub profile_digest: [u8; 32],
+    /// Domain-separated digest of the content bytes.
     pub content_digest: [u8; 32],
+    /// Positive lineage generation; the first generation is one.
     pub generation: i64,
+    /// Predecessor assertion digest; all zero bytes for generation one.
     pub previous: [u8; 32],
+    /// Signed issuance time in Unix seconds.
     pub issued_at: i64,
+    /// Inclusive validity-window start in Unix seconds.
     pub not_before: i64,
+    /// Exclusive validity-window end in Unix seconds.
     pub expires_at: i64,
+    /// SHA-256 digest of the exact canonical compact bytes.
     pub digest: [u8; 32],
+    /// Checks completed by this operation; decoding alone does not verify.
     pub verification: SignatureAndWindow,
+    /// Trust is not evaluated by this pure verifier.
     pub trust: NotEvaluated,
 }
 
@@ -113,6 +172,7 @@ struct DecodedAssertion<'a> {
     claims: AssertionClaims,
 }
 
+/// Hash nonempty bounded content with the content-assertion domain separator.
 pub fn content_digest(content: &[u8], bounds: &Bounds) -> Result<[u8; 32]> {
     if content.is_empty() || content.len() as u64 > bounds.content_bytes() {
         return Err(Invalid);
@@ -123,6 +183,7 @@ pub fn content_digest(content: &[u8], bounds: &Bounds) -> Result<[u8; 32]> {
     Ok(hasher.finalize().into())
 }
 
+/// Validate content-lineage claims and produce the exact canonical JWS signing bytes.
 pub fn assertion_signing_input(
     assertion: &ContentAssertionInput,
     bounds: &Bounds,
@@ -182,6 +243,7 @@ pub fn assertion_signing_input(
     build_produced(&header, &payload, bounds)
 }
 
+/// Assemble canonical assertion segments and a producer-canonical signature without verifying it.
 pub fn assemble_content_assertion_compact(
     input: &SigningInput,
     signature: &[u8; 64],
@@ -216,6 +278,7 @@ pub fn assemble_content_assertion_compact(
     Ok(compact)
 }
 
+/// Decode canonical assertion claims without checking a signature or selecting trusted keys.
 pub fn decode_content_assertion(
     compact: &[u8],
     bounds: &Bounds,
@@ -241,11 +304,13 @@ pub fn decode_content_assertion(
     })
 }
 
+/// Validate canonical assertion bytes and hash the exact compact representation.
 pub fn assertion_digest(compact: &[u8], bounds: &Bounds) -> Result<[u8; 32]> {
     decode_parts(compact, bounds)?;
     Ok(Sha256::digest(compact).into())
 }
 
+/// Verify an assertion against the caller-trusted attestor, content, profile and explicit time.
 pub fn verify_content_assertion(
     compact: &[u8],
     expected: &ExpectedContentAssertion,
@@ -300,6 +365,7 @@ pub fn verify_content_assertion(
     })
 }
 
+/// Check consecutive verified generations and the exact predecessor digest link.
 pub fn verify_content_assertion_successor(
     predecessor: &ContentAssertionFacts,
     successor: &ContentAssertionFacts,

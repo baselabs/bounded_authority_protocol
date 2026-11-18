@@ -39,7 +39,18 @@ defmodule BoundedAuthorityProtocol.V1.Json do
           | {:array, [value()]}
           | {:object, [{binary(), value()}]}
 
-  @doc "Decodes one complete bounded JSON value."
+  @doc """
+  Decodes one complete bounded JSON value.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.Json.decode("1", %{})
+      {:ok, {:integer, 1}}
+      iex> BoundedAuthorityProtocol.V1.Json.decode("1.0")
+      {:ok, {:float, 1.0}}
+      iex> BoundedAuthorityProtocol.V1.Json.decode(~s({"x":1,"x":2}), %{})
+      {:error, :invalid}
+  """
   @spec decode(binary(), Bounds.t() | map()) :: {:ok, value()} | {:error, :invalid}
   def decode(bytes, limits \\ %{})
 

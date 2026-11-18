@@ -2,8 +2,7 @@
 # credo:disable-for-this-file Credo.Check.Warning.WrongTestFilename
 
 # Compile the exact documented modules before compiling tests that call them.
-for [code] <-
-      Regex.scan(~r/^```elixir\n(.*?)^```$/ms, File.read!("recipes.md"), capture: :all_but_first),
+for {code, _prose} <- File.read!("recipes.etf") |> :erlang.binary_to_term([:safe]),
     String.starts_with?(code, "defmodule ") do
   Code.eval_string(code, [], file: "recipes.md")
 end
@@ -17,14 +16,12 @@ defmodule BapReader.MiddlewareTest do
     assert Application.spec(:bounded_authority_protocol, :applications) --
              [:kernel, :stdlib, :elixir, :crypto] == []
 
-    markdown = File.read!("recipes.md")
-    [_before | parts] = String.split(markdown, ~r/^```elixir\n/m)
+    examples = File.read!("recipes.etf") |> :erlang.binary_to_term([:safe])
 
     {{_values, {binding, _env}}, warnings} =
       ExUnit.CaptureIO.with_io(:stderr, fn ->
-        Enum.map_reduce(parts, {[], Code.env_for_eval(file: "recipes.md")}, fn part,
-                                                                               {binding, env} ->
-          [code, prose] = String.split(part, ~r/^```$/m, parts: 2)
+        Enum.map_reduce(examples, {[], Code.env_for_eval(file: "recipes.md")}, fn {code, prose},
+                                                                                  {binding, env} ->
           quoted = Code.string_to_quoted!(code, file: "recipes.md")
           # Module definitions above already ran; evaluate their trailing expressions here.
           quoted =

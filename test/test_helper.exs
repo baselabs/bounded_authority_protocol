@@ -1,3 +1,8 @@
+Code.require_file("../test_support/documentation.ex", __DIR__)
+System.put_env("BAP_LIVEBOOK_NO_MAIN", "1")
+Code.require_file("../scripts/check_livebooks.exs", __DIR__)
+System.delete_env("BAP_LIVEBOOK_NO_MAIN")
+
 shallow =
   case System.cmd("git", ["rev-parse", "--is-shallow-repository"], stderr_to_stdout: true) do
     {output, 0} ->

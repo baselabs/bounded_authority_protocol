@@ -43,7 +43,7 @@ corpus, index, and verdicts are unchanged.
 | `CONFORMANCE-complete` | 40-case certified corpus: both valid roles, missing-member matrix, every rejection family, boundary equalities, both self-attestation discriminating forms (same key id, same key material), outliving window, ES256 confusion, meaningful-byte tampers, cross-profile legs both directions; v1/v2/v3 corpora execute unchanged | populated |
 | `CONFORMANCE-certified-pin` | index SHA-256 pinned independently by the ExUnit suite, this map, the profile spec, and every SDK consumer | populated |
 | `CONFORMANCE-sdks` | Elixir reference plus in-repo Python/Rust/Go legs (this landing); the graduated TypeScript verifier adopts the surface as a release precondition coordinated at corpus freeze | populated |
-| `IANA-template` | exact active registry entry plus machine-readable and rendered RFC 6838 templates; filing remains externally gated | populated |
+| `IANA-template` | exact active registry entry plus machine-readable and rendered RFC 6838 templates; submission to IANA for registration remains externally gated | populated |
 | `CONFORMANCE-cross-repo-receipts` | The artifact has no public transport; the authority-runtime issuance receipt and the companion-signer consumption receipt are named release preconditions discharged by their own private closeouts before any `0.x.0` release bearing this profile. | release gate |
 | `RELEASE-immutable` | Requires the exact reviewed package and corpus identity before adopters consume it; release is the owner's decision, not authorized by design approval. | release gate |
 

@@ -11,20 +11,10 @@ has the quickstart and the full API list.
 
 The module has no tagged version and the Go module proxy does not serve it, so `go get` fails.
 It moves to its own repository when it is first published.
-Until then, build against a
-checkout of this repository. From an empty directory:
-
-```bash
-git clone https://github.com/baselabs/bounded_authority_protocol.git
-mkdir myapp && cd myapp
-go mod init example.com/myapp
-go mod edit \
-  -require=github.com/baselabs/bounded_authority_protocol_go@v0.0.0 \
-  -replace=github.com/baselabs/bounded_authority_protocol_go=../bounded_authority_protocol/sdks/go
-```
-
-Record the commit you build from: without a published version, the commit is the identity of
-what you deployed.
+Use the [empty-project, selected-commit install and executed
+quickstart](../../sdks/go/README.md#install-from-a-checkout). It fetches an exact commit, verifies
+the checkout identity, declares the module replacement, and runs the success/refusal example.
+Without a published version, that full commit is the deployment identity.
 
 Erratum 3 (producer canonicality) is implemented: `AssembleCompact`,
 `EncodeAnchoredExport` (and their `Profile` and `EcdsaProfile` methods),
@@ -85,3 +75,8 @@ normative terms.
 Tests and corpus inputs are self-contained under the SDK root. The complete Hex corpus tree
 is vendored at `conformance/priv/conformance/`; copied-alone and unpacked-package checks
 protect that boundary. See the [verdict digest contract](../design/corpus-verdict-digests.md).
+
+## Migration
+
+Follow the [before/after source-snapshot migration](../../sdks/go/README.md#migration-from-earlier-source-snapshots)
+before adopting a newer commit. There is no published earlier SDK major to migrate from.

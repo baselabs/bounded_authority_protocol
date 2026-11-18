@@ -1,0 +1,374 @@
+defmodule BoundedAuthorityProtocol.DocumentationContractTest do
+  use ExUnit.Case, async: false
+
+  alias BoundedAuthorityProtocol.Documentation
+  alias BoundedAuthorityProtocol.LivebookCheck
+
+  test "every docs page is generated or excluded with a specific reason" do
+    extras = Enum.map(Mix.Project.config()[:docs][:extras], &extra_path/1)
+    exclusions = File.read!("docs/exdoc-exclusions.json") |> :json.decode()
+    pages = Path.wildcard("docs/**/*.{md,cheatmd,livemd,mdx}")
+
+    included = Enum.filter(extras, &String.starts_with?(&1, "docs/"))
+    assert Enum.sort(pages) == Enum.sort(included ++ Map.keys(exclusions))
+
+    for {path, reason} <- exclusions do
+      assert File.regular?(path)
+      assert is_binary(reason) and byte_size(reason) >= 30
+      refute path in extras
+    end
+
+    groups = Mix.Project.config()[:docs][:groups_for_extras]
+
+    assert Enum.map(groups, fn {name, _} -> to_string(name) end) == [
+             "Start",
+             "Concepts",
+             "Integrate and operate",
+             "Profiles and evidence",
+             "Notebooks",
+             "Reference",
+             "Implementers",
+             "Project"
+           ]
+
+    assert Enum.sort(Enum.flat_map(groups, &elem(&1, 1))) == Enum.sort(extras)
+    assert byte_size(File.read!("README.md")) < 50_000
+  end
+
+  test "CommonMark sample discovery handles nested, indented and longer fences" do
+    source = """
+    ~~~elixir
+    1 + 1
+    ~~~
+
+    > ````elixir
+    > :ok
+    > ````
+
+        :indented
+    """
+
+    assert [{"elixir", first}, {"elixir", second}, {"", third}] = Documentation.blocks(source)
+    assert String.trim(first) == "1 + 1"
+    assert String.trim(second) == ":ok"
+    assert String.trim(third) == ":indented"
+  end
+
+  test "every relative source link and heading anchor resolves" do
+    failures =
+      for path <- surfaces(),
+          href <- links(path),
+          error <- link_errors(path, href),
+          do: error
+
+    assert failures == [], Enum.join(failures, "\n")
+    assert link_errors("README.md", "docs/no-such-document.md") != []
+    assert link_errors("README.md", "README.md#no-such-anchor") != []
+  end
+
+  @tag :git_history
+  test "release launch URLs decode to notebook files present at their immutable Git ref" do
+    version = Mix.Project.config()[:version]
+    paths = ["README.md" | Path.wildcard("docs/notebooks/**/*.livemd")]
+
+    for path <- paths do
+      launches = Regex.scan(~r{https://livebook.dev/run\?url=([^)\s]+)}, File.read!(path))
+      assert launches != [], "#{path} needs a launch URL"
+
+      for [_, encoded] <- launches do
+        uri = encoded |> URI.decode() |> URI.parse()
+        assert uri.host == "github.com"
+
+        assert ["", "baselabs", "bounded_authority_protocol", "blob", ref | file] =
+                 String.split(uri.path, "/")
+
+        assert ref == "v#{version}"
+        target = Enum.join(file, "/")
+        assert Path.extname(target) == ".livemd"
+        {output, status} = System.cmd("git", ["cat-file", "-e", "#{ref}:#{target}"])
+        assert status == 0, "#{path}: missing import #{ref}:#{target}: #{output}"
+      end
+    end
+  end
+
+  test "every notebook installs the exact registry version and is directly linked" do
+    version = Mix.Project.config()[:version]
+
+    for {name, entry} <- LivebookCheck.registry!(File.cwd!()) do
+      path = "docs/notebooks/#{name}"
+      source = File.read!(path)
+      assert source =~ ~s|Mix.install([{:bounded_authority_protocol, "== #{version}"}])|
+      assert source =~ ~s(<!-- livebook:{"persist_outputs":true} -->)
+      assert LivebookCheck.parse!(source, entry["outputs"]) != []
+      assert File.read!("README.md") =~ "(#{path})"
+      assert File.read!("docs/guides/getting-started.md") =~ "(../notebooks/#{name})"
+      assert path in Enum.map(Mix.Project.config()[:docs][:extras], &extra_path/1)
+
+      native_cells = for {"elixir", code} <- Documentation.blocks(source), do: code
+      assert length(native_cells) == entry["outputs"]
+    end
+  end
+
+  test "native SDK samples and manifests cannot escape their execution jobs" do
+    native =
+      for path <- surfaces(),
+          {language, code} <- Documentation.blocks(File.read!(path)),
+          language in ["python", "go", "rust", "toml"],
+          do: {path, language, code}
+
+    for {path, language, _code} <- native do
+      expected =
+        if language == "toml",
+          do: "docs/deployment/rust-sdk.md",
+          else: "sdks/#{language}/README.md"
+
+      assert path == expected, "#{path}: #{language} sample needs an executing consumer"
+    end
+
+    for language <- ["python", "go", "rust"] do
+      assert [{_, ^language, _}] = Enum.filter(native, &(elem(&1, 1) == language))
+    end
+
+    assert length(Enum.filter(native, &(elem(&1, 1) == "toml"))) == 2
+    workflow = File.read!(".github/workflows/sdks.yml")
+
+    for sdk <- ["python", "go", "rust"] do
+      assert workflow =~ "scripts/check_sdk_install.py #{sdk}"
+    end
+
+    runner = File.read!("scripts/check_sdk_install.py")
+    assert runner =~ ~s(["path", "git"])
+    assert runner =~ "tomllib.loads(manifest)"
+    assert runner =~ "direct_url.json"
+  end
+
+  test "both notebook modes gate qualification under their required job names" do
+    jobs = YamlElixir.read_from_file!(".github/workflows/ci.yml")["jobs"]
+
+    for mode <- ["local", "published"] do
+      name = "livebooks-#{mode}"
+      assert name in jobs["qualified"]["needs"]
+      assert jobs[name]["runs-on"] == "ubuntu-24.04"
+
+      assert Enum.any?(
+               jobs[name]["steps"],
+               &(&1["run"] == "elixir scripts/check_livebooks.exs --#{mode}")
+             )
+    end
+  end
+
+  test "result-family descriptions follow the compiled public specifications" do
+    modules = [
+      BoundedAuthorityProtocol.V1,
+      BoundedAuthorityProtocol.V2,
+      BoundedAuthorityProtocol.V3,
+      BoundedAuthorityProtocol.V1.Json,
+      BoundedAuthorityProtocol.V1.Jcs,
+      BoundedAuthorityProtocol.V1.Bounds,
+      BoundedAuthorityProtocol.V1.Base64Url,
+      BoundedAuthorityProtocol.V1.Uri,
+      BoundedAuthorityProtocol.V1.Jwk,
+      BoundedAuthorityProtocol.V3.EcJwk,
+      BoundedAuthorityProtocol.Ed25519,
+      BoundedAuthorityProtocol.Es256,
+      BoundedAuthorityProtocol.RoleAttestation.V1,
+      BoundedAuthorityProtocol.ContentAssertion.V1,
+      BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1
+    ]
+
+    for module <- modules do
+      {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
+      {:ok, specs} = Code.Typespec.fetch_specs(module)
+
+      for {{:function, name, arity}, _, _, %{"en" => _}, _} <- docs do
+        {{^name, ^arity}, alternatives} = List.keyfind(specs, {name, arity}, 0)
+
+        signature =
+          alternatives
+          |> Enum.map(&(Code.Typespec.spec_to_quoted(name, &1) |> Macro.to_string()))
+          |> Enum.join("\n")
+
+        cond do
+          module == BoundedAuthorityProtocol.V1.Bounds and name == :maximum ->
+            refute signature =~ "{:error,"
+
+          module in [BoundedAuthorityProtocol.Ed25519, BoundedAuthorityProtocol.Es256] and
+              name not in [:normalize_low_s, :der_to_raw] ->
+            assert signature =~ "boolean()"
+
+          name == :verify_successor ->
+            assert signature =~ ":ok | {:error, :invalid}"
+            refute signature =~ "{:ok,"
+
+          true ->
+            assert signature =~ "{:ok,"
+            assert signature =~ "{:error, :invalid}"
+
+            errors = Regex.scan(~r/\{:error,\s*([^}]+)\}/, signature, capture: :all_but_first)
+            assert Enum.uniq(List.flatten(errors)) == [":invalid"]
+        end
+      end
+    end
+
+    for path <- [
+          "README.md",
+          "lib/bounded_authority_protocol.ex",
+          "docs/guides/api-stability.md",
+          "docs/guides/faq.md"
+        ] do
+      text = File.read!(path)
+      assert text =~ "verify_successor/3", path
+      assert text =~ ":ok", path
+      assert text =~ ~r/boolean/i, path
+    end
+  end
+
+  test "the errors reference covers the complete CLI closed set and public protocol error" do
+    source = File.read!("lib/bounded_authority_protocol/conformance/cli.ex")
+    [_, messages] = Regex.run(~r/@messages %\{(.*?)\n  \}/s, source)
+    actual = Regex.scan(~r/^\s+(\w+):/m, messages, capture: :all_but_first) |> List.flatten()
+    reference = File.read!("docs/guides/errors.md")
+
+    documented =
+      Regex.scan(~r/^\| `:(\w+)` \|/m, reference, capture: :all_but_first) |> List.flatten()
+
+    assert Enum.sort(actual) == Enum.sort(documented)
+    assert reference =~ "`{:error, :invalid}`"
+    assert reference =~ "`false`"
+    assert reference =~ "`Bounds.maximum/0`"
+    assert reference =~ "producer"
+    assert reference =~ "archive"
+    assert reference =~ "Local-loopback"
+  end
+
+  test "deployment, SDK and site claims stay current with their source contracts" do
+    python = File.read!("docs/deployment/python-sdk.md")
+    readme = File.read!("sdks/python/README.md")
+
+    for text <- [python, readme] do
+      assert text =~ "slotted"
+      assert text =~ "read-only"
+      assert text =~ "redacted"
+      refute text =~ "prints every field"
+    end
+
+    versions = File.read!(".tool-versions")
+    [_, go] = Regex.run(~r/^golang_sdk (\S+)$/m, versions)
+    assert File.read!("sdks/go/README.md") =~ "Go **#{go}**"
+    refute File.read!("sdks/README.md") =~ "## Known gaps"
+    assert File.read!("docs/deployment/typescript-sdk.md") =~ "bap-selector-float-zero/1"
+    assert File.read!("docs/deployment/typescript-sdk.md") =~ "161"
+    refute File.read!("CHANGELOG.md") =~ "90-minute"
+    site = File.read!("site/index.html")
+    version = Mix.Project.config()[:version]
+    assert site =~ "https://hexdocs.pm/bounded_authority_protocol/#{version}/"
+    assert site =~ "getting-started.html"
+    assert site =~ "livebook.dev/run"
+    refute site =~ "the Elixir reference"
+    assert site =~ "Holder-side"
+
+    security = File.read!("SECURITY.md")
+    assert security =~ "kci/"
+    assert security =~ ~r/source commit/i
+    assert security =~ "gh attestation verify"
+  end
+
+  test "registration material stays with implementers and describes registrations precisely" do
+    implementers = Keyword.fetch!(Mix.Project.config()[:docs][:groups_for_extras], :Implementers)
+
+    for path <- Path.wildcard("docs/design/iana/*.md") do
+      assert path in implementers
+    end
+
+    for path <- surfaces() ++ ["CHANGELOG.md"] ++ Path.wildcard("spec/*.md") do
+      refute File.read!(path) =~ ~r/\b(?:patents?|filings?|filed|ready[- ]to[- ]file)\b/i, path
+    end
+  end
+
+  defp extra_path({path, _options}), do: path
+  defp extra_path(path), do: path
+
+  defp surfaces do
+    (["README.md", "SECURITY.md", "CONTRIBUTING.md", "usage-rules.md", "sdks/README.md"] ++
+       Path.wildcard("docs/**/*.{md,cheatmd,livemd}") ++
+       Path.wildcard("sdks/*/README.md"))
+    |> Enum.sort()
+  end
+
+  defp links(path) do
+    {_status, ast, _messages} = EarmarkParser.as_ast(File.read!(path))
+    collect_links(ast)
+  end
+
+  defp collect_links(nodes) when is_list(nodes), do: Enum.flat_map(nodes, &collect_links/1)
+
+  defp collect_links({tag, attributes, children, _}) when tag in ["a", "img"] do
+    key = if tag == "a", do: "href", else: "src"
+    value = List.keyfind(attributes, key, 0, {key, ""}) |> elem(1)
+    [value | collect_links(children)]
+  end
+
+  defp collect_links({_tag, _attributes, children, _}), do: collect_links(children)
+  defp collect_links(_), do: []
+
+  defp link_errors(path, href) do
+    uri = URI.parse(href)
+
+    if uri.scheme || uri.host || String.starts_with?(href, "/") do
+      []
+    else
+      target =
+        if uri.path in [nil, ""],
+          do: path,
+          else: Path.expand(URI.decode(uri.path), Path.dirname(Path.expand(path)))
+
+      cond do
+        not File.exists?(target) ->
+          ["#{path}: missing relative link #{href}"]
+
+        uri.fragment && Path.extname(target) in [".md", ".cheatmd", ".livemd"] &&
+            URI.decode(uri.fragment) not in anchors(target) ->
+          ["#{path}: missing anchor #{href}"]
+
+        true ->
+          []
+      end
+    end
+  end
+
+  defp anchors(path) do
+    source = File.read!(path)
+    {_status, ast, _messages} = EarmarkParser.as_ast(source)
+    headings = headings(ast)
+
+    {slugs, _counts} =
+      Enum.map_reduce(headings, %{}, fn heading, counts ->
+        base =
+          heading
+          |> String.downcase()
+          |> String.replace(~r/[^\p{L}\p{N}_\s-]/u, "")
+          |> String.replace(~r/\s/u, "-")
+
+        number = Map.get(counts, base, 0)
+        slug = if number == 0, do: base, else: "#{base}-#{number}"
+        {slug, Map.put(counts, base, number + 1)}
+      end)
+
+    explicit =
+      Regex.scan(~r/(?:id|name)="([^"]+)"/, source, capture: :all_but_first) |> List.flatten()
+
+    slugs ++ explicit
+  end
+
+  defp headings(nodes) when is_list(nodes), do: Enum.flat_map(nodes, &headings/1)
+
+  defp headings({tag, _, children, _}) when tag in ["h1", "h2", "h3", "h4", "h5", "h6"],
+    do: [plain(children)]
+
+  defp headings({_tag, _, children, _}), do: headings(children)
+  defp headings(_), do: []
+
+  defp plain(nodes) when is_list(nodes), do: Enum.map_join(nodes, &plain/1)
+  defp plain({_tag, _, children, _}), do: plain(children)
+  defp plain(text) when is_binary(text), do: text
+end

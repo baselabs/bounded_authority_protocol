@@ -680,9 +680,9 @@ field template; LIMITED USE). The names `application/ba-cap-delegated+jwt` and
 registered. The media-type namespace is distinct from the wire `typ` header values, which are
 unchanged by this section.
 
-The ready-to-file registration templates, their machine-readable sources, and the exact
+The IANA registration templates, their machine-readable sources, and their exact
 reconciliation with the profile's registries document are published with the specification's
-companion artifacts; the filing itself follows the profile's external submission
+companion artifacts. Submission to IANA follows the profile's external-submission
 preconditions.
 
 ## 21. Security considerations

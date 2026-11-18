@@ -59,6 +59,23 @@ _PAYLOAD_KEYS = {
 
 @dataclass(frozen=True)
 class ContentAssertion:
+    """Unsigned content-lineage claims with domain-separated content and predecessor digests.
+
+    Fields:
+        attestor_key_id: str.
+        jti: str.
+        iss: str.
+        aud: str.
+        sub: str.
+        profile: str.
+        profile_digest: bytes.
+        content_digest: bytes.
+        gen: int.
+        prev: bytes.
+        iat: int.
+        nbf: int.
+        exp: int.
+    """
     attestor_key_id: str
     jti: str
     iss: str
@@ -76,6 +93,19 @@ class ContentAssertion:
 
 @dataclass(frozen=True)
 class ExpectedContentAssertion:
+    """Caller-trusted attestor and exact expected subject, profile, content and time.
+
+    Fields:
+        attestor: HistoricalPublicKey.
+        issuer: str.
+        audience: str.
+        subject: str.
+        profile: str.
+        profile_digest: bytes.
+        content_digest: bytes.
+        now: int.
+        bounds: Bounds.
+    """
     attestor: HistoricalPublicKey
     issuer: str
     audience: str
@@ -254,6 +284,7 @@ def _projected_compact_bounds(signing: SigningInput, bounds: Bounds) -> None:
 
 @_closed_shape
 def content_digest(content: bytes, bounds: Bounds | None = None) -> Result[bytes]:
+    """Hash nonempty bounded content using the content-assertion domain separator."""
     def body() -> bytes:
         b = _bounds(bounds)
         if not (1 <= len(content) <= _unwrap(bounds_resolve(b, "content_bytes"))):
@@ -267,6 +298,7 @@ def content_digest(content: bytes, bounds: Bounds | None = None) -> Result[bytes
 def assertion_signing_input(
     assertion: ContentAssertion, bounds: Bounds | None = None
 ) -> Result[SigningInput]:
+    """Validate content-lineage claims and return their exact canonical signing input."""
     return _trying(lambda: _signing_input(assertion, bounds))
 
 
@@ -321,6 +353,7 @@ def _signing_input(assertion: ContentAssertion, bounds: Bounds | None) -> Signin
 def assemble_content_assertion_compact(
     signing_input: SigningInput, signature: bytes, bounds: Bounds | None = None
 ) -> Result[bytes]:
+    """Assemble a content assertion with a canonical signature, without verifying it."""
     def body() -> bytes:
         b = _compact_bounds(bounds)
         if signing_input.kind != "content_assertion":
@@ -339,6 +372,7 @@ def assemble_content_assertion_compact(
 def decode_assertion(
     compact: bytes, bounds: Bounds | None = None
 ) -> Result[ContentAssertionDecoded]:
+    """Decode canonical content-assertion claims without verifying their signature."""
     def body() -> ContentAssertionDecoded:
         b = _compact_bounds(bounds)
         _segments, kid, payload = _parse(compact, b)
@@ -383,6 +417,7 @@ def _expected(expected: ExpectedContentAssertion, bounds: Bounds) -> None:
 def verify_assertion(
     compact: bytes, expected: ExpectedContentAssertion
 ) -> Result[ContentAssertionFacts]:
+    """Verify a content assertion against the caller-trusted attestor, content, profile and time."""
     def body() -> ContentAssertionFacts:
         b = _compact_bounds(expected.bounds)
         _expected(expected, b)
@@ -448,6 +483,7 @@ def verify_assertion(
 
 @_closed_shape
 def assertion_digest(compact: bytes, bounds: Bounds | None = None) -> Result[bytes]:
+    """Validate canonical assertion bytes and hash their exact compact representation."""
     def body() -> bytes:
         b = _compact_bounds(bounds)
         _parse(compact, b)
@@ -482,6 +518,7 @@ def verify_successor(
     successor: ContentAssertionFacts,
     bounds: Bounds,
 ) -> Result[None]:
+    """Check verified predecessor/successor facts for consecutive generation and exact digest linkage."""
     def body() -> None:
         b = _unwrap(coerce_bounds(bounds))
         _facts(predecessor, b)

@@ -142,6 +142,12 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
 
   It does not halt; the escript's entry point halts with the returned status. The certified index
   identities are fixed in this module and cannot be supplied by the caller.
+
+  ## Examples
+
+      iex> output = ExUnit.CaptureIO.capture_io(:stderr, fn -> 2 = BoundedAuthorityProtocol.Conformance.Cli.run(["--unknown-option"]) end)
+      iex> String.contains?(output, "usage")
+      true
   """
   @spec run([binary()]) :: 0 | 1 | 2
   def run(argv) do

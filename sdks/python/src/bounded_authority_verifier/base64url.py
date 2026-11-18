@@ -25,6 +25,7 @@ def _classify(byte: int) -> int:
 
 
 def base64url_decode(data: bytes, max_decoded_bytes: int | None = None) -> Result[bytes]:
+    """Decode canonical, unpadded base64url bytes; refuse alternate encodings."""
     try:
         data = _bytes(data)
         if max_decoded_bytes is not None and (
@@ -90,6 +91,7 @@ def base64url_decode(data: bytes, max_decoded_bytes: int | None = None) -> Resul
 
 
 def base64url_encode(data: bytes) -> Result[bytes]:
+    """Encode bytes as unpadded base64url in an explicit Result."""
     try:
         data = _bytes(data)
         n = len(data)

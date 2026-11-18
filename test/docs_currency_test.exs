@@ -129,8 +129,6 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
       {"README install", "README.md", "{:bounded_authority_protocol, \"#{requirement}\"}"},
       {"getting-started install", "docs/guides/getting-started.md",
        "{:bounded_authority_protocol, \"#{requirement}\"}"},
-      {"Livebook install", "docs/notebooks/bap-walkthrough.livemd",
-       "{:bounded_authority_protocol, \"#{requirement}\"}"},
       {"security support", "SECURITY.md", "`#{series}.x` source release line is supported"},
       {"security current", "SECURITY.md",
        "`v#{released_version}` is the current tagged source release"},

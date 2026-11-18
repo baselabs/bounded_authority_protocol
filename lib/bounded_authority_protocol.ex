@@ -24,6 +24,8 @@ defmodule BoundedAuthorityProtocol do
   checks consistency between supplied facts and returns `:ok` or `{:error, :invalid}` without
   establishing their provenance. Public signature and key predicates return booleans. No result
   is an authorization decision. Already-trusted public keys and time are explicit inputs; this
-  package has no private-key access or custody. Start with the getting-started guide.
+  package has no private-key access or custody. `BoundedAuthorityProtocol.V1.Bounds.maximum/0`
+  returns its struct directly; the conformance CLI returns an integer exit status, `0`, `1` or
+  `2`. See the API result matrix and start with the getting-started guide.
   """
 end

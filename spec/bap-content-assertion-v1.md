@@ -261,8 +261,8 @@ Companion dependency admission follows its own existing policy
 ## 9. IANA considerations
 
 IANA is asked to register `application/ba-content-assertion+jwt` using the RFC 6838
-field template under LIMITED USE. The ready-to-file source and rendered form live
+field template under LIMITED USE. The prepared registration source and rendered form live
 in `docs/design/iana/media-types.json` and `docs/design/iana/media-types.md`.
-Filing remains gated on the protocol's first external submission; this profile and
+Submission to IANA for registration remains gated on the protocol's first external submission; this profile and
 its protected `ba+content-assertion` wire `typ` do not claim an existing registration
 (`REQ-CA1-IANA-template`).
