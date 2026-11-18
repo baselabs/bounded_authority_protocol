@@ -2,16 +2,6 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
-## [Unreleased]
-
-### Changed
-
-- Publish only inspected, qualification-attested archives from an isolated Hex upload
-  process. Resume held package and documentation uploads by exact bytes, refuse new names
-  and retired versions, and deliver the archive, checksum and SBOMs through GitHub releases.
-- Disable implicit qualification cache writers, enforce the Pages deploy ref guard, and
-  use the complete attestation action permissions and release pin comments.
-
 ## [1.1.0] (2026-11-18)
 
 ### Added
@@ -38,6 +28,11 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - `mix docs.links` checks every local `src` as well as every `href` in the built HexDocs,
   requires scripts, stylesheets, images and the EPUB to exist, and exempts only
   `docs_config.js`, which HexDocs serves per package.
+- Publish only inspected, qualification-attested archives from an isolated Hex upload
+  process. Resume held package and documentation uploads by exact bytes, refuse new names
+  and retired versions, and deliver the archive, checksum and SBOMs through GitHub releases.
+- Disable implicit qualification cache writers, enforce the Pages deploy ref guard, and
+  use the complete attestation action permissions and release pin comments.
 - The documented SDK Git installs run twice in CI: at the pinned commit the guides name, and
   with that pin replaced by the commit under test.
 
