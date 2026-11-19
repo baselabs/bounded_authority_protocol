@@ -11,11 +11,17 @@ defmodule BoundedAuthorityProtocol.ShellFailurePropagationTest do
       workflow = YamlElixir.read_from_file!(path)
       assert get_in(workflow, ["defaults", "run", "shell"]) == "bash", path
 
-      for {_name, job} <- workflow["jobs"],
-          step <- job["steps"] || [],
-          Map.has_key?(step, "run") do
-        shell = step["shell"] || get_in(job, ["defaults", "run", "shell"]) || "bash"
-        assert shell == "bash", "#{path}: run steps must keep the Bash default"
+      for {name, job} <- workflow["jobs"] do
+        # A job's defaults.run replaces the workflow's whole defaults.run, shell included.
+        if job_run_defaults = get_in(job, ["defaults", "run"]) do
+          assert job_run_defaults["shell"] == "bash",
+                 "#{path}: job #{name} must restate shell: bash in its defaults.run"
+        end
+
+        for step <- job["steps"] || [], Map.has_key?(step, "run") do
+          assert (step["shell"] || "bash") == "bash",
+                 "#{path}: run steps must keep the Bash default"
+        end
       end
     end
 
