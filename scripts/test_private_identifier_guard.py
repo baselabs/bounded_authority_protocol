@@ -165,15 +165,17 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         *args: str,
         input_text: str | None = None,
         env: dict[str, str] | None = None,
+        repo: Path | None = None,
     ) -> subprocess.CompletedProcess[str]:
+        checkout = self.repo if repo is None else repo
         return run(
             sys.executable,
             str(GUARD),
             "--repo",
-            str(self.repo),
+            str(checkout),
             mode,
             *args,
-            cwd=self.repo,
+            cwd=checkout,
             input_text=input_text,
             env=env,
         )
@@ -374,6 +376,67 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("tree-entry=", result.stderr)
         self.assert_safe_output(result)
+
+    def test_linked_worktree_reads_main_checkout_policy(self) -> None:
+        remote, remote_oid = self.make_remote()
+        linked = self.scratch / "linked"
+        git(self.repo, "worktree", "add", "-q", "-b", "linked-fixture", str(linked))
+        self.assertFalse((linked / ".kimosabe").exists())
+
+        def push(local_oid: str) -> subprocess.CompletedProcess[str]:
+            return self.guard(
+                "pre-push",
+                "origin",
+                str(remote),
+                repo=linked,
+                input_text=(
+                    f"refs/heads/linked-fixture {local_oid} "
+                    f"refs/heads/main {remote_oid}\n"
+                ),
+            )
+
+        (linked / "linked.txt").write_text("clean\n", encoding="utf-8")
+        git(linked, "add", "linked.txt")
+        git(linked, "commit", "-qm", "linked clean")
+        clean_oid = git(linked, "rev-parse", "HEAD")
+        result = push(clean_oid)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, "")
+
+        (linked / "outgoing.txt").write_text(
+            f"secret payload {self.pattern}\n", encoding="utf-8"
+        )
+        git(linked, "add", "outgoing.txt")
+        git(linked, "commit", "-qm", "linked content change")
+        result = push(git(linked, "rev-parse", "HEAD"))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("blob=", result.stderr)
+        self.assert_safe_output(result)
+
+        # Only the main checkout's policy counts: a copy in the linked
+        # worktree does not stand in for a manifest missing from the main one.
+        shutil.copytree(self.repo / ".kimosabe", linked / ".kimosabe")
+        (self.repo / ".kimosabe" / "private-identifiers").unlink()
+        result = push(clean_oid)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("guard-state=manifest", result.stderr)
+        self.assert_safe_output(result)
+
+        bare = self.scratch / "bare.git"
+        git(self.scratch, "clone", "--bare", "-q", str(self.repo), str(bare))
+        git(bare, "config", "maintenance.auto", "false")
+        git(bare, "config", "gc.auto", "0")
+        bare_linked = self.scratch / "bare-linked"
+        git(bare, "worktree", "add", "-q", "--detach", str(bare_linked), remote_oid)
+        result = self.guard(
+            "pre-push",
+            "origin",
+            str(remote),
+            repo=bare_linked,
+            input_text=f"refs/heads/main {remote_oid} refs/heads/main {remote_oid}\n",
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("guard-state=policy-root-bare", result.stderr)
 
     def test_pre_push_scans_annotated_tag_message(self) -> None:
         remote, _remote_oid = self.make_remote()

@@ -109,6 +109,7 @@ class Guard:
         }.get(self.git("rev-parse", "--show-object-format").strip())
         if self.object_hex_length is None:
             raise GuardError("object-format")
+        self.policy_root = self.main_worktree()
         self._batch: subprocess.Popen[bytes] | None = None
         self.seen_blobs: set[bytes] = set()
         self._trees: dict[bytes, tuple[TreeEntry, ...]] = {}
@@ -214,6 +215,23 @@ class Guard:
             return b""
         return result.stdout
 
+    def main_worktree(self) -> Path:
+        """Return the main checkout, where the untracked policy lives.
+
+        Activation is clone-shared local config, so every linked worktree of the
+        clone reads the one policy kept in the main checkout.
+        """
+        records = self.git("worktree", "list", "--porcelain", "-z").split(b"\0\0")
+        fields = records[0].split(b"\0") if records else []
+        if not fields or not fields[0].startswith(b"worktree "):
+            raise GuardError("policy-root")
+        if b"bare" in fields[1:]:
+            raise GuardError("policy-root-bare")
+        root = Path(fields[0][len(b"worktree ") :].decode("utf-8", "surrogateescape"))
+        if not root.is_absolute():
+            raise GuardError("policy-root")
+        return root.resolve()
+
     @staticmethod
     def read_regular(path: Path, code: str) -> bytes:
         try:
@@ -262,11 +280,11 @@ class Guard:
         return patterns
 
     def manifest(self) -> tuple[bytes, list[bytes]]:
-        raw = self.read_regular(self.repo / MANIFEST_REL, "manifest")
+        raw = self.read_regular(self.policy_root / MANIFEST_REL, "manifest")
         return raw, self.parse_patterns(raw)
 
     def ensure_policy_directories(self, create: bool) -> None:
-        current = self.repo
+        current = self.policy_root
         for component in EXPECTATION_REL.parent.parts:
             current /= component
             try:
@@ -283,9 +301,9 @@ class Guard:
 
     def policy_present(self) -> bool:
         paths = (
-            self.repo / MANIFEST_REL,
-            self.repo / EXPECTATION_REL,
-            self.repo / ACTIVATION_REL,
+            self.policy_root / MANIFEST_REL,
+            self.policy_root / EXPECTATION_REL,
+            self.policy_root / ACTIVATION_REL,
         )
         present = False
         for path in paths:
@@ -303,7 +321,7 @@ class Guard:
         raw, patterns = self.manifest()
         if len(patterns) != expected_count:
             raise GuardError("manifest-count")
-        destination = self.repo / EXPECTATION_REL
+        destination = self.policy_root / EXPECTATION_REL
         try:
             existing = destination.lstat()
             if not stat.S_ISREG(existing.st_mode):
@@ -329,7 +347,7 @@ class Guard:
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary_path, destination)
-            activation = self.repo / ACTIVATION_REL
+            activation = self.policy_root / ACTIVATION_REL
             activation_descriptor, activation_temporary = tempfile.mkstemp(
                 prefix=".private-identifier-active.", dir=activation.parent
             )
@@ -357,7 +375,7 @@ class Guard:
         self.ensure_policy_directories(create=False)
         raw, patterns = self.manifest()
         expectation_raw = self.read_regular(
-            self.repo / EXPECTATION_REL, "expectation"
+            self.policy_root / EXPECTATION_REL, "expectation"
         )
         try:
             expectation = json.loads(expectation_raw)
@@ -378,7 +396,7 @@ class Guard:
             raise GuardError("manifest-count-changed")
         if not hmac.compare_digest(digest, hashlib.sha256(raw).hexdigest()):
             raise GuardError("manifest-digest-changed")
-        activation = self.read_regular(self.repo / ACTIVATION_REL, "activation")
+        activation = self.read_regular(self.policy_root / ACTIVATION_REL, "activation")
         if activation != b"enabled\n":
             raise GuardError("activation-invalid")
         return patterns
