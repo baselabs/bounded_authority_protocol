@@ -304,9 +304,9 @@ here.
 ## Development
 
 ```bash
-test -z "$(gofmt -l .)" && go vet ./...
+unformatted=$(gofmt -l .) && test -z "$unformatted" && go vet ./...
 go test ./...
-sh tools/purity_check.sh && sh tools/license_check.sh
+bash tools/purity_check.sh && bash tools/license_check.sh
 ```
 
 Deployment notes: [`docs/deployment/go-sdk.md`](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/go-sdk.md).

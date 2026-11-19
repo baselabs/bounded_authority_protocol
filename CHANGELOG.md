@@ -2,6 +2,14 @@
 
 All notable changes to `bounded_authority_protocol` are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- Propagate command and pipeline failures through every workflow and tracked shell script.
+  Use Bash consistently, distinguish expected nonzero check results from execution errors,
+  and guard the failure-handling contract in the architecture tests.
+
 ## [1.1.0] (2026-11-18)
 
 ### Added

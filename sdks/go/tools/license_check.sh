@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
+
 # BAP-16 — enforce the runtime dependency-license allowlist for the Go SDK.
 #
 # AGENTS rule 10 + ADR 0014 D8: every dependency a CONSUMER inherits must
@@ -17,16 +19,15 @@
 # script exit 1 (proven at authoring with a fabricated require, recorded in
 # the README).
 
-set -eu
-
-cd "$(dirname "$0")/.."
+script_dir=$(dirname "$0")
+cd "$script_dir/.."
 
 if ! command -v go >/dev/null 2>&1; then
   echo "license_check: FAIL — go toolchain not found." >&2
   exit 1
 fi
 
-deps=$(go list -m all 2>/dev/null || true)
+deps=$(go list -m all 2>/dev/null)
 
 if [ -z "$deps" ]; then
   echo "license_check: FAIL — 'go list -m all' returned nothing (degraded output refused)." >&2
@@ -34,11 +35,12 @@ if [ -z "$deps" ]; then
 fi
 
 # every line beyond the main module is a dependency
-count=$(printf '%s\n' "$deps" | grep -v '^github.com/baselabs/bounded_authority_protocol_go$' | grep -c . || true)
+runtime_deps=$(grep -v '^github.com/baselabs/bounded_authority_protocol_go$' <<< "$deps") || [ "$?" -eq 1 ]
+count=$(grep -c . <<< "$runtime_deps") || [ "$?" -eq 1 ]
 
 if [ "$count" -ne 0 ]; then
   echo "license_check: FAIL — $count runtime module dependency(ies) present; the SDK pins zero:" >&2
-  printf '%s\n' "$deps" | grep -v '^github.com/baselabs/bounded_authority_protocol_go$' | grep . >&2 || true
+  grep . <<< "$runtime_deps" >&2
   exit 1
 fi
 

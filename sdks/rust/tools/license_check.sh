@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
+
 # BAP-15 Task 16 — enforce the runtime dependency-license allowlist.
 #
 # AGENTS rule 10 + ADR 0014 D8: every dependency a CONSUMER inherits must carry
@@ -26,9 +28,8 @@
 # Exits 0 if every runtime dep is permissively licensed, 1 otherwise. Proven
 # red-capable: a fabricated `GPL-3.0` license string is rejected.
 
-set -eu
-
-cd "$(dirname "$0")/.."
+script_dir=$(dirname "$0")
+cd "$script_dir/.."
 
 # Allowlist (D-RISK-2 verified permissive set). Unicode-DFS-2016 is the
 # pre-2023 Unicode data license; Unicode-3.0 is its OSI-approved (2023-11-17)

@@ -1,7 +1,7 @@
-#!/bin/sh
-# Enforce the ignored local private-identifier policy on the pending commit message.
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -u
+# Enforce the ignored local private-identifier policy on the pending commit message.
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   printf 'commit-msg: repository resolution failed; failing closed\n' >&2

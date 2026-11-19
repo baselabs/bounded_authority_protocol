@@ -266,7 +266,7 @@ setup: a pre-commit hook and a CI job reject it here.
 ```bash
 cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked
-sh tools/purity_check.sh && sh tools/license_check.sh
+bash tools/purity_check.sh && bash tools/license_check.sh
 ```
 
 Deployment notes, including AWS Lambda and PostgreSQL: see

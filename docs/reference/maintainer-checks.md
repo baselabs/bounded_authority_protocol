@@ -7,7 +7,7 @@ Maintainer checks for confidential terms require an ignored identifier inventory
 and activation marker, plus activation recorded in local Git configuration. The inventory owner
 prepares the inventory locally, then initializes its policy with
 `python3 scripts/private_identifier_guard.py --repo "$PWD" initialize --expected-count COUNT`,
-using the verified entry count. Install with `sh scripts/install-hooks.sh`. Routine installation
+using the verified entry count. Install with `bash scripts/install-hooks.sh`. Routine installation
 validates the existing policy; it does not accept a changed inventory. After activation, missing
 or changed inputs fail closed even if the entire ignored policy directory is removed. Partial
 owner-policy state without activation also denies. Contributor mode prints an inactive notice.

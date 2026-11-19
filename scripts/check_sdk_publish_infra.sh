@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
+
 # check_sdk_publish_infra.sh: single source of truth for the SDK publish guard.
 #
 # Called by scripts/hooks/pre-commit (on staged blobs via stdin) and by the
@@ -23,8 +25,6 @@
 # act no commit gate sees. The kci qualification run gates committed infrastructure;
 # the local hook is honor-system for contributors. The deliberate-admin bypass is
 # 'git commit --no-verify' (documented in CONTRIBUTING.md).
-
-set -u
 
 path="${1:-}"
 if [ -z "$path" ]; then
@@ -96,10 +96,12 @@ publishConfig'
 
 # Publish CLI subcommands (regex, flag-tolerant): every scanned surface.
 for re in "$cli_publish_re" "$twine_upload_re"; do
-  if printf '%s' "$content" 2>/dev/null | grep -qE -- "$re"; then
+  if grep -E -- "$re" <<< "$content" >/dev/null; then
     printf '%s: registry-publish command: SDKs must not publish from the monorepo (ADR 0015)\n' \
       "$path" >&2
     status=1
+  else
+    [ "$?" -eq 1 ]
   fi
 done
 
@@ -109,10 +111,12 @@ while IFS= read -r cmd; do
   if [ "$path" = .github/workflows/publish.yml ] && [ "$cmd" = 'mix hex.publish' ]; then
     continue
   fi
-  if printf '%s' "$content" 2>/dev/null | grep -qF -- "$cmd"; then
+  if grep -F -- "$cmd" <<< "$content" >/dev/null; then
     printf '%s: publish signal "%s": SDKs must not publish from the monorepo (ADR 0015)\n' \
       "$path" "$cmd" >&2
     status=1
+  else
+    [ "$?" -eq 1 ]
   fi
 done <<EOF
 $publish_cmds
@@ -122,10 +126,12 @@ EOF
 if [ "$is_sdk_manifest" = 1 ]; then
   while IFS= read -r key; do
     [ -n "$key" ] || continue
-    if printf '%s' "$content" 2>/dev/null | grep -qF -- "$key"; then
+    if grep -F -- "$key" <<< "$content" >/dev/null; then
       printf '%s: publish lifecycle key "%s": SDKs must not publish from the monorepo (ADR 0015)\n' \
         "$path" "$key" >&2
       status=1
+    else
+      [ "$?" -eq 1 ]
     fi
   done <<EOF
 $manifest_keys

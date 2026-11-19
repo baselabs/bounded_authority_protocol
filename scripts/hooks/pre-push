@@ -1,7 +1,7 @@
-#!/bin/sh
-# Scan every commit and annotated-tag message introduced by the requested push.
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -u
+# Scan every commit and annotated-tag message introduced by the requested push.
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   printf 'pre-push: repository resolution failed; failing closed\n' >&2

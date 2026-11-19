@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
+
 # BAP-16 — enforce the library-path purity invariant for the Go SDK.
 #
 # AGENTS rule 2 + ADR 0014 D8: the library path (every non-test .go file at
@@ -15,15 +17,14 @@
 # library file makes this script exit 1; removing it restores exit 0 (proven
 # at authoring, recorded in the README).
 
-set -eu
-
-lib_dir=$(cd "$(dirname "$0")/.." && pwd)
+script_dir=$(dirname "$0")
+lib_dir=$(cd "$script_dir/.." && pwd)
 
 # Safe-but-impure APIs (dots escaped; `os\.` also catches os.ReadFile etc.).
 patterns='os\.|io\.|net\.|time\.|math/rand|crypto/rand|os/exec|unsafe\.|syscall\.|runtime\.GC|flag\.|log\.|context\.|sync\.'
 
 # Import allowlist: the pure stdlib packages the library consumes.
-allowed_imports='^\t"crypto/ecdsa"$|^\t"crypto/ed25519"$|^\t"crypto/elliptic"$|^\t"crypto/sha256"$|^\t"encoding/binary"$|^\t"errors"$|^\t"math"$|^\t"math/big"$|^\t"sort"$|^\t"strconv"$|^\t"strings"$|^\t"unicode/utf16"$|^\t"unicode/utf8"$|^import \($|^\)$'
+allowed_imports='^"(crypto/ecdsa|crypto/ed25519|crypto/elliptic|crypto/sha256|crypto/subtle|encoding/binary|errors|fmt|math|math/big|sort|strconv|strings|unicode/utf16|unicode/utf8)"$'
 
 status=0
 if [ "${1:-}" != "--derivation-top-level" ]; then
@@ -33,17 +34,22 @@ for f in "$lib_dir"/*.go; do
   esac
   # strip // comment tails first so doc prose (e.g. "I/O", "context.") cannot
   # false-positive — only code is scanned
-  if sed 's://.*$::' "$f" | grep -En "$patterns" >/dev/null 2>&1; then
+  code=$(sed 's://.*$::' "$f")
+  if matches=$(grep -En "$patterns" <<< "$code"); then
     echo "purity_check: FAIL — forbidden API in library path of ${f##*/}:" >&2
-    sed 's://.*$::' "$f" | grep -En "$patterns" >&2 || true
+    printf '%s\n' "$matches" >&2
     status=1
+  else
+    [ "$?" -eq 1 ]
   fi
   # any import line — block, aliased, dotted, or single — whose quoted path
   # is outside the allowlist fails (aliases and dot-imports cannot hide it):
   # extract the import block plus single imports, then filter quoted paths
-  imp_block=$(awk '/^import \(/ {flag=1} flag {print} /^\)/ {if (flag) flag=0}' "$f" 2>/dev/null || true)
-  imp_single=$(grep -E '^import ' "$f" 2>/dev/null || true)
-  bad_imports=$(printf '%s\n%s\n' "$imp_block" "$imp_single" | grep -oE '"[^"]+"' | grep -vE '^"(crypto/ecdsa|crypto/ed25519|crypto/elliptic|crypto/sha256|crypto/subtle|encoding/binary|errors|fmt|math|math/big|sort|strconv|strings|unicode/utf16|unicode/utf8)"$' || true)
+  imp_block=$(awk '/^import \(/ {flag=1} flag {print} /^\)/ {if (flag) flag=0}' "$f")
+  imp_single=$(grep -E '^import ' "$f") || [ "$?" -eq 1 ]
+  import_lines=$(printf '%s\n%s\n' "$imp_block" "$imp_single")
+  imports=$(grep -oE '"[^"]+"' <<< "$import_lines") || [ "$?" -eq 1 ]
+  bad_imports=$(grep -vE "$allowed_imports" <<< "$imports") || [ "$?" -eq 1 ]
   if [ -n "$bad_imports" ]; then
     echo "purity_check: FAIL — non-allowlisted import in ${f##*/}:" >&2
     printf '%s\n' "$bad_imports" >&2
@@ -52,7 +58,7 @@ for f in "$lib_dir"/*.go; do
 done
 fi
 
-sdk_dir=$(cd "$(dirname "$0")/.." && pwd)
+sdk_dir="$lib_dir"
 
 # Authored-text derivation rules also support the monorepo's top-level SDK documents.
 scan_root="$sdk_dir"

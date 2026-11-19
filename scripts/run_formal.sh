@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
+
 # Formal-analysis re-run (ADR 0025): pinned ProVerif execution + three checks.
 #
 #   1. run the model and diff the RESULT lines against spec/formal/expected-summary.txt
@@ -9,8 +11,8 @@
 #
 # Any escalated disposition is printed loudly: it blocks the program's done-claim until the
 # owner rules (routed via SECURITY.md).
-set -eu
-cd "$(dirname "$0")/.."
+script_dir=$(dirname "$0")
+cd "$script_dir/.."
 
 MODEL=spec/formal/proverif/bap-core.pv
 SUMMARY=spec/formal/expected-summary.txt
@@ -31,24 +33,31 @@ if ! command -v proverif >/dev/null 2>&1; then
 fi
 
 # --- 1. non-regression summary diff -------------------------------------------
-results=$(mktemp "${TMPDIR:-/tmp}/bap-formal-results.XXXXXX")
-trap 'rm -f "$results"' 0
+work_dir=$(mktemp -d "${TMPDIR:-/tmp}/bap-formal-results.XXXXXX")
+trap 'rm -rf "$work_dir"' EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-proverif "$MODEL" 2>&1 | grep -E '^RESULT' > "$results" || true
+results="$work_dir/results"
+proverif "$MODEL" > "$work_dir/output" 2>&1
+grep -E '^RESULT' "$work_dir/output" > "$results" || [ "$?" -eq 1 ]
 expected=$(grep -E '^RESULT' "$SUMMARY")
 actual=$(cat "$results")
 
 if [ "$expected" != "$actual" ]; then
   echo "run_formal: FAILED: model output diverges from the frozen summary:" >&2
-  printf '%s\n' "$expected" | diff - "$results" >&2 || true
+  printf '%s\n' "$expected" > "$work_dir/expected"
+  diff "$work_dir/expected" "$results" >&2 || [ "$?" -eq 1 ]
   fail=1
 else
-  echo "run_formal: summary ok ($(echo "$actual" | grep -c 'is true')/$(echo "$actual" | wc -l | tr -d ' ') queries true)"
-  if echo "$actual" | grep -q 'cannot be proved'; then
+  true_count=$(grep -c 'is true' "$results") || [ "$?" -eq 1 ]
+  query_count=$(wc -l < "$results" | tr -d ' ')
+  echo "run_formal: summary ok ($true_count/$query_count queries true)"
+  if grep 'cannot be proved' "$results" >/dev/null; then
     echo "run_formal: FAILED: at least one query is NOT proved" >&2
     fail=1
+  else
+    [ "$?" -eq 1 ]
   fi
 fi
 
@@ -63,7 +72,10 @@ REQ1-VERIFY-time-bounds REQ1-CLAIM-case-sensitive"
 missing=0
 model_ids=$(grep -o 'REQ1-[A-Z0-9]*-[a-z0-9-]*' "$MODEL" | sort -u)
 for id in $model_ids; do
-  if ! printf '%s\n' "$map_ids" | grep -x "$id" >/dev/null; then
+  if grep -x "$id" <<< "$map_ids" >/dev/null; then
+    continue
+  else
+    [ "$?" -eq 1 ]
     echo "run_formal: FAILED: model annotates $id which is not in the requirement map" >&2
     missing=1
   fi
@@ -71,12 +83,18 @@ done
 # Exact step-annotation form "(* <id> *)"; declaration prose that merely mentions ids does
 # not satisfy the pin; the annotation must ride a code line.
 for id in $PINNED; do
-  if ! grep -q "(\* $id \*)" "$MODEL"; then
+  if grep "(\* $id \*)" "$MODEL" >/dev/null; then
+    continue
+  else
+    [ "$?" -eq 1 ]
     echo "run_formal: FAILED: pinned annotation $id dropped from the model" >&2
     missing=1
   fi
 done
-[ "$missing" = 0 ] && echo "run_formal: coverage ok ($(grep -o 'REQ1-[A-Z0-9]*-[a-z0-9-]*' "$MODEL" | sort -u | wc -l | tr -d ' ') annotated ids all mapped; pinned set intact)"
+if [ "$missing" = 0 ]; then
+  annotation_count=$(printf '%s\n' "$model_ids" | wc -l | tr -d ' ')
+  echo "run_formal: coverage ok ($annotation_count annotated ids all mapped; pinned set intact)"
+fi
 
 # --- 3. findings ledger schema --------------------------------------------------
 python3 - "$LEDGER" <<'PYEOF'

@@ -1,5 +1,5 @@
-#!/bin/sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
 expected_version='8.30.1'
 
@@ -72,7 +72,8 @@ assert_history_safe() {
     echo "secret history scan requires a complete, non-shallow repository" >&2
     return 1
   fi
-  if [ -n "$(git --no-replace-objects -C "$scan_root" for-each-ref --format='%(refname)' refs/replace)" ]; then
+  replace_refs=$(git --no-replace-objects -C "$scan_root" for-each-ref --format='%(refname)' refs/replace)
+  if [ -n "$replace_refs" ]; then
     echo "secret history scan refuses Git replace refs" >&2
     return 1
   fi
@@ -110,9 +111,9 @@ unstaged_scan() {
 
 write_pat() {
   target=$1
-  prefix=$(printf 'gh%s_' 'p')
-  suffix=$(openssl rand -hex 18)
-  printf '%s%s\n' "$prefix" "$suffix" > "$target"
+  prefix=$(printf 'gh%s_' 'p') || return $?
+  suffix=$(openssl rand -hex 18) || return $?
+  printf '%s%s\n' "$prefix" "$suffix" > "$target" || return $?
   printf '%s%s' "$prefix" "$suffix"
 }
 
@@ -124,17 +125,17 @@ write_generic_key() {
   # 8.30.1), a probabilistic gate. The literal mixes digits and letters with no long
   # runs, so the detector fires deterministically.
   value='a3f1c9e7b5d2468f0a1e3c5b7d9f2e4a6c8b0d3f5a7c9e1b3d5f7a9c'
-  printf '{"key_fingerprint": "%s"}\n' "$value" > "$target"
+  printf '{"key_fingerprint": "%s"}\n' "$value" > "$target" || return $?
   printf '%s' "$value"
 }
 
 write_jwt() {
   target=$1
-  header=$(printf '{"alg":"HS256","typ":"JWT"}' | openssl base64 -A | tr '+/' '-_' | tr -d '=')
-  payload=$(printf '{"sub":"runtime-sensitivity-probe","iat":1}' | openssl base64 -A | tr '+/' '-_' | tr -d '=')
+  header=$(printf '{"alg":"HS256","typ":"JWT"}' | openssl base64 -A | tr '+/' '-_' | tr -d '=') || return $?
+  payload=$(printf '{"sub":"runtime-sensitivity-probe","iat":1}' | openssl base64 -A | tr '+/' '-_' | tr -d '=') || return $?
   # Fixed signature (same determinism rationale as write_generic_key).
   signature='Uo1bVz9xQ3mK7cS2wE5nR8tY4uI6oP0aD3fG7hJ9kL1zM4xC6vB8nQ2wE5rT7yU'
-  printf '%s.%s.%s\n' "$header" "$payload" "$signature" > "$target"
+  printf '%s.%s.%s\n' "$header" "$payload" "$signature" > "$target" || return $?
   printf '%s.%s.%s' "$header" "$payload" "$signature"
 }
 
@@ -153,6 +154,8 @@ assert_redacted_finding() {
   if grep -F "$canary" "$stdout_file" "$stderr_file" "$report" >/dev/null; then
     echo "redacted scanner output exposed a canary" >&2
     return 1
+  else
+    [ "$?" -eq 1 ]
   fi
 }
 
@@ -218,6 +221,8 @@ run_check() {
   if git config --global --get diff.noprefix >/dev/null 2>&1; then
     echo "secret-scan test Git inherited global configuration" >&2
     return 1
+  else
+    [ "$?" -eq 1 ]
   fi
 
   guard_repo="$check_dir/history-guard"
@@ -252,7 +257,8 @@ run_check() {
     /*) ;;
     *) shallow_path="$guard_repo/$shallow_path" ;;
   esac
-  printf '%s\n' "$(git --no-replace-objects -C "$guard_repo" rev-parse HEAD^)" > "$shallow_path"
+  shallow_parent=$(git --no-replace-objects -C "$guard_repo" rev-parse HEAD^)
+  printf '%s\n' "$shallow_parent" > "$shallow_path"
   if (cd "$guard_repo" && "$repo_root/scripts/secret_scan.sh" --history) \
     > "$check_dir/history-guard-shallow.stdout" 2> "$check_dir/history-guard-shallow.stderr"; then
     echo "shallow-history self-check did not fail" >&2
@@ -277,7 +283,8 @@ run_check() {
     /*) ;;
     *) grafts_path="$guard_repo/$grafts_path" ;;
   esac
-  mkdir -p "$(dirname "$grafts_path")"
+  grafts_dir=$(dirname "$grafts_path")
+  mkdir -p "$grafts_dir"
   printf '%s %s\n' "$guard_head" "$guard_parent" > "$grafts_path"
   if (cd "$guard_repo" && "$repo_root/scripts/secret_scan.sh" --history) \
     > "$check_dir/history-guard-grafts.stdout" 2> "$check_dir/history-guard-grafts.stderr"; then
@@ -371,7 +378,8 @@ lib/non_fixture_probe.ex'
   IFS='
 '
   for path in $fixture_paths; do
-    mkdir -p "$probe_repo/$(dirname "$path")"
+    parent_dir=$(dirname "$path")
+    mkdir -p "$probe_repo/$parent_dir"
     canary=$(write_pat "$probe_repo/$path")
     printf '%s\n' "$canary" >> "$canary_file"
     fixture_count=$((fixture_count + 1))
@@ -447,7 +455,8 @@ EOF
   generic_canaries="$check_dir/generic-canaries.txt"
   : > "$generic_canaries"
   while IFS= read -r path; do
-    mkdir -p "$generic_repo/$(dirname "$path")"
+    parent_dir=$(dirname "$path")
+    mkdir -p "$generic_repo/$parent_dir"
     value=$(write_generic_key "$generic_repo/$path")
     printf '%s\n' "$value" >> "$generic_canaries"
   done < "$generic_paths_file"
@@ -532,7 +541,8 @@ PY
   jwt_canaries="$check_dir/jwt-canaries.txt"
   : > "$jwt_canaries"
   while IFS= read -r path; do
-    mkdir -p "$jwt_repo/$(dirname "$path")"
+    parent_dir=$(dirname "$path")
+    mkdir -p "$jwt_repo/$parent_dir"
     value=$(write_jwt "$jwt_repo/$path")
     printf '%s\n' "$value" >> "$jwt_canaries"
   done < "$jwt_paths_file"
@@ -667,8 +677,10 @@ PY
   git -C "$historical_repo" -c core.hooksPath=/dev/null commit -q -m 'historical fixture base'
   historical_generic_path=$(cat "$check_dir/historical-generic-path.txt")
   historical_jwt_path=$(cat "$check_dir/historical-jwt-path.txt")
-  mkdir -p "$historical_repo/$(dirname "$historical_generic_path")"
-  mkdir -p "$historical_repo/$(dirname "$historical_jwt_path")"
+  historical_generic_dir=$(dirname "$historical_generic_path")
+  historical_jwt_dir=$(dirname "$historical_jwt_path")
+  mkdir -p "$historical_repo/$historical_generic_dir"
+  mkdir -p "$historical_repo/$historical_jwt_dir"
   cat "$check_dir/historical-generic-value.txt" >> "$historical_repo/$historical_generic_path"
   cat "$check_dir/historical-jwt-value.txt" >> "$historical_repo/$historical_jwt_path"
   git -C "$historical_repo" add "$historical_generic_path" "$historical_jwt_path"

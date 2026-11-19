@@ -155,19 +155,23 @@ BOUNDARY_EXCEPTIONS = {
         'The imported SDK module lives in src/bounded_authority_verifier; its directory stays in the SDK.',
     ('python/tools/license_check.py', "python:Path(__file__).resolve().parent.parent / 'pyproject.toml'", 1):
         '__file__-anchored traversal stops at the SDK root or a directory beneath it.',
-    ('rust/tools/license_check.sh', 'cd "$(dirname "$0")/.."', 1):
+    ('go/tools/license_check.sh', 'script_dir=$(dirname "$0")', 1):
+        '$0 names this SDK tool; dirname resolves its containing tools directory.',
+    ('go/tools/purity_check.sh', 'script_dir=$(dirname "$0")', 1):
+        '$0 names this SDK tool; dirname resolves its containing tools directory.',
+    ('rust/tools/license_check.sh', 'script_dir=$(dirname "$0")', 1):
+        '$0 names this SDK tool; dirname resolves its containing tools directory.',
+    ('rust/tools/purity_check.sh', 'script_dir=$(dirname "$0")', 1):
+        '$0 names this SDK tool; dirname resolves its containing tools directory.',
+    ('rust/tools/license_check.sh', 'cd "$script_dir/.."', 1):
         '$0 is tools/<checker>; its directory plus one parent is exactly the SDK root.',
-    ('go/tools/license_check.sh', 'cd "$(dirname "$0")/.."', 1):
+    ('go/tools/license_check.sh', 'cd "$script_dir/.."', 1):
         '$0 is tools/<checker>; its directory plus one parent is exactly the SDK root.',
     ('python/tools/purity_check.py', 'python:Path(__file__).resolve().parent.parent', 1):
         '__file__-anchored traversal stops at the SDK root or a directory beneath it.',
-    ('go/tools/purity_check.sh', 'lib_dir=$(cd "$(dirname "$0")/.." && pwd)', 1):
+    ('go/tools/purity_check.sh', 'lib_dir=$(cd "$script_dir/.." && pwd)', 1):
         '$0 is tools/<checker>; its directory plus one parent is exactly the SDK root.',
-    ('rust/tools/purity_check.sh', 'sdk_dir=$(cd "$(dirname "$0")/.." && pwd)', 1):
-        '$0 is tools/<checker>; its directory plus one parent is exactly the SDK root.',
-    ('go/tools/purity_check.sh', 'sdk_dir=$(cd "$(dirname "$0")/.." && pwd)', 1):
-        '$0 is tools/<checker>; its directory plus one parent is exactly the SDK root.',
-    ('rust/tools/purity_check.sh', 'src_dir=$(cd "$(dirname "$0")/.." && pwd)/src', 1):
+    ('rust/tools/purity_check.sh', 'sdk_dir=$(cd "$script_dir/.." && pwd)', 1):
         '$0 is tools/<checker>; its directory plus one parent is exactly the SDK root.',
     ('go/uri.go', 'case "..":', 1):
         'RFC 3986 URI normalization input or token; never used as a filesystem path.',
@@ -496,7 +500,7 @@ def python_package(root, temp):
 
 def rust_suite(root, env):
     run(['cargo', 'test', '--locked'], root, env)
-    run(['sh', 'tools/purity_check.sh'], root, env)
+    run(['bash', 'tools/purity_check.sh'], root, env)
 
 
 def rust_package(root, temp, env):
@@ -531,7 +535,7 @@ def go_zip(root, temp, env):
     print('Go module zip carries the complete conformance tree', flush=True)
     module_root = unpack / 'github.com/baselabs/bounded_authority_protocol_go@v0.0.0'
     run(['go', 'test', './...'], module_root, env)
-    run(['sh', 'tools/purity_check.sh'], module_root, env)
+    run(['bash', 'tools/purity_check.sh'], module_root, env)
 
 
 def main():
@@ -557,7 +561,7 @@ def main():
             rust_package(root, temp, env)
         else:
             run(['go', 'test', './...'], root, env)
-            run(['sh', 'tools/purity_check.sh'], root, env)
+            run(['bash', 'tools/purity_check.sh'], root, env)
             go_zip(root, temp, env)
     print(f'{args.sdk}: isolated suite and package: PASS')
 

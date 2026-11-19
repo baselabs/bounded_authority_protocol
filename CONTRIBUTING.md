@@ -56,7 +56,7 @@ Cross-language verifier SDKs under `sdks/` are authored in this repository but *
 from it**. Each SDK graduates to its own per-SDK repository (`bounded_authority_protocol_<lang>`)
 on first publication, because a registry publication is irreversible and each SDK's release
 cadence and credentials belong to its own repository. A
-local pre-commit hook (`sh scripts/install-hooks.sh`) and a job in every CI run reject SDK publish
+local pre-commit hook (`bash scripts/install-hooks.sh`) and a job in every CI run reject SDK publish
 infrastructure (registry-publish steps, `prepublishOnly`/`prepack` scripts, `publishConfig`)
 committed to this repository. Contributor hook installation works without any local policy;
 maintainer checks activate only where a maintainer has set one up. The deliberate-admin bypass is `git commit --no-verify`, documented
@@ -64,7 +64,7 @@ here as the sanctioned escape hatch. Neither layer catches a literal ad-hoc publ
 against a working tree, since no commit gate sees that runtime act; the `kci/<sha>` qualification
 run is the hard gate for committed infrastructure. Only the Elixir Hex command in
 `.github/workflows/publish.yml` is exempt; every other registry command and action stays blocked.
-Existing checkouts must rerun `sh scripts/install-hooks.sh` after updating the hook.
+Existing checkouts must rerun `bash scripts/install-hooks.sh` after updating the hook.
 
 ## Package publication and site deployment
 

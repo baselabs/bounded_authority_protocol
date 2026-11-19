@@ -236,10 +236,10 @@ def main():
         case_file.write_bytes(case_bytes)
         command(verify_content, tree)
         print('GREEN: restored signed-content generator inputs', flush=True)
-        publish = subprocess.run(['sh', str(ROOT / 'scripts/check_sdk_publish_infra.sh'), '.github/actions/release/action.yml'], input='run: cargo publish\n', text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        publish = subprocess.run(['bash', str(ROOT / 'scripts/check_sdk_publish_infra.sh'), '.github/actions/release/action.yml'], input='run: cargo publish\n', text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         assert publish.returncode == 1 and 'registry-publish command' in publish.stdout
         print('RED: ' + publish.stdout.strip(), flush=True)
-        clean = subprocess.run(['sh', str(ROOT / 'scripts/check_sdk_publish_infra.sh'), '.github/actions/release/action.yml'], input='run: cargo test\n', text=True)
+        clean = subprocess.run(['bash', str(ROOT / 'scripts/check_sdk_publish_infra.sh'), '.github/actions/release/action.yml'], input='run: cargo test\n', text=True)
         assert clean.returncode == 0
         print('GREEN: composite action restored', flush=True)
     print('corpus distribution execution mutations: PASS', flush=True)

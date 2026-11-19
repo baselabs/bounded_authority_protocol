@@ -1,7 +1,9 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
+
 # pre-commit: guard against SDK publish infrastructure landing in the monorepo.
 #
-# Installed by: sh scripts/install-hooks.sh   (symlinks this into .git/hooks/)
+# Installed by: bash scripts/install-hooks.sh   (symlinks this into .git/hooks/)
 # Bypass:       git commit --no-verify        (documented deliberate-admin escape)
 # Authority:    ADR 0015 (SDK graduation and publish topology), Decision 5.
 # Patterns:     scripts/check_sdk_publish_infra.sh (single source of truth; the CI
@@ -15,8 +17,6 @@
 # literal 'npm publish' run against a working tree. The kci qualification run is the hard,
 # non-bypassable backstop for committed infrastructure; this hook is honor-system
 # fast feedback for contributors.
-
-set -u
 
 # Resolve the repo root from the git toplevel so the checker path is stable whether
 # the hook runs via .git/hooks/pre-commit (symlink) or directly.

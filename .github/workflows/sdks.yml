@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 env:
   GOTOOLCHAIN: local
 
@@ -170,11 +174,11 @@ jobs:
         working-directory: sdks/rust
 
       - name: purity check
-        run: sh tools/purity_check.sh
+        run: bash tools/purity_check.sh
         working-directory: sdks/rust
 
       - name: license check
-        run: sh tools/license_check.sh
+        run: bash tools/license_check.sh
         working-directory: sdks/rust
 
   # Go runs as its own job in the same call. The go.mod floor (1.25) is the
@@ -222,7 +226,9 @@ jobs:
         run: python3 scripts/check_sdk_install.py go
 
       - name: gofmt
-        run: test -z "$(gofmt -l .)"
+        run: |
+          unformatted="$(gofmt -l .)"
+          test -z "$unformatted"
         working-directory: sdks/go
 
       - name: vet
@@ -234,11 +240,11 @@ jobs:
         working-directory: sdks/go
 
       - name: purity check
-        run: sh tools/purity_check.sh
+        run: bash tools/purity_check.sh
         working-directory: sdks/go
 
       - name: license check
-        run: sh tools/license_check.sh
+        run: bash tools/license_check.sh
         working-directory: sdks/go
 
   # Audit the complete module set, including stdlib, on a supported patched toolchain.

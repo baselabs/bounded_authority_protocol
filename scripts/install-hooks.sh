@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
+
 # install-hooks.sh: install this repo's tracked git hooks into .git/hooks/.
 #
 # The hooks live tracked under scripts/hooks/ so they ship with the repo and are
@@ -13,8 +15,6 @@
 # (documented in CONTRIBUTING.md). To uninstall entirely, remove the symlink from
 # .git/hooks/.
 
-set -eu
-
 die() { printf 'install-hooks.sh: %s\n' "$*" >&2; exit 1; }
 
 initialize_count=""
@@ -22,10 +22,10 @@ case "$#" in
   0) ;;
   2)
     [ "$1" = "--initialize-private-identifier-expectation" ] \
-      || die "usage: sh scripts/install-hooks.sh [--initialize-private-identifier-expectation COUNT]"
+      || die "usage: bash scripts/install-hooks.sh [--initialize-private-identifier-expectation COUNT]"
     initialize_count="$2"
     ;;
-  *) die "usage: sh scripts/install-hooks.sh [--initialize-private-identifier-expectation COUNT]" ;;
+  *) die "usage: bash scripts/install-hooks.sh [--initialize-private-identifier-expectation COUNT]" ;;
 esac
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" \
@@ -39,6 +39,8 @@ common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
   || die "linked worktree detected; refusing shared hook installation"
 if configured_hooks="$(git config --get core.hooksPath 2>/dev/null)"; then
   [ -z "$configured_hooks" ] || die "core.hooksPath is configured; refusing to modify hooks"
+else
+  [ "$?" -eq 1 ] || die "cannot read core.hooksPath"
 fi
 hooks_dir="$(git rev-parse --path-format=absolute --git-path hooks 2>/dev/null)" \
   || die "cannot resolve the Git hooks directory"
@@ -57,7 +59,11 @@ print(os.path.relpath(sys.argv[1], sys.argv[2]))
 PY
 )" || die "cannot compute the hook target"
   if [ -e "$link" ] || [ -L "$link" ]; then
-    if [ ! -L "$link" ] || [ "$(readlink "$link")" != "$relative_target" ]; then
+    if [ ! -L "$link" ]; then
+      die "existing hook collision for $name; preserved"
+    fi
+    existing_target="$(readlink "$link")" || die "cannot read the hook target"
+    if [ "$existing_target" != "$relative_target" ]; then
       die "existing hook collision for $name; preserved"
     fi
   fi

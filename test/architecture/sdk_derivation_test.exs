@@ -5,8 +5,8 @@ defmodule BoundedAuthorityProtocol.SdkDerivationTest do
   @root Path.expand("../..", __DIR__)
   @sdks [
     {"python", "purity_check.py", "python3", "src/bounded_authority_verifier/probe.py", "#"},
-    {"rust", "purity_check.sh", "sh", "src/probe.rs", "//"},
-    {"go", "purity_check.sh", "sh", "probe.go", "//"}
+    {"rust", "purity_check.sh", "bash", "src/probe.rs", "//"},
+    {"go", "purity_check.sh", "bash", "probe.go", "//"}
   ]
   @citations [
     {"lib/bounded_authority_protocol/v1/grant.ex", "reference source citation"},

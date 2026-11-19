@@ -149,14 +149,14 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         subdirectory = self.repo / "subdirectory"
         subdirectory.mkdir()
         result = run(
-            "sh",
+            "bash",
             "../scripts/install-hooks.sh",
             "--initialize-private-identifier-expectation",
             str(len(self.patterns)),
             cwd=subdirectory,
         )
         self.assertEqual(result.returncode, 0, "real hook installation failed")
-        result = run("sh", "../scripts/install-hooks.sh", cwd=subdirectory)
+        result = run("bash", "../scripts/install-hooks.sh", cwd=subdirectory)
         self.assertEqual(result.returncode, 0, "routine hook validation failed")
 
     def guard(
@@ -460,7 +460,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         wrapper_dir.mkdir()
         wrapper = wrapper_dir / "git"
         wrapper.write_text(
-            '#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$GUARD_INVOCATION_LOG"\n'
+            '#!/usr/bin/env bash\nset -euo pipefail\nprintf \'%s\\n\' "$*" >> "$GUARD_INVOCATION_LOG"\n'
             f'exec {shlex.quote(real_git)} "$@"\n',
             encoding="utf-8",
         )
@@ -1051,7 +1051,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         git(self.repo, "rm", "-q", verbose_removable.name)
         editor = self.scratch / "clean-editor.sh"
         editor.write_text(
-            "#!/bin/sh\nprintf 'clean editor removal\\n' > \"$1\"\n",
+            "#!/usr/bin/env bash\nset -euo pipefail\nprintf 'clean editor removal\\n' > \"$1\"\n",
             encoding="utf-8",
         )
         editor.chmod(0o700)
@@ -1074,7 +1074,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
             self.other_pattern + "-changed",
             *self.patterns[2:],
         )
-        result = run("sh", "scripts/install-hooks.sh", cwd=self.repo)
+        result = run("bash", "scripts/install-hooks.sh", cwd=self.repo)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(expectation.read_bytes(), before)
 
@@ -1084,9 +1084,9 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.copy_hook_sources()
         scripts = self.repo / "scripts"
         hook = self.repo / ".git" / "hooks" / "pre-commit"
-        hook.write_text("#!/bin/sh\necho preserved\n", encoding="utf-8")
+        hook.write_text("#!/usr/bin/env bash\nset -euo pipefail\necho preserved\n", encoding="utf-8")
         before = hook.read_bytes()
-        result = run("sh", str(scripts / "install-hooks.sh"), cwd=self.repo)
+        result = run("bash", str(scripts / "install-hooks.sh"), cwd=self.repo)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("existing hook collision", result.stderr)
         self.assertEqual(hook.read_bytes(), before)
@@ -1099,7 +1099,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.copy_hook_sources()
         subdirectory = self.repo / "subdirectory"
         subdirectory.mkdir()
-        result = run("sh", "../scripts/install-hooks.sh", cwd=subdirectory)
+        result = run("bash", "../scripts/install-hooks.sh", cwd=subdirectory)
         self.assertEqual(result.returncode, 0, result.stderr)
         for name in ("pre-commit", "commit-msg", "pre-push"):
             self.assertTrue((self.repo / ".git" / "hooks" / name).is_symlink())
@@ -1123,7 +1123,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
             for name in ("pre-commit", "commit-msg", "pre-push")
         ]
         self.assertTrue(all(not path.exists() for path in destinations))
-        result = run("sh", "scripts/install-hooks.sh", cwd=linked)
+        result = run("bash", "scripts/install-hooks.sh", cwd=linked)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("linked worktree detected", result.stderr)
         self.assertTrue(all(not path.exists() for path in destinations))
@@ -1143,7 +1143,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         ]
         self.assertTrue(all(not path.exists() for path in destinations))
         result = run(
-            "sh",
+            "bash",
             "../scripts/install-hooks.sh",
             cwd=subdirectory,
             env={"GIT_CONFIG_GLOBAL": str(global_config)},

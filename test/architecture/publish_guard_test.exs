@@ -25,7 +25,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
       # The guard reads content on stdin; feed it from the temp file (System.cmd has no stdin
       # option on this Elixir). @script and path carry no shell metacharacters in these cases.
       {_out, status} =
-        System.cmd("sh", ["-c", "#{@script} #{path} < #{tmp}"], stderr_to_stdout: true)
+        System.cmd("bash", ["-c", "#{@script} #{path} < #{tmp}"], stderr_to_stdout: true)
 
       status
     after
@@ -148,7 +148,10 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
   end
 
   test "a clean SDK script exits 0" do
-    assert run("#!/bin/sh\nnpm run build\n", "sdks/typescript/scripts/build.sh") == 0
+    assert run(
+             "#!/usr/bin/env bash\nset -euo pipefail\nnpm run build\n",
+             "sdks/typescript/scripts/build.sh"
+           ) == 0
   end
 
   test "an out-of-scope file carrying a publish string is not scanned" do

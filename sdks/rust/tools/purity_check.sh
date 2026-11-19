@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
+
 # BAP-15 Task 16 — enforce the lib-path purity invariant.
 #
 # AGENTS rule 2 + ADR 0014 D8: the library path under src/ must contain no I/O,
@@ -18,9 +20,9 @@
 # red-capable: planting `use std::fs;` in a src/ lib path makes this script
 # exit 1; removing it restores exit 0.
 
-set -eu
-
-src_dir=$(cd "$(dirname "$0")/.." && pwd)/src
+script_dir=$(dirname "$0")
+sdk_dir=$(cd "$script_dir/.." && pwd)
+src_dir="$sdk_dir/src"
 
 # Safe-but-impure APIs that #![forbid(unsafe_code)] does not catch.
 # `rand::` / `rand_core::` are path-qualified to avoid the doc-comment mention
@@ -40,15 +42,15 @@ if [ "${1:-}" != "--derivation-top-level" ]; then
 for f in "$src_dir"/*.rs; do
   # Strip the trailing #[cfg(test)] module (test code reads corpus files).
   lib_path=$(awk '/^#\[.*cfg\(test\)/{exit} {print}' "$f")
-  if printf '%s\n' "$lib_path" | grep -En "$patterns" >/dev/null 2>&1; then
+  if matches=$(grep -En "$patterns" <<< "$lib_path"); then
     echo "purity_check: FAIL — forbidden API in lib path of ${f##*/}:" >&2
-    printf '%s\n' "$lib_path" | grep -En "$patterns" >&2 || true
+    printf '%s\n' "$matches" >&2
     status=1
+  else
+    [ "$?" -eq 1 ]
   fi
 done
 fi
-
-sdk_dir=$(cd "$(dirname "$0")/.." && pwd)
 
 # Authored-text derivation rules also support the monorepo's top-level SDK documents.
 scan_root="$sdk_dir"
