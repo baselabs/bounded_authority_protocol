@@ -27,7 +27,10 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
-deps=$(go list -m all 2>/dev/null)
+deps=$(go list -m all) || {
+  echo "license_check: FAIL — 'go list -m all' failed." >&2
+  exit 1
+}
 
 if [ -z "$deps" ]; then
   echo "license_check: FAIL — 'go list -m all' returned nothing (degraded output refused)." >&2
