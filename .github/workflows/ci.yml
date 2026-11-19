@@ -537,7 +537,7 @@ jobs:
   formal-analysis:
     name: Pinned ProVerif re-run + ledger checks
     runs-on: ubuntu-24.04
-    timeout-minutes: 90 # no green run yet without the implicit opam cache
+    timeout-minutes: 28 # 2x slowest green 13.9 min, run 44305879447; OCaml setup alone varies 4-12 min with or without a cache.
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
