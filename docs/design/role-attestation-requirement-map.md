@@ -7,7 +7,7 @@ evidence or an explicit adoption or release obligation. The certified profile co
 `be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a`.
 
 Current releases follow the package 1.x policy in [API stability](../guides/api-stability.md)
-and the [release-candidate contract](../release-candidate-contract.md). A new sibling profile
+and the [release-candidate contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/release-candidate-contract.md). A new sibling profile
 requires a minor release; changes to this released profile must preserve its bytes and verdicts,
 except for a soundness repair meeting the published governance conditions. Release evidence
 must identify the exact candidate and corpus and be understandable without private work tracking.

@@ -8,7 +8,7 @@ The evidence column names the required checks. The profile was first released in
 package 0.7.0.
 
 Current releases follow the package 1.x policy in [API stability](../guides/api-stability.md)
-and the [release-candidate contract](../release-candidate-contract.md). A new sibling profile
+and the [release-candidate contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/release-candidate-contract.md). A new sibling profile
 requires a minor release; this released profile keeps its bytes and verdicts except for a
 soundness repair meeting the published governance conditions.
 

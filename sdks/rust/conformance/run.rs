@@ -6,7 +6,7 @@
 //! gate that:
 //!
 //! 1. **SHA-binds** the vendored corpus snapshot (certified index SHA-256 binding
-//! (docs/design/conformance-contract.md)): hashes
+//!    (docs/design/conformance-contract.md)): hashes
 //!    `conformance/priv/conformance/v1/corpus/index.json` at startup and fails closed on mismatch
 //!    with the certified SHA: a consumer who vendors a drifted corpus gets a
 //!    hard failure, not silent drift.
@@ -16,7 +16,7 @@
 //!    `src/` struct; `serde_json` reads the corpus into `serde_json::Value` and
 //!    the runner hand-builds every input).
 //! 3. **Runs the two-boundary key census** (import-boundary public-key census
-//! (docs/design/conformance-contract.md)): the set of public
+//!    (docs/design/conformance-contract.md)): the set of public
 //!    keys imported at the SDK's `[u8;32]` crypto boundary: every key the
 //!    runner feeds to a crate function: thumbprinted and compared BOTH
 //!    directions against the index `public_key_fingerprints` (no extra, no

@@ -41,7 +41,7 @@
 //!   (not decode-bounded) value passed directly to this public primitive cannot
 //!   force unbounded recursion, traversal, or intermediate allocation: the
 //!   `(d)`-class per-node encode-bounds closure (per-defect mutation proofs
-//! (docs/design/conformance-contract.md); the corpus
+//!   (docs/design/conformance-contract.md); the corpus
 //!   cannot express it, so the permissiveness battery proves it red-capable).
 
 use crate::bounds::Bounds;

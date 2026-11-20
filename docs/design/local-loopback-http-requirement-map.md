@@ -6,7 +6,7 @@ evidence or an explicit adoption or release obligation. The certified profile co
 `priv/conformance/application-profiles/local-loopback-http/v1`.
 
 Current releases follow the package 1.x policy in [API stability](../guides/api-stability.md)
-and the [release-candidate contract](../release-candidate-contract.md). A new sibling profile
+and the [release-candidate contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/release-candidate-contract.md). A new sibling profile
 requires a minor release; this released profile keeps its bytes and verdicts except for a
 soundness repair meeting the published governance conditions. Adoption obligations apply to
 every authority host, independently of any private work tracking.
