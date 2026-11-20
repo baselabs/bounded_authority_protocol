@@ -36,7 +36,11 @@ gh attestation verify bounded_authority_protocol-<version>.tar \
 
 The maintainers' release operator dispatches [publish.yml](../.github/workflows/publish.yml)
 from `main` to publish the Hex package after qualification. It refuses a package name Hex has
-never had, a tagged or retired version, or existing package or documentation bytes that differ.
+never had, a tagged or retired version, or an existing package whose bytes differ. Docs are a
+rendering of the package and an ExDoc build is not byte-stable, so docs Hex already serves for
+the version are kept and read back as present, never compared by bytes. The docs archive
+carries `release.json` naming the package, version and commit that built it; a resumed
+publication finishes only on that commit, and a refusal names it.
 It builds HTML docs and the archive without a cache, checks package identity, file inventory
 and source bytes, and verifies the archive's qualification attestation before uploading.
 Only the upload step holds the registry key, from a directory with no `mix.exs`.
