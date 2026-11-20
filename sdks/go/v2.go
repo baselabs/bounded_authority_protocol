@@ -11,12 +11,13 @@ import (
 // the sibling SDKs get from their module systems). The profile is byte-honest
 // with the frozen v1 surface except: (1) every versioned payload carries
 // "v":2 and this major rejects v1 bytes (and vice versa), (2) the domain
-// separators below are the BAP2 forms — the v1 constants in
-// selector.go/chain.go/archive.go are untouched — and (3) the selector
+// separators below are the BAP2 forms: the v1 constants in
+// selector.go/chain.go/archive.go are untouched: and (3) the selector
 // algebra additionally admits the two inclusive one-sided range kinds lte/gte
 // on the existing {kind, path, value} member set: same-tag numeric operands
 // only, comparison by numeric value, cross-tag never matches, and a
-// non-numeric bound is rejected at decode (ADR 0028 §1-§3). The shared json
+// non-numeric bound is rejected at decode (inclusive same-tag numeric ranges in closed member
+// sets (spec/bap-v2.md §4)). The shared json
 // algebra, JCS, base64url, JWK, URI, and bounds modules are reused unchanged;
 // only wire-version, domain-separator, and selector-kind decisions live here.
 
@@ -41,12 +42,12 @@ type Profile struct{}
 // holds no state, so this is the same namespace as any Profile{} value.
 var successor = Profile{}
 
-// ---- selector algebra (ADR 0028) ----
+// ---- selector algebra (spec/bap-v2.md §4) ----
 
 // validateSelector closed-set-validates one selector value: the v1 kind set
 // plus lte/gte on the same {kind, path, value} member set. An lte/gte bound
-// must be numeric (Int or Float) — a non-numeric bound is malformed and fails
-// the whole grant at decode (ADR 0028 §7).
+// must be numeric (Int or Float): a non-numeric bound is malformed and fails
+// the whole grant at decode (crossed endpoints never match (spec/bap-v2.md §4)).
 func (Profile) validateSelector(v Value, bounds *Bounds) error {
 	b, err := resolveBounds(bounds)
 	if err != nil {
@@ -113,7 +114,8 @@ func (Profile) validateSelector(v Value, bounds *Bounds) error {
 			return ErrInvalid // one-of size ceiling
 		}
 	case "lte", "gte":
-		// ADR 0028 §3: the second recognized member set, value carries the
+		// the existing {kind, path, value} member set (spec/bap-v2.md §4): the second recognized
+		// member set, value carries the
 		// bound. A non-numeric bound is malformed, not a non-match.
 		if len(obj) != 3 || !pathValid || !hasValue {
 			return ErrInvalid
@@ -230,13 +232,14 @@ func (Profile) applySelectors(selectors []Value, args Value) error {
 	return nil
 }
 
-// rangeMatch applies the ADR 0028 §2 operand domain: the traversed value and
+// rangeMatch applies the same-tag numeric operands (spec/bap-v2.md §4) operand domain: the
+// traversed value and
 // the bound must carry the SAME numeric tag (both integer-tagged or both
-// float-tagged — cross-tag never matches); comparison is by numeric value on
+// float-tagged: cross-tag never matches); comparison is by numeric value on
 // the finite binary64 domain (IEEE 754 ordering, −0.0 = 0.0); lte is
 // inclusive ≤, gte is inclusive ≥. A non-numeric operand never matches. No
 // new bound exists: both operands are already inside the decoder's closed
-// numeric domain (ADR 0028 §4).
+// numeric domain (numeric comparison on bounded operands (spec/bap-v2.md §4)).
 func rangeMatch(kind Str, found, bound Value) bool {
 	switch f := found.(type) {
 	case Int:
@@ -539,7 +542,7 @@ func (Profile) requestDigestRaw(operation string, castArguments Value, bounds *B
 	return out, nil
 }
 
-// ---- decode/verify façades ----
+// ---- decode/verify facades ----
 
 // DecodeGrant decodes and closed-set-validates a raw grant compact of this
 // major. It performs no signature verification and rejects v1 bytes.
@@ -1111,8 +1114,8 @@ func (Profile) AssembleCompact(si SigningInput, signature []byte, bounds *Bounds
 	if len(signature) != b.SignatureBytes {
 		return "", ErrInvalid
 	}
-	// Erratum 3 (REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer surface — it
-	// frames a signature and verifies none — so it refuses a signature that fails the keyless
+	// Erratum 3 (REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer surface: it
+	// frames a signature and verifies none: so it refuses a signature that fails the keyless
 	// part of rule S1 and emits accepted bytes unchanged.
 	if !signatureGate(signature) {
 		return "", ErrInvalid
@@ -1959,14 +1962,14 @@ func (Profile) verifyAnchoredExportCore(obj ArchivedObject, keys HistoricalKeyCh
 }
 
 // VerifyAnchoredExport verifies a complete archived object of this major
-// through the same archive-digest seam as the v1 façade.
+// through the same archive-digest seam as the v1 facade.
 func (Profile) VerifyAnchoredExport(obj ArchivedObject, keys HistoricalKeyChain, expected ExpectedAnchoredExport) (f AnchoredExportFacts, err error) {
 	defer closedResult(&err)
 	return successor.verifyAnchoredExportCore(obj, keys, expected, archiveDigest)
 }
 
 // validateExpectedExport is the encode-side expected-context suite: the
-// verify-path hoist minus its verify-only legs — no archive-digest width and
+// verify-path hoist minus its verify-only legs: no archive-digest width and
 // no object-store version (this producer derives its own digest and holds no
 // object store) and no key-chain shapes (the encode path holds no public
 // keys; the expected tuples carry the key identities).
@@ -2052,7 +2055,7 @@ func (Profile) EncodeAnchoredExport(input AnchoredExportInput, expected Expected
 	if err != nil {
 		return EncodedExport{}, ErrInvalid
 	}
-	// expected-side consistency: the encode-side suite — the verify-path hoist
+	// expected-side consistency: the encode-side suite: the verify-path hoist
 	// minus the verify-only digest and object-store-version contracts (this
 	// producer derives its own digest and holds no object store, so the
 	// ExpectedAnchoredExport digest/object-version fields are not read here)
@@ -2185,8 +2188,8 @@ func (Profile) parseAnchorCompactGated(compact string, b Bounds) (anchorClaims, 
 	if err != nil {
 		return anchorClaims{}, ErrInvalid
 	}
-	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
-	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	// Erratum 3: encoding is a producer surface: it frames this signature and verifies none.
+	// The encode-side gated parse refuses a signature no conforming signer emits.
 	if !signatureGate(parts.Signature) {
 		return anchorClaims{}, ErrInvalid
 	}
@@ -2227,8 +2230,8 @@ func (Profile) parseTransitionCompactGated(compact string, b Bounds) (transition
 	if err != nil {
 		return transitionClaims{}, ErrInvalid
 	}
-	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
-	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	// Erratum 3: encoding is a producer surface: it frames this signature and verifies none.
+	// The encode-side gated parse refuses a signature no conforming signer emits.
 	if !signatureGate(parts.Signature) {
 		return transitionClaims{}, ErrInvalid
 	}

@@ -1548,7 +1548,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusTest do
   # conformance/grant_proof_independent.mjs:22-41 appear as corpus data. The 6 VALID (idempotent)
   # + 5 normalizable-but-non-idempotent appear as valid uri.normalize cases; the 6 rejected
   # by both implementations appear as invalid_uri. https://[:::]/ is implementation-divergent
-  # (Elixir rejects, Node accepts) and is omitted, recorded in ADR 0005. 17 of 18 ported.
+  # (Elixir rejects, Node accepts) and is omitted, recorded in per-guard mutation proof. 17 of 18 ported.
   test "the corpus subsumes the 17 port-able legacy URI byte-values " do
     legacy_inputs = [
       "https://example.com/",

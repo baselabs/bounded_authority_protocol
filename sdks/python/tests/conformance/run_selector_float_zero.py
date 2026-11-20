@@ -1,8 +1,8 @@
 """Conformance runner for the bap-selector-float-zero/1 corpus (erratum 6).
 
 Loads the certified corpus from ``priv/conformance/selector-float-zero/``, recomputes every
-verdict by driving the SDK's contract-major 1, 2 and 3 surfaces — ``decode_grant``,
-``grant_signing_input`` and ``check_envelope`` — and requires exact agreement: a rejected or
+verdict by driving the SDK's contract-major 1, 2 and 3 surfaces: ``decode_grant``,
+``grant_signing_input`` and ``check_envelope``: and requires exact agreement: a rejected or
 refused case is the closed error; an accepted decode names the certified ``key_id``; an accepted
 signing input is byte-equal to the certified segments. Typed values travel as JSON TEXT
 (``operations_json``, ``cast_arguments_json``) and are decoded with the SDK's own tag-preserving

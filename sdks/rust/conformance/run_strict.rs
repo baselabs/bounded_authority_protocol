@@ -5,8 +5,8 @@
 //! 1. **SHA-binds** the vendored snapshot: hashes `conformance/priv/conformance/strict-ed25519/index.json` at
 //!    startup and fails closed on mismatch with the certified SHA-256, then verifies every listed
 //!    file against the index's per-file SHA-256 and case count.
-//! 2. **Recomputes every verdict** for all cases through the public façades: the primitive and
-//!    key-acceptance helpers, the v1 and v2 façades (selected per case by `major`), the JWK and
+//! 2. **Recomputes every verdict** for all cases through the public facades: the primitive and
+//!    key-acceptance helpers, the v1 and v2 facades (selected per case by `major`), the JWK and
 //!    thumbprint family, and the loopback, role-attestation and content-assertion profiles.
 //! 3. Requires `agreed == total_cases` and `disagreed == 0`.
 //!
@@ -567,7 +567,7 @@ fn strict_ed25519_corpus_all_cases_agree() {
     let actual = hex_sha256(&index_bytes);
     assert_eq!(
         actual, CERTIFIED_INDEX_SHA,
-        "index.json SHA mismatch — corpus drift (expected {CERTIFIED_INDEX_SHA}, got {actual})"
+        "index.json SHA mismatch: corpus drift (expected {CERTIFIED_INDEX_SHA}, got {actual})"
     );
     let index: Value = serde_json::from_slice(&index_bytes).unwrap();
     assert_eq!(index["profile"], PROFILE);

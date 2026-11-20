@@ -31,7 +31,7 @@ defmodule BoundedAuthorityProtocol.V2.SelectorTest do
   end
 
   test "cross-tag operands never match in either direction" do
-    # ADR 0028 §2: extends REQ1-SELECTOR-no-tag-collapse from identity to ordering.
+    # same-tag numeric operands (spec/bap-v2.md §4): extends REQ1-SELECTOR-no-tag-collapse from identity to ordering.
     arguments = {:object, [{"id", {:integer, 50}}, {"amount", {:float, 50.0}}]}
 
     for selector <- [
@@ -95,7 +95,7 @@ defmodule BoundedAuthorityProtocol.V2.SelectorTest do
   end
 
   test "signed zero compares by numeric value in both directions" do
-    # ADR 0028 §2: under IEEE 754 numeric comparison −0.0 = 0.0; signed zero
+    # same-tag numeric operands (spec/bap-v2.md §4): under IEEE 754 numeric comparison −0.0 = 0.0; signed zero
     # distinguishes no authority in either the comparison or JCS serialization.
     arguments = {:object, [{"minus", {:float, -0.0}}, {"plus", {:float, 0.0}}]}
 
@@ -145,7 +145,7 @@ defmodule BoundedAuthorityProtocol.V2.SelectorTest do
   end
 
   test "crossed interval endpoints are unsatisfiable, never a special error" do
-    # ADR 0028 §7: lo > hi is not a decode error; the conjunction simply never matches.
+    # crossed endpoints never match (spec/bap-v2.md §4): lo > hi is not a decode error; the conjunction simply never matches.
     arguments = {:object, [{"amount", {:integer, 75}}]}
 
     assert {:error, :invalid} =

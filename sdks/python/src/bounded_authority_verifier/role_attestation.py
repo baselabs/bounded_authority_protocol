@@ -1,17 +1,17 @@
-"""The role-attestation sibling profile façade (spec/bap-role-attestation-v1.md, profile identity
+"""The role-attestation sibling profile facade (spec/bap-role-attestation-v1.md, profile identity
 ``bap-role-attestation/1``).
 
 A role attestation is a standalone, grant-unbound compact JWS in which an attestor key binds a
 subject key to a role (``issuer`` or ``holder``) for a bounded window. It single-sources the
 contract-major 1 primitives (EdDSA under ``BAP1-Ed25519-SHA256``, the bounded JSON/JCS/base64url/JWK
 machinery) and is parsed by no contract-major profile; this profile rejects every contract-major
-``typ`` and every contract-major façade rejects ``ba+role-attestation`` (REQ-RA1-CORE-*).
+``typ`` and every contract-major facade rejects ``ba+role-attestation`` (REQ-RA1-CORE-*).
 
 Four public functions, each returning ``Result[T] = Ok | Err`` (the ``{:ok, value} | {:error,
-:invalid}`` mirror). No ``authorized`` / ``decision`` surface (AGENTS rule 1); no signer, no private
+:invalid}`` mirror). No ``authorized`` / ``decision`` surface; no signer, no private
 key, no signing callback (REQ-RA1-API-no-signer). Wire format derived from spec/bap-role-attestation-v1.md
 + the certified corpus alone. Derived from the spec and certified corpus, not from
-any sibling-SDK or reference source (ADR 0014 D5). The corpus is the byte-level arbiter.
+any sibling-SDK or reference source (docs/design/conformance-contract.md, Independent implementation rule). The corpus is the byte-level arbiter.
 
 The dispatch structs here are frozen dataclasses mirroring the SDK's established shapes: ``bytes``
 for raw-32 key fields, ``int`` / ``str`` for scalars, ``int | None`` for the unbounded attestor
@@ -73,7 +73,7 @@ def _is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-# --- dispatch struct types (the contract for each façade) ---
+# --- dispatch struct types (the contract for each facade) ---
 
 
 @dataclass(frozen=True)
@@ -185,7 +185,7 @@ def _valid_uri_authority(authority: str) -> bool:
     userinfo = "" if at == -1 else authority[:at]
     hostport = authority if at == -1 else authority[at + 1 :]
     if "@" in hostport or "[" in userinfo or "]" in userinfo:
-        return False  # a second @ lands in the host — invalid.
+        return False  # a second @ lands in the host: invalid.
     if hostport.startswith("["):
         close = hostport.find("]")
         if close == -1:
@@ -408,7 +408,7 @@ def _walk_annotation(annotation: object) -> None:
 
 
 def _shape_ok(value: object, annotation: object) -> bool:
-    """True iff value matches the declared annotation shape exactly (ADR 0017 clauses 1-2)."""
+    """True iff value matches the declared annotation shape exactly (closed results and exact structured-input types (spec/bap-v1.md §§15-17))."""
     if annotation is Any or annotation is object:
         return True
     if annotation is type(None):
@@ -430,7 +430,7 @@ def _shape_ok(value: object, annotation: object) -> bool:
             if not isinstance(value, annotation):
                 return False
             # A struct can arrive malformed (constructed via __new__ or a broken subclass) with
-            # attributes missing entirely — that is a shape failure, never a crash (the gate
+            # attributes missing entirely: that is a shape failure, never a crash (the gate
             # itself must uphold the closed surface it enforces).
             hints = _dataclass_hints(annotation)
             for name, sub in hints.items():
@@ -438,13 +438,13 @@ def _shape_ok(value: object, annotation: object) -> bool:
                 if member is _MISSING or not _shape_ok(member, sub):
                     return False
             return True
-        return False  # unreachable — _walk_annotation rejects unsupported types at import
+        return False  # unreachable: _walk_annotation rejects unsupported types at import
     if _is_union(annotation):
         return any(_shape_ok(value, member) for member in get_args(annotation))
     origin = get_origin(annotation)
     if origin is tuple:
         # Variadic tuple[X, ...] carries the ELEMENT contract; the container accepts list|tuple
-        # (the historical input surface — conformant fixtures pass lists; bodies iterate).
+        # (the historical input surface: conformant fixtures pass lists; bodies iterate).
         if not isinstance(value, (list, tuple)):
             return False
         (elem, _rest) = get_args(annotation)
@@ -456,13 +456,13 @@ def _shape_ok(value: object, annotation: object) -> bool:
         return all(_shape_ok(item, elem) for item in value)
     if origin is Mapping:
         return isinstance(value, Mapping)
-    return False  # unreachable — _walk_annotation rejects unsupported origins at import
+    return False  # unreachable: _walk_annotation rejects unsupported origins at import
 
 
 def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
-    """Façade decorator: validate caller arguments against their declared shapes before the
+    """Facade decorator: validate caller arguments against their declared shapes before the
     body runs; malformed values return Err, and accepted buffers are copied. Applied to all four public functions of this sibling profile. Hints resolve lazily
-    on the first call — façade signatures forward-reference structs defined in this module."""
+    on the first call: facade signatures forward-reference structs defined in this module."""
     resolved: list[tuple[dict[str, object], inspect.Signature]] = []
 
     @functools.wraps(fn)
@@ -585,6 +585,7 @@ def assemble_attestation_compact(
     input_: SigningInput, signature: bytes, bounds: Bounds | None = None
 ) -> Result[bytes]:
     """Assemble a canonical role attestation; signing and trusted-key installation remain caller-owned."""
+
     def body() -> bytes:
         b = _coerce_attestation_bounds(bounds)
         if input_.kind != "role_attestation":
@@ -643,7 +644,7 @@ def _decode_attestation_body(compact: bytes, bounds: Bounds | None) -> Attestati
 
 
 # 4. attestation verification (the citation symbol the companion signer documents:
-# verify_attestation/2 — compact + expected context).
+# verify_attestation/2: compact + expected context).
 @_closed_shape
 def verify_attestation(compact: bytes, expected: ExpectedAttestation) -> Result[AttestationFacts]:
     """Verify a role attestation against explicit trusted key, role and time context."""
@@ -655,7 +656,7 @@ def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> A
     b = _coerce_attestation_bounds(expected.bounds)
     magnitude = _unwrap(bounds_resolve(b, "integer_magnitude"))
     # Fail-closed shallow context checks (a malformed context struct is a closed Invalid, never an
-    # AttributeError past the Result contract — mirrors the v1 verify_grant pattern).
+    # AttributeError past the Result contract: mirrors the v1 verify_grant pattern).
     if (
         not isinstance(getattr(attestor, "public_key", None), bytes)
         or len(attestor.public_key) != 32

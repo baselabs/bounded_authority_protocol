@@ -31,7 +31,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
   # does NOT (it proxies args to `scripts/check_architecture.exs`, which exits 2 on any unknown
   # flag, so appending would make every architecture entry spuriously red).
   @mutations [
-    # --- v2 range-selector + cross-major activation proofs (BAP-21 / ADR 0030) ----
+    # --- v2 range-selector + cross-major activation proofs (BAP-21 / spec/bap-v2.md) ----
     %{
       # Strictness mutation: the inclusive lte comparison flipped to strict reddens the
       # boundary-equal corpus case (argument == bound must PASS for inclusive kinds).
@@ -149,7 +149,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
       to: "  @prefix <<\"BAP1-REQUEST\", 0>>\n",
       target: {"test/conformance/cli_test.exs", "exit 0 on the shipped v2 corpus (in-VM)"}
     },
-    # --- v3 ES256 suite activation proofs (BAP-22 / ADR 0035) ------------------
+    # --- v3 ES256 suite activation proofs (BAP-22 / spec/bap-v3.md) ------------------
     %{
       # Canonicality: dropping the low-S half-order rule lets the high-S corpus case
       # (a genuinely verifying high-S signature: backend malleability, probe-observed)
@@ -619,7 +619,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         {"test/conformance/corpus_independent_test.exs",
          "independent runner agrees on every shipped corpus case (repo mode)"}
     },
-    # --- independent runner strict Ed25519 gate (ADR 0040) ---------------------
+    # --- independent runner strict Ed25519 gate (docs/errata.md erratum 2) ---------------------
     %{
       # Deleting the A small-order clause of the runner's S1 gate lets strict-corpus vectors the rule rejects agree as valid in
       # the independent runner (strict mode, Node 22.23.1); the strict-mode test reds on disagreed > 0.
@@ -1298,7 +1298,7 @@ defmodule BoundedAuthorityProtocol.ConformanceMutationGate do
         {"test/conformance/corpus_independent_test.exs",
          "independent runner agrees on every shipped corpus case (repo mode)"}
     },
-    # --- Role-attestation sibling profile (BAP-23 / ADR 0036) ------------------
+    # --- Role-attestation sibling profile (BAP-23 / spec/bap-role-attestation-v1.md) ------------------
     %{
       # Self-attestation material check removed: the attestor thumbprint equaling the subject
       # thumbprint no longer rejects, so the self-attestation-same-material corpus case verifies.

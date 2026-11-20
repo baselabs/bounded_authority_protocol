@@ -1,6 +1,6 @@
-//! Public input structs for the verification façades.
+//! Public input structs for the verification facades.
 //!
-//! This module holds the typed structs the public façades take: the
+//! This module holds the typed structs the public facades take: the
 //! compact-signing kind enum and [`SigningInput`], and the trusted-issuer,
 //! expected-grant, expected-request, consumption-chain, boundary-anchor,
 //! key-transition, anchored-export, and role-attestation input structs. No
@@ -12,7 +12,7 @@
 //! every struct here is a plain Rust struct with `pub` fields that the
 //! conformance runner assembles field-by-field from `serde_json::Value`. There
 //! is deliberately NO `#[derive(serde::Serialize)]` or `Deserialize` anywhere
-//! in `src/` — the lib build must not depend on serde, and planting such a
+//! in `src/`: the lib build must not depend on serde, and planting such a
 //! derive is a compile error (a test proves this). The fixed
 //! cryptographic widths (`[u8; 32]` / `[u8; 64]`) are enforced as array types,
 //! not stored in [`Bounds`] (`REQ1-BOUNDS-fixed-widths`).
@@ -43,8 +43,8 @@ pub enum SigningKind {
     Proof,
     /// A byte-distinct literal-loopback HTTP proof (`typ: "ba+loopback-proof"`).
     LocalLoopbackHttpProof,
-    /// A role attestation (`typ: "ba+role-attestation"`) — the standalone
-    /// sibling attestation profile, parsed by no contract-major façade.
+    /// A role attestation (`typ: "ba+role-attestation"`): the standalone
+    /// sibling attestation profile, parsed by no contract-major facade.
     RoleAttestation,
     /// A content assertion (`typ: "ba+content-assertion"`).
     ContentAssertion,
@@ -63,7 +63,7 @@ impl SigningKind {
     //
     // `pub(crate)`, and its only caller is this module's corpus test. `pub(crate)` does not suppress dead-code the
     // way `pub` does, so the per-item allow keeps the lint clean. Remove once
-    // the façade decodes kinds through this.
+    // the facade decodes kinds through this.
     #[allow(dead_code)]
     pub(crate) fn decode(s: &str) -> Result<Self> {
         Ok(match s {
@@ -83,11 +83,11 @@ impl SigningKind {
 ///
 /// Carries the two segments that form the exact RFC 7515 signing input
 /// `ASCII(base64url(protected) || "." || base64url(payload))`
-/// (`REQ1-SIGNING-exact-input`) plus the [`SigningKind`] the façade
+/// (`REQ1-SIGNING-exact-input`) plus the [`SigningKind`] the facade
 /// uses to validate the protected-header `typ`. The segments are
 /// already-canonical base64url ASCII bytes;
 /// [`crate::v1::assemble_compact`] passes them through VERBATIM and
-/// appends the base64url-encoded signature — the composer does not re-encode or
+/// appends the base64url-encoded signature: the composer does not re-encode or
 /// re-validate the segments (`REQ1-SIGNING-any-order`: a correctly signed
 /// closed JSON object may use any member order, so the producer's deterministic
 /// JCS representation is the contract, not a re-canonicalization).
@@ -127,7 +127,7 @@ pub struct TrustedIssuer {
 /// 336–338). The corpus `grant-verify` input supplies `issuer`, `audience`,
 /// `evaluation_time`, `clock_skew`; `bounds` defaults to
 /// [`Bounds::maximum()`] when the corpus carries no overrides, stored here so
-/// the façade can tighten per-call.
+/// the facade can tighten per-call.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExpectedGrant {
     /// Expected grant `iss` (StringOrURI, exact match).
@@ -165,7 +165,7 @@ pub enum NonceMode {
 /// `:not_required | {:required, nonce}`" (`spec/bap-v1.md` lines 351–353),
 /// on top of the [`ExpectedGrant`] scalar/timing fields. The corpus
 /// `envelope/check.json` `input.expected` object also embeds the
-/// [`TrustedIssuer`] (the `check_envelope(Credentials, ExpectedRequest)` façade
+/// [`TrustedIssuer`] (the `check_envelope(Credentials, ExpectedRequest)` facade
 /// takes no separate trusted-issuer argument, so it rides here).
 #[derive(Debug, Clone)]
 pub struct ExpectedRequest {
@@ -207,7 +207,7 @@ pub struct ExpectedRequest {
 ///
 /// Mirrors the `envelope/check.json` corpus `input.{grant, proof}` pair: the
 /// received grant compact and proof compact bytes, as the
-/// `check_envelope(Credentials, ExpectedRequest)` façade signature requires
+/// `check_envelope(Credentials, ExpectedRequest)` facade signature requires
 /// (`spec/bap-v1.md` line 303).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Credentials {
@@ -228,7 +228,7 @@ pub struct Credentials {
 pub struct KeyLocator {
     /// The grant protected-header `kid` hint (NOT a trust selector).
     pub key_id: String,
-    /// Trust was not evaluated — the locator is not authority.
+    /// Trust was not evaluated: the locator is not authority.
     pub trust: NotEvaluated,
 }
 
@@ -242,7 +242,7 @@ pub struct KeyLocator {
 /// verifying the Ed25519 signature, so the result carries
 /// `verification: NotEvaluated` (`REQ1-VERIFY-decode-not-evaluated`). It
 /// surfaces the decoded identity/timing claims a caller inspects before
-/// deciding to verify — an unverified diagnostic view of the parsed compact, not a verified
+/// deciding to verify: an unverified diagnostic view of the parsed compact, not a verified
 /// fact. The corpus `grant-decode/decode.json` `expected` pins only `key_id`;
 /// the remaining fields are the unambiguous decoded scalars (the
 /// `holder_thumbprint` is the decoded `cnf.jkt`, not a verified digest). It
@@ -262,7 +262,7 @@ pub struct GrantDecoded {
     /// The decoded `aud` claim (one or more audiences; the matched audience is
     /// not determined at decode time).
     pub audiences: Vec<String>,
-    /// Decoded `cnf.jkt` (RFC 7638 thumbprint of the holder key) — parsed, not
+    /// Decoded `cnf.jkt` (RFC 7638 thumbprint of the holder key): parsed, not
     /// verified against a holder proof.
     pub holder_thumbprint: [u8; 32],
     /// Grant `iat` (integral NumericDate).
@@ -282,7 +282,8 @@ pub struct GrantDecoded {
 /// `proof-decode/decode.json` `expected` pins only `proof_id`; the remaining
 /// fields are the decoded proof claims. `nonce` is surfaced as an `Option`
 /// because a proof MAY carry one (decode reflects what was decoded; the
-/// specified diagnostic rendering redacts the nonce, spec/diagnostic-rendering.md § Diagnostic rendering).
+/// specified diagnostic rendering redacts the nonce, spec/diagnostic-rendering.md § Diagnostic
+/// rendering).
 #[derive(Clone, PartialEq)]
 pub struct ProofDecoded {
     /// Contract-major of the proof.
@@ -302,9 +303,9 @@ pub struct ProofDecoded {
     pub invocation_id: String,
     /// The proof `ba_op` (operation name).
     pub operation: String,
-    /// Decoded `ath` — raw 32-byte SHA-256 over the received grant compact.
+    /// Decoded `ath`: raw 32-byte SHA-256 over the received grant compact.
     pub grant_hash: [u8; 32],
-    /// Decoded `ba_req` — raw 32-byte request digest.
+    /// Decoded `ba_req`: raw 32-byte request digest.
     pub request_hash: [u8; 32],
     /// The proof `iat` (integral NumericDate).
     pub issued_at: i64,
@@ -323,9 +324,9 @@ pub struct ProofDecoded {
 
 /// Raw consumption-row bytes for chain range verification.
 ///
-/// Per the `check_chain(ChainInput, ExpectedChain)` façade split,
+/// Per the `check_chain(ChainInput, ExpectedChain)` facade split,
 /// [`ChainInput`] carries ONLY the received raw canonical row binaries; every
-/// boundary the range is bound against lives in [`ExpectedChain`]. ADR 0004:
+/// boundary the range is bound against lives in [`ExpectedChain`]. spec/bap-v1.md §15:
 /// "Verification accepts a nonempty proper list of raw row binaries and an
 /// `ExpectedChain`." Each entry is `base64url`-decoded from the corpus
 /// `consumption-chain/check.json` `input.rows` member (a row is the closed JCS
@@ -342,7 +343,7 @@ pub struct ChainInput {
 /// count, and the predecessor/head digests a self-consistent chain alone
 /// cannot prove (`REQ1-CHAIN-no-deletion-cert`). Mapped from the corpus
 /// `consumption-chain/check.json` `input` members; the corpus `last_hash` maps
-/// to `head_hash` (ADR 0004 calls this "caller head").
+/// to `head_hash` (spec/bap-v1.md §15 calls this "caller head").
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExpectedChain {
     /// Expected chain identity.
@@ -364,7 +365,7 @@ pub struct ExpectedChain {
 
 /// A single canonical consumption row the caller asks the encoder to frame.
 ///
-/// Closed row shape (ADR 0004 § Consumption rows):
+/// Closed row shape (spec/bap-v1.md §15, Consumption rows):
 /// `{"chain_id":"<StringOrURI>","commitment":"<base64url-32>","previous":
 /// "<base64url-32>","sequence":1,"v":1}`. Sequence one requires the all-zero
 /// predecessor. Sourced from `consumption-chain/entry.json` `input`.
@@ -386,7 +387,7 @@ pub struct ConsumptionEntry {
 
 /// Open vs. bounded upper validity interval for a historical key.
 ///
-/// ADR 0004: "`:unbounded` is the only open upper interval" for a
+/// spec/bap-v1.md §15: "`:unbounded` is the only open upper interval" for a
 /// [`HistoricalPublicKey`]. The corpus always carries an integral
 /// `valid_before`, but the contract permits an unbounded upper bound.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -420,9 +421,9 @@ pub struct HistoricalPublicKey {
 ///
 /// A newtype around `Vec<HistoricalPublicKey>` so the
 /// `verify_anchored_export(ArchivedObject, HistoricalKeyChain,
-/// ExpectedAnchoredExport)` façade takes a distinct named struct. Sourced from
+/// ExpectedAnchoredExport)` facade takes a distinct named struct. Sourced from
 /// `anchored-export/verify.json` `input.keys`. Positional order is load-bearing
-/// (ADR 0004: "advances through the caller-supplied ordered key list
+/// (spec/bap-v1.md §15: "advances through the caller-supplied ordered key list
 /// positionally").
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HistoricalKeyChain {
@@ -433,7 +434,7 @@ pub struct HistoricalKeyChain {
 /// A boundary anchor the producer frames into a compact signing input.
 ///
 /// Closed payload binds: protocol version, anchor identity and time, chain
-/// identity, sequence, chain hash, and the key ID (ADR 0004 § Boundary
+/// identity, sequence, chain hash, and the key ID (spec/bap-v1.md §15, Boundary
 /// anchors). `public_key` is the raw 32-byte signing key supplied to the
 /// producer (the verifier receives it separately as a [`HistoricalPublicKey`]).
 /// Sourced from `signing-input/anchor.json` `input`.
@@ -458,7 +459,7 @@ pub struct BoundaryAnchor {
 /// A historical key transition the producer frames into a compact signing input.
 ///
 /// Closed payload binds: transition and chain identities, effective time,
-/// current fingerprint, next key ID, and next fingerprint (ADR 0004 §
+/// current fingerprint, next key ID, and next fingerprint (spec/bap-v1.md §15,
 /// Authenticated key transitions). The current key signs it. Sourced from
 /// `signing-input/transition.json` `input`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -546,7 +547,7 @@ pub struct ArchivedObject {
 
 /// Artifacts the anchored-export producer frames into the archive bytes.
 ///
-/// The `encode_anchored_export(AnchoredExportInput, ExpectedExport)` façade
+/// The `encode_anchored_export(AnchoredExportInput, ExpectedExport)` facade
 /// splits the corpus `anchored-export/encode.json` `input` blob into the
 /// artifacts (here) and the caller's expected boundaries ([`ExpectedExport`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -564,9 +565,9 @@ pub struct AnchoredExportInput {
 /// Caller-expected anchored-export boundaries (the encode path).
 ///
 /// Sourced from `anchored-export/encode.json` `input.expected`. Reuses
-/// [`ExpectedChain`], [`ExpectedAnchor`], and [`ExpectedKeyTransition`] — the
+/// [`ExpectedChain`], [`ExpectedAnchor`], and [`ExpectedKeyTransition`]: the
 /// same shapes the verify path's [`ExpectedAnchoredExport`] carries. Kept a
-/// distinct struct so the `encode_anchored_export(…, ExpectedExport)` façade
+/// distinct struct so the `encode_anchored_export(…, ExpectedExport)` facade
 /// param is a distinct named type.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExpectedExport {
@@ -593,7 +594,7 @@ pub struct ExpectedExport {
 /// Sourced from `anchored-export/verify.json` `input.expected`. Field-identical
 /// to [`ExpectedExport`] (both describe the archive's expected bindings), but a
 /// distinct struct so the `verify_anchored_export(…, ExpectedAnchoredExport)`
-/// façade param is a distinct named type.
+/// facade param is a distinct named type.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExpectedAnchoredExport {
     /// Expected chain boundaries.
@@ -618,7 +619,7 @@ pub struct ExpectedAnchoredExport {
 /// Sourced from `anchored-export/encode.json` `expected` (`byte_count` +
 /// `digest`). `bytes` is the framed archive concatenation the caller stores;
 /// `byte_count` and `digest` are the derived conveniences the corpus pins. None
-/// of the three is a credential — the archive is public, and the digest is a
+/// of the three is a credential: the archive is public, and the digest is a
 /// SHA-256 over public bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnchoredExportEncoded {
@@ -638,17 +639,17 @@ pub struct AnchoredExportEncoded {
 /// plus the exact two-segment RFC 7515 signing input.
 ///
 /// `REQ1-SIGNING-exact-input`: the message that was signed is
-/// `ASCII(base64url(protected) || "." || base64url(payload))` — no bytes precede
+/// `ASCII(base64url(protected) || "." || base64url(payload))`: no bytes precede
 /// or follow. [`crate::v1::assemble_compact`] appends the `.` + signature
 /// segment separately. The corpus pins all three byte-exact
 /// (`REQ1-SIGNING-deterministic-produce`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProducedSigningInput {
-    /// `base64url(JCS(protected_header))` — canonical ASCII.
+    /// `base64url(JCS(protected_header))`: canonical ASCII.
     pub protected_segment: Vec<u8>,
-    /// `base64url(JCS(payload))` — canonical ASCII.
+    /// `base64url(JCS(payload))`: canonical ASCII.
     pub payload_segment: Vec<u8>,
-    /// `protected_segment ++ b"." ++ payload_segment` — the exact signed
+    /// `protected_segment ++ b"." ++ payload_segment`: the exact signed
     /// message (two-segment RFC 7515 signing input).
     pub message: Vec<u8>,
 }
@@ -718,10 +719,10 @@ pub struct ProofInput {
     pub invocation_id: String,
     /// Expected `ba_op` claim (operation name).
     pub operation: String,
-    /// Tagged JSON cast arguments — the `ba_req` digest preimage (NOT emitted
+    /// Tagged JSON cast arguments: the `ba_req` digest preimage (NOT emitted
     /// in the payload; only its digest is).
     pub cast_arguments: JsonValue,
-    /// The received grant compact bytes — the `ath` hash preimage.
+    /// The received grant compact bytes: the `ath` hash preimage.
     pub grant_compact: Vec<u8>,
     /// Raw 32-byte holder Ed25519 public key (the header `jwk.x` source).
     pub holder_public_key: [u8; 32],
@@ -799,13 +800,13 @@ impl Role {
 /// `nbf < exp` (`REQ-RA1-CLAIM-window`). The artifact is standalone and
 /// grant-unbound: it binds no grant, names no issuer identity, audience, or
 /// scope, and carries no authorization (`REQ-RA1-CORE-profile-identity`).
-/// `attestor_key_id` is the header `kid` — a hint, never a trust selector;
+/// `attestor_key_id` is the header `kid`: a hint, never a trust selector;
 /// `key_id`/`public_key` are the attested subject binding.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AttestationInput {
     /// The attestor key id (the protected-header `kid`, BAP1 `kid` rules).
     pub attestor_key_id: String,
-    /// The `jti` — the audit and revocation-reference handle (non-empty
+    /// The `jti`: the audit and revocation-reference handle (non-empty
     /// bounded StringOrURI under the BAP1 grant `jti` rules).
     pub jti: String,
     /// The attested subject key id (BAP1 `kid` rules).
@@ -823,7 +824,7 @@ pub struct AttestationInput {
 /// Caller-expected context for role-attestation verification
 /// (`bap-role-attestation/1` §3, `REQ-RA1-VERIFY-caller-supplied`).
 ///
-/// Carries the trusted attestor key (a [`HistoricalPublicKey`] — key id, raw
+/// Carries the trusted attestor key (a [`HistoricalPublicKey`]: key id, raw
 /// 32-byte public key, and its own `[valid_from, valid_before)` validity
 /// window, `valid_before` possibly unbounded), the expected subject binding
 /// (subject key id + raw 32-byte subject public key), the caller's `now`, and
@@ -929,7 +930,7 @@ mod tests {
     use super::*;
 
     // ==========================================================================
-    // SigningKind::decode — closed lowercase kind set
+    // SigningKind::decode: closed lowercase kind set
     // ==========================================================================
 
     #[test]
@@ -968,7 +969,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // SigningInput — construction (kind carried as metadata)
+    // SigningInput: construction (kind carried as metadata)
     // ==========================================================================
 
     #[test]
@@ -985,7 +986,7 @@ mod tests {
 
     // ==========================================================================
     // Input-struct structural sanity (Debug renders, Clone works, the fixed
-    // crypto widths are the array types). These are smoke tests; the façade
+    // crypto widths are the array types). These are smoke tests; the facade
     // and conformance tests exercise every field.
     // ==========================================================================
 

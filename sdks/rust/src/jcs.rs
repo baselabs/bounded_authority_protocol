@@ -7,11 +7,11 @@
 //! derived first-hand from RFC 8785 (§3.2.2.2 strings, §3.2.2.3 numbers) +
 //! ECMA-262 §6.1.6.1.20 `Number::toString` + `spec/bap-v1.md` § JCS, the normative sources.
 //! Derived from the spec and certified corpus, not from any sibling-SDK or
-//! reference source (ADR 0014 D5).
+//! reference source (docs/design/conformance-contract.md, Independent implementation rule).
 //!
 //! Rules enforced:
 //! - **Strings** (`REQ1-JSON-jcs-exact`, RFC 8785 §3.2.2.2): the escape
-//!   predicate keys on the explicit C0 range `U+0000..=U+001F` — NOT on Rust's
+//!   predicate keys on the explicit C0 range `U+0000..=U+001F`: NOT on Rust's
 //!   `char::is_control()`, which also catches the C1/DEL range and would
 //!   over-escape `U+007F`. `\b\t\n\f\r` for `0x08/09/0A/0C/0D`; lowercase
 //!   `\u00XX` for the rest of C0; `\\` and `\"` only; every other code point
@@ -19,14 +19,14 @@
 //!   bytes. Lone surrogates are structurally impossible: a Rust `String` holds
 //!   only Unicode scalar values, and the decoder ([`crate::json::json_decode`])
 //!   rejects lone surrogates at decode time.
-//! - **Numbers — integers**: plain decimal text, no exponent.
-//! - **Numbers — floats** (RFC 8785 §3.2.2.3, delegated to ECMA-262
+//! - **Numbers: integers**: plain decimal text, no exponent.
+//! - **Numbers: floats** (RFC 8785 §3.2.2.3, delegated to ECMA-262
 //!   `Number::toString`): shortest round-trip text via `ryu-js` (the
 //!   ECMAScript-flavored Ryu that RFC 8785 §3.2.2.3 names for number serialization). `-0.0` serializes as `0` (the sign of zero is dropped);
 //!   the `e < -6` → scientific / `e >= 21` → scientific / otherwise fixed
 //!   thresholds are ryu-js's own.
-//! - **Non-finite floats** (RFC 8785 §3.2.2.3 + AGENTS rule 3): `NaN`, `+Inf`,
-//!   `-Inf` are `Err(Invalid)` — they MUST fail closed BEFORE formatting (ryu-js
+//! - **Non-finite floats** (RFC 8785 §3.2.2.3): `NaN`, `+Inf`,
+//!   `-Inf` are `Err(Invalid)`: they MUST fail closed BEFORE formatting (ryu-js
 //!   would otherwise emit `"NaN"`/`"Infinity"`, violating the RFC). This is the
 //!   F2 tripwire: [`JsonValue::Float`] can hold non-finite values and
 //!   [`jcs_encode`] is a public primitive reachable by a direct caller, not only
@@ -39,8 +39,9 @@
 //!   (`jcs_bytes`, 65536) AND the per-node/per-depth structural ceilings
 //!   (`total_nodes`, `depth`) are enforced DURING recursion, so a hand-built
 //!   (not decode-bounded) value passed directly to this public primitive cannot
-//!   force unbounded recursion, traversal, or intermediate allocation — the
-//!   `(d)`-class per-node encode-bounds closure (ADR 0014 D6/D7; the corpus
+//!   force unbounded recursion, traversal, or intermediate allocation: the
+//!   `(d)`-class per-node encode-bounds closure (per-defect mutation proofs
+//! (docs/design/conformance-contract.md); the corpus
 //!   cannot express it, so the permissiveness battery proves it red-capable).
 
 use crate::bounds::Bounds;
@@ -57,7 +58,8 @@ use crate::json::JsonValue;
 /// ceilings mirror [`crate::json::json_decode`]; a value that came through the
 /// decoder is already within them, but `jcs_encode` is a public primitive
 /// reachable by a direct caller with a hand-built value, so the ceilings are
-/// re-enforced here (the `(d)`-class closure, ADR 0014 D6/D7).
+/// re-enforced here (the `(d)`-class closure, per-defect mutation proofs
+/// (docs/design/conformance-contract.md)).
 pub fn jcs_encode(value: &JsonValue, bounds: &Bounds) -> Result<Vec<u8>> {
     let mut out: Vec<u8> = Vec::new();
     let mut nodes: u64 = 0;
@@ -78,7 +80,7 @@ pub fn jcs_encode(value: &JsonValue, bounds: &Bounds) -> Result<Vec<u8>> {
 /// `integer_magnitude`/`float_magnitude`, `string_bytes`, `array_items`,
 /// `object_members`, `key_bytes`, duplicate-key rejection, non-finite-float
 /// rejection, and the `jcs_bytes` output ceiling (the `(d)`-class closure,
-/// ADR 0014 D6/D7; mirrors the `spec/bap-v1.md §8`
+/// per-defect mutation proofs (docs/design/conformance-contract.md); mirrors the `spec/bap-v1.md §8`
 /// `encode_value` guard set).
 /// `depth` is the container nesting level (root container = 1), mirroring
 /// [`crate::json::json_decode`]'s accounting.
@@ -89,7 +91,7 @@ fn encode_value(
     out: &mut Vec<u8>,
     nodes: &mut u64,
 ) -> Result<()> {
-    // (d)-class per-node encode bounds — total_nodes counts every value.
+    // (d)-class per-node encode bounds: total_nodes counts every value.
     *nodes += 1;
     if *nodes > bounds.total_nodes() {
         return Err(Invalid);
@@ -165,7 +167,7 @@ fn encode_value(
             // RFC 8785 §3.2.3: sort members by unsigned UTF-16 code-unit
             // comparison of names. The duplicate check above proves the names
             // are distinct, so the sort has no ties and stability is irrelevant
-            // — `sort_unstable_by` is correct.
+            //: `sort_unstable_by` is correct.
             let mut order: Vec<usize> = (0..members.len()).collect();
             order.sort_unstable_by(|&a, &b| utf16_compare(&members[a].0, &members[b].0));
             out.push(b'{');
@@ -201,7 +203,7 @@ fn encode_int(n: i64, out: &mut Vec<u8>) {
 ///
 /// The non-finite guard is the F2 fail-closed tripwire: it MUST run before any
 /// ryu-js call. With it removed, `ryu-js`'s `format` emits `"NaN"`/`"Infinity"`
-/// and `format_finite` is unsound on non-finite input — either violates RFC
+/// and `format_finite` is unsound on non-finite input: either violates RFC
 /// 8785 §3.2.2.3.
 fn encode_float(f: f64, out: &mut Vec<u8>) -> Result<()> {
     if !f.is_finite() {
@@ -219,14 +221,14 @@ fn encode_float(f: f64, out: &mut Vec<u8>) -> Result<()> {
 ///
 /// The escape predicate keys on the explicit C0 range `0x00..=0x1f`. Using
 /// `char::is_control()` instead would also catch `0x7f` (DEL) and the C1 range,
-/// over-escaping DEL and violating the RFC — DEL is OUTSIDE C0 and is neither
+/// over-escaping DEL and violating the RFC: DEL is OUTSIDE C0 and is neither
 /// `\` nor `"`, so it serializes "as is" as a raw `0x7f` byte.
 fn encode_string(s: &str, out: &mut Vec<u8>) {
     out.push(b'"');
     for c in s.chars() {
         let cp = c as u32;
         if cp <= 0x1f {
-            // C0 control range — the 5 predefined short escapes, else \u00XX.
+            // C0 control range: the 5 predefined short escapes, else \u00XX.
             match cp {
                 0x08 => out.extend_from_slice(b"\\b"),
                 0x09 => out.extend_from_slice(b"\\t"),
@@ -244,7 +246,7 @@ fn encode_string(s: &str, out: &mut Vec<u8>) {
         } else if cp == 0x22 {
             out.extend_from_slice(b"\\\"");
         } else {
-            // Everything else — including DEL (0x7f) and astral (>= 0x10000) —
+            // Everything else: including DEL (0x7f) and astral (>= 0x10000),
             // emitted as raw UTF-8 bytes. JCS does NOT emit surrogate-pair
             // escapes for astral code points.
             let mut buf = [0u8; 4];
@@ -269,7 +271,7 @@ fn hex_nibble(n: u8) -> u8 {
 /// sequence of `u16` code units (with surrogate pairs for astral code points),
 /// compared element-wise as unsigned `u16`, with the shorter sequence ordering
 /// first when it is a prefix. This is NOT Rust's `String`/UTF-8-byte ordering
-/// and NOT Unicode code-point ordering — astral code points differ between the
+/// and NOT Unicode code-point ordering: astral code points differ between the
 /// three (e.g. `U+10000` < `U+FFFF` in UTF-16 because `0xd800 < 0xffff`, but
 /// `U+10000` > `U+FFFF` in UTF-8-byte order because `0xf0 > 0xef`).
 fn utf16_compare(a: &str, b: &str) -> std::cmp::Ordering {
@@ -313,7 +315,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure — DEL U+007F emitted RAW (not \u007f). RFC 8785 §3.2.2.2.
+    // Closure: DEL U+007F emitted RAW (not \u007f). RFC 8785 §3.2.2.2.
     // ==========================================================================
 
     #[test]
@@ -336,7 +338,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure — astral codepoint emitted RAW as UTF-8 (not surrogate-pair escape)
+    // Closure: astral codepoint emitted RAW as UTF-8 (not surrogate-pair escape)
     // ==========================================================================
 
     #[test]
@@ -357,14 +359,14 @@ mod tests {
         // (LINEAR B SYLLABLE B008 A, 𐀀), UTF-8 = F0 90 80 80. JCS emits the 4
         // raw bytes, NOT a \uD800\uDC00 surrogate-pair escape. (The JCS
         // source-read note mislabels this codepoint as U+10300; the corpus is
-        // the authority and carries U+10000 — confirmed by reading the raw
+        // the authority and carries U+10000: confirmed by reading the raw
         // codepoints of encode.json.)
         let out = enc(&JsonValue::String("\u{10000}".to_string()));
         assert_eq!(out, vec![b'"', 0xF0, 0x90, 0x80, 0x80, b'"']);
     }
 
     // ==========================================================================
-    // Closure — float thresholds (the 5 jcs-encode-float-* cases via ryu-js)
+    // Closure: float thresholds (the 5 jcs-encode-float-* cases via ryu-js)
     // ==========================================================================
 
     #[test]
@@ -390,12 +392,12 @@ mod tests {
     #[test]
     fn float_over_magnitude_is_rejected_at_encode() {
         // 1e20 and 1e21 exceed the float magnitude bound (±2^53−1 ≈ 9.0e15), so
-        // jcs_encode rejects them — the magnitude half of the (d)-class
+        // jcs_encode rejects them: the magnitude half of the (d)-class
         // per-node closure (spec/bap-v1.md §8). NOTE:
         // these values were
         // previously used to exercise ryu-js's e≥21 scientific threshold, but
         // that threshold is UNREACHABLE from within-magnitude floats (the
-        // largest representable float has decimal exponent ≈ 15.95 — see
+        // largest representable float has decimal exponent ≈ 15.95: see
         // docs/design/conformance-contract.md), so the decoder cannot produce
         // them and the corpus pins no case for it. The lower (e<−6) threshold
         // stays pinned by `float_1e_neg7_serializes_scientific`.
@@ -418,7 +420,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // F2 — NaN / +Infinity / -Infinity MUST fail closed (MANDATORY tripwire)
+    // F2: NaN / +Infinity / -Infinity MUST fail closed (MANDATORY tripwire)
     // ==========================================================================
 
     #[test]
@@ -449,7 +451,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure — object members sorted by UNSIGNED UTF-16 code units
+    // Closure: object members sorted by UNSIGNED UTF-16 code units
     // ==========================================================================
 
     #[test]
@@ -499,7 +501,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure — integers plain decimal; arrays preserve order; basic shapes
+    // Closure: integers plain decimal; arrays preserve order; basic shapes
     // ==========================================================================
 
     #[test]
@@ -557,7 +559,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Bounds — jcs_bytes ceiling
+    // Bounds: jcs_bytes ceiling
     // ==========================================================================
 
     #[test]

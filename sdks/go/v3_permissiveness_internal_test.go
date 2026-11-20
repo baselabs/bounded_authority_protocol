@@ -4,10 +4,11 @@ package verifier
 // leg is red-capable: the mechanical break named in its header comment makes
 // exactly that leg fail. The red observations recorded below were produced by
 // applying each break to v3.go, running this file's tests, capturing the
-// failure, and reverting (the ADR 0014 D6/D7 mutation-gate discipline the
+// failure, and reverting (the per-defect mutation proofs (docs/design/conformance-contract.md)
+// mutation-gate discipline the
 // v1/v2 batteries follow). Where the Go stdlib backend already subsumes a
 // gate, the per-clause red-capable form is the direct unit leg on the pure
-// profile validator (the ADR 0017 subsumption pattern the v1 battery uses for
+// profile validator (the spec/bap-v1.md §§15-17 subsumption pattern the v1 battery uses for
 // the canonical-form gate).
 
 import (
@@ -126,9 +127,9 @@ func es256LoadJwkInput(t *testing.T, id, field string) string {
 //
 // RED OBSERVATION (2026-09-21, Go 1.25.14): deleting the
 // `s.Cmp(p256HalfOrder) > 0` clause from validateRawRS in v3.go reddens exactly
-// this leg — the high-S corpus compact then VERIFIES (Go's crypto/ecdsa
+// this leg: the high-S corpus compact then VERIFIES (Go's crypto/ecdsa
 // backend accepts the malleable (r, n-s) counterpart, so the profile gate is
-// the only closure) — observed: `go test -run TestEcdsaPermissiveLowS ./...`
+// the only closure): observed: `go test -run TestEcdsaPermissiveLowS ./...`
 // failed with "verify-grant-v3-invalid-signature-high-s: high-S signature
 // must be rejected (malleable counterpart)", and the full corpus under the
 // same break failed exactly that one case (agreed=291).
@@ -151,7 +152,7 @@ func TestEcdsaPermissiveLowS(t *testing.T) {
 //
 // Go's crypto/ecdsa backend (fips140 verifyGeneric: bigmod SetBytes under the
 // curve order plus the zero checks) already rejects r=0, s=0, r>=n, and s>=n,
-// so those public-path rejections are SUBSUMED by the backend — the
+// so those public-path rejections are SUBSUMED by the backend: the
 // per-clause red-capable form is this direct unit leg on the profile's pure
 // validator, exactly the subsumption pattern of TestCanonicalGateUnit.
 //
@@ -159,7 +160,7 @@ func TestEcdsaPermissiveLowS(t *testing.T) {
 // `Cmp(p256Params.N) >= 0` clauses from validateRawRS in v3.go reddens exactly
 // the zero/at-n assertions of this leg (validateRawRS returns nil for them)
 // while the corpus r-at-n/s-at-n/zero cases stay rejected through backend
-// subsumption — observed: `go test -run TestEcdsaPermissiveRawRS ./...` failed
+// subsumption: observed: `go test -run TestEcdsaPermissiveRawRS ./...` failed
 // with "validateRawRS(64 bytes) = <nil>, want invalid" (the r=0 spelling,
 // first assertion) and the full corpus stayed at agreed=292 under the same
 // break (the subsumption, observed live).
@@ -192,22 +193,22 @@ func TestEcdsaPermissiveRawRS(t *testing.T) {
 
 // ---- (c) EC JWK closed member set (REQ3-HEADER-proof-jwk, no-private-jwk) ----
 //
-// The member-set closure is LAYERED in decodePublicJwk — the exact-four
+// The member-set closure is LAYERED in decodePublicJwk: the exact-four
 // count gate, the per-member allowlist default arm, and the nil-presence
-// check each independently close the corpus fixtures — so no single-layer
+// check each independently close the corpus fixtures: so no single-layer
 // removal reddens the extra-member/missing-y assertions.
 //
 // RED OBSERVATIONS (2026-09-21, Go 1.25.14):
 //   - break 1: replacing the `*crv != "P-256" || *kty != "EC"` rejection
-//     with `false` reddened exactly the wrong-crv assertion first —
+//     with `false` reddened exactly the wrong-crv assertion first,
 //     `go test -run TestEcdsaPermissiveJwkMemberSet ./...` failed with
 //     "jwk-decode-public-invalid-crv-p384: wrong crv must be rejected"
 //     (wrong-kty reddens under the same break on the next assertion);
-//   - break 2 (count gate alone removed): observed GREEN — the extra-member
+//   - break 2 (count gate alone removed): observed GREEN: the extra-member
 //     fixture was still closed by the per-member allowlist arm (the layered
 //     closure, recorded as an observation, not a gap);
 //   - break 3 (count + allowlist + presence removed together): reddened the
-//     extra-member assertion — the same run failed with
+//     extra-member assertion: the same run failed with
 //     "jwk-decode-public-invalid-extra-member-d: extra member d must be
 //     rejected". All breaks reverted; the v3.go hash returned to baseline.
 func TestEcdsaPermissiveJwkMemberSet(t *testing.T) {
@@ -242,7 +243,7 @@ func TestEcdsaPermissiveJwkMemberSet(t *testing.T) {
 // the decodePublicJwk width gate deleted, the corpus short-coordinate case
 // still rejects through the curve equation), and the padded-coordinate
 // assertion is SUBSUMED by the shared Base64urlDecode canonicality gate
-// (pinned red-capable in the v1 battery) — the raw-key leg is this class's
+// (pinned red-capable in the v1 battery): the raw-key leg is this class's
 // per-clause red-capable form. Observed:
 // `go test -run TestEcdsaPermissiveWidths ./...` failed with
 // "jwk-encode-public-invalid-length-64: non-65-byte/compressed raw key must
@@ -290,10 +291,10 @@ func TestEcdsaPermissiveWidths(t *testing.T) {
 // ---- (e) pure-arithmetic point validation (REQ3-KEY-point-on-curve) ----
 //
 // RED OBSERVATION (2026-09-21, Go 1.25.14): replacing p256OnCurve's body
-// with `return true` reddens exactly this leg — the off-curve and
+// with `return true` reddens exactly this leg: the off-curve and
 // at-field-prime corpus JWKs then decode, and the off-curve 65-byte key then
 // passes verifyECDSA's point gate (the corpus off-curve case and this leg
-// both fail) — observed:
+// both fail): observed:
 // `go test -run TestEcdsaPermissiveOnCurve ./...` failed with
 // "jwk-decode-public-invalid-off-curve: off-curve/coordinate-at-prime point
 // must be rejected at decode", and the full corpus under the same break fell
@@ -324,14 +325,14 @@ func TestEcdsaPermissiveOnCurve(t *testing.T) {
 //
 // RED OBSERVATION (2026-09-21, Go 1.25.14): widening the payload v-check in
 // (EcdsaProfile).decodeGrantPayload and decodeProofPayload (replacing
-// `i != 3` with a tautology) reddens exactly the forged-v assertions below —
+// `i != 3` with a tautology) reddens exactly the forged-v assertions below,
 // the v:1 and v:2 spellings of an otherwise-valid ES256 artifact then
 // decode (DecodeGrant performs no signature check, so the v gate is the only
-// closure for the forged fixtures) — observed:
+// closure for the forged fixtures): observed:
 // `go test -run TestEcdsaPermissiveCrossMajor ./...` failed with
 // 'forged "v":1 payload must be rejected by the v gate' (the v:2 spelling
 // reddens on the next loop iteration); the full corpus stayed at agreed=292
-// under the same break — the real v1/v2 corpus bytes are double-gated by the
+// under the same break: the real v1/v2 corpus bytes are double-gated by the
 // ES256 alg header, exactly the isolation the forged fixtures provide. The
 // real v1/v2 corpus bytes stay rejected through the independent alg-header
 // gate under this break (double-gated by construction); the symmetric

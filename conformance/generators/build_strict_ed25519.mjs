@@ -1847,7 +1847,7 @@ function buildCorpus() {
   emit(files, "primitive", "verify-strict", familyPrimitive());
   emit(files, "primitive", "key-only-forgeries", familyKeyOnly());
   // Both contract majors share one file per family; each case carries its `major` as data, so no
-  // path names a major (ADR 0022 admits major tokens only on enumerated contract paths).
+  // path names a major (docs/design/registries.md identifier policy admits major tokens only on enumerated contract paths).
   const bothMajors = (family) => [...family(1), ...family(2)];
   emit(files, "grant-verify", "grant-verify", bothMajors(familyGrant));
   emit(files, "envelope", "envelope", bothMajors(familyEnvelope));

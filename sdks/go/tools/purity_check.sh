@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# BAP-16 — enforce the library-path purity invariant for the Go SDK.
+# BAP-16: enforce the library-path purity invariant for the Go SDK.
 #
-# AGENTS rule 2 + ADR 0014 D8: the library path (every non-test .go file at
-# the module root — the `verifier` package) must contain no I/O, filesystem,
+# The library path (every non-test .go file at the module root, the `verifier`
+# package) must contain no I/O, filesystem,
 # network, process-spawn, environment, wall/monotonic clock, RNG, or unsafe
 # code. `go vet` catches none of these classes, so a grep is the enforcement.
 #
 # Test files (_test.go), the conformance/ runner package, and the tests/
-# battery legitimately read corpus files and use encoding/json — only the
+# battery legitimately read corpus files and use encoding/json: only the
 # library path is purity-bound.
 #
 # Exits 0 if the library path is pure, 1 on any forbidden API or import
@@ -33,16 +33,16 @@ for f in "$lib_dir"/*.go; do
     *_test.go) continue ;; # test files are not the library path
   esac
   # strip // comment tails first so doc prose (e.g. "I/O", "context.") cannot
-  # false-positive — only code is scanned
+  # false-positive: only code is scanned
   code=$(sed 's://.*$::' "$f")
   if matches=$(grep -En "$patterns" <<< "$code"); then
-    echo "purity_check: FAIL — forbidden API in library path of ${f##*/}:" >&2
+    echo "purity_check: FAIL: forbidden API in library path of ${f##*/}:" >&2
     printf '%s\n' "$matches" >&2
     status=1
   else
     [ "$?" -eq 1 ]
   fi
-  # any import line — block, aliased, dotted, or single — whose quoted path
+  # any import line (block, aliased, dotted, or single) whose quoted path
   # is outside the allowlist fails (aliases and dot-imports cannot hide it):
   # extract the import block plus single imports, then filter quoted paths
   imp_block=$(awk '/^import \(/ {flag=1} flag {print} /^\)/ {if (flag) flag=0}' "$f")
@@ -51,7 +51,7 @@ for f in "$lib_dir"/*.go; do
   imports=$(grep -oE '"[^"]+"' <<< "$import_lines") || [ "$?" -eq 1 ]
   bad_imports=$(grep -vE "$allowed_imports" <<< "$imports") || [ "$?" -eq 1 ]
   if [ -n "$bad_imports" ]; then
-    echo "purity_check: FAIL — non-allowlisted import in ${f##*/}:" >&2
+    echo "purity_check: FAIL: non-allowlisted import in ${f##*/}:" >&2
     printf '%s\n' "$bad_imports" >&2
     status=1
   fi
@@ -74,7 +74,8 @@ import sys
 from pathlib import Path
 
 # BEGIN DERIVATION RULES
-# ADR 0014 D5: identical rules travel with each independently publishable SDK.
+# independent spec-and-corpus derivation (docs/design/conformance-contract.md): identical rules
+# travel with each independently publishable SDK.
 # Split and escaped literals keep this checker inside its own scan boundary.
 DERIVATION_PATTERNS = [
     ("reference source citation", re.compile(
@@ -139,4 +140,4 @@ if [ "$status" -ne 0 ]; then
   exit 1
 fi
 
-echo "purity_check: OK — no I/O / clock / RNG / network / env / unsafe API in the library path."
+echo "purity_check: OK: no I/O / clock / RNG / network / env / unsafe API in the library path."

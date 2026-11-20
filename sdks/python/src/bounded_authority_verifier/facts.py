@@ -1,9 +1,14 @@
 """Value-bearing, redacted, non-authorizing facts (spec/bap-v1.md § Public verification contract,
 REQ1-VERIFY-facts-redacted, REQ1-VERIFY-facts-not-credentials).
 
-No generic encoder, no ``asdict``, no authorization/decision method (AGENTS rule 1). Grant/Envelope/
-Export carry ``authorization="not_evaluated"``; Chain/Anchor/Transition carry
-``trust="not_evaluated"``.
+The eight public verification facts types are GrantFacts, EnvelopeFacts, ChainFacts,
+AnchorFacts, KeyTransitionFacts, AnchoredExportFacts, AttestationFacts, and ContentAssertionFacts.
+The sibling profiles follow spec/bap-role-attestation-v1.md and spec/bap-content-assertion-v1.md.
+
+There is no generic encoder, ``asdict``, or authorization/decision method. GrantFacts,
+EnvelopeFacts, and AnchoredExportFacts carry ``authorization="not_evaluated"``. ChainFacts,
+AnchorFacts, KeyTransitionFacts, AnchoredExportFacts, AttestationFacts, and ContentAssertionFacts
+carry ``trust="not_evaluated"``.
 
 Verified facts are slotted value objects with read-only properties. They refuse generic
 enumeration, pickling, and copy reduction; callers read named properties explicitly.
@@ -1101,7 +1106,7 @@ class AnchoredExportFacts(_Facts):
 
 @dataclass(frozen=True)
 class GrantDecoded:
-    """Decode surface — structural grant facts (verification=not_evaluated)."""
+    """Decode surface: structural grant facts (verification=not_evaluated)."""
 
     version: int
     key_id: str
@@ -1321,7 +1326,7 @@ class ProofDecoded(_Facts):
 
 @dataclass(frozen=True)
 class KeyLocator:
-    """Locator surface — header-only key id (trust=not_evaluated)."""
+    """Locator surface: header-only key id (trust=not_evaluated)."""
 
     key_id: str
     trust: str = "not_evaluated"
@@ -1329,7 +1334,7 @@ class KeyLocator:
 
 @dataclass(frozen=True)
 class AttestationDecoded:
-    """Decode surface — structural role-attestation facts (verification=not_evaluated).
+    """Decode surface: structural role-attestation facts (verification=not_evaluated).
 
     ``public_key`` is the raw 32-byte subject public key as specified in
     spec/bap-role-attestation-v1.md §2 (REQ-RA1-CLAIM-public-key).
@@ -1367,7 +1372,7 @@ class AttestationDecoded:
 
 
 class AttestationFacts(_Facts):
-    "AttestationFacts (spec/bap-role-attestation-v1.md §3): value-bearing, redacted,\nnon-authorizing. Fingerprints are RFC 7638 Ed25519 thumbprints (raw 32) — never a hash of\nraw key bytes. No raw key material, no signature, no decision (REQ-RA1-VERIFY-facts,\nREQ-RA1-VERIFY-facts-non-authorizing)."
+    "AttestationFacts (spec/bap-role-attestation-v1.md §3): value-bearing, redacted,\nnon-authorizing. Fingerprints are RFC 7638 Ed25519 thumbprints (raw 32): never a hash of\nraw key bytes. No raw key material, no signature, no decision (REQ-RA1-VERIFY-facts,\nREQ-RA1-VERIFY-facts-non-authorizing)."
 
     __slots__ = (
         "_attestor_key_id",

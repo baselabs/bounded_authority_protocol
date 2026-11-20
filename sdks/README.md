@@ -44,6 +44,11 @@ All four are pure verification libraries (no I/O, clock, randomness, or network 
 Their verification facades return facts or a single value-free rejection, never an authorization
 decision. Facts exclude raw credentials and secrets; field-redacted display is a separate
 requirement.
+The eight verification facts types are `GrantFacts`, `EnvelopeFacts`, `ChainFacts`,
+`AnchorFacts`, `KeyTransitionFacts`, `AnchoredExportFacts`, `AttestationFacts`, and
+`ContentAssertionFacts`. The last two belong to the role-attestation and content-assertion
+profiles. All carry a not-evaluated marker and follow the same redaction contract.
+
 Decoded diagnostics and redacted facts follow the
 [diagnostic rendering contract](../spec/diagnostic-rendering.md#diagnostic-rendering).
 Their behavior is defined by the specifications and the corpora; the in-repository SDKs' source

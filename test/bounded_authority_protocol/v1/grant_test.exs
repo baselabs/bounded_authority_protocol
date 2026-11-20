@@ -84,7 +84,7 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
           # floor-limit object) is rejected by the closed v1 payload set exactly like any other
           # unlisted member; a verifier that predates the claim denies a grant carrying it.
           # This is the reference-implementation tripwire against silently admitting the reserved
-          # name; activation is a successor contract-major (ADR 0016).
+          # name; activation is a successor contract-major (docs/design/successor-major-charter.md).
           replace_json(
             compact,
             1,
@@ -118,7 +118,7 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
     compact = fixture["grant"]["compact"]
     grant = grant(fixture)
 
-    # BAP-20 / ADR 0028: the reserved-but-inactive range selector kinds (`lte`, `gte`) are
+    # BAP-20 / spec/bap-v2.md §4: the reserved-but-inactive range selector kinds (`lte`, `gte`) are
     # rejected by the closed v1 kind set exactly like any other unlisted kind. Each object
     # sits on the recognized `kind,path,value` member set, so the kind dispatch in the
     # decoder is the sole rejector. Activation is a successor contract-major.
@@ -146,11 +146,11 @@ defmodule BoundedAuthorityProtocol.V1.GrantTest do
   end
 
   test "successor-major grant bytes are rejected by the closed v1 profile" do
-    # BAP-21 / ADR 0030 cross-major tripwire: the v2 successor major self-declares with
+    # BAP-21 / spec/bap-v2.md cross-major tripwire: the v2 successor major self-declares with
     # payload `v: 2`; the closed v1 decode (`{:integer, 1}` check) is the sole rejector on
     # an otherwise-identical payload, mirroring the BAP-20 reserved-kind tripwire above.
     # v1 stays byte-frozen; this pins the frozen behavior against the new major's existence.
-    # BAP-22 / ADR 0035 extends the tripwire to the v3 successor major the same way: `v: 3`
+    # BAP-22 / spec/bap-v3.md extends the tripwire to the v3 successor major the same way: `v: 3`
     # on an otherwise-v1 payload is rejected by the same sole check.
     fixture = fixture!()
     compact = fixture["grant"]["compact"]

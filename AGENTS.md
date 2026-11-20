@@ -35,7 +35,7 @@ grant operational authority by itself.
    `AnchorFacts`, `KeyTransitionFacts`, `AnchoredExportFacts`, `AttestationFacts`, and
    `ContentAssertionFacts`. Only
    `GrantFacts`, `EnvelopeFacts`, and `AnchoredExportFacts` carry `authorization: :not_evaluated`;
-   the diagnostic chain, anchor, transition, and attestation facts carry only
+   the diagnostic chain, anchor, transition, role-attestation, and content-assertion facts carry only
    `trust: :not_evaluated`. There is no `allowed?`,
    `authorized?`, `decision`, or receipt. Facts are value-bearing and redacted, never execution
    credentials.
@@ -101,7 +101,7 @@ their own; the landing run qualifies them.
   change that finds it.
 - Update the CHANGELOG when behavior, a dependency or a contract changes; other docs only when
   a contract changes.
-- A changed public contract updates its vectors, spec or ADR and consumer documentation in the
+- A changed public contract updates its vectors, normative specification and consumer documentation in the
   same commit.
 - Do not claim interoperability from self-round-trips. Normative vectors require an independent
   implementation and exact-byte comparison.

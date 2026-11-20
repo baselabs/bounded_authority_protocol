@@ -355,7 +355,7 @@ fn certified_role_attestation_corpus_drives_rust_verdicts() {
             let overrides = overrides.as_object().unwrap();
             // The certified override set: the four singleton forms plus the
             // one combined form the corpus carries (both subject-binding
-            // members together — the self-attestation-same-material case).
+            // members together: the self-attestation-same-material case).
             // An unknown key, or any OTHER combination, is rejected here
             // rather than silently applied.
             let known = [
@@ -436,7 +436,7 @@ fn producer_and_assembly_round_trip_both_roles_from_profile_material() {
         .unwrap(),
     );
     // The library accepts only external signature bytes: the TEST generates
-    // the attestor signing key (a fixed deterministic seed — no library RNG),
+    // the attestor signing key (a fixed deterministic seed: no library RNG),
     // and the trusted attestor context carries its public half.
     let signing_key = SigningKey::from_bytes(&[0x5A; 32]);
     let attestor_public_key = signing_key.verifying_key().to_bytes();
@@ -497,7 +497,7 @@ fn producer_and_assembly_round_trip_both_roles_from_profile_material() {
         message.extend_from_slice(&produced.payload_segment);
         assert_eq!(produced.message, message);
 
-        // External signature bytes only — the library never signs.
+        // External signature bytes only: the library never signs.
         let signature = signing_key.sign(&produced.message);
         let mut signature64 = [0u8; 64];
         signature64.copy_from_slice(&signature.to_bytes());

@@ -55,7 +55,7 @@ func TestJcsEncodeBasics(t *testing.T) {
 // ECMAScript Number::toString thresholds (spec worked examples; corpus pins
 // jcs-encode-float-* on the reachable e<-6 side). The e>=21 side is
 // unreachable from magnitude-bound-compliant floats (the largest allowed
-// float has decimal exponent ~15.95) — the branch exists because the spec
+// float has decimal exponent ~15.95): the branch exists because the spec
 // documents both thresholds (spec/bap-v1.md §8, REQ1-JSON-jcs-exact).
 func TestJcsEncodeFloats(t *testing.T) {
 	cases := []struct {

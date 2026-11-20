@@ -1,4 +1,4 @@
-//! Certified input closure and computed verdict accounting, ADR 0049 D4-D5.
+//! Certified input closure and computed verdict accounting, certified input closure and computed verdict accounting (self-contained SDK distribution contract).
 //! Ordering and outcome projections: the corpus distribution contract, index order.
 #![allow(dead_code)]
 use bounded_authority_protocol as bap;

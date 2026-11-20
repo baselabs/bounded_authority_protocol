@@ -429,7 +429,7 @@ def test_attestation_assembly_revalidates() -> None:
     # Wrong signature width (Ed25519 signatures are exactly 64 bytes).
     assert not assemble_attestation_compact(signing_input.value, signature[:63]).is_ok
 
-    # Non-canonical payload: same members, non-JCS member order — assembly re-parses under the
+    # Non-canonical payload: same members, non-JCS member order: assembly re-parses under the
     # profile and rejects bytes its own consumer would reject (REQ-RA1-API-assembly-revalidate).
     non_canonical_payload = json.dumps(
         {

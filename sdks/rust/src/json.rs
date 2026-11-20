@@ -1,6 +1,6 @@
 //! Duplicate-rejecting, raw-lexeme, single-value, tagged JSON decoder.
 //!
-//! Hand-rolled per ADR 0014 D6 / design-note decision D5: `serde_json` is
+//! Hand-rolled to preserve the tagged JSON algebra of spec/bap-v1.md §7: `serde_json` is
 //! last-wins on duplicate members, unordered by default, and collapses the
 //! integer/float tag distinction, so it CANNOT back the protocol's tagged JSON
 //! algebra. This decoder is permissiveness closures #1/#3/#4/#5 (the JCS encoder
@@ -12,7 +12,7 @@
 //! - `REQ1-JSON-single-value`: the input is exactly one RFC 8259 value followed
 //!   only by JSON whitespace; trailing non-whitespace is invalid.
 //! - `REQ1-JSON-no-normalization`: UTF-8 is mandatory; strings are preserved
-//!   without Unicode normalization (lone surrogates rejected — unrepresentable).
+//!   without Unicode normalization (lone surrogates rejected: unrepresentable).
 //! - `REQ1-JSON-raw-lexeme`: raw RFC 8259 number lexemes are scanned OUTSIDE
 //!   strings; the 64-byte ceiling and exact decimal magnitude (no FP rounding)
 //!   are enforced BEFORE host conversion.
@@ -24,10 +24,10 @@
 use crate::bounds::Bounds;
 use crate::error::{Invalid, Result};
 
-/// The tagged JSON algebra — mirrors `spec/bap-v1.md` § JSON algebra table.
+/// The tagged JSON algebra: mirrors `spec/bap-v1.md` § JSON algebra table.
 ///
 /// `Int(i64)` and `Float(f64)` are DISTINCT variants: `1` decodes to `Int(1)`,
-/// `1.0` to `Float(1.0)` (permissiveness closure #5 — selector semantic identity
+/// `1.0` to `Float(1.0)` (permissiveness closure #5: selector semantic identity
 /// and the typed request-digest projection depend on the tag). `Object` is an
 /// ordered `Vec<(String, JsonValue)>` (RFC 8785 sorts at JCS encode time, not
 /// here) and is duplicate-free by construction.
@@ -282,7 +282,7 @@ impl<'a> Decoder<'a> {
     }
 
     /// Encodes a `\uXXXX` code point, handling surrogate pairs. A lone surrogate
-    /// (unpaired high/low) is rejected — it is not a Unicode scalar value and so
+    /// (unpaired high/low) is rejected: it is not a Unicode scalar value and so
     /// cannot be represented in the mandatory UTF-8 string.
     fn encode_codepoint(&mut self, buf: &mut Vec<u8>, cp: u32) -> Result<()> {
         if (0xD800..=0xDBFF).contains(&cp) {
@@ -315,7 +315,7 @@ impl<'a> Decoder<'a> {
         self.scan_number_lexeme()?;
         let lexeme = &self.input[start..self.pos];
 
-        // Closure #5 — int/float tag by lexeme shape: a lexeme containing `.` or
+        // Closure #5: int/float tag by lexeme shape: a lexeme containing `.` or
         // `e`/`E` is a non-integer number -> Float; a pure decimal integer lexeme
         // -> Int. `1` -> Int(1), `1.0` -> Float(1.0) (distinct variants). Removing
         // this distinction (forcing Float) collapses selector identity.
@@ -399,7 +399,7 @@ impl<'a> Decoder<'a> {
 }
 
 // ----------------------------------------------------------------------------
-// Number helpers (raw-lexeme magnitude check — exact decimal, no FP rounding)
+// Number helpers (raw-lexeme magnitude check: exact decimal, no FP rounding)
 // ----------------------------------------------------------------------------
 
 /// Appends the UTF-8 encoding of `cp` (a validated Unicode scalar value) to buf.
@@ -487,7 +487,7 @@ fn strip_leading_zeros(s: &str) -> &str {
 /// the power of ten to apply (exp − frac_count), `bound` is the symmetric
 /// magnitude ceiling (9_007_199_254_740_991). Returns true iff |digits × 10^scale|
 /// is within the bound. Comparison is by decimal digit length, then byte ordering
-/// — exact for the bound's 16-digit width and bomb-free (large |scale| resolves
+///: exact for the bound's 16-digit width and bomb-free (large |scale| resolves
 /// via the length test without materializing zeros).
 fn magnitude_ok(digits: &str, scale: i64, bound: u64) -> bool {
     if digits == "0" {
@@ -539,12 +539,12 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure #1 — REQ1-JSON-no-duplicate
+    // Closure #1: REQ1-JSON-no-duplicate
     // ==========================================================================
 
     #[test]
     fn duplicate_member_at_root_is_rejected() {
-        // The load-bearing permissiveness case (ADR 0005:240-246): a last-wins
+        // The load-bearing permissiveness case (per-guard mutation proof): a last-wins
         // host decoder silently accepts `{"a":1,"a":2}` (keeping `a:2`); the
         // dup-rejecting decoder must fail closed.
         let result = json_decode(br#"{"a":1,"a":2}"#, &max());
@@ -566,7 +566,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure — REQ1-JSON-single-value
+    // Closure: REQ1-JSON-single-value
     // ==========================================================================
 
     #[test]
@@ -588,12 +588,12 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure — REQ1-JSON-raw-lexeme (byte ceiling + exact magnitude, pre-conversion)
+    // Closure: REQ1-JSON-raw-lexeme (byte ceiling + exact magnitude, pre-conversion)
     // ==========================================================================
 
     #[test]
     fn number_lexeme_at_byte_ceiling_is_accepted() {
-        // 64-byte float lexeme (`1.` + 62 zeros) — value 1.0, within magnitude.
+        // 64-byte float lexeme (`1.` + 62 zeros): value 1.0, within magnitude.
         let mut s = String::from("1.");
         s.push_str(&"0".repeat(62));
         let result = json_decode(s.as_bytes(), &max());
@@ -602,7 +602,7 @@ mod tests {
 
     #[test]
     fn number_lexeme_over_byte_ceiling_is_rejected_before_conversion() {
-        // 65-byte float lexeme (`1.` + 63 zeros) — over the 64-byte ceiling.
+        // 65-byte float lexeme (`1.` + 63 zeros): over the 64-byte ceiling.
         let mut s = String::from("1.");
         s.push_str(&"0".repeat(63));
         let result = json_decode(s.as_bytes(), &max());
@@ -611,7 +611,7 @@ mod tests {
 
     #[test]
     fn integer_over_magnitude_is_rejected_before_conversion() {
-        // 9007199254740992 = 2^53 — fits i64 (a permissive host parse would
+        // 9007199254740992 = 2^53: fits i64 (a permissive host parse would
         // accept it), but the raw-lexeme magnitude check rejects it pre-conversion.
         let result = json_decode(b"9007199254740992", &max());
         assert_eq!(result, Err(Invalid));
@@ -640,7 +640,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure #5 — int/float tag (distinct variants by lexeme shape)
+    // Closure #5: int/float tag (distinct variants by lexeme shape)
     // ==========================================================================
 
     #[test]
@@ -675,12 +675,12 @@ mod tests {
     }
 
     // ==========================================================================
-    // Structural bounds — exact_bound / maximum_plus_one behavior
+    // Structural bounds: exact_bound / maximum_plus_one behavior
     // ==========================================================================
 
     #[test]
     fn depth_exact_bound_is_accepted() {
-        // 32 nested empty arrays (`[`*32 + `]`*32 — the corpus depth-exact shape).
+        // 32 nested empty arrays (`[`*32 + `]`*32: the corpus depth-exact shape).
         // 33-deep is rejected. Depth is measured on containers; the innermost
         // empty array sits at depth 32 (== the bound).
         let mut s = String::new();
@@ -698,7 +698,7 @@ mod tests {
 
     #[test]
     fn depth_maximum_plus_one_is_rejected() {
-        // 33 nested empty arrays (`[`*33 + `]`*33 — the corpus depth-max+1 shape).
+        // 33 nested empty arrays (`[`*33 + `]`*33: the corpus depth-max+1 shape).
         let mut s = String::new();
         for _ in 0..33 {
             s.push('[');
@@ -756,13 +756,13 @@ mod tests {
 
     #[test]
     fn malformed_member_name_is_rejected() {
-        // `{"\xff":1}` — invalid UTF-8 in the member name.
+        // `{"\xff":1}`: invalid UTF-8 in the member name.
         let result = json_decode(b"{\"\xff\":1}", &max());
         assert_eq!(result, Err(Invalid));
     }
 
     // ==========================================================================
-    // Tagged algebra — valid value shapes + source-order preservation
+    // Tagged algebra: valid value shapes + source-order preservation
     // ==========================================================================
 
     #[test]
@@ -821,9 +821,9 @@ mod tests {
             json_decode(b"{}", &max()).unwrap(),
             JsonValue::Object(vec![])
         );
-        // `{"a":}` — missing value.
+        // `{"a":}`: missing value.
         assert_eq!(json_decode(br#"{"a":}"#, &max()), Err(Invalid));
-        // `{"a":1}xyz` — trailing non-ws.
+        // `{"a":1}xyz`: trailing non-ws.
         assert_eq!(json_decode(b"{\"a\":1}xyz", &max()), Err(Invalid));
         // first byte tamper.
         assert_eq!(json_decode(b"z\"a\":1}", &max()), Err(Invalid));

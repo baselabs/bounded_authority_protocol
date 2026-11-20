@@ -1,4 +1,4 @@
-//! Façade — the public v3 verification entry points (contract-major 3,
+//! Facade: the public v3 verification entry points (contract-major 3,
 //! suite `BAP3-ES256-SHA256`).
 //!
 //! The v3 profile is the v1 wire contract carried at major 3 under the
@@ -15,14 +15,16 @@
 //! 65-byte uncompressed SEC1 point `0x04||x||y`, and signatures are the
 //! RFC 7518 §3.4 raw 64-byte `r||s` with low-S enforced at verification
 //! (`REQ3-SIGNING-low-s`). The selector algebra is the v2 algebra unchanged
-//! — the FIVE kinds `{all, equals, one_of, lte, gte}`
+//!: the FIVE kinds `{all, equals, one_of, lte, gte}`
 //! (`selector::evaluate_v2`, spec/bap-v3.md §4).
 //!
-//! Derivation hygiene mirrors the v1/v2 façades (ADR 0014 D5): derived from
+//! Derivation hygiene mirrors the v1/v2 facades (docs/design/conformance-contract.md,
+//! Independent implementation rule): derived from
 //! `spec/bap-v3.md`, `spec/bap-v1.md` (incorporated with the §2
 //! substitutions), `spec/bap-v2.md` §4, and the certified v3 conformance
 //! corpus (`conformance/priv/conformance/v3/corpus/`). Derived from the spec and certified corpus,
-//! not from any sibling-SDK or reference source (ADR 0014 D5). `REQ1-*`/`REQ2-*` citations below name the
+//! not from any sibling-SDK or reference source (docs/design/conformance-contract.md,
+//! Independent implementation rule). `REQ1-*`/`REQ2-*` citations below name the
 //! incorporated requirement of the same name; v3 carries them as
 //! `REQ3-*` (spec/bap-v3.md §6).
 //!
@@ -35,7 +37,7 @@
 //!
 //! The v3 profile has no local-loopback application-proof typ (the loopback
 //! profile is bound to contract-major 1, spec/bap-v3.md §2): the
-//! byte-distinct loopback kinds stay closed out of this façade.
+//! byte-distinct loopback kinds stay closed out of this facade.
 
 use crate::base64url::{base64url_decode, base64url_encode};
 use crate::bounds::Bounds;
@@ -61,13 +63,13 @@ use crate::uri::uri_normalize;
 use sha2::{Digest, Sha256};
 
 // ============================================================================
-// request_digest — the v3 auth-binding primitive
+// request_digest: the v3 auth-binding primitive
 // ============================================================================
 
 /// Compute the v3 request digest.
 ///
 /// The identical typed projection and JCS preimage as the v1/v2 primitives,
-/// hashed under `BAP3-REQUEST\0` (`REQ3-SIGNING-digest-prefix`) — no two
+/// hashed under `BAP3-REQUEST\0` (`REQ3-SIGNING-digest-prefix`): no two
 /// majors share a request-binding domain (a v1/v2 `ba_req` can never satisfy
 /// a v3 binding).
 pub fn request_digest(
@@ -79,7 +81,7 @@ pub fn request_digest(
 }
 
 // ============================================================================
-// Constants — closed header/claim member values (suite BAP3-ES256-SHA256)
+// Constants: closed header/claim member values (suite BAP3-ES256-SHA256)
 // ============================================================================
 
 const ALG_ECDSA_P256: &str = "ES256";
@@ -91,24 +93,24 @@ const CRV_NIST: &str = "P-256";
 const KTY_EC: &str = "EC";
 
 /// The ASCII domain-separation prefix for the consumption row-domain hash,
-/// including its FINAL NUL byte — the same `REQ1-SIGNING-digest-prefix`
+/// including its FINAL NUL byte: the same `REQ1-SIGNING-digest-prefix`
 /// pattern as `BAP3-REQUEST\0` (the v3 request digest), carried at major 3
 /// (`REQ3-SIGNING-digest-prefix` incorporation).
 ///
 /// `"BAP3-CHAIN\0"` = `[B, A, P, 3, -, C, H, A, I, N, 0x00]` (10 ASCII + 1
-/// NUL = 11 bytes — confirmed byte-exact against the v3 corpus entry.json
-/// row-domain hash). The final zero byte is load-bearing (ADR 0004 §
+/// NUL = 11 bytes: confirmed byte-exact against the v3 corpus entry.json
+/// row-domain hash). The final zero byte is load-bearing (spec/bap-v1.md §15,
 /// Consumption rows: `SHA-256("BAP3-CHAIN\0" || canonical_row_bytes)`).
 const CHAIN_DIGEST_PREFIX: &[u8] = b"BAP3-CHAIN\0";
 
-/// The 20-byte archive magic prefix (ADR 0004 § Anchored export, carried at
+/// The 20-byte archive magic prefix (spec/bap-v1.md §15, Anchored export, carried at
 /// major 3): the exact ASCII bytes `BAP3-ARCHIVE\0EXPORT\0` (12 + NUL + 6 +
 /// NUL = 20). Confirmed byte-exact against the v3 corpus
 /// `anchored-export/verify.json` `chunks[0]`.
 const ARCHIVE_MAGIC: &[u8] = b"BAP3-ARCHIVE\0EXPORT\0";
 
 // ============================================================================
-// v3 input types — the 65-byte-key family
+// v3 input types: the 65-byte-key family
 // ============================================================================
 //
 // The shared `types` structs are reused everywhere a v1/v2 struct carries no
@@ -138,7 +140,7 @@ pub struct TrustedIssuer {
 }
 
 /// Caller expectation for combined envelope verification (`check_envelope`)
-/// at major 3 — the v1/v2 `ExpectedRequest` shape with the v3 trusted-issuer
+/// at major 3: the v1/v2 `ExpectedRequest` shape with the v3 trusted-issuer
 /// key width. Embeds the trusted issuer because `check_envelope(Credentials,
 /// ExpectedRequest)` takes no separate trusted-issuer argument.
 #[derive(Debug, Clone)]
@@ -174,7 +176,7 @@ pub struct ExpectedRequest {
     pub trusted_issuer: TrustedIssuer,
 }
 
-/// A historical v3 public key with its validity interval — the v1/v2
+/// A historical v3 public key with its validity interval: the v1/v2
 /// `HistoricalPublicKey` shape with the 65-byte EC key width. Used by
 /// `verify_historical_anchor` (one key), `verify_key_transition` (current +
 /// next), and `verify_anchored_export` (an ordered chain via
@@ -188,19 +190,19 @@ pub struct HistoricalPublicKey {
     /// Lower validity bound (integral NumericDate, always bounded).
     pub valid_from: i64,
     /// Upper validity bound (bounded NumericDate or
-    /// [`ValidityUpperBound::Unbounded`] — the only open upper interval).
+    /// [`ValidityUpperBound::Unbounded`]: the only open upper interval).
     pub valid_before: ValidityUpperBound,
 }
 
 /// Ordered historical public-key chain a v3 anchored export advances through
-/// (positional order is load-bearing, ADR 0004).
+/// (positional order is load-bearing, spec/bap-v1.md §15).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HistoricalKeyChain {
     /// Ordered historical keys (start key first).
     pub keys: Vec<HistoricalPublicKey>,
 }
 
-/// A boundary anchor the v3 producer frames into a compact signing input —
+/// A boundary anchor the v3 producer frames into a compact signing input,
 /// the v1/v2 `BoundaryAnchor` shape with the 65-byte EC key width.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoundaryAnchor {
@@ -222,7 +224,7 @@ pub struct BoundaryAnchor {
 }
 
 /// A historical key transition the v3 producer frames into a compact signing
-/// input — the v1/v2 `KeyTransition` shape with the 65-byte EC key widths.
+/// input: the v1/v2 `KeyTransition` shape with the 65-byte EC key widths.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyTransition {
     /// The chain identity.
@@ -242,7 +244,7 @@ pub struct KeyTransition {
 }
 
 /// The structured v3 proof fields the proof producer frames into a signing
-/// input — the v1/v2 `ProofInput` shape with the 65-byte EC holder key. The
+/// input: the v1/v2 `ProofInput` shape with the 65-byte EC holder key. The
 /// producer derives `ath`, `ba_req` (under `BAP3-REQUEST\0`), `htu`, and the
 /// header `jwk` in the EC canonical form.
 #[derive(Debug, Clone, PartialEq)]
@@ -257,10 +259,10 @@ pub struct ProofInput {
     pub invocation_id: String,
     /// Expected `ba_op` claim (operation name).
     pub operation: String,
-    /// Tagged JSON cast arguments — the `ba_req` digest preimage (NOT emitted
+    /// Tagged JSON cast arguments: the `ba_req` digest preimage (NOT emitted
     /// in the payload; only its digest is).
     pub cast_arguments: JsonValue,
-    /// The received grant compact bytes — the `ath` hash preimage.
+    /// The received grant compact bytes: the `ath` hash preimage.
     pub grant_compact: Vec<u8>,
     /// Raw 65-byte uncompressed SEC1 P-256 holder public key (the header
     /// `jwk` source).
@@ -319,14 +321,14 @@ pub fn jwk_encode_public(public_key: &[u8; es256::PUBLIC_KEY_WIDTH]) -> Result<V
 /// raw-lexeme / magnitude bounds) and then enforces the exact EC JWK shape
 /// (`REQ3-HEADER-proof-jwk`). Returns `Err(Invalid)` for any of:
 /// - malformed JSON or a non-object root;
-/// - a member set other than exactly `{crv, kty, x, y}` — any extra member,
+/// - a member set other than exactly `{crv, kty, x, y}`: any extra member,
 ///   including the private `d`, is rejected (`REQ3-HEADER-no-private-jwk`);
 /// - `crv` other than `"P-256"` or `kty` other than `"EC"`;
 /// - a non-string or wrong-valued `crv` / `kty` / `x` / `y`;
 /// - an `x` or `y` that is not canonical unpadded base64url of exactly 32
 ///   bytes (fixed-width coordinate spelling, RFC 7518 §6.2.1);
 /// - coordinates `>= p` or a point not on the curve
-///   (`REQ3-KEY-point-on-curve` — pure arithmetic, before any backend).
+///   (`REQ3-KEY-point-on-curve`: pure arithmetic, before any backend).
 pub fn jwk_decode_public(text: &[u8]) -> Result<[u8; es256::PUBLIC_KEY_WIDTH]> {
     // Parse under profile maxima (the JWK is a tiny fixed-shape object well
     // within every ceiling; no caller tightening applies at this primitive).
@@ -350,7 +352,7 @@ pub fn jwk_decode_public(text: &[u8]) -> Result<[u8; es256::PUBLIC_KEY_WIDTH]> {
             "kty" => kty = Some(val),
             "x" => x = Some(val),
             "y" => y = Some(val),
-            _ => return Err(Invalid), // unknown member — closed set
+            _ => return Err(Invalid), // unknown member: closed set
         }
     }
 
@@ -397,7 +399,7 @@ pub fn jwk_decode_public(text: &[u8]) -> Result<[u8; es256::PUBLIC_KEY_WIDTH]> {
 /// The RFC 7638 thumbprint preimage for a P-256 public key.
 ///
 /// Returns the exact UTF-8 bytes of the sorted JSON object
-/// `{"crv":"P-256","kty":"EC","x":"<canonical-x>","y":"<canonical-y>"}` —
+/// `{"crv":"P-256","kty":"EC","x":"<canonical-x>","y":"<canonical-y>"}`,
 /// the four required EC members in lexicographic order, no whitespace
 /// (`REQ3-HEADER-thumbprint`). This is byte-identical to
 /// [`jwk_encode_public`]: for a P-256 EC key the RFC 7638 preimage IS the
@@ -431,7 +433,7 @@ pub fn thumbprint_raw(public_key: &[u8; es256::PUBLIC_KEY_WIDTH]) -> Result<[u8;
 ///
 /// `REQ1-HEADER-issuer-fingerprint` incorporated: the issuer fingerprint uses
 /// exactly the same `{crv, kty, x, y}` preimage + SHA-256 as the holder
-/// thumbprint — the only difference is naming (the input is the caller's raw
+/// thumbprint: the only difference is naming (the input is the caller's raw
 /// trusted key, not a decoded proof JWK). `kid` never enters the preimage.
 pub fn public_key_thumbprint_raw(public_key: &[u8; es256::PUBLIC_KEY_WIDTH]) -> Result<[u8; 32]> {
     thumbprint_raw(public_key)
@@ -447,7 +449,7 @@ pub fn public_key_thumbprint_raw(public_key: &[u8; es256::PUBLIC_KEY_WIDTH]) -> 
 /// `REQ1-LOCATOR-three-segments` (incorporated): the compact MUST have
 /// exactly three segments. `REQ1-LOCATOR-opaque-payload`: the payload and
 /// signature segments are NOT decoded, validated, or even required to be
-/// non-empty — they stay opaque. `REQ1-LOCATOR-not-authority`: the result is
+/// non-empty: they stay opaque. `REQ1-LOCATOR-not-authority`: the result is
 /// a `kid` hint plus `trust: NotEvaluated`; it selects no key and authorizes
 /// nothing. `REQ1-LOCATOR-no-value-leak`: every failure returns `Err(Invalid)`
 /// with no input values.
@@ -458,7 +460,7 @@ pub fn untrusted_key_locator(compact: &[u8], bounds: &Bounds) -> Result<KeyLocat
     }
     // Split into EXACTLY three segments. Unlike parse_compact (which validates
     // every segment as non-empty canonical b64url), the locator leaves the
-    // payload+signature segments completely opaque — they may even be empty
+    // payload+signature segments completely opaque: they may even be empty
     // (the `header..` form). Only the protected segment is examined.
     let (protected, _payload, _signature) = split_three_segments(compact)?;
     // Bound + decode + validate ONLY the protected grant header.
@@ -545,16 +547,16 @@ pub fn decode_proof(compact: &[u8], bounds: &Bounds) -> Result<ProofDecoded> {
 }
 
 // ============================================================================
-// verify_grant — the grant verification surface (the authz surface)
+// verify_grant: the grant verification surface (the authz surface)
 // ============================================================================
 //
 // This is the **silent-forgery surface**: a permissive verify silently
-// accepts FORGED CREDENTIALS. Every binding — exact key id, exact
+// accepts FORGED CREDENTIALS. Every binding: exact key id, exact
 // issuer/audience, the ES256 signature (point-form, range, low-S, then the
 // backend) over the exact 2-segment signing input, coherent signed times,
-// and the three skew invariants — collapses to exactly [`Invalid`] on any
+// and the three skew invariants: collapses to exactly [`Invalid`] on any
 // mismatch (`REQ1-VERIFY-return-shape` incorporated) with no value leak. The
-// result is [`GrantFacts`] carrying `authorization: NotEvaluated` —
+// result is [`GrantFacts`] carrying `authorization: NotEvaluated`,
 // verification is not authority (`REQ1-VERIFY-grant-not-authorized`).
 
 /// Verify a grant compact against a trusted issuer and caller expectation.
@@ -647,7 +649,7 @@ pub fn verify_grant(
 }
 
 // ============================================================================
-// check_envelope — combined envelope verification
+// check_envelope: combined envelope verification
 // ============================================================================
 //
 // The **highest-stakes silent-forgery surface**: a permissive check_envelope
@@ -743,7 +745,7 @@ pub fn check_envelope(
 
     // ath binding (REQ1-CLAIM-ath): SHA-256 over the ASCII bytes of the EXACT
     // RECEIVED grant compact. Computing ath over a re-serialized compact would
-    // let a modified compact pass — this is the parse!=verify protection.
+    // let a modified compact pass: this is the parse!=verify protection.
     let mut ath_hasher = Sha256::new();
     ath_hasher.update(&credentials.grant);
     let mut recomputed_ath = [0u8; 32];
@@ -875,7 +877,7 @@ fn scan_compact(compact: &[u8], bounds: &Bounds) -> Result<()> {
 }
 
 // ============================================================================
-// assemble_compact — public façade wrapper (compose + per-kind validation)
+// assemble_compact: public facade wrapper (compose + per-kind validation)
 // ============================================================================
 
 /// Assemble the 3-segment compact serialization from a signing input + raw
@@ -885,8 +887,8 @@ fn scan_compact(compact: &[u8], bounds: &Bounds) -> Result<()> {
 /// with the per-kind CONTENT validation (it re-parses the composed output as
 /// a grant/proof/anchor/transition). `None` bounds = the profile maximum. A
 /// caller passing segments that compose to a structurally-invalid credential
-/// — wrong segment count, non-canonical base64url, or a header/payload that
-/// does not parse as the declared kind's closed header/claim set — is
+///: wrong segment count, non-canonical base64url, or a header/payload that
+/// does not parse as the declared kind's closed header/claim set: is
 /// rejected.
 pub fn assemble_compact(
     input: &SigningInput,
@@ -923,7 +925,7 @@ pub fn assemble_compact(
             return Err(Invalid);
         }
         // The v3 profile parses no role-attestation typ: the standalone
-        // sibling profile's bytes stay closed out of this façade
+        // sibling profile's bytes stay closed out of this facade
         // (`REQ-RA1-CORE-cross-profile-reject`).
         SigningKind::RoleAttestation => {
             return Err(Invalid);
@@ -1154,7 +1156,7 @@ pub fn boundary_anchor_signing_input(
     // The signing key MUST be a valid v3 EC point (the fingerprint is derived
     // from its canonical EC JWK form).
     es256::validate_point(&anchor.public_key)?;
-    // Sequence zero requires the all-zero chain hash (ADR 0004 § Boundary
+    // Sequence zero requires the all-zero chain hash (spec/bap-v1.md §15, Boundary
     // anchors; corpus `boundary-anchor-signing-input-v3-invalid-*`).
     if anchor.sequence == 0 && anchor.chain_hash.iter().any(|&b| b != 0) {
         return Err(Invalid);
@@ -1286,13 +1288,13 @@ pub fn key_transition_signing_input(
 }
 
 // ============================================================================
-// Façade B — consumption entry + chain verification
+// Facade B: consumption entry + chain verification
 // ============================================================================
 //
 // This is a **silent-relink surface**: a permissive chain check silently
-// certifies a relinked, shortened, or omitted archive. Every invariant —
+// certifies a relinked, shortened, or omitted archive. Every invariant,
 // canonical re-encode, genesis binding, predecessor links, and the caller
-// head/predecessor/sequence/count boundaries — collapses to exactly
+// head/predecessor/sequence/count boundaries: collapses to exactly
 // [`Invalid`] on any mismatch. [`ChainFacts`] carries
 // `trust: NotEvaluated` and makes no `authorization` field part of its
 // shape. A self-consistent chain does NOT certify completeness
@@ -1302,7 +1304,7 @@ pub fn key_transition_signing_input(
 /// Encode one canonical consumption row and compute its row-domain hash.
 ///
 /// Builds the closed JCS row object
-/// `{"chain_id","commitment","previous","sequence","v":3}` (ADR 0004 §
+/// `{"chain_id","commitment","previous","sequence","v":3}` (spec/bap-v1.md §15,
 /// Consumption rows carried at major 3), enforces `sequence >= 1` and the
 /// genesis binding (`sequence == 1` requires the all-zero predecessor),
 /// bounds the canonical bytes by `bounds.chain_row_bytes()`, and returns
@@ -1325,7 +1327,7 @@ pub fn encode_consumption_entry(
     validate_identifier(&entry.chain_id, bounds)?;
     // Genesis binding: sequence 1 requires the all-zero predecessor (corpus
     // invalid-seq1-nonzero-previous). A sequence > 1 MAY carry any
-    // predecessor — the encoder does not know the prior row's hash; the
+    // predecessor: the encoder does not know the prior row's hash; the
     // verifier binds it.
     if entry.sequence == 1 && entry.previous_hash.iter().any(|&b| b != 0) {
         return Err(Invalid);
@@ -1333,7 +1335,7 @@ pub fn encode_consumption_entry(
 
     let previous_str = b64url_to_string(&base64url_encode(&entry.previous_hash))?;
     let commitment_str = b64url_to_string(&base64url_encode(&entry.commitment))?;
-    // Member names + order derived first-hand from ADR 0004 § Consumption
+    // Member names + order derived first-hand from spec/bap-v1.md §15, Consumption
     // rows + the v3 corpus entry.json expected.bytes: chain_id, commitment,
     // previous, sequence, v (already in JCS / UTF-16-sorted order).
     let row = JsonValue::Object(vec![
@@ -1483,7 +1485,7 @@ struct ParsedRow {
 }
 
 /// Computes `SHA-256("BAP3-CHAIN\0" || canonical_row_bytes)` as a raw 32-byte
-/// digest — the v3 row-domain hash (ADR 0004 § Consumption rows carried at
+/// digest: the v3 row-domain hash (spec/bap-v1.md §15, Consumption rows carried at
 /// major 3).
 fn row_domain_hash(canonical_row: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
@@ -1500,7 +1502,7 @@ fn row_domain_hash(canonical_row: &[u8]) -> [u8; 32] {
 /// row-domain hash.
 ///
 /// Closed row shape: exactly `{chain_id: string, commitment: base64url-32,
-/// previous: base64url-32, sequence: int, v: 3}` — no extra members.
+/// previous: base64url-32, sequence: int, v: 3}`: no extra members.
 /// `commitment` is validated to decode to exactly 32 bytes but otherwise
 /// stays opaque (it is neither stored nor compared). The canonical re-encode
 /// check rejects any row whose received bytes are not the exact JCS encoding
@@ -1539,7 +1541,7 @@ fn parse_row(row: &[u8], bounds: &Bounds) -> Result<ParsedRow> {
         _ => return Err(Invalid),
     };
     // commitment + previous MUST be canonical base64url of exactly 32 bytes
-    // (ADR 0004: "<base64url-32>"). base64url_decode enforces the canonical
+    // (spec/bap-v1.md §15: "<base64url-32>"). base64url_decode enforces the canonical
     // encoding, so a non-canonical lexeme is rejected here.
     let _commitment = take_b64url_32(commitment)?;
     let previous = take_b64url_32(previous)?;
@@ -1578,18 +1580,18 @@ fn take_b64url_32(value: Option<&JsonValue>) -> Result<[u8; 32]> {
 }
 
 // ============================================================================
-// Façade D — anchored export verify/encode
+// Facade D: anchored export verify/encode
 // ============================================================================
 //
 // This is the **silent-relink surface**: a permissive export verify silently
 // certifies a RELINKED or SHORTENED archive, and a permissive rollover
 // silently accepts a key path with no authenticated transition. Every
-// binding — the exact archive bytes (`BAP3-ARCHIVE\0EXPORT\0` magic + frames
+// binding: the exact archive bytes (`BAP3-ARCHIVE\0EXPORT\0` magic + frames
 // + EOF), the constant-time SHA-256 digest, the out-of-band object-store
 // version, the closed header, the authenticated start/end anchors, the
 // positional key-transition path, the chronology, the surplus-key invariant
 // (`keys.len() == transitions.len() + 1`), and the re-checked row-domain
-// hash chain — collapses to exactly [`Invalid`] on any mismatch.
+// hash chain: collapses to exactly [`Invalid`] on any mismatch.
 // [`AnchoredExportFacts`] is the ONLY chain-family fact that carries BOTH
 // `trust: NotEvaluated` and `authorization: NotEvaluated`: an anchored
 // export binds the retrieved object generation, but even a fully
@@ -1657,7 +1659,7 @@ pub fn verify_historical_anchor(
     }
 
     // Sequence-zero binding: sequence 0 requires the all-zero chain hash
-    // (ADR 0004 § Boundary anchors).
+    // (spec/bap-v1.md §15, Boundary anchors).
     if a.payload.sequence == 0 && a.payload.chain_hash.iter().any(|&b| b != 0) {
         return Err(Invalid);
     }
@@ -1757,7 +1759,7 @@ pub fn verify_key_transition(
     }
     // Signed to_key_id / chain_id / effective_at / transition_id == expected.
     // to_key_id is bound to BOTH the positional next key's identifier AND the
-    // caller's expected id — the next side must bind to next.key_id too, or
+    // caller's expected id: the next side must bind to next.key_id too, or
     // the positional key chain could advance under a mismatched identifier.
     if t.payload.to_key_id != next.key_id
         || t.payload.to_key_id != expected.next_key_id
@@ -1807,7 +1809,7 @@ pub fn verify_key_transition(
 
 /// Encode an anchored export archive (the producer).
 ///
-/// Builds the exact binary concatenation (ADR 0004 § Anchored export, at
+/// Builds the exact binary concatenation (spec/bap-v1.md §15, Anchored export, at
 /// major 3): `ARCHIVE_MAGIC || frame(canonical_header) ||
 /// frame(start_anchor) || frame(each transition) || frame(each row) ||
 /// frame(end_anchor)`, where each frame is `UINT32_BE(nonzero_length) ||
@@ -1898,7 +1900,7 @@ pub fn encode_anchored_export(
     // Row chain re-check: the rows must verify against the expected
     // boundaries before they are archived. Per-row byte ceilings are
     // enforced BEFORE the row set is cloned into ChainInput (which owns its
-    // rows) — cloning an oversized caller-controlled row first would amplify
+    // rows): cloning an oversized caller-controlled row first would amplify
     // memory before the rejection.
     for r in &input.rows {
         if r.len() as u64 > bounds.chain_row_bytes() {
@@ -1915,8 +1917,8 @@ pub fn encode_anchored_export(
         },
     )?;
 
-    // Erratum 3: encoding is a producer surface — it frames these signatures and verifies
-    // none — so it refuses any framed anchor or transition signature no conforming signer
+    // Erratum 3: encoding is a producer surface: it frames these signatures and verifies
+    // none: so it refuses any framed anchor or transition signature no conforming signer
     // emits, never rewriting its bytes.
     for framed in [&input.start_anchor, &input.end_anchor]
         .into_iter()
@@ -2089,7 +2091,7 @@ pub fn encode_anchored_export(
 }
 
 /// Resolves a caller-supplied optional bounds to the effective value: `None`
-/// is the profile maximum. Tighten-only by construction — `Bounds::new`
+/// is the profile maximum. Tighten-only by construction: `Bounds::new`
 /// rejects widenings and merges overrides onto the maximum struct, so an
 /// identity override (value == maximum) resolves EQUAL to the maximum.
 pub fn resolve_bounds(nested: Option<&Bounds>) -> Bounds {
@@ -2101,7 +2103,7 @@ pub fn resolve_bounds(nested: Option<&Bounds>) -> Bounds {
 
 /// The nested-bounds pin: a present nested bounds must equal the outer; an
 /// absent nested is valid only when the outer is effectively maximum
-/// (identity overrides are NOT tightening — struct equality against the
+/// (identity overrides are NOT tightening: struct equality against the
 /// maximum).
 pub fn require_bounds_equal(nested: Option<&Bounds>, outer: &Bounds) -> Result<()> {
     match nested {
@@ -2152,7 +2154,7 @@ fn transition_matches(
 /// The key-path walk over the EXPECTED set: the running
 /// `(key_id, fingerprint)` starts at the start anchor's; each transition
 /// must carry it as its current key, be STRICTLY after the previous time,
-/// and name a next fingerprint not already seen (cycle guard — the running
+/// and name a next fingerprint not already seen (cycle guard: the running
 /// current is always in `seen`, so a self-loop rejects here); the end anchor
 /// must bind the final running key and carry `anchored_at >=` the running
 /// time (NON-STRICT; the zero-transition case compares against the start
@@ -2315,7 +2317,7 @@ pub fn verify_anchored_export(
     }
 
     // Static expected-side bindings: the caller's expected anchors belong to
-    // the expected chain — sequence/hash bindings are re-checked on the
+    // the expected chain: sequence/hash bindings are re-checked on the
     // verified facts below, but the chain_id membership is checked here.
     let expected_start_seq = expected
         .chain
@@ -2395,7 +2397,7 @@ pub fn verify_anchored_export(
         buf.extend_from_slice(c);
     }
 
-    // Exact magic prefix (a v1/v2 archive carries BAP1/BAP2 magic — the
+    // Exact magic prefix (a v1/v2 archive carries BAP1/BAP2 magic: the
     // cross-major archive cases reject here).
     if &buf[..ARCHIVE_MAGIC.len()] != ARCHIVE_MAGIC {
         return Err(Invalid);
@@ -2433,17 +2435,17 @@ pub fn verify_anchored_export(
         rows.push(read_frame_bounded(&buf, &mut cursor, bounds.chain_row_bytes())?.to_vec());
     }
     let end_anchor_compact = read_frame_bounded(&buf, &mut cursor, bounds.anchor_bytes())?;
-    // Exact EOF — nothing follows the end-anchor frame.
+    // Exact EOF: nothing follows the end-anchor frame.
     if cursor != buf.len() {
         return Err(Invalid);
     }
 
     // Surplus-key invariant: keys.len() == transitions.len() + 1. WITHOUT
     // this check a 0-transition archive carrying two distinct keys (start
-    // signed by keys[0], end by keys[1]) would be accepted — both anchors
+    // signed by keys[0], end by keys[1]) would be accepted: both anchors
     // verify individually, but no transition authenticates the rollover.
     // Deliberate redundancy (implied by the pre-digest keys==transitions+1
-    // gate + the header equality — kept as defense-in-depth).
+    // gate + the header equality: kept as defense-in-depth).
     if keys.keys.len() as i64 != header.transition_count + 1 {
         return Err(Invalid);
     }
@@ -2496,7 +2498,7 @@ pub fn verify_anchored_export(
     )?;
 
     // Re-check every row (canonical re-encode, predecessor links, genesis,
-    // sequence, count, head — reused from Façade B).
+    // sequence, count, head: reused from Facade B).
     let chain_input = ChainInput { rows };
     check_chain(
         &chain_input,
@@ -2523,7 +2525,7 @@ pub fn verify_anchored_export(
 }
 
 // ----------------------------------------------------------------------------
-// Façade D helpers — anchor/transition decode, archive framing, chronology
+// Facade D helpers: anchor/transition decode, archive framing, chronology
 // ----------------------------------------------------------------------------
 
 /// The fully-decoded boundary-anchor compact (segments borrowed from input).
@@ -2548,9 +2550,9 @@ struct AnchorPayload {
 /// Splits, bounds, decodes, and structurally validates a boundary-anchor
 /// compact. Shared by [`verify_historical_anchor`], [`assemble_compact`], and
 /// the encode path's start-anchor binding check. The decoded signature
-/// segment MUST be exactly 64 bytes (`REQ3-BOUNDS-fixed-widths` — the raw
+/// segment MUST be exactly 64 bytes (`REQ3-BOUNDS-fixed-widths`: the raw
 /// ES256 `r||s` width), and the protected/payload segments must equal their
-/// exact JCS re-encoding (canonical form) — enforced inside the validators
+/// exact JCS re-encoding (canonical form): enforced inside the validators
 /// below.
 fn decode_anchor_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedAnchor<'a>> {
     // The whole-input compact_bytes ceiling FIRST (a tightened compact_bytes
@@ -2948,7 +2950,7 @@ fn frame_into(content: &[u8], out: &mut Vec<u8>) {
 /// Reads one archive frame at `*cursor`: a UINT32_BE nonzero length prefix
 /// followed by exactly that many bytes. Returns a borrowed slice of the
 /// frame payload and advances `*cursor` past it.
-/// read_frame with a per-frame byte ceiling — the row/anchor reads cap each
+/// read_frame with a per-frame byte ceiling: the row/anchor reads cap each
 /// frame at its role's bound (chain_row_bytes / anchor_bytes) so a
 /// digest-matching malformed archive cannot materialize a ~full-archive
 /// frame before check_chain's per-row gate.
@@ -3003,7 +3005,8 @@ fn in_interval(t: i64, valid_from: i64, upper: &ValidityUpperBound) -> bool {
     }
 }
 
-/// Chronology + rollover checks for a v3 anchored export (ADR 0004 §49-55):
+/// Chronology + rollover checks for a v3 anchored export (spec/bap-v1.md §15 (ordered key
+/// rollover and chronology)):
 /// fingerprints cannot cycle (all key fingerprints distinct); transition
 /// effective times strictly increase; the start anchor precedes every
 /// transition; the end anchor is at or after the last transition. Equal
@@ -3064,7 +3067,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 }
 
 // ============================================================================
-// Internal helpers — segment splitting / decoding / production
+// Internal helpers: segment splitting / decoding / production
 // ============================================================================
 
 /// Splits `compact` on `.` into EXACTLY three segments without validating any
@@ -3187,7 +3190,7 @@ fn decode_proof_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedP
 }
 
 /// Assembles the RFC 7515 two-segment signing input
-/// (`protected_segment || "." || payload_segment`) — the exact bytes the
+/// (`protected_segment || "." || payload_segment`): the exact bytes the
 /// ES256 signature covers (`REQ1-SIGNING-exact-input` incorporated).
 fn signing_input_bytes(protected_seg: &[u8], payload_seg: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(protected_seg.len() + 1 + payload_seg.len());
@@ -3279,7 +3282,7 @@ fn b64url_to_string(bytes: &[u8]) -> Result<String> {
 }
 
 // ============================================================================
-// Internal helpers — closed-set header / claim validation
+// Internal helpers: closed-set header / claim validation
 // ============================================================================
 
 /// Validates the grant protected header is exactly
@@ -3405,7 +3408,7 @@ fn validate_grant_payload(payload: &JsonValue, bounds: &Bounds) -> Result<GrantP
         }
     }
     // v MUST be exactly the integer 3 (`REQ3-CLAIM-v`; every v1/v2 artifact
-    // — and any other version — rejects here:
+    // (and any other version) rejects here:
     // `REQ3-CORE-cross-major-reject`).
     let version = match version {
         Some(JsonValue::Int(3)) => 3,
@@ -3538,7 +3541,7 @@ fn validate_proof_payload(payload: &JsonValue, bounds: &Bounds) -> Result<ProofP
 }
 
 // ============================================================================
-// Internal helpers — claim-type extraction
+// Internal helpers: claim-type extraction
 // ============================================================================
 
 /// Extracts a non-empty StringOrURI (<= `identifier_bytes`).
@@ -3560,7 +3563,7 @@ fn take_string_or_uri(value: Option<&JsonValue>, bounds: &Bounds) -> Result<Stri
 }
 
 /// Validates a StringOrURI / identifier scalar: a colon-free value is a
-/// PLAIN string (any valid UTF-8 — automatic for a Rust `&str`); a
+/// PLAIN string (any valid UTF-8: automatic for a Rust `&str`); a
 /// colon-bearing value is a URI whose scheme is valid and whose every byte
 /// is alphanumeric, a URI punctuation byte
 /// (`-._~:/?#[]@!$&'()*+,;=`), or part of a well-formed `%HH` escape.
@@ -3569,7 +3572,7 @@ fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
         return Err(Invalid);
     }
     match s.find(':') {
-        None => Ok(()), // plain string — any valid UTF-8
+        None => Ok(()), // plain string: any valid UTF-8
         Some(colon) => {
             validate_scheme(&s[..colon])?;
             validate_uri_bytes(s.as_bytes())?;
@@ -3588,14 +3591,14 @@ fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
 fn validate_authority_port(value: &str) -> Result<()> {
     let after_scheme_host = match value.find("://") {
         Some(i) => &value[i + 3..],
-        None => return Ok(()), // no authority (e.g. `urn:…`) — nothing to port-check
+        None => return Ok(()), // no authority (e.g. `urn:…`): nothing to port-check
     };
     let auth_end = after_scheme_host
         .find(['/', '?', '#'])
         .unwrap_or(after_scheme_host.len());
     let authority = &after_scheme_host[..auth_end];
     if authority.starts_with('[') {
-        return Ok(()); // IP literal — colons inside […] are not a port.
+        return Ok(()); // IP literal: colons inside […] are not a port.
     }
     if let Some(c) = authority.rfind(':') {
         let port = &authority[c + 1..];
@@ -3675,7 +3678,7 @@ fn take_audiences(value: Option<&JsonValue>, bounds: &Bounds) -> Result<Vec<Stri
     }
 }
 
-/// Extracts an integral NumericDate (`JsonValue::Int` only — a float is not
+/// Extracts an integral NumericDate (`JsonValue::Int` only: a float is not
 /// integral and is rejected). `None` → `Invalid`.
 fn take_integral_date(value: Option<&JsonValue>) -> Result<i64> {
     match value {
@@ -3720,7 +3723,7 @@ fn take_cnf_jkt(value: Option<&JsonValue>, bounds: &Bounds) -> Result<[u8; 32]> 
 /// Validates the `operations` array shape: each element MUST be exactly
 /// `{name: string, selectors: non_empty_array}`
 /// (`REQ1-CLAIM-operation-shape` incorporated); selectors are validated
-/// through the incorporated v2 algebra (`selector::validate_v2` — the five
+/// through the incorporated v2 algebra (`selector::validate_v2`: the five
 /// kinds). `None` → `Invalid` (operations is required).
 fn validate_operations(value: Option<&JsonValue>, bounds: &Bounds) -> Result<()> {
     let value = value.ok_or(Invalid)?;
@@ -3930,8 +3933,8 @@ fn is_printable_ascii(b: u8) -> bool {
 }
 
 // ============================================================================
-// Tests — the vendored v3 corpus pins + the cross-major and suite closures.
-// Mirrors the v2 façade's in-module battery (which mirrors the v1 one),
+// Tests: the vendored v3 corpus pins + the cross-major and suite closures.
+// Mirrors the v2 facade's in-module battery (which mirrors the v1 one),
 // re-derived against spec/bap-v3.md and the certified corpus-v3 snapshot.
 // ============================================================================
 
@@ -3946,7 +3949,8 @@ mod tests {
         Bounds::maximum()
     }
 
-    /// The vendored self-contained v3 corpus snapshot (ADR 0015 D5) — NOT the
+    /// The vendored self-contained v3 corpus snapshot (SDK publication requires a separate
+    /// repository (sdks/README.md publication boundary)): NOT the
     /// monorepo source tree.
     fn corpus_root() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -4068,7 +4072,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Domain separators — the BAP3-* bytes are load-bearing (major confusion
+    // Domain separators: the BAP3-* bytes are load-bearing (major confusion
     // is the silent-auth failure this profile exists to prevent)
     // ==========================================================================
 
@@ -4085,7 +4089,7 @@ mod tests {
 
     #[test]
     fn cross_major_chain_row_hashes_never_collide() {
-        // Identical row fields hashed under BAP1/BAP2/BAP3 MUST differ — a
+        // Identical row fields hashed under BAP1/BAP2/BAP3 MUST differ: a
         // shared row hash would let a prior-major chain graft onto a v3
         // verification.
         let entry = ConsumptionEntry {
@@ -4122,7 +4126,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Cross-major rejection — each major verifies under its own closed
+    // Cross-major rejection: each major verifies under its own closed
     // profile only. RED if a v:3 check were widened (or vice versa).
     // ==========================================================================
 
@@ -4153,7 +4157,7 @@ mod tests {
     fn decode_grant_rejects_both_prior_majors_from_corpus() {
         // Corpus grant-decode-v3-invalid-cross-major-v1-bytes and
         // grant-decode-v3-invalid-cross-major-v2-bytes: authentic v1/v2
-        // compacts, rejected by the v3 façade with the single closed error.
+        // compacts, rejected by the v3 facade with the single closed error.
         for id in [
             "grant-decode-v3-invalid-cross-major-v1-bytes",
             "grant-decode-v3-invalid-cross-major-v2-bytes",
@@ -4250,7 +4254,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // v3 request digest — BAP3-REQUEST\0, pinned by the corpus
+    // v3 request digest: BAP3-REQUEST\0, pinned by the corpus
     // ==========================================================================
 
     #[test]
@@ -4278,13 +4282,13 @@ mod tests {
     }
 
     // ==========================================================================
-    // lte/gte — producer byte-exactness + closed-set at the v3 façade
+    // lte/gte: producer byte-exactness + closed-set at the v3 facade
     // ==========================================================================
 
     #[test]
     fn grant_producer_emits_range_selectors_byte_exact() {
         // Corpus grant-signing-input-v3-valid-range-selectors pins all three
-        // segments byte-exact — including the "ES256" alg and the "v":3
+        // segments byte-exact: including the "ES256" alg and the "v":3
         // member.
         let case = find_case(
             "signing-input/grant.json",
@@ -4378,7 +4382,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // The ES256 suite matrices — signature canonicality + key encodings
+    // The ES256 suite matrices: signature canonicality + key encodings
     // (spec/bap-v3.md §7), driven through the public verify path.
     // ==========================================================================
 
@@ -4415,7 +4419,7 @@ mod tests {
     #[test]
     fn corpus_suite_matrix_signatures_are_rejected() {
         // The §7 signature-canonicality matrix: tampered r, tampered s,
-        // high-s, zero r, zero s, r >= n, s >= n — every one rejected by the
+        // high-s, zero r, zero s, r >= n, s >= n: every one rejected by the
         // profile gates (and, where subsumed, the backend).
         for id in [
             "verify-grant-v3-tamper-signature-r",
@@ -4572,7 +4576,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Envelope + export corpus smoke — the valid cases verify end-to-end
+    // Envelope + export corpus smoke: the valid cases verify end-to-end
     // ==========================================================================
 
     #[test]

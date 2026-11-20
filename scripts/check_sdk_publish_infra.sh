@@ -10,9 +10,9 @@ set -euo pipefail
 # Usage:  <content-on-stdin> | check_sdk_publish_infra.sh <path>
 # Exit 0: the file is clean (or not a scanned surface).
 # Exit 1: publish infrastructure found; one stderr line per hit names the file,
-#         the matched pattern, and cites ADR 0015.
+#         the matched pattern, and cites sdks/README.md publication boundary.
 #
-# What it blocks, and why (ADR 0015 Decision 5): no SDK publishes from this
+# Publication boundary (sdks/README.md): no SDK publishes from this
 # monorepo. Each SDK graduates to its own per-SDK repo on first publication. This
 # script catches the ENABLING change: registry-publish commands, registry-publish
 # GitHub Actions, and npm publish lifecycle hooks committed to manifests or
@@ -97,7 +97,7 @@ publishConfig'
 # Publish CLI subcommands (regex, flag-tolerant): every scanned surface.
 for re in "$cli_publish_re" "$twine_upload_re"; do
   if grep -E -- "$re" <<< "$content" >/dev/null; then
-    printf '%s: registry-publish command: SDKs must not publish from the monorepo (ADR 0015)\n' \
+    printf '%s: registry-publish command: SDKs must not publish from the monorepo (sdks/README.md publication boundary)\n' \
       "$path" >&2
     status=1
   else
@@ -112,7 +112,7 @@ while IFS= read -r cmd; do
     continue
   fi
   if grep -F -- "$cmd" <<< "$content" >/dev/null; then
-    printf '%s: publish signal "%s": SDKs must not publish from the monorepo (ADR 0015)\n' \
+    printf '%s: publish signal "%s": SDKs must not publish from the monorepo (sdks/README.md publication boundary)\n' \
       "$path" "$cmd" >&2
     status=1
   else
@@ -127,7 +127,7 @@ if [ "$is_sdk_manifest" = 1 ]; then
   while IFS= read -r key; do
     [ -n "$key" ] || continue
     if grep -F -- "$key" <<< "$content" >/dev/null; then
-      printf '%s: publish lifecycle key "%s": SDKs must not publish from the monorepo (ADR 0015)\n' \
+      printf '%s: publish lifecycle key "%s": SDKs must not publish from the monorepo (sdks/README.md publication boundary)\n' \
         "$path" "$key" >&2
       status=1
     else

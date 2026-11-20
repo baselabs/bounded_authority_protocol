@@ -291,7 +291,7 @@ func applySelectors(selectors []Value, args Value) error {
 	return nil
 }
 
-// walkPath traverses object members only — never indexes arrays
+// walkPath traverses object members only: never indexes arrays
 // (REQ1-SELECTOR-path-shape).
 func walkPath(root Value, path []string) (Value, bool) {
 	cur := root

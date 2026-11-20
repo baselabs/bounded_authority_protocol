@@ -1,4 +1,4 @@
-"""Certified corpus integrity and execution accounting (ADR 0049 D4-D5).
+"""Certified corpus integrity and execution accounting (certified input closure and computed verdict accounting (self-contained SDK distribution contract)).
 
 The digest uses index order, then case order within each file. Profile inputs without
 case IDs are fixtures, not cases. Outcome projections follow the profile case schemas.

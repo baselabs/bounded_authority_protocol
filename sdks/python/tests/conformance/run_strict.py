@@ -52,7 +52,8 @@ from bounded_authority_verifier.json_alg import str_utf8  # noqa: E402
 from corpus_support import CorpusRun, canonical, computed, integrity, outcome  # noqa: E402
 
 CORPUS_DIR = _CORPUS_ROOT / "priv" / "conformance" / "strict-ed25519"
-# The certified index.json SHA-256 (ADR 0014 D4). A mismatched corpus fails closed.
+# The certified index.json SHA-256 (certified index SHA-256 binding
+# (docs/design/conformance-contract.md)). A mismatched corpus fails closed.
 CERTIFIED_INDEX_SHA = "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
 PROFILE = "bap-strict-ed25519/1"
 TOTAL_CASES = 2410

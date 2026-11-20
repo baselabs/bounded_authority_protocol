@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # Installed by: bash scripts/install-hooks.sh   (symlinks this into .git/hooks/)
 # Bypass:       git commit --no-verify        (documented deliberate-admin escape)
-# Authority:    ADR 0015 (SDK graduation and publish topology), Decision 5.
+# Authority:    sdks/README.md publication boundary (SDK graduation and publish topology).
 # Patterns:     scripts/check_sdk_publish_infra.sh (single source of truth; the CI
 #               job in .github/workflows/sdk-publish-guard.yml uses the same script).
 #

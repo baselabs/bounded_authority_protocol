@@ -1,6 +1,7 @@
 name: SDK conformance
 
-# Cross-language verifier SDK gate (ADR 0014 D8). CI calls this workflow on every
+# Cross-language SDK conformance, purity, and permissive-dependency gates.
+# CI calls this workflow on every
 # kci/<sha> qualification run without path filters. These suites run separately
 # from the Elixir mix quality battery.
 
@@ -41,7 +42,7 @@ jobs:
         run: bash scripts/ci_tool_versions.sh python
 
       # The TypeScript SDK graduated to its own repository on first publication
-      # (ADR 0015, 2026-09-14): baselabs/bounded_authority_protocol_typescript
+      # (sdks/README.md publication boundary, 2026-09-14): baselabs/bounded_authority_protocol_typescript
       # carries its CI, conformance, and npm releases now.
 
       # --- Python SDK gate ---

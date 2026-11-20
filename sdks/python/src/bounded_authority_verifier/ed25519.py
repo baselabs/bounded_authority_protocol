@@ -25,7 +25,7 @@ bytes satisfy the rule; it never selects trusted keys or grants authority.
 Malformed input and invalid signatures return False. Unexpected backend failures propagate.
 
 Purity note: ``hashlib`` and ``cryptography`` primitives are pure transformations (no I/O, clock,
-RNG, or network) — the purity gate's ban list targets ``datetime.now``/``time.time``/``random.*``/
+RNG, or network): the purity gate's ban list targets ``datetime.now``/``time.time``/``random.*``/
 ``open``/``socket``/``subprocess``/``os.environ``/``urllib.request``/``http.client``, none of which
 appear here.
 """

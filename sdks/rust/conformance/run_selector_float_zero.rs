@@ -54,7 +54,7 @@ fn load_cases() -> Vec<Value> {
     assert_eq!(
         sha256_hex(&index_bytes),
         CERTIFIED_INDEX_SHA,
-        "corpus index.json SHA-256 mismatch — silent drift is impossible"
+        "corpus index.json SHA-256 mismatch: silent drift is impossible"
     );
     let index: Value = serde_json::from_slice(&index_bytes).unwrap();
     assert_eq!(index["profile"].as_str().unwrap(), PROFILE);

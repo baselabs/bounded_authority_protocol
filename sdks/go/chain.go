@@ -2,7 +2,7 @@ package verifier
 
 import "crypto/sha256"
 
-// The consumption chain (ADR 0004): one row is the closed JCS object
+// The consumption chain (spec/bap-v1.md §15): one row is the closed JCS object
 // {"chain_id","commitment","previous","sequence","v"} and its raw hash is
 // SHA-256("BAP1-CHAIN\0" || canonical_row_bytes). Sequence one requires the
 // all-zero predecessor; verification accepts raw canonical row bytes plus
@@ -19,7 +19,7 @@ type ConsumedEntry struct {
 }
 
 // EncodeConsumptionEntry produces the canonical row bytes and domain hash
-// (ADR 0004). Sequence one requires the all-zero predecessor.
+// (spec/bap-v1.md §15). Sequence one requires the all-zero predecessor.
 func EncodeConsumptionEntry(e ConsumptionEntry, bounds *Bounds) (out ConsumedEntry, err error) {
 	defer closedResult(&err)
 	b, err := resolveBounds(bounds)
@@ -144,7 +144,7 @@ func parseCanonicalRow(raw []byte, b Bounds) (chainRowData, error) {
 // CheckChain verifies a consumption range: raw canonical rows against
 // mandatory caller boundaries. Requires chain identity, consecutive
 // sequence, predecessor links, row count, first/last sequence, caller
-// predecessor, and caller head (ADR 0004).
+// predecessor, and caller head (spec/bap-v1.md §15).
 func CheckChain(input ChainInput, expected ExpectedChain) (f ChainFacts, err error) {
 	defer closedResult(&err)
 	b, err := resolveBounds(expected.Bounds)

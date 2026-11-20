@@ -2,8 +2,14 @@
 
 This map traces every normative `REQ-LLH1-*` requirement in
 [`spec/bap-local-loopback-http-v1.md`](../../spec/bap-local-loopback-http-v1.md) to executable
-evidence or an explicit downstream/release gate. The certified profile corpus is revision 1 at
+evidence or an explicit adoption or release obligation. The certified profile corpus is revision 1 at
 `priv/conformance/application-profiles/local-loopback-http/v1`.
+
+Current releases follow the package 1.x policy in [API stability](../guides/api-stability.md)
+and the [release-candidate contract](../release-candidate-contract.md). A new sibling profile
+requires a minor release; this released profile keeps its bytes and verdicts except for a
+soundness repair meeting the published governance conditions. Adoption obligations apply to
+every authority host, independently of any private work tracking.
 
 Strict Ed25519 verification ([erratum 2](../errata.md)):
 the profile's signature and key checks follow the strict rule of
@@ -37,8 +43,8 @@ corpus, index, and verdicts are unchanged.
 | `CONFORMANCE-real-network`, `HOST-direct-target`, `HOST-one-profile` | `mix local_loopback_http.verify`: real `127.0.0.1` and `::1` HTTP listeners, fresh in-memory keys, direct listener/request target derivation, secret-free receipt | populated |
 | `SECURITY-honest-scope` | normative security section, README, and threat model state that loopback HTTP is neither TLS nor process isolation | populated |
 | `IANA-template` | exact active registry entry plus machine-readable and rendered RFC 6838 templates; submission to IANA for registration remains externally gated | populated |
-| `HOST-replay-trust` | Public verifier checks the required nonce but owns no state. BA-37 must prove reservation before effect in the adopting authority runtime. | downstream gate |
-| `RELEASE-immutable` | Requires the exact reviewed package and corpus identity to be published before BA-37 adopts it. Publication is not authorized by design approval. | release gate |
+| `HOST-replay-trust` | The public verifier checks the required nonce but owns no state. Every adopting authority runtime must select trusted keys and reserve the nonce and invocation before any effect, and enforce its own revocation and authorization policy. | adopting host obligation |
+| `RELEASE-immutable` | The release-candidate contract requires qualification of the exact source commit, package checksum, corpus, and provenance. Adopters consume the published package identity. Only the maintainers' release operator publishes from `main`; design approval does not authorize publication. | package 1.x release qualification |
 
 “Populated” means the repository contains executable evidence for the public-library obligation. It
 does not claim live replay reservation, revocation, trust selection, or a business effect; those

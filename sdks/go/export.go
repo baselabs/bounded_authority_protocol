@@ -6,13 +6,14 @@ import (
 	"unicode/utf8"
 )
 
-// The anchored export (ADR 0004): the exact binary concatenation
+// The anchored export (spec/bap-v1.md §15): the exact binary concatenation
 //
 //	"BAP1-ARCHIVE\0EXPORT\0" frame(header) frame(start) frame(transitions…)
 //	frame(rows…) frame(end) EOF
 //
 // with UINT32_BE(nonzero_length) || bytes frames. Verification validates the
-// complete expected context BEFORE hashing the archive (ADR 0017 clause 3 and
+// complete expected context BEFORE hashing the archive (expected-context validation before
+// archive hashing (spec/bap-v1.md §§15-17) and
 // its 2026-08-18 resolution), scans the bounded chunk list incrementally,
 // requires exact EOF, hashes every raw byte, compares the digest, then
 // authenticates both anchors and every transition, re-checks all rows, and
@@ -25,7 +26,8 @@ type EncodedExport struct {
 	ByteCount int64
 }
 
-// resolveExportBounds resolves the outer bounds and applies ADR 0018 D2
+// resolveExportBounds resolves the outer bounds and applies nested bounds must equal the
+// resolved outer bounds (spec/bap-v1.md §17)
 // nested-pins identity semantics: a present nested bounds must equal the
 // outer; an absent nested bounds is valid only under an effectively
 // untightened outer.
@@ -97,7 +99,7 @@ func validateExpectedAnchoredExport(expected *ExpectedAnchoredExport, obj Archiv
 	}
 	// the fingerprint walk seeds with the start anchor's key fingerprint:
 	// any later to-fingerprint equal to one already visited (start included)
-	// is a cycle (ADR 0004 "fingerprints cannot cycle")
+	// is a cycle (spec/bap-v1.md §15 "fingerprints cannot cycle")
 	startFP, ok := canonicalDigestString(expected.StartAnchor.KeyFingerprint)
 	if !ok {
 		return ErrInvalid
@@ -133,7 +135,7 @@ func validateExpectedAnchoredExport(expected *ExpectedAnchoredExport, obj Archiv
 		}
 		prevEffective = t.EffectiveAt
 	}
-	// key chain: ids, widths, windows (clause 3 key-window gates)
+	// key chain: ids, widths, windows (REQ1-VERIFY-revalidate)
 	for _, k := range keys {
 		if !validHistoricalKey(k, b) {
 			return ErrInvalid
@@ -180,18 +182,18 @@ func isWellFormedUTF8(s string) bool {
 	return utf8.ValidString(s)
 }
 
-// verifyAnchoredExportCore is the seam-bearing core; the public façade passes
+// verifyAnchoredExportCore is the seam-bearing core; the public facade passes
 // defaultArchiveDigest and the white-box battery observes hash calls.
 func verifyAnchoredExportCore(obj ArchivedObject, keys HistoricalKeyChain, expected ExpectedAnchoredExport, digest archiveDigestFn) (AnchoredExportFacts, error) {
 	b, err := resolveExportBounds(&expected)
 	if err != nil {
 		return AnchoredExportFacts{}, ErrInvalid
 	}
-	// clause 3: expected-context validation BEFORE the archive digest
+	// Validate expected context before hashing archive bytes (REQ1-BOUNDS-ordering).
 	if err := validateExpectedAnchoredExport(&expected, obj, keys, b); err != nil {
 		return AnchoredExportFacts{}, ErrInvalid
 	}
-	// bounded chunk list (role-bounded frame reads, clause 5)
+	// bounded chunk list (role-bounded frame reads)
 	if len(obj.Chunks) == 0 || len(obj.Chunks) > b.ArchiveChunks {
 		return AnchoredExportFacts{}, ErrInvalid
 	}
@@ -387,8 +389,8 @@ func verifyAnchoredExportCore(obj ArchivedObject, keys HistoricalKeyChain, expec
 	})}, nil
 }
 
-// archiveDigest is the archive-hashing seam: the public façade resolves it,
-// and only same-package tests substitute it (Go's work-observation channel —
+// archiveDigest is the archive-hashing seam: the public facade resolves it,
+// and only same-package tests substitute it (Go's work-observation channel,
 // the equivalent of the Python battery's monkeypatched sha256, without
 // monkeypatching and without a public API seam). Production never writes it.
 var archiveDigest archiveDigestFn = defaultArchiveDigest
@@ -412,7 +414,7 @@ func EncodeAnchoredExport(input AnchoredExportInput, expected ExpectedAnchoredEx
 		return EncodedExport{}, ErrInvalid
 	}
 	// expected-side consistency (the pre-digest suite; version equality here
-	// compares against the expected struct's own copy — the producer has no
+	// compares against the expected struct's own copy: the producer has no
 	// object store)
 	synthetic := ArchivedObject{Version: expected.ObjectVersion}
 	if err := validateExpectedAnchoredExport(&expected, synthetic, keysFromExpected(expected, b), b); err != nil {
@@ -530,7 +532,7 @@ func EncodeAnchoredExport(input AnchoredExportInput, expected ExpectedAnchoredEx
 	}
 	archive = appendFrame(archive, []byte(input.EndAnchor))
 	// aggregate archive bounds: chunks count CHUNKS (magic + frames), bytes
-	// count bytes (cross-vendor F11 — the two bounds are distinct ceilings)
+	// count bytes (cross-vendor F11: the two bounds are distinct ceilings)
 	chunkCount := 1 + 1 + 1 + len(input.Transitions) + len(input.Rows) + 1
 	if int64(len(archive)) > int64(b.ArchiveBytes) || chunkCount > b.ArchiveChunks {
 		return EncodedExport{}, ErrInvalid
@@ -585,8 +587,8 @@ func parseAnchorCompactGated(compact string, b Bounds) (anchorClaims, error) {
 	if err != nil {
 		return anchorClaims{}, ErrInvalid
 	}
-	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
-	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	// Erratum 3: encoding is a producer surface: it frames this signature and verifies none.
+	// The encode-side gated parse refuses a signature no conforming signer emits.
 	if !signatureGate(parts.Signature) {
 		return anchorClaims{}, ErrInvalid
 	}
@@ -626,8 +628,8 @@ func parseTransitionCompactGated(compact string, b Bounds) (transitionClaims, er
 	if err != nil {
 		return transitionClaims{}, ErrInvalid
 	}
-	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
-	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	// Erratum 3: encoding is a producer surface: it frames this signature and verifies none.
+	// The encode-side gated parse refuses a signature no conforming signer emits.
 	if !signatureGate(parts.Signature) {
 		return transitionClaims{}, ErrInvalid
 	}

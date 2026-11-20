@@ -1,5 +1,6 @@
 // Package verifier_test is the BAP-16 per-language permissiveness
-// mutation-gate battery (ADR 0014 D6/D7, ADR 0017, ADR 0018). Every leg is
+// mutation-gate battery. It proves the spec/bap-v1.md §§15-17 guards fail
+// when their checks are removed (docs/design/conformance-contract.md). Every leg is
 // red-capable: mechanically removing the closure or gate it pins makes the
 // leg fail. The mutation probes run at authoring and are recorded in the SDK
 // README; the CI job runs the battery green-as-is.
@@ -146,7 +147,7 @@ func mustFloat(t *testing.T, f float64) v.Value {
 func TestPermissiveSourceOrderPreserved(t *testing.T) {
 	// The corpus cannot pin order through JSON expected values; this leg pins
 	// it through the public API: JCS re-encodes sorted, so round-trip through
-	// a path that exposes order — decode a grant whose operations array order
+	// a path that exposes order: decode a grant whose operations array order
 	// is positional (arrays), and verify an object whose JCS form differs
 	// from its source order only by sorting.
 	val, err := v.JsonDecode([]byte(`{"b":1,"a":2}`), nil)
@@ -182,7 +183,8 @@ func TestPermissiveBase64urlCanonical(t *testing.T) {
 	}
 }
 
-// ---- (g) signature width gated at decode (ADR 0017 clause 4) ----
+// ---- (g) signature width gated at decode (canonical segments and fixed signature widths
+// (spec/bap-v1.md §§15-17)) ----
 
 func TestPermissiveSignatureWidthAtDecode(t *testing.T) {
 	seg := strings.Split(grantCompact, ".")
@@ -217,7 +219,8 @@ func TestPermissiveCanonicalExclusion(t *testing.T) {
 	if _, err := v.DecodeGrant(compact, nil); err != nil {
 		t.Fatalf("reordered grant header members must stay valid: %v", err)
 	}
-	// anchor: non-canonical member order is rejected (ADR 0017 clause 4)
+	// anchor: non-canonical member order is rejected (canonical segments and fixed signature
+	// widths (spec/bap-v1.md §§15-17))
 	aseg := strings.Split(anchorCompact, ".")
 	apayload, err := v.Base64urlDecode(aseg[1])
 	if err != nil {
@@ -252,7 +255,8 @@ func TestPermissiveCanonicalExclusion(t *testing.T) {
 	}
 }
 
-// ---- (i-b) canonical-form gate at ENCODE (ADR 0017 clause 4, the
+// ---- (i-b) canonical-form gate at ENCODE (canonical segments and fixed signature widths
+// (spec/bap-v1.md §§15-17), the
 // non-subsumed pin: the encode path holds no signature to reject a reordered
 // segment, so this leg is the load-bearing red-capable form) ----
 
@@ -263,7 +267,7 @@ func TestPermissiveCanonicalAtEncode(t *testing.T) {
 		t.Fatalf("corpus-valid encode must succeed: %v", err)
 	}
 	// reorder the start anchor payload members: same JSON value, non-canonical
-	// bytes — only the canonical gate rejects it at encode
+	// bytes: only the canonical gate rejects it at encode
 	aseg := strings.Split(input.StartAnchor, ".")
 	apayload, err := v.Base64urlDecode(aseg[1])
 	if err != nil {
@@ -415,7 +419,7 @@ func TestPermissiveTimeCeilings(t *testing.T) {
 	}
 	// proof max age ceiling: the corpus-valid envelope with ONLY ProofMaxAge
 	// raised over the ceiling must reject (with the ceiling removed it would
-	// verify — that is the red-capable pin)
+	// verify: that is the red-capable pin)
 	creds, exp := loadCorpusEnvelopeValid(t)
 	exp.ProofMaxAge = 301
 	if _, err := v.CheckEnvelope(creds, exp); err == nil {
@@ -517,7 +521,7 @@ func TestPermissiveOverflowFailClosed(t *testing.T) {
 	}
 }
 
-// ---- (k) ADR 0018 bounds threading: tightened bounds enforced at every ceiling ----
+// ---- (k) spec/bap-v1.md §17 bounds threading: tightened bounds enforced at every ceiling ----
 
 func TestPermissiveBoundsThreading(t *testing.T) {
 	// chain_row_bytes on CheckChain
@@ -552,7 +556,7 @@ func TestPermissiveBoundsThreading(t *testing.T) {
 	if _, err := v.VerifyHistoricalAnchor(anchorCompact, key, expected); err == nil {
 		t.Fatal("tightened anchor_bytes must reject the anchor compact")
 	}
-	// assemble_compact threads caller bounds (ADR 0018 decision 4)
+	// assemble_compact threads caller bounds (caller bounds apply to compact assembly (spec/bap-v1.md §17))
 	seg := strings.Split(grantCompact, ".")
 	tightCompact, _ := v.BoundsNew(map[string]int{"compact_bytes": 100})
 	si := v.SigningInput{Kind: v.KindGrant, Protected: mustB64(t, seg[0]), Payload: mustB64(t, seg[1])}
@@ -567,11 +571,12 @@ func TestPermissiveBoundsThreading(t *testing.T) {
 	}
 }
 
-// ---- (l) ADR 0018 D2 nested-pins identity semantics (export surface) ----
+// ---- (l) nested bounds must equal the resolved outer bounds (spec/bap-v1.md §17) nested-pins
+// identity semantics (export surface) ----
 
 func TestPermissiveNestedBoundsIdentity(t *testing.T) {
 	obj, keys, expected := loadCorpusExportValid(t)
-	// baseline: untightened, absent nested — valid
+	// baseline: untightened, absent nested: valid
 	if _, err := v.VerifyAnchoredExport(obj, keys, expected); err != nil {
 		t.Fatalf("baseline export verification must be valid: %v", err)
 	}
@@ -599,7 +604,7 @@ func TestPermissiveNestedBoundsIdentity(t *testing.T) {
 		t.Fatal("tightened archive_chunks=4 must reject the 6-chunk archive (threading is real)")
 	}
 	// loosened nested under untightened outer: invalid (identity override is
-	// not tightening — a nested value may never differ from the outer)
+	// not tightening: a nested value may never differ from the outer)
 	looser, _ := v.BoundsNew(map[string]int{"archive_chunks": 1000})
 	worse := expected
 	worse.Bounds = nil
@@ -624,10 +629,11 @@ func withAnchorBounds(e v.ExpectedAnchoredExport, start bool, b *v.Bounds) v.Exp
 	return a
 }
 
-// ---- (m) closed Result surface: no panic escapes a façade (ADR 0017 clause 1) ----
+// ---- (m) closed Result surface: no panic escapes a facade (closed, value-free rejection
+// (spec/bap-v1.md §§15-17)) ----
 
 func TestPermissiveClosedResultNoPanic(t *testing.T) {
-	// hostile inputs across representative façades: none may panic
+	// hostile inputs across representative facades: none may panic
 	key := v.HistoricalPublicKey{KeyID: "archive-a", PublicKey: mustB64(t, archiveKeyB64)}
 	expected := v.ExpectedAnchor{
 		AnchorID: "urn:example:anchor:start", ChainID: "urn:example:chain", KeyID: "archive-a",
@@ -667,7 +673,7 @@ func TestPermissiveClosedResultNoPanic(t *testing.T) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					t.Fatalf("façade %d panicked: %v", i, r)
+					t.Fatalf("facade %d panicked: %v", i, r)
 				}
 			}()
 			_ = call()
@@ -796,7 +802,7 @@ func expAnchor(m map[string]json.RawMessage, g func(map[string]json.RawMessage, 
 	}
 }
 
-// ---- successor-major range selectors (ADR 0028): four red-capable legs ----
+// ---- successor-major range selectors (spec/bap-v2.md §4): four red-capable legs ----
 //
 // Fixtures come from the vendored successor corpus (corpus-v2), loaded by case
 // id exactly like the v1 corpus legs above. Every leg is red-capable: the
@@ -896,7 +902,7 @@ func loadGrantCompact(t *testing.T, corpus, id string) string {
 }
 
 // (n-a) inclusive bounds: mutating lte/gte comparison to strict (< / >)
-// reddens exactly this leg — every corpus boundary-equal case below would
+// reddens exactly this leg: every corpus boundary-equal case below would
 // fail its envelope verification (the traversed value equals the bound).
 func TestPermissiveSuccessorRangeInclusive(t *testing.T) {
 	for _, id := range []string{
@@ -917,7 +923,7 @@ func TestPermissiveSuccessorRangeInclusive(t *testing.T) {
 }
 
 // (n-b) same-tag operand domain: removing the SAME-TAG check from rangeMatch
-// (v2.go) reddens exactly this leg — the cross-tag corpus cases would verify
+// (v2.go) reddens exactly this leg: the cross-tag corpus cases would verify
 // (integer 5 satisfies the float bounds -0.5/10.5 by numeric value), and the
 // non-numeric/missing-path legs pin the remaining fail-closed operand rules.
 // The corpus-level mirror is TestConformance (conformance/v2_test.go) on the
@@ -938,7 +944,7 @@ func TestPermissiveSuccessorRangeSameTag(t *testing.T) {
 
 // (n-c) comparator dispatch: swapping the lte/gte comparator dispatch in
 // rangeMatch (v2.go: lte arm comparing >=, gte arm comparing <=) reddens
-// exactly this leg — the exceeded/unmet corpus cases would verify.
+// exactly this leg: the exceeded/unmet corpus cases would verify.
 func TestPermissiveSuccessorRangeDispatch(t *testing.T) {
 	for _, id := range []string{
 		"check-envelope-v2-invalid-selector-lte-exceeded", // 5001 against lte 5000
@@ -1041,8 +1047,9 @@ func TestPermissiveSuccessorAssemblyRevalidates(t *testing.T) {
 
 	// Canonical-payload leg: the identical closed member set with one inserted
 	// whitespace byte decodes and passes the member-set/genesis checks but is
-	// not the JCS encoding — anchor/transition payloads are canonical-bound
-	// (ADR 0017 clause 4). Removing the canonicalSegment call in
+	// not the JCS encoding: anchor/transition payloads are canonical-bound
+	// (canonical segments and fixed signature widths (spec/bap-v1.md §§15-17)). Removing the
+	// canonicalSegment call in
 	// reparseAnchorPayload/reparseTransitionPayload reddens exactly this leg.
 	anchorSeg := strings.Split(loadKindCompact(t, "boundary-anchor", "verify-historical-anchor-v2-valid"), ".")
 	anchorPayload := mustB64(t, anchorSeg[1])

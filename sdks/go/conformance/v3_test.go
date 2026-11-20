@@ -7,8 +7,8 @@
 // the index's public_key_fingerprints (EC P-256 RFC 7638 thumbprints over
 // the 65-byte SEC1 keys). Version-neutral primitive surfaces (json, jcs,
 // base64url, uri, bounds) dispatch to the shared surface; every other
-// surface — the EC JWK surfaces included, since the JWK member set is
-// suite-bound — dispatches to the EcdsaProfile facade.
+// surface: the EC JWK surfaces included, since the JWK member set is
+// suite-bound: dispatches to the EcdsaProfile facade.
 package conformance_test
 
 import (
@@ -111,7 +111,7 @@ func es256LoadCorpus(t *testing.T) (*es256CorpusIndex, []es256LoadedFile) {
 	t.Helper()
 	// es256CertifiedIndexSHA256 is the SHA-256 of the certified v3 corpus
 	// index.json this SDK was conformed against (base64url). A vendored
-	// corpus that hashes to anything else fails closed here — silent drift
+	// corpus that hashes to anything else fails closed here: silent drift
 	// is impossible.
 
 	indexBytes, err := os.ReadFile(filepath.Join(es256CorpusDir, "index.json"))
@@ -120,7 +120,7 @@ func es256LoadCorpus(t *testing.T) (*es256CorpusIndex, []es256LoadedFile) {
 	}
 	sum := sha256.Sum256(indexBytes)
 	if v.Base64urlEncode(sum[:]) != es256CertifiedIndexSHA256 {
-		t.Fatalf("vendored corpus index.json SHA-256 mismatch — fail closed on corpus drift")
+		t.Fatalf("vendored corpus index.json SHA-256 mismatch: fail closed on corpus drift")
 	}
 	var idx es256CorpusIndex
 	if err := json.Unmarshal(indexBytes, &idx); err != nil {
@@ -965,7 +965,7 @@ func es256HistoricalKey(t *testing.T, m map[string]json.RawMessage, pk string) v
 		PublicKey: es256DecodeB64(t, es256CorpusCase{}, pk),
 		ValidFrom: es256RawInt(t, m, "valid_from"),
 	}
-	// a null (or absent) valid_before is the unbounded upper validity — the
+	// a null (or absent) valid_before is the unbounded upper validity: the
 	// same mapping the v2 runner makes.
 	if raw, ok := m["valid_before"]; ok && string(raw) != "null" {
 		k.ValidBefore = es256RawInt(t, m, "valid_before")

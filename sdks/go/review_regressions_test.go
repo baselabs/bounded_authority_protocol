@@ -19,7 +19,7 @@ func TestReviewProofClaimPresence(t *testing.T) {
 	seg := strings.Split(corpusEnvelopeProof(t), ".")
 	header := seg[0]
 	sig := seg[2]
-	// drop `iat` and add `nonce` — same 10-member count, one required claim
+	// drop `iat` and add `nonce`: same 10-member count, one required claim
 	// missing: must be rejected.
 	payload, err := Base64urlDecode(seg[1])
 	if err != nil {
@@ -144,11 +144,11 @@ func TestReviewIPv6EmbeddedCount(t *testing.T) {
 // decoding, and decoded unreserved bytes are lowercased like literal ones.
 func TestReviewHostDecodeThenClassify(t *testing.T) {
 	// %30%31 decodes to "01": the decoded host is numeric-dotted and must
-	// satisfy exact IPv4 (leading zero) — rejected.
+	// satisfy exact IPv4 (leading zero): rejected.
 	if _, err := UriNormalize("https://%30%31.2.3.4/x", nil); err == nil {
 		t.Fatal("percent-decoded numeric-dotted host must face the exact IPv4 gate")
 	}
-	// %25%36%36 decodes to "%FF"? no — decode of %25 is '%' (un? no, '%' is
+	// %25%36%36 decodes to "%FF"? no: decode of %25 is '%' (un? no, '%' is
 	// reserved): use %32%35%36 → "256" for an octet-range reject instead.
 	if _, err := UriNormalize("https://%32%35%36.2.3.4/x", nil); err == nil {
 		t.Fatal("percent-decoded 256 first octet must be rejected as IPv4 range")
@@ -216,7 +216,7 @@ func TestReviewVersionUTF8AndChunkBounds(t *testing.T) {
 		t.Fatal("tightened archive_chunks=4 must reject the 6-chunk archive")
 	}
 	// and a tightened archive_BYTES bound just above the byte count passes
-	// while one below rejects — bytes are bounded as bytes
+	// while one below rejects: bytes are bounded as bytes
 	byteCount := 1900
 	tightBytes, _ := BoundsNew(map[string]int{"archive_bytes": byteCount - 1})
 	exp.Bounds = &tightBytes
@@ -308,7 +308,7 @@ func mustDecodeB64(t *testing.T, s string) []byte {
 }
 
 // swapAnchorChainHash rewrites the corpus anchor payload's chain_hash and
-// re-signs nothing (the 7-field match will fail on signature? no — the
+// re-signs nothing (the 7-field match will fail on signature? no: the
 // signature check happens after the tuple match, and the tuple match rejects
 // first; we only need the gate to fire before acceptance).
 func swapAnchorChainHash(t *testing.T, compact, newHash string) string {

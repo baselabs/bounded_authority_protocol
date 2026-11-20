@@ -4,12 +4,12 @@
 //! The normative authorities are `spec/bap-v1.md` §10 (Protected headers),
 //! RFC 7638 §3.2 (canonical hash), and RFC 8037 (EdDSA/OKP in JOSE).
 //! Derived from the spec and certified corpus, not from any sibling-SDK or
-//! reference source (ADR 0014 D5).
+//! reference source (docs/design/conformance-contract.md, Independent implementation rule).
 //!
 //! The proof JWK is exactly `{crv: "Ed25519", kty: "OKP",
 //! x: canonical_base64url_32_bytes}` in any member order
-//! (`REQ1-HEADER-proof-jwk`). Every additional member — including the
-//! private `d` — is invalid (`REQ1-HEADER-no-private-jwk`). The RFC 7638
+//! (`REQ1-HEADER-proof-jwk`). Every additional member: including the
+//! private `d`: is invalid (`REQ1-HEADER-no-private-jwk`). The RFC 7638
 //! thumbprint preimage is the EXACT sorted JSON
 //! `{"crv":"Ed25519","kty":"OKP","x":"<canonical-x>"}`; the thumbprint is
 //! unpadded base64url SHA-256 of those UTF-8 bytes (`REQ1-HEADER-thumbprint`).
@@ -30,7 +30,7 @@
 //! RFC 7638 §3.1 constructs the preimage by serializing the JWK with ONLY the
 //! required members, lexicographically sorted by UTF-16 code unit. For an
 //! Ed25519 OKP key the sorted member order is `crv` < `kty` < `x`, so the
-//! preimage is byte-identical to the canonical JWK this module emits —
+//! preimage is byte-identical to the canonical JWK this module emits,
 //! [`thumbprint_preimage`] delegates to [`jwk_encode_public`]. The SHA-256 is
 //! computed over those exact UTF-8 bytes; a single transposed member or a
 //! stray space silently produces a wrong key identity, so the order is pinned
@@ -93,7 +93,7 @@ fn encode_unchecked(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Vec<u8> {
 /// raw-lexeme / magnitude bounds) and then enforces the exact Ed25519/OKP
 /// JWK shape. Returns `Err(Invalid)` for any of:
 /// - malformed JSON or a non-object root (`REQ1-HEADER-proof-jwk`);
-/// - a member set other than exactly `{crv, kty, x}` — any extra member,
+/// - a member set other than exactly `{crv, kty, x}`: any extra member,
 ///   including the private `d`, is rejected (`REQ1-HEADER-no-private-jwk`);
 /// - `crv` other than `"Ed25519"` or `kty` other than `"OKP"`;
 /// - a non-string or wrong-valued `crv` / `kty` / `x`;
@@ -120,7 +120,7 @@ pub fn jwk_decode_public(text: &[u8]) -> Result<[u8; PUBLIC_KEY_WIDTH]> {
             "crv" => crv = Some(val),
             "kty" => kty = Some(val),
             "x" => x = Some(val),
-            _ => return Err(Invalid), // unknown member — closed set (REQ1-HEADER-no-private-jwk)
+            _ => return Err(Invalid), // unknown member: closed set (REQ1-HEADER-no-private-jwk)
         }
     }
 
@@ -154,7 +154,7 @@ pub fn jwk_decode_public(text: &[u8]) -> Result<[u8; PUBLIC_KEY_WIDTH]> {
 /// The RFC 7638 thumbprint preimage for an Ed25519 public key.
 ///
 /// Returns the exact UTF-8 bytes of the sorted JSON object
-/// `{"crv":"Ed25519","kty":"OKP","x":"<canonical-x>"}` — the three required
+/// `{"crv":"Ed25519","kty":"OKP","x":"<canonical-x>"}`: the three required
 /// members in lexicographic order, no whitespace (`REQ1-HEADER-thumbprint`).
 /// This is byte-identical to [`jwk_encode_public`]: for an Ed25519 OKP key the
 /// RFC 7638 preimage IS the canonical sorted JWK. A key that fails key
@@ -198,7 +198,7 @@ fn thumbprint_digest_unchecked(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> [u8; PUBL
 /// caller's raw 32-byte public key (`kid` excluded).
 ///
 /// `REQ1-HEADER-issuer-fingerprint`: the issuer fingerprint uses exactly the
-/// same `{crv, kty, x}` preimage + SHA-256 as the holder thumbprint — the only
+/// same `{crv, kty, x}` preimage + SHA-256 as the holder thumbprint: the only
 /// difference is naming (the input is the caller's raw trusted key, not a
 /// decoded proof JWK). `kid` never enters the preimage. A key that fails key
 /// acceptance is `Err(Invalid)`.
@@ -225,7 +225,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // jwk_encode_public — exact bytes, RFC 7638 preimage order
+    // jwk_encode_public: exact bytes, RFC 7638 preimage order
     // ==========================================================================
 
     #[test]
@@ -261,7 +261,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // jwk_decode_public — valid shape + member-order insensitivity
+    // jwk_decode_public: valid shape + member-order insensitivity
     // ==========================================================================
 
     #[test]
@@ -292,7 +292,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure — no-private-jwk: any member beyond {crv,kty,x} is invalid
+    // Closure: no-private-jwk: any member beyond {crv,kty,x} is invalid
     // ==========================================================================
 
     #[test]
@@ -308,7 +308,7 @@ mod tests {
         let x = CORPUS_X;
         let d = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"; // 43 A's
         let text = format!(r#"{{"crv":"Ed25519","kty":"OKP","x":"{x}","d":"{d}"}}"#);
-        // Sanity: the text must parse as JSON (proves the test is non-vacuous —
+        // Sanity: the text must parse as JSON (proves the test is non-vacuous,
         // the rejection comes from the member-set check, not malformed JSON).
         assert!(crate::json::json_decode(text.as_bytes(), &Bounds::maximum()).is_ok());
         assert_eq!(jwk_decode_public(text.as_bytes()), Err(Invalid));
@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn rejects_kid_member() {
-        // kid is also an extra member — rejected by the closed-set rule.
+        // kid is also an extra member: rejected by the closed-set rule.
         let text = concat!(
             r#"{"crv":"Ed25519","kid":"issuer-1","kty":"OKP","x":""#,
             "W1s7yE9fGDMBbmdpqYVwQ1hDCXtzOePUD3fIf1t7FDk",
@@ -350,7 +350,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure — wrong crv / wrong kty
+    // Closure: wrong crv / wrong kty
     // ==========================================================================
 
     #[test]
@@ -385,7 +385,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure — wrong-width x (must decode to exactly 32 bytes)
+    // Closure: wrong-width x (must decode to exactly 32 bytes)
     // ==========================================================================
 
     #[test]
@@ -417,7 +417,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure — malformed JSON / non-object / duplicate members
+    // Closure: malformed JSON / non-object / duplicate members
     // ==========================================================================
 
     #[test]
@@ -463,7 +463,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Thumbprint family — preimage byte-exactness + internal consistency
+    // Thumbprint family: preimage byte-exactness + internal consistency
     // ==========================================================================
 
     #[test]
@@ -606,7 +606,7 @@ mod tests {
                 .unwrap_or_else(|| panic!("case {id} missing expected.verdict"));
             *per_surface.entry(surface).or_default() += 1;
 
-            // Each surface returns `agree: bool` — the verdict matches AND any
+            // Each surface returns `agree: bool`: the verdict matches AND any
             // pinned value field (encoded / public_key / thumbprint / preimage)
             // matches byte-for-byte.
             let agree = match surface {

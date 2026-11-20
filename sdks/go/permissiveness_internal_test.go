@@ -24,8 +24,9 @@ func (c *countingDigest) digest(chunks [][]byte, limit int64) ([32]byte, int64, 
 	return defaultArchiveDigest(chunks, limit)
 }
 
-// panickingDigest exercises the closed-Result guard (ADR 0017 clause 1): a
-// panic anywhere under a public façade must surface as ErrInvalid, never as
+// panickingDigest exercises the closed-Result guard (closed, value-free rejection
+// (spec/bap-v1.md §§15-17)): a
+// panic anywhere under a public facade must surface as ErrInvalid, never as
 // an escaping host panic.
 type panickingDigest struct{}
 
@@ -46,7 +47,7 @@ func loadExportCase(t *testing.T) (ArchivedObject, HistoricalKeyChain, ExpectedA
 	return obj, keys, expected
 }
 
-// TestWorkPinPreDigestHoist is the clause-3 work pin: malformed caller
+// TestWorkPinPreDigestHoist is the pre-hash validation work pin: malformed caller
 // metadata rejects with ZERO archive-hash calls. Removing the hoist (the
 // 2026-08-18 resolution) reddens exactly these assertions (1+ calls).
 func TestWorkPinPreDigestHoist(t *testing.T) {
@@ -71,7 +72,7 @@ func TestWorkPinPreDigestHoist(t *testing.T) {
 			t.Fatalf("mutation %d: expected rejection", i)
 		}
 		if counter.calls != 0 {
-			t.Fatalf("mutation %d: rejected AFTER %d hash call(s) — pre-digest hoist violated", i, counter.calls)
+			t.Fatalf("mutation %d: rejected AFTER %d hash call(s): pre-digest hoist violated", i, counter.calls)
 		}
 	}
 	// the valid path performs exactly one archive digest
@@ -108,7 +109,7 @@ func swapDigest(t *testing.T, fn archiveDigestFn) {
 }
 
 // TestClosedResultPanicThrough pins the recover guard end-to-end through a
-// public façade: removing the guard reddens this leg (the panic escapes).
+// public facade: removing the guard reddens this leg (the panic escapes).
 func TestClosedResultPanicThrough(t *testing.T) {
 	obj, keys, expected := loadExportCase(t)
 	defer func() {
@@ -259,8 +260,8 @@ func parseExportCase(raw []byte) (ArchivedObject, HistoricalKeyChain, ExpectedAn
 
 // TestCanonicalGateUnit pins the anchor canonical-form gate at the unit
 // level: on both macro paths (verify: Ed25519; encode: archive digest) the
-// gate's verdict is subsumed by a later check — the ADR 0017 subsumption
-// pattern — so the per-clause red-capable form is this direct unit leg.
+// gate's verdict is subsumed by a later check: the spec/bap-v1.md §§15-17 subsumption
+// pattern: so the per-clause red-capable form is this direct unit leg.
 // Removing the canonicalSegment calls from parseAnchorCompactGated reddens
 // exactly the non-canonical assertion.
 func TestCanonicalGateUnit(t *testing.T) {
@@ -291,7 +292,7 @@ func TestCanonicalGateUnit(t *testing.T) {
 const anchorCompactCorpus = "eyJhbGciOiJFZERTQSIsImtpZCI6ImFyY2hpdmUtYSIsInR5cCI6ImJhK2NoYWluLWFuY2hvciJ9.eyJhbmNob3JfaWQiOiJ1cm46ZXhhbXBsZTphbmNob3I6c3RhcnQiLCJhbmNob3JlZF9hdCI6MTAwMCwiY2hhaW5faGFzaCI6IkFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUEiLCJjaGFpbl9pZCI6InVybjpleGFtcGxlOmNoYWluIiwia2V5X2ZpbmdlcnByaW50IjoibzdnbDByZHhTUFUtcVhibU5vZDRSQWtWNXBVamFCNDdKaFBBNDNod0tQOCIsInNlcXVlbmNlIjowLCJ2IjoxfQ.Falux3uXvUy7PqELqVP_UNWWr3FDT6jUxT7IwtbHY27dqPqHxdsUrSvE216PAtOku9jjPCgoWHYds8YMLD4gAQ"
 
 // TestSuccessorRangeMatcherTag is the white-box red form of the same-tag
-// operand domain (ADR 0028 §2): removing the tag discrimination from
+// operand domain (same-tag numeric operands (spec/bap-v2.md §4)): removing the tag discrimination from
 // rangeMatch (v2.go) reddens exactly the cross-tag assertions below, and
 // mutating the comparators reddens the inclusive/equality assertions. Signed
 // zero is pinned too: IEEE 754 comparison holds −0.0 = 0.0 on the float tag.

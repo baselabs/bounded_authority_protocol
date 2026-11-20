@@ -2,8 +2,8 @@
 """Conformance runner for the v3 profile of ``bounded_authority_verifier``.
 
 Loads the published v3 corpus from ``priv/conformance/v3/corpus/`, recomputes EVERY verdict from
-scratch by calling the v3 SDK façade (``bounded_authority_verifier.v3``), and asserts agreement on
-all 292 cases. Asserts the ``index.json`` SHA-256 at startup (ADR 0014 D4: the SDK binds to the
+scratch by calling the v3 SDK facade (``bounded_authority_verifier.v3``), and asserts agreement on
+all 292 cases. Asserts the ``index.json`` SHA-256 at startup (certified index SHA-256 binding (docs/design/conformance-contract.md): the SDK binds to the
 exact corpus it was certified against). Runs the two-boundary key census (imported == declared,
 verify-import ⊇ expected-verify-keys) over the ES256 verify boundary.
 
@@ -15,7 +15,7 @@ audited against the tamper-derived input (byte-for-byte re-derivation from its b
 This is the independent conformance proof: the SDK is the implementation under test, the corpus is
 the arbiter. A disagreement aborts nonzero with the case id + the expected/actual verdict.
 
-Derivation: the corpus is the published normative artifact; the runner is a consumer. The SDK façade
+Derivation: the corpus is the published normative artifact; the runner is a consumer. The SDK facade
 was derived from spec/bap-v3.md + the incorporated v1/v2 sections + RFCs; this runner exercises it.
 """
 
@@ -60,8 +60,9 @@ from bounded_authority_verifier.v3 import _imported_fingerprints, _reset_census 
 from corpus_support import CorpusRun, collect_input_keys, computed, integrity  # noqa: E402
 
 CORPUS_DIR = _CORPUS_ROOT / "priv" / "conformance" / "v3" / "corpus"
-# The certified index.json SHA-256 (ADR 0014 D4). The complete Hex corpus tree
-# is vendored inside this SDK; an input mismatch fails closed (ADR 0049).
+# The certified index.json SHA-256 (certified index SHA-256 binding
+# (docs/design/conformance-contract.md)). The complete Hex corpus tree
+# is vendored inside this SDK; an input mismatch fails closed (self-contained SDK distribution contract).
 CERTIFIED_INDEX_SHA = "a5c8075e7534345c3bb6611d0b40292904bcfa3af0702e07ae014fa66926433c"
 
 _input_fingerprints: set[str] = set()
@@ -89,7 +90,8 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes
     integrity(CORPUS_DIR, CERTIFIED_INDEX_SHA)
     index_path = CORPUS_DIR / "index.json"
     index_raw = index_path.read_bytes()
-    # ADR 0014 D4: assert the index.json SHA-256 matches the certified snapshot.
+    # certified index SHA-256 binding (docs/design/conformance-contract.md): assert the
+    # index.json SHA-256 matches the certified snapshot.
     index_sha = hashlib.sha256(index_raw).hexdigest()
     if index_sha != CERTIFIED_INDEX_SHA:
         abort(f"index.json SHA mismatch: got {index_sha}, certified {CERTIFIED_INDEX_SHA}")
@@ -427,7 +429,7 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         if r is INVALID or not r.is_ok:
             return INVALID
         # The v3 corpus encodes the canonical row bytes in the verdict as unpadded base64url
-        # (the v2 corpus carried the raw JSON text — a certified per-major representation
+        # (the v2 corpus carried the raw JSON text: a certified per-major representation
         # choice; the runner consumes the corpus's spelling).
         return {"bytes": _b64e(r.value.bytes_), "hash": _b64e(r.value.hash_)}
     if surface == "check_chain":
@@ -916,7 +918,7 @@ def audit_tampers(cases: list[dict[str, Any]], raws: dict[str, bytes]) -> int:
     dispatches it); the audit checks the corpus guarantees the derivation actually relies on:
 
     - the base case exists;
-    - the tamper is NON-VACUOUS (derived != base — a no-op flip would make the case a silent
+    - the tamper is NON-VACUOUS (derived != base: a no-op flip would make the case a silent
       duplicate of its base);
     - the directed difference is present in the recorded verbatim input (the verbatim agrees
       with the derived value at the directed tamper target).
@@ -924,7 +926,7 @@ def audit_tampers(cases: list[dict[str, Any]], raws: dict[str, bytes]) -> int:
     The recorded verbatim input is otherwise informational: the certified v2 corpus carries one
     tamper case (verify-key-transition-v2-tamper-signature-byte) and the v3 corpus one
     (check-envelope-v3-tamper-grant-signature-byte) whose verbatim input embeds regenerated
-    context beyond the directed flip — the generator sometimes re-mints surrounding fields rather
+    context beyond the directed flip: the generator sometimes re-mints surrounding fields rather
     than pure byte-flipping. Full verbatim==derived equality therefore does NOT hold on the
     certified corpora and is not the contract; the three guarantees above do."""
     by_id = {c["id"]: c for c in cases}

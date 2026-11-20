@@ -2089,7 +2089,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/corpus.ex"),
     do: ~w(Access Bitwise Enum List Map MapSet String)
 
-  # The role-attestation sibling profile (ADR 0036): the codec mirrors the chain codecs'
+  # The role-attestation sibling profile (spec/bap-role-attestation-v1.md): the codec mirrors the chain codecs'
   # module set.
   defp approved_source_modules("lib/bounded_authority_protocol/content_assertion/v1/codec.ex"),
     do: ~w(Access Atom Enum Map String StringOrUri)

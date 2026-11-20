@@ -2,9 +2,15 @@
 
 This map traces every normative `REQ-RA1-*` requirement in
 [`spec/bap-role-attestation-v1.md`](../../spec/bap-role-attestation-v1.md) to executable
-evidence or an explicit downstream/release gate. The certified profile corpus is revision 1
+evidence or an explicit adoption or release obligation. The certified profile corpus is revision 1
 (40 cases) at `priv/conformance/attestation-profiles/role-attestation/v1`, index SHA-256
 `be5275c69539a0f31734242ff00a484c2f855f39181c55689d8b0f671195d62a`.
+
+Current releases follow the package 1.x policy in [API stability](../guides/api-stability.md)
+and the [release-candidate contract](../release-candidate-contract.md). A new sibling profile
+requires a minor release; changes to this released profile must preserve its bytes and verdicts,
+except for a soundness repair meeting the published governance conditions. Release evidence
+must identify the exact candidate and corpus and be understandable without private work tracking.
 
 Strict Ed25519 verification ([erratum 2](../errata.md)):
 the profile's signature and key checks follow the strict rule of
@@ -42,10 +48,10 @@ corpus, index, and verdicts are unchanged.
 | `SECURITY-trust-scope` | containment makes the attestor window the attestation-lifetime ceiling; documented posture (no new bound) | populated |
 | `CONFORMANCE-complete` | 40-case certified corpus: both valid roles, missing-member matrix, every rejection family, boundary equalities, both self-attestation discriminating forms (same key id, same key material), outliving window, ES256 confusion, meaningful-byte tampers, cross-profile legs both directions; v1/v2/v3 corpora execute unchanged | populated |
 | `CONFORMANCE-certified-pin` | index SHA-256 pinned independently by the ExUnit suite, this map, the profile spec, and every SDK consumer | populated |
-| `CONFORMANCE-sdks` | Elixir reference plus in-repo Python/Rust/Go legs (this landing); the graduated TypeScript verifier adopts the surface as a release precondition coordinated at corpus freeze | populated |
+| `CONFORMANCE-sdks` | Elixir plus in-repository Python/Rust/Go consumers and the separately published TypeScript verifier must agree on the certified corpus. Any byte or verdict disagreement blocks qualification. | populated |
 | `IANA-template` | exact active registry entry plus machine-readable and rendered RFC 6838 templates; submission to IANA for registration remains externally gated | populated |
-| `CONFORMANCE-cross-repo-receipts` | The artifact has no public transport; the authority-runtime issuance receipt and the companion-signer consumption receipt are named release preconditions discharged by their own private closeouts before any `0.x.0` release bearing this profile. | release gate |
-| `RELEASE-immutable` | Requires the exact reviewed package and corpus identity before adopters consume it; release is the owner's decision, not authorized by design approval. | release gate |
+| `CONFORMANCE-cross-repo-receipts` | Independent authority-runtime issuance and companion-signer consumption evidence must identify the exact candidate and corpus. The artifact has no public transport, so this proves producer/consumer interoperability only. Evidence must state the checked public contract without depending on private closeouts. | release qualification |
+| `RELEASE-immutable` | The release-candidate contract requires qualification of the exact source commit, package checksum, corpus, and provenance. Only the maintainers' release operator publishes from `main`; design approval does not authorize publication. | package 1.x release qualification |
 
 “Populated” means the repository contains executable evidence for the public-library
 obligation. It does not claim live revocation, trust selection, replay reservation, or a

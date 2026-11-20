@@ -20,7 +20,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   #   5  every map-cited `index.json <surface>.<class>=<count>` re-derives from the live corpus
   #   6  the map's blanket corpus revision integer == revision.json's integer
   #   9  vendor neutrality: every file this gate and the extractor read is git-tracked, inside
-  #      the public-surface privacy gate's full-tree canary sweep (ADR 0023 topology; the term
+  #      the public-surface privacy gate's full-tree canary sweep (the term
   #      list itself is NEVER tracked, the privacy test's hash-canary scheme is the enforcement)
   #   10 anchor completeness: every markdown table in the authority docs sits inside exactly one
   #      anchored region and the anchor set is exactly the closed ten keys
@@ -88,7 +88,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
   # frozen baselines (spec/facts/baseline-v2.json, baseline-v3.json) over their delta fact
   # sets (suite identity, domain separators, selector kinds, and the v3 suite rules/constants)
   # so a silent edit of any successor-major normative constant reds exactly as a v1 edit does
-  # (ADR 0030's and ADR 0035 §9's named deferral, closed).
+  # (spec/bap-v2.md and spec/bap-v3.md define those successor-major constants).
 
   @baseline_majors [1, 2, 3]
 
@@ -457,7 +457,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
     path = Path.join(@root, "#{@baseline_dir}/requirement-statements-v1.json")
 
     # The baseline is a flat id-to-hash object with one member per map row. Since the
-    # strict-Ed25519 erratum (ADR 0040) it holds more rows than the protocol's 64-member object
+    # strict-Ed25519 erratum (docs/errata.md erratum 2) it holds more rows than the protocol's 64-member object
     # ceiling, so it is read with the OTP JSON decoder (gate tooling, not a protocol input). A
     # value that is not a lowercase-hex SHA-256 string still reds as a missing baseline.
     with {:ok, bytes} <- File.read(path),
@@ -782,7 +782,7 @@ defmodule BoundedAuthorityProtocol.SpecFactsGate do
       if privacy_present,
         do: [],
         else: [
-          "rule 9: the public-surface privacy gate (ADR 0023 canary sweep) is missing; vendor neutrality is unenforced"
+          "rule 9: the public-surface privacy canary sweep is missing; vendor neutrality is unenforced"
         ]
 
     problems ++

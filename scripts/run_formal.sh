@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Formal-analysis re-run (ADR 0025): pinned ProVerif execution + three checks.
+# Formal-analysis re-run (spec/formal/README.md): pinned ProVerif execution + three checks.
 #
 #   1. run the model and diff the RESULT lines against spec/formal/expected-summary.txt
 #      (non-regression: a model edit changing any verdict line reds);
@@ -28,7 +28,7 @@ if ! command -v proverif >/dev/null 2>&1; then
     echo "run_formal: SKIP: proverif not found (opam pin proverif.2.05); the CI formal-analysis job enforces this run"
     exit 0
   fi
-  echo "run_formal: proverif not found (opam pin proverif.2.05; ADR 0025)" >&2
+  echo "run_formal: proverif not found (opam pin proverif.2.05; spec/formal/README.md)" >&2
   exit 2
 fi
 

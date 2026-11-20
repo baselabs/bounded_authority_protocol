@@ -3,7 +3,8 @@ name = "bounded-authority-protocol"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.88"
-# Never published from this repository (ADR 0015): the crate moves to its own repository
+# Never published from this repository (sdks/README.md publication boundary): the crate moves to
+# its own repository
 # when it is first published.
 publish = false
 license = "Apache-2.0"
@@ -32,13 +33,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 
 # The BAP-15 T14 conformance runner: the acceptance gate that vendors the 283-
-# case corpus, dispatches all 28 surfaces through the public façade, SHA-binds
+# case corpus, dispatches all 28 surfaces through the public facade, SHA-binds
 # the vendored index.json, and runs the two-boundary key census. It is an
 # integration test living outside `src/` (so it can exercise ONLY the public
 # crate surface), declared as an explicit `[[test]]` target so
 # `cargo test --test conformance` runs it. serde/serde_json (dev-deps) read the
 # corpus JSON into `serde_json::Value`; the runner constructs the `src/` input
-# structs field-by-field (the F3 construction seam) — there is NO serde derive
+# structs field-by-field (the F3 construction seam): there is NO serde derive
 # on any `src/` struct.
 [[test]]
 name = "conformance"
@@ -57,7 +58,7 @@ path = "conformance/run_selector_float_zero.rs"
 
 # The v2 conformance runner: the contract-major 2 acceptance gate over the
 # vendored 268-case v2 snapshot (same SHA-bind + two-boundary census
-# discipline as the v1 runner, against the `v2` façade and the shared
+# discipline as the v1 runner, against the `v2` facade and the shared
 # primitives).
 [[test]]
 name = "conformance_v2"
@@ -65,7 +66,7 @@ path = "conformance/run_v2.rs"
 
 # The v3 conformance runner: the contract-major 3 acceptance gate over the
 # vendored 292-case v3 snapshot (same SHA-bind + two-boundary census
-# discipline as the v1/v2 runners, against the `v3` façade, the shared
+# discipline as the v1/v2 runners, against the `v3` facade, the shared
 # primitives, and the v3 ES256 suite surfaces).
 [[test]]
 name = "conformance_v3"
@@ -73,7 +74,7 @@ path = "conformance/run_v3.rs"
 
 # The strict-Ed25519 conformance runner: the acceptance gate over the vendored additive
 # 2410-case strict-ed25519 snapshot (profile bap-strict-ed25519/1; same SHA-bind discipline as the
-# v1/v2/v3 runners, against the public façades, the strict helpers and the JWK family).
+# v1/v2/v3 runners, against the public facades, the strict helpers and the JWK family).
 [[test]]
 name = "conformance_strict"
 path = "conformance/run_strict.rs"

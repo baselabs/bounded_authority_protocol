@@ -1,8 +1,8 @@
 """Conformance runner for the bap-producer-canonicality/1 corpus (erratum 3).
 
 Loads the certified corpus from ``priv/conformance/producer-canonicality/``, recomputes every
-verdict by driving the SDK's PRODUCER surfaces — compact assembly for contract-majors 1, 2 and 3
-and the three sibling profiles, anchored-export encoding for all three majors — and requires
+verdict by driving the SDK's PRODUCER surfaces: compact assembly for contract-majors 1, 2 and 3
+and the three sibling profiles, anchored-export encoding for all three majors: and requires
 exact agreement: a refused signature is the closed error; an accepted signature's bytes are
 emitted unchanged (byte-equality against the certified compact). The index.json SHA-256 is
 asserted at startup and every listed file is verified against its per-file SHA-256 before any

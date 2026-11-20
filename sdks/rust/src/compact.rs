@@ -1,35 +1,36 @@
-//! Compact-JWS composition + parse (RFC 7515 §7.1) — the
+//! Compact-JWS composition + parse (RFC 7515 §7.1): the
 //! `REQ1-SIGNING-exact-input` mechanic.
 //!
 //! The JWS compact serialization is
 //! `BASE64URL(protected) || "." || BASE64URL(payload) || "." || BASE64URL(signature)`
-//! (RFC 7515 §7.1). The **signing input** — the two-segment message that was
-//! actually signed — is `ASCII(BASE64URL(protected) || "." || BASE64URL(payload))`
+//! (RFC 7515 §7.1). The **signing input**: the two-segment message that was
+//! actually signed: is `ASCII(BASE64URL(protected) || "." || BASE64URL(payload))`
 //! (`REQ1-SIGNING-exact-input`): no bytes precede or follow it.
 //!
 //! [`assemble_compact`] composes the three-segment form from an already-encoded
 //! [`SigningInput`] and a raw 64-byte signature. The protected / payload
 //! segments are already canonical base64url ASCII and pass through VERBATIM
 //! (the producer's deterministic JCS representation is the contract;
-//! `REQ1-SIGNING-any-order` — a correctly signed closed JSON object may use any
+//! `REQ1-SIGNING-any-order`: a correctly signed closed JSON object may use any
 //! member order, so the composer must not re-encode or re-validate them); only
 //! the signature is base64url-encoded. [`parse_compact`] is the inverse
 //! structural split, enforcing exactly three non-empty canonical segments.
 //!
 //! Derived from the spec and certified corpus, not from any sibling-SDK or
-//! reference source (ADR 0014 D5). See spec/bap-v1.md §14 and RFC 7515 §7.1.
+//! reference source (docs/design/conformance-contract.md, Independent implementation rule). See
+//! spec/bap-v1.md §14 and RFC 7515 §7.1.
 
-// `assemble_compact` is `pub` (re-exported at the crate root by the Façade A
+// `assemble_compact` is `pub` (re-exported at the crate root by the Facade A
 // `pub use compact::assemble_compact;` in lib.rs) and `parse_compact` is
 // `pub(crate)` (called by v1::decode_grant / decode_proof). Both are now
-// reachable from the crate root through the Façade A call chain.
+// reachable from the crate root through the Facade A call chain.
 use crate::base64url::{base64url_decode, base64url_encode};
 use crate::error::{Invalid, Result};
 use crate::types::SigningInput;
 
 /// Compose the 3-segment compact serialization from a signing input + raw
-/// signature — the internal composer. The public [`crate::assemble_compact`]
-/// (re-exported from the v1 façade) wraps this with per-kind content validation
+/// signature: the internal composer. The public [`crate::assemble_compact`]
+/// (re-exported from the v1 facade) wraps this with per-kind content validation
 /// (spec/bap-v1.md §16, REQ1-VERIFY-revalidate).
 ///
 /// Returns
@@ -54,7 +55,7 @@ pub(crate) fn compose_compact(input: &SigningInput, signature: &[u8; 64]) -> Res
     out.extend_from_slice(&base64url_encode(signature));
     // Segment well-formedness: three non-empty canonical unpadded base64url
     // segments. Per-kind CONTENT validation (closed header/claim set) is the
-    // public façade wrapper's job (v1::assemble_compact).
+    // public facade wrapper's job (v1::assemble_compact).
     parse_compact(&out)?;
     Ok(out)
 }
@@ -65,7 +66,7 @@ pub(crate) fn compose_compact(input: &SigningInput, signature: &[u8; 64]) -> Res
 /// canonical unpadded base64url. Returns the three raw segment byte slices
 /// (borrowed from `text`); the caller decodes them via
 /// [`base64url_decode`] / [`crate::json::json_decode`] as needed. The
-/// signature-segment width (must decode to 64 bytes) is NOT enforced here —
+/// signature-segment width (must decode to 64 bytes) is NOT enforced here,
 /// that is the decode path's responsibility (each `decode_*_parts` fn in
 /// [`crate::v1`] gates it under spec/bap-v1.md §17, REQ1-BOUNDS-fixed-widths); this parser only
 /// asserts the `REQ1-SIGNING-exact-input` shape.
@@ -73,7 +74,7 @@ pub(crate) fn compose_compact(input: &SigningInput, signature: &[u8; 64]) -> Res
 /// Rejects (`Invalid`): more or fewer than three segments, an empty segment
 /// (leading / trailing / doubled `.`), and any segment that is not canonical
 /// base64url (padding `=`, standard-alphabet `+`/`/`, whitespace, `len % 4 ==
-/// 1`, or non-zero unused pad bits — all inherited from [`base64url_decode`]'s
+/// 1`, or non-zero unused pad bits: all inherited from [`base64url_decode`]'s
 /// `REQ1-B64-*` enforcement).
 pub(crate) fn parse_compact(text: &[u8]) -> Result<(&[u8], &[u8], &[u8])> {
     let mut iter = text.split(|&b| b == b'.');
@@ -94,7 +95,7 @@ pub(crate) fn parse_compact(text: &[u8]) -> Result<(&[u8], &[u8], &[u8])> {
 
 /// Asserts one segment is non-empty and canonical unpadded base64url.
 ///
-/// Decodes (and discards the decoded bytes — only validity is needed here) to
+/// Decodes (and discards the decoded bytes: only validity is needed here) to
 /// inherit every `REQ1-B64-*` rule from [`base64url_decode`]: alphabet, no
 /// padding, no whitespace, length mod 4, and the canonical re-encode check.
 fn validate_segment(seg: &[u8]) -> Result<()> {
@@ -126,7 +127,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // assemble_compact — verbatim segment pass-through + signature encode
+    // assemble_compact: verbatim segment pass-through + signature encode
     // ==========================================================================
 
     #[test]
@@ -198,7 +199,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // parse_compact — REQ1-SIGNING-exact-input shape enforcement
+    // parse_compact: REQ1-SIGNING-exact-input shape enforcement
     // ==========================================================================
 
     #[test]
@@ -303,7 +304,7 @@ mod tests {
             // The import boundary: the raw signature must decode to exactly 64
             // bytes to form the [u8;64] arg. The invalid corpus case
             // (`assemble-compact-invalid-short-signature`, sig "AAEC" -> 3
-            // bytes) is rejected right here — it never reaches assemble_compact.
+            // bytes) is rejected right here: it never reaches assemble_compact.
             let sig_decoded = base64url_decode(sig_b64.as_bytes());
             let sig_is_64 = sig_decoded.as_ref().map(|r| r.len() == 64).unwrap_or(false);
 
@@ -318,7 +319,7 @@ mod tests {
                         payload_segment: payload.to_vec(),
                     };
                     // Exercise the PUBLIC crate::assemble_compact (compose +
-                    // per-kind content validation), not the internal composer —
+                    // per-kind content validation), not the internal composer,
                     // so the conformance corpus covers the spec surface.
                     let compact =
                         crate::assemble_compact(&input, &sig, None).expect("valid case assembles");

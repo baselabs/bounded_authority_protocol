@@ -24,7 +24,7 @@ import (
 )
 
 // strictCertifiedIndexSHA256 is the SHA-256 (hex) of the certified strict corpus index.json. A
-// vendored corpus that hashes to anything else fails closed here — silent drift is impossible.
+// vendored corpus that hashes to anything else fails closed here: silent drift is impossible.
 const strictCertifiedIndexSHA256 = "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
 
 const (
@@ -64,7 +64,7 @@ func loadStrictCorpus(t *testing.T) []strictCaseRef {
 	}
 	sum := sha256.Sum256(indexBytes)
 	if got := hex.EncodeToString(sum[:]); got != strictCertifiedIndexSHA256 {
-		t.Fatalf("vendored strict corpus index.json SHA-256 mismatch: got %s want %s — fail closed on corpus drift",
+		t.Fatalf("vendored strict corpus index.json SHA-256 mismatch: got %s want %s: fail closed on corpus drift",
 			got, strictCertifiedIndexSHA256)
 	}
 	var idx strictIndex

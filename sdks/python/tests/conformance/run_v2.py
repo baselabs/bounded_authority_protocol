@@ -2,8 +2,8 @@
 """Conformance runner for the v2 profile of ``bounded_authority_verifier``.
 
 Loads the published v2 corpus from ``priv/conformance/v2/corpus/``, recomputes EVERY verdict from
-scratch by calling the v2 SDK façade (``bounded_authority_verifier.v2``), and asserts agreement on
-all 268 cases. Asserts the ``index.json`` SHA-256 at startup (ADR 0014 D4: the SDK binds to the
+scratch by calling the v2 SDK facade (``bounded_authority_verifier.v2``), and asserts agreement on
+all 268 cases. Asserts the ``index.json`` SHA-256 at startup (certified index SHA-256 binding (docs/design/conformance-contract.md): the SDK binds to the
 exact corpus it was certified against). Runs the two-boundary key census (imported == index;
 verify-import ⊇ expected valid verification keys).
 
@@ -11,7 +11,7 @@ This is the independent conformance proof: the SDK is the implementation under t
 the arbiter. A disagreement aborts nonzero with the case id + the expected/actual verdict.
 
 Derivation: the corpus is the published normative artifact (BAP-05); the runner is a consumer.
-The SDK façade was derived from spec/bap-v2.md + ADR 0004 + RFCs; this runner exercises it.
+The SDK facade was derived from spec/bap-v2.md + spec/bap-v1.md §15 + RFCs; this runner exercises it.
 """
 
 from __future__ import annotations
@@ -63,8 +63,9 @@ from bounded_authority_verifier.uri import uri_normalize  # noqa: E402
 from corpus_support import CorpusRun, collect_input_keys, computed, integrity  # noqa: E402
 
 CORPUS_DIR = _CORPUS_ROOT / "priv" / "conformance" / "v2" / "corpus"
-# The certified index.json SHA-256 (ADR 0014 D4). The complete Hex corpus tree
-# is vendored inside this SDK; an input mismatch fails closed (ADR 0049).
+# The certified index.json SHA-256 (certified index SHA-256 binding
+# (docs/design/conformance-contract.md)). The complete Hex corpus tree
+# is vendored inside this SDK; an input mismatch fails closed (self-contained SDK distribution contract).
 CERTIFIED_INDEX_SHA = "6de6289b7f47b0e0a78ea4610e7844a0f1d5247d8eace02ec9cf9841308f13d0"
 
 _input_fingerprints: set[str] = set()
@@ -92,7 +93,8 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, bytes
     integrity(CORPUS_DIR, CERTIFIED_INDEX_SHA)
     index_path = CORPUS_DIR / "index.json"
     index_raw = index_path.read_bytes()
-    # ADR 0014 D4: assert the index.json SHA-256 matches the certified snapshot.
+    # certified index SHA-256 binding (docs/design/conformance-contract.md): assert the
+    # index.json SHA-256 matches the certified snapshot.
     index_sha = hashlib.sha256(index_raw).hexdigest()
     if index_sha != CERTIFIED_INDEX_SHA:
         abort(f"index.json SHA mismatch: got {index_sha}, certified {CERTIFIED_INDEX_SHA}")
@@ -604,7 +606,7 @@ def dispatch(surface: str, inp: dict[str, Any], raws: dict[str, bytes]) -> Any:
         transitions_list = inp.get("transitions") or []
         transitions = tuple(_unwrap(str_utf8(t)) for t in transitions_list)
         # The v2 encode cases carry no expected.digest/object_version (both are ENCODE OUTPUTS,
-        # asserted in the verdict — the v1 corpus happened to carry them; the runner must not
+        # asserted in the verdict: the v1 corpus happened to carry them; the runner must not
         # require them on this surface).
         full_expected = _build_export_expected(inp, for_encode=True)
         chain = full_expected.chain

@@ -21,7 +21,7 @@ import (
 
 // certifiedIndexSHA256 is the SHA-256 of the certified corpus index.json this
 // SDK was conformed against (base64url). A vendored corpus that hashes to
-// anything else fails closed here — silent drift is impossible.
+// anything else fails closed here: silent drift is impossible.
 const certifiedIndexSHA256 = "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs"
 
 const corpusDir = "priv/conformance/v1/corpus"
@@ -114,7 +114,7 @@ func loadCorpus(t *testing.T) (*corpusIndex, []loadedFile) {
 	}
 	sum := sha256.Sum256(indexBytes)
 	if v.Base64urlEncode(sum[:]) != certifiedIndexSHA256 {
-		t.Fatalf("vendored corpus index.json SHA-256 mismatch: got %s want %s — fail closed on corpus drift",
+		t.Fatalf("vendored corpus index.json SHA-256 mismatch: got %s want %s: fail closed on corpus drift",
 			v.Base64urlEncode(sum[:]), certifiedIndexSHA256)
 	}
 	var idx corpusIndex

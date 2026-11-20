@@ -21,9 +21,9 @@ func proofTyp(profile proofProfile) string {
 
 // The grant/proof verification core (spec/bap-v1.md § Claims, § Public
 // verification contract). Correctly signed closed JSON objects may use ANY
-// member order — verification uses the exact received segments
+// member order: verification uses the exact received segments
 // (REQ1-SIGNING-any-order); canonical byte-equality applies only to the
-// anchor/transition compacts (ADR 0017 clause 4).
+// anchor/transition compacts (canonical segments and fixed signature widths (spec/bap-v1.md §§15-17)).
 
 // decodeGrantHeader validates the exact grant protected header
 // {alg:"EdDSA", kid, typ:"ba+cap"} and returns the kid.
@@ -63,7 +63,7 @@ func decodeGrantHeader(p compactParts, b Bounds) (string, error) {
 
 // decodeProofHeader validates the exact proof protected header
 // {alg:"EdDSA", jwk:public-OKP-JWK, typ:"dpop+jwt"} and returns the raw
-// holder public key. Every additional JWK member — private `d` included — is
+// holder public key. Every additional JWK member (private `d` included) is
 // invalid (REQ1-HEADER-no-private-jwk).
 func decodeProofHeader(p compactParts, b Bounds) ([]byte, error) {
 	return decodeProofHeaderFor(p, b, proofProfileStandard)
@@ -293,7 +293,7 @@ func decodeProofPayloadFor(p compactParts, b Bounds, profile proofProfile) (proo
 	if !ok || len(obj) < 9 || len(obj) > 10 {
 		return out, ErrInvalid
 	}
-	// presence tracking: every claim except nonce is REQUIRED — a member
+	// presence tracking: every claim except nonce is REQUIRED: a member
 	// count within 9..10 alone cannot prove completeness (cross-vendor F1)
 	present := map[string]bool{}
 	for _, m := range obj {
@@ -552,7 +552,7 @@ func UntrustedKeyLocator(compact string, bounds *Bounds) (loc KeyLocator, err er
 }
 
 // verifyGrantCore is the shared pure raw-grant verification primitive
-// (check_envelope re-verifies the raw grant through it; ADR 0003 D6).
+// (check_envelope re-verifies the raw grant through it; spec/bap-v1.md §16, REQ1-VERIFY-envelope-binding).
 func verifyGrantCore(compact string, issuer TrustedIssuer, exp ExpectedGrant, b Bounds) (grantClaimsData, GrantFacts, error) {
 	if !validKid(issuer.KeyID, b.KidBytes) || len(issuer.PublicKey) != b.PublicKeyBytes {
 		return grantClaimsData{}, GrantFacts{}, ErrInvalid

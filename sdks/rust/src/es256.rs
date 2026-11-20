@@ -1,8 +1,8 @@
-//! ES256 verify wrapper — the `BAP3-ES256-SHA256` signature backend.
+//! ES256 verify wrapper: the `BAP3-ES256-SHA256` signature backend.
 //!
 //! Thin wrapper over `p256` 0.14 with `default-features = false` +
 //! `features = ["ecdsa"]` (verify-only; no `pem`/`pkcs8`/`std`/`serde`/`jwk`).
-//! Same accepted posture as `ed25519.rs` (design-note D-RISK-2): the backend
+//! As with the Ed25519 backend, the ES256 backend
 //! carries transitive `unsafe` internally; the crate-level
 //! `#![forbid(unsafe_code)]` covers OUR code only.
 //!
@@ -24,15 +24,15 @@
 //! off-curve and out-of-range behavior is backend-specific and never
 //! load-bearing). This module therefore runs, in order:
 //!
-//! 1. [`validate_point`] — the 65-byte form MUST be `0x04 || x || y` with
+//! 1. [`validate_point`]: the 65-byte form MUST be `0x04 || x || y` with
 //!    both coordinates `< p` (the field prime) and on the curve
 //!    `y^2 = x^3 - 3x + b`. The check is computed through the p256 arithmetic
 //!    layer (`AffinePoint::from_sec1_point`, which parses each coordinate
-//!    via `FieldElement::from_repr` — rejecting `>= p` — and evaluates the
+//!    via `FieldElement::from_repr` (rejecting `>= p`) and evaluates the
 //!    curve equation), which is deterministic pure arithmetic over the curve
 //!    equation, NOT the signature-verification path. A compressed point, an
 //!    off-curve point, and a coordinate at or above `p` all fail here.
-//! 2. [`validate_rs_range`] — pure big-endian integer comparisons against the
+//! 2. [`validate_rs_range`]: pure big-endian integer comparisons against the
 //!    group order `n` and its half: reject `r = 0`, `s = 0`, `r >= n`,
 //!    `s >= n`, and `s > n/2` (low-S required, `REQ3-SIGNING-low-s`).
 //!    Low-S is the load-bearing half: for any valid ECDSA signature
@@ -101,7 +101,7 @@ pub(crate) const PUBLIC_KEY_WIDTH: usize = 65;
 /// behavior is never load-bearing for these classes.
 pub(crate) fn validate_point(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Result<()> {
     if public_key[0] != UNCOMPRESSED_PREFIX {
-        return Err(Invalid); // compressed or hybrid form — closed out
+        return Err(Invalid); // compressed or hybrid form: closed out
     }
     // AffinePoint::from_sec1_point parses each coordinate through
     // FieldElement::from_repr (rejecting any value >= p) and evaluates the
@@ -120,9 +120,9 @@ pub(crate) fn validate_point(public_key: &[u8; PUBLIC_KEY_WIDTH]) -> Result<()> 
 /// Validates the raw `r || s` integer range in pure profile arithmetic,
 /// BEFORE any backend call (`REQ3-SIGNING-range`):
 ///
-/// - `r = 0` or `s = 0` — a zero half is not a signature value;
-/// - `r >= n` or `s >= n` — out of the scalar field (non-canonical encoding);
-/// - `s > n/2` — the HIGH-S half; low-S is required (`REQ3-SIGNING-low-s`),
+/// - `r = 0` or `s = 0`: a zero half is not a signature value;
+/// - `r >= n` or `s >= n`: out of the scalar field (non-canonical encoding);
+/// - `s > n/2`: the HIGH-S half; low-S is required (`REQ3-SIGNING-low-s`),
 ///   which makes each signature non-malleable: the counterpart
 ///   `(r, n - s)` of a valid signature also satisfies the verification
 ///   equation, so only this check admits one of the two spellings.
@@ -153,18 +153,18 @@ pub(crate) fn validate_rs_range(signature: &[u8; 64]) -> Result<()> {
 /// verifies, or `Err(Invalid)` for any profile rejection (point/range/low-S)
 /// or backend rejection/exception (`REQ3-SIGNING-backend-reject`): a key
 /// that is not a curve point, a signature that does not verify, or any
-/// internal backend error — the diagnostic detail is discarded.
+/// internal backend error: the diagnostic detail is discarded.
 pub(crate) fn verify(
     public_key: &[u8; PUBLIC_KEY_WIDTH],
     message: &[u8],
     signature: &[u8; 64],
 ) -> Result<()> {
     // Profile gates first (spec §3.2 ordering): point form/curve, then
-    // signature integer range + low-S — all before any backend call.
+    // signature integer range + low-S: all before any backend call.
     validate_point(public_key)?;
     validate_rs_range(signature)?;
     // Backend: key parse (on-curve inherent), signature parse (canonical
-    // scalars inherent), ECDSA verification — the p256 Verifier digests the
+    // scalars inherent), ECDSA verification: the p256 Verifier digests the
     // message with SHA-256 (NistP256's DigestPrimitive), which IS ES256.
     // Every failure collapses to Invalid.
     use p256::ecdsa::signature::Verifier;
@@ -175,7 +175,7 @@ pub(crate) fn verify(
 }
 
 // ============================================================================
-// Tests — RFC 6979-style PUBLIC vectors + the profile gates' own closures.
+// Tests: RFC 6979-style PUBLIC vectors + the profile gates' own closures.
 // No private material: every key/signature below is a published public test
 // vector or a corpus public artifact.
 // ============================================================================
@@ -187,13 +187,13 @@ mod tests {
 
     /// A public P-256 key and a verifying ES256 signature over a fixed
     /// message, minted once through an independent tool and pinned here as
-    /// hex. (Minted via `openssl` — see the pinned values; verify-only crate,
+    /// hex. (Minted via `openssl`: see the pinned values; verify-only crate,
     /// the private scalar was discarded and never enters the tree.)
     ///
     /// key (65-byte SEC1):
     ///   04 6b17d1f2 e12c4247 f8bce6e5 63a440f2 77037d81 2deb33a0 f4a13945
     ///   d898c296 (x) 4fe342e2 fe1a7f9b 8ee7eb4a 7c0f9e16 2bce3357 6b315ece
-    ///   cbb64068 37bf51f5 (y) — the NIST P-256 base point G (public domain).
+    ///   cbb64068 37bf51f5 (y): the NIST P-256 base point G (public domain).
     fn base_point() -> [u8; 65] {
         let mut k = [0u8; 65];
         k[0] = 0x04;
@@ -275,11 +275,11 @@ mod tests {
     #[test]
     fn validate_point_rejects_compressed_and_hybrid_prefixes() {
         let mut k = base_point();
-        k[0] = 0x02; // compressed — invalid in the raw form
+        k[0] = 0x02; // compressed: invalid in the raw form
         assert_eq!(validate_point(&k), Err(Invalid));
         k[0] = 0x03;
         assert_eq!(validate_point(&k), Err(Invalid));
-        k[0] = 0x06; // hybrid — invalid
+        k[0] = 0x06; // hybrid: invalid
         assert_eq!(validate_point(&k), Err(Invalid));
         k[0] = 0x07;
         assert_eq!(validate_point(&k), Err(Invalid));
@@ -296,7 +296,7 @@ mod tests {
     #[test]
     fn validate_point_rejects_coordinate_at_or_above_field_prime() {
         // p = 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff
-        // (SEC 2). Set x = p (>= p) — the byte pattern is a valid-looking
+        // (SEC 2). Set x = p (>= p): the byte pattern is a valid-looking
         // coordinate but out of the field.
         let mut k = base_point();
         k[1..33].copy_from_slice(&hex(
@@ -327,7 +327,7 @@ mod tests {
         let mut z = sig;
         z[32..].copy_from_slice(&N);
         assert_eq!(validate_rs_range(&z), Err(Invalid));
-        // s > n/2 (high-S): HALF_N | 1 is high iff it exceeds HALF_N — use
+        // s > n/2 (high-S): HALF_N | 1 is high iff it exceeds HALF_N: use
         // HALF_N + 2 to stay unambiguous.
         let mut z = sig;
         z[32..].copy_from_slice(&HALF_N);
@@ -339,15 +339,15 @@ mod tests {
     fn backend_rejects_a_nonverifying_signature() {
         // A range-valid but cryptographically wrong signature must fail at
         // the backend step (the corpus tamper cases drive this end-to-end
-        // through the façade; this pins the module in isolation).
-        let sig = [0x11u8; 64]; // r,s = 0x11..11 — canonical, low
+        // through the facade; this pins the module in isolation).
+        let sig = [0x11u8; 64]; // r,s = 0x11..11: canonical, low
         assert_eq!(verify(&base_point(), b"message", &sig), Err(Invalid));
     }
 
     #[test]
     fn encoded_point_round_trip_of_the_base_point() {
         // The arithmetic layer we lean on parses and re-emits the exact
-        // 65-byte form — guards against a subtle form-conversion drift.
+        // 65-byte form: guards against a subtle form-conversion drift.
         let encoded = Sec1Point::from_bytes(base_point().as_slice()).unwrap();
         let affine = AffinePoint::from_sec1_point(&encoded);
         assert!(bool::from(affine.is_some()));
@@ -356,12 +356,12 @@ mod tests {
     }
 
     // ==========================================================================
-    // Backend subsumption pin — what Signature::from_slice rejects on its own.
+    // Backend subsumption pin: what Signature::from_slice rejects on its own.
     // The permissiveness battery's r/s-range leg cites this: the zero and
     // r/s >= n rejects are enforced by BOTH the profile gate and the backend
     // (defense in depth), while the high-S reject is the profile gate ALONE
     // (the malleable counterpart (r, n-s) is a canonical scalar the backend
-    // accepts — low-S is why REQ3-SIGNING-low-s exists).
+    // accepts: low-S is why REQ3-SIGNING-low-s exists).
     // ==========================================================================
 
     #[test]
@@ -403,7 +403,7 @@ mod tests {
             "s = n (non-canonical) subsumed by backend"
         );
         // s in the HIGH half (HALF_N + 2 < n): a canonical scalar the backend
-        // ACCEPTS — the profile's low-S gate is the only rejection.
+        // ACCEPTS: the profile's low-S gate is the only rejection.
         let mut z = sig;
         z[32..].copy_from_slice(&HALF_N);
         z[63] = z[63].wrapping_add(2);

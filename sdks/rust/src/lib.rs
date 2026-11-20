@@ -37,38 +37,38 @@ pub mod v2;
 pub mod v3;
 
 // `compact`, `digest`, `ed25519`, `es256`, and `selector` are internal mechanics behind
-// the façades (spec/bap-v1.md §lines 329–330 names only `jcs`/`jwk`/`uri`/
+// the facades (spec/bap-v1.md §lines 329–330 names only `jcs`/`jwk`/`uri`/
 // `base64url`/`bounds`/`json` as public primitives, and notes that request-
 // digest, selector, and compact-JWS composition mechanics "remain internal
-// implementation behind the supported façade; their modules are not additional
-// stable façade contracts"). The MODULES are `pub(crate)` so the façades can
+// implementation behind the supported facade; their modules are not additional
+// stable facade contracts"). The MODULES are `pub(crate)` so the facades can
 // call them; they are intentionally NOT re-exported as module contracts and do
 // not widen the 0.1.0 public module surface. `assemble_compact` is `pub fn` so
-// the Task 10 façade can `pub use` re-export it, but the module itself stays
-// internal. All five are wired by the v1/v2/v3 façade call chains.
+// the Task 10 facade can `pub use` re-export it, but the module itself stays
+// internal. All five are wired by the v1/v2/v3 facade call chains.
 //
 // One distinction the line-329 note draws: request-digest, selector, and
-// compact-JWS MODULES are not additional stable façade contracts, BUT
+// compact-JWS MODULES are not additional stable facade contracts, BUT
 // `request_digest/3` IS named in the 17-function public verification contract
 // (spec/bap-v1.md line 304). So the `digest` MODULE stays `pub(crate)` while
 // its `request_digest` FUNCTION is re-exported at the crate root as a public
-// façade entry point (the conformance runner — Task 14 — dispatches the 9-case
+// facade entry point (the conformance runner (Task 14) dispatches the 9-case
 // `request_digest` corpus through this public re-export). `selector` and
-// `compact` have no equivalently-named façade function and stay fully internal.
+// `compact` have no equivalently-named facade function and stay fully internal.
 pub(crate) mod compact;
 pub(crate) mod digest;
 pub(crate) mod ed25519;
 pub(crate) mod es256;
 pub(crate) mod selector;
 
-// Façade A/B/C/D re-exports (Tasks 10–13): the public v1 entry points reachable
-// at the crate root. `assemble_compact` is re-exported from the `v1` façade
+// Facade A/B/C/D re-exports (Tasks 10–13): the public v1 entry points reachable
+// at the crate root. `assemble_compact` is re-exported from the `v1` facade
 // (compose + per-kind content validation); the pure composer lives internal to
 // `compact`. `request_digest` is re-exported from the internal `digest` MODULE
-// (the function is public — spec/bap-v1.md line 304 — even though the module is
-// not a stable façade contract — line 329).
+// (the function is public (spec/bap-v1.md line 304) even though the module is
+// not a stable facade contract: line 329).
 //
-// The v2 and v3 façades keep their entry points on the `v2`/`v3` modules
+// The v2 and v3 facades keep their entry points on the `v2`/`v3` modules
 // (`v2::verify_grant`, `v3::verify_grant`, etc.): the majors expose
 // same-named functions with byte-distinct contracts, so a root-level
 // re-export set would collide; the module path IS the major namespace.

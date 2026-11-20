@@ -4,10 +4,10 @@
 //! subject key to a role (`"issuer"` or `"holder"`) for a bounded window. The
 //! profile single-sources the contract-major 1 primitives (Ed25519/EdDSA under
 //! `BAP1-Ed25519-SHA256`, the bounded JSON/JCS/base64url/JWK machinery) and is
-//! parsed by no contract-major profile: this façade rejects every
-//! contract-major `typ` and every contract-major façade rejects
+//! parsed by no contract-major profile: this facade rejects every
+//! contract-major `typ` and every contract-major facade rejects
 //! `ba+role-attestation` (`REQ-RA1-CORE-cross-profile-reject`). The artifact
-//! is standalone and grant-unbound — it binds no grant, names no issuer
+//! is standalone and grant-unbound: it binds no grant, names no issuer
 //! identity, audience, or scope, and carries no authorization
 //! (`REQ-RA1-CORE-profile-identity`).
 //!
@@ -16,7 +16,7 @@
 //! [`assemble_attestation_compact`] (compact assembly from a signing input +
 //! external signature), [`decode_attestation`] (decode), and
 //! [`verify_attestation`] (the citation symbol). The package owns no signer
-//! and accepts no private key or signing callback — only external signature
+//! and accepts no private key or signing callback: only external signature
 //! bytes (`REQ-RA1-API-no-signer`). Every failure collapses to exactly
 //! [`Invalid`] (`REQ-RA1-API-return-shape`); profile selection
 //! is trusted caller code and is never inferred from bytes, context, or a
@@ -24,7 +24,7 @@
 //!
 //! This is a **silent-auth-class surface**: a header/claim closed-set leak, an
 //! ES256-signed confusion, or a single wrong signing-input byte is a wrong
-//! verdict. **Verification is not authority** — a verified attestation is
+//! verdict. **Verification is not authority**: a verified attestation is
 //! evidence of a binding, never an authorization decision
 //! (`REQ-RA1-SECURITY-not-authority`).
 //!
@@ -32,14 +32,15 @@
 //!
 //! Derived first-hand from `spec/bap-role-attestation-v1.md` (§2 Protected
 //! header and payload claims, §3 Verification contract, §4 Public verification
-//! contract), ADR 0036, and the certified corpus under
+//! contract), spec/bap-role-attestation-v1.md, and the certified corpus under
 //! `priv/conformance/attestation-profiles/role-attestation/v1/` (the corpus is
 //! the falsifier; the payload member order below is derived by
 //! base64url-decoding the corpus `payload_segment` first-hand).
 //! Derived from the spec and certified corpus, not from any sibling-SDK or
-//! reference source (ADR 0014 D5). The shared BAP1 validation
-//! helpers mirror the v1 façade's own private set (each façade carries its
-//! copy — the v2/v3 precedent).
+//! reference source (docs/design/conformance-contract.md, Independent implementation rule). The
+//! shared BAP1 validation
+//! helpers mirror the v1 facade's own private set (each facade carries its
+//! copy: the v2/v3 precedent).
 
 use crate::base64url::{base64url_decode, base64url_encode};
 use crate::bounds::Bounds;
@@ -55,7 +56,7 @@ use crate::types::{
 };
 
 // ============================================================================
-// Constants — closed header/claim member values (bap-role-attestation/1 §2)
+// Constants: closed header/claim member values (bap-role-attestation/1 §2)
 // ============================================================================
 
 const ALG_EDDSA: &str = "EdDSA";
@@ -63,7 +64,7 @@ const TYP_ROLE_ATTESTATION: &str = "ba+role-attestation";
 const ED25519_SIGNATURE_SEGMENT_BYTES: usize = 86;
 
 // ============================================================================
-// attestation_signing_input — signing-input production (§4 surface 1)
+// attestation_signing_input: signing-input production (§4 surface 1)
 // ============================================================================
 
 /// Produce the deterministic role-attestation signing input from structured
@@ -136,7 +137,7 @@ pub fn attestation_signing_input(
 }
 
 // ============================================================================
-// assemble_attestation_compact — compact assembly (§4 surface 2)
+// assemble_attestation_compact: compact assembly (§4 surface 2)
 // ============================================================================
 
 /// Assemble the 3-segment compact serialization from a signing input + raw
@@ -147,12 +148,12 @@ pub fn attestation_signing_input(
 /// their projected compact length passes the caller's ceilings, then applies
 /// the per-kind content revalidation `REQ-RA1-API-assembly-revalidate`
 /// mandates. The composed bytes are parsed through the same bounded decoder
-/// [`decode_attestation`] uses — closed
+/// [`decode_attestation`] uses: closed
 /// header/payload sets, member rules, JCS canonical byte equality on both
 /// segments (`REQ-RA1-CLAIM-canonical`), segment bounds, and the 64-byte
 /// signature width. A caller-supplied segment set that composes to anything
 /// this profile does not parse (wrong kind, non-canonical member order,
-/// duplicate members, wrong `public_key` width) is rejected — there is no
+/// duplicate members, wrong `public_key` width) is rejected: there is no
 /// permissive compatibility path.
 pub fn assemble_attestation_compact(
     input: &SigningInput,
@@ -170,7 +171,7 @@ pub fn assemble_attestation_compact(
         return Err(Invalid);
     }
     // Erratum 3 (REQ1/REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer
-    // surface — it frames a signature and verifies none — so it refuses a signature that
+    // surface (it frames a signature and verifies none) so it refuses a signature that
     // fails the keyless part of rule S1 and emits accepted bytes unchanged.
     if !ed25519::signature_gate(signature) {
         return Err(Invalid);
@@ -191,7 +192,7 @@ pub fn assemble_attestation_compact(
 }
 
 // ============================================================================
-// decode_attestation — attestation decoding (§4 surface 3)
+// decode_attestation: attestation decoding (§4 surface 3)
 // ============================================================================
 
 /// Parse, bound, and structurally validate a role-attestation compact without
@@ -227,7 +228,7 @@ pub fn decode_attestation(compact: &[u8], bounds: &Bounds) -> Result<Attestation
 /// Verify a role-attestation compact against caller-supplied trusted inputs
 /// and expected context (`REQ-RA1-VERIFY-caller-supplied`).
 ///
-/// Proves, in order (`REQ-RA1-VERIFY-fail-closed` — any failure returns
+/// Proves, in order (`REQ-RA1-VERIFY-fail-closed`: any failure returns
 /// exactly `Err(Invalid)`, value-free):
 ///
 /// 1. the closed header/payload sets and canonical bytes of §2
@@ -235,7 +236,7 @@ pub fn decode_attestation(compact: &[u8], bounds: &Bounds) -> Result<Attestation
 /// 2. the header `kid` equals the attestor key id, and the Ed25519 signature
 ///    verifies under the attestor public key over the exact two-segment
 ///    signing input (`REQ-RA1-VERIFY-attestor-signature`);
-/// 3. the payload subject binding equals the expected subject binding —
+/// 3. the payload subject binding equals the expected subject binding,
 ///    `key_id` equality and raw `public_key` byte-equality
 ///    (`REQ-RA1-VERIFY-subject-binding`);
 /// 4. the attestor and the subject are distinct: the RFC 7638 thumbprints
@@ -247,7 +248,7 @@ pub fn decode_attestation(compact: &[u8], bounds: &Bounds) -> Result<Attestation
 /// 6. the caller-supplied `now` lies in the half-open `[nbf, exp)`
 ///    (`REQ-RA1-VERIFY-now-window`).
 ///
-/// Returns [`AttestationFacts`] — closed, value-bearing, redacted,
+/// Returns [`AttestationFacts`]: closed, value-bearing, redacted,
 /// non-authorizing: the thumbprints are RFC 7638 digests over the
 /// `{"crv":"Ed25519","kty":"OKP","x":…}` preimage, never hashes of raw key
 /// bytes (`REQ-RA1-CLAIM-canonical`), and the facts carry no raw key
@@ -261,7 +262,7 @@ pub fn verify_attestation(
 ) -> Result<AttestationFacts> {
     let bounds = expected.bounds;
     // Attestor-window endpoints are magnitude-bounded under the resolved
-    // bounds, and a bounded window must be nonempty — the same
+    // bounds, and a bounded window must be nonempty: the same
     // HistoricalPublicKey gates `verify_historical_anchor` applies (the
     // attestor context reuses that key shape; window containment alone would
     // accept out-of-magnitude or empty caller windows).
@@ -310,7 +311,7 @@ pub fn verify_attestation(
     }
 
     // REQ-RA1-VERIFY-window-containment: nbf >= valid_from and (unbounded OR
-    // exp <= valid_before — equality is containment).
+    // exp <= valid_before: equality is containment).
     if a.payload.not_before < expected.attestor.valid_from {
         return Err(Invalid);
     }
@@ -340,7 +341,7 @@ pub fn verify_attestation(
 }
 
 // ============================================================================
-// Internal — shared decode (the assembly/decode/verify symmetry point)
+// Internal: shared decode (the assembly/decode/verify symmetry point)
 // ============================================================================
 
 /// The fully-decoded role-attestation compact: the two raw segments (borrowed
@@ -366,7 +367,7 @@ struct AttestationPayload {
 
 /// Splits, bounds, decodes, and structurally validates a role-attestation
 /// compact. Shared by [`decode_attestation`], [`verify_attestation`], and the
-/// assembly revalidation — the `REQ-RA1-API-symmetry` single seam. The
+/// assembly revalidation: the `REQ-RA1-API-symmetry` single seam. The
 /// decoded signature segment MUST be exactly 64 bytes; both JSON segments
 /// MUST equal their JCS re-encoding.
 fn decode_attestation_parts<'a>(
@@ -379,7 +380,7 @@ fn decode_attestation_parts<'a>(
     let header_bytes = decode_segment(protected_seg, bounds)?;
     let payload_bytes = decode_segment(payload_seg, bounds)?;
     // Fixed widths: the decoded signature is exactly 64 bytes
-    // (REQ1-BOUNDS-fixed-widths — a wrong-width signature segment is
+    // (REQ1-BOUNDS-fixed-widths: a wrong-width signature segment is
     // structurally invalid, not merely unverifiable).
     let sig_raw = decode_segment(signature_seg, bounds)?;
     if sig_raw.len() != 64 {
@@ -496,7 +497,7 @@ fn validate_attestation_payload(
     let role = take_role(role)?;
     let not_before = take_integral_date(nbf)?;
     let expires_at = take_integral_date(exp)?;
-    // REQ-RA1-CLAIM-window: nbf < exp (the acceptance window is [nbf, exp) —
+    // REQ-RA1-CLAIM-window: nbf < exp (the acceptance window is [nbf, exp),
     // nonempty).
     if not_before >= expires_at {
         return Err(Invalid);
@@ -515,8 +516,8 @@ fn validate_attestation_payload(
 }
 
 // ============================================================================
-// Internal helpers — claim-type extraction + the shared BAP1 scalar rules
-// (the same private-helper-per-façade set the v2/v3 façades carry)
+// Internal helpers: claim-type extraction + the shared BAP1 scalar rules
+// (the same private-helper-per-facade set the v2/v3 facades carry)
 // ============================================================================
 
 /// Decodes one canonical base64url segment under the caller's bounds
@@ -554,7 +555,7 @@ fn projected_base64url_decoded_len(encoded_len: usize) -> Result<usize> {
 }
 
 /// Assembles the RFC 7515 two-segment signing input
-/// (`protected_segment || "." || payload_segment`) — the exact bytes the
+/// (`protected_segment || "." || payload_segment`): the exact bytes the
 /// Ed25519 signature covers (`REQ1-SIGNING-exact-input`).
 fn signing_input_bytes(protected_seg: &[u8], payload_seg: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(protected_seg.len() + 1 + payload_seg.len());
@@ -666,7 +667,7 @@ fn b64url_to_string(bytes: &[u8]) -> Result<String> {
     String::from_utf8(bytes.to_vec()).map_err(|_| Invalid)
 }
 
-/// Extracts a non-empty StringOrURI (≤ `identifier_bytes`) — the grant-`jti`
+/// Extracts a non-empty StringOrURI (≤ `identifier_bytes`): the grant-`jti`
 /// rule set `REQ-RA1-CLAIM-jti` pins. `None` (claim absent) → `Invalid`.
 fn take_string_or_uri(value: Option<&JsonValue>, bounds: &Bounds) -> Result<String> {
     let s = match value {
@@ -719,7 +720,7 @@ fn take_role(value: Option<&JsonValue>) -> Result<Role> {
     }
 }
 
-/// Extracts an integral NumericDate (`JsonValue::Int` only — a float lexeme
+/// Extracts an integral NumericDate (`JsonValue::Int` only: a float lexeme
 /// such as `1735689600.0` decodes to `Float` and is rejected,
 /// `REQ-RA1-CLAIM-closed-required`). `None` → `Invalid`.
 fn take_integral_date(value: Option<&JsonValue>) -> Result<i64> {
@@ -748,8 +749,8 @@ fn is_kid_byte(b: u8) -> bool {
     b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~')
 }
 
-/// Validates a StringOrURI / identifier scalar — the BAP1 rule set: a
-/// colon-free value is a PLAIN string (any valid UTF-8 — a Rust `&str`
+/// Validates a StringOrURI / identifier scalar: the BAP1 rule set: a
+/// colon-free value is a PLAIN string (any valid UTF-8: a Rust `&str`
 /// guarantees it); a colon-bearing value is a URI whose scheme is valid, every
 /// byte is alnum / URI-punctuation / a well-formed `%HH` escape, and (for a
 /// `://` authority) the port is all-digit.
@@ -758,7 +759,7 @@ pub(crate) fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
         return Err(Invalid);
     }
     match s.find(':') {
-        None => Ok(()), // plain string — any valid UTF-8
+        None => Ok(()), // plain string: any valid UTF-8
         Some(colon) => {
             validate_scheme(&s[..colon])?;
             validate_uri_bytes(s.as_bytes())?;

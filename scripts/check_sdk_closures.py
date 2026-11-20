@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ADR 0014 D7: each D6 closure must independently turn its own test red.
+"""per-defect mutation proofs (docs/design/conformance-contract.md): each D6 closure must independently turn its own test red.
 
 Python requires a named JUnit AssertionError; Rust requires a named assert!/assert_eq!
 assertion panic. Go requires the named --- FAIL without a panic. Other exceptions,

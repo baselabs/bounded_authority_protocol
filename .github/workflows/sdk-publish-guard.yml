@@ -1,7 +1,7 @@
 name: SDK publish guard
 
-# Non-bypassable backstop for ADR 0015 Decision 5: no SDK publishes from the
-# monorepo. The local hook (scripts/hooks/pre-commit) gives fast contributor
+# Enforce the separate-repository publication boundary in sdks/README.md. No SDK
+# publishes from this monorepo. The local hook (scripts/hooks/pre-commit) gives fast contributor
 # feedback; this workflow, which CI calls on every run, is the hard gate. Both use
 # the SAME pattern source (scripts/check_sdk_publish_infra.sh), so the two
 # cannot drift apart. That script is the authority on which strings are blocked;
@@ -72,6 +72,6 @@ jobs:
               )
               failed = failed or result.returncode != 0
           if failed:
-              sys.exit("SDK publish infrastructure is forbidden in the monorepo (ADR 0015).")
+              sys.exit("SDK publish infrastructure is forbidden in the monorepo (sdks/README.md publication boundary).")
           print("No SDK publish infrastructure found.")
           PYTHON

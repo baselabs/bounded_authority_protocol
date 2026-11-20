@@ -1,5 +1,5 @@
 """Pytest wrapper for the producer-canonicality conformance runner (erratum 3): every case in the
-additive bap-producer-canonicality/1 corpus agrees — a refused signature is the closed error, an
+additive bap-producer-canonicality/1 corpus agrees: a refused signature is the closed error, an
 accepted signature's bytes are emitted unchanged."""
 
 from __future__ import annotations

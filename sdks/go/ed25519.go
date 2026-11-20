@@ -135,7 +135,7 @@ func signatureGate(signature []byte) bool {
 
 // verifyEd25519 verifies over the exact received signing input under rule S1. Width gates are the
 // immutable suite constants; a backend rejection or exception is exactly ErrInvalid
-// (REQ1-SIGNING-backend-reject). Public keys are caller-supplied trusted inputs — never discovered
+// (REQ1-SIGNING-backend-reject). Public keys are caller-supplied trusted inputs: never discovered
 // here.
 func verifyEd25519(publicKey []byte, message, signature []byte) error {
 	if !strictGate(signature, publicKey) {

@@ -1,6 +1,6 @@
 import Config
 
-# Self-enforcing toolchain floor (ADR 0031). Evaluated at config-load time, before
+# Self-enforcing toolchain floor (cross-platform toolchain contract). Evaluated at config-load time, before
 # compilation, for every Mix invocation in this repository. NOT shipped in the Hex
 # package (`files:` in mix.exs carries no `config/`), so consumers of the published
 # package never inherit this assert; each consuming repository enforces its own

@@ -1,23 +1,23 @@
-//! Selector evaluation — the request-binding algebra (silent auth class).
+//! Selector evaluation: the request-binding algebra (silent auth class).
 //!
 //! Selectors are the closed-set predicates a grant's operation uses to bind a
 //! specific request's server-derived tagged arguments (`spec/bap-v1.md`
 //! § Selector algebra, lines 204–224). A selector bug that accepts a forged
 //! token, or a tag-collapse that matches the wrong value, yields WRONG
-//! AUTHORIZATION silently — this is the silent-auth-class module.
+//! AUTHORIZATION silently: this is the silent-auth-class module.
 //!
 //! Three kinds form a closed set (`REQ1-SELECTOR-closed-set`):
 //!
 //! | kind | recognized members and interpretation |
 //! |---|---|
 //! | `all` | `{kind}`, `{kind,path,value}`, or `{kind,path,values}`; inert members ignored |
-//! | `equals` | `{kind: "equals", path, value}` — path must exist |
-//! | `one_of` | `{kind: "one_of", path, values}` — path must exist |
+//! | `equals` | `{kind: "equals", path, value}`: path must exist |
+//! | `one_of` | `{kind: "one_of", path, values}`: path must exist |
 //!
 //! `equals` / `one_of` traverse `cast_arguments` along `path` (objects only;
-//! 1–32 member names, each 1–128 UTF-8 bytes — `REQ1-SELECTOR-path-shape`) and
+//! 1–32 member names, each 1–128 UTF-8 bytes: `REQ1-SELECTOR-path-shape`) and
 //! the path MUST resolve (`REQ1-SELECTOR-path-required`): a missing member or a
-//! non-object mid-path is `Err(Invalid)` (fail-closed — never a silent
+//! non-object mid-path is `Err(Invalid)` (fail-closed: never a silent
 //! `Ok(false)`). Match is by **semantic identity**
 //! (`REQ1-SELECTOR-semantic-identity`), which preserves tagged scalar
 //! distinctions (`REQ1-SELECTOR-no-tag-collapse`: `Int(1)` is NOT
@@ -26,10 +26,11 @@
 //! authorization (`REQ1-SELECTOR-not-authorization`).
 //!
 //! Derived from the spec and certified corpus, not from any sibling-SDK or
-//! reference source (ADR 0014 D5). See spec/bap-v1.md §12.
+//! reference source (docs/design/conformance-contract.md, Independent implementation rule). See
+//! spec/bap-v1.md §12.
 
 // `evaluate` / `semantic_identity` are `pub(crate)` and are wired by the v1
-// façade: `evaluate` is called by `check_envelope` (Task 12) for every selector
+// facade: `evaluate` is called by `check_envelope` (Task 12) for every selector
 // in the matched grant operation, and `semantic_identity` is reachable through
 // that call chain. The crate-level `#![forbid(unsafe_code)]` is unaffected.
 
@@ -81,7 +82,7 @@ pub(crate) fn validate(selector: &JsonValue, bounds: &Bounds) -> Result<()> {
 /// arguments.
 ///
 /// Returns `Ok(true)` when the selector matches, `Ok(false)` when it is
-/// well-formed but does not match (only `equals` / `one_of` can return this —
+/// well-formed but does not match (only `equals` / `one_of` can return this,
 /// and only when the path resolves but the value differs), or `Err(Invalid)`
 /// for any malformed selector, unknown kind, wrong member set, malformed /
 /// over-limit path, missing path (`REQ1-SELECTOR-path-required`), or over-limit
@@ -110,7 +111,7 @@ pub(crate) fn evaluate(
         }
         "equals" => eval_equals(members, cast_arguments, bounds),
         "one_of" => eval_one_of(members, cast_arguments, bounds),
-        _ => Err(Invalid), // unknown kind — closed set
+        _ => Err(Invalid), // unknown kind: closed set
     }
 }
 
@@ -125,7 +126,7 @@ fn recognized_member_set(members: &[(String, JsonValue)]) -> bool {
 }
 
 // ============================================================================
-// Erratum 6 — float-tagged zero and integral floats in selector values
+// Erratum 6: float-tagged zero and integral floats in selector values
 // (REQ{1,2,3}-SELECTOR-float-zero, REQ{1,2,3}-SIGNING-integral-float-selector).
 // RFC 8785 writes a float zero as `0`, which decodes integer-tagged, so no
 // conforming producer emits one; verifiers accept non-JCS payload bytes, and
@@ -179,17 +180,17 @@ pub(crate) fn require_signable_values(selector: &JsonValue) -> Result<()> {
 }
 
 // ============================================================================
-// v2 selector algebra — the closed set extended by the two inclusive range
-// kinds `lte`/`gte` (ADR 0028). The v1 closed set is untouched: `validate` /
+// v2 selector algebra: the closed set extended by the two inclusive range
+// kinds `lte`/`gte` (spec/bap-v2.md §4). The v1 closed set is untouched: `validate` /
 // `evaluate` above keep rejecting `lte`/`gte` (an lte-bearing grant is invalid
-// under v1 — the verdict flip a contract-major alone may carry).
+// under v1: the verdict flip a contract-major alone may carry).
 // ============================================================================
 
 /// Validate the complete v2 selector shape independently of request matching.
 ///
 /// Extends the v1 closed kind set `{all, equals, one_of}` with `lte`/`gte` on
-/// the SAME `{kind, path, value}` recognized member set (ADR 0028 §3 — no
-/// fourth member set): the `value` bound MUST be numeric (`Int` or `Float` —
+/// the SAME `{kind, path, value}` recognized member set (the existing {kind, path, value} member set (spec/bap-v2.md §4): no
+/// fourth member set): the `value` bound MUST be numeric (`Int` or `Float`,
 /// a string/boolean/null/array/object bound is rejected at decode, the
 /// `grant-decode-v2-invalid-selector-non-numeric-bound` class). Everything
 /// else (member-set recognition, path shape, one_of bounds) is the v1
@@ -229,7 +230,8 @@ pub(crate) fn validate_v2(selector: &JsonValue, bounds: &Bounds) -> Result<()> {
         "lte" | "gte" => {
             extract_path(members, "path", bounds)?;
             let bound = member_value(members, "value")?;
-            // ADR 0028 §2: the bound MUST be a numeric tag. Non-numeric bounds
+            // same-tag numeric operands (spec/bap-v2.md §4): the bound MUST be a
+            // numeric tag. Non-numeric bounds
             // are rejected at decode, not silently never-matching.
             if !matches!(bound, JsonValue::Int(_) | JsonValue::Float(_)) {
                 return Err(Invalid);
@@ -244,16 +246,18 @@ pub(crate) fn validate_v2(selector: &JsonValue, bounds: &Bounds) -> Result<()> {
 }
 
 /// Conjunctively evaluate one v2 selector against the server-derived tagged
-/// arguments — the v2 façade's envelope binding (ADR 0028 §5: selector
+/// arguments: the v2 facade's envelope binding (selectors are evaluated only for envelope
+/// binding (spec/bap-v2.md §4): selector
 /// enforcement runs only inside `check_envelope`).
 ///
-/// `lte`/`gte` semantics (ADR 0028 §1–2): traverse `path` (a missing member or
-/// non-object mid-path is `Err(Invalid)` — fail-closed exactly as
+/// `lte`/`gte` semantics (inclusive same-tag numeric ranges (spec/bap-v2.md §4)): traverse
+/// `path` (a missing member or
+/// non-object mid-path is `Err(Invalid)`: fail-closed exactly as
 /// `equals`/`one_of`), then compare by numeric value INCLUSIVE (`lte`:
 /// value ≤ bound; `gte`: value ≥ bound) but ONLY when both operands carry the
 /// SAME numeric tag. A cross-tag pair never matches; a non-numeric operand at
 /// the path (string/boolean/null/array/object) never matches. Both no-match
-/// outcomes are `Ok(false)` — the envelope rejects the request, not the
+/// outcomes are `Ok(false)`: the envelope rejects the request, not the
 /// selector shape (the shape was validated at grant decode).
 pub(crate) fn evaluate_v2(
     selector: &JsonValue,
@@ -275,7 +279,7 @@ pub(crate) fn evaluate_v2(
         "one_of" => eval_one_of(members, cast_arguments, bounds),
         "lte" => eval_range(members, cast_arguments, bounds, RangeOrder::Lte),
         "gte" => eval_range(members, cast_arguments, bounds, RangeOrder::Gte),
-        _ => Err(Invalid), // unknown kind — closed set
+        _ => Err(Invalid), // unknown kind: closed set
     }
 }
 
@@ -301,8 +305,9 @@ fn eval_range(
     let path = extract_path(members, "path", bounds)?;
     let bound = member_value(members, "value")?;
     let found = traverse(cast_arguments, &path)?;
-    // Each arm's tag pattern IS the same-tag domain (ADR 0028 §2): an Int
-    // operand never satisfies a Float bound and vice versa — cross-tag falls
+    // Each arm's tag pattern IS the same-tag domain (same-tag numeric operands
+    // (spec/bap-v2.md §4)): an Int
+    // operand never satisfies a Float bound and vice versa: cross-tag falls
     // through to Ok(false) rather than comparing numerically. Removing the
     // tag split (casting both to f64) collapses the distinction and yields
     // wrong authorization.
@@ -369,7 +374,7 @@ fn eval_one_of(
 /// `path` MUST be a non-empty JSON array of 1..=`bounds.path_segments()`
 /// strings, each 1..=`bounds.key_bytes()` UTF-8 bytes, all strings
 /// (`REQ1-SELECTOR-path-shape`: paths traverse objects only and never index
-/// arrays — a non-string element is invalid). Returns the path as owned
+/// arrays: a non-string element is invalid). Returns the path as owned
 /// `String`s (bounded: at most 32 segments of 128 bytes).
 fn extract_path(
     members: &[(String, JsonValue)],
@@ -392,7 +397,7 @@ fn extract_path(
         let s = match elem {
             JsonValue::String(s) => s,
             // A non-string element (number / bool / null / structured) would
-            // index an array — paths traverse objects only.
+            // index an array: paths traverse objects only.
             _ => return Err(Invalid),
         };
         if s.is_empty() {
@@ -410,7 +415,7 @@ fn extract_path(
 ///
 /// Returns the resolved value, or `Err(Invalid)` if any step hits a non-object
 /// (`REQ1-SELECTOR-path-shape`: never indexes arrays) or a member name that is
-/// absent (`REQ1-SELECTOR-path-required`: the path MUST exist — fail-closed,
+/// absent (`REQ1-SELECTOR-path-required`: the path MUST exist: fail-closed,
 /// never a silent `Ok(false)`). The duplicate-rejecting JSON decoder guarantees
 /// each member name is unique within its object, so the linear search resolves
 /// at most one value.
@@ -432,7 +437,7 @@ fn traverse<'a>(root: &'a JsonValue, path: &[String]) -> Result<&'a JsonValue> {
     Ok(current)
 }
 
-/// Semantic identity — two tagged JSON values are identical iff their tags and
+/// Semantic identity: two tagged JSON values are identical iff their tags and
 /// values match, recursively (`REQ1-SELECTOR-semantic-identity`).
 ///
 /// - Scalars match only within the SAME tag: both `Null`; both `Bool` with
@@ -442,7 +447,7 @@ fn traverse<'a>(root: &'a JsonValue, path: &[String]) -> Result<&'a JsonValue> {
 /// - Objects match as UNORDERED key/value sets (duplicate-free by
 ///   construction): same key set and each key's value recursively identical.
 ///
-/// `REQ1-SELECTOR-no-tag-collapse`: mismatched tags are NOT identical — the
+/// `REQ1-SELECTOR-no-tag-collapse`: mismatched tags are NOT identical: the
 /// catch-all `_ => false` arm means `Int(1)` is NOT `Float(1.0)`, `Bool(true)`
 /// is NOT `Int(1)`, and `String("1")` is NOT `Int(1)`. Removing the tag guard
 /// (e.g. casting both numbers to `f64`) collapses this distinction and yields
@@ -453,7 +458,8 @@ fn traverse<'a>(root: &'a JsonValue, path: &[String]) -> Result<&'a JsonValue> {
 /// may not be, and find-first-match equality on a dup-bearing object is unsound.
 fn unique_keys(members: &[(String, JsonValue)]) -> bool {
     // BTreeSet avoids entropy reads while checking duplicate names
-    // (spec/bap-v1.md §7, REQ1-JSON-no-duplicate; ADR 0014 D8).
+    // (spec/bap-v1.md §7, REQ1-JSON-no-duplicate; pure-library and permissive-dependency
+    // gates (docs/design/conformance-contract.md)).
     let mut seen = std::collections::BTreeSet::new();
     members.iter().all(|(k, _)| seen.insert(k.as_str()))
 }
@@ -461,7 +467,7 @@ pub(crate) fn semantic_identity(a: &JsonValue, b: &JsonValue) -> bool {
     match (a, b) {
         (JsonValue::Null, JsonValue::Null) => true,
         (JsonValue::Bool(x), JsonValue::Bool(y)) => x == y,
-        // INT vs INT only — Int(1) is NOT Float(1.0).
+        // INT vs INT only: Int(1) is NOT Float(1.0).
         (JsonValue::Int(x), JsonValue::Int(y)) => x == y,
         // FLOAT vs FLOAT only.
         (JsonValue::Float(x), JsonValue::Float(y)) => x == y,
@@ -521,14 +527,14 @@ mod tests {
     }
 
     /// Decodes a JSON literal through the real tagged decoder (preserves the
-    /// Int/Float tag distinction — closure #5 — so the selector tests exercise
+    /// Int/Float tag distinction (closure #5) so the selector tests exercise
     /// the same algebra the envelope binding uses).
     fn j(bytes: &[u8]) -> JsonValue {
         json_decode(bytes, &max()).expect("test JSON decodes")
     }
 
     // ==========================================================================
-    // REQ1-SELECTOR-no-tag-collapse — the load-bearing silent-auth test
+    // REQ1-SELECTOR-no-tag-collapse: the load-bearing silent-auth test
     // ==========================================================================
 
     #[test]
@@ -572,7 +578,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // REQ1-SELECTOR-path-required — missing path is Invalid, NOT Ok(false)
+    // REQ1-SELECTOR-path-required: missing path is Invalid, NOT Ok(false)
     // ==========================================================================
 
     #[test]
@@ -610,7 +616,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // REQ1-SELECTOR-closed-set — malformed selectors are Invalid
+    // REQ1-SELECTOR-closed-set: malformed selectors are Invalid
     // ==========================================================================
 
     #[test]
@@ -649,14 +655,14 @@ mod tests {
 
     #[test]
     fn equals_missing_path_member_field_is_invalid() {
-        // {kind:"equals", value:1} — the `path` member is absent.
+        // {kind:"equals", value:1}: the `path` member is absent.
         let selector = j(br#"{"kind":"equals","value":1}"#);
         assert_eq!(evaluate(&selector, &j(br#"{"x":1}"#), &max()), Err(Invalid));
     }
 
     #[test]
     fn equals_missing_value_member_field_is_invalid() {
-        // {kind:"equals", path:["x"]} — the `value` member is absent.
+        // {kind:"equals", path:["x"]}: the `value` member is absent.
         let selector = j(br#"{"kind":"equals","path":["x"]}"#);
         assert_eq!(evaluate(&selector, &j(br#"{"x":1}"#), &max()), Err(Invalid));
     }
@@ -703,7 +709,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // REQ1-SELECTOR-path-shape — path bounds + objects-only traversal
+    // REQ1-SELECTOR-path-shape: path bounds + objects-only traversal
     // ==========================================================================
 
     #[test]
@@ -764,7 +770,7 @@ mod tests {
 
     #[test]
     fn path_with_non_string_element_is_invalid() {
-        // path ["x",1] — a numeric element would index an array.
+        // path ["x",1]: a numeric element would index an array.
         let selector = j(br#"{"kind":"equals","path":["x",1],"value":1}"#);
         assert_eq!(
             evaluate(&selector, &j(br#"{"x":{"1":1}}"#), &max()),
@@ -773,7 +779,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // REQ1-SELECTOR-one-of-size — values bound (<= 256, non-empty)
+    // REQ1-SELECTOR-one-of-size: values bound (<= 256, non-empty)
     // ==========================================================================
 
     #[test]
@@ -825,7 +831,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // all — matches any JSON root
+    // all: matches any JSON root
     // ==========================================================================
 
     #[test]
@@ -839,7 +845,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // equals / one_of — match / no-match (path resolves)
+    // equals / one_of: match / no-match (path resolves)
     // ==========================================================================
 
     #[test]
@@ -873,7 +879,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // semantic_identity — set-equality, positionality, tag preservation
+    // semantic_identity: set-equality, positionality, tag preservation
     // ==========================================================================
 
     #[test]
@@ -956,11 +962,12 @@ mod tests {
     }
 
     // ==========================================================================
-    // v2 range kinds — lte/gte (ADR 0028). RED-capable mutations, each naming
+    // v2 range kinds: lte/gte (spec/bap-v2.md §4). RED-capable mutations, each naming
     // the test it reddens:
     //   * `<=` → `<` (or `>=` → `>`) in eval_range →
     //     `range_lte_boundary_equal_matches` / `range_gte_boundary_equal_matches`
-    //     go RED (the inclusive boundary is the ADR 0028 §1 contract).
+    //     go RED (the inclusive boundary is the inclusive range boundaries (spec/bap-v2.md
+    // §4) contract).
     //   * removing the same-tag split in eval_range (casting both operands to
     //     f64) → `range_cross_tag_pair_does_not_match` goes RED.
     //   * swapping the lte/gte dispatch in evaluate_v2 →
@@ -971,8 +978,8 @@ mod tests {
 
     #[test]
     fn range_lte_boundary_equal_matches() {
-        // INCLUSIVE: value == bound matches (ADR 0028 §1). A strict `<` arm
-        // makes this Ok(false) — RED under the strictness mutation.
+        // INCLUSIVE: value == bound matches (inclusive range boundaries (spec/bap-v2.md §4)). A strict `<` arm
+        // makes this Ok(false): RED under the strictness mutation.
         let sel = j(br#"{"kind":"lte","path":["amount"],"value":5000}"#);
         assert_eq!(
             evaluate_v2(&sel, &j(br#"{"amount":5000}"#), &max()),
@@ -1015,10 +1022,10 @@ mod tests {
 
     #[test]
     fn range_cross_tag_pair_does_not_match() {
-        // ADR 0028 §2: the SAME-tag domain extends no-tag-collapse to
+        // same-tag numeric operands (spec/bap-v2.md §4): the SAME-tag domain extends no-tag-collapse to
         // ordering. Int(5000) does not satisfy the Float bound 5000.0 and vice
-        // versa — in BOTH directions and for BOTH kinds. Casting both operands
-        // to f64 makes these Ok(true) — RED under the tag-collapse mutation.
+        // versa: in BOTH directions and for BOTH kinds. Casting both operands
+        // to f64 makes these Ok(true): RED under the tag-collapse mutation.
         let int_bound = j(br#"{"kind":"lte","path":["amount"],"value":5000}"#);
         let float_arg = j(br#"{"amount":5000.0}"#);
         assert_eq!(evaluate_v2(&int_bound, &float_arg, &max()), Ok(false));
@@ -1041,8 +1048,9 @@ mod tests {
 
     #[test]
     fn range_non_numeric_operand_at_path_never_matches() {
-        // ADR 0028 §2: string/boolean/null/array/object at the path never
-        // satisfy a range selector — Ok(false), not Err (the shape is valid;
+        // same-tag numeric operands (spec/bap-v2.md §4):
+        // string/boolean/null/array/object at the path never
+        // satisfy a range selector: Ok(false), not Err (the shape is valid;
         // the value is not in the domain).
         for arg in [
             br#"{"amount":"5000"}"#.as_slice(),
@@ -1096,7 +1104,7 @@ mod tests {
     #[test]
     fn range_lte_and_gte_dispatch_is_distinct() {
         // lte vs gte evaluate OPPOSITE verdicts on the same strictly-interior
-        // pair — swapping the evaluate_v2 dispatch arms flips both assertions.
+        // pair: swapping the evaluate_v2 dispatch arms flips both assertions.
         let lte = j(br#"{"kind":"lte","path":["amount"],"value":100}"#);
         let gte = j(br#"{"kind":"gte","path":["amount"],"value":50}"#);
         let args = j(br#"{"amount":75}"#);
@@ -1122,8 +1130,8 @@ mod tests {
 
     #[test]
     fn range_selector_missing_path_is_invalid() {
-        // ADR 0028 §2: a missing path member fails closed exactly as
-        // equals/one_of — Err(Invalid), never a silent Ok(false).
+        // same-tag numeric operands (spec/bap-v2.md §4): a missing path member fails closed exactly as
+        // equals/one_of: Err(Invalid), never a silent Ok(false).
         let sel = j(br#"{"kind":"lte","path":["missing"],"value":5000}"#);
         assert_eq!(evaluate_v2(&sel, &j(br#"{}"#), &max()), Err(Invalid));
         let gte = j(br#"{"kind":"gte","path":["missing"],"value":50}"#);
@@ -1138,7 +1146,8 @@ mod tests {
 
     #[test]
     fn range_selector_member_set_is_closed() {
-        // lte/gte ride the EXISTING {kind, path, value} set (ADR 0028 §3 — no
+        // lte/gte ride the EXISTING {kind, path, value} set (the existing {kind, path,
+        // value} member set (spec/bap-v2.md §4): no
         // fourth member set): a `values` member, a missing member, or an extra
         // member is invalid.
         for text in [

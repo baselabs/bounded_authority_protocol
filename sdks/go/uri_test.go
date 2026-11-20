@@ -80,7 +80,7 @@ func TestUriNormalizeInvalid(t *testing.T) {
 		"https://example.test:65536/x", // out of range
 		"https://example.test:99999/x", // out of range
 		// ambiguous authority/port syntax
-		"https://a:b@example.test/", // handled as userinfo — invalid
+		"https://a:b@example.test/", // handled as userinfo: invalid
 		// IPv4 exactness: all-digit last label must be exact IPv4
 		"https://1.2.3.4.5/x",   // five labels, not IPv4, all-digits tail
 		"https://999.1.1.1/x",   // dec-octet over 255
@@ -95,7 +95,7 @@ func TestUriNormalizeInvalid(t *testing.T) {
 		"https://[]/x",                  // empty literal
 		"https://[v]/x",                 // bad IPvFuture
 		"https://[v1.]/x",               // empty IPvFuture tail
-		// bare IPv6-shaped host without brackets is a reg-name with colons — ambiguous
+		// bare IPv6-shaped host without brackets is a reg-name with colons: ambiguous
 		"https://2001:db8::1/x", // colons outside brackets
 		// no authority at all
 		"https:/path",

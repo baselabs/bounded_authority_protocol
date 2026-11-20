@@ -1,7 +1,7 @@
 """RFC 7638 JWK thumbprint for OKP Ed25519 public keys (spec/bap-v1.md § Public verification contract).
 
-The public OKP JWK has exactly three members — ``crv="Ed25519"``, ``kty="OKP"``, ``x=<base64url
-raw 32 bytes>`` — in RFC 7638 lexicographic order (crv, kty, x). The thumbprint preimage is the JCS
+The public OKP JWK has exactly three members: ``crv="Ed25519"``, ``kty="OKP"``, ``x=<base64url
+raw 32 bytes>``: in RFC 7638 lexicographic order (crv, kty, x). The thumbprint preimage is the JCS
 of that object; the thumbprint is SHA-256 of the preimage (base64url); the raw thumbprint is the
 32-byte digest.
 
@@ -35,6 +35,7 @@ class OkpPublic:
         kty: str.
         x: str.
     """
+
     crv: str  # always "Ed25519"
     kty: str  # always "OKP"
     x: str  # base64url of the 32 raw bytes

@@ -252,7 +252,7 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
     readme = File.read!("sdks/README.md")
 
     # Three SDKs are authored in this repository; the fourth (TypeScript) graduated to its own
-    # repository on first publication (ADR 0015) and is named by its published identity.
+    # repository on first publication (sdks/README.md publication boundary) and is named by its published identity.
     for sdk <- ["python/", "rust/", "go/"] do
       assert readme =~ "[`#{sdk}`]",
              "sdks/README.md must list the #{sdk} SDK"
@@ -265,7 +265,7 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
            "sdks/README.md must point at the graduated TypeScript repository"
 
     refute readme =~ "[`typescript/`]",
-           "sdks/README.md must not link a typescript/ directory; the SDK graduated (ADR 0015)"
+           "sdks/README.md must not link a typescript/ directory; the SDK graduated (sdks/README.md publication boundary)"
 
     refute readme =~ "@bounded-authority/verifier",
            "sdks/README.md must not cite the retired npm scope"

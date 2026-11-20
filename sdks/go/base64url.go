@@ -7,7 +7,7 @@ package verifier
 //   - padding and whitespace forbidden (REQ1-B64-no-padding);
 //   - length modulo four equal to one is invalid (REQ1-B64-length);
 //   - decoding succeeds only when unpadded re-encoding reproduces the input
-//     exactly — non-zero unused pad bits and alternate encodings are rejected
+//     exactly: non-zero unused pad bits and alternate encodings are rejected
 //     (REQ1-B64-canonical).
 //
 // Hand-rolled rather than encoding/base64: the stdlib decoder silently skips

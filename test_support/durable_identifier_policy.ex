@@ -51,7 +51,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                                   "priv/conformance/application-profiles/local-loopback-http/v1/profile.json",
                                   "priv/conformance/application-profiles/local-loopback-http/v1/proof-cases.json"
                                 ])
-  # The accepted role-attestation sibling-profile family (ADR 0036): the profile namespace,
+  # The accepted role-attestation sibling-profile family (spec/bap-role-attestation-v1.md): the profile namespace,
   # the attestation corpus, and the profile test.
   @role_attestation_profile_paths MapSet.new([
                                     "lib/bounded_authority_protocol/role_attestation/v1.ex",
@@ -378,7 +378,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
       ]
   end
 
-  # The accepted successor-major contract families (ADR 0030 activation): the V2 namespace,
+  # The accepted successor-major contract families (spec/bap-v2.md activation): the V2 namespace,
   # the v2 corpus, the v2 SDK profiles, and the v2 conformance runners.
   defp successor_major_source_path?(path) do
     Regex.match?(~r"\Alib/bounded_authority_protocol/v2(?:\.ex|/)", path) or
@@ -396,7 +396,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
       ]
   end
 
-  # The accepted ES256 contract-major families (ADR 0035 activation): the V3 namespace, the
+  # The accepted ES256 contract-major families (spec/bap-v3.md activation): the V3 namespace, the
   # v3 corpus, and the v3 SDK profiles/runners.
   defp es256_major_source_path?(path) do
     Regex.match?(~r"\Alib/bounded_authority_protocol/v3(?:\.ex|/)", path) or

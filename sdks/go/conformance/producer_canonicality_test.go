@@ -2,9 +2,9 @@ package conformance_test
 
 // The producer-canonicality runner (profile bap-producer-canonicality/1, erratum 3): it executes
 // the vendored additive corpus (corpus-producer-canonicality, a byte-identical snapshot of
-// priv/conformance/producer-canonicality/) against the SDK's PRODUCER surfaces only — compact
+// priv/conformance/producer-canonicality/) against the SDK's PRODUCER surfaces only: compact
 // assembly for contract-majors 1, 2 and 3 and the three sibling profiles, anchored-export
-// encoding for all three majors — SHA-binds the vendored index.json at startup, verifies every
+// encoding for all three majors: SHA-binds the vendored index.json at startup, verifies every
 // listed file against the index's per-file SHA-256 and case counts, and requires every case to
 // agree: a refused signature is ErrInvalid; an accepted signature's bytes are emitted unchanged
 // (byte-equality against the certified compact for every accepted case).
@@ -333,6 +333,6 @@ func TestProducerCanonicalityCorpus(t *testing.T) {
 		t.Fatalf("case census %d != %d", len(seen), pcTotalCases)
 	}
 	execution.Finish()
-	t.Logf("producer-canonicality: PASS — %d/%d verdict agreement (%d refused, %d accepted with bytes unchanged)",
+	t.Logf("producer-canonicality: PASS: %d/%d verdict agreement (%d refused, %d accepted with bytes unchanged)",
 		pcTotalCases, pcTotalCases, refused, accepted)
 }

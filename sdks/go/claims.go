@@ -6,7 +6,7 @@ import "strings"
 // § Protected headers. All are fail-closed and value-free on rejection.
 
 // allZeroHashB64 is the all-zero SHA-256 digest in canonical base64url: the
-// genesis predecessor / chain-hash sentinel (ADR 0004).
+// genesis predecessor / chain-hash sentinel (spec/bap-v1.md §15).
 const allZeroHashB64 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
 // validKid: case-sensitive 1..bound bytes of ASCII letters, digits, '-', '.',
@@ -51,7 +51,7 @@ func isTchar(c byte) bool {
 }
 
 // validStringOrURI: non-empty, at most byteCeiling UTF-8 bytes. When the
-// value contains ":" it must be a structurally valid RFC 3986 URI — scheme
+// value contains ":" it must be a structurally valid RFC 3986 URI: scheme
 // grammar, ASCII-only, and a grammar-valid authority when "//" is present
 // (the corpus pins "ht tp://x" and "http://a:b" invalid). Case-sensitive;
 // never normalized.

@@ -1,12 +1,12 @@
-//! Permissiveness mutation-gate battery — BAP-15 Task 15.
+//! Permissiveness mutation-gate battery: BAP-15 Task 15.
 //!
-//! Three families live here: the ADR 0014 D6 permissiveness closures (each
-//! asserts the SDK REJECTs the host-specific permissive defect that closure
-//! defeats), the decode-path
+//! Three families live here: the host-parser permissiveness closures (each test
+//! rejects the host-specific defect its closure prevents), the decode-path
 //! conformance legs (signature width + canonical form; same RED discipline), and
-//! the canonical-exclusion pins (grant/proof have NO canonical gate — pinned).
-//! Each carries the exact mechanical mutation that makes the SAME test go RED (the ADR
-//! 0005:240-246 discipline — a gate that cannot go red is vacuous). The closures
+//! the canonical-exclusion pins (grant/proof have NO canonical gate: pinned).
+//! Each names the exact mutation that makes its covering test fail. A guard
+//! that cannot fail when removed proves nothing. The conformance rules are in
+//! docs/design/conformance-contract.md. The closures
 //! are exercised through the PUBLIC crate surface only (this file lives outside
 //! `src/` so it cannot reach internals), which is the boundary a consumer sees.
 //!
@@ -14,11 +14,11 @@
 //! `jcs_encode`; the base64url pad-bits closure is owned by `base64url_decode`.
 //! Closure #2 (ordered collision-free members) is, in Rust, structurally
 //! immune to the prototype-absorption half (a `Vec<(String, JsonValue)>` has no
-//! Object-prototype model — `__proto__`/`constructor` are ordinary `String`
+//! Object-prototype model: `__proto__`/`constructor` are ordinary `String`
 //! keys, un-absorbable by any mutation), so its red-capable half here is
 //! **source-order preservation**.
 //!
-//! The red-capability of closure #6 (the `(d)`-class per-node encode-bounds —
+//! The red-capability of closure #6 (the `(d)`-class per-node encode-bounds,
 //! the one closure the corpus CANNOT express) was proven live at authoring by
 //! removing each per-node check from `jcs_encode`, watching the corresponding
 //! test flip RED, and restoring it; the quoted runs ride the T15 commit body.
@@ -57,10 +57,10 @@ fn max() -> Bounds {
 }
 
 // =============================================================================
-// Closure #1 — REQ1-JSON-no-duplicate (duplicate member at ANY depth rejected)
+// Closure #1: REQ1-JSON-no-duplicate (duplicate member at ANY depth rejected)
 // =============================================================================
 //
-// The load-bearing permissiveness case (ADR 0005:240-246): a last-wins host
+// The load-bearing permissiveness case (per-guard mutation proof): a last-wins host
 // decoder silently accepts `{"a":1,"a":2}` (keeping `a:2`), letting a smuggled
 // `alg:"none"` override `alg:"EdDSA"`. RED-capable mutation: convert the
 // decoder's `Object` accumulation to a last-write-wins insert (drop the
@@ -73,7 +73,7 @@ fn closure_1_duplicate_member_rejected() {
         json_decode(br#"{"a":1,"a":2}"#, &max()),
         Err(bounded_authority_protocol::Invalid)
     );
-    // At depth (not only root) — the legacy algorithm-swap shape.
+    // At depth (not only root): the legacy algorithm-swap shape.
     assert_eq!(
         json_decode(br#"{"o":{"alg":"EdDSA","alg":"none"}}"#, &max()),
         Err(bounded_authority_protocol::Invalid)
@@ -81,11 +81,11 @@ fn closure_1_duplicate_member_rejected() {
 }
 
 // =============================================================================
-// Closure #2 — ordered collision-free members (source order preserved)
+// Closure #2: ordered collision-free members (source order preserved)
 // =============================================================================
 //
 // RFC 8785 sorts object members at JCS encode time, NOT at decode time, so the
-// DECODER must preserve source member order — selector semantic identity and
+// DECODER must preserve source member order: selector semantic identity and
 // the canonical re-encode both depend on a stable order surviving the round
 // trip. RED-capable mutation: change `JsonValue::Object`'s carrier from
 // `Vec<(String, JsonValue)>` to a `HashMap<String, JsonValue>` or `BTreeMap`
@@ -109,7 +109,7 @@ fn closure_2_source_member_order_preserved() {
 }
 
 // =============================================================================
-// Closure #3 — REQ1-JSON-raw-lexeme (64-byte ceiling + exact magnitude,
+// Closure #3: REQ1-JSON-raw-lexeme (64-byte ceiling + exact magnitude,
 //              enforced BEFORE host conversion)
 // =============================================================================
 //
@@ -122,7 +122,7 @@ fn closure_2_source_member_order_preserved() {
 
 #[test]
 fn closure_3_raw_lexeme_byte_ceiling_and_magnitude_enforced_pre_conversion() {
-    // 65-byte float lexeme (`1.` + 63 zeros) — over the 64-byte ceiling.
+    // 65-byte float lexeme (`1.` + 63 zeros): over the 64-byte ceiling.
     let mut over = String::from("1.");
     over.push_str(&"0".repeat(63));
     assert_eq!(
@@ -140,7 +140,7 @@ fn closure_3_raw_lexeme_byte_ceiling_and_magnitude_enforced_pre_conversion() {
 }
 
 // =============================================================================
-// Closure #4 — REQ1-JSON-single-value (one value + trailing whitespace only)
+// Closure #4: REQ1-JSON-single-value (one value + trailing whitespace only)
 // =============================================================================
 //
 // RED-capable mutation: make the trailing-bytes check accept any suffix (drop
@@ -167,10 +167,10 @@ fn closure_4_trailing_bytes_after_single_value_rejected() {
 }
 
 // =============================================================================
-// Closure #5 — int/float tag distinction (no tag collapse)
+// Closure #5: int/float tag distinction (no tag collapse)
 // =============================================================================
 //
-// `1` decodes to `Int(1)` and `1.0` to `Float(1.0)` — distinct variants — and
+// `1` decodes to `Int(1)` and `1.0` to `Float(1.0)` (distinct variants) and
 // they produce DIFFERENT request digests (the typed projection wraps them as
 // `["integer",1]` vs `["float",1]`). RED-capable mutation: collapse both number
 // lexemes to `Float` (force `is_float = true` in `json::parse_number`), OR
@@ -198,12 +198,12 @@ fn closure_5_int_and_float_tags_do_not_collapse() {
 }
 
 // =============================================================================
-// Closure #6 — (d)-class per-node encode bounds in `jcs_encode`
+// Closure #6: (d)-class per-node encode bounds in `jcs_encode`
 // =============================================================================
 //
 // `jcs_encode` is a PUBLIC primitive reachable by a direct caller with a
 // hand-built (not decode-bounded) value, so it must enforce the structural
-// ceilings DURING recursion — not only the final output length — or a
+// ceilings DURING recursion (not only the final output length) or a
 // pathological hand-built value could force unbounded recursion (stack
 // overflow), unbounded traversal, or over-budget intermediate allocation. The
 // corpus cannot express this (a hand-built value never enters it), so the
@@ -220,7 +220,7 @@ fn closure_5_int_and_float_tags_do_not_collapse() {
 // The per-node `jcs_bytes` early bail is an allocation guard (it stops
 // materializing the encoding the moment the budget is crossed); its VERDICT is
 // identical to the final-only check, so it is a code-review property, not a
-// verdict test — the depth and total_nodes guards are the verdict-observable
+// verdict test: the depth and total_nodes guards are the verdict-observable
 // red-capable half.
 
 /// Build a value nested `depth` arrays deep around `leaf` (depth counted on
@@ -237,7 +237,7 @@ fn nested_arrays(depth: usize, leaf: JsonValue) -> JsonValue {
 fn closure_6_depth_over_bound_rejected() {
     // 33 nested arrays around Int(0): the innermost array sits at depth 33 >
     // max 32. This shape is INexpressible via `json_decode` (the decoder rejects
-    // depth 33), so it can only arrive at `jcs_encode` as a hand-built value —
+    // depth 33), so it can only arrive at `jcs_encode` as a hand-built value,
     // exactly the direct-caller threat the closure defends.
     let v = nested_arrays(33, JsonValue::Int(0));
     assert_eq!(
@@ -258,7 +258,7 @@ fn closure_6_total_nodes_over_bound_rejected() {
     // 17 arrays each of 256 zeros: 1 (root) + 17 (mids) + 17 * 257 (inner arrays
     // + their leaves) = 4370 nodes > max 4096. Every array is within
     // `array_items` (root 17, inner 256 == exact bound) and depth is 2, so ONLY
-    // the total_nodes ceiling fires — isolating that guard.
+    // the total_nodes ceiling fires: isolating that guard.
     let inner = JsonValue::Array(vec![JsonValue::Int(0); 256]);
     let root = JsonValue::Array(vec![inner; 17]);
     assert_eq!(
@@ -286,7 +286,7 @@ fn closure_6_over_magnitude_and_duplicate_members_rejected() {
     // serialization encode_value
     // guards that the closeout cross-vendor review found the Rust encoder was
     // missing). A hand-built integer above ±2^53−1, and a hand-built Object with
-    // a duplicate member name, are both rejected at encode — a permissive encoder
+    // a duplicate member name, are both rejected at encode: a permissive encoder
     // would accept them. The decoded path cannot produce either (the decoder
     // magnitude-checks and dup-rejects), so these are only reachable via a
     // direct caller of the public `jcs_encode` primitive.
@@ -307,12 +307,12 @@ fn closure_6_over_magnitude_and_duplicate_members_rejected() {
 }
 
 // =============================================================================
-// base64url pad-bits closure — REQ1-B64-canonical (corpus-blind)
+// base64url pad-bits closure: REQ1-B64-canonical (corpus-blind)
 // =============================================================================
 //
 // The two corpus `base64url.decode.invalid_encoding` cases are caught by the
 // padding/alphabet rules, so the non-zero-unused-pad-bits rejection is NOT
-// exercised by any corpus case — it is proven red-capable here. `AB` decodes to
+// exercised by any corpus case: it is proven red-capable here. `AB` decodes to
 // `[0x00]` but its trailing 4 bits are non-zero, so the canonical re-encode is
 // `AA` != `AB`. RED-capable mutation: drop the `base64url_encode(&out) != input`
 // canonical re-encode check in `base64url::base64url_decode` → this test goes
@@ -354,7 +354,7 @@ use bounded_authority_protocol::{
 };
 
 /// Minimal JSON string literal serializer for fixture members (plain ASCII
-/// values; `"`, `\`, and control bytes escaped — nothing else reachable here).
+/// values; `"`, `\`, and control bytes escaped: nothing else reachable here).
 fn json_str(s: &str) -> String {
     let mut out = String::from("\"");
     for c in s.chars() {
@@ -369,7 +369,7 @@ fn json_str(s: &str) -> String {
     out
 }
 
-/// Serializes a JsonValue in SOURCE member order (no JCS sorting) — the
+/// Serializes a JsonValue in SOURCE member order (no JCS sorting): the
 /// order-preserving counterpart `jcs_encode` refuses to be.
 fn raw_json(value: &JsonValue) -> String {
     match value {
@@ -626,7 +626,7 @@ fn signature_width_proof_decode_rejected() {
 #[test]
 fn signature_width_export_encode_start_anchor_rejected() {
     // The encode path parses the START anchor (decode_anchor_parts) and never
-    // width-checks its signature segment elsewhere — this is the anchor width
+    // width-checks its signature segment elsewhere: this is the anchor width
     // gate's one public flip (the plan-review F1 leg of bap-18). Rebuilt on the
     // conformant fixture (the closeout cross-vendor blocking finding: the old
     // garbage-end-anchor control locked in malformed-archive acceptance).
@@ -925,7 +925,7 @@ fn conformant_export() -> ConformantExport {
     ConformantExport { input, expected }
 }
 
-// Leg 1 — expected-side: a transition's chain_id drifts from the chain's.
+// Leg 1: expected-side: a transition's chain_id drifts from the chain's.
 // Mutation: drop the transitions-chain_id clause of the expected-side check.
 #[test]
 fn encode_expected_chain_id_drift_rejected() {
@@ -956,7 +956,7 @@ fn encode_expected_chain_id_drift_rejected() {
     );
 }
 
-// Leg 2 — expected-side: start.chain_hash != chain.previous_hash. Two-sided:
+// Leg 2: expected-side: start.chain_hash != chain.previous_hash. Two-sided:
 // expected.start_anchor carries the same (mismatching) hash the match would
 // accept; only the expected-side binding catches it.
 #[test]
@@ -998,14 +998,14 @@ fn encode_expected_start_hash_binding_rejected() {
     );
 }
 
-// Leg 3 — expected-side: end.sequence != chain.last_sequence (two-sided).
+// Leg 3: expected-side: end.sequence != chain.last_sequence (two-sided).
 #[test]
 fn encode_expected_end_sequence_binding_rejected() {
     let mut f = conformant_export();
     let head = f.expected.chain.head_hash;
     // Two-sided ANCHOR tamper: the signed end anchor AND expected carry
     // sequence 7; chain.last_sequence stays 1 (row-conformant) so check_chain
-    // stays satisfied — only the binding fires.
+    // stays satisfied: only the binding fires.
     let produced = boundary_anchor_signing_input(
         &BoundaryAnchor {
             anchor_id: "anchor-end".to_string(),
@@ -1031,9 +1031,9 @@ fn encode_expected_end_sequence_binding_rejected() {
     );
 }
 
-// Leg 3b — expected-side: an ANCHOR's chain_id drifts from the chain's
+// Leg 3b: expected-side: an ANCHOR's chain_id drifts from the chain's
 // (two-sided on the end anchor: the 7-field match passes; ONLY the expected-side
-// anchors'-chain_id clause fires — the SOLE Rust enforcement of this binding:
+// anchors'-chain_id clause fires: the SOLE Rust enforcement of this binding:
 // the verify path binds only the header chain_id, never the anchor payload's).
 // Mutation: drop the anchors' chain_id clause. (Security-lens F2a; gate-integrity R4.)
 #[test]
@@ -1065,7 +1065,7 @@ fn encode_expected_anchor_chain_id_binding_rejected() {
     );
 }
 
-// Leg 3c — expected-side: end.chain_hash != chain.head_hash (two-sided on the
+// Leg 3c: expected-side: end.chain_hash != chain.head_hash (two-sided on the
 // anchor; the match passes; only the end-hash binding fires). Mutation: drop
 // the end-hash clause. (Security-lens F2b; gate-integrity R3.)
 #[test]
@@ -1097,9 +1097,9 @@ fn encode_expected_end_hash_binding_rejected() {
     );
 }
 
-// Leg 16 — key-path end chronology: end.anchored_at BELOW the running time
+// Leg 16: key-path end chronology: end.anchored_at BELOW the running time
 // (two-sided; the match passes; only the chronology clause fires). Mutation:
-// drop the end-chronology clause. (Gate-integrity BLOCKING — the clause was
+// drop the end-chronology clause. (Gate-integrity BLOCKING: the clause was
 // mutation-invisible: plan-review F4 was resolved by rewording, not a leg.)
 #[test]
 fn encode_key_path_end_before_last_time_rejected() {
@@ -1130,9 +1130,9 @@ fn encode_key_path_end_before_last_time_rejected() {
     );
 }
 
-// Leg 17 — the NON-STRICT pin: end.anchored_at == the running time MUST be
+// Leg 17: the NON-STRICT pin: end.anchored_at == the running time MUST be
 // ACCEPTED (end chronology is >=, spec/bap-v1.md §15). Mutation: flip the clause
-// strict (<) — this leg goes RED. (The equality half of the same BLOCKING.)
+// strict (<): this leg goes RED. (The equality half of the same BLOCKING.)
 #[test]
 fn encode_key_path_end_time_equality_accepted() {
     let (row, head_hash) = encode_consumption_entry(
@@ -1203,7 +1203,7 @@ fn encode_key_path_end_time_equality_accepted() {
     );
 }
 
-// Leg 4 — rows failing the chain re-check. Mutation: drop the check_chain call.
+// Leg 4: rows failing the chain re-check. Mutation: drop the check_chain call.
 #[test]
 fn encode_rows_chain_recheck_rejected() {
     let mut f = conformant_export();
@@ -1214,7 +1214,7 @@ fn encode_rows_chain_recheck_rejected() {
     );
 }
 
-// Leg 5 — the START-anchor 7-field match call-site: the signed anchor_id
+// Leg 5: the START-anchor 7-field match call-site: the signed anchor_id
 // contradicts expected (two-sided to the same off-value).
 #[test]
 fn encode_start_anchor_full_match_rejected() {
@@ -1245,7 +1245,7 @@ fn encode_start_anchor_full_match_rejected() {
     );
 }
 
-// Leg 6 — the END-anchor match call-site: signed chain_id drifts (two-sided).
+// Leg 6: the END-anchor match call-site: signed chain_id drifts (two-sided).
 #[test]
 fn encode_end_anchor_full_match_rejected() {
     let mut f = conformant_export();
@@ -1276,9 +1276,9 @@ fn encode_end_anchor_full_match_rejected() {
     );
 }
 
-// Leg 7 — the END-anchor gated parse: member-reordered (non-canonical) payload.
+// Leg 7: the END-anchor gated parse: member-reordered (non-canonical) payload.
 // Hand-assembled (assemble_compact would reject the reorder). Mutation: drop the
-// 3b decode_anchor_parts call (legs 7+8 flip together — one call-site).
+// 3b decode_anchor_parts call (legs 7+8 flip together: one call-site).
 #[test]
 fn encode_end_anchor_canonical_form_rejected() {
     let f = conformant_export();
@@ -1299,7 +1299,7 @@ fn encode_end_anchor_canonical_form_rejected() {
     );
 }
 
-// Leg 8 — the END-anchor gated parse: wrong-width signature. Same call-site as 7.
+// Leg 8: the END-anchor gated parse: wrong-width signature. Same call-site as 7.
 #[test]
 fn encode_end_anchor_signature_width_rejected() {
     let f = conformant_export();
@@ -1318,13 +1318,13 @@ fn encode_end_anchor_signature_width_rejected() {
     );
 }
 
-// Leg 9 — the transition match call-site: signed effective_at drifts (two-sided).
+// Leg 9: the transition match call-site: signed effective_at drifts (two-sided).
 #[test]
 fn encode_transition_full_match_rejected() {
     let mut f = conformant_export();
     // ONE-SIDED: only the signed effective_at drifts; expected stays at 1500 so
     // the 3c MATCH is the sole rejecting clause (a two-sided tamper passes the
-    // match and the walk — 1501 > 1000, 1600 >= 1501 — and encodes Ok).
+    // match and the walk (1501 > 1000, 1600 >= 1501) and encodes Ok).
     let produced = key_transition_signing_input(
         &KeyTransition {
             chain_id: "chain-x".to_string(),
@@ -1349,7 +1349,7 @@ fn encode_transition_full_match_rejected() {
     );
 }
 
-// Leg 10 — the transition gated parse: non-canonical payload (hand-assembled).
+// Leg 10: the transition gated parse: non-canonical payload (hand-assembled).
 // Mutation: drop the 3c decode_transition_parts call (legs 10+11 together).
 #[test]
 fn encode_transition_canonical_form_rejected() {
@@ -1370,7 +1370,7 @@ fn encode_transition_canonical_form_rejected() {
     );
 }
 
-// Leg 11 — the transition gated parse: wrong-width signature. Same call-site as 10.
+// Leg 11: the transition gated parse: wrong-width signature. Same call-site as 10.
 #[test]
 fn encode_transition_signature_width_rejected() {
     let f = conformant_export();
@@ -1389,8 +1389,8 @@ fn encode_transition_signature_width_rejected() {
     );
 }
 
-// Leg 12 — key-path no-cycle: a SELF-LOOP transition (next fingerprint ==
-// current) — caught by the seen-list (current is always already in seen); also
+// Leg 12: key-path no-cycle: a SELF-LOOP transition (next fingerprint ==
+// current): caught by the seen-list (current is always already in seen); also
 // covers the distinct-fingerprints semantic check by composition (design C4a).
 // Hand-built (the producer refuses current==next public keys): take the valid
 // transition, set to_key_fingerprint := from_fingerprint, re-encode canonically.
@@ -1429,7 +1429,7 @@ fn encode_key_path_self_loop_rejected() {
     let mut input = f.input.clone();
     input.transitions[0] = rebuilt;
     // Two-sided: expected mirrors the self-loop exactly, and the END anchor
-    // moves to KEY_A — after a self-loop the running key IS A, so the walk ends
+    // moves to KEY_A: after a self-loop the running key IS A, so the walk ends
     // consistently WITHOUT the cycle guard; the seen-list is the sole rejector
     // (left on KEY_B, the end-binding clause would backstop under the mutation).
     let mut expected = f.expected.clone();
@@ -1443,8 +1443,8 @@ fn encode_key_path_self_loop_rejected() {
     );
 }
 
-// Leg 13 — key-path: transition 1's current key != the start anchor's key
-// (KEY_C signs, expected mirrors — the match passes; only the walk rejects).
+// Leg 13: key-path: transition 1's current key != the start anchor's key
+// (KEY_C signs, expected mirrors: the match passes; only the walk rejects).
 // Mutation: drop the current-key clause.
 #[test]
 fn encode_key_path_wrong_current_key_rejected() {
@@ -1475,7 +1475,7 @@ fn encode_key_path_wrong_current_key_rejected() {
     );
 }
 
-// Leg 14 — key-path: the end anchor's key != the final running key (KEY_B).
+// Leg 14: key-path: the end anchor's key != the final running key (KEY_B).
 // Re-signed end anchor + mirrored expected; only the end-binding rejects.
 // Mutation: drop the end-binding clause.
 #[test]
@@ -1508,7 +1508,7 @@ fn encode_key_path_end_key_mismatch_rejected() {
     );
 }
 
-// Leg 15 — key-path chronology: the transition effective_at (999) is NOT
+// Leg 15: key-path chronology: the transition effective_at (999) is NOT
 // strictly after the start anchor's anchored_at (1000); expected mirrors.
 // Mutation: drop the strictly-after clause.
 #[test]
@@ -1539,10 +1539,10 @@ fn encode_key_path_non_chronology_rejected() {
     );
 }
 
-// Cross-vendor round-2 leg — the verify-side static expected↔chain bindings.
+// Cross-vendor round-2 leg: the verify-side static expected↔chain bindings.
 // (The anchor_bytes encode ceiling is TS/Python-specific at the default bounds:
 // Rust's identifier_bytes maximum (512) makes a valid anchor compact physically
-// unable to exceed the 8192 default anchor_bytes — the Rust pre-check at the
+// unable to exceed the 8192 default anchor_bytes: the Rust pre-check at the
 // encode entry is unreachable-at-maximum defense-in-depth, Q4-class. The codex
 // probe was the caller-TIGHTENED case, which only the sibling SDKs accept today
 // and which the bounds-parity slice will bring to Rust with its own leg.)
@@ -1550,7 +1550,7 @@ fn encode_key_path_non_chronology_rejected() {
 #[test]
 fn verify_expected_anchor_chain_id_binding_rejected() {
     // Verify-side static binding (round 2): the caller's expected end anchor
-    // carries a chain_id from another chain — one-sided expected tamper; the
+    // carries a chain_id from another chain: one-sided expected tamper; the
     // static check fires before any parse.
     let f = conformant_export();
     let encoded = encode_anchored_export(&f.input, &f.expected).expect("encodes");
@@ -1609,7 +1609,7 @@ fn verify_expected_anchor_chain_id_binding_rejected() {
     );
 }
 
-/// The corpus anchored-export verify fixture (REAL signatures — the only way a
+/// The corpus anchored-export verify fixture (REAL signatures: the only way a
 /// verify leg reaches the deep bounds gates past crypto).
 struct CorpusVerifyFixture {
     obj: ArchivedObject,
@@ -1724,7 +1724,7 @@ fn corpus_export_verify_fixture() -> CorpusVerifyFixture {
 }
 
 // =============================================================================
-// Bounds parity — caller-tightenable bounds through the expected structs.
+// Bounds parity: caller-tightenable bounds through the expected structs.
 // Fixture discipline (plan S1): every tightened-outer leg carries present-and-
 // equal nested bounds on chain + both anchors + every transition, EXCEPT the
 // pin's own legs (7/7b/8).
@@ -1773,7 +1773,7 @@ fn bounds_encode_tightened_anchor_bytes_rejects() {
 #[test]
 fn bounds_encode_tightened_key_transitions_rejects() {
     // Two transitions (the second chained after the first), limit 1 (S2: 0 is
-    // unconstructable — the constructors floor at 1).
+    // unconstructable: the constructors floor at 1).
     let mut f = two_transition_export();
     let b = tight(&[("key_transitions", 1)]);
     f.expected.bounds = Some(b);
@@ -1796,7 +1796,7 @@ fn bounds_encode_tightened_archive_chunks_pins_the_magic() {
     // THE chunk-count magic pin: the fixture's frames = magic + header + start +
     // 1 transition + 1 row + end = 6 WITH the magic, 5 without. Tighten
     // archive_chunks to 5: the count passes WITHOUT the magic and rejects WITH
-    // it — this leg goes red exactly if the magic leaves the count.
+    // it: this leg goes red exactly if the magic leaves the count.
     let mut f = conformant_export();
     let b = tight(&[("archive_chunks", 5)]);
     f.expected.bounds = Some(b);
@@ -1815,7 +1815,7 @@ fn bounds_encode_tightened_archive_bytes_rejects() {
 
 #[test]
 fn bounds_encode_nested_pin_mismatch_rejects() {
-    // Isolated: outer at maximum (untightened — absent nested passes), only the
+    // Isolated: outer at maximum (untightened: absent nested passes), only the
     // chain nested mismatched.
     let mut f = conformant_export();
     f.expected.chain.bounds = Some(tight(&[("chain_row_bytes", 4000)]));
@@ -1824,7 +1824,7 @@ fn bounds_encode_nested_pin_mismatch_rejects() {
 
 #[test]
 fn bounds_encode_absent_nested_under_tightened_outer_rejects() {
-    // B1: the pin's absent branch — outer tightened, ALL nested None → reject
+    // B1: the pin's absent branch: outer tightened, ALL nested None → reject
     // (the wrong-ACCEPT direction; spec/bap-v1.md §15 requires rejection).
     let mut f = conformant_export();
     // use a genuinely tightening value so the absent branch is the rejector
@@ -1844,7 +1844,7 @@ fn bounds_encode_identity_outer_absent_nested_accepts() {
 #[test]
 fn bounds_verify_tightened_rejects() {
     // On the corpus' REAL signed archive: control Ok at maximum, Err under a
-    // tightened archive_chunks (the correctness lens' F1 — the prior fixture
+    // tightened archive_chunks (the correctness lens' F1: the prior fixture
     // was content-only-chunked + zero-signature, vacuously rejecting at the
     // digest compare before any bounds gate).
     let f = corpus_export_verify_fixture();
@@ -1854,7 +1854,7 @@ fn bounds_verify_tightened_rejects() {
     let b = tight(&[("archive_chunks", 3)]);
     v.bounds = Some(b);
     // S1 discipline: present-and-equal nested (the absent-under-tightened pin
-    // would otherwise reject first — the mutation-proof caught it).
+    // would otherwise reject first: the mutation-proof caught it).
     v.chain.bounds = Some(b);
     v.start_anchor.bounds = Some(b);
     v.end_anchor.bounds = Some(b);
@@ -1869,7 +1869,7 @@ fn bounds_verify_tightened_rejects() {
 fn bounds_standalone_anchor_verify_tightened_rejects() {
     // A REAL corpus-signed anchor (the battery's own dummies fail crypto-verify
     // first, masking the bounds gate): the valid boundary-anchor case verifies
-    // Ok at maximum and Err under a tightened anchor_bytes — the standalone
+    // Ok at maximum and Err under a tightened anchor_bytes: the standalone
     // entry's bounds threading, red-capable at its own gate.
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -2140,7 +2140,7 @@ fn bounds_standalone_transition_verify_tightened_rejects() {
 
 #[test]
 fn bounds_encode_tightened_chain_rows_count_rejects() {
-    // The F4 leg: the chain_rows COUNT ceiling (not the per-row byte ceiling) —
+    // The F4 leg: the chain_rows COUNT ceiling (not the per-row byte ceiling),
     // two rows, limit 1.
     let mut f = two_transition_export();
     let b = tight(&[("chain_rows", 1)]);
@@ -2180,7 +2180,7 @@ fn bounds_verify_identity_outer_absent_nested_accepts() {
     assert!(verify_anchored_export(&f.obj, &f.keys, &v).is_ok());
 }
 
-// Cross-vendor round-4 legs — the compact_bytes ceiling in the decoders + the
+// Cross-vendor round-4 legs: the compact_bytes ceiling in the decoders + the
 // key-window magnitude gates. Each names its red mutation.
 
 #[test]
@@ -2246,7 +2246,7 @@ fn bounds_standalone_anchor_tightened_compact_bytes_rejects() {
 
 #[test]
 fn bounds_standalone_anchor_key_window_magnitude_rejects() {
-    // The BOUNDED-VALID_BEFORE half: a huge bounded upper bound (2^62) —
+    // The BOUNDED-VALID_BEFORE half: a huge bounded upper bound (2^62),
     // membership holds (anchored_at is inside), only the magnitude gate fires.
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -2280,7 +2280,7 @@ fn bounds_standalone_anchor_key_window_magnitude_rejects() {
         valid_before: ValidityUpperBound::Unbounded,
     };
     // Membership must still hold so ONLY the magnitude gate can fire: a huge
-    // BOUNDED valid_before (2^62) with valid_from 0 — anchored_at 1000 is inside
+    // BOUNDED valid_before (2^62) with valid_from 0: anchored_at 1000 is inside
     // [0, 2^62), but 2^62 > the integer_magnitude maximum (2^53-1).
     key.valid_before = ValidityUpperBound::Bounded(4_611_686_018_427_387_904); // 2^62
     let e = &input["expected"];
@@ -2430,7 +2430,7 @@ fn bounds_standalone_transition_key_window_magnitude_rejects() {
 #[test]
 fn bounds_standalone_anchor_key_window_magnitude_valid_from_rejects() {
     // The valid_from half with the unsigned_abs sign symmetry: a NEGATIVE
-    // out-of-magnitude valid_from (-2^62) — membership holds (anchored_at
+    // out-of-magnitude valid_from (-2^62): membership holds (anchored_at
     // 1000 >= -2^62), only the magnitude gate can fire.
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -2490,7 +2490,7 @@ fn bounds_standalone_anchor_key_window_magnitude_valid_from_rejects() {
 
 #[test]
 fn bounds_transition_current_valid_from_magnitude_rejects() {
-    // The current key's valid_from half (negative out-of-magnitude — membership
+    // The current key's valid_from half (negative out-of-magnitude: membership
     // holds, magnitude fires; the unsigned_abs sign symmetry).
     let (compact, mut current, next, expected) = corpus_transition_parts();
     current.valid_from = -(4_611_686_018_427_387_904i64);
@@ -2517,7 +2517,7 @@ fn bounds_transition_next_valid_from_magnitude_rejects() {
 fn bounds_transition_corpus_fixture_control_verifies_ok() {
     // The green control for the three legs sharing corpus_transition_parts():
     // the UNTAMpered corpus transition verifies Ok (a construction defect in
-    // the loader would turn the legs red for the wrong reason — the closing
+    // the loader would turn the legs red for the wrong reason: the closing
     // cross-vendor note).
     let (compact, current, next, expected) = corpus_transition_parts();
     assert!(verify_key_transition(&compact, &current, &next, &expected).is_ok());
@@ -2588,7 +2588,7 @@ fn corpus_transition_parts() -> (
 }
 
 // The closing cross-vendor notes: the ordering leg (valid_before > valid_from,
-// spec/bap-v1.md §16) — verdict-equivalent today (an inverted window
+// spec/bap-v1.md §16): verdict-equivalent today (an inverted window
 // admits no time) but a gate reused without membership would inherit the gap.
 
 #[test]
@@ -2596,7 +2596,7 @@ fn bounds_anchor_inverted_window_rejects() {
     // Both endpoints in-magnitude and integral; valid_before <= valid_from.
     // Honest red-capability: the ordering gate is BACKSTOPPED by membership
     // here (an inverted window admits no time), so this leg pins the clause
-    // JOINTLY — removing the ordering gate alone leaves it green; the gate is
+    // JOINTLY: removing the ordering gate alone leaves it green; the gate is
     // defense-in-depth for future gate reuse without membership.
     let (compact, key, expected) = corpus_anchor_triple();
     let mut k = key;
@@ -2604,7 +2604,7 @@ fn bounds_anchor_inverted_window_rejects() {
     assert!(verify_historical_anchor(&compact, &k, &expected).is_err());
 }
 
-/// The corpus anchor triple (compact, key, expected) — shared.
+/// The corpus anchor triple (compact, key, expected): shared.
 fn corpus_anchor_triple() -> (Vec<u8>, HistoricalPublicKey, ExpectedAnchor) {
     let case_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -2686,14 +2686,14 @@ fn bounds_rust_archive_key_window_guards() {
 fn expected_struct_gates_precede_archive_digest_structural_pin() {
     let src = include_str!("../src/v1.rs");
     let hoist = src
-        .find("ADR 0017 clause-3 hoist: expected-struct well-formedness BEFORE the digest")
-        .expect("the clause-3 hoist marker is missing from v1.rs — the expected-struct gates were dropped or moved");
+        .find("REQ1-BOUNDS-ordering: validate expected context before hashing archive bytes")
+        .expect("the expected-context hoist marker is missing from v1.rs: the expected-struct gates were dropped or moved");
     // v1.rs has other hashers (verify_historical_anchor, verify_key_transition);
-    // the pin targets the export verify's digest — the first hasher AFTER the marker.
+    // the pin targets the export verify's digest: the first hasher AFTER the marker.
     let digest = src[hoist..]
         .find("let mut hasher = Sha256::new()")
         .map(|offset| hoist + offset)
-        .expect("the export digest call site moved — update this pin deliberately");
+        .expect("the export digest call site moved: update this pin deliberately");
     assert!(
         hoist < digest,
         "the expected-struct well-formedness gates must run BEFORE the archive digest (REQ1-BOUNDS-ordering)"
@@ -2708,7 +2708,7 @@ fn verify_export_malformed_expected_verdict_matrix() {
     assert!(verify_anchored_export(&f.obj, &f.keys, &f.expected).is_ok());
     // Each mutation below keeps the struct well-typed (the shape gate passes it)
     // but violates one well-formedness predicate; every case must reject. (The
-    // fingerprint/hash WIDTH cases cannot exist in Rust — [u8; 32] typing closes
+    // fingerprint/hash WIDTH cases cannot exist in Rust: [u8; 32] typing closes
     // them; the identifier/magnitude/charset/sequence cases carry the matrix.)
     let mut v = f.expected.clone();
     v.start_anchor.anchor_id = "x".repeat(600);
@@ -2788,7 +2788,7 @@ fn assemble_compact_threads_caller_bounds() {
         assemble_compact(&si, &sig, Some(&tight(&[("compact_bytes", n as u64 - 1)]))).is_err(),
         "tightened compact_bytes must reject the assembly"
     );
-    // (signature_bytes is a FIXED-WIDTH bound — untightenable by design; no leg can
+    // (signature_bytes is a FIXED-WIDTH bound: untightenable by design; no leg can
     // exercise it below 64.)
     assert!(
         assemble_compact(
@@ -2809,10 +2809,10 @@ fn assemble_compact_threads_caller_bounds() {
 }
 
 // =============================================================================
-// The round-12..14 pre-digest export gates — verdict-matrix regression pins (the
+// The round-12..14 pre-digest export gates: verdict-matrix regression pins (the
 // Rust half of the 2026-08-18 pin-debt payment). The red-capable WORK form of
 // these pins lives in the Python battery (verdict-subsumed gates; static calls
-// give Rust no sha256-count channel — the established convention from the
+// give Rust no sha256-count channel: the established convention from the
 // exception-2 hoist).
 // =============================================================================
 
@@ -2854,13 +2854,13 @@ fn round12_14_predigest_export_gates_verdict_matrix() {
 }
 
 // =============================================================================
-// v2 range-selector + contract-major mutation entries (ADR 0028 + the
+// v2 range-selector + contract-major mutation entries (spec/bap-v2.md §4 + the
 // contract-major v2 profile). Same RED discipline as the families above: each
 // entry documents the exact source mutation that flips it (or its named
 // reddening gate), through the PUBLIC crate surface only. Selector EVALUATION
 // (`selector::evaluate_v2`) is reachable publicly only inside
 // `v2::check_envelope`, which requires a valid holder signature the battery
-// cannot produce (AGENTS.md rule #6: no secret material) — the evaluate-path
+// cannot produce (AGENTS.md rule #6: no secret material): the evaluate-path
 // mutations below therefore name their reddening gates where they live: the
 // `conformance_v2` corpus gate (integration) and the `selector` in-module unit
 // tests (which call `evaluate_v2` directly).
@@ -2893,7 +2893,7 @@ fn round12_14_predigest_export_gates_verdict_matrix() {
 
 use bounded_authority_protocol::{v1, v2};
 
-/// A minimal v2 grant input whose one operation carries BOTH range kinds —
+/// A minimal v2 grant input whose one operation carries BOTH range kinds,
 /// the producer's lte/gte encode arms are distinguishable in the emitted
 /// segment bytes (kind strings + bound values).
 fn successor_range_grant() -> GrantInput {
@@ -2933,7 +2933,7 @@ fn successor_range_grant() -> GrantInput {
 #[test]
 fn range_selector_kinds_encode_byte_exact() {
     // (c): the producer emits the lte/gte kind strings and their numeric
-    // bounds at their exact JCS positions — swapping the producer arms, a kind
+    // bounds at their exact JCS positions: swapping the producer arms, a kind
     // string, or a bound tag flips this byte-exact comparison RED.
     let produced =
         v2::grant_signing_input(&successor_range_grant(), &max()).expect("v2 range grant produces");
@@ -2951,7 +2951,7 @@ fn range_selector_kinds_encode_byte_exact() {
 #[test]
 fn prior_major_producer_still_rejects_range_selectors() {
     // (c)/(closed-set): the identical range-selector grant is valid under v2
-    // and rejected by the v1 producer — admitting lte/gte in the v1 closed set
+    // and rejected by the v1 producer: admitting lte/gte in the v1 closed set
     // (or dropping them from the v2 set) flips this RED.
     assert!(v2::grant_signing_input(&successor_range_grant(), &max()).is_ok());
     assert_eq!(
@@ -2978,7 +2978,7 @@ fn compact_with_dummy_signature(
 #[test]
 fn grant_bytes_of_each_major_are_rejected_by_the_other() {
     // (d): a v:1 check widened to accept v:1 (or a v1 validator widened to
-    // v:2) makes one of the two directions decode Ok — RED.
+    // v:2) makes one of the two directions decode Ok: RED.
     let successor_compact = compact_with_dummy_signature(
         &v2::grant_signing_input(&successor_range_grant(), &max()).expect("v2 produces"),
     );
@@ -2986,7 +2986,7 @@ fn grant_bytes_of_each_major_are_rejected_by_the_other() {
     assert_eq!(
         v1::decode_grant(&successor_compact, &max()),
         Err(bounded_authority_protocol::Invalid),
-        "v1 façade must reject v2 grant bytes"
+        "v1 facade must reject v2 grant bytes"
     );
 
     let prior_major_grant = GrantInput {
@@ -3006,7 +3006,7 @@ fn grant_bytes_of_each_major_are_rejected_by_the_other() {
     assert_eq!(
         v2::decode_grant(&prior_compact, &max()),
         Err(bounded_authority_protocol::Invalid),
-        "v2 façade must reject v1 grant bytes"
+        "v2 facade must reject v1 grant bytes"
     );
 }
 
@@ -3048,7 +3048,7 @@ fn proof_bytes_of_each_major_are_rejected_by_the_other() {
 #[test]
 fn chain_rows_of_each_major_are_rejected_by_the_other() {
     // (d), chain-row leg: the v1 producer emits a `"v":1` row the v2
-    // check_chain must reject (and vice versa) — a widened version match in
+    // check_chain must reject (and vice versa): a widened version match in
     // `parse_row` flips this RED.
     let entry = ConsumptionEntry {
         chain_id: "chain-x".to_string(),
@@ -3098,8 +3098,8 @@ fn chain_rows_of_each_major_are_rejected_by_the_other() {
     );
 }
 
-/// SHA-256("BAP2-CHAIN\0" || row) — the v2 row-domain hash (the runner-side
-/// twin of the façade's internal helper; needed to build a caller head).
+/// SHA-256("BAP2-CHAIN\0" || row): the v2 row-domain hash (the runner-side
+/// twin of the facade's internal helper; needed to build a caller head).
 fn successor_row_domain_hash(row: &[u8]) -> [u8; 32] {
     use sha2::Digest;
     let mut h = sha2::Sha256::new();
@@ -3110,7 +3110,7 @@ fn successor_row_domain_hash(row: &[u8]) -> [u8; 32] {
     out
 }
 
-/// SHA-256("BAP1-CHAIN\0" || row) — the v1 row-domain hash.
+/// SHA-256("BAP1-CHAIN\0" || row): the v1 row-domain hash.
 fn prior_row_domain_hash(row: &[u8]) -> [u8; 32] {
     use sha2::Digest;
     let mut h = sha2::Sha256::new();
@@ -3124,7 +3124,7 @@ fn prior_row_domain_hash(row: &[u8]) -> [u8; 32] {
 #[test]
 fn request_digests_are_domain_separated_across_majors() {
     // (domain separation, battery leg): the identical operation + arguments
-    // produce different digests under the two majors — dropping the BAP2
+    // produce different digests under the two majors: dropping the BAP2
     // prefix (hashing v2 bindings under BAP1-REQUEST\0) makes the two digests
     // collide, flipping this RED.
     let args = JsonValue::Object(vec![("amount".to_string(), JsonValue::Int(10))]);
@@ -3137,16 +3137,18 @@ fn request_digests_are_domain_separated_across_majors() {
 }
 
 // =============================================================================
-// v3 legs — the contract-major 3 (`BAP3-ES256-SHA256`) closure classes
-// (ADR 0014 D6 battery extension, spec/bap-v3.md §3). Each leg drives the
+// v3 legs: the contract-major 3 (`BAP3-ES256-SHA256`) closure classes
+// (host-parser permissiveness closures (docs/design/conformance-contract.md) battery extension,
+// spec/bap-v3.md §3). Each leg drives the
 // PUBLIC v3 surface with corpus-v3 fixtures and carries the exact mechanical
-// mutation that makes the SAME test go RED (the ADR 0005:240-246
+// mutation that makes the SAME test go RED (the per-guard mutation proof
 // discipline). Every red observation below was produced LIVE at authoring
 // time by applying the quoted mutation, running the leg, capturing the
 // failure, and reverting; the runs ride this commit's authoring session.
 // =============================================================================
 
-/// The vendored v3 corpus root (self-contained SDK snapshot — ADR 0015 D5).
+/// The vendored v3 corpus root (self-contained SDK snapshot: SDK publication requires a
+/// separate repository (sdks/README.md publication boundary)).
 fn successor_corpus_root() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("conformance/priv/conformance/v3/corpus")
@@ -3221,7 +3223,7 @@ fn successor_with_signature(compact: &[u8], signature: &[u8; 64]) -> Vec<u8> {
 }
 
 // -----------------------------------------------------------------------------
-// (v3-lowS) LOW-S ACCEPTANCE — the malleability the profile exists to close.
+// (v3-lowS) LOW-S ACCEPTANCE: the malleability the profile exists to close.
 // -----------------------------------------------------------------------------
 
 /// s' = n - s over the 32-byte big-endian halves (the ECDSA malleable
@@ -3253,7 +3255,7 @@ fn successor_n_minus_s(signature: &[u8; 64]) -> [u8; 64] {
 fn es256_low_s_high_s_counterpart_is_rejected() {
     // (v3-lowS): the corpus's VALID low-S grant, re-spelled with s <- n - s,
     // is a canonical backend-ACCEPTED encoding that satisfies the ECDSA
-    // equation — ONLY the profile's low-S gate rejects it
+    // equation: ONLY the profile's low-S gate rejects it
     // (`REQ3-SIGNING-low-s`). Without the gate a third party observing any
     // valid signature could re-spell it into a second, differently-hashing,
     // still-valid encoding.
@@ -3261,7 +3263,7 @@ fn es256_low_s_high_s_counterpart_is_rejected() {
     // RED-CAPABLE: mutation = in `es256::validate_rs_range`, comment out the
     // `if *s > HALF_N { return Err(Invalid); }` arm. Observed live at
     // authoring: the leg fails with
-    //   `high-S malleable counterpart verified — low-S gate missing`
+    //   `high-S malleable counterpart verified: low-S gate missing`
     // (verify_grant returns Ok), because the counterpart signature verifies
     // end-to-end. Reverted; green.
     use bounded_authority_protocol::v3;
@@ -3281,29 +3283,29 @@ fn es256_low_s_high_s_counterpart_is_rejected() {
     let verdict = v3::verify_grant(&high_compact, &issuer, &expected);
     assert!(
         verdict == Err(bounded_authority_protocol::Invalid),
-        "high-S malleable counterpart verified — low-S gate missing"
+        "high-S malleable counterpart verified: low-S gate missing"
     );
 }
 
 // -----------------------------------------------------------------------------
-// (v3-range) r/s RANGE — the full `0 < r < n and 0 < s <= n/2` predicate.
+// (v3-range) r/s RANGE: the full `0 < r < n and 0 < s <= n/2` predicate.
 // -----------------------------------------------------------------------------
 
 #[test]
 fn es256_rs_range_rejects_zero_and_overflow_halves() {
     // (v3-range): the full `0 < r < n and 0 < s <= n/2` predicate
     // (`REQ3-SIGNING-range` + `REQ3-SIGNING-low-s`). The corpus's
-    // signature-canonicality matrix — zero r, zero s, r = n, s = n, high-s,
-    // tampered r, tampered s — every one rejected through the public verify
+    // signature-canonicality matrix: zero r, zero s, r = n, s = n, high-s,
+    // tampered r, tampered s: every one rejected through the public verify
     // path, PLUS the crafted malleable counterpart (s' = n - s of the VALID
     // corpus signature): the one range violation whose ONLY rejection site
     // is the profile gate (the backend accepts the canonical high half).
     //
     // RED-CAPABLE: mutation = in `es256::verify`, delete the
     // `validate_rs_range(signature)?;` call entirely. Observed live at
-    // authoring: this leg fails on its own corpus high-s member —
+    // authoring: this leg fails on its own corpus high-s member,
     // `corpus case verify-grant-v3-invalid-signature-high-s must be
-    // rejected` (verify_grant returned Ok) — while the zero-r / zero-s /
+    // rejected` (verify_grant returned Ok): while the zero-r / zero-s /
     // r-at-n / s-at-n members before it STAYED rejected in the same run
     // (the loop passed them before failing): the p256 backend's
     // `Signature::from_slice` rejects zero and non-canonical scalars on its
@@ -3330,7 +3332,7 @@ fn es256_rs_range_rejects_zero_and_overflow_halves() {
         );
     }
     // The gate's own load-bearing member: the malleable counterpart
-    // (0 < s' < n but s' > n/2) is backend-accepted — the range gate is the
+    // (0 < s' < n but s' > n/2) is backend-accepted: the range gate is the
     // only rejection site.
     let (compact, issuer, expected) = successor_grant_fixture("verify-grant-v3-valid");
     let text = std::str::from_utf8(&compact).unwrap();
@@ -3342,25 +3344,25 @@ fn es256_rs_range_rejects_zero_and_overflow_halves() {
     assert_eq!(
         v3::verify_grant(&high_compact, &issuer, &expected),
         Err(bounded_authority_protocol::Invalid),
-        "malleable range counterpart (s > n/2) verified — range gate missing"
+        "malleable range counterpart (s > n/2) verified: range gate missing"
     );
 }
 
 // -----------------------------------------------------------------------------
-// (v3-jwk-set) EC JWK MEMBER SET — closed {crv,kty,x,y} + the pinned values.
+// (v3-jwk-set) EC JWK MEMBER SET: closed {crv,kty,x,y} + the pinned values.
 // -----------------------------------------------------------------------------
 
 #[test]
 fn es256_ec_jwk_member_set_is_closed() {
     // (v3-jwk-set): wrong crv (P-384), wrong kty (OKP), an extra member
-    // (private d), a missing y, and the OKP-form member set — every one
+    // (private d), a missing y, and the OKP-form member set: every one
     // rejected by `v3::jwk_decode_public` (`REQ3-HEADER-proof-jwk`,
     // `REQ3-HEADER-no-private-jwk`).
     //
     // RED-CAPABLE: mutation = in `v3::jwk_decode_public`, (a) change the
     // unknown-member arm `_ => return Err(Invalid)` to `_ => {}` (ignore
     // extras) AND (b) relax the crv/kty matches to accept any string.
-    // Observed live at authoring: the leg fails — the extra-d, missing-y,
+    // Observed live at authoring: the leg fails: the extra-d, missing-y,
     // wrong-crv, and wrong-kty fixtures all decode to Ok. Reverted; green.
     use bounded_authority_protocol::v3;
     for id in [
@@ -3385,7 +3387,7 @@ fn es256_ec_jwk_member_set_is_closed() {
 }
 
 // -----------------------------------------------------------------------------
-// (v3-coord) COORDINATE WIDTH AND CANONICALITY — 32-byte canonical b64url
+// (v3-coord) COORDINATE WIDTH AND CANONICALITY: 32-byte canonical b64url
 // coordinates; 65-byte 0x04||x||y raw form.
 // -----------------------------------------------------------------------------
 
@@ -3393,16 +3395,16 @@ fn es256_ec_jwk_member_set_is_closed() {
 fn es256_coordinate_width_and_canonicality_are_enforced() {
     // (v3-coord): a short coordinate (3-byte x), a padded coordinate
     // (trailing `=`), a 64-byte raw key, and a compressed (0x02-prefixed)
-    // raw key — all rejected (`REQ3-KEY-uncompressed-sec1`, RFC 7518
+    // raw key: all rejected (`REQ3-KEY-uncompressed-sec1`, RFC 7518
     // §6.2.1 fixed-width coordinates, `REQ1-B64-canonical` incorporated).
     //
     // RED-CAPABLE: mutation = in `v3::jwk_decode_public`, drop the
     // `x_bytes.len() != 32` / `y_bytes.len() != 32` width checks. Observed
     // live at authoring: the leg goes RED immediately on the
-    // short-coordinate fixture — the decode path PANICS at the reassembly
+    // short-coordinate fixture: the decode path PANICS at the reassembly
     // (`source slice length (3) does not match destination slice length
     // (32)`) instead of returning Err(Invalid): without the gate the
-    // function neither accepts nor fails closed — it crashes, which is
+    // function neither accepts nor fails closed: it crashes, which is
     // itself the defect the gate prevents. The padded-coordinate fixture is
     // rejected earlier by the canonical-base64url decode (the
     // REQ1-B64-canonical layer the v1 battery's pad-bits leg owns) in both
@@ -3447,20 +3449,20 @@ fn es256_coordinate_width_and_canonicality_are_enforced() {
 }
 
 // -----------------------------------------------------------------------------
-// (v3-offcurve) OFF-CURVE POINT — pure-arithmetic gate before the backend.
+// (v3-offcurve) OFF-CURVE POINT: pure-arithmetic gate before the backend.
 // -----------------------------------------------------------------------------
 
 #[test]
 fn es256_off_curve_point_is_rejected() {
     // (v3-offcurve): a JWK whose coordinates are canonical, fixed-width,
-    // and < p, but which is NOT a curve point — rejected by the profile's
+    // and < p, but which is NOT a curve point: rejected by the profile's
     // pure-arithmetic gate (`REQ3-KEY-point-on-curve`; the spec requires
     // the check to precede the backend, whose off-curve behavior is
     // backend-specific and never load-bearing).
     //
     // RED-CAPABLE: mutation = in `v3::jwk_decode_public`, delete the
     // `es256::validate_point(&public_key)?;` call. Observed live at
-    // authoring: the leg fails — the off-curve fixture decodes to Ok (the
+    // authoring: the leg fails: the off-curve fixture decodes to Ok (the
     // coordinates reassemble cleanly; nothing else in the decode path
     // evaluates the curve equation). Reverted; green.
     use bounded_authority_protocol::v3;
@@ -3484,28 +3486,28 @@ fn es256_off_curve_point_is_rejected() {
 }
 
 // -----------------------------------------------------------------------------
-// (v3-cross-major) CROSS-MAJOR v ACCEPTANCE — v:3 exactly, both directions.
+// (v3-cross-major) CROSS-MAJOR v ACCEPTANCE: v:3 exactly, both directions.
 // -----------------------------------------------------------------------------
 
 #[test]
 fn es256_rejects_prior_major_bytes_both_directions() {
     // (v3-cross-major): authentic v1 and v2 grant compacts (the corpus's
-    // cross-major fixtures) are rejected by the v3 façade with the single
-    // closed error, and the v3 façade's own producer output is rejected by
+    // cross-major fixtures) are rejected by the v3 facade with the single
+    // closed error, and the v3 facade's own producer output is rejected by
     // BOTH prior majors (`REQ3-CORE-cross-major-reject`). The prior-major
     // corpus compacts carry EdDSA headers, so they reject at the alg pin;
     // the v claim's OWN gate is driven by the crafted v-flip fixture: the
     // corpus's valid v3 compact with `v: 3` rewritten to `v: 1` (decode
-    // verifies no signature, so the flip needs no re-signing) — a compact
+    // verifies no signature, so the flip needs no re-signing): a compact
     // whose ONLY prior-major marker is the v value.
     //
     // RED-CAPABLE: mutation = in `v3::validate_grant_payload`, widen the
     // version match from `Some(JsonValue::Int(3))` to
     // `Some(JsonValue::Int(n)) if (1..=3).contains(n)`. Observed live at
     // authoring: the leg fails on the crafted v-flip assert (`v:1 payload
-    // decoded — the v gate is the major detector`) while the corpus v1/v2
+    // decoded: the v gate is the major detector`) while the corpus v1/v2
     // fixtures stay rejected in the same run (their EdDSA headers reject at
-    // the alg pin first — defense in depth: header alg, then payload v).
+    // the alg pin first: defense in depth: header alg, then payload v).
     // The proof validator (`validate_proof_payload`) carries the identical
     // v pin. Reverted; green.
     use bounded_authority_protocol::v3;
@@ -3530,7 +3532,7 @@ fn es256_rejects_prior_major_bytes_both_directions() {
     }
     // The v gate as the sole major detector: rewrite the VALID corpus v3
     // compact's payload v to 1 (decode needs no signature; the canonical
-    // JCS member order is unchanged — `v` is the last member).
+    // JCS member order is unchanged: `v` is the last member).
     let (valid_compact, ..) = successor_grant_fixture("verify-grant-v3-valid");
     let text = std::str::from_utf8(&valid_compact).unwrap();
     let mut parts = text.split('.');
@@ -3553,10 +3555,10 @@ fn es256_rejects_prior_major_bytes_both_directions() {
     assert_eq!(
         v3::decode_grant(flipped_compact.as_bytes(), &max()),
         Err(bounded_authority_protocol::Invalid),
-        "v:1 payload decoded — the v gate is the major detector"
+        "v:1 payload decoded: the v gate is the major detector"
     );
     // The reverse direction: a produced v3 grant (v:3, ES256) is rejected by
-    // the v1 and v2 façades.
+    // the v1 and v2 facades.
     let grant = bounded_authority_protocol::types::GrantInput {
         issuer: "https://issuer.example.test".to_string(),
         grant_id: "urn:example:grant:v3-1".to_string(),

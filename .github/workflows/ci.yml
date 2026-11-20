@@ -230,7 +230,7 @@ jobs:
           # exact toolchain, matching .tool-versions. Pinned exactly (the
           # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
           # small-order inputs differs across Node releases, so a floating major would make the
-          # runners' ungated behavior depend on the runner image (ADR 0040).
+          # runners' ungated behavior depend on the runner image (docs/errata.md erratum 2).
           node-version-file: .tool-versions
           package-manager-cache: false
 
@@ -266,7 +266,7 @@ jobs:
 
       # Corpus sync, generator --verify, verdict digests and distribution mutations.
       # Focused tests use separate VMs, preserving the full test --cover --seed 42
-      # run in quality-tests (ADR 0049 D6).
+      # run in quality-tests. SDK README examples also run against each distributable.
       - name: Run corpus quality stage
         run: mix quality.corpus
 
@@ -302,7 +302,7 @@ jobs:
           # exact toolchain, matching .tool-versions. Pinned exactly (the
           # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
           # small-order inputs differs across Node releases, so a floating major would make the
-          # runners' ungated behavior depend on the runner image (ADR 0040).
+          # runners' ungated behavior depend on the runner image (docs/errata.md erratum 2).
           node-version-file: .tool-versions
           package-manager-cache: false
 
@@ -359,7 +359,7 @@ jobs:
           # exact toolchain, matching .tool-versions. Pinned exactly (the
           # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
           # small-order inputs differs across Node releases, so a floating major would make the
-          # runners' ungated behavior depend on the runner image (ADR 0040).
+          # runners' ungated behavior depend on the runner image (docs/errata.md erratum 2).
           node-version-file: .tool-versions
           package-manager-cache: false
 
@@ -404,7 +404,7 @@ jobs:
           # exact toolchain, matching .tool-versions. Pinned exactly (the
           # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
           # small-order inputs differs across Node releases, so a floating major would make the
-          # runners' ungated behavior depend on the runner image (ADR 0040).
+          # runners' ungated behavior depend on the runner image (docs/errata.md erratum 2).
           node-version-file: .tool-versions
           package-manager-cache: false
 

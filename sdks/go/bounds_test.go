@@ -99,7 +99,7 @@ func TestBoundsNew(t *testing.T) {
 			t.Fatalf("BoundsNew(%v) = %+v, want ErrInvalid", o, b)
 		}
 	}
-	// A zero-value Bounds is NOT the maximum — only BoundsMaximum/BoundsNew
+	// A zero-value Bounds is NOT the maximum: only BoundsMaximum/BoundsNew
 	// produce valid bounds; everything else fails closed at revalidation.
 	var zero Bounds
 	if err := validateBounds(&zero); err == nil {

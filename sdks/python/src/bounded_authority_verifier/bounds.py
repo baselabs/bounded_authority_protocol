@@ -2,7 +2,7 @@
 
 Pinned by the corpus ``bounds.new`` cases so any mistyped constant fails. Fixed-width keys
 (REQ1-BOUNDS-fixed-widths, L395): ``digest_bytes``, ``public_key_bytes``, ``signature_bytes`` are the
-immutable cryptographic constants of suite BAP1-Ed25519-SHA256 — they MUST equal the maximum exactly
+immutable cryptographic constants of suite BAP1-Ed25519-SHA256: they MUST equal the maximum exactly
 (widening is forbidden); all others may be tightened to a positive integer at most the maximum.
 """
 
@@ -15,8 +15,8 @@ from typing import cast
 from ._inputs import _mapping_items, _text
 from .error import InvalidError, Ok, Result, _fail, err
 
-# The original 38-row table comes from spec/bap-v1.md. ``content_bytes`` is the ADR 0018
-# amendment defined by spec/bap-content-assertion-v1.md; existing profile meanings are unchanged.
+# Profile maxima come from spec/bap-v1.md §17. The content-assertion profile adds
+# ``content_bytes`` under spec/bap-content-assertion-v1.md; existing maxima are unchanged.
 MAXIMA: Mapping[str, int] = MappingProxyType(
     {
         "compact_bytes": 65536,
@@ -64,7 +64,7 @@ MAXIMA: Mapping[str, int] = MappingProxyType(
 MaximaKey = str
 """A key into the MAXIMA table (a string, since Python's type system treats it lexically)."""
 
-# The fixed-width keys (REQ1-BOUNDS-fixed-widths, L395) — cannot be tightened or widened.
+# The fixed-width keys (REQ1-BOUNDS-fixed-widths, L395): cannot be tightened or widened.
 FIXED_WIDTH_KEYS: frozenset[str] = frozenset(
     {"digest_bytes", "public_key_bytes", "signature_bytes"}
 )

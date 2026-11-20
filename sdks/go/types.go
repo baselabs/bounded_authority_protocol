@@ -2,7 +2,7 @@ package verifier
 
 // Caller-supplied context structs (spec/bap-v1.md § Public verification
 // contract). Every public entry revalidates every field
-// (REQ1-VERIFY-revalidate); structs are exact — no extra members exist.
+// (REQ1-VERIFY-revalidate); structs are exact: no extra members exist.
 
 // Kind names the four current-v1 signing kinds.
 type Kind string
@@ -19,8 +19,8 @@ const (
 
 // SigningInput is a canonical JWS signing-input pair: the exact canonical
 // JSON bytes of the protected header and payload. The JWS signing input is
-// ASCII(BASE64URL(protected) || '.' || BASE64URL(payload)) — no domain
-// prefix, no extra bytes (REQ1-SIGNING-exact-input, ADR 0003).
+// ASCII(BASE64URL(protected) || '.' || BASE64URL(payload)): no domain
+// prefix, no extra bytes (REQ1-SIGNING-exact-input, spec/bap-v1.md §14).
 type SigningInput struct {
 	Kind      Kind
 	Protected []byte
@@ -85,7 +85,7 @@ type KeyTransition struct {
 	NextPublicKey    []byte
 }
 
-// ConsumptionEntry is one canonical consumption row input (ADR 0004).
+// ConsumptionEntry is one canonical consumption row input (spec/bap-v1.md §15).
 type ConsumptionEntry struct {
 	ChainID      string
 	Commitment   string
@@ -100,7 +100,7 @@ type ChainInput struct {
 
 // HistoricalPublicKey is one exact caller-trusted historical key with its
 // validity window. ValidBeforeUnbounded is the only open upper interval
-// (ADR 0004).
+// (spec/bap-v1.md §15).
 type HistoricalPublicKey struct {
 	KeyID                string
 	PublicKey            []byte
@@ -150,7 +150,8 @@ type ExpectedKeyTransition struct {
 // ExpectedAnchoredExport is the complete expected chain/anchor/transition/
 // digest/object-version context (REQ1-EXPORT-input-shape). A present nested
 // Bounds must equal the outer resolved bounds; absent nested bounds are valid
-// only under an effectively-untightened outer (ADR 0018 D2 identity
+// only under an effectively-untightened outer (nested bounds must equal the resolved outer
+// bounds (spec/bap-v1.md §17) identity
 // semantics).
 type ExpectedAnchoredExport struct {
 	Chain         ExpectedChain
@@ -162,7 +163,7 @@ type ExpectedAnchoredExport struct {
 	Bounds        *Bounds
 }
 
-// AnchoredExportInput is the producer-side archive composition (ADR 0004):
+// AnchoredExportInput is the producer-side archive composition (spec/bap-v1.md §15):
 // canonical rows plus the start/end anchor compacts and ordered transition
 // compacts.
 type AnchoredExportInput struct {

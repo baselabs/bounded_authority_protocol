@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# BAP-16 — enforce the runtime dependency-license allowlist for the Go SDK.
+# BAP-16: enforce the runtime dependency-license allowlist for the Go SDK.
 #
-# AGENTS rule 10 + ADR 0014 D8: every dependency a CONSUMER inherits must
-# carry a permissive license. This module pins ZERO runtime dependencies by
+# Every dependency inherited by a consumer must carry a permissive license. This module pins ZERO runtime dependencies by
 # design (standard library only: crypto/ed25519, crypto/ecdsa, crypto/elliptic,
 # crypto/sha256, crypto/subtle, math/big, and pure parsing packages),
-# so the gate asserts the dependency closure is exactly empty — with a
-# fail-closed floor: a degraded or unparseable `go list` output can never
+# so the gate requires an exactly empty dependency closure. It fails closed: a degraded or unparseable `go list` output can never
 # satisfy the gate, and any require line (module dependency) fails it.
 #
 # The Go standard library is BSD-3-Clause toolchain surface, not a module
@@ -23,17 +21,17 @@ script_dir=$(dirname "$0")
 cd "$script_dir/.."
 
 if ! command -v go >/dev/null 2>&1; then
-  echo "license_check: FAIL — go toolchain not found." >&2
+  echo "license_check: FAIL: go toolchain not found." >&2
   exit 1
 fi
 
 deps=$(go list -m all) || {
-  echo "license_check: FAIL — 'go list -m all' failed." >&2
+  echo "license_check: FAIL: 'go list -m all' failed." >&2
   exit 1
 }
 
 if [ -z "$deps" ]; then
-  echo "license_check: FAIL — 'go list -m all' returned nothing (degraded output refused)." >&2
+  echo "license_check: FAIL: 'go list -m all' returned nothing (degraded output refused)." >&2
   exit 1
 fi
 
@@ -42,9 +40,9 @@ runtime_deps=$(grep -v '^github.com/baselabs/bounded_authority_protocol_go$' <<<
 count=$(grep -c . <<< "$runtime_deps") || [ "$?" -eq 1 ]
 
 if [ "$count" -ne 0 ]; then
-  echo "license_check: FAIL — $count runtime module dependency(ies) present; the SDK pins zero:" >&2
+  echo "license_check: FAIL: $count runtime module dependency(ies) present; the SDK pins zero:" >&2
   grep . <<< "$runtime_deps" >&2
   exit 1
 fi
 
-echo "license_check: OK — zero runtime dependencies (stdlib-only module)."
+echo "license_check: OK: zero runtime dependencies (stdlib-only module)."

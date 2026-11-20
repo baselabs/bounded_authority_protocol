@@ -25,7 +25,7 @@ import (
 
 // certifiedIndexSHA256 is the SHA-256 of the certified v2 corpus index.json
 // this SDK was conformed against (base64url). A vendored corpus that hashes
-// to anything else fails closed here — silent drift is impossible.
+// to anything else fails closed here: silent drift is impossible.
 const certifiedIndexSHA256 = "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A"
 
 const corpusDir = "priv/conformance/v2/corpus"
@@ -120,7 +120,7 @@ func loadCorpus(t *testing.T) (*corpusIndex, []loadedFile) {
 	}
 	sum := sha256.Sum256(indexBytes)
 	if v.Base64urlEncode(sum[:]) != certifiedIndexSHA256 {
-		t.Fatalf("vendored corpus index.json SHA-256 mismatch: got %s want %s — fail closed on corpus drift",
+		t.Fatalf("vendored corpus index.json SHA-256 mismatch: got %s want %s: fail closed on corpus drift",
 			v.Base64urlEncode(sum[:]), certifiedIndexSHA256)
 	}
 	var idx corpusIndex
@@ -330,7 +330,7 @@ func collectCaseKeys(t *testing.T, m map[string]json.RawMessage, target map[stri
 
 // runCase dispatches one corpus case to its surface driver. Primitive
 // surfaces dispatch to the shared surface; every wire-versioned surface
-// dispatches to the V2 façade. Any disagreement is fatal.
+// dispatches to the V2 facade. Any disagreement is fatal.
 func runCase(t *testing.T, c corpusCase) {
 	t.Helper()
 	// JWK text contributes a key only after the public decoder accepts it.
@@ -927,7 +927,7 @@ func historicalKey(t *testing.T, m map[string]json.RawMessage, pk string) v.Hist
 		PublicKey: decodeB64(t, corpusCase{}, pk),
 		ValidFrom: rawInt(t, m, "valid_from"),
 	}
-	// a null (or absent) valid_before is the unbounded upper validity — the
+	// a null (or absent) valid_before is the unbounded upper validity: the
 	// same mapping the Rust runner makes (ValidityUpperBound::Unbounded).
 	if raw, ok := m["valid_before"]; ok && string(raw) != "null" {
 		k.ValidBefore = rawInt(t, m, "valid_before")

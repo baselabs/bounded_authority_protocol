@@ -1,12 +1,11 @@
-//! Ed25519 verify wrapper — the `BAP1-Ed25519-SHA256` signature backend.
+//! Ed25519 verify wrapper: the `BAP1-Ed25519-SHA256` signature backend.
 //!
 //! Thin wrapper over `ed25519-dalek` 3.0 with `default-features = false` (the
-//! serial verify backend — no `fast`/`asm`/`pkcs8`/`pem`/`rand_core` features;
-//! verify-only). Per design-note D-RISK-2, the accepted posture is that
-//! `curve25519-dalek` / `ed25519-dalek` carry transitive `unsafe` internally;
+//! serial verify backend: no `fast`/`asm`/`pkcs8`/`pem`/`rand_core` features;
+//! verify-only). `curve25519-dalek` and `ed25519-dalek` contain transitive `unsafe`;
 //! the crate-level `#![forbid(unsafe_code)]` covers OUR code only and does not
 //! reach into the backend. This module does not attempt to eliminate that
-//! transitive `unsafe` — it is the documented, accepted trade for a reviewed
+//! transitive `unsafe`: it is the documented, accepted trade for a reviewed
 //! pure-Rust Ed25519 verify path.
 //!
 //! **Verify-only, public keys only.** No key generation, no signing callback,
@@ -15,14 +14,14 @@
 //! satisfy caller-supplied trusted inputs; it never selects keys, reserves
 //! replay, checks live revocation, or grants execution.
 //!
-//! Every backend rejection or exception — a public-key encoding that does not
+//! Every backend rejection or exception (a public-key encoding that does not
 //! decompress to a valid Edwards point, a signature that does not verify, or
-//! any internal error inside the backend — collapses to exactly `Err(Invalid)`
+//! any internal error inside the backend) collapses to exactly `Err(Invalid)`
 //! (`REQ1-SIGNING-backend-reject`). The backend's `SignatureError` carries
 //! diagnostic detail that the protocol forbids leaking, so it is mapped to the
 //! single closed error shape and discarded.
 
-// `verify` is `pub(crate)` and is wired by the v1 façade: `verify_grant` and
+// `verify` is `pub(crate)` and is wired by the v1 facade: `verify_grant` and
 // `check_envelope` (Task 12) call it for the grant and holder-proof Ed25519
 // signatures. The crate-level `#![forbid(unsafe_code)]` is unaffected.
 //
@@ -256,13 +255,13 @@ mod tests {
     }
 
     // ==========================================================================
-    // RFC 8032 §7.1 TEST 1 — the independent positive + tamper battery
+    // RFC 8032 §7.1 TEST 1: the independent positive + tamper battery
     //
     // ALL test material below is PUBLIC (the RFC's published public key +
     // signature + empty message). This crate is verify-only and public-keys-
     // only (AGENTS.md rule #6): no SigningKey, secret seed, or private scalar
     // enters the source even in tests. The RFC vector is an INDEPENDENT
-    // implementation's output — NOT a self-round-trip — so a passing verify
+    // implementation's output (NOT a self-round-trip) so a passing verify
     // proves ed25519-dalek interoperates with the RFC reference.
     // ==========================================================================
 

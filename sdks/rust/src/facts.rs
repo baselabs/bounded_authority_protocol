@@ -1,20 +1,21 @@
 //! Redacted-by-construction verification facts (the public value records the
-//! façade returns on success).
+//! facade returns on success).
 //!
-//! These six structs are the ONLY public outputs of the verification surfaces
-//! (`verify_grant`, `check_envelope`, `check_chain`, `verify_historical_anchor`,
-//! `verify_key_transition`, `verify_anchored_export`). They are
-//! **value-bearing, fixed-redacted, and non-authorizing**: each carries an
-//! explicit `NotEvaluated` marker so a successful result can never be read as a
-//! decision, receipt, or execution credential
-//! (`REQ1-VERIFY-facts-redacted`, `REQ1-VERIFY-facts-not-credentials`,
-//! `REQ1-CHAIN-facts-not-evaluated`). The sibling role-attestation profile
-//! (`bap-role-attestation/1`) adds a seventh — [`AttestationFacts`] — under
-//! the same redaction contract.
+//! The eight public verification facts types are [`GrantFacts`], [`EnvelopeFacts`],
+//! [`ChainFacts`], [`AnchorFacts`], [`KeyTransitionFacts`], [`AnchoredExportFacts`],
+//! [`AttestationFacts`], and [`ContentAssertionFacts`](crate::ContentAssertionFacts). The first six serve the
+//! contract-major verification surfaces; the last two serve the role-attestation
+//! and content-assertion sibling profiles. They are
+//! **value-bearing, fixed-redacted, and non-authorizing**: each carries an explicit
+//! `NotEvaluated` marker so a successful result can never be read as a decision,
+//! receipt, or execution credential (`REQ1-VERIFY-facts-redacted`,
+//! `REQ1-VERIFY-facts-not-credentials`, `REQ1-CHAIN-facts-not-evaluated`). Both
+//! sibling profiles follow the same redaction contract.
 //!
 //! # Redaction contract (load-bearing)
 //!
-//! Every facts struct implements the specified diagnostic rendering (spec/diagnostic-rendering.md § Diagnostic rendering), for example
+//! Every facts struct implements the specified diagnostic rendering
+//! (spec/diagnostic-rendering.md § Diagnostic rendering), for example
 //! `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`, including alternate, width,
 //! and precision formatting. Only the contract-major selects the constant text.
 //! Facts derive [`Clone`] and [`PartialEq`], but never `serde::Serialize`,
@@ -38,15 +39,16 @@ use crate::types::Role;
 /// The single not-evaluated marker carried by every facts struct.
 ///
 /// A unit struct used as the type of both the `authorization` and `trust`
-/// fields — the FIELD NAME distinguishes the semantics, matching the
+/// fields: the FIELD NAME distinguishes the semantics, matching the
 /// protocol's single `:not_evaluated` atom. `GrantFacts` / `EnvelopeFacts` /
 /// `AnchoredExportFacts` expose `authorization: NotEvaluated`; the diagnostic
-/// chain / anchor / transition / export facts expose `trust: NotEvaluated`;
+/// chain, anchor, transition, export, role-attestation, and content-assertion
+/// facts expose `trust: NotEvaluated`;
 /// `AnchoredExportFacts` carries BOTH (`REQ1-CHAIN-facts-shape`:
 /// "Only `AnchoredExportFacts` additionally carries `authorization:
 /// not_evaluated`").
 ///
-/// Derives [`Debug`], [`Clone`], [`Copy`], [`PartialEq`], [`Eq`] only — it
+/// Derives [`Debug`], [`Clone`], [`Copy`], [`PartialEq`], [`Eq`] only: it
 /// renders as the bare token `NotEvaluated` and carries no value, so it cannot
 /// be mistaken for a positive decision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,11 +60,11 @@ pub struct NotEvaluated;
 ///
 /// The positive-but-bounded spelling of what a role-attestation verification
 /// proved: the Ed25519 signature under the attestor key and the window
-/// containment — nothing more. It is deliberately NOT an authorization: trust
+/// containment: nothing more. It is deliberately NOT an authorization: trust
 /// scope, the required role, replay, and revocation stay caller-side
 /// (`REQ-RA1-VERIFY-policy-caller-side`, `REQ-RA1-SECURITY-not-authority`).
 ///
-/// Derives [`Debug`], [`Clone`], [`Copy`], [`PartialEq`], [`Eq`] only — it
+/// Derives [`Debug`], [`Clone`], [`Copy`], [`PartialEq`], [`Eq`] only: it
 /// renders as the bare token `SignatureAndWindow` and carries no value, so it
 /// cannot be mistaken for a decision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,7 +107,7 @@ pub struct GrantFacts {
     pub nbf: i64,
     /// Grant `exp` (integral NumericDate).
     pub exp: i64,
-    /// Authorization was not evaluated — verification is not authority.
+    /// Authorization was not evaluated: verification is not authority.
     pub authorization: NotEvaluated,
 }
 
@@ -116,7 +118,7 @@ pub struct GrantFacts {
 /// of the grant result. `check_envelope` re-verifies the raw grant, so
 /// `EnvelopeFacts` **embeds** [`GrantFacts`] (the grant view it re-established)
 /// rather than duplicating its fields. Both the embedded grant view and the
-/// envelope itself carry `authorization: NotEvaluated` — neither is authorized
+/// envelope itself carry `authorization: NotEvaluated`: neither is authorized
 /// (`REQ1-VERIFY-grant-not-authorized`, `REQ1-VERIFY-envelope-binding`).
 ///
 /// The grant/request hashes are raw 32-byte SHA-256 digests (`ath` over the
@@ -136,15 +138,15 @@ pub struct EnvelopeFacts {
     pub operation: String,
     /// The proof `htu` (normalized HTTPS target URI).
     pub normalized_uri: String,
-    /// Raw 32-byte `ath` — SHA-256 over the ASCII bytes of the received grant
+    /// Raw 32-byte `ath`: SHA-256 over the ASCII bytes of the received grant
     /// compact value (`REQ1-CLAIM-ath`).
     pub grant_hash: [u8; 32],
-    /// Raw 32-byte `ba_req` — the request digest
+    /// Raw 32-byte `ba_req`: the request digest
     /// (`base64url(SHA-256("BAP1-REQUEST\0" || JCS([op, typed(cast_args)])))`).
     pub request_hash: [u8; 32],
     /// The proof `iat` (integral NumericDate).
     pub proof_iat: i64,
-    /// Authorization was not evaluated — verification is not authority.
+    /// Authorization was not evaluated: verification is not authority.
     pub authorization: NotEvaluated,
 }
 
@@ -159,12 +161,12 @@ pub struct EnvelopeFacts {
 /// `trust: :not_evaluated`" (`spec/bap-v1.md` line 462). The fields are the
 /// VERIFIED chain boundaries: chain identity, row count, first/last sequence,
 /// and the caller predecessor / caller head the range was bound against
-/// (ADR 0004 § Consumption rows: "requires ... chain identity, consecutive
+/// (spec/bap-v1.md §15, Consumption rows: "requires ... chain identity, consecutive
 /// sequence, predecessor links, row count, first/last sequence, caller
 /// predecessor, and caller head"). The corpus `expected` for `check_chain`
-/// carries only `verdict`, so the ADR 0004 contract is the field-set authority.
+/// carries only `verdict`, so the spec/bap-v1.md §15 contract is the field-set authority.
 ///
-/// Chain facts carry `trust` only — they make no `authorization` field part of
+/// Chain facts carry `trust` only: they make no `authorization` field part of
 /// their public shape (`REQ1-CHAIN-facts-shape`).
 #[derive(Clone, PartialEq)]
 pub struct ChainFacts {
@@ -184,7 +186,7 @@ pub struct ChainFacts {
     /// Raw 32-byte caller head: the hash of the last row in the range
     /// (`SHA-256("BAP1-CHAIN\0" || canonical_row_bytes)` of the final row).
     pub head_hash: [u8; 32],
-    /// Trust was not evaluated — a self-consistent chain does not certify
+    /// Trust was not evaluated: a self-consistent chain does not certify
     /// completeness (`REQ1-CHAIN-no-deletion-cert`).
     pub trust: NotEvaluated,
 }
@@ -195,7 +197,7 @@ pub struct ChainFacts {
 /// A boundary anchor is a compact JWS whose closed JCS payload "binds protocol
 /// version, anchor identity and time, chain identity, sequence, chain hash, and
 /// the RFC 7638 fingerprint derived from the raw Ed25519 public key"
-/// (ADR 0004 § Boundary anchors). These verified values are echoed in the
+/// (spec/bap-v1.md §15, Boundary anchors). These verified values are echoed in the
 /// facts. Anchor facts carry `trust` only (`REQ1-CHAIN-facts-shape`).
 #[derive(Clone, PartialEq)]
 pub struct AnchorFacts {
@@ -226,7 +228,7 @@ pub struct AnchorFacts {
 ///
 /// A transition is a compact JWS whose closed payload "binds transition and
 /// chain identities, effective time, current fingerprint, next key ID, and next
-/// fingerprint" (ADR 0004 § Authenticated key transitions). Transition facts
+/// fingerprint" (spec/bap-v1.md §15, Authenticated key transitions). Transition facts
 /// carry `trust` only (`REQ1-CHAIN-facts-shape`).
 #[derive(Clone, PartialEq)]
 pub struct KeyTransitionFacts {
@@ -254,11 +256,11 @@ pub struct KeyTransitionFacts {
 /// (`verify_anchored_export`).
 ///
 /// "anchored-export results additionally carry `authorization: :not_evaluated`"
-/// (`REQ1-CHAIN-facts-shape`) — this is the ONLY chain-family fact that exposes
+/// (`REQ1-CHAIN-facts-shape`): this is the ONLY chain-family fact that exposes
 /// an `authorization` field, because an anchored export binds the retrieved
 /// object generation. The closed archive header "binds chain identity,
 /// first/last sequence, row count, transition count, predecessor, head, and
-/// version one" (ADR 0004 § Anchored export); verification also independently
+/// version one" (spec/bap-v1.md §15, Anchored export); verification also independently
 /// recomputes the complete-archive SHA-256 and compares the out-of-band
 /// object-store version.
 #[derive(Clone, PartialEq)]
@@ -287,7 +289,7 @@ pub struct AnchoredExportFacts {
     pub object_version: String,
     /// Trust was not evaluated.
     pub trust: NotEvaluated,
-    /// Authorization was not evaluated — even a fully authenticated export is
+    /// Authorization was not evaluated: even a fully authenticated export is
     /// not an execution decision.
     pub authorization: NotEvaluated,
 }
@@ -326,7 +328,7 @@ pub struct AttestationFacts {
     pub nbf: i64,
     /// The `exp` (integral NumericDate).
     pub exp: i64,
-    /// The signature and the window containment were verified — and nothing
+    /// The signature and the window containment were verified: and nothing
     /// else.
     pub verification: SignatureAndWindow,
     /// Trust was not evaluated.

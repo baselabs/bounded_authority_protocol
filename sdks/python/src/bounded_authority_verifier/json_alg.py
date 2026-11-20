@@ -1,6 +1,6 @@
 """Tagged JSON algebra (spec/bap-v1.md § JSON algebra and decoding, L72-95).
 
-Each JSON value is tagged so the integer/float distinction survives — selector semantic identity
+Each JSON value is tagged so the integer/float distinction survives: selector semantic identity
 (REQ1-SELECTOR-semantic-identity) and the typed request-digest projection both depend on it::
 
     Null | Boolean(bool) | Integer(int) | Float(float) | String(utf8) | Array([Value]) | Object([(str, Value)])
@@ -8,7 +8,7 @@ Each JSON value is tagged so the integer/float distinction survives — selector
 Objects retain source member order; duplicate names at any depth reject pre-dict-conversion
 (REQ1-JSON-no-duplicate). Input is one complete RFC 8259 value + only whitespace (REQ1-JSON-single-
 value). UTF-8 mandatory; no Unicode normalization (REQ1-JSON-no-normalization). Number lexemes are
-scanned raw before conversion (64-byte ceiling, exact decimal magnitude) — REQ1-JSON-raw-lexeme.
+scanned raw before conversion (64-byte ceiling, exact decimal magnitude): REQ1-JSON-raw-lexeme.
 
 PERMISSIVENESS CLOSURES (the load-bearing host-runtime discipline):
  - duplicate-reject: hand-rolled recursive scan with a per-object set of seen names. NOT ``json.loads``
@@ -99,7 +99,7 @@ class JArray:
 class JObject:
     # Plain dict (NOT a subclass) keyed by the decoded string; insertion order preserved (dict
     # iteration order = insertion order in Python 3.7+). Members are accessed ONLY by dict[key]
-    # subscription throughout the SDK — never getattr — so __class__/__proto__ keys are data.
+    # subscription throughout the SDK (never getattr) so __class__/__proto__ keys are data.
     """An ordered collection of UTF-8 member names and tagged values.
 
     Fields:
@@ -215,7 +215,7 @@ def _expect_lit(ctx: _Ctx, lit: bytes) -> None:
     src = ctx.src
     pos = ctx.pos
     if pos + len(lit) > len(src):
-        _fail(f"json: expected {lit!r}")  # truncated literal — bounds-check before indexing
+        _fail(f"json: expected {lit!r}")  # truncated literal: bounds-check before indexing
     for i, b in enumerate(lit):
         if src[pos + i] != b:
             _fail(f"json: expected {lit!r}")
@@ -274,11 +274,11 @@ def _scan_string(ctx: _Ctx, start: int) -> bytes:
                 out.append(0x0D)
             elif e == 0x74:
                 out.append(0x09)
-            elif e == 0x75:  # \uXXXX — 4 hex digits; handle surrogate pairs.
+            elif e == 0x75:  # \uXXXX: 4 hex digits; handle surrogate pairs.
                 hi = _parse_hex4(ctx)
                 if 0xD800 <= hi <= 0xDBFF:
                     # High surrogate; require \uXXXX low surrogate. Bounds-guard the continuation
-                    # check — a lone high-surrogate escape at end-of-buffer (b'"\uD800') must fail
+                    # check: a lone high-surrogate escape at end-of-buffer (b'"\uD800') must fail
                     # closed as InvalidError, not raise IndexError on src[ctx.pos+1]. The TS sibling
                     # is safe (out-of-range Uint8Array access yields undefined); Python raises.
                     if _byte_at(src, ctx.pos) != 0x5C or _byte_at(src, ctx.pos + 1) != 0x75:
@@ -395,14 +395,14 @@ def _parse_number(ctx: _Ctx) -> Tagged:
     if is_float:
         # REQ1-JSON-raw-lexeme: check the magnitude of the RAW lexeme by decimal arithmetic BEFORE
         # float() conversion. A lexeme like "9007199254740991.0001" rounds to the max binary64 value
-        # under float(), so a post-conversion abs(n) > MAX check accepts it — defeating the exact
+        # under float(), so a post-conversion abs(n) > MAX check accepts it: defeating the exact
         # bound. Compare the raw significant decimal digits before conversion
         # as required by spec/bap-v1.md §8, REQ1-JSON-raw-lexeme.
         if not _lexeme_magnitude_within(text, MAX_FLOAT):
             _fail("json: float magnitude bound")
         n = float(text)
         # Python floats are always finite here (a non-finite lexeme like "1e400" overflows to inf,
-        # which we reject — float_magnitude is the finite bound).
+        # which we reject: float_magnitude is the finite bound).
         if _is_inf(n):
             _fail("json: float not finite")
         return JFloat(n)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Library-path purity linter for ``bounded_authority_verifier`` (ADR 0014 D8).
+"""Library-path purity linter for ``bounded_authority_verifier``.
 
-Forbids I/O + clock + RNG + network + filesystem imports/calls in ``src/`` — the analog of the
+Forbids I/O + clock + RNG + network + filesystem imports/calls in ``src/``: the analog of the
 repository architecture purity rules for the library path. A stray ``datetime.now()`` /
 ``time.time()`` / ``random.random()`` / ``open(...)`` / ``socket.*`` / ``subprocess.*`` /
 ``os.environ`` / ``urllib.request`` / ``http.client`` in the verify path fails it.
@@ -60,7 +60,8 @@ SRC_DIR = SDK_DIR / "src" / "bounded_authority_verifier"
 
 # fmt: off
 # BEGIN DERIVATION RULES
-# ADR 0014 D5: identical rules travel with each independently publishable SDK.
+# independent spec-and-corpus derivation (docs/design/conformance-contract.md): identical rules
+# travel with each independently publishable SDK.
 # Split and escaped literals keep this checker inside its own scan boundary.
 DERIVATION_PATTERNS = [
     ("reference source citation", re.compile(
@@ -158,7 +159,7 @@ class PurityChecker(ast.NodeVisitor):
             qual = _qualified_name(node.func)
             if qual in FORBIDDEN_ATTR:
                 self._violation(node.lineno, f"forbidden call: {qual} ({FORBIDDEN_ATTR[qual]})")
-            # datetime.now(), time.time(), random.* — the clock/RNG family via attribute call.
+            # datetime.now(), time.time(), random.*: the clock/RNG family via attribute call.
             if _is_clock_rng_call(node.func):
                 self._violation(
                     node.lineno, f"forbidden call: {_qualified_name(node.func)} (clock/RNG)"
@@ -166,14 +167,14 @@ class PurityChecker(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
-        # os.environ access (not a call — a read).
+        # os.environ access (not a call: a read).
         qual = _qualified_name(node)
         if qual in FORBIDDEN_ATTR:
             self._violation(node.lineno, f"forbidden access: {qual} ({FORBIDDEN_ATTR[qual]})")
         self.generic_visit(node)
 
     def visit_Subscript(self, node: ast.Subscript) -> None:
-        # os.environ["X"] — the subscript on os.environ.
+        # os.environ["X"]: the subscript on os.environ.
         if isinstance(node.value, ast.Attribute):
             qual = _qualified_name(node.value)
             if qual in FORBIDDEN_ATTR:

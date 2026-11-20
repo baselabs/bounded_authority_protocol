@@ -1,7 +1,8 @@
 defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
   @moduledoc """
-  Non-vacuity + scope tests for `scripts/check_sdk_publish_infra.sh` (ADR 0015 Decision 5: no SDK
-  publishes from the monorepo). The guard is invoked with `<content-on-stdin> | script <path>`;
+  Non-vacuity and scope tests for `scripts/check_sdk_publish_infra.sh`. The publication
+  boundary in sdks/README.md requires each SDK to publish from its own repository.
+  The guard is invoked with `<content-on-stdin> | script <path>`;
   these drive it directly with crafted (content, path) pairs.
 
   The broadened scan (workflows + composite actions + SDK shell scripts / Makefiles / justfiles +

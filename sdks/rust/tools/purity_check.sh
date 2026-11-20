@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# BAP-15 Task 16 — enforce the lib-path purity invariant.
+# BAP-15 Task 16: enforce the lib-path purity invariant.
 #
-# AGENTS rule 2 + ADR 0014 D8: the library path under src/ must contain no I/O,
-# filesystem, network, process-spawn, environment, wall/monotonic clock, or RNG.
+# The library path under src/ must contain no I/O, filesystem, network,
+# process-spawn, environment, wall/monotonic clock, or RNG.
 # These are SAFE Rust APIs that #![forbid(unsafe_code)] does NOT catch, so a
 # grep is the enforcement. Test modules (#[cfg(test)]) are stripped before the
-# scan — the corpus loaders under tests legitimately read corpus files; only the
+# scan: the corpus loaders under tests legitimately read corpus files; only the
 # non-test lib path is purity-bound.
 #
 # `unsafe` is enforced separately by the crate-level #![forbid(unsafe_code)]
-# (a planted `unsafe {}` block fails `cargo build` — that is the red-capable
+# (a planted `unsafe {}` block fails `cargo build`: that is the red-capable
 # proof for the unsafe half). It is intentionally NOT grep-checked here: several
 # src/ doc comments legitimately name the forbid policy, so a bare-`unsafe` grep
 # would false-positive on the very prose that documents the invariant.
@@ -28,8 +28,8 @@ src_dir="$sdk_dir/src"
 # `rand::` / `rand_core::` are path-qualified to avoid the doc-comment mention
 # of `rand_core` (features) in src/ed25519.rs. The bare tokens `HashSet` /
 # `HashMap` match the default `RandomState::new()` collections (whose constructor
-# reads OS entropy via hashmap_random_keys — a randomness boundary this pure
-# library forbids; use `BTreeSet`/`BTreeMap`) in ANY spelling — fully-qualified,
+# reads OS entropy via hashmap_random_keys: a randomness boundary this pure
+# library forbids; use `BTreeSet`/`BTreeMap`) in ANY spelling: fully-qualified,
 # brace-import (`use std::collections::{HashSet, …}`), or bare. The src/ comments
 # that document this choice are worded to avoid the bare tokens, so the grep does
 # not false-positive on its own prose.
@@ -43,7 +43,7 @@ for f in "$src_dir"/*.rs; do
   # Strip the trailing #[cfg(test)] module (test code reads corpus files).
   lib_path=$(awk '/^#\[.*cfg\(test\)/{exit} {print}' "$f")
   if matches=$(grep -En "$patterns" <<< "$lib_path"); then
-    echo "purity_check: FAIL — forbidden API in lib path of ${f##*/}:" >&2
+    echo "purity_check: FAIL: forbidden API in lib path of ${f##*/}:" >&2
     printf '%s\n' "$matches" >&2
     status=1
   else
@@ -66,7 +66,8 @@ import sys
 from pathlib import Path
 
 # BEGIN DERIVATION RULES
-# ADR 0014 D5: identical rules travel with each independently publishable SDK.
+# independent spec-and-corpus derivation (docs/design/conformance-contract.md): identical rules
+# travel with each independently publishable SDK.
 # Split and escaped literals keep this checker inside its own scan boundary.
 DERIVATION_PATTERNS = [
     ("reference source citation", re.compile(
@@ -131,4 +132,4 @@ if [ "$status" -ne 0 ]; then
   exit 1
 fi
 
-echo "purity_check: OK — no I/O / clock / RNG / network / env API in src/ lib path."
+echo "purity_check: OK: no I/O / clock / RNG / network / env API in src/ lib path."

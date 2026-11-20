@@ -143,7 +143,7 @@ from .v2 import ROW_PREFIX as ROW_PREFIX_V2
 from .v2 import VERSION as VERSION_2
 
 __all__ = [
-    # contract-major 1 façade and the local-loopback proof functions
+    # contract-major 1 facade and the local-loopback proof functions
     "untrusted_key_locator",
     "decode_grant",
     "decode_proof",
@@ -230,8 +230,8 @@ __all__ = [
     "PROOF_TYP",
     "LOCAL_LOOPBACK_PROOF_TYP",
     "ANCHOR_TYP",
-    # v2 profile (contract-major 2) — the v2 façade module + its byte-distinct constants. The
-    # 17 façade functions live on the module (``bounded_authority_verifier.v2``); the v1 names
+    # v2 profile (contract-major 2): the v2 facade module + its byte-distinct constants. The
+    # 17 facade functions live on the module (``bounded_authority_verifier.v2``); the v1 names
     # above stay the package's default surface.
     "v2",
     "VERSION_2",
@@ -239,9 +239,10 @@ __all__ = [
     "ROW_PREFIX_V2",
     "ARCHIVE_PREFIX_V2",
     "request_digest_v2",
-    # role-attestation sibling profile (``bap-role-attestation/1``, ADR 0036) — the four surfaces
+    # role-attestation sibling profile (``bap-role-attestation/1``,
+    # spec/bap-role-attestation-v1.md): the four surfaces
     # (REQ-RA1-API-complete) + dispatch structs + facts. Grant-unbound and standalone: contract-major
-    # façades reject its ``ba+role-attestation`` bytes and it rejects every contract-major ``typ``.
+    # facades reject its ``ba+role-attestation`` bytes and it rejects every contract-major ``typ``.
     "attestation_signing_input",
     "assemble_attestation_compact",
     "decode_attestation",

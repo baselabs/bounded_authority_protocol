@@ -1,41 +1,41 @@
-"""T9 permissiveness mutation-gate — the per-language falsifier the frozen corpus cannot be
-(ADR 0005:240-246; ADR 0014 Decision 6/7). The corpus has no parser-layer permissiveness cases
+"""T9 permissiveness mutation-gate: the per-language falsifier the frozen corpus cannot be
+(per-guard mutation proof; per-defect mutation proofs (docs/design/conformance-contract.md)). The corpus has no parser-layer permissiveness cases
 (host parsers are not in its input algebra), so each closure below is proven red-capable IN THE
 LANGUAGE WHOSE HOST RUNTIME IT TARGETS: construct the host-specific permissive defect the closure
 defeats, assert the SDK REJECTs it.
 
-DEFECT-INJECTION BATTERY (8 items — the ADR 0005:240-246 "prove red-when-removed" half). Each
+DEFECT-INJECTION BATTERY (8 items: the "prove red-when-removed" requirement). Each
 item below was defect-injected at authoring: the named closure/gate was mechanically removed or
 broken, the named test/gate went RED, and the change was reverted. The record:
   1. duplicate-reject (REQ1-JSON-no-duplicate): remove the `if name in members: _fail(...)` in
      json_alg.py → "duplicate member at depth 3" goes RED.
   2. __class__/dunder null-prototype (REQ1-SELECTOR-semantic-identity): switch JObject.v to a
-     dict-subclass-with-`__getattr__` (the Python defect — attribute collision) →
+     dict-subclass-with-`__getattr__` (the Python defect: attribute collision) →
      "__class__ member preserved as data" + "does not collapse identity" go RED.
   3. raw-lexeme 64-byte ceiling (REQ1-JSON-raw-lexeme): remove the lexeme length check in
      json_alg.py → "66-byte number lexeme" goes RED (the 66-byte tiny-float value 1e-64 passes
-     magnitude but fails ONLY the lexeme ceiling — a genuinely falsifiable case).
+     magnitude but fails ONLY the lexeme ceiling: a genuinely falsifiable case).
   4. single-value/trailing (REQ1-JSON-single-value): remove the `ctx.pos != len(src)` check in
      json_alg.py → "trailing bytes" + "two top-level values" go RED.
   5. int/float tag distinction: collapse the float decode to JInt in json_alg._parse_number
      (return JInt(int(n)) instead of JFloat(n)) → "integer 1 and float 1.0 distinct identity" +
      "equals selector distinguishes" go RED.
-  6. census two-boundary (ADR 0014 D9): make _import_public_key in ed25519.py NOT register the
+  6. census two-boundary (import-boundary public-key census (docs/design/conformance-contract.md)): make _import_public_key in ed25519.py NOT register the
      fingerprint → conformance/run.py census aborts ("declared by a valid verification case but
      never imported at the Ed25519 verify boundary").
-  7. purity lint (ADR 0014 D8): inject `datetime.now()` into a src/ module → tools/purity_check.py
+  7. purity lint (pure-library and permissive-dependency gates (docs/design/conformance-contract.md)): inject `datetime.now()` into a src/ module → tools/purity_check.py
      fails ("forbidden call: datetime.now").
-  8. license check (ADR 0014 D8): add a non-allowlisted runtime dep to pyproject.toml →
+  8. license check (pure-library and permissive-dependency gates (docs/design/conformance-contract.md)): add a non-allowlisted runtime dep to pyproject.toml →
      tools/license_check.py fails ("not in the allowlist").
 
-Closures (design § Invariant conformance — Python-specific):
-  1. REQ1-JSON-no-duplicate — hand-rolled duplicate-rejecting decoder (NOT json.loads).
-  2. REQ1-SELECTOR-semantic-identity / __class__ — plain dict with dict[key] subscription only
+Closures (design § Invariant conformance: Python-specific):
+  1. REQ1-JSON-no-duplicate: hand-rolled duplicate-rejecting decoder (NOT json.loads).
+  2. REQ1-SELECTOR-semantic-identity / __class__: plain dict with dict[key] subscription only
      (never getattr), so __class__/__proto__ keys are data. THE PYTHON DEFECT differs from TS:
      Python's risk is dunder/attribute collision, not prototype absorption.
-  3. REQ1-JSON-raw-lexeme — number magnitude + 64-byte ceiling scanned on the raw lexeme.
-  4. REQ1-JSON-single-value — trailing bytes after the top-level value reject.
-  5. int/float tag distinction — 1 != 1.0 in selector semantic identity.
+  3. REQ1-JSON-raw-lexeme: number magnitude + 64-byte ceiling scanned on the raw lexeme.
+  4. REQ1-JSON-single-value: trailing bytes after the top-level value reject.
+  5. int/float tag distinction: 1 != 1.0 in selector semantic identity.
 """
 
 from __future__ import annotations
@@ -125,7 +125,7 @@ def _to_hex(b: bytes) -> str:
     return b.hex()
 
 
-# 1. REQ1-JSON-no-duplicate — the host defect: json.loads silently last-wins duplicates. The SDK's
+# 1. REQ1-JSON-no-duplicate: the host defect: json.loads silently last-wins duplicates. The SDK's
 # hand-rolled decoder rejects at EVERY depth. (The corpus catches depth-1 duplicates via json/decode
 # invalid_duplicate; this closure's distinct value is depth>=3 + the guarantee that no host-parser
 # fallback exists anywhere in the SDK path.)
@@ -138,7 +138,7 @@ def test_distinct_members_accepted():
     assert isinstance(v, JObject)
 
 
-# 2. __class__/dunder null-prototype — the Python defect: a dict-subclass-with-__getattr__ would
+# 2. __class__/dunder null-prototype: the Python defect: a dict-subclass-with-__getattr__ would
 # collide a "__class__" key with the attribute, so the member would resolve to the type object
 # instead of the data value, collapsing identity. The SDK uses plain dict + dict[key] subscription
 # only (never getattr), so __class__ is DATA.
@@ -167,9 +167,9 @@ def test_dunder_does_not_collapse_identity():
     assert _to_hex(_unwrap(semantic_identity(a))) != _to_hex(_unwrap(semantic_identity(b)))
 
 
-# 3. REQ1-JSON-raw-lexeme — the host defect: float() rounds a long lexeme to a finite value, so a
+# 3. REQ1-JSON-raw-lexeme: the host defect: float() rounds a long lexeme to a finite value, so a
 # magnitude check AFTER conversion accepts it. The SDK scans the raw lexeme (64-byte ceiling) BEFORE
-# conversion. The 66-byte tiny-float below has value 1e-64 (finite, within magnitude) — it is
+# conversion. The 66-byte tiny-float below has value 1e-64 (finite, within magnitude): it is
 # rejected ONLY by the lexeme ceiling.
 def test_66_byte_number_lexeme():
     assert invalid_json(b"0." + b"0" * 63 + b"1")
@@ -179,7 +179,7 @@ def test_integer_magnitude_over_bound():
     assert invalid_json(b"9007199254740992")  # MAXIMA.integer_magnitude + 1
 
 
-# 4. REQ1-JSON-single-value — the host defect: json.loads accepts trailing data after the top-level
+# 4. REQ1-JSON-single-value: the host defect: json.loads accepts trailing data after the top-level
 # value in some configurations. The SDK rejects any byte after the single value (whitespace-only).
 def test_trailing_bytes():
     assert invalid_json(b"{} junk")
@@ -189,7 +189,7 @@ def test_two_top_level_values():
     assert isinstance(dec(b"1 2"), Err)
 
 
-# 5. int/float tag distinction — the host defect: a naive JSON loader collapses `1` and `1.0` to the
+# 5. int/float tag distinction: the host defect: a naive JSON loader collapses `1` and `1.0` to the
 # same value, so a selector identity comparison that used the raw value would treat them as equal.
 # The SDK's tagged algebra preserves the distinction; the typed projection wraps them differently.
 def test_integer_and_float_distinct_identity():
@@ -269,7 +269,8 @@ def test_jcs_astral_codepoint_emits_4_byte_utf8():
 # Each closure below was verified divergent against the running reference verifier, then
 # corrected under spec/bap-v1.md §§7-8 and §16 (REQ1-JSON-raw-lexeme,
 # REQ1-JSON-jcs-exact, REQ1-VERIFY-revalidate). Removing the fix makes its test red
-# (ADR 0014 D5-D7). The differential run records discovery, not normative authority.
+# (independent derivation and per-defect mutation proofs (docs/design/conformance-contract.md)).
+# The differential run records discovery, not normative authority.
 
 
 def test_lone_high_surrogate_at_eof_is_invalid_not_indexerror():
@@ -379,7 +380,7 @@ def test_jcs_enforces_per_node_bounds_at_encode():
     assert isinstance(_unwrap(jcs_encode(JString(v=b"x" * 8192))), bytes)
 
 
-# === FIX-C cross-vendor remediation — v1 façade closed-boundary (defect-injected) ===
+# === FIX-C cross-vendor remediation: v1 facade closed-boundary (defect-injected) ===
 
 
 def test_untrusted_key_locator_decodes_only_protected_segment():
@@ -509,7 +510,8 @@ def test_check_envelope_rejects_fractional_and_zero_temporal_context():
 
 # Each closure was verified divergent against the running reference verifier, then corrected
 # under spec/bap-v1.md §§15-17 (REQ1-EXPORT-input-shape, REQ1-VERIFY-revalidate,
-# REQ1-BOUNDS-ordering). Removing each fix makes its test red (ADR 0014 D5-D7).
+# REQ1-BOUNDS-ordering). Removing each fix makes its test red (independent derivation and
+# per-defect mutation proofs (docs/design/conformance-contract.md)).
 # The differential run records discovery, not normative authority.
 
 
@@ -532,8 +534,8 @@ _GATE_PASSING_SIG = bytes(_GATE_PASSING_SIG)
 
 def _must_assemble(si: SigningInput, sig: bytes, es256: bool = False) -> bytes:
     """Unwrap the low-level assembler's Result in test helpers (failure is a test-setup bug). Uses
-    assemble_segments (not the validating façade) so permissiveness cases can build compacts freely
-    and then prove the VERIFY path (or the façade) rejects them."""
+    assemble_segments (not the validating facade) so permissiveness cases can build compacts freely
+    and then prove the VERIFY path (or the facade) rejects them."""
     c = assemble_segments_es256(si, sig) if es256 else assemble_segments(si, sig)
     if not (c.is_ok):
         raise AssertionError("assemble_segments failed in test helper")
@@ -684,7 +686,7 @@ def _build_archive(
         key_id=f"k{len(keys) - 1}",
         key_fingerprint=_unwrap(public_key_thumbprint_raw(end_pub)),
     )
-    # encode_anchored_export validates inputs (incl. the key path) — for the malformed-path archives
+    # encode_anchored_export validates inputs (incl. the key path): for the malformed-path archives
     # (#2 non-monotone / cycle), bypass encode-time validation by hand-assembling the frames.
     if effective_ats is None:
         enc = encode_anchored_export(
@@ -734,7 +736,7 @@ def _build_archive(
 
 def _hand_frame_archive(input_: AnchoredExportInput) -> bytes:
     """Hand-assemble the archive byte stream (mirrors encode_anchored_export's framing) WITHOUT the
-    encode-time key-path validation — used to build malformed-path archives for the #2 tests."""
+    encode-time key-path validation: used to build malformed-path archives for the #2 tests."""
     from bounded_authority_verifier.jcs import jcs_encode
 
     members = {
@@ -903,7 +905,7 @@ def test_check_chain_rejects_noncanonical_row_and_sequence_zero():
 
 
 def test_encode_anchored_export_rejects_transition_count_over_bound():
-    """Cross-vendor #17: encode_anchored_export MUST validate inputs before framing — at minimum the
+    """Cross-vendor #17: encode_anchored_export MUST validate inputs before framing: at minimum the
     transition count <= key_transitions bound (256). The SDK previously accepted 257 transitions.
     Defect: revert the bound check -> encode returns Ok.
 
@@ -1363,7 +1365,7 @@ def test_expected_structs_bounds_absent_defaults_to_max():
 def test_assemble_segments_and_request_digest_return_result_contract():
     """The low-level assembler (assemble_segments) + request_digest return Ok/Err (the Result
     contract), not raw values + throw. Invalid inputs return Err; a minimal well-shaped input
-    returns Ok. See spec/bap-v1.md §16, REQ1-VERIFY-return-shape. The PUBLIC assemble_compact façade
+    returns Ok. See spec/bap-v1.md §16, REQ1-VERIFY-return-shape. The PUBLIC assemble_compact facade
     adds per-kind content validation (tested separately)."""
     # assemble_segments: bad kind -> Err (not raise).
     bad = assemble_segments(
@@ -1456,7 +1458,7 @@ def test_jcs_encode_rejects_invalid_utf8_string():
 
 def test_untrusted_key_locator_accepts_empty_payload_signature_segments():
     """Cross-vendor (key-locator empty segments): the contract (spec/bap-v1.md §18) accepts empty
-    payload/signature segments — it decodes ONLY the protected segment. Defect: re-add the empty-
+    payload/signature segments: it decodes ONLY the protected segment. Defect: re-add the empty-
     segment rejection -> RED."""
     _reset_census()
     g = _signed_grant()
@@ -1574,7 +1576,7 @@ def test_malformed_trusted_issuer_fails_closed():
 
 # === BAP-09 derisk: cross-vendor reference-divergence tripwires (TS/Python derisk, pre-BAP-07) ===
 
-# The corpus grant/proof protected headers (typ=ba+cap / typ=dpop+jwt) — used by the #11 façade tests.
+# The corpus grant/proof protected headers (typ=ba+cap / typ=dpop+jwt): used by the #11 facade tests.
 _DERISK_GRANT_PROTECTED = b"eyJhbGciOiJFZERTQSIsImtpZCI6Imlzc3VlciIsInR5cCI6ImJhK2NhcCJ9"
 _DERISK_PROOF_PROTECTED = (
     b"eyJhbGciOiJFZERTQSIsImp3ayI6eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Ilcxczd5RTlmR0RNQmJtZHBx"
@@ -1595,7 +1597,7 @@ def test_proof_signing_input_rejects_malformed_grant_compact():
         issued_at=1400,
         invocation_id="550e8400-e29b-41d4-a716-446655440000",
         operation="read",
-        grant_compact=b"aaa.bbb",  # one dot — not a 3-segment compact
+        grant_compact=b"aaa.bbb",  # one dot: not a 3-segment compact
         cast_arguments=JNull(),
     )
     r = proof_signing_input(proof)
@@ -1624,7 +1626,7 @@ def test_encode_anchored_export_rejects_when_archive_chunks_exceeded():
 
 
 def test_assemble_compact_facade_rejects_invalid_signing_input():
-    """#11: the public assemble_compact façade MUST validate the signing input (kind↔typ, segment
+    """#11: the public assemble_compact facade MUST validate the signing input (kind↔typ, segment
     bounds, base64url payload) and reparse the composed kind (spec/bap-v1.md §16,
     REQ1-VERIFY-revalidate). It must NOT assemble a mislabeled or malformed compact."""
     sig = _GATE_PASSING_SIG
@@ -1649,7 +1651,7 @@ def test_assemble_compact_facade_rejects_invalid_signing_input():
         sig,
     )
     assert not r.is_ok, "non-base64url payload must reject"
-    # structurally-invalid grant payload (empty object) — the per-kind re-parse rejects it.
+    # structurally-invalid grant payload (empty object): the per-kind re-parse rejects it.
     r = assemble_compact(
         SigningInput(
             kind="grant", protected_segment=_DERISK_GRANT_PROTECTED, payload_segment=b"e30"
@@ -1680,13 +1682,13 @@ def test_assemble_compact_facade_rejects_numeric_iss():
 
 def test_assemble_compact_facade_rejects_noncanonical_anchor():
     """Canonical-form (spec/bap-v1.md §15 (anchors)): the protected AND payload segments of
-    an anchor compact must be the exact JCS encoding. The façade (and verify) now enforce this on
-    both segments — without the check the façade accepts the non-canonical compact."""
+    an anchor compact must be the exact JCS encoding. The facade (and verify) now enforce this on
+    both segments: without the check the facade accepts the non-canonical compact."""
     import json as _json
 
     def _reorder(segment_text: bytes) -> bytes:
         # segment_text is base64url TEXT; decode, reverse the JSON member order (values unchanged),
-        # re-encode — non-canonical bytes, same valid fields.
+        # re-encode: non-canonical bytes, same valid fields.
         pad = b"=" * (-len(segment_text) % 4)
         obj = _json.loads(base64.urlsafe_b64decode(segment_text + pad).decode("utf-8"))
         keys = list(reversed(list(obj.keys())))
@@ -1732,8 +1734,8 @@ def test_assemble_compact_facade_rejects_noncanonical_anchor():
 
 def test_assemble_compact_facade_rejects_noncanonical_transition():
     """Canonical-form (spec/bap-v1.md §15 (transitions)): the protected AND payload segments
-    of a transition compact must be the exact JCS encoding. Symmetric to the anchor test above —
-    proves the transition canonical checks fire (without them the façade accepts the non-canonical
+    of a transition compact must be the exact JCS encoding. Symmetric to the anchor test above,
+    proves the transition canonical checks fire (without them the facade accepts the non-canonical
     compact)."""
     import json as _json
 
@@ -1797,7 +1799,7 @@ def test_decode_grant_rejects_wrong_signature_width():
 # Encode-path validation parity (spec/bap-v1.md §15 (archives) encode):
 # the row chain re-check + gated parses + full matches for both anchors and
 # every transition. One red-capable leg per NEW clause (red-capability proven
-# by neutralizing the encode wiring — the pre-parity state — in the task log).
+# by neutralizing the encode wiring (the pre-parity state) in the task log).
 # ============================================================================
 
 
@@ -2163,7 +2165,7 @@ def test_encode_parity_chain_pin_isolated_rejects():
 
 
 def test_encode_parity_tightened_anchor_bytes_rejects():
-    """Round-2 codex probe: anchor_bytes=1 tightened outer — _parse_compact only gates
+    """Round-2 codex probe: anchor_bytes=1 tightened outer: _parse_compact only gates
     compact_bytes, so without the explicit per-anchor ceiling the ~440-byte anchors
     framed fine (spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only)."""
     from dataclasses import replace as _replace
@@ -2177,7 +2179,7 @@ def test_encode_parity_tightened_anchor_bytes_rejects():
 
 
 def test_encode_parity_expected_bool_rejected():
-    """Round-2: Python ``1 == True`` — an untyped boolean expected field would equal a
+    """Round-2: Python ``1 == True``: an untyped boolean expected field would equal a
     decoded 0/1 at the match; the type-strict gate refuses it."""
     from dataclasses import replace as _replace
 
@@ -2232,7 +2234,7 @@ def test_verify_parity_expected_anchor_chain_id_rejects():
 
 
 def test_bounds_magnitude_gate_rejects():
-    """The key-window magnitude gate (all-SDK convergence — the Rust round-4 fix
+    """The key-window magnitude gate (all-SDK convergence: the Rust round-4 fix
     mirrored): a REAL runtime signature so the control verifies Ok and only the
     magnitude gate rejects the bad case."""
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -2293,7 +2295,7 @@ def test_bounds_magnitude_gate_rejects():
 
 
 def test_bounds_magnitude_valid_from_half_rejects():
-    """The valid_from half (negative out-of-magnitude — membership holds; the
+    """The valid_from half (negative out-of-magnitude: membership holds; the
     unsigned-abs sign symmetry fires)."""
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -2338,7 +2340,7 @@ def test_bounds_magnitude_valid_from_half_rejects():
 
 def test_bounds_magnitude_non_integral_rejects():
     """Cross-vendor (codex live probe): bool/fractional key-validity endpoints must
-    fail closed — Python ``1 == True`` and floats pass ``abs()``; the type-strict
+    fail closed: Python ``1 == True`` and floats pass ``abs()``; the type-strict
     integral gate refuses them."""
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -2389,7 +2391,7 @@ def b64_32_ea(v, k):
 
 def test_archive_verify_key_validity_guards():
     """Cross-vendor round 7: the ARCHIVE verify path guards key-window validity
-    (integral + magnitude). Built on the corpus' REAL signed anchored export —
+    (integral + magnitude). Built on the corpus' REAL signed anchored export,
     the keys are caller-supplied, so only they are tampered."""
     import json as _json
     from pathlib import Path
@@ -2480,7 +2482,7 @@ def test_archive_verify_key_validity_guards():
     assert verify_anchored_export(obj, keys_ok, exp).is_ok
     # Fractional valid_from on the first key -> fail closed at the archive path.
     # Shape-coupling guard: the tampered chains below rebuild keys_ok in full,
-    # replacing exactly one entry — a corpus reshape changes the count here and
+    # replacing exactly one entry: a corpus reshape changes the count here and
     # trips this assert, not a silent vacuity (the closing cross-vendor note).
     assert len(keys_ok.keys) == len(exp.transitions) + 1
     bad0 = HistoricalPublicKey(
@@ -2505,7 +2507,7 @@ def test_archive_verify_key_validity_guards():
 
 def test_bounds_inverted_window_rejects():
     """The ordering leg (valid_before > valid_from, spec/bap-v1.md §16):
-    an inverted window (both endpoints in-magnitude, integral) rejects — jointly
+    an inverted window (both endpoints in-magnitude, integral) rejects: jointly
     with membership (an inverted window admits no time); the gate pins the clause."""
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -2548,7 +2550,7 @@ def test_bounds_inverted_window_rejects():
 
 def test_expected_anchor_non_integral_rejects():
     """The codex closing probe: float/bool EXPECTED fields equate to decoded ints
-    (1000.0 == 1000, False == 0) — type-strict expected ints fail closed."""
+    (1000.0 == 1000, False == 0): type-strict expected ints fail closed."""
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
@@ -2596,21 +2598,22 @@ def replace_ok(ok, **kw):
 
 
 # ---------------------------------------------------------------------------
-# The closed-Result family sweep (ADR 0017 clauses 1-2; the 2026-08-18 alignment-audit
-# §1 defect, swept across the whole façade surface).
+# The closed-Result family sweep (closed results and exact structured-input types (spec/bap-v1.md
+# §§15-17); the 2026-08-18 alignment-audit
+# §1 defect, swept across the whole facade surface).
 #
 # The 2026-08-17 risk ledger named two Python escape paths (request_digest operation,
-# ConsumptionEntry.chain_id). A mechanical sibling sweep (every façade × every parameter ×
+# ConsumptionEntry.chain_id). A mechanical sibling sweep (every facade × every parameter ×
 # every wrong-typed sentinel, then every dataclass FIELD the same way) found the family is
 # total: 31/34 parameter sites and every caller-supplied struct field escape the closed
 # Result as AttributeError/TypeError (237 + 516 pre-fix findings, probe-evidenced 2026-08-18).
-# The fix is the annotation-driven _closed_shape gate on all 17 public façades (v1.py), so a
+# The fix is the annotation-driven _closed_shape gate on all 17 public facades (v1.py), so a
 # wrong-typed caller value returns Err BEFORE any attribute deref, len(), or encode consumes it.
 #
-# RED-CAPABILITY: every case below raised (AttributeError/TypeError) at the pre-fix tree —
+# RED-CAPABILITY: every case below raised (AttributeError/TypeError) at the pre-fix tree,
 # the sweep IS the red run. Mutation-proven 2026-08-18: removing the _closed_shape decorator
-# from any single façade reddens exactly that façade's cases (verified for request_digest:
-# 2 failures). The shape layer's bool-is-not-int exclusion is DEFENSE-IN-DEPTH — every current
+# from any single facade reddens exactly that facade's cases (verified for request_digest:
+# 2 failures). The shape layer's bool-is-not-int exclusion is DEFENSE-IN-DEPTH: every current
 # bool-on-int path is also body-gated (probe-verified for issued_at/anchored_at/sequence), so
 # no sweep case pins it alone; the body-level type-strict tests (cross-vendor rounds 14/17)
 # own that contract. The named legs pin the two ledgered paths specifically.
@@ -2620,7 +2623,7 @@ _SWEEP_SENTINELS = [123, True, None, "s", b"s", [], {}, 3.5, object()]
 
 
 def _sweep_valid_args():
-    """Valid arguments for all 17 façades, reusing this file's fixtures. Mirrors the
+    """Valid arguments for all 17 facades, reusing this file's fixtures. Mirrors the
     probe's control set (all 17 verified Ok at the pre-fix tree)."""
     from bounded_authority_verifier.v1 import (
         decode_proof,
@@ -2861,7 +2864,7 @@ def _sentinel_may_be_ok(kind: str, sentinel) -> bool:
 
 
 def test_closed_result_family_param_sweep():
-    """Every façade × every parameter × wrong-typed sentinel: the call must return a Result
+    """Every facade × every parameter × wrong-typed sentinel: the call must return a Result
     (never raise past the closed surface), and any never-valid sentinel must yield Err.
     Pre-fix: 237 of these raised AttributeError/TypeError."""
     cases = []
@@ -2948,9 +2951,9 @@ def test_closed_result_family_field_sweep():
 
 
 def test_request_digest_nonstring_operation_returns_err():
-    """The ledgered defect (2026-08-17 risk ledger; ADR 0017 exception 1): a non-string
-    operation must return Err — pre-fix it raised AttributeError('int' object has no
-    attribute 'encode') out of the public façade."""
+    """The ledgered defect (2026-08-17 risk ledger; spec/bap-v1.md §§15-17 exception 1): a non-string
+    operation must return Err: pre-fix it raised AttributeError('int' object has no
+    attribute 'encode') out of the public facade."""
     for bad in [123, True, None, b"read", 3.5, [], {}]:
         r = request_digest(bad, _unwrap(json_decode(b"null")))
         assert not r.is_ok, f"operation={bad!r} must fail closed"
@@ -2958,7 +2961,7 @@ def test_request_digest_nonstring_operation_returns_err():
 
 def test_encode_consumption_entry_wrong_typed_fields_return_err():
     """The ledgered defect's entry point + its len() siblings: non-string chain_id and
-    non-bytes previous_hash/commitment must return Err — pre-fix chain_id raised
+    non-bytes previous_hash/commitment must return Err: pre-fix chain_id raised
     AttributeError and non-sized hashes raised TypeError."""
     zeros, ones = bytes(32), bytes([7] * 32)
     bad_entries = [
@@ -2981,7 +2984,7 @@ def test_encode_consumption_entry_wrong_typed_fields_return_err():
 
 
 def test_verify_export_malformed_expected_rejects_before_hashing(monkeypatch):
-    """The clause-3 work-discipline leg: semantic malformation of the expected struct
+    """The pre-hash validation leg: semantic malformation of the expected struct
     (well-typed, so the Fix-A shape gate passes it) must reject BEFORE the chunk digest."""
     import bounded_authority_verifier.v1 as v1mod
 
@@ -3036,7 +3039,7 @@ def test_verify_export_malformed_expected_rejects_before_hashing(monkeypatch):
         r = verify_with(**mutations)
         assert not r.is_ok, f"{label}: must reject"
         assert calls == [], (
-            f"{label}: rejected only AFTER hashing the chunks ({len(calls)} sha256 calls) — the clause-3 hoist is missing"
+            f"{label}: rejected only AFTER hashing the chunks ({len(calls)} sha256 calls): the expected-context hoist is missing"
         )
 
     # Control: the unmutated expected DOES hash (the digest gate runs) and verifies Ok.
@@ -3099,7 +3102,7 @@ def test_assemble_compact_threads_caller_bounds():
     # Tightened compact_bytes just below the assembled size → reject.
     r = assemble_compact(si.value, sig, bounds=_unwrap(bounds_new({"compact_bytes": n - 1})))
     assert not r.is_ok, "tightened compact_bytes must reject the assembly"
-    # (signature_bytes is a FIXED-WIDTH bound — untightenable by design; the gate exists
+    # (signature_bytes is a FIXED-WIDTH bound: untightenable by design; the gate exists
     # as a fixed-width invariant; no valid bounds can lower it below 64.)
     # Tightened encoded_segment_bytes below the protected segment length → reject.
     r = assemble_compact(
@@ -3120,13 +3123,13 @@ def test_assemble_compact_threads_caller_bounds():
 # hardening arc added (rounds 12-14). Each gate is VERDICT-SUBSUMED by a later
 # gate (probe-evidenced: count → "key chain length", charset → "start: kid",
 # magnitude → "end: valid_before magnitude", shape/equality → the parse), so the
-# red-capable pin is the WORK form in the monkeypatched-counter leg below — each
+# red-capable pin is the WORK form in the monkeypatched-counter leg below: each
 # was verified load-bearing at authoring by mechanically removing its gate and
 # watching the work pin go RED (all five proven 2026-08-18). The verdict-matrix
 # leg that follows is regression coverage, not the red-capable pin. Clauses on
 # UNTOUCHED surfaces (the standalone verify_historical_anchor /
 # verify_key_transition anchor_bytes gates, allocation bounds) remain disclosed
-# debt per ADR 0017's Honest limit.
+# debt when a later guard subsumes the removed check.
 # ---------------------------------------------------------------------------
 
 
@@ -3134,7 +3137,7 @@ def test_round12_14_export_predigest_gates_work_pinned(monkeypatch):
     """The round-12..14 pre-digest export gates as WORK pins. Each is verdict-subsumed by a
     later gate (probe-evidenced 2026-08-18: count → "key chain length", charset → "start:
     kid", magnitude → "end: valid_before magnitude" fire AFTER the digest when the pre-digest
-    gate is removed), so a verdict leg cannot be red-capable — the red-capable form is the
+    gate is removed), so a verdict leg cannot be red-capable: the red-capable form is the
     work pin: each malformation must reject with ZERO sha256 calls. Removing any pre-digest
     gate sends its case to the subsuming post-digest gate → the count goes RED."""
     from dataclasses import replace as _replace
@@ -3194,7 +3197,7 @@ def test_round12_14_export_predigest_gates_work_pinned(monkeypatch):
         r = run()
         assert not r.is_ok, f"{label}: must reject"
         assert calls == [], (
-            f"{label}: rejected only AFTER hashing ({len(calls)} calls) — the pre-digest gate is missing or unthreaded"
+            f"{label}: rejected only AFTER hashing ({len(calls)} calls): the pre-digest gate is missing or unthreaded"
         )
 
 
@@ -3211,14 +3214,14 @@ def test_round12_14_export_predigest_gates_pinned():
 
     # Control.
     assert verify().is_ok
-    # R12/R13: version SHAPE — both versions identical but over object_version_bytes.
+    # R12/R13: version SHAPE: both versions identical but over object_version_bytes.
     long_version = "x" * 600
     assert not verify(
         o=obj(long_version), expected=_replace(exp, object_version=long_version)
     ).is_ok, "an over-bound object version (both sides equal) must reject at the shape gate"
-    # R13/R14: version EQUALITY — shape-fine, values differ.
+    # R13/R14: version EQUALITY: shape-fine, values differ.
     assert not verify(o=obj("v2")).is_ok, "a version mismatch must reject at the equality gate"
-    # R13: strict pre-digest key-count — an extra valid-but-unused key.
+    # R13: strict pre-digest key-count: an extra valid-but-unused key.
     extra = HistoricalPublicKey(
         key_id="k-x", public_key=_fresh_key()[0], valid_from=0, valid_before=None
     )
@@ -3238,18 +3241,19 @@ def test_round12_14_export_predigest_gates_pinned():
 
 
 # ---------------------------------------------------------------------------
-# The v2 profile (contract-major 2) — permissiveness mutation battery
-# (ADR 0028 range selector kinds + the cross-major version gate). Mirrors the
+# The v2 profile (contract-major 2): permissiveness mutation battery
+# (spec/bap-v2.md §4 range selector kinds + the cross-major version gate). Mirrors the
 # defect-injection discipline of the 8-item battery at the top of this file: each
 # entry names the closure, the mutation, and the test that goes RED when the
 # mutation is applied. All four mutations were executed at authoring
 # (2026-09-13: mutation applied → pytest run → observed red → reverted):
-#   v2-1. INCLUSIVE boundary (ADR 0028 §1): `<=`/`>=` mutated to `<`/`>` in
+#   v2-1. INCLUSIVE boundary (inclusive range boundaries (spec/bap-v2.md §4)): `<=`/`>=` mutated to `<`/`>` in
 #         v2.selector_matches → test_v2_range_selectors_are_inclusive goes RED
 #         (boundary-equal stops matching). Observed: 1 failed; the v2 corpus
 #         runner also went 259/268 with the boundary-equal family disagreeing
 #         (check-envelope-v2-valid-{lte,gte}-boundary-equal et al.).
-#   v2-2. SAME-TAG operand domain (ADR 0028 §2): the same-tag arms collapsed to a
+#   v2-2. SAME-TAG operand domain (same-tag numeric operands (spec/bap-v2.md §4)): the same-tag
+# arms collapsed to a
 #         plain numeric comparison (float(...) both sides) in
 #         v2.selector_matches → test_v2_range_selectors_same_tag_only goes RED
 #         (a float bound starts satisfying an integer value). Observed: 1
@@ -3261,13 +3265,13 @@ def test_round12_14_export_predigest_gates_pinned():
 #   v2-4. VERSION WIDENING: the `!= VERSION` claim gate in v2's
 #         _validate_grant_payload widened to `not in (1, VERSION)` →
 #         test_v2_and_v1_facades_reject_each_others_bytes goes RED (a v1 grant
-#         decodes Ok under the v2 façade). Observed: 1 failed; the v2 corpus
+#         decodes Ok under the v2 facade). Observed: 1 failed; the v2 corpus
 #         runner went 265/268 with the three cross-major cases disagreeing.
 # ---------------------------------------------------------------------------
 
 
 def test_range_selectors_are_inclusive():
-    """ADR 0028 §1: both range kinds are INCLUSIVE. A traversed value exactly equal to the bound
+    """inclusive range boundaries (spec/bap-v2.md §4): both range kinds are INCLUSIVE. A traversed value exactly equal to the bound
     satisfies lte and gte alike. Defect: mutate `<=` to `<` (and `>=` to `>`) in
     v2.selector_matches → both boundary assertions go RED."""
     args = _unwrap(json_decode(b'{"amount":50}'))
@@ -3286,7 +3290,7 @@ def test_range_selectors_are_inclusive():
 
 
 def test_range_selector_direction():
-    """lte asserts value <= bound; gte asserts value >= bound — the directions are not
+    """lte asserts value <= bound; gte asserts value >= bound: the directions are not
     interchangeable. Defect: swap the SelLte/SelGte dispatch in v2.parse_selector
     (returning SelGte for kind "lte" and SelLte for kind "gte") → every off-bound assertion
     goes RED."""
@@ -3305,7 +3309,7 @@ def test_range_selector_direction():
 
 
 def test_range_selectors_same_tag_only():
-    """ADR 0028 §2: the traversed value and the bound must carry the SAME numeric tag
+    """same-tag numeric operands (spec/bap-v2.md §4): the traversed value and the bound must carry the SAME numeric tag
     (both integer-tagged or both float-tagged); a cross-tag pair NEVER matches, and
     non-numeric operands never match (a missing path fails closed like equals/one_of).
     Defect: collapse the same-tag arms in v2.selector_matches to a plain numeric
@@ -3319,10 +3323,10 @@ def test_range_selectors_same_tag_only():
     int_target = _unwrap(json_decode(b'{"amount":5}'))
     float_target = _unwrap(json_decode(b'{"amount":5.0}'))
     assert _unwrap(v2.selector_matches(flt_bound, int_target)) is False, (
-        "float bound vs integer-tagged value is cross-tag — never matches"
+        "float bound vs integer-tagged value is cross-tag: never matches"
     )
     assert _unwrap(v2.selector_matches(int_bound, float_target)) is False, (
-        "integer bound vs float-tagged value is cross-tag — never matches"
+        "integer bound vs float-tagged value is cross-tag: never matches"
     )
     # Controls: same-tag pairs compare by numeric value.
     assert _unwrap(v2.selector_matches(flt_bound, float_target)) is True
@@ -3336,7 +3340,7 @@ def test_range_selectors_same_tag_only():
 
 def test_non_numeric_bound_rejects_at_decode():
     """The range-kind bound is numeric-only AT DECODE (a string/boolean/null/array/object bound
-    rejects in v2.parse_selector — the producer must not mint one). The corpus's
+    rejects in v2.parse_selector: the producer must not mint one). The corpus's
     grant-signing-input-v2-invalid-non-numeric-bound case is the wire-level analogue."""
     for encoded in (
         b'{"kind":"lte","path":["amount"],"value":"5000"}',
@@ -3349,7 +3353,7 @@ def test_non_numeric_bound_rejects_at_decode():
 
 
 def test_range_member_set_is_kind_path_value():
-    """ADR 0028 §3: lte/gte use EXACTLY the existing {kind, path, value} recognized member set —
+    """the existing {kind, path, value} member set (spec/bap-v2.md §4): lte/gte use EXACTLY the existing {kind, path, value} recognized member set,
     no fourth member set. A `values` member, a missing member, an empty path, or an extra member
     rejects at decode."""
     for encoded in (
@@ -3363,14 +3367,14 @@ def test_range_member_set_is_kind_path_value():
 
 
 def test_facades_reject_each_others_major_bytes():
-    """Cross-major isolation (the successor-major charter): the v2 façade rejects v1 bytes and
-    the v1 façade rejects v2 bytes — an in-major decode of the other major's grant is Err on the
-    version claim alone, and the v1 façade still rejects the v2-only selector kinds. Defect:
+    """Cross-major isolation (the successor-major charter): the v2 facade rejects v1 bytes and
+    the v1 facade rejects v2 bytes: an in-major decode of the other major's grant is Err on the
+    version claim alone, and the v1 facade still rejects the v2-only selector kinds. Defect:
     widen v2's `v != VERSION` grant gate to accept v:1 → the v2-decodes-v1 assertion goes RED."""
     issuer_pub, issuer_priv = _fresh_key()
     holder_fp = _unwrap(public_key_thumbprint_raw(_fresh_key()[0]))
-    # One kwarg set per major: the structs are per-façade (the closed-shape gate rejects a v1
-    # OperationInput inside a v2 GrantProducer — the gates are module-scoped).
+    # One kwarg set per major: the structs are per-facade (the closed-shape gate rejects a v1
+    # OperationInput inside a v2 GrantProducer: the gates are module-scoped).
     v1_kwargs: dict = {
         "key_id": "issuer-123456",
         "issuer": "https://issuer.example.test",
@@ -3397,8 +3401,8 @@ def test_facades_reject_each_others_major_bytes():
     )
     assert decode_grant(v1_compact).is_ok, "control: the v1 grant decodes under v1"
     assert v2.decode_grant(v2_compact).is_ok, "control: the v2 grant decodes under v2"
-    assert not v2.decode_grant(v1_compact).is_ok, "v1 bytes (v:1) must reject under the v2 façade"
-    assert not decode_grant(v2_compact).is_ok, "v2 bytes (v:2) must reject under the v1 façade"
+    assert not v2.decode_grant(v1_compact).is_ok, "v1 bytes (v:1) must reject under the v2 facade"
+    assert not decode_grant(v2_compact).is_ok, "v2 bytes (v:2) must reject under the v1 facade"
     # The v1 closed kind set is unchanged: lte rejects under the shared (v1) selector parse.
     assert isinstance(
         parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["a"],"value":1}'))), Err
@@ -3406,8 +3410,8 @@ def test_facades_reject_each_others_major_bytes():
 
 
 # ---------------------------------------------------------------------------
-# The v3 profile (contract-major 3, BAP3-ES256-SHA256) — permissiveness mutation
-# battery for the ES256 closure classes (spec/bap-v3.md §3; ADR 0035). Mirrors
+# The v3 profile (contract-major 3, BAP3-ES256-SHA256): permissiveness mutation
+# battery for the ES256 closure classes (spec/bap-v3.md §3). Mirrors
 # the defect-injection discipline of the v1/v2 batteries above: each leg names
 # its closure, the mutation, and the red observation recorded when the mutation
 # was executed (mutation applied → pytest run → observed red → reverted).
@@ -3421,7 +3425,7 @@ def test_facades_reject_each_others_major_bytes():
 #         v3.es256_verify removed → test_es256_rs_range_checked_before_backend goes
 #         RED on the work pins (each crafted signature reaches the backend: the
 #         call count goes 0 → 1). VERDICT-subsumed by the backend (it also
-#         rejects r=0/s=0/r≥n/s≥n), so the red-capable form is the WORK pin —
+#         rejects r=0/s=0/r≥n/s≥n), so the red-capable form is the WORK pin,
 #         the same discipline as the round-12..14 legs above.
 #   v3-3. EC JWK CLOSED MEMBER SET (REQ3-HEADER-proof-jwk /
 #         REQ3-HEADER-no-private-jwk): the `_require_object_exact(obj,
@@ -3433,7 +3437,7 @@ def test_facades_reject_each_others_major_bytes():
 #         `len(raw_x) != COORDINATE_BYTES or len(raw_y) != COORDINATE_BYTES`
 #         gate in v3._ec_public_from_tagged removed →
 #         test_es256_coordinate_width_and_canonicality goes RED (the 33-byte
-#         same-integer coordinate — a leading zero byte, still on-curve —
+#         same-integer coordinate: a leading zero byte, still on-curve,
 #         wrongly parses; only the width gate rejects it).
 #   v3-5. ON-CURVE (REQ3-KEY-point-on-curve): the `_point_on_curve` gate in
 #         v3._ec_public_from_tagged removed → test_es256_off_curve_point_rejected
@@ -3537,7 +3541,7 @@ def test_es256_rs_range_checked_before_backend(monkeypatch):
     """REQ3-SIGNING-range: r=0, s=0, r≥n, s≥n are invalid ENCODINGS rejected BEFORE any backend
     call. The verdict is subsumed by the backend (it rejects these too), so the red-capable pin
     is the WORK form (the round-12..14 discipline): each crafted signature must reject with
-    ZERO crossings of the DER-encode step — the last pure step immediately preceding the
+    ZERO crossings of the DER-encode step: the last pure step immediately preceding the
     cryptography verify call (the backend's verify method lives on a Rust-overriding subclass,
     not reliably patchable, so the module-level encode_dss_signature boundary is the
     observable). Defect: remove the zero/range arms in v3._es256_verify → each crafted case
@@ -3572,7 +3576,7 @@ def test_es256_rs_range_checked_before_backend(monkeypatch):
         )
         assert not result.is_ok, f"{label}: must reject"
         assert calls == [], (
-            f"{label}: rejected only AFTER the DER-encode/backend boundary — the range gate is missing"
+            f"{label}: rejected only AFTER the DER-encode/backend boundary: the range gate is missing"
         )
 
 
@@ -3600,7 +3604,7 @@ def test_es256_ec_jwk_member_set_closed():
     assert isinstance(v3.jwk_from_json(jwk_json("P-384", "EC")), Err)
     assert isinstance(v3.jwk_from_json(jwk_json("Ed25519", "EC")), Err)
     assert isinstance(v3.jwk_from_json(jwk_json("P-256", "OKP")), Err)
-    # Extra members — including the private d.
+    # Extra members: including the private d.
     assert isinstance(v3.jwk_from_json(jwk_json("P-256", "EC", extra='"d":"AAAA"')), Err)
     assert isinstance(v3.jwk_from_json(jwk_json("P-256", "EC", extra='"kid":"k1"')), Err)
     # Missing y.
@@ -3609,7 +3613,7 @@ def test_es256_ec_jwk_member_set_closed():
 
 def _ec_key_with_leading_zero_coordinate() -> bytes:
     """A deterministic P-256 public key whose x or y coordinate starts with a zero byte (so the
-    same integer also spells as 31 raw bytes — only the fixed-width gate can reject that
+    same integer also spells as 31 raw bytes: only the fixed-width gate can reject that
     spelling). Derived, not generated, so the fixture is reproducible."""
     for d in range(1, 100000):
         priv = _ecdsa.derive_private_key(d, _ecdsa.SECP256R1())
@@ -3623,7 +3627,7 @@ def _ec_key_with_leading_zero_coordinate() -> bytes:
 
 def test_es256_coordinate_width_and_canonicality():
     """REQ3-BOUNDS-fixed-widths: each coordinate is canonical unpadded base64url of EXACTLY 32
-    bytes — the RFC 7518 §6.2.1 fixed-width big-endian spelling. A 33-byte spelling (leading
+    bytes: the RFC 7518 §6.2.1 fixed-width big-endian spelling. A 33-byte spelling (leading
     zero byte prepended) carries the SAME integer (so the on-curve and <p checks pass) and only
     the width gate rejects it; likewise a 31-byte spelling of a leading-zero coordinate.
     Padded base64url ('=') rejects at the shared canonical-decode gate. Defect: remove the
@@ -3636,7 +3640,7 @@ def test_es256_coordinate_width_and_canonicality():
     assert isinstance(_unwrap(v3.jwk_from_json(valid)), v3.EcPublic), (
         "control: the 32-byte coordinates parse"
     )
-    # 33-byte x (leading zero byte, same integer — on-curve): only the width gate rejects.
+    # 33-byte x (leading zero byte, same integer: on-curve): only the width gate rejects.
     wide = (
         '{"crv":"P-256","kty":"EC","x":"'
         + _b64e(b"\x00" + x).decode()
@@ -3687,7 +3691,7 @@ def test_es256_coordinate_width_and_canonicality():
 
 def test_es256_off_curve_point_rejected():
     """REQ3-KEY-point-on-curve: decoded JWK coordinates must form a point on y^2 = x^3 - 3x + b
-    (mod p) — pure arithmetic preceding the backend. The leg drives the decode path (no
+    (mod p): pure arithmetic preceding the backend. The leg drives the decode path (no
     signature verification), so the on-curve gate is the ONLY rejection: with it removed the
     compact decodes Ok. Defect: remove the `_point_on_curve` gate in
     v3._ec_public_from_tagged → this test goes RED."""
@@ -3729,11 +3733,11 @@ def test_es256_off_curve_point_rejected():
 
 
 def test_es256_rejects_prior_major_bytes():
-    """REQ3-CORE-cross-major-reject: the v3 façade rejects v1 and v2 bytes, and both prior
-    façades reject v3 bytes — an in-major decode of another major's grant is Err on the version
+    """REQ3-CORE-cross-major-reject: the v3 facade rejects v1 and v2 bytes, and both prior
+    facades reject v3 bytes: an in-major decode of another major's grant is Err on the version
     claim alone (plus the alg gate: an EdDSA grant never passes the ES256 header check, and an
     ES256 grant never passes theirs). Defect: widen v3's `v != VERSION` grant gate to
-    `not in (1, 2, VERSION)` → both v3-façade assertions go RED."""
+    `not in (1, 2, VERSION)` → both v3-facade assertions go RED."""
     issuer_pub65, issuer_priv_ec = _fresh_ec_key()
     holder_fp_ec = _unwrap(v3.public_key_thumbprint_raw(_fresh_ec_key()[0]))
     v3_kwargs: dict = {
@@ -3786,22 +3790,22 @@ def test_es256_rejects_prior_major_bytes():
         v2_si.value,
         issuer_priv_ed.sign(v2_si.value.protected_segment + b"." + v2_si.value.payload_segment),
     )
-    # Controls: each major decodes under its own façade.
+    # Controls: each major decodes under its own facade.
     assert v3.decode_grant(v3_compact).is_ok, "control: the v3 grant decodes under v3"
     assert decode_grant(v1_compact).is_ok, "control: the v1 grant decodes under v1"
     assert v2.decode_grant(v2_compact).is_ok, "control: the v2 grant decodes under v2"
     # Cross-major rejections, all six directions.
     assert not v3.decode_grant(v1_compact).is_ok, (
-        "v1 bytes (v:1, EdDSA) must reject under the v3 façade"
+        "v1 bytes (v:1, EdDSA) must reject under the v3 facade"
     )
     assert not v3.decode_grant(v2_compact).is_ok, (
-        "v2 bytes (v:2, EdDSA) must reject under the v3 façade"
+        "v2 bytes (v:2, EdDSA) must reject under the v3 facade"
     )
     assert not decode_grant(v3_compact).is_ok, (
-        "v3 bytes (v:3, ES256) must reject under the v1 façade"
+        "v3 bytes (v:3, ES256) must reject under the v1 facade"
     )
     assert not v2.decode_grant(v3_compact).is_ok, (
-        "v3 bytes (v:3, ES256) must reject under the v2 façade"
+        "v3 bytes (v:3, ES256) must reject under the v2 facade"
     )
     # The VERSION gate is load-bearing independent of the alg gate: an ES256-header grant whose
     # payload carries v:1 / v:2 (hand-spelled; decode does not verify signatures) rejects on the
@@ -3814,9 +3818,9 @@ def test_es256_rejects_prior_major_bytes():
             [parts[0], _b64e(payload[: -len(b'"v":3}')] + b'"v":' + prior_major + b"}"), parts[2]]
         )
         assert not v3.decode_grant(mixed).is_ok, (
-            f"an ES256 grant carrying v:{prior_major.decode()} must reject under the v3 façade (version gate)"
+            f"an ES256 grant carrying v:{prior_major.decode()} must reject under the v3 facade (version gate)"
         )
-    # The five-kind selector algebra is v3's too: lte parses under the v3 façade and the v1
+    # The five-kind selector algebra is v3's too: lte parses under the v3 facade and the v1
     # closed kind set still rejects it.
     assert isinstance(
         _unwrap(v3.parse_selector(_unwrap(json_decode(b'{"kind":"lte","path":["a"],"value":1}')))),

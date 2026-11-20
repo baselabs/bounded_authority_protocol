@@ -10,10 +10,11 @@ import (
 )
 
 // The contract-major-3 ES256 profile (spec/bap-v3.md, suite BAP3-ES256-SHA256,
-// activated by ADR 0035). Re-derived from the normative sources alone —
+// activated by spec/bap-v3.md). Re-derived from the normative sources alone,
 // spec/bap-v3.md, the v1 sections it incorporates with the §2 substitutions,
 // and the v2 §4 selector algebra. Derived from the spec and certified corpus,
-// not from any sibling-SDK or reference source (ADR 0014 D5). This file mirrors its v1/v2
+// not from any sibling-SDK or reference source (docs/design/conformance-contract.md, Independent
+// implementation rule). This file mirrors its v1/v2
 // counterparts member for member; the profile differences are exactly:
 //
 //   - every versioned payload carries "v":3 and this major rejects v1/v2
@@ -37,7 +38,7 @@ import (
 // shared Bounds struct keeps certifying the version-neutral bounds surface
 // (its public_key_bytes stays the shared 32-byte fixed width of the v1
 // suite's raw keys), and no v3 code path may read b.PublicKeyBytes for the
-// key width — the SEC1 width below is the profile's own constant
+// key width: the SEC1 width below is the profile's own constant
 // (REQ3-BOUNDS-fixed-widths).
 
 // es256RequestPrefix is the contract-major-3 request-digest domain
@@ -116,7 +117,7 @@ func p256CoordinatesOnCurve(xb, yb []byte) bool {
 
 // validateRawRS is the signature encoding gate: exactly 64 bytes as two
 // fixed-width 32-byte unsigned big-endian integers, rejected unless
-// 0 < r < n and 0 < s <= n/2 (low-S) — all before any backend call
+// 0 < r < n and 0 < s <= n/2 (low-S): all before any backend call
 // (REQ3-SIGNING-raw-rs, REQ3-SIGNING-range, REQ3-SIGNING-low-s). DER is
 // never a v3 wire spelling and no other width is admitted.
 func validateRawRS(signature []byte) error {
@@ -143,7 +144,7 @@ func validateRawRS(signature []byte) error {
 // arithmetic (< p, on-curve); the raw-r||s width and integer-range gates;
 // then the backend verification. A backend rejection or exception is exactly
 // ErrInvalid (REQ3-SIGNING-backend-reject). Public keys are caller-supplied
-// trusted inputs — never discovered here.
+// trusted inputs: never discovered here.
 func verifyECDSA(publicKey, message, signature []byte) error {
 	if len(publicKey) != es256PublicKeyBytes || publicKey[0] != 0x04 {
 		return ErrInvalid // uncompressed SEC1 form only; compressed is invalid
@@ -180,7 +181,7 @@ func ecThumbprintPreimage(raw []byte) []byte {
 }
 
 // jwkThumbprintOfKeyEC is the RFC 7638 thumbprint of a raw (already
-// width-gated) v3 public key — the cnf.jkt binding check's construction.
+// width-gated) v3 public key: the cnf.jkt binding check's construction.
 func jwkThumbprintOfKeyEC(raw []byte) [32]byte {
 	return sha256.Sum256(ecThumbprintPreimage(raw))
 }
@@ -191,8 +192,8 @@ func jwkThumbprintOfKeyEC(raw []byte) [32]byte {
 // member set {crv:"P-256", kty:"EC", x, y} in any member order and returns
 // the raw 65-byte uncompressed SEC1 public key. Coordinates are canonical
 // unpadded base64url of exactly 32 bytes each, MUST be less than the field
-// prime, and MUST form a point on the curve; every additional member —
-// private d included — is invalid (REQ3-HEADER-proof-jwk,
+// prime, and MUST form a point on the curve; every additional member,
+// private d included: is invalid (REQ3-HEADER-proof-jwk,
 // REQ3-HEADER-no-private-jwk, REQ3-KEY-point-on-curve).
 func (EcdsaProfile) JwkDecodePublic(data []byte, bounds *Bounds) ([]byte, error) {
 	raw, err := ecdsaSuite.decodePublicJwk(data, bounds)
@@ -335,8 +336,8 @@ func (EcdsaProfile) decodePublicJwk(data []byte, bounds *Bounds) ([]byte, error)
 
 // validateSelector closed-set-validates one selector value: the v1 kind set
 // plus lte/gte on the same {kind, path, value} member set. An lte/gte bound
-// must be numeric (Int or Float) — a non-numeric bound is malformed and fails
-// the whole grant at decode (the ADR 0028 §7 rule, carried as v3).
+// must be numeric (Int or Float): a non-numeric bound is malformed and fails
+// the whole grant at decode (the crossed endpoints never match (spec/bap-v2.md §4) rule, carried as v3).
 func (EcdsaProfile) validateSelector(v Value, bounds *Bounds) error {
 	b, err := resolveBounds(bounds)
 	if err != nil {
@@ -560,8 +561,8 @@ func decodeGrantHeaderES(p compactParts, b Bounds) (string, error) {
 
 // decodeProofHeaderES validates the exact proof protected header
 // {alg:"ES256", jwk:public_EC_JWK, typ:"dpop+jwt"} and returns the raw
-// 65-byte holder public key. Every additional JWK member — private d
-// included — is invalid (REQ3-HEADER-no-private-jwk).
+// 65-byte holder public key. Every additional JWK member: private d
+// included: is invalid (REQ3-HEADER-no-private-jwk).
 func decodeProofHeaderES(p compactParts, b Bounds) ([]byte, error) {
 	v, err := JsonDecode(p.Protected, &b)
 	if err != nil {
@@ -945,7 +946,7 @@ func (EcdsaProfile) requestDigestRaw(operation string, castArguments Value, boun
 	return out, nil
 }
 
-// ---- decode/verify façades ----
+// ---- decode/verify facades ----
 
 // DecodeGrant decodes and closed-set-validates a raw grant compact of this
 // major. It performs no signature verification and rejects v1/v2 bytes.
@@ -1520,8 +1521,8 @@ func (EcdsaProfile) AssembleCompact(si SigningInput, signature []byte, bounds *B
 	if len(signature) != b.SignatureBytes {
 		return "", ErrInvalid
 	}
-	// Erratum 3 (REQ3-SIGNING-producer-canonical): assembly is a producer surface — it frames
-	// a signature and verifies none — so it refuses a raw r||s outside 0 < r < n,
+	// Erratum 3 (REQ3-SIGNING-producer-canonical): assembly is a producer surface: it frames
+	// a signature and verifies none: so it refuses a raw r||s outside 0 < r < n,
 	// 0 < s <= floor(n/2) (validateRawRS owns the rule) and emits accepted bytes unchanged.
 	if validateRawRS(signature) != nil {
 		return "", ErrInvalid
@@ -2185,7 +2186,7 @@ func (EcdsaProfile) VerifyKeyTransition(compact string, currentKey, nextKey Hist
 
 // ---- anchored export ----
 
-// validateExpectedAnchoredExportES is this major's clause-3 pre-digest hoist:
+// validateExpectedAnchoredExportES is this major's expected-context pre-digest hoist:
 // the complete expected-context well-formedness suite of the shared
 // validator, with this suite's 65-byte historical-key width (the shared
 // validator pins the version-neutral 32 of the v1 suite).
@@ -2495,7 +2496,7 @@ func (EcdsaProfile) VerifyAnchoredExport(obj ArchivedObject, keys HistoricalKeyC
 }
 
 // validateExpectedExport is the encode-side expected-context suite: the
-// verify-path hoist minus its verify-only legs — no archive-digest width and
+// verify-path hoist minus its verify-only legs: no archive-digest width and
 // no object-store version (this producer derives its own digest and holds no
 // object store) and no key-chain shapes (the encode path holds no public
 // keys; the expected tuples carry the key identities).
@@ -2711,8 +2712,8 @@ func (EcdsaProfile) parseAnchorCompactGated(compact string, b Bounds) (anchorCla
 	if err != nil {
 		return anchorClaims{}, ErrInvalid
 	}
-	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
-	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	// Erratum 3: encoding is a producer surface: it frames this signature and verifies none.
+	// The encode-side gated parse refuses a signature no conforming signer emits.
 	if validateRawRS(parts.Signature) != nil {
 		return anchorClaims{}, ErrInvalid
 	}
@@ -2753,8 +2754,8 @@ func (EcdsaProfile) parseTransitionCompactGated(compact string, b Bounds) (trans
 	if err != nil {
 		return transitionClaims{}, ErrInvalid
 	}
-	// Erratum 3: encoding is a producer surface — it frames this signature and verifies none —
-	// so the encode-side gated parse refuses a signature no conforming signer emits.
+	// Erratum 3: encoding is a producer surface: it frames this signature and verifies none.
+	// The encode-side gated parse refuses a signature no conforming signer emits.
 	if validateRawRS(parts.Signature) != nil {
 		return transitionClaims{}, ErrInvalid
 	}

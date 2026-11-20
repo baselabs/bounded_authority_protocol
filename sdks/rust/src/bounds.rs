@@ -4,7 +4,7 @@
 //! § Hard maxima, optionally tightened by caller-supplied overrides. The
 //! 32-byte Ed25519 public-key/digest widths and the 64-byte signature width
 //! are immutable cryptographic constants of the `BAP1-Ed25519-SHA256` suite
-//! (`REQ1-BOUNDS-fixed-widths`); they are NOT stored in `Bounds` — they are
+//! (`REQ1-BOUNDS-fixed-widths`); they are NOT stored in `Bounds`: they are
 //! enforced as the fixed array types `[u8; 32]` / `[u8; 64]` throughout the
 //! crate. The overrides map recognizes them only to reject any attempt to
 //! change them.
@@ -29,12 +29,12 @@ use crate::json::JsonValue;
 /// [`Bounds::new`] (validate a caller overrides map, tightening-only).
 ///
 /// Fields are private so a `Bounds` value can only be obtained through the
-/// validating constructors — callers cannot bypass tighten-only / fixed-width
+/// validating constructors: callers cannot bypass tighten-only / fixed-width
 /// enforcement by assembling a struct literal.
 ///
 /// Derives [`Debug`], [`Clone`], [`Copy`], [`PartialEq`], and [`Eq`] (not
 /// `Serialize`/`Display`): a `Bounds` is public configuration of integer
-/// ceilings (every field is a `u64`), not a credential — printing, copying, or
+/// ceilings (every field is a `u64`), not a credential: printing, copying, or
 /// comparing it leaks no authority-bearing material. `Clone`/`Copy`/`Eq` are
 /// required so the input structs that embed a `Bounds` (e.g. `ExpectedGrant`,
 /// `ExpectedRequest`) can derive `Clone`/`Eq` themselves.
@@ -80,7 +80,7 @@ pub struct Bounds {
 
 impl Bounds {
     // ------------------------------------------------------------------------
-    // Immutable profile maxima — spec/bap-v1.md § Hard maxima (lines 377–415)
+    // Immutable profile maxima: spec/bap-v1.md § Hard maxima (lines 377–415)
     // ------------------------------------------------------------------------
 
     const MAX_COMPACT_BYTES: u64 = 65536;
@@ -121,7 +121,7 @@ impl Bounds {
     const MAX_CONTENT_BYTES: u64 = 65_536;
 
     // ------------------------------------------------------------------------
-    // Fixed cryptographic widths — REQ1-BOUNDS-fixed-widths.
+    // Fixed cryptographic widths: REQ1-BOUNDS-fixed-widths.
     // NOT stored in Bounds; enforced as [u8; N] array types.
     // Recognized in the overrides map only to reject any attempt to change them.
     // ------------------------------------------------------------------------
@@ -184,7 +184,7 @@ impl Bounds {
     /// returns a [`Bounds`] with the tightened values applied.
     ///
     /// `overrides` is a decoded [`JsonValue::Object`] mapping bound names to
-    /// positive integers — e.g. the decoded form of `{"compact_bytes":1000,
+    /// positive integers: e.g. the decoded form of `{"compact_bytes":1000,
     /// "string_bytes":4096}`. `None` or an empty object returns
     /// [`Bounds::maximum`] unchanged.
     ///
@@ -307,7 +307,7 @@ impl Bounds {
     }
 
     // ------------------------------------------------------------------------
-    // Accessors — each returns the effective value (maximum or tightened).
+    // Accessors: each returns the effective value (maximum or tightened).
     // ------------------------------------------------------------------------
 
     /// Compact input bytes ceiling.
@@ -472,7 +472,7 @@ fn tighten(field: &mut u64, max: u64, value: u64) -> Result<()> {
 }
 
 /// Fixed-width check: accepts `value == width` exactly. The crypto widths are
-/// immutable protocol constants — any deviation (above or below) is invalid.
+/// immutable protocol constants: any deviation (above or below) is invalid.
 fn fixed(width: u64, value: u64) -> Result<()> {
     if value == width {
         Ok(())
@@ -493,7 +493,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // maximum() — every value must match spec/bap-v1.md § Hard maxima
+    // maximum(): every value must match spec/bap-v1.md § Hard maxima
     // ------------------------------------------------------------------
 
     #[test]
@@ -541,7 +541,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // new() — no-override cases
+    // new(): no-override cases
     // ------------------------------------------------------------------
 
     #[test]
@@ -562,7 +562,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // new() — tightening accepted
+    // new(): tightening accepted
     // ------------------------------------------------------------------
 
     #[test]
@@ -590,7 +590,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // new() — REQ1-BOUNDS-reject-list (each → Invalid)
+    // new(): REQ1-BOUNDS-reject-list (each → Invalid)
     // ------------------------------------------------------------------
 
     #[test]
@@ -653,7 +653,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // Fixed-width keys — REQ1-BOUNDS-fixed-widths
+    // Fixed-width keys. REQ1-BOUNDS-fixed-widths
     // ------------------------------------------------------------------
 
     #[test]

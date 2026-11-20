@@ -1,4 +1,4 @@
-"""The v3 verification façade (contract-major 3, the ``BAP3-ES256-SHA256`` suite).
+"""The v3 verification facade (contract-major 3, the ``BAP3-ES256-SHA256`` suite).
 
 The v3 profile is byte-distinct from v1 and v2 (spec/bap-v3.md under the successor-major
 charter): every versioned payload carries ``v: 3``, the protected ``alg`` is exactly
@@ -8,18 +8,18 @@ JWK ``{crv:"P-256", kty:"EC", x, y}`` with the RFC 7638 thumbprint over that fou
 raw public keys are the 65-byte uncompressed SEC1 point ``0x04 || x || y``, and signatures are
 the RFC 7518 §3.4 raw ``r || s`` form with the low-S rule enforced at verification. The selector
 algebra admits the five kinds ``all``/``equals``/``one_of``/``lte``/``gte`` (incorporated from
-v2 §4). This façade rejects v1 and v2 bytes, and those façades reject v3 bytes — each major
+v2 §4). This facade rejects v1 and v2 bytes, and those facades reject v3 bytes: each major
 verifies under its own complete closed profile (REQ3-CORE-cross-major-reject).
 
 The local-loopback application proof profile is bound to contract-major 1 (spec/bap-v3.md §2);
-this façade exposes no loopback functions.
+this facade exposes no loopback functions.
 
 17 public functions, each returning ``Result[T] = Ok | Err`` (the ``{:ok, value} | {:error, :invalid}``
-mirror). No ``authorized`` / ``decision`` surface (AGENTS rule 1). All claims revalidated at every
+mirror). No ``authorized`` / ``decision`` surface. All claims revalidated at every
 public entry (REQ1-VERIFY-revalidate, incorporated). Derived from spec/bap-v3.md + spec/bap-v1.md
 (incorporated with the §2 substitutions) + spec/bap-v2.md §4 + the certified corpus; the corpus is
 the byte-level arbiter. Derived from the spec and certified corpus, not from
-any sibling-SDK or reference source (ADR 0014 D5).
+any sibling-SDK or reference source (docs/design/conformance-contract.md, Independent implementation rule).
 
 Frozen dataclasses carry the caller inputs defined by spec/bap-v1.md §16
 (incorporated by spec/bap-v2.md §2 and spec/bap-v3.md §2). They use ``bytes`` for raw-32/raw-65 fields and ``int`` / ``str`` for scalars.
@@ -139,7 +139,7 @@ def _is_int(value: object) -> bool:
 # ECDSA over NIST P-256 with SHA-256. The P-256 domain parameters (SEC 2) are protocol constants:
 #
 #   p = 2^256 - 2^224 + 2^192 + 2^96 - 1
-#   y^2 = x^3 - 3x + b  (mod p)   — a = -3, the short-Weierstrass form the check below uses
+#   y^2 = x^3 - 3x + b  (mod p)  : a = -3, the short-Weierstrass form the check below uses
 #
 # On-curve validation of decoded JWK points is PURE ARITHMETIC in the profile (REQ3-KEY-point-on-
 # curve): it precedes the crypto backend, whose off-curve behavior is backend-specific and never
@@ -159,7 +159,7 @@ def _canonical_signature(signature: bytes) -> bool:
     """The suite's canonical-signature rule (spec/bap-v3.md § 3.2): a raw 64-byte r || s has
     0 < r < n and 0 < s <= floor(n / 2). Every producer surface (compact assembly,
     anchored-export encoding, erratum 3) refuses a signature that fails it; the producer never
-    normalizes — low-S is the signer's duty."""
+    normalizes: low-S is the signer's duty."""
     if not isinstance(signature, bytes) or len(signature) != 64:
         return False
     r = int.from_bytes(signature[:32], "big")
@@ -169,7 +169,7 @@ def _canonical_signature(signature: bytes) -> bool:
 
 # Suite fixed widths (REQ3-BOUNDS-fixed-widths, spec/bap-v3.md §5): coordinate 32, raw public key
 # (uncompressed SEC1) 65, signature (r || s) 64, SHA-256 digest 32. Immutable cryptographic
-# constants of BAP3-ES256-SHA256 — the shared bounds table's 32-byte public-key width is the v1
+# constants of BAP3-ES256-SHA256: the shared bounds table's 32-byte public-key width is the v1
 # suite's; the v3 width is enforced here as the profile's own constant.
 COORDINATE_BYTES = 32
 PUBLIC_KEY_BYTES = 65
@@ -199,13 +199,13 @@ class EcPublic:
 
 
 def _point_on_curve(x: int, y: int) -> bool:
-    """y^2 = x^3 - 3x + b (mod p) — pure arithmetic over the decoded coordinates."""
+    """y^2 = x^3 - 3x + b (mod p): pure arithmetic over the decoded coordinates."""
     return (y * y - (x * x * x - 3 * x + P256_B)) % P256_P == 0
 
 
 def _validated_public_key(raw_key: bytes) -> bytes:
     """Validate a raw v3 public key: exactly 65 bytes, ``0x04 || x || y`` uncompressed SEC1
-    (compressed points invalid — REQ3-KEY-uncompressed-sec1), each coordinate < p, and the point
+    (compressed points invalid: REQ3-KEY-uncompressed-sec1), each coordinate < p, and the point
     on the curve (REQ3-KEY-point-on-curve). Returns the same bytes narrowed."""
     _require(len(raw_key) == PUBLIC_KEY_BYTES, "es256: public key must be 65 bytes")
     if raw_key[0] != 0x04:
@@ -235,14 +235,14 @@ def _import_public_key(raw_key: bytes, fingerprint: str) -> ec.EllipticCurvePubl
 def _es256_verify(message: bytes, signature: bytes, public_key: ec.EllipticCurvePublicKey) -> bool:
     """Verify an ES256 signature over the exact RFC 7515 signing input.
 
-    The wire signature is the RFC 7518 §3.4 raw form — exactly 64 bytes, ``r || s``, two
+    The wire signature is the RFC 7518 §3.4 raw form: exactly 64 bytes, ``r || s``, two
     fixed-width 32-byte unsigned big-endian integers (REQ3-SIGNING-raw-rs). DER is never a v3
     wire spelling. The verifier rejects, as invalid encodings BEFORE any backend call
     (REQ3-SIGNING-range):
 
     - ``r = 0`` or ``s = 0``;
     - ``r >= n`` or ``s >= n``;
-    - ``s > n/2`` — the HIGH-S half (low-S required, REQ3-SIGNING-low-s). Low-S makes each
+    - ``s > n/2``: the HIGH-S half (low-S required, REQ3-SIGNING-low-s). Low-S makes each
       signature non-malleable: for a valid ECDSA pair ``(r, s)`` the counterpart ``(r, n-s)``
       also verifies, so only the low-S rule admits one of the two encodings.
 
@@ -413,7 +413,7 @@ def public_key_thumbprint_raw(raw_key: bytes) -> Result[bytes]:
 # shared selector module (the identical closed validation); lte/gte use the EXISTING
 # {kind, path, value} recognized member set (no fourth member set), with the bound constrained
 # to the numeric tags. Same-tag semantics: the traversed value and the bound must BOTH be
-# integer-tagged or BOTH be float-tagged; a cross-tag pair NEVER matches (fail closed — the v1
+# integer-tagged or BOTH be float-tagged; a cross-tag pair NEVER matches (fail closed: the v1
 # no-tag-collapse invariant extended from identity to ordering). Comparison is INCLUSIVE by
 # numeric value on the closed numeric domain the bounded decoder admits (lte: value <= bound;
 # gte: value >= bound). Non-numeric operands never match, and a missing path fails closed
@@ -452,7 +452,7 @@ V3Selector = _V1Selector | SelLte | SelGte
 def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[V3Selector]:
     """Parse a v3 selector: the v1 kinds delegate; lte/gte validate the numeric bound at decode.
 
-    A non-numeric bound (string/boolean/null/array/object) rejects HERE — the producer must not
+    A non-numeric bound (string/boolean/null/array/object) rejects HERE: the producer must not
     mint, and the verifier must not accept, a range selector whose bound cannot participate in
     the same-tag domain.
     """
@@ -519,7 +519,7 @@ def selector_matches(sel: V3Selector, cast_arguments: Tagged) -> Result[bool]:
             bound = sel.bound
             inclusive_low = isinstance(sel, SelLte)
             # Same-tag arms ONLY: JInt pairs compare as integers, JFloat pairs as floats; every other
-            # pairing — cross-tag, or a non-numeric traversed operand — is False.
+            # pairing (cross-tag, or a non-numeric traversed operand) is False.
             if isinstance(bound, JInt) and isinstance(target, JInt):
                 return Ok(target.v <= bound.v if inclusive_low else target.v >= bound.v)
             if isinstance(bound, JFloat) and isinstance(target, JFloat):
@@ -530,7 +530,7 @@ def selector_matches(sel: V3Selector, cast_arguments: Tagged) -> Result[bool]:
         return err()
 
 
-# --- dispatch struct types (match corpus input field names; the contract for each façade) ---
+# --- dispatch struct types (match corpus input field names; the contract for each facade) ---
 
 
 @dataclass(frozen=True)
@@ -966,7 +966,7 @@ def _parse_grant_header(seg: CompactSegments, bounds: Bounds) -> str:
 def _parse_proof_header(seg: CompactSegments, bounds: Bounds) -> tuple[bytes, bytes]:
     """Returns (holderThumbprint raw32, holderKey raw65 uncompressed SEC1).
 
-    The protected proof JWK is validated here in full — closed member set, coordinate widths,
+    The protected proof JWK is validated here in full: closed member set, coordinate widths,
     coordinate range, on-curve (REQ3-BOUNDS-ordering: the JWK checks precede the signature
     integer-range checks and the backend).
     """
@@ -1067,7 +1067,7 @@ def _valid_uri_authority(authority: str) -> bool:
     at = authority.find("@")
     hostport = authority if at == -1 else authority[at + 1 :]
     if "@" in hostport:
-        return False  # a second @ lands in the host — invalid.
+        return False  # a second @ lands in the host: invalid.
     if hostport.startswith("["):
         close = hostport.find("]")
         if close == -1:
@@ -1092,7 +1092,7 @@ def _is_well_formed(s: str) -> bool:
     # A well-formed Unicode string has no unpaired surrogates. Python str CAN carry lone surrogates
     # (e.g. a caller-supplied chain_id with '\ud800'); re-encoding to UTF-8 rejects them. For strings
     # that came through json_decode, the unpaired-surrogate case was already rejected at the escape
-    # level — this check is the defense for direct (non-JSON) inputs like producer fields.
+    # level: this check is the defense for direct (non-JSON) inputs like producer fields.
     try:
         s.encode("utf-8")
     except UnicodeEncodeError:
@@ -1352,7 +1352,7 @@ def _bytes_equal(a: bytes, b: bytes) -> bool:
 _T = TypeVar("_T")
 
 
-# --- the 17 façade functions ---
+# --- the 17 facade functions ---
 
 
 def _trying(fn: Callable[[], _T]) -> Result[_T]:
@@ -1423,7 +1423,7 @@ def _walk_annotation(annotation: object) -> None:
 
 
 def _shape_ok(value: object, annotation: object) -> bool:
-    """True iff value matches the declared annotation shape exactly (ADR 0017 clauses 1-2)."""
+    """True iff value matches the declared annotation shape exactly (closed results and exact structured-input types (spec/bap-v1.md §§15-17))."""
     if annotation is Any or annotation is object:
         return True
     if annotation is type(None):
@@ -1445,7 +1445,7 @@ def _shape_ok(value: object, annotation: object) -> bool:
             if not isinstance(value, annotation):
                 return False
             # A struct can arrive malformed (constructed via __new__ or a broken subclass) with
-            # attributes missing entirely — that is a shape failure, never a crash (the gate
+            # attributes missing entirely: that is a shape failure, never a crash (the gate
             # itself must uphold the closed surface it enforces).
             hints = _dataclass_hints(annotation)
             for name, sub in hints.items():
@@ -1453,13 +1453,13 @@ def _shape_ok(value: object, annotation: object) -> bool:
                 if member is _MISSING or not _shape_ok(member, sub):
                     return False
             return True
-        return False  # unreachable — _walk_annotation rejects unsupported types at import
+        return False  # unreachable: _walk_annotation rejects unsupported types at import
     if _is_union(annotation):
         return any(_shape_ok(value, member) for member in get_args(annotation))
     origin = get_origin(annotation)
     if origin is tuple:
         # Variadic tuple[X, ...] carries the ELEMENT contract; the container accepts list|tuple
-        # (the historical input surface — conformant fixtures pass lists; bodies iterate).
+        # (the historical input surface: conformant fixtures pass lists; bodies iterate).
         if not isinstance(value, (list, tuple)):
             return False
         (elem, _rest) = get_args(annotation)
@@ -1471,15 +1471,15 @@ def _shape_ok(value: object, annotation: object) -> bool:
         return all(_shape_ok(item, elem) for item in value)
     if origin is Mapping:
         return isinstance(value, Mapping)
-    return False  # unreachable — _walk_annotation rejects unsupported origins at import
+    return False  # unreachable: _walk_annotation rejects unsupported origins at import
 
 
 def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
-    """Façade decorator: validate caller arguments against their declared shapes before the
-    body runs; malformed values return Err, and accepted buffers are copied. Applied to all 17 public functions. Hints resolve lazily on the first call —
-    façade signatures forward-reference structs defined later in this module (ExpectedExport);
+    """Facade decorator: validate caller arguments against their declared shapes before the
+    body runs; malformed values return Err, and accepted buffers are copied. Applied to all 17 public functions. Hints resolve lazily on the first call,
+    facade signatures forward-reference structs defined later in this module (ExpectedExport);
     an unsupported annotation form therefore fails on first call (the family sweep exercises
-    every façade, so it fails in CI, just not at import)."""
+    every facade, so it fails in CI, just not at import)."""
     resolved: list[tuple[dict[str, object], inspect.Signature]] = []
 
     @functools.wraps(fn)
@@ -1515,7 +1515,7 @@ def untrusted_key_locator(compact: bytes, bounds: Bounds | None = None) -> Resul
 
 
 def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLocator:
-    # The v1 §18 locator decodes ONLY the protected segment — payload and signature are NOT
+    # The v1 §18 locator decodes ONLY the protected segment: payload and signature are NOT
     # decoded, interpreted, or independently size-checked (REQ1-LOCATOR-opaque-payload,
     # incorporated). Split into exactly 3 segments, decode protected only, validate the grant
     # header + kid. (An invalid payload/signature does not affect the kid.)
@@ -1531,7 +1531,7 @@ def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLoc
         _fail("key_locator: three segments")
     protected_text = parts[0]
     # Empty payload/signature segments are ACCEPTED (only the protected segment is decoded;
-    # an empty protected segment is invalid — it must base64url-decode to a header).
+    # an empty protected segment is invalid: it must base64url-decode to a header).
     if len(protected_text) == 0:
         _fail("key_locator: empty protected segment")
     if len(protected_text) > _unwrap(bounds_resolve(b, "encoded_segment_bytes")):
@@ -1655,9 +1655,9 @@ def verify_grant(
 def _verify_grant_body(
     compact: bytes, trusted: TrustedIssuer, expected: ExpectedGrant
 ) -> GrantFacts:
-    # Fail-closed shallow: a None OR a struct missing public_key/key_id must fail closed — not
+    # Fail-closed shallow: a None OR a struct missing public_key/key_id must fail closed: not
     # raise AttributeError past the Result contract (the closed-Result discipline of the v1/v2
-    # façades, carried into v3).
+    # facades, carried into v3).
     if trusted is None:
         _fail("verify_grant: trusted issuer required")
     if (
@@ -1914,8 +1914,8 @@ def _check_envelope_body(
     )
 
 
-# 6. request_digest (the façade; returns Ok<raw 32-byte digest> | Err). The v3 digest is
-# base64url(SHA-256("BAP3-REQUEST\0" || JCS([operation, typed(cast_arguments)]))) — the v1 §7
+# 6. request_digest (the facade; returns Ok<raw 32-byte digest> | Err). The v3 digest is
+# base64url(SHA-256("BAP3-REQUEST\0" || JCS([operation, typed(cast_arguments)]))): the v1 §7
 # construction with the REQ3-SIGNING-digest-prefix substitution.
 @_closed_shape
 def request_digest(
@@ -2001,7 +2001,7 @@ def _within_tagged_bounds(v: Tagged, level: int, bounds: Bounds) -> bool:
             and len(v.v) <= _unwrap(bounds_resolve(bounds, "object_members"))
             and all(_within_tagged_bounds(val, level + 1, bounds) for val in v.v.values())
         )
-    return False  # type: ignore[unreachable]  # unreachable — the algebra is closed
+    return False  # type: ignore[unreachable]  # unreachable: the algebra is closed
 
 
 def _count_tagged_nodes(v: Tagged) -> int:
@@ -2432,7 +2432,7 @@ def _proof_signing_input_body(proof: ProofProducer, bounds: Bounds | None) -> Si
         "typ": JString(_unwrap(str_utf8(PROOF_TYP))),
     }
     # Producer ath: gate the grant compact by scan (shape+size, NOT base64url canonicity) before
-    # hashing it into `ath` — a caller-supplied non-compact grant must not be embedded as
+    # hashing it into `ath`: a caller-supplied non-compact grant must not be embedded as
     # sha256(garbage) in the proof.
     _scan_compact(proof.grant_compact, b)
     ath_raw = _unwrap(sha256(proof.grant_compact))
@@ -2497,7 +2497,7 @@ def assemble_compact(
 
 
 def _assemble_compact_body(input_: SigningInput, signature: bytes, bounds: Bounds | None) -> bytes:
-    # ADR 0018 divergence closed (2026-08-18): apply caller-tightened segment
+    # spec/bap-v1.md §17 divergence closed (2026-08-18): apply caller-tightened segment
     # and compact ceilings at assembly (spec/bap-v1.md §17,
     # REQ1-BOUNDS-tighten-only, REQ1-BOUNDS-ordering). Absent bounds use maxima.
     b = _unwrap(coerce_bounds(bounds if bounds is not None else MAXIMUM_BOUNDS))
@@ -2750,8 +2750,8 @@ def _encode_anchored_export_body(
     # strict: the count equality is already enforced above; strict zip is defense-in-depth.
     for i, (compact, exp) in enumerate(zip(input_.transitions, expected.transitions, strict=True)):
         framed_signatures.append(_parse_and_match_transition(compact, exp, i, b))
-    # Erratum 3: encoding is a producer surface — it frames these signatures and verifies
-    # none — so it refuses any framed signature no conforming signer emits, never rewriting
+    # Erratum 3: encoding is a producer surface: it frames these signatures and verifies
+    # none: so it refuses any framed signature no conforming signer emits, never rewriting
     # its bytes.
     for _signature in framed_signatures:
         _require(_canonical_signature(_signature), "encode_anchored_export: signature canonicality")
@@ -2772,7 +2772,7 @@ def _encode_anchored_export_body(
 
 def _utf8_bytes(v: object, ctx: str) -> int:
     """UTF-8 byte length, fail-closed on non-str AND ill-formed (lone-surrogate)
-    input — .encode raises UnicodeEncodeError/AttributeError, either of which
+    input: .encode raises UnicodeEncodeError/AttributeError, either of which
     would escape the Result contract."""
     if not isinstance(v, str):
         _fail(ctx)
@@ -2805,8 +2805,8 @@ def _parse_and_match_anchor(
     """Parse an anchor compact and match all seven signed fields against expected values
     (spec/bap-v3.md §2 incorporates spec/bap-v1.md §§15-16, REQ1-EXPORT-input-shape).
     Encoding checks structure and canonical form without verifying signatures."""
-    # Bound every anchor compact at anchor_bytes — stricter than parse_compact's whole-input
-    # compact_bytes ceiling. (The ENCODE path only — the standalone verify has its own gates.)
+    # Bound every anchor compact at anchor_bytes: stricter than parse_compact's whole-input
+    # compact_bytes ceiling. (The ENCODE path only: the standalone verify has its own gates.)
     if len(compact) > _unwrap(bounds_resolve(b, "anchor_bytes")):
         _fail(f"encode_anchored_export: {which} anchor anchor_bytes")
     seg = _parse_compact(compact, b)
@@ -2953,7 +2953,7 @@ def _build_archive_header(input_: AnchoredExportInput, chain: ExpectedChain, b: 
 
 
 def _frame(data: bytes) -> bytes:
-    """UINT32_BE(len) || bytes — the archive framing (v1 §15 incorporated)."""
+    """UINT32_BE(len) || bytes: the archive framing (v1 §15 incorporated)."""
     if len(data) == 0:
         _fail("archive: zero-length frame")
     v = len(data)
@@ -3190,8 +3190,9 @@ def _verify_anchored_export_body(
     _expected_int(expected.chain.first_sequence, "verify_anchored_export: first_sequence type")
     _expected_int(expected.chain.last_sequence, "verify_anchored_export: last_sequence type")
     _expected_int(expected.chain.row_count, "verify_anchored_export: row_count type")
-    # Expected-struct well-formedness BEFORE the digest (the ADR 0017 clause-3 discipline the
-    # v1/v2 façades enforce): chain + both anchors + transitions validate before key shapes,
+    # Expected-struct well-formedness BEFORE the digest (the expected-context validation
+    # before archive hashing (spec/bap-v1.md §§15-17) discipline the
+    # v1/v2 facades enforce): chain + both anchors + transitions validate before key shapes,
     # chunks, and hash_chunks, so a malformed expected struct never forces processing of the
     # full archive.
     _bpre = _unwrap(
@@ -3298,7 +3299,7 @@ def _verify_anchored_export_body(
         # the ASCII-unreserved key_id class, pre-hash
         if not _k.key_id.isascii() or not all(c.isalnum() or c in "-._~" for c in _k.key_id):
             _fail("verify_anchored_export: key id charset")
-        # (the isinstance half is owned by the _closed_shape gate — exact bytes;
+        # (the isinstance half is owned by the _closed_shape gate: exact bytes;
         # the WIDTH is still this gate's to check: the 65-byte uncompressed SEC1 point)
         if len(_k.public_key) != PUBLIC_KEY_BYTES:
             _fail("verify_anchored_export: key width")
@@ -3438,7 +3439,7 @@ def _verify_anchored_export_body(
     # Chronology over the ACTUAL anchored times: each transition's effective_at must be strictly
     # greater than the previous anchor/transition time, and the end anchor's anchored_at must be
     # >= the last transition's effective_at (>= the start anchor's anchored_at for the
-    # no-transition case — covered by _validate_key_path's chronological end).
+    # no-transition case: covered by _validate_key_path's chronological end).
     transition_time = expected.start_anchor.anchored_at
     for i, t in enumerate(expected.transitions):
         if not (t.effective_at > transition_time):

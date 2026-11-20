@@ -38,7 +38,7 @@ defmodule BoundedAuthorityProtocol.SdkDerivationTest do
   #BoundedAuthorityProtocol.V1.GrantFacts<redacted>
   n/2, s > n/2, a/b, https://example.test/URI.new/1, docs/URI.new/1
   C:\\docs\\URI.new/1, URI.new/1.md, reference verdict, cross-reference
-  Derived from the spec and certified corpus, not from sibling-SDK or reference source (ADR 0014 D5).
+  Derived from the spec and certified corpus, not from sibling-SDK or reference source (independent spec-and-corpus derivation (docs/design/conformance-contract.md)).
   """
   @generated ~w(.git .venv __pycache__ .mypy_cache .pytest_cache .ruff_cache target dist build node_modules example.egg-info)
 

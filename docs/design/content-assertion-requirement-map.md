@@ -7,6 +7,11 @@ profiles](../governance.md#byte-distinct-sibling-attestation-profiles).
 The evidence column names the required checks. The profile was first released in
 package 0.7.0.
 
+Current releases follow the package 1.x policy in [API stability](../guides/api-stability.md)
+and the [release-candidate contract](../release-candidate-contract.md). A new sibling profile
+requires a minor release; this released profile keeps its bytes and verdicts except for a
+soundness repair meeting the published governance conditions.
+
 Corpus: `priv/conformance/attestation-profiles/content-assertion/v1`, revision 1;
 131 assertion cases, 9 digest cases, and 14 successor cases. Frozen index SHA-256:
 `14b7436ccf7cc91fece52a1578c3760df6720a93494d147ee5ab523e2ce21876`.
@@ -31,14 +36,14 @@ producer-canonicality corpus (`priv/conformance/producer-canonicality`, index SH
 RED PROOF: mutation `ed25519-assembly-gate-removed` reddens the family test. This profile's own
 corpus, index, and verdicts are unchanged.
 
-OBSERVED local checks against this corpus: the Elixir corpus consumer, Python
+Historical first-release checks against this corpus: the Elixir corpus consumer, Python
 `tests/test_content_assertion.py`, Go content-assertion tests, Rust
 `cargo test --test content_assertion`, and TypeScript
 `pnpm conformance:content-assertion` passed. The 131 assertions include seven URI
 regressions added without rewriting the previous signed vectors. The independent
 producer/assembly comparison covers 38 structurally valid assertions.
 
-OBSERVED safety checks: `scripts/check_content_assertion_mutations.exs` killed
+Historical first-release safety checks: `scripts/check_content_assertion_mutations.exs` killed
 30 of 30 permissive changes. Python and TypeScript content-assertion mutation tests
 and Go guard mutations passed. Rust killed 11 runtime guard mutations; deleting
 marker comparisons survived because the markers have distinct singleton types.
@@ -79,9 +84,9 @@ the independent Python verifier.
 | `SECURITY-not-authority`, `SECURITY-trust`, `SECURITY-knowledge` | Non-authorizing facts/pure boundary; documentation of explicit trust/windows and offline/restore knowledge limits; no implicit transition-derived trust. | local focused checks passed |
 | `CONFORMANCE-pin`, `CONFORMANCE-cases` | Certified index/file hashes, exact case census, independent bytes/verdicts, and named red-capable mutation receipts. | local corpus and guard checks passed |
 | `CONFORMANCE-sdks` | Elixir reference and independent Python/Rust/Go/TypeScript implementations against the same frozen corpus; graduated snapshot coordinated at freeze. | all five passed the frozen corpus before release |
-| `CONFORMANCE-receipts` | Real companion-signer issuance plus independent non-Elixir consumption and content-digest equality against exact immutable candidate. | receipts retained against the built 0.7.0 package |
+| `CONFORMANCE-receipts` | Real companion-signer issuance plus independent non-Elixir consumption and content-digest equality against the exact immutable candidate. Evidence states the checked public contract without private work tracking. | historical first-release evidence against package 0.7.0; required for profile qualification |
 | `IANA-template` | Matching registry and RFC 6838 source/rendered template; specification requests registration without claiming completed registration. | source-reviewed; IANA registration submission gated |
-| `RELEASE-immutable` | Exact reviewed source, package/checksum, corpus, full final gate, companion admission policy, and owner approval for exact publication. | released in 0.7.0 under owner approval |
+| `RELEASE-immutable` | Exact qualified source commit, package checksum, corpus, and provenance under the release-candidate contract. Only the maintainers' release operator publishes from `main`. Companion admission remains the adopting host's policy. | historical first release in 0.7.0; current package 1.x release qualification |
 
 A structural traceability check only establishes that requirements have entries.
 Execution receipts establish observed outcomes. Neither proves live revocation,

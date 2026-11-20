@@ -1,8 +1,8 @@
-"""JWS compact serialization (RFC 7515) — the 3-segment wire shape:
+"""JWS compact serialization (RFC 7515): the 3-segment wire shape:
 ``base64url(protected) || "." || base64url(payload) || "." || base64url(signature)``.
 
 The signing input (REQ1-SIGNING-exact-input) is ``ASCII(base64url(protected) || "." ||
-base64url(payload))`` — no signature, no extra bytes.
+base64url(payload))``: no signature, no extra bytes.
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ class CompactSegments:
         payload_bytes: bytes.
         signing_input: bytes.
     """
+
     protected_segment: bytes  # the raw base64url TEXT (not decoded)
     payload_segment: bytes
     signature: bytes  # decoded raw bytes (64 for Ed25519)
@@ -123,6 +124,7 @@ class SigningInput:
         protected_segment: bytes.
         payload_segment: bytes.
     """
+
     kind: str  # Closed profile-specific kind; see _KINDS.
     protected_segment: bytes  # base64url text
     payload_segment: bytes  # base64url text
@@ -153,7 +155,7 @@ def assemble_segments(signing_input: SigningInput, signature: bytes) -> Result[b
             _fail("assemble_segments: kind closed set")
         _require(len(signature) == 64, "assemble_segments: signature width 64")
         # Erratum 3 (REQ1/REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer
-        # surface — it frames a signature and verifies none — so it refuses a signature that
+        # surface (it frames a signature and verifies none) so it refuses a signature that
         # fails the keyless part of rule S1 and emits accepted bytes unchanged. Every Ed25519
         # assembler (contract-majors 1 and 2, local loopback, role attestation, content
         # assertion) assembles through this function.

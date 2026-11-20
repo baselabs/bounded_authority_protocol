@@ -1,4 +1,4 @@
-//! Façade — the public v2 verification entry points (contract-major 2).
+//! Facade: the public v2 verification entry points (contract-major 2).
 //!
 //! The v2 profile is the frozen v1 profile carried at major 2
 //! (`BAP2-Ed25519-SHA256`): every payload validator below requires `"v": 2`
@@ -6,12 +6,13 @@
 //! `BAP2-CHAIN\0`, `BAP2-ARCHIVE\0EXPORT\0`), so v2 bytes never verify
 //! under v1 and vice versa. The selector algebra alone widens: the closed kind
 //! set extends to `{all, equals, one_of, lte, gte}` with same-tag inclusive
-//! range semantics (`selector::evaluate_v2`, ADR 0028). Headers, typs,
+//! range semantics (`selector::evaluate_v2`, spec/bap-v2.md §4). Headers, typs,
 //! claims, bounds, JCS, JWK, URI rules, and facts shapes are the v1 contracts
 //! unchanged.
 //!
 //! Derived from the spec and certified corpus, not from any sibling-SDK or
-//! reference source (ADR 0014 D5). The normative authorities are spec/bap-v2.md
+//! reference source (docs/design/conformance-contract.md, Independent implementation rule). The
+//! normative authorities are spec/bap-v2.md
 //! and its incorporated v1 requirements. `REQ1-*` citations below name the
 //! v1 requirement of the same name, carried into v2
 //! by the contract-major rule with only the version and domain-separator
@@ -24,7 +25,7 @@
 //! `authorization`/`trust: NotEvaluated` and there is no `allowed?` anywhere.
 //!
 //! The v2 profile has no local-loopback application-proof typ: the
-//! byte-distinct loopback kinds stay closed out of this façade.
+//! byte-distinct loopback kinds stay closed out of this facade.
 
 use crate::base64url::{base64url_decode, base64url_encode};
 use crate::bounds::Bounds;
@@ -53,13 +54,13 @@ use crate::uri::uri_normalize;
 use sha2::{Digest, Sha256};
 
 // ============================================================================
-// request_digest — the v2 auth-binding primitive
+// request_digest: the v2 auth-binding primitive
 // ============================================================================
 
 /// Compute the v2 request digest.
 ///
 /// The identical typed projection and JCS preimage as the v1 primitive,
-/// hashed under `BAP2-REQUEST\0` — the two majors never share a
+/// hashed under `BAP2-REQUEST\0`: the two majors never share a
 /// request-binding domain (a v1 `ba_req` can never satisfy a v2 binding).
 pub fn request_digest(
     operation: &str,
@@ -70,7 +71,7 @@ pub fn request_digest(
 }
 
 // ============================================================================
-// Constants — closed header/claim member values (suite BAP2-Ed25519-SHA256)
+// Constants: closed header/claim member values (suite BAP2-Ed25519-SHA256)
 // ============================================================================
 
 const ALG_EDDSA: &str = "EdDSA";
@@ -82,16 +83,16 @@ const CRV_ED25519: &str = "Ed25519";
 const KTY_OKP: &str = "OKP";
 
 /// The ASCII domain-separation prefix for the consumption row-domain hash,
-/// including its FINAL NUL byte — the same `REQ1-SIGNING-digest-prefix` pattern
+/// including its FINAL NUL byte: the same `REQ1-SIGNING-digest-prefix` pattern
 /// as `BAP2-REQUEST\0` (the v2 request digest).
 ///
 /// `"BAP2-CHAIN\0"` = `[B, A, P, 2, -, C, H, A, I, N, 0x00]` (10 ASCII + 1 NUL
-/// = 11 bytes — confirmed byte-exact against the corpus entry.json row-domain
-/// hash). The final zero byte is load-bearing (ADR 0004 § Consumption rows:
+/// = 11 bytes: confirmed byte-exact against the corpus entry.json row-domain
+/// hash). The final zero byte is load-bearing (spec/bap-v1.md §15, Consumption rows:
 /// `SHA-256("BAP2-CHAIN\0" || canonical_row_bytes)`).
 const CHAIN_DIGEST_PREFIX: &[u8] = b"BAP2-CHAIN\0";
 
-/// The 20-byte archive magic prefix (ADR 0004 § Anchored export): the exact
+/// The 20-byte archive magic prefix (spec/bap-v1.md §15, Anchored export): the exact
 /// ASCII bytes `BAP2-ARCHIVE\0EXPORT\0` (12 + NUL + 6 + NUL = 20). Confirmed
 /// byte-exact against the corpus `anchored-export/verify.json` `chunks[0]`.
 const ARCHIVE_MAGIC: &[u8] = b"BAP2-ARCHIVE\0EXPORT\0";
@@ -105,7 +106,7 @@ const ARCHIVE_MAGIC: &[u8] = b"BAP2-ARCHIVE\0EXPORT\0";
 ///
 /// `REQ1-LOCATOR-three-segments`: the compact MUST have exactly three segments.
 /// `REQ1-LOCATOR-opaque-payload`: the payload and signature segments are NOT
-/// decoded, validated, or even required to be non-empty — they stay opaque.
+/// decoded, validated, or even required to be non-empty: they stay opaque.
 /// `REQ1-LOCATOR-not-authority`: the result is a `kid` hint plus
 /// `trust: NotEvaluated`; it selects no key and authorizes nothing.
 /// `REQ1-LOCATOR-no-value-leak`: every failure returns `Err(Invalid)` with no
@@ -117,7 +118,7 @@ pub fn untrusted_key_locator(compact: &[u8], bounds: &Bounds) -> Result<KeyLocat
     }
     // Split into EXACTLY three segments. Unlike parse_compact (which validates
     // every segment as non-empty canonical b64url), the locator leaves the
-    // payload+signature segments completely opaque — they may even be empty
+    // payload+signature segments completely opaque: they may even be empty
     // (the corpus `untrusted-key-locator-empty-payload-signature` case is
     // `header..`). Only the protected segment is examined.
     let (protected, _payload, _signature) = split_three_segments(compact)?;
@@ -204,15 +205,15 @@ pub fn decode_proof(compact: &[u8], bounds: &Bounds) -> Result<ProofDecoded> {
 }
 
 // ============================================================================
-// verify_grant — Façade C (Task 12): grant verification (the authz surface)
+// verify_grant: Facade C (Task 12): grant verification (the authz surface)
 // ============================================================================
 //
 // This is the **silent-forgery surface**: a permissive verify silently accepts
-// FORGED CREDENTIALS. Every binding — exact key id, exact issuer/audience, the
+// FORGED CREDENTIALS. Every binding: exact key id, exact issuer/audience, the
 // Ed25519 signature over the exact 2-segment signing input, coherent signed
-// times, and the three skew invariants — collapses to exactly [`Invalid`] on
+// times, and the three skew invariants: collapses to exactly [`Invalid`] on
 // any mismatch (`REQ1-VERIFY-return-shape`) with no value leak. The result is
-// [`GrantFacts`] carrying `authorization: NotEvaluated` — verification is not
+// [`GrantFacts`] carrying `authorization: NotEvaluated`: verification is not
 // authority (`REQ1-VERIFY-grant-not-authorized`).
 
 /// Verify a grant compact against a trusted issuer and caller expectation.
@@ -306,7 +307,7 @@ pub fn verify_grant(
 }
 
 // ============================================================================
-// check_envelope — Façade C (Task 12): combined envelope verification
+// check_envelope: Facade C (Task 12): combined envelope verification
 // ============================================================================
 //
 // The **highest-stakes silent-forgery surface**: a permissive check_envelope
@@ -398,7 +399,7 @@ pub fn check_envelope(
 
     // ath binding (REQ1-CLAIM-ath): SHA-256 over the ASCII bytes of the EXACT
     // RECEIVED grant compact. Computing ath over a re-serialized compact would
-    // let a modified compact pass — this is the parse!=verify protection.
+    // let a modified compact pass: this is the parse!=verify protection.
     let mut ath_hasher = Sha256::new();
     ath_hasher.update(&credentials.grant);
     let mut recomputed_ath = [0u8; 32];
@@ -529,7 +530,7 @@ fn scan_compact(compact: &[u8], bounds: &Bounds) -> Result<()> {
 }
 
 // ============================================================================
-// assemble_compact — public façade wrapper (compose + per-kind validation)
+// assemble_compact: public facade wrapper (compose + per-kind validation)
 // ============================================================================
 
 /// Assemble a compact from signing input and external signature, then revalidate
@@ -540,7 +541,7 @@ pub fn assemble_compact(
     signature: &[u8; 64],
     bounds: Option<&Bounds>,
 ) -> Result<Vec<u8>> {
-    // ADR 0018 divergence closed (2026-08-18): apply caller-tightened bounds
+    // spec/bap-v1.md §17 divergence closed (2026-08-18): apply caller-tightened bounds
     // at assembly and the kind reparse (spec/bap-v1.md §§16-17,
     // REQ1-VERIFY-revalidate, REQ1-BOUNDS-tighten-only). None uses maxima.
     let bounds = resolve_bounds(bounds);
@@ -574,7 +575,7 @@ pub fn assemble_compact(
             return Err(Invalid);
         }
         // The v2 profile parses no role-attestation typ: the standalone
-        // sibling profile's bytes stay closed out of this façade
+        // sibling profile's bytes stay closed out of this facade
         // (`REQ-RA1-CORE-cross-profile-reject`).
         SigningKind::RoleAttestation => {
             return Err(Invalid);
@@ -773,8 +774,7 @@ pub fn proof_signing_input(proof: &ProofInput, bounds: &Bounds) -> Result<Produc
 
 /// Produce the deterministic boundary-anchor signing input.
 ///
-/// The protected header is `{alg:"EdDSA", kid, typ:"ba+chain-anchor"}` (ADR
-/// 0004 § Boundary anchors). The payload binds protocol version, anchor
+/// The protected header is `{alg:"EdDSA", kid, typ:"ba+chain-anchor"}` (spec/bap-v1.md §15, Boundary anchors). The payload binds protocol version, anchor
 /// identity+time, chain identity, sequence, the chain hash, and the RFC 7638
 /// fingerprint derived from `public_key`. Sequence zero requires the all-zero
 /// chain hash.
@@ -789,7 +789,7 @@ pub fn boundary_anchor_signing_input(
     if anchor.sequence < 0 {
         return Err(Invalid);
     }
-    // Sequence zero requires the all-zero chain hash (ADR 0004 § Boundary
+    // Sequence zero requires the all-zero chain hash (spec/bap-v1.md §15, Boundary
     // anchors; corpus `boundary-anchor-signing-input-invalid-seq0-nonzero-chain-hash`).
     if anchor.sequence == 0 && anchor.chain_hash.iter().any(|&b| b != 0) {
         return Err(Invalid);
@@ -842,7 +842,7 @@ pub fn boundary_anchor_signing_input(
 /// Produce the deterministic historical key-transition signing input.
 ///
 /// The protected header is `{alg:"EdDSA", kid:current_key_id,
-/// typ:"ba+key-transition"}` (ADR 0004 § Authenticated key transitions). The
+/// typ:"ba+key-transition"}` (spec/bap-v1.md §15, Authenticated key transitions). The
 /// payload binds transition+chain identities, effective time, the current key
 /// fingerprint (`from_key_fingerprint`), the next key id (`to_key_id`), and the
 /// next fingerprint (`to_key_fingerprint`). The current and next public keys
@@ -910,13 +910,13 @@ pub fn key_transition_signing_input(
 }
 
 // ============================================================================
-// Façade B — consumption entry + chain verification (Task 11)
+// Facade B: consumption entry + chain verification (Task 11)
 // ============================================================================
 //
 // This is a **silent-relink surface**: a permissive chain check silently
-// certifies a relinked, shortened, or omitted archive. Every invariant —
+// certifies a relinked, shortened, or omitted archive. Every invariant,
 // canonical re-encode, genesis binding, predecessor links, and the caller
-// head/predecessor/sequence/count boundaries — collapses to exactly
+// head/predecessor/sequence/count boundaries: collapses to exactly
 // [`Invalid`] on any mismatch (`REQ1-VERIFY-return-shape`).
 // [`ChainFacts`] carries `trust: NotEvaluated` and makes no `authorization`
 // field part of its shape (`REQ1-CHAIN-facts-shape`,
@@ -927,7 +927,7 @@ pub fn key_transition_signing_input(
 /// Encode one canonical consumption row and compute its row-domain hash.
 ///
 /// Builds the closed JCS row object
-/// `{"chain_id","commitment","previous","sequence","v":2}` (ADR 0004 §
+/// `{"chain_id","commitment","previous","sequence","v":2}` (spec/bap-v1.md §15,
 /// Consumption rows), enforces `sequence >= 1` and the genesis binding
 /// (`sequence == 1` requires the all-zero predecessor), bounds the canonical
 /// bytes by `bounds.chain_row_bytes()`, and returns
@@ -947,7 +947,7 @@ pub fn encode_consumption_entry(
     // The chain ID is a bounded StringOrURI (spec/bap-v1.md §15; RFC 7519 §2).
     validate_identifier(&entry.chain_id, bounds)?;
     // Genesis binding: sequence 1 requires the all-zero predecessor (corpus
-    // invalid-seq1-nonzero-previous). A sequence > 1 MAY carry any predecessor —
+    // invalid-seq1-nonzero-previous). A sequence > 1 MAY carry any predecessor,
     // the encoder does not know the prior row's hash; the verifier binds it.
     if entry.sequence == 1 && entry.previous_hash.iter().any(|&b| b != 0) {
         return Err(Invalid);
@@ -955,7 +955,7 @@ pub fn encode_consumption_entry(
 
     let previous_str = b64url_to_string(&base64url_encode(&entry.previous_hash))?;
     let commitment_str = b64url_to_string(&base64url_encode(&entry.commitment))?;
-    // Member names + order derived first-hand from ADR 0004 § Consumption rows
+    // Member names + order derived first-hand from spec/bap-v1.md §15, Consumption rows
     // + the corpus entry.json expected.bytes: chain_id, commitment, previous,
     // sequence, v (already in JCS / UTF-16-sorted order).
     let row = JsonValue::Object(vec![
@@ -1042,7 +1042,7 @@ pub fn check_chain(input: &ChainInput, expected: &ExpectedChain) -> Result<Chain
     // The first row's previous is ALWAYS bound to expected.previous_hash
     // (spec/bap-v1.md §15 (rows), seeded from the expected predecessor), and when
     // first_sequence == 1 expected.previous_hash MUST be the all-zero hash
-    // (spec/bap-v1.md §16 — a fresh chain has no
+    // (spec/bap-v1.md §16: a fresh chain has no
     // predecessor, so a caller-inconsistent predecessor is rejected, not
     // attested unchecked into ChainFacts). Corpus: sequence-zero-row +
     // genesis-previous-hash-forge.
@@ -1107,7 +1107,7 @@ struct ParsedRow {
 }
 
 /// Computes `SHA-256("BAP2-CHAIN\0" || canonical_row_bytes)` as a raw 32-byte
-/// digest — the row-domain hash (ADR 0004 § Consumption rows).
+/// digest: the row-domain hash (spec/bap-v1.md §15, Consumption rows).
 fn row_domain_hash(canonical_row: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(CHAIN_DIGEST_PREFIX);
@@ -1123,7 +1123,7 @@ fn row_domain_hash(canonical_row: &[u8]) -> [u8; 32] {
 /// hash.
 ///
 /// Closed row shape: exactly `{chain_id: string, commitment: base64url-32,
-/// previous: base64url-32, sequence: int, v: 2}` — no extra members.
+/// previous: base64url-32, sequence: int, v: 2}`: no extra members.
 /// `commitment` is validated to decode to exactly 32 bytes but otherwise stays
 /// opaque (it is neither stored nor compared). The canonical re-encode check
 /// rejects any row whose received bytes are not the exact JCS encoding of the
@@ -1162,7 +1162,7 @@ fn parse_row(row: &[u8], bounds: &Bounds) -> Result<ParsedRow> {
         _ => return Err(Invalid),
     };
     // commitment + previous MUST be canonical base64url of exactly 32 bytes
-    // (ADR 0004: "<base64url-32>"). base64url_decode enforces the canonical
+    // (spec/bap-v1.md §15: "<base64url-32>"). base64url_decode enforces the canonical
     // encoding, so a non-canonical lexeme is rejected here.
     let _commitment = take_b64url_32(commitment)?;
     let previous = take_b64url_32(previous)?;
@@ -1201,18 +1201,18 @@ fn take_b64url_32(value: Option<&JsonValue>) -> Result<[u8; 32]> {
 }
 
 // ============================================================================
-// Façade D — anchored export verify/encode (Task 13)
+// Facade D: anchored export verify/encode (Task 13)
 // ============================================================================
 //
 // This is the **silent-relink surface**: a permissive export verify silently
 // certifies a RELINKED or SHORTENED archive, and a permissive rollover silently
-// accepts a key path with no authenticated transition. Every binding — the
+// accepts a key path with no authenticated transition. Every binding: the
 // exact archive bytes (magic + frames + EOF), the constant-time SHA-256 digest,
 // the out-of-band object-store version, the closed header, the authenticated
 // start/end anchors, the positional key-transition path, the chronology
 // (strictly increasing effective times, no fingerprint cycle, anchor ordering),
 // the surplus-key invariant (`keys.len() == transitions.len() + 1`), and the
-// re-checked row-domain hash chain — collapses to exactly [`Invalid`] on any
+// re-checked row-domain hash chain: collapses to exactly [`Invalid`] on any
 // mismatch. [`AnchoredExportFacts`] is the ONLY chain-family fact that carries
 // BOTH `trust: NotEvaluated` and `authorization: NotEvaluated`
 // (`REQ1-CHAIN-facts-shape`): an anchored export binds the retrieved object
@@ -1280,7 +1280,7 @@ pub fn verify_historical_anchor(
     }
 
     // Sequence-zero binding: sequence 0 requires the all-zero chain hash
-    // (ADR 0004 § Boundary anchors).
+    // (spec/bap-v1.md §15, Boundary anchors).
     if a.payload.sequence == 0 && a.payload.chain_hash.iter().any(|&b| b != 0) {
         return Err(Invalid);
     }
@@ -1377,7 +1377,7 @@ pub fn verify_key_transition(
     }
     // Signed to_key_id / chain_id / effective_at / transition_id == expected.
     // to_key_id is bound to BOTH the positional next key's identifier AND the
-    // caller's expected id (spec/bap-v1.md §15 (transitions)) — the
+    // caller's expected id (spec/bap-v1.md §15 (transitions)): the
     // current-key side at line ~11 binds header.kid to current.key_id; the
     // next side must bind to_key_id to next.key_id too, or the positional key
     // chain could advance under a mismatched identifier.
@@ -1429,7 +1429,7 @@ pub fn verify_key_transition(
 
 /// Encode an anchored export archive (the producer).
 ///
-/// Builds the exact binary concatenation (ADR 0004 § Anchored export):
+/// Builds the exact binary concatenation (spec/bap-v1.md §15, Anchored export):
 /// `ARCHIVE_MAGIC || frame(canonical_header) || frame(start_anchor) ||
 /// frame(each transition) || frame(each row) || frame(end_anchor)`, where each
 /// frame is `UINT32_BE(nonzero_length) || bytes`. The closed canonical header
@@ -1441,7 +1441,7 @@ pub fn verify_key_transition(
 /// (REQ1-VERIFY-revalidate)
 /// (`spec/bap-v1.md §15 (archives)` encode): expected-side consistency (the chain_id
 /// binding of both anchors and every transition; the start/end sequence + hash
-/// bindings to the chain — the start binding caught by the corpus
+/// bindings to the chain: the start binding caught by the corpus
 /// `encode-anchored-export-invalid-start-anchor-binding` case), a full
 /// [`check_chain`] re-check of the rows, gated parses + 7-field matches for
 /// BOTH anchors and every transition (the decoded signature width and the
@@ -1460,7 +1460,7 @@ pub fn encode_anchored_export(
     let bounds = resolve_bounds(expected.bounds.as_ref());
 
     // The count ceiling BEFORE any per-element walk (cross-vendor round 3: the
-    // pin loop walked unbounded caller input first — O(n) work past the ceiling).
+    // pin loop walked unbounded caller input first: O(n) work past the ceiling).
     if expected.transitions.len() as u64 > bounds.key_transitions() {
         return Err(Invalid);
     }
@@ -1535,8 +1535,8 @@ pub fn encode_anchored_export(
         },
     )?;
 
-    // Erratum 3: encoding is a producer surface — it frames these signatures and verifies
-    // none — so it refuses any framed anchor or transition signature no conforming signer
+    // Erratum 3: encoding is a producer surface: it frames these signatures and verifies
+    // none: so it refuses any framed anchor or transition signature no conforming signer
     // emits, never rewriting its bytes.
     for framed in [&input.start_anchor, &input.end_anchor]
         .into_iter()
@@ -1710,7 +1710,8 @@ pub fn encode_anchored_export(
 }
 
 /// Resolves a caller-supplied optional bounds to the effective value: `None`
-/// uses the profile maximum (spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only). Tighten-only by construction; `Bounds::new` rejects
+/// uses the profile maximum (spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only). Tighten-only by
+/// construction; `Bounds::new` rejects
 /// widenings and merges overrides onto the maximum struct, so an identity
 /// override (value == maximum) resolves EQUAL to the maximum: the sibling
 /// map-size trap is structurally inexpressible against the full-struct
@@ -1836,13 +1837,13 @@ pub fn verify_anchored_export(
 ) -> Result<AnchoredExportFacts> {
     let bounds = resolve_bounds(expected.bounds.as_ref());
 
-    // ADR 0017 clause-3 hoist: expected-struct well-formedness BEFORE the digest.
+    // REQ1-BOUNDS-ordering: validate expected context before hashing archive bytes.
     // Validate chain, anchors, and transitions before processing chunks so malformed
     // context cannot force archive hashing (spec/bap-v1.md §§16-17,
     // REQ1-VERIFY-revalidate, REQ1-BOUNDS-ordering).
     {
         // Cross-vendor round 18 (claude): the count ceiling BEFORE the hoisted per-element
-        // walk (the round-3 invariant — the hoist must not regress it; the TS sibling
+        // walk (the round-3 invariant: the hoist must not regress it; the TS sibling
         // ordered this way from the start).
         if expected.transitions.len() as u64 > bounds.key_transitions() {
             return Err(Invalid);
@@ -1981,8 +1982,8 @@ pub fn verify_anchored_export(
     if total < ARCHIVE_MAGIC.len() as u64 {
         return Err(Invalid);
     }
-    // (the full version shape gate — non-empty, ≤ object_version_bytes, both
-    // sides — runs at the compare below; cross-vendor round 11.)
+    // (the full version shape gate: non-empty, ≤ object_version_bytes, both
+    // sides: runs at the compare below; cross-vendor round 11.)
 
     // Stream the archive digest without allocating the complete archive
     // (spec/bap-v1.md §§15-17, REQ1-EXPORT-complete-scan, REQ1-BOUNDS-ordering).
@@ -2019,7 +2020,7 @@ pub fn verify_anchored_export(
         return Err(Invalid);
     }
 
-    // (the version gates ran before the digest — rounds 12-14.)
+    // (the version gates ran before the digest: rounds 12-14.)
 
     // Materialize the byte stream for the magic check + incremental frame scan.
     let mut buf = Vec::with_capacity(total as usize);
@@ -2064,17 +2065,17 @@ pub fn verify_anchored_export(
         rows.push(read_frame_bounded(&buf, &mut cursor, bounds.chain_row_bytes())?.to_vec());
     }
     let end_anchor_compact = read_frame_bounded(&buf, &mut cursor, bounds.anchor_bytes())?;
-    // Exact EOF — nothing follows the end-anchor frame.
+    // Exact EOF: nothing follows the end-anchor frame.
     if cursor != buf.len() {
         return Err(Invalid);
     }
 
     // F1 surplus-key invariant: keys.len() == transitions.len() + 1. WITHOUT
     // this check a 0-transition archive carrying two distinct keys (start
-    // signed by keys[0], end by keys[1]) would be accepted — both anchors
+    // signed by keys[0], end by keys[1]) would be accepted: both anchors
     // verify individually, but no transition authenticates the rollover.
     // Deliberate redundancy (cross-vendor round 16: implied by the pre-digest
-    // keys==transitions+1 gate + the header equality — kept as defense-in-depth
+    // keys==transitions+1 gate + the header equality: kept as defense-in-depth
     // for future header-economy changes, NOT load-bearing today).
     if keys.keys.len() as i64 != header.transition_count + 1 {
         return Err(Invalid);
@@ -2126,7 +2127,7 @@ pub fn verify_anchored_export(
     )?;
 
     // Re-check every row (canonical re-encode, predecessor links, genesis,
-    // sequence, count, head — reused from Façade B).
+    // sequence, count, head: reused from Facade B).
     let chain_input = ChainInput { rows };
     check_chain(
         &chain_input,
@@ -2153,7 +2154,7 @@ pub fn verify_anchored_export(
 }
 
 // ----------------------------------------------------------------------------
-// Façade D helpers — anchor/transition decode, archive framing, chronology
+// Facade D helpers: anchor/transition decode, archive framing, chronology
 // ----------------------------------------------------------------------------
 
 /// The fully-decoded boundary-anchor compact (segments borrowed from input).
@@ -2181,7 +2182,7 @@ struct AnchorPayload {
 /// MUST be exactly 64 bytes (REQ1-BOUNDS-fixed-widths, mirroring
 /// spec/bap-v1.md §15 (anchors)), and the protected/payload segments must equal
 /// their exact JCS re-encoding (canonical form, spec/bap-v1.md §15 (anchors)
-/// + 118-119) — enforced inside the validators below.
+/// + 118-119): enforced inside the validators below.
 fn decode_anchor_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedAnchor<'a>> {
     // Enforce compact_bytes before the tighter anchor_bytes ceiling
     // (spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only, REQ1-BOUNDS-ordering).
@@ -2359,7 +2360,7 @@ fn decode_transition_parts<'a>(
     let payload_bytes = decode_segment(payload_seg, bounds)?;
     // REQ1-BOUNDS-fixed-widths: the decoded signature is exactly 64 bytes
     // (spec/bap-v1.md §15 (transitions)). Publicly reachable through
-    // encode_anchored_export, which parses caller-supplied transitions here —
+    // encode_anchored_export, which parses caller-supplied transitions here,
     // battery leg `encode_transition_signature_width_rejected` drives a
     // 32-byte signature to exactly this gate. assemble_compact stays
     // [u8; 64]-type-locked and verify_key_transition's decode_signature64
@@ -2584,7 +2585,7 @@ fn frame_into(content: &[u8], out: &mut Vec<u8>) {
 /// Reads one archive frame at `*cursor`: a UINT32_BE nonzero length prefix
 /// followed by exactly that many bytes. Returns a borrowed slice of the frame
 /// payload and advances `*cursor` past it.
-/// read_frame with a per-frame byte ceiling — the row/anchor reads cap each
+/// read_frame with a per-frame byte ceiling: the row/anchor reads cap each
 /// frame at its role's bound (chain_row_bytes / anchor_bytes) so a
 /// digest-matching malformed archive cannot materialize a ~full-archive frame
 /// before check_chain's per-row gate (cross-vendor round 11).
@@ -2639,7 +2640,8 @@ fn in_interval(t: i64, valid_from: i64, upper: &ValidityUpperBound) -> bool {
     }
 }
 
-/// Chronology + rollover checks for an anchored export (ADR 0004 §49-55):
+/// Chronology + rollover checks for an anchored export (spec/bap-v1.md §15 (ordered key
+/// rollover and chronology)):
 /// fingerprints cannot cycle (all key fingerprints distinct); transition
 /// effective times strictly increase; the start anchor precedes every
 /// transition; the end anchor is at or after the last transition. Equal
@@ -2701,7 +2703,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 }
 
 // ============================================================================
-// Internal helpers — segment splitting / decoding / production
+// Internal helpers: segment splitting / decoding / production
 // ============================================================================
 
 /// Splits `compact` on `.` into EXACTLY three segments without validating any
@@ -2825,7 +2827,7 @@ fn decode_proof_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedP
 }
 
 /// Assembles the RFC 7515 two-segment signing input
-/// (`protected_segment || "." || payload_segment`) — the exact bytes the
+/// (`protected_segment || "." || payload_segment`): the exact bytes the
 /// Ed25519 signature covers (`REQ1-SIGNING-exact-input`).
 fn signing_input_bytes(protected_seg: &[u8], payload_seg: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(protected_seg.len() + 1 + payload_seg.len());
@@ -2916,7 +2918,7 @@ fn b64url_to_string(bytes: &[u8]) -> Result<String> {
 }
 
 // ============================================================================
-// Internal helpers — closed-set header / claim validation
+// Internal helpers: closed-set header / claim validation
 // ============================================================================
 
 /// Validates the grant protected header is exactly
@@ -3165,7 +3167,7 @@ fn validate_proof_payload(payload: &JsonValue, bounds: &Bounds) -> Result<ProofP
 }
 
 // ============================================================================
-// Internal helpers — claim-type extraction
+// Internal helpers: claim-type extraction
 // ============================================================================
 
 /// Extracts a non-empty StringOrURI (≤ `identifier_bytes`).
@@ -3195,7 +3197,7 @@ fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
         return Err(Invalid);
     }
     match s.find(':') {
-        None => Ok(()), // plain string — any valid UTF-8 (a Rust &str guarantees it)
+        None => Ok(()), // plain string: any valid UTF-8 (a Rust &str guarantees it)
         Some(colon) => {
             validate_scheme(&s[..colon])?;
             validate_uri_bytes(s.as_bytes())?;
@@ -3213,14 +3215,14 @@ fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
 fn validate_authority_port(value: &str) -> Result<()> {
     let after_scheme_host = match value.find("://") {
         Some(i) => &value[i + 3..],
-        None => return Ok(()), // no authority (e.g. `urn:…`) — nothing to port-check
+        None => return Ok(()), // no authority (e.g. `urn:…`): nothing to port-check
     };
     let auth_end = after_scheme_host
         .find(['/', '?', '#'])
         .unwrap_or(after_scheme_host.len());
     let authority = &after_scheme_host[..auth_end];
     if authority.starts_with('[') {
-        return Ok(()); // IP literal — colons inside […] are not a port.
+        return Ok(()); // IP literal: colons inside […] are not a port.
     }
     if let Some(c) = authority.rfind(':') {
         let port = &authority[c + 1..];
@@ -3299,7 +3301,7 @@ fn take_audiences(value: Option<&JsonValue>, bounds: &Bounds) -> Result<Vec<Stri
     }
 }
 
-/// Extracts an integral NumericDate (`JsonValue::Int` only — a float is not
+/// Extracts an integral NumericDate (`JsonValue::Int` only: a float is not
 /// integral and is rejected). `None` → `Invalid`.
 fn take_integral_date(value: Option<&JsonValue>) -> Result<i64> {
     match value {
@@ -3560,7 +3562,8 @@ mod tests {
         Bounds::maximum()
     }
 
-    /// The vendored self-contained v2 corpus snapshot (ADR 0015 D5) — NOT the
+    /// The vendored self-contained v2 corpus snapshot (SDK publication requires a separate
+    /// repository (sdks/README.md publication boundary)): NOT the
     /// monorepo source tree.
     fn corpus_root() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -3627,7 +3630,7 @@ mod tests {
         Some(arr)
     }
 
-    /// Builds a v2 range-selector grant input (the ADR 0028 shape).
+    /// Builds a v2 range-selector grant input (the spec/bap-v2.md §4 shape).
     fn range_grant() -> GrantInput {
         GrantInput {
             issuer: "https://issuer.example.test".to_string(),
@@ -3663,7 +3666,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Domain separators — the BAP2-* bytes are load-bearing (major confusion is
+    // Domain separators: the BAP2-* bytes are load-bearing (major confusion is
     // the silent-auth failure this profile exists to prevent)
     // ==========================================================================
 
@@ -3680,7 +3683,7 @@ mod tests {
 
     #[test]
     fn cross_major_chain_row_hashes_never_collide() {
-        // Identical row fields hashed under BAP1 vs BAP2 MUST differ — a shared
+        // Identical row fields hashed under BAP1 vs BAP2 MUST differ: a shared
         // row hash would let a v1 chain graft onto a v2 verification.
         let entry = ConsumptionEntry {
             chain_id: "chain-x".to_string(),
@@ -3705,7 +3708,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Cross-major rejection — each major verifies under its own closed profile
+    // Cross-major rejection: each major verifies under its own closed profile
     // only. RED if a v:2 check were widened to accept v:1 (or vice versa).
     // ==========================================================================
 
@@ -3875,7 +3878,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // v2 request digest — BAP2-REQUEST\0, pinned by the corpus
+    // v2 request digest: BAP2-REQUEST\0, pinned by the corpus
     // ==========================================================================
 
     #[test]
@@ -3895,13 +3898,13 @@ mod tests {
     }
 
     // ==========================================================================
-    // lte/gte — producer byte-exactness + closed-set at the v1 façade
+    // lte/gte: producer byte-exactness + closed-set at the v1 facade
     // ==========================================================================
 
     #[test]
     fn grant_producer_emits_range_selectors_byte_exact() {
         // Corpus grant-signing-input-v2-valid-range-selectors pins all three
-        // segments byte-exact — including the `"v":2` member.
+        // segments byte-exact: including the `"v":2` member.
         let cases = load_cases("signing-input/grant.json");
         let case = cases
             .iter()
@@ -3972,7 +3975,7 @@ mod tests {
     #[test]
     fn prior_major_grant_producer_rejects_range_selectors() {
         // The SAME range-selector grant is valid under v2 but rejected by the
-        // v1 producer — the closed-set verdict flip only a contract-major
+        // v1 producer: the closed-set verdict flip only a contract-major
         // carries.
         assert!(grant_signing_input(&range_grant(), &max()).is_ok());
         assert_eq!(

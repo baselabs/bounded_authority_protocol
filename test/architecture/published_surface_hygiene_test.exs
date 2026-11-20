@@ -8,7 +8,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
 
   # Published-surface hygiene gate (2026-09-14): the Hex package and its rendered docs must
   # carry no internal authoring-tooling vocabulary. The class escaped once (the changelog and
-  # four ADRs shipped naming local harness paths and AI-vendor review peers) and was
+  # four internal design documents shipped naming local harness paths and AI-vendor peers) and was
   # neutralized before the next release; this gate makes the class red-capable instead of a
   # one-time sweep. The scanned set mirrors the mix.exs package `files` boundary (ROADMAP is outside that
   # boundary and is asserted absent from the scan). Explicit authoring-tool names are banned.
@@ -164,29 +164,80 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     assert Enum.any?(@banned, &Regex.match?(&1, File.read!(path)))
   end
 
-  # Decision records are local and unpublished, so a shipped file or HexDocs page that cites one
-  # by number points the reader at nothing. Shipped text states the rule itself or links a
-  # shipped section (a specification, governance, or the errata registry).
-  @adr_citation ~r/\bADR[ -]?0\d/
+  # Public text states each rule itself or links a tracked specification. Scan all tracked
+  # text, including SDK sources, tests, hidden configuration, scripts, and site files.
+  # Split spellings keep the checker and its positive examples inside their own scan.
+  @unpublished_reference ~r/\bA[D]Rs?(?:\b|\d{4}\b)|\b(?:architecture[ -]+)?decision[ -]+records?\b/i
 
-  test "no shipped file or HexDocs page cites a decision record by number" do
-    violations =
-      for path <- shipped_and_extras(),
-          line <- path |> File.read!() |> String.split("\n") |> Enum.with_index(1),
-          {text, number} = line,
-          Regex.match?(@adr_citation, text),
-          do: "#{path}:#{number}: #{String.trim(text)}"
+  test "no tracked public text depends on unpublished design references" do
+    violations = unpublished_references(tracked_public_files())
 
     assert violations == [],
-           "decision-record citations in the published surface:\n#{Enum.join(violations, "\n")}"
+           "unpublished design references in public text:\n#{Enum.join(violations, "\n")}"
   end
 
-  test "the decision-record check is red-capable" do
-    for text <- ["see ADR 0040", "(ADR-0015)", "ADR 0021 §2"] do
-      assert Regex.match?(@adr_citation, text), text
+  test "the unpublished-reference check rejects numbered, plural, and general forms" do
+    abbreviation = "A" <> "DR"
+    full_name = "decision" <> " record"
+
+    for text <- [
+          "see #{abbreviation} 0014",
+          "(#{abbreviation}-0014)",
+          "#{abbreviation}0014",
+          "#{abbreviation}s",
+          "#{abbreviation}",
+          "#{full_name} 0014",
+          "#{full_name}s",
+          "architecture-#{String.replace(full_name, " ", "-")}"
+        ] do
+      assert Regex.match?(@unpublished_reference, text), text
+      assert Regex.match?(@unpublished_reference, String.downcase(text)), text
     end
 
-    refute Regex.match?(@adr_citation, "a GRADR 01 token")
+    refute Regex.match?(@unpublished_reference, "a GRADR 01 token")
+    refute Regex.match?(@unpublished_reference, "spec/bap-v1.md §15")
+  end
+
+  test "the tracked scan covers SDKs and catches a citation planted in a source file" do
+    paths = tracked_public_files()
+
+    for path <- [
+          "sdks/go/archive.go",
+          "sdks/python/tests/test_permissiveness.py",
+          "sdks/rust/src/facts.rs",
+          "sdks/rust/.config/nextest.toml",
+          ".github/workflows/ci.yml",
+          "scripts/check_sdk_publish_infra.sh",
+          "site/index.html",
+          "test/architecture/published_surface_hygiene_test.exs"
+        ] do
+      assert path in paths, path
+    end
+
+    root = Path.join(System.tmp_dir!(), "bap-public-text-#{System.unique_integer([:positive])}")
+    on_exit(fn -> File.rm_rf!(root) end)
+    path = Path.join(root, "sdks/go/archive.go")
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, "// Canonical archive framing (spec/bap-v1.md §15).\n")
+    assert unpublished_references([path]) == []
+    File.write!(path, "// See A" <> "DR 0014.\n")
+    assert [violation] = unpublished_references([path])
+    assert String.starts_with?(violation, "#{path}:1:")
+  end
+
+  test "tracked narrative text uses punctuation without long dashes" do
+    dash = <<0x2014::utf8>>
+
+    violations =
+      for path <- tracked_public_files(),
+          not corpus_data?(path),
+          {line, number} <- path |> File.read!() |> String.split("\n") |> Enum.with_index(1),
+          String.contains?(line, dash),
+          do: "#{path}:#{number}: #{String.trim(line)}"
+
+    assert violations == [], "rewrite narrative punctuation:\n#{Enum.join(violations, "\n")}"
+    assert String.contains?("A rule" <> dash <> "an explanation", dash)
+    refute String.contains?("A rule: an explanation", dash)
   end
 
   test "no HexDocs page starts with YAML front matter" do
@@ -239,8 +290,26 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     end
   end
 
-  defp shipped_and_extras do
-    @roots |> Enum.flat_map(&wildcard/1) |> Enum.concat(extras()) |> Enum.uniq()
+  defp tracked_public_files do
+    {files, 0} = System.cmd("git", ["ls-files", "-z"])
+
+    files
+    |> String.split(<<0>>, trim: true)
+    |> Enum.filter(&(File.regular?(&1) and String.valid?(File.read!(&1))))
+  end
+
+  defp unpublished_references(paths) do
+    for path <- paths,
+        {line, number} <- path |> File.read!() |> String.split("\n") |> Enum.with_index(1),
+        Regex.match?(@unpublished_reference, line),
+        do: "#{path}:#{number}: #{String.trim(line)}"
+  end
+
+  # Certified corpus bytes are protocol data, not narrative. Never rewrite or exempt
+  # authored SDK sources or tests, including those beside the vendored snapshots.
+  defp corpus_data?(path) do
+    String.starts_with?(path, "priv/conformance/") or
+      Regex.match?(~r{^sdks/[^/]+/conformance/priv/conformance/}, path)
   end
 
   defp front_matter?(source), do: String.starts_with?(source, "---\n")

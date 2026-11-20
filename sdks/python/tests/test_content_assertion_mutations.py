@@ -137,7 +137,7 @@ def _probe_signature(module: types.ModuleType) -> bool:
 
 def _gate_passing_signature() -> bytes:
     # Erratum 3: the assembler refuses an all-zero signature (small-order R, S = 0), so this
-    # probe frames gate-passing bytes instead — R the little-endian encoding of y = 2 (canonical,
+    # probe frames gate-passing bytes instead: R the little-endian encoding of y = 2 (canonical,
     # not small order) and S = L - 1. The kind gate under mutation stays the only rejection.
     sig = bytearray(64)
     sig[1] = 2

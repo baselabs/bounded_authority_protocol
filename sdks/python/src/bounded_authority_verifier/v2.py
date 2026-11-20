@@ -1,16 +1,16 @@
-"""The v2 verification façade (contract-major 2, the ``BAP2-Ed25519-SHA256`` suite).
+"""The v2 verification facade (contract-major 2, the ``BAP2-Ed25519-SHA256`` suite).
 
-The v2 profile is byte-distinct from v1 (ADR 0028 + the successor-major charter): every versioned
+The v2 profile is byte-distinct from v1 (spec/bap-v2.md §4 + the successor-major charter): every versioned
 payload carries ``v: 2``, the domain separators are ``BAP2-REQUEST\\0`` / ``BAP2-CHAIN\\0`` /
 ``BAP2-ARCHIVE\\0EXPORT\\0``, and the selector algebra admits the two inclusive range kinds
-``lte``/``gte`` (same-tag numeric operands only, ADR 0028 §2). This façade rejects v1 bytes, and the
-v1 façade rejects v2 bytes — each major verifies under its own complete closed profile.
-The local-loopback proof profile binds contract-major 1 grants only, so this façade has no loopback
+``lte``/``gte`` (same-tag numeric operands only, spec/bap-v2.md §4). This facade rejects v1 bytes, and the
+v1 facade rejects v2 bytes: each major verifies under its own complete closed profile.
+The local-loopback proof profile binds contract-major 1 grants only, so this facade has no loopback
 functions.
 
 17 public functions, each returning ``Result[T] = Ok | Err`` (the ``{:ok, value} | {:error, :invalid}``
-mirror). No ``authorized`` / ``decision`` surface (AGENTS rule 1). All claims revalidated at every
-public entry (REQ1-VERIFY-revalidate). Wire formats derived from the v1 contract + ADR 0004 + ADR 0028
+mirror). No ``authorized`` / ``decision`` surface. All claims revalidated at every
+public entry (REQ1-VERIFY-revalidate). Wire formats derived from the v1 contract + spec/bap-v1.md §15 + spec/bap-v2.md §4
 + the corpus; the corpus is the byte-level arbiter.
 
 Frozen dataclasses carry the caller inputs defined by spec/bap-v1.md §16
@@ -97,7 +97,7 @@ ANCHOR_TYP = "ba+chain-anchor"
 TRANSITION_TYP = "ba+key-transition"
 VERSION = 2
 
-# BAP2-CHAIN\0 prefix for consumption-row hashing (the v2 domain separator; ADR 0004 §
+# BAP2-CHAIN\0 prefix for consumption-row hashing (the v2 domain separator; spec/bap-v1.md §15,
 # Consumption rows, successor-major charter). Byte-distinct from BAP1-CHAIN\0, so a v2 chain
 # link never collides with a v1 chain link.
 ROW_PREFIX = b"BAP2-CHAIN\x00"
@@ -111,12 +111,12 @@ def _is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-# BAP2-ARCHIVE\0EXPORT\0 prefix (the v2 domain separator; ADR 0004 § Anchored export; the
+# BAP2-ARCHIVE\0EXPORT\0 prefix (the v2 domain separator; spec/bap-v1.md §15, Anchored export; the
 # 20-byte magic, NOT framed). Byte-distinct from the v1 prefix, so v1 and v2 archives never
 # share a frame grammar.
 ARCHIVE_PREFIX = b"BAP2-ARCHIVE\x00EXPORT\x00"
 
-# The all-zero 32-byte hash: sequence-1 predecessor + sequence-0 anchor chain hash (ADR 0004).
+# The all-zero 32-byte hash: sequence-1 predecessor + sequence-0 anchor chain hash (spec/bap-v1.md §15).
 DEFAULT_HASH = bytes(32)
 
 # Lowercase RFC 4122 UUID.
@@ -126,14 +126,16 @@ _METHOD_TOKEN = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
 _OPERATION_PRINTABLE = re.compile(r"^[\x20-\x7e]+$")
 
 
-# --- the v2 selector algebra (ADR 0028: the v1 kinds + the inclusive range kinds) ---
+# --- the v2 selector algebra (spec/bap-v2.md §4: the v1 kinds + the inclusive range kinds) ---
 #
 # The closed kind set extends to {all, equals, one_of, lte, gte}. The three v1 kinds delegate to
 # the shared selector module (the identical closed validation); lte/gte use the EXISTING
-# {kind, path, value} recognized member set (ADR 0028 §3 — no fourth member set), with the bound
-# constrained to the numeric tags. Same-tag semantics (ADR 0028 §2): the traversed value and the
+# {kind, path, value} recognized member set (the existing {kind, path, value} member set
+# (spec/bap-v2.md §4): no fourth member set), with the bound
+# constrained to the numeric tags. Same-tag semantics (same-tag numeric operands (spec/bap-v2.md
+# §4)): the traversed value and the
 # bound must BOTH be integer-tagged or BOTH be float-tagged; a cross-tag pair NEVER matches (fail
-# closed — REQ1-SELECTOR-no-tag-collapse extended from identity to ordering). Comparison is
+# closed: REQ1-SELECTOR-no-tag-collapse extended from identity to ordering). Comparison is
 # INCLUSIVE by numeric value on the finite binary64 domain (lte: value <= bound; gte: value >=
 # bound). Non-numeric operands never match, and a missing path fails closed exactly as
 # equals/one_of.
@@ -171,7 +173,7 @@ V2Selector = _V1Selector | SelLte | SelGte
 def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[V2Selector]:
     """Parse a v2 selector: the v1 kinds delegate; lte/gte validate the numeric bound at decode.
 
-    A non-numeric bound (string/boolean/null/array/object) rejects HERE — the producer must not
+    A non-numeric bound (string/boolean/null/array/object) rejects HERE: the producer must not
     mint, and the verifier must not accept, a range selector whose bound cannot participate in
     the same-tag domain.
     """
@@ -185,7 +187,8 @@ def parse_selector(obj: Tagged, bounds: Bounds = MAXIMUM_BOUNDS) -> Result[V2Sel
         kind = _unwrap(utf8_str(kind_v.v))
         if kind not in ("lte", "gte"):
             return Ok(_unwrap(_parse_v1_selector(obj, bounds)))
-        # ADR 0028 §3: exactly the {kind, path, value} recognized member set.
+        # the existing {kind, path, value} member set (spec/bap-v2.md §4): exactly the
+        # {kind, path, value} recognized member set.
         if frozenset(obj.v) != frozenset({"kind", "path", "value"}):
             _fail("selector: member set")
         path = _parse_selector_path(obj.v.get("path"), bounds)
@@ -237,8 +240,9 @@ def selector_matches(sel: V2Selector, cast_arguments: Tagged) -> Result[bool]:
                 return Ok(False)  # missing path fails closed exactly as equals/one_of
             bound = sel.bound
             inclusive_low = isinstance(sel, SelLte)
-            # Same-tag arms ONLY (ADR 0028 §2): JInt pairs compare as integers, JFloat pairs as
-            # floats; every other pairing — cross-tag, or a non-numeric traversed operand — is False.
+            # Same-tag arms ONLY (same-tag numeric operands (spec/bap-v2.md §4)): JInt
+            # pairs compare as integers, JFloat pairs as
+            # floats; every other pairing (cross-tag, or a non-numeric traversed operand) is False.
             if isinstance(bound, JInt) and isinstance(target, JInt):
                 return Ok(target.v <= bound.v if inclusive_low else target.v >= bound.v)
             if isinstance(bound, JFloat) and isinstance(target, JFloat):
@@ -249,7 +253,7 @@ def selector_matches(sel: V2Selector, cast_arguments: Tagged) -> Result[bool]:
         return err()
 
 
-# --- dispatch struct types (match corpus input field names; the contract for each façade) ---
+# --- dispatch struct types (match corpus input field names; the contract for each facade) ---
 
 
 @dataclass(frozen=True)
@@ -733,7 +737,8 @@ def _parse_transition_header(seg: CompactSegments, bounds: Bounds) -> str:
     _require_string_lit(h, "alg", ALG, "transition header alg")
     _require_string_lit(h, "typ", TRANSITION_TYP, "transition header typ")
     kid = _require_kid(h, bounds)
-    # Canonical form: the protected segment must be the exact JCS encoding (spec/bap-v1.md §15 Authenticated
+    # Canonical form: the protected segment must be the exact JCS encoding (spec/bap-v1.md §15
+    # Authenticated
     # key transitions).
     if not _bytes_equal(_unwrap(jcs_encode(h, bounds)), seg.protected_bytes):
         _fail("transition header: canonical")
@@ -799,7 +804,7 @@ def _valid_uri_authority(authority: str) -> bool:
     at = authority.find("@")
     hostport = authority if at == -1 else authority[at + 1 :]
     if "@" in hostport:
-        return False  # a second @ lands in the host — invalid.
+        return False  # a second @ lands in the host: invalid.
     if hostport.startswith("["):
         close = hostport.find("]")
         if close == -1:
@@ -824,7 +829,7 @@ def _is_well_formed(s: str) -> bool:
     # A well-formed Unicode string has no unpaired surrogates. Python str CAN carry lone surrogates
     # (e.g. a caller-supplied chain_id with '\ud800'); re-encoding to UTF-8 rejects them. For strings
     # that came through json_decode, the unpaired-surrogate case was already rejected at the escape
-    # level — this check is the defense for direct (non-JSON) inputs like producer fields.
+    # level: this check is the defense for direct (non-JSON) inputs like producer fields.
     try:
         s.encode("utf-8")
     except UnicodeEncodeError:
@@ -1074,7 +1079,8 @@ def _validate_transition_payload(
         _fail("transition: to_key_id bytes")
     if _KID_CHARSET.match(s) is None:
         _fail("transition: to_key_id charset")
-    # Canonical form: the payload segment must be the exact JCS encoding (spec/bap-v1.md §15 Authenticated key
+    # Canonical form: the payload segment must be the exact JCS encoding (spec/bap-v1.md §15
+    # Authenticated key
     # transitions).
     if not _bytes_equal(_unwrap(jcs_encode(p, bounds)), payload_bytes):
         _fail("transition payload: canonical")
@@ -1096,7 +1102,7 @@ def _bytes_equal(a: bytes, b: bytes) -> bool:
 _T = TypeVar("_T")
 
 
-# --- the 17 façade functions ---
+# --- the 17 facade functions ---
 
 
 def _trying(fn: Callable[[], _T]) -> Result[_T]:
@@ -1167,7 +1173,7 @@ def _walk_annotation(annotation: object) -> None:
 
 
 def _shape_ok(value: object, annotation: object) -> bool:
-    """True iff value matches the declared annotation shape exactly (ADR 0017 clauses 1-2)."""
+    """True iff value matches the declared annotation shape exactly (closed results and exact structured-input types (spec/bap-v1.md §§15-17))."""
     if annotation is Any or annotation is object:
         return True
     if annotation is type(None):
@@ -1189,7 +1195,7 @@ def _shape_ok(value: object, annotation: object) -> bool:
             if not isinstance(value, annotation):
                 return False
             # A struct can arrive malformed (constructed via __new__ or a broken subclass) with
-            # attributes missing entirely — that is a shape failure, never a crash (the gate
+            # attributes missing entirely: that is a shape failure, never a crash (the gate
             # itself must uphold the closed surface it enforces).
             hints = _dataclass_hints(annotation)
             for name, sub in hints.items():
@@ -1197,13 +1203,13 @@ def _shape_ok(value: object, annotation: object) -> bool:
                 if member is _MISSING or not _shape_ok(member, sub):
                     return False
             return True
-        return False  # unreachable — _walk_annotation rejects unsupported types at import
+        return False  # unreachable: _walk_annotation rejects unsupported types at import
     if _is_union(annotation):
         return any(_shape_ok(value, member) for member in get_args(annotation))
     origin = get_origin(annotation)
     if origin is tuple:
         # Variadic tuple[X, ...] carries the ELEMENT contract; the container accepts list|tuple
-        # (the historical input surface — conformant fixtures pass lists; bodies iterate).
+        # (the historical input surface: conformant fixtures pass lists; bodies iterate).
         if not isinstance(value, (list, tuple)):
             return False
         (elem, _rest) = get_args(annotation)
@@ -1215,15 +1221,15 @@ def _shape_ok(value: object, annotation: object) -> bool:
         return all(_shape_ok(item, elem) for item in value)
     if origin is Mapping:
         return isinstance(value, Mapping)
-    return False  # unreachable — _walk_annotation rejects unsupported origins at import
+    return False  # unreachable: _walk_annotation rejects unsupported origins at import
 
 
 def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
-    """Façade decorator: validate caller arguments against their declared shapes before the
-    body runs; malformed values return Err, and accepted buffers are copied. Applied to all 17 public functions. Hints resolve lazily on the first call —
-    façade signatures forward-reference structs defined later in this module (ExpectedExport);
+    """Facade decorator: validate caller arguments against their declared shapes before the
+    body runs; malformed values return Err, and accepted buffers are copied. Applied to all 17 public functions. Hints resolve lazily on the first call,
+    facade signatures forward-reference structs defined later in this module (ExpectedExport);
     an unsupported annotation form therefore fails on first call (the family sweep exercises
-    every façade, so it fails in CI, just not at import)."""
+    every facade, so it fails in CI, just not at import)."""
     resolved: list[tuple[dict[str, object], inspect.Signature]] = []
 
     @functools.wraps(fn)
@@ -1275,7 +1281,7 @@ def _untrusted_key_locator_body(compact: bytes, bounds: Bounds | None) -> KeyLoc
     protected_text = parts[0]
     # Cross-vendor (key-locator empty segments): the contract (spec/bap-v1.md §18) only
     # requires exactly 3
-    # segments and decodes the PROTECTED segment alone — payload and signature are bound to _ and
+    # segments and decodes the PROTECTED segment alone: payload and signature are bound to _ and
     # never decoded or size-checked, so empty payload/signature segments are ACCEPTED. Only an empty
     # PROTECTED segment is invalid (it must base64url-decode to a header). Do NOT reject empty
     # payload/signature.
@@ -1676,7 +1682,7 @@ def request_digest(
     )
 
 
-# 7. encode_consumption_entry (ADR 0004 § Consumption rows). Returns canonical row bytes + hash.
+# 7. encode_consumption_entry (spec/bap-v1.md §15, Consumption rows). Returns canonical row bytes + hash.
 @_closed_shape
 def encode_consumption_entry(
     entry: ConsumptionEntry, bounds: Bounds | None = None
@@ -1747,7 +1753,7 @@ def _canonical_row_bytes(
     )
 
 
-# 8. check_chain (ADR 0004 § Consumption rows; REQ1-CHAIN-raw-rows-bounds).
+# 8. check_chain (spec/bap-v1.md §15, Consumption rows; REQ1-CHAIN-raw-rows-bounds).
 @_closed_shape
 def check_chain(chain: ChainInput, expected: ExpectedChain) -> Result[ChainFacts]:
     """Verify canonical rows and their expected hash-chain boundary without live state."""
@@ -1972,7 +1978,8 @@ def _selector_to_tagged(s: SelectorInput, b: Bounds) -> Tagged:
                 }
             )
         if isinstance(kind, str) and kind in ("lte", "gte"):
-            # ADR 0028 §2/§3: the {kind, path, value} member set with a numeric bound. The
+            # same-tag numeric operands and closed member sets (spec/bap-v2.md §4):
+            # the {kind, path, value} member set with a numeric bound. The
             # bound arrives as a Tagged value (programmatic callers) or a JSON-decoded raw
             # scalar (the conformance runner); bool is not a numeric tag (Python bool is int,
             # so the bool arm must precede the int arm).
@@ -2166,7 +2173,7 @@ def _assemble_compact_for(
     profile: ProofProfile,
 ) -> Result[bytes]:
     def body() -> bytes:
-        # ADR 0018 divergence closed (2026-08-18): apply caller-tightened segment
+        # spec/bap-v1.md §17 divergence closed (2026-08-18): apply caller-tightened segment
         # and compact ceilings at assembly (spec/bap-v1.md §17,
         # REQ1-BOUNDS-tighten-only, REQ1-BOUNDS-ordering). Absent bounds use maxima.
         b = _unwrap(coerce_bounds(bounds if bounds is not None else MAXIMUM_BOUNDS))
@@ -2213,7 +2220,7 @@ def _assemble_compact_for(
     return _trying(body)
 
 
-# 12. boundary_anchor_signing_input (ADR 0004 § Boundary anchors).
+# 12. boundary_anchor_signing_input (spec/bap-v1.md §15, Boundary anchors).
 @_closed_shape
 def boundary_anchor_signing_input(
     anchor: BoundaryAnchorProducer, bounds: Bounds | None = None
@@ -2289,7 +2296,7 @@ def _boundary_anchor_signing_input_body(
     )
 
 
-# 13. key_transition_signing_input (ADR 0004 § Authenticated key transitions).
+# 13. key_transition_signing_input (spec/bap-v1.md §15, Authenticated key transitions).
 @_closed_shape
 def key_transition_signing_input(
     t: KeyTransitionProducer, bounds: Bounds | None = None
@@ -2364,7 +2371,7 @@ def _key_transition_signing_input_body(
     )
 
 
-# 14. encode_anchored_export (ADR 0004 § Anchored export; REQ1-EXPORT-input-shape).
+# 14. encode_anchored_export (spec/bap-v1.md §15, Anchored export; REQ1-EXPORT-input-shape).
 @_closed_shape
 def encode_anchored_export(
     input_: AnchoredExportInput, expected: ExpectedExport
@@ -2419,8 +2426,8 @@ def _encode_anchored_export_body(
     # strict: the count equality is already enforced above; strict zip is defense-in-depth.
     for i, (compact, exp) in enumerate(zip(input_.transitions, expected.transitions, strict=True)):
         framed_signatures.append(_parse_and_match_transition(compact, exp, i, b))
-    # Erratum 3: encoding is a producer surface — it frames these signatures and verifies
-    # none — so it refuses any framed signature no conforming signer emits, never rewriting
+    # Erratum 3: encoding is a producer surface: it frames these signatures and verifies
+    # none: so it refuses any framed signature no conforming signer emits, never rewriting
     # its bytes.
     for _signature in framed_signatures:
         _require(_signature_gate(_signature), "encode_anchored_export: signature canonicality")
@@ -2441,7 +2448,7 @@ def _encode_anchored_export_body(
 
 def _utf8_bytes(v: object, ctx: str) -> int:
     """UTF-8 byte length, fail-closed on non-str AND ill-formed (lone-surrogate)
-    input — .encode raises UnicodeEncodeError/AttributeError, either of which
+    input: .encode raises UnicodeEncodeError/AttributeError, either of which
     would escape the Result contract."""
     if not isinstance(v, str):
         _fail(ctx)
@@ -2626,14 +2633,14 @@ def _build_archive_header(input_: AnchoredExportInput, chain: ExpectedChain, b: 
 
 
 def _frame(data: bytes) -> bytes:
-    """UINT32_BE(len) || bytes — the archive framing (ADR 0004 § Anchored export)."""
+    """UINT32_BE(len) || bytes: the archive framing (spec/bap-v1.md §15, Anchored export)."""
     if len(data) == 0:
         _fail("archive: zero-length frame")
     v = len(data)
     return bytes([(v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF]) + data
 
 
-# 15. verify_historical_anchor (ADR 0004 § Boundary anchors; spec/bap-v1.md § Historical anchor).
+# 15. verify_historical_anchor (spec/bap-v1.md §15, Boundary anchors).
 @_closed_shape
 def verify_historical_anchor(
     compact: bytes, key: HistoricalPublicKey, expected: ExpectedAnchor
@@ -2722,7 +2729,7 @@ def _verify_historical_anchor_body(
     )
 
 
-# 16. verify_key_transition (ADR 0004 § Authenticated key transitions).
+# 16. verify_key_transition (spec/bap-v1.md §15, Authenticated key transitions).
 @_closed_shape
 def verify_key_transition(
     compact: bytes,
@@ -2750,9 +2757,9 @@ def _verify_key_transition_body(
     # Apply the resolved caller bounds to the compact and payload
     # (spec/bap-v1.md §17, REQ1-BOUNDS-tighten-only).
     b = _unwrap(coerce_bounds(expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS))
-    # Key-window endpoints magnitude-bounded (both keys — the Rust parity).
+    # Key-window endpoints magnitude-bounded (both keys: the Rust parity).
     # The anchor_bytes compact ceiling at the STANDALONE verify entry
-    # (spec/bap-v1.md §15 (transitions) — cross-vendor round 12).
+    # (spec/bap-v1.md §15 (transitions): cross-vendor round 12).
     if len(compact) > _unwrap(bounds_resolve(b, "anchor_bytes")):
         _fail("verify_key_transition: anchor_bytes")
     _ovf = _expected_int(old_key.valid_from, "verify_key_transition: valid_from type")
@@ -2836,7 +2843,7 @@ def _verify_key_transition_body(
     )
 
 
-# 17. verify_anchored_export (ADR 0004 § Anchored export; REQ1-EXPORT-complete-scan).
+# 17. verify_anchored_export (spec/bap-v1.md §15, Anchored export; REQ1-EXPORT-complete-scan).
 @_closed_shape
 def verify_anchored_export(
     archived: ArchivedObject, key_chain: HistoricalKeyChain, expected: ExpectedExport
@@ -2847,7 +2854,7 @@ def verify_anchored_export(
 
 
 def _pre_identifier(value: object, ctx: str, bounds: Bounds) -> None:
-    """The clause-3 pre-digest identifier gate: non-empty str, UTF-8 byte length within
+    """The expected-context pre-digest identifier gate: non-empty str, UTF-8 byte length within
     identifier_bytes, StringOrURI syntax (spec/bap-v1.md §11; RFC 7519 §2)."""
     if (
         not isinstance(value, str)
@@ -2867,7 +2874,7 @@ def _verify_anchored_export_body(
     _expected_int(expected.chain.first_sequence, "verify_anchored_export: first_sequence type")
     _expected_int(expected.chain.last_sequence, "verify_anchored_export: last_sequence type")
     _expected_int(expected.chain.row_count, "verify_anchored_export: row_count type")
-    # ADR 0017 clause-3 hoist: expected-struct well-formedness BEFORE the digest.
+    # REQ1-BOUNDS-ordering: validate expected context before hashing archive bytes.
     # Validate chain, anchors, and transitions before processing chunks so malformed
     # context cannot force archive hashing (spec/bap-v1.md §§16-17,
     # REQ1-VERIFY-revalidate, REQ1-BOUNDS-ordering).
@@ -2876,7 +2883,7 @@ def _verify_anchored_export_body(
     )
     _mpre = _unwrap(bounds_resolve(_bpre, "integer_magnitude"))
     # Cross-vendor round 18 (claude): the count ceiling BEFORE the hoisted per-element walk
-    # (the round-3 invariant — the hoist must not regress it; the TS sibling ordered this
+    # (the round-3 invariant: the hoist must not regress it; the TS sibling ordered this
     # way from the start).
     if len(expected.transitions) > _unwrap(bounds_resolve(_bpre, "key_transitions")):
         _fail("verify_anchored_export: transition count bound")
@@ -2958,14 +2965,14 @@ def _verify_anchored_export_body(
     # Expected-side identifier strings used in header construction must be
     # well-formed BEFORE the digest (cross-vendor round 16: a lone-surrogate
     # chain_id raised UnicodeEncodeError out of the Result API at the
-    # str_utf8() header encode — the same escape class as key_id/version).
+    # str_utf8() header encode: the same escape class as key_id/version).
     _utf8_bytes(expected.chain.chain_id, "verify_anchored_export: chain_id encoding")
     _utf8_bytes(expected.start_anchor.chain_id, "verify_anchored_export: chain_id encoding")
     _utf8_bytes(expected.end_anchor.chain_id, "verify_anchored_export: chain_id encoding")
     for _t in expected.transitions:
         _utf8_bytes(_t.chain_id, "verify_anchored_export: chain_id encoding")
     # Key ID/public-key SHAPE before the digest (cross-vendor round 14: an
-    # oversized key ID reached the SHA-256 call in a live probe — the window
+    # oversized key ID reached the SHA-256 call in a live probe: the window
     # gates alone were incomplete pre-hash validation).
     for _k in key_chain.keys:
         if (
@@ -2980,7 +2987,7 @@ def _verify_anchored_export_body(
         # (spec/bap-v1.md §10, REQ1-HEADER-kid-bytes; §17, REQ1-BOUNDS-ordering).
         if not _k.key_id.isascii() or not all(c.isalnum() or c in "-._~" for c in _k.key_id):
             _fail("verify_anchored_export: key id charset")
-        # (the isinstance half is owned by the _closed_shape gate — exact bytes;
+        # (the isinstance half is owned by the _closed_shape gate: exact bytes;
         # the WIDTH is still this gate's to check)
         if len(_k.public_key) != 32:
             _fail("verify_anchored_export: key width")
@@ -3056,7 +3063,7 @@ def _verify_anchored_export_body(
     digest = _unwrap(sha256(*archived.chunks))
     if not _bytes_equal(digest, expected.digest):
         _fail("verify_anchored_export: digest")
-    # (the version SHAPE + equality gates ran before the digest — round 12.)
+    # (the version SHAPE + equality gates ran before the digest: round 12.)
     # Materialize for parsing ONLY after the digest matches (caller-legitimate, bounded archive).
     archive = b"".join(archived.chunks)
     if len(archive) <= len(ARCHIVE_PREFIX):
@@ -3223,7 +3230,7 @@ def _verify_anchor_compact(
         else (expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     )
     # Key-window endpoints: integral + magnitude-bounded (the standalone path's
-    # gates — cross-vendor round 7: the archive path skipped them).
+    # gates: cross-vendor round 7: the archive path skipped them).
     _vf = _expected_int(key.valid_from, f"{ctx}: valid_from type")
     _vb = (
         _expected_int(key.valid_before, f"{ctx}: valid_before type")
@@ -3300,7 +3307,7 @@ def _verify_transition_compact(
         else (expected.bounds if expected.bounds is not None else MAXIMUM_BOUNDS)
     )
     # Key-window endpoints: integral + magnitude-bounded for BOTH keys (the
-    # standalone path's gates — cross-vendor round 7).
+    # standalone path's gates: cross-vendor round 7).
     _ovf = _expected_int(current_key.valid_from, f"{ctx}: valid_from type")
     _nvf = _expected_int(next_key.valid_from, f"{ctx}: valid_from type")
     _ovb = (

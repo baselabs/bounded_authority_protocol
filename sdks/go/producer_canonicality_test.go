@@ -1,7 +1,7 @@
 package verifier_test
 
 // Producer-canonicality refusals (erratum 3): the certified rule matrix lives in the vendored
-// bap-producer-canonicality/1 corpus (the conformance package's runner, 75 cases — every refusal
+// bap-producer-canonicality/1 corpus (the conformance package's runner, 75 cases: every refusal
 // clause on every producer surface, the exact-bound accepts with byte-equality). This file adds
 // what the corpus cannot carry: honest-signature positive controls per suite, proving the gates
 // do not over-refuse what a conforming signer emits, and the same signature's refusal legs
@@ -103,8 +103,8 @@ func TestProducerEd25519HonestControlAndSLRefusal(t *testing.T) {
 	}
 }
 
-// An honest low-S ES256 signature assembles unchanged on v3; its high-S twin — which verifies
-// under raw ECDSA — refuses.
+// An honest low-S ES256 signature assembles unchanged on v3; its high-S twin: which verifies
+// under raw ECDSA: refuses.
 func TestProducerES256HonestControlAndTwinRefusal(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

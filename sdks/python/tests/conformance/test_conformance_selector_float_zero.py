@@ -1,5 +1,5 @@
 """Pytest wrapper for the selector float-zero conformance runner (erratum 6): every case in the
-additive bap-selector-float-zero/1 corpus agrees — grant decode rejects a float-tagged zero in an
+additive bap-selector-float-zero/1 corpus agrees: grant decode rejects a float-tagged zero in an
 equals value or one_of member, the grant producer refuses a float-tagged integral selector value,
 and range bounds keep comparing numerically."""
 

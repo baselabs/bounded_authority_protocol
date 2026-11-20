@@ -1,8 +1,8 @@
 //! The producer-canonicality runner (profile `bap-producer-canonicality/1`, erratum 3): it
 //! executes the vendored additive corpus (corpus-producer-canonicality, a byte-identical
 //! snapshot of priv/conformance/producer-canonicality/) against the crate's PRODUCER surfaces
-//! only — compact assembly for contract-majors 1, 2 and 3 and the three sibling profiles,
-//! anchored-export encoding for all three majors — SHA-binds the vendored index.json at
+//! only: compact assembly for contract-majors 1, 2 and 3 and the three sibling profiles,
+//! anchored-export encoding for all three majors: SHA-binds the vendored index.json at
 //! startup, verifies every listed file against the index's per-file SHA-256 and case counts,
 //! and requires every case to agree: a refused signature is the closed error; an accepted
 //! signature's bytes are emitted unchanged (byte-equality against the certified compact).
@@ -50,7 +50,7 @@ fn load_cases() -> Vec<Value> {
     assert_eq!(
         sha256_hex(&index_bytes),
         CERTIFIED_INDEX_SHA,
-        "corpus index.json SHA-256 mismatch — silent drift is impossible"
+        "corpus index.json SHA-256 mismatch: silent drift is impossible"
     );
     let index: Value = serde_json::from_slice(&index_bytes).unwrap();
     assert_eq!(index["profile"].as_str().unwrap(), PROFILE);

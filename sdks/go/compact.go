@@ -7,7 +7,7 @@ import (
 
 // Compact-JWS machinery: deterministic producers, the bounded assembler, and
 // the shared split. Grant and proof signatures use the exact RFC 7515 signing
-// input with no domain prefix (ADR 0003, REQ1-SIGNING-exact-input); the
+// input with no domain prefix (spec/bap-v1.md §14, REQ1-SIGNING-exact-input); the
 // retired BAP1-GRANT\0 / BAP1-PROOF\0 prefixes are invalid signing prefixes.
 
 // signingInputMessage builds ASCII(BASE64URL(protected) || '.' ||
@@ -21,7 +21,8 @@ func signingInputMessage(si SigningInput) []byte {
 }
 
 // compactParts is a split compact JWS. The signature is width-gated at decode
-// time (ADR 0017 clause 4): a decoded signature that is not exactly 64 bytes
+// time (canonical segments and fixed signature widths (spec/bap-v1.md §§15-17)): a decoded
+// signature that is not exactly 64 bytes
 // never reaches cryptography.
 type compactParts struct {
 	ProtectedSeg string
@@ -261,7 +262,7 @@ func proofSigningInputFor(p Proof, bounds *Bounds, profile proofProfile) (si Sig
 }
 
 // BoundaryAnchorSigningInput composes the deterministic anchor signing input
-// (ADR 0004: header {alg,kid,typ:"ba+chain-anchor"}; payload binding v,
+// (spec/bap-v1.md §15: header {alg,kid,typ:"ba+chain-anchor"}; payload binding v,
 // anchor identity/time, chain identity, sequence, chain hash, and the raw-key
 // fingerprint). Sequence zero requires the all-zero hash.
 func BoundaryAnchorSigningInput(a BoundaryAnchor, bounds *Bounds) (si SigningInput, err error) {
@@ -312,7 +313,7 @@ func BoundaryAnchorSigningInput(a BoundaryAnchor, bounds *Bounds) (si SigningInp
 }
 
 // KeyTransitionSigningInput composes the deterministic transition signing
-// input (ADR 0004: typ ba+key-transition; the CURRENT key signs; the payload
+// input (spec/bap-v1.md §15: typ ba+key-transition; the CURRENT key signs; the payload
 // binds transition+chain identities, effective time, current and next
 // fingerprints, and the next key id). Fingerprints must differ; key IDs may
 // be equal.
@@ -385,7 +386,7 @@ func assembleCompactFor(si SigningInput, signature []byte, bounds *Bounds, profi
 		return "", ErrInvalid
 	}
 	// Erratum 3 (REQ1/REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer
-	// surface — it frames a signature and verifies none — so it refuses a signature that
+	// surface (it frames a signature and verifies none) so it refuses a signature that
 	// fails the keyless part of rule S1 and emits accepted bytes unchanged.
 	if !signatureGate(signature) {
 		return "", ErrInvalid
@@ -453,8 +454,9 @@ func assembleCompactFor(si SigningInput, signature []byte, bounds *Bounds, profi
 	return compact, nil
 }
 
-// closedResult is the ADR 0017 clause-1 closure in Go: no panic — however
-// unexpected — may escape a public façade; it fails closed to ErrInvalid.
+// closedResult is the closed, value-free rejection (spec/bap-v1.md §§15-17) closure in Go: no
+// panic: however
+// unexpected: may escape a public facade; it fails closed to ErrInvalid.
 func closedResult(err *error) {
 	if r := recover(); r != nil {
 		*err = ErrInvalid

@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# BAP-15 Task 16 — enforce the runtime dependency-license allowlist.
+# BAP-15 Task 16: enforce the runtime dependency-license allowlist.
 #
-# AGENTS rule 10 + ADR 0014 D8: every dependency a CONSUMER inherits must carry
-# a permissive license under ADR 0014 D8. This is the SDK dependency gate
-# (the repository license check audits production dependencies): only the
+# Every dependency inherited by a consumer must carry a permissive license.
+# This gate audits the runtime dependency closure, independently of test tools.
+# Only the
 # `[dependencies]` closure (cargo `kind=normal`) is audited, because
-# `[dev-dependencies]` (serde/serde_json — the conformance runner's test-time
+# `[dev-dependencies]` (serde/serde_json: the conformance runner's test-time
 # tools) are NOT inherited by a downstream consumer and do not ship in its
 # binary. The runtime closure is taken from `cargo tree --edges normal`, the
 # authoritative source for the consumer-facing tree.
 #
 # SPDX expression handling: `OR` is a distributor choice (the expression passes
-# when ANY disjunct is allowlisted — e.g. `Apache-2.0 OR BSL-1.0` passes via
+# when ANY disjunct is allowlisted: e.g. `Apache-2.0 OR BSL-1.0` passes via
 # Apache-2.0); `AND` is cumulative (ALL conjuncts must be allowlisted); `/` is
 # treated as `OR` (Rust crate convention, e.g. `MIT/Apache-2.0`); parenthesized
 # sub-expressions are evaluated RECURSIVELY (e.g. `(MIT OR Apache-2.0) AND
@@ -33,7 +33,7 @@ cd "$script_dir/.."
 
 # Allowlist (D-RISK-2 verified permissive set). Unicode-DFS-2016 is the
 # pre-2023 Unicode data license; Unicode-3.0 is its OSI-approved (2023-11-17)
-# successor, carried by unicode-ident >= 1.0.15 — a transitive of syn inside
+# successor, carried by unicode-ident >= 1.0.15: a transitive of syn inside
 # the proc-macro runtime closure on supported targets.
 ALLOW='Apache-2.0 MIT BSD-3-Clause ISC BSD-2-Clause BSD-1-Clause Zlib Unicode-DFS-2016 Unicode-3.0'
 
@@ -62,13 +62,13 @@ def license_ok(expr, allow):
         return all(license_ok(p, allow) for p in and_parts)
     leaf = expr.strip()
     if " " in leaf or "(" in leaf or ")" in leaf:
-        # A compound the splitter could not decompose — never silently pass it.
+        # A compound the splitter could not decompose: never silently pass it.
         return False
     return leaf in allow
 
 
 def _strip_parens(t):
-    """Strip parentheses that wrap the WHOLE expression (balanced-aware —
+    """Strip parentheses that wrap the WHOLE expression (balanced-aware,
     `(A) OR (B)` keeps its outer parens because they do not enclose it all)."""
     t = t.strip()
     while t.startswith("(") and t.endswith(")"):
@@ -152,11 +152,11 @@ def main():
     print(f"license_check: {len(rows)} runtime dependencies audited")
     # Fail-closed floor (gate-integrity): if cargo tree's output drifted to
     # fewer than the 3 direct runtime deps (ed25519-dalek, sha2, ryu-js), the
-    # parser audited nothing meaningful — refuse the "OK" path on empty or
+    # parser audited nothing meaningful: refuse the "OK" path on empty or
     # degraded input rather than reporting success over zero dependencies.
     if len(rows) < 3:
         print(
-            f"license_check: FAIL — only {len(rows)} runtime dep(s) parsed "
+            f"license_check: FAIL: only {len(rows)} runtime dep(s) parsed "
             f"(expected >= 3: ed25519-dalek, sha2, ryu-js). cargo tree output "
             f"drift or an empty success suspected.",
             file=sys.stderr,
@@ -167,9 +167,9 @@ def main():
         flag = "OK " if ok else "FAIL"
         print(f"  [{flag}] {name} {version} :: {expr or '<no license>'}")
     if bad:
-        print(f"license_check: FAIL — {len(bad)} runtime dep(s) outside the allowlist.", file=sys.stderr)
+        print(f"license_check: FAIL: {len(bad)} runtime dep(s) outside the allowlist.", file=sys.stderr)
         sys.exit(1)
-    print("license_check: OK — every runtime dependency is permissively licensed.")
+    print("license_check: OK: every runtime dependency is permissively licensed.")
 
 
 if __name__ == "__main__":

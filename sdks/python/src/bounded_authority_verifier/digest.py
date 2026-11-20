@@ -36,7 +36,7 @@ REQUEST_PREFIX = b"BAP1-REQUEST\x00"
 """The 13-byte ASCII prefix including its final zero byte (REQ1-SIGNING-digest-prefix)."""
 
 REQUEST_PREFIX_V2 = b"BAP2-REQUEST\x00"
-"""The v2 (contract-major 2) domain separator — same shape, byte-distinct from the v1 prefix."""
+"""The v2 (contract-major 2) domain separator: same shape, byte-distinct from the v1 prefix."""
 
 
 def typed_project(value: Tagged) -> Result[Tagged]:
@@ -71,7 +71,7 @@ def _typed_project(value: Tagged) -> Tagged:
     if isinstance(value, JObject):
         out = {k: _typed_project(v) for k, v in value.v.items()}
         return JArray((JString(_unwrap(str_utf8("object"))), JObject(out)))
-    raise _invalid_error("typed: unknown tag")  # unreachable — the algebra is closed
+    raise _invalid_error("typed: unknown tag")  # unreachable: the algebra is closed
 
 
 def request_digest(
@@ -163,7 +163,7 @@ def _within_tagged_bounds(v: Tagged, level: int, bounds: Bounds) -> bool:
             and len(v.v) <= _unwrap(bounds_resolve(bounds, "object_members"))
             and all(_within_tagged_bounds(val, level + 1, bounds) for val in v.v.values())
         )
-    return False  # type: ignore[unreachable] # unreachable — the algebra is closed
+    return False  # type: ignore[unreachable] # unreachable: the algebra is closed
 
 
 def _count_tagged_nodes(v: Tagged) -> int:

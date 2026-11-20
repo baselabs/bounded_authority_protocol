@@ -2843,7 +2843,7 @@ function dispatchVerifyAnchoredExport(input) {
       "verify_anchored_export: end not chronologically after last transition",
     );
   }
-  // Independently verify every archived row (ADR 0004: "and then independently checks every row";
+  // Independently verify every archived row (spec/bap-v1.md §15: "and then independently checks every row";
   // REQ1-EXPORT-complete-scan). Mirrors dispatchCheckChain's row loop over the archive's framed
   // rows against the caller's expected chain boundaries: the per-row commitment/sequence/
   // previous-hash chain the overall archive digest cannot express.

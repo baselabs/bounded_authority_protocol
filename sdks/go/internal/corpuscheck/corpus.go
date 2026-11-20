@@ -1,4 +1,4 @@
-// Package corpuscheck verifies certified input closure and computed verdicts (ADR 0049).
+// Package corpuscheck verifies certified input closure and computed verdicts (self-contained SDK distribution contract).
 // It is test tooling and has no dependency on the verifier's runtime package.
 package corpuscheck
 

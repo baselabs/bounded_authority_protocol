@@ -2,7 +2,7 @@
 //!
 //! Target URIs are bounded ASCII, hierarchical, and HTTPS-only, with a nonempty
 //! authority and host and no user information, fragment, or query. This module
-//! is a pure byte transform — it performs no DNS, IDNA, or network work
+//! is a pure byte transform: it performs no DNS, IDNA, or network work
 //! (`REQ1-URI-no-network`). Verification is not authority: the normalized string
 //! is a comparison key, never an execution credential.
 //!
@@ -23,7 +23,7 @@ use crate::bounds::Bounds;
 use crate::error::{Invalid, Result};
 
 // ============================================================================
-// Character classes — RFC 3986 §2.2 / §2.3
+// Character classes: RFC 3986 §2.2 / §2.3
 // ============================================================================
 
 /// `unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"` (RFC 3986 §2.3).
@@ -197,7 +197,7 @@ pub fn local_loopback_http_uri_normalize(text: &str, bounds: &Bounds) -> Result<
 }
 
 // ============================================================================
-// Authority — RFC 3986 §3.2: [ userinfo "@" ] host [ ":" port ]
+// Authority: RFC 3986 §3.2: [ userinfo "@" ] host [ ":" port ]
 // ============================================================================
 
 /// Parse the authority byte slice into `(normalized_host, Option<port>)`.
@@ -304,7 +304,7 @@ fn parse_port(digits: &[u8]) -> Result<Option<Vec<u8>>> {
 }
 
 // ============================================================================
-// Host — RFC 3986 §3.2.2
+// Host: RFC 3986 §3.2.2
 // ============================================================================
 
 /// Validate a bracketed IP-literal body and return its lowercased form.
@@ -370,7 +370,7 @@ fn validate_ipvfuture(s: &[u8]) -> bool {
 /// `IPv6address` (RFC 3986 / RFC 4291): up to 8 hextets of 1–4 hex digits
 /// separated by `:`, with at most one `::` elision. Returns `Some(())` for a
 /// well-formed literal and `None` otherwise. Embedded IPv4 in `ls32` is NOT
-/// supported (a conservative, fail-closed subset — see module risk notes).
+/// supported (a conservative, fail-closed subset: see module risk notes).
 fn validate_ipv6(s: &[u8]) -> Option<()> {
     if s.is_empty() {
         return None;
@@ -500,7 +500,7 @@ fn normalize_reg_name(s: &[u8]) -> Result<Vec<u8>> {
 }
 
 // ============================================================================
-// Path — RFC 3986 §3.3
+// Path: RFC 3986 §3.3
 // ============================================================================
 
 /// Validate and percent-normalize the path, then apply RFC 3986 §5.2.4
@@ -549,7 +549,7 @@ fn normalize_path(path: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// RFC 3986 §5.2.4 `remove_dot_segments`. Operates on absolute-or-empty paths
-/// (path-abempty) only — the sole form produced for an HTTPS authority URI.
+/// (path-abempty) only: the sole form produced for an HTTPS authority URI.
 fn remove_dot_segments(path: &[u8]) -> Vec<u8> {
     let mut input: Vec<u8> = path.to_vec();
     let mut output: Vec<u8> = Vec::new();
@@ -612,7 +612,7 @@ mod tests {
     const B: fn() -> Bounds = Bounds::maximum;
 
     // ------------------------------------------------------------------
-    // Scheme normalization — REQ1-URI-reject-list
+    // Scheme normalization: REQ1-URI-reject-list
     // ------------------------------------------------------------------
 
     #[test]
@@ -757,7 +757,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // Host grammar — RFC 3986 §3.2.2
+    // Host grammar: RFC 3986 §3.2.2
     // ------------------------------------------------------------------
 
     #[test]
@@ -820,7 +820,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // REQ1-URI-reject-list — each class → Invalid
+    // REQ1-URI-reject-list: each class → Invalid
     // ------------------------------------------------------------------
 
     #[test]
@@ -840,7 +840,7 @@ mod tests {
 
     #[test]
     fn reject_authority_less_form() {
-        // `https:/path` (single slash) — empty authority.
+        // `https:/path` (single slash): empty authority.
         assert_eq!(uri_normalize("https:/path", &B()), Err(Invalid));
         assert_eq!(uri_normalize("https://", &B()), Err(Invalid));
         assert_eq!(uri_normalize("https:///path", &B()), Err(Invalid));

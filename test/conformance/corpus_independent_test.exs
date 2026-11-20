@@ -87,7 +87,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CorpusIndependentTest do
     assert output =~ "tamper verbatim != derived"
   end
 
-  # --- strict-Ed25519 corpus (ADR 0040) -------------------------------------
+  # --- strict-Ed25519 corpus (docs/errata.md erratum 2) -------------------------------------
 
   @strict_corpus Path.join(@root, "priv/conformance/strict-ed25519")
   @strict_index_sha256 "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"

@@ -6,7 +6,7 @@ Public boundaries catch only ``InvalidError``. A runner or SDK programming error
 never masquerade as a protocol rejection. Results refuse implicit truth testing; inspect ``is_ok``
 or match ``Ok`` / ``Err`` explicitly.
 
-``Result`` is a frozen dataclass: ``Ok(value) | Err(InvalidError)`` — never both. The ``Err``
+``Result`` is a frozen dataclass: ``Ok(value) | Err(InvalidError)``: never both. The ``Err``
 branch carries an ``InvalidError`` (closed, value-free) so callers can match on the type, but it
 exposes no reason and no partial value, exactly mirroring ``{:error, :invalid}``.
 """
@@ -28,7 +28,7 @@ class InvalidError(Exception):
 
 @dataclass(frozen=True)
 class Ok(Generic[T]):
-    """The success variant of Result — carries a value."""
+    """The success variant of Result: carries a value."""
 
     value: T
 
@@ -43,7 +43,7 @@ class Ok(Generic[T]):
 
 @dataclass(frozen=True)
 class Err:
-    """The failure variant of Result — closed, value-free (carries an InvalidError sentinel)."""
+    """The failure variant of Result: closed, value-free (carries an InvalidError sentinel)."""
 
     error: InvalidError
 

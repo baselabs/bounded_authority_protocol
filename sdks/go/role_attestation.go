@@ -6,10 +6,10 @@ import (
 )
 
 // The standalone role-attestation sibling profile `bap-role-attestation/1`
-// (spec/bap-role-attestation-v1.md, ADR 0036): a compact JWS in which an
+// (spec/bap-role-attestation-v1.md, spec/bap-role-attestation-v1.md): a compact JWS in which an
 // attestor key binds a subject key to a role for a bounded window. It
-// single-sources the contract-major 1 primitives — Ed25519/EdDSA under
-// BAP1-Ed25519-SHA256 and the bounded JSON/JCS/base64url/JWK machinery — and
+// single-sources the contract-major 1 primitives: Ed25519/EdDSA under
+// BAP1-Ed25519-SHA256 and the bounded JSON/JCS/base64url/JWK machinery: and
 // is parsed by no contract-major profile: this profile rejects every
 // contract-major typ and every contract-major decoder rejects
 // `ba+role-attestation` (REQ-RA1-CORE-cross-profile-reject).
@@ -36,7 +36,7 @@ type Attestation struct {
 
 // TrustedAttestor is the exact caller-trusted attestor key with its own
 // [ValidFrom, ValidBefore) validity window. ValidBeforeUnbounded is the only
-// open upper interval — the HistoricalPublicKey convention; a configured
+// open upper interval: the HistoricalPublicKey convention; a configured
 // unbounded window admits unbounded attestation lifetimes by that choice
 // (REQ-RA1-SECURITY-trust-scope).
 type TrustedAttestor struct {
@@ -83,7 +83,7 @@ const (
 )
 
 // AttestationFacts is the attestation verification result: redacted,
-// value-bearing, non-authorizing — the attestor and subject key ids with
+// value-bearing, non-authorizing: the attestor and subject key ids with
 // their RFC 7638 thumbprints, the role, the jti, and the window
 // (REQ-RA1-VERIFY-facts). Facts carry no raw key material, no signature, and
 // no decision (REQ-RA1-VERIFY-facts-non-authorizing).
@@ -272,8 +272,8 @@ func validateProducedAttestation(protected, payload []byte, b Bounds) error {
 }
 
 // decodeAttestationHeader validates the exact protected header
-// {alg:"EdDSA", kid, typ:"ba+role-attestation"} — every unlisted member or
-// value is invalid — and its canonical bytes, returning the attestor kid
+// {alg:"EdDSA", kid, typ:"ba+role-attestation"}: every unlisted member or
+// value is invalid: and its canonical bytes, returning the attestor kid
 // (REQ-RA1-HEADER-closed-set, REQ-RA1-CORE-typ, REQ-RA1-CLAIM-canonical).
 func decodeAttestationHeader(p compactParts, b Bounds) (string, error) {
 	v, err := JsonDecode(p.Protected, &b)

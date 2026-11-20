@@ -1,4 +1,4 @@
-//! Request digest — the auth-binding primitive (`BAP1-Ed25519-SHA256`).
+//! Request digest: the auth-binding primitive (`BAP1-Ed25519-SHA256`).
 //!
 //! The request digest binds a specific operation + cast-arguments pair to the
 //! proof's `ba_req` claim. A wrong digest → wrong `ba_req` → silent
@@ -14,18 +14,18 @@
 //! recursing into arrays/objects) BEFORE JCS. The explicit scalar tags preserve
 //! the integer-vs-integral-float distinction (permissiveness closure #5
 //! end-to-end): `Int(1)` projects to `["integer",1]`, `Float(1.0)` to
-//! `["float",1]` — distinct JCS bytes even though RFC 8785 would emit both
+//! `["float",1]`: distinct JCS bytes even though RFC 8785 would emit both
 //! payloads as the bare number `1`.
 //!
 //! `operation` is the RAW operation string (the first signing-array element),
-//! NOT `typed`-wrapped — only `cast_arguments` goes through `typed`.
+//! NOT `typed`-wrapped: only `cast_arguments` goes through `typed`.
 //!
 //! Per `spec/bap-v1.md` §lines 329–330, request-digest's typed projection is an
-//! internal mechanic behind the v1 façade; this module is `pub(crate)` and
-//! [`request_digest`] is re-exported through the façade at Task 12.
+//! internal mechanic behind the v1 facade; this module is `pub(crate)` and
+//! [`request_digest`] is re-exported through the facade at Task 12.
 
 // `request_digest` is `pub(crate)` and is now wired by v1::proof_signing_input
-// (Façade A); `typed` / `tag1` / `tag2` / `validate_bounds` are all reachable
+// (Facade A); `typed` / `tag1` / `tag2` / `validate_bounds` are all reachable
 // through that call chain. check_envelope (T12) will add a second caller.
 use crate::base64url::base64url_encode;
 use crate::bounds::Bounds;
@@ -42,13 +42,13 @@ const REQUEST_DIGEST_PREFIX: &[u8] = b"BAP1-REQUEST\0";
 
 /// The v2 domain-separation prefix (the `BAP2-Ed25519-SHA256` suite): the same
 /// 13-byte shape with the major digit advanced. A v1 preimage hashed under this
-/// prefix (or vice versa) yields a different digest — the two majors never share
+/// prefix (or vice versa) yields a different digest: the two majors never share
 /// a request-binding domain.
 const SUCCESSOR_REQUEST_DIGEST_PREFIX: &[u8] = b"BAP2-REQUEST\0";
 
 /// The v3 domain-separation prefix (the `BAP3-ES256-SHA256` suite,
 /// spec/bap-v3.md §2 `REQ3-SIGNING-digest-prefix`): the same 13-byte shape
-/// with the major digit advanced to 3. Identical discipline — no two majors
+/// with the major digit advanced to 3. Identical discipline: no two majors
 /// share a request-binding domain.
 const ECDSA_REQUEST_DIGEST_PREFIX: &[u8] = b"BAP3-REQUEST\0";
 
@@ -68,8 +68,8 @@ pub fn request_digest(
     request_digest_with(REQUEST_DIGEST_PREFIX, operation, cast_arguments, bounds)
 }
 
-/// Compute the v2 request digest — the identical typed projection and JCS
-/// preimage, hashed under `BAP2-REQUEST\0` (the v2 façade's binding primitive).
+/// Compute the v2 request digest: the identical typed projection and JCS
+/// preimage, hashed under `BAP2-REQUEST\0` (the v2 facade's binding primitive).
 pub(crate) fn request_digest_successor(
     operation: &str,
     cast_arguments: &JsonValue,
@@ -83,8 +83,8 @@ pub(crate) fn request_digest_successor(
     )
 }
 
-/// Compute the v3 request digest — the identical typed projection and JCS
-/// preimage, hashed under `BAP3-REQUEST\0` (the v3 façade's binding primitive;
+/// Compute the v3 request digest: the identical typed projection and JCS
+/// preimage, hashed under `BAP3-REQUEST\0` (the v3 facade's binding primitive;
 /// `REQ3-SIGNING-digest-prefix`). The v1/v2 functions above are byte-identical
 /// to their pre-v3 forms.
 pub(crate) fn request_digest_v3(
@@ -244,7 +244,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Prefix — REQ1-SIGNING-digest-prefix (exact ASCII incl. the final NUL byte)
+    // Prefix: REQ1-SIGNING-digest-prefix (exact ASCII incl. the final NUL byte)
     // ==========================================================================
 
     #[test]
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn prefix_with_nul_differs_from_prefix_without_nul() {
-        // RED-capable: the final zero byte is load-bearing — the two prefixes
+        // RED-capable: the final zero byte is load-bearing: the two prefixes
         // produce different digests for the same input.
         let args = JsonValue::Object(vec![]);
         let correct = request_digest("read", &args, &max()).expect("digest");
@@ -276,7 +276,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // v2 domain separation — BAP2-REQUEST\0 (the v2 façade's binding primitive)
+    // v2 domain separation: BAP2-REQUEST\0 (the v2 facade's binding primitive)
     // ==========================================================================
 
     #[test]
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn the_two_major_prefixes_yield_distinct_digests_for_identical_input() {
         // Domain separation: the SAME operation + cast_arguments MUST produce
-        // different digests under the two majors — a shared digest would let a
+        // different digests under the two majors: a shared digest would let a
         // v1 proof's ba_req satisfy a v2 binding (and vice versa).
         let args = JsonValue::Object(vec![("limit".to_string(), JsonValue::Int(10))]);
         let prior = request_digest("read", &args, &max()).expect("v1 digest");
@@ -302,7 +302,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // typed projection — every scalar wrapped in its explicit tag array
+    // typed projection: every scalar wrapped in its explicit tag array
     // ==========================================================================
 
     #[test]
@@ -403,14 +403,14 @@ mod tests {
     }
 
     // ==========================================================================
-    // Closure #5 end-to-end — Int(1) vs Float(1.0) produce DIFFERENT digests
+    // Closure #5 end-to-end: Int(1) vs Float(1.0) produce DIFFERENT digests
     // ==========================================================================
 
     #[test]
     fn int_one_and_float_one_zero_produce_different_digests() {
         // The load-bearing closure #5 test for request_digest: Int(1) projects
         // to ["integer",1] and Float(1.0) to ["float",1] (ryu-js emits "1" for
-        // 1.0). The tag difference makes the JCS bytes — and thus the digest —
+        // 1.0). The tag difference makes the JCS bytes: and thus the digest,
         // distinct. Collapsing both to the same tag makes the digests collide.
         let int_digest = request_digest("read", &JsonValue::Int(1), &max()).expect("int digest");
         let float_digest =
@@ -442,12 +442,12 @@ mod tests {
     }
 
     // ==========================================================================
-    // operation — first element is the RAW operation string (NOT typed-wrapped)
+    // operation: first element is the RAW operation string (NOT typed-wrapped)
     // ==========================================================================
 
     #[test]
     fn operation_is_raw_string_first_element() {
-        // The signing array is [operation, typed(cast_arguments)] — operation
+        // The signing array is [operation, typed(cast_arguments)]: operation
         // appears as a bare JSON string, NOT as ["string", operation].
         let args = JsonValue::Object(vec![]);
         let projected = typed(&args).unwrap();
@@ -457,7 +457,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Bounds — operation_bytes / depth / total_nodes / object_members
+    // Bounds: operation_bytes / depth / total_nodes / object_members
     // ==========================================================================
 
     #[test]
@@ -523,7 +523,7 @@ mod tests {
     }
 
     // ==========================================================================
-    // Known digest — the request-digest-float-cast-arguments pin
+    // Known digest: the request-digest-float-cast-arguments pin
     // ==========================================================================
 
     #[test]

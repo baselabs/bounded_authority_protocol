@@ -404,7 +404,7 @@ func normalizePath(path string) (string, error) {
 	return out, nil
 }
 
-// pathChar: pchar and "/" — unreserved, sub-delims, ":", "@".
+// pathChar: pchar and "/": unreserved, sub-delims, ":", "@".
 func pathChar(c byte) bool {
 	return c == '/' ||
 		strings.IndexByte(unreservedBytes, c) >= 0 ||

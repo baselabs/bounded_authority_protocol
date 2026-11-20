@@ -150,7 +150,7 @@ def _emit(value: Tagged, out: bytearray, bounds: Bounds, level: int, nodes: int)
             nodes = _emit(value.v[name], out, bounds, level + 1, nodes)
         out.append(0x7D)  # }
         return nodes
-    _fail("jcs: unknown tag")  # pragma: no cover — the algebra is closed
+    _fail("jcs: unknown tag")  # pragma: no cover: the algebra is closed
 
 
 def _next_node(nodes: int, bounds: Bounds) -> int:
@@ -240,7 +240,7 @@ def _escape_string(src_bytes: bytes, out: bytearray) -> None:
     i = 0
     n = len(s)
     while i < n:
-        # codePointAt equivalent — handle surrogate pairs for astral code points.
+        # codePointAt equivalent: handle surrogate pairs for astral code points.
         cu = ord(s[i])
         if 0xD800 <= cu <= 0xDBFF and i + 1 < n:
             lo = ord(s[i + 1])
@@ -255,7 +255,7 @@ def _escape_string(src_bytes: bytes, out: bytearray) -> None:
         else:
             cp = cu
         if cp > 0xFFFF:
-            # Astral — RFC 8785 emits astral chars as their UTF-8 bytes (not \u escapes).
+            # Astral: RFC 8785 emits astral chars as their UTF-8 bytes (not \u escapes).
             _append_utf8_bytes(cp, out)
         elif cp < 0x20:
             esc = _SHORT_ESCAPES.get(cp)
@@ -291,7 +291,7 @@ def _append_utf8_bytes(cp: int, out: bytearray) -> None:
         out.append(0x80 | ((cp >> 6) & 0x3F))
         out.append(0x80 | (cp & 0x3F))
     else:
-        # Astral code points (cp >= 0x10000) — 4-byte UTF-8 (RFC 8785 keeps astral chars as their
+        # Astral code points (cp >= 0x10000): 4-byte UTF-8 (RFC 8785 keeps astral chars as their
         # UTF-8 bytes, not \u escapes). The prior 3-byte-cap branch here produced a malformed
         # sequence for astral chars; this is the 4-byte form.
         out.append(0xF0 | (cp >> 18))
@@ -305,6 +305,6 @@ def _utf16_key(s: str) -> bytes:
 
     Encode the string as UTF-16 big-endian code units; byte comparison of that encoding yields the
     unsigned-UTF-16 ordering. (Python sorts strings by code point; RFC 8785 sorts by UTF-16 unit,
-    which differs for astral characters — so we encode to UTF-16-BE bytes and sort on those.)
+    which differs for astral characters: so we encode to UTF-16-BE bytes and sort on those.)
     """
     return s.encode("utf-16-be")

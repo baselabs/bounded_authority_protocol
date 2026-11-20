@@ -2,13 +2,19 @@ package verifier
 
 import "fmt"
 
+// The eight public verification facts types are GrantFacts, EnvelopeFacts,
+// ChainFacts, AnchorFacts, KeyTransitionFacts, AnchoredExportFacts,
+// AttestationFacts, and ContentAssertionFacts. Sibling-profile facts follow
+// spec/bap-role-attestation-v1.md and spec/bap-content-assertion-v1.md.
+//
 // Verified facts (spec/bap-v1.md § Public verification contract). Facts
 // are value-bearing and redacted: they contain only their exact documented
 // fields, no raw credentials, signatures, JWK containers, nonces, request
 // argument values, or selector values. They carry no JSON or generic
 // encoder and are not credentials (REQ1-VERIFY-facts-redacted,
 // REQ1-VERIFY-facts-not-credentials). String, GoString, and Format always
-// emit the specified diagnostic rendering (spec/diagnostic-rendering.md § Diagnostic rendering), including flags and precision.
+// emit the specified diagnostic rendering (spec/diagnostic-rendering.md § Diagnostic rendering),
+// including flags and precision.
 // JSON, text, and gob encoders return ErrInvalid without field values.
 
 // Authorization is the fixed non-authorizing marker on GrantFacts,
@@ -20,7 +26,8 @@ const (
 )
 
 // Trust is the fixed not-a-trust-decision marker on the diagnostic chain,
-// anchor, transition, and export facts. Only NotEvaluated exists.
+// anchor, transition, export, attestation, and content-assertion facts.
+// Only NotEvaluated exists.
 type Trust int
 
 const (

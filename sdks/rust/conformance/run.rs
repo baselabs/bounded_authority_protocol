@@ -1,28 +1,31 @@
-//! BAP-15 Task 14 — the conformance runner (acceptance gate).
+//! BAP-15 Task 14: the conformance runner (acceptance gate).
 //!
 //! This is an integration test living OUTSIDE `src/`, so it can call ONLY the
 //! crate's public surface. It is the consolidation of the per-surface corpus
 //! harnesses written into the `src/` test modules during Tasks 1–13 into one
 //! gate that:
 //!
-//! 1. **SHA-binds** the vendored corpus snapshot (ADR 0014 §D4): hashes
+//! 1. **SHA-binds** the vendored corpus snapshot (certified index SHA-256 binding
+//! (docs/design/conformance-contract.md)): hashes
 //!    `conformance/priv/conformance/v1/corpus/index.json` at startup and fails closed on mismatch
-//!    with the certified SHA — a consumer who vendors a drifted corpus gets a
+//!    with the certified SHA: a consumer who vendors a drifted corpus gets a
 //!    hard failure, not silent drift.
 //! 2. **Dispatches all 283 cases** across the 28 surfaces through the public
-//!    façade + versioned primitives, constructing each `src/` input struct
-//!    field-by-field (the F3 construction seam — there is NO serde derive on any
+//!    facade + versioned primitives, constructing each `src/` input struct
+//!    field-by-field (the F3 construction seam: there is NO serde derive on any
 //!    `src/` struct; `serde_json` reads the corpus into `serde_json::Value` and
 //!    the runner hand-builds every input).
-//! 3. **Runs the two-boundary key census** (ADR 0014 §D9): the set of public
-//!    keys imported at the SDK's `[u8;32]` crypto boundary — every key the
-//!    runner feeds to a crate function — thumbprinted and compared BOTH
+//! 3. **Runs the two-boundary key census** (import-boundary public-key census
+//! (docs/design/conformance-contract.md)): the set of public
+//!    keys imported at the SDK's `[u8;32]` crypto boundary: every key the
+//!    runner feeds to a crate function: thumbprinted and compared BOTH
 //!    directions against the index `public_key_fingerprints` (no extra, no
 //!    missing).
 //! 4. Asserts `agreed == total_cases (283)` and `disagreed == 0`.
 //!
 //! Derived from the spec and certified corpus, not from any sibling-SDK or
-//! reference source (ADR 0014 D5). The corpus is
+//! reference source (docs/design/conformance-contract.md, Independent implementation rule). The
+//! corpus is
 //! the falsifier; the SHA binding + census are the mechanisms.
 
 #![forbid(unsafe_code)]
@@ -41,14 +44,16 @@ use bounded_authority_protocol::{Bounds, Invalid, JsonValue};
 use sha2::{Digest, Sha256};
 
 // ============================================================================
-// ADR 0014 §D4 — the certified corpus index SHA-256 (verified by hashing the
+// certified index SHA-256 binding (docs/design/conformance-contract.md): the certified corpus
+// index SHA-256 (verified by hashing the
 // source corpus index.json, then byte-copied into the SDK's vendored snapshot).
 // ============================================================================
 
 const CERTIFIED_INDEX_SHA: &str =
     "4cb5072ab40ffd4b111659e6d4ab20209202380505f1f8424b96d22e533cb91b";
 
-/// The vendored corpus root (self-contained SDK test corpus — ADR 0015 D5).
+/// The vendored corpus root (self-contained SDK test corpus: SDK publication requires a
+/// separate repository (sdks/README.md publication boundary)).
 fn corpus_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("conformance/priv/conformance/v1/corpus")
 }
@@ -69,17 +74,18 @@ fn hex_sha256(bytes: &[u8]) -> String {
         })
 }
 
-/// ADR 0014 §D4 binding: panic on any drift from the certified index SHA.
+/// certified index SHA-256 binding (docs/design/conformance-contract.md): panic on any
+/// drift from the certified index SHA.
 fn assert_certified_index_sha(bytes: &[u8]) {
     let actual = hex_sha256(bytes);
     assert_eq!(
         actual, CERTIFIED_INDEX_SHA,
-        "index.json SHA mismatch — corpus drift (expected {CERTIFIED_INDEX_SHA}, got {actual})"
+        "index.json SHA mismatch: corpus drift (expected {CERTIFIED_INDEX_SHA}, got {actual})"
     );
 }
 
 // ============================================================================
-// ADR 0014 §D9 — the two-boundary key census.
+// import-boundary public-key census (docs/design/conformance-contract.md): the two-boundary key census.
 // ============================================================================
 
 /// Collects the base64url RFC 7638 thumbprints of every `[u8;32]` public key
@@ -125,7 +131,7 @@ fn assert_census(observed: &BTreeSet<String>, declared: &BTreeSet<String>) {
 }
 
 // ============================================================================
-// F3 construction seam — hand-build `src/` inputs from `serde_json::Value`.
+// F3 construction seam: hand-build `src/` inputs from `serde_json::Value`.
 // Lifted verbatim from the in-crate harnesses (src/v1.rs, src/digest.rs, etc.).
 // ============================================================================
 
@@ -192,7 +198,7 @@ fn b64url_to_64(field: &serde_json::Value) -> Option<[u8; 64]> {
 }
 
 /// The closed lowercase `kind` set (`SigningKind::decode` is `pub(crate)`, so
-/// the runner maps the public variants itself — the set is closed: an unknown
+/// the runner maps the public variants itself: the set is closed: an unknown
 /// kind is `Invalid`).
 fn kind_from_str(s: &str) -> Option<SigningKind> {
     Some(match s {
@@ -204,7 +210,7 @@ fn kind_from_str(s: &str) -> Option<SigningKind> {
     })
 }
 
-// ---- Historical-key / expected-context builders (Façade D harness) ---------
+// ---- Historical-key / expected-context builders (Facade D harness) ---------
 
 fn historical_key_from(v: &serde_json::Value) -> HistoricalPublicKey {
     let valid_before = match v["valid_before"].as_i64() {
@@ -464,7 +470,7 @@ fn d_grant_signing_input(case: &serde_json::Value, census: &mut KeyCensus) -> bo
         issuer: input["issuer"].as_str().unwrap_or("").to_string(),
         grant_id: input["grant_id"].as_str().unwrap_or("").to_string(),
         key_id: input["key_id"].as_str().unwrap_or("").to_string(),
-        // holder_thumbprint is a [u8;32] DIGEST (cnf.jkt), not a key — not censused.
+        // holder_thumbprint is a [u8;32] DIGEST (cnf.jkt), not a key: not censused.
         holder_thumbprint: b64url_to_32(&input["holder_thumbprint"]).unwrap_or([0u8; 32]),
         issued_at: input["issued_at"].as_i64().unwrap_or(0),
         not_before: input["not_before"].as_i64().unwrap_or(0),
@@ -1010,7 +1016,8 @@ fn conformance_full_corpus() {
     let root = corpus_root();
     let mut execution = support::Run::new(&root, CERTIFIED_INDEX_SHA);
 
-    // (1) ADR 0014 §D4 — SHA-bind the vendored index.json.
+    // (1) certified index SHA-256 binding (docs/design/conformance-contract.md): SHA-bind
+    // the vendored index.json.
     let index_bytes = fs::read(root.join("index.json")).expect("read vendored index.json");
     assert_certified_index_sha(&index_bytes);
     let index: serde_json::Value =
@@ -1133,7 +1140,8 @@ fn conformance_full_corpus() {
 
     execution.finish();
 
-    // (4) ADR 0014 §D9 — two-boundary key census (both directions).
+    // (4) import-boundary public-key census (docs/design/conformance-contract.md):
+    // two-boundary key census (both directions).
     assert_census(&census.observed, &declared_fps);
 
     // (5) Every surface in the index applicability was exercised (skip-would-
@@ -1160,20 +1168,20 @@ fn conformance_full_corpus() {
 }
 
 // ============================================================================
-// RED-CAPABLE PROOFS — each test below proves a gate goes RED when its
-// mechanism is removed/bypassed. (ADR 0005:240-246 discipline.)
+// RED-CAPABLE PROOFS: each test below proves a gate goes RED when its
+// mechanism is removed/bypassed. (per-guard mutation proof discipline.)
 // ============================================================================
 
 /// RED-capable: if the SHA-bind compared against the WRONG certified hash (or
 /// were a no-op), a tampered index would be silently accepted. This test goes
 /// RED (panics from `assert_certified_index_sha`) when fed a byte-tampered index
-/// — proving the bind is load-bearing.
+///: proving the bind is load-bearing.
 #[test]
 #[should_panic(expected = "index.json SHA mismatch")]
 fn red_sha_binding_rejects_tampered_index() {
     let mut bytes = fs::read(corpus_root().join("index.json")).expect("read index.json");
     // Flip one byte that is inside the JSON payload (never the first byte if it
-    // could be structural whitespace — flip a deep byte to guarantee content
+    // could be structural whitespace: flip a deep byte to guarantee content
     // change while keeping the test deterministic).
     bytes[100] ^= 0xFF;
     assert_certified_index_sha(&bytes);
@@ -1211,7 +1219,7 @@ fn red_census_rejects_missing_declared_key() {
 /// import-boundary width check. Kept compiled; if it ever drifts it is caught.
 #[test]
 fn import_boundary_width_helpers_reject_wrong_widths() {
-    // A 43-char base64url string is 32 bytes; a 4-char "AAEC" is 3 bytes — the
+    // A 43-char base64url string is 32 bytes; a 4-char "AAEC" is 3 bytes: the
     // import boundary must reject it (the census must never see a 3-byte key).
     let short = serde_json::Value::String("AAEC".to_string());
     assert!(

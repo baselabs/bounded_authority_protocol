@@ -1,15 +1,15 @@
 //! Canonical base64url encode/decode (RFC 4648 §5, unpadded).
 //!
-//! Hand-rolled per the design note (decision D4): the canonical re-encode
-//! check is protocol-specific (`REQ1-B64-canonical`), so dropping the `base64`
-//! crate both hand-verifies the semantics and shrinks the supply-chain surface.
+//! The decoder checks the alphabet and length, then requires an exact unpadded
+//! re-encoding (`REQ1-B64-canonical`). A permissive host decoder cannot establish
+//! canonical bytes on its own. The rules are defined in spec/bap-v1.md §9.
 //!
 //! Rules enforced (`spec/bap-v1.md` § Base64url, lines 131–135):
 //! - `REQ1-B64-alphabet`: only `A`–`Z`, `a`–`z`, `0`–`9`, `-`, `_`.
 //! - `REQ1-B64-no-padding`: padding (`=`) and whitespace are forbidden.
 //! - `REQ1-B64-length`: `input.len() % 4 == 1` is invalid.
 //! - `REQ1-B64-canonical`: decode succeeds only when unpadded re-encoding
-//!   reproduces the input exactly — rejects non-zero unused pad bits and any
+//!   reproduces the input exactly: rejects non-zero unused pad bits and any
 //!   alternate encoding of the same bytes.
 
 use crate::error::{Invalid, Result};
@@ -69,7 +69,7 @@ fn decode_char(c: u8) -> Option<u8> {
 /// check that rejects non-zero unused pad bits and alternate encodings).
 pub fn base64url_decode(input: &[u8]) -> Result<Vec<u8>> {
     // REQ1-B64-length: a trailing group of one char carries fewer than 8 bits,
-    // which is not a whole byte — invalid. After this check the remainder mod 4
+    // which is not a whole byte: invalid. After this check the remainder mod 4
     // is 0, 2, or 3, so every group we enter below has at least two chars.
     if input.len() % 4 == 1 {
         return Err(Invalid);
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn rejects_non_canonical_unused_pad_bits() {
-        // REQ1-B64-canonical — the rejection class the corpus does NOT cover
+        // REQ1-B64-canonical: the rejection class the corpus does NOT cover
         // (the two corpus invalid cases are caught by padding/alphabet rules).
         //
         // `AB` decodes to `[0x00]` but its trailing 4 bits are `0001` (non-zero),

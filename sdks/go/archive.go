@@ -2,11 +2,11 @@ package verifier
 
 import "crypto/sha256"
 
-// The anchored-export surface (ADR 0004 + ADR 0017 + ADR 0018): boundary
+// The anchored-export surface (spec/bap-v1.md §§15-17): boundary
 // anchors and key transitions as canonically-encoded compact JWS objects, the
 // framed archive, expected-struct validation BEFORE any archive hashing
-// (clause 3 + its 2026-08-18 resolution), role-bounded frame reads (clause 5),
-// canonical byte-equality for anchor/transition segments (clause 4), and
+// (REQ1-BOUNDS-ordering), role-bounded frame reads,
+// canonical byte-equality for anchor/transition segments, and
 // caller-tightenable bounds threaded through every ceiling.
 
 var archiveMagic = []byte("BAP1-ARCHIVE\x00EXPORT\x00")
@@ -100,7 +100,8 @@ func decodeTransitionHeader(protected []byte, b Bounds) (string, error) {
 	return string(*kid), nil
 }
 
-// canonicalSegment enforces ADR 0017 clause 4 for anchor/transition compacts:
+// canonicalSegment enforces canonical segments and fixed signature widths (spec/bap-v1.md
+// §§15-17) for anchor/transition compacts:
 // the received segment bytes must equal the canonical re-encoding of the
 // decoded value (a reordered or non-canonical member order is rejected).
 func canonicalSegment(seg string, decoded []byte, b Bounds) error {
@@ -282,7 +283,7 @@ func decodeTransitionClaims(obj Obj, b Bounds) (transitionClaims, bool) {
 	return out, true
 }
 
-// validHistoricalKey revalidates one historical key (clause 2/3): key-id
+// validHistoricalKey revalidates one historical key (REQ1-VERIFY-revalidate): key-id
 // class and width, raw key width, integral endpoints within the magnitude
 // bound, and valid_before > valid_from ordering.
 func validHistoricalKey(k HistoricalPublicKey, b Bounds) bool {
@@ -312,7 +313,7 @@ func keyCovers(k HistoricalPublicKey, t int64) bool {
 }
 
 // VerifyHistoricalAnchor verifies a boundary-anchor compact against one exact
-// historical key and expected anchor tuple (ADR 0004): signed values, key ID,
+// historical key and expected anchor tuple (spec/bap-v1.md §15): signed values, key ID,
 // derived fingerprint, Ed25519 signature, and
 // valid_from <= anchored_at < valid_before.
 func VerifyHistoricalAnchor(compact string, key HistoricalPublicKey, expected ExpectedAnchor) (f AnchorFacts, err error) {
@@ -343,7 +344,7 @@ func VerifyHistoricalAnchor(compact string, key HistoricalPublicKey, expected Ex
 // fingerprint, signature, key window.
 func verifyAnchorCompact(compact string, key HistoricalPublicKey, expected ExpectedAnchor, b Bounds) (anchorClaims, error) {
 	if len(compact) == 0 || len(compact) > b.AnchorBytes {
-		return anchorClaims{}, ErrInvalid // clause 5: role-bounded frame read
+		return anchorClaims{}, ErrInvalid // Require the bounded frame length before reading it.
 	}
 	if !validHistoricalKey(key, b) {
 		return anchorClaims{}, ErrInvalid
@@ -372,7 +373,7 @@ func verifyAnchorCompact(compact string, key HistoricalPublicKey, expected Expec
 		return anchorClaims{}, ErrInvalid
 	}
 	if err := canonicalSegment(parts.ProtectedSeg, parts.Protected, b); err != nil {
-		return anchorClaims{}, ErrInvalid // clause 4
+		return anchorClaims{}, ErrInvalid // Require canonical segments and the fixed signature width.
 	}
 	if err := canonicalSegment(parts.PayloadSeg, parts.Payload, b); err != nil {
 		return anchorClaims{}, ErrInvalid
@@ -420,7 +421,7 @@ func verifyAnchorCompact(compact string, key HistoricalPublicKey, expected Expec
 
 // VerifyKeyTransition verifies a transition compact: the CURRENT key signs;
 // current and next keys/fingerprints must differ while key IDs may equal; the
-// effective time must lie in both historical intervals (ADR 0004).
+// effective time must lie in both historical intervals (spec/bap-v1.md §15).
 func VerifyKeyTransition(compact string, currentKey, nextKey HistoricalPublicKey, expected ExpectedKeyTransition) (f KeyTransitionFacts, err error) {
 	defer closedResult(&err)
 	b, err := resolveBounds(expected.Bounds)
@@ -517,7 +518,7 @@ func verifyTransitionCompact(compact string, currentKey, nextKey HistoricalPubli
 	return claims, nil
 }
 
-// enforceAnchorGenesis is the seq-zero all-zero-hash invariant of ADR 0004,
+// enforceAnchorGenesis is the seq-zero all-zero-hash invariant of spec/bap-v1.md §15,
 // extracted so the standalone and export paths enforce it identically.
 func enforceAnchorGenesis(claims anchorClaims) error {
 	if claims.Sequence == 0 && claims.ChainHash != [32]byte{} {

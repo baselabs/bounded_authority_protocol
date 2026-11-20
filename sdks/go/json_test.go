@@ -109,7 +109,7 @@ func TestJsonDecodeInvalid(t *testing.T) {
 }
 
 // Bounds enforcement during decode: depth 32, members 64, items 256, nodes
-// 4096, string bytes 8192, name bytes 128, raw bytes 65536 — all
+// 4096, string bytes 8192, name bytes 128, raw bytes 65536: all
 // tightening-capable through *Bounds.
 func TestJsonDecodeBounds(t *testing.T) {
 	// depth: 32 nested arrays is valid, 33 is not.

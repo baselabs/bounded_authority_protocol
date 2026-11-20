@@ -2,7 +2,7 @@
 // frozen v1 profile (suite BAP1-Ed25519-SHA256).
 //
 // Derived from the spec and certified corpus, not from any sibling-SDK or
-// reference source (ADR 0014 D5).
+// reference source (docs/design/conformance-contract.md, Independent implementation rule).
 //
 // Verification is not authority: a successful result proves only that
 // caller-supplied bytes satisfy caller-supplied trusted inputs and expected
@@ -10,7 +10,7 @@
 // signing, replay reservation, revocation checks, or business authorization.
 //
 // Every public function returns (T, error) where the error is either nil or
-// exactly ErrInvalid — the Go spelling of the protocol's closed
+// exactly ErrInvalid: the Go spelling of the protocol's closed
 // {:ok, value} | {:error, :invalid} result contract. No other error value is
 // ever returned, and no failure carries input values.
 package verifier

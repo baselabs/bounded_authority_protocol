@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Dependency-license checker for ``bounded_authority_verifier`` (ADR 0014 D8).
+"""Dependency-license checker for ``bounded_authority_verifier``.
 
 Enumerates the SDK's runtime dependency tree and fails if any package license is outside the
-Apache-2.0/BSD/MIT/ISC-compatible allowlist (ADR 0014 D8), enforcing
+Apache-2.0/BSD/MIT/ISC-compatible allowlist, enforcing
 the repository dependency-license check for the SDK tree. The ``cryptography`` Apache-2.0/BSD claim is
 verified by this gate, not by author assertion.
 
@@ -18,7 +18,7 @@ from pathlib import Path
 
 try:
     import tomllib  # Python 3.11+ stdlib
-except ModuleNotFoundError:  # pragma: no cover — the 3.10 fallback
+except ModuleNotFoundError:  # pragma: no cover: the 3.10 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
 
@@ -26,7 +26,7 @@ def _runtime_deps() -> list[str]:
     """Read the runtime dependencies from pyproject.toml [project] dependencies.
 
     Parses the actual manifest (NOT a hardcoded list) so adding a non-allowlisted dep to
-    pyproject.toml makes this gate fail — the defect-injection battery item 8 claim.
+    pyproject.toml makes this gate fail: the defect-injection battery item 8 claim.
     """
     pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
     with open(pyproject, "rb") as f:
@@ -44,7 +44,7 @@ def _runtime_deps() -> list[str]:
     return names
 
 
-# The allowlist of SPDX-compatible licenses (AGENTS rule 10). ``cryptography`` is Apache-2.0 OR BSD-3-Clause.
+# The allowlist of SPDX-compatible licenses. ``cryptography`` is Apache-2.0 OR BSD-3-Clause.
 ALLOWED_LICENSES = {
     "Apache Software License",
     "Apache-2.0",
@@ -56,7 +56,7 @@ ALLOWED_LICENSES = {
     "MIT",
     "ISC License",
     "ISC",
-    "Mozilla Public License 2.0",  # only as a component of cryptography's optional deps — flagged below
+    "Mozilla Public License 2.0",  # only as a component of cryptography's optional deps: flagged below
 }
 
 # Packages whose license we've verified and accept (name → expected SPDX family or substring).
@@ -116,7 +116,7 @@ def main() -> int:
         for v in violations:
             print(f"license: {v}", file=sys.stderr)
         print(
-            f"\nlicense: {len(violations)} violation(s) — all runtime deps must be Apache-2.0/BSD/MIT/ISC",
+            f"\nlicense: {len(violations)} violation(s): all runtime deps must be Apache-2.0/BSD/MIT/ISC",
             file=sys.stderr,
         )
         return 1

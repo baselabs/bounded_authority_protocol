@@ -4,7 +4,7 @@ defmodule BoundedAuthorityProtocol.SignatureWidthErrorShapeTest do
   # verification surface; never a bare boolean leaked from a `with` guard. Found by the
   # role-attestation profile's ES256 confusion corpus case (a 66-byte raw ECDSA r||s
   # signature survived scan and base64url decode and reached the width guard); v3 already
-  # normalizes, v1/v2 leaked `false`. Fixed by the v3-style parse wrapper (ADR 0036 landing).
+  # normalizes, v1/v2 leaked `false`. Fixed by the v3-style parse wrapper (spec/bap-role-attestation-v1.md landing).
   use ExUnit.Case, async: true
 
   alias BoundedAuthorityProtocol.V1
