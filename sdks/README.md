@@ -11,6 +11,8 @@ verifiers, not additional normative text.
 Verification takes already-trusted public keys, expected context, and time as explicit inputs.
 The SDKs have no private-key access or custody and do not choose trust or authorize execution.
 
+## Publication boundary
+
 **None of the three is published to a registry yet.** Install them from this repository by
 local path or Git commit; each README shows how. Each SDK moves to its own repository when it is
 first published, never publishing from this one
