@@ -1,6 +1,10 @@
 defmodule BoundedAuthorityProtocol.Conformance.VerdictDigestGateTest do
   use ExUnit.Case, async: true
 
+  # Two `mix run` subprocesses regenerate every corpus verdict; a loaded runner can take
+  # longer than ExUnit's 60-second default (seeded coverage run 44706506709 timed out).
+  @moduletag timeout: 300_000
+
   test "the generator is red on a stale manifest and green after restoration" do
     root = Path.expand("../..", __DIR__)
 

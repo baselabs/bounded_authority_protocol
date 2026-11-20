@@ -1,6 +1,10 @@
 defmodule BoundedAuthorityProtocol.Architecture.SbomGenerationTest do
   use ExUnit.Case, async: false
 
+  # `mix sbom.generate` runs two `mix run` subprocesses; ExUnit's 60-second default is too
+  # small for a loaded runner.
+  @moduletag timeout: 300_000
+
   @root Path.expand("../..", __DIR__)
   @generator "cmd mix run --no-start scripts/generate_sbom.exs "
   @options "--exclude-system-dependencies --classification library --schema 1.6 --format json --output "

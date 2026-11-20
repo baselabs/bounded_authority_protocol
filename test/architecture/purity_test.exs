@@ -4,6 +4,10 @@ Code.require_file("../../test_support/portable.ex", __DIR__)
 defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
   use ExUnit.Case, async: false
 
+  # Fixture projects compile in `mix compile` subprocesses; ExUnit's 60-second default is too
+  # small for a loaded runner.
+  @moduletag timeout: 300_000
+
   alias BoundedAuthorityProtocol.ArchitectureGate
   alias BoundedAuthorityProtocol.BuildPath
   alias BoundedAuthorityProtocol.TestSupport.Portable
