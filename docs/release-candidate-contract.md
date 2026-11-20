@@ -36,18 +36,20 @@ gh attestation verify bounded_authority_protocol-<version>.tar \
 
 The maintainers' release operator dispatches [publish.yml](../.github/workflows/publish.yml)
 from `main` to publish the Hex package after qualification. It refuses a package name Hex has
-never had, a tagged or retired version, or an existing package whose bytes differ. Docs are a
-rendering of the package and an ExDoc build is not byte-stable, so docs Hex already serves for
-the version are kept and read back as present, never compared by bytes. The docs archive
-carries `release.json` naming the package, version and commit that built it; a resumed
-publication finishes only on that commit, and a refusal names it.
+never had, a tagged or retired version, or an existing package whose bytes differ.
 It builds HTML docs and the archive without a cache, checks package identity, file inventory
 and source bytes, and verifies the archive's qualification attestation before uploading.
 Only the upload step holds the registry key, from a directory with no `mix.exs`.
-A held upload is incomplete: after approval on Hex, another dispatch on the same commit
-uploads only what is missing and reads both uploads back. It never replaces a package.
+Docs are a rendering of the package, and an ExDoc build is not byte-stable, so docs are never
+compared by bytes. The docs archive carries `release.json` naming the package, version and
+commit that built it. Read-back requires served docs to name this package and version, and a
+commit that is the dispatched commit or its ancestor on `main`; that commit is the published
+commit. A held upload is incomplete: after approval on Hex, another dispatch from `main`
+uploads only what is missing, keeps docs Hex already serves, and reads both uploads back. It
+never replaces a package or served docs. Read-back saves the served docs archive in the
+`release-assets` bundle beside the package, checksums and SBOMs.
 Contributors and agents do not publish, tag or dispatch. After the read-back, the operator
-tags the exact commit and creates its GitHub release with the archive, checksum and SBOMs.
+tags the published commit and creates its GitHub release with the archive, checksum and SBOMs.
 No workflow creates a GitHub release or runs on a tag.
 [pages.yml](../.github/workflows/pages.yml) is also dispatch-only from `main`, limited to the
 same maintainer accounts, and retains its `github-pages` environment.
