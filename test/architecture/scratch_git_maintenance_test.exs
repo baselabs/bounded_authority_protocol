@@ -36,11 +36,11 @@ defmodule BoundedAuthorityProtocol.ScratchGitMaintenanceTest do
   @subcommands "commit|merge|fetch|pull|push|am|rebase|clone|cherry-pick|revert"
 
   # A git invocation whose subcommand starts automatic maintenance:
-  #   Elixir   git!(repo, ["commit", ...])
+  #   Elixir   git!(repo, ["commit", ...])  (a list literal, never a subscript like built["commit"])
   #   Python   git(repo, "commit", ...)  and  run("git", "commit", ...)
   #   shell    git -C "$repo" -c key=value commit ...  (at the start of a line)
   @maintenance_invocations [
-    ~r/\[\s*"(?:#{@subcommands})"/,
+    ~r/(?<![\w\])])\[\s*"(?:#{@subcommands})"/,
     ~r/(?:\bgit\(\s*[\w.]+\s*,\s*|"git"\s*,\s*)"(?:#{@subcommands})"/,
     ~r/^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*git\b[^\n#]*?\s(?:#{@subcommands})(?:\s|$)/m
   ]
@@ -50,6 +50,13 @@ defmodule BoundedAuthorityProtocol.ScratchGitMaintenanceTest do
   # a GIT_CONFIG_KEY_n/GIT_CONFIG_VALUE_n pair.
   @maintenance_off ~r/"maintenance\.auto"\s*,\s*"false"|maintenance\.auto=false\b|=maintenance\.auto\s+GIT_CONFIG_VALUE_\d+=false\b/
   @gc_off ~r/"gc\.auto"\s*,\s*"0"|gc\.auto=0\b|=gc\.auto\s+GIT_CONFIG_VALUE_\d+=0\b/
+
+  test "an argument list names a git subcommand; a subscript with the same key does not" do
+    [list_literal | _] = @maintenance_invocations
+    assert ~s|git!(repo, ["commit", "-m", "x"])| =~ list_literal
+    refute ~s|commit = built["commit"]| =~ list_literal
+    refute ~s|members["merge"]| =~ list_literal
+  end
 
   test "every scratch git repository that commits, merges, fetches, or pushes disables automatic maintenance" do
     {listing, 0} =
