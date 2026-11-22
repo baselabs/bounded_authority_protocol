@@ -13,7 +13,6 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
   # one-time sweep. The scanned set mirrors the mix.exs package `files` boundary (ROADMAP is outside that
   # boundary and is asserted absent from the scan). Explicit authoring-tool names are banned.
   @banned [
-    ~r/\bkimosabe\b/i,
     ~r/\bcodex\b/i,
     ~r/\bclaude\b/i,
     ~r/\bglm\b/i,
@@ -131,7 +130,6 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
 
   test "the banned set is red-capable (a planted term is caught on every pattern)" do
     planted = [
-      "a kimosabe note",
       "codex reviewed",
       "claude reviewed",
       "glm lens",
@@ -159,7 +157,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     File.mkdir_p!(root)
     on_exit(fn -> File.rm_rf!(root) end)
     path = Path.join(root, ".hidden.md")
-    File.write!(path, "a kimosabe note")
+    File.write!(path, "codex reviewed")
     assert path in wildcard(root)
     assert Enum.any?(@banned, &Regex.match?(&1, File.read!(path)))
   end

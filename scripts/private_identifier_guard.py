@@ -17,13 +17,12 @@ import sys
 import tempfile
 
 
-MANIFEST_REL = Path(".kimosabe/private-identifiers")
+MANIFEST_REL = Path("info/private-identifiers")
 EXPECTATION_REL = Path(
-    ".kimosabe/evidence/privacy-remediation/local-guard/"
-    "private-identifier-expectation.json"
+    "info/private-identifier-guard/private-identifier-expectation.json"
 )
 ACTIVATION_REL = Path(
-    ".kimosabe/evidence/privacy-remediation/local-guard/private-identifier-active"
+    "info/private-identifier-guard/private-identifier-active"
 )
 ACTIVATION_CONFIG_KEY = "bap.privateIdentifierGuard.active"
 MAX_POLICY_BYTES = 1_048_576
@@ -109,7 +108,7 @@ class Guard:
         }.get(self.git("rev-parse", "--show-object-format").strip())
         if self.object_hex_length is None:
             raise GuardError("object-format")
-        self.policy_root = self.main_worktree()
+        self.policy_root = self.common_git_directory()
         self._batch: subprocess.Popen[bytes] | None = None
         self.seen_blobs: set[bytes] = set()
         self._trees: dict[bytes, tuple[TreeEntry, ...]] = {}
@@ -215,11 +214,11 @@ class Guard:
             return b""
         return result.stdout
 
-    def main_worktree(self) -> Path:
-        """Return the main checkout, where the untracked policy lives.
+    def common_git_directory(self) -> Path:
+        """Resolve clone-shared policy storage outside every tracked worktree.
 
-        Activation is clone-shared local config, so every linked worktree of the
-        clone reads the one policy kept in the main checkout.
+        Activation and policy are shared by every linked worktree. Keep the
+        existing refusal of linked checkouts anchored in a bare repository.
         """
         records = self.git("worktree", "list", "--porcelain", "-z").split(b"\0\0")
         fields = records[0].split(b"\0") if records else []
@@ -227,10 +226,14 @@ class Guard:
             raise GuardError("policy-root")
         if b"bare" in fields[1:]:
             raise GuardError("policy-root-bare")
-        root = Path(fields[0][len(b"worktree ") :].decode("utf-8", "surrogateescape"))
+        raw = self.git("rev-parse", "--path-format=absolute", "--git-common-dir")
+        root = Path(raw.decode("utf-8", "surrogateescape").rstrip("\n"))
         if not root.is_absolute():
             raise GuardError("policy-root")
-        return root.resolve()
+        root = root.resolve()
+        if not root.is_dir():
+            raise GuardError("policy-root")
+        return root
 
     @staticmethod
     def read_regular(path: Path, code: str) -> bytes:

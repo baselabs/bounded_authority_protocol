@@ -5,7 +5,11 @@ Contributors do not need them; the hooks print an inactive notice without the lo
 
 Maintainer checks for confidential terms require an ignored identifier inventory, integrity policy,
 and activation marker, plus activation recorded in local Git configuration. The inventory owner
-prepares the inventory locally, then initializes its policy with
+stores the inventory at `<git-common-dir>/info/private-identifiers`, where
+`git rev-parse --path-format=absolute --git-common-dir` resolves `<git-common-dir>`.
+The integrity policy and activation marker live beside it under
+`info/private-identifier-guard/`. These files stay outside tracked worktrees and are shared
+by every linked worktree. The inventory owner then initializes its policy with
 `python3 scripts/private_identifier_guard.py --repo "$PWD" initialize --expected-count COUNT`,
 using the verified entry count. Install with `bash scripts/install-hooks.sh`. Routine installation
 validates the existing policy; it does not accept a changed inventory. After activation, missing

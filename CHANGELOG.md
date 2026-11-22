@@ -6,6 +6,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Keep local identifier inventories and their integrity state in the shared Git directory.
+  Enforce an explicit allowlist of dot-prefixed tracked path components without publishing
+  confidential identifiers in guards or their test fixtures.
 - Propagate command and pipeline failures through every workflow and tracked shell script.
   Use Bash consistently, distinguish expected nonzero check results from execution errors,
   and guard the failure-handling contract in the architecture tests.

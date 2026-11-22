@@ -19,6 +19,5 @@
 
 # Python CI installs and audits the committed uv.lock.
 /sdks/python/.venv/
-.kimosabe/
 # Bytecode from running scripts/test_private_identifier_guard.py.
 /scripts/__pycache__/

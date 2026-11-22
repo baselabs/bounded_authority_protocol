@@ -19,12 +19,12 @@ import unittest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 GUARD = PROJECT_ROOT / "scripts" / "private_identifier_guard.py"
 INSTALLER = PROJECT_ROOT / "scripts" / "install-hooks.sh"
+MANIFEST_REL = Path("info/private-identifiers")
 EXPECTATION_REL = Path(
-    ".kimosabe/evidence/privacy-remediation/local-guard/"
-    "private-identifier-expectation.json"
+    "info/private-identifier-guard/private-identifier-expectation.json"
 )
 ACTIVATION_REL = Path(
-    ".kimosabe/evidence/privacy-remediation/local-guard/private-identifier-active"
+    "info/private-identifier-guard/private-identifier-active"
 )
 ACTIVATION_CONFIG_KEY = "bap.privateIdentifierGuard.active"
 ZERO_OID = "0" * 40
@@ -89,6 +89,9 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.repo = self.scratch / "repo"
         self.repo.mkdir()
         init_scratch_repo(self.repo, "-q")
+        self.common_dir = Path(
+            git(self.repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
+        )
         git(self.repo, "config", "user.email", "guard@example.invalid")
         git(self.repo, "config", "user.name", "Guard Test")
         self.pattern = "public-synthetic-orchid"
@@ -111,7 +114,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         shutil.rmtree(self.scratch)
 
     def write_manifest(self, *patterns: str) -> None:
-        manifest = self.repo / ".kimosabe" / "private-identifiers"
+        manifest = self.common_dir / MANIFEST_REL
         manifest.parent.mkdir(parents=True, exist_ok=True)
         manifest.write_text("\n".join(patterns) + "\n", encoding="utf-8")
 
@@ -120,12 +123,12 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, "expectation initialization failed")
         self.assertEqual(result.stdout, "")
         self.assertEqual(result.stderr, "")
-        expectation = self.repo / EXPECTATION_REL
+        expectation = self.common_dir / EXPECTATION_REL
         self.assertTrue(expectation.is_file())
         parsed = json.loads(expectation.read_text(encoding="utf-8"))
         self.assertEqual(parsed["entry_count"], count)
         self.assertEqual(set(parsed), {"entry_count", "manifest_sha256"})
-        self.assertEqual((self.repo / ACTIVATION_REL).read_bytes(), b"enabled\n")
+        self.assertEqual((self.common_dir / ACTIVATION_REL).read_bytes(), b"enabled\n")
         self.assertEqual(
             git(self.repo, "config", "--local", "--bool", "--get", ACTIVATION_CONFIG_KEY),
             "true",
@@ -145,7 +148,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
     def install_real_hooks(self) -> None:
         self.write_manifest(*self.patterns)
         self.copy_hook_sources()
-        (self.repo / EXPECTATION_REL).unlink()
+        (self.common_dir / EXPECTATION_REL).unlink()
         subdirectory = self.repo / "subdirectory"
         subdirectory.mkdir()
         result = run(
@@ -188,9 +191,9 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.assertNotIn("secret message", output)
 
     def test_manifest_state_fails_closed(self) -> None:
-        manifest = self.repo / ".kimosabe" / "private-identifiers"
-        expectation = self.repo / EXPECTATION_REL
-        activation = self.repo / ACTIVATION_REL
+        manifest = self.common_dir / MANIFEST_REL
+        expectation = self.common_dir / EXPECTATION_REL
+        activation = self.common_dir / ACTIVATION_REL
 
         manifest.unlink()
         result = self.guard("pre-commit")
@@ -242,17 +245,41 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.assert_safe_output(result)
 
     def test_policy_parent_symlink_fails_closed(self) -> None:
-        evidence = self.repo / ".kimosabe" / "evidence"
-        held = self.repo / ".kimosabe" / "evidence-held"
-        evidence.rename(held)
-        evidence.symlink_to(held.name, target_is_directory=True)
+        policy = self.common_dir / EXPECTATION_REL.parent
+        held = policy.with_name("private-identifier-guard-held")
+        policy.rename(held)
+        policy.symlink_to(held.name, target_is_directory=True)
         result = self.guard("pre-commit")
         self.assertEqual(result.returncode, 2)
         self.assert_safe_output(result)
 
+    def test_shared_info_parent_symlink_fails_closed(self) -> None:
+        info = self.common_dir / "info"
+        held = self.common_dir / "info-held"
+        info.rename(held)
+        info.symlink_to(held.name, target_is_directory=True)
+        result = self.guard("pre-commit")
+        self.assertEqual(result.returncode, 2)
+        self.assert_safe_output(result)
+
+    def test_policy_follows_separate_git_directory(self) -> None:
+        separate = self.scratch / "metadata.git"
+        git(self.repo, "init", "-q", "--separate-git-dir", str(separate))
+        self.assertTrue((separate / MANIFEST_REL).is_file())
+        self.assertFalse(self.common_dir.is_dir())
+        result = self.guard("validate-policy")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        path = self.repo / "content.txt"
+        path.write_text(f"secret payload {self.pattern}\n", encoding="utf-8")
+        git(self.repo, "add", path.name)
+        result = self.guard("pre-commit")
+        self.assertEqual(result.returncode, 1)
+        self.assert_safe_output(result)
+
     def test_persistent_activation_denies_removed_ignored_policy(self) -> None:
-        (self.repo / ".kimosabe" / "private-identifiers").unlink()
-        shutil.rmtree(self.repo / ".kimosabe" / "evidence")
+        (self.common_dir / MANIFEST_REL).unlink()
+        shutil.rmtree(self.common_dir / EXPECTATION_REL.parent)
         self.assertEqual(
             git(self.repo, "config", "--local", "--bool", "--get", ACTIVATION_CONFIG_KEY),
             "true",
@@ -377,11 +404,16 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.assertIn("tree-entry=", result.stderr)
         self.assert_safe_output(result)
 
-    def test_linked_worktree_reads_main_checkout_policy(self) -> None:
+    def test_linked_worktree_reads_common_git_policy(self) -> None:
         remote, remote_oid = self.make_remote()
         linked = self.scratch / "linked"
         git(self.repo, "worktree", "add", "-q", "-b", "linked-fixture", str(linked))
-        self.assertFalse((linked / ".kimosabe").exists())
+        self.assertEqual(
+            Path(git(linked, "rev-parse", "--path-format=absolute", "--git-common-dir")),
+            self.common_dir,
+        )
+        linked_git_dir = Path(git(linked, "rev-parse", "--absolute-git-dir"))
+        self.assertFalse((linked_git_dir / MANIFEST_REL).exists())
 
         def push(local_oid: str) -> subprocess.CompletedProcess[str]:
             return self.guard(
@@ -413,10 +445,14 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.assertIn("blob=", result.stderr)
         self.assert_safe_output(result)
 
-        # Only the main checkout's policy counts: a copy in the linked
-        # worktree does not stand in for a manifest missing from the main one.
-        shutil.copytree(self.repo / ".kimosabe", linked / ".kimosabe")
-        (self.repo / ".kimosabe" / "private-identifiers").unlink()
+        # A per-worktree policy cannot replace missing clone-shared policy.
+        (linked_git_dir / MANIFEST_REL.parent).mkdir(parents=True)
+        shutil.copy2(self.common_dir / MANIFEST_REL, linked_git_dir / MANIFEST_REL)
+        shutil.copytree(
+            self.common_dir / EXPECTATION_REL.parent,
+            linked_git_dir / EXPECTATION_REL.parent,
+        )
+        (self.common_dir / MANIFEST_REL).unlink()
         result = push(clean_oid)
         self.assertEqual(result.returncode, 2)
         self.assertIn("guard-state=manifest", result.stderr)
@@ -1067,7 +1103,7 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
 
     def test_routine_installer_does_not_repin_changed_manifest(self) -> None:
         self.install_real_hooks()
-        expectation = self.repo / EXPECTATION_REL
+        expectation = self.common_dir / EXPECTATION_REL
         before = expectation.read_bytes()
         self.write_manifest(
             self.pattern,
@@ -1092,10 +1128,12 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.assertEqual(hook.read_bytes(), before)
 
     def test_public_contributor_installs_sdk_hook_without_private_state(self) -> None:
-        (self.repo / ".kimosabe" / "private-identifiers").unlink()
-        shutil.rmtree(self.repo / ".kimosabe" / "evidence")
+        (self.common_dir / MANIFEST_REL).unlink()
+        shutil.rmtree(self.common_dir / EXPECTATION_REL.parent)
         git(self.repo, "config", "--local", "--unset-all", ACTIVATION_CONFIG_KEY)
-        self.assertEqual(git(self.repo, "ls-files", ".kimosabe").strip(), "")
+        self.assertEqual(
+            git(self.repo, "ls-files", "--", str(self.common_dir)).strip(), ""
+        )
         self.copy_hook_sources()
         subdirectory = self.repo / "subdirectory"
         subdirectory.mkdir()

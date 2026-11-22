@@ -2,89 +2,123 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
   @moduledoc false
   use ExUnit.Case, async: true
 
-  # The local .kimosabe directory is never tracked. Two paths were tracked by earlier commits
-  # and untracked on 2026-09-28; they remain in HEAD ancestry until that history is rewritten,
-  # so the history scan admits exactly these two paths and nothing else. The index admits none.
-  @historical [
-    ".kimosabe/critical-surfaces",
-    ".kimosabe/handoffs/2026-09-19-ap2-interop-and-ecdsa-suite.md"
+  # Only these dot-prefixed components occur in the project's tracked configuration.
+  # Match exact spellings at every depth; new configuration requires an explicit review.
+  @allowed_dot_components [
+    ".config",
+    ".formatter.exs",
+    ".gitattributes",
+    ".github",
+    ".gitignore",
+    ".gitleaks.toml",
+    ".hex-version",
+    ".tool-versions"
   ]
 
-  @tag :git_history
-  test "real index and every reachable ref exclude local authoring directories" do
+  test "the current tree and index contain only approved dot-prefixed components" do
     entries = git!(".", ["ls-files", "-z"]) |> String.split(<<0>>, trim: true)
 
-    for positive <- [".gitleaks.toml", ".formatter.exs"] do
-      assert positive in entries
-    end
+    actual =
+      entries
+      |> Enum.flat_map(&String.split(&1, "/"))
+      |> Enum.filter(&String.starts_with?(&1, "."))
+      |> MapSet.new()
 
-    for historical <- @historical do
-      refute historical in entries
-    end
-
+    assert actual == MapSet.new(@allowed_dot_components)
     assert scan(".") == []
   end
 
-  test "a formerly tracked path is a finding when tracked again" do
-    for historical <- @historical do
-      repo = repo!()
-      put!(repo, historical, "public canary\n")
-      assert scan(repo) != [], historical
+  test "approved dot-prefixed configuration is accepted at every depth" do
+    repo = repo!()
+
+    paths =
+      [".github/workflows/ci.yml", "sdks/rust/.config/nextest.toml"] ++
+        Enum.map(@allowed_dot_components, &"fixtures/#{&1}/config.txt")
+
+    for path <- paths do
+      put!(repo, path, "public configuration\n")
     end
+
+    assert scan(repo) == []
+    commit!(repo)
+    assert scan(repo) == []
   end
 
-  test "every path component is checked" do
+  test "every unapproved dot-prefixed path component is checked" do
     repo = repo!()
     assert scan(repo) == []
 
     paths = [
-      ".kimosabe/x",
-      "lib/.kimosabe/x",
-      ".kimosabe",
-      ".kimosabe/critical-surfaces.bak",
-      "sub/.kimosabe/critical-surfaces",
-      ".KIMOSABE/x",
-      ".kimosabe./x",
-      ".kimosabe /x"
+      ".local-notes/x",
+      "lib/.local-notes/x",
+      ".local-notes",
+      ".local-notes/config.bak",
+      "sub/.local-notes/config",
+      ".LOCAL-NOTES/x",
+      ".local-notes./x",
+      ".local-notes /x",
+      ".GITHUB/x",
+      ".github./x",
+      ".github /x",
+      "fixtures/.unlisted.json"
     ]
 
     for path <- paths do
       put!(repo, path, "public canary\n")
-      assert scan(repo) != [], path
+      assert {:index, path} in scan(repo), path
       git!(repo, ["rm", "-f", "--", path])
+      assert scan(repo) == []
     end
   end
 
-  test "a directory gitlink or symlink entry is a finding" do
-    repo = repo!()
-    commit = git!(repo, ["rev-parse", "HEAD"]) |> String.trim()
-    git!(repo, ["update-index", "--add", "--cacheinfo", "160000,#{commit},.kimosabe"])
-    assert scan(repo) != []
-    git!(repo, ["update-index", "--force-remove", ".kimosabe"])
+  test "a directory gitlink or symlink entry is a finding in the index and tree" do
+    for mode <- ["160000", "120000"] do
+      repo = repo!()
 
-    target = Path.join(repo, "link-target")
-    File.write!(target, "public-target")
-    blob = git!(repo, ["hash-object", "-w", "--", target]) |> String.trim()
-    File.rm!(target)
-    git!(repo, ["update-index", "--add", "--cacheinfo", "120000,#{blob},.kimosabe"])
-    assert scan(repo) != []
+      object =
+        case mode do
+          "160000" -> git!(repo, ["rev-parse", "HEAD"]) |> String.trim()
+          "120000" -> git!(repo, ["rev-parse", "HEAD:README.md"]) |> String.trim()
+        end
+
+      git!(repo, ["update-index", "--add", "--cacheinfo", "#{mode},#{object},.local-notes"])
+      assert {:index, ".local-notes"} in scan(repo)
+      commit!(repo)
+      git!(repo, ["update-index", "--force-remove", ".local-notes"])
+      assert scan(repo) == [{:tree, ".local-notes"}]
+    end
   end
 
-  test "deleted side-branch paths and renames remain visible after merge" do
+  test "renames into and out of an unapproved directory check both current snapshots" do
+    repo = repo!()
+    File.mkdir_p!(Path.join(repo, ".local-notes"))
+    git!(repo, ["mv", "README.md", ".local-notes/renamed.txt"])
+    assert scan(repo) == [{:index, ".local-notes/renamed.txt"}]
+    commit!(repo)
+    git!(repo, ["mv", ".local-notes/renamed.txt", "renamed.txt"])
+    assert scan(repo) == [{:tree, ".local-notes/renamed.txt"}]
+    commit!(repo)
+    assert scan(repo) == []
+  end
+
+  test "merged side-branch paths are checked until their removal is committed" do
     repo = repo!()
     git!(repo, ["switch", "-c", "side"])
-    put!(repo, ".kimosabe/removed.txt", "public canary\n")
-    commit!(repo)
-    git!(repo, ["mv", ".kimosabe/removed.txt", "renamed.txt"])
+    put!(repo, ".local-notes/side.txt", "public canary\n")
     commit!(repo)
     git!(repo, ["switch", "main"])
     put!(repo, "main.txt", "main\n")
     commit!(repo)
+    assert scan(repo) == []
     git!(repo, ["merge", "--no-edit", "side"])
-    assert scan(repo) != []
+    assert {:tree, ".local-notes/side.txt"} in scan(repo)
+    git!(repo, ["rm", ".local-notes/side.txt"])
+    assert scan(repo) == [{:tree, ".local-notes/side.txt"}]
+    commit!(repo)
+    assert scan(repo) == []
   end
 
-  test "merge-resolution-only paths remain visible after removal" do
+  test "merge-resolution-only paths are checked without rewriting history" do
     repo = repo!()
     git!(repo, ["switch", "-c", "side"])
     put!(repo, "side.txt", "side\n")
@@ -93,123 +127,66 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     put!(repo, "main.txt", "main\n")
     commit!(repo)
     git!(repo, ["merge", "--no-commit", "side"])
-    put!(repo, ".kimosabe/merge.txt", "public canary\n")
-    commit!(repo)
-    git!(repo, ["rm", ".kimosabe/merge.txt"])
+    put!(repo, ".local-notes/merge.txt", "public canary\n")
+    assert scan(repo) == [{:index, ".local-notes/merge.txt"}]
     commit!(repo)
     git!(repo, ["config", "log.diffMerges", "off"])
-    assert scan(repo) != []
+    assert {:tree, ".local-notes/merge.txt"} in scan(repo)
+    git!(repo, ["rm", ".local-notes/merge.txt"])
+    commit!(repo)
+    assert scan(repo) == []
   end
 
-  test "a history path outside the two historical paths is a finding" do
+  test "historical paths under other refs do not change current-tree findings" do
     repo = repo!()
-    put!(repo, ".kimosabe/handoffs/2026-09-19-other.md", "public canary\n")
+    put!(repo, ".local-notes/archive/other.md", "public canary\n")
     commit!(repo)
-    git!(repo, ["rm", "-f", "--", ".kimosabe/handoffs/2026-09-19-other.md"])
+    git!(repo, ["tag", "-a", "historical-path", "-m", "historical path probe"])
+    git!(repo, ["rm", "--", ".local-notes/archive/other.md"])
+    assert scan(repo) == [{:tree, ".local-notes/archive/other.md"}]
     commit!(repo)
-    assert scan(repo) != []
+    assert scan(repo) == []
   end
 
-  test "a real shallow clone excludes history tests unless full history is required" do
+  test "a shallow checkout still checks its current tree and index" do
     source = repo!()
-    put!(source, "removed.txt", "public canary\n")
-    commit!(source)
-    git!(source, ["rm", "removed.txt"])
+    put!(source, "second.txt", "public canary\n")
     commit!(source)
     shallow = source <> "-shallow"
     on_exit(fn -> File.rm_rf!(shallow) end)
     git!(source, ["clone", "--depth=1", "--no-local", source, shallow])
-    helper = Path.join(shallow, "test_helper.exs")
-    File.cp!(Path.expand("../test_helper.exs", __DIR__), helper)
-    probe = Path.join(shallow, "history_probe.exs")
-
-    File.write!(probe, """
-    defmodule HistoryProbe do
-      use ExUnit.Case
-      @tag :git_history
-      test "repository history invariant", do: flunk("history test must be excluded here")
-    end
-    """)
-
-    {output, 0} =
-      System.cmd("elixir", ["-r", helper, probe],
-        cd: shallow,
-        stderr_to_stdout: true,
-        env: [{"BAP_REQUIRE_FULL_HISTORY", nil}]
-      )
-
-    assert output =~ "Excluding :git_history tests: shallow checkout"
-    assert output =~ "1 excluded"
-
-    {output, status} =
-      System.cmd("elixir", ["-r", helper, probe],
-        cd: shallow,
-        stderr_to_stdout: true,
-        env: [{"BAP_REQUIRE_FULL_HISTORY", "1"}]
-      )
-
-    assert status != 0
-    assert output =~ "BAP_REQUIRE_FULL_HISTORY=1 requires a complete checkout"
-    refute output =~ "Excluding :git_history"
     assert String.trim(git!(shallow, ["rev-parse", "--is-shallow-repository"])) == "true"
+    assert scan(shallow) == []
+    put!(shallow, ".local-notes/shallow.txt", "public canary\n")
+    assert scan(shallow) == [{:index, ".local-notes/shallow.txt"}]
   end
 
-  test "unavailable history and Git errors fail closed" do
+  test "Git errors fail closed" do
     repo = repo!()
-    head = git!(repo, ["rev-parse", "HEAD"]) |> String.trim()
-    File.write!(Path.join(repo, ".git/shallow"), head <> "\n")
-
-    assert_raise RuntimeError, ~r/full history/, fn ->
-      scan(repo)
-    end
 
     assert_raise RuntimeError, ~r/Git failed/, fn ->
       scan(Path.join(repo, "nonexistent"))
     end
   end
 
-  # Check every reachable ref, including both merge parents and annotated tags.
+  # Inspect both snapshots, including staged removals, gitlinks, and symlinks.
+  # Historical trees stay unchanged and are not publication candidates.
   def scan(repo) do
-    unless String.trim(git!(repo, ["rev-parse", "--is-shallow-repository"])) == "false" do
-      raise "full history is required"
-    end
-
-    tip =
-      git!(repo, ["ls-files", "-z"])
-      |> String.split(<<0>>, trim: true)
-      |> Enum.filter(&forbidden_path?/1)
-      |> Enum.map(fn _path -> :tracked_path end)
-
-    history =
-      git!(repo, [
-        "log",
-        "--format=",
-        "--name-only",
-        "-z",
-        "--no-renames",
-        "--diff-merges=separate",
-        "--all"
-      ])
-      |> String.split(<<0>>, trim: true)
-      |> Enum.map(&String.trim_leading(&1, "\n"))
-      |> Enum.filter(&(&1 not in @historical and forbidden_path?(&1)))
-      |> Enum.map(fn _path -> :historical_path end)
-
-    tip ++ history
+    for {source, args} <- [
+          {:index, ["ls-files", "-z"]},
+          {:tree, ["ls-tree", "-r", "--name-only", "-z", "HEAD"]}
+        ],
+        path <- git!(repo, args) |> String.split(<<0>>, trim: true),
+        forbidden_path?(path),
+        do: {source, path}
   end
 
   defp forbidden_path?(path) do
     path
     |> String.split("/")
     |> Enum.any?(fn component ->
-      Regex.replace(~r/[. ]+$/, ascii_lowercase(component), "") == ".kimosabe"
+      String.starts_with?(component, ".") and component not in @allowed_dot_components
     end)
-  end
-
-  defp ascii_lowercase(component) do
-    for <<byte <- component>>, into: <<>> do
-      if byte in ?A..?Z, do: <<byte + 32>>, else: <<byte>>
-    end
   end
 
   defp repo! do
@@ -217,10 +194,7 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     File.mkdir_p!(repo)
     on_exit(fn -> File.rm_rf!(repo) end)
     git!(repo, ["init", "--initial-branch=main"])
-    # The throwaway repository never runs git's automatic maintenance. From git
-    # 2.54 the default maintenance strategy is "geometric", and a commit or merge
-    # starts `git maintenance run --auto --detach`: a repack that keeps writing
-    # into .git after the command returns and races the on_exit File.rm_rf!.
+    # Disable background maintenance so cleanup cannot race a detached repack.
     git!(repo, ["config", "maintenance.auto", "false"])
     git!(repo, ["config", "gc.auto", "0"])
     git!(repo, ["config", "user.email", "path-guard@example.invalid"])

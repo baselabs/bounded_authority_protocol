@@ -72,6 +72,8 @@ done
 guard="$repo_root/scripts/private_identifier_guard.py"
 [ -r "$guard" ] || die "private-identifier guard unavailable"
 command -v python3 >/dev/null 2>&1 || die "python3 unavailable"
+# The guard resolves the shared Git directory itself: its inventory lives at
+# info/private-identifiers and its integrity state at info/private-identifier-guard/.
 if [ -n "$initialize_count" ]; then
   python3 "$guard" --repo "$repo_root" initialize --expected-count "$initialize_count" \
     || die "private-identifier expectation initialization failed"
