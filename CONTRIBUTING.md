@@ -65,6 +65,9 @@ against a working tree, since no commit gate sees that runtime act; the `kci/<sh
 run is the hard gate for committed infrastructure. Only the Elixir Hex command in
 `.github/workflows/publish.yml` is exempt; every other registry command and action stays blocked.
 Existing checkouts must rerun `bash scripts/install-hooks.sh` after updating the hook.
+The generic pre-commit hook runs the repository's staged SDK check from
+`scripts/hooks/pre-commit.d/sdk-publish-infra` after the local identifier guard. Extension files
+run in byte-sorted order and must be readable and executable; any failure stops the commit.
 
 ## Package publication and site deployment
 

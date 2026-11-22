@@ -6,6 +6,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Run repository-specific pre-commit checks from `scripts/hooks/pre-commit.d/` after the
+  generic local identifier guard. Keep SDK publication enforcement in its own extension and
+  test the shared hooks independently of repository-specific checks.
 - Keep local identifier inventories and their integrity state in the shared Git directory.
   Enforce an explicit allowlist of dot-prefixed tracked path components without publishing
   confidential identifiers in guards or their test fixtures.

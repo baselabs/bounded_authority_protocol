@@ -3,7 +3,7 @@ set -euo pipefail
 
 # check_sdk_publish_infra.sh: single source of truth for the SDK publish guard.
 #
-# Called by scripts/hooks/pre-commit (on staged blobs via stdin) and by the
+# Called by scripts/hooks/pre-commit.d/sdk-publish-infra (on staged blobs via stdin) and by the
 # .github/workflows/sdk-publish-guard.yml CI job (on checked-out files via stdin).
 # One set of patterns, two callers, so the hook and CI cannot drift apart.
 #
@@ -43,7 +43,7 @@ fi
 # script, Makefile, or justfile UNDER sdks/ (an SDK release script, the review's
 # `sdks/typescript/scripts/release.sh` gap); and a repo-root Makefile/justfile (a
 # top-level target that publishes an SDK). NOTE the shell-script scan is scoped to
-# `sdks/` deliberately: this guard script and scripts/hooks/pre-commit both carry the
+# `sdks/` deliberately: this guard script and its hook extension both carry the
 # publish-command patterns as literal data, and a repo-wide `*.sh` scan would
 # self-match them. SDK release scripts live under sdks/, so that scope has the reach
 # without the self-match.

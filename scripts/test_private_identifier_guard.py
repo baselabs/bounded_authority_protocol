@@ -138,12 +138,11 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         scripts = self.repo / "scripts"
         scripts.mkdir(exist_ok=True)
         shutil.copy2(GUARD, scripts / GUARD.name)
-        shutil.copy2(
-            PROJECT_ROOT / "scripts" / "check_sdk_publish_infra.sh",
-            scripts / "check_sdk_publish_infra.sh",
-        )
         shutil.copy2(INSTALLER, scripts / "install-hooks.sh")
-        shutil.copytree(PROJECT_ROOT / "scripts" / "hooks", scripts / "hooks")
+        hooks = scripts / "hooks"
+        hooks.mkdir()
+        for name in ("pre-commit", "commit-msg", "pre-push"):
+            shutil.copy2(PROJECT_ROOT / "scripts" / "hooks" / name, hooks / name)
 
     def install_real_hooks(self) -> None:
         self.write_manifest(*self.patterns)
@@ -1127,7 +1126,106 @@ class PrivateIdentifierGuardTest(unittest.TestCase):
         self.assertIn("existing hook collision", result.stderr)
         self.assertEqual(hook.read_bytes(), before)
 
-    def test_public_contributor_installs_sdk_hook_without_private_state(self) -> None:
+    def write_extension(self, name: str, body: str, mode: int = 0o700) -> Path:
+        directory = self.repo / "scripts" / "hooks" / "pre-commit.d"
+        directory.mkdir(exist_ok=True)
+        extension = directory / name
+        extension.write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + body, encoding="utf-8")
+        extension.chmod(mode)
+        return extension
+
+    def test_pre_commit_accepts_missing_and_empty_extension_directory(self) -> None:
+        self.copy_hook_sources()
+        directory = self.repo / "scripts" / "hooks" / "pre-commit.d"
+        for present in (False, True):
+            with self.subTest(present=present):
+                if present:
+                    directory.mkdir()
+                result = run("bash", "scripts/hooks/pre-commit", cwd=self.repo)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assert_safe_output(result)
+
+    def test_pre_commit_extensions_run_in_sorted_order_and_are_not_installed(self) -> None:
+        self.copy_hook_sources()
+        log = self.scratch / "extension-order"
+        for name in ("z-last", "a-second", ".first"):
+            self.write_extension(name, f'printf "%s\\n" {shlex.quote(name)} >> "$GUARD_EXTENSION_LOG"\n')
+        result = run("bash", "scripts/install-hooks.sh", cwd=self.repo)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("3 hook(s) installed", result.stdout)
+        self.assertFalse((self.common_dir / "hooks" / "pre-commit.d").exists())
+        result = run(
+            "git", "commit", "--allow-empty", "-m", "ordered extensions",
+            cwd=self.repo, env={"GUARD_EXTENSION_LOG": str(log)},
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(log.read_text().splitlines(), [".first", "a-second", "z-last"])
+        self.assert_safe_output(result)
+
+    def test_pre_commit_propagates_extension_failure_and_stops(self) -> None:
+        self.copy_hook_sources()
+        log = self.scratch / "extension-order"
+        self.write_extension("10-first", 'printf "first\\n" >> "$GUARD_EXTENSION_LOG"\n')
+        self.write_extension("20-fail", 'printf "failed\\n" >> "$GUARD_EXTENSION_LOG"\nexit 23\n')
+        self.write_extension("30-last", 'printf "last\\n" >> "$GUARD_EXTENSION_LOG"\n')
+        result = run(
+            "bash", "scripts/hooks/pre-commit", cwd=self.repo,
+            env={"GUARD_EXTENSION_LOG": str(log)},
+        )
+        self.assertEqual(result.returncode, 23)
+        self.assertEqual(log.read_text().splitlines(), ["first", "failed"])
+        self.assert_safe_output(result)
+
+    def test_pre_commit_rejects_nonexecutable_and_unreadable_extensions(self) -> None:
+        self.copy_hook_sources()
+        marker = self.repo / "extension-ran"
+        extension = self.write_extension("check", 'touch extension-ran\n')
+        for mode in (0o600, 0o111, 0o700):
+            with self.subTest(mode=oct(mode)):
+                extension.chmod(mode)
+                result = run("bash", "scripts/hooks/pre-commit", cwd=self.repo)
+                if mode == 0o700:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertTrue(marker.exists())
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("extension unavailable; failing closed", result.stderr)
+                    self.assertFalse(marker.exists())
+                self.assert_safe_output(result)
+
+    def test_pre_commit_rejects_nonregular_extension_entries(self) -> None:
+        self.copy_hook_sources()
+        target = self.write_extension("target", "exit 0\n")
+        entry = target.with_name("00-entry")
+        for kind in ("directory", "symlink", "broken-symlink"):
+            with self.subTest(kind=kind):
+                if kind == "directory":
+                    entry.mkdir()
+                else:
+                    entry.symlink_to(target.name if kind == "symlink" else "missing")
+                try:
+                    result = run("bash", "scripts/hooks/pre-commit", cwd=self.repo)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("extension unavailable; failing closed", result.stderr)
+                    self.assert_safe_output(result)
+                finally:
+                    if kind == "directory":
+                        entry.rmdir()
+                    else:
+                        entry.unlink()
+
+    def test_pre_commit_guard_denial_prevents_extensions(self) -> None:
+        self.copy_hook_sources()
+        self.write_extension("check", "touch extension-ran\n")
+        staged = self.repo / "guarded.txt"
+        staged.write_text(self.pattern + "\n", encoding="utf-8")
+        git(self.repo, "add", staged.name)
+        result = run("bash", "scripts/hooks/pre-commit", cwd=self.repo)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse((self.repo / "extension-ran").exists())
+        self.assert_safe_output(result)
+
+    def test_public_contributor_installs_hooks_without_private_state(self) -> None:
         (self.common_dir / MANIFEST_REL).unlink()
         shutil.rmtree(self.common_dir / EXPECTATION_REL.parent)
         git(self.repo, "config", "--local", "--unset-all", ACTIVATION_CONFIG_KEY)

@@ -1,62 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# pre-commit: guard against SDK publish infrastructure landing in the monorepo.
-#
-# Installed by: bash scripts/install-hooks.sh   (symlinks this into .git/hooks/)
-# Bypass:       git commit --no-verify        (documented deliberate-admin escape)
-# Authority:    sdks/README.md publication boundary (SDK graduation and publish topology).
-# Patterns:     scripts/check_sdk_publish_infra.sh (single source of truth; the CI
-#               job in .github/workflows/sdk-publish-guard.yml uses the same script).
-#
-# What it does: for each staged file that is a workflow or an SDK manifest, run the
-# shared checker against the STAGED blob (git show :<path>), not the working tree,
-# so an un-staged revert does not fool the gate. Fail the commit on the first hit.
-#
-# Honesty limit: this catches publish infrastructure STAGED. It cannot catch a
-# literal 'npm publish' run against a working tree. The kci qualification run is the hard,
-# non-bypassable backstop for committed infrastructure; this hook is honor-system
-# fast feedback for contributors.
-
-# Resolve the repo root from the git toplevel so the checker path is stable whether
-# the hook runs via .git/hooks/pre-commit (symlink) or directly.
+# Enforce the local identifier policy before repository-specific staged checks.
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
-  printf 'pre-commit: not inside a git work tree; skipping SDK publish guard\n' >&2
-  exit 0
+  printf 'pre-commit: repository resolution failed; failing closed\n' >&2
+  exit 1
 }
-checker="$repo_root/scripts/check_sdk_publish_infra.sh"
-privacy_guard="$repo_root/scripts/private_identifier_guard.py"
+guard="$repo_root/scripts/private_identifier_guard.py"
 
-if [ ! -r "$privacy_guard" ] || ! command -v python3 >/dev/null 2>&1; then
+if [ ! -r "$guard" ] || ! command -v python3 >/dev/null 2>&1; then
   printf 'pre-commit: private-identifier guard unavailable; failing closed\n' >&2
   exit 1
 fi
 
-python3 "$privacy_guard" --repo "$repo_root" pre-commit || exit $?
+python3 "$guard" --repo "$repo_root" pre-commit || exit $?
 
-if [ ! -x "$checker" ]; then
-  printf 'pre-commit: %s missing or not executable; cannot enforce SDK publish guard\n' "$checker" >&2
-  exit 1
-fi
-
-status=0
-# Stage the file list into a temp, then iterate. Avoids the here-doc-with-$()
-# pattern (shellcheck SC2094) and, critically, avoids a pipeline, which would
-# run the loop in a subshell and silently drop any failure (a present but
-# ineffective gate).
-tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
-git diff --cached --name-only --diff-filter=ACM --no-renames > "$tmp"
-while IFS= read -r path; do
-  [ -n "$path" ] || continue
-  blob="$(git show ":$path" 2>/dev/null)" || {
-    printf 'pre-commit: could not read staged blob for %s\n' "$path" >&2
-    status=1
-    continue
-  }
-  if ! printf '%s' "$blob" | "$checker" "$path"; then
-    status=1
+extensions="$repo_root/scripts/hooks/pre-commit.d"
+if [ -e "$extensions" ] || [ -L "$extensions" ]; then
+  if [ -L "$extensions" ] || [ ! -d "$extensions" ] \
+      || [ ! -r "$extensions" ] || [ ! -x "$extensions" ]; then
+    printf 'pre-commit: extension directory unavailable; failing closed\n' >&2
+    exit 1
   fi
-done < "$tmp"
-
-exit "$status"
+  # Include hidden entries and sort by byte value, independent of the locale.
+  export LC_ALL=C
+  shopt -s nullglob dotglob
+  for extension in "$extensions"/*; do
+    if [ -L "$extension" ] || [ ! -f "$extension" ] \
+        || [ ! -r "$extension" ] || [ ! -x "$extension" ]; then
+      printf 'pre-commit: extension unavailable; failing closed\n' >&2
+      exit 1
+    fi
+    "$extension" "$@" || exit $?
+  done
+fi

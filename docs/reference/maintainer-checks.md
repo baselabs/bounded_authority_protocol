@@ -20,6 +20,16 @@ Explicit initialization can accept an updated
 inventory; the local owner remains trusted. Do not share the inventory or its digest in source,
 reviews, issues, or CI.
 
+The three top-level hooks are generic. After the identifier guard succeeds, pre-commit runs
+every entry in `scripts/hooks/pre-commit.d/` in byte-sorted order, including hidden entries.
+Entries must be readable, executable regular files, not symlinks; an invalid entry or the first
+failing check stops the commit. A missing or empty directory is valid. The installer links only
+the top-level hook files. This repository keeps its staged SDK publication check in
+`scripts/hooks/pre-commit.d/sdk-publish-infra`, using the same checker as its CI backstop.
+The standalone `python3 scripts/test_private_identifier_guard.py` tests only the generic files
+with synthetic identifiers and real temporary Git repositories. CI runs it through
+`mix privacy.hooks`, included in `mix quality.source`.
+
 These hooks check staged bytes and raw pending messages. Before a push, they check each outgoing
 commit's message and the paths and blobs it introduces relative to its parents, along with pushed
 refs, tags, and terminal objects. Automatic merge, cherry-pick, rebase, and mail-application commits

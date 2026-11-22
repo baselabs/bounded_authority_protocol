@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Check staged blobs with the same SDK publication rules enforced by CI.
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  printf 'pre-commit: repository resolution failed; failing closed\n' >&2
+  exit 1
+}
+checker="$repo_root/scripts/check_sdk_publish_infra.sh"
+
+if [ ! -x "$checker" ]; then
+  printf 'pre-commit: %s missing or not executable; cannot enforce SDK publish guard\n' "$checker" >&2
+  exit 1
+fi
+
+status=0
+# Stage the file list into a temp, then iterate. Avoids the here-doc-with-$()
+# pattern (shellcheck SC2094) and, critically, avoids a pipeline, which would
+# run the loop in a subshell and silently drop any failure (a present but
+# ineffective gate).
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+git diff --cached --name-only --diff-filter=ACM --no-renames > "$tmp"
+while IFS= read -r path; do
+  [ -n "$path" ] || continue
+  blob="$(git show ":$path" 2>/dev/null)" || {
+    printf 'pre-commit: could not read staged blob for %s\n' "$path" >&2
+    status=1
+    continue
+  }
+  if ! printf '%s' "$blob" | "$checker" "$path"; then
+    status=1
+  fi
+done < "$tmp"
+
+exit "$status"
