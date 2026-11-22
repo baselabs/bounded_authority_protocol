@@ -18,6 +18,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- Limit new-ref identifier checks to commits outside the pushing remote's tracking refs.
+  Keep full-history checks for unconfigured remotes and remotes without tracking refs.
 - Make public SDK comments and repository text self-contained: state verification and
   conformance rules with tracked specifications instead of unpublished design citations.
   Extend the public-text hygiene gate to every tracked text surface, including SDK sources,

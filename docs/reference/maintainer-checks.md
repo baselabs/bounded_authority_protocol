@@ -33,8 +33,11 @@ with synthetic identifiers and real temporary Git repositories. CI runs it throu
 These hooks check staged bytes and raw pending messages. Before a push, they check each outgoing
 commit's message and the paths and blobs it introduces relative to its parents, along with pushed
 refs, tags, and terminal objects. Automatic merge, cherry-pick, rebase, and mail-application commits
-can skip the commit checks; the pre-push check is their local backstop. Creating a new remote ref
-still scans its full ancestry, including commits already retained under another remote ref.
+can skip the commit checks; the pre-push check is their local backstop. For an existing remote ref,
+the commit scan excludes ancestry reachable from its current remote object. For a new remote ref,
+it excludes commits already reachable from `refs/remotes/<remote>/*`, using the exact configured
+remote name passed to the hook. An unconfigured name or URL, or a remote without tracking refs,
+keeps the full-ancestry scan. Tracking refs for other remotes never exclude commits.
 
 The message hook rejects confidential terms even in editor comments, verbose diffs, or templates:
 Git does not tell this hook which cleanup mode will later remove those bytes. For deletion-only
