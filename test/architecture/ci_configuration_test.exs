@@ -204,7 +204,8 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
             assert Enum.any?(Enum.take(steps, index), fn earlier ->
                      earlier["id"] == "toolchain" and
                        earlier["run"] == ~s|scripts/toolchain.sh >> "$GITHUB_OUTPUT"|
-                   end), "#{path} #{name}: read versions before installation"
+                   end),
+                   "#{path} #{name}: read versions before installation"
           end
 
           if tool do
@@ -214,7 +215,8 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
                      String.starts_with?(later["run"] || "", prefix) and
                        String.contains?(later["run"], "#{tool}=#{expected}") and
                        later["if"] == step["if"]
-                   end), "#{path} #{name}: refuse #{tool} drift after installation"
+                   end),
+                   "#{path} #{name}: refuse #{tool} drift after installation"
           end
         end
 
@@ -279,7 +281,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
   end
 
   defp toolchain_outputs do
-    {output, 0} = System.cmd("scripts/toolchain.sh", [])
+    {output, 0} = System.cmd(Path.expand("scripts/toolchain.sh"), [])
 
     Map.new(String.split(output, "\n", trim: true), fn line ->
       [key, value] = String.split(line, "=", parts: 2)
