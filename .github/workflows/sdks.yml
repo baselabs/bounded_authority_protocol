@@ -226,7 +226,7 @@ jobs:
           printf 'golang=%s\n' "$golang" >> "$GITHUB_OUTPUT"
 
       - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: ${{ steps.go-floor.outputs.golang }}
           cache: false
@@ -279,7 +279,7 @@ jobs:
         run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
 
       - name: Set up patched Go for the advisory scan
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: ${{ steps.toolchain.outputs.golang }}
           cache: false
@@ -343,7 +343,7 @@ jobs:
           golang="$(jq -er '.[0]' <<< "$GO_LANES")"
           printf 'golang=%s\n' "$golang" >> "$GITHUB_OUTPUT"
       - if: matrix.sdk == 'go'
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: ${{ steps.go-floor.outputs.golang }}
           cache: false
