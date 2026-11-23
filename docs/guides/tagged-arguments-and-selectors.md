@@ -5,6 +5,21 @@ Use the protocol's tagged JSON algebra after applying your route's real argument
 duplicate members are invalid, and object order does not change the canonical digest. Arrays
 remain ordered. A missing member is different from a member with `:null`.
 
+Convert cast Elixir terms with `BoundedAuthorityProtocol.V1.Json.from_term/2`. Plain maps may
+use binary or atom keys; colliding names, structs, invalid UTF-8, and over-limit values return
+`{:error, :invalid}`. Object members are sorted by binary name. Integers and floats keep their
+tags, including whole floats. This helper serves all three contract-majors. When the body is
+still raw bytes, use `BoundedAuthorityProtocol.V1.Json.decode/2` to retain duplicate-name checks.
+The term converter applies the decoder's structural and magnitude limits; raw `json_bytes`
+and `number_lexeme_bytes` limits do not apply.
+
+```elixir
+alias BoundedAuthorityProtocol.V1
+V1.Json.from_term(%{width: 4, scale: 4.0}, %{object_members: 2})
+```
+
+The value is `{:ok, {:object, [{"scale", {:float, 4.0}}, {"width", {:integer, 4}}]}}`.
+
 All selectors for an operation must hold. contract-major 1 supports `:all`, `equals`, and `one_of`. contract-major 2 and
 contract-major 3 add inclusive `lte` and `gte`; both operands must have the same numeric tag. Paths traverse
 object members only and never index arrays. Unknown kinds, empty paths, non-numeric range bounds,
@@ -13,7 +28,6 @@ because canonical JSON would re-tag them as integers; decoders also reject float
 `equals` and `one_of` (erratum 6). Never coerce a refused value into a passing one.
 
 ```elixir
-alias BoundedAuthorityProtocol.V1
 {:ok, integer_digest} = V1.request_digest("resize_image", {:object, [{"width", {:integer, 4}}]}, %{})
 {:ok, float_digest} = V1.request_digest("resize_image", {:object, [{"width", {:float, 4.0}}]}, %{})
 integer_digest != float_digest

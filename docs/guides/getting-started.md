@@ -170,8 +170,9 @@ The value is `3` again.
 
 Arguments use the package's tagged JSON form (`{:object, members}`, `{:string, s}`,
 `{:integer, i}`, and so on), so an integer and a float never compare equal by accident. Your
-service builds this value from the request it parsed; `BoundedAuthorityProtocol.V1.Json.decode/2`
-produces it from raw JSON bytes.
+service converts its parsed and cast request with `BoundedAuthorityProtocol.V1.Json.from_term/2`;
+`BoundedAuthorityProtocol.V1.Json.decode/2` produces it from raw JSON bytes. Cast to your route's
+declared types before tagging; whole floats keep their float tag.
 
 ### 4. Verify
 

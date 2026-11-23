@@ -43,46 +43,14 @@ than treating this recipe as a replacement binding.
 
 The request digest covers the operation's arguments in the package's tagged JSON form. When
 Plug has already parsed the body, and after your own code has cast it to the operation's
-declared types, convert the result once, at the boundary. The module below handles what
-`Plug.Parsers` and Ecto produce: string or atom keys, strings, integers, floats, booleans, `nil`,
-lists, and maps. It refuses anything else, such as a struct or a tuple, instead of guessing.
+declared types, convert the result once, at the boundary with `V1.Json.from_term/2`. It accepts
+string or atom keys, UTF-8 strings, integers, floats, booleans, `nil`, lists, and plain maps.
+It rejects structs, unsupported terms, and colliding member names, and sorts object members.
+The same structural and numeric bounds as `decode/2` apply; `json_bytes` and
+`number_lexeme_bytes` concern raw text and do not apply to terms.
 
 ```elixir
-defmodule MyApp.CastArguments do
-  @moduledoc "Converts cast request params into the protocol's tagged JSON value."
-
-  def tag(value) do
-    {:ok, do_tag(value)}
-  catch
-    :invalid -> {:error, :invalid}
-  end
-
-  defp do_tag(nil), do: :null
-  defp do_tag(value) when is_boolean(value), do: {:boolean, value}
-  defp do_tag(value) when is_integer(value), do: {:integer, value}
-  defp do_tag(value) when is_float(value), do: {:float, value}
-  defp do_tag(value) when is_binary(value), do: {:string, value}
-  defp do_tag(values) when is_list(values), do: {:array, Enum.map(values, &do_tag/1)}
-
-  defp do_tag(%{__struct__: _}), do: throw(:invalid)
-
-  defp do_tag(%{} = map) do
-    members = for {key, value} <- map, do: {member_name(key), do_tag(value)}
-    names = Enum.map(members, &elem(&1, 0))
-    if length(Enum.uniq(names)) != length(names), do: throw(:invalid)
-    {:object, Enum.sort(members)}
-  end
-
-  defp do_tag(_other), do: throw(:invalid)
-
-  defp member_name(key) when is_binary(key), do: key
-  defp member_name(key) when is_atom(key) and not is_nil(key) and not is_boolean(key),
-    do: Atom.to_string(key)
-
-  defp member_name(_key), do: throw(:invalid)
-end
-
-MyApp.CastArguments.tag(%{"dataset" => "tides", "rows" => 500, "dry_run" => false})
+V1.Json.from_term(%{"dataset" => "tides", "rows" => 500, "dry_run" => false}, %{})
 ```
 
 The value is
@@ -128,7 +96,7 @@ defmodule MyAppWeb.BoundedAuthority do
     with {:ok, grant} <- header(conn, "authorization", "DPoP "),
          {:ok, proof} <- header(conn, "dpop", ""),
          {:ok, invocation_id} <- header(conn, "invocation-id", ""),
-         {:ok, arguments} <- MyApp.CastArguments.tag(conn.body_params),
+         {:ok, arguments} <- V1.Json.from_term(conn.body_params, %{}),
          {:ok, locator} <- V1.untrusted_key_locator(grant, %{}),
          {:ok, issuer_key} <- Map.fetch(options.issuer_keys, locator.kid) do
       expected = %ExpectedRequest{
@@ -209,7 +177,7 @@ grant = %V1.Grant{
 {:ok, grant_compact} = V1.assemble_compact(grant_input, ed25519_sign.(grant_input.message, issuer_private))
 
 params = %{"dataset" => "tides", "rows" => 500, "dry_run" => false}
-{:ok, arguments} = MyApp.CastArguments.tag(params)
+{:ok, arguments} = V1.Json.from_term(params, %{})
 
 proof = %V1.Proof{
   holder_public_key: holder_public,

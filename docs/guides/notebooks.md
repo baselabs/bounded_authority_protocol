@@ -14,7 +14,7 @@ workflow runs them unchanged against the exact Hex release right after each uplo
 | Journey | Focus | Outputs |
 |---|---|---|
 | [Core envelope verification](../notebooks/bap-walkthrough.livemd) | Grant, holder proof, request binding, tampering and freshness | 10 |
-| [Contract-major 2 ranges](../notebooks/range-selectors.livemd) | Inclusive endpoints, integer/float tags and invalid selectors | 7 |
+| [Contract-major 2 ranges](../notebooks/range-selectors.livemd) | Term conversion, inclusive endpoints, integer/float tags and invalid selectors | 8 |
 | [Contract-major 3 ES256](../notebooks/es256-signing.livemd) | P-256 signing, DER conversion, low S and cross-profile refusals | 9 |
 | [Service integration](../notebooks/service-integration.livemd) | Trusted-key rotation and grant-lifetime execution replay retention | 16 |
 | [Local loopback](../notebooks/local-loopback.livemd) | Explicit HTTP profile, literal addresses and exact server nonce | 7 |

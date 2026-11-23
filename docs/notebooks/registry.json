@@ -20,7 +20,7 @@
     "release_launch": "local-loopback.livemd"
   },
   "range-selectors.livemd": {
-    "outputs": 7,
+    "outputs": 8,
     "release_launch": "range-selectors.livemd"
   },
   "role-attestations.livemd": {

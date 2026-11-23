@@ -4,6 +4,13 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- `BoundedAuthorityProtocol.V1.Json.from_term/2` converts already-parsed, cast Elixir terms into
+  the tagged JSON algebra shared by all contract-majors. It preserves numeric tags, sorts
+  object names, rejects unsupported terms and colliding names, and enforces the decoder's
+  structural and numeric bounds. Raw-text byte and number-lexeme limits do not apply.
+
 ### Changed
 
 - Run repository-specific pre-commit checks from `scripts/hooks/pre-commit.d/` after the

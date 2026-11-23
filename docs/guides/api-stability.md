@@ -96,6 +96,11 @@ Shared building blocks:
 - `BoundedAuthorityProtocol.V1.Jwk`
 - `BoundedAuthorityProtocol.V1.Uri`
 
+`BoundedAuthorityProtocol.V1.Json.from_term/2` is an additive Elixir API on this shared stable
+surface, with a default limits argument and the same tagged return algebra as `decode/2`.
+It serves every contract-major without changing a wire profile or corpus. It preserves numeric
+tags, sorts converted object names, and returns only `{:ok, value}` or `{:error, :invalid}`.
+
 Contract-major 2 facade and structs:
 
 - `BoundedAuthorityProtocol.V2`

@@ -19,11 +19,15 @@ specifications under [`spec/`](../spec/), and the [errata registry](errata.md).
   that carriage rather than introducing a separate BAP-over-HTTP binding. The profile is
   design-only; it does not establish runtime interoperability.
 
+## Unreleased
+
+- `Json.from_term/2` converts already-parsed, cast Elixir terms into the bounded tagged JSON
+  form shared by all contract-majors. See the [recipe](guides/recipes.md#turn-already-parsed-params-into-tagged-arguments).
+
 ## Later
 
 Candidates, not commitments; each lands as its own minor release under the governance rules:
 
-- `Json.from_term/2`, converting already-parsed Elixir terms into the tagged JSON form;
 - first publication of the Python, Rust, and Go verifiers;
 - the standards submissions prepared under [`standards/`](standards/) and
   [`extensions/`](extensions/), when a venue accepts the work.

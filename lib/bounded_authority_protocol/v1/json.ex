@@ -1,11 +1,14 @@
 defmodule BoundedAuthorityProtocol.V1.Json do
   @moduledoc """
-  Bounded JSON decoder preserving object order and rejecting duplicate binary names.
+  Bounded JSON conversion rejecting duplicate binary names.
 
-  `decode/2` returns the tagged, closed v1 algebra documented by `t:value/0`; it never atomizes an
-  input name. Raw numeric lexemes are byte-bounded and exact-magnitude-checked before OTP
-  conversion. Caller limits may only tighten the positive-integer hard maxima. Every failure is
-  the fixed value-free `{:error, :invalid}`.
+  `decode/2` preserves object order and returns the tagged, closed v1 algebra documented by
+  `t:value/0`; it never atomizes an input name. Raw numeric lexemes are byte-bounded and
+  exact-magnitude-checked before OTP conversion. Caller limits may only tighten the
+  positive-integer hard maxima. Every failure is the fixed value-free `{:error, :invalid}`.
+
+  `from_term/2` converts already-parsed, cast Elixir terms into the same algebra, sorting object
+  members by binary name. It preserves numeric tags and applies the same structural bounds.
 
   Draft 2020-12 schemas shipped with the package describe structural shape. They do not replace
   this decoder's duplicate-name, raw-lexeme, UTF-8 byte, depth, node, or exact encoding checks.
@@ -64,6 +67,101 @@ defmodule BoundedAuthorityProtocol.V1.Json do
   end
 
   def decode(_bytes, _limits), do: {:error, :invalid}
+
+  @doc """
+  Converts an already-parsed, cast Elixir term into one bounded tagged JSON value.
+
+  Accepts `nil`, booleans, integers, floats, UTF-8 binaries, lists, and plain maps. Map keys
+  must be binaries or atoms other than `nil`, `true`, and `false`; atom keys become strings.
+  Object members are sorted by binary name, and colliding names are invalid. Structs,
+  tuples, other atoms, improper lists, and all other terms are refused without coercion.
+  Cast arguments to their declared types before conversion: `4.0` stays float-tagged.
+
+  Limits accept a `Bounds` struct or tightening map, as in `decode/2`. Depth, object members,
+  array items, total nodes, UTF-8 string and key bytes, and numeric magnitudes are bounded
+  with the decoder's counting rules. `json_bytes` and `number_lexeme_bytes` bound raw text
+  and do not apply to terms. Every failure returns the value-free `{:error, :invalid}`.
+  The result is shared by all three contract-majors.
+
+  ## Examples
+
+      iex> BoundedAuthorityProtocol.V1.Json.from_term(%{rows: 4, ratio: 4.0})
+      {:ok, {:object, [{"ratio", {:float, 4.0}}, {"rows", {:integer, 4}}]}}
+      iex> BoundedAuthorityProtocol.V1.Json.from_term([nil, true, "ok"], %{array_items: 3})
+      {:ok, {:array, [:null, {:boolean, true}, {:string, "ok"}]}}
+      iex> BoundedAuthorityProtocol.V1.Json.from_term(%{:rows => 4, "rows" => 4})
+      {:error, :invalid}
+      iex> BoundedAuthorityProtocol.V1.Json.from_term("abc", %{string_bytes: 2})
+      {:error, :invalid}
+  """
+  @spec from_term(term(), Bounds.t() | map()) :: {:ok, value()} | {:error, :invalid}
+  def from_term(term, limits \\ %{}) do
+    case Bounds.coerce(limits) do
+      {:ok, bounds} ->
+        try do
+          %JsonValue{value: value} = term_node(term, %Root{}, bounds)
+          {:ok, value}
+        rescue
+          _error in [Violation, ArgumentError, ErlangError] -> {:error, :invalid}
+        end
+
+      {:error, :invalid} ->
+        {:error, :invalid}
+    end
+  end
+
+  defp term_node(nil, _parent, _bounds), do: %JsonValue{value: :null}
+  defp term_node(value, _parent, _bounds) when is_boolean(value), do: normalize_node(value)
+  defp term_node(value, _parent, bounds) when is_integer(value), do: integer_node(value, bounds)
+  defp term_node(value, _parent, bounds) when is_float(value), do: float_node(value, bounds)
+
+  defp term_node(value, _parent, bounds) when is_binary(value), do: string_node(value, bounds)
+
+  defp term_node(values, parent, bounds) when is_list(values) do
+    container = start_container(:array, parent, bounds)
+    {node, _parent} = finish_container(term_items(values, container, bounds), parent, bounds)
+    node
+  end
+
+  defp term_node(%{__struct__: _}, _parent, _bounds), do: raise(Violation)
+
+  defp term_node(%{} = map, parent, bounds) do
+    require_valid!(map_size(map) <= bounds.object_members)
+    container = start_container(:object, parent, bounds)
+    container = term_members(Map.to_list(map), container, bounds)
+
+    {%JsonValue{value: {:object, members}} = node, _parent} =
+      finish_container(container, parent, bounds)
+
+    %{node | value: {:object, Enum.sort(members)}}
+  end
+
+  defp term_node(_value, _parent, _bounds), do: raise(Violation)
+
+  defp term_items([], container, _bounds), do: container
+
+  defp term_items([value | rest], container, bounds) do
+    node = term_node(value, container, bounds)
+    term_items(rest, push_array(node, container, bounds), bounds)
+  end
+
+  defp term_items(_improper, _container, _bounds), do: raise(Violation)
+
+  defp term_members([], container, _bounds), do: container
+
+  defp term_members([{key, value} | rest], container, bounds) do
+    name = term_key(key)
+    encoded_key = %JsonValue{value: {:string, name}}
+    node = term_node(value, container, bounds)
+    term_members(rest, push_object(encoded_key, node, container, bounds), bounds)
+  end
+
+  defp term_key(key) when is_binary(key), do: key
+
+  defp term_key(key) when is_atom(key) and key not in [nil, true, false],
+    do: Atom.to_string(key)
+
+  defp term_key(_key), do: raise(Violation)
 
   defp decode_bounded(bytes, bounds) do
     if number_lexemes_valid?(bytes, bounds) do
@@ -127,7 +225,7 @@ defmodule BoundedAuthorityProtocol.V1.Json do
     nodes = container.nodes + node.nodes
 
     require_valid!(
-      is_binary(key) and byte_size(key) <= bounds.key_bytes and
+      is_binary(key) and byte_size(key) <= bounds.key_bytes and String.valid?(key) and
         not Map.has_key?(container.seen, key) and count <= bounds.object_members and
         nodes + 1 <= bounds.total_nodes
     )
@@ -153,20 +251,24 @@ defmodule BoundedAuthorityProtocol.V1.Json do
     {node, parent}
   end
 
-  defp integer_node(token, bounds) do
-    value = :erlang.binary_to_integer(token)
+  defp integer_node(token, bounds) when is_binary(token),
+    do: integer_node(:erlang.binary_to_integer(token), bounds)
+
+  defp integer_node(value, bounds) do
     require_valid!(value >= -bounds.integer_magnitude and value <= bounds.integer_magnitude)
     %JsonValue{value: {:integer, value}}
   end
 
-  defp float_node(token, bounds) do
-    value = :erlang.binary_to_float(token)
+  defp float_node(token, bounds) when is_binary(token),
+    do: float_node(:erlang.binary_to_float(token), bounds)
+
+  defp float_node(value, bounds) do
     require_valid!(value >= -bounds.float_magnitude and value <= bounds.float_magnitude)
     %JsonValue{value: {:float, value}}
   end
 
   defp string_node(string, bounds) do
-    require_valid!(byte_size(string) <= bounds.string_bytes)
+    require_valid!(byte_size(string) <= bounds.string_bytes and String.valid?(string))
     %JsonValue{value: {:string, string}}
   end
 

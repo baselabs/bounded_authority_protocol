@@ -61,6 +61,28 @@ end
 :signer_ready
 ```
 
+## Convert cast request arguments
+
+Cast each argument to the operation's declared type before tagging it. The shared term converter
+preserves whole floats, converts atom member names, and refuses colliding names. The decoder's
+structural and numeric limits apply; raw-text limits do not apply to already-parsed terms.
+
+```elixir
+alias BoundedAuthorityProtocol.V1.Json
+
+{:ok, {:object, [{"workers", {:integer, 4}}]}} = Json.from_term(%{workers: 4}, %{})
+{:ok, {:object, [{"workers", {:float, 4.0}}]}} = Json.from_term(%{workers: 4.0}, %{})
+{:error, :invalid} = Json.from_term(%{:workers => 4, "workers" => 4}, %{})
+
+[:integer_preserved, :float_preserved, :colliding_names_rejected]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[:integer_preserved, :float_preserved, :colliding_names_rejected]
+```
+
 ## Build and sign a bounded grant
 
 Both range selectors must hold. Integer bounds require integer-tagged arguments; numeric

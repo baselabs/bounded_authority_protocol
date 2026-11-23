@@ -124,8 +124,9 @@ defmodule BapReader.MiddlewareTest do
     assert MyAppWeb.BoundedAuthority.call(%{conn | host: "attacker.example"}, opts).assigns.bounded_authority_facts ==
              facts
 
-    assert {:ok, {:object, [{"rows", {:integer, 500}}]}} = MyApp.CastArguments.tag(%{rows: 500})
-    assert {:error, :invalid} = MyApp.CastArguments.tag(%{:rows => 500, "rows" => 500})
+    assert {:ok, {:object, [{"rows", {:integer, 500}}]}} = V1.Json.from_term(%{rows: 500})
+    assert {:error, :invalid} = V1.Json.from_term(%{:rows => 500, "rows" => 500})
+    reject(%{conn | body_params: %{rows: String.duplicate("a", 8_193)}}, opts)
   end
 
   defp reject(conn, opts) do

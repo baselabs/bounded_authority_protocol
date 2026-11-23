@@ -123,6 +123,17 @@ V1.Json.decode(~s({"n":2,"x":2.5,"ok":true}), %{})
 The value is
 `{:ok, {:object, [{"n", {:integer, 2}}, {"x", {:float, 2.5}}, {"ok", {:boolean, true}}]}}`.
 
+### Tagged JSON from cast terms
+
+```elixir
+V1.Json.from_term(%{n: 2, x: 2.0}, %{})
+```
+
+The value is `{:ok, {:object, [{"n", {:integer, 2}}, {"x", {:float, 2.0}}]}}`.
+Cast first: the helper preserves numeric tags, sorts object names, and rejects unsupported
+terms or name collisions. Structural and magnitude bounds apply; raw `json_bytes` and
+`number_lexeme_bytes` limits do not.
+
 ### Normalize a URI
 
 ```elixir
