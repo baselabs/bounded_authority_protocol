@@ -2012,6 +2012,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules("lib/bounded_authority_protocol/v1/jcs.ex"),
     do: ~w(Enum Integer MapSet String)
 
+  defp approved_source_modules("lib/bounded_authority_protocol/v1/json.ex"),
+    do: ~w(Atom Enum String)
+
   defp approved_source_modules("lib/bounded_authority_protocol/v1/request_digest.ex"),
     do: ~w(Enum)
 
@@ -2204,7 +2207,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       ]
 
   defp approved_source_call?("lib/bounded_authority_protocol/v1/json.ex", module, function),
-    do: {module, function} in [{"Atom", :to_string}, {"Enum", :sort}]
+    do: {module, function} in [{"Atom", :to_string}, {"Enum", :sort}, {"String", :valid?}]
 
   defp approved_source_call?("lib/bounded_authority_protocol/v1/jcs.ex", module, function),
     do:
@@ -2834,7 +2837,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         ]
 
       "Elixir.BoundedAuthorityProtocol.V1.Json.beam" ->
-        [{:erlang, :atom_to_binary}, {Enum, :sort}]
+        [{:erlang, :atom_to_binary}, {Enum, :sort}, {String, :valid?}]
 
       codec_beam
       when codec_beam in [

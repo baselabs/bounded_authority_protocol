@@ -15,7 +15,7 @@ defmodule BoundedAuthorityProtocol.Property.JsonFromTermPropertyTest do
 
   property "decoded values survive plain-term projection with identical JCS bytes" do
     check all(term <- json_term(), max_runs: 300) do
-      bytes = :json.encode(term) |> IO.iodata_to_binary()
+      bytes = encode(term)
       assert {:ok, decoded} = Json.decode(bytes)
       assert {:ok, converted} = Json.from_term(plain(decoded))
       assert Jcs.encode(converted, %{}) == Jcs.encode(decoded, %{})
@@ -25,7 +25,7 @@ defmodule BoundedAuthorityProtocol.Property.JsonFromTermPropertyTest do
 
   property "term conversion and decoding agree under every applicable tightened ceiling" do
     check all(term <- json_term(), limits <- limits(), max_runs: 300) do
-      bytes = :json.encode(term) |> IO.iodata_to_binary()
+      bytes = encode(term)
 
       case Json.decode(bytes, limits) do
         {:ok, decoded} ->
@@ -54,6 +54,16 @@ defmodule BoundedAuthorityProtocol.Property.JsonFromTermPropertyTest do
       assert {:ok, canonical} = Jcs.encode(decoded, %{})
       assert Jcs.encode(converted, %{}) == {:ok, canonical}
     end
+  end
+
+  # OTP's encoder writes the atom nil as the string "nil"; JSON null is the term nil here.
+  defp encode(term) do
+    term
+    |> :json.encode(fn
+      nil, _encoder -> "null"
+      value, encoder -> :json.encode_value(value, encoder)
+    end)
+    |> IO.iodata_to_binary()
   end
 
   defp json_term do
