@@ -13,6 +13,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Use the shared toolchain reader for every CI runtime installation and installed-version
+  refusal. Keep compatibility versions in `.tool-versions` and derive the BEAM matrix
+  from reader outputs, preserving the supported toolchains and SDK floors.
 - Run repository-specific pre-commit checks from `scripts/hooks/pre-commit.d/` after the
   generic local identifier guard. Keep SDK publication enforcement in its own extension and
   test the shared hooks independently of repository-specific checks.

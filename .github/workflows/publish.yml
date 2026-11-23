@@ -43,17 +43,14 @@ jobs:
           # Read-back places the served docs' commit on the default branch's history.
           fetch-depth: 0
 
-      - name: Read Python version
-        id: python
-        run: bash scripts/ci_tool_versions.sh read python
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: ${{ steps.python.outputs.python }}
-
-      - name: Refuse Python version drift
-        run: bash scripts/ci_tool_versions.sh python
+          python-version: ${{ steps.toolchain.outputs.python }}
 
       - name: Refuse a package name the registry has never had
         env:
@@ -63,11 +60,12 @@ jobs:
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+          otp-version: ${{ steps.toolchain.outputs.otp }}
           version-type: strict
 
       - name: Refuse BEAM version drift
-        run: bash scripts/ci_tool_versions.sh beam
+        run: scripts/toolchain.sh --installed elixir=${{ steps.toolchain.outputs.elixir }} erlang=${{ steps.toolchain.outputs.otp }}
 
       - name: Pin the Hex client
         run: |
@@ -199,14 +197,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+          otp-version: ${{ steps.toolchain.outputs.otp }}
           version-type: strict
 
       - name: Refuse BEAM version drift
-        run: bash scripts/ci_tool_versions.sh beam
+        run: scripts/toolchain.sh --installed elixir=${{ steps.toolchain.outputs.elixir }} erlang=${{ steps.toolchain.outputs.otp }}
 
       - name: Pin the Hex client
         run: |

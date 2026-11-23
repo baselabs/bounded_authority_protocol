@@ -31,7 +31,12 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
         else
           assert timeout == "${{ matrix.timeout }}", "#{path} job #{name} has no timeout"
 
-          for entry <- job["strategy"]["matrix"]["include"] do
+          entries =
+            if name == "compatibility",
+              do: compatibility_matrix()["include"],
+              else: job["strategy"]["matrix"]["include"]
+
+          for entry <- entries do
             assert is_integer(entry["timeout"]) and entry["timeout"] >= 5 and
                      entry["timeout"] <= 90,
                    "#{path} job #{name} matrix timeouts must be 5 to 90 minutes"
@@ -135,52 +140,175 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     assert step["with"]["head-ref"] == "${{ github.sha }}"
   end
 
-  test "BEAM installations are strict and primary toolchains read the version file" do
-    for path <- workflows(), {_name, job} <- read(path)["jobs"], step <- job["steps"] || [] do
-      if uses?(step, "erlef/setup-beam@") do
-        assert step["with"]["version-type"] == "strict"
+  test "runtime installations use the shared reader and refuse supported installed drift" do
+    actions = Path.wildcard(".github/actions/**/action.{yml,yaml}")
 
-        assert step["with"]["version-file"] == ".tool-versions" or
-                 (step["with"]["elixir-version"] == "${{ matrix.elixir }}" and
-                    step["with"]["otp-version"] == "${{ matrix.otp }}")
+    jobs = for path <- workflows(), {name, job} <- read(path)["jobs"], do: {path, name, job}
+
+    composites =
+      for path <- actions, read(path)["runs"]["using"] == "composite" do
+        {path, "composite", %{"steps" => read(path)["runs"]["steps"]}}
+      end
+
+    for {path, name, job} <- jobs ++ composites, steps = job["steps"] || [] do
+      for {step, index} <- Enum.with_index(steps) do
+        inputs = step["with"] || %{}
+
+        for {key, value} <- inputs do
+          refute key =~ "version-file", "#{path} #{name}: setup actions cannot read version files"
+          refute value == ".tool-versions", "#{path} #{name}: use reader outputs"
+        end
+
+        tool_inputs =
+          cond do
+            uses?(step, "erlef/setup-beam@") ->
+              assert inputs["version-type"] == "strict"
+              [{"elixir-version", "elixir", "elixir"}, {"otp-version", "erlang", "otp"}]
+
+            uses?(step, "actions/setup-node@") ->
+              [{"node-version", "nodejs", "nodejs"}]
+
+            uses?(step, "actions/setup-go@") ->
+              [{"go-version", "golang", "golang"}]
+
+            uses?(step, "actions/setup-python@") ->
+              [{"python-version", nil, "python"}]
+
+            uses?(step, "ruby/setup-ruby@") ->
+              [{"ruby-version", nil, "ruby"}]
+
+            uses?(step, "ocaml/setup-ocaml@") ->
+              [{"ocaml-compiler", nil, "ocaml"}]
+
+            true ->
+              []
+          end
+
+        for {input, tool, output} <- tool_inputs do
+          expected =
+            cond do
+              path == @gate and name == "compatibility" ->
+                assert job["needs"] == "toolchain"
+                "${{ matrix.#{output} }}"
+
+              tool == "golang" and name in ["go-conformance", "isolated-distribution"] ->
+                "${{ fromJSON(steps.toolchain.outputs.golang_lanes)[0] }}"
+
+              true ->
+                "${{ steps.toolchain.outputs.#{output} }}"
+            end
+
+          assert inputs[input] == expected, "#{path} #{name}: #{input} must come from the reader"
+
+          unless name == "compatibility" do
+            assert Enum.any?(Enum.take(steps, index), fn earlier ->
+                     earlier["id"] == "toolchain" and
+                       earlier["run"] == ~s|scripts/toolchain.sh >> "$GITHUB_OUTPUT"|
+                   end), "#{path} #{name}: read versions before installation"
+          end
+
+          if tool do
+            prefix = "scripts/toolchain.sh --installed "
+
+            assert Enum.any?(Enum.drop(steps, index + 1), fn later ->
+                     String.starts_with?(later["run"] || "", prefix) and
+                       String.contains?(later["run"], "#{tool}=#{expected}") and
+                       later["if"] == step["if"]
+                   end), "#{path} #{name}: refuse #{tool} drift after installation"
+          end
+        end
+
+        if String.contains?(step["run"] || "", "mix deps.get") do
+          assert step["run"] == "mix deps.get --check-locked"
+        end
+
+        if String.contains?(step["run"] || "", "rustup toolchain install") do
+          assert step["run"] =~ "rustup toolchain install ${{ steps.toolchain.outputs.rust }} "
+
+          assert step["run"] =~
+                   ~s|echo "RUSTUP_TOOLCHAIN=${{ steps.toolchain.outputs.rust }}" >> "$GITHUB_ENV"|
+        end
+
+        if String.contains?(step["run"] || "", "pip install uv") do
+          assert step["run"] =~ "pip install uv==${{ steps.toolchain.outputs.uv }}"
+        end
       end
     end
+  end
 
-    ci = read(@gate)
-    legs = ci["jobs"]["compatibility"]["strategy"]["matrix"]["include"]
+  test "compatibility lanes and SDK floors come from shared reader outputs" do
+    jobs = read(@gate)["jobs"]
 
-    assert Enum.map(Enum.reject(legs, & &1["primary"]), &{&1["elixir"], &1["otp"]}) == [
-             {"1.18.4", "27.3.4.14"},
-             {"1.19.5", "28.5.0.3"}
-           ]
+    assert jobs["compatibility"]["strategy"]["matrix"] ==
+             "${{ fromJSON(needs.toolchain.outputs.beam_matrix) }}"
 
-    for {_name, job} <- ci["jobs"], steps = job["steps"] || [], step <- steps do
-      if uses?(step, "actions/setup-node@") do
-        assert step["with"]["node-version-file"] == ".tool-versions"
-        assert Enum.any?(steps, &(&1["run"] == "bash scripts/ci_tool_versions.sh nodejs"))
-      end
+    assert jobs["toolchain"]["outputs"]["beam_matrix"] ==
+             "${{ steps.compatibility.outputs.matrix }}"
 
-      if uses?(step, "actions/setup-go@") do
-        assert step["with"]["go-version-file"] == ".tool-versions"
-        assert Enum.any?(steps, &(&1["run"] == "bash scripts/ci_tool_versions.sh golang"))
-      end
+    assert Enum.any?(
+             jobs["toolchain"]["steps"],
+             &(&1["run"] == "scripts/toolchain.sh --self-test")
+           )
 
-      if uses?(step, "actions/setup-python@") do
-        assert step["with"]["python-version"] == "${{ steps.python.outputs.python }}"
+    outputs = toolchain_outputs()
+    lanes = :json.decode(outputs["beam_lanes"])
+    entries = compatibility_matrix()["include"]
 
-        assert Enum.any?(
-                 steps,
-                 &(&1["id"] == "python" and
-                     &1["run"] == "bash scripts/ci_tool_versions.sh read python")
-               )
+    assert Enum.map(entries, &Map.take(&1, ["elixir", "otp"])) ==
+             lanes ++ [%{"elixir" => outputs["elixir"], "otp" => outputs["otp"]}]
 
-        assert Enum.any?(steps, &(&1["run"] == "bash scripts/ci_tool_versions.sh python"))
-      end
+    assert Enum.map(entries, & &1["primary"]) == [false, false, true]
+    assert Enum.map(entries, & &1["timeout"]) == [19, 18, 18]
 
-      if String.contains?(step["run"] || "", "mix deps.get") do
-        assert step["run"] == "mix deps.get --check-locked"
-      end
-    end
+    [go_floor] = :json.decode(outputs["golang_lanes"])
+    [_, declared_go] = Regex.run(~r/^go (\S+)$/m, File.read!("sdks/go/go.mod"))
+    assert go_floor == declared_go <> ".0"
+
+    [_, rust] = Regex.run(~r/^channel = "([^"]+)"$/m, File.read!("sdks/rust/rust-toolchain.toml"))
+    assert outputs["rust"] == rust
+  end
+
+  test "the shared reader is byte-identical and executable" do
+    digest = :crypto.hash(:sha256, File.read!("scripts/toolchain.sh"))
+
+    assert Base.encode16(digest, case: :lower) ==
+             "b29bfeb6ec4ec8f5b7e3ac3c963f04b6d3c73483172e5bd59ea40f20b102f1eb"
+
+    assert {"100755 " <> _, 0} =
+             System.cmd("git", ["ls-files", "--stage", "scripts/toolchain.sh"])
+  end
+
+  defp toolchain_outputs do
+    {output, 0} = System.cmd("scripts/toolchain.sh", [])
+
+    Map.new(String.split(output, "\n", trim: true), fn line ->
+      [key, value] = String.split(line, "=", parts: 2)
+      {key, value}
+    end)
+  end
+
+  defp compatibility_matrix do
+    outputs = toolchain_outputs()
+    step = Enum.find(read(@gate)["jobs"]["toolchain"]["steps"], &(&1["id"] == "compatibility"))
+
+    assert step["env"] == %{
+             "ELIXIR" => "${{ steps.toolchain.outputs.elixir }}",
+             "OTP" => "${{ steps.toolchain.outputs.otp }}",
+             "BEAM_LANES" => "${{ steps.toolchain.outputs.beam_lanes }}"
+           }
+
+    {output, 0} =
+      System.cmd("bash", ["-c", step["run"]],
+        env: [
+          {"ELIXIR", outputs["elixir"]},
+          {"OTP", outputs["otp"]},
+          {"BEAM_LANES", outputs["beam_lanes"]},
+          {"GITHUB_OUTPUT", "/dev/stdout"}
+        ]
+      )
+
+    "matrix=" <> matrix = String.trim(output)
+    :json.decode(matrix)
   end
 
   test "each quality job runs exactly its own unconditional stage" do

@@ -37,17 +37,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Read Python version
-        id: python
-        run: bash scripts/ci_tool_versions.sh read python
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: ${{ steps.python.outputs.python }}
-
-      - name: Refuse Python version drift
-        run: bash scripts/ci_tool_versions.sh python
+          python-version: ${{ steps.toolchain.outputs.python }}
 
       - name: Install verified Gitleaks 8.30.1
         run: |
@@ -70,38 +67,61 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: .tool-versions
+          go-version: ${{ steps.toolchain.outputs.golang }}
           cache: false
 
       - name: Refuse Go version drift
-        run: bash scripts/ci_tool_versions.sh golang
+        run: scripts/toolchain.sh --installed golang=${{ steps.toolchain.outputs.golang }}
 
       - name: Run actionlint
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
+  toolchain:
+    name: Toolchain versions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      beam_matrix: ${{ steps.compatibility.outputs.matrix }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
+      - name: Test the shared toolchain reader
+        run: scripts/toolchain.sh --self-test
+
+      - name: Build the compatibility matrix
+        id: compatibility
+        env:
+          ELIXIR: ${{ steps.toolchain.outputs.elixir }}
+          OTP: ${{ steps.toolchain.outputs.otp }}
+          BEAM_LANES: ${{ steps.toolchain.outputs.beam_lanes }}
+        run: |
+          matrix="$(jq -cn --arg elixir "$ELIXIR" --arg otp "$OTP" --argjson lanes "$BEAM_LANES" '
+            {include: (($lanes | to_entries | map(.value + {primary: false, timeout: (if .key == 0 then 19 else 18 end)}))
+              + [{elixir: $elixir, otp: $otp, primary: true, timeout: 18}])}')"
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+
   compatibility:
     name: ${{ matrix.primary && 'Elixir and OTP from .tool-versions' || format('Elixir {0} / OTP {1}', matrix.elixir, matrix.otp) }}
+    needs: toolchain
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ matrix.timeout }} # 2x green 9.5/8.7/8.6 min; runs 44109672500/44095313459/44095313459.
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - elixir: "1.18.4"
-            otp: "27.3.4.14"
-            primary: false
-            timeout: 19
-          - elixir: "1.19.5"
-            otp: "28.5.0.3"
-            primary: false
-            timeout: 18
-          - elixir: primary
-            otp: .tool-versions
-            primary: true
-            timeout: 18
+      matrix: ${{ fromJSON(needs.toolchain.outputs.beam_matrix) }}
 
     steps:
       - name: Check out source
@@ -110,31 +130,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up primary BEAM
-        if: matrix.primary
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
-        with:
-          version-file: .tool-versions
-          version-type: strict
-
-      - name: Set up compatibility BEAM
-        if: ${{ !matrix.primary }}
+      - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
           version-type: strict
 
-      - name: Refuse primary BEAM version drift
-        if: matrix.primary
-        run: bash scripts/ci_tool_versions.sh beam
-
-      - name: Refuse compatibility BEAM version drift
-        if: ${{ !matrix.primary }}
-        env:
-          ELIXIR_VERSION: ${{ matrix.elixir }}
-          OTP_VERSION: ${{ matrix.otp }}
-        run: bash scripts/ci_tool_versions.sh beam "$ELIXIR_VERSION" "$OTP_VERSION"
+      - name: Refuse BEAM version drift
+        run: scripts/toolchain.sh --installed elixir=${{ matrix.elixir }} erlang=${{ matrix.otp }}
 
       - name: Pin the Hex client
         run: |
@@ -161,14 +165,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+          otp-version: ${{ steps.toolchain.outputs.otp }}
           version-type: strict
 
       - name: Refuse BEAM version drift
-        run: bash scripts/ci_tool_versions.sh beam
+        run: scripts/toolchain.sh --installed elixir=${{ steps.toolchain.outputs.elixir }} erlang=${{ steps.toolchain.outputs.otp }}
 
       - name: Pin the Hex client
         run: |
@@ -180,17 +189,10 @@ jobs:
           scripts/install_gitleaks.sh "$RUNNER_TEMP/gitleaks-bin"
           echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
 
-      - name: Read Python version
-        id: python
-        run: bash scripts/ci_tool_versions.sh read python
-
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: ${{ steps.python.outputs.python }}
-
-      - name: Refuse Python version drift
-        run: bash scripts/ci_tool_versions.sh python
+          python-version: ${{ steps.toolchain.outputs.python }}
 
       - name: Install dependencies
         run: mix deps.get --check-locked
@@ -209,14 +211,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+          otp-version: ${{ steps.toolchain.outputs.otp }}
           version-type: strict
 
       - name: Refuse BEAM version drift
-        run: bash scripts/ci_tool_versions.sh beam
+        run: scripts/toolchain.sh --installed elixir=${{ steps.toolchain.outputs.elixir }} erlang=${{ steps.toolchain.outputs.otp }}
 
       - name: Pin the Hex client
         run: |
@@ -231,35 +238,28 @@ jobs:
           # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
           # small-order inputs differs across Node releases, so a floating major would make the
           # runners' ungated behavior depend on the runner image (docs/errata.md erratum 2).
-          node-version-file: .tool-versions
+          node-version: ${{ steps.toolchain.outputs.nodejs }}
           package-manager-cache: false
 
       - name: Refuse Node version drift
-        run: bash scripts/ci_tool_versions.sh nodejs
-
-      - name: Read Python version
-        id: python
-        run: bash scripts/ci_tool_versions.sh read python
+        run: scripts/toolchain.sh --installed nodejs=${{ steps.toolchain.outputs.nodejs }}
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: ${{ steps.python.outputs.python }}
-
-      - name: Refuse Python version drift
-        run: bash scripts/ci_tool_versions.sh python
+          python-version: ${{ steps.toolchain.outputs.python }}
 
       - name: Install locked SDK environment manager
-        run: python -m pip install uv==0.11.20
+        run: python -m pip install uv==${{ steps.toolchain.outputs.uv }}
 
       - name: Set up Go for manifest mutation checks
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: .tool-versions
+          go-version: ${{ steps.toolchain.outputs.golang }}
           cache: false
 
       - name: Refuse Go version drift
-        run: bash scripts/ci_tool_versions.sh golang
+        run: scripts/toolchain.sh --installed golang=${{ steps.toolchain.outputs.golang }}
 
       - name: Install dependencies
         run: mix deps.get --check-locked
@@ -281,14 +281,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+          otp-version: ${{ steps.toolchain.outputs.otp }}
           version-type: strict
 
       - name: Refuse BEAM version drift
-        run: bash scripts/ci_tool_versions.sh beam
+        run: scripts/toolchain.sh --installed elixir=${{ steps.toolchain.outputs.elixir }} erlang=${{ steps.toolchain.outputs.otp }}
 
       - name: Pin the Hex client
         run: |
@@ -303,23 +308,16 @@ jobs:
           # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
           # small-order inputs differs across Node releases, so a floating major would make the
           # runners' ungated behavior depend on the runner image (docs/errata.md erratum 2).
-          node-version-file: .tool-versions
+          node-version: ${{ steps.toolchain.outputs.nodejs }}
           package-manager-cache: false
 
       - name: Refuse Node version drift
-        run: bash scripts/ci_tool_versions.sh nodejs
-
-      - name: Read Python version
-        id: python
-        run: bash scripts/ci_tool_versions.sh read python
+        run: scripts/toolchain.sh --installed nodejs=${{ steps.toolchain.outputs.nodejs }}
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: ${{ steps.python.outputs.python }}
-
-      - name: Refuse Python version drift
-        run: bash scripts/ci_tool_versions.sh python
+          python-version: ${{ steps.toolchain.outputs.python }}
 
       - name: Install dependencies
         run: mix deps.get --check-locked
@@ -338,14 +336,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+          otp-version: ${{ steps.toolchain.outputs.otp }}
           version-type: strict
 
       - name: Refuse BEAM version drift
-        run: bash scripts/ci_tool_versions.sh beam
+        run: scripts/toolchain.sh --installed elixir=${{ steps.toolchain.outputs.elixir }} erlang=${{ steps.toolchain.outputs.otp }}
 
       - name: Pin the Hex client
         run: |
@@ -360,11 +363,11 @@ jobs:
           # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
           # small-order inputs differs across Node releases, so a floating major would make the
           # runners' ungated behavior depend on the runner image (docs/errata.md erratum 2).
-          node-version-file: .tool-versions
+          node-version: ${{ steps.toolchain.outputs.nodejs }}
           package-manager-cache: false
 
       - name: Refuse Node version drift
-        run: bash scripts/ci_tool_versions.sh nodejs
+        run: scripts/toolchain.sh --installed nodejs=${{ steps.toolchain.outputs.nodejs }}
 
       - name: Install dependencies
         run: mix deps.get --check-locked
@@ -383,14 +386,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+          otp-version: ${{ steps.toolchain.outputs.otp }}
           version-type: strict
 
       - name: Refuse BEAM version drift
-        run: bash scripts/ci_tool_versions.sh beam
+        run: scripts/toolchain.sh --installed elixir=${{ steps.toolchain.outputs.elixir }} erlang=${{ steps.toolchain.outputs.otp }}
 
       - name: Pin the Hex client
         run: |
@@ -405,11 +413,11 @@ jobs:
           # TypeScript repositories pin the same release): node:crypto's Ed25519 verdict on
           # small-order inputs differs across Node releases, so a floating major would make the
           # runners' ungated behavior depend on the runner image (docs/errata.md erratum 2).
-          node-version-file: .tool-versions
+          node-version: ${{ steps.toolchain.outputs.nodejs }}
           package-manager-cache: false
 
       - name: Refuse Node version drift
-        run: bash scripts/ci_tool_versions.sh nodejs
+        run: scripts/toolchain.sh --installed nodejs=${{ steps.toolchain.outputs.nodejs }}
 
       - name: Install dependencies
         run: mix deps.get --check-locked
@@ -430,14 +438,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+          otp-version: ${{ steps.toolchain.outputs.otp }}
           version-type: strict
 
       - name: Refuse BEAM version drift
-        run: bash scripts/ci_tool_versions.sh beam
+        run: scripts/toolchain.sh --installed elixir=${{ steps.toolchain.outputs.elixir }} erlang=${{ steps.toolchain.outputs.otp }}
 
       - name: Pin the Hex client
         # The Hex version is written into the archive metadata; .hex-version keeps CI, the
@@ -494,13 +507,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up Ruby
         uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
         with:
-          ruby-version: .tool-versions
-
-      - name: Refuse Ruby version drift
-        run: bash scripts/ci_tool_versions.sh ruby
+          ruby-version: ${{ steps.toolchain.outputs.ruby }}
 
       # Pin by version AND gem checksum (the A2 amendment: Ruby gem pinned by version+checksum).
       # The primary .gem is checksum-verified before install; its version-constrained
@@ -531,13 +545,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up Ruby
         uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
         with:
-          ruby-version: .tool-versions
-
-      - name: Refuse Ruby version drift
-        run: bash scripts/ci_tool_versions.sh ruby
+          ruby-version: ${{ steps.toolchain.outputs.ruby }}
 
       - name: Install pinned cddl validator 0.12.14 (version + checksum)
         run: |
@@ -563,18 +578,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Read OCaml version
-        id: ocaml
-        run: bash scripts/ci_tool_versions.sh read ocaml
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
 
       - name: Set up OCaml
         uses: ocaml/setup-ocaml@ff66428f72b64472e749b22e0ad4dded4b2ddca6 # v3.9.1
         with:
-          ocaml-compiler: ${{ steps.ocaml.outputs.ocaml }}
+          ocaml-compiler: ${{ steps.toolchain.outputs.ocaml }}
           cache: false
-
-      - name: Refuse OCaml version drift
-        run: bash scripts/ci_tool_versions.sh ocaml
 
       # opam depext apt-installs system packages (libgtk2.0-dev et al.); the runner
       # image's apt index can be stale enough that those fetches 404 against the
@@ -625,14 +637,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up BEAM
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          version-file: .tool-versions
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+          otp-version: ${{ steps.toolchain.outputs.otp }}
           version-type: strict
 
       - name: Refuse BEAM version drift
-        run: bash scripts/ci_tool_versions.sh beam
+        run: scripts/toolchain.sh --installed elixir=${{ steps.toolchain.outputs.elixir }} erlang=${{ steps.toolchain.outputs.otp }}
 
       - name: Pin the Hex client
         run: |
@@ -647,6 +664,7 @@ jobs:
     needs:
       - secret-scan
       - workflow-syntax
+      - toolchain
       - compatibility
       - quality-source
       - livebooks-local

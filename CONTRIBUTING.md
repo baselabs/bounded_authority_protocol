@@ -34,10 +34,13 @@ The declared Elixir range is `~> 1.18` (1.18/1.19/1.20) and the supported Erlang
 `config/config.exs` at config load, before anything compiles; the assert is not shipped in the Hex
 package, so consumers enforce their own. The mix.exs range, the config set, `.tool-versions`, and
 the CI lanes move together in one commit. Primary CI toolchains are exact versions in
-`.tool-versions`; strict installation and installed-version checks refuse drift. The Linux
-qualification run covers each supported Erlang/OTP major plus all six quality stages;
-the older compatibility lanes retain exact version literals. Windows developers use WSL2 (clone
-inside the WSL filesystem, not under `/mnt/c`), which is the Linux path; no native-Windows developer
+`.tool-versions`; the first version on each line is the local asdf default and later versions
+are CI compatibility lanes. Every CI installation takes its exact version from the shared
+`scripts/toolchain.sh` reader. BEAM, Node and Go installations also pass its `--installed`
+refusal step; the other tools use exact installation requests. The Linux qualification run
+covers each supported Erlang/OTP major plus all six quality stages. The Go SDK floor is a
+Go lane matching `sdks/go/go.mod`; the Rust default matches `sdks/rust/rust-toolchain.toml`.
+Windows developers use WSL2 (clone inside the WSL filesystem, not under `/mnt/c`), which is the Linux path; no native-Windows developer
 path is maintained. The full quality battery is
 POSIX-only tooling. Focused boundary commands are
 `mix architecture`, `mix audit`, `mix package.check`, and

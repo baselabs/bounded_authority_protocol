@@ -29,17 +29,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Read Python version
-        id: python
-        run: bash scripts/ci_tool_versions.sh read python rust golang_floor
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: ${{ steps.python.outputs.python }}
-
-      - name: Refuse Python version drift
-        run: bash scripts/ci_tool_versions.sh python
+          python-version: ${{ steps.toolchain.outputs.python }}
 
       # The TypeScript SDK graduated to its own repository on first publication
       # (sdks/README.md publication boundary, 2026-09-14): baselabs/bounded_authority_protocol_typescript
@@ -48,7 +45,7 @@ jobs:
       # --- Python SDK gate ---
       - name: "Python: install"
         run: |
-          python -m pip install uv==0.11.20
+          python -m pip install uv==${{ steps.toolchain.outputs.uv }}
           uv sync --locked
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
         working-directory: sdks/python
@@ -104,12 +101,12 @@ jobs:
         run: python tests/conformance/run_v3.py
         working-directory: sdks/python
 
-  # TypeScript runs in its graduated repository. The independent Node runner reads
-  # .tool-versions in ci.yml's quality-corpus, quality-tests, quality-conformance and
-  # quality-mutations jobs, matching
-  # its strict-Ed25519 backend evidence; SDK jobs here have no Node dependency.
-  # The Rust MSRV (1.88) is pinned by sdks/rust/rust-toolchain.toml; this job installs
-  # that exact toolchain so the MSRV floor is the CI-tested floor.
+  # TypeScript runs in its graduated repository. The independent Node runner uses the
+  # shared toolchain reader outputs in ci.yml's quality-corpus, quality-tests,
+  # quality-conformance and quality-mutations jobs, matching its strict-Ed25519
+  # backend evidence; SDK jobs here have no Node dependency.
+  # The Rust MSRV is the default rust version in .tool-versions, matching the local
+  # rust-toolchain.toml pin. RUSTUP_TOOLCHAIN keeps CI on the reader output.
   rust-conformance:
     name: Cross-language SDK conformance (Rust MSRV 1.88)
     runs-on: ubuntu-24.04
@@ -120,25 +117,20 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Read Python version
-        id: python
-        run: bash scripts/ci_tool_versions.sh read python rust golang_floor
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: ${{ steps.python.outputs.python }}
+          python-version: ${{ steps.toolchain.outputs.python }}
 
-      - name: Refuse Python version drift
-        run: bash scripts/ci_tool_versions.sh python
-
-      - name: Install Rust (MSRV 1.88.0 + rustfmt + clippy)
+      - name: Install the Rust MSRV with rustfmt and clippy
         run: |
-          rustup toolchain install ${{ steps.python.outputs.rust }} --profile minimal --component rustfmt --component clippy --no-self-update
-          rustup default ${{ steps.python.outputs.rust }}
-
-      - name: Refuse Rust MSRV drift
-        run: bash scripts/ci_tool_versions.sh rust
+          rustup toolchain install ${{ steps.toolchain.outputs.rust }} --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup default ${{ steps.toolchain.outputs.rust }}
+          echo "RUSTUP_TOOLCHAIN=${{ steps.toolchain.outputs.rust }}" >> "$GITHUB_ENV"
 
       - name: "Rust: audit Cargo.lock"
         run: |
@@ -199,26 +191,23 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Read Python version
-        id: python
-        run: bash scripts/ci_tool_versions.sh read python rust golang_floor
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: ${{ steps.python.outputs.python }}
-
-      - name: Refuse Python version drift
-        run: bash scripts/ci_tool_versions.sh python
+          python-version: ${{ steps.toolchain.outputs.python }}
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ steps.python.outputs.golang_floor }}
+          go-version: ${{ fromJSON(steps.toolchain.outputs.golang_lanes)[0] }}
           cache: false
 
       - name: Refuse Go floor drift
-        run: bash scripts/ci_tool_versions.sh golang-floor
+        run: scripts/toolchain.sh --installed golang=${{ fromJSON(steps.toolchain.outputs.golang_lanes)[0] }}
 
       - name: "Go: closure removal must fail"
         run: python3 scripts/check_sdk_closures.py go
@@ -260,14 +249,18 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
+
       - name: Set up patched Go for the advisory scan
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: .tool-versions
+          go-version: ${{ steps.toolchain.outputs.golang }}
           cache: false
 
       - name: Refuse Go version drift
-        run: bash scripts/ci_tool_versions.sh golang
+        run: scripts/toolchain.sh --installed golang=${{ steps.toolchain.outputs.golang }}
 
       - name: Audit every module, including packages without reachable symbols
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 -scan=module
@@ -291,33 +284,30 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Read Python version
-        id: python
-        run: bash scripts/ci_tool_versions.sh read python rust golang_floor
+      - name: Read toolchain versions
+        id: toolchain
+        run: scripts/toolchain.sh >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: ${{ steps.python.outputs.python }}
-
-      - name: Refuse Python version drift
-        run: bash scripts/ci_tool_versions.sh python
+          python-version: ${{ steps.toolchain.outputs.python }}
 
       - if: matrix.sdk == 'python'
-        run: python -m pip install uv==0.11.20
+        run: python -m pip install uv==${{ steps.toolchain.outputs.uv }}
       - if: matrix.sdk == 'rust'
-        run: rustup toolchain install ${{ steps.python.outputs.rust }} --profile minimal --no-self-update && rustup default ${{ steps.python.outputs.rust }}
-      - if: matrix.sdk == 'rust'
-        name: Refuse Rust MSRV drift
-        run: bash scripts/ci_tool_versions.sh rust
+        run: |
+          rustup toolchain install ${{ steps.toolchain.outputs.rust }} --profile minimal --no-self-update
+          rustup default ${{ steps.toolchain.outputs.rust }}
+          echo "RUSTUP_TOOLCHAIN=${{ steps.toolchain.outputs.rust }}" >> "$GITHUB_ENV"
       - if: matrix.sdk == 'go'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ steps.python.outputs.golang_floor }}
+          go-version: ${{ fromJSON(steps.toolchain.outputs.golang_lanes)[0] }}
           cache: false
       - if: matrix.sdk == 'go'
         name: Refuse Go floor drift
-        run: bash scripts/ci_tool_versions.sh golang-floor
+        run: scripts/toolchain.sh --installed golang=${{ fromJSON(steps.toolchain.outputs.golang_lanes)[0] }}
       - if: matrix.sdk == 'go'
         name: Cache the module zip verifier
         run: go mod download golang.org/x/mod@v0.29.0

@@ -165,49 +165,23 @@ defmodule BoundedAuthorityProtocol.MutationGateSupport do
     File.write!(path, String.replace(contents, source, replacement))
   end
 
-  @doc "Halts with status 2 unless `node --version` equals the `.tool-versions` nodejs pin."
+  @doc "Halts with status 2 unless the shared reader accepts the installed Node version."
   def require_tool_node! do
-    expected = tool_node_version!()
-
-    case node_version() do
-      ^expected ->
-        :ok
-
-      actual ->
-        IO.puts(
-          :stderr,
-          "mutation gate: Node #{expected} is required (pinned in .tool-versions), found " <>
-            "#{actual}. Put Node #{expected} first on PATH and run the battery again."
-        )
-
+    with {output, 0} <- System.cmd(Path.join(@root, "scripts/toolchain.sh"), [], cd: @root),
+         "nodejs=" <> expected <-
+           Enum.find(String.split(output, "\n"), "", &String.starts_with?(&1, "nodejs=")),
+         {_output, 0} <-
+           System.cmd(
+             Path.join(@root, "scripts/toolchain.sh"),
+             ["--installed", "nodejs=" <> expected],
+             cd: @root,
+             stderr_to_stdout: true
+           ) do
+      :ok
+    else
+      error ->
+        IO.puts(:stderr, "mutation gate: shared toolchain reader refused Node: #{inspect(error)}")
         System.halt(@toolchain_status)
-    end
-  end
-
-  @doc false
-  def tool_node_version! do
-    @root
-    |> Path.join(".tool-versions")
-    |> File.read!()
-    |> String.split("\n")
-    |> Enum.find_value(fn line ->
-      case String.split(line) do
-        ["nodejs", version] -> version
-        _other -> nil
-      end
-    end) || raise ".tool-versions pins no nodejs version"
-  end
-
-  defp node_version do
-    case System.find_executable("node") do
-      nil ->
-        "no node on PATH"
-
-      node ->
-        case System.cmd(node, ["--version"], stderr_to_stdout: true) do
-          {"v" <> version, 0} -> String.trim(version)
-          {output, status} -> "an unreadable version (exit #{status}: #{String.trim(output)})"
-        end
     end
   end
 end
