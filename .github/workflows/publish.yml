@@ -52,6 +52,9 @@ jobs:
         with:
           python-version: ${{ steps.toolchain.outputs.python }}
 
+      - name: Refuse Python version drift
+        run: scripts/toolchain.sh --installed python=${{ steps.toolchain.outputs.python }}
+
       - name: Refuse a package name the registry has never had
         env:
           PACKAGE: bounded_authority_protocol

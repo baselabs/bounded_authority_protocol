@@ -13,6 +13,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Refuse installed-version drift for every supported CI tool, including Python, uv, Rust,
+  Ruby, and OCaml, with the updated shared toolchain reader. Expose the Go SDK floor as a
+  reader-derived step output for setup and refusal checks.
 - Use the shared toolchain reader for every CI runtime installation and installed-version
   refusal. Keep compatibility versions in `.tool-versions` and derive the BEAM matrix
   from reader outputs, preserving the supported toolchains and SDK floors.

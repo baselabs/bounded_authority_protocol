@@ -46,6 +46,9 @@ jobs:
         with:
           python-version: ${{ steps.toolchain.outputs.python }}
 
+      - name: Refuse Python version drift
+        run: scripts/toolchain.sh --installed python=${{ steps.toolchain.outputs.python }}
+
       - name: Run SDK publish guard over every classified path
         env:
           CHECKER: scripts/check_sdk_publish_infra.sh

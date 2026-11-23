@@ -36,8 +36,8 @@ package, so consumers enforce their own. The mix.exs range, the config set, `.to
 the CI lanes move together in one commit. Primary CI toolchains are exact versions in
 `.tool-versions`; the first version on each line is the local asdf default and later versions
 are CI compatibility lanes. Every CI installation takes its exact version from the shared
-`scripts/toolchain.sh` reader. BEAM, Node and Go installations also pass its `--installed`
-refusal step; the other tools use exact installation requests. The Linux qualification run
+`scripts/toolchain.sh` reader. Every installed tool the reader supports passes its `--installed`
+refusal step, including BEAM, Node, Go, Python, uv, Rust, Ruby, and OCaml. The Linux qualification run
 covers each supported Erlang/OTP major plus all six quality stages. The Go SDK floor is a
 Go lane matching `sdks/go/go.mod`; the Rust default matches `sdks/rust/rust-toolchain.toml`.
 Windows developers use WSL2 (clone inside the WSL filesystem, not under `/mnt/c`), which is the Linux path; no native-Windows developer

@@ -46,6 +46,9 @@ jobs:
         with:
           python-version: ${{ steps.toolchain.outputs.python }}
 
+      - name: Refuse Python version drift
+        run: scripts/toolchain.sh --installed python=${{ steps.toolchain.outputs.python }}
+
       - name: Install verified Gitleaks 8.30.1
         run: |
           scripts/install_gitleaks.sh "$RUNNER_TEMP/gitleaks-bin"
@@ -194,6 +197,9 @@ jobs:
         with:
           python-version: ${{ steps.toolchain.outputs.python }}
 
+      - name: Refuse Python version drift
+        run: scripts/toolchain.sh --installed python=${{ steps.toolchain.outputs.python }}
+
       - name: Install dependencies
         run: mix deps.get --check-locked
 
@@ -249,8 +255,14 @@ jobs:
         with:
           python-version: ${{ steps.toolchain.outputs.python }}
 
+      - name: Refuse Python version drift
+        run: scripts/toolchain.sh --installed python=${{ steps.toolchain.outputs.python }}
+
       - name: Install locked SDK environment manager
         run: python -m pip install uv==${{ steps.toolchain.outputs.uv }}
+
+      - name: Refuse uv version drift
+        run: scripts/toolchain.sh --installed uv=${{ steps.toolchain.outputs.uv }}
 
       - name: Set up Go for manifest mutation checks
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -318,6 +330,9 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ steps.toolchain.outputs.python }}
+
+      - name: Refuse Python version drift
+        run: scripts/toolchain.sh --installed python=${{ steps.toolchain.outputs.python }}
 
       - name: Install dependencies
         run: mix deps.get --check-locked
@@ -516,6 +531,9 @@ jobs:
         with:
           ruby-version: ${{ steps.toolchain.outputs.ruby }}
 
+      - name: Refuse Ruby version drift
+        run: scripts/toolchain.sh --installed ruby=${{ steps.toolchain.outputs.ruby }}
+
       # Pin by version AND gem checksum (the A2 amendment: Ruby gem pinned by version+checksum).
       # The primary .gem is checksum-verified before install; its version-constrained
       # dependencies resolve from rubygems over TLS (--local cannot resolve them).
@@ -554,6 +572,9 @@ jobs:
         with:
           ruby-version: ${{ steps.toolchain.outputs.ruby }}
 
+      - name: Refuse Ruby version drift
+        run: scripts/toolchain.sh --installed ruby=${{ steps.toolchain.outputs.ruby }}
+
       - name: Install pinned cddl validator 0.12.14 (version + checksum)
         run: |
           curl -fsSLo /tmp/cddl.gem https://rubygems.org/downloads/cddl-0.12.14.gem
@@ -587,6 +608,9 @@ jobs:
         with:
           ocaml-compiler: ${{ steps.toolchain.outputs.ocaml }}
           cache: false
+
+      - name: Refuse OCaml version drift
+        run: opam exec -- scripts/toolchain.sh --installed ocaml=${{ steps.toolchain.outputs.ocaml }}
 
       # opam depext apt-installs system packages (libgtk2.0-dev et al.); the runner
       # image's apt index can be stale enough that those fetches 404 against the

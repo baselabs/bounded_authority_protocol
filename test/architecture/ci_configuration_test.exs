@@ -140,7 +140,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     assert step["with"]["head-ref"] == "${{ github.sha }}"
   end
 
-  test "runtime installations use the shared reader and refuse supported installed drift" do
+  test "runtime installations use the shared reader and refuse every installed tool's drift" do
     actions = Path.wildcard(".github/actions/**/action.{yml,yaml}")
 
     jobs = for path <- workflows(), {name, job} <- read(path)["jobs"], do: {path, name, job}
@@ -172,13 +172,13 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
               [{"go-version", "golang", "golang"}]
 
             uses?(step, "actions/setup-python@") ->
-              [{"python-version", nil, "python"}]
+              [{"python-version", "python", "python"}]
 
             uses?(step, "ruby/setup-ruby@") ->
-              [{"ruby-version", nil, "ruby"}]
+              [{"ruby-version", "ruby", "ruby"}]
 
             uses?(step, "ocaml/setup-ocaml@") ->
-              [{"ocaml-compiler", nil, "ocaml"}]
+              [{"ocaml-compiler", "ocaml", "ocaml"}]
 
             true ->
               []
@@ -192,7 +192,11 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
                 "${{ matrix.#{output} }}"
 
               tool == "golang" and name in ["go-conformance", "isolated-distribution"] ->
-                "${{ fromJSON(steps.toolchain.outputs.golang_lanes)[0] }}"
+                assert Enum.any?(Enum.take(steps, index), fn earlier ->
+                         earlier["id"] == "go-floor" and earlier["if"] == step["if"]
+                       end)
+
+                "${{ steps.go-floor.outputs.golang }}"
 
               true ->
                 "${{ steps.toolchain.outputs.#{output} }}"
@@ -208,16 +212,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
                    "#{path} #{name}: read versions before installation"
           end
 
-          if tool do
-            prefix = "scripts/toolchain.sh --installed "
-
-            assert Enum.any?(Enum.drop(steps, index + 1), fn later ->
-                     String.starts_with?(later["run"] || "", prefix) and
-                       String.contains?(later["run"], "#{tool}=#{expected}") and
-                       later["if"] == step["if"]
-                   end),
-                   "#{path} #{name}: refuse #{tool} drift after installation"
-          end
+          assert_installed_refusal(steps, index, tool, expected, "#{path} #{name}")
         end
 
         if String.contains?(step["run"] || "", "mix deps.get") do
@@ -229,13 +224,42 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
 
           assert step["run"] =~
                    ~s|echo "RUSTUP_TOOLCHAIN=${{ steps.toolchain.outputs.rust }}" >> "$GITHUB_ENV"|
+
+          assert_installed_refusal(
+            steps,
+            index,
+            "rust",
+            "${{ steps.toolchain.outputs.rust }}",
+            "#{path} #{name}"
+          )
         end
 
         if String.contains?(step["run"] || "", "pip install uv") do
           assert step["run"] =~ "pip install uv==${{ steps.toolchain.outputs.uv }}"
+
+          assert_installed_refusal(
+            steps,
+            index,
+            "uv",
+            "${{ steps.toolchain.outputs.uv }}",
+            "#{path} #{name}"
+          )
         end
       end
     end
+  end
+
+  defp assert_installed_refusal(steps, index, tool, expected, context) do
+    prefix = if tool == "ocaml", do: "opam exec -- ", else: ""
+    command = prefix <> "scripts/toolchain.sh --installed "
+    setup = Enum.at(steps, index)
+
+    assert Enum.any?(Enum.drop(steps, index + 1), fn later ->
+             String.starts_with?(later["run"] || "", command) and
+               String.contains?(later["run"], "#{tool}=#{expected}") and
+               later["if"] == setup["if"]
+           end),
+           "#{context}: refuse #{tool} drift after installation"
   end
 
   test "compatibility lanes and SDK floors come from shared reader outputs" do
@@ -263,6 +287,20 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     assert Enum.map(entries, & &1["timeout"]) == [19, 18, 18]
 
     [go_floor] = :json.decode(outputs["golang_lanes"])
+
+    for name <- ["go-conformance", "isolated-distribution"] do
+      job = read(".github/workflows/sdks.yml")["jobs"][name]
+      step = Enum.find(job["steps"], &(&1["id"] == "go-floor"))
+      assert step["env"] == %{"GO_LANES" => "${{ steps.toolchain.outputs.golang_lanes }}"}
+
+      {output, 0} =
+        System.cmd("bash", ["-c", step["run"]],
+          env: [{"GO_LANES", outputs["golang_lanes"]}, {"GITHUB_OUTPUT", "/dev/stdout"}]
+        )
+
+      assert String.trim(output) == "golang=#{go_floor}"
+    end
+
     [_, declared_go] = Regex.run(~r/^go (\S+)$/m, File.read!("sdks/go/go.mod"))
     assert go_floor == declared_go <> ".0"
 
@@ -274,7 +312,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     digest = :crypto.hash(:sha256, File.read!("scripts/toolchain.sh"))
 
     assert Base.encode16(digest, case: :lower) ==
-             "b29bfeb6ec4ec8f5b7e3ac3c963f04b6d3c73483172e5bd59ea40f20b102f1eb"
+             "25bbfa023b7f031256428b498fe300fcc460988fea81277072355e4c0d933764"
 
     assert {"100755 " <> _, 0} =
              System.cmd("git", ["ls-files", "--stage", "scripts/toolchain.sh"])
