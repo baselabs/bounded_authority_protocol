@@ -13,6 +13,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Keep CI and release artifacts for 7 days, the period anything reads them after their run.
 - Refuse installed-version drift for every supported CI tool, including Python, uv, Rust,
   Ruby, and OCaml, with the updated shared toolchain reader. Expose the Go SDK floor as a
   reader-derived step output for setup and refusal checks.

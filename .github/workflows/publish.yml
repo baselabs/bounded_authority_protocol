@@ -177,7 +177,7 @@ jobs:
             artifacts/release.cdx.json
             artifacts/tooling.cdx.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
       - name: Remove publication scratch
         if: always()

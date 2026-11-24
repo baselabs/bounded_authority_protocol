@@ -510,7 +510,7 @@ jobs:
             artifacts/tooling.cdx.json
             artifacts/SHA256SUMS
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
   spec-render:
     name: Spec renders under pinned kramdown-rfc
