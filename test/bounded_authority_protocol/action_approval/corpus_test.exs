@@ -7,17 +7,17 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
   alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1, as: ES256
   alias BoundedAuthorityProtocol.ContentAssertion.V1, as: CA1
   alias BoundedAuthorityProtocol.ContentAssertion.V1.Codec
+  alias BoundedAuthorityProtocol.{Ed25519, Es256}
   alias BoundedAuthorityProtocol.RoleAttestation.V1, as: Role
   alias BoundedAuthorityProtocol.V1, as: BAP1
+  alias BoundedAuthorityProtocol.V1.{Base64Url, Bounds, HistoricalPublicKey, Jcs, Json}
   alias BoundedAuthorityProtocol.V2, as: BAP2
   alias BoundedAuthorityProtocol.V3, as: BAP3
-  alias BoundedAuthorityProtocol.{Ed25519, Es256}
-  alias BoundedAuthorityProtocol.V1.{Base64Url, Bounds, HistoricalPublicKey, Jcs, Json}
 
   @es256_root "priv/conformance/attestation-profiles/content-assertion-es256/v1"
   @approval_root "priv/conformance/content-profiles/action-approval/v1"
   @es256_pin "d79329d431de093f162613fbd2a2fe838766b690fa67cfbc1478eafa322b3c63"
-  @approval_pin "2a6765c2b6990068a99d5690d35d961b12a25c56d5439ec315234544d1820ceb"
+  @approval_pin "35470198349f2b03b0c5df4368569a437eae39847fa4b8df1cd1f24b33d6f826"
 
   @binary_fields ~w(attestor_key_fingerprint content_digest digest prev profile_digest public_key
     revision_digest)a
@@ -58,35 +58,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
     assert sha(preimage) == profile["profile_digest_hex"]
     assert :crypto.hash(:sha256, preimage) == Approval.profile_digest()
 
-    for item <- fixture(@approval_root, "record-cases.json") do
-      ca = fields(item["ca_bounds"])
-      limits = fields(item["bounds"])
-
-      case {item, item["expected"]} do
-        {%{"wire" => wire}, "invalid"} ->
-          assert Approval.decode_record(raw(wire), ca, limits) == {:error, :invalid}, item["id"]
-
-        {%{"wire" => wire}, %{"wire" => exact, "content_digest" => digest}} ->
-          assert {:ok, %Record{} = record} = Approval.decode_record(raw(wire), ca, limits),
-                 item["id"]
-
-          assert Approval.encode_record(record, ca, limits) == {:ok, raw(exact)}, item["id"]
-          assert ES256.content_digest(raw(exact), ca) == {:ok, raw(digest)}, item["id"]
-
-        {%{"author" => record}, expected} ->
-          record = struct!(Record, fields(Map.delete(record, "v")))
-          result = Approval.encode_record(record, ca, limits, item["canonicalize"])
-
-          case expected do
-            "invalid" ->
-              assert result == {:error, :invalid}, item["id"]
-
-            %{"wire" => wire, "content_digest" => digest} ->
-              assert result == {:ok, raw(wire)}, item["id"]
-              assert ES256.content_digest(raw(wire), ca) == {:ok, raw(digest)}, item["id"]
-          end
-      end
-    end
+    Enum.each(fixture(@approval_root, "record-cases.json"), &assert_record_case/1)
 
     assert Approval.decode_record(nil) == {:error, :invalid}
     assert Approval.decode_record("{}", %{}, []) == {:error, :invalid}
@@ -100,26 +72,12 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
   test "approval diagnostic precedence and complete verified facts" do
     for file <- ["approval-cases.json", "multi-fault-cases.json"],
         item <- fixture(@approval_root, file) do
-      result = verify_case(item)
-
-      case item["expected"] do
-        expected when is_binary(expected) ->
-          assert result == {:error, String.to_existing_atom(expected)}, item["id"]
-
-        expected ->
-          assert {:ok, facts} = result, item["id"]
-          assert Map.from_struct(facts.record) == fields(Map.delete(expected["record"], "v"))
-          assert Map.from_struct(facts.assertion) == fields(expected["assertion"])
-          assert facts.suite == String.to_existing_atom(expected["suite"])
-          assert facts.trust_domain == expected["trust_domain"]
-          assert facts.trust == :not_evaluated
-
-      end
+      assert_approval_case(item)
     end
 
     cases = fixture(@approval_root, "approval-cases.json")
     missing = Enum.find(cases, &(&1["id"] == "missing-trust"))
-    missing_context = context(missing["context"])
+    missing_context = fields(missing["context"])
     assert missing_context.snapshot == nil
 
     assert Approval.verify_es256(raw(missing["record"]), missing["compact"], missing_context) ==
@@ -128,7 +86,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
     assert Approval.verify_es256(nil, nil, nil) == {:error, :invalid_context}
 
     item = Enum.find(cases, &(&1["id"] == "es256-verified"))
-    context = context(item["context"])
+    context = fields(item["context"])
     record = raw(item["record"])
     compact = item["compact"]
     assert {:ok, _} = Approval.verify_es256(record, compact, Map.delete(context, :max_active))
@@ -184,50 +142,20 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
 
   test "record size preflight stops before escaping fields or encoding the tree" do
     cases = fixture(@approval_root, "record-cases.json")
-    encode = {Jcs, :encode_approval_record, 4}
-    escape = {Jcs, :escape_string, 1}
-
     for {id, result, encoding_calls} <- [
           {"authoring-escaped-size-exact", :ok, 1},
           {"authoring-escaped-size-plus", :error, 0},
           {"escape-heavy-over", :error, 0}
         ] do
       item = Enum.find(cases, &(&1["id"] == id))
-      record = struct!(Record, fields(Map.delete(item["author"], "v")))
-
-      trace_calls([encode, escape], fn ->
-        assert {^result, _} = Approval.encode_record(record), id
-        assert call_count(encode) == encoding_calls, id
-        assert (call_count(escape) > 0) == (encoding_calls == 1), id
-      end)
+      assert_encoding_calls(item, result, encoding_calls)
     end
 
-    escaped_size = {Jcs, :escaped_size, 3}
-
-    trace_calls([escaped_size, escape], fn ->
-      assert Jcs.escaped_string_bytes(:binary.copy(<<1>>, 1024), 7) == {:error, :invalid}
-      assert call_count(escaped_size) == 2, "escaped-size-early-stop"
-      assert call_count(escape) == 0
-      assert Jcs.escaped_string_bytes(<<1, ?\n, ?">> <> "é", 14) == {:ok, 14}
-      assert Jcs.escaped_string_bytes(<<1, ?\n, ?">> <> "é", 13) == {:error, :invalid}
-    end)
+    assert_escaped_size_early_stop()
   end
 
   test "revision digest width is checked before decoding base64url" do
-    base64_decode = {Base64Url, :decode, 2}
-    wire = @approval_root |> fixture("record-cases.json") |> hd() |> Map.fetch!("wire") |> raw()
-    [_, revision] = Regex.run(~r/"revision_digest":"([^"]+)"/, wire)
-
-    for {value, expected, calls} <- [
-          {revision, :ok, 1},
-          {binary_part(revision, 0, 42), :error, 0},
-          {revision <> "A", :error, 0}
-        ] do
-      trace_calls([base64_decode], fn ->
-        assert {^expected, _} = Approval.decode_record(String.replace(wire, revision, value))
-        assert call_count(base64_decode) == calls, "revision-width-before-base64"
-      end)
-    end
+    assert_revision_width()
   end
 
   test "approval rendering redacts raw and transformed canaries" do
@@ -254,17 +182,163 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
     end
   end
 
+  @doc false
+  def assert_mutation_witness("authoring-escaped-size-plus" = id) do
+    item = fixture_case!(@approval_root, "record-cases.json", id)
+    assert_encoding_calls(item, :error, 0)
+  end
+
+  def assert_mutation_witness("escaped-size-early-stop"), do: assert_escaped_size_early_stop()
+  def assert_mutation_witness("revision-width-before-base64"), do: assert_revision_width()
+
+  def assert_mutation_witness(id) do
+    cases = [
+      {@approval_root, "record-cases.json", &assert_record_case/1},
+      {@approval_root, "approval-cases.json", &assert_approval_case/1},
+      {@approval_root, "multi-fault-cases.json", &assert_approval_case/1},
+      {@es256_root, "assembly-cases.json", &assert_assembly_witness/1}
+    ]
+
+    [{item, assertion}] =
+      for {root, file, assertion} <- cases,
+          %{"id" => ^id} = item <- fixture(root, file) do
+        {item, assertion}
+      end
+
+    assertion.(item)
+  end
+
+  defp fixture_case!(root, file, id) do
+    [item] = Enum.filter(fixture(root, file), &(&1["id"] == id))
+    item
+  end
+
+  defp assert_assembly_witness(item) do
+    signing = fixture(@es256_root, "profile.json")["signing"]
+    {:ok, input} = ES256.assertion_signing_input(signing_producer(signing), %{})
+    assert_assembly_case(item, input)
+  end
+
+  defp assert_encoding_calls(item, result, encoding_calls) do
+    encode = {Jcs, :encode_approval_record, 4}
+    escape = {Jcs, :escape_string, 1}
+    record = struct!(Record, fields(Map.delete(item["author"], "v")))
+    id = item["id"]
+
+    trace_calls([encode, escape], fn ->
+      assert {^result, _} = Approval.encode_record(record), id
+      assert call_count(encode) == encoding_calls, id
+      assert (call_count(escape) > 0) == (encoding_calls == 1), id
+    end)
+  end
+
+  defp assert_escaped_size_early_stop do
+    escaped_size = {Jcs, :escaped_size, 3}
+    escape = {Jcs, :escape_string, 1}
+
+    trace_calls([escaped_size, escape], fn ->
+      assert Jcs.escaped_string_bytes(:binary.copy(<<1>>, 1024), 7) == {:error, :invalid}
+      assert call_count(escaped_size) == 2, "escaped-size-early-stop"
+      assert call_count(escape) == 0
+      assert Jcs.escaped_string_bytes(<<1, ?\n, ?">> <> "é", 14) == {:ok, 14}
+      assert Jcs.escaped_string_bytes(<<1, ?\n, ?">> <> "é", 13) == {:error, :invalid}
+    end)
+  end
+
+  defp assert_revision_width do
+    base64_decode = {Base64Url, :decode, 2}
+    wire = @approval_root |> fixture("record-cases.json") |> hd() |> Map.fetch!("wire") |> raw()
+    [_, revision] = Regex.run(~r/"revision_digest":"([^"]+)"/, wire)
+
+    for {value, expected, calls} <- [
+          {revision, :ok, 1},
+          {binary_part(revision, 0, 42), :error, 0},
+          {revision <> "A", :error, 0}
+        ] do
+      trace_calls([base64_decode], fn ->
+        assert {^expected, _} = Approval.decode_record(String.replace(wire, revision, value))
+        assert call_count(base64_decode) == calls, "revision-width-before-base64"
+      end)
+    end
+  end
+
+  defp assert_record_case(item) do
+    ca = fields(item["ca_bounds"])
+    limits = fields(item["bounds"])
+
+    case {item, item["expected"]} do
+      {%{"wire" => wire}, "invalid"} ->
+        assert Approval.decode_record(raw(wire), ca, limits) == {:error, :invalid}, item["id"]
+
+      {%{"wire" => wire}, %{"wire" => exact, "content_digest" => digest}} ->
+        assert {:ok, %Record{} = record} = Approval.decode_record(raw(wire), ca, limits),
+               item["id"]
+
+        assert Approval.encode_record(record, ca, limits) == {:ok, raw(exact)}, item["id"]
+        assert ES256.content_digest(raw(exact), ca) == {:ok, raw(digest)}, item["id"]
+
+      {%{"author" => record}, expected} ->
+        record = struct!(Record, fields(Map.delete(record, "v")))
+        result = Approval.encode_record(record, ca, limits, item["canonicalize"])
+
+        case expected do
+          "invalid" ->
+            assert result == {:error, :invalid}, item["id"]
+
+          %{"wire" => wire, "content_digest" => digest} ->
+            assert result == {:ok, raw(wire)}, item["id"]
+            assert ES256.content_digest(raw(wire), ca) == {:ok, raw(digest)}, item["id"]
+        end
+    end
+  end
+
+  defp assert_approval_case(item) do
+    result = verify_case(item)
+
+    case item["expected"] do
+      expected when is_binary(expected) ->
+        assert result == {:error, String.to_existing_atom(expected)}, item["id"]
+
+      expected ->
+        assert {:ok, facts} = result, item["id"]
+        assert Map.from_struct(facts.record) == fields(Map.delete(expected["record"], "v"))
+        assert Map.from_struct(facts.assertion) == fields(expected["assertion"])
+        assert facts.suite == String.to_existing_atom(expected["suite"])
+        assert facts.trust_domain == expected["trust_domain"]
+        assert facts.trust == :not_evaluated
+    end
+  end
+
+  defp signing_producer(signing) do
+    fields = signing["payload"] |> Map.delete("v") |> fields()
+    struct!(ES256.ContentAssertion, Map.put(fields, :attestor_key_id, signing["kid"]))
+  end
+
+  defp assert_assembly_case(item, input) do
+    signature = raw(item["signature"])
+
+    case item["expected"] do
+      "invalid" ->
+        assert ES256.assemble_compact(input, signature, %{}) == {:error, :invalid}, item["id"]
+
+      compact ->
+        assert ES256.assemble_compact(input, signature, %{}) == {:ok, compact}, item["id"]
+    end
+  end
+
   defp verify_case(item) do
-    context = context(item["context"])
+    context = fields(item["context"])
     record = raw(item["record"])
     compact = item["compact"]
 
-    case item["suite"] do
-      "es256" -> Approval.verify_es256(record, compact, context)
-      "eddsa" -> Approval.verify_eddsa(record, compact, context)
+    try do
+      case item["suite"] do
+        "es256" -> Approval.verify_es256(record, compact, context)
+        "eddsa" -> Approval.verify_eddsa(record, compact, context)
+      end
+    rescue
+      KeyError -> {:raised, KeyError}
     end
-  rescue
-    _error -> flunk("verification raised for #{item["id"]}")
   end
 
   defp trace_calls(patterns, fun) do
@@ -335,8 +409,10 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
     for item <- fixture(@es256_root, "assertion-verification-cases.json") do
       context = fields(item["context"])
       key = struct!(HistoricalPublicKey, context.attestor)
+
       expected =
         struct!(ES256.ExpectedContentAssertion, Map.merge(context, %{attestor: key, bounds: %{}}))
+
       assert inspect(expected) ==
                "#BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion<redacted>"
 
@@ -360,9 +436,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
 
   test "exact signing input and strict assembly" do
     signing = fixture(@es256_root, "profile.json")["signing"]
-    producer_fields = signing["payload"] |> Map.delete("v") |> fields()
-    producer =
-      struct!(ES256.ContentAssertion, Map.put(producer_fields, :attestor_key_id, signing["kid"]))
+    producer = signing_producer(signing)
 
     assert inspect(producer) ==
              "#BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertion<redacted>"
@@ -371,17 +445,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
     assert Map.from_struct(input) == fields(signing["expected"])
     assert ES256.assemble_compact(input, raw(signing["signature"])) == {:ok, signing["compact"]}
 
-    for item <- fixture(@es256_root, "assembly-cases.json") do
-      signature = raw(item["signature"])
-
-      case item["expected"] do
-        "invalid" ->
-          assert ES256.assemble_compact(input, signature, %{}) == {:error, :invalid}, item["id"]
-
-        compact ->
-          assert ES256.assemble_compact(input, signature, %{}) == {:ok, compact}, item["id"]
-      end
-    end
+    for item <- fixture(@es256_root, "assembly-cases.json"), do: assert_assembly_case(item, input)
 
     assert ES256.assemble_compact(%{input | message: "a.b"}, raw(signing["signature"])) ==
              {:error, :invalid}
@@ -438,22 +502,6 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
     end
   end
 
-  defp context(context) do
-    context = fields(context)
-
-    Map.update!(context, :snapshot, fn
-      nil ->
-        nil
-
-      snapshot ->
-        Map.update!(snapshot, :entries, fn entries ->
-          Enum.map(entries, fn entry ->
-            Map.update!(entry, :key, &Map.put(&1, :__struct__, HistoricalPublicKey))
-          end)
-        end)
-    end)
-  end
-
   defp build_facts("es256", values), do: struct!(ES256.ContentAssertionFacts, fields(values))
   defp build_facts("eddsa", values), do: struct!(CA1.ContentAssertionFacts, fields(values))
 
@@ -473,6 +521,9 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
 
   defp field_value(field, value) when field in [:kind, :suite, :trust, :verification],
     do: String.to_existing_atom(value)
+
+  defp field_value(:key, value) when is_map(value),
+    do: Map.put(fields(value), :__struct__, HistoricalPublicKey)
 
   defp field_value(:valid_before, "unbounded"), do: :unbounded
   defp field_value(_, value), do: fields(value)

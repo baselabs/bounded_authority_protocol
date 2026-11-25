@@ -224,7 +224,7 @@ defmodule BoundedAuthorityProtocol.V1.Bounds do
     do: is_integer(value) and value > 0 and value <= maximum
 
   defp valid_override?(key, value, maximum) when key in @fixed_width_keys,
-    do: value == maximum
+    do: value === maximum
 
   defp valid_override?(_key, value, maximum), do: valid_integer_override?(value, maximum)
 end

@@ -289,7 +289,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:strict_agrees?, 1} => %{variable_call: 6}
     },
     "Elixir.BoundedAuthorityProtocol.Conformance.Candidate.beam" => %{
-      {:execute, 4} => %{variable_call: 6},
+      {:execute, 4} => %{variable_call: 5},
       {:known_answer?, 2} => %{variable_call: 3},
       {:run, 2} => %{variable_call: 4}
     },
@@ -1199,8 +1199,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     AnchoredExportInput ArchivedObject AttestationFacts Base64Url BoundaryAnchor BoundaryAnchorCodec Bounds
     ChainFacts ChainInput Codec CompactJws ConsumptionChain ConsumptionEntry Container ContextValidation Credentials
     ContentAssertion ContentAssertionFacts DecodedContentAssertion ExpectedContentAssertion
-    Approval EdContext EdDSA ES256 EsAssertion EsDecoded EsExpected EsFacts Loopback
-    Record RecordCodec VerifiedApprovalFacts
     Corpus DecodedAttestation DecodedGrant DecodedProof Ed25519 EncodedAnchoredExport EncodedConsumptionEntry
     EnvelopeFacts
     ExpectedAnchor ExpectedAnchoredExport ExpectedAttestation ExpectedChain ExpectedExport ExpectedGrant
@@ -1229,8 +1227,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     bound_profile tamper verdict agree agreed disagreed agreement exit_status total kid
     issuer_key_fingerprint matched_audience major attestor attestor_key_id
     attestor_key_fingerprint subject_key_id subject_key_fingerprint subject_public_key role jti
-    nbf exp now content_bytes iss aud sub profile profile_digest content_digest gen prev iat subject
-    action approver_role fingerprint key max_lifetime max_staleness record_bytes request_id
+    nbf exp now content_bytes iss aud sub profile profile_digest content_digest gen prev iat
+    subject action approver_role fingerprint key max_lifetime max_staleness record_bytes request_id
     resource_count resources revision_digest roles trust_domain)a
 
   def check(root, opts \\ []) do
@@ -1579,12 +1577,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
     with {:ok, source} <- File.read(path),
          {:ok, ast} <- Code.string_to_quoted(source, file: path) do
-      {_ast, violations} =
-        Macro.prewalk(ast, [], fn node, acc ->
-          {node, node_violations(node, relative) ++ acc}
-        end)
-
-      violations ++
+      source_node_violations(ast, relative, %{}) ++
         source_dynamic_allowance_violations(ast, relative) ++
         source_contract_violations(ast, relative)
     else
@@ -1598,6 +1591,85 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
         ]
     end
   end
+
+  # A short name only inherits package identity from a preceding lexical alias.
+  defp source_node_violations({:__block__, _, expressions}, path, aliases) do
+    {violations, _aliases} =
+      Enum.flat_map_reduce(expressions, aliases, fn expression, bindings ->
+        findings = source_node_violations(expression, path, bindings)
+        {findings, bind_source_aliases(expression, bindings)}
+      end)
+
+    violations
+  end
+
+  defp source_node_violations({:alias, _, [target | options]}, path, aliases) do
+    Enum.flat_map(source_alias_targets(target, options, aliases), fn {target, options} ->
+      alias_shadow_violations(target, options, path) ++ node_violations(target, path)
+    end)
+  end
+
+  defp source_node_violations({:__aliases__, _, _} = alias_ast, path, aliases),
+    do: node_violations(expand_source_alias(alias_ast, aliases), path)
+
+  defp source_node_violations(
+         {{:., dot_meta, [module, function]}, meta, args} = node,
+         path,
+         aliases
+       ) do
+    expanded = {{:., dot_meta, [expand_source_alias(module, aliases), function]}, meta, args}
+    node_violations(expanded, path) ++ source_children(node, path, aliases)
+  end
+
+  defp source_node_violations(node, path, aliases),
+    do: node_violations(node, path) ++ source_children(node, path, aliases)
+
+  defp source_children(node, path, aliases) when is_tuple(node) do
+    node |> Tuple.to_list() |> source_children(path, aliases)
+  end
+
+  defp source_children(nodes, path, aliases) when is_list(nodes),
+    do: Enum.flat_map(nodes, &source_node_violations(&1, path, aliases))
+
+  defp source_children(_node, _path, _aliases), do: []
+
+  defp bind_source_aliases({:alias, _, [target | options]}, aliases) do
+    Enum.reduce(source_alias_targets(target, options, aliases), aliases, fn
+      {{:__aliases__, _, segments} = target, options}, bindings ->
+        binding = alias_binding_name(target, options)
+        Map.put(bindings, binding, segments)
+
+      {target, options}, bindings ->
+        Map.delete(bindings, alias_binding_name(target, options))
+    end)
+  end
+
+  defp bind_source_aliases(_expression, aliases), do: aliases
+
+  defp source_alias_targets(
+         {{:., _, [{:__aliases__, _, _} = base, :{}]}, _, members},
+         [],
+         aliases
+       ) do
+    {:__aliases__, _, prefix} = expand_source_alias(base, aliases)
+
+    Enum.map(members, fn {:__aliases__, meta, suffix} ->
+      {{:__aliases__, meta, prefix ++ suffix}, []}
+    end)
+  end
+
+  defp source_alias_targets(target, options, aliases),
+    do: [{expand_source_alias(target, aliases), List.first(options, [])}]
+
+  defp expand_source_alias({:__aliases__, meta, [root | suffix]} = alias_ast, aliases)
+       when is_atom(root) do
+    case Map.fetch(aliases, Atom.to_string(root)) do
+      {:ok, prefix} -> {:__aliases__, meta, prefix ++ suffix}
+      :error -> alias_ast
+    end
+  end
+
+  defp expand_source_alias(alias_ast, _aliases), do: alias_ast
 
   defp source_dynamic_allowance_violations(
          ast,
@@ -1729,14 +1801,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     category_violation(category, path, "forbidden module #{name}")
   end
 
-  defp node_violations({:alias, _meta, [target, options]}, path) when is_list(options) do
-    alias_shadow_violations(target, options, path)
-  end
-
-  defp node_violations({:alias, _meta, [target]}, path) do
-    alias_shadow_violations(target, [], path)
-  end
-
   defp node_violations({directive, _meta, [target | _options]}, path)
        when directive in [:import, :require, :use] do
     target_name = module_name(target)
@@ -1792,6 +1856,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           path,
           "forbidden call #{format_call(module_ast, function)}"
         )
+
+      module in @approved_local_aliases ->
+        []
 
       true ->
         module
@@ -1920,7 +1987,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp alias_binding_name(target, _options), do: alias_binding_name(target, [])
 
   defp mfa_category(:dynamic, _function), do: :dynamic_dispatch
-  defp mfa_category(module, _function) when module in @approved_local_aliases, do: nil
 
   defp mfa_category(module, _function) when is_atom(module) and module in [:file, :filelib],
     do: :filesystem
@@ -2188,8 +2254,10 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules("lib/bounded_authority_protocol/action_approval/v1.ex"),
     do: ~w(Enum MapSet String)
 
-  defp approved_source_modules("lib/bounded_authority_protocol/action_approval/v1/record_codec.ex"),
-    do: ~w(Enum String)
+  defp approved_source_modules(
+         "lib/bounded_authority_protocol/action_approval/v1/record_codec.ex"
+       ),
+       do: ~w(Enum String)
 
   defp approved_source_modules("lib/bounded_authority_protocol/role_attestation/v1/codec.ex"),
     do: ~w(Access Enum Map String StringOrUri)
@@ -2555,16 +2623,19 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       ]
   end
 
-  defp approved_source_call?("lib/bounded_authority_protocol/action_approval/v1.ex", module, function),
-    do:
-      {module, function} in [
-        {"Enum", :member?},
-        {"Map", :get},
-        {"MapSet", :member?},
-        {"MapSet", :new},
-        {"MapSet", :put},
-        {"String", :valid?}
-      ]
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/action_approval/v1.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {"Enum", :member?},
+           {"MapSet", :member?},
+           {"MapSet", :new},
+           {"MapSet", :put},
+           {"String", :valid?}
+         ]
 
   defp approved_source_call?(
          "lib/bounded_authority_protocol/action_approval/v1/record_codec.ex",
@@ -3039,7 +3110,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.beam" ->
         [
           {Enum, :member?},
-          {Map, :get},
           {MapSet, :member?},
           {MapSet, :new},
           {MapSet, :put},
@@ -3359,6 +3429,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Map, :from_struct},
           {Map, :get},
           {Map, :new},
+          {:erlang, :atom_to_binary},
           {:erlang, :iolist_to_binary},
           {:maps, :remove}
         ]

@@ -1,10 +1,10 @@
 defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
   @moduledoc false
 
+  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1, as: ES256
   alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertion, as: EsAssertion
   alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts, as: EsFacts
   alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.DecodedContentAssertion, as: EsDecoded
-  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion, as: EsExpected
 
   alias BoundedAuthorityProtocol.ContentAssertion.V1.{
     ContentAssertion,
@@ -39,7 +39,7 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
   @payload_keys Enum.sort(["v" | Enum.map(@claims, &Atom.to_string/1)])
   @producer_fields Map.keys(ContentAssertion.__struct__())
   @es_producer_fields Map.keys(EsAssertion.__struct__())
-  @es_expected_fields Map.keys(EsExpected.__struct__())
+  @es_expected_fields Map.keys(ES256.ExpectedContentAssertion.__struct__())
   @es_facts_fields Map.keys(EsFacts.__struct__())
   @facts_fields Map.keys(ContentAssertionFacts.__struct__())
   @expected_fields Map.keys(ExpectedContentAssertion.__struct__())
@@ -144,7 +144,8 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
   defp expected_shape?(value, :eddsa),
     do: shape?(value, @expected_fields, ExpectedContentAssertion)
 
-  defp expected_shape?(value, :es256), do: shape?(value, @es_expected_fields, EsExpected)
+  defp expected_shape?(value, :es256),
+    do: shape?(value, @es_expected_fields, ES256.ExpectedContentAssertion)
 
   def historical_key(key, bounds, :eddsa), do: EdContext.historical_key(key, bounds)
   def historical_key(key, bounds, :es256), do: ContextValidation.historical_key(key, bounds)

@@ -371,9 +371,12 @@ def approval(record_bytes, compact, context, suite, profile_digest):
         snapshot = context["snapshot"]
         demand(snapshot["trust_domain"] == context["trust_domain"] and snapshot["suite"] == suite)
         demand(string(snapshot["provenance"], ca["identifier_bytes"]) and integer(snapshot["as_of"], cap))
-        for entry in snapshot["entries"]:
+        entries = snapshot["entries"]
+        demand(isinstance(entries, list))
+        for entry in entries:
+            demand(isinstance(entry, dict))
             key = entry["key"]
-            demand(key.keys() == {"key_id", "public_key", "valid_from", "valid_before"})
+            demand(isinstance(key, dict) and key.keys() == {"key_id", "public_key", "valid_from", "valid_before"})
             kid = key["key_id"]
             demand(kid_ok(kid, ca) and kid not in keys)
             demand(identifier(entry["issuer"], ca["identifier_bytes"]) and roles(entry["roles"], bounds))
@@ -865,6 +868,11 @@ def approval_vectors(keys, record, base, digest):
               ctx={"bounds": {"key_bytes": 3}})
         build(f"{suite}-fixed-width-explicit", "verified", suite=suite,
               ctx={"bounds": {field: CA_MAX[field] for field in FIXED_WIDTHS}})
+        for field in sorted(FIXED_WIDTHS):
+            width = CA_MAX[field]
+            build(f"{suite}-{field}-integer", "verified", suite=suite, ctx={"bounds": {field: width}})
+            build(f"{suite}-{field}-float", "invalid_context", suite=suite,
+                  ctx={"bounds": {field: float(width)}})
         build(f"{suite}-fixed-width-tightened", "invalid_context", suite=suite,
               ctx={"bounds": {"signature_bytes": 63}})
     exact_request = "request-10"
@@ -917,6 +925,12 @@ def approval_vectors(keys, record, base, digest):
     def dual(case_id, reason, **kwargs):
         build(case_id, reason, combined=True, **kwargs)
 
+    build("empty-entry-list", "unknown_key", snapshot={"entries": []})
+    for shape, malformed in (("object", {}), ("string", ""), ("null-entry", [None]),
+                           ("null-key", [entries[0] | {"key": None}])):
+        build(f"snapshot-{shape}", "trust_unavailable", snapshot={"entries": malformed})
+        dual(f"stale-snapshot-{shape}", "trust_unavailable", snapshot={"as_of": 0, "entries": malformed})
+    dual("context-before-snapshot", "invalid_context", ctx={"now": False, "snapshot": None})
     dual("context-before-snapshot-and-bytes", "invalid_context", ctx={"now": False, "snapshot": None}, compact=".")
     dual("unavailable-before-stale-and-malformed", "trust_unavailable", snapshot={"as_of": 0, "provenance": ""}, compact=".")
     dual("stale-before-shape", "stale_trust", snapshot={"as_of": 0}, compact=".")

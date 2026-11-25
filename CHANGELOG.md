@@ -40,6 +40,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- Reject floating-point overrides for fixed cryptographic widths. Exercise typed bound and
+  malformed snapshot inputs in the candidate action approval corpus.
 - Limit new-ref identifier checks to commits outside the pushing remote's tracking refs.
   Keep full-history checks for unconfigured remotes and remotes without tracking refs.
 - Make public SDK comments and repository text self-contained: state verification and

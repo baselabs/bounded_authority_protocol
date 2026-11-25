@@ -288,6 +288,50 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
     end)
   end
 
+  test "a package alias is allowed only in its lexical scope" do
+    package = "BoundedAuthorityProtocol.ActionApproval.V1"
+
+    root =
+      fixture_root!("""
+      alias #{package}, as: Approval
+      def probe, do: Approval.profile_digest()
+      """)
+
+    assert [] == ArchitectureGate.check(root, compiled: false)
+
+    root =
+      fixture_root!("""
+      def bound do
+        alias #{package}, as: Approval
+        Approval.profile_digest()
+      end
+      def unbound, do: Approval.profile_digest()
+      """)
+
+    details = Enum.map(ArchitectureGate.check(root, compiled: false), & &1.detail)
+    assert Enum.sort(details) == [
+             "forbidden call Approval.profile_digest",
+             "forbidden module Approval"
+           ]
+  end
+
+  test "compiled imports require a package module identity" do
+    root = fixture_root!("def probe, do: Approval.profile_digest()")
+
+    File.write!(Path.join(root, "lib/approval.ex"), """
+    defmodule Approval do
+      def profile_digest, do: :external
+    end
+    """)
+
+    compile_copy!(root, ["compile"])
+
+    assert Enum.any?(compiled_copy_violations(root), fn violation ->
+             violation.category == :unapproved_runtime and
+               violation.detail == "compiled import Approval.profile_digest/0"
+           end)
+  end
+
   test "the source gate rejects external compile-time directives" do
     bodies = [
       {"external require is forbidden",

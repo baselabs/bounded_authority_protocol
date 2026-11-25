@@ -34,10 +34,10 @@ weakening = [
   {approval, "freshness-lower", "age >= 0 and age <= cap", "age <= cap", "future-trust"},
   {approval, "freshness-upper", "age >= 0 and age <= cap", "age >= 0 and is_integer(cap)",
    "old-trust"},
-  {approval, "snapshot-domain", "%{trust_domain: domain},", "%{trust_domain: _domain},",
-   "wrong-trust-domain"},
-  {approval, "snapshot-suite", "           suite: suite,\n           provenance: provenance,",
-   "           suite: _snapshot_suite,\n           provenance: provenance,",
+  {approval, "snapshot-domain", "snapshot: %{\n             trust_domain: domain,",
+   "snapshot: %{\n             trust_domain: _domain,", "wrong-trust-domain"},
+  {approval, "snapshot-suite", "             suite: suite,\n             provenance: provenance,",
+   "             suite: _snapshot_suite,\n             provenance: provenance,",
    "wrong-trust-suite"},
   {approval, "snapshot-provenance",
    "scalar_identity?(provenance, ca) and Codec.integer?(as_of, ca)",
@@ -46,7 +46,7 @@ weakening = [
    "duplicate-key-entry"},
   {approval, "historical-key-shape",
    "public_key: public_key,\n                 valid_from: _,\n                 valid_before: _",
-   "public_key: public_key", "missing-valid_from-selected"},
+   "public_key: public_key", "es256-missing-valid_from-selected"},
   {approval, "enrolled-role",
    "check(Enum.member?(entry.roles, record.approver_role), :role_not_permitted)",
    "check(is_list(entry.roles), :role_not_permitted)", "empty-enrolled-roles"},
@@ -66,8 +66,10 @@ weakening = [
    "is_binary(context.revision_digest)", "revision-mismatch"},
   {record, "wire-canonicality", "{:ok, ^bytes} <- encode(record, bounds, ca, false)",
    "{:ok, _} <- encode(record, bounds, ca, false)", "trailing-lf"},
-  {record, "old-wire-fallthrough", "_failure -> {:error, :invalid}", "failure -> failure",
+  {record, "old-wire-success-fallthrough", "_failure -> {:error, :invalid}", "failure -> failure",
    "trailing-lf"},
+  {record, "old-wire-key-set-fallthrough", "_failure -> {:error, :invalid}", "failure -> failure",
+   "missing-action"},
   {record, "wire-object-root", "_failure -> {:error, :invalid}",
    "{:ok, {:string, _}} = root -> root\n      _failure -> {:error, :invalid}", "scalar-root"},
   {record, "strict-resource-set", "previous < name", "previous <= name", "duplicate-resource"},
@@ -89,8 +91,18 @@ weakening = [
    "true <- is_binary(signature),", "assembly-high-s"}
 ]
 
+active =
+  ":ok <-\n           check(is_nil(max_active) or parsed.exp - parsed.nbf <= max_active, :active_too_long)"
+
 ordering =
   for {label, first, second, case_id} <- [
+        {"context-before-trust", "{:ok, max_active} <- preflight(context, ca, bounds)",
+         "{:ok, entries, as_of} <- snapshot_context(context, suite, ca)",
+         "context-before-snapshot"},
+        {"trust-before-freshness",
+         "{:ok, keys} <- admit_entries(entries, %{}, suite, ca, bounds)",
+         ":ok <- check(fresh?(context.now - as_of, context.max_staleness), :stale_trust)",
+         "stale-snapshot-null-key"},
         {"stale-before-shape",
          ":ok <- check(fresh?(context.now - as_of, context.max_staleness), :stale_trust)",
          "{:ok, parsed} <- Codec.parse(compact, ca, suite)", "stale-before-shape"},
@@ -99,17 +111,21 @@ ordering =
         {"key-window-before-record", ":ok <- Codec.key_window(parsed, entry.key)",
          ":ok <- record_binding(parsed, bytes, ca)", "key-window-before-record-binding"},
         {"record-before-issuer", ":ok <- record_binding(parsed, bytes, ca)",
-         ":ok <- check(parsed.iss == entry.issuer, :issuer_mismatch)", "record-binding-before-issuer"},
+         ":ok <- check(parsed.iss == entry.issuer, :issuer_mismatch)",
+         "record-binding-before-issuer"},
         {"issuer-before-audience", ":ok <- check(parsed.iss == entry.issuer, :issuer_mismatch)",
-         ":ok <- check(parsed.aud == context.audience, :audience_mismatch)", "issuer-before-audience"},
+         ":ok <- check(parsed.aud == context.audience, :audience_mismatch)",
+         "issuer-before-audience"},
         {"audience-before-request",
          ":ok <- check(parsed.aud == context.audience, :audience_mismatch)",
          ":ok <- request_binding(parsed, record, context)", "audience-before-request"},
         {"request-before-subject", ":ok <- request_binding(parsed, record, context)",
-         ":ok <- check(record.subject == context.subject, :subject_mismatch)", "request-before-subject"},
+         ":ok <- check(record.subject == context.subject, :subject_mismatch)",
+         "request-before-subject"},
         {"subject-before-scope",
          ":ok <- check(record.subject == context.subject, :subject_mismatch)",
-         ":ok <- check(record.action == context.action, :scope_mismatch)", "subject-before-scope"},
+         ":ok <- check(record.action == context.action, :scope_mismatch)",
+         "subject-before-scope"},
         {"scope-before-time",
          ":ok <- check(record.resources == context.resources, :scope_mismatch)",
          ":ok <- Codec.current_window(parsed, context.now)", "scope-before-time"},
@@ -118,10 +134,8 @@ ordering =
          "window-before-duration"},
         {"lifetime-before-active",
          ":ok <- check(parsed.exp - parsed.iat <= context.max_lifetime, :lifetime_too_long)",
-         ":ok <-\n           check(is_nil(max_active) or parsed.exp - parsed.nbf <= max_active, :active_too_long)",
-         "lifetime-before-active"},
-        {"active-before-role",
-         ":ok <-\n           check(is_nil(max_active) or parsed.exp - parsed.nbf <= max_active, :active_too_long)",
+         active, "lifetime-before-active"},
+        {"active-before-role", active,
          ":ok <- check(Enum.member?(context.roles, record.approver_role), :role_not_permitted)",
          "active-before-role"}
       ] do
@@ -131,23 +145,6 @@ ordering =
   end
 
 early_ordering = [
-  {approval, "context-before-trust",
-   "    with {:ok, ca, bounds, max_active} <- preflight(context),\n",
-   """
-       with :ok <-
-              if(match?(%{snapshot: nil}, context), do: {:error, :trust_unavailable}, else: :ok),
-            {:ok, ca, bounds, max_active} <- preflight(context),
-   """, "context-before-snapshot-and-bytes"},
-  {approval, "trust-before-freshness",
-   "         {:ok, keys, as_of} <-",
-   """
-            :ok <-
-              if match?(%{snapshot: %{provenance: "", as_of: 0}}, context),
-                do: {:error, :stale_trust},
-                else: :ok,
-            {:ok, keys, as_of} <-
-   """
-   |> String.trim_trailing("\n"), "stale-invalid-provenance"},
   {approval, "record-before-key",
    """
             {:ok, record} <- parse_record(bytes, bounds, ca),
@@ -187,36 +184,41 @@ args =
   |> Path.wildcard()
   |> Enum.flat_map(&["-pa", &1])
 
-run = fn source, label, case_id, expected_exit ->
+run = fn source, label, check, verdict, expected_exit ->
   code = """
   Code.compiler_options(ignore_module_conflict: true)
   Code.compile_string(#{inspect(source, limit: :infinity, printable_limit: :infinity)})
   ExUnit.start(autorun: false, seed: 42)
   Code.require_file("test/bounded_authority_protocol/action_approval/corpus_test.exs")
-  result = ExUnit.run()
-  IO.puts("APPROVAL_MUTATION_RESULT total=" <> Integer.to_string(result.total))
-  System.halt(cond do
-    result.total != 12 -> 1
-    result.failures > 0 -> 42
-    true -> 0
-  end)
+  #{check}
   """
 
   {output, status} = System.cmd("elixir", args ++ ["-e", code], stderr_to_stdout: true)
 
-  ran_all = String.contains?(output, "APPROVAL_MUTATION_RESULT total=12")
-  targeted = is_nil(case_id) or String.contains?(output, case_id)
+  results =
+    output
+    |> String.split("\n")
+    |> Enum.filter(&String.starts_with?(&1, "APPROVAL_MUTATION_RESULT "))
 
-  unless status == expected_exit and ran_all and targeted do
+  unless status == expected_exit and results == ["APPROVAL_MUTATION_RESULT " <> verdict] do
     IO.puts(output)
     raise "approval mutation #{label} did not produce expected test verdict: #{status}"
   end
 
-  outcome = if status == 0, do: "control passed", else: "mutation killed by #{case_id}"
-  IO.puts("#{label}: #{outcome}")
+  IO.puts("#{label}: #{verdict}")
 end
 
-run.(File.read!(approval), "unmodified", nil, 0)
+control = """
+case ExUnit.run() do
+  %{total: 12, failures: 0, skipped: 0, excluded: 0} ->
+    IO.puts("APPROVAL_MUTATION_RESULT control passed")
+
+  result ->
+    raise "unexpected full corpus control: " <> inspect(result)
+end
+"""
+
+run.(File.read!(approval), "unmodified", control, "control passed", 0)
 
 for {file, label, before, after_mutation, case_id} <-
       omissions ++ weakening ++ ordering ++ early_ordering do
@@ -225,5 +227,22 @@ for {file, label, before, after_mutation, case_id} <-
   unless length(:binary.matches(source, before)) == 1,
     do: raise("approval mutation #{label} does not have exactly one target")
 
-  run.(String.replace(source, before, after_mutation, global: false), label, case_id, 42)
+  witness = """
+  id = #{inspect(case_id)}
+
+  try do
+    BoundedAuthorityProtocol.ActionApproval.CorpusTest.assert_mutation_witness(id)
+  rescue
+    error in ExUnit.AssertionError ->
+      if error.message === id do
+        IO.puts("APPROVAL_MUTATION_RESULT mutation killed by " <> id)
+        System.halt(42)
+      end
+
+      reraise error, __STACKTRACE__
+  end
+  """
+
+  mutant = String.replace(source, before, after_mutation, global: false)
+  run.(mutant, label, witness, "mutation killed by " <> case_id, 42)
 end

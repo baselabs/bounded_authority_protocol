@@ -8,29 +8,34 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1, as: ES256
   alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertion, as: EsAssertion
   alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts, as: EsFacts
-  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion, as: EsExpected
   alias BoundedAuthorityProtocol.ContentAssertion.V1, as: EdDSA
   alias BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts
+  alias BoundedAuthorityProtocol.RoleAttestation.V1, as: RoleAttestation
+  alias BoundedAuthorityProtocol.V1, as: V1Facade
   alias BoundedAuthorityProtocol.V1.{Bounds, HistoricalPublicKey, Jcs}
+  alias BoundedAuthorityProtocol.V2, as: V2Facade
+  alias BoundedAuthorityProtocol.V3, as: V3Facade
 
   @approval "bap-action-approval/1"
   @es256 "bap-content-assertion-es256/1"
 
   # Source candidate identities. The released corpus catalog remains independently gated.
   @pins %{
-    "KmdlwraZAGipnVaQ012WGxKiXFbVQ57DFSNFRNGCDOs" => @approval,
+    "NUcBmDSfKwOwxd9DaFaaQ36uOYR_pLjfHNHySzPW-CY" => @approval,
     "15Mp1DHeCT8WJhP70qL-g4dmtpD6Z8-8FHjq-jIrPGM" => @es256
   }
 
   @binary_fields ~w(attestor_key_fingerprint content_digest digest prev profile_digest
     public_key revision_digest)a
+  # Include the intentionally unsupported fixture key so the bounds validator rejects it.
   @fields Map.new(
             Map.keys(Bounds.__struct__()) ++
-              ~w(action approver_role assertion attestor attestor_key_id audience bounds
-                 entries exp gen iat id iss issuer jti key key_id max_active max_lifetime
-                 max_staleness nbf now profile provenance record record_bounds request_id
-                 resource_count resources roles snapshot sub subject suite trust trust_domain
-                 valid_before valid_from verification version as_of)a ++ @binary_fields,
+              ~w(action approver_role as_of assertion attestor attestor_key_id aud audience
+                 bounds entries exp gen iat id iss issuer jti key key_id max_active max_lifetime
+                 max_staleness nbf now profile provenance record record_bounds record_bytes
+                 request_id resource_count resources roles snapshot sub subject suite trust
+                 trust_domain unknown valid_before valid_from verification
+                 version)a ++ @binary_fields,
             fn field -> {Atom.to_string(field), field} end
           )
 
@@ -79,18 +84,13 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
     %{"profile_preimage_hex" => hex, "profile_digest_hex" => digest} = metadata
 
     sha(Base.decode16!(hex, case: :lower)) == digest and
-      Base.encode16(Approval.profile_digest(), case: :lower) ==
-        digest
+      Base.encode16(Approval.profile_digest(), case: :lower) == digest
   end
 
   defp known_answer?(@es256, %{"signing" => signing}) do
     with {:ok, input} <- signing_input(signing),
          true <- output(input) == signing["expected"],
-         {:ok, compact} <-
-           ES256.assemble_compact(
-             input,
-             raw(signing["signature"])
-           ) do
+         {:ok, compact} <- ES256.assemble_compact(input, raw(signing["signature"])) do
       compact == signing["compact"]
     else
       _failure -> false
@@ -146,23 +146,16 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
     encoded =
       case item do
         %{"wire" => wire} ->
-          with {:ok, %Record{} = record} <-
-                 Approval.decode_record(raw(wire), ca, limits) do
-            Approval.encode_record(record, ca, limits)
-          else
-            {:error, :invalid} -> {:error, :invalid}
+          case Approval.decode_record(raw(wire), ca, limits) do
+            {:ok, %Record{} = record} -> Approval.encode_record(record, ca, limits)
+            {:error, :invalid} = error -> error
             _unexpected -> :unexpected
           end
 
         %{"author" => author} ->
           record = struct!(Record, fields(Map.delete(author, "v")))
 
-          Approval.encode_record(
-            record,
-            ca,
-            limits,
-            item["canonicalize"]
-          )
+          Approval.encode_record(record, ca, limits, item["canonicalize"])
       end
 
     case encoded do
@@ -206,10 +199,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
     compact = item["compact"]
     bounds = fields(item["bounds"])
 
-    with {:ok, artifact} <-
-           ES256.decode_assertion(compact, bounds),
-         {:ok, digest} <-
-           ES256.assertion_digest(compact, bounds) do
+    with {:ok, artifact} <- ES256.decode_assertion(compact, bounds),
+         {:ok, digest} <- ES256.assertion_digest(compact, bounds) do
       artifact
       |> output()
       |> Map.drop(["version", "verification"])
@@ -221,7 +212,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
   defp execute("assertion-verification-cases.json", item, _, _) do
     context = item["context"] |> fields() |> Map.put(:bounds, %{})
-    expected = struct!(EsExpected, context)
+    expected = struct!(ES256.ExpectedContentAssertion, context)
 
     case ES256.verify_assertion(item["compact"], expected) do
       {:ok, facts} -> output(facts)
@@ -230,10 +221,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   end
 
   defp execute("digest-cases.json", item, _, _) do
-    case ES256.content_digest(
-           raw(item["input"]),
-           fields(item["bounds"])
-         ) do
+    case ES256.content_digest(raw(item["input"]), fields(item["bounds"])) do
       {:ok, digest} -> b64(digest)
       {:error, :invalid} -> "invalid"
     end
@@ -242,10 +230,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   defp execute("assembly-cases.json", item, %{"signing" => signing}, _) do
     {:ok, input} = signing_input(signing)
 
-    case ES256.assemble_compact(
-           input,
-           raw(item["signature"])
-         ) do
+    case ES256.assemble_compact(input, raw(item["signature"])) do
       {:ok, compact} -> compact
       {:error, :invalid} -> "invalid"
     end
@@ -264,8 +249,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   defp execute("separation-cases.json", item, _, _) do
     id = item["id"]
 
-    with {:error, :invalid} <-
-           ES256.decode_assertion(item["foreign"], %{}),
+    with {:error, :invalid} <- ES256.decode_assertion(item["foreign"], %{}),
          {:ok, _} <- foreign(id, item["foreign"]),
          {:error, :invalid} <- foreign(id, item["candidate"]) do
       "both_reject"
@@ -314,7 +298,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   defp field_value(field, value) when field in @binary_fields, do: raw(value)
 
   # Preserve exact fixture keys so malformed historical entries reach snapshot admission.
-  defp field_value(field, value) when field in [:attestor, :key],
+  defp field_value(field, value) when field in [:attestor, :key] and is_map(value),
     do: Map.put(fields(value), :__struct__, HistoricalPublicKey)
 
   defp field_value(:suite, "eddsa"), do: :eddsa
@@ -372,42 +356,41 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
     do: Loopback.decode_proof(compact, %{})
 
   defp foreign("role-attestation", compact),
-    do: BoundedAuthorityProtocol.RoleAttestation.V1.decode_attestation(compact, %{})
+    do: RoleAttestation.decode_attestation(compact, %{})
 
   defp foreign("v1-grant", compact),
-    do: BoundedAuthorityProtocol.V1.decode_grant(compact, %{})
+    do: V1Facade.decode_grant(compact, %{})
 
   defp foreign("v1-proof", compact),
-    do: BoundedAuthorityProtocol.V1.decode_proof(compact, %{})
+    do: V1Facade.decode_proof(compact, %{})
 
   defp foreign("v1-anchor", compact),
-    do: BoundedAuthorityProtocol.V1.BoundaryAnchorCodec.parse(compact, Bounds.maximum())
+    do: V1Facade.BoundaryAnchorCodec.parse(compact, Bounds.maximum())
 
   defp foreign("v1-transition", compact),
-    do: BoundedAuthorityProtocol.V1.KeyTransitionCodec.parse(compact, Bounds.maximum())
+    do: V1Facade.KeyTransitionCodec.parse(compact, Bounds.maximum())
 
   defp foreign("v2-grant", compact),
-    do: BoundedAuthorityProtocol.V2.decode_grant(compact, %{})
+    do: V2Facade.decode_grant(compact, %{})
 
   defp foreign("v2-proof", compact),
-    do: BoundedAuthorityProtocol.V2.decode_proof(compact, %{})
+    do: V2Facade.decode_proof(compact, %{})
 
   defp foreign("v2-anchor", compact),
-    do: BoundedAuthorityProtocol.V2.BoundaryAnchorCodec.parse(compact, Bounds.maximum())
+    do: V2Facade.BoundaryAnchorCodec.parse(compact, Bounds.maximum())
 
   defp foreign("v2-transition", compact),
-    do: BoundedAuthorityProtocol.V2.KeyTransitionCodec.parse(compact, Bounds.maximum())
+    do: V2Facade.KeyTransitionCodec.parse(compact, Bounds.maximum())
 
   defp foreign("v3-grant", compact),
-    do: BoundedAuthorityProtocol.V3.decode_grant(compact, %{})
+    do: V3Facade.decode_grant(compact, %{})
 
   defp foreign("v3-proof", compact),
-    do: BoundedAuthorityProtocol.V3.decode_proof(compact, %{})
+    do: V3Facade.decode_proof(compact, %{})
 
   defp foreign("v3-anchor", compact),
-    do: BoundedAuthorityProtocol.V3.BoundaryAnchorCodec.parse(compact, Bounds.maximum())
+    do: V3Facade.BoundaryAnchorCodec.parse(compact, Bounds.maximum())
 
   defp foreign("v3-transition", compact),
-    do: BoundedAuthorityProtocol.V3.KeyTransitionCodec.parse(compact, Bounds.maximum())
-
+    do: V3Facade.KeyTransitionCodec.parse(compact, Bounds.maximum())
 end

@@ -60,11 +60,11 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   test "candidate CLI reports all applicable Elixir verdicts and the SDK-owned census" do
     roots = [
-      "attestation-profiles/content-assertion-es256/v1",
-      "content-profiles/action-approval/v1"
+      {"attestation-profiles/content-assertion-es256/v1", 217, 0},
+      {"content-profiles/action-approval/v1", 190, 119}
     ]
 
-    for root <- roots do
+    for {root, total, sdk_owned} <- roots do
       path = Path.join(@priv_conformance, root)
       index_bytes = File.read!(Path.join(path, "index.json"))
       index = :json.decode(index_bytes)
@@ -77,11 +77,14 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
       assert report["profile"] == index["profile"]
       assert report["index_sha256_base64url"] == Report.index_identity(index_bytes)
       assert report["elixir_verdict_sha256"] == index["elixir_verdict_sha256"]
-      assert report["total"] == report["agreed"]
+      assert report["exit_status"] == 0
+      assert report["total"] == total
+      assert report["agreed"] == total
+      assert report["disagreed"] == 0
+      assert report["sdk_owned"] == sdk_owned
 
       declared = Enum.sum(for %{"cases" => count} <- index["files"], do: count)
       assert report["total"] + report["sdk_owned"] == declared
-      assert (report["sdk_owned"] > 0) == String.contains?(root, "action-approval")
     end
   end
 

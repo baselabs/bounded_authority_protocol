@@ -229,9 +229,10 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
   def verify_es256(record, compact, context), do: verify(:es256, record, compact, context)
 
   defp verify(suite, bytes, compact, context) do
-    with {:ok, ca, bounds, max_active} <- preflight(context),
-         {:ok, keys, as_of} <-
-           admit_snapshot(Map.get(context, :snapshot), context, suite, ca, bounds),
+    with {:ok, ca, bounds} <- context_bounds(context),
+         {:ok, max_active} <- preflight(context, ca, bounds),
+         {:ok, entries, as_of} <- snapshot_context(context, suite, ca),
+         {:ok, keys} <- admit_entries(entries, %{}, suite, ca, bounds),
          :ok <- check(fresh?(context.now - as_of, context.max_staleness), :stale_trust),
          {:ok, parsed} <- Codec.parse(compact, ca, suite),
          :ok <- check(RecordCodec.request_id?(parsed.sub, bounds, ca), :malformed),
@@ -269,40 +270,51 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
       String.valid?(value)
   end
 
-  defp preflight(%{
-         trust_domain: domain,
-         audience: audience,
-         request_id: request,
-         revision_digest: revision,
-         subject: subject,
-         action: action,
-         resources: resources,
-         roles: [_ | _] = roles,
-         now: now,
-         max_staleness: staleness,
-         max_lifetime: lifetime,
-         bounds: limits,
-         record_bounds: record_limits
-       } = context) do
+  defp context_bounds(%{bounds: limits, record_bounds: record_limits}) do
     result =
       with {:ok, ca} <- Bounds.coerce(limits),
-           {:ok, bounds} <- RecordCodec.bounds(record_limits, ca),
-           true <- scalar_identity?(domain, ca) and Codec.identifier?(audience, ca),
+           {:ok, bounds} <- RecordCodec.bounds(record_limits, ca) do
+        {:ok, ca, bounds}
+      end
+
+    stage(result, :invalid_context)
+  end
+
+  defp context_bounds(_), do: {:error, :invalid_context}
+
+  defp preflight(
+         %{
+           trust_domain: domain,
+           audience: audience,
+           request_id: request,
+           revision_digest: revision,
+           subject: subject,
+           action: action,
+           resources: resources,
+           roles: [_ | _] = roles,
+           now: now,
+           max_staleness: staleness,
+           max_lifetime: lifetime
+         } = context,
+         ca,
+         bounds
+       ) do
+    result =
+      with true <- scalar_identity?(domain, ca) and Codec.identifier?(audience, ca),
            true <- RecordCodec.request_id?(request, bounds, ca),
            true <- is_binary(revision) and byte_size(revision) == 32,
            true <- RecordCodec.text?(subject, bounds) and RecordCodec.text?(action, bounds),
            true <- RecordCodec.resources?(resources, bounds, false),
            true <- valid_roles?(roles, bounds, MapSet.new()),
            true <- Codec.integer?(now, ca),
-           true <- cap?(staleness, ca) and cap?(lifetime, ca),
-           {:ok, active} <- active_cap(Map.fetch(context, :max_active), ca) do
-        {:ok, ca, bounds, active}
+           true <- cap?(staleness, ca) and cap?(lifetime, ca) do
+        active_cap(Map.fetch(context, :max_active), ca)
       end
 
     stage(result, :invalid_context)
   end
 
-  defp preflight(_), do: {:error, :invalid_context}
+  defp preflight(_, _, _), do: {:error, :invalid_context}
 
   defp active_cap(:error, _ca), do: {:ok, nil}
 
@@ -312,29 +324,26 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
 
   defp cap?(value, ca), do: Codec.integer?(value, ca) and value >= 0
 
-  defp admit_snapshot(
+  defp snapshot_context(
          %{
            trust_domain: domain,
-           suite: suite,
-           provenance: provenance,
-           as_of: as_of,
-           entries: entries
+           snapshot: %{
+             trust_domain: domain,
+             suite: suite,
+             provenance: provenance,
+             as_of: as_of,
+             entries: entries
+           }
          },
-         %{trust_domain: domain},
          suite,
-         ca,
-         bounds
+         ca
        ) do
-    result =
-      with true <- scalar_identity?(provenance, ca) and Codec.integer?(as_of, ca),
-           {:ok, keys} <- admit_entries(entries, %{}, suite, ca, bounds) do
-        {:ok, keys, as_of}
-      end
-
-    stage(result, :trust_unavailable)
+    if scalar_identity?(provenance, ca) and Codec.integer?(as_of, ca),
+      do: {:ok, entries, as_of},
+      else: {:error, :trust_unavailable}
   end
 
-  defp admit_snapshot(_, _, _, _, _), do: {:error, :trust_unavailable}
+  defp snapshot_context(_, _, _), do: {:error, :trust_unavailable}
 
   defp admit_entries([], keys, _, _, _), do: {:ok, keys}
 
@@ -419,6 +428,5 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
 
   defp stage({:ok, _} = result, _code), do: result
   defp stage({:ok, _, _} = result, _code), do: result
-  defp stage({:ok, _, _, _} = result, _code), do: result
   defp stage(_, code), do: {:error, code}
 end

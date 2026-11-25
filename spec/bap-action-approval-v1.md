@@ -334,7 +334,7 @@ with an exact record-digest selector and a holder proof
 
 The candidate corpus root is `priv/conformance/content-profiles/action-approval/v1`.
 Use one frozen `index.json` covering the following case files. Index SHA-256 (hex) at freeze
-is `2a6765c2b6990068a99d5690d35d961b12a25c56d5439ec315234544d1820ceb`. Consumers MUST pin the index and verify
+is `35470198349f2b03b0c5df4368569a437eae39847fa4b8df1cd1f24b33d6f826`. Consumers MUST pin the index and verify
 its indexed file hashes (`REQ-AA1-CONFORMANCE-pin`).
 
 | File | Inputs and expected results |
