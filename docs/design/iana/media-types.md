@@ -94,6 +94,24 @@ Submission to IANA for registration is externally gated.
 - **Change controller:** Bounded Authority Protocol maintainers
 - **Wire `typ`:** `ba+content-assertion`
 
+## application/ba-content-assertion-es256+jwt (candidate)
+
+- **Type name:** application
+- **Subtype name:** ba-content-assertion-es256+jwt
+- **Required parameters:** None
+- **Optional parameters:** None
+- **Encoding considerations:** Compact JWS (RFC 7515) serialization of a closed JSON object; UTF-8; base64url segments; binary-safe
+- **Security considerations:** See Trust, knowledge, and operational limits in the BAP ES256 Content Assertion Profile 1
+- **Interoperability considerations:** Closed ES256 content assertion with an exact protected type and a raw low-S P-256 signature; the Ed25519 content assertion profile rejects these bytes
+- **Published specification:** spec/bap-content-assertion-es256-v1.md (BAP ES256 Content Assertion Profile 1)
+- **Applications that use this media type:** Standalone ES256 signed assertions about exact external content bytes
+- **Fragment identifier considerations:** N/A
+- **Intended usage:** LIMITED USE
+- **Restrictions on usage:** Trusted-key selection, content interpretation and durable successor selection remain caller obligations
+- **Author:** Bounded Authority Protocol maintainers
+- **Change controller:** Bounded Authority Protocol maintainers
+- **Wire `typ`:** `ba+content-assertion-es256`
+
 ## application/ba-key-transition+jwt (active)
 
 - **Type name:** application

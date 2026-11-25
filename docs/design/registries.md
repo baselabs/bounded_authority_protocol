@@ -11,7 +11,8 @@ reserved-but-inactive name exactly as it rejects any other unlisted member.
 
 Registry policy: entries are added by a published specification or governance change. `active` means normative in a named closed profile;
 `reserved` means the name is held for a specified future purpose and MUST NOT be used for anything
-else by any implementation or deployment.
+else by any implementation or deployment. `candidate` means the name has a candidate normative
+contract and remains reserved until its first bearing release.
 
 ## Cryptographic suites
 
@@ -50,6 +51,7 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 | `ba+chain-anchor` | active | `application/ba-chain-anchor+jwt` | Signed consumption-chain boundary anchor |
 | `ba+role-attestation` | active | `application/ba-role-attestation+jwt` | Signed role attestation binding a subject key to a role under `bap-role-attestation/1` (a sibling attestation profile) |
 | `ba+content-assertion` | active | `application/ba-content-assertion+jwt` | Standalone exact-content assertion under `bap-content-assertion/1` (a sibling attestation profile) |
+| `ba+content-assertion-es256` | candidate | `application/ba-content-assertion-es256+jwt` | Standalone ES256 exact-content assertion under `bap-content-assertion-es256/1` (a sibling attestation profile) |
 | `ba+key-transition` | active | `application/ba-key-transition+jwt` | Authenticated historical-key transition |
 | `ba+cap-delegated` | reserved | `application/ba-cap-delegated+jwt` | Delegated attenuated grant, per charter § Delegation with attenuation; full mechanism charted in the successor-major charter |
 | `ba+suite-attestation` | reserved | `application/ba-suite-attestation+jwt` | A current-suite key signs the archive's content digest as a cross-suite content-covering countersignature, so evidence trust survives the original suite's cryptanalytic break; charter § Evidence longevity and cross-suite attestation |
@@ -69,6 +71,16 @@ grant-unbound signed artifacts verified only through their own named API.
 |---|---|---|---|
 | `bap-role-attestation/1` | active | `ba+role-attestation` | Role attestation binding a subject key to `issuer` or `holder` for a bounded window, in [`spec/bap-role-attestation-v1.md`](../../spec/bap-role-attestation-v1.md); every contract-major profile rejects these bytes |
 | `bap-content-assertion/1` | active | `ba+content-assertion` | Digest-bound context, validity and successor assertions in [`spec/bap-content-assertion-v1.md`](../../spec/bap-content-assertion-v1.md) |
+| `bap-content-assertion-es256/1` | candidate | `ba+content-assertion-es256` | P-256 sibling content assertion in [`spec/bap-content-assertion-es256-v1.md`](../../spec/bap-content-assertion-es256-v1.md) |
+
+## Content profiles
+
+Content profile identities name externally carried record contracts. The signed
+`profile` and `profile_digest` fields bind the identity and descriptor.
+
+| Identity | Status | Definition |
+|---|---|---|
+| `bap-action-approval/1` | candidate | Canonical exact-action record and versioned approval verification in [`spec/bap-action-approval-v1.md`](../../spec/bap-action-approval-v1.md) |
 
 ## Selector kinds
 
