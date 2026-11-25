@@ -76,7 +76,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
             []
         end)
 
-      if Enum.all?(cases, &(&1 != :wrong_count)),
+      if Enum.all?(cases, &match?({_path, _item}, &1)),
         do: {:ok, cases, :json.decode(Map.fetch!(files, "profile.json"))},
         else: {:error, :integrity}
     end
