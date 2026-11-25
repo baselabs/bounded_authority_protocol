@@ -7,6 +7,8 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec do
 
   @maximum %{string_bytes: 1_024, resource_count: 4_096, record_bytes: 65_536}
   @keys ~w(action approver_role request_id resources revision_digest subject v)
+  @empty_record ~s({"action":"","approver_role":"","request_id":"","resources":[],"revision_digest":"","subject":"","v":1})
+  @record_overhead byte_size(@empty_record) + 43
 
   def bounds(limits, ca) when is_map(limits) and not is_map_key(limits, :__struct__) do
     if Enum.all?(limits, &valid_bound?/1) do
@@ -89,7 +91,8 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec do
            true <- request_id?(request_id, bounds, ca),
            true <- is_binary(digest) and byte_size(digest) == 32,
            true <- resources?(resources, bounds, canonicalize?),
-           names = canonical_resources(resources, canonicalize?) do
+           names = canonical_resources(resources, canonicalize?),
+           true <- fits_encoding?(record, names, bounds.record_bytes) do
         value =
           {:object,
            [
@@ -114,6 +117,27 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec do
   end
 
   def encode(_, _, _, _), do: {:error, :invalid}
+
+  defp fits_encoding?(record, resources, limit) do
+    # The empty record already accounts for the four surrounding quote pairs.
+    size =
+      @record_overhead + Jcs.escaped_string_bytes(record.action) +
+        Jcs.escaped_string_bytes(record.approver_role) +
+        Jcs.escaped_string_bytes(record.request_id) + Jcs.escaped_string_bytes(record.subject) -
+        8
+
+    resources_fit?(resources, limit - size)
+  end
+
+  defp resources_fit?([], remaining), do: remaining >= 0
+
+  defp resources_fit?([name | rest], remaining) do
+    remaining = remaining - Jcs.escaped_string_bytes(name) - separator_bytes(rest)
+    remaining >= 0 and resources_fit?(rest, remaining)
+  end
+
+  defp separator_bytes([]), do: 0
+  defp separator_bytes([_ | _]), do: 1
 
   defp canonical_resources(resources, false), do: resources
   defp canonical_resources(resources, true), do: resources |> Enum.sort() |> Enum.dedup()

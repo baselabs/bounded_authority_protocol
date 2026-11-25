@@ -792,6 +792,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     BoundedAuthorityProtocol.Conformance.Cli.Main
     BoundedAuthorityProtocol.V1.Json.decode_approval_record/3
     BoundedAuthorityProtocol.V1.Jcs.encode_approval_record/4
+    BoundedAuthorityProtocol.V1.Jcs.escaped_string_bytes/1
     BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1
     BoundedAuthorityProtocol.Ed25519.signature_gate?/1
     BoundedAuthorityProtocol.Ed25519.strict_gate?/2

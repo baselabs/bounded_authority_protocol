@@ -126,7 +126,7 @@ finite key-window endpoints obey integer magnitude and `valid_from < valid_befor
 7. The ES256 signature over the original JWS signing input verifies against the
    supplied public key (`REQ-CAE1-VERIFY-signature`).
 
-[BAP v3 § 3.1](bap-v3.md#31-keys-and-the-proof-jwk) supplies the exact raw key
+[BAP v3 § 3.1](bap-v3.md#suite-rules) supplies the exact raw key
 format, coordinate range, on-curve rules, and P-256 JWK thumbprint construction.
 [BAP v3 § 3.2](bap-v3.md#signatures) supplies the exact signature rules. The raw
 64-byte `r || s` signature MUST pass range validation and then the low-S check

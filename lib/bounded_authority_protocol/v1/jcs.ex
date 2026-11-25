@@ -44,6 +44,9 @@ defmodule BoundedAuthorityProtocol.V1.Jcs do
 
   def encode_approval_record(_, _, _, _), do: {:error, :invalid}
 
+  @doc false
+  def escaped_string_bytes(value), do: :erlang.iolist_size(escape_string(value))
+
   defp encode_bounded(value, bounds) do
     try do
       {encoded, _nodes} = encode_value(value, bounds, 0, 0)

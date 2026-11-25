@@ -66,10 +66,12 @@ the input before canonicalizing, and the encoded-size limit to the output.
 A wire parser MUST reject unordered or duplicate entries without
 repairing them (`REQ-AA1-RECORD-authoring`).
 
+<a id="record-profile-identity"></a>
+
 ## 3. Bounds and profile identity
 
 The record ceilings `string_bytes`, `resource_count` and `record_bytes` are
-independently tightenable under [BAP v1 § 17](bap-v1.md#17-hard-maxima).
+independently tightenable under [BAP v1 § 17](bap-v1.md#maxima).
 Only known ceilings with positive integer values at or below their maxima
 are valid. Fixed widths, schema rules, and cryptographic formats remain fixed.
 Invalid resource bounds return `invalid_context` during approval preflight.
@@ -191,7 +193,7 @@ a public key and its fingerprint, its historical validity window, and its
 current approver role set. The issuer obeys CA StringOrUri and identifier bounds.
 Admit strict torsion-free Ed25519 keys per
 [BAP v1 § 14.1](bap-v1.md#strict-ed25519), or P-256 keys under
-[BAP v3 § 3.1](bap-v3.md#31-keys-and-the-proof-jwk), before installing the
+[BAP v3 § 3.1](bap-v3.md#suite-rules), before installing the
 snapshot or making fingerprint-based deny comparisons. Compute or validate the
 fingerprint using the selected CA profile. Refuse duplicate key IDs at
 admission. `valid_from` is a finite signed NumericDate. `valid_before` is a
