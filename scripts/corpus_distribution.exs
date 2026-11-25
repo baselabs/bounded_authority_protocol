@@ -4,6 +4,13 @@ defmodule BoundedAuthorityProtocol.CorpusDistribution do
   @moduledoc false
   alias BoundedAuthorityProtocol.CorpusCatalog, as: Catalog
 
+  # These source-only candidates join the Hex and SDK inventory when every
+  # maintained runner can execute their complete case sets.
+  @candidate_roots [
+    "attestation-profiles/content-assertion-es256/v1/",
+    "content-profiles/action-approval/v1/"
+  ]
+
   def files!(root), do: walk!(root, root) |> MapSet.new()
 
   defp walk!(path, root) do
@@ -15,8 +22,11 @@ defmodule BoundedAuthorityProtocol.CorpusDistribution do
   end
 
   def compare!(source, snapshot) do
+    compare_files!(source, snapshot, files!(snapshot))
+  end
+
+  defp compare_files!(source, snapshot, snapshot_files) do
     source_files = files!(source)
-    snapshot_files = files!(snapshot)
     unless source_files == snapshot_files, do: raise("corpus file set mismatch: #{snapshot}")
 
     for relative <- source_files do
@@ -27,7 +37,7 @@ defmodule BoundedAuthorityProtocol.CorpusDistribution do
 
   def inventory!(package_root, source_root \\ Catalog.root()) do
     shipped = files!(Path.join(package_root, "priv/conformance"))
-    source = files!(Path.join(source_root, "priv/conformance"))
+    source = release_source_files(Path.join(source_root, "priv/conformance"))
     unless shipped == source, do: raise("Hex corpus inventory differs from source tree")
 
     # Read the independent exact package census without executing the consumer build gate.
@@ -73,13 +83,21 @@ defmodule BoundedAuthorityProtocol.CorpusDistribution do
   def check!(package_root, source_root \\ Catalog.root()) do
     inventory!(package_root, source_root)
     source = Path.join(package_root, "priv/conformance")
-    compare!(source, Path.join(source_root, "priv/conformance"))
+    source_tree = Path.join(source_root, "priv/conformance")
+    compare_files!(source, source_tree, release_source_files(source_tree))
 
     for sdk <- ["python", "rust", "go"] do
       old = Path.wildcard(Path.join(source_root, "sdks/#{sdk}/conformance/corpus*"))
       if old != [], do: raise("uncatalogued SDK snapshots: #{inspect(old)}")
       compare!(source, Path.join(source_root, "sdks/#{sdk}/conformance/priv/conformance"))
     end
+  end
+
+  defp release_source_files(root) do
+    root
+    |> files!()
+    |> Enum.reject(&String.starts_with?(&1, @candidate_roots))
+    |> MapSet.new()
   end
 
   def with_package!(fun) do

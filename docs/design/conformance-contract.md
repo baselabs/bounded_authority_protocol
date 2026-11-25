@@ -237,3 +237,15 @@ projections for cases with and without `expected`. Each runner records actual re
 unique case ID, rejects missing execution, and compares its computed digest with the manifest.
 The CLI 1.x report retains its existing members. The manifest sits outside every corpus
 folder, so each corpus's refusal of files absent from its index remains intact.
+
+## ES256 content assertion and action approval candidates
+
+The candidate indexes under
+`priv/conformance/attestation-profiles/content-assertion-es256/v1` and
+`priv/conformance/content-profiles/action-approval/v1` bind their exact file sets,
+counts, SHA-256 digests and expected verdict digests. The independent Python
+checker regenerates them from the signature, record and ordered diagnostic
+contracts. Elixir consumes the pure cases by index. The SDK helper fixtures
+supply public predicate observations and the expected call sequence and result.
+SDK adoption and full runner qualification precede adding these indexes to the
+published corpus inventory.

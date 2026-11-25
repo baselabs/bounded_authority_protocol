@@ -326,17 +326,27 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.ExpectedContentAssertion.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
     },
-    "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.Codec.beam" => %{
-      {:assemble, 3} => %{variable_call: 4},
-      {:assertion_digest, 2} => %{variable_call: 2},
-      {:canonical_object, 3} => %{variable_call: 4},
-      {:content_digest, 2} => %{variable_call: 2},
-      {:decode, 2} => %{variable_call: 2},
-      {:parse, 2} => %{variable_call: 13},
-      {:signing_input, 2} => %{variable_call: 9},
-      {:verify, 2} => %{variable_call: 10},
-      {:verify_successor, 3} => %{variable_call: 8}
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertion.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
     },
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.DecodedContentAssertion.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.Record.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts.beam" => %{
+      {:__struct__, 1} => %{enum_reduce: 1}
+    },
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.Codec.beam" => %{},
+    "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.beam" => %{},
+    "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec.beam" => %{},
     "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
     },
@@ -414,6 +424,34 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
                                     verify_successor: 3,
                                     module_info: 0,
                                     module_info: 1
+                                  ],
+                                  "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.beam" => [
+                                    __info__: 1,
+                                    assertion_signing_input: 2,
+                                    assemble_compact: 2,
+                                    assemble_compact: 3,
+                                    decode_assertion: 2,
+                                    verify_assertion: 2,
+                                    content_digest: 2,
+                                    assertion_digest: 2,
+                                    verify_successor: 3,
+                                    module_info: 0,
+                                    module_info: 1
+                                  ],
+                                  "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.beam" => [
+                                    __info__: 1,
+                                    decode_record: 1,
+                                    decode_record: 2,
+                                    decode_record: 3,
+                                    encode_record: 1,
+                                    encode_record: 2,
+                                    encode_record: 3,
+                                    encode_record: 4,
+                                    module_info: 0,
+                                    module_info: 1,
+                                    profile_digest: 0,
+                                    verify_eddsa: 3,
+                                    verify_es256: 3
                                   ],
                                   "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.beam" => [
                                     __info__: 1,
@@ -652,6 +690,14 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   @stable_modules ~w(
     BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1
     BoundedAuthorityProtocol.Conformance.Cli
+    BoundedAuthorityProtocol.ActionApproval.V1
+    BoundedAuthorityProtocol.ActionApproval.V1.Record
+    BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts
+    BoundedAuthorityProtocol.ContentAssertion.ES256.V1
+    BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertion
+    BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts
+    BoundedAuthorityProtocol.ContentAssertion.ES256.V1.DecodedContentAssertion
+    BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion
     BoundedAuthorityProtocol.ContentAssertion.V1
     BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertion
     BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts
@@ -744,6 +790,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     BoundedAuthorityProtocol.Conformance.Runner
     BoundedAuthorityProtocol.Conformance.Report
     BoundedAuthorityProtocol.Conformance.Cli.Main
+    BoundedAuthorityProtocol.V1.Json.decode_approval_record/3
+    BoundedAuthorityProtocol.V1.Jcs.encode_approval_record/4
     BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1
     BoundedAuthorityProtocol.Ed25519.signature_gate?/1
     BoundedAuthorityProtocol.Ed25519.strict_gate?/2
@@ -764,6 +812,21 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   # The exact field set of every stable struct (sorted). Adding a field with a default is a minor
   # release and updates this pin in the same change; removing or renaming one is a 2.0.0.
   @public_struct_fields %{
+    "BoundedAuthorityProtocol.ActionApproval.V1.Record" =>
+      ~w(action approver_role request_id resources revision_digest subject)a,
+    "BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts" =>
+      ~w(assertion record suite trust trust_domain)a,
+    "BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertion" =>
+      ~w(attestor_key_id aud content_digest exp gen iat iss jti nbf prev profile profile_digest
+        sub)a,
+    "BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts" =>
+      ~w(attestor_key_fingerprint attestor_key_id aud content_digest digest exp gen iat iss jti
+        nbf prev profile profile_digest sub trust verification version)a,
+    "BoundedAuthorityProtocol.ContentAssertion.ES256.V1.DecodedContentAssertion" =>
+      ~w(attestor_key_id aud content_digest exp gen iat iss jti nbf prev profile profile_digest
+        sub verification version)a,
+    "BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion" =>
+      ~w(attestor audience bounds content_digest issuer now profile profile_digest subject)a,
     "BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertion" =>
       ~w(attestor_key_id aud content_digest exp gen iat iss jti nbf prev profile profile_digest
         sub)a,
@@ -982,7 +1045,13 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "lib/bounded_authority_protocol/content_assertion/v1/content_assertion.ex",
     "lib/bounded_authority_protocol/content_assertion/v1/content_assertion_facts.ex",
     "lib/bounded_authority_protocol/content_assertion/v1/decoded_content_assertion.ex",
-    "lib/bounded_authority_protocol/content_assertion/v1/expected_content_assertion.ex"
+    "lib/bounded_authority_protocol/content_assertion/v1/expected_content_assertion.ex",
+    "lib/bounded_authority_protocol/content_assertion/es256/v1/content_assertion.ex",
+    "lib/bounded_authority_protocol/content_assertion/es256/v1/content_assertion_facts.ex",
+    "lib/bounded_authority_protocol/content_assertion/es256/v1/decoded_content_assertion.ex",
+    "lib/bounded_authority_protocol/content_assertion/es256/v1/expected_content_assertion.ex",
+    "lib/bounded_authority_protocol/action_approval/v1/record.ex",
+    "lib/bounded_authority_protocol/action_approval/v1/verified_approval_facts.ex"
   ]
 
   # Input and decoded structs that hold credentials (compacts, typed arguments, nonces). Their
@@ -1118,6 +1187,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     AnchoredExportInput ArchivedObject AttestationFacts Base64Url BoundaryAnchor BoundaryAnchorCodec Bounds
     ChainFacts ChainInput Codec CompactJws ConsumptionChain ConsumptionEntry Container ContextValidation Credentials
     ContentAssertion ContentAssertionFacts DecodedContentAssertion ExpectedContentAssertion
+    EdContext EdDSA ES256 Record RecordCodec VerifiedApprovalFacts
     Corpus DecodedAttestation DecodedGrant DecodedProof Ed25519 EncodedAnchoredExport EncodedConsumptionEntry
     EnvelopeFacts
     ExpectedAnchor ExpectedAnchoredExport ExpectedAttestation ExpectedChain ExpectedExport ExpectedGrant
@@ -1146,7 +1216,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     bound_profile tamper verdict agree agreed disagreed agreement exit_status total kid
     issuer_key_fingerprint matched_audience major attestor attestor_key_id
     attestor_key_fingerprint subject_key_id subject_key_fingerprint subject_public_key role jti
-    nbf exp now content_bytes iss aud sub profile profile_digest content_digest gen prev iat subject)a
+    nbf exp now content_bytes iss aud sub profile profile_digest content_digest gen prev iat subject
+    action approver_role fingerprint key max_lifetime max_staleness record_bytes request_id
+    resource_count resources revision_digest roles trust_domain)a
 
   def check(root, opts \\ []) do
     root = Path.expand(root)
@@ -2097,6 +2169,12 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules("lib/bounded_authority_protocol/content_assertion/v1/codec.ex"),
     do: ~w(Access Atom Enum Map String StringOrUri)
 
+  defp approved_source_modules("lib/bounded_authority_protocol/action_approval/v1.ex"),
+    do: ~w(Enum MapSet String)
+
+  defp approved_source_modules("lib/bounded_authority_protocol/action_approval/v1/record_codec.ex"),
+    do: ~w(Enum String)
+
   defp approved_source_modules("lib/bounded_authority_protocol/role_attestation/v1/codec.ex"),
     do: ~w(Access Enum Map String StringOrUri)
 
@@ -2461,6 +2539,34 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       ]
   end
 
+  defp approved_source_call?("lib/bounded_authority_protocol/action_approval/v1.ex", module, function),
+    do:
+      {module, function} in [
+        {"Enum", :member?},
+        {"Map", :get},
+        {"MapSet", :member?},
+        {"MapSet", :new},
+        {"MapSet", :put},
+        {"String", :valid?}
+      ]
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/action_approval/v1/record_codec.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {"Enum", :all?},
+           {"Enum", :dedup},
+           {"Enum", :map},
+           {"Enum", :reverse},
+           {"Enum", :sort},
+           {"Map", :get},
+           {"Map", :new},
+           {"String", :valid?}
+         ]
+
   # CLI I/O carve-out (C1): exact-path + exact-function allowances. cli.ex may use File.read/1,
   # File.ls/1, File.lstat/1 (entries are inspected without following links), File.write/2,
   # IO.binwrite/1,2 and Path.join/2 (the only filesystem/io calls in the verification tool's
@@ -2776,6 +2882,12 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
          "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",
          "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam",
+         "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertion.beam",
+         "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts.beam",
+         "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.DecodedContentAssertion.beam",
+         "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion.beam",
+         "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.Record.beam",
+         "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts.beam",
          "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertion.beam",
          "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts.beam",
          "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion.beam",
@@ -2871,6 +2983,28 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Map, :take},
           {:maps, :keys},
           {:erlang, :atom_to_binary}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.beam" ->
+        [
+          {Enum, :member?},
+          {Map, :get},
+          {MapSet, :member?},
+          {MapSet, :new},
+          {MapSet, :put},
+          {String, :valid?}
+        ]
+
+      "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec.beam" ->
+        [
+          {Enum, :all?},
+          {Enum, :dedup},
+          {Enum, :map},
+          {Enum, :reverse},
+          {Enum, :sort},
+          {Map, :get},
+          {Map, :new},
+          {String, :valid?}
         ]
 
       "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.Codec.beam" ->

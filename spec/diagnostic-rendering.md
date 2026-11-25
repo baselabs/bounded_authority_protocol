@@ -56,8 +56,12 @@ The fully redacted names are `BoundedAuthorityProtocol.VN.GrantFacts`,
 `BoundedAuthorityProtocol.VN.AnchorFacts`, `BoundedAuthorityProtocol.VN.KeyTransitionFacts`,
 and `BoundedAuthorityProtocol.VN.AnchoredExportFacts`, for those same three majors, plus
 `BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts`,
-`BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts`, and
-`BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion`.
+`BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts`,
+`BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion`,
+`BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts`,
+`BoundedAuthorityProtocol.ContentAssertion.ES256.V1.DecodedContentAssertion`,
+`BoundedAuthorityProtocol.ActionApproval.V1.Record`, and
+`BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts`.
 
 ### Grammar and redaction
 
@@ -82,7 +86,15 @@ value        = struct / list / keyword-list / tuple / binary / quoted-string /
                decimal-integer / decimal-float / atom / "nil" / "true" / "false" / unrenderable
 ```
 
-All facts and decoded content assertions use exactly `redacted`, with no fields.
+All facts, decoded content assertions and approval records use exactly
+`redacted`, with no fields. An approval success wrapper renders as
+`{:ok, #BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts<redacted>}`.
+An SDK host-helper success renders as
+`#BoundedAuthorityProtocol.ActionApproval.V1.Approved<redacted>`.
+Host-local failed results render as `{:error, :code}` with the exact specified
+reason atom substituted for `code`. Presenter-facing failed results render
+as `{:error, :invalid}`. These forms serialize statically, including when
+used in logs. They expose no nested record or assertion fields.
 Proofs use `proof`. A proof nonce is `nil` if absent and exactly `:redacted` whenever
 present, regardless of its contents. Redaction happens before any rendering.
 Other proof fields keep their diagnostic values. Structural decoded grants, operations,

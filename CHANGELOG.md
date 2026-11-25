@@ -6,10 +6,11 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
-- Specify the candidate ES256 content assertion sibling with its own protected
-  type, the shared exact-content digest and suite-specific successor verification.
-- Specify the candidate action-approval record and descriptor, pure verification
-  with ordered host-local diagnostics, and host obligations at execution.
+- Implement the candidate ES256 content assertion sibling with a distinct protected
+  type, strict low-S verification and assembly, the shared exact-content digest and suite-specific successor verification.
+- Implement the candidate action-approval record codec and pure verification
+  with ordered host-local diagnostics. Pin the record descriptor and both
+  candidate corpora. Specify atomic claims and retry delivery of a durable intent.
 
 - `BoundedAuthorityProtocol.V1.Json.from_term/2` converts already-parsed, cast Elixir terms into
   the tagged JSON algebra shared by all contract-majors. It preserves numeric tags, sorts

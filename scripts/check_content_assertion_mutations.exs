@@ -18,7 +18,7 @@ mutations = [
   {"expected-subject", "p.sub == e.subject", "true"},
   {"expected-profile", "p.profile == e.profile", "true"},
   {"expected-key", "p.attestor_key_id == key.key_id", "true"},
-  {"current-window", "parsed.nbf <= expected.now and expected.now < parsed.exp", "true"},
+  {"current-window", "now < parsed.exp", "true"},
   {"key-lower-window", "p.iat >= key.valid_from and p.nbf >= key.valid_from", "true"},
   {"key-upper-window", "p.exp <= key.valid_before", "true"},
   {"closed-members", "Enum.sort(Enum.map(members, &elem(&1, 0))) == keys", "true"},

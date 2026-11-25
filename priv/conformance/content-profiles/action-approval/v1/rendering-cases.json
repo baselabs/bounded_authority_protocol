@@ -1,0 +1,1 @@
+[{"expected":"{:ok, #BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts<redacted>}","id":"verified-facts","pure_case":"es256-verified"},{"expected":"{:error, :unknown_key}","id":"host-local-error","pure_case":"unknown-key"},{"expected":"{:error, :invalid}","id":"presenter-error","pure_case":"unknown-key"}]

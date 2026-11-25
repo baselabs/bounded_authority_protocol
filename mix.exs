@@ -202,6 +202,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
   defp docs do
     [
       main: "readme",
+      assets: %{"spec/profiles" => "profiles"},
       source_ref: "v#{@version}",
       source_url: @source_url,
       # The API stability page names the excluded internals; they are hidden, so never link them.
@@ -215,6 +216,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "BoundedAuthorityProtocol.Conformance.Report",
         "BoundedAuthorityProtocol.Conformance.Cli.Main",
         "BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1",
+        "BoundedAuthorityProtocol.V1.Json.decode_approval_record/3",
+        "BoundedAuthorityProtocol.V1.Jcs.encode_approval_record/4",
         "BoundedAuthorityProtocol.Ed25519.signature_gate?/1",
         "BoundedAuthorityProtocol.Ed25519.strict_gate?/2",
         "BoundedAuthorityProtocol.V1.Selector.float_zero_free?/1",
@@ -271,6 +274,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/deployment/typescript-sdk.md",
         "docs/guides/implementers-guide.md",
         "spec/bap-content-assertion-v1.md",
+        "spec/bap-content-assertion-es256-v1.md",
+        "spec/bap-action-approval-v1.md",
         "spec/bap-local-loopback-http-v1.md",
         "spec/bap-role-attestation-v1.md",
         "spec/bap-v1.md",
@@ -357,6 +362,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         Implementers: [
           "docs/guides/implementers-guide.md",
           "spec/bap-content-assertion-v1.md",
+          "spec/bap-content-assertion-es256-v1.md",
+          "spec/bap-action-approval-v1.md",
           "spec/bap-local-loopback-http-v1.md",
           "spec/bap-role-attestation-v1.md",
           "spec/bap-v1.md",
@@ -401,7 +408,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "Sibling profiles": [
           ~r"^BoundedAuthorityProtocol\.ApplicationProfile\.",
           ~r"^BoundedAuthorityProtocol\.RoleAttestation\.",
-          ~r"^BoundedAuthorityProtocol\.ContentAssertion\."
+          ~r"^BoundedAuthorityProtocol\.ContentAssertion\.",
+          ~r"^BoundedAuthorityProtocol\.ActionApproval\."
         ],
         Conformance: ~r"^BoundedAuthorityProtocol\.Conformance\."
       ],
@@ -430,7 +438,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
   defp facade?(module),
     do:
       module =~
-        ~r"^BoundedAuthorityProtocol\.((ApplicationProfile\.LocalLoopbackHttp|RoleAttestation|ContentAssertion)\.)?V\d$"
+        ~r"^BoundedAuthorityProtocol\.((ApplicationProfile\.LocalLoopbackHttp|RoleAttestation|ContentAssertion(\.ES256)?|ActionApproval)\.)?V\d$"
 
   defp aliases do
     [
@@ -491,7 +499,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "cmd node conformance/generators/build_strict_ed25519.mjs --verify",
         "cmd node conformance/generators/build_producer_canonicality.mjs --verify",
         "cmd node conformance/generators/build_selector_float_zero.mjs --verify",
-        "cmd python3 scripts/build_content_assertion_corpus.py --verify"
+        "cmd python3 scripts/build_content_assertion_corpus.py --verify",
+        "cmd uv run --project sdks/python --locked --no-install-project python scripts/build_approval_corpora.py --verify"
       ],
       "corpus.distribution.mutations": [
         "cmd mix test test/corpus_tooling_test.exs",
@@ -552,11 +561,13 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "local_loopback_http.verify",
         "role_attestation.verify",
         "content_assertion.verify",
+        "test test/bounded_authority_protocol/action_approval/corpus_test.exs --seed 42",
         "conformance.mutations"
       ],
       "quality.mutations": [
         "chain_archive.mutations",
         "content_assertion.mutations",
+        "run --no-start scripts/check_approval_mutations.exs",
         "spec_facts.mutations"
       ],
       "quality.package": [

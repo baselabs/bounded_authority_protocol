@@ -102,7 +102,7 @@ Submission to IANA for registration is externally gated.
 - **Optional parameters:** None
 - **Encoding considerations:** Compact JWS (RFC 7515) serialization of a closed JSON object; UTF-8; base64url segments; binary-safe
 - **Security considerations:** See Trust, knowledge, and operational limits in the BAP ES256 Content Assertion Profile 1
-- **Interoperability considerations:** Closed ES256 content assertion with an exact protected type and a raw low-S P-256 signature; the Ed25519 content assertion profile rejects these bytes
+- **Interoperability considerations:** Closed ES256 content assertion with an exact protected type and a raw low-S P-256 signature; distinct compact wire profiles reject these bytes
 - **Published specification:** spec/bap-content-assertion-es256-v1.md (BAP ES256 Content Assertion Profile 1)
 - **Applications that use this media type:** Standalone ES256 signed assertions about exact external content bytes
 - **Fragment identifier considerations:** N/A

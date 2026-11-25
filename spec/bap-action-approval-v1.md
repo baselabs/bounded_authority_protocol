@@ -60,16 +60,21 @@ remain distinct (`REQ-AA1-RECORD-set`, `REQ-AA1-RECORD-text`).
 
 An authoring call produces JCS bytes and enforces the same schema and effective
 limits as the record parser. By default it requires an already strictly ordered
-set. An explicit authoring option MAY sort and deduplicate valid resource
-strings before encoding. The producer applies raw-string and count limits to
+set. An explicit authoring option MUST sort and deduplicate valid resource
+strings in unsigned UTF-8 order before encoding. The producer applies raw-string and count limits to
 the input before canonicalizing, and the encoded-size limit to the output.
 A wire parser MUST reject unordered or duplicate entries without
 repairing them (`REQ-AA1-RECORD-authoring`).
 
 ## 3. Bounds and profile identity
 
-The record ceilings are independently tightenable. Fixed widths, schema rules,
-and cryptographic formats remain fixed. Where limits overlap, the effective
+The record ceilings `string_bytes`, `resource_count` and `record_bytes` are
+independently tightenable under [BAP v1 § 17](bap-v1.md#17-hard-maxima).
+Only known ceilings with positive integer values at or below their maxima
+are valid. Fixed widths, schema rules, and cryptographic formats remain fixed.
+Invalid resource bounds return `invalid_context` during approval preflight.
+Raw-string and count limits apply to authoring input before optional resource
+canonicalization. The encoded-size ceiling applies to the resulting record. Where limits overlap, the effective
 ceiling is the smaller approval and selected CA ceiling, after caller
 tightening. CA JSON structural, node and array bounds still apply to the
 assertion. The record has its own closed grammar and the limits below
@@ -78,9 +83,9 @@ assertion. The record has its own closed grammar and the limits below
 | Item | Maximum or fixed width | Where enforced |
 |---|---|---|
 | Raw UTF-8 bytes of each `subject`, `action`, `approver_role` and resource | 1,024 each | Authoring input, record parser, matching expected text, and snapshot role names. |
-| Raw UTF-8 bytes of `request_id` | 1,024, intersected with CA `identifier_bytes` (512 at its default ceiling) | Authoring input, record parser, expected request ID and signed `sub`. |
+| Raw UTF-8 bytes of `request_id` | `min(effective string_bytes, effective CA.identifier_bytes)` (512 by default) | Authoring input, record parser, expected request ID and signed `sub`. |
 | Resource items | 4,096 | Authoring input, record parser and expected resource set. |
-| Encoded record | 65,536 bytes, intersected with CA `content_bytes` | Source read, authoring output and record parser. For expected scope, enforce count and raw byte ceilings. The encoded-record ceiling applies to the complete record. |
+| Encoded record | `min(effective record_bytes, effective CA.content_bytes)` (65,536 by default) | Source read, authoring output and record parser. For expected scope, enforce count and raw byte ceilings. The encoded-record ceiling applies to the complete record. |
 | `revision_digest` | 32 decoded bytes, 43 unpadded base64url characters on the wire | Authoring input, record parser and expected revision. |
 | Assertion compact | Selected CA `anchor_bytes` and all applicable compact and segment bounds | Assertion source read, producer, assembler and verifier. Count original compact bytes. |
 | CA identifiers and key IDs | Selected CA `identifier_bytes` or `kid_bytes`, respectively | Assertion producer/parser, matching expected identifiers and snapshot entries. |
@@ -118,8 +123,8 @@ profile semantics requires a new identifier and digest
 
 | Known answer | Hex value at candidate freeze |
 |---|---|
-| Profile digest preimage | `TBD-by-reference-implementation` |
-| Profile digest | `TBD-by-reference-implementation` |
+| Profile digest preimage | `6261702d616374696f6e2d617070726f76616c2f31007b22617574686f72696e67223a7b226c696d6974735f6170706c795f746f5f696e707574223a747275652c227265736f757263655f736f72745f616e645f64656475706c69636174696f6e223a226578706c69636974206f70742d696e206f6e6c79227d2c22626f756e6473223a7b22617373657274696f6e5f636f6d70616374223a2243412e616e63686f725f627974657320616e64206170706c696361626c6520636f6d706163742c207365676d656e742c20616e64206465636f6465642d7365676d656e7420626f756e6473222c22617373657274696f6e5f6964656e74696669657273223a2243412e6964656e7469666965725f627974657320616e642043412e6b69645f6279746573222c22617373657274696f6e5f696e746567657273223a2243412e696e74656765725f6d61676e6974756465222c2263616c6c65725f7469676874656e696e67223a226b6e6f776e206365696c696e6773206f6e6c793b20706f73697469766520696e746567657273206e6f206c6172676572207468616e2065616368206d6178696d756d3b2066697865642077696474687320756e6368616e676564222c227265636f72645f737472756374757265223a227265636f7264206772616d6d617220616e64207265636f72642d7370656369666963206365696c696e6773227d2c2270726f66696c65223a226261702d616374696f6e2d617070726f76616c2f31222c227265636f7264223a7b226164646974696f6e616c5f6d656d62657273223a66616c73652c22616c6c5f6d656d626572735f7265717569726564223a747275652c226d656d62657273223a7b22616374696f6e223a7b226d61785f757466385f6279746573223a313032342c226d696e5f757466385f6279746573223a312c2274797065223a22737472696e67227d2c22617070726f7665725f726f6c65223a7b226d61785f757466385f6279746573223a313032342c226d696e5f757466385f6279746573223a312c2274797065223a22737472696e67227d2c22726571756573745f6964223a7b226164646974696f6e616c5f72756c65223a22434120537472696e674f72557269222c226566666563746976655f6c696d6974223a226d696e28656666656374697665207265636f726420737472696e675f62797465732c206566666563746976652043412e6964656e7469666965725f627974657329222c226d61785f757466385f6279746573223a313032342c226d696e5f757466385f6279746573223a312c2274797065223a22737472696e67227d2c227265736f7572636573223a7b226974656d73223a7b226d61785f757466385f6279746573223a313032342c226d696e5f757466385f6279746573223a312c2274797065223a22737472696e67227d2c226d61785f6974656d73223a343039362c226d696e5f6974656d73223a312c226f72646572223a227374726963746c7920696e6372656173696e6720756e7369676e6564206c657869636f67726170686963205554462d382062797465206f72646572222c2273656d616e74696373223a22736574222c2274797065223a226172726179227d2c227265766973696f6e5f646967657374223a7b226465636f6465645f6279746573223a33322c22656e636f6465645f6279746573223a34332c22656e636f64696e67223a2263616e6f6e6963616c20756e7061646465642062617365363475726c222c2274797065223a22737472696e67222c2276616c69646174696f6e223a226465636f646520616e642065786163742072652d656e636f6465227d2c227375626a656374223a7b226d61785f757466385f6279746573223a313032342c226d696e5f757466385f6279746573223a312c2274797065223a22737472696e67227d2c2276223a7b22636f6e7374223a312c2274797065223a224a534f4e20696e7465676572227d7d2c2274797065223a226f626a656374227d2c2274657874223a7b22646f6d61696e223a22556e69636f6465207363616c61722076616c756573222c22657175616c697479223a226578616374205554462d38206279746573222c226e6f726d616c697a6174696f6e223a226e6f6e65227d2c2277697265223a7b2263616e6f6e6963616c5f76616c69646174696f6e223a226578616374206279746520657175616c6974792061667465722072652d656e636f64696e67222c226475706c69636174655f6d656d62657273223a2272656a656374206265666f7265206d6174657269616c697a6174696f6e222c226566666563746976655f656e636f6465645f6c696d6974223a226d696e28656666656374697665207265636f7264207265636f72645f62797465732c206566666563746976652043412e636f6e74656e745f627974657329222c22656e636f64696e67223a225554462d38205246432038373835204a4353222c226d61785f656e636f6465645f6279746573223a36353533367d7d` |
+| Profile digest | `7e44f73217cd25037839ecc25837de84aad3673626b9b125c94c97e9967fa1eb` |
 
 Publish both values from the reference implementation and independently
 reproduce them before certification (`REQ-AA1-PROFILE-known-answer`).
@@ -163,7 +168,7 @@ independently supplied nonempty scalar string within CA `identifier_bytes`
 
 The policy contains `now`, `max_staleness`, `max_lifetime` and, optionally,
 `max_active`. The host supplies trusted current time. `now` is a signed CA
-NumericDate. Ceilings are nonnegative and inclusive. All times and ceilings are
+NumericDate. Temporal policy caps are nonnegative and inclusive. All times and ceilings are
 exact bounded integers. Reject booleans, floats and out-of-range values.
 Evaluate differences exactly, including opposite-sign NumericDate endpoints
 whose difference exceeds the input magnitude ceiling. Invalid or missing
@@ -192,7 +197,13 @@ fingerprint using the selected CA profile. Refuse duplicate key IDs at
 admission. `valid_from` is a finite signed NumericDate. `valid_before` is a
 finite signed NumericDate greater than `valid_from`, or explicitly unbounded.
 The snapshot provides current role eligibility at the supplied verification
-time. Signing-window containment uses the historical key window
+time. Expected and enrolled roles are sets of nonempty scalar strings, subject
+to the per-string ceiling. When supplied as arrays, refuse duplicate role names;
+an enrolled set may be empty. Before reading the compact, every entry, including
+unselected entries, MUST satisfy the effective snapshot-field bounds of the call.
+A typed snapshot built under equally strict or stricter bounds can establish
+this invariant. Entry failure returns `trust_unavailable` before freshness.
+Signing-window containment uses the historical key window
 (`REQ-AA1-CONTEXT-entries`).
 
 ### 4.3 Ordered outcome contract
@@ -255,9 +266,11 @@ diagnostic code are eligible for default rendering
 
 ## 5. Host helper and disclosure
 
-The host helper takes `record_bytes`, `assertion_compact`, `trusted_keys`,
-`now`, `max_validity`, `is_replayed` and `is_revoked`, with explicit suite,
-expected context and remaining policy inputs. `max_validity` maps to
+SDKs expose a host helper. Bindings with named arguments use
+`verify(grant, proof, trusted_keys, now, max_validity, is_replayed, is_revoked, *, suite, expected, ...)`.
+The first two arguments carry the record bytes and assertion compact,
+respectively. Positional bindings use that conceptual argument order and supply
+the suite, expected context and remaining policy inputs explicitly. `max_validity` maps to
 `max_lifetime`. It invokes the pure facade first, then uses the same immutable
 snapshot and the entry admitted for the verified assertion. The helper
 returns an `ApprovalResult` with either `Approved(facts)` or a closed failure
@@ -287,20 +300,23 @@ pre-authentication results such as `unknown_key`
 ## 6. Execution and trust boundaries
 
 The host MUST bind execution to the exact independently prepared effect. In
-the effect's transaction, conditionally insert `(trust_domain, iss, jti)` and
-the host-scoped `(request_id, revision_digest)` under uniqueness constraints.
-Refuse a second use. A read-only replay check cannot make the conditional
-inserts. When the effect cannot join the transaction, the host MUST use durable
-intent and destination idempotency. For an indeterminate outcome, look up the
-effect at the destination, including after a restart. A retry MAY resubmit
-the stored artifact. The host refuses or re-executes according to its own
-rule. It MUST NOT return an earlier result
-(`REQ-AA1-EXEC-claim`).
+one transaction, conditionally insert `(trust_domain, iss, jti)` and the
+host-scoped `(request_id, revision_digest)` under uniqueness constraints,
+require exact current-revision equality, and commit the effect or create its
+durable intent. Both claims and the effect or intent MUST succeed atomically.
+A collision on either constraint refuses the duplicate claim. A failed
+transaction leaves neither claim. A read-only replay check cannot claim either
+identity. When the effect cannot join the transaction, the host MUST use a
+durable intent and destination idempotency. The host MAY retry delivery of the
+same committed intent with the same destination idempotency identity, including
+after restart. For an indeterminate outcome, look up the effect at the
+destination (`REQ-AA1-EXEC-claim`).
 
-In the transaction for the effect or its durable intent, the host MUST read the
-revision its own request record holds as current. Execute only when that revision digest equals the exact
-`revision_digest` in the approval. Refuse every other revision
-(`REQ-AA1-EXEC-current-revision`).
+The host MUST compare the exact approval `revision_digest` with the current
+revision of its own request record. The equality check and effect or intent
+commitment MUST serialize against changes to that request's revision. A guarded
+write or a row lock shared with request revision updates can establish that
+property. Refuse every other revision (`REQ-AA1-EXEC-current-revision`).
 
 The artifact binds an enrolled key to a record, audience and window. A claim
 of human assent additionally requires independently established approver
@@ -316,20 +332,22 @@ with an exact record-digest selector and a holder proof
 
 The candidate corpus root is `priv/conformance/content-profiles/action-approval/v1`.
 Use one frozen `index.json` covering the following case files. Index SHA-256 (hex) at freeze
-is `TBD-by-reference-implementation`. Consumers MUST pin the index and verify
+is `30ff68f1552ee1d5a02407c96c0f60caf381f8d89607a04e0012379fe5909be2`. Consumers MUST pin the index and verify
 its indexed file hashes (`REQ-AA1-CONFORMANCE-pin`).
 
 | File | Inputs and expected results |
 |---|---|
 | `record-cases.json` | Exact wire bytes or typed authoring input, effective bounds, canonical output bytes or rejection, and independent descriptor/content known answers. Cover each schema field, duplicates and escapes, Unicode scalar and UTF-8 ordering edges, normalization distinctions, explicit authoring deduplication, and simultaneous raw-string/count/encoded-byte and CA tightening edges. |
-| `approval-cases.json` | Public compact and record bytes, selected suite, explicit expected context, bounds, time and snapshot, and exact facts or one named pure diagnostic. Cover every pure code, each time and containment edge, both suites, and cross-profile and foreign-suite rejection. |
+| `approval-cases.json` | Public compact and record bytes, selected suite, explicit expected context, bounds, time and snapshot, and exact facts or one named pure diagnostic. Cover every pure code, each time and containment edge, zero resource ceilings and zero time caps, tightened bounds on an unselected entry, empty enrolled roles, both suites, and cross-profile and foreign-suite rejection. |
 | `multi-fault-cases.json` | The same public inputs with independent faults and the winning pure diagnostic. Cover preflight and snapshot freshness over malformed input, structure over suite, suite over payload and key lookup, bad signature over signed times/key windows, and ordering among authenticated failures. |
+
+| `helper-cases.json` | Pure case reference, predicate observations, ordered call arguments and counts, helper outcome and presenter result. Cases identify the exercised subcases of `REQ-AA1-HOST-predicates` and `REQ-AA1-HOST-disclosure`. |
 
 Independent implementations MUST agree on canonical bytes, digest values and
 every verdict. Keep all old known-answer verdicts and demonstrate red-capable
 mutations for every material predicate and precedence boundary. A foreign-suite
 case with a valid independently enrolled signer in each suite MUST show zero
-calls into the other verifier. Exercise host predicate outcomes, exact call
+payload-parser, key-lookup and foreign-verifier calls. Exercise host predicate outcomes, exact call
 counts, short-circuiting and zero calls on pure failures in host tests. Check
 presenter-visible and local log serialization and default rendering with
 distinct canaries and base64url, hex and JSON-escaped forms, including nested
@@ -340,8 +358,9 @@ All maintained SDKs MUST certify against the exact immutable candidate before
 the first bearing package release. Consumer qualification MUST include a tested
 offline verifier README example titled “Verifying a grant before issuing it”,
 linked from the signer README. It exercises independent context and trust
-inputs, exact effect and set matching, conditional inserts and refusal of a
-second use, exact current-revision comparison, and destination lookup after
-restart for an indeterminate effect. It explains when to use a capability
+inputs, exact effect and set matching, collision on each conditional insert,
+rollback of both claims on failure, serialized comparison under a concurrent
+revision update, and destination lookup and retry of the same durable intent
+after restart for an indeterminate effect. It explains when to use a capability
 grant and holder proof
 (`REQ-AA1-CONFORMANCE-release`).

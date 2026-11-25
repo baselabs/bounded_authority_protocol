@@ -16,8 +16,8 @@ lineage, semantic profile, time window, and predecessor. The profile identity is
 `alg: "ES256"` (`REQ-CAE1-CORE-identity`).
 
 The separately named API is `BoundedAuthorityProtocol.ContentAssertion.ES256.V1`.
-Callers MUST select it explicitly before reading the compact. This profile and
-every other profile, including [CA1](bap-content-assertion-v1.md), MUST reject one
+Callers MUST select it explicitly before reading the compact. This compact wire profile and
+every distinct compact wire profile, including [CA1](bap-content-assertion-v1.md), MUST reject one
 another's bytes (`REQ-CAE1-CORE-separation`). The protected type and algorithm
 are checked only against the selected profile. Runtime dispatch, negotiation,
 schema lookup, and fallback are forbidden (`REQ-CAE1-CORE-no-dispatch`).
@@ -84,7 +84,7 @@ UTF8("BAP1-CONTENT") || 0x00 || exact_content_bytes
 ```
 
 This domain is shared with CA1. The same content bytes yield the same digest in
-both suites. BAP MUST NOT parse, normalize, re-encode, or fetch that content
+both suites. Standalone content assertion operations MUST NOT parse, normalize, re-encode, or fetch that content
 (`REQ-CAE1-DIGEST-content`). Content authors own serialization and schema validation.
 A caller MUST retain and compare the exact hashed bytes when interpreting content.
 `profile_digest` is an opaque caller-pinned 32-byte identity; BAP only compares it
@@ -249,14 +249,14 @@ and keys. Such guarantees require separately qualified host mechanisms
 The candidate corpus location is
 `priv/conformance/attestation-profiles/content-assertion-es256/v1`. Every consumer
 MUST pin the frozen index and verify the indexed file hashes. Index SHA-256
-(hex) at freeze is `TBD-by-reference-implementation`
+(hex) at freeze is `067cbdc96a7846f55a9c50e69091096456137262741c7e59b6e5eac88531838a`
 (`REQ-CAE1-CONFORMANCE-pin`).
 
 Required cases cover every header and payload rule, canonical encodings, digests,
 bounds and numeric edges, issuer and key-window mismatches, invalid SEC1 points,
 signature widths, scalar ranges, high-S alternatives, bad signature equations,
 and all successor rules. Include mixed-suite successor refusal and bidirectional
-rejection with every other profile, including CA1, as well as ES256 and EdDSA
+rejection with every distinct compact wire profile, including CA1, as well as ES256 and EdDSA
 algorithm-confusion cases. Preserve existing corpus verdicts. Independently
 compare the content digest across both content assertion profiles and prove
 signing-input and assembly agreement with exact bytes. Compare whole compacts in

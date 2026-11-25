@@ -329,6 +329,9 @@ run_check() {
   # Old paths remain sensitivity probes for the immutable Git history.
   # New paths cover all three complete SDK snapshots.
   fixture_paths='docs/protocol-v1.md
+priv/conformance/attestation-profiles/content-assertion-es256/v1/assembly-cases.json
+priv/conformance/attestation-profiles/content-assertion-es256/v1/assertion-structure-cases.json
+priv/conformance/content-profiles/action-approval/v1/approval-cases.json
 spec/bap-v1.md
 priv/conformance/application-profiles/local-loopback-http/v1/profile.json
 priv/conformance/attestation-profiles/role-attestation/v1/attestation-cases.json
@@ -427,6 +430,8 @@ PY
 
   generic_paths_file="$check_dir/generic-paths.txt"
   cat > "$generic_paths_file" <<'EOF'
+priv/conformance/attestation-profiles/content-assertion-es256/v1/assertion-structure-cases.json
+priv/conformance/content-profiles/action-approval/v1/approval-cases.json
 priv/conformance/v2/corpus/cases/anchored-export/probe.json
 priv/conformance/v1/vectors/consumption-chain-archive.json
 sdks/go/conformance/corpus-v2/cases/signing-input/probe.json
@@ -480,6 +485,8 @@ EOF
   done < "$generic_canaries"
   jwt_paths_file="$check_dir/jwt-paths.txt"
   cat > "$jwt_paths_file" <<'EOF'
+priv/conformance/attestation-profiles/content-assertion-es256/v1/assembly-cases.json
+priv/conformance/content-profiles/action-approval/v1/approval-cases.json
 docs/protocol-v1.md
 priv/conformance/application-profiles/local-loopback-http/v1/profile.json
 priv/conformance/attestation-profiles/role-attestation/v1/attestation-cases.json

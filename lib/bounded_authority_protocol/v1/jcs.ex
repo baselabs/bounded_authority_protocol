@@ -19,15 +19,37 @@ defmodule BoundedAuthorityProtocol.V1.Jcs do
   def encode(value, limits) do
     case Bounds.coerce(limits) do
       {:ok, bounds} ->
-        try do
-          {encoded, _nodes} = encode_value(value, bounds, 0, 0)
-          {:ok, :erlang.iolist_to_binary(encoded)}
-        rescue
-          _error in [Violation, ArgumentError, ErlangError] -> {:error, :invalid}
-        end
+        encode_bounded(value, bounds)
 
       {:error, :invalid} ->
         {:error, :invalid}
+    end
+  end
+
+  @doc false
+  def encode_approval_record(value, bytes, string_bytes, resource_count)
+      when bytes in 1..65_536 and string_bytes in 1..1_024 and resource_count in 1..4_096 do
+    encode_bounded(value, %{
+      depth: 2,
+      object_members: 7,
+      array_items: resource_count,
+      total_nodes: resource_count + 8,
+      string_bytes: max(string_bytes, 43),
+      key_bytes: 15,
+      jcs_bytes: bytes,
+      integer_magnitude: 1,
+      float_magnitude: 1
+    })
+  end
+
+  def encode_approval_record(_, _, _, _), do: {:error, :invalid}
+
+  defp encode_bounded(value, bounds) do
+    try do
+      {encoded, _nodes} = encode_value(value, bounds, 0, 0)
+      {:ok, :erlang.iolist_to_binary(encoded)}
+    rescue
+      _error in [Violation, ArgumentError, ErlangError] -> {:error, :invalid}
     end
   end
 

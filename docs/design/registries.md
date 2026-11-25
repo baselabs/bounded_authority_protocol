@@ -75,8 +75,10 @@ grant-unbound signed artifacts verified only through their own named API.
 
 ## Content profiles
 
-Content profile identities name externally carried record contracts. The signed
-`profile` and `profile_digest` fields bind the identity and descriptor.
+Content profile identities name externally carried record contracts. Standalone
+content assertion facades compare caller-pinned profile identities and opaque
+digests. Action approval fixes its signed profile identity and
+[canonical record descriptor](../../spec/bap-action-approval-v1.md#3-bounds-and-profile-identity).
 
 | Identity | Status | Definition |
 |---|---|---|

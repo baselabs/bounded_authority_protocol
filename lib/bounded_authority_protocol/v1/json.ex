@@ -68,6 +68,25 @@ defmodule BoundedAuthorityProtocol.V1.Json do
 
   def decode(_bytes, _limits), do: {:error, :invalid}
 
+  @doc false
+  def decode_approval_record(bytes, string_bytes, resource_count)
+      when is_binary(bytes) and byte_size(bytes) <= 65_536 and string_bytes in 1..1_024 and
+             resource_count in 1..4_096 do
+    decode_bounded(bytes, %{
+      depth: 2,
+      object_members: 7,
+      array_items: resource_count,
+      total_nodes: resource_count + 8,
+      string_bytes: max(string_bytes, 43),
+      key_bytes: 15,
+      number_lexeme_bytes: 1,
+      integer_magnitude: 1,
+      float_magnitude: 1
+    })
+  end
+
+  def decode_approval_record(_, _, _), do: {:error, :invalid}
+
   @doc """
   Converts an already-parsed, cast Elixir term into one bounded tagged JSON value.
 

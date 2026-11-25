@@ -152,6 +152,14 @@ Sibling profiles:
 - `BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts`
 - `BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion`
 - `BoundedAuthorityProtocol.ContentAssertion.V1.ExpectedContentAssertion`
+- `BoundedAuthorityProtocol.ContentAssertion.ES256.V1`
+- `BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertion`
+- `BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts`
+- `BoundedAuthorityProtocol.ContentAssertion.ES256.V1.DecodedContentAssertion`
+- `BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion`
+- `BoundedAuthorityProtocol.ActionApproval.V1`
+- `BoundedAuthorityProtocol.ActionApproval.V1.Record`
+- `BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts`
 
 Conformance:
 
@@ -160,6 +168,16 @@ Conformance:
   (`0` complete agreement, `1` any disagreement, integrity, completeness, or I/O failure, `2` a
   usage error), and its report's JSON fields (`format`, `agreement`, `exit_status`, `total`,
   `agreed`, `disagreed`, `index_sha256_base64url`) are part of the contract.
+
+The [ES256 content assertion](../../spec/bap-content-assertion-es256-v1.md) and
+[action approval](../../spec/bap-action-approval-v1.md) surfaces are candidates.
+Use `BoundedAuthorityProtocol.ActionApproval.V1.encode_record/4` to author exact
+bytes. The fourth argument explicitly enables resource sorting and deduplication.
+Use `BoundedAuthorityProtocol.ActionApproval.V1.verify_eddsa/3` or
+`BoundedAuthorityProtocol.ActionApproval.V1.verify_es256/3` with the independently
+configured suite, expected operation, clock and snapshot. Successful facts carry
+`trust: :not_evaluated`. Keep detailed failure codes local and use the same
+`invalid` result for every presenter-facing failure.
 
 ## Not covered
 
