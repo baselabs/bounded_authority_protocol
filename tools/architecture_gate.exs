@@ -341,9 +341,10 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.DecodedContentAssertion.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
     },
-    "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion.beam" => %{
-      {:__struct__, 1} => %{enum_reduce: 1}
-    },
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion.beam" =>
+      %{
+        {:__struct__, 1} => %{enum_reduce: 1}
+      },
     "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.Record.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
     },
@@ -435,19 +436,20 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
                                     module_info: 0,
                                     module_info: 1
                                   ],
-                                  "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.beam" => [
-                                    __info__: 1,
-                                    assertion_signing_input: 2,
-                                    assemble_compact: 2,
-                                    assemble_compact: 3,
-                                    decode_assertion: 2,
-                                    verify_assertion: 2,
-                                    content_digest: 2,
-                                    assertion_digest: 2,
-                                    verify_successor: 3,
-                                    module_info: 0,
-                                    module_info: 1
-                                  ],
+                                  "Elixir.BoundedAuthorityProtocol.ContentAssertion.ES256.V1.beam" =>
+                                    [
+                                      __info__: 1,
+                                      assertion_signing_input: 2,
+                                      assemble_compact: 2,
+                                      assemble_compact: 3,
+                                      decode_assertion: 2,
+                                      verify_assertion: 2,
+                                      content_digest: 2,
+                                      assertion_digest: 2,
+                                      verify_successor: 3,
+                                      module_info: 0,
+                                      module_info: 1
+                                    ],
                                   "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.beam" => [
                                     __info__: 1,
                                     decode_record: 1,
@@ -2241,7 +2243,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     do: ~w(Access Enum Map String StringOrUri URI)
 
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/candidate.ex"),
-    do: ~w(Access Atom Enum Integer Map)
+    do: ~w(Atom Enum Integer Map)
 
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/corpus.ex"),
     do: ~w(Access Bitwise Enum List Map MapSet String)
@@ -2700,7 +2702,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
        ),
        do:
          {module, function} in [
-           {"Access", :get},
            {"Atom", :to_string},
            {"Base", :decode16!},
            {"Base", :encode16},
@@ -2711,7 +2712,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            {"Enum", :flat_map},
            {"Enum", :intersperse},
            {"Enum", :map},
-           {"Enum", :member?},
            {"Enum", :sort},
            {"Enum", :split_with},
            {"Enum", :uniq},
@@ -3412,7 +3412,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
 
       "Elixir.BoundedAuthorityProtocol.Conformance.Candidate.beam" ->
         [
-          {Access, :get},
           {Base, :decode16!},
           {Base, :encode16},
           {Base, :url_decode64!},
@@ -3421,7 +3420,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Enum, :flat_map},
           {Enum, :intersperse},
           {Enum, :map},
-          {Enum, :member?},
           {Enum, :sort},
           {Enum, :split_with},
           {Enum, :uniq},

@@ -9,8 +9,8 @@ jcs = "lib/bounded_authority_protocol/v1/jcs.ex"
 # or a test census that cannot execute all checks cannot kill a mutation.
 omissions =
   for {label, clause, case_id} <- [
-        {"signed-sub-bound",
-         "check(RecordCodec.request_id?(parsed.sub, bounds, ca), :malformed)", "signed-sub-over"},
+        {"signed-sub-bound", "check(RecordCodec.request_id?(parsed.sub, bounds, ca), :malformed)",
+         "signed-sub-over"},
         {"signature", "Codec.signature(parsed, entry.key, suite)", "bad-signature"},
         {"key-window", "Codec.key_window(parsed, entry.key)", "key-window-lower"},
         {"issuer", "check(parsed.iss == entry.issuer, :issuer_mismatch)", "issuer-mismatch"},
@@ -140,8 +140,7 @@ ordering =
          "active-before-role"}
       ] do
     {approval, label, "         #{first},\n         #{second},",
-     "         #{second},\n         #{first},",
-     case_id}
+     "         #{second},\n         #{first},", case_id}
   end
 
 early_ordering = [

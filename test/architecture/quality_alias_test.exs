@@ -35,7 +35,9 @@ defmodule BoundedAuthorityProtocol.QualityAliasTest do
     "local_loopback_http.verify",
     "role_attestation.verify",
     "content_assertion.verify",
+    "cmd mix test test/bounded_authority_protocol/action_approval/corpus_test.exs --seed 42",
     "content_assertion.mutations",
+    "run --no-start scripts/check_approval_mutations.exs",
     "spec_facts.mutations"
   ]
 
@@ -50,7 +52,7 @@ defmodule BoundedAuthorityProtocol.QualityAliasTest do
     commands =
       Enum.flat_map(@quality_stages, &Keyword.fetch!(aliases, String.to_existing_atom(&1)))
 
-    assert length(commands) == 32
+    assert length(commands) == 34
     assert Enum.frequencies(commands) == Enum.frequencies(@quality_commands)
 
     for stage <- @quality_stages do

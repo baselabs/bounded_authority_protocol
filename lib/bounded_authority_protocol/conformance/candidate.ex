@@ -27,6 +27,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
   @binary_fields ~w(attestor_key_fingerprint content_digest digest prev profile_digest
     public_key revision_digest)a
+  @binary_field_keys Map.new(@binary_fields, &{&1, true})
+
   # Include the intentionally unsupported fixture key so the bounds validator rejects it.
   @fields Map.new(
             Map.keys(Bounds.__struct__()) ++
@@ -74,9 +76,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
             []
         end)
 
-      if Enum.member?(cases, :wrong_count),
-        do: {:error, :integrity},
-        else: {:ok, cases, :json.decode(Map.fetch!(files, "profile.json"))}
+      if Enum.all?(cases, &(&1 != :wrong_count)),
+        do: {:ok, cases, :json.decode(Map.fetch!(files, "profile.json"))},
+        else: {:error, :integrity}
     end
   end
 
@@ -89,9 +91,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
   defp known_answer?(@es256, %{"signing" => signing}) do
     with {:ok, input} <- signing_input(signing),
-         true <- output(input) == signing["expected"],
-         {:ok, compact} <- ES256.assemble_compact(input, raw(signing["signature"])) do
-      compact == signing["compact"]
+         true <- output(input) == Map.get(signing, "expected"),
+         {:ok, compact} <- ES256.assemble_compact(input, raw(Map.get(signing, "signature"))) do
+      compact == Map.get(signing, "compact")
     else
       _failure -> false
     end
@@ -99,12 +101,12 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
   defp report(index_bytes, index, cases, metadata) do
     {sdk, elixir} = Enum.split_with(cases, &sdk_case?/1)
-    pure_cases = Map.new(elixir, fn {_path, item} -> {item["id"], item} end)
+    pure_cases = Map.new(elixir, fn {_path, item} -> {Map.get(item, "id"), item} end)
 
     results =
       Enum.map(elixir, fn {path, item} ->
         actual = execute(path, item, metadata, pure_cases)
-        {[path <> "/" <> item["id"], actual], actual === item["expected"]}
+        {[path <> "/" <> Map.get(item, "id"), actual], actual === Map.get(item, "expected")}
       end)
 
     rows = Enum.map(results, &elem(&1, 0))
@@ -115,13 +117,13 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
     agreement =
       total > 0 and length(ids) == total and length(Enum.uniq(ids)) == total and
-        agreed == total and digest == index["elixir_verdict_sha256"]
+        agreed == total and digest == Map.get(index, "elixir_verdict_sha256")
 
     status = if agreement, do: 0, else: 1
 
     report = %{
       "format" => "bounded-authority-protocol-candidate-conformance-report",
-      "profile" => index["profile"],
+      "profile" => Map.get(index, "profile"),
       "agreement" => agreement,
       "exit_status" => status,
       "total" => total,
@@ -140,22 +142,20 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   defp sdk_case?(_case), do: false
 
   defp execute("record-cases.json", item, _, _) do
-    ca = fields(item["ca_bounds"])
-    limits = fields(item["bounds"])
+    ca = fields(Map.get(item, "ca_bounds"))
+    limits = fields(Map.get(item, "bounds"))
 
     encoded =
       case item do
         %{"wire" => wire} ->
-          case Approval.decode_record(raw(wire), ca, limits) do
-            {:ok, %Record{} = record} -> Approval.encode_record(record, ca, limits)
-            {:error, :invalid} = error -> error
-            _unexpected -> :unexpected
+          with {:ok, %Record{} = record} <- Approval.decode_record(raw(wire), ca, limits) do
+            Approval.encode_record(record, ca, limits)
           end
 
         %{"author" => author} ->
           record = struct!(Record, fields(Map.delete(author, "v")))
 
-          Approval.encode_record(record, ca, limits, item["canonicalize"])
+          Approval.encode_record(record, ca, limits, Map.get(item, "canonicalize"))
       end
 
     case encoded do
@@ -165,9 +165,6 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
       {:error, :invalid} ->
         "invalid"
-
-      :unexpected ->
-        "unexpected"
     end
   end
 
@@ -183,10 +180,10 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   end
 
   defp execute("rendering-cases.json", item, _, pure_cases) do
-    result = approval(Map.fetch!(pure_cases, item["pure_case"]))
+    result = approval(Map.fetch!(pure_cases, Map.get(item, "pure_case")))
 
     render =
-      case {item["id"], result} do
+      case {Map.get(item, "id"), result} do
         {"nested-record", {:ok, %{record: record}}} -> record
         {"nested-assertion", {:ok, %{assertion: assertion}}} -> assertion
         _other -> result
@@ -196,32 +193,33 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   end
 
   defp execute("assertion-structure-cases.json", item, _, _) do
-    compact = item["compact"]
-    bounds = fields(item["bounds"])
+    compact = Map.get(item, "compact")
+    bounds = fields(Map.get(item, "bounds"))
 
     with {:ok, artifact} <- ES256.decode_assertion(compact, bounds),
          {:ok, digest} <- ES256.assertion_digest(compact, bounds) do
       artifact
       |> output()
       |> Map.drop(["version", "verification"])
-      |> Map.merge(%{"v" => 1, "digest" => b64(digest)})
+      |> Map.put("v", 1)
+      |> Map.put("digest", b64(digest))
     else
       {:error, :invalid} -> "invalid"
     end
   end
 
   defp execute("assertion-verification-cases.json", item, _, _) do
-    context = item["context"] |> fields() |> Map.put(:bounds, %{})
+    context = Map.get(item, "context") |> fields() |> Map.put(:bounds, %{})
     expected = struct!(ES256.ExpectedContentAssertion, context)
 
-    case ES256.verify_assertion(item["compact"], expected) do
+    case ES256.verify_assertion(Map.get(item, "compact"), expected) do
       {:ok, facts} -> output(facts)
       {:error, :invalid} -> "invalid"
     end
   end
 
   defp execute("digest-cases.json", item, _, _) do
-    case ES256.content_digest(raw(item["input"]), fields(item["bounds"])) do
+    case ES256.content_digest(raw(Map.get(item, "input")), fields(Map.get(item, "bounds"))) do
       {:ok, digest} -> b64(digest)
       {:error, :invalid} -> "invalid"
     end
@@ -230,15 +228,15 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   defp execute("assembly-cases.json", item, %{"signing" => signing}, _) do
     {:ok, input} = signing_input(signing)
 
-    case ES256.assemble_compact(input, raw(item["signature"])) do
+    case ES256.assemble_compact(input, raw(Map.get(item, "signature"))) do
       {:ok, compact} -> compact
       {:error, :invalid} -> "invalid"
     end
   end
 
   defp execute("successor-cases.json", item, _, _) do
-    previous = assertion_facts(item["previous_suite"], item["predecessor"])
-    next = assertion_facts(item["next_suite"], item["successor"])
+    previous = assertion_facts(Map.get(item, "previous_suite"), Map.get(item, "predecessor"))
+    next = assertion_facts(Map.get(item, "next_suite"), Map.get(item, "successor"))
 
     case ES256.verify_successor(previous, next, %{}) do
       :ok -> "ok"
@@ -246,12 +244,10 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
     end
   end
 
-  defp execute("separation-cases.json", item, _, _) do
-    id = item["id"]
-
-    with {:error, :invalid} <- ES256.decode_assertion(item["foreign"], %{}),
-         {:ok, _} <- foreign(id, item["foreign"]),
-         {:error, :invalid} <- foreign(id, item["candidate"]) do
+  defp execute("separation-cases.json", %{"id" => id, "foreign" => compact} = item, _, _) do
+    with {:error, :invalid} <- ES256.decode_assertion(compact, %{}),
+         {:ok, _} <- foreign(id, compact),
+         {:error, :invalid} <- foreign(id, Map.get(item, "candidate")) do
       "both_reject"
     else
       _disagreement -> "unexpected"
@@ -259,11 +255,11 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   end
 
   defp approval(item) do
-    record = raw(item["record"])
-    compact = item["compact"]
-    context = fields(item["context"])
+    record = raw(Map.get(item, "record"))
+    compact = Map.get(item, "compact")
+    context = fields(Map.get(item, "context"))
 
-    case item["suite"] do
+    case Map.get(item, "suite") do
       "eddsa" -> Approval.verify_eddsa(record, compact, context)
       "es256" -> Approval.verify_es256(record, compact, context)
     end
@@ -273,10 +269,12 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   defp assertion_facts("es256", values), do: struct!(EsFacts, fields(values))
 
   defp signing_input(signing) do
+    %{"payload" => payload, "kid" => key_id} = signing
+
     values =
-      signing["payload"]
+      payload
       |> Map.delete("v")
-      |> Map.put("attestor_key_id", signing["kid"])
+      |> Map.put("attestor_key_id", key_id)
       |> fields()
 
     producer = struct!(EsAssertion, values)
@@ -295,7 +293,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
   defp fields(value), do: value
 
-  defp field_value(field, value) when field in @binary_fields, do: raw(value)
+  defp field_value(field, value) when is_map_key(@binary_field_keys, field), do: raw(value)
 
   # Preserve exact fixture keys so malformed historical entries reach snapshot admission.
   defp field_value(field, value) when field in [:attestor, :key] and is_map(value),
@@ -312,7 +310,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
   defp output(value) when is_map(value) do
     Map.new(value, fn {key, value} ->
-      {Atom.to_string(key), if(key in @binary_fields, do: b64(value), else: output(value))}
+      rendered = if is_map_key(@binary_field_keys, key), do: b64(value), else: output(value)
+      {Atom.to_string(key), rendered}
     end)
   end
 

@@ -45,7 +45,8 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAsse
         }
 end
 
-defimpl Inspect, for: BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion do
+defimpl Inspect,
+  for: BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion do
   def inspect(_value, _options),
     do:
       Inspect.Algebra.string(

@@ -8,6 +8,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        # Shared rendering covers every accepted contract-major.
                        "lib/bounded_authority_protocol/diagnostic_rendering.ex",
                        "test/bounded_authority_protocol/diagnostic_rendering_test.exs",
+                       "lib/bounded_authority_protocol/conformance/candidate.ex",
                        "lib/bounded_authority_protocol/conformance/corpus.ex",
                        "lib/bounded_authority_protocol/conformance/report.ex",
                        "lib/bounded_authority_protocol/conformance/runner.ex",
@@ -84,6 +85,35 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                                      "priv/conformance/attestation-profiles/content-assertion/v1/content-over-limit.raw",
                                      "priv/conformance/attestation-profiles/content-assertion/v1/successor-cases.json"
                                    ])
+  @es256_assertion_profile_paths MapSet.new([
+                                             "lib/bounded_authority_protocol/content_assertion/es256/v1.ex",
+                                             "lib/bounded_authority_protocol/content_assertion/es256/v1/content_assertion.ex",
+                                             "lib/bounded_authority_protocol/content_assertion/es256/v1/content_assertion_facts.ex",
+                                             "lib/bounded_authority_protocol/content_assertion/es256/v1/decoded_content_assertion.ex",
+                                             "lib/bounded_authority_protocol/content_assertion/es256/v1/expected_content_assertion.ex",
+                                             "priv/conformance/attestation-profiles/content-assertion-es256/v1/assembly-cases.json",
+                                             "priv/conformance/attestation-profiles/content-assertion-es256/v1/assertion-structure-cases.json",
+                                             "priv/conformance/attestation-profiles/content-assertion-es256/v1/assertion-verification-cases.json",
+                                             "priv/conformance/attestation-profiles/content-assertion-es256/v1/digest-cases.json",
+                                             "priv/conformance/attestation-profiles/content-assertion-es256/v1/index.json",
+                                             "priv/conformance/attestation-profiles/content-assertion-es256/v1/profile.json",
+                                             "priv/conformance/attestation-profiles/content-assertion-es256/v1/separation-cases.json",
+                                             "priv/conformance/attestation-profiles/content-assertion-es256/v1/successor-cases.json"
+                                           ])
+  @action_approval_profile_paths MapSet.new([
+                                             "lib/bounded_authority_protocol/action_approval/v1.ex",
+                                             "lib/bounded_authority_protocol/action_approval/v1/record.ex",
+                                             "lib/bounded_authority_protocol/action_approval/v1/record_codec.ex",
+                                             "lib/bounded_authority_protocol/action_approval/v1/verified_approval_facts.ex",
+                                             "test/bounded_authority_protocol/action_approval/corpus_test.exs",
+                                             "priv/conformance/content-profiles/action-approval/v1/approval-cases.json",
+                                             "priv/conformance/content-profiles/action-approval/v1/helper-cases.json",
+                                             "priv/conformance/content-profiles/action-approval/v1/index.json",
+                                             "priv/conformance/content-profiles/action-approval/v1/multi-fault-cases.json",
+                                             "priv/conformance/content-profiles/action-approval/v1/profile.json",
+                                             "priv/conformance/content-profiles/action-approval/v1/record-cases.json",
+                                             "priv/conformance/content-profiles/action-approval/v1/rendering-cases.json"
+                                           ])
   @requirement_ids "test/fixtures/durable_identifier_requirements.txt"
                    |> File.read!()
                    |> String.split()
@@ -270,6 +300,10 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
        ) and local_loopback_profile_source_path?(path)) or
       (String.starts_with?(name, "BoundedAuthorityProtocol.ContentAssertion.V1") and
          MapSet.member?(@content_assertion_profile_paths, path)) or
+      (String.starts_with?(name, "BoundedAuthorityProtocol.ContentAssertion.ES256.V1") and
+         MapSet.member?(@es256_assertion_profile_paths, path)) or
+      (String.starts_with?(name, "BoundedAuthorityProtocol.ActionApproval.V1") and
+         MapSet.member?(@action_approval_profile_paths, path)) or
       (String.starts_with?(name, "BoundedAuthorityProtocol.RoleAttestation.V1") and
          MapSet.member?(@role_attestation_profile_paths, path)) or
       (name == "BoundedAuthorityProtocol.Conformance.V1SchemaTest" and
@@ -327,7 +361,9 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
     do:
       current_major_source_path?(path) or MapSet.member?(@local_loopback_profile_paths, path) or
         MapSet.member?(@role_attestation_profile_paths, path) or
-        MapSet.member?(@content_assertion_profile_paths, path)
+        MapSet.member?(@content_assertion_profile_paths, path) or
+        MapSet.member?(@es256_assertion_profile_paths, path) or
+        MapSet.member?(@action_approval_profile_paths, path)
 
   defp current_major_path?(path, "v2"), do: successor_major_source_path?(path)
 
@@ -530,6 +566,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
       MapSet.member?(@local_loopback_profile_paths, path) or
       MapSet.member?(@role_attestation_profile_paths, path) or
       MapSet.member?(@content_assertion_profile_paths, path) or
+      MapSet.member?(@es256_assertion_profile_paths, path) or
+      MapSet.member?(@action_approval_profile_paths, path) or
       MapSet.member?(@external_v1_paths, path) or
       path == "scripts/check_package.exs" or
       String.starts_with?(path, "test/conformance/") or

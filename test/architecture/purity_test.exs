@@ -309,6 +309,7 @@ defmodule BoundedAuthorityProtocol.Architecture.PurityTest do
       """)
 
     details = Enum.map(ArchitectureGate.check(root, compiled: false), & &1.detail)
+
     assert Enum.sort(details) == [
              "forbidden call Approval.profile_digest",
              "forbidden module Approval"

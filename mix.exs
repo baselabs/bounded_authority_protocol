@@ -503,7 +503,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "cmd node conformance/generators/build_producer_canonicality.mjs --verify",
         "cmd node conformance/generators/build_selector_float_zero.mjs --verify",
         "cmd python3 scripts/build_content_assertion_corpus.py --verify",
-        "cmd uv run --project sdks/python --locked --no-install-project python scripts/build_approval_corpora.py --verify"
+        "cmd uv sync --project sdks/python --locked --no-dev --no-install-project",
+        "cmd uv run --project sdks/python --no-sync python scripts/build_approval_corpora.py --verify"
       ],
       "corpus.distribution.mutations": [
         "cmd mix test test/corpus_tooling_test.exs",
@@ -564,7 +565,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "local_loopback_http.verify",
         "role_attestation.verify",
         "content_assertion.verify",
-        "test test/bounded_authority_protocol/action_approval/corpus_test.exs --seed 42",
+        "cmd mix test test/bounded_authority_protocol/action_approval/corpus_test.exs --seed 42",
         "conformance.mutations"
       ],
       "quality.mutations": [

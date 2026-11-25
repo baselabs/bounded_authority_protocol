@@ -69,6 +69,21 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
     assert Jcs.encode_approval_record({}, 0, 0, 0) == {:error, :invalid}
   end
 
+  test "record resources must contain strings and authoring preflight rejects tiny bounds" do
+    item = @approval_root |> fixture("record-cases.json") |> hd()
+    wire = raw(item["wire"])
+
+    assert {:ok, %Record{} = record} = Approval.decode_record(wire)
+
+    for resource <- ["true", "1", "null"] do
+      invalid = Regex.replace(~r/"resources":\[[^\]]*\]/, wire, ~s("resources":[#{resource}]))
+      assert invalid != wire
+      assert Approval.decode_record(invalid) == {:error, :invalid}
+    end
+
+    assert Approval.encode_record(record, %{}, %{record_bytes: 1}) == {:error, :invalid}
+  end
+
   test "approval diagnostic precedence and complete verified facts" do
     for file <- ["approval-cases.json", "multi-fault-cases.json"],
         item <- fixture(@approval_root, file) do
@@ -92,13 +107,32 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
     assert {:ok, _} = Approval.verify_es256(record, compact, Map.delete(context, :max_active))
 
     snapshot = %{context.snapshot | entries: :unavailable}
+
     assert Approval.verify_es256(record, compact, %{context | snapshot: snapshot}) ==
              {:error, :trust_unavailable}
 
     [entry] = context.snapshot.entries
     snapshot = %{context.snapshot | entries: [%{entry | roles: :unavailable}]}
+
     assert Approval.verify_es256(record, compact, %{context | snapshot: snapshot}) ==
              {:error, :trust_unavailable}
+  end
+
+  test "a context missing a required request field is rejected before snapshot admission" do
+    item = fixture_case!(@approval_root, "approval-cases.json", "es256-verified")
+    context = fields(item["context"])
+    record = raw(item["record"])
+    compact = item["compact"]
+
+    assert {:ok, _} = Approval.verify_es256(record, compact, context)
+
+    for field <- [:audience, :action, :roles, :max_lifetime] do
+      assert Approval.verify_es256(record, compact, Map.delete(context, field)) ==
+               {:error, :invalid_context}
+    end
+
+    assert Approval.verify_es256(record, compact, Map.put(context, :max_active, -1)) ==
+             {:error, :invalid_context}
   end
 
   test "foreign-suite inputs stop before claims, lookup or signature verification" do
@@ -142,6 +176,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
 
   test "record size preflight stops before escaping fields or encoding the tree" do
     cases = fixture(@approval_root, "record-cases.json")
+
     for {id, result, encoding_calls} <- [
           {"authoring-escaped-size-exact", :ok, 1},
           {"authoring-escaped-size-plus", :error, 0},
@@ -228,7 +263,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
     trace_calls([encode, escape], fn ->
       assert {^result, _} = Approval.encode_record(record), id
       assert call_count(encode) == encoding_calls, id
-      assert (call_count(escape) > 0) == (encoding_calls == 1), id
+      assert call_count(escape) > 0 == (encoding_calls == 1), id
     end)
   end
 
