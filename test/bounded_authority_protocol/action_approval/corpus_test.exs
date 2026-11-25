@@ -11,12 +11,13 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
   alias BoundedAuthorityProtocol.V1, as: BAP1
   alias BoundedAuthorityProtocol.V2, as: BAP2
   alias BoundedAuthorityProtocol.V3, as: BAP3
-  alias BoundedAuthorityProtocol.V1.{Bounds, HistoricalPublicKey, Jcs, Json}
+  alias BoundedAuthorityProtocol.{Ed25519, Es256}
+  alias BoundedAuthorityProtocol.V1.{Base64Url, Bounds, HistoricalPublicKey, Jcs, Json}
 
   @es256_root "priv/conformance/attestation-profiles/content-assertion-es256/v1"
   @approval_root "priv/conformance/content-profiles/action-approval/v1"
-  @es256_pin "067cbdc96a7846f55a9c50e69091096456137262741c7e59b6e5eac88531838a"
-  @approval_pin "30ff68f1552ee1d5a02407c96c0f60caf381f8d89607a04e0012379fe5909be2"
+  @es256_pin "d79329d431de093f162613fbd2a2fe838766b690fa67cfbc1478eafa322b3c63"
+  @approval_pin "2a6765c2b6990068a99d5690d35d961b12a25c56d5439ec315234544d1820ceb"
 
   @binary_fields ~w(attestor_key_fingerprint content_digest digest prev profile_digest public_key
     revision_digest)a
@@ -61,24 +62,29 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
       ca = fields(item["ca_bounds"])
       limits = fields(item["bounds"])
 
-      result =
-        case item do
-          %{"wire" => wire} ->
-            with {:ok, record} <- Approval.decode_record(raw(wire), ca, limits),
-                 do: Approval.encode_record(record, ca, limits)
+      case {item, item["expected"]} do
+        {%{"wire" => wire}, "invalid"} ->
+          assert Approval.decode_record(raw(wire), ca, limits) == {:error, :invalid}, item["id"]
 
-          %{"author" => record} ->
-            record = record |> Map.delete("v") |> fields()
-            Approval.encode_record(struct!(Record, record), ca, limits, item["canonicalize"])
-        end
+        {%{"wire" => wire}, %{"wire" => exact, "content_digest" => digest}} ->
+          assert {:ok, %Record{} = record} = Approval.decode_record(raw(wire), ca, limits),
+                 item["id"]
 
-      case item["expected"] do
-        "invalid" ->
-          assert result == {:error, :invalid}, item["id"]
+          assert Approval.encode_record(record, ca, limits) == {:ok, raw(exact)}, item["id"]
+          assert ES256.content_digest(raw(exact), ca) == {:ok, raw(digest)}, item["id"]
 
-        %{"wire" => wire, "content_digest" => digest} ->
-          assert result == {:ok, raw(wire)}, item["id"]
-          assert ES256.content_digest(raw(wire), ca) == {:ok, raw(digest)}, item["id"]
+        {%{"author" => record}, expected} ->
+          record = struct!(Record, fields(Map.delete(record, "v")))
+          result = Approval.encode_record(record, ca, limits, item["canonicalize"])
+
+          case expected do
+            "invalid" ->
+              assert result == {:error, :invalid}, item["id"]
+
+            %{"wire" => wire, "content_digest" => digest} ->
+              assert result == {:ok, raw(wire)}, item["id"]
+              assert ES256.content_digest(raw(wire), ca) == {:ok, raw(digest)}, item["id"]
+          end
       end
     end
 
@@ -94,15 +100,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
   test "approval diagnostic precedence and complete verified facts" do
     for file <- ["approval-cases.json", "multi-fault-cases.json"],
         item <- fixture(@approval_root, file) do
-      context = context(item["context"])
-      record = raw(item["record"])
-      compact = item["compact"]
-
-      result =
-        case item["suite"] do
-          "es256" -> Approval.verify_es256(record, compact, context)
-          "eddsa" -> Approval.verify_eddsa(record, compact, context)
-        end
+      result = verify_case(item)
 
       case item["expected"] do
         expected when is_binary(expected) ->
@@ -116,20 +114,20 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
           assert facts.trust_domain == expected["trust_domain"]
           assert facts.trust == :not_evaluated
 
-          rendering =
-            @approval_root
-            |> fixture("rendering-cases.json")
-            |> Enum.find(&(&1["id"] == "verified-facts"))
-
-          assert inspect(result) == rendering["expected"]
-          assert inspect(facts.record) ==
-                   "#BoundedAuthorityProtocol.ActionApproval.V1.Record<redacted>"
       end
     end
 
+    cases = fixture(@approval_root, "approval-cases.json")
+    missing = Enum.find(cases, &(&1["id"] == "missing-trust"))
+    missing_context = context(missing["context"])
+    assert missing_context.snapshot == nil
+
+    assert Approval.verify_es256(raw(missing["record"]), missing["compact"], missing_context) ==
+             {:error, :trust_unavailable}
+
     assert Approval.verify_es256(nil, nil, nil) == {:error, :invalid_context}
 
-    item = Enum.find(fixture(@approval_root, "approval-cases.json"), &(&1["id"] == "es256-verified"))
+    item = Enum.find(cases, &(&1["id"] == "es256-verified"))
     context = context(item["context"])
     record = raw(item["record"])
     compact = item["compact"]
@@ -145,52 +143,147 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
              {:error, :trust_unavailable}
   end
 
-  test "foreign-suite inputs stop before claims, lookup or the foreign verifier" do
-    for module <- [Codec, Approval], do: Code.ensure_loaded!(module)
-    patterns = [{Codec, :parse_claims, 2}, {Approval, :key_entry, 2}, {Codec, :parse, 3}]
-    parent = self()
+  test "foreign-suite inputs stop before claims, lookup or signature verification" do
+    patterns = [
+      {Codec, :parse, 3},
+      {Codec, :parse_claims, 2},
+      {Approval, :key_entry, 2},
+      {Codec, :signature, 3},
+      {Ed25519, :verify_strict, 3},
+      {Es256, :verify_strict, 3}
+    ]
 
-    for item <- fixture(@approval_root, "approval-cases.json"),
-        Map.has_key?(item, "expected_calls") do
-      suite = String.to_existing_atom(item["suite"])
-      context = context(item["context"])
-      record = raw(item["record"])
-      compact = item["compact"]
+    cases = fixture(@approval_root, "approval-cases.json")
 
-      worker =
-        spawn_link(fn ->
-          receive do
-            :verify ->
-              result =
-                case suite do
-                  :eddsa -> Approval.verify_eddsa(record, compact, context)
-                  :es256 -> Approval.verify_es256(record, compact, context)
-                end
+    for {id, calls} <- [
+          {"eddsa-verified", [1, 1, 1, 1, 1, 0]},
+          {"es256-verified", [1, 1, 1, 1, 0, 1]},
+          {"foreign-eddsa", [1, 0, 0, 0, 0, 0]},
+          {"foreign-es256", [1, 0, 0, 0, 0, 0]}
+        ] do
+      item = Enum.find(cases, &(&1["id"] == id))
 
-              send(parent, {:verification, self(), result})
+      trace_calls(patterns, fn ->
+        case item["expected"] do
+          "unsupported_algorithm" ->
+            assert verify_case(item) == {:error, :unsupported_algorithm}
+            expected = item["expected_calls"]
+            [_, claims, lookup, _, eddsa, es256] = Enum.map(patterns, &call_count/1)
+            assert claims == expected["payload_parser"], id
+            assert lookup == expected["key_lookup"], id
+            assert eddsa + es256 == expected["foreign_verifier"], id
 
-              receive do
-                :stop -> :ok
-              end
-          end
-        end)
+          _verified ->
+            assert {:ok, _} = verify_case(item)
+        end
 
-      try do
-        for mfa <- patterns, do: :erlang.trace_pattern(mfa, true, [:local])
-        :erlang.trace(worker, true, [:call, {:tracer, parent}])
-        send(worker, :verify)
+        assert Enum.map(patterns, &call_count/1) == calls, id
+      end)
+    end
+  end
 
-        assert_receive {:verification, ^worker, {:error, :unsupported_algorithm}}, 1_000
-        ref = :erlang.trace_delivered(worker)
-        assert_receive {:trace_delivered, ^worker, ^ref}, 1_000
+  test "record size preflight stops before escaping fields or encoding the tree" do
+    cases = fixture(@approval_root, "record-cases.json")
+    encode = {Jcs, :encode_approval_record, 4}
+    escape = {Jcs, :escape_string, 1}
 
-        assert_received {:trace, ^worker, :call, {Codec, :parse, [^compact, _, ^suite]}}
-        refute_received {:trace, ^worker, :call, _}
-      after
-        send(worker, :stop)
-        for mfa <- patterns, do: :erlang.trace_pattern(mfa, false, [:local])
+    for {id, result, encoding_calls} <- [
+          {"authoring-escaped-size-exact", :ok, 1},
+          {"authoring-escaped-size-plus", :error, 0},
+          {"escape-heavy-over", :error, 0}
+        ] do
+      item = Enum.find(cases, &(&1["id"] == id))
+      record = struct!(Record, fields(Map.delete(item["author"], "v")))
+
+      trace_calls([encode, escape], fn ->
+        assert {^result, _} = Approval.encode_record(record), id
+        assert call_count(encode) == encoding_calls, id
+        assert (call_count(escape) > 0) == (encoding_calls == 1), id
+      end)
+    end
+
+    escaped_size = {Jcs, :escaped_size, 3}
+
+    trace_calls([escaped_size, escape], fn ->
+      assert Jcs.escaped_string_bytes(:binary.copy(<<1>>, 1024), 7) == {:error, :invalid}
+      assert call_count(escaped_size) == 2, "escaped-size-early-stop"
+      assert call_count(escape) == 0
+      assert Jcs.escaped_string_bytes(<<1, ?\n, ?">> <> "é", 14) == {:ok, 14}
+      assert Jcs.escaped_string_bytes(<<1, ?\n, ?">> <> "é", 13) == {:error, :invalid}
+    end)
+  end
+
+  test "revision digest width is checked before decoding base64url" do
+    base64_decode = {Base64Url, :decode, 2}
+    wire = @approval_root |> fixture("record-cases.json") |> hd() |> Map.fetch!("wire") |> raw()
+    [_, revision] = Regex.run(~r/"revision_digest":"([^"]+)"/, wire)
+
+    for {value, expected, calls} <- [
+          {revision, :ok, 1},
+          {binary_part(revision, 0, 42), :error, 0},
+          {revision <> "A", :error, 0}
+        ] do
+      trace_calls([base64_decode], fn ->
+        assert {^expected, _} = Approval.decode_record(String.replace(wire, revision, value))
+        assert call_count(base64_decode) == calls, "revision-width-before-base64"
+      end)
+    end
+  end
+
+  test "approval rendering redacts raw and transformed canaries" do
+    cases = fixture(@approval_root, "approval-cases.json")
+
+    for item <- fixture(@approval_root, "rendering-cases.json"),
+        item["owner"] != "sdk_helper" do
+      input = Enum.find(cases, &(&1["id"] == item["pure_case"]))
+      result = verify_case(input)
+
+      result =
+        case {item["id"], result} do
+          {"nested-record", {:ok, facts}} -> facts.record
+          {"nested-assertion", {:ok, facts}} -> facts.assertion
+          _other -> result
+        end
+
+      rendered = inspect(result)
+      assert rendered == item["expected"], item["id"]
+
+      for {field, forms} <- Map.get(item, "forbidden", %{}), form <- forms do
+        refute String.contains?(rendered, form), "#{item["id"]}/#{field}"
       end
     end
+  end
+
+  defp verify_case(item) do
+    context = context(item["context"])
+    record = raw(item["record"])
+    compact = item["compact"]
+
+    case item["suite"] do
+      "es256" -> Approval.verify_es256(record, compact, context)
+      "eddsa" -> Approval.verify_eddsa(record, compact, context)
+    end
+  rescue
+    _error -> flunk("verification raised for #{item["id"]}")
+  end
+
+  defp trace_calls(patterns, fun) do
+    try do
+      for {module, _, _} = mfa <- patterns do
+        Code.ensure_loaded!(module)
+        assert :erlang.trace_pattern(mfa, true, [:call_count]) == 1
+      end
+
+      fun.()
+    after
+      for mfa <- patterns, do: :erlang.trace_pattern(mfa, false, [:call_count])
+    end
+  end
+
+  defp call_count(mfa) do
+    assert {:call_count, count} = :erlang.trace_info(mfa, :call_count)
+    assert is_integer(count)
+    count
   end
 
   test "ES256 assertion structure and compact digest" do
@@ -355,7 +448,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
       snapshot ->
         Map.update!(snapshot, :entries, fn entries ->
           Enum.map(entries, fn entry ->
-            Map.update!(entry, :key, &struct!(HistoricalPublicKey, &1))
+            Map.update!(entry, :key, &Map.put(&1, :__struct__, HistoricalPublicKey))
           end)
         end)
     end)
@@ -373,6 +466,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
   end
 
   defp fields(value) when is_list(value), do: Enum.map(value, &fields/1)
+  defp fields(:null), do: nil
   defp fields(value), do: value
 
   defp field_value(field, value) when field in @binary_fields, do: raw(value)

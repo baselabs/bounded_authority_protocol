@@ -249,7 +249,7 @@ and keys. Such guarantees require separately qualified host mechanisms
 The candidate corpus location is
 `priv/conformance/attestation-profiles/content-assertion-es256/v1`. Every consumer
 MUST pin the frozen index and verify the indexed file hashes. Index SHA-256
-(hex) at freeze is `067cbdc96a7846f55a9c50e69091096456137262741c7e59b6e5eac88531838a`
+(hex) at freeze is `d79329d431de093f162613fbd2a2fe838766b690fa67cfbc1478eafa322b3c63`
 (`REQ-CAE1-CONFORMANCE-pin`).
 
 Required cases cover every header and payload rule, canonical encodings, digests,

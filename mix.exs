@@ -477,7 +477,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "cmd ./bounded_authority_conformance --corpus priv/conformance/selector-float-zero",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/application-profiles/local-loopback-http/v1",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/attestation-profiles/role-attestation/v1",
-        "cmd ./bounded_authority_conformance --corpus priv/conformance/attestation-profiles/content-assertion/v1"
+        "cmd ./bounded_authority_conformance --corpus priv/conformance/attestation-profiles/content-assertion/v1",
+        "cmd ./bounded_authority_conformance --corpus priv/conformance/attestation-profiles/content-assertion-es256/v1",
+        "cmd ./bounded_authority_conformance --corpus priv/conformance/content-profiles/action-approval/v1"
       ],
       "local_loopback_http.verify": [
         "run scripts/check_local_loopback_http.exs",

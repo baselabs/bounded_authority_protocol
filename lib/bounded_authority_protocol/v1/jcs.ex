@@ -45,7 +45,21 @@ defmodule BoundedAuthorityProtocol.V1.Jcs do
   def encode_approval_record(_, _, _, _), do: {:error, :invalid}
 
   @doc false
-  def escaped_string_bytes(value), do: :erlang.iolist_size(escape_string(value))
+  def escaped_string_bytes(value, allowance), do: escaped_size(value, 2, allowance)
+
+  defp escaped_size(_value, size, allowance) when size > allowance, do: {:error, :invalid}
+  defp escaped_size(<<>>, size, _allowance), do: {:ok, size}
+
+  defp escaped_size(<<byte, rest::binary>>, size, allowance)
+       when byte in [?", ?\\, 0x08, 0x09, 0x0A, 0x0C, 0x0D],
+       do: escaped_size(rest, size + 2, allowance)
+
+  defp escaped_size(<<byte, rest::binary>>, size, allowance) when byte < 0x20,
+    do: escaped_size(rest, size + 6, allowance)
+
+  # Every other UTF-8 byte is written verbatim. The record validates scalar UTF-8 first.
+  defp escaped_size(<<_byte, rest::binary>>, size, allowance),
+    do: escaped_size(rest, size + 1, allowance)
 
   defp encode_bounded(value, bounds) do
     try do

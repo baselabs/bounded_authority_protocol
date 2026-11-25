@@ -334,7 +334,7 @@ with an exact record-digest selector and a holder proof
 
 The candidate corpus root is `priv/conformance/content-profiles/action-approval/v1`.
 Use one frozen `index.json` covering the following case files. Index SHA-256 (hex) at freeze
-is `30ff68f1552ee1d5a02407c96c0f60caf381f8d89607a04e0012379fe5909be2`. Consumers MUST pin the index and verify
+is `2a6765c2b6990068a99d5690d35d961b12a25c56d5439ec315234544d1820ceb`. Consumers MUST pin the index and verify
 its indexed file hashes (`REQ-AA1-CONFORMANCE-pin`).
 
 | File | Inputs and expected results |
@@ -342,8 +342,8 @@ its indexed file hashes (`REQ-AA1-CONFORMANCE-pin`).
 | `record-cases.json` | Exact wire bytes or typed authoring input, effective bounds, canonical output bytes or rejection, and independent descriptor/content known answers. Cover each schema field, duplicates and escapes, Unicode scalar and UTF-8 ordering edges, normalization distinctions, explicit authoring deduplication, and simultaneous raw-string/count/encoded-byte and CA tightening edges. |
 | `approval-cases.json` | Public compact and record bytes, selected suite, explicit expected context, bounds, time and snapshot, and exact facts or one named pure diagnostic. Cover every pure code, each time and containment edge, zero resource ceilings and zero time caps, tightened bounds on an unselected entry, empty enrolled roles, both suites, and cross-profile and foreign-suite rejection. |
 | `multi-fault-cases.json` | The same public inputs with independent faults and the winning pure diagnostic. Cover preflight and snapshot freshness over malformed input, structure over suite, suite over payload and key lookup, bad signature over signed times/key windows, and ordering among authenticated failures. |
-
 | `helper-cases.json` | Pure case reference, predicate observations, ordered call arguments and counts, helper outcome and presenter result. Cases identify the exercised subcases of `REQ-AA1-HOST-predicates` and `REQ-AA1-HOST-disclosure`. |
+| `rendering-cases.json` | Nested record and assertion canaries, their raw, base64url, hex and JSON-escaped forms, and exact local and presenter renderings. SDK helper cases include exception, chained context and provider cause canaries. |
 
 Independent implementations MUST agree on canonical bytes, digest values and
 every verdict. Keep all old known-answer verdicts and demonstrate red-capable

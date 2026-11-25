@@ -188,9 +188,13 @@ change in any release:
   `BoundedAuthorityProtocol.V3.Runtime`, and every other `Runtime` module;
 - `BoundedAuthorityProtocol.DiagnosticRendering`, the internal diagnostic formatter;
 - `BoundedAuthorityProtocol.Conformance.Corpus`, `BoundedAuthorityProtocol.Conformance.Runner`,
-  and `BoundedAuthorityProtocol.Conformance.Report`, the CLI's internals;
+  `BoundedAuthorityProtocol.Conformance.Report`, and
+  `BoundedAuthorityProtocol.Conformance.Candidate`, the CLI's internals;
 - `BoundedAuthorityProtocol.Conformance.Cli.Main`, the escript entry point;
 - `BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1`;
+- `BoundedAuthorityProtocol.V1.Json.decode_approval_record/3`,
+  `BoundedAuthorityProtocol.V1.Jcs.encode_approval_record/4`, and
+  `BoundedAuthorityProtocol.V1.Jcs.escaped_string_bytes/2`;
 - the signature gate helpers `BoundedAuthorityProtocol.Ed25519.signature_gate?/1` and
   `BoundedAuthorityProtocol.Ed25519.strict_gate?/2`;
 - the selector helpers that verification and the producers share, in each of `BoundedAuthorityProtocol.V1.Selector`, `BoundedAuthorityProtocol.V2.Selector`, and `BoundedAuthorityProtocol.V3.Selector`:

@@ -1,6 +1,11 @@
 defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
   @moduledoc false
 
+  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertion, as: EsAssertion
+  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts, as: EsFacts
+  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.DecodedContentAssertion, as: EsDecoded
+  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion, as: EsExpected
+
   alias BoundedAuthorityProtocol.ContentAssertion.V1.{
     ContentAssertion,
     ContentAssertionFacts,
@@ -8,7 +13,6 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
     ExpectedContentAssertion
   }
 
-  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1, as: ES256
   alias BoundedAuthorityProtocol.{Ed25519, Es256}
   alias BoundedAuthorityProtocol.V3.{ContextValidation, EcJwk}
 
@@ -34,9 +38,9 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
   @claims @strings ++ @digests ++ @integers
   @payload_keys Enum.sort(["v" | Enum.map(@claims, &Atom.to_string/1)])
   @producer_fields Map.keys(ContentAssertion.__struct__())
-  @es_producer_fields Map.keys(ES256.ContentAssertion.__struct__())
-  @es_expected_fields Map.keys(ES256.ExpectedContentAssertion.__struct__())
-  @es_facts_fields Map.keys(ES256.ContentAssertionFacts.__struct__())
+  @es_producer_fields Map.keys(EsAssertion.__struct__())
+  @es_expected_fields Map.keys(EsExpected.__struct__())
+  @es_facts_fields Map.keys(EsFacts.__struct__())
   @facts_fields Map.keys(ContentAssertionFacts.__struct__())
   @expected_fields Map.keys(ExpectedContentAssertion.__struct__())
   @input_fields Map.keys(SigningInput.__struct__())
@@ -62,8 +66,7 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
 
   defp producer_shape?(value, :eddsa), do: shape?(value, @producer_fields, ContentAssertion)
 
-  defp producer_shape?(value, :es256),
-    do: shape?(value, @es_producer_fields, ES256.ContentAssertion)
+  defp producer_shape?(value, :es256), do: shape?(value, @es_producer_fields, EsAssertion)
 
   def assemble(input, signature, limits, suite \\ :eddsa)
 
@@ -141,8 +144,7 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
   defp expected_shape?(value, :eddsa),
     do: shape?(value, @expected_fields, ExpectedContentAssertion)
 
-  defp expected_shape?(value, :es256),
-    do: shape?(value, @es_expected_fields, ES256.ExpectedContentAssertion)
+  defp expected_shape?(value, :es256), do: shape?(value, @es_expected_fields, EsExpected)
 
   def historical_key(key, bounds, :eddsa), do: EdContext.historical_key(key, bounds)
   def historical_key(key, bounds, :es256), do: ContextValidation.historical_key(key, bounds)
@@ -150,24 +152,30 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
   def fingerprint(key, bounds, :eddsa), do: Jwk.public_key_thumbprint_raw(key, bounds)
   def fingerprint(key, bounds, :es256), do: EcJwk.public_key_thumbprint_raw(key, bounds)
 
-  def admitted_fingerprint(key, bounds, :eddsa) do
+  def admitted_fingerprint(key, :eddsa) do
     result =
       with true <- Ed25519.torsion_free?(key) do
-        fingerprint(key, bounds, :eddsa)
+        fingerprint(key, %{}, :eddsa)
       end
 
     stage(result, :invalid)
   end
 
-  def admitted_fingerprint(key, bounds, :es256), do: fingerprint(key, bounds, :es256)
+  def admitted_fingerprint(key, :es256) do
+    with {:ok, preimage} <- EcJwk.encode_public(key, %{}) do
+      {:ok, :crypto.hash(:sha256, preimage)}
+    end
+  end
 
-  def signature(parsed, key, :eddsa),
-    do:
-      check(Ed25519.verify_strict(parsed.message, parsed.signature, key.public_key), :bad_signature)
+  def signature(parsed, key, :eddsa) do
+    verified = Ed25519.verify_strict(parsed.message, parsed.signature, key.public_key)
+    check(verified, :bad_signature)
+  end
 
-  def signature(parsed, key, :es256),
-    do:
-      check(Es256.verify_strict(parsed.message, parsed.signature, key.public_key), :bad_signature)
+  def signature(parsed, key, :es256) do
+    verified = Es256.verify_strict(parsed.message, parsed.signature, key.public_key)
+    check(verified, :bad_signature)
+  end
 
   def key_window(parsed, key), do: check(contained?(parsed, key), :key_window)
 
@@ -297,15 +305,14 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
   defp decode_claim(_, _, _), do: {:error, :invalid}
 
   defp canonical_object(bytes, keys, bounds) do
-    result =
-      with {:ok, {:object, members} = value} <- Json.decode(bytes, bounds),
-           true <- Enum.sort(Enum.map(members, &elem(&1, 0))) == keys,
-           {:ok, canonical} <- Jcs.encode(value, bounds),
-           true <- canonical == bytes do
-        {:ok, Map.new(members)}
-      end
-
-    stage(result, :invalid)
+    with {:ok, {:object, members} = value} <- Json.decode(bytes, bounds),
+         true <- Enum.sort(Enum.map(members, &elem(&1, 0))) == keys,
+         {:ok, canonical} <- Jcs.encode(value, bounds),
+         true <- canonical == bytes do
+      {:ok, Map.new(members)}
+    else
+      _failure -> {:error, :invalid}
+    end
   end
 
   defp valid_claims?(value, bounds) do
@@ -313,13 +320,15 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
       Enum.all?(@strings, &identifier?(Map.fetch!(value, &1), bounds)) and
       Enum.all?(@digests, &digest?(Map.fetch!(value, &1))) and
       Enum.all?(@integers, &integer?(Map.fetch!(value, &1), bounds)) and
-      value.gen >= 1 and value.gen == 1 == (value.prev == @zero) and
+      value.gen >= 1 and value.gen == 1 == FixedBytes.equal?(value.prev, @zero) and
       value.iat <= value.nbf and value.nbf < value.exp
   end
 
   defp valid_expected?(e, bounds) do
+    identifiers = [:issuer, :audience, :subject, :profile]
+
     shape?(e.attestor, @key_fields, HistoricalPublicKey) and
-      Enum.all?([:issuer, :audience, :subject, :profile], &identifier?(Map.fetch!(e, &1), bounds)) and
+      Enum.all?(identifiers, &identifier?(Map.fetch!(e, &1), bounds)) and
       digest?(e.profile_digest) and digest?(e.content_digest) and integer?(e.now, bounds)
   end
 
@@ -345,14 +354,13 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
 
   defp facts_shape?(f, :eddsa), do: shape?(f, @facts_fields, ContentAssertionFacts)
 
-  defp facts_shape?(f, :es256),
-    do: shape?(f, @es_facts_fields, ES256.ContentAssertionFacts)
+  defp facts_shape?(f, :es256), do: shape?(f, @es_facts_fields, EsFacts)
 
   defp facts_type(:eddsa), do: ContentAssertionFacts
-  defp facts_type(:es256), do: ES256.ContentAssertionFacts
+  defp facts_type(:es256), do: EsFacts
 
   defp decoded_type(:eddsa), do: DecodedContentAssertion
-  defp decoded_type(:es256), do: ES256.DecodedContentAssertion
+  defp decoded_type(:es256), do: EsDecoded
 
   defp shape?(value, fields, module) when is_map(value),
     do: Map.get(value, :__struct__) == module and Enum.sort(Map.keys(value)) == Enum.sort(fields)
@@ -366,10 +374,10 @@ defmodule BoundedAuthorityProtocol.ContentAssertion.V1.Codec do
       is_integer(value) and value >= -bounds.integer_magnitude and
         value <= bounds.integer_magnitude
 
-  def identifier?(value, bounds),
-    do:
-      is_binary(value) and byte_size(value) > 0 and byte_size(value) <= bounds.identifier_bytes and
-        String.valid?(value) and StringOrUri.valid?(value)
+  def identifier?(value, bounds) do
+    is_binary(value) and byte_size(value) > 0 and byte_size(value) <= bounds.identifier_bytes and
+      String.valid?(value) and StringOrUri.valid?(value)
+  end
 
   defp valid_kid?(value, bounds),
     do:

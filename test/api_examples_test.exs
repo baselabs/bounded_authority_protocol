@@ -17,6 +17,8 @@ defmodule BoundedAuthorityProtocol.ApiExamplesTest do
     BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1,
     BoundedAuthorityProtocol.RoleAttestation.V1,
     BoundedAuthorityProtocol.ContentAssertion.V1,
+    BoundedAuthorityProtocol.ContentAssertion.ES256.V1,
+    BoundedAuthorityProtocol.ActionApproval.V1,
     BoundedAuthorityProtocol.Conformance.Cli
   ]
 

@@ -9,6 +9,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   use ExUnit.Case, async: false
 
+  alias BoundedAuthorityProtocol.Conformance.Candidate
   alias BoundedAuthorityProtocol.Conformance.Cli
   alias BoundedAuthorityProtocol.Conformance.Corpus
   alias BoundedAuthorityProtocol.Conformance.Report
@@ -55,6 +56,69 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   test "exit 0 on the shipped v3 corpus (in-VM)" do
     assert Cli.run(["--corpus", @shipped_v3_corpus]) == 0
+  end
+
+  test "candidate CLI reports all applicable Elixir verdicts and the SDK-owned census" do
+    roots = [
+      "attestation-profiles/content-assertion-es256/v1",
+      "content-profiles/action-approval/v1"
+    ]
+
+    for root <- roots do
+      path = Path.join(@priv_conformance, root)
+      index_bytes = File.read!(Path.join(path, "index.json"))
+      index = :json.decode(index_bytes)
+      tmp = unique_tmp("candidate-report")
+      on_exit(fn -> File.rm_rf!(Path.dirname(tmp)) end)
+
+      assert Cli.run(["--corpus", path, "--report", tmp]) == 0
+      report = tmp |> File.read!() |> :json.decode()
+      assert report["agreement"]
+      assert report["profile"] == index["profile"]
+      assert report["index_sha256_base64url"] == Report.index_identity(index_bytes)
+      assert report["elixir_verdict_sha256"] == index["elixir_verdict_sha256"]
+      assert report["total"] == report["agreed"]
+
+      declared = Enum.sum(for %{"cases" => count} <- index["files"], do: count)
+      assert report["total"] + report["sdk_owned"] == declared
+      assert (report["sdk_owned"] > 0) == String.contains?(root, "action-approval")
+    end
+  end
+
+  test "candidate execution hashes observed verdicts and rejects a different expected digest" do
+    root = Path.join(@priv_conformance, "content-profiles/action-approval/v1")
+
+    files =
+      Map.new(File.ls!(root), fn name ->
+        {name, File.read!(Path.join(root, name))}
+      end)
+
+    index = :json.decode(files["index.json"])
+    different = Map.put(index, "elixir_verdict_sha256", String.duplicate("0", 64))
+    edited = Map.put(files, "index.json", IO.iodata_to_binary(:json.encode(different)))
+
+    assert {:ok, bytes, 1} = Candidate.run(edited, index["profile"])
+    report = :json.decode(bytes)
+    refute report["agreement"]
+    assert report["agreed"] == report["total"]
+    assert report["elixir_verdict_sha256"] == index["elixir_verdict_sha256"]
+  end
+
+  test "candidate CLI refuses index drift and indexed-file drift" do
+    dst = unique_tmp("candidate-drift") |> Path.dirname()
+    path = Path.join(@priv_conformance, "content-profiles/action-approval/v1")
+    File.cp_r!(path, dst)
+    on_exit(fn -> File.rm_rf!(dst) end)
+
+    index = Path.join(dst, "index.json")
+    original = File.read!(index)
+    File.write!(index, original <> "\n")
+    assert Cli.run(["--corpus", dst]) == 1
+
+    File.write!(index, original)
+    file = Path.join(dst, "rendering-cases.json")
+    File.write!(file, File.read!(file) <> "\n")
+    assert Cli.run(["--corpus", dst]) == 1
   end
 
   # --- the certified-corpus pin (index-SHA) -----------------------------------

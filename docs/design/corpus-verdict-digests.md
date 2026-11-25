@@ -79,3 +79,20 @@ reviewed exceptions; it cannot prove what arbitrary executable code will read. T
 self-containment guarantee is the copied-alone isolated package run, including the unpacked
 Python sdist, Rust crate, and Go module zip. Every SDK suite must pass with only its own tree
 available. Mutation controls exercise manifest escapes and representative source-lint bypasses.
+
+
+## Source candidates
+
+The ES256 content assertion and action approval candidate indexes pin a
+`verdict_sha256` over the complete case inventory. The projection is the JCS
+array of `[file + "/" + id, expected]` pairs in index and case order, with the
+SHA-256 written in lowercase hex. Each case-file hash and count remains
+part of the index identity.
+
+The source CLI recognizes the exact candidate indexes. It substitutes Elixir's
+observed outcomes for `expected` in that projection, omitting SDK helper cases,
+and checks the resulting hash against `elixir_verdict_sha256`. The report gives
+the count of SDK-owned cases and requires every applicable Elixir case to
+execute and agree. Candidate reports use the format
+`bounded-authority-protocol-candidate-conformance-report`. The packaged corpus
+inventory follows the candidate specs' SDK qualification rule.

@@ -26,16 +26,15 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec do
 
   def parse(bytes, %{record_bytes: maximum} = bounds, ca)
       when is_binary(bytes) and byte_size(bytes) > 0 and byte_size(bytes) <= maximum do
-    result =
-      with {:ok, {:object, members}} <-
-             Json.decode_approval_record(bytes, bounds.string_bytes, bounds.resource_count),
-           true <- Enum.sort(Enum.map(members, &elem(&1, 0))) == @keys,
-           {:ok, record} <- from_wire(Map.new(members)),
-           {:ok, ^bytes} <- encode(record, bounds, ca, false) do
-        {:ok, record}
-      end
-
-    stage(result, :invalid)
+    with {:ok, {:object, members}} <-
+           Json.decode_approval_record(bytes, bounds.string_bytes, bounds.resource_count),
+         true <- Enum.sort(Enum.map(members, &elem(&1, 0))) == @keys,
+         {:ok, record} <- from_wire(Map.new(members)),
+         {:ok, ^bytes} <- encode(record, bounds, ca, false) do
+      {:ok, record}
+    else
+      _failure -> {:error, :invalid}
+    end
   end
 
   def parse(_, _, _), do: {:error, :invalid}
@@ -47,7 +46,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec do
          "request_id" => {:string, request_id},
          "approver_role" => {:string, role},
          "resources" => {:array, resources},
-         "revision_digest" => {:string, encoded}
+         "revision_digest" => {:string, <<encoded::binary-size(43)>>}
        }) do
     with {:ok, digest} <- Base64Url.decode(encoded, %{}),
          {:ok, names} <- wire_strings(resources, []) do
@@ -119,21 +118,32 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec do
   def encode(_, _, _, _), do: {:error, :invalid}
 
   defp fits_encoding?(record, resources, limit) do
-    # The empty record already accounts for the four surrounding quote pairs.
-    size =
-      @record_overhead + Jcs.escaped_string_bytes(record.action) +
-        Jcs.escaped_string_bytes(record.approver_role) +
-        Jcs.escaped_string_bytes(record.request_id) + Jcs.escaped_string_bytes(record.subject) -
-        8
+    # The empty record already includes the four quote pairs.
+    encoding_fits?(
+      [record.action, record.approver_role, record.request_id, record.subject],
+      resources,
+      limit - @record_overhead + 8
+    )
+  end
 
-    resources_fit?(resources, limit - size)
+  defp encoding_fits?([], resources, remaining), do: resources_fit?(resources, remaining)
+
+  defp encoding_fits?([field | rest], resources, remaining) do
+    case Jcs.escaped_string_bytes(field, remaining) do
+      {:ok, size} -> encoding_fits?(rest, resources, remaining - size)
+      {:error, :invalid} -> false
+    end
   end
 
   defp resources_fit?([], remaining), do: remaining >= 0
 
   defp resources_fit?([name | rest], remaining) do
-    remaining = remaining - Jcs.escaped_string_bytes(name) - separator_bytes(rest)
-    remaining >= 0 and resources_fit?(rest, remaining)
+    remaining = remaining - separator_bytes(rest)
+
+    case Jcs.escaped_string_bytes(name, remaining) do
+      {:ok, size} -> resources_fit?(rest, remaining - size)
+      {:error, :invalid} -> false
+    end
   end
 
   defp separator_bytes([]), do: 0

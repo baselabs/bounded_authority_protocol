@@ -11,6 +11,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Implement the candidate action-approval record codec and pure verification
   with ordered host-local diagnostics. Pin the record descriptor and both
   candidate corpora. Specify atomic claims and retry delivery of a durable intent.
+- Run both source candidates through the conformance CLI and report the digest
+  of executed Elixir outcomes and the count of SDK-owned cases.
 
 - `BoundedAuthorityProtocol.V1.Json.from_term/2` converts already-parsed, cast Elixir terms into
   the tagged JSON algebra shared by all contract-majors. It preserves numeric tags, sorts

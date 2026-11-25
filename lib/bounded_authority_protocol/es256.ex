@@ -103,6 +103,8 @@ defmodule BoundedAuthorityProtocol.Es256 do
         der_signature(signature),
         [public_key, :prime256v1]
       )
+  rescue
+    _error in [ArgumentError, ErlangError] -> false
   end
 
   def verify_strict(_message, _signature, _public_key), do: false

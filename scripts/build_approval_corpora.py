@@ -4,11 +4,11 @@
 import argparse
 import base64
 import hashlib
+import ipaddress
 import json
 import re
 from copy import deepcopy
 from pathlib import Path
-from urllib.parse import urlsplit
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
@@ -74,24 +74,57 @@ def string(value, cap):
     return isinstance(value, str) and 0 < len(value.encode("utf-8")) <= cap
 
 
+URI_TOKEN = r"(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f]{2})"
+URI_SEGMENT = rf"(?:{URI_TOKEN}|[:@])*"
+URI_PATH = rf"{URI_SEGMENT}(?:/{URI_SEGMENT})*"
+URI_QUERY = rf"(?:{URI_TOKEN}|[:@/?])*"
+URI = re.compile(
+    rf"[A-Za-z][A-Za-z0-9+.-]*:(?://(?P<authority>[^/?#]*)(?:/{URI_PATH})?"
+    rf"|(?!//){URI_PATH})(?:\?{URI_QUERY})?(?:#{URI_QUERY})?"
+)
+AUTHORITY = re.compile(
+    rf"(?:(?:{URI_TOKEN}|:)*@)?(?P<host>{URI_TOKEN}*|\[[^\]]*\])(?::[0-9]*)?"
+)
+
+
 def identifier(value, cap):
     if not string(value, cap):
         return False
     if ":" not in value:
         return True
-    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9+.-]*:(?:[A-Za-z0-9/?:#\[\]@!$&'()*+,;=._~-]|%[0-9A-Fa-f]{2})*", value):
+    uri = URI.fullmatch(value)
+    if uri is None:
         return False
-    return bool(urlsplit(value).scheme)
+    authority = uri["authority"]
+    if authority is None:
+        return True
+    parsed = AUTHORITY.fullmatch(authority)
+    if parsed is None:
+        return False
+    host = parsed["host"]
+    if not host.startswith("["):
+        return True
+    literal = host[1:-1]
+    if re.fullmatch(rf"v[0-9A-Fa-f]+\.(?:{URI_TOKEN}|:)+", literal, re.IGNORECASE):
+        return "%" not in literal
+    try:
+        return "%" not in literal and bool(ipaddress.IPv6Address(literal))
+    except ValueError:
+        return False
 
 
 def integer(value, cap):
     return type(value) is int and -cap <= value <= cap
 
 
+FIXED_WIDTHS = {"public_key_bytes", "signature_bytes", "digest_bytes"}
+
+
 def effective(overrides, maxima):
     demand(isinstance(overrides, dict) and overrides.keys() <= maxima.keys())
     for key, value in overrides.items():
         demand(type(value) is int and 1 <= value <= maxima[key])
+        demand(key not in FIXED_WIDTHS or value == maxima[key])
     return maxima | overrides
 
 
@@ -100,7 +133,13 @@ CA_MAX = dict(anchor_bytes=8192, compact_bytes=65536, encoded_segment_bytes=3276
               depth=32, object_members=64, array_items=256, total_nodes=4096,
               string_bytes=8192, key_bytes=128, number_lexeme_bytes=64,
               identifier_bytes=512, content_bytes=65536, kid_bytes=128,
-              integer_magnitude=MAGNITUDE)
+              integer_magnitude=MAGNITUDE, float_magnitude=MAGNITUDE,
+              uri_bytes=8192, nonce_bytes=512, method_bytes=32, operation_bytes=128,
+              audiences=64, operations=64, selectors=64, path_segments=32, one_of_values=256,
+              public_key_bytes=32, signature_bytes=64, digest_bytes=32,
+              clock_skew=60, proof_max_age=300, chain_row_bytes=4096, chain_rows=65536,
+              archive_header_bytes=8192, archive_chunks=65796, archive_bytes=270820384,
+              object_version_bytes=512, key_transitions=256)
 RECORD_MAX = dict(string_bytes=1024, resource_count=4096, record_bytes=65536)
 
 
@@ -117,7 +156,7 @@ def author_record(record, ca, bounds, sort_set=False):
     demand(all(string(record[k], bounds["string_bytes"]) for k in
                ("subject", "action", "approver_role", "request_id")))
     demand(identifier(record["request_id"], ca["identifier_bytes"]))
-    demand(len(unb64(record["revision_digest"])) == 32)
+    demand(len(record["revision_digest"]) == 43 and len(unb64(record["revision_digest"])) == 32)
     demand(scopes(record["resources"], bounds, not sort_set))
     if sort_set:
         record = record | {"resources": sorted(set(record["resources"]), key=str.encode)}
@@ -185,16 +224,62 @@ def public_bytes(key, suite):
     return key.public_bytes_raw()
 
 
+ED_FIELD = (1 << 255) - 19
+ED_ORDER = (1 << 252) + 27742317777372353535851937790883648493
+ED_D = -121665 * pow(121666, -1, ED_FIELD) % ED_FIELD
+ED_IDENTITY = (0, 1, 1, 0)
+
+
+def ed_point(encoded):
+    demand(len(encoded) == 32)
+    value = int.from_bytes(encoded, "little")
+    sign, y = value >> 255, value & ((1 << 255) - 1)
+    demand(y < ED_FIELD)
+    y2 = y * y % ED_FIELD
+    square = (y2 - 1) * pow(ED_D * y2 + 1, -1, ED_FIELD) % ED_FIELD
+    x = pow(square, (ED_FIELD + 3) // 8, ED_FIELD)
+    if x * x % ED_FIELD != square:
+        x = x * pow(2, (ED_FIELD - 1) // 4, ED_FIELD) % ED_FIELD
+    demand(x * x % ED_FIELD == square and (x != 0 or not sign))
+    if x % 2 != sign:
+        x = ED_FIELD - x
+    return x, y, 1, x * y % ED_FIELD
+
+
+def ed_add(p, q):
+    x1, y1, z1, t1 = p
+    x2, y2, z2, t2 = q
+    a = (y1 - x1) * (y2 - x2)
+    b = (y1 + x1) * (y2 + x2)
+    c = 2 * ED_D * t1 * t2
+    d = 2 * z1 * z2
+    e, f, g, h = (b - a) % ED_FIELD, (d - c) % ED_FIELD, (d + c) % ED_FIELD, (b + a) % ED_FIELD
+    return tuple(n % ED_FIELD for n in (e * f, g * h, f * g, e * h))
+
+
+def ed_multiply(point, scalar):
+    result = ED_IDENTITY
+    while scalar:
+        if scalar & 1:
+            result = ed_add(result, point)
+        point = ed_add(point, point)
+        scalar >>= 1
+    return result
+
+
+def ed_identity(point):
+    x, y, z, _ = point
+    return x == 0 and y == z
+
+
 def fingerprint(public, suite):
     if suite == "es256":
         ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), public)
         demand(len(public) == 65 and public[0] == 4)
         jwk = dict(crv="P-256", kty="EC", x=b64(public[1:33]), y=b64(public[33:]))
     else:
-        ed25519.Ed25519PublicKey.from_public_bytes(public)
-        # All Ed25519 admission controls use generated prime-order keys, except
-        # explicit identity and zero encodings, independently known to be torsion.
-        demand(public not in (bytes(32), b"\1" + bytes(31)))
+        point = ed_point(public)
+        demand(not ed_identity(point) and ed_identity(ed_multiply(point, ED_ORDER)))
         jwk = dict(crv="Ed25519", kty="OKP", x=b64(public))
     return b64(sha(canonical(jwk)))
 
@@ -212,6 +297,8 @@ def valid_signature(message, sig, public, suite):
             der = utils.encode_dss_signature(int.from_bytes(sig[:32], "big"), int.from_bytes(sig[32:], "big"))
             key.verify(der, message, ec.ECDSA(hashes.SHA256()))
         else:
+            demand(len(sig) == 64 and int.from_bytes(sig[32:], "little") < ED_ORDER)
+            demand(not ed_identity(ed_multiply(ed_point(sig[:32]), 8)))
             ed25519.Ed25519PublicKey.from_public_bytes(public).verify(sig, message)
         return True
     except (InvalidSignature, ValueError):
@@ -286,6 +373,7 @@ def approval(record_bytes, compact, context, suite, profile_digest):
         demand(string(snapshot["provenance"], ca["identifier_bytes"]) and integer(snapshot["as_of"], cap))
         for entry in snapshot["entries"]:
             key = entry["key"]
+            demand(key.keys() == {"key_id", "public_key", "valid_from", "valid_before"})
             kid = key["key_id"]
             demand(kid_ok(kid, ca) and kid not in keys)
             demand(identifier(entry["issuer"], ca["identifier_bytes"]) and roles(entry["roles"], bounds))
@@ -308,6 +396,7 @@ def approval(record_bytes, compact, context, suite, profile_digest):
         return "unsupported_algorithm"
     try:
         p = claims(payload, ca)
+        demand(identifier(p["sub"], min(bounds["string_bytes"], ca["identifier_bytes"])))
         record = parse_record(record_bytes, ca, bounds)
     except (ValueError, TypeError):
         return "malformed"
@@ -386,6 +475,10 @@ def record_vectors(record):
         ("boolean-version", wire.replace(b'"v":1', b'"v":true')),
         ("wrong-version", wire.replace(b'"v":1', b'"v":2')),
         ("trailing-lf", wire + b"\n"),
+        ("scalar-root", b'"scalar"'),
+        ("array-root", b"[]"),
+        ("boolean-root", b"true"),
+        ("null-root", b"null"),
         ("bom", b"\xef\xbb\xbf" + wire),
         ("duplicate", wire.replace(b'"v":1', b'"v":1,"v":1')),
         ("escaped-duplicate", wire.replace(b'"v":1', b'"v":1,"\\u0076":1')),
@@ -421,7 +514,7 @@ def record_vectors(record):
     names = [f"{i:02}" + chr(1) * 1022 for i in range(10)]
     tail = 65536 - len(canonical(record | {"resources": names + ["z"]}))
     names += ["z" + "x" * min(tail, 1023)]
-    # Fill the remaining byte budget across two already ordered strings.
+    # Fill the remaining byte allowance across two already ordered strings.
     if len(canonical(record | {"resources": names})) < 65536:
         remaining = 65536 - len(canonical(record | {"resources": names + ["zz"]}))
         names += ["zz" + chr(1) * (remaining // 6) + "x" * (remaining % 6)]
@@ -429,6 +522,8 @@ def record_vectors(record):
     assert len(boundary) == 65536, len(boundary)
     add("encoded-size-exact", wire=boundary, valid=True)
     add("encoded-size-plus", wire=boundary.replace(b'"subject":"', b'"subject":"x'))
+    add("authoring-escaped-size-exact", author=record | {"resources": names}, valid=True)
+    add("authoring-escaped-size-plus", author=record | {"resources": names, "subject": "x" + record["subject"]})
     add("ca-content-size-over", wire=wire, ca={"content_bytes": len(wire) - 1})
     add("record-size-over", wire=wire, bounds={"record_bytes": len(wire) - 1})
     simultaneous = record | {"resources": ["x" * 12, "y" * 12]}
@@ -469,8 +564,8 @@ def assertion_vectors(keys, base):
 
     def add(case_id, compact, expected=False, bounds=None):
         overrides = bounds or {}
-        limits = effective(overrides, CA_MAX)
         try:
+            limits = effective(overrides, CA_MAX)
             head, body, _, _ = frame(compact, limits)
             demand(suite_matches(head, suite))
             parsed = claims(body, limits)
@@ -497,6 +592,8 @@ def assertion_vectors(keys, base):
         add("short-digest-" + key, sign(base | {key: b64(bytes(31))}))
         add("padded-digest-" + key, sign(base | {key: base[key] + "="}))
     for name, compact in [
+        ("scalar-header", sign(head=b"true")),
+        ("array-payload", sign(b"[]")),
         ("unknown-header", sign(head=header | {"jwk": {}})),
         ("unknown-claim", sign(base | {"extra": 1})),
         ("empty-kid", sign(head=header | {"kid": ""})),
@@ -547,6 +644,19 @@ def assertion_vectors(keys, base):
     ]:
         add(bound + "-exact", valid, True, {bound: exact})
         add(bound + "-minus", valid, False, {bound: exact - 1})
+    for name, uri, accepted in [
+        ("single-fragment", "urn:x#a", True),
+        ("double-fragment", "urn:x#a#b", False),
+        ("raw-brackets", "urn:x[foo]", False),
+        ("escaped-userinfo", "urn://user%5Binfo%5D@example.com/x", True),
+        ("raw-userinfo-brackets", "urn://user[info]@example.com/x", False),
+        ("ipv6-literal", "urn://[::1]/x", True),
+        ("invalid-bracketed-host", "urn://[abc]/x", False),
+    ]:
+        add("inherited-uri-" + name, sign(base | {"jti": uri}), accepted)
+    for field in sorted(FIXED_WIDTHS):
+        add(field + "-same", valid, True, {field: CA_MAX[field]})
+        add(field + "-changed", valid, False, {field: CA_MAX[field] - 1})
     add("signed-date-extremes", sign(base | {"iat": -MAGNITUDE, "exp": MAGNITUDE}), True)
 
     key = dict(key_id=h["kid"], public_key=b64(public), valid_from=10, valid_before=40)
@@ -724,6 +834,12 @@ def approval_vectors(keys, record, base, digest):
     build("wrong-trust-domain", "trust_unavailable", ctx={"trust_domain": "other"})
     build("malformed-provenance", "trust_unavailable", snapshot={"provenance": ""})
     build("torsion-entry", "trust_unavailable", suite="eddsa", key={"public_key": b64(b"\1" + bytes(31))})
+    # B + (0, -1) has a nonzero torsion component despite being on curve.
+    mixed_order = (-4 * pow(5, -1, ED_FIELD) % ED_FIELD) | (1 << 255)
+    build("mixed-order-entry", "trust_unavailable", suite="eddsa",
+          key={"public_key": b64(mixed_order.to_bytes(32, "little"))})
+    build("noncanonical-edwards-entry", "trust_unavailable", suite="eddsa",
+          key={"public_key": b64(ED_FIELD.to_bytes(32, "little"))})
     build("invalid-point-entry", "trust_unavailable", key={"public_key": b64(b"\4" + bytes(64))})
     entries = es_ok["context"]["snapshot"]["entries"]
     build("duplicate-key-entry", "trust_unavailable", snapshot={"entries": entries * 2})
@@ -732,6 +848,33 @@ def approval_vectors(keys, record, base, digest):
     unused.update(issuer="x" * 65, key=unused["key"] | {"key_id": "different"})
     build("bounds-tightened-unselected-entry", "trust_unavailable",
           ctx={"bounds": {"identifier_bytes": 64}}, snapshot={"entries": entries + [unused]})
+    for suite, accepted in (("es256", es_ok), ("eddsa", ed_ok)):
+        snapshot_entries = accepted["context"]["snapshot"]["entries"]
+        original = snapshot_entries[0]
+        for field in ("public_key", "valid_from", "valid_before"):
+            malformed_key = {k: v for k, v in original["key"].items() if k != field}
+            malformed_key["id"] = "unexpected-field"
+            build(f"{suite}-missing-{field}-selected", "trust_unavailable", suite=suite,
+                  entry={"key": malformed_key})
+            unrelated = original | {"key": malformed_key | {"key_id": "unselected"}}
+            build(f"{suite}-missing-{field}-unselected-stale", "trust_unavailable", suite=suite,
+                  snapshot={"entries": snapshot_entries + [unrelated], "as_of": 0})
+        build(f"{suite}-assertion-member-limit", "malformed", suite=suite,
+              ctx={"bounds": {"object_members": 3}})
+        build(f"{suite}-assertion-key-limit", "malformed", suite=suite,
+              ctx={"bounds": {"key_bytes": 3}})
+        build(f"{suite}-fixed-width-explicit", "verified", suite=suite,
+              ctx={"bounds": {field: CA_MAX[field] for field in FIXED_WIDTHS}})
+        build(f"{suite}-fixed-width-tightened", "invalid_context", suite=suite,
+              ctx={"bounds": {"signature_bytes": 63}})
+    exact_request = "request-10"
+    exact_wire = canonical(record | {"request_id": exact_request})
+    build("signed-sub-exact", "verified", wire=exact_wire,
+          claim={"sub": exact_request, "content_digest": content_digest(exact_wire)},
+          ctx={"request_id": exact_request, "record_bounds": {"string_bytes": 10}})
+    build("signed-sub-over", "malformed", claim={"sub": "x" * 11},
+          ctx={"record_bounds": {"string_bytes": 10}})
+    build("stale-invalid-provenance", "trust_unavailable", snapshot={"as_of": 0, "provenance": ""})
     build("future-trust", "stale_trust", snapshot={"as_of": 21})
     build("old-trust", "stale_trust", snapshot={"as_of": 14})
     build("malformed-compact", "malformed", compact="x")
@@ -783,6 +926,10 @@ def approval_vectors(keys, record, base, digest):
     dual("suite-before-claims", "unsupported_algorithm",
          compact=signed(keys["eddsa"], "eddsa", HEADERS["eddsa"], b"not-json"))
     dual("suite-before-key", "unsupported_algorithm", head={"typ": "other", "kid": "different"})
+    dual("noncanonical-record-before-key", "malformed", wire=canonical(record) + b" ",
+         head={"kid": "different"})
+    dual("signed-sub-bound-before-key", "malformed", claim={"sub": "x" * 11},
+         ctx={"record_bounds": {"string_bytes": 10}}, head={"kid": "different"})
     dual("record-shape-before-key", "malformed", wire=b"{}", head={"kid": "different"})
     dual("key-before-signature", "unknown_key", head={"kid": "different"}, corrupt=True)
     dual("signature-before-times", "bad_signature", claim={"nbf": 21}, key={"valid_from": 11}, corrupt=True)
@@ -791,12 +938,38 @@ def approval_vectors(keys, record, base, digest):
     dual("issuer-before-audience", "issuer_mismatch", claim={"iss": "other", "aud": "other"})
     dual("audience-before-request", "audience_mismatch", claim={"aud": "other", "sub": "other"})
     dual("request-before-scope", "request_mismatch", ctx={"request_id": "other", "resources": ["other"]})
+    dual("request-before-subject", "request_mismatch", ctx={"request_id": "other", "subject": "other"})
     dual("subject-before-scope", "subject_mismatch", ctx={"subject": "other", "action": "other"})
     dual("scope-before-time", "scope_mismatch", ctx={"resources": ["other"]}, claim={"nbf": 21})
     dual("window-before-duration", "not_yet_valid", ctx={"max_lifetime": 0}, claim={"nbf": 21})
     dual("lifetime-before-active", "lifetime_too_long", ctx={"max_lifetime": 0, "max_active": 0})
     dual("active-before-role", "active_too_long", ctx={"max_active": 0, "roles": ["other"]})
 
+    canaries = {
+        name: f"canary-{name}-é" for name in
+        ("action", "approver_role", "request_id", "resource", "subject", "trust_domain", "jti",
+         "traceback", "chained_context", "provider_cause")
+    }
+    canaries["subject"] += '"\\\n\x01'
+    canary_revision = b"canary-revision-digest".ljust(32, b"!")
+    canaries["revision_digest"] = canary_revision.decode()
+    nested = record | {name: canaries[name] for name in ("action", "approver_role", "request_id", "subject")}
+    nested |= {"resources": [canaries["resource"]], "revision_digest": b64(canary_revision)}
+    wire = canonical(nested)
+    canary_context = {name: nested[name] for name in
+                      ("request_id", "revision_digest", "subject", "action", "resources")}
+    canary_context |= {"roles": [nested["approver_role"]], "trust_domain": canaries["trust_domain"]}
+    canary_case = build("rendering-canaries-verified", "verified", wire=wire, ctx=canary_context,
+                        claim={"jti": canaries["jti"], "sub": nested["request_id"],
+                               "content_digest": content_digest(wire)},
+                        snapshot={"trust_domain": canaries["trust_domain"]},
+                        entry={"roles": [nested["approver_role"]]})
+
+    forbidden = {
+        name: [value, b64(value.encode()), value.encode().hex(),
+               json.dumps(value, ensure_ascii=True)[1:-1]]
+        for name, value in canaries.items()
+    }
     helpers = []
     rendering = "#BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts<redacted>"
     for case in singles + multi:
@@ -836,9 +1009,18 @@ def approval_vectors(keys, record, base, digest):
         "multi-fault-cases.json": multi,
         "helper-cases.json": helpers,
         "rendering-cases.json": [
-            dict(id="verified-facts", pure_case=es_ok["id"], expected="{:ok, " + rendering + "}"),
+            dict(id="verified-facts", pure_case=canary_case["id"], forbidden=forbidden,
+                 expected="{:ok, " + rendering + "}"),
+            dict(id="nested-record", pure_case=canary_case["id"], forbidden=forbidden,
+                 expected="#BoundedAuthorityProtocol.ActionApproval.V1.Record<redacted>"),
+            dict(id="nested-assertion", pure_case=canary_case["id"], forbidden=forbidden,
+                 expected="#BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts<redacted>"),
             dict(id="host-local-error", pure_case="unknown-key", expected="{:error, :unknown_key}"),
-            dict(id="presenter-error", pure_case="unknown-key", expected="{:error, :invalid}"),
+            dict(id="presenter-error", pure_case="unknown-key", owner="sdk_helper", expected="{:error, :invalid}"),
+            dict(id="helper-exception", pure_case=canary_case["id"], owner="sdk_helper",
+                 inputs={name: canaries[name] for name in ("traceback", "chained_context", "provider_cause")},
+                 forbidden=forbidden,
+                 expected={"local": "{:error, :predicate_failed}", "presenter": "{:error, :invalid}"}),
         ],
     }
 
@@ -849,7 +1031,13 @@ def freeze(root, profile, files, verify):
     all_ids = [name + "/" + item["id"] for name, content in cases for item in content]
     demand(len({item["id"] for _, content in cases for item in content}) == len(all_ids))
     verdicts = [[name + "/" + case["id"], case["expected"]] for name, content in cases for case in content]
+    elixir_verdicts = [
+        [name + "/" + case["id"], case["expected"]]
+        for name, content in cases if name != "helper-cases.json"
+        for case in content if case.get("owner") != "sdk_helper"
+    ]
     index = dict(profile=profile, revision=1, private_material_tracked=False,
+                 elixir_verdict_sha256=sha(canonical(elixir_verdicts)).hex(),
                  verdict_sha256=sha(canonical(verdicts)).hex(),
                  files=[dict(path=name, sha256=sha(raw).hex(),
                              **({"cases": len(files[name])} if isinstance(files[name], list) else {}))
@@ -896,7 +1084,7 @@ def main():
         spec = (ROOT / "spec/bap-action-approval-v1.md").read_text()
         demand(preimage.hex() in spec and digest.hex() in spec)
         runtime = (ROOT / "lib/bounded_authority_protocol/action_approval/v1.ex").read_text()
-        demand(digest.hex() in runtime)
+        demand(digest.hex() in runtime.lower())
     print("descriptor bytes", len(descriptor), "preimage bytes", len(preimage), "profile digest", digest.hex())
 
 

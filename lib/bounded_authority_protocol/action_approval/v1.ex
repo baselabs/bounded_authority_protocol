@@ -14,7 +14,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
   @profile "bap-action-approval/1"
   # SHA-256 of the domain, separator and immutable descriptor bytes. The corpus
   # checks the complete preimage and the resulting constant.
-  @profile_digest <<0x7e44f73217cd25037839ecc25837de84aad3673626b9b125c94c97e9967fa1eb::256>>
+  @profile_digest <<0x7E44F73217CD25037839ECC25837DE84AAD3673626B9B125C94C97E9967FA1EB::256>>
 
   @typedoc "The positive, independently tightenable record ceilings."
   @type record_bounds :: %{
@@ -80,11 +80,34 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
           | :active_too_long
           | :role_not_permitted
 
-  @doc "Returns the raw 32-byte digest of the frozen profile descriptor preimage."
+  @doc """
+  Returns the raw 32-byte digest of the frozen profile descriptor preimage.
+
+  ## Examples
+
+      iex> byte_size(BoundedAuthorityProtocol.ActionApproval.V1.profile_digest())
+      32
+  """
   @spec profile_digest() :: binary()
   def profile_digest, do: @profile_digest
 
-  @doc "Encodes a record; pass `true` to sort and deduplicate validated resource names."
+  @doc """
+  Encodes a record; pass `true` to sort and deduplicate validated resource names.
+
+  ## Examples
+
+      iex> alias BoundedAuthorityProtocol.ActionApproval.V1, as: Approval
+      iex> alias Approval.Record
+      iex> record = %Record{
+      ...>   subject: "report", action: "read", request_id: "request-1",
+      ...>   approver_role: "reviewer", resources: ["summary"], revision_digest: <<0::256>>
+      ...> }
+      iex> {:ok, bytes} = Approval.encode_record(record, %{}, %{}, false)
+      iex> Approval.decode_record(bytes) == {:ok, record}
+      true
+      iex> Approval.encode_record(%{})
+      {:error, :invalid}
+  """
   @spec encode_record(Record.t(), Bounds.t() | map(), record_bounds(), boolean()) ::
           {:ok, binary()} | {:error, :invalid}
   def encode_record(record, limits \\ %{}, record_limits \\ %{}, canonicalize? \\ false) do
@@ -94,7 +117,18 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
     end
   end
 
-  @doc "Decodes exactly canonical wire bytes under the effective record bounds."
+  @doc """
+  Decodes exactly canonical wire bytes under the effective record bounds.
+
+  ## Examples
+
+      iex> alias BoundedAuthorityProtocol.ActionApproval.V1, as: Approval
+      iex> alias Approval.Record
+      iex> bytes = ~s({"action":"read","approver_role":"reviewer","request_id":"request-1","resources":["summary","title"],"revision_digest":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","subject":"report","v":1})
+      iex> {:ok, %Record{request_id: "request-1"}} = Approval.decode_record(bytes, %{}, %{})
+      iex> Approval.decode_record(bytes <> " ")
+      {:error, :invalid}
+  """
   @spec decode_record(binary(), Bounds.t() | map(), record_bounds()) ::
           {:ok, Record.t()} | {:error, :invalid}
   def decode_record(bytes, limits \\ %{}, record_limits \\ %{}) do
@@ -104,12 +138,92 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
     end
   end
 
-  @doc "Verifies a record and a CA1 assertion against the supplied context."
+  @doc """
+  Verifies a record and a CA1 assertion against the supplied context.
+
+  ## Examples
+
+      iex> alias BoundedAuthorityProtocol.ActionApproval.V1, as: Approval
+      iex> alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
+      iex> revision = Base.url_decode64!("FudFEaFNzHrZbTc0xsACd9HUCRgbQFNTtwCKO3JHY0c", padding: false)
+      iex> record = %Approval.Record{
+      ...>   subject: "subject-é", action: "read", request_id: "request", approver_role: "reviewer",
+      ...>   resources: ["field-é", "field-"], revision_digest: revision
+      ...> }
+      iex> {:ok, bytes} = Approval.encode_record(record)
+      iex> key = %HistoricalPublicKey{
+      ...>   key_id: "approver-key", valid_from: 10, valid_before: 40,
+      ...>   public_key: Base.url_decode64!("3JsgfKMGTZu2lk1z-cFvRwmCakhuQJUZSQUsFjCtXJ4", padding: false)
+      ...> }
+      iex> snapshot = %{
+      ...>   trust_domain: "release-domain", suite: :eddsa, provenance: "configured-snapshot",
+      ...>   as_of: 15, entries: [%{issuer: "issuer", key: key, roles: ["reviewer"]}]
+      ...> }
+      iex> context = %{
+      ...>   trust_domain: "release-domain", audience: "executor", request_id: record.request_id,
+      ...>   revision_digest: revision, subject: record.subject, action: record.action,
+      ...>   resources: record.resources, roles: ["reviewer"], now: 20,
+      ...>   max_staleness: 5, max_lifetime: 30, bounds: %{}, record_bounds: %{}, snapshot: snapshot
+      ...> }
+      iex> compact =
+      ...>   "eyJhbGciOiJFZERTQSIsImtpZCI6ImFwcHJvdmVyLWtleSIsInR5cCI6ImJhK2NvbnRlbnQtYXNzZXJ0aW9uIn0." <>
+      ...>   "eyJhdWQiOiJleGVjdXRvciIsImNvbnRlbnRfZGlnZXN0IjoiMWkwWS1GTHJtMkZBbkowdE84" <>
+      ...>   "bnp3RHQyZzh5YzhCRDB1UVBJUHBzSm5wQSIsImV4cCI6NDAsImdlbiI6MSwiaWF0IjoxMCwi" <>
+      ...>   "aXNzIjoiaXNzdWVyIiwianRpIjoiZXZlbnQiLCJuYmYiOjE1LCJwcmV2IjoiQUFBQUFBQUFB" <>
+      ...>   "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQSIsInByb2ZpbGUiOiJiYXAtYWN0" <>
+      ...>   "aW9uLWFwcHJvdmFsLzEiLCJwcm9maWxlX2RpZ2VzdCI6ImZrVDNNaGZOSlFONE9lekNXRGZl" <>
+      ...>   "aEtyVFp6WW11YkVseVV5WDZaWl9vZXMiLCJzdWIiOiJyZXF1ZXN0IiwidiI6MX0." <>
+      ...>   "Ez9K0c1ONLaKnAdfAzbHVDk3slPPl1Rq6tX8gBM8WYzzTRlYs6RWp63I9c2ONfO9L1DYnRYr8P12FgvXx4HQDg"
+      iex> {:ok, %Approval.VerifiedApprovalFacts{suite: :eddsa, trust: :not_evaluated}} =
+      ...>   Approval.verify_eddsa(bytes, compact, context)
+      iex> Approval.verify_eddsa(bytes <> " ", compact, context)
+      {:error, :malformed}
+  """
   @spec verify_eddsa(binary(), binary(), context()) ::
           {:ok, VerifiedApprovalFacts.t()} | {:error, diagnostic()}
   def verify_eddsa(record, compact, context), do: verify(:eddsa, record, compact, context)
 
-  @doc "Verifies a record and an ES256 content assertion against the supplied context."
+  @doc """
+  Verifies a record and an ES256 content assertion against the supplied context.
+
+  ## Examples
+
+      iex> alias BoundedAuthorityProtocol.ActionApproval.V1, as: Approval
+      iex> alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
+      iex> revision = Base.url_decode64!("FudFEaFNzHrZbTc0xsACd9HUCRgbQFNTtwCKO3JHY0c", padding: false)
+      iex> record = %Approval.Record{
+      ...>   subject: "subject-é", action: "read", request_id: "request", approver_role: "reviewer",
+      ...>   resources: ["field-é", "field-"], revision_digest: revision
+      ...> }
+      iex> {:ok, bytes} = Approval.encode_record(record)
+      iex> key = %HistoricalPublicKey{
+      ...>   key_id: "approver-key", valid_from: 10, valid_before: 40,
+      ...>   public_key: Base.url_decode64!("BFPn4oSWfvquAn8La4G_C3_ee1TkUoE4tUzpQeM7tD5vx67fjvAfsxnHU6XzXq9SEOQmDtC6IPcV8S5R3WQTf5s", padding: false)
+      ...> }
+      iex> snapshot = %{
+      ...>   trust_domain: "release-domain", suite: :es256, provenance: "configured-snapshot",
+      ...>   as_of: 15, entries: [%{issuer: "issuer", key: key, roles: ["reviewer"]}]
+      ...> }
+      iex> context = %{
+      ...>   trust_domain: "release-domain", audience: "executor", request_id: record.request_id,
+      ...>   revision_digest: revision, subject: record.subject, action: record.action,
+      ...>   resources: record.resources, roles: ["reviewer"], now: 20,
+      ...>   max_staleness: 5, max_lifetime: 30, bounds: %{}, record_bounds: %{}, snapshot: snapshot
+      ...> }
+      iex> compact =
+      ...>   "eyJhbGciOiJFUzI1NiIsImtpZCI6ImFwcHJvdmVyLWtleSIsInR5cCI6ImJhK2NvbnRlbnQtYXNzZXJ0aW9uLWVzMjU2In0." <>
+      ...>   "eyJhdWQiOiJleGVjdXRvciIsImNvbnRlbnRfZGlnZXN0IjoiMWkwWS1GTHJtMkZBbkowdE84" <>
+      ...>   "bnp3RHQyZzh5YzhCRDB1UVBJUHBzSm5wQSIsImV4cCI6NDAsImdlbiI6MSwiaWF0IjoxMCwi" <>
+      ...>   "aXNzIjoiaXNzdWVyIiwianRpIjoiZXZlbnQiLCJuYmYiOjE1LCJwcmV2IjoiQUFBQUFBQUFB" <>
+      ...>   "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQSIsInByb2ZpbGUiOiJiYXAtYWN0" <>
+      ...>   "aW9uLWFwcHJvdmFsLzEiLCJwcm9maWxlX2RpZ2VzdCI6ImZrVDNNaGZOSlFONE9lekNXRGZl" <>
+      ...>   "aEtyVFp6WW11YkVseVV5WDZaWl9vZXMiLCJzdWIiOiJyZXF1ZXN0IiwidiI6MX0." <>
+      ...>   "IdRYig0kuBSQv3YncKYCezT_J4bTCeYs89vT3iPFRVku02_jHXLHtQcjxStz_xtOEqVmfg204KOH7ydMcfDUuQ"
+      iex> {:ok, %Approval.VerifiedApprovalFacts{suite: :es256, trust: :not_evaluated}} =
+      ...>   Approval.verify_es256(bytes, compact, context)
+      iex> Approval.verify_es256(bytes <> " ", compact, context)
+      {:error, :malformed}
+  """
   @spec verify_es256(binary(), binary(), context()) ::
           {:ok, VerifiedApprovalFacts.t()} | {:error, diagnostic()}
   def verify_es256(record, compact, context), do: verify(:es256, record, compact, context)
@@ -120,6 +234,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
            admit_snapshot(Map.get(context, :snapshot), context, suite, ca, bounds),
          :ok <- check(fresh?(context.now - as_of, context.max_staleness), :stale_trust),
          {:ok, parsed} <- Codec.parse(compact, ca, suite),
+         :ok <- check(RecordCodec.request_id?(parsed.sub, bounds, ca), :malformed),
          {:ok, record} <- parse_record(bytes, bounds, ca),
          {:ok, entry} <- key_entry(keys, parsed.attestor_key_id),
          :ok <- Codec.signature(parsed, entry.key, suite),
@@ -224,7 +339,20 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
   defp admit_entries([], keys, _, _, _), do: {:ok, keys}
 
   defp admit_entries(
-         [%{issuer: issuer, key: %HistoricalPublicKey{key_id: kid} = key, roles: roles} | rest],
+         [
+           %{
+             issuer: issuer,
+             key:
+               %HistoricalPublicKey{
+                 key_id: kid,
+                 public_key: public_key,
+                 valid_from: _,
+                 valid_before: _
+               } = key,
+             roles: roles
+           }
+           | rest
+         ],
          keys,
          suite,
          ca,
@@ -235,7 +363,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
       with false <- Map.has_key?(keys, kid),
            true <- Codec.identifier?(issuer, ca) and valid_roles?(roles, bounds, MapSet.new()),
            :ok <- Codec.historical_key(key, ca, suite),
-           {:ok, fingerprint} <- Codec.admitted_fingerprint(key.public_key, ca, suite) do
+           {:ok, fingerprint} <- Codec.admitted_fingerprint(public_key, suite) do
         entry = %{issuer: issuer, key: key, roles: roles, fingerprint: fingerprint}
         admit_entries(rest, Map.put(keys, kid, entry), suite, ca, bounds)
       end

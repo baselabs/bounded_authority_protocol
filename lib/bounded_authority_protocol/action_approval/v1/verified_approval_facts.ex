@@ -2,8 +2,8 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts do
   @moduledoc "Verification facts under explicit approval context and snapshot data."
 
   alias BoundedAuthorityProtocol.ActionApproval.V1.Record
-  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1, as: ES256
-  alias BoundedAuthorityProtocol.ContentAssertion.V1, as: EdDSA
+  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts, as: EsFacts
+  alias BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts
 
   @enforce_keys [:suite, :trust_domain, :record, :assertion]
   defstruct @enforce_keys ++ [trust: :not_evaluated]
@@ -13,7 +13,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts do
           suite: :eddsa | :es256,
           trust_domain: binary(),
           record: Record.t(),
-          assertion: EdDSA.ContentAssertionFacts.t() | ES256.ContentAssertionFacts.t(),
+          assertion: ContentAssertionFacts.t() | EsFacts.t(),
           trust: :not_evaluated
         }
 end

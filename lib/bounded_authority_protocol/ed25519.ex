@@ -84,6 +84,8 @@ defmodule BoundedAuthorityProtocol.Ed25519 do
              is_binary(public_key) and byte_size(public_key) == 32 do
     strict_gate?(signature, public_key) and
       :crypto.verify(:eddsa, :none, message, signature, [public_key, :ed25519])
+  rescue
+    _error in [ArgumentError, ErlangError] -> false
   end
 
   def verify_strict(_message, _signature, _public_key), do: false

@@ -3,37 +3,169 @@ Code.require_file("../tools/build_path.exs", __DIR__)
 approval = "lib/bounded_authority_protocol/action_approval/v1.ex"
 assertion = "lib/bounded_authority_protocol/content_assertion/v1/codec.ex"
 record = "lib/bounded_authority_protocol/action_approval/v1/record_codec.ex"
+jcs = "lib/bounded_authority_protocol/v1/jcs.ex"
 
-mutations = [
-  {approval, "snapshot-freshness", "age >= 0 and age <= cap", "is_integer(age) and is_integer(cap)"},
+# Each edit names the independent case that must fail. A compile error, an unrelated failure,
+# or a test census that cannot execute all checks cannot kill a mutation.
+omissions =
+  for {label, clause, case_id} <- [
+        {"signed-sub-bound",
+         "check(RecordCodec.request_id?(parsed.sub, bounds, ca), :malformed)", "signed-sub-over"},
+        {"signature", "Codec.signature(parsed, entry.key, suite)", "bad-signature"},
+        {"key-window", "Codec.key_window(parsed, entry.key)", "key-window-lower"},
+        {"issuer", "check(parsed.iss == entry.issuer, :issuer_mismatch)", "issuer-mismatch"},
+        {"audience", "check(parsed.aud == context.audience, :audience_mismatch)",
+         "audience-mismatch"},
+        {"subject", "check(record.subject == context.subject, :subject_mismatch)",
+         "subject-mismatch"},
+        {"action", "check(record.action == context.action, :scope_mismatch)", "action-mismatch"},
+        {"resources", "check(record.resources == context.resources, :scope_mismatch)",
+         "resources-mismatch"},
+        {"lifetime", "check(parsed.exp - parsed.iat <= context.max_lifetime, :lifetime_too_long)",
+         "lifetime-too-long"},
+        {"expected-role",
+         "check(Enum.member?(context.roles, record.approver_role), :role_not_permitted)",
+         "role-not-required"}
+      ] do
+    {approval, label, "         :ok <- #{clause},\n", "", case_id}
+  end
+
+weakening = [
+  {approval, "freshness-lower", "age >= 0 and age <= cap", "age <= cap", "future-trust"},
+  {approval, "freshness-upper", "age >= 0 and age <= cap", "age >= 0 and is_integer(cap)",
+   "old-trust"},
+  {approval, "snapshot-domain", "%{trust_domain: domain},", "%{trust_domain: _domain},",
+   "wrong-trust-domain"},
+  {approval, "snapshot-suite", "           suite: suite,\n           provenance: provenance,",
+   "           suite: _snapshot_suite,\n           provenance: provenance,",
+   "wrong-trust-suite"},
+  {approval, "snapshot-provenance",
+   "scalar_identity?(provenance, ca) and Codec.integer?(as_of, ca)",
+   "is_binary(provenance) and Codec.integer?(as_of, ca)", "malformed-provenance"},
+  {approval, "duplicate-key", "false <- Map.has_key?(keys, kid)", "false <- is_nil(kid)",
+   "duplicate-key-entry"},
+  {approval, "historical-key-shape",
+   "public_key: public_key,\n                 valid_from: _,\n                 valid_before: _",
+   "public_key: public_key", "missing-valid_from-selected"},
+  {approval, "enrolled-role",
+   "check(Enum.member?(entry.roles, record.approver_role), :role_not_permitted)",
+   "check(is_list(entry.roles), :role_not_permitted)", "empty-enrolled-roles"},
+  {approval, "active-duration", "is_nil(max_active) or parsed.exp - parsed.nbf <= max_active",
+   "is_nil(max_active) or is_integer(max_active)", "active-too-long"},
+  {approval, "record-content-digest", "FixedBytes.equal?(parsed.content_digest, digest)",
+   "is_binary(digest)", "wrong-content_digest"},
+  {approval, "record-profile", "parsed.profile == @profile", "is_binary(parsed.profile)",
+   "wrong-profile"},
+  {approval, "record-profile-digest", "FixedBytes.equal?(parsed.profile_digest, @profile_digest)",
+   "is_binary(parsed.profile_digest)", "wrong-profile_digest"},
+  {approval, "expected-request", "record.request_id == context.request_id",
+   "is_binary(context.request_id)", "request-expected"},
+  {approval, "signed-request", "record.request_id == parsed.sub", "is_binary(parsed.sub)",
+   "request-signed"},
+  {approval, "revision", "FixedBytes.equal?(record.revision_digest, context.revision_digest)",
+   "is_binary(context.revision_digest)", "revision-mismatch"},
   {record, "wire-canonicality", "{:ok, ^bytes} <- encode(record, bounds, ca, false)",
-   "{:ok, _} <- encode(record, bounds, ca, false)"},
-  {record, "strict-resource-set", "previous < name", "previous <= name"},
-  {approval, "key-window", ":ok <- Codec.key_window(parsed, entry.key),", ""},
-  {approval, "issuer", ":ok <- check(parsed.iss == entry.issuer, :issuer_mismatch),", ""},
-  {approval, "audience", ":ok <- check(parsed.aud == context.audience, :audience_mismatch),", ""},
-  {approval, "request", ":ok <- request_binding(parsed, record, context),",
-   ":ok <- request_binding(parsed, record, Map.put(context, :request_id, record.request_id)),"},
-  {approval, "expected-role",
-   ":ok <- check(Enum.member?(context.roles, record.approver_role), :role_not_permitted),", ""},
-  {approval, "signature-before-key-window",
+   "{:ok, _} <- encode(record, bounds, ca, false)", "trailing-lf"},
+  {record, "old-wire-fallthrough", "_failure -> {:error, :invalid}", "failure -> failure",
+   "trailing-lf"},
+  {record, "wire-object-root", "_failure -> {:error, :invalid}",
+   "{:ok, {:string, _}} = root -> root\n      _failure -> {:error, :invalid}", "scalar-root"},
+  {record, "strict-resource-set", "previous < name", "previous <= name", "duplicate-resource"},
+  {record, "encoded-size-preflight", "true <- fits_encoding?(record, names, bounds.record_bytes)",
+   "true <- is_list(names)", "authoring-escaped-size-plus"},
+  {record, "revision-width", "<<encoded::binary-size(43)>>", "encoded",
+   "revision-width-before-base64"},
+  {jcs, "escaped-size-early-stop", "escaped_size(_value, size, allowance) when size > allowance",
+   "escaped_size(<<>>, size, allowance) when size > allowance", "escaped-size-early-stop"},
+  {assertion, "key-window-lower", "p.iat >= key.valid_from and p.nbf >= key.valid_from",
+   "is_integer(key.valid_from)", "key-window-lower"},
+  {assertion, "key-window-upper", "p.exp <= key.valid_before", "is_integer(p.exp)",
+   "key-window-upper"},
+  {assertion, "signature-width", "byte_size(signature) == bounds.signature_bytes",
+   "is_binary(signature)", "signature-width-before-suite"},
+  {assertion, "not-yet-valid", "parsed.nbf <= now", "is_integer(now)", "not-yet-valid"},
+  {assertion, "expiry", "now < parsed.exp", "is_integer(parsed.exp)", "expired"},
+  {assertion, "scalar-gate", "true <- Es256.canonical_signature?(signature),",
+   "true <- is_binary(signature),", "assembly-high-s"}
+]
+
+ordering =
+  for {label, first, second, case_id} <- [
+        {"stale-before-shape",
+         ":ok <- check(fresh?(context.now - as_of, context.max_staleness), :stale_trust)",
+         "{:ok, parsed} <- Codec.parse(compact, ca, suite)", "stale-before-shape"},
+        {"signature-before-key-window", ":ok <- Codec.signature(parsed, entry.key, suite)",
+         ":ok <- Codec.key_window(parsed, entry.key)", "signature-before-times"},
+        {"key-window-before-record", ":ok <- Codec.key_window(parsed, entry.key)",
+         ":ok <- record_binding(parsed, bytes, ca)", "key-window-before-record-binding"},
+        {"record-before-issuer", ":ok <- record_binding(parsed, bytes, ca)",
+         ":ok <- check(parsed.iss == entry.issuer, :issuer_mismatch)", "record-binding-before-issuer"},
+        {"issuer-before-audience", ":ok <- check(parsed.iss == entry.issuer, :issuer_mismatch)",
+         ":ok <- check(parsed.aud == context.audience, :audience_mismatch)", "issuer-before-audience"},
+        {"audience-before-request",
+         ":ok <- check(parsed.aud == context.audience, :audience_mismatch)",
+         ":ok <- request_binding(parsed, record, context)", "audience-before-request"},
+        {"request-before-subject", ":ok <- request_binding(parsed, record, context)",
+         ":ok <- check(record.subject == context.subject, :subject_mismatch)", "request-before-subject"},
+        {"subject-before-scope",
+         ":ok <- check(record.subject == context.subject, :subject_mismatch)",
+         ":ok <- check(record.action == context.action, :scope_mismatch)", "subject-before-scope"},
+        {"scope-before-time",
+         ":ok <- check(record.resources == context.resources, :scope_mismatch)",
+         ":ok <- Codec.current_window(parsed, context.now)", "scope-before-time"},
+        {"time-before-lifetime", ":ok <- Codec.current_window(parsed, context.now)",
+         ":ok <- check(parsed.exp - parsed.iat <= context.max_lifetime, :lifetime_too_long)",
+         "window-before-duration"},
+        {"lifetime-before-active",
+         ":ok <- check(parsed.exp - parsed.iat <= context.max_lifetime, :lifetime_too_long)",
+         ":ok <-\n           check(is_nil(max_active) or parsed.exp - parsed.nbf <= max_active, :active_too_long)",
+         "lifetime-before-active"},
+        {"active-before-role",
+         ":ok <-\n           check(is_nil(max_active) or parsed.exp - parsed.nbf <= max_active, :active_too_long)",
+         ":ok <- check(Enum.member?(context.roles, record.approver_role), :role_not_permitted)",
+         "active-before-role"}
+      ] do
+    {approval, label, "         #{first},\n         #{second},",
+     "         #{second},\n         #{first},",
+     case_id}
+  end
+
+early_ordering = [
+  {approval, "context-before-trust",
+   "    with {:ok, ca, bounds, max_active} <- preflight(context),\n",
    """
-            :ok <- Codec.signature(parsed, entry.key, suite),
-            :ok <- Codec.key_window(parsed, entry.key),
+       with :ok <-
+              if(match?(%{snapshot: nil}, context), do: {:error, :trust_unavailable}, else: :ok),
+            {:ok, ca, bounds, max_active} <- preflight(context),
+   """, "context-before-snapshot-and-bytes"},
+  {approval, "trust-before-freshness",
+   "         {:ok, keys, as_of} <-",
+   """
+            :ok <-
+              if match?(%{snapshot: %{provenance: "", as_of: 0}}, context),
+                do: {:error, :stale_trust},
+                else: :ok,
+            {:ok, keys, as_of} <-
+   """
+   |> String.trim_trailing("\n"), "stale-invalid-provenance"},
+  {approval, "record-before-key",
+   """
+            {:ok, record} <- parse_record(bytes, bounds, ca),
+            {:ok, entry} <- key_entry(keys, parsed.attestor_key_id),
    """,
    """
-            :ok <- Codec.key_window(parsed, entry.key),
-            :ok <- Codec.signature(parsed, entry.key, suite),
-   """},
-  {approval, "issuer-before-audience",
+            {:ok, entry} <- key_entry(keys, parsed.attestor_key_id),
+            {:ok, record} <- parse_record(bytes, bounds, ca),
+   """, "noncanonical-record-before-key"},
+  {approval, "lookup-before-signature", ":error -> {:error, :unknown_key}",
    """
-            :ok <- check(parsed.iss == entry.issuer, :issuer_mismatch),
-            :ok <- check(parsed.aud == context.audience, :audience_mismatch),
-   """,
+   :error ->
+           case Map.values(keys) do
+             [entry | _] -> {:ok, entry}
+             [] -> {:error, :unknown_key}
+           end
    """
-            :ok <- check(parsed.aud == context.audience, :audience_mismatch),
-            :ok <- check(parsed.iss == entry.issuer, :issuer_mismatch),
-   """},
+   |> String.trim_trailing("\n"), "unknown-key"},
   {assertion, "suite-before-payload",
    """
        with {:ok, framed} <- frame(compact, bounds),
@@ -45,9 +177,7 @@ mutations = [
             {:ok, parsed} <- parse_claims(framed, bounds),
             :ok <- admit_suite(framed, suite) do
          {:ok, parsed}
-   """},
-  {assertion, "scalar-gate", "true <- Es256.canonical_signature?(signature),",
-   "true <- is_binary(signature),"}
+   """, "suite-before-claims"}
 ]
 
 args =
@@ -57,7 +187,7 @@ args =
   |> Path.wildcard()
   |> Enum.flat_map(&["-pa", &1])
 
-run = fn source, label, expected_exit ->
+run = fn source, label, case_id, expected_exit ->
   code = """
   Code.compiler_options(ignore_module_conflict: true)
   Code.compile_string(#{inspect(source, limit: :infinity, printable_limit: :infinity)})
@@ -66,7 +196,7 @@ run = fn source, label, expected_exit ->
   result = ExUnit.run()
   IO.puts("APPROVAL_MUTATION_RESULT total=" <> Integer.to_string(result.total))
   System.halt(cond do
-    result.total != 9 -> 1
+    result.total != 12 -> 1
     result.failures > 0 -> 42
     true -> 0
   end)
@@ -74,21 +204,26 @@ run = fn source, label, expected_exit ->
 
   {output, status} = System.cmd("elixir", args ++ ["-e", code], stderr_to_stdout: true)
 
-  unless status == expected_exit and String.contains?(output, "APPROVAL_MUTATION_RESULT total=9") do
+  ran_all = String.contains?(output, "APPROVAL_MUTATION_RESULT total=12")
+  targeted = is_nil(case_id) or String.contains?(output, case_id)
+
+  unless status == expected_exit and ran_all and targeted do
     IO.puts(output)
     raise "approval mutation #{label} did not produce expected test verdict: #{status}"
   end
 
-  IO.puts("#{label}: #{if status == 0, do: "control passed", else: "mutation killed"}")
+  outcome = if status == 0, do: "control passed", else: "mutation killed by #{case_id}"
+  IO.puts("#{label}: #{outcome}")
 end
 
-run.(File.read!(approval), "unmodified", 0)
+run.(File.read!(approval), "unmodified", nil, 0)
 
-for {file, label, before, after_mutation} <- mutations do
+for {file, label, before, after_mutation, case_id} <-
+      omissions ++ weakening ++ ordering ++ early_ordering do
   source = File.read!(file)
 
   unless length(:binary.matches(source, before)) == 1,
     do: raise("approval mutation #{label} does not have exactly one target")
 
-  run.(String.replace(source, before, after_mutation, global: false), label, 42)
+  run.(String.replace(source, before, after_mutation, global: false), label, case_id, 42)
 end

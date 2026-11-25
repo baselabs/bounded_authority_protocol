@@ -1,8 +1,9 @@
 # Errors and outcomes
 
-The protocol deliberately discloses no failing credential stage. Invalid caller input, malformed
-bytes, an over-limit structure, and a failed cryptographic or context check all return the same
-closed refusal. Never derive a more detailed external response from a decoder comparison.
+Most protocol operations return the same closed refusal for invalid caller input, malformed
+bytes, exceeded ceilings, and failed cryptographic or context checks. The action approval
+verifier returns [ordered local diagnostics](../../spec/bap-action-approval-v1.md#4-approval-verification)
+for operators. Every presenter-facing verification failure uses the uniform `invalid` result.
 
 | Public family | Refusal | Meaning and cause | Remedy |
 |---|---|---|---|
@@ -10,6 +11,8 @@ closed refusal. Never derive a more detailed external response from a decoder co
 | Grant verification and envelope checks | `{:error, :invalid}` | Bytes do not satisfy trusted keys, expected context, selectors or time | Compare your own inputs using [troubleshooting](troubleshooting.md); never broaden expectations to pass |
 | Chain, anchor, transition and archive producers/verifiers | `{:error, :invalid}` | Missing/reordered/changed evidence or wrong caller boundaries/key history/object version | Supply complete raw evidence and independently trusted expected boundaries |
 | Local-loopback, role-attestation and content-assertion operations | `{:error, :invalid}` | Wrong explicit profile, nonce, context, attestor window, digest or lineage relation | Select the right profile before parsing and correct the exact expected inputs |
+| Action approval record encoding and decoding | `{:error, :invalid}` | Invalid or over-limit record, or noncanonical wire bytes | Use the exact canonical record and its effective bounds |
+| Action approval verification | `{:error, code}` | Value-free diagnostic for the first failed stage | Use the code locally and return uniform `invalid` to presenters |
 | JSON, JCS, base64url, URI, JWK, bounds construction/coercion and digest primitives | `{:error, :invalid}` | Invalid type/tag/encoding, duplicate member or exceeded ceiling | Pass valid tagged values and canonical encodings; tighten only known bounds |
 | `ContentAssertion.V1.verify_successor/3` | `{:error, :invalid}` | Supplied facts are inconsistent, not a provenance judgment | Verify both assertions, compare forward generations, maintain durable high-water state |
 | Crypto predicates | `false` | Invalid key/signature or failed predicate | Enroll acceptable keys; use the selected suite and canonical signature form |
@@ -18,7 +21,7 @@ closed refusal. Never derive a more detailed external response from a decoder co
 `Bounds.maximum/0` has no refusal. Successful tuple operations return `{:ok, value}`;
 `verify_successor/3` returns `:ok`. See the [complete result matrix](api-stability.md#result-families).
 The SDK spellings are Python `Err(InvalidError())`, Go `ErrInvalid`, and Rust `Err(Invalid)`;
-crypto predicates use booleans. No verifier failure contains partial facts or a reason.
+crypto predicates use booleans. Verifier failures carry no partial facts.
 
 ## CLI exit statuses
 
@@ -48,7 +51,7 @@ Each message omits paths, case ids and corpus bytes. Stderr wording is not a sta
 
 Unknown trusted key, unavailable revocation state, exhausted replay storage, and host policy
 refusal are host outcomes. The service notebook's `:unknown_key`, `:replayed`, `:accepted`, and
-`:rejected` labels illustrate host logic; none is a verifier credential error. Keep your host's
+`:rejected` labels illustrate host logic. The action approval verifier also uses `:unknown_key` as a local diagnostic. Keep your host's
 closed error contract separate and return a uniform refusal when verification fails.
 
 A malformed invocation of a language's function itself (for example the wrong arity) is a

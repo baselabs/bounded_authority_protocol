@@ -23,7 +23,7 @@ mutations = [
   {"key-upper-window", "p.exp <= key.valid_before", "true"},
   {"closed-members", "Enum.sort(Enum.map(members, &elem(&1, 0))) == keys", "true"},
   {"canonical-bytes", "canonical == bytes", "true"},
-  {"genesis-pair", "value.gen == 1 == (value.prev == @zero)", "true"},
+  {"genesis-pair", "value.gen == 1 == FixedBytes.equal?(value.prev, @zero)", "true"},
   {"structural-window", "value.iat <= value.nbf and value.nbf < value.exp", "true"},
   {"negative-magnitude", "value >= -bounds.integer_magnitude", "true"},
   {"successor-schema", "FixedBytes.equal?(previous.profile_digest, next.profile_digest)", "true"},

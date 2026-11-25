@@ -288,8 +288,14 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:side_verdict, 2} => %{variable_call: 3},
       {:strict_agrees?, 1} => %{variable_call: 6}
     },
+    "Elixir.BoundedAuthorityProtocol.Conformance.Candidate.beam" => %{
+      {:execute, 4} => %{variable_call: 6},
+      {:known_answer?, 2} => %{variable_call: 3},
+      {:run, 2} => %{variable_call: 4}
+    },
     "Elixir.BoundedAuthorityProtocol.Conformance.Cli.beam" => %{
-      {:verify, 2} => %{variable_call: 5}
+      {:verify_candidate, 3} => %{variable_call: 2},
+      {:verify_released, 2} => %{variable_call: 4}
     },
     "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1},
@@ -344,9 +350,13 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
     },
-    "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.Codec.beam" => %{},
+    "Elixir.BoundedAuthorityProtocol.ContentAssertion.V1.Codec.beam" => %{
+      {:canonical_object, 3} => %{variable_call: 4}
+    },
     "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.beam" => %{},
-    "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec.beam" => %{},
+    "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec.beam" => %{
+      {:parse, 3} => %{variable_call: 4}
+    },
     "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1}
     },
@@ -786,13 +796,14 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     BoundedAuthorityProtocol.V1.Runtime
     BoundedAuthorityProtocol.V2.Runtime
     BoundedAuthorityProtocol.V3.Runtime
+    BoundedAuthorityProtocol.Conformance.Candidate
     BoundedAuthorityProtocol.Conformance.Corpus
     BoundedAuthorityProtocol.Conformance.Runner
     BoundedAuthorityProtocol.Conformance.Report
     BoundedAuthorityProtocol.Conformance.Cli.Main
     BoundedAuthorityProtocol.V1.Json.decode_approval_record/3
     BoundedAuthorityProtocol.V1.Jcs.encode_approval_record/4
-    BoundedAuthorityProtocol.V1.Jcs.escaped_string_bytes/1
+    BoundedAuthorityProtocol.V1.Jcs.escaped_string_bytes/2
     BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1
     BoundedAuthorityProtocol.Ed25519.signature_gate?/1
     BoundedAuthorityProtocol.Ed25519.strict_gate?/2
@@ -1188,7 +1199,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     AnchoredExportInput ArchivedObject AttestationFacts Base64Url BoundaryAnchor BoundaryAnchorCodec Bounds
     ChainFacts ChainInput Codec CompactJws ConsumptionChain ConsumptionEntry Container ContextValidation Credentials
     ContentAssertion ContentAssertionFacts DecodedContentAssertion ExpectedContentAssertion
-    EdContext EdDSA ES256 Record RecordCodec VerifiedApprovalFacts
+    Approval EdContext EdDSA ES256 EsAssertion EsDecoded EsExpected EsFacts Loopback
+    Record RecordCodec VerifiedApprovalFacts
     Corpus DecodedAttestation DecodedGrant DecodedProof Ed25519 EncodedAnchoredExport EncodedConsumptionEntry
     EnvelopeFacts
     ExpectedAnchor ExpectedAnchoredExport ExpectedAttestation ExpectedChain ExpectedExport ExpectedGrant
@@ -2162,6 +2174,9 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules(path) when path in @chain_codec_source_paths,
     do: ~w(Access Enum Map String StringOrUri URI)
 
+  defp approved_source_modules("lib/bounded_authority_protocol/conformance/candidate.ex"),
+    do: ~w(Access Atom Enum Integer Map)
+
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/corpus.ex"),
     do: ~w(Access Bitwise Enum List Map MapSet String)
 
@@ -2606,6 +2621,41 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
          :run
        ),
        do: true
+
+  defp approved_source_call?(
+         "lib/bounded_authority_protocol/conformance/candidate.ex",
+         module,
+         function
+       ),
+       do:
+         {module, function} in [
+           {"Access", :get},
+           {"Atom", :to_string},
+           {"Base", :decode16!},
+           {"Base", :encode16},
+           {"Base", :url_decode64!},
+           {"Base", :url_encode64},
+           {"Enum", :all?},
+           {"Enum", :count},
+           {"Enum", :flat_map},
+           {"Enum", :intersperse},
+           {"Enum", :map},
+           {"Enum", :member?},
+           {"Enum", :sort},
+           {"Enum", :split_with},
+           {"Enum", :uniq},
+           {"Integer", :to_string},
+           {"Map", :delete},
+           {"Map", :drop},
+           {"Map", :fetch},
+           {"Map", :fetch!},
+           {"Map", :from_struct},
+           {"Map", :keys},
+           {"Map", :get},
+           {"Map", :new},
+           {"Map", :put},
+           {:erlang, :iolist_to_binary}
+         ]
 
   defp approved_source_call?(
          "lib/bounded_authority_protocol/conformance/corpus.ex",
@@ -3290,6 +3340,29 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {:lists, :member}
         ]
 
+      "Elixir.BoundedAuthorityProtocol.Conformance.Candidate.beam" ->
+        [
+          {Access, :get},
+          {Base, :decode16!},
+          {Base, :encode16},
+          {Base, :url_decode64!},
+          {Enum, :all?},
+          {Enum, :count},
+          {Enum, :flat_map},
+          {Enum, :intersperse},
+          {Enum, :map},
+          {Enum, :member?},
+          {Enum, :sort},
+          {Enum, :split_with},
+          {Enum, :uniq},
+          {Map, :drop},
+          {Map, :from_struct},
+          {Map, :get},
+          {Map, :new},
+          {:erlang, :iolist_to_binary},
+          {:maps, :remove}
+        ]
+
       "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam" ->
         [
           {:maps, :keys},
@@ -3505,6 +3578,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam",
+           "Elixir.BoundedAuthorityProtocol.Conformance.Candidate.beam",
+           "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Cli.beam"
          ],
          do: [],

@@ -1,0 +1,413 @@
+defmodule BoundedAuthorityProtocol.Conformance.Candidate do
+  @moduledoc false
+
+  alias BoundedAuthorityProtocol.ActionApproval.V1, as: Approval
+  alias BoundedAuthorityProtocol.ActionApproval.V1.Record
+  alias BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1, as: Loopback
+  alias BoundedAuthorityProtocol.Conformance.Report
+  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1, as: ES256
+  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertion, as: EsAssertion
+  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts, as: EsFacts
+  alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ExpectedContentAssertion, as: EsExpected
+  alias BoundedAuthorityProtocol.ContentAssertion.V1, as: EdDSA
+  alias BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts
+  alias BoundedAuthorityProtocol.V1.{Bounds, HistoricalPublicKey, Jcs}
+
+  @approval "bap-action-approval/1"
+  @es256 "bap-content-assertion-es256/1"
+
+  # Source candidate identities. The released corpus catalog remains independently gated.
+  @pins %{
+    "KmdlwraZAGipnVaQ012WGxKiXFbVQ57DFSNFRNGCDOs" => @approval,
+    "15Mp1DHeCT8WJhP70qL-g4dmtpD6Z8-8FHjq-jIrPGM" => @es256
+  }
+
+  @binary_fields ~w(attestor_key_fingerprint content_digest digest prev profile_digest
+    public_key revision_digest)a
+  @fields Map.new(
+            Map.keys(Bounds.__struct__()) ++
+              ~w(action approver_role assertion attestor attestor_key_id audience bounds
+                 entries exp gen iat id iss issuer jti key key_id max_active max_lifetime
+                 max_staleness nbf now profile provenance record record_bounds request_id
+                 resource_count resources roles snapshot sub subject suite trust trust_domain
+                 valid_before valid_from verification version as_of)a ++ @binary_fields,
+            fn field -> {Atom.to_string(field), field} end
+          )
+
+  def identify(index_bytes), do: Map.get(@pins, Report.index_identity(index_bytes))
+
+  def run(files, profile) do
+    index_bytes = Map.fetch!(files, "index.json")
+    index = :json.decode(index_bytes)
+
+    with %{"profile" => ^profile, "files" => entries} <- index,
+         true <- map_size(files) == length(entries) + 1,
+         {:ok, cases, metadata} <- checked_cases(entries, files),
+         true <- known_answer?(profile, metadata) do
+      report(index_bytes, index, cases, metadata)
+    else
+      _failure -> {:error, :integrity}
+    end
+  end
+
+  # The pinned index fixes order, names and counts. Verify each file before decoding it.
+  defp checked_cases(entries, files) do
+    with true <-
+           Enum.all?(entries, fn %{"path" => path, "sha256" => hash} ->
+             case Map.fetch(files, path) do
+               {:ok, bytes} -> sha(bytes) == hash
+               :error -> false
+             end
+           end) do
+      cases =
+        Enum.flat_map(entries, fn
+          %{"path" => path, "cases" => count} ->
+            list = :json.decode(Map.fetch!(files, path))
+            if length(list) == count, do: Enum.map(list, &{path, &1}), else: [:wrong_count]
+
+          _metadata ->
+            []
+        end)
+
+      if Enum.member?(cases, :wrong_count),
+        do: {:error, :integrity},
+        else: {:ok, cases, :json.decode(Map.fetch!(files, "profile.json"))}
+    end
+  end
+
+  defp known_answer?(@approval, metadata) do
+    %{"profile_preimage_hex" => hex, "profile_digest_hex" => digest} = metadata
+
+    sha(Base.decode16!(hex, case: :lower)) == digest and
+      Base.encode16(Approval.profile_digest(), case: :lower) ==
+        digest
+  end
+
+  defp known_answer?(@es256, %{"signing" => signing}) do
+    with {:ok, input} <- signing_input(signing),
+         true <- output(input) == signing["expected"],
+         {:ok, compact} <-
+           ES256.assemble_compact(
+             input,
+             raw(signing["signature"])
+           ) do
+      compact == signing["compact"]
+    else
+      _failure -> false
+    end
+  end
+
+  defp report(index_bytes, index, cases, metadata) do
+    {sdk, elixir} = Enum.split_with(cases, &sdk_case?/1)
+    pure_cases = Map.new(elixir, fn {_path, item} -> {item["id"], item} end)
+
+    results =
+      Enum.map(elixir, fn {path, item} ->
+        actual = execute(path, item, metadata, pure_cases)
+        {[path <> "/" <> item["id"], actual], actual === item["expected"]}
+      end)
+
+    rows = Enum.map(results, &elem(&1, 0))
+    ids = Enum.map(rows, &hd/1)
+    digest = sha(canonical(rows))
+    total = length(elixir)
+    agreed = Enum.count(results, &elem(&1, 1))
+
+    agreement =
+      total > 0 and length(ids) == total and length(Enum.uniq(ids)) == total and
+        agreed == total and digest == index["elixir_verdict_sha256"]
+
+    status = if agreement, do: 0, else: 1
+
+    report = %{
+      "format" => "bounded-authority-protocol-candidate-conformance-report",
+      "profile" => index["profile"],
+      "agreement" => agreement,
+      "exit_status" => status,
+      "total" => total,
+      "agreed" => agreed,
+      "disagreed" => total - agreed,
+      "sdk_owned" => length(sdk),
+      "index_sha256_base64url" => Report.index_identity(index_bytes),
+      "elixir_verdict_sha256" => digest
+    }
+
+    {:ok, :erlang.iolist_to_binary(canonical(report)), status}
+  end
+
+  defp sdk_case?({"helper-cases.json", _item}), do: true
+  defp sdk_case?({_path, %{"owner" => "sdk_helper"}}), do: true
+  defp sdk_case?(_case), do: false
+
+  defp execute("record-cases.json", item, _, _) do
+    ca = fields(item["ca_bounds"])
+    limits = fields(item["bounds"])
+
+    encoded =
+      case item do
+        %{"wire" => wire} ->
+          with {:ok, %Record{} = record} <-
+                 Approval.decode_record(raw(wire), ca, limits) do
+            Approval.encode_record(record, ca, limits)
+          else
+            {:error, :invalid} -> {:error, :invalid}
+            _unexpected -> :unexpected
+          end
+
+        %{"author" => author} ->
+          record = struct!(Record, fields(Map.delete(author, "v")))
+
+          Approval.encode_record(
+            record,
+            ca,
+            limits,
+            item["canonicalize"]
+          )
+      end
+
+    case encoded do
+      {:ok, wire} ->
+        {:ok, digest} = EdDSA.content_digest(wire, ca)
+        %{"wire" => b64(wire), "content_digest" => b64(digest)}
+
+      {:error, :invalid} ->
+        "invalid"
+
+      :unexpected ->
+        "unexpected"
+    end
+  end
+
+  defp execute(path, item, _, _) when path in ["approval-cases.json", "multi-fault-cases.json"] do
+    case approval(item) do
+      {:ok, facts} ->
+        %{"record" => record} = result = output(facts)
+        Map.put(result, "record", Map.put(record, "v", 1))
+
+      {:error, code} ->
+        Atom.to_string(code)
+    end
+  end
+
+  defp execute("rendering-cases.json", item, _, pure_cases) do
+    result = approval(Map.fetch!(pure_cases, item["pure_case"]))
+
+    render =
+      case {item["id"], result} do
+        {"nested-record", {:ok, %{record: record}}} -> record
+        {"nested-assertion", {:ok, %{assertion: assertion}}} -> assertion
+        _other -> result
+      end
+
+    Kernel.inspect(render)
+  end
+
+  defp execute("assertion-structure-cases.json", item, _, _) do
+    compact = item["compact"]
+    bounds = fields(item["bounds"])
+
+    with {:ok, artifact} <-
+           ES256.decode_assertion(compact, bounds),
+         {:ok, digest} <-
+           ES256.assertion_digest(compact, bounds) do
+      artifact
+      |> output()
+      |> Map.drop(["version", "verification"])
+      |> Map.merge(%{"v" => 1, "digest" => b64(digest)})
+    else
+      {:error, :invalid} -> "invalid"
+    end
+  end
+
+  defp execute("assertion-verification-cases.json", item, _, _) do
+    context = item["context"] |> fields() |> Map.put(:bounds, %{})
+    expected = struct!(EsExpected, context)
+
+    case ES256.verify_assertion(item["compact"], expected) do
+      {:ok, facts} -> output(facts)
+      {:error, :invalid} -> "invalid"
+    end
+  end
+
+  defp execute("digest-cases.json", item, _, _) do
+    case ES256.content_digest(
+           raw(item["input"]),
+           fields(item["bounds"])
+         ) do
+      {:ok, digest} -> b64(digest)
+      {:error, :invalid} -> "invalid"
+    end
+  end
+
+  defp execute("assembly-cases.json", item, %{"signing" => signing}, _) do
+    {:ok, input} = signing_input(signing)
+
+    case ES256.assemble_compact(
+           input,
+           raw(item["signature"])
+         ) do
+      {:ok, compact} -> compact
+      {:error, :invalid} -> "invalid"
+    end
+  end
+
+  defp execute("successor-cases.json", item, _, _) do
+    previous = assertion_facts(item["previous_suite"], item["predecessor"])
+    next = assertion_facts(item["next_suite"], item["successor"])
+
+    case ES256.verify_successor(previous, next, %{}) do
+      :ok -> "ok"
+      {:error, :invalid} -> "invalid"
+    end
+  end
+
+  defp execute("separation-cases.json", item, _, _) do
+    id = item["id"]
+
+    with {:error, :invalid} <-
+           ES256.decode_assertion(item["foreign"], %{}),
+         {:ok, _} <- foreign(id, item["foreign"]),
+         {:error, :invalid} <- foreign(id, item["candidate"]) do
+      "both_reject"
+    else
+      _disagreement -> "unexpected"
+    end
+  end
+
+  defp approval(item) do
+    record = raw(item["record"])
+    compact = item["compact"]
+    context = fields(item["context"])
+
+    case item["suite"] do
+      "eddsa" -> Approval.verify_eddsa(record, compact, context)
+      "es256" -> Approval.verify_es256(record, compact, context)
+    end
+  end
+
+  defp assertion_facts("eddsa", values), do: struct!(ContentAssertionFacts, fields(values))
+  defp assertion_facts("es256", values), do: struct!(EsFacts, fields(values))
+
+  defp signing_input(signing) do
+    values =
+      signing["payload"]
+      |> Map.delete("v")
+      |> Map.put("attestor_key_id", signing["kid"])
+      |> fields()
+
+    producer = struct!(EsAssertion, values)
+    ES256.assertion_signing_input(producer, %{})
+  end
+
+  defp fields(value) when is_list(value), do: Enum.map(value, &fields/1)
+  defp fields(:null), do: nil
+
+  defp fields(value) when is_map(value) do
+    Map.new(value, fn {key, value} ->
+      field = Map.fetch!(@fields, key)
+      {field, field_value(field, value)}
+    end)
+  end
+
+  defp fields(value), do: value
+
+  defp field_value(field, value) when field in @binary_fields, do: raw(value)
+
+  # Preserve exact fixture keys so malformed historical entries reach snapshot admission.
+  defp field_value(field, value) when field in [:attestor, :key],
+    do: Map.put(fields(value), :__struct__, HistoricalPublicKey)
+
+  defp field_value(:suite, "eddsa"), do: :eddsa
+  defp field_value(:suite, "es256"), do: :es256
+  defp field_value(:trust, "not_evaluated"), do: :not_evaluated
+  defp field_value(:verification, "signature_and_window"), do: :signature_and_window
+  defp field_value(:valid_before, "unbounded"), do: :unbounded
+  defp field_value(_, value), do: fields(value)
+
+  defp output(%{__struct__: _} = value), do: value |> Map.from_struct() |> output()
+
+  defp output(value) when is_map(value) do
+    Map.new(value, fn {key, value} ->
+      {Atom.to_string(key), if(key in @binary_fields, do: b64(value), else: output(value))}
+    end)
+  end
+
+  defp output(value) when is_atom(value), do: Atom.to_string(value)
+  defp output(value), do: value
+
+  # A corpus verdict stream may exceed wire bounds. Frame its rows as JCS and encode
+  # scalar strings separately. Large strings in these pinned projections are base64url.
+  defp canonical(value) when is_list(value),
+    do: ["[", Enum.intersperse(Enum.map(value, &canonical/1), ","), "]"]
+
+  defp canonical(value) when is_map(value) do
+    members =
+      value
+      |> Enum.sort()
+      |> Enum.map(fn {key, item} -> [canonical(key), ":", canonical(item)] end)
+
+    ["{", Enum.intersperse(members, ","), "}"]
+  end
+
+  defp canonical(value) when is_binary(value) and byte_size(value) > 8_192,
+    do: [?", value, ?"]
+
+  defp canonical(value) when is_binary(value) do
+    {:ok, bytes} = Jcs.encode({:string, value}, %{})
+    bytes
+  end
+
+  defp canonical(value) when is_integer(value), do: Integer.to_string(value)
+  defp canonical(true), do: "true"
+  defp canonical(false), do: "false"
+
+  defp raw(value), do: Base.url_decode64!(value, padding: false)
+  defp b64(bytes), do: Base.url_encode64(bytes, padding: false)
+  defp sha(bytes), do: Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
+
+  defp foreign("ca1", compact),
+    do: EdDSA.decode_assertion(compact, %{})
+
+  defp foreign("loopback", compact),
+    do: Loopback.decode_proof(compact, %{})
+
+  defp foreign("role-attestation", compact),
+    do: BoundedAuthorityProtocol.RoleAttestation.V1.decode_attestation(compact, %{})
+
+  defp foreign("v1-grant", compact),
+    do: BoundedAuthorityProtocol.V1.decode_grant(compact, %{})
+
+  defp foreign("v1-proof", compact),
+    do: BoundedAuthorityProtocol.V1.decode_proof(compact, %{})
+
+  defp foreign("v1-anchor", compact),
+    do: BoundedAuthorityProtocol.V1.BoundaryAnchorCodec.parse(compact, Bounds.maximum())
+
+  defp foreign("v1-transition", compact),
+    do: BoundedAuthorityProtocol.V1.KeyTransitionCodec.parse(compact, Bounds.maximum())
+
+  defp foreign("v2-grant", compact),
+    do: BoundedAuthorityProtocol.V2.decode_grant(compact, %{})
+
+  defp foreign("v2-proof", compact),
+    do: BoundedAuthorityProtocol.V2.decode_proof(compact, %{})
+
+  defp foreign("v2-anchor", compact),
+    do: BoundedAuthorityProtocol.V2.BoundaryAnchorCodec.parse(compact, Bounds.maximum())
+
+  defp foreign("v2-transition", compact),
+    do: BoundedAuthorityProtocol.V2.KeyTransitionCodec.parse(compact, Bounds.maximum())
+
+  defp foreign("v3-grant", compact),
+    do: BoundedAuthorityProtocol.V3.decode_grant(compact, %{})
+
+  defp foreign("v3-proof", compact),
+    do: BoundedAuthorityProtocol.V3.decode_proof(compact, %{})
+
+  defp foreign("v3-anchor", compact),
+    do: BoundedAuthorityProtocol.V3.BoundaryAnchorCodec.parse(compact, Bounds.maximum())
+
+  defp foreign("v3-transition", compact),
+    do: BoundedAuthorityProtocol.V3.KeyTransitionCodec.parse(compact, Bounds.maximum())
+
+end

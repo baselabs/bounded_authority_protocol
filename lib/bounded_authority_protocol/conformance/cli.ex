@@ -26,6 +26,11 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   | `attestation-profiles/role-attestation/v1` | role attestations |
   | `attestation-profiles/content-assertion/v1` | content assertions |
 
+  The source tree also contains two pinned candidates, `bap-content-assertion-es256/1` and
+  `bap-action-approval/1`. Their candidate reports include the profile, executed Elixir verdict
+  digest and SDK-owned case count. The candidate files enter the package inventory after SDK
+  qualification.
+
   Each directory must be exactly the certified corpus this release was built against: its
   `index.json` bytes must hash to the pinned identity, so a regenerated or edited corpus fails
   even when it is internally consistent.
@@ -187,14 +192,36 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   defp parse_args(_argv, _acc), do: :usage
 
   defp verify(corpus_dir, report_path) do
-    with {:ok, map} <- read_corpus(corpus_dir),
-         {:ok, corpus} <- load(map),
+    case read_corpus(corpus_dir) do
+      {:ok, %{"index.json" => index} = files} ->
+        case BoundedAuthorityProtocol.Conformance.Candidate.identify(index) do
+          nil -> verify_released(files, report_path)
+          profile -> verify_candidate(files, profile, report_path)
+        end
+
+      {:error, class} ->
+        fail(class)
+    end
+  end
+
+  defp verify_released(files, report_path) do
+    with {:ok, corpus} <- load(files),
          :ok <- certified(corpus),
          results = Runner.run(corpus),
          report = Report.build(corpus, results),
          {:ok, bytes} <- Report.to_bytes(corpus, results),
          :ok <- write_report(bytes <> "\n", report_path) do
       if report.exit_status == 0, do: 0, else: fail(:disagreement)
+    else
+      {:error, class} -> fail(class)
+    end
+  end
+
+  defp verify_candidate(files, profile, report_path) do
+    with {:ok, bytes, status} <-
+           BoundedAuthorityProtocol.Conformance.Candidate.run(files, profile),
+         :ok <- write_report(bytes <> "\n", report_path) do
+      if status == 0, do: 0, else: fail(:disagreement)
     else
       {:error, class} -> fail(class)
     end
