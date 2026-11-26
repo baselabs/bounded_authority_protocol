@@ -318,8 +318,8 @@ MUTATIONS: tuple[tuple[str, str, str, Probe], ...] = (
     ),
     (
         "successor-lineage-context",
-        "if (\n            predecessor.iss,",
-        "if False and (\n            predecessor.iss,",
+        "if (\n        predecessor.iss,",
+        "if False and (\n        predecessor.iss,",
         _probe_context,
     ),
     (

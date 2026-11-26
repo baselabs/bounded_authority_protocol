@@ -8,12 +8,11 @@ version = "0.1.0"
 description = "Provider-neutral, deterministic verifier SDK for bounded proof-of-possession authority: the BAP contract-majors 1, 2, and 3 and the sibling profiles, in typed Python."
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{ name = "BaseLabs" }]
 classifiers = [
   "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -39,7 +38,7 @@ packages = ["src/bounded_authority_verifier"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 src = ["src", "tests", "conformance"]
 
 [tool.ruff.lint]
@@ -66,12 +65,13 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ARG"]
 "conformance/**/*.py" = ["ARG"]
+"candidate/**/*.py" = ["ARG"]
 
 [tool.ruff.format]
 quote-style = "double"
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unreachable = true
@@ -87,3 +87,14 @@ packages = ["bounded_authority_verifier"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+reportPrivateUsage = "none"
+include = [
+  "src/bounded_authority_verifier/action_approval.py",
+  "src/bounded_authority_verifier/approval_record.py",
+  "src/bounded_authority_verifier/content_assertion.py",
+  "src/bounded_authority_verifier/content_assertion_es256.py",
+]

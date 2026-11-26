@@ -28,7 +28,7 @@ its own repository when it is first published. Until then,
 install it from this repository.
 
 - Version `0.1.0`, pre-1.0: the API may change between minor versions.
-- Python **3.10** or later is declared; CI tests Python 3.13.
+- Python **3.11** or later is required. CI tests Python 3.11, 3.12, and 3.13.
 - One runtime dependency, [`cryptography`](https://pypi.org/project/cryptography/) `>= 50.0.0`,
   for Ed25519 and ECDSA P-256 (the committed lock selects 50.0.2). SHA-256 comes from `hashlib`; base64url, JSON
   decoding, and JCS canonicalization are implemented in the package.
@@ -321,6 +321,48 @@ The monorepo's distribution job copies only this SDK root into a temporary direc
 runs its full suite, checks its package, and removes the temporary artifacts afterward.
 A corpus update replaces the entire snapshot from the verified Hex unpack in one change;
 individual case edits are not a supported update path. These checks do not publish the SDK.
+
+## Verifying a grant before issuing it
+
+The source candidate includes `bap-action-approval/1` and its ES256 carrier
+`bap-content-assertion-es256/1`. These profiles have separate, pinned candidate corpora
+in the protocol checkout. The SDK's vendored snapshot continues to track released corpora.
+
+In the [offline SQLite example](examples/action_approval.py), the host verifies a content
+assertion over the canonical record for an image-indexing request. The host prepares the request
+ID, its current revision, subject, action, and complete resource set. Its own policy supplies the
+audience, approver roles, suite, time and validity caps, and an independently enrolled trusted-key
+snapshot for the configured trust domain. The assertion binds the exact record bytes to the
+`bap-action-approval/1` profile and those context checks. Use the pure
+`verify_approval_eddsa` or `verify_approval_es256` entry point selected by host configuration.
+
+```python
+identity = verify_and_submit(
+    host_db, record_bytes, assertion_compact, prepared_request, host_policy, now,
+    external=True,
+)
+```
+
+The example acquires a SQLite write transaction before reading the current request. Inside the
+transaction it compares the revision and the entire prepared effect, including exact resource
+set equality. It conditionally inserts both the artifact identity and the scoped request and
+revision. A collision on either insert rolls back the transaction. The same commit records the
+local effect or a durable intent for an external effect. Revision writers and the claim compare
+against the same SQLite write lock.
+
+After an interruption, the worker reloads the durable intent from the host database and looks
+up its identity at the destination. If the effect is absent, it delivers the same bytes with
+the same identity. If the destination already has the effect, the worker confirms exact equality
+before marking delivery. CI exercises both restart points and both orders of concurrent claim
+and revision writes.
+
+The optional `action_approval.verify` helper evaluates the host's read-only revocation and replay
+predicates after pure verification. Keep its reason codes in host-local logs. Return only
+`invalid` to the presenter on a verification failure. The host authenticates the executor and
+applies its own approval policy. Where the invocation requires executor key possession, use a
+separate capability grant with a holder-bound proof. The host can set an `equals` selector on
+`record_digest` using the base64url of the exact record's content digest. The capability grant's
+operation and lifetime come from the issuer's policy.
 
 ## What this SDK does not do
 

@@ -9,18 +9,24 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from hmac import compare_digest as _bytes_equal
 
+from . import v3
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .compact import CompactSegments, SigningInput, _parse_compact, assemble_segments
 from .ed25519 import _ed25519_verify, _import_public_key, sha256
 from .error import Ok, Result, _fail, _unwrap
-from .facts import ContentAssertionDecoded, ContentAssertionFacts
+from .facts import (
+    ContentAssertionDecoded,
+    ContentAssertionFacts,
+    Es256ContentAssertionDecoded,
+    Es256ContentAssertionFacts,
+)
 from .jcs import jcs_encode
 from .json_alg import JInt, JObject, JString, Tagged, json_decode, str_utf8, utf8_str
 from .jwk import jwk_from_public_key, thumbprint_raw
 from .role_attestation import (
-    _bytes_equal,
     _closed_shape,
     _is_int,
     _is_string_or_uri,
@@ -40,7 +46,7 @@ ZERO_DIGEST = bytes(32)
 _KID_CHARSET = re.compile(r"[A-Za-z0-9._~-]+")
 _SIGNATURE_BYTES = 64
 _SIGNATURE_SEGMENT_BYTES = len(_unwrap(base64url_encode(bytes(_SIGNATURE_BYTES))))
-_PAYLOAD_KEYS = {
+_PAYLOAD_KEYS = frozenset({
     "aud",
     "content_digest",
     "exp",
@@ -54,7 +60,7 @@ _PAYLOAD_KEYS = {
     "profile_digest",
     "sub",
     "v",
-}
+})
 
 
 @dataclass(frozen=True)
@@ -201,45 +207,83 @@ def _preflight(compact: bytes, bounds: Bounds) -> None:
             _fail("content assertion: decoded segment")
 
 
-def _header(segments: CompactSegments, bounds: Bounds) -> str:
+@dataclass(frozen=True)
+class _Suite:
+    alg: bytes
+    typ: bytes
+    kind: str
+
+
+_EDDSA = _Suite(ALG.encode("ascii"), CONTENT_ASSERTION_TYP.encode("ascii"), "content_assertion")
+_ES256 = _Suite(b"ES256", b"ba+content-assertion-es256", "content_assertion_es256")
+
+
+@dataclass(frozen=True, repr=False)
+class _Header:
+    alg: bytes
+    typ: bytes
+    kid: str
+
+
+def _framing(compact: bytes, bounds: Bounds) -> tuple[CompactSegments, _Header]:
+    _preflight(compact, bounds)
+    segments = _parse_compact(compact, bounds)
+    return segments, _header(segments, bounds)
+
+
+def _header(segments: CompactSegments, bounds: Bounds) -> _Header:
     value = _unwrap(json_decode(segments.protected_bytes, bounds))
     if not isinstance(value, JObject) or set(value.v) != {"alg", "kid", "typ"}:
         _fail("content assertion: header members")
     alg = value.v.get("alg")
     typ = value.v.get("typ")
     kid = value.v.get("kid")
-    if not isinstance(alg, JString) or _unwrap(utf8_str(alg.v)) != ALG:
+    if not isinstance(alg, JString):
         _fail("content assertion: alg")
-    if not isinstance(typ, JString) or _unwrap(utf8_str(typ.v)) != CONTENT_ASSERTION_TYP:
+    if not isinstance(typ, JString):
         _fail("content assertion: typ")
     if not isinstance(kid, JString):
         _fail("content assertion: kid")
     result = _kid(_unwrap(utf8_str(kid.v)), bounds)
     if not _bytes_equal(_unwrap(jcs_encode(value, bounds)), segments.protected_bytes):
         _fail("content assertion: canonical header")
-    return result
+    return _Header(alg.v, typ.v, result)
 
 
-def _payload(segments: CompactSegments, bounds: Bounds) -> JObject:
+def _suite_matches(header: _Header, suite: _Suite) -> bool:
+    return (header.alg, header.typ) == (suite.alg, suite.typ)
+
+
+def _payload(
+    segments: CompactSegments, kid: str, bounds: Bounds, suite: _Suite
+) -> ContentAssertionDecoded:
     value = _unwrap(json_decode(segments.payload_bytes, bounds))
     if not isinstance(value, JObject) or set(value.v) != _PAYLOAD_KEYS:
         _fail("content assertion: payload members")
     version = value.v.get("v")
     if not isinstance(version, JInt) or version.v != VERSION:
         _fail("content assertion: version")
-    for key in ("jti", "iss", "aud", "sub", "profile"):
-        _json_identifier(value.v.get(key), bounds)
-    for key in ("profile_digest", "content_digest", "prev"):
-        _json_digest(value.v.get(key))
-    gen = _json_integer(value.v.get("gen"), bounds)
-    iat = _json_integer(value.v.get("iat"), bounds)
-    nbf = _json_integer(value.v.get("nbf"), bounds)
-    exp = _json_integer(value.v.get("exp"), bounds)
-    prev = _json_digest(value.v.get("prev"))
-    _structure(gen, prev, iat, nbf, exp, bounds)
+    decoded_type = Es256ContentAssertionDecoded if suite is _ES256 else ContentAssertionDecoded
+    claims = decoded_type(
+        version=VERSION,
+        attestor_key_id=kid,
+        jti=_json_identifier(value.v.get("jti"), bounds),
+        iss=_json_identifier(value.v.get("iss"), bounds),
+        aud=_json_identifier(value.v.get("aud"), bounds),
+        sub=_json_identifier(value.v.get("sub"), bounds),
+        profile=_json_identifier(value.v.get("profile"), bounds),
+        profile_digest=_json_digest(value.v.get("profile_digest")),
+        content_digest=_json_digest(value.v.get("content_digest")),
+        gen=_json_integer(value.v.get("gen"), bounds),
+        prev=_json_digest(value.v.get("prev")),
+        iat=_json_integer(value.v.get("iat"), bounds),
+        nbf=_json_integer(value.v.get("nbf"), bounds),
+        exp=_json_integer(value.v.get("exp"), bounds),
+    )
+    _structure(claims.gen, claims.prev, claims.iat, claims.nbf, claims.exp, bounds)
     if not _bytes_equal(_unwrap(jcs_encode(value, bounds)), segments.payload_bytes):
         _fail("content assertion: canonical payload")
-    return value
+    return claims
 
 
 def _structure(gen: int, prev: bytes, iat: int, nbf: int, exp: int, bounds: Bounds) -> None:
@@ -251,12 +295,13 @@ def _structure(gen: int, prev: bytes, iat: int, nbf: int, exp: int, bounds: Boun
         _fail("content assertion: time structure")
 
 
-def _parse(compact: bytes, bounds: Bounds) -> tuple[CompactSegments, str, JObject]:
-    _preflight(compact, bounds)
-    segments = _parse_compact(compact, bounds)
-    kid = _header(segments, bounds)
-    payload = _payload(segments, bounds)
-    return segments, kid, payload
+def _parse(
+    compact: bytes, bounds: Bounds, suite: _Suite = _EDDSA
+) -> tuple[CompactSegments, ContentAssertionDecoded]:
+    segments, header = _framing(compact, bounds)
+    if not _suite_matches(header, suite):
+        _fail("content assertion: suite")
+    return segments, _payload(segments, header.kid, bounds, suite)
 
 
 def _projected_compact_bounds(signing: SigningInput, bounds: Bounds) -> None:
@@ -302,7 +347,9 @@ def assertion_signing_input(
     return _trying(lambda: _signing_input(assertion, bounds))
 
 
-def _signing_input(assertion: ContentAssertion, bounds: Bounds | None) -> SigningInput:
+def _signing_input(
+    assertion: ContentAssertion, bounds: Bounds | None, suite: _Suite = _EDDSA
+) -> SigningInput:
     b = _compact_bounds(bounds)
     kid = _kid(assertion.attestor_key_id, b)
     identifiers = {
@@ -321,9 +368,9 @@ def _signing_input(assertion: ContentAssertion, bounds: Bounds | None) -> Signin
     exp = _integer(assertion.exp, b)
     _structure(gen, prev, iat, nbf, exp, b)
     header: dict[str, Tagged] = {
-        "alg": JString(_unwrap(str_utf8(ALG))),
+        "alg": JString(suite.alg),
         "kid": JString(_unwrap(str_utf8(kid))),
-        "typ": JString(_unwrap(str_utf8(CONTENT_ASSERTION_TYP))),
+        "typ": JString(suite.typ),
     }
     payload: dict[str, Tagged] = {
         "aud": JString(_unwrap(str_utf8(identifiers["aud"]))),
@@ -341,7 +388,7 @@ def _signing_input(assertion: ContentAssertion, bounds: Bounds | None) -> Signin
         "v": JInt(VERSION),
     }
     signing = SigningInput(
-        kind="content_assertion",
+        kind=suite.kind,
         protected_segment=_unwrap(base64url_encode(_unwrap(jcs_encode(JObject(header), b)))),
         payload_segment=_unwrap(base64url_encode(_unwrap(jcs_encode(JObject(payload), b)))),
     )
@@ -373,33 +420,13 @@ def decode_assertion(
     compact: bytes, bounds: Bounds | None = None
 ) -> Result[ContentAssertionDecoded]:
     """Decode canonical content-assertion claims without verifying their signature."""
-    def body() -> ContentAssertionDecoded:
-        b = _compact_bounds(bounds)
-        _segments, kid, payload = _parse(compact, b)
-        return ContentAssertionDecoded(
-            version=VERSION,
-            attestor_key_id=kid,
-            jti=_json_identifier(payload.v.get("jti"), b),
-            iss=_json_identifier(payload.v.get("iss"), b),
-            aud=_json_identifier(payload.v.get("aud"), b),
-            sub=_json_identifier(payload.v.get("sub"), b),
-            profile=_json_identifier(payload.v.get("profile"), b),
-            profile_digest=_json_digest(payload.v.get("profile_digest")),
-            content_digest=_json_digest(payload.v.get("content_digest")),
-            gen=_json_integer(payload.v.get("gen"), b),
-            prev=_json_digest(payload.v.get("prev")),
-            iat=_json_integer(payload.v.get("iat"), b),
-            nbf=_json_integer(payload.v.get("nbf"), b),
-            exp=_json_integer(payload.v.get("exp"), b),
-        )
-
-    return _trying(body)
+    return _trying(lambda: _parse(compact, _compact_bounds(bounds))[1])
 
 
-def _expected(expected: ExpectedContentAssertion, bounds: Bounds) -> None:
+def _expected(expected: ExpectedContentAssertion, bounds: Bounds, suite: _Suite) -> None:
     attestor = expected.attestor
     _kid(attestor.key_id, bounds)
-    if len(attestor.public_key) != 32:
+    if len(attestor.public_key) != (65 if suite is _ES256 else 32):
         _fail("content assertion: attestor key width")
     valid_from = _integer(attestor.valid_from, bounds)
     if attestor.valid_before is not None:
@@ -418,67 +445,91 @@ def verify_assertion(
     compact: bytes, expected: ExpectedContentAssertion
 ) -> Result[ContentAssertionFacts]:
     """Verify a content assertion against the caller-trusted attestor, content, profile and time."""
-    def body() -> ContentAssertionFacts:
-        b = _compact_bounds(expected.bounds)
-        _expected(expected, b)
-        segments, kid, payload = _parse(compact, b)
-        attestor = expected.attestor
-        if kid != attestor.key_id:
-            _fail("content assertion: attestor key id")
-        actual_identifiers = (
-            _json_identifier(payload.v.get("iss"), b),
-            _json_identifier(payload.v.get("aud"), b),
-            _json_identifier(payload.v.get("sub"), b),
-            _json_identifier(payload.v.get("profile"), b),
-        )
-        if actual_identifiers != (
-            expected.issuer,
-            expected.audience,
-            expected.subject,
-            expected.profile,
-        ):
-            _fail("content assertion: expected identities")
-        profile_digest = _json_digest(payload.v.get("profile_digest"))
-        asserted_content_digest = _json_digest(payload.v.get("content_digest"))
-        if not _bytes_equal(profile_digest, expected.profile_digest):
-            _fail("content assertion: expected profile digest")
-        if not _bytes_equal(asserted_content_digest, expected.content_digest):
-            _fail("content assertion: expected content digest")
-        iat = _json_integer(payload.v.get("iat"), b)
-        nbf = _json_integer(payload.v.get("nbf"), b)
-        exp = _json_integer(payload.v.get("exp"), b)
-        if iat < attestor.valid_from or nbf < attestor.valid_from:
-            _fail("content assertion: key window start")
-        if attestor.valid_before is not None and exp > attestor.valid_before:
-            _fail("content assertion: key window end")
-        if not nbf <= expected.now < exp:
-            _fail("content assertion: current window")
-        fingerprint = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(attestor.public_key))))
-        key = _import_public_key(
-            attestor.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(fingerprint))))
-        )
-        if not _ed25519_verify(segments.signing_input, segments.signature, key):
-            _fail("content assertion: signature")
-        return ContentAssertionFacts(
-            version=VERSION,
-            attestor_key_id=attestor.key_id,
-            attestor_key_fingerprint=fingerprint,
-            jti=_json_identifier(payload.v.get("jti"), b),
-            iss=actual_identifiers[0],
-            aud=actual_identifiers[1],
-            sub=actual_identifiers[2],
-            profile=actual_identifiers[3],
-            profile_digest=profile_digest,
-            content_digest=asserted_content_digest,
-            gen=_json_integer(payload.v.get("gen"), b),
-            prev=_json_digest(payload.v.get("prev")),
-            iat=iat,
-            nbf=nbf,
-            exp=exp,
-            digest=_unwrap(sha256(compact)),
-        )
+    return _trying(lambda: _verify_assertion(compact, expected, _EDDSA))
 
-    return _trying(body)
+
+def _fingerprint(raw_key: bytes, suite: _Suite) -> bytes:
+    if suite is _ES256:
+        return _unwrap(v3.public_key_thumbprint_raw(raw_key))
+    return _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(raw_key))))
+
+
+def _signature_matches(
+    segments: CompactSegments, raw_key: bytes, suite: _Suite
+) -> bool:
+    if suite is _ES256:
+        try:
+            key_es256 = v3._import_public_key(raw_key)
+            return v3._es256_verify(segments.signing_input, segments.signature, key_es256)
+        except Exception:
+            return False
+    key = _import_public_key(raw_key)
+    if not _ed25519_verify(segments.signing_input, segments.signature, key):
+        return False
+    return True
+
+
+def _key_window(claims: ContentAssertionDecoded, attestor: HistoricalPublicKey) -> bool:
+    return (
+        claims.iat >= attestor.valid_from
+        and claims.nbf >= attestor.valid_from
+        and (attestor.valid_before is None or claims.exp <= attestor.valid_before)
+    )
+
+
+def _verified_facts(
+    claims: ContentAssertionDecoded, compact: bytes, fingerprint: bytes, suite: _Suite
+) -> ContentAssertionFacts:
+    facts_type = Es256ContentAssertionFacts if suite is _ES256 else ContentAssertionFacts
+    return facts_type(
+        version=VERSION,
+        attestor_key_id=claims.attestor_key_id,
+        attestor_key_fingerprint=fingerprint,
+        jti=claims.jti,
+        iss=claims.iss,
+        aud=claims.aud,
+        sub=claims.sub,
+        profile=claims.profile,
+        profile_digest=claims.profile_digest,
+        content_digest=claims.content_digest,
+        gen=claims.gen,
+        prev=claims.prev,
+        iat=claims.iat,
+        nbf=claims.nbf,
+        exp=claims.exp,
+        digest=_unwrap(sha256(compact)),
+    )
+
+
+def _verify_assertion(
+    compact: bytes, expected: ExpectedContentAssertion, suite: _Suite
+) -> ContentAssertionFacts:
+    b = _compact_bounds(expected.bounds)
+    _expected(expected, b, suite)
+    segments, claims = _parse(compact, b, suite)
+    attestor = expected.attestor
+    if claims.attestor_key_id != attestor.key_id:
+        _fail("content assertion: attestor key id")
+    if (claims.iss, claims.aud, claims.sub, claims.profile) != (
+        expected.issuer,
+        expected.audience,
+        expected.subject,
+        expected.profile,
+    ):
+        _fail("content assertion: expected identities")
+    if not _bytes_equal(claims.profile_digest, expected.profile_digest):
+        _fail("content assertion: expected profile digest")
+    asserted_content_digest = claims.content_digest
+    if not _bytes_equal(asserted_content_digest, expected.content_digest):
+        _fail("content assertion: expected content digest")
+    if not _key_window(claims, attestor):
+        _fail("content assertion: key window")
+    if not claims.nbf <= expected.now < claims.exp:
+        _fail("content assertion: current window")
+    fingerprint = _fingerprint(attestor.public_key, suite)
+    if not _signature_matches(segments, attestor.public_key, suite):
+        _fail("content assertion: signature")
+    return _verified_facts(claims, compact, fingerprint, suite)
 
 
 @_closed_shape
@@ -519,33 +570,36 @@ def verify_successor(
     bounds: Bounds,
 ) -> Result[None]:
     """Check verified predecessor/successor facts for consecutive generation and exact digest linkage."""
-    def body() -> None:
-        b = _unwrap(coerce_bounds(bounds))
-        _facts(predecessor, b)
-        _facts(successor, b)
-        if (
-            predecessor.iss,
-            predecessor.aud,
-            predecessor.sub,
-            predecessor.profile,
-            predecessor.profile_digest,
-        ) != (
-            successor.iss,
-            successor.aud,
-            successor.sub,
-            successor.profile,
-            successor.profile_digest,
-        ):
-            _fail("content assertion successor: context")
-        magnitude = _unwrap(bounds_resolve(b, "integer_magnitude"))
-        if predecessor.gen >= magnitude or successor.gen != predecessor.gen + 1:
-            _fail("content assertion successor: generation")
-        if not _bytes_equal(successor.prev, predecessor.digest):
-            _fail("content assertion successor: predecessor")
-        if successor.iat < predecessor.iat:
-            _fail("content assertion successor: time")
-        if successor.jti == predecessor.jti:
-            _fail("content assertion successor: identity")
-        return
+    return _trying(lambda: _verify_successor(predecessor, successor, bounds))
 
-    return _trying(body)
+
+def _verify_successor(
+    predecessor: ContentAssertionFacts, successor: ContentAssertionFacts, bounds: Bounds
+) -> None:
+    b = _unwrap(coerce_bounds(bounds))
+    _facts(predecessor, b)
+    _facts(successor, b)
+    if (
+        predecessor.iss,
+        predecessor.aud,
+        predecessor.sub,
+        predecessor.profile,
+    ) != (
+        successor.iss,
+        successor.aud,
+        successor.sub,
+        successor.profile,
+    ):
+        _fail("content assertion successor: context")
+    if not _bytes_equal(predecessor.profile_digest, successor.profile_digest):
+        _fail("content assertion successor: profile digest")
+    magnitude = _unwrap(bounds_resolve(b, "integer_magnitude"))
+    if predecessor.gen >= magnitude or successor.gen != predecessor.gen + 1:
+        _fail("content assertion successor: generation")
+    if not _bytes_equal(successor.prev, predecessor.digest):
+        _fail("content assertion successor: predecessor")
+    if successor.iat < predecessor.iat:
+        _fail("content assertion successor: time")
+    if successor.jti == predecessor.jti:
+        _fail("content assertion successor: identity")
+    return

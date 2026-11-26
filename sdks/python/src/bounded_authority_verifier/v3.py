@@ -175,19 +175,6 @@ COORDINATE_BYTES = 32
 PUBLIC_KEY_BYTES = 65
 SIGNATURE_BYTES = 64
 
-# Census tracking: every key imported via import_public_key is recorded here, so the conformance
-# runner can check declared discovery and that valid verification keys reach this boundary.
-_census_fingerprints: set[str] = set()
-
-
-def _imported_fingerprints() -> frozenset[str]:
-    return frozenset(_census_fingerprints)
-
-
-def _reset_census() -> None:
-    _census_fingerprints.clear()
-
-
 @dataclass(frozen=True)
 class EcPublic:
     """The public EC JWK value: exactly ``{crv: "P-256", kty: "EC", x, y}`` (REQ3-HEADER-proof-jwk)."""
@@ -219,36 +206,18 @@ def _validated_public_key(raw_key: bytes) -> bytes:
     return raw_key
 
 
-def _import_public_key(raw_key: bytes, fingerprint: str) -> ec.EllipticCurvePublicKey:
-    """Import a raw 65-byte uncompressed-SEC1 P-256 public key, recording the fingerprint for the
-    census. Throws InvalidError on a malformed key (width, form, coordinate range, off-curve).
+def _import_public_key(raw_key: bytes) -> ec.EllipticCurvePublicKey:
+    """Import an uncompressed SEC1 P-256 public key after validating the point.
 
     The pure on-curve/coordinate checks run FIRST (REQ3-BOUNDS-ordering); the backend import is
     never load-bearing for those rejections.
     """
     _validated_public_key(raw_key)
-    key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), raw_key)
-    _census_fingerprints.add(fingerprint)
-    return key
+    return ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), raw_key)
 
 
-def _es256_verify(message: bytes, signature: bytes, public_key: ec.EllipticCurvePublicKey) -> bool:
-    """Verify an ES256 signature over the exact RFC 7515 signing input.
-
-    The wire signature is the RFC 7518 §3.4 raw form: exactly 64 bytes, ``r || s``, two
-    fixed-width 32-byte unsigned big-endian integers (REQ3-SIGNING-raw-rs). DER is never a v3
-    wire spelling. The verifier rejects, as invalid encodings BEFORE any backend call
-    (REQ3-SIGNING-range):
-
-    - ``r = 0`` or ``s = 0``;
-    - ``r >= n`` or ``s >= n``;
-    - ``s > n/2``: the HIGH-S half (low-S required, REQ3-SIGNING-low-s). Low-S makes each
-      signature non-malleable: for a valid ECDSA pair ``(r, s)`` the counterpart ``(r, n-s)``
-      also verifies, so only the low-S rule admits one of the two encodings.
-
-    Returns True on a valid low-S signature, False on a backend signature mismatch, and raises
-    the closed InvalidError on a range violation. Unexpected backend errors propagate.
-    """
+def _es256_scalars(signature: bytes) -> tuple[int, int]:
+    """Validate the exact raw signature representation, including low-S."""
     _require(len(signature) == SIGNATURE_BYTES, "es256: signature must be 64 bytes")
     r = int.from_bytes(signature[:32], "big")
     s = int.from_bytes(signature[32:], "big")
@@ -258,6 +227,12 @@ def _es256_verify(message: bytes, signature: bytes, public_key: ec.EllipticCurve
         _fail("es256: r/s range")
     if s > _LOW_S_MAX:
         _fail("es256: high-s")
+    return r, s
+
+
+def _es256_verify(message: bytes, signature: bytes, public_key: ec.EllipticCurvePublicKey) -> bool:
+    """Verify low-S ECDSA with SHA-256 over the original JWS signing input."""
+    r, s = _es256_scalars(signature)
     der = encode_dss_signature(r, s)
     try:
         public_key.verify(der, message, ec.ECDSA(hashes.SHA256()))
@@ -1369,7 +1344,6 @@ def _trying(fn: Callable[[], _T]) -> Result[_T]:
 # Unsupported annotations are SDK defects and propagate; malformed inputs return Err.
 
 _OPAQUE_ANNOTATIONS = (Bounds, JNull, JBool, JInt, JFloat, JString, JArray, JObject)
-_DATACLASS_HINTS: dict[type, dict[str, object]] = {}
 
 
 class _MissingField:
@@ -1380,11 +1354,8 @@ _MISSING = _MissingField()
 
 
 def _dataclass_hints(cls: type) -> dict[str, object]:
-    hints = _DATACLASS_HINTS.get(cls)
-    if hints is None:
-        hints = get_type_hints(cls.__init__) if issubclass(cls, _Facts) else get_type_hints(cls)
-        hints.pop("return", None)
-        _DATACLASS_HINTS[cls] = hints
+    hints = get_type_hints(cls.__init__) if issubclass(cls, _Facts) else get_type_hints(cls)
+    hints.pop("return", None)
     return hints
 
 
@@ -1480,17 +1451,14 @@ def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
     facade signatures forward-reference structs defined later in this module (ExpectedExport);
     an unsupported annotation form therefore fails on first call (the family sweep exercises
     every facade, so it fails in CI, just not at import)."""
-    resolved: list[tuple[dict[str, object], inspect.Signature]] = []
+    signature = inspect.signature(fn)
 
     @functools.wraps(fn)
     def wrapper(*args: object, **kwargs: object) -> Result[Any]:
-        if not resolved:
-            hints = get_type_hints(fn)
-            for name, annotation in hints.items():
-                if name != "return":
-                    _walk_annotation(annotation)
-            resolved.append((hints, inspect.signature(fn)))
-        hints, signature = resolved[0]
+        hints = get_type_hints(fn)
+        for name, annotation in hints.items():
+            if name != "return":
+                _walk_annotation(annotation)
         bound = signature.bind(*args, **kwargs)
         try:
             for name, value in bound.arguments.items():
@@ -1710,7 +1678,7 @@ def _verify_grant_body(
     cnf = _require_object_exact(cnf, ["jkt"], "grant cnf")
     jkt = _require_b64url_n(cnf.v.get("jkt"), "jkt", 32)
     fp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(trusted.public_key))))
-    key = _import_public_key(trusted.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(fp)))))
+    key = _import_public_key(trusted.public_key)
     if not _es256_verify(seg.signing_input, seg.signature, key):
         _fail("verify_grant: signature")
     from .facts import GrantFacts
@@ -1804,7 +1772,7 @@ def _check_envelope_body(
     if not (gexp > expected.evaluation_time - expected.clock_skew):
         _fail("check_envelope: grant exp")
     gfp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(t.public_key))))
-    gkey = _import_public_key(t.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(gfp)))))
+    gkey = _import_public_key(t.public_key)
     if not _es256_verify(gseg.signing_input, gseg.signature, gkey):
         _fail("check_envelope: grant signature")
     # --- verify proof (holder signature) ---
@@ -1812,9 +1780,7 @@ def _check_envelope_body(
     holder_thumbprint, holder_key = _parse_proof_header(pseg, b)
     pp = _unwrap(json_decode(pseg.payload_bytes, b))
     _validate_proof_payload(pp, b)
-    hkey = _import_public_key(
-        holder_key, _unwrap(utf8_str(_unwrap(base64url_encode(holder_thumbprint))))
-    )
+    hkey = _import_public_key(holder_key)
     if not _es256_verify(pseg.signing_input, pseg.signature, hkey):
         _fail("check_envelope: proof signature")
     if not isinstance(pp, JObject):
@@ -3030,9 +2996,7 @@ def _verify_historical_anchor_body(
         _fail("verify_historical_anchor: fingerprint")
     if not _in_window(anchored_at, key):
         _fail("verify_historical_anchor: window")
-    pk = _import_public_key(
-        key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_fp))))
-    )
+    pk = _import_public_key(key.public_key)
     if not _es256_verify(seg.signing_input, seg.signature, pk):
         _fail("verify_historical_anchor: signature")
     from .facts import AnchorFacts
@@ -3143,9 +3107,7 @@ def _verify_key_transition_body(
         _fail("verify_key_transition: current window")
     if not _in_window(effective_at, new_key):
         _fail("verify_key_transition: next window")
-    pk = _import_public_key(
-        old_key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_from))))
-    )
+    pk = _import_public_key(old_key.public_key)
     if not _es256_verify(seg.signing_input, seg.signature, pk):
         _fail("verify_key_transition: signature")
     from .facts import KeyTransitionFacts
@@ -3595,9 +3557,7 @@ def _verify_anchor_compact(
         _fail(f"{ctx}: fingerprint")
     if not _in_window(anchored_at, key):
         _fail(f"{ctx}: window")
-    pk = _import_public_key(
-        key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_fp))))
-    )
+    pk = _import_public_key(key.public_key)
     if not _es256_verify(seg.signing_input, seg.signature, pk):
         _fail(f"{ctx}: signature")
 
@@ -3688,9 +3648,7 @@ def _verify_transition_compact(
         _fail(f"{ctx}: current window")
     if not _in_window(effective_at, next_key):
         _fail(f"{ctx}: next window")
-    pk = _import_public_key(
-        current_key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_from))))
-    )
+    pk = _import_public_key(current_key.public_key)
     if not _es256_verify(seg.signing_input, seg.signature, pk):
         _fail(f"{ctx}: signature")
 

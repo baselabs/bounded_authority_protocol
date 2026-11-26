@@ -26,7 +26,7 @@ import re
 import types as _types
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, is_dataclass
-from typing import Any, TypeVar, Union, get_args, get_origin, get_type_hints
+from typing import Any, ParamSpec, TypeVar, Union, get_args, get_origin, get_type_hints
 
 from ._inputs import _normalize_arg
 from .base64url import base64url_decode, base64url_encode
@@ -354,7 +354,6 @@ def _preflight_attestation_compact(compact: bytes, bounds: Bounds) -> None:
 # Unsupported annotations are SDK defects and propagate; malformed inputs return Err.
 
 _OPAQUE_ANNOTATIONS = (Bounds, JNull, JBool, JInt, JFloat, JString, JArray, JObject)
-_DATACLASS_HINTS: dict[type, dict[str, object]] = {}
 
 
 class _MissingField:
@@ -365,11 +364,8 @@ _MISSING = _MissingField()
 
 
 def _dataclass_hints(cls: type) -> dict[str, object]:
-    hints = _DATACLASS_HINTS.get(cls)
-    if hints is None:
-        hints = get_type_hints(cls.__init__) if issubclass(cls, _Facts) else get_type_hints(cls)
-        hints.pop("return", None)
-        _DATACLASS_HINTS[cls] = hints
+    hints = get_type_hints(cls.__init__) if issubclass(cls, _Facts) else get_type_hints(cls)
+    hints.pop("return", None)
     return hints
 
 
@@ -459,21 +455,19 @@ def _shape_ok(value: object, annotation: object) -> bool:
     return False  # unreachable: _walk_annotation rejects unsupported origins at import
 
 
-def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
-    """Facade decorator: validate caller arguments against their declared shapes before the
-    body runs; malformed values return Err, and accepted buffers are copied. Applied to all four public functions of this sibling profile. Hints resolve lazily
-    on the first call: facade signatures forward-reference structs defined in this module."""
-    resolved: list[tuple[dict[str, object], inspect.Signature]] = []
+_P = ParamSpec("_P")
+
+
+def _closed_shape(fn: Callable[_P, Result[_T]]) -> Callable[_P, Result[_T]]:
+    """Validate declared argument shapes and copy accepted buffers before calling a facade."""
+    signature = inspect.signature(fn)
 
     @functools.wraps(fn)
-    def wrapper(*args: object, **kwargs: object) -> Result[Any]:
-        if not resolved:
-            hints = get_type_hints(fn)
-            for name, annotation in hints.items():
-                if name != "return":
-                    _walk_annotation(annotation)
-            resolved.append((hints, inspect.signature(fn)))
-        hints, signature = resolved[0]
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Result[_T]:
+        hints = get_type_hints(fn)
+        for name, annotation in hints.items():
+            if name != "return":
+                _walk_annotation(annotation)
         bound = signature.bind(*args, **kwargs)
         try:
             for name, value in bound.arguments.items():
@@ -702,9 +696,7 @@ def _verify_attestation_body(compact: bytes, expected: ExpectedAttestation) -> A
     attestor_fingerprint = _unwrap(
         thumbprint_raw(_unwrap(jwk_from_public_key(attestor.public_key)))
     )
-    key = _import_public_key(
-        attestor.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(attestor_fingerprint))))
-    )
+    key = _import_public_key(attestor.public_key)
     if not _ed25519_verify(seg.signing_input, seg.signature, key):
         _fail("verify_attestation: signature")
     # 3. the payload subject binding equals the expected subject binding (key_id equality + raw

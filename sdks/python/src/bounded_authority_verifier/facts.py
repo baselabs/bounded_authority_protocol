@@ -1853,7 +1853,7 @@ class ContentAssertionFacts(_Facts):
     __str__ = __repr__
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, ContentAssertionFacts) and (
+        return isinstance(other, ContentAssertionFacts) and type(self) is type(other) and (
             self._version,
             self._attestor_key_id,
             self._attestor_key_fingerprint,
@@ -1916,3 +1916,25 @@ class ContentAssertionFacts(_Facts):
                 self._trust,
             )
         )
+
+
+class Es256ContentAssertionDecoded(ContentAssertionDecoded):
+    """Decoded values from the ES256 content assertion profile."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "#BoundedAuthorityProtocol.ContentAssertion.ES256.V1.DecodedContentAssertion<redacted>"
+
+    __str__ = __repr__
+
+
+class Es256ContentAssertionFacts(ContentAssertionFacts):
+    """Verified facts from the ES256 content assertion profile."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "#BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts<redacted>"
+
+    __str__ = __repr__

@@ -13,13 +13,9 @@ where the SDK is installed (``uv pip install -e .``).
 from __future__ import annotations
 
 import sys
+import tomllib
 from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
-
-try:
-    import tomllib  # Python 3.11+ stdlib
-except ModuleNotFoundError:  # pragma: no cover: the 3.10 fallback
-    import tomli as tomllib  # type: ignore[no-redef]
 
 
 def _runtime_deps() -> list[str]:

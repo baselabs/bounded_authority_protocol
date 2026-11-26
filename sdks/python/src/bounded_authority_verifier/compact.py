@@ -183,7 +183,7 @@ def assemble_segments_es256(signing_input: SigningInput, signature: bytes) -> Re
     try:
         signing_input = _normalize_arg(signing_input, SigningInput)
         signature = _bytes(signature)
-        if signing_input.kind not in ("grant", "proof", "boundary_anchor", "key_transition"):
+        if signing_input.kind not in ("grant", "proof", "boundary_anchor", "key_transition", "content_assertion_es256"):
             _fail("assemble_segments: kind closed set")
         _require(len(signature) == 64, "assemble_segments: signature width 64")
         sig_b64 = _unwrap(base64url_encode(signature))

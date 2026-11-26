@@ -412,7 +412,7 @@ def test_every_public_key_function_rejects_weak_keys_and_accepts_an_honest_key()
         assert isinstance(thumbprint_raw(_okp(weak)), Err)
         assert isinstance(thumbprint_preimage(_okp(weak)), Err)
         with pytest.raises(InvalidError):
-            _import_public_key(weak, "fingerprint")
+            _import_public_key(weak)
 
 
 def test_unchecked_thumbprint_is_a_pure_hash_available_for_weak_keys() -> None:

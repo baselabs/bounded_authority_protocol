@@ -34,11 +34,7 @@ sys.path.insert(0, str(_HERE.parents[1]))
 
 from bounded_authority_verifier import v2  # noqa: E402
 from bounded_authority_verifier.base64url import base64url_decode, base64url_encode  # noqa: E402
-from bounded_authority_verifier.ed25519 import (  # noqa: E402
-    _imported_fingerprints,
-    _reset_census,
-    sha256,
-)
+from bounded_authority_verifier.ed25519 import sha256  # noqa: E402
 from bounded_authority_verifier.error import InvalidError  # noqa: E402
 from bounded_authority_verifier.jcs import jcs_encode  # noqa: E402
 from bounded_authority_verifier.json_alg import (  # noqa: E402
@@ -60,7 +56,13 @@ from bounded_authority_verifier.jwk import (  # noqa: E402
     thumbprint_preimage,
 )
 from bounded_authority_verifier.uri import uri_normalize  # noqa: E402
-from corpus_support import CorpusRun, collect_input_keys, computed, integrity  # noqa: E402
+from corpus_support import (  # noqa: E402
+    CorpusRun,
+    collect_input_keys,
+    computed,
+    integrity,
+    observe_imports,
+)
 
 CORPUS_DIR = _CORPUS_ROOT / "priv" / "conformance" / "v2" / "corpus"
 # The certified index.json SHA-256 (certified index SHA-256 binding
@@ -915,7 +917,7 @@ def _collect_case_keys(value: Any, target: set[str]) -> None:
     collect_input_keys(value, target, major=2)
 
 
-def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
+def run_census(index: dict[str, Any], cases: list[dict[str, Any]], verify_import: set[str]) -> None:
     declared = list(index["public_key_fingerprints"])
     declared_sorted = sorted(set(declared))
     if declared != declared_sorted:
@@ -925,7 +927,6 @@ def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
     extra, missing = sorted(imported - declared_set), sorted(declared_set - imported)
     if extra or missing:
         abort(f"census: imported != declared; extra={extra}; missing={missing}")
-    verify_import = set(_imported_fingerprints())
     if verify_import - declared_set:
         abort(f"census: undeclared verification imports: {sorted(verify_import - declared_set)}")
     expected_verify: set[str] = set()
@@ -948,9 +949,13 @@ def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
 
 
 def run_all() -> dict[str, Any]:
+    with observe_imports(v2, major=2) as verify_import:
+        return _run_all(verify_import)
+
+
+def _run_all(verify_import: set[str]) -> dict[str, Any]:
     index, cases, raws = load_corpus()
     execution = CorpusRun(CORPUS_DIR, CERTIFIED_INDEX_SHA)
-    _reset_census()
     _input_fingerprints.clear()
     passed = 0
     failed = 0
@@ -970,7 +975,7 @@ def run_all() -> dict[str, Any]:
         else:
             failed += 1
             failures.append(c["id"])
-    run_census(index, cases)
+    run_census(index, cases, verify_import)
     execution.finish()
     return {
         "pass": passed,

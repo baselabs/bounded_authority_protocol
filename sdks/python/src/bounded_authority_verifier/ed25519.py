@@ -1,5 +1,4 @@
-"""Strict Ed25519 verification (rule S1) via the ``cryptography`` package (the crypto import boundary
-the two-boundary census tracks) + SHA-256 via ``hashlib``.
+"""Strict Ed25519 verification (rule S1) via ``cryptography`` and SHA-256 via ``hashlib``.
 
 Per spec/bap-v1.md § Signing and digest inputs + RFC 8032. This module is the single owner of the
 Ed25519 point and scalar rules for the SDK. ``verify_strict`` accepts a signature ``R || S`` over a
@@ -175,29 +174,14 @@ def torsion_free(raw_key: bytes) -> bool:
     return point is not None and _is_identity(_multiply(_L, point))
 
 
-# Census tracking: every key imported via import_public_key is recorded here, so the conformance
-# runner can check declared discovery and that valid verification keys reach this boundary.
-_census_fingerprints: set[str] = set()
-
-
-def _imported_fingerprints() -> frozenset[str]:
-    return frozenset(_census_fingerprints)
-
-
-def _reset_census() -> None:
-    _census_fingerprints.clear()
-
-
-def _import_public_key(raw_key: bytes, fingerprint: str) -> Ed25519PublicKey:
-    """Import a raw 32-byte Ed25519 public key, recording the fingerprint for the census.
+def _import_public_key(raw_key: bytes) -> Ed25519PublicKey:
+    """Import an acceptable raw 32-byte Ed25519 public key.
 
     Reject malformed keys under spec/bap-v1.md §14, REQ1-KEY-ed25519-acceptable.
     """
     _require(len(raw_key) == 32, "ed25519: public key must be 32 bytes")
     _require(acceptable_public_key(raw_key), "ed25519: public key not acceptable")
-    key = Ed25519PublicKey.from_public_bytes(raw_key)
-    _census_fingerprints.add(fingerprint)
-    return key
+    return Ed25519PublicKey.from_public_bytes(raw_key)
 
 
 def _ed25519_verify(message: bytes, signature: bytes, public_key: Ed25519PublicKey) -> bool:

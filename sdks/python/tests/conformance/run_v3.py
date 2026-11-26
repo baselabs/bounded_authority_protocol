@@ -56,8 +56,13 @@ from bounded_authority_verifier.json_alg import (  # noqa: E402
     utf8_str,
 )
 from bounded_authority_verifier.uri import uri_normalize  # noqa: E402
-from bounded_authority_verifier.v3 import _imported_fingerprints, _reset_census  # noqa: E402
-from corpus_support import CorpusRun, collect_input_keys, computed, integrity  # noqa: E402
+from corpus_support import (  # noqa: E402
+    CorpusRun,
+    collect_input_keys,
+    computed,
+    integrity,
+    observe_imports,
+)
 
 CORPUS_DIR = _CORPUS_ROOT / "priv" / "conformance" / "v3" / "corpus"
 # The certified index.json SHA-256 (certified index SHA-256 binding
@@ -880,7 +885,7 @@ def _collect_case_keys(value: Any, target: set[str]) -> None:
     collect_input_keys(value, target, major=3)
 
 
-def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
+def run_census(index: dict[str, Any], cases: list[dict[str, Any]], verify_import: set[str]) -> None:
     declared = list(index["public_key_fingerprints"])
     declared_sorted = sorted(set(declared))
     if declared != declared_sorted:
@@ -890,7 +895,6 @@ def run_census(index: dict[str, Any], cases: list[dict[str, Any]]) -> None:
     extra, missing = sorted(imported - declared_set), sorted(declared_set - imported)
     if extra or missing:
         abort(f"census: imported != declared; extra={extra}; missing={missing}")
-    verify_import = set(_imported_fingerprints())
     if verify_import - declared_set:
         abort(f"census: undeclared verification imports: {sorted(verify_import - declared_set)}")
     expected_verify: set[str] = set()
@@ -987,10 +991,14 @@ def audit_tampers(cases: list[dict[str, Any]], raws: dict[str, bytes]) -> int:
 
 
 def run_all() -> dict[str, Any]:
+    with observe_imports(v3, major=3) as verify_import:
+        return _run_all(verify_import)
+
+
+def _run_all(verify_import: set[str]) -> dict[str, Any]:
     index, cases, raws = load_corpus()
     audit_tampers(cases, raws)
     execution = CorpusRun(CORPUS_DIR, CERTIFIED_INDEX_SHA)
-    _reset_census()
     _input_fingerprints.clear()
     passed = 0
     failed = 0
@@ -1010,7 +1018,7 @@ def run_all() -> dict[str, Any]:
         else:
             failed += 1
             failures.append(c["id"])
-    run_census(index, cases)
+    run_census(index, cases, verify_import)
     execution.finish()
     return {
         "pass": passed,

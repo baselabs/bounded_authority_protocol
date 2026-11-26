@@ -242,11 +242,13 @@ def _parse_string(ctx: _Ctx) -> JString:
 # Scan a JSON string starting at the opening quote; return the decoded UTF-8 bytes. Validates escapes
 # and rejects unpaired surrogates / non-UTF-8 (REQ1-JSON-no-normalization: preserve without normalizing,
 # but the bytes must be valid UTF-8).
-def _scan_string(ctx: _Ctx, start: int) -> bytes:
+def _scan_string(ctx: _Ctx, start: int, limit: int | None = None) -> bytes:
     src = ctx.src
     ctx.pos = start + 1  # skip opening quote
     out = bytearray()
     while True:
+        if limit is not None and len(out) > limit:
+            _fail("json: string_bytes bound")
         if ctx.pos >= len(src):
             _fail("json: unterminated string")
         c = src[ctx.pos]

@@ -20,8 +20,7 @@ broken, the named test/gate went RED, and the change was reverted. The record:
   5. int/float tag distinction: collapse the float decode to JInt in json_alg._parse_number
      (return JInt(int(n)) instead of JFloat(n)) → "integer 1 and float 1.0 distinct identity" +
      "equals selector distinguishes" go RED.
-  6. census two-boundary (import-boundary public-key census (docs/design/conformance-contract.md)): make _import_public_key in ed25519.py NOT register the
-     fingerprint → conformance/run.py census aborts ("declared by a valid verification case but
+  6. census two-boundary (import-boundary public-key census (docs/design/conformance-contract.md)): suppress the test runner’s successful-import observation → conformance/run.py census aborts ("declared by a valid verification case but
      never imported at the Ed25519 verify boundary").
   7. purity lint (pure-library and permissive-dependency gates (docs/design/conformance-contract.md)): inject `datetime.now()` into a src/ module → tools/purity_check.py
      fails ("forbidden call: datetime.now").
@@ -54,7 +53,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 from bounded_authority_verifier import v2, v3
 from bounded_authority_verifier.bounds import Bounds, bounds_new
 from bounded_authority_verifier.compact import assemble_segments_es256
-from bounded_authority_verifier.ed25519 import _reset_census, sha256
+from bounded_authority_verifier.ed25519 import sha256
 from bounded_authority_verifier.error import Err, _unwrap
 from bounded_authority_verifier.json_alg import (
     JArray,
@@ -1030,7 +1029,6 @@ def test_verify_anchored_export_accepts_valid_one_key_zero_transition_archive():
     """Cross-vendor #3: a valid 1-key / 0-transition archive MUST verify
     (spec/bap-v1.md §15, Authenticated key transitions, permits keys == transitions+1). The SDK previously gated on keys.length < 2 and falsely rejected it. Defect: revert
     to the `< 2` gate → this valid archive returns Err."""
-    _reset_census()
     built = _build_archive([_fresh_key()])
     r = verify_anchored_export(
         ArchivedObject(chunks=(built["archive"],), version="v1"),
@@ -1047,7 +1045,6 @@ def test_verify_anchored_export_rejects_zero_key_chain_fail_closed():
     keys[0] deref. Defect: revert the length-check-before-deref ordering → IndexError propagates."""
     from bounded_authority_verifier.v1 import HistoricalKeyChain
 
-    _reset_census()
     built = _build_archive([_fresh_key()])
     empty_chain = HistoricalKeyChain(keys=())
     r = verify_anchored_export(
@@ -1062,7 +1059,6 @@ def test_verify_anchored_export_rejects_bad_chunk_lists():
     """Cross-vendor #18: verify_anchored_export MUST validate the chunk list BEFORE concatenation
     (spec/bap-v1.md §§16-17, REQ1-EXPORT-input-shape, REQ1-BOUNDS-tighten-only): reject
     empty chunks, chunk count > archive_chunks, and total > archive_bytes. Defect: revert _validate_chunks → these pass."""
-    _reset_census()
     built = _build_archive([_fresh_key()])
     # Empty chunk in the list.
     with_empty = ArchivedObject(chunks=(built["archive"], b""), version="v1")
@@ -1089,7 +1085,6 @@ def test_verify_anchored_export_rejects_non_monotonic_rollover():
     transitions are built with the actual non-monotonic effective_at sequence (each compact
     individually valid), so the chronology check is the load-bearing gate. Defect: revert
     _validate_key_path + the chronology loop → this archive wrongly verifies."""
-    _reset_census()
     a = _fresh_key()
     b = _fresh_key()
     c = _fresh_key()
@@ -1121,7 +1116,6 @@ def test_verify_anchored_export_rejects_fingerprint_cycle():
     """Cross-vendor #2 (cycle): a key-path where a fingerprint repeats (A→B→A) must reject. Built with
     a REAL repeated key (positions 0 and 2 reuse key A) so each transition (A→B, B→A) is individually
     valid, and the cycle check is the load-bearing gate. Defect: revert _validate_key_path → verifies."""
-    _reset_census()
     a = _fresh_key()
     b = _fresh_key()
     cyclic = _build_archive([a, b, a], effective_ats=[1500, 2000], end_anchored_at=3000)
@@ -1256,7 +1250,6 @@ def test_verify_grant_honors_caller_bounds():
     (spec/bap-v1.md §10, REQ1-HEADER-kid-bytes). The
     grant is validly signed, so the only load-bearing gate under the tightening is the kid bound.
     Defect: revert verify_grant's bounds threading → the tightened call returns Ok."""
-    _reset_census()
     g = _signed_grant()
     expected_max = ExpectedGrant(
         issuer="https://issuer.example.test",
@@ -1285,7 +1278,6 @@ def test_check_envelope_honors_caller_bounds():
     """#10/#11: check_envelope MUST thread ExpectedRequest.bounds into the grant header parse. The
     grant + proof are both validly signed; the only load-bearing gate under the tightening is the
     grant kid bound. Defect: revert check_envelope's bounds threading → the tightened call returns Ok."""
-    _reset_census()
     issuer_pub, issuer_priv = _fresh_key()
     holder_pub, holder_priv = _fresh_key()
     holder_fp = _unwrap(public_key_thumbprint_raw(holder_pub))
@@ -1350,7 +1342,6 @@ def test_expected_structs_bounds_absent_defaults_to_max():
     """#11 control: bounds absent on every Expected* MUST default to MAX (the conformance runner
     constructs Expected* without bounds; a missing default would break 283/283). The 13-byte kid grant
     verifies at MAX via every entry point that takes an Expected*."""
-    _reset_census()
     g = _signed_grant()
     eg = ExpectedGrant(
         issuer="https://issuer.example.test",
@@ -1420,7 +1411,6 @@ def test_forged_widening_bounds_rejected_at_entry_points():
     """Cross-vendor F2: a hand-crafted Bounds with a widening override bypasses bounds_new. Resolution
     and every entry point must re-validate the supplied limits. Defect: revert
     coerce_bounds -> a forged widening is honored."""
-    _reset_census()
     g = _signed_grant()
     forged = Bounds({"compact_bytes": 1000000})  # > MAXIMA.compact_bytes (65536)
     assert isinstance(forged.resolve("compact_bytes"), Err), "resolution rejects forged widening"
@@ -1460,7 +1450,6 @@ def test_untrusted_key_locator_accepts_empty_payload_signature_segments():
     """Cross-vendor (key-locator empty segments): the contract (spec/bap-v1.md §18) accepts empty
     payload/signature segments: it decodes ONLY the protected segment. Defect: re-add the empty-
     segment rejection -> RED."""
-    _reset_census()
     g = _signed_grant()
     protected_seg = g["compact"].split(b".")[0]
     empty_ps = protected_seg + b".."
@@ -1475,7 +1464,6 @@ def test_verify_anchored_export_rejects_nested_bounds_mismatch():
     """Cross-vendor (nested bounds pinning): nested bounds must resolve to the outer limits
     (spec/bap-v1.md §§16-17, REQ1-VERIFY-revalidate, REQ1-BOUNDS-tighten-only). A tightened top + nested default-MAX must reject. Defect:
     remove _require_bounds_equal -> a tightened top silently overrides nested."""
-    _reset_census()
     built = _build_archive([_fresh_key()])
     tightened = ExpectedExport(
         chain=built["expected"].chain,
@@ -1495,7 +1483,6 @@ def test_check_chain_rejects_genesis_previous_hash_mismatch():
     """Cross-vendor F4: genesis chain must not return an unchecked chain.previous_hash as a verified
     fact. The SDK now validates chain.previous_hash == expected.previous_hash in BOTH cases. Defect:
     revert the equality check + return chain.previous_hash -> a forged genesis input flows through."""
-    _reset_census()
     zero = bytes(32)
     chain_id = "ba://chain-f4"
     commitment = _unwrap(sha256(b"commitment-f4"))
@@ -1542,7 +1529,6 @@ def test_malformed_trusted_issuer_fails_closed():
     """Cross-vendor (fail-closed shallow): a malformed trusted issuer (missing public_key/key_id) must
     fail closed as Err, not raise AttributeError past the Result contract. Defect: revert the shape
     check -> AttributeError."""
-    _reset_census()
     g = _signed_grant()
     eg = ExpectedGrant(
         issuer="https://issuer.example.test",
@@ -2878,7 +2864,6 @@ def test_closed_result_family_param_sweep():
                     (f"{name}.{param}={sentinel!r}", fn, probe, _sentinel_may_be_ok(kind, sentinel))
                 )
     for label, fn, probe, may_ok in cases:
-        _reset_census()
         r = fn(**probe)
         try:
             is_ok = r.is_ok
@@ -2937,7 +2922,6 @@ def test_closed_result_family_field_sweep():
                     probe[param] = mutated
                     cases.append((f"{name}.{param}.{f.name}={sentinel!r}", fn, probe, may_ok))
     for label, fn, probe, may_ok in cases:
-        _reset_census()
         r = fn(**probe)
         try:
             is_ok = r.is_ok
@@ -3020,7 +3004,6 @@ def test_verify_export_malformed_expected_rejects_before_hashing(monkeypatch):
                 },
             ),
         )
-        _reset_census()
         return verify_anchored_export(
             ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected
         )
@@ -3044,7 +3027,6 @@ def test_verify_export_malformed_expected_rejects_before_hashing(monkeypatch):
 
     # Control: the unmutated expected DOES hash (the digest gate runs) and verifies Ok.
     calls.clear()
-    _reset_census()
     r = verify_anchored_export(
         ArchivedObject(chunks=(built["archive"],), version="v1"),
         built["key_chain"],
@@ -3068,7 +3050,6 @@ def test_verify_export_malformed_expected_transition_verdicts():
         ("current_key_fingerprint width", _replace(t0, current_key_fingerprint=b"\x00" * 31)),
     ]:
         expected = _replace(built["expected"], transitions=[mutated_t])
-        _reset_census()
         r = verify_anchored_export(
             ArchivedObject(chunks=(built["archive"],), version="v1"), built["key_chain"], expected
         )
@@ -3156,7 +3137,6 @@ def test_round12_14_export_predigest_gates_work_pinned(monkeypatch):
     kc, exp = built["key_chain"], built["expected"]
 
     def verify(o, keys=kc, expected=exp):
-        _reset_census()
         return verify_anchored_export(o, keys, expected)
 
     base_obj = ArchivedObject(chunks=(built["archive"],), version="v1")
@@ -3209,7 +3189,6 @@ def test_round12_14_export_predigest_gates_pinned():
     kc, exp = built["key_chain"], built["expected"]
 
     def verify(o=obj("v1"), keys=kc, expected=exp):
-        _reset_census()
         return verify_anchored_export(o, keys, expected)
 
     # Control.
@@ -3522,7 +3501,6 @@ def test_es256_low_s_enforced():
     signature (malleability). The control (low-S) verifies; the high-S re-spelling of the SAME
     signature must reject. Defect: remove the `s > _LOW_S_MAX` gate in v3._es256_verify → the
     high-S assertion goes RED (the backend accepts it)."""
-    _reset_census()
     g = _es256_signed_grant()
     assert v3.verify_grant(g["compact"], g["issuer"], _V3_EXPECTED_GRANT).is_ok, (
         "control: the low-S signed grant must verify"
@@ -3554,7 +3532,6 @@ def test_es256_rs_range_checked_before_backend(monkeypatch):
         return real(r, s)
 
     monkeypatch.setattr(v3, "encode_dss_signature", counting)
-    _reset_census()
     g = _es256_signed_grant()
     # Control: the valid signature crosses the DER boundary exactly once and verifies.
     calls.clear()

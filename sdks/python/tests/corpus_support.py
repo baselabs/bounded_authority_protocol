@@ -8,7 +8,9 @@ import base64
 import hashlib
 import json
 import re
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 from bounded_authority_verifier.error import _unwrap
 from bounded_authority_verifier.jcs import jcs_encode
@@ -224,3 +226,19 @@ def collect_input_keys(value, target, *, major=1):
             ):
                 raw_key(decode(child))
             collect_input_keys(child, target, major=major)
+
+
+@contextmanager
+def observe_imports(facade, *, major):
+    """Record successful calls to the real public-key import boundary."""
+    observed = set()
+    import_key = facade._import_public_key
+
+    def recorded(raw_key):
+        key = import_key(raw_key)
+        text = base64.urlsafe_b64encode(raw_key).rstrip(b"=").decode()
+        collect_input_keys({"public_key": text}, observed, major=major)
+        return key
+
+    with patch.object(facade, "_import_public_key", recorded):
+        yield observed

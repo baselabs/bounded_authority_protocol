@@ -967,7 +967,6 @@ def _trying(fn: Callable[[], _T]) -> Result[_T]:
 # Unsupported annotations are SDK defects and propagate; malformed inputs return Err.
 
 _OPAQUE_ANNOTATIONS = (Bounds, JNull, JBool, JInt, JFloat, JString, JArray, JObject)
-_DATACLASS_HINTS: dict[type, dict[str, object]] = {}
 
 
 class _MissingField:
@@ -978,11 +977,8 @@ _MISSING = _MissingField()
 
 
 def _dataclass_hints(cls: type) -> dict[str, object]:
-    hints = _DATACLASS_HINTS.get(cls)
-    if hints is None:
-        hints = get_type_hints(cls.__init__) if issubclass(cls, _Facts) else get_type_hints(cls)
-        hints.pop("return", None)
-        _DATACLASS_HINTS[cls] = hints
+    hints = get_type_hints(cls.__init__) if issubclass(cls, _Facts) else get_type_hints(cls)
+    hints.pop("return", None)
     return hints
 
 
@@ -1078,17 +1074,14 @@ def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
     facade signatures forward-reference structs defined later in this module (ExpectedExport);
     an unsupported annotation form therefore fails on first call (the family sweep exercises
     every facade, so it fails in CI, just not at import)."""
-    resolved: list[tuple[dict[str, object], inspect.Signature]] = []
+    signature = inspect.signature(fn)
 
     @functools.wraps(fn)
     def wrapper(*args: object, **kwargs: object) -> Result[Any]:
-        if not resolved:
-            hints = get_type_hints(fn)
-            for name, annotation in hints.items():
-                if name != "return":
-                    _walk_annotation(annotation)
-            resolved.append((hints, inspect.signature(fn)))
-        hints, signature = resolved[0]
+        hints = get_type_hints(fn)
+        for name, annotation in hints.items():
+            if name != "return":
+                _walk_annotation(annotation)
         bound = signature.bind(*args, **kwargs)
         try:
             for name, value in bound.arguments.items():
@@ -1313,7 +1306,7 @@ def _verify_grant_body(
     cnf = _require_object_exact(cnf, ["jkt"], "grant cnf")
     jkt = _require_b64url_n(cnf.v.get("jkt"), "jkt", 32)
     fp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(trusted.public_key))))
-    key = _import_public_key(trusted.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(fp)))))
+    key = _import_public_key(trusted.public_key)
     if not _ed25519_verify(seg.signing_input, seg.signature, key):
         _fail("verify_grant: signature")
     from .facts import GrantFacts
@@ -1416,7 +1409,7 @@ def _check_envelope_body(
     if not (gexp > expected.evaluation_time - expected.clock_skew):
         _fail("check_envelope: grant exp")
     gfp = _unwrap(thumbprint_raw(_unwrap(jwk_from_public_key(t.public_key))))
-    gkey = _import_public_key(t.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(gfp)))))
+    gkey = _import_public_key(t.public_key)
     if not _ed25519_verify(gseg.signing_input, gseg.signature, gkey):
         _fail("check_envelope: grant signature")
     # --- verify proof (holder signature) ---
@@ -1424,9 +1417,7 @@ def _check_envelope_body(
     holder_thumbprint, holder_key = _parse_proof_header(pseg, b, profile)
     pp = _unwrap(json_decode(pseg.payload_bytes, b))
     _validate_proof_payload(pp, b, profile)
-    hkey = _import_public_key(
-        holder_key, _unwrap(utf8_str(_unwrap(base64url_encode(holder_thumbprint))))
-    )
+    hkey = _import_public_key(holder_key)
     if not _ed25519_verify(pseg.signing_input, pseg.signature, hkey):
         _fail("check_envelope: proof signature")
     if not isinstance(pp, JObject):
@@ -2549,9 +2540,7 @@ def _verify_historical_anchor_body(
         _fail("verify_historical_anchor: fingerprint")
     if not _in_window(anchored_at, key):
         _fail("verify_historical_anchor: window")
-    pk = _import_public_key(
-        key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_fp))))
-    )
+    pk = _import_public_key(key.public_key)
     if not _ed25519_verify(seg.signing_input, seg.signature, pk):
         _fail("verify_historical_anchor: signature")
     from .facts import AnchorFacts
@@ -2663,9 +2652,7 @@ def _verify_key_transition_body(
         _fail("verify_key_transition: current window")
     if not _in_window(effective_at, new_key):
         _fail("verify_key_transition: next window")
-    pk = _import_public_key(
-        old_key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_from))))
-    )
+    pk = _import_public_key(old_key.public_key)
     if not _ed25519_verify(seg.signing_input, seg.signature, pk):
         _fail("verify_key_transition: signature")
     from .facts import KeyTransitionFacts
@@ -3115,9 +3102,7 @@ def _verify_anchor_compact(
         _fail(f"{ctx}: fingerprint")
     if not _in_window(anchored_at, key):
         _fail(f"{ctx}: window")
-    pk = _import_public_key(
-        key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_fp))))
-    )
+    pk = _import_public_key(key.public_key)
     if not _ed25519_verify(seg.signing_input, seg.signature, pk):
         _fail(f"{ctx}: signature")
 
@@ -3206,9 +3191,7 @@ def _verify_transition_compact(
         _fail(f"{ctx}: current window")
     if not _in_window(effective_at, next_key):
         _fail(f"{ctx}: next window")
-    pk = _import_public_key(
-        current_key.public_key, _unwrap(utf8_str(_unwrap(base64url_encode(derived_from))))
-    )
+    pk = _import_public_key(current_key.public_key)
     if not _ed25519_verify(seg.signing_input, seg.signature, pk):
         _fail(f"{ctx}: signature")
 
