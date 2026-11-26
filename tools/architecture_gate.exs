@@ -3110,9 +3110,6 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.beam" ->
         [
           {Enum, :member?},
-          {MapSet, :member?},
-          {MapSet, :new},
-          {MapSet, :put},
           {String, :valid?}
         ]
 

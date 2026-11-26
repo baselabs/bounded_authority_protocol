@@ -305,7 +305,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
            true <- is_binary(revision) and byte_size(revision) == 32,
            true <- RecordCodec.text?(subject, bounds) and RecordCodec.text?(action, bounds),
            true <- RecordCodec.resources?(resources, bounds, false),
-           true <- valid_roles?(roles, bounds, MapSet.new()),
+           true <- valid_roles?(roles, bounds, []),
            true <- Codec.integer?(now, ca),
            true <- cap?(staleness, ca) and cap?(lifetime, ca) do
         active_cap(Map.fetch(context, :max_active), ca)
@@ -370,7 +370,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
        when map_size(key) == 5 do
     result =
       with false <- Map.has_key?(keys, kid),
-           true <- Codec.identifier?(issuer, ca) and valid_roles?(roles, bounds, MapSet.new()),
+           true <- Codec.identifier?(issuer, ca) and valid_roles?(roles, bounds, []),
            :ok <- Codec.historical_key(key, ca, suite),
            {:ok, fingerprint} <- Codec.admitted_fingerprint(public_key, suite) do
         entry = %{issuer: issuer, key: key, roles: roles, fingerprint: fingerprint}
@@ -386,8 +386,8 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
 
   defp valid_roles?([role | rest], bounds, seen),
     do:
-      RecordCodec.text?(role, bounds) and not MapSet.member?(seen, role) and
-        valid_roles?(rest, bounds, MapSet.put(seen, role))
+      RecordCodec.text?(role, bounds) and role not in seen and
+        valid_roles?(rest, bounds, [role | seen])
 
   defp valid_roles?(_, _, _), do: false
 
