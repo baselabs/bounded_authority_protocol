@@ -187,6 +187,14 @@ def test_only_protocol_errors_are_caught():
         "except BaseException:\n"
         "    return None\n"
     ).body[0])
+    # REQ-CAE1-VERIFY-v3-primitives: backend rejection and exceptions return the closed
+    # signature failure, at this exact boundary only.
+    signature_boundary = ast.dump(ast.parse(
+        "try:\n"
+        "    return _signature_matches(segments, raw_key, suite)\n"
+        "except Exception:\n"
+        "    return False\n"
+    ).body[0])
     source = Path(bap.__file__).parent
     catches = []
     for path in source.glob("*.py"):
@@ -200,6 +208,16 @@ def test_only_protocol_errors_are_caught():
             if callback is None
             else {n for n in ast.walk(callback) if isinstance(n, ast.ExceptHandler)}
         )
+        if path.name in {"action_approval.py", "content_assertion.py"}:
+            for function in tree.body:
+                if (
+                    isinstance(function, ast.FunctionDef)
+                    and function.name == "_signature_boundary"
+                    and len(function.body) == 1
+                    and isinstance(boundary := function.body[0], ast.Try)
+                    and ast.dump(boundary) == signature_boundary
+                ):
+                    callback_handlers.update(boundary.handlers)
         if path.name == "action_approval.py":
             for function in tree.body:
                 if (

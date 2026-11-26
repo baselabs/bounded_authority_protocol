@@ -13,7 +13,7 @@ from .bounds import MAXIMUM_BOUNDS, Bounds, coerce_bounds
 from .content_assertion import _identifier
 from .error import InvalidError, Ok, Result, _fail, _unwrap, err
 from .facts import _Facts
-from .json_alg import _Ctx, _byte_at, _expect_lit
+from .json_alg import _byte_at, _Ctx, _expect_lit
 
 PROFILE = "bap-action-approval/1"
 PROFILE_DIGEST = bytes.fromhex("7e44f73217cd25037839ecc25837de84aad3673626b9b125c94c97e9967fa1eb")

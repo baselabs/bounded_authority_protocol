@@ -20,10 +20,10 @@ from .approval_record import (
     _width,
 )
 from .bounds import MAXIMUM_BOUNDS, Bounds
+from .compact import CompactSegments
 from .content_assertion import (
     _EDDSA,
     _ES256,
-    _Suite,
     _bounds,
     _fingerprint,
     _framing,
@@ -33,6 +33,7 @@ from .content_assertion import (
     _kid,
     _payload,
     _signature_matches,
+    _Suite,
     _suite_matches,
     _verified_facts,
     content_digest,
@@ -332,11 +333,7 @@ def _verify(
     if enrolled is None:
         return Diagnostic.UNKNOWN_KEY
     entry, fingerprint = enrolled
-    try:
-        authenticated = _signature_matches(segments, entry.key.public_key, suite)
-    except InvalidError:
-        authenticated = False
-    if not authenticated:
+    if not _signature_boundary(segments, entry.key.public_key, suite):
         return Diagnostic.BAD_SIGNATURE
     if not _key_window(claims, entry.key):
         return Diagnostic.KEY_WINDOW
@@ -391,6 +388,14 @@ def verify_approval_es256(
 
 
 _PredicateParams = ParamSpec("_PredicateParams")
+
+
+def _signature_boundary(segments: CompactSegments, raw_key: bytes, suite: _Suite) -> bool:
+    # Backend rejection and exceptions return the closed signature failure.
+    try:
+        return _signature_matches(segments, raw_key, suite)
+    except Exception:
+        return False
 
 
 def _call_predicate(

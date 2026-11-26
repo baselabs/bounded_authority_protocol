@@ -502,6 +502,14 @@ def _signature_matches(
     return True
 
 
+def _signature_boundary(segments: CompactSegments, raw_key: bytes, suite: _Suite) -> bool:
+    # Backend rejection and exceptions return the closed signature failure.
+    try:
+        return _signature_matches(segments, raw_key, suite)
+    except Exception:
+        return False
+
+
 def _key_window(claims: ContentAssertionDecoded, attestor: HistoricalPublicKey) -> bool:
     return (
         claims.iat >= attestor.valid_from
@@ -562,7 +570,7 @@ def _verify_assertion(
     if not claims.nbf <= expected.now < claims.exp:
         _fail("content assertion: current window")
     fingerprint = _fingerprint(attestor.public_key, suite)
-    if not _signature_matches(segments, attestor.public_key, suite):
+    if not _signature_boundary(segments, attestor.public_key, suite):
         _fail("content assertion: signature")
     return _verified_facts(claims, compact, fingerprint, suite)
 

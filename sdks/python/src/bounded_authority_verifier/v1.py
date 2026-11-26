@@ -18,7 +18,17 @@ import re
 import types as _types
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, is_dataclass, replace
-from typing import Any, Literal, ParamSpec, TypeVar, Union, cast, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    Literal,
+    ParamSpec,
+    TypeVar,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from ._inputs import _normalize_arg
 from .base64url import base64url_decode, base64url_encode

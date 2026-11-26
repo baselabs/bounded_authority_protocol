@@ -16,7 +16,12 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
-from bounded_authority_verifier import HistoricalPublicKey, content_assertion, content_assertion_es256, v3
+from bounded_authority_verifier import (
+    HistoricalPublicKey,
+    content_assertion,
+    content_assertion_es256,
+    v3,
+)
 from bounded_authority_verifier.action_approval import (
     ApprovalContext,
     Diagnostic,
