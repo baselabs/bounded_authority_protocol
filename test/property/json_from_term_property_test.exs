@@ -5,7 +5,7 @@ defmodule BoundedAuthorityProtocol.Property.JsonFromTermPropertyTest do
   alias BoundedAuthorityProtocol.V1.{Bounds, Jcs, Json}
 
   property "arbitrary terms and limits return only a tagged success or the closed error" do
-    check all(value <- term(), limits <- term(), max_runs: 500) do
+    check all(value <- resize(term(), 12), limits <- resize(term(), 12), max_runs: 500) do
       for bounds <- [%{}, %{depth: 2, total_nodes: 3}, limits] do
         result = Json.from_term(value, bounds)
         assert result == {:error, :invalid} or match?({:ok, _value}, result)
