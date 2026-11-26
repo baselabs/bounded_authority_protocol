@@ -158,6 +158,40 @@ other_section = {:object, [{"section", {:string, "sports"}}, {"title", {:string,
 The final value is `{"publish_article", :not_evaluated}`: the bytes verified, and the
 authorization decision is still yours to make.
 
+## Verifying a grant before issuing it
+
+A host can require approval before issuing a capability grant or carrying out one exact request.
+In this example, a records service requires a records reviewer to approve activating a retention
+index for a specific set of archives. The signing backend signs a content assertion over the
+canonical approval record. The approval requirement and eligible approver roles come from host policy.
+
+The host takes the request ID, revision digest, subject, action, and complete resource set from its
+own request. It selects the action approval profile and EdDSA verifier from configuration, and
+supplies its own clock and trusted-key snapshot from enrolled keys. The approval verifier checks
+those inputs against the signed bytes and returns verified facts for the one bound request.
+
+The [offline Elixir example](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/examples/action-approval.exs)
+runs from a source checkout with `sqlite3` on `PATH`. It exercises the candidate approval profile.
+
+```bash
+mix run docs/examples/action-approval.exs
+```
+
+The host compares the current revision and exact proposed effect with the verified facts under a
+SQLite write transaction. It checks current key revocation, then conditionally claims the artifact
+identity and the request ID plus revision digest. Either collision aborts the transaction. Both
+claims commit with the effect or with a durable delivery intent. The example checks that a different
+effect commits nothing, that a failed write rolls back both claims, and that a competing revision
+writer serializes with the comparison.
+
+For an external effect, a restarted worker reads the committed intent and looks up its identity at
+the destination. If the effect is absent, the worker delivers the same intent using that identity for
+idempotency. If the destination already recorded it, the worker confirms the stored effect before
+recording delivery. The example interrupts a worker on both sides of the destination commit.
+
+Use a [capability grant with a holder proof](#quickstart) when an executor must prove possession of
+the holder key for an invocation.
+
 ## What it leaves to you
 
 The package verifies grants, proofs, and the evidence formats, and computes the exact bytes to

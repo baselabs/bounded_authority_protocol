@@ -154,6 +154,13 @@ jobs:
       - name: Compile with warnings as errors
         run: mix compile --warnings-as-errors
 
+      - name: Install SQLite for the approval example
+        run: |
+          if ! command -v sqlite3 >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y sqlite3
+          fi
+
       - name: Run tests and coverage
         run: mix test --cover
 
@@ -336,6 +343,13 @@ jobs:
 
       - name: Install dependencies
         run: mix deps.get --check-locked
+
+      - name: Install SQLite for the approval example
+        run: |
+          if ! command -v sqlite3 >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y sqlite3
+          fi
 
       - name: Run tests quality stage
         run: mix quality.tests

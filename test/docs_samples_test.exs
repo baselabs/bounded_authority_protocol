@@ -22,6 +22,14 @@ defmodule BoundedAuthorityProtocol.DocsSamplesTest do
     assert claim_errors("README.md", File.read!("README.md")) == []
   end
 
+  test "the README approval example runs against durable host and destination stores" do
+    [_, section] = String.split(File.read!("README.md"), "## Verifying a grant before issuing it\n")
+    [section | _] = String.split(section, "\n## ", parts: 2)
+    assert [{"bash", command}] = BoundedAuthorityProtocol.Documentation.blocks(section)
+    assert ["mix", "run", "docs/examples/action-approval.exs" = example] = String.split(command)
+    assert {:ok, _binding} = Code.eval_file(example)
+  end
+
   test "every getting-started block runs, in order, with the value the prose states" do
     path = "docs/guides/getting-started.md"
 
