@@ -142,7 +142,7 @@ def benchmark(suite: Suite, *, at_cap: bool) -> bool:
     label = "encoded-cap" if at_cap else "500x64"
     sizes = [len(case.wire) for case in cases]
     print(
-        f"{suite.value} {label} record_bytes={min(sizes)}..{max(sizes)} "
+        f"{suite.value} {label} record_bytes_min={min(sizes)} record_bytes_max={max(sizes)} "
         f"verification_p99_ms={full_p99 / 1e6:.3f} "
         f"snapshot_admission_p99_ms={p99(admitted_ns) / 1e6:.3f} "
         f"host_predicates_p99_ms={p99(predicate_ns) / 1e6:.3f}",

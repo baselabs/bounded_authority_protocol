@@ -198,6 +198,9 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
 
                 "${{ steps.go-floor.outputs.golang }}"
 
+              tool == "python" and name == "python-compatibility" ->
+                "${{ fromJSON(steps.toolchain.outputs.python_lanes)[matrix.lane] }}"
+
               true ->
                 "${{ steps.toolchain.outputs.#{output} }}"
             end
@@ -285,6 +288,10 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
 
     assert Enum.map(entries, & &1["primary"]) == [false, false, true]
     assert Enum.map(entries, & &1["timeout"]) == [19, 18, 18]
+
+    python_lanes = :json.decode(outputs["python_lanes"])
+    python_job = read(".github/workflows/sdks.yml")["jobs"]["python-compatibility"]
+    assert python_job["strategy"]["matrix"]["lane"] == Enum.to_list(0..(length(python_lanes) - 1))
 
     [go_floor] = :json.decode(outputs["golang_lanes"])
 

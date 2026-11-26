@@ -180,16 +180,34 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
       assert path == expected, "#{path}: #{language} sample needs an executing consumer"
     end
 
-    for language <- ["python", "go", "rust"] do
+    for language <- ["go", "rust"] do
       assert [{_, ^language, _}] = Enum.filter(native, &(elem(&1, 1) == language))
     end
+
+    python_readme = File.read!("sdks/python/README.md")
+    sample_pattern = ~r/<!-- (sdk-\S+) -->\s*```python\n(.*?)\n```/s
+
+    assert [["sdk-quickstart:python", quickstart], ["sdk-example:action-approval", approval]] =
+             Regex.scan(sample_pattern, python_readme, capture: :all_but_first)
+
+    python_samples = for {_, "python", code} <- native, do: String.trim_trailing(code)
+    assert python_samples == Enum.map([quickstart, approval], &String.trim_trailing/1)
 
     assert length(Enum.filter(native, &(elem(&1, 1) == "toml"))) == 2
     workflow = File.read!(".github/workflows/sdks.yml")
 
-    for sdk <- ["python", "go", "rust"] do
+    for sdk <- ["go", "rust"] do
       assert workflow =~ "scripts/check_sdk_install.py #{sdk}"
     end
+
+    python_steps = YamlElixir.read_from_string!(workflow)["jobs"]["sdks-conformance"]["steps"]
+    candidate_suite = "python -m pytest -c sdks/python/pyproject.toml sdks/python/candidate -q"
+    assert Enum.any?(python_steps, &(&1["run"] == "python scripts/check_sdk_install.py python"))
+    assert Enum.any?(python_steps, &(&1["run"] == candidate_suite))
+
+    candidate = File.read!("sdks/python/candidate/test_approval_example.py")
+    assert candidate =~ ~s{block(readme, "sdk-example:action-approval", "python")}
+    assert candidate =~ "exec(source, inputs)"
 
     runner = File.read!("scripts/check_sdk_install.py")
     assert runner =~ ~s{[("path", None)] if sdk == "rust"}

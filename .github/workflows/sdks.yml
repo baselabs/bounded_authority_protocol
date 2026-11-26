@@ -140,7 +140,7 @@ jobs:
       - name: Refuse uv version drift
         run: scripts/toolchain.sh --installed uv=${{ steps.toolchain.outputs.uv }}
       - name: Install the locked SDK
-        run: uv sync --locked
+        run: uv sync --locked --python "$(command -v python)"
         working-directory: sdks/python
       - name: Verify released and candidate profiles
         run: sdks/python/.venv/bin/python -m pytest -c sdks/python/pyproject.toml sdks/python/tests sdks/python/candidate -q
