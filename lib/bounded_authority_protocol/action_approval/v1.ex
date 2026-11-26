@@ -386,7 +386,7 @@ defmodule BoundedAuthorityProtocol.ActionApproval.V1 do
 
   defp valid_roles?([role | rest], bounds, seen),
     do:
-      RecordCodec.text?(role, bounds) and role not in seen and
+      RecordCodec.text?(role, bounds) and not Enum.member?(seen, role) and
         valid_roles?(rest, bounds, [role | seen])
 
   defp valid_roles?(_, _, _), do: false
