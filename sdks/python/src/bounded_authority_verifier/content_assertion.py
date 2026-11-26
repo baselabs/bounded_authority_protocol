@@ -11,6 +11,8 @@ import re
 from dataclasses import dataclass
 from hmac import compare_digest as _bytes_equal
 
+from cryptography.exceptions import InternalError, UnsupportedAlgorithm
+
 from . import v3
 from ._inputs import _buffer, _buffer_size, _bytes, _normalize_arg, _text
 from .base64url import base64url_decode, base64url_encode
@@ -419,12 +421,9 @@ def _assemble_assertion(
     b = _compact_bounds(bounds)
     if type(signing_input) is not SigningInput:
         _fail("content assertion: signing input")
-    try:
-        kind = _text(signing_input.kind)
-        protected = _buffer(signing_input.protected_segment)
-        payload = _buffer(signing_input.payload_segment)
-    except AttributeError:
-        _fail("content assertion: signing input")
+    kind = _text(getattr(signing_input, "kind", None))
+    protected = _buffer(getattr(signing_input, "protected_segment", None))
+    payload = _buffer(getattr(signing_input, "payload_segment", None))
     if kind != suite.kind:
         _fail("content assertion: signing kind")
     _projected_compact_bounds(_buffer_size(protected), _buffer_size(payload), b)
@@ -491,14 +490,14 @@ def _fingerprint(raw_key: bytes, suite: _Suite) -> bytes:
 def _signature_matches(
     segments: CompactSegments, raw_key: bytes, suite: _Suite
 ) -> bool:
-    if suite is _ES256:
-        try:
+    try:
+        if suite is _ES256:
             key_es256 = v3._import_public_key(raw_key)
             return v3._es256_verify(segments.signing_input, segments.signature, key_es256)
-        except Exception:
+        key = _import_public_key(raw_key)
+        if not _ed25519_verify(segments.signing_input, segments.signature, key):
             return False
-    key = _import_public_key(raw_key)
-    if not _ed25519_verify(segments.signing_input, segments.signature, key):
+    except (InternalError, UnsupportedAlgorithm):
         return False
     return True
 

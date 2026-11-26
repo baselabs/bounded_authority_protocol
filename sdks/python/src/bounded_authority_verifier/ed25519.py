@@ -39,6 +39,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from ._inputs import _bytes
 from .error import InvalidError, Ok, Result, _require, err
 
+__all__ = ["_import_public_key", "acceptable_public_key", "sha256", "torsion_free", "verify_strict"]
+
 # --- rule S1 constants ---------------------------------------------------------------------------
 # The field prime p = 2^255 - 19, the base-point order L, the curve constant d = -121665/121666 mod p,
 # and sqrt(-1) = 2^((p - 1) / 4) mod p (RFC 8032 section 5.1).

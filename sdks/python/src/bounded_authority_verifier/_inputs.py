@@ -9,6 +9,17 @@ from typing import Any, TypeVar, Union, cast, get_args, get_origin, get_type_hin
 
 from .error import _fail, _invalid_error
 
+__all__ = [
+    "_buffer",
+    "_buffer_size",
+    "_bytes",
+    "_decode_utf8",
+    "_mapping_items",
+    "_normalize_arg",
+    "_sequence",
+    "_text",
+]
+
 
 def _buffer(value: object) -> bytes | memoryview[int]:
     if type(value) is bytes:
@@ -169,9 +180,9 @@ def _normalize_arg(value: object, annotation: object, depth: int = 0) -> object:
 def _sequence(value: Sequence[_T]) -> tuple[_T, ...]:
     """Snapshot native containers without calling subclass iteration or length methods."""
     iterator = (
-        list.__iter__(cast(list[_T], value))
+        list[_T].__iter__(cast(list[_T], value))
         if issubclass(type(value), list)
-        else tuple.__iter__(cast(tuple[_T, ...], value))
+        else tuple[_T, ...].__iter__(cast(tuple[_T, ...], value))
     )
     return tuple(iterator)
 
@@ -184,7 +195,7 @@ def _mapping_items(value: object) -> list[tuple[object, object]]:
     remains outside the catch.
     """
     if issubclass(type(value), dict):
-        return list(dict.items(cast(dict[object, object], value)))
+        return list(dict[object, object].items(cast(dict[object, object], value)))
     try:
         if not issubclass(type(value), Mapping):
             _fail()

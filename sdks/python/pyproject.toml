@@ -91,5 +91,8 @@ python_files = ["test_*.py"]
 [tool.pyright]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
+# The verifier re-checks types at runtime for callers that do not type-check.
+reportUnnecessaryIsInstance = "none"
+reportUnnecessaryComparison = "none"
 reportPrivateUsage = "none"
 include = ["src/bounded_authority_verifier"]

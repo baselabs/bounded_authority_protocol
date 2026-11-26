@@ -33,10 +33,10 @@ from .bounds import (  # noqa: F401
     MAXIMA,
     MAXIMUM_BOUNDS,
     Bounds,
-    bounds_new,
     bounds_resolve,
     coerce_bounds,
 )
+from .bounds import bounds_new as bounds_new
 from .compact import (  # noqa: F401
     CompactSegments,
     SigningInput,
@@ -74,12 +74,8 @@ from .json_alg import (
     str_utf8,
     utf8_str,
 )
-from .jwk import (
-    OkpPublic,
-    jwk_encode_public,  # noqa: F401
-    jwk_from_public_key,
-    thumbprint_raw,
-)
+from .jwk import OkpPublic, jwk_from_public_key, thumbprint_raw
+from .jwk import jwk_encode_public as jwk_encode_public
 from .selector import Selector as _V1Selector
 from .selector import _integral_float_free
 from .selector import parse_selector as _parse_v1_selector
@@ -1128,7 +1124,7 @@ class _MissingField:
 _MISSING = _MissingField()
 
 
-def _dataclass_hints(cls: type) -> dict[str, object]:
+def _dataclass_hints(cls: type[object]) -> dict[str, object]:
     hints = get_type_hints(cls.__init__) if issubclass(cls, _Facts) else get_type_hints(cls)
     hints.pop("return", None)
     return hints

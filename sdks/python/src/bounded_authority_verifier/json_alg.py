@@ -31,6 +31,24 @@ from ._inputs import _bytes, _decode_utf8, _sequence, _text
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .error import InvalidError, Ok, Result, _fail, _invalid_error, _unwrap, err
 
+__all__ = [
+    "MAX_FLOAT",
+    "MAX_INT",
+    "JArray",
+    "JBool",
+    "JFloat",
+    "JInt",
+    "JNull",
+    "JObject",
+    "JString",
+    "Tagged",
+    "_normalize_tagged",
+    "is_valid_utf8",
+    "json_decode",
+    "str_utf8",
+    "utf8_str",
+]
+
 MAX_INT = 9007199254740991
 MAX_FLOAT = 9007199254740991
 
@@ -646,13 +664,13 @@ def _normalize_tagged(value: object, bounds: Bounds = MAXIMUM_BOUNDS) -> Tagged:
         if isinstance(node, JObject):
             if not issubclass(type(member), dict):
                 _fail()
-            member = dict.copy(cast(dict[str, Tagged], member))
-            if len(member) > _unwrap(bounds_resolve(b, "object_members")) or level >= _unwrap(
+            members = dict[object, object].copy(cast(dict[object, object], member))
+            if len(members) > _unwrap(bounds_resolve(b, "object_members")) or level >= _unwrap(
                 bounds_resolve(b, "depth")
             ):
                 _fail()
-            out = {}
-            for key, child in member.items():
+            out: dict[str, Tagged] = {}
+            for key, child in members.items():
                 name = _text(key)
                 if len(name.encode("utf-8")) > _unwrap(bounds_resolve(b, "key_bytes")):
                     _fail()

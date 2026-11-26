@@ -25,6 +25,17 @@ from .error import InvalidError, Ok, Result, _fail, _unwrap, err
 from .jcs import jcs_encode
 from .json_alg import JArray, JObject, JString, Tagged, _normalize_tagged, utf8_str
 
+__all__ = [
+    "SelAll",
+    "SelEquals",
+    "SelOneOf",
+    "Selector",
+    "_integral_float_free",
+    "parse_selector",
+    "selector_matches",
+    "semantic_identity",
+]
+
 _SELECTOR_KINDS = {"all", "equals", "one_of"}
 _SELECTOR_MEMBER_SETS = {
     frozenset({"kind"}),

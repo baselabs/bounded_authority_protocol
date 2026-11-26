@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, replace
 from enum import Enum, StrEnum
 from hmac import compare_digest
-from typing import Literal
+from typing import Literal, ParamSpec
 
 from .approval_record import (
     PROFILE,
@@ -148,18 +148,22 @@ class VerifiedApprovalFacts(_Facts):
 
     @property
     def suite(self) -> Suite:
+        """The carrier suite selected for verification."""
         return self._suite
 
     @property
     def trust_domain(self) -> str:
+        """The trust domain supplied by the host."""
         return self._trust_domain
 
     @property
     def record(self) -> ApprovalRecord:
+        """The canonical record bound to the assertion."""
         return self._record
 
     @property
     def assertion(self) -> ContentAssertionFacts:
+        """The verified content assertion facts."""
         return self._assertion
 
     @property
@@ -194,6 +198,13 @@ class Approved:
 
 
 ApprovalResult = Approved | Diagnostic
+
+
+_CONTEXT_FIELDS = tuple(field.name for field in fields(ApprovalContext) if field.name != "snapshot")
+_HELPER_CONTEXT_FIELDS = tuple(name for name in _CONTEXT_FIELDS if name not in {"now", "max_lifetime"})
+_SNAPSHOT_FIELDS = tuple(field.name for field in fields(TrustSnapshot))
+_ENTRY_FIELDS = tuple(field.name for field in fields(TrustEntry))
+_KEY_FIELDS = tuple(field.name for field in fields(HistoricalPublicKey))
 
 
 def _roles(values: tuple[str, ...], maximum: int, *, nonempty: bool = False) -> None:
@@ -237,7 +248,11 @@ def _context(context: ApprovalContext, bounds: Bounds, limits: RecordBounds) -> 
 def _snapshot(
     snapshot: TrustSnapshot | None, suite: Suite, domain: str, b: Bounds, limits: RecordBounds
 ) -> dict[str, tuple[TrustEntry, bytes]]:
-    if type(snapshot) is not TrustSnapshot or snapshot.suite is not suite:
+    if type(snapshot) is not TrustSnapshot or not all(
+        hasattr(snapshot, name) for name in _SNAPSHOT_FIELDS
+    ):
+        _fail()
+    if snapshot.suite is not suite:
         _fail()
     identifier_limit = _unwrap(b.resolve("identifier_bytes"))
     _text(snapshot.trust_domain, identifier_limit)
@@ -247,9 +262,11 @@ def _snapshot(
     _time(snapshot.as_of, b)
     admitted: dict[str, tuple[TrustEntry, bytes]] = {}
     for entry in snapshot.entries:
-        if type(entry) is not TrustEntry or type(entry.key) is not HistoricalPublicKey:
+        if type(entry) is not TrustEntry or not all(hasattr(entry, name) for name in _ENTRY_FIELDS):
             _fail()
         key = entry.key
+        if type(key) is not HistoricalPublicKey or not all(hasattr(key, name) for name in _KEY_FIELDS):
+            _fail()
         _text(key.key_id, _unwrap(b.resolve("kid_bytes")))
         _kid(key.key_id, b)
         _text(entry.issuer, identifier_limit)
@@ -279,18 +296,18 @@ def _verify(
     if type(context) is not ApprovalContext:
         return Diagnostic.INVALID_CONTEXT
     try:
-        if type(context.bounds) is not Bounds:
+        if not all(hasattr(context, name) for name in _CONTEXT_FIELDS) or type(context.bounds) is not Bounds:
             _fail()
         b = _bounds(context.bounds)
         limits = _limits(b, context.record_bounds)
         resources = _context(context, b, limits)
-    except (InvalidError, AttributeError):
+    except InvalidError:
         return Diagnostic.INVALID_CONTEXT
 
-    snapshot = context.snapshot
+    snapshot: TrustSnapshot | None = getattr(context, "snapshot", None)
     try:
         entries = _snapshot(snapshot, selected, context.trust_domain, b, limits)
-    except (InvalidError, AttributeError):
+    except InvalidError:
         return Diagnostic.TRUST_UNAVAILABLE
     assert snapshot is not None
     if not 0 <= context.now - snapshot.as_of <= context.max_staleness:
@@ -317,7 +334,7 @@ def _verify(
     entry, fingerprint = enrolled
     try:
         authenticated = _signature_matches(segments, entry.key.public_key, suite)
-    except Exception:
+    except InvalidError:
         authenticated = False
     if not authenticated:
         return Diagnostic.BAD_SIGNATURE
@@ -373,6 +390,22 @@ def verify_approval_es256(
     return result if isinstance(result, Diagnostic) else result[0]
 
 
+_PredicateParams = ParamSpec("_PredicateParams")
+
+
+def _call_predicate(
+    predicate: Callable[_PredicateParams, bool],
+    /,
+    *args: _PredicateParams.args,
+    **kwargs: _PredicateParams.kwargs,
+) -> bool | None:
+    # Only the caller's predicate may fail or cancel at this boundary.
+    try:
+        return predicate(*args, **kwargs)
+    except BaseException:
+        return None
+
+
 def verify(
     grant: bytes,
     proof: bytes,
@@ -386,28 +419,26 @@ def verify(
     expected: ApprovalContext,
 ) -> ApprovalResult:
     """Evaluate the pure result and the host's read-only predicates."""
-    if type(expected) is not ApprovalContext or type(suite) is not Suite:
+    if (
+        type(expected) is not ApprovalContext
+        or type(suite) is not Suite
+        or not all(hasattr(expected, name) for name in _HELPER_CONTEXT_FIELDS)
+    ):
         return Diagnostic.INVALID_CONTEXT
-    try:
-        context = replace(expected, now=now, max_lifetime=max_validity, snapshot=trusted_keys)
-    except AttributeError:
-        return Diagnostic.INVALID_CONTEXT
+    context = replace(expected, now=now, max_lifetime=max_validity, snapshot=trusted_keys)
     result = _verify(grant, proof, context, suite, _EDDSA if suite is Suite.EDDSA else _ES256)
     if isinstance(result, Diagnostic):
         return result
     facts, entry = result
-    try:
-        revoked = is_revoked(entry, facts.assertion.attestor_key_fingerprint)
-        if revoked is True:
-            return Diagnostic.REVOKED_KEY
-        if revoked is False:
-            replayed = is_replayed(facts.trust_domain, facts.assertion.iss, facts.assertion.jti)
-            if replayed is True:
-                return Diagnostic.REPLAYED
-            if replayed is False:
-                return Approved(facts)
-    except BaseException:
-        pass
+    revoked = _call_predicate(is_revoked, entry, facts.assertion.attestor_key_fingerprint)
+    if revoked is True:
+        return Diagnostic.REVOKED_KEY
+    if revoked is False:
+        replayed = _call_predicate(is_replayed, facts.trust_domain, facts.assertion.iss, facts.assertion.jti)
+        if replayed is True:
+            return Diagnostic.REPLAYED
+        if replayed is False:
+            return Approved(facts)
     return Diagnostic.PREDICATE_FAILED
 
 

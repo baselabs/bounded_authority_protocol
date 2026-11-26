@@ -15,6 +15,15 @@ from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
 from .ed25519 import _signature_gate
 from .error import InvalidError, Ok, Result, _fail, _require, _unwrap, err
 
+__all__ = [
+    "CompactSegments",
+    "SigningInput",
+    "_parse_compact",
+    "_scan_compact",
+    "assemble_segments",
+    "assemble_segments_es256",
+]
+
 _DOT = 0x2E
 
 

@@ -46,10 +46,10 @@ from .bounds import (  # noqa: F401
     MAXIMA,
     MAXIMUM_BOUNDS,
     Bounds,
-    bounds_new,
     bounds_resolve,
     coerce_bounds,
 )
+from .bounds import bounds_new as bounds_new
 from .compact import (  # noqa: F401
     CompactSegments,
     SigningInput,
@@ -1353,7 +1353,7 @@ class _MissingField:
 _MISSING = _MissingField()
 
 
-def _dataclass_hints(cls: type) -> dict[str, object]:
+def _dataclass_hints(cls: type[object]) -> dict[str, object]:
     hints = get_type_hints(cls.__init__) if issubclass(cls, _Facts) else get_type_hints(cls)
     hints.pop("return", None)
     return hints

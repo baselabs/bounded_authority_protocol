@@ -64,26 +64,32 @@ class ApprovalRecord(_Facts):
 
     @property
     def subject(self) -> str:
+        """The subject of the exact operation."""
         return self._subject
 
     @property
     def action(self) -> str:
+        """The action named by the record."""
         return self._action
 
     @property
     def request_id(self) -> str:
+        """The host request identifier bound to the record."""
         return self._request_id
 
     @property
     def approver_role(self) -> str:
+        """The role named by the record."""
         return self._approver_role
 
     @property
     def resources(self) -> tuple[str, ...]:
+        """The resources named by the record."""
         return self._resources
 
     @property
     def revision_digest(self) -> bytes:
+        """The digest of the host request revision."""
         return self._revision_digest
 
     def __repr__(self) -> str:
@@ -112,9 +118,9 @@ def _limits(ca: Bounds, record: RecordBounds) -> RecordBounds:
     if type(record) is not RecordBounds or any(
         type(value) is not int or not 1 <= value <= maximum
         for value, maximum in (
-            (record.string_bytes, 1024),
-            (record.resource_count, 4096),
-            (record.record_bytes, 65536),
+            (getattr(record, "string_bytes", None), 1024),
+            (getattr(record, "resource_count", None), 4096),
+            (getattr(record, "record_bytes", None), 65536),
         )
     ):
         _fail()
@@ -164,6 +170,8 @@ def _encode(
     record: ApprovalRecord, ca: Bounds, limits: RecordBounds, canonicalize: bool = False
 ) -> bytes:
     if type(record) is not ApprovalRecord or type(canonicalize) is not bool:
+        _fail()
+    if not all(hasattr(record, name) for name in ApprovalRecord.__slots__):
         _fail()
     maximum = limits.string_bytes
     action = _text(record.action, maximum)
@@ -266,7 +274,7 @@ def encode_record(
     try:
         ca = _unwrap(coerce_bounds(ca_bounds))
         return Ok(_encode(record, ca, _limits(ca, record_bounds), canonicalize))
-    except (InvalidError, AttributeError):
+    except InvalidError:
         return err()
 
 
@@ -279,5 +287,5 @@ def decode_record(
     try:
         ca = _unwrap(coerce_bounds(ca_bounds))
         return Ok(_decode(wire, ca, _limits(ca, record_bounds)))
-    except (InvalidError, AttributeError):
+    except InvalidError:
         return err()

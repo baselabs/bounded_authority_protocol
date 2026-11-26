@@ -37,7 +37,7 @@ def scalar(value: object) -> Term:
     if isinstance(value, int):
         # Convert bounded decimal chunks without the host's integer-string ceiling.
         number = abs(value)
-        chunks = []
+        chunks: list[int] = []
         while number:
             number, chunk = divmod(number, 1_000_000_000)
             chunks.append(chunk)
@@ -108,8 +108,8 @@ def _sequence(value: object) -> TypeGuard[tuple[object, ...] | list[object]]:
 
 def _sequence_items(value: tuple[object, ...] | list[object]) -> Iterator[object]:
     if issubclass(type(value), tuple):
-        return tuple.__iter__(cast(tuple[object, ...], value))
-    return list.__iter__(cast(list[object], value))
+        return tuple[object, ...].__iter__(cast(tuple[object, ...], value))
+    return list[object].__iter__(cast(list[object], value))
 
 
 def mapped_listing(values: object, convert: Callable[[object], Term]) -> Term:
@@ -228,7 +228,7 @@ def render(term: Term) -> str:
 
     def container(values: Iterable[Term], left: str, right: str, keyword: bool = False) -> str:
         nonlocal remaining
-        parts = []
+        parts: list[str] = []
         for value in values:
             if remaining <= 0:
                 parts.append("...")
@@ -316,14 +316,18 @@ def _tagged(value: object) -> Term:
     if type(value) is JArray and _sequence(value.v):
         return tupled(atom("array"), mapped_listing(value.v, tagged))
     if type(value) is JObject and issubclass(type(value.v), dict):
-        return tupled(atom("object"), listing(_Mapped(dict.items(value.v), _member_pair)))
+        members = dict[object, object].items(cast(dict[object, object], value.v))
+        return tupled(atom("object"), listing(_Mapped(members, _member_pair)))
     return Term("unrenderable")
 
 
 def _member_pair(value: object) -> Term:
-    if type(value) is not tuple or len(value) != 2:
+    if type(value) is not tuple:
         return Term("unrenderable")
-    return tupled(text(value[0]), tagged(value[1]))
+    pair = cast(tuple[object, ...], value)
+    if len(pair) != 2:
+        return Term("unrenderable")
+    return tupled(text(pair[0]), tagged(pair[1]))
 
 
 def selector(value: object) -> Term:
@@ -331,15 +335,16 @@ def selector(value: object) -> Term:
 
     if type(value) is not JObject or not issubclass(type(value.v), dict):
         return Term("unrenderable")
-    if not all(type(key) is str for key in dict.keys(value.v)):
+    members = cast(dict[object, object], value.v)
+    if not all(type(key) is str for key in dict[object, object].keys(members)):
         return Term("unrenderable")
-    kind_value = dict.get(value.v, "kind")
+    kind_value = dict[object, object].get(members, "kind")
     if type(kind_value) is not JString or not issubclass(type(kind_value.v), bytes):
         return Term("unrenderable")
     kind = bytes.decode(kind_value.v, "utf-8", errors="surrogateescape")
     if kind == "all":
         return atom("all")
-    path = dict.get(value.v, "path")
+    path = dict[object, object].get(members, "path")
     if (
         type(path) is not JArray
         or not _sequence(path.v)
@@ -350,14 +355,14 @@ def selector(value: object) -> Term:
         return Term("unrenderable")
     names = mapped_listing(path.v, _path_name)
     if kind == "one_of":
-        members = dict.get(value.v, "values")
-        if type(members) is not JArray or not _sequence(members.v):
+        values = dict[object, object].get(members, "values")
+        if type(values) is not JArray or not _sequence(values.v):
             return Term("unrenderable")
-        operand = mapped_listing(members.v, tagged)
+        operand = mapped_listing(values.v, tagged)
     else:
-        if not dict.__contains__(value.v, "value"):
+        if not dict[object, object].__contains__(members, "value"):
             return Term("unrenderable")
-        operand = tagged(dict.__getitem__(value.v, "value"))
+        operand = tagged(dict[object, object].__getitem__(members, "value"))
     return tupled(atom(kind), names, operand)
 
 
@@ -387,14 +392,13 @@ def operations(values: object, version: int) -> Term:
     from .json_alg import JArray, JObject
 
     def operation(value: object) -> Term:
-        if (
-            type(value) is not JObject
-            or not issubclass(type(value.v), dict)
-            or not all(type(key) is str for key in dict.keys(value.v))
-            or not {"name", "selectors"} <= dict.keys(value.v)
-        ):
+        if type(value) is not JObject or not issubclass(type(value.v), dict):
             return Term("unrenderable")
-        selectors = dict.__getitem__(value.v, "selectors")
+        members = cast(dict[object, object], value.v)
+        keys = dict[object, object].keys(members)
+        if not all(type(key) is str for key in keys) or not {"name", "selectors"} <= keys:
+            return Term("unrenderable")
+        selectors = dict[object, object].__getitem__(members, "selectors")
         selected = (
             mapped_listing(selectors.v, selector)
             if type(selectors) is JArray and _sequence(selectors.v)
@@ -403,7 +407,7 @@ def operations(values: object, version: int) -> Term:
         return structure(
             f"BoundedAuthorityProtocol.V{version}.Operation",
             [
-                ("name", _ordinary(dict.__getitem__(value.v, "name"))),
+                ("name", _ordinary(dict[object, object].__getitem__(members, "name"))),
                 ("selectors", selected),
             ],
         )

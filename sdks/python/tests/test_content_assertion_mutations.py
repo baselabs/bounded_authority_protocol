@@ -270,8 +270,8 @@ MUTATIONS: tuple[tuple[str, str, str, Probe], ...] = (
     ),
     (
         "content-size-ceiling",
-        'if not (1 <= len(content) <= _unwrap(bounds_resolve(b, "content_bytes"))):',
-        "if not (1 <= len(content)):",
+        'raw = _bytes(content, _unwrap(bounds_resolve(b, "content_bytes")))',
+        "raw = _bytes(content)",
         _probe_content_ceiling,
     ),
     (
@@ -288,13 +288,13 @@ MUTATIONS: tuple[tuple[str, str, str, Probe], ...] = (
     ),
     (
         "profile-specific-assembly-kind",
-        'if signing_input.kind != "content_assertion":',
+        "if kind != suite.kind:",
         "if False:",
         _probe_assembly_kind,
     ),
     (
         "producer-decoded-segment-ceiling",
-        "if _project_base64url_decoded_size(len(signing.payload_segment)) > decoded_limit:",
+        "if _project_base64url_decoded_size(payload_size) > decoded_limit:",
         "if False:",
         _probe_decoded_segment,
     ),

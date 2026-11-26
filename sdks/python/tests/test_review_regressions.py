@@ -180,6 +180,13 @@ def test_only_protocol_errors_are_caught():
         "OverflowError",
         "RecursionError",
     }
+    # REQ-AA1-HOST-predicates allows this exact caller boundary to catch cancellation.
+    predicate_boundary = ast.dump(ast.parse(
+        "try:\n"
+        "    return predicate(*args, **kwargs)\n"
+        "except BaseException:\n"
+        "    return None\n"
+    ).body[0])
     source = Path(bap.__file__).parent
     catches = []
     for path in source.glob("*.py"):
@@ -193,6 +200,16 @@ def test_only_protocol_errors_are_caught():
             if callback is None
             else {n for n in ast.walk(callback) if isinstance(n, ast.ExceptHandler)}
         )
+        if path.name == "action_approval.py":
+            for function in tree.body:
+                if (
+                    isinstance(function, ast.FunctionDef)
+                    and function.name == "_call_predicate"
+                    and len(function.body) == 1
+                    and isinstance(boundary := function.body[0], ast.Try)
+                    and ast.dump(boundary) == predicate_boundary
+                ):
+                    callback_handlers.update(boundary.handlers)
         for node in ast.walk(tree):
             if isinstance(node, ast.ExceptHandler) and node.type is not None:
                 names = {part.id for part in ast.walk(node.type) if isinstance(part, ast.Name)}

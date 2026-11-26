@@ -707,8 +707,10 @@ def test_mutation_drops_independent_authenticated_clause(case_id, code, clause, 
     def remove(body):
         guard = body[_diagnostic_guard(body, code)]
         assert isinstance(guard.test, ast.BoolOp)
-        index = next(i for i, node in enumerate(guard.test.values) if ast.unparse(node) == clause)
-        guard.test.values[index] = ast.Constant(value=False)
+        target = ast.dump(ast.parse(clause, mode="eval").body)
+        matches = [index for index, node in enumerate(guard.test.values) if ast.dump(node) == target]
+        assert len(matches) == 1, clause
+        guard.test.values[matches[0]] = ast.Constant(value=False)
 
     monkeypatch.setattr(approval, "_verify", _mutated_verify(remove))
     assert isinstance(pure_result(case), approval.VerifiedApprovalFacts)
