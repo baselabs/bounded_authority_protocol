@@ -111,32 +111,60 @@ defmodule ActionApprovalExample do
 
       compare = frozen_request("activate-compare")
       comparison = verify_request(db, compare, record, "artifact-4", sign, policy)
+      next_revision = :crypto.hash(:sha256, "records revision 8")
+
       with_db(host, fn writer ->
         [] = query!(writer, "BEGIN IMMEDIATE;")
-        next_revision = :crypto.hash(:sha256, "records revision 8")
-        [] = query!(writer, """
-        UPDATE requests SET revision = #{blob(next_revision)} WHERE id = #{blob(compare.request_id)};
-        """)
-
+        [] = query!(writer, revision_update(compare, next_revision))
         {:error, :busy} = claim(db, comparison, effect, :external)
         [] = query!(writer, "COMMIT;")
       end)
+
       {:error, :revision_changed} = claim(db, comparison, effect, :external)
       ["2|2|2|0"] = totals(db)
 
+      claim_first = frozen_request("activate-claim-first")
+      first_facts = verify_request(db, claim_first, record, "artifact-5", sign, policy)
+      update = revision_update(claim_first, next_revision)
+
+      with_db(host, fn writer ->
+        # Pause at the completed comparison and try the update on a second connection.
+        {:ok, first_id} = claim(db, first_facts, effect, :local, fn ->
+          {:error, :busy} = query(writer, update)
+          :ok
+        end)
+
+        revision = Base.encode16(claim_first.revision_digest)
+        read_revision = revision_query(claim_first.request_id)
+        [^revision] = query!(writer, read_revision)
+
+        [^expected_effect] =
+          query!(writer, "SELECT hex(effect) FROM effects WHERE id = #{blob(first_id)};")
+
+        [] = query!(writer, update)
+        next_hex = Base.encode16(next_revision)
+        [^next_hex] = query!(writer, read_revision)
+        {:error, :revision_changed} = claim(db, first_facts, effect, :local)
+      end)
+
       for {mode, request_id, artifact_id, prior_count} <- [
-            {"before-commit", "external-1", "artifact-5", 0},
-            {"after-commit", "external-2", "artifact-6", 1}
+            {"before-commit", "external-1", "artifact-6", 0},
+            {"after-commit", "external-2", "artifact-7", 1}
           ] do
         external = frozen_request(request_id)
+        external = if mode == "before-commit", do: large_request(external), else: external
+        external_effect = effect(external)
+        external_bytes = effect_bytes(external_effect)
+        expected_external_effect = Base.encode16(external_bytes)
+        if mode == "before-commit", do: true = byte_size(expected_external_effect) > 65_536
         checked = verify_request(db, external, record, artifact_id, sign, policy)
-        {:ok, intent_id} = claim(db, checked, effect, :external)
+        {:ok, intent_id} = claim(db, checked, external_effect, :external)
         identity = blob(intent_id)
 
         # Each run starts a new BEAM and loads the intent from the host database.
         75 = worker(host, destination, mode)
         ["0"] = query!(db, "SELECT delivered FROM intents WHERE id = #{identity};")
-        before_retry = if mode == "before-commit", do: [], else: [expected_effect]
+        before_retry = if mode == "before-commit", do: [], else: [expected_external_effect]
         ^before_retry = destination_effect(destination, identity)
 
         if mode == "after-commit" do
@@ -149,15 +177,22 @@ defmodule ActionApprovalExample do
         end
 
         0 = worker(host, destination, "recover")
-        [^expected_effect] = destination_effect(destination, identity)
+        [^expected_external_effect] = destination_effect(destination, identity)
         ["1"] = query!(db, "SELECT delivered FROM intents WHERE id = #{identity};")
         count = Integer.to_string(prior_count + 1)
         with_db(destination, fn dest -> [^count] = query!(dest, "SELECT count(*) FROM applied;") end)
       end
 
-      ["4|4|2|2"] = totals(db)
+      ["5|5|3|2"] = totals(db)
       :ok
     end)
+  end
+
+  defp large_request(request) do
+    # A 40 KiB effect produces a hexadecimal SQL row longer than a port line fragment.
+    suffix = String.duplicate("x", 940)
+    resources = Enum.map(10..53, &"archive/#{&1}/#{suffix}")
+    %{request | resources: resources}
   end
 
   defp frozen_request(id) do
@@ -236,7 +271,7 @@ defmodule ActionApprovalExample do
 
   defp verify_request(db, request, record, artifact_id, sign, policy) do
     store_request(db, request)
-    artifact = signed_record(%{record | request_id: request.request_id}, artifact_id, sign)
+    artifact = signed_record(struct!(record, request), artifact_id, sign)
     {:ok, facts} = verify(artifact, Map.merge(request, policy))
     facts
   end
@@ -265,7 +300,23 @@ defmodule ActionApprovalExample do
     """)
   end
 
-  defp claim(db, facts, proposed_effect, mode) do
+  defp revision_query(request_id) do
+    "SELECT hex(revision) FROM requests WHERE id = #{blob(request_id)};"
+  end
+
+  defp revision_update(request, revision) do
+    "UPDATE requests SET revision = #{blob(revision)} WHERE id = #{blob(request.request_id)};"
+  end
+
+  defp compare_revision(db, record, after_comparison) do
+    expected = [Base.encode16(record.revision_digest)]
+
+    with :ok <- require_rows(db, revision_query(record.request_id), expected, :revision_changed) do
+      after_comparison.()
+    end
+  end
+
+  defp claim(db, facts, proposed_effect, mode, after_comparison \\ fn -> :ok end) do
     # BEGIN IMMEDIATE serializes this comparison and both claims with revision writers.
     transaction(db, fn ->
       record = facts.record
@@ -278,8 +329,7 @@ defmodule ActionApprovalExample do
       expected_effect = Base.encode16(approved_bytes)
       id = IO.iodata_to_binary(:json.encode([record.request_id, expected_revision]))
 
-      with :ok <- require_rows(db, "SELECT hex(revision) FROM requests WHERE id = #{requested};",
-             [expected_revision], :revision_changed),
+      with :ok <- compare_revision(db, record, after_comparison),
            true <- proposed_effect == approved_effect,
            :ok <- require_rows(db, "SELECT hex(effect) FROM requests WHERE id = #{requested};",
              [expected_effect], :effect_mismatch),
@@ -351,7 +401,7 @@ defmodule ActionApprovalExample do
   end
 
   defp worker(host, destination, mode) do
-    code_path = :code.which(Approval) |> to_string() |> Path.dirname()
+    code_path = Application.app_dir(:bounded_authority_protocol, "ebin")
     args = ["-pa", code_path, __ENV__.file, "--worker", host, destination, mode]
     {_output, status} = System.cmd("elixir", args, stderr_to_stdout: true)
     status
@@ -371,16 +421,21 @@ defmodule ActionApprovalExample do
           lookup = "SELECT hex(effect) FROM applied WHERE id = #{identity};"
 
           case query!(dest, lookup) do
-            [] when mode == "before-commit" ->
-              :interrupted
-
             [] ->
+              [] = query!(dest, "BEGIN IMMEDIATE;")
               [] = query!(dest, """
               INSERT INTO applied VALUES (#{identity}, #{value}) ON CONFLICT DO NOTHING;
               """)
 
               [^bytes] = query!(dest, lookup)
-              :confirmed
+
+              if mode == "before-commit" do
+                # Closing the connection interrupts the attempted write before it commits.
+                :interrupted
+              else
+                [] = query!(dest, "COMMIT;")
+                :confirmed
+              end
 
             [^bytes] ->
               :confirmed
@@ -427,20 +482,24 @@ defmodule ActionApprovalExample do
 
   defp query(db, sql) do
     true = Port.command(db, [sql, "\n.print bap-sql-end\n"])
-    collect(db, [], nil)
+    collect(db, [], [], nil)
   end
 
-  defp collect(db, rows, error) do
+  defp collect(db, rows, fragments, error) do
     receive do
-      {^db, {:data, {:eol, "bap-sql-end"}}} ->
+      {^db, {:data, {:eol, "bap-sql-end"}}} when fragments == [] ->
         if error, do: {:error, error}, else: {:ok, Enum.reverse(rows)}
-      {^db, {:data, {:eol, line}}} ->
+      {^db, {:data, {:noeol, fragment}}} ->
+        collect(db, rows, [fragment | fragments], error)
+      {^db, {:data, {:eol, last}}} ->
+        line = fragments |> Enum.reverse([last]) |> IO.iodata_to_binary()
         case line do
           "Runtime error" <> _ ->
             code = if String.contains?(line, "database is locked"), do: :busy, else: :database
-            collect(db, rows, code)
-          "Parse error" <> _ -> collect(db, rows, :database)
-          _ -> collect(db, [line | rows], error)
+            collect(db, rows, [], code)
+          "Parse error" <> _ -> collect(db, rows, [], :database)
+          "Error" <> _ -> collect(db, rows, [], :database)
+          _ -> collect(db, [line | rows], [], error)
         end
       {^db, {:exit_status, _}} -> {:error, :database}
     after

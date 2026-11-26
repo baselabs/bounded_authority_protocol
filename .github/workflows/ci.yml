@@ -92,6 +92,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       beam_matrix: ${{ steps.compatibility.outputs.matrix }}
+      sqlite3: ${{ steps.toolchain.outputs.sqlite3 }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -155,11 +156,9 @@ jobs:
         run: mix compile --warnings-as-errors
 
       - name: Install SQLite for the approval example
-        run: |
-          if ! command -v sqlite3 >/dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y sqlite3
-          fi
+        env:
+          SQLITE_VERSION: ${{ needs.toolchain.outputs.sqlite3 }}
+        run: scripts/install_sqlite.sh "$SQLITE_VERSION" "$RUNNER_TEMP/bap-sqlite"
 
       - name: Run tests and coverage
         run: mix test --cover
@@ -345,11 +344,9 @@ jobs:
         run: mix deps.get --check-locked
 
       - name: Install SQLite for the approval example
-        run: |
-          if ! command -v sqlite3 >/dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y sqlite3
-          fi
+        env:
+          SQLITE_VERSION: ${{ steps.toolchain.outputs.sqlite3 }}
+        run: scripts/install_sqlite.sh "$SQLITE_VERSION" "$RUNNER_TEMP/bap-sqlite"
 
       - name: Run tests quality stage
         run: mix quality.tests

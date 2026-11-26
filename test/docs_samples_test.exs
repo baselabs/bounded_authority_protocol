@@ -23,7 +23,8 @@ defmodule BoundedAuthorityProtocol.DocsSamplesTest do
   end
 
   test "the README approval example runs against durable host and destination stores" do
-    [_, section] = String.split(File.read!("README.md"), "## Verifying a grant before issuing it\n")
+    readme = File.read!("README.md")
+    [_, section] = String.split(readme, "## Verifying a grant before issuing it\n")
     [section | _] = String.split(section, "\n## ", parts: 2)
     assert [{"bash", command}] = BoundedAuthorityProtocol.Documentation.blocks(section)
     assert ["mix", "run", "docs/examples/action-approval.exs" = example] = String.split(command)

@@ -189,8 +189,12 @@ the destination. If the effect is absent, the worker delivers the same intent us
 idempotency. If the destination already recorded it, the worker confirms the stored effect before
 recording delivery. The example interrupts a worker on both sides of the destination commit.
 
-Use a [capability grant with a holder proof](#quickstart) when an executor must prove possession of
-the holder key for an invocation.
+When an executor must prove possession of the holder key, issue a capability grant with an exact
+record-digest selector and require a holder proof for the invocation. Apply the content assertion's
+`content_digest/2` to the exact approved record bytes and encode the digest as unpadded base64url.
+For a string argument named `record_digest`, use `{:equals, ["record_digest"], {:string, digest}}`
+in the grant. Derive that argument from the record bytes at the verifier and check it with the
+grant and holder proof.
 
 ## What it leaves to you
 
