@@ -78,7 +78,7 @@ jobs:
         run: mypy src/
         working-directory: sdks/python
 
-      - name: "Python: typecheck candidate profiles (Pyright strict)"
+      - name: "Python: typecheck verifier package (Pyright strict)"
         run: uvx --from pyright==1.1.408 pyright --pythonpath .venv/bin/python
         working-directory: sdks/python
 
@@ -144,6 +144,8 @@ jobs:
         working-directory: sdks/python
       - name: Verify released and candidate profiles
         run: sdks/python/.venv/bin/python -m pytest -c sdks/python/pyproject.toml sdks/python/tests sdks/python/candidate -q
+      - name: Enforce approval verification p99
+        run: sdks/python/.venv/bin/python sdks/python/candidate/benchmark_approval.py
 
   # TypeScript runs in its graduated repository. The independent Node runner uses the
   # shared toolchain reader outputs in ci.yml's quality-corpus, quality-tests,

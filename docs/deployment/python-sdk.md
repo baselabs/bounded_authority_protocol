@@ -24,7 +24,7 @@ signature. No verification verdict changes. See the SDK README.
 
 ## Runtime posture
 
-- Python 3.10 or later is declared; CI tests Python 3.13.
+- Python 3.11 is the minimum. CI runs Python 3.11, 3.12, and 3.13.
 - One runtime dependency, `cryptography` `>= 50.0.0` (Ed25519 and ECDSA P-256). Nothing in the
   runtime declaration forces that exact version on consumers. CI installs the committed
   `uv.lock` (`cryptography` 50.0.2), then audits the 50.0.0 floor separately. Pin the version

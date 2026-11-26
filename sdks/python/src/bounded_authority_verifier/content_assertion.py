@@ -12,11 +12,18 @@ from dataclasses import dataclass
 from hmac import compare_digest as _bytes_equal
 
 from . import v3
+from ._inputs import _buffer, _buffer_size, _bytes, _normalize_arg, _text
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve, coerce_bounds
-from .compact import CompactSegments, SigningInput, _parse_compact, assemble_segments
+from .compact import (
+    CompactSegments,
+    SigningInput,
+    _parse_compact,
+    assemble_segments,
+    assemble_segments_es256,
+)
 from .ed25519 import _ed25519_verify, _import_public_key, sha256
-from .error import Ok, Result, _fail, _unwrap
+from .error import Result, _fail, _unwrap
 from .facts import (
     ContentAssertionDecoded,
     ContentAssertionFacts,
@@ -304,37 +311,43 @@ def _parse(
     return segments, _payload(segments, header.kid, bounds, suite)
 
 
-def _projected_compact_bounds(signing: SigningInput, bounds: Bounds) -> None:
-    if len(signing.protected_segment) > _unwrap(bounds_resolve(bounds, "encoded_segment_bytes")):
+def _projected_compact_bounds(protected_size: int, payload_size: int, bounds: Bounds) -> None:
+    if protected_size > _unwrap(bounds_resolve(bounds, "encoded_segment_bytes")):
         _fail("content assertion: protected segment")
-    if len(signing.payload_segment) > _unwrap(bounds_resolve(bounds, "encoded_segment_bytes")):
+    if payload_size > _unwrap(bounds_resolve(bounds, "encoded_segment_bytes")):
         _fail("content assertion: payload segment")
     decoded_limit = _unwrap(bounds_resolve(bounds, "decoded_segment_bytes"))
-    if _project_base64url_decoded_size(len(signing.protected_segment)) > decoded_limit:
+    if _project_base64url_decoded_size(protected_size) > decoded_limit:
         _fail("content assertion: decoded protected segment")
-    if _project_base64url_decoded_size(len(signing.payload_segment)) > decoded_limit:
+    if _project_base64url_decoded_size(payload_size) > decoded_limit:
         _fail("content assertion: decoded payload segment")
-    projected = (
-        len(signing.protected_segment)
-        + 1
-        + len(signing.payload_segment)
-        + 1
-        + _SIGNATURE_SEGMENT_BYTES
-    )
+    projected = protected_size + payload_size + 2 + _SIGNATURE_SEGMENT_BYTES
     if projected > _unwrap(bounds_resolve(bounds, "compact_bytes")):
         _fail("content assertion: projected compact")
     if projected > _unwrap(bounds_resolve(bounds, "anchor_bytes")):
         _fail("content assertion: projected anchor")
 
 
-@_closed_shape
+def _compact_bytes(compact: bytes, bounds: Bounds) -> bytes:
+    decoded = _unwrap(bounds_resolve(bounds, "decoded_segment_bytes"))
+    segment_limit = min(
+        _unwrap(bounds_resolve(bounds, "encoded_segment_bytes")), (4 * decoded + 2) // 3
+    )
+    return _bytes(compact, min(
+        _unwrap(bounds_resolve(bounds, "compact_bytes")),
+        _unwrap(bounds_resolve(bounds, "anchor_bytes")),
+        2 * segment_limit + 2 + _SIGNATURE_SEGMENT_BYTES,
+    ))
+
+
 def content_digest(content: bytes, bounds: Bounds | None = None) -> Result[bytes]:
     """Hash nonempty bounded content using the content-assertion domain separator."""
     def body() -> bytes:
         b = _bounds(bounds)
-        if not (1 <= len(content) <= _unwrap(bounds_resolve(b, "content_bytes"))):
+        raw = _bytes(content, _unwrap(bounds_resolve(b, "content_bytes")))
+        if not raw:
             _fail("content assertion: content_bytes")
-        return _unwrap(sha256(CONTENT_PREFIX, content))
+        return _unwrap(sha256(CONTENT_PREFIX, raw))
 
     return _trying(body)
 
@@ -387,40 +400,62 @@ def _signing_input(
         "sub": JString(_unwrap(str_utf8(identifiers["sub"]))),
         "v": JInt(VERSION),
     }
+    protected_bytes = _unwrap(jcs_encode(JObject(header), b))
+    payload_bytes = _unwrap(jcs_encode(JObject(payload), b))
+    _unwrap(json_decode(protected_bytes, b))
+    _unwrap(json_decode(payload_bytes, b))
     signing = SigningInput(
         kind=suite.kind,
-        protected_segment=_unwrap(base64url_encode(_unwrap(jcs_encode(JObject(header), b)))),
-        payload_segment=_unwrap(base64url_encode(_unwrap(jcs_encode(JObject(payload), b)))),
+        protected_segment=_unwrap(base64url_encode(protected_bytes)),
+        payload_segment=_unwrap(base64url_encode(payload_bytes)),
     )
-    _projected_compact_bounds(signing, b)
+    _projected_compact_bounds(len(signing.protected_segment), len(signing.payload_segment), b)
     return signing
 
 
-@_closed_shape
+def _assemble_assertion(
+    signing_input: SigningInput, signature: bytes, bounds: Bounds | None, suite: _Suite
+) -> bytes:
+    b = _compact_bounds(bounds)
+    if type(signing_input) is not SigningInput:
+        _fail("content assertion: signing input")
+    try:
+        kind = _text(signing_input.kind)
+        protected = _buffer(signing_input.protected_segment)
+        payload = _buffer(signing_input.payload_segment)
+    except AttributeError:
+        _fail("content assertion: signing input")
+    if kind != suite.kind:
+        _fail("content assertion: signing kind")
+    _projected_compact_bounds(_buffer_size(protected), _buffer_size(payload), b)
+    signature = _bytes(signature, _SIGNATURE_BYTES)
+    signing = SigningInput(kind, _bytes(protected), _bytes(payload))
+    if suite is _ES256:
+        v3._es256_scalars(signature)
+        compact = _unwrap(assemble_segments_es256(signing, signature))
+    else:
+        compact = _unwrap(assemble_segments(signing, signature))
+    _parse(compact, b, suite)
+    return compact
+
+
 def assemble_content_assertion_compact(
     signing_input: SigningInput, signature: bytes, bounds: Bounds | None = None
 ) -> Result[bytes]:
     """Assemble a content assertion with a canonical signature, without verifying it."""
-    def body() -> bytes:
-        b = _compact_bounds(bounds)
-        if signing_input.kind != "content_assertion":
-            _fail("content assertion: signing kind")
-        _projected_compact_bounds(signing_input, b)
-        assembled = assemble_segments(signing_input, signature)
-        if not isinstance(assembled, Ok):
-            _fail("content assertion: assembly")
-        _parse(assembled.value, b)
-        return assembled.value
-
-    return _trying(body)
+    return _trying(lambda: _assemble_assertion(signing_input, signature, bounds, _EDDSA))
 
 
-@_closed_shape
+def _decode_assertion(compact: bytes, bounds: Bounds | None, suite: _Suite) -> ContentAssertionDecoded:
+    b = _compact_bounds(bounds)
+    return _parse(_compact_bytes(compact, b), b, suite)[1]
+
+
 def decode_assertion(
     compact: bytes, bounds: Bounds | None = None
 ) -> Result[ContentAssertionDecoded]:
     """Decode canonical content-assertion claims without verifying their signature."""
-    return _trying(lambda: _parse(compact, _compact_bounds(bounds))[1])
+    return _trying(lambda: _decode_assertion(compact, bounds, _EDDSA))
 
 
 def _expected(expected: ExpectedContentAssertion, bounds: Bounds, suite: _Suite) -> None:
@@ -440,7 +475,6 @@ def _expected(expected: ExpectedContentAssertion, bounds: Bounds, suite: _Suite)
     _integer(expected.now, bounds)
 
 
-@_closed_shape
 def verify_assertion(
     compact: bytes, expected: ExpectedContentAssertion
 ) -> Result[ContentAssertionFacts]:
@@ -504,8 +538,10 @@ def _verified_facts(
 def _verify_assertion(
     compact: bytes, expected: ExpectedContentAssertion, suite: _Suite
 ) -> ContentAssertionFacts:
+    expected = _normalize_arg(expected, ExpectedContentAssertion)
     b = _compact_bounds(expected.bounds)
     _expected(expected, b, suite)
+    compact = _compact_bytes(compact, b)
     segments, claims = _parse(compact, b, suite)
     attestor = expected.attestor
     if claims.attestor_key_id != attestor.key_id:
@@ -532,15 +568,16 @@ def _verify_assertion(
     return _verified_facts(claims, compact, fingerprint, suite)
 
 
-@_closed_shape
+def _assertion_digest(compact: bytes, bounds: Bounds | None, suite: _Suite) -> bytes:
+    b = _compact_bounds(bounds)
+    raw = _compact_bytes(compact, b)
+    _parse(raw, b, suite)
+    return _unwrap(sha256(raw))
+
+
 def assertion_digest(compact: bytes, bounds: Bounds | None = None) -> Result[bytes]:
     """Validate canonical assertion bytes and hash their exact compact representation."""
-    def body() -> bytes:
-        b = _compact_bounds(bounds)
-        _parse(compact, b)
-        return _unwrap(sha256(compact))
-
-    return _trying(body)
+    return _trying(lambda: _assertion_digest(compact, bounds, _EDDSA))
 
 
 def _facts(value: ContentAssertionFacts, bounds: Bounds) -> None:

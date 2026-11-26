@@ -5,18 +5,21 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from hmac import compare_digest
+from json import JSONDecodeError, loads
 from json.encoder import encode_basestring
 
 from .base64url import base64url_decode, base64url_encode
 from .bounds import MAXIMUM_BOUNDS, Bounds, coerce_bounds
 from .content_assertion import _identifier
 from .error import InvalidError, Ok, Result, _fail, _unwrap, err
-from .json_alg import _Ctx, _byte_at, _expect_lit, _scan_string
+from .facts import _Facts
+from .json_alg import _Ctx, _byte_at, _expect_lit
 
 PROFILE = "bap-action-approval/1"
 PROFILE_DIGEST = bytes.fromhex("7e44f73217cd25037839ecc25837de84aad3673626b9b125c94c97e9967fa1eb")
 
 _STRING_SPECIAL = re.compile(rb'["\\\x00-\x1f]')
+_ESCAPED_TAIL = re.compile(rb'(?:[^"\\\x00-\x1f]++|\\(?:["\\/bfnrt]|u[0-9A-Fa-f]{4}))*+"')
 _SHORT_ESCAPES = frozenset(b'"\\\b\t\n\f\r')
 _RECORD_SCAFFOLD = b'{"action":,"approver_role":,"request_id":,"resources":[],"revision_digest":,"subject":,"v":1}'
 
@@ -30,21 +33,79 @@ class RecordBounds:
     record_bytes: int = 65536
 
 
-@dataclass(frozen=True, slots=True, repr=False)
-class ApprovalRecord:
+class ApprovalRecord(_Facts):
     """Canonicalizable data for one exact operation on a resource set."""
 
-    subject: str
-    action: str
-    request_id: str
-    approver_role: str
-    resources: tuple[str, ...]
-    revision_digest: bytes
+    __slots__ = ("_subject", "_action", "_request_id", "_approver_role", "_resources", "_revision_digest")
+    _subject: str
+    _action: str
+    _request_id: str
+    _approver_role: str
+    _resources: tuple[str, ...]
+    _revision_digest: bytes
+
+    def __init__(
+        self,
+        subject: str,
+        action: str,
+        request_id: str,
+        approver_role: str,
+        resources: tuple[str, ...],
+        revision_digest: bytes,
+    ) -> None:
+        if hasattr(self, "_subject"):
+            raise TypeError("Facts cannot be initialized twice")
+        object.__setattr__(self, "_subject", subject)
+        object.__setattr__(self, "_action", action)
+        object.__setattr__(self, "_request_id", request_id)
+        object.__setattr__(self, "_approver_role", approver_role)
+        object.__setattr__(self, "_resources", resources)
+        object.__setattr__(self, "_revision_digest", revision_digest)
+
+    @property
+    def subject(self) -> str:
+        return self._subject
+
+    @property
+    def action(self) -> str:
+        return self._action
+
+    @property
+    def request_id(self) -> str:
+        return self._request_id
+
+    @property
+    def approver_role(self) -> str:
+        return self._approver_role
+
+    @property
+    def resources(self) -> tuple[str, ...]:
+        return self._resources
+
+    @property
+    def revision_digest(self) -> bytes:
+        return self._revision_digest
 
     def __repr__(self) -> str:
         return "#BoundedAuthorityProtocol.ActionApproval.V1.Record<redacted>"
 
     __str__ = __repr__
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, ApprovalRecord) and type(self) is type(other) and (
+            self.subject == other.subject
+            and self.action == other.action
+            and self.request_id == other.request_id
+            and self.approver_role == other.approver_role
+            and self.resources == other.resources
+            and self.revision_digest == other.revision_digest
+        )
+
+    def __hash__(self) -> int:
+        return hash((
+            self.subject, self.action, self.request_id, self.approver_role,
+            self.resources, self.revision_digest,
+        ))
 
 
 def _limits(ca: Bounds, record: RecordBounds) -> RecordBounds:
@@ -143,12 +204,24 @@ def _string(ctx: _Ctx, maximum: int) -> str:
     if ctx.src[stop] == 34:
         raw = ctx.src[start:stop]
         ctx.pos = stop + 1
-    else:
-        raw = _scan_string(ctx, start - 1, maximum)
-    try:
-        return raw.decode("utf-8")
-    except UnicodeDecodeError:
+        try:
+            return raw.decode("utf-8")
+        except UnicodeDecodeError:
+            _fail()
+    # Each decoded UTF-8 byte needs at most six wire bytes. Find the closing
+    # quote inside this bound before handing the string to the JSON decoder.
+    escaped = _ESCAPED_TAIL.match(ctx.src, stop, start + 6 * maximum + 1)
+    if escaped is None:
         _fail()
+    ctx.pos = escaped.end()
+    try:
+        decoded: object = loads(ctx.src[start - 1:ctx.pos].decode("utf-8"))
+    except (JSONDecodeError, UnicodeDecodeError):
+        _fail()
+    if not isinstance(decoded, str):
+        _fail()
+    _text(decoded, maximum)
+    return decoded
 
 
 def _decode(wire: bytes, ca: Bounds, limits: RecordBounds) -> ApprovalRecord:

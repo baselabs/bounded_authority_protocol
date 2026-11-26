@@ -6,6 +6,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- Add source-candidate Python verification for `bap-content-assertion-es256/1` and
+  `bap-action-approval/1`, including the canonical approval record codec.
+
 - Implement the candidate ES256 content assertion sibling with a distinct protected
   type, strict low-S verification and assembly, the shared exact-content digest and suite-specific successor verification.
 - Implement the candidate action-approval record codec and pure verification
@@ -22,6 +25,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
   structural and numeric bounds. Raw-text byte and number-lexeme limits do not apply.
 
 ### Changed
+
+- Raise the Python SDK minimum to 3.11. Qualify Python 3.11, 3.12, and 3.13 in CI.
 
 - Keep CI and release artifacts for 7 days, the period anything reads them after their run.
 - Refuse installed-version drift for every supported CI tool, including Python, uv, Rust,

@@ -71,6 +71,8 @@ output, and keeps this copy identical to the file. To run it yourself, install t
 (above) into a virtual environment and run `python examples/quickstart.py` from `sdks/python`
 in a checkout, or save the block as `quickstart.py` anywhere and run `python quickstart.py`.
 
+<!-- sdk-quickstart:python -->
+
 ```python
 """Issue a grant, sign a holder proof for one request, verify both, then show that the same
 proof fails for other arguments. The keys come from fixed seeds so the output is stable; in
@@ -261,7 +263,8 @@ when a copy is needed.
 the contract-major. `GrantDecoded` includes `version` and ordered `operations`; `ProofDecoded`
 now carries all decoded claims and the holder public key, but hides the optional nonce in
 `repr` and `str`. `ProofDecoded` and `ContentAssertionDecoded` are slotted values with read-only
-properties and refuse the same bulk exports and reduction as facts. Grant and role-attestation
+properties and refuse the same bulk exports and reduction as facts. The candidate
+`ApprovalRecord` and `VerifiedApprovalFacts` use the same read-only representation. Grant and role-attestation
 diagnostics have no redacted fields and remain dataclasses.
 
 ## Strict Ed25519
@@ -335,6 +338,8 @@ audience, approver roles, suite, time and validity caps, and an independently en
 snapshot for the configured trust domain. The assertion binds the exact record bytes to the
 `bap-action-approval/1` profile and those context checks. Use the pure
 `verify_approval_eddsa` or `verify_approval_es256` entry point selected by host configuration.
+
+<!-- sdk-example:action-approval -->
 
 ```python
 identity = verify_and_submit(

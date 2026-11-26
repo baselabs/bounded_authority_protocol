@@ -33,10 +33,7 @@ def quickstart(sdk: str) -> str:
     """Read the same native example exercised by each SDK's own suite."""
     source = (ROOT / "sdks" / sdk / "README.md").read_text()
     language = {"python": "python", "go": "go", "rust": "rust"}[sdk]
-    found = re.findall(rf"^`{{3}}{language}\n(.*?)^`{{3}}$", source, re.M | re.S)
-    if len(found) != 1:
-        raise AssertionError(f"{sdk}: expected one complete quickstart")
-    return found[0] + "\n"
+    return block(source, f"sdk-quickstart:{sdk}", language)
 
 
 def run(args: list[str], directory: Path) -> None:

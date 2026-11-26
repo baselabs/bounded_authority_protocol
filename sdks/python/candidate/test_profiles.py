@@ -6,6 +6,7 @@ import hashlib
 import inspect
 import json
 import logging
+import tracemalloc
 from asyncio import CancelledError
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -51,6 +52,7 @@ ASSERTION = (
     "version", "attestor_key_id", "jti", "iss", "aud", "sub", "profile",
     "profile_digest", "content_digest", "gen", "prev", "iat", "nbf", "exp",
 )
+RECORD = ("subject", "action", "request_id", "approver_role", "resources", "revision_digest")
 VERIFY = {"eddsa": approval.verify_approval_eddsa, "es256": approval.verify_approval_es256}
 
 
@@ -176,7 +178,7 @@ def approval_outcome(value):
         "suite": value.suite.value,
         "trust_domain": value.trust_domain,
         "assertion": assertion(value.assertion, verified=True),
-        "record": project(asdict(value.record) | {"v": 1}),
+        "record": project({name: getattr(value.record, name) for name in RECORD} | {"v": 1}),
         "trust": value.trust,
     }
 
@@ -219,7 +221,7 @@ def _observation(value):
     return value
 
 
-def helper_outcome(case, pure):
+def helper_outcome(case, pure, caplog):
     calls = []
 
     def revoked(entry, fingerprint):
@@ -233,25 +235,30 @@ def helper_outcome(case, pure):
         calls.append({"predicate": "is_replayed", "arguments": list(identity)})
         return _observation(case["observations"]["is_replayed"])
 
+    caplog.clear()
     result = invoke_helper(pure, revoked, replayed)
     presenter = approval.presenter_result(result)
+    rendering = approval.render_presenter_result(result)
+    log_render(result, caplog, rendering)
     return {
         "calls": calls,
         "helper": "approved" if isinstance(result, approval.Approved) else result.value,
         "presenter": presenter,
-        "rendering": repr(result) if presenter == "approved" else f"{{:error, :{presenter}}}",
+        "rendering": rendering,
     }
 
 
 def rendering_outcome(case, pure, caplog):
-    result = pure_result(pure)
     example = case["id"]
+    caplog.clear()
     if example == "helper-exception":
         def revoked(*_args):
             try:
                 raise RuntimeError(case["inputs"]["chained_context"])
             except RuntimeError as cause:
-                raise RuntimeError(case["inputs"]["provider_cause"]) from cause
+                failure = RuntimeError(case["inputs"]["provider_cause"])
+                failure.add_note(case["inputs"]["traceback"])
+                raise failure from cause
 
         replay_calls = []
 
@@ -262,38 +269,54 @@ def rendering_outcome(case, pure, caplog):
         result = invoke_helper(pure, revoked, replayed)
         assert replay_calls == []
         assert isinstance(result, approval.Diagnostic)
-        presenter = approval.presenter_result(result)
-        output = {"local": f"{{:error, :{result}}}", "presenter": f"{{:error, :{presenter}}}"}
+        assert result.value == "predicate_failed"
+        output = {"local": repr(result), "presenter": approval.render_presenter_result(result)}
     elif example in {"host-local-error", "presenter-error"}:
+        result = pure_result(pure)
         assert isinstance(result, approval.Diagnostic)
-        code = result.value if example == "host-local-error" else approval.presenter_result(result)
-        output = f"{{:error, :{code}}}"
+        assert result.value == pure["expected"]
+        output = repr(result) if example == "host-local-error" else approval.render_presenter_result(result)
     else:
+        result = pure_result(pure)
         assert isinstance(result, approval.VerifiedApprovalFacts)
-        if example == "nested-record":
+        if example == "verified-facts":
+            output = approval.render_verification_result(result)
+        elif example == "nested-record":
             result = result.record
+            output = repr(result)
         elif example == "nested-assertion":
             result = result.assertion
-        output = f"{{:ok, {result!r}}}" if example == "verified-facts" else repr(result)
+            output = repr(result)
+        else:
+            pytest.fail(f"unknown rendering case {example}")
 
-    rendered = (repr(result), str(result), repr(Ok(result)), str(output), log_render(result, caplog))
+    display = tuple(output.values()) if isinstance(output, dict) else (output,)
+    rendered = (repr(result), str(result), repr(Ok(result)), *display, log_render(result, caplog, *display))
     for spellings in case.get("forbidden", {}).values():
         for spelling in spellings:
             assert all(spelling not in text for text in rendered)
     return output
 
 
-def log_render(value, caplog):
-    caplog.clear()
+def log_render(value, caplog, *display):
     logging.getLogger(__name__).warning("%r %s", value, value)
+    for text in display:
+        logging.getLogger(__name__).warning("%s", text)
     assert all(record.exc_info is None for record in caplog.records)
+    assert "Traceback (most recent call last)" not in caplog.text
+    assert "was the direct cause of the following exception" not in caplog.text
+    assert "During handling of the above exception" not in caplog.text
     return caplog.text
 
 
 def signing_input(meta):
+    return _unwrap(es256.assertion_signing_input(producer(meta)))
+
+
+def producer(meta):
     signing = meta["signing"]
     payload = {k: v for k, v in binary_fields(signing["payload"]).items() if k != "v"}
-    return _unwrap(es256.assertion_signing_input(es256.ContentAssertion(signing["kid"], **payload)))
+    return es256.ContentAssertion(signing["kid"], **payload)
 
 
 def foreign_accepts(identifier, compact):
@@ -360,6 +383,7 @@ def es256_outcome(name, case, meta):
 
 @pytest.mark.parametrize("corpus", [APPROVAL, ES256])
 def test_candidate_corpus(corpus, caplog):
+    caplog.set_level(logging.DEBUG)
     index, meta, cases = load(corpus)
     by_id = {case["id"]: case for _, case in cases}
     executed = []
@@ -367,9 +391,13 @@ def test_candidate_corpus(corpus, caplog):
         if corpus == ES256:
             actual = es256_outcome(name, case, meta)
         elif name in ("approval-cases.json", "multi-fault-cases.json"):
-            actual = approval_outcome(pure_result(case))
+            caplog.clear()
+            result = pure_result(case)
+            actual = approval_outcome(result)
+            if isinstance(case["expected"], str):
+                assert_redacted_rejection(case, result, case["expected"], caplog)
         elif name == "helper-cases.json":
-            actual = helper_outcome(case, by_id[case["pure_case"]])
+            actual = helper_outcome(case, by_id[case["pure_case"]], caplog)
         elif name == "rendering-cases.json":
             actual = rendering_outcome(case, by_id[case["pure_case"]], caplog)
         elif name == "record-cases.json":
@@ -377,19 +405,15 @@ def test_candidate_corpus(corpus, caplog):
         else:
             pytest.fail(f"unknown case file {name}")
         assert actual == case["expected"], case["id"]
-        if corpus == APPROVAL and isinstance(case["expected"], str) and name in {
-            "approval-cases.json", "multi-fault-cases.json",
-        }:
-            assert_redacted_rejection(case, actual, caplog)
         executed.append([f"{name}/{case['id']}", actual])
     assert sha(json_bytes(executed)) == index["verdict_sha256"]
 
 
-def assert_redacted_rejection(case, code, caplog):
-    result = pure_result(case)
+def assert_redacted_rejection(case, result, code, caplog):
     assert isinstance(result, approval.Diagnostic)
     shown = repr(result) + str(result) + log_render(result, caplog)
     assert result.value == code
+    assert repr(result) == str(result)
     original = case["compact"].split(".")
     for segment in original:
         if len(segment) > 12:
@@ -418,6 +442,76 @@ def test_profile_known_answers():
     assert compact.decode() == meta["signing"]["compact"]
     assert not es256.assemble_compact(replace(signing, kind="content_assertion"), raw(meta["signing"]["signature"])).is_ok
     assert not eddsa.assemble_content_assertion_compact(signing, raw(meta["signing"]["signature"])).is_ok
+
+
+@pytest.mark.parametrize("ceiling", ["json_bytes", "number_lexeme_bytes"])
+def test_es256_producer_and_consumer_share_json_ceilings(ceiling):
+    _, meta, _ = load(ES256)
+    claims = producer(meta)
+    signing = signing_input(meta)
+    if ceiling == "json_bytes":
+        required = max(len(raw(segment.decode())) for segment in (
+            signing.protected_segment, signing.payload_segment,
+        ))
+    else:
+        required = max(len(str(value)) for value in (claims.iat, claims.nbf, claims.exp, claims.gen, 1))
+    compact = meta["signing"]["compact"].encode()
+    exact, below = Bounds({ceiling: required}), Bounds({ceiling: required - 1})
+    assert _unwrap(es256.assertion_signing_input(claims, exact)) == signing
+    assert es256.decode_assertion(compact, exact).is_ok
+    assert not es256.assertion_signing_input(claims, below).is_ok
+    assert not es256.decode_assertion(compact, below).is_ok
+
+
+@pytest.mark.parametrize("buffer_kind", [bytearray, lambda raw: memoryview(raw).cast("I")])
+@pytest.mark.parametrize(
+    "surface",
+    ["decode", "assertion_digest", "content_digest", "assemble_protected", "assemble_payload", "assemble_signature"],
+)
+def test_es256_rejects_oversized_buffers_before_copy(buffer_kind, surface):
+    _, meta, _ = load(ES256)
+    signing = signing_input(meta)
+    signature = raw(meta["signing"]["signature"])
+    oversized = buffer_kind(bytearray(2 * 1024 * 1024))
+    operations = {
+        "decode": lambda: es256.decode_assertion(oversized),
+        "assertion_digest": lambda: es256.assertion_digest(oversized),
+        "content_digest": lambda: es256.content_digest(oversized),
+        "assemble_protected": lambda: es256.assemble_compact(replace(signing, protected_segment=oversized), signature),
+        "assemble_payload": lambda: es256.assemble_compact(replace(signing, payload_segment=oversized), signature),
+        "assemble_signature": lambda: es256.assemble_compact(signing, oversized),
+    }
+    tracemalloc.start()
+    try:
+        result = operations[surface]()
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert not result.is_ok
+    assert peak < 1024 * 1024
+
+
+def test_es256_accepts_mutable_buffers_at_effective_ceilings():
+    _, meta, _ = load(ES256)
+    signing = signing_input(meta)
+    signature = raw(meta["signing"]["signature"])
+    compact = meta["signing"]["compact"].encode()
+    exact = Bounds({"anchor_bytes": len(compact), "content_bytes": len(compact)})
+    below = Bounds({"anchor_bytes": len(compact) - 1, "content_bytes": len(compact) - 1})
+    parse = (es256.decode_assertion, es256.assertion_digest, es256.content_digest)
+    for operation in parse:
+        assert operation(memoryview(compact), exact).is_ok
+        assert not operation(memoryview(compact), below).is_ok
+    input_ = replace(signing, payload_segment=bytearray(signing.payload_segment))
+    assert _unwrap(es256.assemble_compact(input_, bytearray(signature), exact)) == compact
+    assert not es256.assemble_compact(input_, bytearray(signature), below).is_ok
+
+
+def test_es256_content_digest_counts_memoryview_bytes():
+    view = memoryview(b"abcdefgh").cast("I")
+    assert len(view) < view.nbytes
+    assert es256.content_digest(view, Bounds({"content_bytes": view.nbytes})).is_ok
+    assert not es256.content_digest(view, Bounds({"content_bytes": view.nbytes - 1})).is_ok
 
 
 @pytest.mark.parametrize("case_id", ["foreign-eddsa", "foreign-es256"])
@@ -455,9 +549,80 @@ def _mutated_verify(edit):
     return namespace["_verify"]
 
 
+def _try_stage(body, code):
+    return next(
+        index for index, node in enumerate(body)
+        if isinstance(node, ast.Try)
+        and any(
+            isinstance(item, ast.Return) and ast.unparse(item.value) == f"Diagnostic.{code}"
+            for handler in node.handlers for item in handler.body
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("case_id", "boundary", "wrong"),
+    [
+        ("context-before-snapshot-and-bytes", "context", approval.Diagnostic.TRUST_UNAVAILABLE),
+        ("unavailable-before-stale-and-malformed", "snapshot", approval.Diagnostic.STALE_TRUST),
+        ("es256-missing-public_key-unselected-stale", "snapshot", approval.Diagnostic.STALE_TRUST),
+        ("eddsa-missing-valid_from-unselected-stale", "snapshot", approval.Diagnostic.STALE_TRUST),
+        ("stale-before-shape", "freshness", approval.Diagnostic.MALFORMED),
+        ("shape-before-suite", "framing", approval.Diagnostic.UNSUPPORTED_ALGORITHM),
+        ("signature-width-before-suite", "framing", approval.Diagnostic.UNSUPPORTED_ALGORITHM),
+        ("suite-before-claims", "suite_payload", approval.Diagnostic.MALFORMED),
+        ("suite-before-key", "suite_lookup", approval.Diagnostic.UNKNOWN_KEY),
+        ("noncanonical-record-before-key", "record", approval.Diagnostic.UNKNOWN_KEY),
+        ("record-shape-before-key", "record", approval.Diagnostic.UNKNOWN_KEY),
+        ("signed-sub-bound-before-key", "record", approval.Diagnostic.UNKNOWN_KEY),
+    ],
+)
+def test_mutation_reorders_preflight_and_parsing(case_id, boundary, wrong, monkeypatch):
+    _, _, cases = load(APPROVAL)
+    case = next(case for _, case in cases if case["id"] == case_id)
+    assert pure_result(case).value == case["expected"]
+
+    def reorder(body):
+        snapshot = _try_stage(body, "TRUST_UNAVAILABLE")
+        freshness = _diagnostic_guard(body, "STALE_TRUST")
+        framing = _try_stage(body, "MALFORMED")
+        suite = _diagnostic_guard(body, "UNSUPPORTED_ALGORITHM")
+        lookup = _diagnostic_guard(body, "UNKNOWN_KEY")
+        if boundary == "context":
+            # Look at snapshot availability before validating explicit context.
+            body[:0] = ast.parse(
+                "if context.snapshot is None: return Diagnostic.TRUST_UNAVAILABLE"
+            ).body
+        elif boundary == "snapshot":
+            body[snapshot:snapshot] = body[snapshot + 1:freshness + 1]
+            del body[freshness + 1:freshness + 3]
+        elif boundary == "freshness":
+            body[freshness], body[framing] = body[framing], body[freshness]
+        elif boundary == "framing":
+            # Read just the selector, ahead of validating the compact and header shape.
+            body[framing:framing] = ast.parse(
+                "from base64 import urlsafe_b64decode\n"
+                "from json import loads\n"
+                "encoded = compact.partition(b'.')[0]\n"
+                "early = loads(urlsafe_b64decode(encoded + b'=' * (-len(encoded) % 4)))\n"
+                "if (early['alg'].encode(), early['typ'].encode()) != (suite.alg, suite.typ):\n"
+                "    return Diagnostic.UNSUPPORTED_ALGORITHM\n"
+            ).body
+        elif boundary == "suite_payload":
+            body[suite], body[suite + 1] = body[suite + 1], body[suite]
+        else:
+            # Lookup needs the parsed header only. Move it ahead of suite or payload admission.
+            target = suite if boundary == "suite_lookup" else suite + 1
+            body[target:lookup + 1] = body[lookup - 1:lookup + 1] + body[target:lookup - 1]
+
+    monkeypatch.setattr(approval, "_verify", _mutated_verify(reorder))
+    assert pure_result(case) is wrong
+
+
 @pytest.mark.parametrize(
     ("case_id", "earlier", "later"),
     [
+        ("signature-before-times", "BAD_SIGNATURE", "KEY_WINDOW"),
         ("key-window-before-record-binding", "KEY_WINDOW", "RECORD_MISMATCH"),
         ("record-binding-before-issuer", "RECORD_MISMATCH", "ISSUER_MISMATCH"),
         ("issuer-before-audience", "ISSUER_MISMATCH", "AUDIENCE_MISMATCH"),
@@ -465,6 +630,7 @@ def _mutated_verify(edit):
         ("request-before-subject", "REQUEST_MISMATCH", "SUBJECT_MISMATCH"),
         ("subject-before-scope", "SUBJECT_MISMATCH", "SCOPE_MISMATCH"),
         ("scope-before-time", "SCOPE_MISMATCH", "NOT_YET_VALID"),
+        ("window-before-duration", "NOT_YET_VALID", "LIFETIME_TOO_LONG"),
         ("lifetime-before-active", "LIFETIME_TOO_LONG", "ACTIVE_TOO_LONG"),
         ("active-before-role", "ACTIVE_TOO_LONG", "ROLE_NOT_PERMITTED"),
     ],
@@ -483,25 +649,15 @@ def test_mutation_reorders_precedence(case_id, earlier, later, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("case_id", "code"),
+    ("case_id", "code", "wrong"),
     [
-        ("stale-before-shape", "STALE_TRUST"),
-        ("suite-before-claims", "UNSUPPORTED_ALGORITHM"),
-        ("key-before-signature", "UNKNOWN_KEY"),
-        ("signature-before-times", "BAD_SIGNATURE"),
-        ("key-window-before-record-binding", "KEY_WINDOW"),
-        ("record-binding-before-issuer", "RECORD_MISMATCH"),
-        ("issuer-before-audience", "ISSUER_MISMATCH"),
-        ("audience-before-request", "AUDIENCE_MISMATCH"),
-        ("request-before-subject", "REQUEST_MISMATCH"),
-        ("subject-before-scope", "SUBJECT_MISMATCH"),
-        ("scope-before-time", "SCOPE_MISMATCH"),
-        ("window-before-duration", "NOT_YET_VALID"),
-        ("lifetime-before-active", "LIFETIME_TOO_LONG"),
-        ("active-before-role", "ACTIVE_TOO_LONG"),
+        ("key-before-signature", "UNKNOWN_KEY", "bad_signature"),
+        ("signature-before-times", "BAD_SIGNATURE", "key_window"),
+        ("expired", "EXPIRED", None),
+        ("role-not-required", "ROLE_NOT_PERMITTED", None),
     ],
 )
-def test_mutation_drops_checked_stage(case_id, code, monkeypatch):
+def test_mutation_drops_checked_stage(case_id, code, wrong, monkeypatch):
     _, _, cases = load(APPROVAL)
     case = next(case for _, case in cases if case["id"] == case_id)
     assert pure_result(case).value == case["expected"]
@@ -516,7 +672,46 @@ def test_mutation_drops_checked_stage(case_id, code, monkeypatch):
 
     monkeypatch.setattr(approval, "_verify", _mutated_verify(remove))
     result = pure_result(case)
-    assert not isinstance(result, approval.Diagnostic) or result.value != case["expected"]
+    if wrong is None:
+        assert isinstance(result, approval.VerifiedApprovalFacts)
+    else:
+        assert result is approval.Diagnostic(wrong)
+
+
+@pytest.mark.parametrize(
+    ("case_id", "code", "clause"),
+    [
+        ("wrong-profile", "RECORD_MISMATCH", "claims.profile != PROFILE"),
+        ("wrong-profile_digest", "RECORD_MISMATCH", "not compare_digest(claims.profile_digest, PROFILE_DIGEST)"),
+        ("wrong-content_digest", "RECORD_MISMATCH", "not compare_digest(claims.content_digest, _unwrap(content_digest(wire, b)))"),
+        ("request-record", "REQUEST_MISMATCH", "record.request_id != context.request_id"),
+        ("request-signed", "REQUEST_MISMATCH", "claims.sub != context.request_id"),
+        ("revision-mismatch", "REQUEST_MISMATCH", "not compare_digest(record.revision_digest, context.revision_digest)"),
+        ("action-mismatch", "SCOPE_MISMATCH", "record.action != context.action"),
+        ("resources-mismatch", "SCOPE_MISMATCH", "tuple(item.encode('utf-8') for item in record.resources) != resources"),
+        ("role-not-required", "ROLE_NOT_PERMITTED", "record.approver_role not in context.roles"),
+        ("empty-enrolled-roles", "ROLE_NOT_PERMITTED", "record.approver_role not in entry.roles"),
+    ],
+)
+def test_mutation_drops_independent_authenticated_clause(case_id, code, clause, monkeypatch):
+    _, _, cases = load(APPROVAL)
+    by_id = {case["id"]: case for _, case in cases}
+    if case_id == "request-record":
+        case = by_id["request-signed"]
+        # The signed subject is now the expected ID, leaving only the record side unequal.
+        case = dict(case, context=dict(case["context"], request_id="other"))
+    else:
+        case = by_id[case_id]
+    assert pure_result(case) is approval.Diagnostic[code]
+
+    def remove(body):
+        guard = body[_diagnostic_guard(body, code)]
+        assert isinstance(guard.test, ast.BoolOp)
+        index = next(i for i, node in enumerate(guard.test.values) if ast.unparse(node) == clause)
+        guard.test.values[index] = ast.Constant(value=False)
+
+    monkeypatch.setattr(approval, "_verify", _mutated_verify(remove))
+    assert isinstance(pure_result(case), approval.VerifiedApprovalFacts)
 
 
 def test_verification_leaves_module_state_unchanged():
@@ -555,6 +750,8 @@ def test_signature_backend_failure_discards_cause(monkeypatch, caplog):
             raise RuntimeError("outer signature cause") from cause
 
     monkeypatch.setattr(approval, "_signature_matches", failed)
+    caplog.set_level(logging.DEBUG)
+    caplog.clear()
     result = pure_result(case)
     assert result is approval.Diagnostic.BAD_SIGNATURE
     assert "signature cause" not in log_render(result, caplog)

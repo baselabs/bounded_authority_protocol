@@ -61,6 +61,8 @@ caller-owned signer. `cargo test` also executes this block as a native doctest.
 The example signs with keys from fixed demonstration seeds. Production private keys stay with
 the issuer and holder; the verifier receives public keys only.
 
+<!-- sdk-quickstart:rust -->
+
 ```rust
 use bounded_authority_protocol::types::{
     Credentials, ExpectedRequest, GrantInput, GrantOperation, NonceMode, ProofInput,

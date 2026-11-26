@@ -26,7 +26,7 @@ import re
 import types as _types
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, is_dataclass
-from typing import Any, ParamSpec, TypeVar, Union, get_args, get_origin, get_type_hints
+from typing import Any, ParamSpec, TypeVar, Union, cast, get_args, get_origin, get_type_hints
 
 from ._inputs import _normalize_arg
 from .base64url import base64url_decode, base64url_encode
@@ -189,8 +189,10 @@ def _valid_uri_authority(authority: str) -> bool:
     if hostport.startswith("["):
         close = hostport.find("]")
         if close == -1:
-            return False  # unterminated IPv6 literal.
-        if not _is_ipv6(hostport[1:close]):
+            return False  # unterminated IP-literal.
+        literal = hostport[1:close]
+        ipv_future = re.fullmatch(r"[vV][0-9A-Fa-f]+\.[A-Za-z0-9._~!$&'()*+,;=:-]+", literal)
+        if ipv_future is None and not _is_ipv6(literal):
             return False
         suffix = hostport[close + 1 :]
         return suffix == "" or re.fullmatch(r":\d*", suffix) is not None
@@ -444,12 +446,12 @@ def _shape_ok(value: object, annotation: object) -> bool:
         if not isinstance(value, (list, tuple)):
             return False
         (elem, _rest) = get_args(annotation)
-        return all(_shape_ok(item, elem) for item in value)
+        return all(_shape_ok(item, elem) for item in cast(Sequence[object], value))
     if origin is Sequence:
         if not isinstance(value, (list, tuple)):
             return False
         (elem,) = get_args(annotation)
-        return all(_shape_ok(item, elem) for item in value)
+        return all(_shape_ok(item, elem) for item in cast(Sequence[object], value))
     if origin is Mapping:
         return isinstance(value, Mapping)
     return False  # unreachable: _walk_annotation rejects unsupported origins at import
@@ -464,7 +466,7 @@ def _closed_shape(fn: Callable[_P, Result[_T]]) -> Callable[_P, Result[_T]]:
 
     @functools.wraps(fn)
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Result[_T]:
-        hints = get_type_hints(fn)
+        hints: dict[str, object] = get_type_hints(fn)
         for name, annotation in hints.items():
             if name != "return":
                 _walk_annotation(annotation)
@@ -478,7 +480,7 @@ def _closed_shape(fn: Callable[_P, Result[_T]]) -> Callable[_P, Result[_T]]:
                         return err()
         except InvalidError:
             return err()
-        return fn(*bound.args, **bound.kwargs)
+        return cast(Callable[..., Result[_T]], fn)(*bound.args, **bound.kwargs)
 
     return wrapper
 

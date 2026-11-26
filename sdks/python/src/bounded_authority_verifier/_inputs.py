@@ -3,33 +3,42 @@
 from __future__ import annotations
 
 import types
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import fields, is_dataclass
-from typing import Any, Union, cast, get_args, get_origin, get_type_hints
+from typing import Any, TypeVar, Union, cast, get_args, get_origin, get_type_hints, overload
 
 from .error import _fail, _invalid_error
 
 
-def _bytes(value: object) -> bytes:
+def _buffer(value: object) -> bytes | memoryview[int]:
     if type(value) is bytes:
         return value
-    if issubclass(type(value), bytes):
-        return memoryview(cast(bytes | bytearray, value)).tobytes()
-    if issubclass(type(value), bytearray):
-        return memoryview(cast(bytes | bytearray, value)).tobytes()
+    if issubclass(type(value), (bytes, bytearray)):
+        return memoryview(cast(bytes | bytearray, value))
     if issubclass(type(value), memoryview):
         # A released view has no readable buffer. Its built-in representation is the
         # non-raising state query; buffer access would raise ValueError.
         if memoryview.__repr__(cast("memoryview[int]", value)).startswith("<released "):
             _fail()
-        return memoryview.tobytes(cast("memoryview[int]", value))
+        return cast("memoryview[int]", value)
     raise _invalid_error()
+
+
+def _buffer_size(value: bytes | memoryview[int]) -> int:
+    return len(value) if isinstance(value, bytes) else value.nbytes
+
+
+def _bytes(value: object, maximum: int | None = None) -> bytes:
+    buffer = _buffer(value)
+    if maximum is not None and _buffer_size(buffer) > maximum:
+        _fail()
+    return buffer if isinstance(buffer, bytes) else buffer.tobytes()
 
 
 def _text(value: object) -> str:
     if not issubclass(type(value), str):
         _fail()
-    text = str.__str__(value)
+    text = str.__str__(cast(str, value))
     if any(0xD800 <= ord(char) <= 0xDFFF for char in text):
         _fail()
     return text
@@ -42,7 +51,18 @@ def _decode_utf8(value: bytes) -> str:
         _fail()
 
 
-def _normalize_arg(value: object, annotation: object, depth: int = 0) -> Any:
+_T = TypeVar("_T")
+
+
+@overload
+def _normalize_arg(value: object, annotation: type[_T], depth: int = 0) -> _T: ...
+
+
+@overload
+def _normalize_arg(value: object, annotation: object, depth: int = 0) -> object: ...
+
+
+def _normalize_arg(value: object, annotation: object, depth: int = 0) -> object:
     """Copy accepted host values before protocol code uses them; bound recursive shapes."""
     from .bounds import Bounds, coerce_bounds
     from .error import _unwrap
@@ -64,7 +84,7 @@ def _normalize_arg(value: object, annotation: object, depth: int = 0) -> Any:
         if issubclass(type(value), (list, tuple)):
             return tuple(
                 _normalize_arg(v, object, depth + 1)
-                for v in _sequence(cast(list[Any] | tuple[Any, ...], value))
+                for v in _sequence(cast(list[object] | tuple[object, ...], value))
             )
         return {_text(k): _normalize_arg(v, object, depth + 1) for k, v in _mapping_items(value)}
     if annotation is type(None):
@@ -98,8 +118,8 @@ def _normalize_arg(value: object, annotation: object, depth: int = 0) -> Any:
             if type(value) is not annotation:
                 _fail()
             missing = object()
-            members = {}
-            hints = (
+            members: dict[str, object] = {}
+            hints: dict[str, object] = (
                 get_type_hints(annotation.__init__)
                 if issubclass(annotation, _Facts)
                 else get_type_hints(annotation)
@@ -118,7 +138,7 @@ def _normalize_arg(value: object, annotation: object, depth: int = 0) -> Any:
                 normalized = _normalize_arg(member, sub, depth + 1)
                 if name in init_names:
                     members[name] = normalized
-            return annotation(**members)
+            return cast(Callable[..., object], annotation)(**members)
     origin = get_origin(annotation)
     if origin is Union or isinstance(annotation, types.UnionType):
         from .error import InvalidError
@@ -135,7 +155,7 @@ def _normalize_arg(value: object, annotation: object, depth: int = 0) -> Any:
         sub = get_args(annotation)[0]
         return tuple(
             _normalize_arg(member, sub, depth + 1)
-            for member in _sequence(cast(list[Any] | tuple[Any, ...], value))
+            for member in _sequence(cast(list[object] | tuple[object, ...], value))
         )
     if origin is Mapping:
         key_type, value_type = get_args(annotation)
@@ -146,17 +166,17 @@ def _normalize_arg(value: object, annotation: object, depth: int = 0) -> Any:
     raise TypeError(f"unsupported input annotation: {annotation!r}")
 
 
-def _sequence(value: list[Any] | tuple[Any, ...]) -> tuple[Any, ...]:
+def _sequence(value: Sequence[_T]) -> tuple[_T, ...]:
     """Snapshot native containers without calling subclass iteration or length methods."""
     iterator = (
-        list.__iter__(cast(list[Any], value))
+        list.__iter__(cast(list[_T], value))
         if issubclass(type(value), list)
-        else tuple.__iter__(cast(tuple[Any, ...], value))
+        else tuple.__iter__(cast(tuple[_T, ...], value))
     )
     return tuple(iterator)
 
 
-def _mapping_items(value: object) -> list[tuple[Any, Any]]:
+def _mapping_items(value: object) -> list[tuple[object, object]]:
     """The sole caller-callback boundary: snapshot an arbitrary Mapping exactly once.
 
     Native dictionaries use their builtin storage. Exceptions from an external Mapping's
@@ -164,18 +184,18 @@ def _mapping_items(value: object) -> list[tuple[Any, Any]]:
     remains outside the catch.
     """
     if issubclass(type(value), dict):
-        return list(dict.items(cast(dict[Any, Any], value)))
+        return list(dict.items(cast(dict[object, object], value)))
     try:
         if not issubclass(type(value), Mapping):
             _fail()
-        snapshot = list(cast(Mapping[Any, Any], value).items())
+        snapshot: list[object] = list(cast(Mapping[object, object], value).items())
     except Exception:
         _fail()
-    out = []
+    out: list[tuple[object, object]] = []
     for pair in snapshot:
         if not issubclass(type(pair), (list, tuple)):
             _fail()
-        native = _sequence(cast(list[Any] | tuple[Any, ...], pair))
+        native = _sequence(cast(list[object] | tuple[object, ...], pair))
         if len(native) != 2:
             _fail()
         out.append((native[0], native[1]))

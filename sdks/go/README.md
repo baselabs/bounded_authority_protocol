@@ -71,6 +71,8 @@ complete tests and conformance inputs.
 This is [`example_test.go`](example_test.go): `go test` runs it and checks its output, and a
 test keeps this copy identical to the file.
 
+<!-- sdk-quickstart:go -->
+
 ```go
 package verifier_test
 

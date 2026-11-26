@@ -92,9 +92,4 @@ python_files = ["test_*.py"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 reportPrivateUsage = "none"
-include = [
-  "src/bounded_authority_verifier/action_approval.py",
-  "src/bounded_authority_verifier/approval_record.py",
-  "src/bounded_authority_verifier/content_assertion.py",
-  "src/bounded_authority_verifier/content_assertion_es256.py",
-]
+include = ["src/bounded_authority_verifier"]

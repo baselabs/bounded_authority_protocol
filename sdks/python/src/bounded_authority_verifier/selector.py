@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import cast
 
 from ._inputs import _normalize_arg
 from .bounds import MAXIMUM_BOUNDS, Bounds, bounds_resolve
@@ -207,7 +208,7 @@ def _traverse_path(root: Tagged, path: tuple[str, ...]) -> Tagged | None:
 def selector_matches(sel: Selector, cast_arguments: Tagged) -> Result[bool]:
     """Does this selector match? equals/one_of REQUIRE the path to exist (missing path → no match)."""
     try:
-        sel = _normalize_arg(sel, Selector)
+        sel = cast(Selector, _normalize_arg(sel, Selector))
         cast_arguments = _normalize_tagged(cast_arguments, MAXIMUM_BOUNDS)
         if isinstance(sel, SelAll):
             return Ok(True)

@@ -18,7 +18,7 @@ import re
 import types as _types
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, is_dataclass, replace
-from typing import Any, Literal, TypeVar, Union, cast, get_args, get_origin, get_type_hints
+from typing import Any, Literal, ParamSpec, TypeVar, Union, cast, get_args, get_origin, get_type_hints
 
 from ._inputs import _normalize_arg
 from .base64url import base64url_decode, base64url_encode
@@ -1057,18 +1057,21 @@ def _shape_ok(value: object, annotation: object) -> bool:
         if not isinstance(value, (list, tuple)):
             return False
         (elem, _rest) = get_args(annotation)
-        return all(_shape_ok(item, elem) for item in value)
+        return all(_shape_ok(item, elem) for item in cast(Sequence[object], value))
     if origin is Sequence:
         if not isinstance(value, (list, tuple)):
             return False
         (elem,) = get_args(annotation)
-        return all(_shape_ok(item, elem) for item in value)
+        return all(_shape_ok(item, elem) for item in cast(Sequence[object], value))
     if origin is Mapping:
         return isinstance(value, Mapping)
     return False  # unreachable: _walk_annotation rejects unsupported origins at import
 
 
-def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
+_P = ParamSpec("_P")
+
+
+def _closed_shape(fn: Callable[_P, Result[_T]]) -> Callable[_P, Result[_T]]:
     """Facade decorator: validate caller arguments against their declared shapes before the
     body runs; malformed values return Err, and accepted buffers are copied. Applied to all 21 public functions. Hints resolve lazily on the first call,
     facade signatures forward-reference structs defined later in this module (ExpectedExport);
@@ -1077,8 +1080,8 @@ def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
     signature = inspect.signature(fn)
 
     @functools.wraps(fn)
-    def wrapper(*args: object, **kwargs: object) -> Result[Any]:
-        hints = get_type_hints(fn)
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> Result[_T]:
+        hints: dict[str, object] = get_type_hints(fn)
         for name, annotation in hints.items():
             if name != "return":
                 _walk_annotation(annotation)
@@ -1092,7 +1095,7 @@ def _closed_shape(fn: Callable[..., Result[Any]]) -> Callable[..., Result[Any]]:
                         return err()
         except InvalidError:
             return err()
-        return fn(*bound.args, **bound.kwargs)
+        return cast(Callable[..., Result[_T]], fn)(*bound.args, **bound.kwargs)
 
     return wrapper
 
@@ -2296,11 +2299,11 @@ def _expected_int(v: object, ctx: str) -> int:
     return v
 
 
-def _require_ok(result: Result[Any], ctx: str) -> Any:
+def _require_ok(result: Result[_T], ctx: str) -> _T:
     """Unwrap a Result or fail closed (encode-path helper)."""
-    if not result.is_ok:
+    if not isinstance(result, Ok):
         _fail(ctx)
-    return result.value  # type: ignore[union-attr]  # is_ok implies Ok
+    return result.value
 
 
 def _parse_and_match_anchor(

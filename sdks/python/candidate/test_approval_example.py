@@ -2,14 +2,18 @@
 
 import hashlib
 import inspect
+import pickle
 import sqlite3
 import subprocess
 import sys
 from contextlib import closing
-from dataclasses import replace
+from copy import copy, deepcopy
+from dataclasses import asdict, fields, replace
+from pathlib import Path
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from scripts.check_sdk_install import block
 from sdks.python.examples import action_approval as example
 
 from bounded_authority_verifier import (
@@ -40,6 +44,7 @@ from bounded_authority_verifier.approval_record import (
     PROFILE,
     PROFILE_DIGEST,
     ApprovalRecord,
+    decode_record,
     encode_record,
 )
 from bounded_authority_verifier.error import _unwrap
@@ -57,8 +62,12 @@ def databases(tmp_path):
 
 @pytest.fixture
 def operation():
+    return signed_operation("request-7")
+
+
+def signed_operation(request_id):
     request = example.Request(
-        "request-7",
+        request_id,
         hashlib.sha256(b"request revision 7").digest(),
         example.Effect("image-indexer", "index", ("caption", "thumbnail")),
     )
@@ -108,6 +117,67 @@ def submit(db, operation, *, external=False):
 def count(db, table):
     # Test-owned fixed table names.
     return db.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+
+
+def test_readme_approval_example(databases, operation):
+    readme = Path("sdks/python/README.md").read_text()
+    source = block(readme, "sdk-example:action-approval", "python")
+    request, policy, wire, compact = operation
+    with closing(sqlite3.connect(databases[0])) as host:
+        install(host, request)
+        inputs = {
+            "verify_and_submit": example.verify_and_submit,
+            "host_db": host,
+            "record_bytes": wire,
+            "assertion_compact": compact,
+            "prepared_request": request,
+            "host_policy": policy,
+            "now": 10,
+        }
+        exec(source, inputs)
+        assert inputs["identity"]
+        assert count(host, "artifact_claims") == count(host, "request_claims") == 1
+
+
+@pytest.mark.parametrize("request_id", ["https://[v1.a]/r", "https://[VF.a:b]:42/r", "https://[::1]/r"])
+def test_request_id_accepts_ip_literals(request_id):
+    operation = signed_operation(request_id)
+    _, _, wire, _ = operation
+    record = _unwrap(decode_record(wire))
+    assert record.request_id == request_id
+    verified = facts(operation)
+    assert verified.record == record
+    assert verified.assertion.sub == request_id
+
+
+@pytest.mark.parametrize("request_id", ["https://[v1.]/r", "https://[v1.a%20]/r", "https://[vg.a]/r"])
+def test_request_id_rejects_invalid_ip_literals(request_id):
+    _, _, wire, _ = signed_operation("https://[v1.a]/r")
+    record = _unwrap(decode_record(wire))
+    invalid = ApprovalRecord(
+        record.subject, record.action, request_id, record.approver_role,
+        record.resources, record.revision_digest,
+    )
+    assert not encode_record(invalid).is_ok
+    assert not decode_record(wire.replace(b"https://[v1.a]/r", request_id.encode())).is_ok
+
+
+def test_approval_values_refuse_reinitialization_and_export(operation):
+    result = facts(operation)
+    record = result.record
+    with pytest.raises(TypeError, match="initialized twice"):
+        record.__init__(
+            "changed", record.action, record.request_id, record.approver_role,
+            record.resources, record.revision_digest,
+        )
+    with pytest.raises(TypeError, match="initialized twice"):
+        result.__init__(result.suite, "changed", record, result.assertion)
+    assert record.subject == operation[0].effect.subject
+    assert result.trust_domain == operation[1].trust_domain
+    for value in (result, record):
+        for export in (asdict, fields, vars, pickle.dumps, copy, deepcopy):
+            with pytest.raises(TypeError):
+                export(value)
 
 
 @pytest.mark.parametrize("mismatch", ["subject", "action", "subset", "superset", "stored_effect"])

@@ -39,7 +39,7 @@ from .content_assertion import (
 )
 from .ed25519 import torsion_free
 from .error import InvalidError, _fail, _unwrap
-from .facts import ContentAssertionFacts
+from .facts import ContentAssertionFacts, _Facts
 from .v1 import HistoricalPublicKey
 
 
@@ -75,6 +75,11 @@ class Diagnostic(StrEnum):
     REVOKED_KEY = "revoked_key"
     REPLAYED = "replayed"
     PREDICATE_FAILED = "predicate_failed"
+
+    def __repr__(self) -> str:
+        return f"{{:error, :{self.value}}}"
+
+    __str__ = __repr__
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -118,14 +123,44 @@ class ApprovalContext:
     record_bounds: RecordBounds = RecordBounds()
 
 
-@dataclass(frozen=True, slots=True, repr=False)
-class VerifiedApprovalFacts:
+class VerifiedApprovalFacts(_Facts):
     """Redacted facts bound to the supplied operation and trust context."""
 
-    suite: Suite
-    trust_domain: str
-    record: ApprovalRecord
-    assertion: ContentAssertionFacts
+    __slots__ = ("_suite", "_trust_domain", "_record", "_assertion")
+    _suite: Suite
+    _trust_domain: str
+    _record: ApprovalRecord
+    _assertion: ContentAssertionFacts
+
+    def __init__(
+        self,
+        suite: Suite,
+        trust_domain: str,
+        record: ApprovalRecord,
+        assertion: ContentAssertionFacts,
+    ) -> None:
+        if hasattr(self, "_suite"):
+            raise TypeError("Facts cannot be initialized twice")
+        object.__setattr__(self, "_suite", suite)
+        object.__setattr__(self, "_trust_domain", trust_domain)
+        object.__setattr__(self, "_record", record)
+        object.__setattr__(self, "_assertion", assertion)
+
+    @property
+    def suite(self) -> Suite:
+        return self._suite
+
+    @property
+    def trust_domain(self) -> str:
+        return self._trust_domain
+
+    @property
+    def record(self) -> ApprovalRecord:
+        return self._record
+
+    @property
+    def assertion(self) -> ContentAssertionFacts:
+        return self._assertion
 
     @property
     def trust(self) -> str:
@@ -136,6 +171,14 @@ class VerifiedApprovalFacts:
         return "#BoundedAuthorityProtocol.ActionApproval.V1.VerifiedApprovalFacts<redacted>"
 
     __str__ = __repr__
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, VerifiedApprovalFacts) and type(self) is type(other) and (
+            self.suite == other.suite
+            and self.trust_domain == other.trust_domain
+            and self.record == other.record
+            and self.assertion == other.assertion
+        )
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -371,3 +414,15 @@ def verify(
 def presenter_result(result: ApprovalResult) -> Literal["approved", "invalid"]:
     """Collapse failures at the presenter boundary."""
     return "approved" if isinstance(result, Approved) else "invalid"
+
+
+def render_presenter_result(result: ApprovalResult) -> str:
+    """Render the disclosure-limited result for presenters and their logs."""
+    return repr(result) if isinstance(result, Approved) else "{:error, :invalid}"
+
+
+def render_verification_result(result: VerifiedApprovalFacts | Diagnostic) -> str:
+    """Render the pure verification result for host-local inspection."""
+    if isinstance(result, Diagnostic):
+        return repr(result)
+    return f"{{:ok, {result!r}}}"
