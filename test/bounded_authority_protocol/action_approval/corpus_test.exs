@@ -377,16 +377,14 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
   end
 
   defp trace_calls(patterns, fun) do
-    try do
-      for {module, _, _} = mfa <- patterns do
-        Code.ensure_loaded!(module)
-        assert :erlang.trace_pattern(mfa, true, [:call_count]) == 1
-      end
-
-      fun.()
-    after
-      for mfa <- patterns, do: :erlang.trace_pattern(mfa, false, [:call_count])
+    for {module, _, _} = mfa <- patterns do
+      Code.ensure_loaded!(module)
+      assert :erlang.trace_pattern(mfa, true, [:call_count]) == 1
     end
+
+    fun.()
+  after
+    for mfa <- patterns, do: :erlang.trace_pattern(mfa, false, [:call_count])
   end
 
   defp call_count(mfa) do

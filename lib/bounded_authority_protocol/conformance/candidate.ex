@@ -59,13 +59,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
   # The pinned index fixes order, names and counts. Verify each file before decoding it.
   defp checked_cases(entries, files) do
-    with true <-
-           Enum.all?(entries, fn %{"path" => path, "sha256" => hash} ->
-             case Map.fetch(files, path) do
-               {:ok, bytes} -> sha(bytes) == hash
-               :error -> false
-             end
-           end) do
+    with true <- Enum.all?(entries, &file_matches?(&1, files)) do
       cases =
         Enum.flat_map(entries, fn
           %{"path" => path, "cases" => count} ->
@@ -79,6 +73,13 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
       if Enum.all?(cases, &match?({_path, _item}, &1)),
         do: {:ok, cases, :json.decode(Map.fetch!(files, "profile.json"))},
         else: {:error, :integrity}
+    end
+  end
+
+  defp file_matches?(%{"path" => path, "sha256" => hash}, files) do
+    case Map.fetch(files, path) do
+      {:ok, bytes} -> sha(bytes) == hash
+      :error -> false
     end
   end
 

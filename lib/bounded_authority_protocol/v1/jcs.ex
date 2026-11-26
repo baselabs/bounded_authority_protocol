@@ -62,12 +62,10 @@ defmodule BoundedAuthorityProtocol.V1.Jcs do
     do: escaped_size(rest, size + 1, allowance)
 
   defp encode_bounded(value, bounds) do
-    try do
-      {encoded, _nodes} = encode_value(value, bounds, 0, 0)
-      {:ok, :erlang.iolist_to_binary(encoded)}
-    rescue
-      _error in [Violation, ArgumentError, ErlangError] -> {:error, :invalid}
-    end
+    {encoded, _nodes} = encode_value(value, bounds, 0, 0)
+    {:ok, :erlang.iolist_to_binary(encoded)}
+  rescue
+    _error in [Violation, ArgumentError, ErlangError] -> {:error, :invalid}
   end
 
   defp encode_value(:null, bounds, level, nodes) do

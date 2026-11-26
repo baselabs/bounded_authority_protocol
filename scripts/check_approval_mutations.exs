@@ -209,7 +209,7 @@ end
 
 control = """
 case ExUnit.run() do
-  %{total: 12, failures: 0, skipped: 0, excluded: 0} ->
+  %{total: 14, failures: 0, skipped: 0, excluded: 0} ->
     IO.puts("APPROVAL_MUTATION_RESULT control passed")
 
   result ->

@@ -88,6 +88,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   randomness or trust selection is involved.
   """
 
+  alias BoundedAuthorityProtocol.Conformance.Candidate
   alias BoundedAuthorityProtocol.Conformance.Corpus
   alias BoundedAuthorityProtocol.Conformance.Report
   alias BoundedAuthorityProtocol.Conformance.Runner
@@ -194,7 +195,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   defp verify(corpus_dir, report_path) do
     case read_corpus(corpus_dir) do
       {:ok, %{"index.json" => index} = files} ->
-        case BoundedAuthorityProtocol.Conformance.Candidate.identify(index) do
+        case Candidate.identify(index) do
           nil -> verify_released(files, report_path)
           profile -> verify_candidate(files, profile, report_path)
         end
@@ -218,8 +219,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   end
 
   defp verify_candidate(files, profile, report_path) do
-    with {:ok, bytes, status} <-
-           BoundedAuthorityProtocol.Conformance.Candidate.run(files, profile),
+    with {:ok, bytes, status} <- Candidate.run(files, profile),
          :ok <- write_report(bytes <> "\n", report_path) do
       if status == 0, do: 0, else: fail(:disagreement)
     else
