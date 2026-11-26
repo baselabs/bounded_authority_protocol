@@ -493,19 +493,23 @@ defmodule ActionApprovalExample do
         collect(db, rows, [fragment | fragments], error)
       {^db, {:data, {:eol, last}}} ->
         line = fragments |> Enum.reverse([last]) |> IO.iodata_to_binary()
-        case line do
-          "Runtime error" <> _ ->
-            code = if String.contains?(line, "database is locked"), do: :busy, else: :database
-            collect(db, rows, [], code)
-          "Parse error" <> _ -> collect(db, rows, [], :database)
-          "Error" <> _ -> collect(db, rows, [], :database)
-          _ -> collect(db, [line | rows], [], error)
+        if sqlite_error?(line) do
+          collect(db, rows, [], error_code(line))
+        else
+          collect(db, [line | rows], [], error)
         end
       {^db, {:exit_status, _}} -> {:error, :database}
     after
       5_000 -> raise "SQLite did not complete the query"
     end
   end
+
+  defp sqlite_error?(line),
+    do: Enum.any?(["Runtime error", "Parse error", "Error"], &String.starts_with?(line, &1))
+
+  # The CLI reports SQLITE_BUSY as "database is locked" under each error prefix.
+  defp error_code(line),
+    do: if(String.contains?(line, "database is locked"), do: :busy, else: :database)
 end
 
 case System.argv() do

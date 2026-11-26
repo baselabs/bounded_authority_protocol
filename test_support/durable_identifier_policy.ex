@@ -8,6 +8,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        # Shared rendering covers every accepted contract-major.
                        "lib/bounded_authority_protocol/diagnostic_rendering.ex",
                        "test/bounded_authority_protocol/diagnostic_rendering_test.exs",
+                       # The README approval example names the V1 historical-key struct.
+                       "docs/examples/action-approval.exs",
                        "lib/bounded_authority_protocol/conformance/candidate.ex",
                        "lib/bounded_authority_protocol/conformance/corpus.ex",
                        "lib/bounded_authority_protocol/conformance/report.ex",
