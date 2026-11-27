@@ -56,14 +56,20 @@ for vulnerability reporting and the supported release line.
 
 ## Reproducibility
 
+Install the version in `.github/actions/hex-publish/hex-version` in
+[`baselabs/.github`](https://github.com/baselabs/.github) at the commit pinned by the
+`package` job in [CI](../.github/workflows/ci.yml). Run `mix local.hex VERSION --force`
+from a directory without `mix.exs`, substituting the version from that file.
+
 ```bash
 mix release.candidate
 ```
 
 The [reproducibility gate](../scripts/check_release_candidate.exs) builds the archive twice
 from fresh source-tree copies with separate dependency and build directories, then compares
-their SHA-256 digests. It requires the Hex client pinned in `.hex-version`, because that
-client's version enters archive metadata. The gate removes both copies when it finishes.
+their SHA-256 digests. It fetches the action's pin with `curl` at the commit specified in
+the checkout's CI workflow and checks the running Hex version, which is stored in archive
+metadata. The gate removes both copies when it finishes.
 
 This is regression detection for nondeterministic packaged inputs, not proof that every
 environment produces the same archive. Compare a local candidate and a CI candidate built

@@ -11,7 +11,6 @@ defmodule BoundedAuthorityProtocol.TrackedAuthoringPathsTest do
     ".github",
     ".gitignore",
     ".gitleaks.toml",
-    ".hex-version",
     ".tool-versions"
   ]
 
