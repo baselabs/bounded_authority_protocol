@@ -50,6 +50,7 @@ Standard JWT claims used by the profile (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti
 | `ba+loopback-proof` | active | `application/ba-loopback-proof+jwt` | Literal-loopback HTTP holder proof under `bap-application-proof/local-loopback-http/1` (a sibling application proof profile) |
 | `ba+chain-anchor` | active | `application/ba-chain-anchor+jwt` | Signed consumption-chain boundary anchor |
 | `ba+role-attestation` | active | `application/ba-role-attestation+jwt` | Signed role attestation binding a subject key to a role under `bap-role-attestation/1` (a sibling attestation profile) |
+| `ba+holder-custody-attestation` | candidate | `application/ba-holder-custody-attestation+jwt` | Signed statement of holder key custody under `bap-holder-custody-attestation/1` |
 | `ba+content-assertion` | active | `application/ba-content-assertion+jwt` | Standalone exact-content assertion under `bap-content-assertion/1` (a sibling attestation profile) |
 | `ba+content-assertion-es256` | candidate | `application/ba-content-assertion-es256+jwt` | Standalone ES256 exact-content assertion under `bap-content-assertion-es256/1` (a sibling attestation profile) |
 | `ba+key-transition` | active | `application/ba-key-transition+jwt` | Authenticated historical-key transition |
@@ -70,6 +71,7 @@ grant-unbound signed artifacts verified only through their own named API.
 | Identity | Status | Protected `typ` | Definition |
 |---|---|---|---|
 | `bap-role-attestation/1` | active | `ba+role-attestation` | Role attestation binding a subject key to `issuer` or `holder` for a bounded window, in [`spec/bap-role-attestation-v1.md`](../../spec/bap-role-attestation-v1.md); every contract-major profile rejects these bytes |
+| `bap-holder-custody-attestation/1` | candidate | `ba+holder-custody-attestation` | A holder key's `standard` or `hosted` custody class during a bounded window in the [profile specification](../../spec/bap-holder-custody-attestation-v1.md) |
 | `bap-content-assertion/1` | active | `ba+content-assertion` | Digest-bound context, validity and successor assertions in [`spec/bap-content-assertion-v1.md`](../../spec/bap-content-assertion-v1.md) |
 | `bap-content-assertion-es256/1` | candidate | `ba+content-assertion-es256` | P-256 sibling content assertion in [`spec/bap-content-assertion-es256-v1.md`](../../spec/bap-content-assertion-es256-v1.md) |
 

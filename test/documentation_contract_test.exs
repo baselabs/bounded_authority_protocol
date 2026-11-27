@@ -295,6 +295,7 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
       BoundedAuthorityProtocol.Ed25519,
       BoundedAuthorityProtocol.Es256,
       BoundedAuthorityProtocol.RoleAttestation.V1,
+      BoundedAuthorityProtocol.HolderCustodyAttestation.V1,
       BoundedAuthorityProtocol.ContentAssertion.V1,
       BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1
     ]

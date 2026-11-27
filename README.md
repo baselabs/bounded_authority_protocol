@@ -44,6 +44,7 @@ release carries several profiles.
 | Contract-major 3 | frozen | `BoundedAuthorityProtocol.V3` | `BAP3-ES256-SHA256` | [spec](spec/bap-v3.md) |
 | Local-loopback HTTP proofs | profile 1 | `...ApplicationProfile.LocalLoopbackHttp.V1` | Ed25519 | [spec](spec/bap-local-loopback-http-v1.md) |
 | Role attestations | profile 1 | `...RoleAttestation.V1` | Ed25519 | [spec](spec/bap-role-attestation-v1.md) |
+| Holder custody attestations (source candidate) | profile 1 | `...HolderCustodyAttestation.V1` | Ed25519 | [spec](spec/bap-holder-custody-attestation-v1.md) |
 | Content assertions | profile 1 | `...ContentAssertion.V1` | Ed25519 | [spec](spec/bap-content-assertion-v1.md) |
 
 See [Choosing a profile](docs/guides/choosing-a-profile.md) and

@@ -8,7 +8,8 @@ defmodule BoundedAuthorityProtocol.V1.SigningInput do
   ## Fields
 
   * `kind`: which compact this input builds (`:grant`, `:proof`, `:local_loopback_http_proof`,
-    `:boundary_anchor`, `:key_transition`, `:role_attestation`, `:content_assertion` or `:content_assertion_es256`).
+    `:boundary_anchor`, `:key_transition`, `:role_attestation`, `:holder_custody_attestation`,
+    `:content_assertion` or `:content_assertion_es256`).
   * `protected_segment`: the base64url-encoded JCS protected header. Redacted by `inspect/2`.
   * `payload_segment`: the base64url-encoded JCS payload. Redacted by `inspect/2`.
   * `message`: the exact RFC 7515 signing input `protected_segment <> "." <> payload_segment`.
@@ -27,6 +28,7 @@ defmodule BoundedAuthorityProtocol.V1.SigningInput do
             | :boundary_anchor
             | :key_transition
             | :role_attestation
+            | :holder_custody_attestation
             | :content_assertion
             | :content_assertion_es256,
           protected_segment: binary(),

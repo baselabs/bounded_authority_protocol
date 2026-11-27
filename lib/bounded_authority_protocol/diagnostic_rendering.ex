@@ -8,6 +8,8 @@ defmodule BoundedAuthorityProtocol.DiagnosticRendering do
   @grant_fields ~w(version key_id issuer grant_id audiences issued_at not_before expires_at
                    holder_thumbprint operations verification)a
   @attestation_fields ~w(version attestor_key_id jti key_id public_key role nbf exp verification)a
+  @custody_fields ~w(version attestor_key_id jti key_id public_key custody_class nbf exp
+                     verification)a
   @proof_fields ~w(version proof_id method target_uri issued_at nonce invocation_id operation
                    grant_hash request_hash holder_public_key holder_thumbprint verification)a
 
@@ -17,6 +19,18 @@ defmodule BoundedAuthorityProtocol.DiagnosticRendering do
     {document, _remaining} = term(value, @container_budget)
     :erlang.iolist_to_binary(document)
   end
+
+  defp term(
+         %BoundedAuthorityProtocol.HolderCustodyAttestation.V1.DecodedAttestation{} = value,
+         budget
+       ),
+       do:
+         structure(
+           value,
+           BoundedAuthorityProtocol.HolderCustodyAttestation.V1.DecodedAttestation,
+           @custody_fields,
+           budget
+         )
 
   defp term(%{__struct__: module} = value, budget)
        when module in [

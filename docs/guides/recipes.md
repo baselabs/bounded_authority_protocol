@@ -258,6 +258,45 @@ role_expected = %Role.ExpectedAttestation{
 The value is `{"holder", :not_evaluated, {:error, :invalid}}`. Decoding alone checks no
 signature; verification checks the supplied context without choosing trust or reserving replay.
 
+## Verify a holder custody attestation
+
+In a device provisioning flow, an attestor can describe a device holder key as `"standard"`.
+A document workflow can use `"hosted"` when the operator holds the key under a non-exporting
+handle and signs on the holder's behalf. The application supplies the expected holder key
+and chooses its trusted attestor. This [source candidate](../../spec/bap-holder-custody-attestation-v1.md)
+grants nothing.
+
+```elixir
+alias BoundedAuthorityProtocol.HolderCustodyAttestation.V1, as: Custody
+
+custody = %Custody.HolderCustodyAttestation{
+  attestor_key_id: "attestor-1",
+  jti: "urn:example:device:custody:1",
+  key_id: "holder-1",
+  public_key: holder_public,
+  custody_class: "standard",
+  nbf: 1_800_000_000,
+  exp: 1_800_003_600
+}
+{:ok, custody_input} = Custody.attestation_signing_input(custody, %{})
+custody_signature = ed25519_sign.(custody_input.message, issuer_private)
+{:ok, custody_compact} = Custody.assemble_compact(custody_input, custody_signature)
+{:ok, custody_decoded} = Custody.decode_attestation(custody_compact, %{})
+custody_expected = %Custody.ExpectedAttestation{
+  attestor: attestor,
+  subject_key_id: "holder-1",
+  subject_public_key: holder_public,
+  now: now,
+  bounds: %{}
+}
+{:ok, custody_facts} = Custody.verify_attestation(custody_compact, custody_expected)
+{custody_decoded.custody_class, custody_facts.custody_class, custody_facts.trust,
+ Custody.verify_attestation(custody_compact, %{custody_expected | now: custody.exp})}
+```
+
+The value is `{"standard", "standard", :not_evaluated, {:error, :invalid}}`.
+The last result shows that the window excludes its end.
+
 ## Verify content and its successor
 
 Content assertions bind nonempty content bytes to a profile, subject lineage, and window. Both

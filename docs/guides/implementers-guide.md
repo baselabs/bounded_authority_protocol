@@ -174,6 +174,20 @@ declared two-file set and per-file hashes, execute all 40 cases, and prove cross
 rejection in both directions. Derive every fingerprint with the RFC 7638 Ed25519 thumbprint
 preimage. Hashing raw key bytes is not equivalent.
 
+### Holder custody attestation candidate
+
+The [holder custody profile](../../spec/bap-holder-custody-attestation-v1.md) uses the same
+BAP1 primitives and caller context. Name its four surfaces separately. The protected header
+is exactly `{alg: "EdDSA", kid, typ: "ba+holder-custody-attestation"}`. Its canonical payload
+is exactly `{v: 1, jti, key_id, public_key, custody_class, nbf, exp}`. The key id and Ed25519
+public JWK `x` value bind the holder. Decode the closed custody class and verify the exact
+signed bytes, expected holder, attestor window, and evaluation time.
+
+Pin the candidate index cited in the specification. Run the signed vectors and compare the
+exact producer and assembly bytes. Run both rejection legs against each existing profile
+and use the pinned verdict digests to verify the existing corpora. Return `custody_class`
+with the verified facts and leave trust and authorization to the host.
+
 ## 11. Implementing the content-assertion sibling profile
 
 The content assertion is the second sibling attestation profile: a standalone,

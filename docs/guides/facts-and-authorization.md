@@ -2,8 +2,9 @@
 
 A successful verification means only that supplied bytes satisfy the supplied trusted inputs
 and expected context. `GrantFacts`, `EnvelopeFacts`, and `AnchoredExportFacts` expose
-`authorization: :not_evaluated`. Diagnostic chain, anchor, transition, role-attestation, and
-content-assertion facts expose `trust: :not_evaluated`; they are not execution credentials.
+`authorization: :not_evaluated`. Diagnostic chain, anchor, transition, attestation, and
+content-assertion facts expose `trust: :not_evaluated`. The host uses those facts as evidence
+when applying its own authorization policy.
 
 The host selects trust, authenticates the request's origin, derives the operation and cast
 arguments, verifies raw credentials, checks live revocation, reserves the execution identity,

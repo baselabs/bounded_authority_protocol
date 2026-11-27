@@ -10,6 +10,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts, as: EsFacts
   alias BoundedAuthorityProtocol.ContentAssertion.V1, as: EdDSA
   alias BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts
+  alias BoundedAuthorityProtocol.HolderCustodyAttestation.V1, as: Custody
   alias BoundedAuthorityProtocol.RoleAttestation.V1, as: RoleAttestation
   alias BoundedAuthorityProtocol.V1, as: V1Facade
   alias BoundedAuthorityProtocol.V1.{Bounds, HistoricalPublicKey, Jcs}
@@ -17,24 +18,26 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   alias BoundedAuthorityProtocol.V3, as: V3Facade
 
   @approval "bap-action-approval/1"
+  @custody "bap-holder-custody-attestation/1"
   @es256 "bap-content-assertion-es256/1"
 
   # Source candidate identities. The released corpus catalog remains independently gated.
   @pins %{
     "U4S4aA-2dXNgaWxoicXWs7cG6HKO3Mrm3QxcRoqBmmQ" => @approval,
-    "K7Qbj7yfvcAmf3KXbVYoC-BUFCDkwUJBymIvHdBx0Ms" => @es256
+    "K7Qbj7yfvcAmf3KXbVYoC-BUFCDkwUJBymIvHdBx0Ms" => @es256,
+    "b59Jd5LcqLr3eEuj52ugUHcx54WZhuidhl9fiaBLz6o" => @custody
   }
 
   @binary_fields ~w(attestor_key_fingerprint content_digest digest prev profile_digest
-    public_key revision_digest)a
+    public_key revision_digest subject_key_fingerprint)a
   @binary_field_keys Map.new(@binary_fields, &{&1, true})
 
   # Include the intentionally unsupported fixture key so the bounds validator rejects it.
   @fields Map.new(
             Map.keys(Bounds.__struct__()) ++
               ~w(action approver_role as_of assertion attestor attestor_key_id aud audience
-                 bounds entries exp gen iat id iss issuer jti key key_id max_active max_lifetime
-                 max_staleness nbf now profile provenance record record_bounds record_bytes
+                 bounds custody_class entries exp gen iat id iss issuer jti key key_id max_active
+                 max_lifetime max_staleness nbf now profile provenance record record_bounds record_bytes
                  request_id resource_count resources roles snapshot sub subject suite trust
                  trust_domain unknown valid_before valid_from verification
                  version)a ++ @binary_fields,
@@ -98,6 +101,23 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
       _failure -> false
     end
   end
+
+  defp known_answer?(@custody, %{
+         "profile" => @custody,
+         "revision" => 1,
+         "attestor" => %{"key_id" => key_id},
+         "signing" => %{"payload" => payload, "compact" => compact, "signature" => signature}
+       }) do
+    values = payload |> Map.delete("v") |> Map.put("attestor_key_id", key_id) |> fields()
+    producer = struct!(Custody.HolderCustodyAttestation, values)
+
+    case Custody.attestation_signing_input(producer, %{}) do
+      {:ok, input} -> Custody.assemble_compact(input, raw(signature)) == {:ok, compact}
+      {:error, :invalid} -> false
+    end
+  end
+
+  defp known_answer?(@custody, _metadata), do: false
 
   defp report(index_bytes, index, cases, metadata) do
     {sdk, elixir} = Enum.split_with(cases, &sdk_case?/1)
@@ -254,6 +274,44 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
     end
   end
 
+  defp execute("attestation-cases.json", item, metadata, _) do
+    subject = Map.get(item, "subject", Map.fetch!(metadata, "subject"))
+    attestor = Map.get(item, "attestor", Map.fetch!(metadata, "attestor"))
+    bounds = fields(Map.get(item, "bounds", %{}))
+    compact = Map.fetch!(item, "compact")
+
+    expected = %Custody.ExpectedAttestation{
+      attestor: struct!(HistoricalPublicKey, fields(attestor)),
+      subject_key_id: Map.fetch!(subject, "key_id"),
+      subject_public_key: raw(Map.fetch!(subject, "public_key")),
+      now: Map.get(item, "now", Map.fetch!(metadata, "now")),
+      bounds: bounds
+    }
+
+    %{
+      "decode" => attestation_outcome(Custody.decode_attestation(compact, bounds)),
+      "verify" => attestation_outcome(Custody.verify_attestation(compact, expected))
+    }
+  end
+
+  defp execute("custody-separation-cases.json", %{"id" => id} = item, _, _) do
+    compact = Map.fetch!(item, "candidate")
+    other = Map.fetch!(item, "foreign")
+    other = if id == "action-approval-record", do: raw(other), else: other
+
+    if match?({:ok, _}, Custody.decode_attestation(compact, %{})) and
+         match?({:ok, _}, foreign(id, other)) and
+         Custody.decode_attestation(other, %{}) == {:error, :invalid} and
+         foreign(id, compact) == {:error, :invalid} do
+      "both_reject"
+    else
+      "unexpected"
+    end
+  end
+
+  defp attestation_outcome({:ok, value}), do: output(value)
+  defp attestation_outcome({:error, :invalid}), do: "invalid"
+
   defp approval(item) do
     record = raw(Map.get(item, "record"))
     compact = Map.get(item, "compact")
@@ -350,6 +408,12 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
   defp foreign("ca1", compact),
     do: EdDSA.decode_assertion(compact, %{})
+
+  defp foreign("ca-es256", compact),
+    do: ES256.decode_assertion(compact, %{})
+
+  defp foreign("action-approval-record", bytes),
+    do: Approval.decode_record(bytes, %{}, %{})
 
   defp foreign("loopback", compact),
     do: Loopback.decode_proof(compact, %{})

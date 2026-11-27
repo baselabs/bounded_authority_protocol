@@ -26,8 +26,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   | `attestation-profiles/role-attestation/v1` | role attestations |
   | `attestation-profiles/content-assertion/v1` | content assertions |
 
-  The source tree also contains two pinned candidates, `bap-content-assertion-es256/1` and
-  `bap-action-approval/1`. Their candidate reports include the profile, executed Elixir verdict
+  The source tree also contains pinned candidates for ES256 content assertions, action approval
+  and holder custody attestations. Their reports include the profile, executed Elixir verdict
   digest and SDK-owned case count. The candidate files enter the package inventory after SDK
   qualification.
 

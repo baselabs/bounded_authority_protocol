@@ -22,6 +22,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   @shipped_v2_corpus Path.expand("../../priv/conformance/v2/corpus", __DIR__)
   @shipped_v3_corpus Path.expand("../../priv/conformance/v3/corpus", __DIR__)
   @priv_conformance Path.expand("../../priv/conformance", __DIR__)
+  @custody_root "attestation-profiles/holder-custody-attestation/v1"
   @role_corpus Path.expand(
                  "../../priv/conformance/attestation-profiles/role-attestation/v1",
                  __DIR__
@@ -61,6 +62,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   test "candidate CLI reports all applicable Elixir verdicts and the SDK-owned census" do
     roots = [
       {"attestation-profiles/content-assertion-es256/v1", 223, 0},
+      {@custody_root, 76, 0},
       {"content-profiles/action-approval/v1", 202, 129}
     ]
 
@@ -153,17 +155,35 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   end
 
   test "candidate execution records a failed cross-profile rejection" do
-    {files, index} = candidate_files("attestation-profiles/content-assertion-es256/v1")
-    file = "separation-cases.json"
-    [item | rest] = :json.decode(files[file])
-    cases = [%{item | "foreign" => item["candidate"]} | rest]
-    edited = replace_candidate_file(files, index, file, cases)
+    for {root, file} <- [
+          {"attestation-profiles/content-assertion-es256/v1", "separation-cases.json"},
+          {@custody_root, "custody-separation-cases.json"}
+        ] do
+      {files, index} = candidate_files(root)
+      [item | rest] = :json.decode(files[file])
+      cases = [%{item | "foreign" => item["candidate"]} | rest]
+      edited = replace_candidate_file(files, index, file, cases)
 
-    assert {:ok, bytes, 1} = Candidate.run(edited, index["profile"])
-    report = :json.decode(bytes)
-    assert report["disagreed"] == 1
-    refute report["agreement"]
-    refute report["elixir_verdict_sha256"] == index["elixir_verdict_sha256"]
+      assert {:ok, bytes, 1} = Candidate.run(edited, index["profile"])
+      report = :json.decode(bytes)
+      assert report["disagreed"] == 1
+      refute report["agreement"]
+      refute report["elixir_verdict_sha256"] == index["elixir_verdict_sha256"]
+    end
+  end
+
+  test "custody corpus refuses a different identity or invalid known-answer input" do
+    {files, index} = candidate_files(@custody_root)
+    file = "profile.json"
+    metadata = :json.decode(files[file])
+
+    for wrong <- [
+          %{metadata | "revision" => 2},
+          put_in(metadata, ["signing", "payload", "custody_class"], "unknown")
+        ] do
+      edited = replace_candidate_file(files, index, file, wrong)
+      assert {:error, :integrity} = Candidate.run(edited, index["profile"])
+    end
   end
 
   defp candidate_files(profile_path) do

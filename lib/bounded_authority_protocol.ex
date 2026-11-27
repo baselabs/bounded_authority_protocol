@@ -16,6 +16,8 @@ defmodule BoundedAuthorityProtocol do
     * `BoundedAuthorityProtocol.RoleAttestation.V1` and
       `BoundedAuthorityProtocol.ContentAssertion.V1`: the standalone sibling attestation
       profiles.
+    * `BoundedAuthorityProtocol.HolderCustodyAttestation.V1`: the source candidate for describing
+      how a holder key is held.
     * `BoundedAuthorityProtocol.Ed25519` and `BoundedAuthorityProtocol.Es256`: the signature
       rules each suite's verification and producer surfaces share.
 

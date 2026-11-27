@@ -9,6 +9,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- Add the source candidate `bap-holder-custody-attestation/1`, with a separate Elixir API
+  and pinned conformance corpus for bounded, non-authorizing holder custody evidence.
+
 - Add Rust verification for the candidate ES256 content-assertion and action-approval
   profiles, including the bounded canonical record codec and host-local diagnostics.
 

@@ -35,7 +35,7 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
   Assembly is a producer surface (erratum 3): it verifies no signature, and it refuses one that
   fails the keyless part of rule S1 (`BoundedAuthorityProtocol.Ed25519`), emitting accepted
   signature bytes unchanged. Every Ed25519 assembler (contract-majors 1 and 2, local loopback,
-  role attestation, content assertion) assembles through this function.
+  role attestation, holder custody attestation, content assertion) assembles through this function.
   """
   @spec assemble(SigningInput.t(), binary(), Bounds.t() | map()) ::
           {:ok, binary()} | {:error, :invalid}
@@ -105,6 +105,7 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
       :boundary_anchor,
       :key_transition,
       :role_attestation,
+      :holder_custody_attestation,
       :content_assertion
     ] and
       is_binary(input.protected_segment) and
@@ -179,12 +180,19 @@ defmodule BoundedAuthorityProtocol.V1.CompactJws do
     end
   end
 
-  defp exact_signing_header?(:role_attestation, members, bounds) when length(members) == 3 do
+  defp exact_signing_header?(kind, members, bounds)
+       when kind in [:role_attestation, :holder_custody_attestation] and length(members) == 3 do
+    typ =
+      case kind do
+        :role_attestation -> "ba+role-attestation"
+        :holder_custody_attestation -> "ba+holder-custody-attestation"
+      end
+
     case Map.new(members) do
       %{
         "alg" => {:string, "EdDSA"},
         "kid" => {:string, kid},
-        "typ" => {:string, "ba+role-attestation"}
+        "typ" => {:string, ^typ}
       } ->
         byte_size(kid) > 0 and byte_size(kid) <= bounds.kid_bytes
 

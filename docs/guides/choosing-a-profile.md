@@ -14,6 +14,7 @@ after a rejection.
 | P-256 keys (ES256), for example keys that live in a cloud KMS or an HSM without Ed25519 | Contract-major 3, `BoundedAuthorityProtocol.V3` | `BAP3-ES256-SHA256` |
 | Proofs to a development listener on `127.0.0.1` or `[::1]` over plain HTTP | Local-loopback HTTP, `BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1` | Ed25519 |
 | A signed statement that a key holds the `issuer` or `holder` role | Role attestation, `BoundedAuthorityProtocol.RoleAttestation.V1` | Ed25519 |
+| A signed statement about how a holder key is held | Holder custody attestation candidate, `BoundedAuthorityProtocol.HolderCustodyAttestation.V1` | Ed25519 |
 | A signed statement binding the digest of exact content bytes to a context and lineage | Content assertion, `BoundedAuthorityProtocol.ContentAssertion.V1` | Ed25519 |
 
 If none of the special cases apply, start with contract-major 1. Move to contract-major 2 when a
@@ -59,6 +60,9 @@ API, and its own corpus.
 - **Role attestation** (`typ: "ba+role-attestation"`) is a standalone artifact in which an
   attestor key binds a subject key to the `issuer` or `holder` role for a window inside the
   attestor key's own validity ([spec](../../spec/bap-role-attestation-v1.md)).
+- **Holder custody attestation** (`typ: "ba+holder-custody-attestation"`) describes a
+  holder key's custody class during a bounded window. The verifier returns custody facts with
+  `trust: :not_evaluated` ([spec](../../spec/bap-holder-custody-attestation-v1.md)).
 - **Content assertion** (`typ: "ba+content-assertion"`) is a standalone artifact that binds the
   SHA-256 digest of exact content bytes to an issuer, audience, lineage subject, semantic
   profile, window, and predecessor ([spec](../../spec/bap-content-assertion-v1.md)).

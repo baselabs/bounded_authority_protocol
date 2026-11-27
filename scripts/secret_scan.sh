@@ -335,6 +335,7 @@ priv/conformance/content-profiles/action-approval/v1/approval-cases.json
 spec/bap-v1.md
 priv/conformance/application-profiles/local-loopback-http/v1/profile.json
 priv/conformance/attestation-profiles/role-attestation/v1/attestation-cases.json
+priv/conformance/attestation-profiles/holder-custody-attestation/v1/attestation-cases.json
 priv/conformance/attestation-profiles/content-assertion/v1/assertion-structure-cases.json
 priv/conformance/v2/corpus/cases/anchored-export/probe.json
 priv/conformance/v1/vectors/consumption-chain-archive.json
@@ -491,6 +492,7 @@ priv/conformance/content-profiles/action-approval/v1/approval-cases.json
 docs/protocol-v1.md
 priv/conformance/application-profiles/local-loopback-http/v1/profile.json
 priv/conformance/attestation-profiles/role-attestation/v1/attestation-cases.json
+priv/conformance/attestation-profiles/holder-custody-attestation/v1/attestation-cases.json
 priv/conformance/attestation-profiles/content-assertion/v1/assertion-structure-cases.json
 priv/conformance/v2/corpus/cases/envelope/probe.json
 priv/conformance/v1/vectors/grant-holder-proof.json

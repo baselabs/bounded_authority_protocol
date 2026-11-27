@@ -363,6 +363,8 @@ The same steps apply to the other namespaces, each with its own specification an
   does not isolate local processes.
 - `BoundedAuthorityProtocol.RoleAttestation.V1` binds a key to the `issuer` or `holder` role
   ([spec](../../spec/bap-role-attestation-v1.md)).
+- The `BoundedAuthorityProtocol.HolderCustodyAttestation.V1` source candidate binds a holder key
+  to a custody class for a bounded window. See the [recipe](recipes.md#verify-a-holder-custody-attestation).
 - `BoundedAuthorityProtocol.ContentAssertion.V1` binds the digest of exact content bytes to an
   issuer, audience, lineage subject, and window ([spec](../../spec/bap-content-assertion-v1.md)).
 

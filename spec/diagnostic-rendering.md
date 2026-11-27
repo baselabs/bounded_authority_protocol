@@ -3,7 +3,7 @@
 This is the language-neutral diagnostic display contract for decoded BAP values and fully
 redacted facts. It defines display bytes, not a wire encoding, a generic serialization format,
 or evidence of verification, trust, or authorization. It applies to contract-majors 1, 2, and 3
-and the role-attestation and content-assertion sibling profiles.
+and the role-attestation, holder custody attestation, and content-assertion sibling profiles.
 
 ## Diagnostic rendering
 
@@ -41,6 +41,13 @@ The structural role-attestation name is
 
 ```text
 version, attestor_key_id, jti, key_id, public_key, role, nbf, exp, verification
+```
+
+The structural holder custody attestation name is
+`BoundedAuthorityProtocol.HolderCustodyAttestation.V1.DecodedAttestation`. Its fields are:
+
+```text
+version, attestor_key_id, jti, key_id, public_key, custody_class, nbf, exp, verification
 ```
 
 The fixed proof names are `BoundedAuthorityProtocol.VN.DecodedProof`, with the same three
@@ -98,7 +105,7 @@ used in logs. They expose no nested record or assertion fields.
 Proofs use `proof`. A proof nonce is `nil` if absent and exactly `:redacted` whenever
 present, regardless of its contents. Redaction happens before any rendering.
 Other proof fields keep their diagnostic values. Structural decoded grants, operations,
-and role attestations use `struct`; their fields are diagnostic data, never trusted inputs.
+and attestations use `struct`. Their fields are unverified diagnostic data.
 The `verification` field remains `:not_evaluated`.
 
 Atom names and field keys MUST be plain identifiers matching `[a-z_][a-zA-Z0-9_]*[?!]?`.

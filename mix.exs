@@ -150,6 +150,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/design/requirement-map.md",
         "docs/design/local-loopback-http-requirement-map.md",
         "docs/design/role-attestation-requirement-map.md",
+        "docs/design/holder-custody-attestation-requirement-map.md",
         "docs/design/content-assertion-requirement-map.md",
         "docs/design/standards-track.md",
         "docs/design/threat-model.md",
@@ -225,6 +226,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "BoundedAuthorityProtocol.Conformance.Report",
         "BoundedAuthorityProtocol.Conformance.Candidate",
         "BoundedAuthorityProtocol.Conformance.Cli.Main",
+        "BoundedAuthorityProtocol.HolderCustodyAttestation.V1.Codec",
         "BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1",
         "BoundedAuthorityProtocol.V1.Json.decode_approval_record/3",
         "BoundedAuthorityProtocol.V1.Jcs.encode_approval_record/4",
@@ -289,6 +291,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "spec/bap-action-approval-v1.md",
         "spec/bap-local-loopback-http-v1.md",
         "spec/bap-role-attestation-v1.md",
+        "spec/bap-holder-custody-attestation-v1.md",
         "spec/bap-v1.md",
         "spec/bap-v2.md",
         "spec/bap-v3.md",
@@ -305,6 +308,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "docs/design/registries.md",
         "docs/design/requirement-map.md",
         "docs/design/role-attestation-requirement-map.md",
+        "docs/design/holder-custody-attestation-requirement-map.md",
         "docs/design/standards-track.md",
         "docs/design/successor-major-charter.md",
         "docs/design/threat-model.md",
@@ -379,6 +383,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
           "spec/bap-action-approval-v1.md",
           "spec/bap-local-loopback-http-v1.md",
           "spec/bap-role-attestation-v1.md",
+          "spec/bap-holder-custody-attestation-v1.md",
           "spec/bap-v1.md",
           "spec/bap-v2.md",
           "spec/bap-v3.md",
@@ -395,6 +400,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
           "docs/design/registries.md",
           "docs/design/requirement-map.md",
           "docs/design/role-attestation-requirement-map.md",
+          "docs/design/holder-custody-attestation-requirement-map.md",
           "docs/design/standards-track.md",
           "docs/design/successor-major-charter.md",
           "docs/design/threat-model.md",
@@ -423,6 +429,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "Sibling profiles": [
           ~r"^BoundedAuthorityProtocol\.ApplicationProfile\.",
           ~r"^BoundedAuthorityProtocol\.RoleAttestation\.",
+          ~r"^BoundedAuthorityProtocol\.HolderCustodyAttestation\.",
           ~r"^BoundedAuthorityProtocol\.ContentAssertion\.",
           ~r"^BoundedAuthorityProtocol\.ActionApproval\."
         ],
@@ -453,7 +460,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
   defp facade?(module),
     do:
       module =~
-        ~r"^BoundedAuthorityProtocol\.((ApplicationProfile\.LocalLoopbackHttp|RoleAttestation|ContentAssertion(\.ES256)?|ActionApproval)\.)?V\d$"
+        ~r"^BoundedAuthorityProtocol\.((ApplicationProfile\.LocalLoopbackHttp|RoleAttestation|HolderCustodyAttestation|ContentAssertion(\.ES256)?|ActionApproval)\.)?V\d$"
 
   defp aliases do
     [
@@ -494,6 +501,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "cmd ./bounded_authority_conformance --corpus priv/conformance/attestation-profiles/role-attestation/v1",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/attestation-profiles/content-assertion/v1",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/attestation-profiles/content-assertion-es256/v1",
+        "cmd ./bounded_authority_conformance --corpus priv/conformance/attestation-profiles/holder-custody-attestation/v1",
         "cmd ./bounded_authority_conformance --corpus priv/conformance/content-profiles/action-approval/v1"
       ],
       "local_loopback_http.verify": [
@@ -519,7 +527,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "cmd node conformance/generators/build_selector_float_zero.mjs --verify",
         "cmd python3 scripts/build_content_assertion_corpus.py --verify",
         "cmd uv sync --project sdks/python --locked --no-dev --no-install-project",
-        "cmd uv run --project sdks/python --no-sync python scripts/build_approval_corpora.py --verify"
+        "cmd uv run --project sdks/python --no-sync python scripts/build_approval_corpora.py --verify",
+        "cmd uv run --project sdks/python --no-sync python -B scripts/build_holder_custody_corpus.py --verify"
       ],
       "corpus.distribution.mutations": [
         "cmd mix test test/corpus_tooling_test.exs",

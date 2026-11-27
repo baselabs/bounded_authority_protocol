@@ -76,6 +76,24 @@ Submission to IANA for registration is externally gated.
 - **Change controller:** Bounded Authority Protocol maintainers
 - **Wire `typ`:** `ba+role-attestation`
 
+## application/ba-holder-custody-attestation+jwt (candidate)
+
+- **Type name:** application
+- **Subtype name:** ba-holder-custody-attestation+jwt
+- **Required parameters:** None
+- **Optional parameters:** None
+- **Encoding considerations:** Compact JWS (RFC 7515) with closed, canonical JSON header and payload and base64url segments
+- **Security considerations:** See Security and host obligations in the BAP Holder Custody Attestation Profile 1
+- **Interoperability considerations:** A closed Ed25519 profile with a distinct protected type and a bounded validity window
+- **Published specification:** spec/bap-holder-custody-attestation-v1.md (BAP Holder Custody Attestation Profile 1)
+- **Applications that use this media type:** Signed custody statements for holder keys
+- **Fragment identifier considerations:** N/A
+- **Intended usage:** LIMITED USE
+- **Restrictions on usage:** The statement grants no authority. Trust selection and replay reservation belong to the host.
+- **Author:** Bounded Authority Protocol maintainers
+- **Change controller:** Bounded Authority Protocol maintainers
+- **Wire `typ`:** `ba+holder-custody-attestation`
+
 ## application/ba-content-assertion+jwt (active)
 
 - **Type name:** application

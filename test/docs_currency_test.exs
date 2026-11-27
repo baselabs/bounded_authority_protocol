@@ -347,6 +347,19 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
     assert report =~ index["profile"]
   end
 
+  test "the holder custody specification cites the current source corpus" do
+    root = "priv/conformance/attestation-profiles/holder-custody-attestation/v1"
+    index_bytes = File.read!(Path.join(root, "index.json"))
+    index = :json.decode(index_bytes)
+    digest = :sha256 |> :crypto.hash(index_bytes) |> Base.encode16(case: :lower)
+    case_count = Enum.sum(for %{"cases" => count} <- index["files"], do: count)
+    spec = File.read!("spec/bap-holder-custody-attestation-v1.md")
+
+    assert spec =~ index["profile"]
+    assert spec =~ "Revision #{index["revision"]}'s pinned"
+    assert spec =~ "`#{digest}` (#{case_count} cases)"
+  end
+
   test "the requirement-map summary counts its mapped identifiers and the normative specs" do
     map = File.read!("docs/design/requirement-map.md")
 

@@ -90,6 +90,10 @@ digest, and the time.
 **Profile.** A closed wire format with its own `typ` or `v` value, specification, and corpus: a
 contract-major or a sibling profile.
 
+**Holder custody attestation.** A sibling attestation profile
+(`typ: "ba+holder-custody-attestation"`) that describes how a holder key is held during a
+bounded window. See the [profile](../../spec/bap-holder-custody-attestation-v1.md).
+
 **Role attestation.** A sibling attestation profile (`typ: "ba+role-attestation"`) in which an
 attestor key binds a subject key to the `issuer` or `holder` role.
 
@@ -97,7 +101,8 @@ attestor key binds a subject key to the `issuer` or `holder` role.
 contract-major 2, `lte` and `gte`.
 
 **Sibling profile.** A byte-distinct profile beside the contract-majors, with its own protected
-`typ` and API: local-loopback HTTP proofs, role attestations, and content assertions.
+`typ` and API: local-loopback HTTP proofs, role attestations, holder custody attestations,
+and content assertions.
 
 **Signing input.** The exact bytes to sign for a protocol object (`message`), returned by the
 `*_signing_input/2` producers.

@@ -238,7 +238,7 @@ unique case ID, rejects missing execution, and compares its computed digest with
 The CLI 1.x report retains its existing members. The manifest sits outside every corpus
 folder, so each corpus's refusal of files absent from its index remains intact.
 
-## ES256 content assertion and action approval candidates
+## Source candidate corpora
 
 The candidate indexes under
 `priv/conformance/attestation-profiles/content-assertion-es256/v1` and
@@ -249,3 +249,8 @@ contracts. Elixir consumes the pure cases by index. The SDK helper fixtures
 supply public predicate observations and the expected call sequence and result.
 SDK adoption and full runner qualification precede adding these indexes to the
 published corpus inventory.
+
+The [holder custody attestation candidate](../../spec/bap-holder-custody-attestation-v1.md#6-conformance-and-release)
+follows the same inventory rule. Its index under
+`priv/conformance/attestation-profiles/holder-custody-attestation/v1` covers independent signed
+vectors, an exact signing and assembly answer, and two-way rejection across profiles.

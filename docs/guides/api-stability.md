@@ -147,6 +147,11 @@ Sibling profiles:
 - `BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation`
 - `BoundedAuthorityProtocol.RoleAttestation.V1.ExpectedAttestation`
 - `BoundedAuthorityProtocol.RoleAttestation.V1.RoleAttestation`
+- `BoundedAuthorityProtocol.HolderCustodyAttestation.V1`
+- `BoundedAuthorityProtocol.HolderCustodyAttestation.V1.AttestationFacts`
+- `BoundedAuthorityProtocol.HolderCustodyAttestation.V1.DecodedAttestation`
+- `BoundedAuthorityProtocol.HolderCustodyAttestation.V1.ExpectedAttestation`
+- `BoundedAuthorityProtocol.HolderCustodyAttestation.V1.HolderCustodyAttestation`
 - `BoundedAuthorityProtocol.ContentAssertion.V1`
 - `BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertion`
 - `BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts`
@@ -170,7 +175,8 @@ Conformance:
   `agreed`, `disagreed`, `index_sha256_base64url`) are part of the contract.
 
 The [ES256 content assertion](../../spec/bap-content-assertion-es256-v1.md) and
-[action approval](../../spec/bap-action-approval-v1.md) surfaces are candidates.
+[action approval](../../spec/bap-action-approval-v1.md) surfaces are candidates, as is
+[holder custody attestation](../../spec/bap-holder-custody-attestation-v1.md).
 Use `BoundedAuthorityProtocol.ActionApproval.V1.encode_record/4` to author exact
 bytes. The fourth argument explicitly enables resource sorting and deduplication.
 Use `BoundedAuthorityProtocol.ActionApproval.V1.verify_eddsa/3` or
@@ -191,6 +197,7 @@ change in any release:
   `BoundedAuthorityProtocol.Conformance.Report`, and
   `BoundedAuthorityProtocol.Conformance.Candidate`, the CLI's internals;
 - `BoundedAuthorityProtocol.Conformance.Cli.Main`, the escript entry point;
+- `BoundedAuthorityProtocol.HolderCustodyAttestation.V1.Codec`, the internal codec;
 - `BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1`;
 - `BoundedAuthorityProtocol.V1.Json.decode_approval_record/3`,
   `BoundedAuthorityProtocol.V1.Jcs.encode_approval_record/4`, and
@@ -233,7 +240,7 @@ Whatever the package version:
 | Family | Success | Refusal | Boundary |
 |---|---|---|---|
 | Contract-major producers, assembly, decoders, credential and evidence verifiers | `{:ok, value}` | `{:error, :invalid}` | contract-major 1, contract-major 2, contract-major 3 |
-| Sibling-profile producers, assembly, decoders and verifiers | `{:ok, value}` | `{:error, :invalid}` | Local loopback, role attestations, content assertions |
+| Sibling-profile producers, assembly, decoders and verifiers | `{:ok, value}` | `{:error, :invalid}` | Local loopback, role and holder custody attestations, content assertions |
 | Content digests and assertion digests | `{:ok, digest}` | `{:error, :invalid}` | No content interpretation or trust selection |
 | `ContentAssertion.V1.verify_successor/3` | `:ok` | `{:error, :invalid}` | Consistency of supplied facts, no provenance verification |
 | `Ed25519.verify_strict/3`, `acceptable_public_key?/1`, `torsion_free?/1` | `true` | `false` | Signature/key predicates |

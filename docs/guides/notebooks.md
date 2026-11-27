@@ -23,6 +23,9 @@ workflow runs them unchanged against the exact Hex release right after each uplo
 | [Chains and archives](../notebooks/chains-and-archives.livemd) | Expected boundaries, historical-key transitions and immutable object identity | 16 |
 | [Advanced strict crypto](../notebooks/strict-crypto.livemd) | Certified Ed25519 forgery controls and enrollment subgroup checks | 10 |
 
+The holder custody attestation source candidate has an
+[executable recipe](recipes.md#verify-a-holder-custody-attestation).
+
 Import a current `.livemd` file into Livebook and choose **Run all** to use these steps.
 The launch links open each journey's own file under `docs/notebooks/` at the immutable 1.1.0
 release tag, including the focused contract-major 2 range notebook.

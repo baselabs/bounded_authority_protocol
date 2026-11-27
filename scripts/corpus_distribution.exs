@@ -8,6 +8,7 @@ defmodule BoundedAuthorityProtocol.CorpusDistribution do
   # maintained runner can execute their complete case sets.
   @candidate_roots [
     "attestation-profiles/content-assertion-es256/v1/",
+    "attestation-profiles/holder-custody-attestation/v1/",
     "content-profiles/action-approval/v1/"
   ]
 
