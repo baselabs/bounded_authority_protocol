@@ -54,6 +54,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Fixed
 
+- Expose suite-specific Go action approval assertion facts for EdDSA and ES256 successor verification.
 - Reject floating-point overrides for fixed cryptographic widths. Exercise typed bound and
   malformed snapshot inputs in the candidate action approval corpus.
 - Limit new-ref identifier checks to commits outside the pushing remote's tracking refs.

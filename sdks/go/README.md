@@ -260,6 +260,13 @@ diagnostic. Keep diagnostic codes in host-local logs. For a presenter-facing fai
 then the replay predicate after pure verification succeeds. Use its `PresenterResult` or
 `RenderPresenterResult` for the presenter.
 
+To check consecutive approvals, call `AssertionEdDSA()` on both verified EdDSA approvals and
+pass the returned `ContentAssertionFacts` to `VerifyContentAssertionSuccessor`. For ES256,
+call `AssertionES256()` on both approvals and pass the returned `ES256ContentAssertionFacts`
+to `ContentAssertionES256{}.VerifySuccessor`. Both accessors return zero facts and `false`
+for a different suite or a zero approval value. `Assertion()` provides the common assertion
+fields for inspection.
+
 At execution, atomically claim both the artifact identity and the request's current revision.
 When the effect is external to that transaction, use a durable intent, destination idempotency,
 and reconciliation. The approval contract specifies the full matching and disclosure rules.

@@ -151,8 +151,29 @@ func (f VerifiedApprovalFacts) TrustDomain() string { return f.fields().trustDom
 // Record returns the canonical record bound to the assertion.
 func (f VerifiedApprovalFacts) Record() ApprovalRecord { return f.fields().record }
 
-// Assertion returns the verified content assertion facts.
+// Assertion returns the verified content assertion fields for inspection.
+// Use AssertionEdDSA or AssertionES256 to obtain suite-specific successor inputs.
 func (f VerifiedApprovalFacts) Assertion() ContentAssertionFacts { return f.fields().assertion }
+
+// AssertionEdDSA returns the EdDSA facts for VerifyContentAssertionSuccessor.
+// It returns zero facts and false for any other suite or a zero approval.
+func (f VerifiedApprovalFacts) AssertionEdDSA() (ContentAssertionFacts, bool) {
+	assertion := f.Assertion()
+	if assertion.kind != KindContentAssertion {
+		return ContentAssertionFacts{}, false
+	}
+	return assertion, true
+}
+
+// AssertionES256 returns the ES256 facts for ContentAssertionES256.VerifySuccessor.
+// It returns zero facts and false for any other suite or a zero approval.
+func (f VerifiedApprovalFacts) AssertionES256() (ES256ContentAssertionFacts, bool) {
+	assertion := f.Assertion()
+	if assertion.kind != KindContentAssertionES256 {
+		return ES256ContentAssertionFacts{}, false
+	}
+	return ES256ContentAssertionFacts{assertion}, true
+}
 
 // Trust returns the static marker for the verifier trust boundary.
 func (VerifiedApprovalFacts) Trust() Trust { return TrustNotEvaluated }
