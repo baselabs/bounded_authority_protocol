@@ -37,7 +37,41 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
            ]
 
     assert Enum.sort(Enum.flat_map(groups, &elem(&1, 1))) == Enum.sort(extras)
+    assert "IPR.md" in extras
+    assert "TRADEMARKS.md" in extras
+    assert File.read!("README.md") =~ "](TRADEMARKS.md)"
     assert byte_size(File.read!("README.md")) < 50_000
+  end
+
+  test "the protocol and SDK ports identify their steward and link their IP statements" do
+    products = [
+      {".", "Bounded Authority Protocol (bounded_authority_protocol)"},
+      {"sdks/go", "github.com/baselabs/bounded_authority_protocol_go"},
+      {"sdks/python", "bounded-authority-protocol-verifier"},
+      {"sdks/rust", "bounded-authority-protocol"}
+    ]
+
+    for {directory, product} <- products do
+      notice_header = """
+      #{product}
+      Copyright 2026 BaseLabs Holdings LLC
+
+      This product includes software developed by BaseLabs Holdings LLC
+      (https://github.com/baselabs).
+      """
+
+      assert String.starts_with?(File.read!(Path.join(directory, "NOTICE")), notice_header)
+
+      assert File.read!(Path.join(directory, "LICENSE")) =~
+               "   Copyright 2026 BaseLabs Holdings LLC\n"
+
+      assert File.read!(Path.join(directory, "README.md")) =~
+               "](IPR.md) for contributions and use of the name."
+    end
+
+    contributing = File.read!("CONTRIBUTING.md")
+    assert contributing =~ "Developer Certificate of Origin sign-off (`git commit -s`)"
+    assert contributing =~ "](IPR.md)."
   end
 
   test "CommonMark sample discovery handles nested, indented and longer fences" do
@@ -381,9 +415,19 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
   defp extra_path(path), do: path
 
   defp surfaces do
-    (["README.md", "SECURITY.md", "CONTRIBUTING.md", "usage-rules.md", "sdks/README.md"] ++
+    root_pages = [
+      "README.md",
+      "SECURITY.md",
+      "CONTRIBUTING.md",
+      "IPR.md",
+      "TRADEMARKS.md",
+      "usage-rules.md",
+      "sdks/README.md"
+    ]
+
+    (root_pages ++
        Path.wildcard("docs/**/*.{md,cheatmd,livemd}") ++
-       Path.wildcard("sdks/*/README.md"))
+       Path.wildcard("sdks/*/{README,IPR}.md"))
     |> Enum.sort()
   end
 

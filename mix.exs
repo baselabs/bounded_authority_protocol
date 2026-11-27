@@ -116,6 +116,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "CHANGELOG.md",
         "CODE_OF_CONDUCT.md",
         "CONTRIBUTING.md",
+        "IPR.md",
+        "TRADEMARKS.md",
         "LICENSE",
         "NOTICE",
         "SECURITY.md",
@@ -312,6 +314,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "CHANGELOG.md",
         "SECURITY.md",
         "CONTRIBUTING.md",
+        "IPR.md",
+        "TRADEMARKS.md",
         "CODE_OF_CONDUCT.md",
         "LICENSE",
         "NOTICE"
@@ -402,6 +406,8 @@ defmodule BoundedAuthorityProtocol.MixProject do
           "CHANGELOG.md",
           "SECURITY.md",
           "CONTRIBUTING.md",
+          "IPR.md",
+          "TRADEMARKS.md",
           "CODE_OF_CONDUCT.md",
           "LICENSE",
           "NOTICE"

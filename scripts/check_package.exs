@@ -8,6 +8,8 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "CHANGELOG.md",
                     "CODE_OF_CONDUCT.md",
                     "CONTRIBUTING.md",
+                    "IPR.md",
+                    "TRADEMARKS.md",
                     "LICENSE",
                     "NOTICE",
                     "README.md",

@@ -96,8 +96,9 @@ consumer code. Runtime code, public APIs, wire formats, and conformance artifact
 provider-neutral; boundary documentation may name consumers only to state exclusions and
 dependency direction.
 
-By contributing, you agree that your contribution is licensed under Apache License 2.0. No
-contributor license agreement or DCO sign-off is currently required.
+Contributions are licensed under Apache-2.0, as section 5 of the license describes, and
+every commit carries a Developer Certificate of Origin sign-off (`git commit -s`). See
+[IPR.md](IPR.md).
 
 ## Code of Conduct
 

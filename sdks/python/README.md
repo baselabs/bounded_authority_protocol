@@ -1,4 +1,4 @@
-# Bounded Authority Protocol verifier for Python
+# Bounded Authority Protocol™ verifier for Python
 
 A pure, deterministic Python implementation of the Bounded Authority Protocol (BAP) verification
 profiles: contract-majors 1 and 2 (Ed25519) and 3 (ES256), the local-loopback HTTP proof
@@ -419,4 +419,5 @@ When moving from an older source commit, apply these changes recorded in the mon
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Apache-2.0, maintained by BaseLabs Holdings LLC. See [LICENSE](LICENSE) and [NOTICE](NOTICE),
+and [IPR.md](IPR.md) for contributions and use of the name.

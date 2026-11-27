@@ -31,7 +31,7 @@ Homepage = "https://github.com/baselabs/bounded_authority_protocol"
 Repository = "https://github.com/baselabs/bounded_authority_protocol"
 
 [tool.hatch.build.targets.sdist]
-include = ["src/", "examples/", "tests/", "conformance/", "tools/", "README.md", "LICENSE", "LICENSE-THIRD-PARTY", "NOTICE", "pyproject.toml", "uv.lock"]
+include = ["src/", "examples/", "tests/", "conformance/", "tools/", "README.md", "IPR.md", "LICENSE", "LICENSE-THIRD-PARTY", "NOTICE", "pyproject.toml", "uv.lock"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bounded_authority_verifier"]

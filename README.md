@@ -1,4 +1,4 @@
-# bounded_authority_protocol
+# Bounded Authority Protocol™
 
 [![Hex version](https://img.shields.io/hexpm/v/bounded_authority_protocol.svg)](https://hex.pm/packages/bounded_authority_protocol)
 [![HexDocs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/bounded_authority_protocol)
@@ -229,7 +229,7 @@ verdict digests bind each runner to the same frozen cases. See the
 2. Concepts: [grants and proofs](docs/guides/grants-and-holder-proofs.md), [trusted keys](docs/guides/trusted-keys-and-rotation.md), [tagged arguments](docs/guides/tagged-arguments-and-selectors.md), [nonce and time](docs/guides/nonce-and-time-policy.md), [facts and authorization](docs/guides/facts-and-authorization.md), [evidence](docs/guides/evidence.md).
 3. Integrate and operate: [hosts and frameworks](docs/guides/framework-integration.md), [security](docs/guides/integration-security.md), [operations](docs/guides/operations.md), [observability](docs/guides/observability.md), [errors](docs/guides/errors.md), [troubleshooting](docs/guides/troubleshooting.md), [recipes](docs/guides/recipes.md), [testing](docs/guides/testing-your-integration.md).
 4. Reference: [cheatsheet](docs/guides/cheatsheet.cheatmd), [API and result matrix](docs/guides/api-stability.md), [glossary](docs/guides/glossary.md), [FAQ](docs/guides/faq.md), [upgrading](docs/guides/upgrading.md), [other languages](docs/guides/other-languages.md), [usage rules](usage-rules.md).
-5. Implementers: [implementer's guide](docs/guides/implementers-guide.md), [specifications](spec/bap-v1.md), [conformance](docs/design/conformance-contract.md), [interoperability](docs/design/interoperability-report.md).
+5. Implementers: [implementer's guide](docs/guides/implementers-guide.md), [specifications](spec/bap-v1.md), [conformance](docs/design/conformance-contract.md), [interoperability](docs/design/interoperability-report.md), [name and conformance policy](TRADEMARKS.md).
 
 ### Notebook journeys
 
@@ -257,4 +257,5 @@ Report a vulnerability privately through the
 
 ## License
 
-Apache License 2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+Apache-2.0, maintained by BaseLabs Holdings LLC. See [LICENSE](LICENSE) and [NOTICE](NOTICE),
+and [IPR.md](IPR.md) for contributions and use of the name.
