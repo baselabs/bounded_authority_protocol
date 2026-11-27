@@ -203,6 +203,10 @@ eight-file set and per-file hashes, execute all 131 assertion, 9 digest, and 14 
 compare producer and assembly bytes where the corpus supplies them, and prove cross-profile
 rejection in both directions.
 
+For both attestation profiles, reject an IPvFuture authority host such as `https://[v1.a]/`.
+StringOrURI permits IPv6 inside the host brackets. Run the additive `bap-string-or-uri/1`
+corpus alongside the original profile corpora. See [erratum 7](../errata.md).
+
 ## 12. Implementing strict Ed25519 verification
 
 Every Ed25519 surface uses one rule, specified in

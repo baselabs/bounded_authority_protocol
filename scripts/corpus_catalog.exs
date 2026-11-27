@@ -12,6 +12,8 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
     {3, "v3/corpus", "run_v3.py", "run_v3.rs", "conformance/v3_test.go"},
     {:strict_ed25519, "strict-ed25519", "run_strict.py", "run_strict.rs",
      "conformance/strict_test.go"},
+    {:string_or_uri, "string-or-uri", "run_strict.py", "run_strict.rs",
+     "conformance/strict_test.go"},
     {:producer_canonicality, "producer-canonicality", "run_producer_canonicality.py",
      "run_producer_canonicality.rs", "conformance/producer_canonicality_test.go"},
     {:selector_float_zero, "selector-float-zero", "run_selector_float_zero.py",
@@ -133,7 +135,8 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
      [
        {:strict_ed25519, :hex, 1},
        {:producer_canonicality, :hex, 1},
-       {:selector_float_zero, :hex, 1}
+       {:selector_float_zero, :hex, 1},
+       {:string_or_uri, :hex, 1}
      ]},
     {"docs/guides/implementers-guide.md",
      [
@@ -168,7 +171,10 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
 
   def root, do: @root
   def cli, do: @cli
-  def runner_pin, do: @runner_pin
+  def runner_pin(:string_or_uri),
+    do: ~r/(?m)^(?:const )?(?:STRING_OR_URI_INDEX_SHA256|stringOrURICorpusIndexSHA256)\b[^=\n]*=\s*"([^"]*)"/
+
+  def runner_pin(_key), do: @runner_pin
 
   def entries do
     pins = certified_pins()

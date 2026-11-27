@@ -21,8 +21,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
   # Source candidate identities. The released corpus catalog remains independently gated.
   @pins %{
-    "NUcBmDSfKwOwxd9DaFaaQ36uOYR_pLjfHNHySzPW-CY" => @approval,
-    "15Mp1DHeCT8WJhP70qL-g4dmtpD6Z8-8FHjq-jIrPGM" => @es256
+    "U4S4aA-2dXNgaWxoicXWs7cG6HKO3Mrm3QxcRoqBmmQ" => @approval,
+    "K7Qbj7yfvcAmf3KXbVYoC-BUFCDkwUJBymIvHdBx0Ms" => @es256
   }
 
   @binary_fields ~w(attestor_key_fingerprint content_digest digest prev profile_digest

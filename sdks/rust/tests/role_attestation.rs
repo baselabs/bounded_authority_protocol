@@ -206,6 +206,7 @@ fn string_or_uri_rules_are_symmetric_across_every_attestation_surface() {
             true,
         ),
         ("IPv6 with numeric port", "https://[::1]:443", true),
+        ("IPvFuture literal", "https://[v1.a]/", false),
         ("malformed IPv6", "https://[bad]", false),
         ("IPv6 with nonnumeric port", "https://[::1]:abc", false),
         ("unterminated IPv6", "https://[::1", false),

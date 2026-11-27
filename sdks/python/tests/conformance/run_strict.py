@@ -55,6 +55,7 @@ CORPUS_DIR = _CORPUS_ROOT / "priv" / "conformance" / "strict-ed25519"
 # The certified index.json SHA-256 (certified index SHA-256 binding
 # (docs/design/conformance-contract.md)). A mismatched corpus fails closed.
 CERTIFIED_INDEX_SHA = "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
+STRING_OR_URI_INDEX_SHA256 = "11c7d8ba162c9de81eec8dbaf75847b7d9c0c2c40043008c80066efb1c5381a5"
 PROFILE = "bap-strict-ed25519/1"
 TOTAL_CASES = 2410
 
@@ -92,19 +93,19 @@ def _verdict(expected: dict[str, Any], accepted: bool) -> bool:
 # ---- corpus loading ----
 
 
-def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    integrity(CORPUS_DIR, CERTIFIED_INDEX_SHA)
-    index_raw = (CORPUS_DIR / "index.json").read_bytes()
+def load_corpus(root, pin, profile, total) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    integrity(root, pin)
+    index_raw = (root / "index.json").read_bytes()
     index_sha = hashlib.sha256(index_raw).hexdigest()
-    if index_sha != CERTIFIED_INDEX_SHA:
-        abort(f"index.json SHA mismatch: got {index_sha}, certified {CERTIFIED_INDEX_SHA}")
+    if index_sha != pin:
+        abort(f"index.json SHA mismatch: got {index_sha}, certified {pin}")
     index = json.loads(index_raw.decode("utf8"))
-    if index.get("profile") != PROFILE or index.get("revision") != 1:
+    if index.get("profile") != profile or index.get("revision") != 1:
         abort("index.json: profile or revision")
     cases: list[dict[str, Any]] = []
     family_counts: dict[str, int] = {}
     for entry in index["files"]:
-        body = (CORPUS_DIR / entry["path"]).read_bytes()
+        body = (root / entry["path"]).read_bytes()
         if hashlib.sha256(body).hexdigest() != entry["sha256"]:
             abort(f"{entry['path']}: file SHA mismatch")
         if entry["path"] in ("profile.json", "revision.json"):
@@ -122,7 +123,7 @@ def load_corpus() -> tuple[dict[str, Any], list[dict[str, Any]]]:
         cases.extend(file_json["cases"])
     if family_counts != index["families"]:
         abort("family counts differ from the index")
-    if len(cases) != index["total_cases"] or len(cases) != TOTAL_CASES:
+    if len(cases) != index["total_cases"] or len(cases) != total:
         abort(f"case count: index says {index['total_cases']}, loaded {len(cases)}")
     if len({c["id"] for c in cases}) != len(cases):
         abort("duplicate case ids")
@@ -260,11 +261,18 @@ def run_case(case: dict[str, Any]) -> dict[str, Any]:
     return _run_shaped(case)
 
 
-def run_all(only: frozenset[str] | None = None) -> dict[str, Any]:
-    index, cases = load_corpus()
+def run_all(
+    only: frozenset[str] | None = None,
+    *,
+    root=CORPUS_DIR,
+    pin=CERTIFIED_INDEX_SHA,
+    profile=PROFILE,
+    total=TOTAL_CASES,
+) -> dict[str, Any]:
+    index, cases = load_corpus(root, pin, profile, total)
     passed = 0
     failures: list[str] = []
-    execution = CorpusRun(CORPUS_DIR, CERTIFIED_INDEX_SHA)
+    execution = CorpusRun(root, pin)
     selected = [c for c in cases if only is None or c["_family"] in only]
     for case in selected:
         actual = run_case(case)
@@ -281,6 +289,15 @@ def run_all(only: frozenset[str] | None = None) -> dict[str, Any]:
         "index": index,
         "failures": failures,
     }
+
+
+def run_string_or_uri() -> dict[str, Any]:
+    return run_all(
+        root=CORPUS_DIR.with_name("string-or-uri"),
+        pin=STRING_OR_URI_INDEX_SHA256,
+        profile="bap-string-or-uri/1",
+        total=6,
+    )
 
 
 def main() -> None:

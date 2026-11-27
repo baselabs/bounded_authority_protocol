@@ -29,6 +29,9 @@ RECORD_FIELDS = set("v subject action request_id approver_role resources revisio
 STRINGS = "jti iss aud sub profile".split()
 DIGESTS = "profile_digest content_digest prev".split()
 INTEGERS = "gen iat nbf exp".split()
+IPVFUTURE = "https://[v1.a]/"
+STRING_OR_URI = "bap-string-or-uri/1"
+STRING_OR_URI_FORMAT = "bounded-authority-protocol-string-or-uri-conformance"
 
 
 def sha(raw):
@@ -105,8 +108,6 @@ def identifier(value, cap):
     if not host.startswith("["):
         return True
     literal = host[1:-1]
-    if re.fullmatch(rf"v[0-9A-Fa-f]+\.(?:{URI_TOKEN}|:)+", literal, re.IGNORECASE):
-        return "%" not in literal
     try:
         return "%" not in literal and bool(ipaddress.IPv6Address(literal))
     except ValueError:
@@ -496,9 +497,11 @@ def record_vectors(record):
         ("short-revision", canonical(record | {"revision_digest": b64(bytes(31))})),
         ("padded-revision", canonical(record | {"revision_digest": record["revision_digest"] + "="})),
         ("invalid-request-id", canonical(record | {"request_id": "1:invalid"})),
+        ("ipvfuture-request-id-wire", canonical(record | {"request_id": IPVFUTURE})),
     ]:
         add(name, wire=data)
     add("canonicalize", author=record | {"resources": ["z", "a", "z"]}, sort=True, valid=True)
+    add("ipvfuture-request-id-author", author=record | {"request_id": IPVFUTURE})
     add("authoring-explicit-only", author=record | {"resources": ["z", "a", "z"]})
     add("authoring-input-count", author=record | {"resources": ["a"] * 3}, sort=True,
         bounds={"resource_count": 2})
@@ -591,6 +594,7 @@ def assertion_vectors(keys, base):
     for key in STRINGS:
         add("empty-claim-" + key, sign(base | {key: ""}))
         add("invalid-uri-" + key, sign(base | {key: "1:invalid"}))
+        add("ipvfuture-" + key, sign(base | {key: IPVFUTURE}))
     for key in DIGESTS:
         add("short-digest-" + key, sign(base | {key: b64(bytes(31))}))
         add("padded-digest-" + key, sign(base | {key: base[key] + "="}))
@@ -654,6 +658,7 @@ def assertion_vectors(keys, base):
         ("escaped-userinfo", "urn://user%5Binfo%5D@example.com/x", True),
         ("raw-userinfo-brackets", "urn://user[info]@example.com/x", False),
         ("ipv6-literal", "urn://[::1]/x", True),
+        ("ipvfuture-userinfo-port", "https://user@[VF.a:b]:443/", False),
         ("invalid-bracketed-host", "urn://[abc]/x", False),
     ]:
         add("inherited-uri-" + name, sign(base | {"jti": uri}), accepted)
@@ -852,6 +857,17 @@ def approval_vectors(keys, record, base, digest):
     build("bounds-tightened-unselected-entry", "trust_unavailable",
           ctx={"bounds": {"identifier_bytes": 64}}, snapshot={"entries": entries + [unused]})
     for suite, accepted in (("es256", es_ok), ("eddsa", ed_ok)):
+        build(f"{suite}-ipvfuture-audience", "invalid_context", suite=suite,
+              ctx={"audience": IPVFUTURE})
+        build(f"{suite}-ipvfuture-expected-request", "invalid_context", suite=suite,
+              ctx={"request_id": IPVFUTURE})
+        build(f"{suite}-ipvfuture-enrolled-issuer", "trust_unavailable", suite=suite,
+              entry={"issuer": IPVFUTURE})
+        build(f"{suite}-ipvfuture-signed-id", "malformed", suite=suite,
+              claim={"jti": IPVFUTURE})
+        wire = canonical(record | {"request_id": IPVFUTURE})
+        build(f"{suite}-ipvfuture-record-request", "malformed", suite=suite, wire=wire,
+              claim={"content_digest": content_digest(wire)})
         snapshot_entries = accepted["context"]["snapshot"]["entries"]
         original = snapshot_entries[0]
         for field in ("public_key", "valid_from", "valid_before"):
@@ -1070,6 +1086,70 @@ def freeze(root, profile, files, verify):
           "index base64url", b64(sha(encoded["index.json"])), "verdict", index["verdict_sha256"])
 
 
+def freeze_string_or_uri(signer, base, verify):
+    # These independently signed cases extend the released profiles without rotating either
+    # certified index or changing any existing case outcome.
+    attestor = dict(key_id=HEADERS["eddsa"]["kid"],
+                    public_key=b64(public_bytes(signer.public_key(), "eddsa")),
+                    valid_from=10, valid_before=40)
+    subject_key = ed25519.Ed25519PrivateKey.from_private_bytes(sha(b"BAP StringOrURI subject"))
+    subject_public = public_bytes(subject_key.public_key(), "eddsa")
+    subject = dict(key_id="subject-key", public_key=b64(subject_public))
+    role_header = HEADERS["eddsa"] | {"typ": "ba+role-attestation"}
+    role_payload = subject | dict(v=1, role="holder", nbf=15, exp=40)
+    expected = dict(issuer=base["iss"], audience=base["aud"], subject=base["sub"],
+                    profile=base["profile"], profile_digest=base["profile_digest"],
+                    content_digest=base["content_digest"], now=20)
+    role_cases, content_cases = [], []
+    for label, uri, accepted in [
+        ("ipvfuture", IPVFUTURE, False),
+        ("ipvfuture-userinfo-port", "https://user@[VF.a:b]:443/", False),
+        ("ipv6-userinfo-port", "https://user@[::1]:443/", True),
+    ]:
+        demand(identifier(uri, CA_MAX["identifier_bytes"]) == accepted)
+        role_cases.append(dict(id="role-attestation-" + label, surface="role_attestation",
+                               compact=signed(signer, "eddsa", role_header, role_payload | {"jti": uri}),
+                               attestor=attestor, subject=subject, now=20,
+                               decode=accepted, verify=accepted))
+        verdict = "valid" if accepted else "invalid"
+        content_cases.append(dict(id="content-assertion-" + label, surface="content_assertion",
+                                  compact=signed(signer, "eddsa", HEADERS["eddsa"], base | {"jti": uri}),
+                                  attestor=attestor, expected_context=expected,
+                                  expected=dict(decode=verdict, verify=verdict)))
+
+    files = {
+        "profile.json": dict(format=STRING_OR_URI_FORMAT + "-profile", profile=STRING_OR_URI,
+                             revision=1, erratum=7),
+        "revision.json": dict(format=STRING_OR_URI_FORMAT + "-corpus-revision", revision=1,
+                              generated_from="scripts/build_approval_corpora.py"),
+    }
+    families = {"content-assertion": content_cases, "role-attestation": role_cases}
+    for family, cases in families.items():
+        files[f"cases/{family}/ipvfuture.json"] = dict(
+            format=STRING_OR_URI_FORMAT + "-cases", family=family, cases=cases)
+    encoded = {name: canonical(doc) + b"\n" for name, doc in files.items()}
+    index = dict(format=STRING_OR_URI_FORMAT + "-corpus-index", profile=STRING_OR_URI,
+                 revision=1, private_material_tracked=False,
+                 families={family: len(cases) for family, cases in families.items()},
+                 total_cases=sum(map(len, families.values())),
+                 files=[dict(path=name, sha256=sha(raw).hex(), cases=len(files[name].get("cases", [])))
+                        for name, raw in sorted(encoded.items())])
+    encoded["index.json"] = canonical(index) + b"\n"
+    root = CORPORA / "string-or-uri"
+    if verify:
+        demand(set(encoded) == {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()})
+    for name, raw in encoded.items():
+        path = root / name
+        if verify:
+            if path.read_bytes() != raw:
+                raise ValueError(f"fixture drift: string-or-uri/{name}")
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+    print(STRING_OR_URI, "cases", index["total_cases"], "index hex", sha(encoded["index.json"]).hex(),
+          "index base64url", b64(sha(encoded["index.json"])))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -1094,6 +1174,7 @@ def main():
                                      profile_digest_hex=digest.hex())
     freeze(CORPORA / "attestation-profiles/content-assertion-es256/v1", ES, assertions, args.verify)
     freeze(CORPORA / "content-profiles/action-approval/v1", APPROVAL, approvals, args.verify)
+    freeze_string_or_uri(keys["eddsa"], base, args.verify)
     if args.verify:
         spec = (ROOT / "spec/bap-action-approval-v1.md").read_text()
         demand(preimage.hex() in spec and digest.hex() in spec)

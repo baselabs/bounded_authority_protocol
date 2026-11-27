@@ -9,6 +9,12 @@ defmodule BoundedAuthorityProtocol.V1.StringOrUriTest do
     assert StringOrUri.valid?("https://example.test/a%20b?x=1#fragment")
   end
 
+  test "IP-literal identifier hosts require IPv6" do
+    assert StringOrUri.valid?("https://user@[::1]:443/")
+    refute StringOrUri.valid?("https://[v1.a]/")
+    refute StringOrUri.valid?("https://user@[VF.a:b]:443/")
+  end
+
   test "rejects malformed schemes, percent escapes, spaces, controls, and non-URI bytes" do
     for invalid <- [
           ":missing-scheme",

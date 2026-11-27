@@ -240,9 +240,9 @@ revocation comparison. The action-approval facade admits the caller's snapshot b
 ## Conformance
 
 `conformance/priv/conformance/` is a complete, byte-identical snapshot of the Hex package built
-from this commit's `priv/conformance/` tree. It includes all nine certified corpora, schemas, focused vectors,
-and `verdict-digests.json`. Every test input is inside this SDK root; copying this directory
-alone is sufficient to run the suite.
+from this commit's `priv/conformance/` tree. It includes all certified corpora, schemas, focused
+vectors, and `verdict-digests.json`. Copying the SDK directory alone is sufficient to run
+the certified suite.
 The manifest was introduced in 1.1.0.
 
 | Corpus | Cases |
@@ -254,6 +254,7 @@ The manifest was introduced in 1.1.0.
 | Producer canonicality | 75 |
 | Selector float zero | 161 |
 | Strict Ed25519 | 2,410 |
+| StringOrURI identifiers | 6 |
 
 Each runner pins its index, hashes every indexed file, including `.raw` inputs, and rejects
 extra or missing files, duplicate IDs, and skipped cases. It records computed outcomes,

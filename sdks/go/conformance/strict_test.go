@@ -27,6 +27,8 @@ import (
 // vendored corpus that hashes to anything else fails closed here: silent drift is impossible.
 const strictCertifiedIndexSHA256 = "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
 
+const stringOrURICorpusIndexSHA256 = "11c7d8ba162c9de81eec8dbaf75847b7d9c0c2c40043008c80066efb1c5381a5"
+
 const (
 	strictCorpusDir  = "priv/conformance/strict-ed25519"
 	strictProfile    = "bap-strict-ed25519/1"
@@ -56,29 +58,29 @@ type strictHead struct {
 	Major   int    `json:"major"`
 }
 
-func loadStrictCorpus(t *testing.T) []strictCaseRef {
+func loadAdditiveCorpus(t *testing.T, dir, pin, profile string, total int) []strictCaseRef {
 	t.Helper()
-	indexBytes, err := os.ReadFile(filepath.Join(strictCorpusDir, "index.json"))
+	indexBytes, err := os.ReadFile(filepath.Join(dir, "index.json"))
 	if err != nil {
 		t.Fatalf("vendored strict index.json: %v", err)
 	}
 	sum := sha256.Sum256(indexBytes)
-	if got := hex.EncodeToString(sum[:]); got != strictCertifiedIndexSHA256 {
+	if got := hex.EncodeToString(sum[:]); got != pin {
 		t.Fatalf("vendored strict corpus index.json SHA-256 mismatch: got %s want %s: fail closed on corpus drift",
-			got, strictCertifiedIndexSHA256)
+			got, pin)
 	}
 	var idx strictIndex
 	if err := json.Unmarshal(indexBytes, &idx); err != nil {
 		t.Fatalf("strict index.json parse: %v", err)
 	}
-	if idx.Profile != strictProfile || idx.Revision != 1 || idx.TotalCases != strictTotalCases {
+	if idx.Profile != profile || idx.Revision != 1 || idx.TotalCases != total {
 		t.Fatalf("strict index header: profile=%s revision=%d total=%d", idx.Profile, idx.Revision, idx.TotalCases)
 	}
 	var refs []strictCaseRef
 	families := map[string]int{}
 	seen := map[string]bool{}
 	for _, f := range idx.Files {
-		body, err := os.ReadFile(filepath.Join(strictCorpusDir, f.Path))
+		body, err := os.ReadFile(filepath.Join(dir, f.Path))
 		if err != nil {
 			t.Fatalf("strict corpus file %s: %v", f.Path, err)
 		}
@@ -120,8 +122,8 @@ func loadStrictCorpus(t *testing.T) []strictCaseRef {
 			t.Fatalf("family %s: %d cases, index says %d", fam, families[fam], n)
 		}
 	}
-	if len(refs) != strictTotalCases {
-		t.Fatalf("loaded %d strict cases, want %d", len(refs), strictTotalCases)
+	if len(refs) != total {
+		t.Fatalf("loaded %d cases, want %d", len(refs), total)
 	}
 	return refs
 }
@@ -134,8 +136,17 @@ type strictCaseRef struct {
 }
 
 func TestStrictEd25519Corpus(t *testing.T) {
-	execution := corpuscheck.New(t, strictCorpusDir, "priv/conformance", strictCertifiedIndexSHA256)
-	refs := loadStrictCorpus(t)
+	runAdditiveCorpus(t, strictCorpusDir, strictCertifiedIndexSHA256, strictProfile, strictTotalCases)
+}
+
+func TestStringOrURICorpus(t *testing.T) {
+	runAdditiveCorpus(t, "priv/conformance/string-or-uri", stringOrURICorpusIndexSHA256, "bap-string-or-uri/1", 6)
+}
+
+func runAdditiveCorpus(t *testing.T, dir, pin, profile string, total int) {
+	t.Helper()
+	execution := corpuscheck.New(t, dir, "priv/conformance", pin)
+	refs := loadAdditiveCorpus(t, dir, pin, profile, total)
 	agreed := 0
 	for _, ref := range refs {
 		ref := ref
@@ -144,11 +155,11 @@ func TestStrictEd25519Corpus(t *testing.T) {
 			agreed++
 		}
 	}
-	if agreed != strictTotalCases {
-		t.Fatalf("strict corpus: %d/%d cases agree", agreed, strictTotalCases)
+	if agreed != total {
+		t.Fatalf("%s: %d/%d cases agree", profile, agreed, total)
 	}
 	execution.Finish()
-	t.Logf("strict corpus: agreed=%d/%d", agreed, strictTotalCases)
+	t.Logf("%s: agreed=%d/%d", profile, agreed, total)
 }
 
 func strictB64(t *testing.T, id, s string) []byte {

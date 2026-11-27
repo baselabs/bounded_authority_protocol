@@ -60,8 +60,8 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   test "candidate CLI reports all applicable Elixir verdicts and the SDK-owned census" do
     roots = [
-      {"attestation-profiles/content-assertion-es256/v1", 217, 0},
-      {"content-profiles/action-approval/v1", 190, 119}
+      {"attestation-profiles/content-assertion-es256/v1", 223, 0},
+      {"content-profiles/action-approval/v1", 202, 129}
     ]
 
     for {root, total, sdk_owned} <- roots do
@@ -401,6 +401,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
           {"strict-ed25519", "strict-ed25519", nil},
           {"producer-canonicality", "producer-canonicality", nil},
           {"selector-float-zero", "selector-float-zero", 161},
+          {"string-or-uri", "string-or-uri", 6},
           {"application-profiles/local-loopback-http/v1", "local-loopback-http", 46},
           {"attestation-profiles/role-attestation/v1", "role-attestation", 40},
           {"attestation-profiles/content-assertion/v1", "content-assertion", 154}

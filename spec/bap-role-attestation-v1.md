@@ -1,7 +1,7 @@
 # BAP Role Attestation Profile 1
 
 Document status: normative for attestation profile `bap-role-attestation/1`. Document revision:
-rev 2 (erratum 2; erratum 3 amends revision 2 in place; see the
+rev 2 (erratum 2; errata 3 and 7 amend revision 2 in place; see the
 [errata registry](../docs/errata.md)). This document defines a standalone sibling attestation
 profile under [governance § Byte-distinct sibling attestation
 profiles](../docs/governance.md#byte-distinct-sibling-attestation-profiles); it changes no contract-major

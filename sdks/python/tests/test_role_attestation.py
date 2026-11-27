@@ -490,6 +490,8 @@ def test_attestation_identifiers_reject_trailing_newline(field: str, value: str)
     "jti",
     [
         "https://[bad]",
+        "https://[v1.a]/",
+        "https://user@[VF.a:b]:443/",
         "https://[::1]:abc",
         "https://[::1",
         "https://[1::2::3]",

@@ -9,6 +9,7 @@ verification soundness repair ([§ 14.1](#strict-ed25519)); errata 3 (producer-s
 canonicality, [§ 16](#verification)), 4, and 5 (editorial) amend revision 2 in place. Revision 3
 incorporates erratum 6, the selector float-zero soundness repair ([§ 12](#selectors)). The
 [errata registry](../docs/errata.md) records each entry.
+Erratum 7 clarifies the StringOrURI host rule in revision 3.
 
 A conforming implementation rejects every unlisted member, value, encoding, or extension with a
 single closed error value. Successful decode or verification is not a trust-selection or
@@ -267,6 +268,9 @@ case-sensitive (`REQ1-CLAIM-case-sensitive`).
 | `iat`, `nbf`, `exp` | integral NumericDate |
 | `cnf` | exact object `{jkt: canonical_base64url_sha256}` |
 | `operations` | nonempty array of at most 64 operation objects |
+
+For a StringOrURI identifier, an IP-literal authority host **MUST** be an IPv6
+address. An IPvFuture literal, such as `https://[v1.a]/`, is invalid.
 
 An operation is exactly `{name: string, selectors: selector_array}`. Names are unique within the
 grant and contain 1–128 printable ASCII bytes. The ordered selector array has 1–64 members

@@ -286,7 +286,7 @@ verification path.
 ## Conformance
 
 `conformance/priv/conformance/` is a complete, byte-identical snapshot of the Hex package built
-from this commit's `priv/conformance/` tree. It includes all nine certified corpora, schemas, focused vectors,
+from this commit's `priv/conformance/` tree. It includes all certified corpora, schemas, focused vectors,
 and `verdict-digests.json`. Copying the SDK directory alone is sufficient to run the certified suite.
 The manifest was introduced in 1.1.0.
 
@@ -299,6 +299,7 @@ The manifest was introduced in 1.1.0.
 | Producer canonicality | 75 |
 | Selector float zero | 161 |
 | Strict Ed25519 | 2,410 |
+| StringOrURI identifiers | 6 |
 
 Each runner pins its index, hashes every indexed file, including `.raw` inputs, and rejects
 extra or missing files, duplicate IDs, and skipped cases. It records computed outcomes,
@@ -307,7 +308,7 @@ against the vendored manifest. Expected-value comparison cannot substitute for t
 Outcome projections and index ordering are specified in the
 [verdict digest contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/corpus-verdict-digests.md).
 The contract-major runners also retain their public-key import censuses.
-The monorepo candidate run reads 217 ES256 content assertion cases and 309 action approval
+The monorepo candidate run reads 223 ES256 content assertion cases and 331 action approval
 cases from the protocol source. It checks the complete verdict digests and the shared subset
 of outcomes computed by the protocol's Elixir runner.
 

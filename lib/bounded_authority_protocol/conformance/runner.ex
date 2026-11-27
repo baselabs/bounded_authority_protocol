@@ -141,7 +141,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     end)
   end
 
-  defp execute_case(case_obj, _raws, :strict_ed25519),
+  defp execute_case(case_obj, _raws, major) when major in [:strict_ed25519, :string_or_uri],
     do: %{case_id: case_obj["id"], agree: strict_agrees?(case_obj)}
 
   defp execute_case(case_obj, _raws, :producer_canonicality),
@@ -180,12 +180,14 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
     computed_loopback(c["compact"], c["grant"], expected)
   end
 
-  defp computed_case(:strict_ed25519, %{"surface" => "role_attestation"} = c, _, _) do
+  defp computed_case(major, %{"surface" => "role_attestation"} = c, _, _)
+       when major in [:strict_ed25519, :string_or_uri] do
     {:ok, expected} = build_expected_attestation(c)
     computed_attestation(c["compact"], expected)
   end
 
-  defp computed_case(:strict_ed25519, %{"surface" => "content_assertion"} = c, _, _) do
+  defp computed_case(major, %{"surface" => "content_assertion"} = c, _, _)
+       when major in [:strict_ed25519, :string_or_uri] do
     {:ok, expected} = build_expected_assertion(c)
     computed_assertion(c["compact"], expected, %{})
   end

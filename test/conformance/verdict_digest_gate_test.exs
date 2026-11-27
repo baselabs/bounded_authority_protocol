@@ -41,7 +41,7 @@ defmodule BoundedAuthorityProtocol.Conformance.VerdictDigestGateTest do
       System.cmd("mix", ["run", "--no-start", generator], cd: root, stderr_to_stdout: true)
 
     assert status == 0, output
-    assert output =~ "corpus verdict digests: ok corpora=9"
+    assert output =~ "corpus verdict digests: ok"
     IO.puts("GREEN stale verdict manifest: restored")
   end
 end

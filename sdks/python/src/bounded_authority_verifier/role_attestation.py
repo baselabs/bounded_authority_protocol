@@ -190,9 +190,7 @@ def _valid_uri_authority(authority: str) -> bool:
         close = hostport.find("]")
         if close == -1:
             return False  # unterminated IP-literal.
-        literal = hostport[1:close]
-        ipv_future = re.fullmatch(r"[vV][0-9A-Fa-f]+\.[A-Za-z0-9._~!$&'()*+,;=:-]+", literal)
-        if ipv_future is None and not _is_ipv6(literal):
+        if not _is_ipv6(hostport[1:close]):
             return False
         suffix = hostport[close + 1 :]
         return suffix == "" or re.fullmatch(r":\d*", suffix) is not None

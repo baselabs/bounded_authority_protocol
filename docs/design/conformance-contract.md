@@ -48,7 +48,7 @@ A self-round-trip proves only internal consistency. Byte drift or a manifest cen
 nonzero.
 
 BAP-03's focused vectors and independent verifier are public repository acceptance evidence. The
-Hex package ships the protocol schemas, runtime, and all nine certified corpora, including the portable v1 corpus
+Hex package ships the protocol schemas, runtime, and all certified corpora, including the portable v1 corpus
 (283 cases across 28 surfaces with a total surface × class applicability matrix, `.raw` sidecars
 for oversize wire inputs). BAP-05's corpus is normative: a second Node implementation
 (`conformance/corpus_independent.mjs`, node:* only) independently recomputes every corpus verdict
@@ -226,7 +226,7 @@ pins it. The spec subsection documents both thresholds and the reference impleme
 
 ## Corpus distribution and computed verdict binding
 
-A Hex build carries the complete `priv/conformance/` tree, including all nine certified
+A Hex build carries the complete `priv/conformance/` tree, including all certified
 corpora and the sibling `verdict-digests.json` manifest, introduced in 1.1.0. Each in-tree SDK
 vendors that exact tree at `conformance/priv/conformance/` beneath its own root. The package
 census, unpacked Hex inventory, and every SDK snapshot must agree in both directions, including

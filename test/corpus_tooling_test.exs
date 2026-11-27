@@ -89,7 +89,7 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
     for entry <- Catalog.entries(), runner <- entry.runners do
       path = Path.join(root, Path.relative_to(runner, Catalog.root()))
       original = File.read!(path)
-      [declaration, digest] = Regex.run(Catalog.runner_pin(), original)
+      [declaration, digest] = Regex.run(Catalog.runner_pin(entry.key), original)
       bad = String.replace(declaration, digest, String.duplicate("0", byte_size(digest)))
       File.write!(path, String.replace(original, declaration, bad, global: false))
       {output, status} = run(root, "regen_corpus_digests")
@@ -99,7 +99,7 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
     end
   end
 
-  test "rotation updates all nine corpora, SDK pins, and Elixir mirrors", %{root: root} do
+  test "rotation updates all corpora, SDK pins, and Elixir mirrors", %{root: root} do
     for entry <- Catalog.entries() do
       path = Path.join([root, entry.source, "index.json"])
       File.write!(path, File.read!(path) <> "\n")
@@ -130,7 +130,7 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
       for runner <- entry.runners do
         [_, actual] =
           Regex.run(
-            Catalog.runner_pin(),
+            Catalog.runner_pin(entry.key),
             File.read!(Path.join(root, Path.relative_to(runner, Catalog.root())))
           )
 

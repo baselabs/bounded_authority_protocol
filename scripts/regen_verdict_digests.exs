@@ -11,4 +11,4 @@ case System.argv() do
   _ -> raise "usage: mix run scripts/regen_verdict_digests.exs [--write]"
 end
 
-IO.puts("corpus verdict digests: ok corpora=9")
+IO.puts("corpus verdict digests: ok")

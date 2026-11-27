@@ -2,13 +2,13 @@
 
 The Hex release's complete `priv/conformance/` tree is the distribution boundary. Each
 unpublished verifier SDK vendors that tree at `conformance/priv/conformance/` beneath its own
-root. The snapshot includes schemas, focused vectors, all nine certified corpora, and the
+root. The snapshot includes schemas, focused vectors, all certified corpora, and the
 sibling `verdict-digests.json` manifest. A corpus directory still contains exactly the files
 its own index names, plus its index. The sibling manifest does not alter that rule or the
 CLI 1.x report contract.
 
 The manifest was introduced in 1.1.0. The in-tree snapshots match the unpacked Hex package
-built from this commit. Frozen case bytes and all nine certified index digests remain unchanged.
+built from this commit. Existing frozen case bytes and certified index digests remain unchanged.
 
 ## Ordering
 
@@ -49,6 +49,7 @@ inputs or modifiers. In particular, `expected_overrides`, `compact`, `constructi
 | `strict-ed25519` | Primitive, key acceptance, shaped major 1/2 surfaces, content assertion | `expected` verbatim | [BAP1 §14.1](../../spec/bap-v1.md#strict-ed25519) and indexed `profile.json`, `case_envelope.primitive`, `.v1_shaped`, `.content_assertion` |
 | `strict-ed25519` | `local_loopback_http` | `decode_local`, `decode_standard`, `envelope_local` | [BAP1 §14.1](../../spec/bap-v1.md#strict-ed25519), [local loopback HTTP §6](../../spec/bap-local-loopback-http-v1.md#6-conformance-and-release), indexed `profile.json`, `case_envelope.loopback` |
 | `strict-ed25519` | `role_attestation` | `decode`, `verify` | [BAP1 §14.1](../../spec/bap-v1.md#strict-ed25519), [role attestation §6](../../spec/bap-role-attestation-v1.md#6-conformance-and-release), indexed `profile.json`, `case_envelope.role_attestation` |
+| `string-or-uri` | `role_attestation`, `content_assertion` | `decode`, `verify` | [Erratum 7](../errata.md) |
 
 The role corpus's optional `v1_grant` cross-profile diagnostic is separately asserted by
 its tests. The role surface's digest projection is `decode` and `verify`, as in the strict
@@ -68,8 +69,7 @@ protocol message's resource ceilings to this tooling aggregate.
 `scripts/regen_verdict_digests.exs` implements this contract and fails when the checked-in
 manifest is stale. The manifest is a JCS object without a trailing newline, matching the
 corpus JSON convention. Its format is `bap-corpus-verdict-digests/1`; each corpus entry
-binds its index SHA-256, case count, and expected verdict digest. The nine existing index
-pins and all frozen input bytes remain unchanged.
+binds its index SHA-256, case count, and expected verdict digest.
 
 ## SDK distribution boundary
 

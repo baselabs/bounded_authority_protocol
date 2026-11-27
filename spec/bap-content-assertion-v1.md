@@ -1,7 +1,7 @@
 # BAP Content Assertion Profile 1
 
 Document status: normative contract for `bap-content-assertion/1`, revision 2 (erratum 2;
-erratum 3 amends revision 2 in place; see the [errata registry](../docs/errata.md)); first
+errata 3 and 7 amend revision 2 in place; see the [errata registry](../docs/errata.md)); first
 released in package 0.7.0; the companion signer supports it from
 `bounded_authority_report_adapter` 0.9.0. It is a sibling attestation profile under
 [governance § Byte-distinct sibling attestation

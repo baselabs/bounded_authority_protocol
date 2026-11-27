@@ -4,6 +4,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+- Clarify in erratum 7 that StringOrURI IP-literal hosts require IPv6. Align Python
+  attestation and candidate verification with the reference and add pinned rejection cases.
+
 ### Added
 
 - Add Rust verification for the candidate ES256 content-assertion and action-approval

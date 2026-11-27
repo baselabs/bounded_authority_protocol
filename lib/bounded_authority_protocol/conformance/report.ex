@@ -22,6 +22,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Report do
     :producer_canonicality =>
       "bounded-authority-protocol-producer-canonicality-conformance-report",
     :selector_float_zero => "bounded-authority-protocol-selector-float-zero-conformance-report",
+    :string_or_uri => "bounded-authority-protocol-string-or-uri-conformance-report",
     :local_loopback_http => "bounded-authority-protocol-local-loopback-http-conformance-report",
     :role_attestation => "bounded-authority-protocol-role-attestation-conformance-report",
     :content_assertion => "bounded-authority-protocol-content-assertion-conformance-report"

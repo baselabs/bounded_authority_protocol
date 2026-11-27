@@ -50,6 +50,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
             | :strict_ed25519
             | :producer_canonicality
             | :selector_float_zero
+            | :string_or_uri
             | :local_loopback_http
             | :role_attestation
             | :content_assertion,
@@ -118,6 +119,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
          {:error, :invalid} <- load_strict_ed25519(map),
          {:error, :invalid} <- load_producer_canonicality(map),
          {:error, :invalid} <- load_selector_float_zero(map),
+         {:error, :invalid} <- load_string_or_uri(map),
          {:error, :invalid} <- load_local_loopback_http(map),
          {:error, :invalid} <- load_role_attestation(map) do
       load_content_assertion(map)
@@ -203,9 +205,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   defp plain_bytes?(<<0, _rest::binary>>), do: false
   defp plain_bytes?(<<_byte, rest::binary>>), do: plain_bytes?(rest)
 
-  # --- additive corpora (strict-Ed25519, producer-canonicality) -------------
+  # --- additive corpora -----------------------------------------------------
 
-  # The two additive corpora share one closed index shape: per-file lowercase-hex SHA-256,
+  # The additive corpora share one closed index shape: per-file lowercase-hex SHA-256,
   # per-file and per-family case counts, a profile and a revision sidecar, and no applicability
   # matrix. Each carries its own profile and format strings, so a loader accepts only its own.
   @strict_ed25519 %{
@@ -235,6 +237,18 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     profile_format: "bounded-authority-protocol-selector-float-zero-conformance-profile",
     revision_format: "bounded-authority-protocol-selector-float-zero-conformance-corpus-revision"
   }
+
+  @string_or_uri %{
+    major: :string_or_uri,
+    profile: "bap-string-or-uri/1",
+    index_format: "bounded-authority-protocol-string-or-uri-conformance-corpus-index",
+    case_format: "bounded-authority-protocol-string-or-uri-conformance-cases",
+    profile_format: "bounded-authority-protocol-string-or-uri-conformance-profile",
+    revision_format: "bounded-authority-protocol-string-or-uri-conformance-corpus-revision"
+  }
+
+  defp load_string_or_uri(map) when is_map(map), do: load_additive(map, @string_or_uri)
+  defp load_string_or_uri(_map), do: {:error, :invalid}
 
   @additive_sidecars ["profile.json", "revision.json"]
 

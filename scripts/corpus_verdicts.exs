@@ -57,7 +57,7 @@ defmodule BoundedAuthorityProtocol.CorpusVerdicts do
         {"strict-ed25519", _, "local_loopback_http"} ->
           ["decode_local", "decode_standard", "envelope_local"]
 
-        {"strict-ed25519", _, "role_attestation"} ->
+        {corpus, _, "role_attestation"} when corpus in ["strict-ed25519", "string-or-uri"] ->
           ["decode", "verify"]
 
         _ ->

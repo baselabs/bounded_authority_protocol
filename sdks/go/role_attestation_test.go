@@ -262,6 +262,7 @@ func TestRoleAttestationStringOrURIProfile(t *testing.T) {
 		{"userinfo", "https://user:pass@example.com/path", true},
 		{"multiple userinfo delimiters", "https://a@b@example.com/path", false},
 		{"IPv6 literal and numeric port", "https://[::1]:443/path", true},
+		{"IPvFuture literal", "https://[v1.a]/", false},
 		{"empty port allowed by StringOrUri", "https://example.com:", true},
 		{"out-of-range numeric port allowed by StringOrUri", "https://example.com:65536/path", true},
 		{"file URI with empty authority", "file:///tmp", true},

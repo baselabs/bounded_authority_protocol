@@ -16,8 +16,8 @@ defmodule BoundedAuthorityProtocol.ActionApproval.CorpusTest do
 
   @es256_root "priv/conformance/attestation-profiles/content-assertion-es256/v1"
   @approval_root "priv/conformance/content-profiles/action-approval/v1"
-  @es256_pin "d79329d431de093f162613fbd2a2fe838766b690fa67cfbc1478eafa322b3c63"
-  @approval_pin "35470198349f2b03b0c5df4368569a437eae39847fa4b8df1cd1f24b33d6f826"
+  @es256_pin "2bb41b8fbc9fbdc0267f72976d56280be0541420e4c14241ca622f1dd071d0cb"
+  @approval_pin "5384b8680fb6757360696c6889c5d6b3b706e8728edccae6dd0c5c468a819a64"
 
   @binary_fields ~w(attestor_key_fingerprint content_digest digest prev profile_digest public_key
     revision_digest)a

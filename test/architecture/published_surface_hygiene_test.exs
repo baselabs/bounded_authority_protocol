@@ -35,6 +35,7 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "priv/conformance/strict-ed25519",
     "priv/conformance/producer-canonicality",
     "priv/conformance/selector-float-zero",
+    "priv/conformance/string-or-uri",
     ".formatter.exs",
     "mix.exs",
     "README.md",

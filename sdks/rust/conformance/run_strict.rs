@@ -29,6 +29,8 @@ use sha2::{Digest, Sha256};
 
 const CERTIFIED_INDEX_SHA: &str =
     "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9";
+const STRING_OR_URI_INDEX_SHA256: &str =
+    "11c7d8ba162c9de81eec8dbaf75847b7d9c0c2c40043008c80066efb1c5381a5";
 const PROFILE: &str = "bap-strict-ed25519/1";
 const TOTAL_CASES: usize = 2410;
 
@@ -561,18 +563,31 @@ fn run_case(case: &Value) -> Value {
 
 #[test]
 fn strict_ed25519_corpus_all_cases_agree() {
-    let root = corpus_root();
-    let mut execution = support::Run::new(&root, CERTIFIED_INDEX_SHA);
+    assert_corpus(corpus_root(), CERTIFIED_INDEX_SHA, PROFILE, TOTAL_CASES);
+}
+
+#[test]
+fn string_or_uri_corpus_all_cases_agree() {
+    assert_corpus(
+        corpus_root().with_file_name("string-or-uri"),
+        STRING_OR_URI_INDEX_SHA256,
+        "bap-string-or-uri/1",
+        6,
+    );
+}
+
+fn assert_corpus(root: PathBuf, index_pin: &str, profile: &str, total_cases: usize) {
+    let mut execution = support::Run::new(&root, index_pin);
     let index_bytes = fs::read(root.join("index.json")).expect("vendored index.json");
     let actual = hex_sha256(&index_bytes);
     assert_eq!(
-        actual, CERTIFIED_INDEX_SHA,
-        "index.json SHA mismatch: corpus drift (expected {CERTIFIED_INDEX_SHA}, got {actual})"
+        actual, index_pin,
+        "index.json SHA mismatch: corpus drift (expected {index_pin}, got {actual})"
     );
     let index: Value = serde_json::from_slice(&index_bytes).unwrap();
-    assert_eq!(index["profile"], PROFILE);
+    assert_eq!(index["profile"], profile);
     assert_eq!(index["revision"], 1);
-    assert_eq!(index["total_cases"], TOTAL_CASES);
+    assert_eq!(index["total_cases"], total_cases);
 
     let mut families: BTreeMap<String, usize> = BTreeMap::new();
     let mut cases: Vec<Value> = Vec::new();
@@ -608,11 +623,11 @@ fn strict_ed25519_corpus_all_cases_agree() {
         .map(|(k, v)| (k.clone(), v.as_u64().unwrap() as usize))
         .collect();
     assert_eq!(families, declared, "family counts differ from the index");
-    assert_eq!(cases.len(), TOTAL_CASES);
+    assert_eq!(cases.len(), total_cases);
     let mut ids: Vec<&str> = cases.iter().map(|c| c["id"].as_str().unwrap()).collect();
     ids.sort_unstable();
     ids.dedup();
-    assert_eq!(ids.len(), TOTAL_CASES, "duplicate case ids");
+    assert_eq!(ids.len(), total_cases, "duplicate case ids");
 
     let mut failures = Vec::new();
     for case in &cases {
@@ -638,7 +653,7 @@ fn strict_ed25519_corpus_all_cases_agree() {
     execution.finish();
     assert!(
         failures.is_empty(),
-        "{} of {} strict cases disagree: {:?}",
+        "{} of {} {profile} cases disagree: {:?}",
         failures.len(),
         cases.len(),
         &failures[..failures.len().min(20)]

@@ -153,7 +153,8 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
     [
       cli_pin
       | mirrors ++
-          manifests ++ Enum.map(entry.runners, &pin(&1, Catalog.runner_pin(), digests, :auto))
+          manifests ++
+          Enum.map(entry.runners, &pin(&1, Catalog.runner_pin(entry.key), digests, :auto))
     ]
   end
 
