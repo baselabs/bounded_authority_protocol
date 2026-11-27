@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from hmac import compare_digest
-from json import JSONDecodeError, loads
+from json import JSONDecodeError, JSONDecoder
 from json.encoder import encode_basestring
 
 from .base64url import base64url_decode, base64url_encode
@@ -19,7 +18,9 @@ PROFILE = "bap-action-approval/1"
 PROFILE_DIGEST = bytes.fromhex("7e44f73217cd25037839ecc25837de84aad3673626b9b125c94c97e9967fa1eb")
 
 _STRING_SPECIAL = re.compile(rb'["\\\x00-\x1f]')
-_ESCAPED_TAIL = re.compile(rb'(?:[^"\\\x00-\x1f]++|\\(?:["\\/bfnrt]|u[0-9A-Fa-f]{4}))*+"')
+_STRING_TOKEN = re.compile(
+    rb'"([^"\\\x00-\x1f]*+)(?:\\(?:["\\/bfnrt]|u[0-9A-Fa-f]{4})[^"\\\x00-\x1f]*+)*+"'
+)
 _SHORT_ESCAPES = frozenset(b'"\\\b\t\n\f\r')
 _RECORD_SCAFFOLD = b'{"action":,"approver_role":,"request_id":,"resources":[],"revision_digest":,"subject":,"v":1}'
 
@@ -202,65 +203,77 @@ def _encode(
     ))
 
 
-def _string(ctx: _Ctx, maximum: int) -> str:
-    _expect_lit(ctx, b'"')
+def _string(ctx: _Ctx, maximum: int, decoder: JSONDecoder) -> str:
     start = ctx.pos
-    match = _STRING_SPECIAL.search(ctx.src, start, start + maximum + 1)
+    prefix_start = start + 1
+    # Each decoded UTF-8 byte needs at most six wire bytes. Bound the scan even
+    # when the closing quote is absent, and bound the unescaped prefix before copying.
+    match = _STRING_TOKEN.match(ctx.src, start, start + 6 * maximum + 2)
     if match is None:
         _fail()
-    stop = match.start()
-    if ctx.src[stop] == 34:
-        raw = ctx.src[start:stop]
-        ctx.pos = stop + 1
+    stop = match.end()
+    prefix_end = match.end(1)
+    if prefix_end - prefix_start > maximum:
+        _fail()
+    ctx.pos = stop
+    if prefix_end == stop - 1:
+        if prefix_end == prefix_start:
+            _fail()
         try:
-            return raw.decode("utf-8")
+            # With no escapes or controls, strict UTF-8 is already the JCS spelling.
+            return ctx.src[prefix_start:prefix_end].decode("utf-8")
         except UnicodeDecodeError:
             _fail()
-    # Each decoded UTF-8 byte needs at most six wire bytes. Find the closing
-    # quote inside this bound before handing the string to the JSON decoder.
-    escaped = _ESCAPED_TAIL.match(ctx.src, stop, start + 6 * maximum + 1)
-    if escaped is None:
-        _fail()
-    ctx.pos = escaped.end()
     try:
-        decoded: object = loads(ctx.src[start - 1:ctx.pos].decode("utf-8"))
+        token = ctx.src[start:stop].decode("utf-8")
+        decoded: object
+        decoded, _ = decoder.raw_decode(token)
     except (JSONDecodeError, UnicodeDecodeError):
         _fail()
     if not isinstance(decoded, str):
         _fail()
     _text(decoded, maximum)
+    # Strict UTF-8 has one byte representation per scalar string. Comparing the
+    # re-encoded JSON token as text is therefore exact, without another UTF-8 copy.
+    if token != encode_basestring(decoded):
+        _fail()
     return decoded
 
 
 def _decode(wire: bytes, ca: Bounds, limits: RecordBounds) -> ApprovalRecord:
     if type(wire) is not bytes or not 1 <= len(wire) <= limits.record_bytes:
         _fail()
-    # Exact member literals fix the grammar, disallowing duplicates before construction.
+    # Fixed literals and exact canonical string tokens give byte equality with the
+    # record's JCS serialization, without rebuilding or rescanning the whole record.
     ctx = _Ctx(wire, ca)
+    decoder = JSONDecoder()
+    maximum = limits.string_bytes
     _expect_lit(ctx, b'{"action":')
-    action = _string(ctx, limits.string_bytes)
+    action = _string(ctx, maximum, decoder)
     _expect_lit(ctx, b',"approver_role":')
-    role = _string(ctx, limits.string_bytes)
+    role = _string(ctx, maximum, decoder)
     _expect_lit(ctx, b',"request_id":')
-    request_id = _string(ctx, min(limits.string_bytes, _unwrap(ca.resolve("identifier_bytes"))))
+    request_id = _string(ctx, min(maximum, _unwrap(ca.resolve("identifier_bytes"))), decoder)
+    _identifier(request_id, ca)
     _expect_lit(ctx, b',"resources":[')
-    resources = [_string(ctx, limits.string_bytes)]
+    resources = [_string(ctx, maximum, decoder)]
     while _byte_at(wire, ctx.pos) == 44:
         if len(resources) >= limits.resource_count:
             _fail()
         ctx.pos += 1
-        resources.append(_string(ctx, limits.string_bytes))
+        resource = _string(ctx, maximum, decoder)
+        # UTF-8 byte order is scalar order (RFC 3629 §1), which is Python str order.
+        if resource <= resources[-1]:
+            _fail()
+        resources.append(resource)
     _expect_lit(ctx, b'],"revision_digest":')
-    digest = _unwrap(base64url_decode(_string(ctx, 43).encode("utf-8")))
+    digest = _width(_unwrap(base64url_decode(_string(ctx, 43, decoder).encode("utf-8"))))
     _expect_lit(ctx, b',"subject":')
-    subject = _string(ctx, limits.string_bytes)
+    subject = _string(ctx, maximum, decoder)
     _expect_lit(ctx, b',"v":1}')
     if ctx.pos != len(wire):
         _fail()
-    record = ApprovalRecord(subject, action, request_id, role, tuple(resources), digest)
-    if not compare_digest(wire, _encode(record, ca, limits)):
-        _fail()
-    return record
+    return ApprovalRecord(subject, action, request_id, role, tuple(resources), digest)
 
 
 def encode_record(
