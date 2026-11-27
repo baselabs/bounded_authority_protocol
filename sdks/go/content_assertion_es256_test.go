@@ -74,3 +74,15 @@ func TestES256ContentAssertionSignatureAndSuite(t *testing.T) {
 		})
 	}
 }
+
+func TestES256ContentAssertionIPvFutureIdentifier(t *testing.T) {
+	es := ContentAssertionES256{}
+	assertion := ContentAssertion{AttestorKeyID: "k", Jti: "https://[::1]/", Iss: "i", Aud: "a", Sub: "s", Profile: "p", Gen: 1, Iat: 1, Nbf: 1, Exp: 5}
+	if _, err := es.AssertionSigningInput(assertion, nil); err != nil {
+		t.Fatal(err)
+	}
+	assertion.Jti = "https://[v1.a]/"
+	if _, err := es.AssertionSigningInput(assertion, nil); err != ErrInvalid {
+		t.Fatal("accepted an IPvFuture identifier")
+	}
+}

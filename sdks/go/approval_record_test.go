@@ -16,6 +16,10 @@ func TestApprovalRecordCanonicalGrammar(t *testing.T) {
 	if err != nil || len(record.Resources()) != 2 {
 		t.Fatalf("canonical scalar order: %v", err)
 	}
+	ipvFuture := strings.Replace(valid, `"request_id":"r"`, `"request_id":"https://[v1.a]/"`, 1)
+	if _, err := DecodeApprovalRecord([]byte(ipvFuture), nil, nil); err != ErrInvalid {
+		t.Fatal("accepted an IPvFuture request identifier")
+	}
 	for name, wire := range map[string]string{
 		"UTF-16 order":        strings.Replace(valid, `"","𐀀"`, `"𐀀",""`, 1),
 		"duplicate item":      strings.Replace(valid, `"","𐀀"`, `"",""`, 1),

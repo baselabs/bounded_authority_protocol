@@ -18,7 +18,7 @@ const approvalCorpus = "content-profiles/action-approval/v1"
 
 func TestCandidateActionApprovalCorpus(t *testing.T) {
 	root := candidateSource(t, approvalCorpus)
-	corpuscheck.Candidate(t, root, "35470198349f2b03b0c5df4368569a437eae39847fa4b8df1cd1f24b33d6f826", candidateApprovalOutcome)
+	corpuscheck.Candidate(t, root, "5384b8680fb6757360696c6889c5d6b3b706e8728edccae6dd0c5c468a819a64", candidateApprovalOutcome)
 }
 
 func TestApprovalProfileDigest(t *testing.T) {

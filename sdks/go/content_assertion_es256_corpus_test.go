@@ -186,7 +186,7 @@ func candidateVerifiedValues(a ContentAssertionFacts) map[string]any {
 
 func TestCandidateES256ContentAssertionCorpus(t *testing.T) {
 	root := candidateSource(t, es256Corpus)
-	corpuscheck.Candidate(t, root, "d79329d431de093f162613fbd2a2fe838766b690fa67cfbc1478eafa322b3c63", es256CandidateOutcome)
+	corpuscheck.Candidate(t, root, "2bb41b8fbc9fbdc0267f72976d56280be0541420e4c14241ca622f1dd071d0cb", es256CandidateOutcome)
 }
 
 func es256CandidateOutcome(t *testing.T, entry corpuscheck.Case, profile, _ map[string]any) any {
