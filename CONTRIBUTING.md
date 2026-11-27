@@ -65,8 +65,8 @@ committed to this repository. Contributor hook installation works without any lo
 maintainer checks activate only where a maintainer has set one up. The deliberate-admin bypass is `git commit --no-verify`, documented
 here as the sanctioned escape hatch. Neither layer catches a literal ad-hoc publish command run
 against a working tree, since no commit gate sees that runtime act; the `kci/<sha>` qualification
-run is the hard gate for committed infrastructure. Only the Elixir Hex command in
-`.github/workflows/publish.yml` is exempt; every other registry command and action stays blocked.
+run is the hard gate for committed infrastructure. The shared Hex action may qualify the Elixir
+package in `ci.yml` and publish it in `publish.yml`.
 Existing checkouts must rerun `bash scripts/install-hooks.sh` after updating the hook.
 The generic pre-commit hook runs the repository's staged SDK check from
 `scripts/hooks/pre-commit.d/sdk-publish-infra` after the local identifier guard. Extension files
@@ -78,10 +78,11 @@ Contributors and agents never publish, tag a version, deploy or dispatch a workf
 maintainers' release operator dispatches `publish.yml` for Hex and `pages.yml` for the static
 site, both from `main`; neither workflow starts on a push, and only the maintainers' accounts
 can run either. The default-branch ruleset admits only commits whose `qualified` job passed.
-Publication rejects an existing registry version or origin tag and inspects the newly built
-archive before publishing. The registry credential belongs only
-to the `publish` environment and the publication step. The operator verifies publication and
-creates the version tag on the published commit.
+Qualification builds and attests the exact package and builds the HTML docs. The operator
+dispatches Hex publication with the full qualified commit. The upload job runs the shared
+Hex action with workload identity in the `publish` environment. It refuses first publication,
+an existing version tag, a retired release, or differing registry bytes. After both archives
+match on read-back, the operator records the release tag on the commit named in the served docs.
 
 ## Maintainer checks
 

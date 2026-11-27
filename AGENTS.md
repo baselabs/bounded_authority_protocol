@@ -95,8 +95,8 @@ their own; the landing run qualifies them.
   `mix quality.conformance`, `mix quality.mutations` and `mix quality.package` as separate
   jobs. `mix quality` runs them all locally. Run the parts that cover your change.
 - Contributors and agents never publish, tag a version, deploy or dispatch a workflow.
-  `publish.yml` publishes the Hex package and `pages.yml` deploys the site; the maintainers'
-  release operator dispatches both from `main`.
+  The maintainers' release operator dispatches `publish.yml` for an exact qualified commit
+  and `pages.yml` for the site, both from `main`.
 - A test that fails on every run is a defect: fix it, or quarantine it with a reason, in the
   change that finds it.
 - Update the CHANGELOG when behavior, a dependency or a contract changes; other docs only when

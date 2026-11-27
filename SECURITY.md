@@ -50,20 +50,20 @@ published, deployment-decided contract-major overlap. A verdict never changes si
 
 ## Supply-chain verification
 
-Every CI run builds the package archive in its package job, with a SHA-256 checksum and release
-and tooling CycloneDX SBOM documents. In that same `kci/<sha>` qualification run, after every
+The CI package job qualifies the package and HTML docs archives, records the package checksum
+and produces release and tooling CycloneDX SBOM documents. In that same `kci/<sha>` qualification run, after every
 quality stage job has passed, CI calls the supply-chain workflow, which signs separate
 build-provenance and SBOM attestations for that archive. Verify the exact source commit,
 which must be on `main` before release; the attestation's source ref is the qualification branch.
-Download the archive, `SHA256SUMS`, `release.cdx.json` and `tooling.cdx.json` from the
-GitHub release `v<version>` in this repository. Publication verifies that its newly built
-archive matches the qualification attestation, then reads both package and documentation
-bytes back from Hex. After that read-back, the release operator tags the exact commit and
+Download both archives, `SHA256SUMS`, `release.cdx.json` and `tooling.cdx.json` from the
+GitHub release `baselabs_bounded_authority_protocol-v<version>` in this repository.
+Publication verifies the qualified package attestation before upload. Read-back compares both
+served archives with the qualified bytes and checks the source commit in the docs. After that read-back, the release operator tags the exact commit and
 attaches these files to the GitHub release. Verify the downloaded archive with:
 
 ```bash
-gh release download v<version> --repo baselabs/bounded_authority_protocol \
-  --pattern '*.tar' --pattern SHA256SUMS --pattern '*.cdx.json'
+gh release download baselabs_bounded_authority_protocol-v<version> --repo baselabs/bounded_authority_protocol \
+  --pattern '*.tar' --pattern '*-docs.tar.gz' --pattern SHA256SUMS --pattern '*.cdx.json'
 sha256sum --check SHA256SUMS
 gh attestation verify bounded_authority_protocol-<version>.tar \
   --repo baselabs/bounded_authority_protocol \

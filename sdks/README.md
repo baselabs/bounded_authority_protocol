@@ -20,7 +20,8 @@ first published, never publishing from this one
 reject SDK registry-publish setup here in every `kci/<sha>` qualification run. Pull requests,
 including forks, get no CI run of their own; a maintainer's landing run qualifies the exact
 commit before `main` moves. The sole publication exception is the Elixir package in
-`.github/workflows/publish.yml`, dispatched from `main` by the maintainers' release operator.
+`.github/workflows/publish.yml`. The release operator dispatches it from `main` for a
+qualified commit, and the shared Hex action uses workload identity to publish the archives.
 Each SDK root already contains its full test suite and corpus inputs; CI proves that closure
 from a copied directory and from the language's distributable format.
 

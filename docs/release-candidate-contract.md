@@ -14,18 +14,18 @@ operational authority or replace a deployment's authorization checks.
 [CI](../.github/workflows/ci.yml) runs `mix quality.source`, `mix quality.corpus`,
 `mix quality.tests`, `mix quality.conformance`, `mix quality.mutations` and
 `mix quality.package` as separate jobs. `mix quality` runs them all locally. The package job
-builds an unpublished Hex archive with its SHA-256 checksum and release and tooling CycloneDX
-documents. Attestation requires every quality stage to pass. In the same
+qualifies the exact Hex package and HTML docs archives, records the package checksum and
+produces release and tooling CycloneDX documents. Attestation requires every quality stage to pass. In the same
 `kci/<sha>` qualification run, the
 [supply-chain workflow](../.github/workflows/supply-chain.yml) signs separate build-provenance
 and SBOM attestations for that archive. Verify by source commit, because the attestation names
 the qualification branch. The commit must be on `main` before release. Consumers download
-the archive, `SHA256SUMS`, `release.cdx.json` and `tooling.cdx.json` from this repository's
-GitHub release `v<version>`. To compare a candidate with those release files:
+the package and docs archives, `SHA256SUMS`, `release.cdx.json` and `tooling.cdx.json` from this repository's
+GitHub release `baselabs_bounded_authority_protocol-v<version>`. To compare a candidate with those release files:
 
 ```bash
-gh release download v<version> --repo baselabs/bounded_authority_protocol \
-  --pattern '*.tar' --pattern SHA256SUMS --pattern '*.cdx.json'
+gh release download baselabs_bounded_authority_protocol-v<version> --repo baselabs/bounded_authority_protocol \
+  --pattern '*.tar' --pattern '*-docs.tar.gz' --pattern SHA256SUMS --pattern '*.cdx.json'
 sha256sum --check SHA256SUMS
 gh attestation verify bounded_authority_protocol-<version>.tar \
   --repo baselabs/bounded_authority_protocol \
@@ -35,21 +35,18 @@ gh attestation verify bounded_authority_protocol-<version>.tar \
 ```
 
 The maintainers' release operator dispatches [publish.yml](../.github/workflows/publish.yml)
-from `main` to publish the Hex package after qualification. It refuses a package name Hex has
-never had, a tagged or retired version, or an existing package whose bytes differ.
-It builds HTML docs and the archive without a cache, checks package identity, file inventory
-and source bytes, and verifies the archive's qualification attestation before uploading.
-Only the upload step holds the registry key, from a directory with no `mix.exs`.
-Docs are a rendering of the package, and an ExDoc build is not byte-stable, so docs are never
-compared by bytes. The docs archive carries `release.json` naming the package, version and
-commit that built it. Read-back requires served docs to name this package and version, and a
-commit that is the dispatched commit or its ancestor on `main`; that commit is the published
-commit. A held upload is incomplete: after approval on Hex, another dispatch from `main`
-uploads only what is missing, keeps docs Hex already serves, and reads both uploads back. It
-never replaces a package or served docs. Read-back saves the served docs archive in the
-`release-assets` bundle beside the package, checksums and SBOMs.
-Contributors and agents do not publish, tag or dispatch. After the read-back, the operator
-tags the published commit and creates its GitHub release with the archive, checksum and SBOMs.
+from `main` with `release_commit` set to the full qualified SHA. Publication verifies the
+qualified package attestation before upload. In the `publish` environment, the shared
+Hex action verifies the qualification artifact, package identity, source bytes and stamped
+changelog. It refuses an unknown package, a tagged or retired version, or differing served
+bytes. It uses a short-lived, package-scoped workload token to upload missing archives.
+Public read-back compares both served archives byte for byte and checks that the docs'
+`release.json` names the exact release commit.
+
+A held upload is incomplete. After approval on Hex, dispatch the same commit again with
+`qualification_run` set to the original CI run ID. Matching uploads are preserved. The
+`release-assets` bundle contains the verified archives, checksums and SBOMs. The operator
+tags the published commit and attaches these files to its GitHub release.
 No workflow creates a GitHub release or runs on a tag.
 [pages.yml](../.github/workflows/pages.yml) is also dispatch-only from `main`, limited to the
 same maintainer accounts, and retains its `github-pages` environment.

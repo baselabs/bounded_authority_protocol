@@ -16,9 +16,8 @@ set -euo pipefail
 # monorepo. Each SDK graduates to its own per-SDK repo on first publication. This
 # script catches the ENABLING change: registry-publish commands, registry-publish
 # GitHub Actions, and npm publish lifecycle hooks committed to manifests or
-# workflows. The sole Elixir publication exception is the exact path
-# .github/workflows/publish.yml: only the Hex publish command is allowed there.
-# Every other registry command and action remains blocked, including in that file.
+# workflows. The shared Hex action is allowed in the canonical qualification and
+# publication workflows. All registry-publish CLI commands remain blocked.
 #
 # Honesty limit: this catches publish infrastructure STAGED/COMMITTED. It cannot
 # catch a literal ad-hoc 'npm publish' typed at a working tree; that is a runtime
@@ -82,6 +81,7 @@ twine_upload_re='(^|[[:space:]/])twine([[:space:]]+[^[:space:]]+)*[[:space:]]+up
 # Deliberately excludes 'npm version', 'mix hex.build', and 'gh release create' (all allowed).
 publish_cmds='cargo-release publish
 mix hex.publish
+baselabs/.github/.github/actions/hex-publish@
 pypa/gh-action-pypi-publish
 JS-DevTools/npm-publish
 JS-DevTools/action-publish
@@ -108,9 +108,10 @@ done
 # Publish actions + contiguous forms (fixed string): every scanned surface.
 while IFS= read -r cmd; do
   [ -n "$cmd" ] || continue
-  if [ "$path" = .github/workflows/publish.yml ] && [ "$cmd" = 'mix hex.publish' ]; then
-    continue
-  fi
+  case "$path:$cmd" in
+    .github/workflows/ci.yml:baselabs/.github/.github/actions/hex-publish@ | \
+      .github/workflows/publish.yml:baselabs/.github/.github/actions/hex-publish@) continue ;;
+  esac
   if grep -F -- "$cmd" <<< "$content" >/dev/null; then
     printf '%s: publish signal "%s": SDKs must not publish from the monorepo (sdks/README.md publication boundary)\n' \
       "$path" "$cmd" >&2

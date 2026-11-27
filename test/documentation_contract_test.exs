@@ -229,8 +229,13 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
 
     publish = YamlElixir.read_from_file!(".github/workflows/publish.yml")["jobs"]
     published = publish["published-livebooks"]
-    assert published["needs"] == "publish"
-    assert published["if"] == publish["publish"]["if"]
+    assert published["needs"] == "read-back"
+    assert published["if"] == publish["upload"]["if"]
+
+    checkout =
+      Enum.find(published["steps"], &String.starts_with?(&1["uses"] || "", "actions/checkout@"))
+
+    assert checkout["with"]["ref"] == "${{ inputs.release_commit }}"
     assert published["runs-on"] == "ubuntu-24.04"
     refute Map.has_key?(published, "environment")
     refute inspect(published) =~ "secrets."

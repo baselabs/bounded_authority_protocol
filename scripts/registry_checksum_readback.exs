@@ -6,7 +6,7 @@
 #   mix run --no-start scripts/registry_checksum_readback.exs -- --self-check
 #
 # The registry checksum is the release API's `checksum` (SHA-256 of the whole package tarball,
-# the "outer" checksum `mix hex.publish` prints), read from
+# the outer checksum), read from
 # https://hex.pm/api/packages/bounded_authority_protocol/releases/VERSION with TLS peer
 # verification. SHA256SUMS is the file the supply-chain workflow writes with `sha256sum` beside
 # the attested archive; verify it first (`sha256sum --check SHA256SUMS` and

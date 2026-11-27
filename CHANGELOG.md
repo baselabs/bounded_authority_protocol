@@ -26,6 +26,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Qualify the Hex package and docs together, publish them through workload identity and
+  verify both served archives byte for byte.
+
 - Raise the Python SDK minimum to 3.11. Qualify Python 3.11, 3.12, and 3.13 in CI.
 
 - Keep CI and release artifacts for 7 days, the period anything reads them after their run.

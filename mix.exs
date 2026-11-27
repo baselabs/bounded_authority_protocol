@@ -200,10 +200,13 @@ defmodule BoundedAuthorityProtocol.MixProject do
   # HexDocs reading path: start here, then guides, then reference, then the normative specs.
   # The extras order is the sidebar order inside each group.
   defp docs do
+    source_ref = System.get_env("HEX_DOCS_SOURCE_REF")
+
     [
       main: "readme",
       assets: %{"spec/profiles" => "profiles"},
-      source_ref: "v#{@version}",
+      source_ref: source_ref || "v#{@version}",
+      formatters: if(source_ref, do: ["html"]),
       source_url: @source_url,
       # The API stability page names the excluded internals; they are hidden, so never link them.
       skip_code_autolink_to: [

@@ -56,12 +56,16 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
              1
   end
 
-  test "only the canonical Hex workflow may publish the Elixir package" do
-    content = "      - run: mix hex.publish --yes\n"
-    assert run(content, ".github/workflows/publish.yml") == 0
+  test "the shared Hex action is confined to the canonical Hex workflows" do
+    action =
+      "      - uses: baselabs/.github/.github/actions/hex-publish@#{String.duplicate("a", 40)}"
+
+    for path <- [".github/workflows/ci.yml", ".github/workflows/publish.yml"] do
+      assert run(action, path) == 0, path
+      assert run(File.read!(path), path) == 0, path
+    end
 
     for path <- [
-          ".github/workflows/ci.yml",
           ".github/workflows/release.yml",
           ".github/workflows/publish.yaml",
           ".github/workflows/nested/publish.yml",
@@ -69,12 +73,14 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
           "sdks/elixir/release.sh",
           "Makefile"
         ] do
-      assert run(content, path) == 1, path
+      assert run(action, path) == 1, path
     end
   end
 
-  test "the Hex workflow exception never permits other registry commands or actions" do
-    for command <- [
+  test "the canonical Hex workflows reject registry commands and other publish actions" do
+    for path <- [".github/workflows/publish.yml", ".github/workflows/ci.yml"],
+        command <- [
+          "mix hex.publish --yes",
           "npm publish",
           "pnpm publish",
           "yarn -s publish",
@@ -89,14 +95,8 @@ defmodule BoundedAuthorityProtocol.Architecture.PublishGuardTest do
           "JS-DevTools/action-publish",
           "crate-ci/cargo-release"
         ] do
-      content = "run: mix hex.publish --yes\nrun: #{command}\n"
-      assert run(content, ".github/workflows/publish.yml") == 1, command
+      assert run("run: #{command}\n", path) == 1, inspect({path, command})
     end
-  end
-
-  test "the committed Hex workflow is allowed by the shared guard" do
-    path = ".github/workflows/publish.yml"
-    assert run(File.read!(path), path) == 0
   end
 
   test "the guard does not self-match its own literal pattern list" do

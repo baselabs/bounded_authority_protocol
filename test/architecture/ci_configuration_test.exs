@@ -187,6 +187,18 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
         for {input, tool, output} <- tool_inputs do
           expected =
             cond do
+              path == ".github/workflows/publish.yml" and name in ["upload", "read-back"] ->
+                verify = read(path)["jobs"]["verify-provenance"]
+                assert "verify-provenance" in List.wrap(job["needs"])
+                assert verify["outputs"][output] == "${{ steps.toolchain.outputs.#{output} }}"
+
+                assert Enum.any?(
+                         verify["steps"],
+                         &(&1["run"] == ~s|scripts/toolchain.sh >> "$GITHUB_OUTPUT"|)
+                       )
+
+                "${{ needs.verify-provenance.outputs.#{output} }}"
+
               path == @gate and name == "compatibility" ->
                 assert job["needs"] == "toolchain"
                 "${{ matrix.#{output} }}"
@@ -207,7 +219,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
 
           assert inputs[input] == expected, "#{path} #{name}: #{input} must come from the reader"
 
-          unless name == "compatibility" do
+          if expected == "${{ steps.toolchain.outputs.#{output} }}" do
             assert Enum.any?(Enum.take(steps, index), fn earlier ->
                      earlier["id"] == "toolchain" and
                        earlier["run"] == ~s|scripts/toolchain.sh >> "$GITHUB_OUTPUT"|
@@ -215,7 +227,17 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
                    "#{path} #{name}: read versions before installation"
           end
 
-          assert_installed_refusal(steps, index, tool, expected, "#{path} #{name}")
+          if path == ".github/workflows/publish.yml" and name in ["upload", "read-back"] do
+            expected_var = if tool == "elixir", do: "EXPECTED_ELIXIR", else: "EXPECTED_OTP"
+            version_var = if tool == "elixir", do: "elixir_version", else: "otp_version"
+
+            assert Enum.any?(Enum.drop(steps, index + 1), fn later ->
+                     (later["env"] || %{})[expected_var] == expected and
+                       later["run"] =~ ~s(test "$#{version_var}" = "$#{expected_var}")
+                   end)
+          else
+            assert_installed_refusal(steps, index, tool, expected, "#{path} #{name}")
+          end
         end
 
         if String.contains?(step["run"] || "", "mix deps.get") do
@@ -378,29 +400,12 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     pages = read(".github/workflows/pages.yml")
     assert pages["on"] == %{"workflow_dispatch" => nil}
     publish = read(".github/workflows/publish.yml")
-    assert pages["jobs"]["build"]["if"] == publish["jobs"]["publish"]["if"]
+    assert pages["jobs"]["build"]["if"] == publish["jobs"]["upload"]["if"]
     assert pages["jobs"]["deploy"]["if"] == pages["jobs"]["build"]["if"]
     assert pages["jobs"]["deploy"]["needs"] == "build"
     assert_default_branch_first(pages["jobs"]["build"])
     assert_default_branch_first(pages["jobs"]["deploy"])
     assert pages["jobs"]["deploy"]["environment"]["name"] == "github-pages"
-  end
-
-  test "Hex publication is dispatch-only, maintainer-restricted and environment-scoped" do
-    workflow = read(".github/workflows/publish.yml")
-    assert workflow["on"] == %{"workflow_dispatch" => nil}
-    assert workflow["permissions"] == %{"contents" => "read"}
-    assert Enum.sort(Map.keys(workflow["jobs"])) == ["publish", "published-livebooks"]
-    job = workflow["jobs"]["publish"]
-    assert job["environment"] == "publish"
-
-    assert job["if"] ==
-             ~s|contains(fromJSON('["corepay","palermo-git"]'), github.actor) && contains(fromJSON('["corepay","palermo-git"]'), github.triggering_actor)|
-
-    assert_default_branch_first(job)
-    refute Map.has_key?(workflow, "env")
-    refute Map.has_key?(job, "env")
-    assert job["timeout-minutes"] == 5
   end
 
   test "the attested package passed every quality stage and its archive was checked" do
@@ -412,7 +417,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     assert package["outputs"]["version"] == "${{ steps.archive.outputs.version }}"
     steps = package["steps"]
     quality = Enum.find_index(steps, &(&1["run"] == "mix quality.package"))
-    archive = Enum.find_index(steps, &String.contains?(&1["run"] || "", "mix hex.build"))
+    archive = Enum.find_index(steps, &(&1["id"] == "archive"))
 
     inspect_package =
       Enum.find_index(steps, &String.contains?(&1["run"] || "", "check_package.exs"))
