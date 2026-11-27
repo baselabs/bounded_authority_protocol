@@ -320,7 +320,7 @@ func foreignAssertionAccepts(id, compact string, b Bounds) bool {
 	case "anchor":
 		switch major {
 		case "v1":
-			return v1ArchiveAssertionAccepts(compact, b, KindBoundaryAnchor)
+			return archiveAssertionAccepts(compact, b, KindBoundaryAnchor)
 		case "v2":
 			_, err := (Profile{}).parseAnchorCompactGated(compact, b)
 			return err == nil
@@ -331,7 +331,7 @@ func foreignAssertionAccepts(id, compact string, b Bounds) bool {
 	case "transition":
 		switch major {
 		case "v1":
-			return v1ArchiveAssertionAccepts(compact, b, KindKeyTransition)
+			return archiveAssertionAccepts(compact, b, KindKeyTransition)
 		case "v2":
 			_, err := (Profile{}).parseTransitionCompactGated(compact, b)
 			return err == nil
@@ -343,7 +343,7 @@ func foreignAssertionAccepts(id, compact string, b Bounds) bool {
 	panic("unknown foreign assertion profile")
 }
 
-func v1ArchiveAssertionAccepts(compact string, b Bounds, kind Kind) bool {
+func archiveAssertionAccepts(compact string, b Bounds, kind Kind) bool {
 	p, err := splitCompact(compact, b)
 	if err != nil || canonicalSegment(p.ProtectedSeg, p.Protected, b) != nil ||
 		canonicalSegment(p.PayloadSeg, p.Payload, b) != nil {
