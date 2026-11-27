@@ -294,8 +294,14 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
              "#{path} contains a hardcoded versioned artifact filename: the quiet-mislabel class"
     end
 
-    assert File.read!(".github/workflows/ci.yml") =~ "@version",
-           "ci.yml must derive the artifact name from mix.exs @version"
+    ci = YamlElixir.read_from_file!(".github/workflows/ci.yml")
+    archive = Enum.find(ci["jobs"]["package"]["steps"], &(&1["id"] == "archive"))
+
+    # The action checks the archive metadata against mix.exs before writing qualified.json.
+    version_reader = ~S|jq -er .version "$RUNNER_TEMP/qualified-hex/qualified.json"|
+
+    assert archive["run"] =~ ~s|VERSION="$(#{version_reader})"|,
+           "ci.yml must derive the artifact name from the qualified package version"
   end
 
   test "the derived view's footer names the spec revision" do

@@ -119,8 +119,9 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     end
 
     for name <- @quality_jobs do
-      refute Map.has_key?(ci["jobs"][name], "permissions")
-      refute Enum.any?(ci["jobs"][name]["steps"], &uses?(&1, "actions/attest@"))
+      job = ci["jobs"][name]
+      assert Enum.all?(Map.values(job["permissions"] || %{}), &(&1 == "read"))
+      refute Enum.any?(job["steps"], &uses?(&1, "actions/attest@"))
     end
 
     attest = ci["jobs"]["attest"]
@@ -414,6 +415,7 @@ defmodule BoundedAuthorityProtocol.CiConfigurationTest do
     assert ci["jobs"]["attest"]["with"]["version"] == "${{ needs.package.outputs.version }}"
 
     package = ci["jobs"]["package"]
+    assert package["needs"] == "hex-qualification"
     assert package["outputs"]["version"] == "${{ steps.archive.outputs.version }}"
     steps = package["steps"]
     quality = Enum.find_index(steps, &(&1["run"] == "mix quality.package"))

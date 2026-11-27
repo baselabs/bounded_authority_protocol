@@ -16,7 +16,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
       elixir: "~> 1.18",
       deps: deps(),
       package: package(),
-      docs: docs(),
+      docs: qualified_docs(docs(), System.get_env("HEX_DOCS_SOURCE_REF")),
       aliases: aliases(),
       escript: [
         main_module: BoundedAuthorityProtocol.Conformance.Cli.Main,
@@ -197,16 +197,19 @@ defmodule BoundedAuthorityProtocol.MixProject do
     ]
   end
 
+  # Release qualification builds the HTML docs with source links to the qualified commit.
+  defp qualified_docs(docs, nil), do: docs
+
+  defp qualified_docs(docs, source_ref),
+    do: Keyword.merge(docs, source_ref: source_ref, formatters: ["html"])
+
   # HexDocs reading path: start here, then guides, then reference, then the normative specs.
   # The extras order is the sidebar order inside each group.
   defp docs do
-    source_ref = System.get_env("HEX_DOCS_SOURCE_REF")
-
     [
       main: "readme",
       assets: %{"spec/profiles" => "profiles"},
-      source_ref: source_ref || "v#{@version}",
-      formatters: if(source_ref, do: ["html"]),
+      source_ref: "v#{@version}",
       source_url: @source_url,
       # The API stability page names the excluded internals; they are hidden, so never link them.
       skip_code_autolink_to: [
