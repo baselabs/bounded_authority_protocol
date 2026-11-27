@@ -27,8 +27,8 @@ from a copied directory and from the language's distributable format.
 
 ## What is here
 
-- **[`python/`](python/)**: `bounded-authority-verifier` (planned PyPI name; import
-  `bounded_authority_verifier`). Python 3.10 or later; one dependency, `cryptography`, for
+- **[`python/`](python/)**: `bounded-authority-protocol-verifier` (planned PyPI name; import
+  `bounded_authority_verifier`). Python 3.11 or later; one dependency, `cryptography`, for
   Ed25519 and ECDSA P-256.
 - **[`rust/`](rust/)**: `bounded-authority-protocol` (planned crates.io name). Rust 1.88 or
   later; `ed25519-dalek`, `p256`, `sha2`, and `ryu-js` (with transitive `zeroize`). See the

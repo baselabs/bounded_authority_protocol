@@ -76,9 +76,15 @@ def main(sdk: str) -> None:
                 if sdk == "python":
                     (work / "quickstart.py").write_text(quickstart(sdk))
                     # PEP 610 records the installed Git identity, independently of the URL text.
+                    expected_name = (
+                        "assert names == ['bounded-authority-protocol-verifier']; "
+                        if commit == under_test else ""
+                    )
                     identity = (
                         "import importlib.metadata as m, json; "
-                        "d=json.loads(m.distribution('bounded-authority-verifier').read_text('direct_url.json')); "
+                        "names=m.packages_distributions()['bounded_authority_verifier']; assert len(names)==1; "
+                        f"{expected_name}"
+                        "d=json.loads(m.distribution(names[0]).read_text('direct_url.json')); "
                         f"assert d['vcs_info']['commit_id'] == '{commit}'; "
                         "assert d['url'] == 'https://github.com/baselabs/bounded_authority_protocol.git'; "
                         "assert d['subdirectory'] == 'sdks/python'"

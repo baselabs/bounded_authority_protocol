@@ -38,6 +38,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Changed
 
+- Rename the unpublished Python verifier distribution to `bounded-authority-protocol-verifier`.
+  The `bounded_authority_verifier` import is unchanged.
+
 - Qualify the Hex package and docs together, publish them through workload identity and
   verify both served archives byte for byte.
 
@@ -1863,7 +1866,7 @@ several note findings, all in surfaces this program touched. All fixed:
   of the frozen v1 profile from spec + corpus alone, authored under `sdks/` and graduating per
   the separate-repository SDK publication policy. Post-1.0 rows; no code shipped.
 - Ship cross-language verifier SDKs (TypeScript `@bounded-authority/verifier` + Python
-  `bounded-authority-verifier`) under `sdks/`, providing typed reimplementations of the frozen v1 profile from
+  `bounded-authority-protocol-verifier`) under `sdks/`, providing typed reimplementations of the frozen v1 profile from
   the spec + corpus alone, with no code-level derivation from the Elixir reference
   (the independent SDK derivation and conformance contract). Each passes all 283 conformance vectors
   (recomputed from scratch), asserts the corpus `index.json` SHA at startup, and proves every

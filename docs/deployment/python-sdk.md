@@ -1,6 +1,6 @@
 # Python verifier SDK: deployment notes
 
-The Python verifier SDK (`sdks/python/`, distribution `bounded-authority-verifier`, import
+The Python verifier SDK (`sdks/python/`, distribution `bounded-authority-protocol-verifier`, import
 package `bounded_authority_verifier`) is a pure, deterministic implementation of the BAP
 verification profiles: contract-majors 1, 2, and 3 plus the local-loopback, role-attestation,
 and content-assertion sibling profiles. It is a **verifier**: it returns redacted facts or a

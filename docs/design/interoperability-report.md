@@ -68,7 +68,7 @@ per-language permissiveness mutation gate proving its closures red-capable.
 | SDK | Language surface | Corpus binding | Contract-major 1 result |
 |---|---|---|---|
 | `@bounded-authority-protocol/verifier` | TypeScript, Node >= 22, `node:crypto` only | graduated repository ([baselabs/bounded_authority_protocol_typescript](https://github.com/baselabs/bounded_authority_protocol_typescript)), vendored snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
-| `bounded-authority-verifier` | Python >= 3.10, `cryptography` | complete vendored Hex tree, file hashes and verdict digest | **283/283 agreed + census (11 keys)** |
+| `bounded-authority-protocol-verifier` | Python >= 3.11, `cryptography` | complete vendored Hex tree, file hashes and verdict digest | **283/283 agreed + census (11 keys)** |
 | `bounded-authority-protocol` | Rust, MSRV 1.88, `ed25519-dalek`+`p256`+`sha2` | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 | `bounded_authority_protocol_go` | Go 1.25, stdlib only | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 

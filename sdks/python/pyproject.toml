@@ -3,7 +3,7 @@ requires = ["hatchling>=1.0.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "bounded-authority-verifier"
+name = "bounded-authority-protocol-verifier"
 version = "0.1.0"
 description = "Provider-neutral, deterministic verifier SDK for bounded proof-of-possession authority: the BAP contract-majors 1, 2, and 3 and the sibling profiles, in typed Python."
 readme = "README.md"

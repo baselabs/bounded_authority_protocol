@@ -3,7 +3,7 @@
 A pure, deterministic Python implementation of the Bounded Authority Protocol (BAP) verification
 profiles: contract-majors 1 and 2 (Ed25519) and 3 (ES256), the local-loopback HTTP proof
 profile, and the role-attestation and content-assertion profiles, with strict Ed25519
-verification on every Ed25519 surface. The distribution is `bounded-authority-verifier`; the
+verification on every Ed25519 surface. The distribution is `bounded-authority-protocol-verifier`; the
 import package is `bounded_authority_verifier`.
 
 It checks the exact bytes of a grant, a holder proof, or an evidence object against public keys
@@ -22,7 +22,7 @@ source comments cite the tracked normative specifications and independent confor
 
 ## Status
 
-**Not published.** The package is not on PyPI; `bounded-authority-verifier` is the name it will
+**Not published.** The package is not on PyPI; `bounded-authority-protocol-verifier` is the name it will
 use, and any package of that name there is not ours until this page says otherwise. It moves to
 its own repository when it is first published. Until then,
 install it from this repository.
@@ -51,13 +51,14 @@ resolution of every runtime, build, development, and optional dependency declara
 ## Install from a pinned source
 
 From an empty directory, install the selected source commit in a virtual environment.
-This SDK is unpublished; the full commit is its deployment identity.
+This SDK is unpublished; the full commit is its deployment identity. The pinned
+source predates the distribution rename. The import package is the same at both revisions.
 
 <!-- sdk-install:python -->
 
 ```bash
 python3 -m venv venv
-venv/bin/python -m pip install "bounded-authority-verifier @ git+https://github.com/baselabs/bounded_authority_protocol.git@c8b3bab8e4caf0b7f93e6f240570673534c331e2#subdirectory=sdks/python"
+venv/bin/python -m pip install "git+https://github.com/baselabs/bounded_authority_protocol.git@c8b3bab8e4caf0b7f93e6f240570673534c331e2#subdirectory=sdks/python"
 ```
 
 Save the following quickstart as `quickstart.py` and run `venv/bin/python quickstart.py`.
