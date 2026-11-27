@@ -242,9 +242,15 @@ func (d *jsonDecoder) parseObject() (Value, error) {
 // parseString parses a JSON string literal. isName is advisory only (names
 // carry the fixed 128-byte ceiling; values the bounds ceiling).
 func (d *jsonDecoder) parseString(isName bool) (string, error) {
+	return d.parseStringInto(isName, nil)
+}
+
+func (d *jsonDecoder) parseStringInto(isName bool, out []byte) (string, error) {
 	d.pos++ // opening '"'
-	var out []byte
 	for {
+		if !isName && len(out) > d.b.StringBytes {
+			return "", ErrInvalid
+		}
 		if d.pos >= len(d.data) {
 			return "", ErrInvalid // unterminated
 		}
@@ -256,9 +262,6 @@ func (d *jsonDecoder) parseString(isName bool) (string, error) {
 				return "", ErrInvalid // REQ1-JSON-no-normalization: UTF-8 is mandatory
 			}
 			if utf8.RuneCount(out) == 0 && len(out) != 0 {
-				return "", ErrInvalid
-			}
-			if !isName && len(out) > d.b.StringBytes {
 				return "", ErrInvalid
 			}
 			return string(out), nil

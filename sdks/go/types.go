@@ -15,6 +15,7 @@ const (
 	KindKeyTransition          Kind = "key_transition"
 	KindRoleAttestation        Kind = "role_attestation"
 	KindContentAssertion       Kind = "content_assertion"
+	KindContentAssertionES256  Kind = "content_assertion_es256"
 )
 
 // SigningInput is a canonical JWS signing-input pair: the exact canonical

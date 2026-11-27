@@ -80,6 +80,25 @@ func Outcome(c map[string]any) map[string]any {
 }
 func New(t *testing.T, root, tree, pin string) *Run {
 	t.Helper()
+	index, cases := readIndexed(t, root, pin)
+	total := 0
+	if n, ok := index["total_cases"]; ok {
+		total, _ = strconv.Atoi(string(n.(json.Number)))
+	} else {
+		for _, key := range []string{"uri_cases", "proof_cases", "attestation_cases", "digest_cases", "assertion_cases", "successor_cases"} {
+			if n, ok := index[key]; ok {
+				count, _ := strconv.Atoi(string(n.(json.Number)))
+				total += count
+			}
+		}
+	}
+	if len(cases) != total {
+		t.Fatal("total case count mismatch")
+	}
+	return &Run{t: t, root: root, tree: tree, Cases: cases, actual: map[string]map[string]any{}}
+}
+func readIndexed(t *testing.T, root, pin string) (map[string]any, []Case) {
+	t.Helper()
 	raw := read(filepath.Join(root, "index.json"))
 	sum := sha256.Sum256(raw)
 	if SHA(raw) != pin && hex.EncodeToString(sum[:]) != pin {
@@ -158,22 +177,44 @@ func New(t *testing.T, root, tree, pin string) *Run {
 			t.Fatal("corpus file set mismatch")
 		}
 	}
-	total := 0
-	if n, ok := index["total_cases"]; ok {
-		total, _ = strconv.Atoi(string(n.(json.Number)))
-	} else {
-		for _, key := range []string{"uri_cases", "proof_cases", "attestation_cases", "digest_cases", "assertion_cases", "successor_cases"} {
-			if n, ok := index[key]; ok {
-				count, _ := strconv.Atoi(string(n.(json.Number)))
-				total += count
+	return index, cases
+}
+
+// Candidate runs a complete source-only corpus and compares the calculated
+// outcomes with the checked-in cross-language verdict digests.
+func Candidate(t *testing.T, root, pin string, run func(*testing.T, Case, map[string]any, map[string]any) any) {
+	t.Helper()
+	index, cases := readIndexed(t, root, pin)
+	profile := Decode(read(filepath.Join(root, "profile.json"))).(map[string]any)
+	byID := make(map[string]any, len(cases))
+	for _, c := range cases {
+		byID[c.Value["id"].(string)] = c.Value
+	}
+	var all, shared []any
+	for _, c := range cases {
+		id := c.File + "/" + c.Value["id"].(string)
+		var got any
+		t.Run(id, func(t *testing.T) {
+			got = run(t, c, profile, byID)
+			if want := c.Value["expected"]; !bytes.Equal(Canonical(got), Canonical(want)) {
+				t.Fatalf("computed outcome %s, want %s", Canonical(got), Canonical(want))
 			}
+		})
+		pair := []any{id, got}
+		all = append(all, pair)
+		if c.File != "helper-cases.json" && c.Value["owner"] != "sdk_helper" {
+			shared = append(shared, pair)
 		}
 	}
-	if len(cases) != total {
-		t.Fatal("total case count mismatch")
+	digest := sha256.Sum256(Canonical(all))
+	sharedDigest := sha256.Sum256(Canonical(shared))
+	t.Logf("%s: %d cases, verdict SHA-256 %x, shared SHA-256 %x", index["profile"], len(all), digest, sharedDigest)
+	if hex.EncodeToString(digest[:]) != index["verdict_sha256"] ||
+		hex.EncodeToString(sharedDigest[:]) != index["elixir_verdict_sha256"] {
+		t.Fatal("computed candidate verdict digest mismatch")
 	}
-	return &Run{t: t, root: root, tree: tree, Cases: cases, actual: map[string]map[string]any{}}
 }
+
 func (r *Run) Record(t *testing.T, id, file string, actual map[string]any) {
 	t.Helper()
 	if _, ok := r.actual[id]; ok {

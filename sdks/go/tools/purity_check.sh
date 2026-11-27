@@ -24,7 +24,7 @@ lib_dir=$(cd "$script_dir/.." && pwd)
 patterns='os\.|io\.|net\.|time\.|math/rand|crypto/rand|os/exec|unsafe\.|syscall\.|runtime\.GC|flag\.|log\.|context\.|sync\.'
 
 # Import allowlist: the pure stdlib packages the library consumes.
-allowed_imports='^"(crypto/ecdsa|crypto/ed25519|crypto/elliptic|crypto/sha256|crypto/subtle|encoding/binary|errors|fmt|math|math/big|sort|strconv|strings|unicode/utf16|unicode/utf8)"$'
+allowed_imports='^"(crypto/ecdsa|crypto/ed25519|crypto/elliptic|crypto/sha256|crypto/subtle|encoding/binary|errors|fmt|math|math/big|slices|sort|strconv|strings|unicode/utf16|unicode/utf8)"$'
 
 status=0
 if [ "${1:-}" != "--derivation-top-level" ]; then

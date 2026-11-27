@@ -2,10 +2,8 @@ package verifier
 
 import "fmt"
 
-// The eight public verification facts types are GrantFacts, EnvelopeFacts,
-// ChainFacts, AnchorFacts, KeyTransitionFacts, AnchoredExportFacts,
-// AttestationFacts, and ContentAssertionFacts. Sibling-profile facts follow
-// spec/bap-role-attestation-v1.md and spec/bap-content-assertion-v1.md.
+// Public verification facts follow the contract-major and sibling-profile
+// specifications. Approval facts additionally describe the matching record.
 //
 // Verified facts (spec/bap-v1.md § Public verification contract). Facts
 // are value-bearing and redacted: they contain only their exact documented
@@ -26,7 +24,7 @@ const (
 )
 
 // Trust is the fixed not-a-trust-decision marker on the diagnostic chain,
-// anchor, transition, export, attestation, and content-assertion facts.
+// anchor, transition, export, attestation, content assertion, and approval facts.
 // Only NotEvaluated exists.
 type Trust int
 
@@ -355,6 +353,9 @@ func (AttestationFacts) GobEncode() ([]byte, error) { return nil, ErrInvalid }
 
 // String returns the exact fixed rendering for the verified profile.
 func (facts ContentAssertionFacts) String() string {
+	if facts.kind == KindContentAssertionES256 {
+		return "#BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts<redacted>"
+	}
 	return "#BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts<redacted>"
 }
 

@@ -2,13 +2,12 @@
 
 A pure, deterministic Go implementation of the Bounded Authority Protocol (BAP) verification
 profiles: contract-majors 1 and 2 (Ed25519) and 3 (ES256), the local-loopback HTTP proof
-profile, and the role-attestation and content-assertion profiles, with strict Ed25519
-verification on every Ed25519 surface.
+profile, the role-attestation and content-assertion profiles, and the candidate ES256 content
+assertion and action approval profiles.
 
 It checks the exact bytes of a grant, a holder proof, or an evidence object against public keys
-and expected context that you supply, and returns facts or the single error
-`ErrInvalid`. It is a **verifier, not an authority**: it never selects trusted keys, reserves
-replay, checks revocation, or decides whether a request may run. Those stay in your service.
+and expected context that you supply. The host owns trust, replay reservations, revocation state,
+and execution.
 Facts exclude raw credentials and secrets; the logging notes below describe their display limitations.
 
 Already-trusted public keys, expected context, and time are explicit inputs. The SDK has no
@@ -204,14 +203,17 @@ SEC1 keys and 64-byte raw `r || s` signatures). Each major rejects the others' b
 | Local-loopback HTTP proofs | `LocalLoopbackHTTPUriNormalize`, `LocalLoopbackHTTPProofSigningInput`, `AssembleLocalLoopbackHTTPCompact`, `DecodeLocalLoopbackHTTPProof`, `CheckLocalLoopbackHTTPEnvelope` |
 | Role attestations | `AttestationSigningInput`, `AssembleAttestationCompact`, `DecodeAttestation`, `VerifyAttestation` |
 | Content assertions | `AssertionSigningInput`, `AssembleContentAssertionCompact`, `DecodeContentAssertion`, `VerifyContentAssertion`, `ContentDigest`, `AssertionDigest`, `VerifyContentAssertionSuccessor` |
+| ES256 content assertions | `ContentAssertionES256` with `AssertionSigningInput`, `AssembleCompact`, `DecodeAssertion`, `VerifyAssertion`, `ContentDigest`, `AssertionDigest`, `VerifySuccessor` |
+| Action approval | `NewApprovalRecord`, `EncodeApprovalRecord`, `DecodeApprovalRecord`, `VerifyApprovalEdDSA`, `VerifyApprovalES256`, `CheckApproval` |
 | Strict Ed25519 | `VerifyStrict`, `AcceptablePublicKey`, `TorsionFree` |
 | Primitives | `JsonDecode`, `JcsEncode`, `Base64urlDecode`, `Base64urlEncode`, `UriNormalize`, `JwkDecodePublic`, `JwkEncodePublic`, `JwkThumbprintPreimage`, `JwkThumbprint`, `JwkThumbprintRaw`, `PublicKeyThumbprintRaw`, `BoundsMaximum`, `BoundsNew`, `NonceNotRequired`, `NonceRequired` |
 
-`EcdsaProfile` also carries its own EC JWK and thumbprint methods. The loopback, attestation,
-and content-assertion functions exist only at package level (they are Ed25519 profiles).
+`EcdsaProfile` also carries its own EC JWK and thumbprint methods. The package-level loopback,
+role-attestation, and content-assertion functions use Ed25519. The ES256 assertion facade uses
+a distinct protected type, signing-input kind, and successor facts.
 
-**Errors.** Every fallible function returns `(T, error)`, and the error is `nil` or exactly
-`ErrInvalid`; it carries no reason, and no function panics on bad input.
+**Errors.** Error-returning functions use `nil` or exactly `ErrInvalid`.
+The action approval facades return a closed host-local `ApprovalDiagnostic`.
 `VerifyContentAssertionSuccessor` returns only an `error` (`nil` when the successor step holds).
 `VerifyStrict`,
 `AcceptablePublicKey`, and `TorsionFree` return `bool`; `Base64urlEncode` and `BoundsMaximum`
@@ -244,6 +246,25 @@ named accessors and render fully redacted. Both refuse JSON, text, and gob encod
 Decoded proofs now include `GrantHash()`, `RequestHash()`, `HolderPublicKey()`, and
 `HolderThumbprint()`; the returned public-key slice is a copy.
 
+## Action approval
+
+Choose `VerifyApprovalEdDSA` or `VerifyApprovalES256` from trusted operation configuration.
+Pass the exact canonical record bytes and compact assertion with an `ApprovalContext` built from
+the operation, current time, policy ceilings, and the corresponding trust snapshot. Resources
+are an exact set ordered by UTF-8 bytes on the wire. Pass `true` to `EncodeApprovalRecord` to
+sort and deduplicate validated authoring input.
+
+Pure verification returns redacted facts with `Trust() == TrustNotEvaluated` or a host-local
+diagnostic. Keep diagnostic codes in host-local logs. For a presenter-facing failure use
+`invalid`. The `CheckApproval` helper calls the supplied read-only revocation predicate and
+then the replay predicate after pure verification succeeds. Use its `PresenterResult` or
+`RenderPresenterResult` for the presenter.
+
+At execution, atomically claim both the artifact identity and the request's current revision.
+When the effect is external to that transaction, use a durable intent, destination idempotency,
+and reconciliation. The approval contract specifies the full matching and disclosure rules.
+[Action approval specification](https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-action-approval-v1.md)
+
 ## Strict Ed25519
 
 Every Ed25519 signature check goes through one function (`verifyEd25519` in `ed25519.go`) that
@@ -259,8 +280,7 @@ verification path.
 
 `conformance/priv/conformance/` is a complete, byte-identical snapshot of the Hex package built
 from this commit's `priv/conformance/` tree. It includes all nine certified corpora, schemas, focused vectors,
-and `verdict-digests.json`. Every test input is inside this SDK root; copying this directory
-alone is sufficient to run the suite.
+and `verdict-digests.json`. Copying the SDK directory alone is sufficient to run the certified suite.
 The manifest was introduced in 1.1.0.
 
 | Corpus | Cases |
@@ -280,6 +300,9 @@ against the vendored manifest. Expected-value comparison cannot substitute for t
 Outcome projections and index ordering are specified in the
 [verdict digest contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/corpus-verdict-digests.md).
 The contract-major runners also retain their public-key import censuses.
+The monorepo candidate run reads 217 ES256 content assertion cases and 309 action approval
+cases from the protocol source. It checks the complete verdict digests and the shared subset
+of outcomes computed by the protocol's Elixir runner.
 
 Run from this SDK directory:
 
@@ -308,6 +331,8 @@ here.
 ```bash
 unformatted=$(gofmt -l .) && test -z "$unformatted" && go vet ./...
 go test ./...
+go test -run '^(TestCandidate|TestApprovalProfileDigest)' -count=1 -v -args -candidate-source "$(git rev-parse --show-toplevel)"
+go test -run '^TestApprovalP99$' -count=1 -v -args -approval-p99
 bash tools/purity_check.sh && bash tools/license_check.sh
 ```
 

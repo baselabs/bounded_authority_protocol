@@ -140,37 +140,42 @@ func encodeJcsString(s string, byteCeiling int) ([]byte, error) {
 	if !utf8.ValidString(s) {
 		return nil, ErrInvalid // includes CESU-8 surrogate encodings
 	}
-	out := make([]byte, 0, len(s)+2)
+	return appendJcsString(make([]byte, 0, len(s)+2), s), nil
+}
+
+// appendJcsString writes already validated scalar UTF-8.
+func appendJcsString(out []byte, s string) []byte {
 	out = append(out, '"')
-	for i := 0; i < len(s); {
-		r, size := utf8.DecodeRuneInString(s[i:])
-		if r == utf8.RuneError && size == 1 {
-			return nil, ErrInvalid // unreachable after ValidString; fail closed
-		}
-		switch {
-		case r == '"':
-			out = append(out, '\\', '"')
-		case r == '\\':
-			out = append(out, '\\', '\\')
-		case r == '\b':
-			out = append(out, '\\', 'b')
-		case r == '\t':
-			out = append(out, '\\', 't')
-		case r == '\n':
-			out = append(out, '\\', 'n')
-		case r == '\f':
-			out = append(out, '\\', 'f')
-		case r == '\r':
-			out = append(out, '\\', 'r')
-		case r < 0x20:
-			out = append(out, '\\', 'u', '0', '0', hexDigit(byte(r)>>4), hexDigit(byte(r)&0xf))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch escape := jcsShortEscape(c); {
+		case escape != 0:
+			out = append(out, '\\', escape)
+		case c < 0x20:
+			out = append(out, '\\', 'u', '0', '0', hexDigit(c>>4), hexDigit(c&0xf))
 		default:
-			// every other code point, U+007F included, is emitted raw
-			out = append(out, s[i:i+size]...)
+			out = append(out, c)
 		}
-		i += size
 	}
-	return append(out, '"'), nil
+	return append(out, '"')
+}
+
+func jcsShortEscape(c byte) byte {
+	switch c {
+	case '"', '\\':
+		return c
+	case '\b':
+		return 'b'
+	case '\t':
+		return 't'
+	case '\n':
+		return 'n'
+	case '\f':
+		return 'f'
+	case '\r':
+		return 'r'
+	}
+	return 0
 }
 
 func hexDigit(v byte) byte {

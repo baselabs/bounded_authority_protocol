@@ -1,5 +1,4 @@
-// Package verifier is a typed Go verifier for the Bounded Authority Protocol
-// frozen v1 profile (suite BAP1-Ed25519-SHA256).
+// Package verifier implements deterministic Bounded Authority Protocol verification.
 //
 // Derived from the spec and certified corpus, not from any sibling-SDK or
 // reference source (docs/design/conformance-contract.md, Independent implementation rule).
@@ -9,15 +8,13 @@
 // context. This library performs no I/O, trust discovery, key custody,
 // signing, replay reservation, revocation checks, or business authorization.
 //
-// Every public function returns (T, error) where the error is either nil or
-// exactly ErrInvalid: the Go spelling of the protocol's closed
-// {:ok, value} | {:error, :invalid} result contract. No other error value is
-// ever returned, and no failure carries input values.
+// Error-returning APIs use ErrInvalid for failures. The action approval verifier
+// returns value-free diagnostics for host-local use.
 package verifier
 
 import "errors"
 
-// ErrInvalid is the single, value-free failure result every public entry
-// returns. It is a sentinel, never wrapped: callers compare with == (or
+// ErrInvalid is the closed, value-free failure sentinel.
+// Callers compare with == (or
 // errors.Is, which is equivalent here).
 var ErrInvalid = errors.New("invalid")

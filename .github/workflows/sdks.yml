@@ -292,6 +292,14 @@ jobs:
         run: go test ./...
         working-directory: sdks/go
 
+      - name: Verify source candidate corpora
+        run: go test -run '^(TestCandidate|TestApprovalProfileDigest)' -count=1 -v -args -candidate-source "$GITHUB_WORKSPACE"
+        working-directory: sdks/go
+
+      - name: Enforce approval verification p99
+        run: go test -run '^TestApprovalP99$' -count=1 -v -args -approval-p99
+        working-directory: sdks/go
+
       - name: purity check
         run: bash tools/purity_check.sh
         working-directory: sdks/go

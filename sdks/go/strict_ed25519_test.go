@@ -505,10 +505,10 @@ func TestStrictUncheckedThumbprintIsAPureHashForWeakKeys(t *testing.T) {
 // caller runs after the key was accepted (verified or decoded); a new caller must be reviewed.
 func TestStrictUncheckedThumbprintCallerSetIsPinned(t *testing.T) {
 	allowed := map[string]bool{
-		"content_assertion.go:VerifyContentAssertion": true, // after verifyEd25519 under the attestor key
-		"role_attestation.go:VerifyAttestation":       true, // after verifyEd25519 and the subject binding
-		"v1.go:checkEnvelopeFor":                      true, // holder key decoded through JwkDecodePublic
-		"v2.go:CheckEnvelope":                         true, // holder key decoded through JwkDecodePublic
+		"content_assertion.go:fingerprint":      true, // after assertion verification or torsion-free snapshot admission
+		"role_attestation.go:VerifyAttestation": true, // after verifyEd25519 and the subject binding
+		"v1.go:checkEnvelopeFor":                true, // holder key decoded through JwkDecodePublic
+		"v2.go:CheckEnvelope":                   true, // holder key decoded through JwkDecodePublic
 	}
 	files, err := filepath.Glob("*.go")
 	if err != nil {

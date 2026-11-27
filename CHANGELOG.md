@@ -16,6 +16,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
   candidate corpora. Specify atomic claims and retry delivery of a durable intent.
 - Run both source candidates through the conformance CLI and report the digest
   of executed Elixir outcomes and the count of SDK-owned cases.
+- Add Go verification for both approval-related candidate profiles, with a canonical
+  record codec, ordered host-local diagnostics, and conformance and p99 gates.
 - Execute the README action approval example in CI with file-backed SQLite claims,
   revision comparison, and delivery recovery across a worker restart.
 
