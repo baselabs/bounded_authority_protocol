@@ -11,6 +11,24 @@ fn wire(resources: &[u8]) -> Vec<u8> {
 }
 
 #[test]
+fn approval_request_identifier_requires_ipv6_for_ip_literals() {
+    let bounds = Bounds::maximum();
+    let limits = RecordBounds::default();
+    let base = String::from_utf8(wire(br#""a""#)).unwrap();
+    let mut record = decode_record(base.as_bytes(), &bounds, &limits).unwrap();
+    record.request_id = "https://[v1.a]/".into();
+    let ipvfuture = base.replace("request-1", &record.request_id);
+    assert_eq!(
+        decode_record(ipvfuture.as_bytes(), &bounds, &limits),
+        Err(Invalid)
+    );
+    assert_eq!(
+        encode_record(&record, &bounds, &limits, false),
+        Err(Invalid)
+    );
+}
+
+#[test]
 fn requires_exact_canonical_tokens_and_scalar_utf8() {
     let bounds = Bounds::maximum();
     let limits = RecordBounds::default();

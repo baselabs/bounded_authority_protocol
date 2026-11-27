@@ -264,11 +264,13 @@ Outcome projections and index ordering are specified in the
 [verdict digest contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/corpus-verdict-digests.md).
 The contract-major runners also retain their public-key import censuses.
 
-The candidate ES256 content-assertion (217 cases) and action-approval (309 cases) corpora are
+The candidate ES256 content-assertion (223 cases) and action-approval (331 cases) corpora are
 source-only until every maintained runner executes them, so they are not in the snapshot.
 `conformance_approval` reads them from the protocol checkout named by `BAP_CANDIDATE_SOURCE`,
 checks each frozen index and its verdict digest, and also checks the Elixir verdict digest for
-cases covered by Elixir. Without the variable it reports that it skipped them.
+cases covered by Elixir. The candidate cases cover erratum 7's IPv6 requirement for bracketed
+StringOrURI authority hosts, including rejection of IPvFuture. Without `BAP_CANDIDATE_SOURCE`,
+the runner reports that it skipped the candidate corpora.
 
 Run from this SDK directory:
 

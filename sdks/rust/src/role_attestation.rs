@@ -755,15 +755,6 @@ fn is_kid_byte(b: u8) -> bool {
 /// byte is alnum / URI-punctuation / a well-formed `%HH` escape, and (for a
 /// `://` authority) the port is all-digit.
 pub(crate) fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
-    validate_identifier_with(s, bounds, false)
-}
-
-/// Content approval and its ES256 carrier support the full IP-literal grammar.
-pub(crate) fn validate_content_identifier(s: &str, bounds: &Bounds) -> Result<()> {
-    validate_identifier_with(s, bounds, true)
-}
-
-fn validate_identifier_with(s: &str, bounds: &Bounds, ipvfuture: bool) -> Result<()> {
     if s.is_empty() || s.len() as u64 > bounds.identifier_bytes() {
         return Err(Invalid);
     }
@@ -775,7 +766,7 @@ fn validate_identifier_with(s: &str, bounds: &Bounds, ipvfuture: bool) -> Result
             if s.bytes().filter(|byte| *byte == b'#').count() > 1 {
                 return Err(Invalid);
             }
-            validate_authority_port(s, ipvfuture)?;
+            validate_authority_port(s)?;
             Ok(())
         }
     }
@@ -784,7 +775,7 @@ fn validate_identifier_with(s: &str, bounds: &Bounds, ipvfuture: bool) -> Result
 /// Structural authority/port gate: when the identifier has an authority
 /// (`://authority`), a `:` in the authority outside an IP-literal bracket
 /// MUST introduce an all-digit port.
-fn validate_authority_port(value: &str, ipvfuture: bool) -> Result<()> {
+fn validate_authority_port(value: &str) -> Result<()> {
     let scheme_end = value.find(':').ok_or(Invalid)?;
     let after_scheme = &value[scheme_end + 1..];
     let after_scheme_host = match after_scheme.strip_prefix("//") {
@@ -824,11 +815,9 @@ fn validate_authority_port(value: &str, ipvfuture: bool) -> Result<()> {
     if host_port.starts_with('[') {
         let close = host_port.find(']').ok_or(Invalid)?;
         let literal = &host_port[1..close];
-        if !(ipvfuture && crate::uri::is_ipvfuture_literal(literal.as_bytes())) {
-            literal
-                .parse::<core::net::Ipv6Addr>()
-                .map_err(|_| Invalid)?;
-        }
+        literal
+            .parse::<core::net::Ipv6Addr>()
+            .map_err(|_| Invalid)?;
         let suffix = &host_port[close + 1..];
         if suffix.is_empty() {
             return Ok(());

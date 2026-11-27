@@ -345,11 +345,6 @@ fn is_ipvfuture_shape(s: &[u8]) -> bool {
     hex >= 1 && i < s.len() && s[i] == b'.'
 }
 
-/// Check an IPvFuture literal without normalizing its spelling.
-pub(crate) fn is_ipvfuture_literal(s: &[u8]) -> bool {
-    is_ipvfuture_shape(s) && validate_ipvfuture(s)
-}
-
 /// Full IPvFuture grammar check (shape already confirmed).
 fn validate_ipvfuture(s: &[u8]) -> bool {
     // s[0] == b'v'; consume 1+ HEXDIG then '.'.

@@ -546,8 +546,8 @@ fn run(
 fn action_approval_candidate() {
     run(
         APPROVAL,
-        "35470198349f2b03b0c5df4368569a437eae39847fa4b8df1cd1f24b33d6f826",
-        309,
+        "5384b8680fb6757360696c6889c5d6b3b706e8728edccae6dd0c5c468a819a64",
+        331,
         |name, case, _, by_id| match name {
             "approval-cases.json" | "multi-fault-cases.json" => project_pure(case),
             "record-cases.json" => record_case(case).unwrap_or(json!("invalid")),
@@ -562,8 +562,8 @@ fn action_approval_candidate() {
 fn es256_content_assertion_candidate() {
     run(
         ES256,
-        "d79329d431de093f162613fbd2a2fe838766b690fa67cfbc1478eafa322b3c63",
-        217,
+        "2bb41b8fbc9fbdc0267f72976d56280be0541420e4c14241ca622f1dd071d0cb",
+        223,
         |name, case, metadata, _| {
             let m = &metadata["signing"];
             let signing = es256::assertion_signing_input(&producer(m), &Bounds::maximum()).unwrap();

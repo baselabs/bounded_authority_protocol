@@ -9,7 +9,7 @@ use crate::facts::{NotEvaluated, SignatureAndWindow};
 use crate::jcs::jcs_encode;
 use crate::json::{json_decode, JsonValue};
 use crate::jwk::public_key_thumbprint_raw;
-use crate::role_attestation::{validate_content_identifier, validate_identifier, validate_kid};
+use crate::role_attestation::{validate_identifier, validate_kid};
 use crate::types::{
     HistoricalPublicKey, ProducedSigningInput, SigningInput, SigningKind, ValidityUpperBound,
 };
@@ -57,16 +57,6 @@ fn suite<const ES256: bool>() -> (&'static str, &'static str, SigningKind) {
             TYP_CONTENT_ASSERTION,
             SigningKind::ContentAssertion,
         )
-    }
-}
-
-type IdentifierCheck = fn(&str, &Bounds) -> Result<()>;
-
-fn identifier_check<const ES256: bool>() -> IdentifierCheck {
-    if ES256 {
-        validate_content_identifier
-    } else {
-        validate_identifier
     }
 }
 
@@ -257,7 +247,6 @@ pub(crate) fn produce<const ES256: bool>(
     bounds: &Bounds,
 ) -> Result<ProducedSigningInput> {
     let (alg, typ, _) = suite::<ES256>();
-    let validate_identifier = identifier_check::<ES256>();
     validate_kid(&assertion.attestor_key_id, bounds)?;
     validate_identifier(&assertion.jti, bounds)?;
     validate_identifier(&assertion.iss, bounds)?;
@@ -351,7 +340,7 @@ pub(crate) fn assemble<const ES256: bool>(
     compact.extend_from_slice(&input.payload_segment);
     compact.push(b'.');
     compact.extend_from_slice(&base64url_encode(signature));
-    parse::<ES256>(&compact, &bounds, identifier_check::<ES256>())?;
+    parse::<ES256>(&compact, &bounds)?;
     Ok(compact)
 }
 
@@ -367,7 +356,7 @@ pub(crate) fn decode<const ES256: bool>(
     compact: &[u8],
     bounds: &Bounds,
 ) -> Result<DecodedAssertionClaims<ES256>> {
-    let decoded = parse::<ES256>(compact, bounds, identifier_check::<ES256>())?;
+    let decoded = parse::<ES256>(compact, bounds)?;
     let claims = decoded.claims;
     Ok(DecodedAssertionClaims {
         version: 1,
@@ -394,7 +383,7 @@ pub fn assertion_digest(compact: &[u8], bounds: &Bounds) -> Result<[u8; 32]> {
 }
 
 pub(crate) fn digest<const ES256: bool>(compact: &[u8], bounds: &Bounds) -> Result<[u8; 32]> {
-    parse::<ES256>(compact, bounds, identifier_check::<ES256>())?;
+    parse::<ES256>(compact, bounds)?;
     Ok(Sha256::digest(compact).into())
 }
 
@@ -442,7 +431,6 @@ pub(crate) fn verify<const ES256: bool, K>(
 ) -> Result<AssertionFacts<ES256>> {
     let bounds = &expected.bounds;
     key.validate_window(bounds)?;
-    let validate_identifier = identifier_check::<ES256>();
     for value in [
         &expected.issuer,
         &expected.audience,
@@ -453,7 +441,7 @@ pub(crate) fn verify<const ES256: bool, K>(
     }
     validate_magnitude(expected.now, bounds)?;
 
-    let parsed = parse::<ES256>(compact, bounds, identifier_check::<ES256>())?;
+    let parsed = parse::<ES256>(compact, bounds)?;
     let claims = &parsed.claims;
     if parsed.key_id != key.key_id
         || claims.iss != expected.issuer
@@ -588,7 +576,6 @@ pub(crate) fn successor<const ES256: bool>(
 pub(crate) fn parse<'a, const ES256: bool>(
     compact: &'a [u8],
     bounds: &Bounds,
-    validate_identifier: IdentifierCheck,
 ) -> Staged<ParsedAssertion<'a, ES256>> {
     validate_compact_size(compact.len(), bounds)?;
     let (protected_segment, payload_segment, signature_segment) = split_compact(compact, bounds)?;
@@ -606,7 +593,7 @@ pub(crate) fn parse<'a, const ES256: bool>(
         return Err(Stage::UnsupportedAlgorithm);
     }
     let payload = json_decode(&payload_bytes, bounds)?;
-    let claims = validate_payload(&payload, &payload_bytes, bounds, validate_identifier)?;
+    let claims = validate_payload(&payload, &payload_bytes, bounds)?;
     let message = &compact[..compact.len() - signature_segment.len() - 1];
     Ok(ParsedAssertion {
         message,
@@ -640,12 +627,7 @@ fn parse_header(raw: &[u8], bounds: &Bounds) -> Result<(String, String, String)>
     }
 }
 
-fn validate_payload(
-    payload: &JsonValue,
-    raw: &[u8],
-    bounds: &Bounds,
-    validate_identifier: IdentifierCheck,
-) -> Result<AssertionClaims> {
+fn validate_payload(payload: &JsonValue, raw: &[u8], bounds: &Bounds) -> Result<AssertionClaims> {
     let members = match payload {
         JsonValue::Object(members) if members.len() == 13 => members,
         _ => return Err(Invalid),
@@ -677,11 +659,11 @@ fn validate_payload(
         return Err(Invalid);
     }
     let claims = AssertionClaims {
-        jti: take_identifier(jti, bounds, validate_identifier)?,
-        iss: take_identifier(iss, bounds, validate_identifier)?,
-        aud: take_identifier(aud, bounds, validate_identifier)?,
-        sub: take_identifier(sub, bounds, validate_identifier)?,
-        profile: take_identifier(profile, bounds, validate_identifier)?,
+        jti: take_identifier(jti, bounds)?,
+        iss: take_identifier(iss, bounds)?,
+        aud: take_identifier(aud, bounds)?,
+        sub: take_identifier(sub, bounds)?,
+        profile: take_identifier(profile, bounds)?,
         profile_digest: take_digest(profile_digest)?,
         content_digest: take_digest(content_digest)?,
         generation: take_integer(generation, bounds)?,
@@ -710,7 +692,6 @@ fn validate_facts<const ES256: bool>(facts: &AssertionFacts<ES256>, bounds: &Bou
         return Err(Invalid);
     }
     validate_kid(&facts.attestor_key_id, bounds)?;
-    let validate_identifier = identifier_check::<ES256>();
     for value in [
         &facts.jti,
         &facts.iss,
@@ -760,11 +741,7 @@ pub(crate) fn validate_magnitude(value: i64, bounds: &Bounds) -> Result<()> {
     }
 }
 
-fn take_identifier(
-    value: Option<&JsonValue>,
-    bounds: &Bounds,
-    validate_identifier: IdentifierCheck,
-) -> Result<String> {
+fn take_identifier(value: Option<&JsonValue>, bounds: &Bounds) -> Result<String> {
     let value = match value {
         Some(JsonValue::String(value)) => value,
         _ => return Err(Invalid),

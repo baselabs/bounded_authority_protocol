@@ -2,7 +2,7 @@
 
 use crate::jcs::{encode_string, encoded_string_len};
 use crate::json::decode_string_prefix;
-use crate::role_attestation::validate_content_identifier;
+use crate::role_attestation::validate_identifier;
 use crate::{base64url_decode, base64url_encode, Bounds, Invalid, Result};
 
 /// Signed identity of the action-approval record profile.
@@ -66,7 +66,7 @@ impl RecordBounds {
 
     pub(crate) fn request_id(&self, text: &str, ca: &Bounds) -> Result<()> {
         self.text(text)?;
-        validate_content_identifier(text, ca)
+        validate_identifier(text, ca)
     }
 
     pub(crate) fn resources<'a>(&self, resources: &'a [String]) -> Result<Vec<&'a str>> {
@@ -193,7 +193,7 @@ pub(crate) fn decode_bounded(
         REQUEST_ID,
         bounds.string_bytes.min(ca.identifier_bytes() as usize),
     )?;
-    validate_content_identifier(&request_id, ca)?;
+    validate_identifier(&request_id, ca)?;
     let mut resources = vec![parser.member(RESOURCES, bounds.string_bytes)?];
     while parser.remaining.first() == Some(&b',') {
         if resources.len() == bounds.resource_count {

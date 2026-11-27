@@ -11,7 +11,7 @@ use crate::content_assertion::{
     Stage,
 };
 use crate::facts::NotEvaluated;
-use crate::role_attestation::validate_content_identifier;
+use crate::role_attestation::validate_identifier;
 use crate::types::ValidityUpperBound;
 use crate::{ed25519, Bounds, Invalid, Result};
 use std::collections::{BTreeMap, BTreeSet};
@@ -422,7 +422,7 @@ where
         StaleTrust,
     )?;
 
-    let parsed = parse::<ES256>(compact, ca, validate_content_identifier)?;
+    let parsed = parse::<ES256>(compact, ca)?;
     let claims = &parsed.claims;
     limits.request_id(&claims.sub, ca).map_err(|_| Malformed)?;
     let record = decode_bounded(wire, ca, &limits).map_err(|_| Malformed)?;
@@ -486,7 +486,7 @@ fn preflight<'a>(
 ) -> Result<Vec<&'a str>> {
     let ca = &context.bounds;
     scalar_identity(&context.trust_domain, ca)?;
-    validate_content_identifier(&context.audience, ca)?;
+    validate_identifier(&context.audience, ca)?;
     limits.request_id(&context.request_id, ca)?;
     limits.text(&context.subject)?;
     limits.text(&context.action)?;
@@ -531,7 +531,7 @@ fn admit<'a, const ES256: bool>(
     let mut entries = BTreeMap::new();
     for entry in &snapshot.entries {
         let key = KeyRef::from(&entry.key);
-        validate_content_identifier(&entry.issuer, ca)?;
+        validate_identifier(&entry.issuer, ca)?;
         validate_roles(&entry.roles, limits)?;
         key.validate_window(ca)?;
         if !ES256 && !ed25519::torsion_free(key.public_key) {

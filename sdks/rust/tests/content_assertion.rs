@@ -91,6 +91,18 @@ fn sign(input: &ContentAssertionInput, key: &SigningKey, bounds: &Bounds) -> Vec
 }
 
 #[test]
+fn es256_assertion_identifier_requires_ipv6_for_ip_literals() {
+    use bounded_authority_protocol::content_assertion_es256;
+
+    let (mut input, _, _) = fixture("issuer", 1, [0; 32], 10, 15, 40);
+    let bounds = Bounds::maximum();
+    input.jti = "https://[::1]/".into();
+    assert!(content_assertion_es256::assertion_signing_input(&input, &bounds).is_ok());
+    input.jti = "https://[v1.a]/".into();
+    assert!(content_assertion_es256::assertion_signing_input(&input, &bounds).is_err());
+}
+
+#[test]
 fn content_digest_uses_exact_domain_and_enforces_bound() {
     let content = b"exact content bytes";
     let mut h = Sha256::new();
