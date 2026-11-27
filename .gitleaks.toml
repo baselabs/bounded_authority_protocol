@@ -1124,9 +1124,7 @@ condition = "AND"
 targetRules = ["jwt"]
 regexTarget = "match"
 paths = [
-  '''^priv/conformance/attestation\-profiles/holder\-custody\-attestation/v1/attestation\-cases\.json$''',
-  '''^priv/conformance/attestation\-profiles/holder\-custody\-attestation/v1/custody\-separation\-cases\.json$''',
-  '''^priv/conformance/attestation\-profiles/holder\-custody\-attestation/v1/profile\.json$''',
+  '''^priv/conformance/attestation\-profiles/holder\-custody\-attestation/v1/(?:attestation\-cases\.json|custody\-separation\-cases\.json|profile\.json)$''',
 ]
 regexes = [
   '''^eyJhbGciOiJFUzI1NiIsImp3ayI6eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImZQSjdHSTBEVDM2S1VqZ0RCTFVhdzhDSmFlSjM4aHMxcGd0SV9FZG1tWGciLCJ5IjoiQjNkVkVOdU8wRUFwUFpyR24zUXcyN3A5cmVZODZZSXBuZ1MzblNKNGM5RSJ9LCJ0eXAiOiJkcG9wK2p3dCJ9\.eyJhdGgiOiJEbUtUdFdMY25sV05CdGFMZVVTaFhKdWNwRGU1MUpQQlBYN0dUNk5YMVBBIiwiYmFfaW52IjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwiYmFfb3AiOiJ0cmFuc2ZlciIsImJhX3JlcSI6Il9WZkdrSl9WbFNZOGtlMUlTZGY4NVJBbWZna2tnTkhQbWZ4dTBZTE42blEiLCJodG0iOiJQT1NUIiwiaHR1IjoiaHR0cHM6Ly9yZXNvdXJjZS5leGFtcGxlLnRlc3QvaW52b2tlIiwiaWF0IjoxMTAwLCJqdGkiOiJ1cm46ZXhhbXBsZTpwcm9vZjp2My0xIiwidiI6M30\.nyKk9L1hRpAJjphLhzPD4vvRQMomoO\-8_c1174zPBA5bMkFRQL1PcCdwJJxpulmaa08TYNZO\-tLUWWRvCMUruw"?$''',

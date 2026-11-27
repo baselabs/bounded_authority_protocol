@@ -205,7 +205,11 @@ defmodule BoundedAuthorityProtocol.DiagnosticRenderingTest do
           kind <- [DecodedGrant, Operation, DecodedProof],
           do: Module.concat(major, kind)
 
-    for module <- [BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation | modules] do
+    for module <- [
+          BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation,
+          BoundedAuthorityProtocol.HolderCustodyAttestation.V1.DecodedAttestation
+          | modules
+        ] do
       value = struct(module)
 
       for field <- Map.keys(Map.from_struct(value)), field != :nonce do
@@ -227,6 +231,7 @@ defmodule BoundedAuthorityProtocol.DiagnosticRenderingTest do
           BoundedAuthorityProtocol.V1.DecodedGrant,
           BoundedAuthorityProtocol.V2.Operation,
           BoundedAuthorityProtocol.RoleAttestation.V1.DecodedAttestation,
+          BoundedAuthorityProtocol.HolderCustodyAttestation.V1.DecodedAttestation,
           BoundedAuthorityProtocol.V3.DecodedProof
         ] do
       assert render(%{__struct__: module}) == "#unrenderable"

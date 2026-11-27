@@ -63,6 +63,7 @@ The fully redacted names are `BoundedAuthorityProtocol.VN.GrantFacts`,
 `BoundedAuthorityProtocol.VN.AnchorFacts`, `BoundedAuthorityProtocol.VN.KeyTransitionFacts`,
 and `BoundedAuthorityProtocol.VN.AnchoredExportFacts`, for those same three majors, plus
 `BoundedAuthorityProtocol.RoleAttestation.V1.AttestationFacts`,
+`BoundedAuthorityProtocol.HolderCustodyAttestation.V1.AttestationFacts`,
 `BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts`,
 `BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion`,
 `BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts`,

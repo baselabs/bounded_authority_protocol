@@ -104,7 +104,6 @@ defmodule BoundedAuthorityProtocol.PublishedSurfaceHygieneTest do
     "spec/bap-content-assertion-v1.md",
     "spec/bap-local-loopback-http-v1.md",
     "spec/bap-role-attestation-v1.md",
-    "spec/bap-holder-custody-attestation-v1.md",
     "spec/bap-v1.md",
     "spec/bap-v2.md",
     "spec/bap-v3.md",

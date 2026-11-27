@@ -68,6 +68,21 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                                     "priv/conformance/attestation-profiles/role-attestation/v1/profile.json",
                                     "test/bounded_authority_protocol/role_attestation/v1_test.exs"
                                   ])
+  # The source-candidate holder-custody attestation sibling profile
+  # (spec/bap-holder-custody-attestation-v1.md).
+  @holder_custody_attestation_profile_paths MapSet.new([
+                                              "lib/bounded_authority_protocol/holder_custody_attestation/v1.ex",
+                                              "lib/bounded_authority_protocol/holder_custody_attestation/v1/attestation_facts.ex",
+                                              "lib/bounded_authority_protocol/holder_custody_attestation/v1/codec.ex",
+                                              "lib/bounded_authority_protocol/holder_custody_attestation/v1/decoded_attestation.ex",
+                                              "lib/bounded_authority_protocol/holder_custody_attestation/v1/expected_attestation.ex",
+                                              "lib/bounded_authority_protocol/holder_custody_attestation/v1/holder_custody_attestation.ex",
+                                              "priv/conformance/attestation-profiles/holder-custody-attestation/v1/attestation-cases.json",
+                                              "priv/conformance/attestation-profiles/holder-custody-attestation/v1/custody-separation-cases.json",
+                                              "priv/conformance/attestation-profiles/holder-custody-attestation/v1/index.json",
+                                              "priv/conformance/attestation-profiles/holder-custody-attestation/v1/profile.json",
+                                              "test/bounded_authority_protocol/holder_custody_attestation/v1_test.exs"
+                                            ])
   @content_assertion_profile_paths MapSet.new([
                                      "lib/bounded_authority_protocol/content_assertion/v1.ex",
                                      "lib/bounded_authority_protocol/content_assertion/v1/codec.ex",
@@ -308,6 +323,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
          MapSet.member?(@action_approval_profile_paths, path)) or
       (String.starts_with?(name, "BoundedAuthorityProtocol.RoleAttestation.V1") and
          MapSet.member?(@role_attestation_profile_paths, path)) or
+      (String.starts_with?(name, "BoundedAuthorityProtocol.HolderCustodyAttestation.V1") and
+         MapSet.member?(@holder_custody_attestation_profile_paths, path)) or
       (name == "BoundedAuthorityProtocol.Conformance.V1SchemaTest" and
          path == "test/conformance/v1_schema_test.exs")
   end
@@ -363,6 +380,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
     do:
       current_major_source_path?(path) or MapSet.member?(@local_loopback_profile_paths, path) or
         MapSet.member?(@role_attestation_profile_paths, path) or
+        MapSet.member?(@holder_custody_attestation_profile_paths, path) or
         MapSet.member?(@content_assertion_profile_paths, path) or
         MapSet.member?(@es256_assertion_profile_paths, path) or
         MapSet.member?(@action_approval_profile_paths, path)
@@ -395,6 +413,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
       {"test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",
        "v1_test"},
       {"test/bounded_authority_protocol/role_attestation/v1_test.exs", "v1_test"},
+      {"test/bounded_authority_protocol/holder_custody_attestation/v1_test.exs", "v1_test"},
       {"test/bounded_authority_protocol/content_assertion/v1_test.exs", "v1_test"}
     ]
   end
@@ -567,6 +586,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
       current_major_source_path?(path) or
       MapSet.member?(@local_loopback_profile_paths, path) or
       MapSet.member?(@role_attestation_profile_paths, path) or
+      MapSet.member?(@holder_custody_attestation_profile_paths, path) or
       MapSet.member?(@content_assertion_profile_paths, path) or
       MapSet.member?(@es256_assertion_profile_paths, path) or
       MapSet.member?(@action_approval_profile_paths, path) or
