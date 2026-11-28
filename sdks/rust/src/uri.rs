@@ -200,6 +200,41 @@ pub fn local_loopback_http_uri_normalize(text: &str, bounds: &Bounds) -> Result<
 // Authority: RFC 3986 §3.2: [ userinfo "@" ] host [ ":" port ]
 // ============================================================================
 
+/// Validate a StringOrURI identifier's authority host and port.
+/// Erratum 7 restricts bracketed identifier hosts to IPv6 literals.
+pub(crate) fn validate_identifier_authority(value: &str) -> Result<()> {
+    let (_, after_scheme) = value.split_once(':').ok_or(Invalid)?;
+    let Some(rest) = after_scheme.strip_prefix("//") else {
+        return Ok(());
+    };
+    let authority = rest.split(['/', '?', '#']).next().ok_or(Invalid)?;
+    if authority.contains(['[', ']']) {
+        let host_port = match authority.split_once('@') {
+            Some((userinfo, host_port)) if !userinfo.contains(['[', ']']) => host_port,
+            Some(_) => return Err(Invalid),
+            None => authority,
+        };
+        let (literal, suffix) = host_port
+            .strip_prefix('[')
+            .and_then(|host| host.split_once(']'))
+            .ok_or(Invalid)?;
+        literal
+            .parse::<core::net::Ipv6Addr>()
+            .map_err(|_| Invalid)?;
+        if !suffix.is_empty() {
+            let port = suffix.strip_prefix(':').ok_or(Invalid)?;
+            if !port.bytes().all(|byte| byte.is_ascii_digit()) {
+                return Err(Invalid);
+            }
+        }
+    } else if let Some((_, port)) = authority.rsplit_once(':') {
+        if port.is_empty() || !port.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(Invalid);
+        }
+    }
+    Ok(())
+}
+
 /// Parse the authority byte slice into `(normalized_host, Option<port>)`.
 ///
 /// Rejects an empty authority, any user-info (`@`), a malformed bracketed
@@ -333,7 +368,7 @@ fn validate_ip_literal(content: &[u8]) -> Result<Vec<u8>> {
 /// matching the shape is dispatched to IPvFuture and never falls back to
 /// IPv6 (the `.` after the version makes the intent unambiguous).
 fn is_ipvfuture_shape(s: &[u8]) -> bool {
-    if s.len() < 3 || !matches!(s[0], b'v' | b'V') {
+    if s.len() < 3 || s[0] != b'v' {
         return false;
     }
     let mut i = 1;
@@ -611,6 +646,25 @@ mod tests {
 
     const B: fn() -> Bounds = Bounds::maximum;
 
+    #[test]
+    fn identifier_bracketed_hosts_require_ipv6() {
+        for uri in [
+            "https://[v1.x]/",
+            "https://user@[V1.x]:443/",
+            "https://[example.test]/",
+            "https://[127.0.0.1]/",
+            "https://[::1/",
+            "https://[::1]extra/",
+            "https://[::1]:port/",
+        ] {
+            assert_eq!(validate_identifier_authority(uri), Err(Invalid), "{uri}");
+        }
+        assert_eq!(
+            validate_identifier_authority("https://user@[::ffff:192.0.2.1]:443/"),
+            Ok(())
+        );
+    }
+
     // ------------------------------------------------------------------
     // Scheme normalization: REQ1-URI-reject-list
     // ------------------------------------------------------------------
@@ -805,7 +859,7 @@ mod tests {
     #[test]
     fn ipvfuture_valid() {
         assert_eq!(
-            uri_normalize("https://[v1.a:b]/", &B()).unwrap(),
+            uri_normalize("https://[V1.a:b]/", &B()).unwrap(),
             "https://[v1.a:b]/"
         );
     }

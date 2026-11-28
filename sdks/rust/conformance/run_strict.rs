@@ -21,7 +21,7 @@ use std::path::PathBuf;
 
 use bounded_authority_protocol as bap;
 use bounded_authority_protocol::types::*;
-use bounded_authority_protocol::v2;
+use bounded_authority_protocol::{v2, v3};
 use bounded_authority_protocol::{Bounds, Invalid, JsonValue};
 mod support;
 use serde_json::{json, Value};
@@ -30,7 +30,7 @@ use sha2::{Digest, Sha256};
 const CERTIFIED_INDEX_SHA: &str =
     "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9";
 const STRING_OR_URI_INDEX_SHA256: &str =
-    "11c7d8ba162c9de81eec8dbaf75847b7d9c0c2c40043008c80066efb1c5381a5";
+    "3b9a7dffd20b886894ad43fcc257a71f7b768cf9426a9a149ea60c79f218ce82";
 const PROFILE: &str = "bap-strict-ed25519/1";
 const TOTAL_CASES: usize = 2410;
 
@@ -301,6 +301,15 @@ fn run_shaped(case: &Value, major: i64) -> Value {
     let input = &case["input"];
     let second_major = major == 2;
     match case["surface"].as_str().unwrap() {
+        "decode_grant" => {
+            let compact = input["compact"].as_str().unwrap().as_bytes();
+            verdict(match major {
+                1 => bap::decode_grant(compact, &max()).is_ok(),
+                2 => v2::decode_grant(compact, &max()).is_ok(),
+                3 => v3::decode_grant(compact, &max()).is_ok(),
+                _ => panic!("unsupported grant major {major}"),
+            })
+        }
         "json.decode" => result_value(
             bap::json_decode(&json_input_bytes(input), &max())
                 .map(|v| json!({"value":json_value(&v)})),
@@ -572,7 +581,7 @@ fn string_or_uri_corpus_all_cases_agree() {
         corpus_root().with_file_name("string-or-uri"),
         STRING_OR_URI_INDEX_SHA256,
         "bap-string-or-uri/1",
-        6,
+        24,
     );
 }
 

@@ -179,6 +179,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "priv/conformance/attestation-profiles/role-attestation/v1/attestation-cases.json",
                     "priv/conformance/verdict-digests.json",
                     "priv/conformance/string-or-uri/cases/content-assertion/ipvfuture.json",
+                    "priv/conformance/string-or-uri/cases/grant-decode/ipvfuture.json",
                     "priv/conformance/string-or-uri/cases/role-attestation/ipvfuture.json",
                     "priv/conformance/string-or-uri/index.json",
                     "priv/conformance/string-or-uri/profile.json",

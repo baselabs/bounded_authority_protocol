@@ -55,7 +55,7 @@ CORPUS_DIR = _CORPUS_ROOT / "priv" / "conformance" / "strict-ed25519"
 # The certified index.json SHA-256 (certified index SHA-256 binding
 # (docs/design/conformance-contract.md)). A mismatched corpus fails closed.
 CERTIFIED_INDEX_SHA = "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
-STRING_OR_URI_INDEX_SHA256 = "11c7d8ba162c9de81eec8dbaf75847b7d9c0c2c40043008c80066efb1c5381a5"
+STRING_OR_URI_INDEX_SHA256 = "3b9a7dffd20b886894ad43fcc257a71f7b768cf9426a9a149ea60c79f218ce82"
 PROFILE = "bap-strict-ed25519/1"
 TOTAL_CASES = 2410
 
@@ -77,6 +77,7 @@ def _load_module(name: str, filename: str) -> Any:
 
 _RUN_V1 = _load_module("bap_strict_run_v1", "run.py")
 _RUN_V2 = _load_module("bap_strict_run_v2", "run_v2.py")
+_RUN_V3 = _load_module("bap_strict_run_v3", "run_v3.py")
 
 
 def _b64d(s: str) -> bytes:
@@ -157,7 +158,7 @@ def _run_primitive(case: dict[str, Any]) -> dict[str, Any]:
 
 
 def _run_shaped(case: dict[str, Any]) -> dict[str, Any]:
-    module = _RUN_V1 if case["major"] == 1 else _RUN_V2
+    module = {1: _RUN_V1, 2: _RUN_V2, 3: _RUN_V3}[case["major"]]
     if case["major"] not in (1, 2):
         abort(f"{case['id']}: unsupported major {case['major']}")
     surface, inp = case["surface"], case["input"]
@@ -296,7 +297,7 @@ def run_string_or_uri() -> dict[str, Any]:
         root=CORPUS_DIR.with_name("string-or-uri"),
         pin=STRING_OR_URI_INDEX_SHA256,
         profile="bap-string-or-uri/1",
-        total=6,
+        total=24,
     )
 
 

@@ -50,6 +50,7 @@ inputs or modifiers. In particular, `expected_overrides`, `compact`, `constructi
 | `strict-ed25519` | `local_loopback_http` | `decode_local`, `decode_standard`, `envelope_local` | [BAP1 §14.1](../../spec/bap-v1.md#strict-ed25519), [local loopback HTTP §6](../../spec/bap-local-loopback-http-v1.md#6-conformance-and-release), indexed `profile.json`, `case_envelope.loopback` |
 | `strict-ed25519` | `role_attestation` | `decode`, `verify` | [BAP1 §14.1](../../spec/bap-v1.md#strict-ed25519), [role attestation §6](../../spec/bap-role-attestation-v1.md#6-conformance-and-release), indexed `profile.json`, `case_envelope.role_attestation` |
 | `string-or-uri` | `role_attestation`, `content_assertion` | `decode`, `verify` | [Erratum 7](../errata.md) |
+| `string-or-uri` | Grant decode in majors 1, 2, and 3 | `expected` verbatim | [Erratum 7](../errata.md) |
 
 The role corpus's optional `v1_grant` cross-profile diagnostic is separately asserted by
 its tests. The role surface's digest projection is `decode` and `verify`, as in the strict

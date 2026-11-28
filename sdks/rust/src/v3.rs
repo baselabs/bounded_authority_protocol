@@ -58,7 +58,7 @@ use crate::types::{
     ExpectedGrant, ExpectedKeyTransition, GrantDecoded, GrantInput, KeyLocator, NonceMode,
     ProducedSigningInput, ProofDecoded, SigningInput, SigningKind, ValidityUpperBound,
 };
-use crate::uri::uri_normalize;
+use crate::uri::{uri_normalize, validate_identifier_authority};
 
 use sha2::{Digest, Sha256};
 
@@ -3576,37 +3576,9 @@ fn validate_identifier(s: &str, bounds: &Bounds) -> Result<()> {
         Some(colon) => {
             validate_scheme(&s[..colon])?;
             validate_uri_bytes(s.as_bytes())?;
-            // Structural authority/port check: a `:` in the authority outside
-            // an IP-literal bracket (`[…]`) MUST introduce an all-digit
-            // port.
-            validate_authority_port(s)?;
-            Ok(())
+            validate_identifier_authority(s)
         }
     }
-}
-
-/// Authority/port structure: when the URI has an authority (`://authority`),
-/// a `:` in the authority outside an IP-literal bracket (`[…]`) MUST
-/// introduce an all-digit port. Rejects e.g. `http://a:b` (port "b").
-fn validate_authority_port(value: &str) -> Result<()> {
-    let after_scheme_host = match value.find("://") {
-        Some(i) => &value[i + 3..],
-        None => return Ok(()), // no authority (e.g. `urn:…`): nothing to port-check
-    };
-    let auth_end = after_scheme_host
-        .find(['/', '?', '#'])
-        .unwrap_or(after_scheme_host.len());
-    let authority = &after_scheme_host[..auth_end];
-    if authority.starts_with('[') {
-        return Ok(()); // IP literal: colons inside […] are not a port.
-    }
-    if let Some(c) = authority.rfind(':') {
-        let port = &authority[c + 1..];
-        if port.is_empty() || !port.bytes().all(|b| b.is_ascii_digit()) {
-            return Err(Invalid);
-        }
-    }
-    Ok(())
 }
 
 /// Validate URI bytes and percent escapes (spec/bap-v1.md §11; RFC 3986 §2;

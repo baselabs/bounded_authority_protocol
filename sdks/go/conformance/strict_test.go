@@ -27,7 +27,7 @@ import (
 // vendored corpus that hashes to anything else fails closed here: silent drift is impossible.
 const strictCertifiedIndexSHA256 = "732117dfe1881b553998126a9524a95bfb1171257e388d5430a0a099f2287cb9"
 
-const stringOrURICorpusIndexSHA256 = "11c7d8ba162c9de81eec8dbaf75847b7d9c0c2c40043008c80066efb1c5381a5"
+const stringOrURICorpusIndexSHA256 = "3b9a7dffd20b886894ad43fcc257a71f7b768cf9426a9a149ea60c79f218ce82"
 
 const (
 	strictCorpusDir  = "priv/conformance/strict-ed25519"
@@ -140,7 +140,7 @@ func TestStrictEd25519Corpus(t *testing.T) {
 }
 
 func TestStringOrURICorpus(t *testing.T) {
-	runAdditiveCorpus(t, "priv/conformance/string-or-uri", stringOrURICorpusIndexSHA256, "bap-string-or-uri/1", 6)
+	runAdditiveCorpus(t, "priv/conformance/string-or-uri", stringOrURICorpusIndexSHA256, "bap-string-or-uri/1", 24)
 }
 
 func runAdditiveCorpus(t *testing.T, dir, pin, profile string, total int) {
@@ -250,7 +250,7 @@ func runStrictPrimitive(t *testing.T, ref strictCaseRef) {
 	strictVerdict(t, id, c.Expected, accepted)
 }
 
-// runStrictShaped dispatches the v1/v2-shaped families, reusing the v2 runner's input builders.
+// runStrictShaped dispatches core cases, reusing the v2 runner's input builders.
 func runStrictShaped(t *testing.T, ref strictCaseRef) {
 	t.Helper()
 	var c corpusCase
@@ -260,6 +260,20 @@ func runStrictShaped(t *testing.T, ref strictCaseRef) {
 	c.Actual = ref.Actual
 	api := strictAPI(ref.head.Major)
 	switch c.Surface {
+	case "decode_grant":
+		compact := rawString(t, c.Input, "compact")
+		var err error
+		switch ref.head.Major {
+		case 1:
+			_, err = v.DecodeGrant(compact, nil)
+		case 2:
+			_, err = (v.Profile{}).DecodeGrant(compact, nil)
+		case 3:
+			_, err = (v.EcdsaProfile{}).DecodeGrant(compact, nil)
+		default:
+			t.Fatalf("unsupported grant major %d", ref.head.Major)
+		}
+		checkVerdict(t, c, err)
 	case "json.decode":
 		var text []byte
 		if c.Input["base64url"] != nil {

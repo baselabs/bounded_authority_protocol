@@ -1086,7 +1086,37 @@ def freeze(root, profile, files, verify):
           "index base64url", b64(sha(encoded["index.json"])), "verdict", index["verdict_sha256"])
 
 
-def freeze_string_or_uri(signer, base, verify):
+def grant_identifier_vectors(keys):
+    ipvfuture = "https://[v1.x]/"
+    ipv6 = "https://[::1]:443/"
+    bracketed_ipv4 = "https://[127.0.0.1]/"
+    cases = []
+    for major, suite in [(1, "eddsa"), (2, "eddsa"), (3, "es256")]:
+        signer = keys[suite]
+        header = dict(alg=HEADERS[suite]["alg"], kid="issuer-key", typ="ba+cap")
+        base = dict(v=major, iss="issuer", aud="audience", jti="grant", iat=10, nbf=10, exp=40,
+                    cnf=dict(jkt=fingerprint(public_bytes(signer.public_key(), suite), suite)),
+                    operations=[dict(name="read", selectors=[dict(kind="all")])])
+        for label, changes, accepted in [
+            ("iss-ipvfuture", dict(iss=ipvfuture), False),
+            ("aud-scalar-ipvfuture", dict(aud=ipvfuture), False),
+            ("aud-array-ipvfuture", dict(aud=["audience", ipvfuture]), False),
+            ("jti-ipvfuture", dict(jti=ipvfuture), False),
+            ("jti-bracketed-ipv4", dict(jti=bracketed_ipv4), False),
+            ("ipv6", dict(iss=ipv6, aud=["audience", ipv6], jti=ipv6), True),
+        ]:
+            payload = base | changes
+            audience = [payload["aud"]] if isinstance(payload["aud"], str) else payload["aud"]
+            identifiers = [payload["iss"], *audience, payload["jti"]]
+            demand(all(identifier(value, 512) for value in identifiers) == accepted)
+            cases.append(dict(id=f"grant-v{major}-{label}", major=major, surface="decode_grant",
+                              input=dict(compact=signed(signer, suite, header, payload)),
+                              expected=dict(verdict="valid" if accepted else "invalid")))
+    return cases
+
+
+def freeze_string_or_uri(keys, base, verify):
+    signer = keys["eddsa"]
     # These independently signed cases extend the released profiles without rotating either
     # certified index or changing any existing case outcome.
     attestor = dict(key_id=HEADERS["eddsa"]["kid"],
@@ -1123,7 +1153,8 @@ def freeze_string_or_uri(signer, base, verify):
         "revision.json": dict(format=STRING_OR_URI_FORMAT + "-corpus-revision", revision=1,
                               generated_from="scripts/build_approval_corpora.py"),
     }
-    families = {"content-assertion": content_cases, "role-attestation": role_cases}
+    families = {"content-assertion": content_cases, "grant-decode": grant_identifier_vectors(keys),
+                "role-attestation": role_cases}
     for family, cases in families.items():
         files[f"cases/{family}/ipvfuture.json"] = dict(
             format=STRING_OR_URI_FORMAT + "-cases", family=family, cases=cases)
@@ -1174,7 +1205,7 @@ def main():
                                      profile_digest_hex=digest.hex())
     freeze(CORPORA / "attestation-profiles/content-assertion-es256/v1", ES, assertions, args.verify)
     freeze(CORPORA / "content-profiles/action-approval/v1", APPROVAL, approvals, args.verify)
-    freeze_string_or_uri(keys["eddsa"], base, args.verify)
+    freeze_string_or_uri(keys, base, args.verify)
     if args.verify:
         spec = (ROOT / "spec/bap-action-approval-v1.md").read_text()
         demand(preimage.hex() in spec and digest.hex() in spec)

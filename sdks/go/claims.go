@@ -53,8 +53,8 @@ func isTchar(c byte) bool {
 // validStringOrURI: non-empty, at most byteCeiling UTF-8 bytes. When the
 // value contains ":" it must be a structurally valid RFC 3986 URI: scheme
 // grammar, ASCII-only, and a grammar-valid authority when "//" is present
-// (the corpus pins "ht tp://x" and "http://a:b" invalid). Case-sensitive;
-// never normalized.
+// (the corpus pins "ht tp://x" and "http://a:b" invalid). Bracketed hosts
+// must be IPv6 literals (erratum 7). Case-sensitive; never normalized.
 func validStringOrURI(s string, byteCeiling int) bool {
 	if len(s) == 0 || len(s) > byteCeiling {
 		return false
@@ -82,7 +82,15 @@ func validStringOrURI(s string, byteCeiling int) bool {
 			return false
 		}
 		host, port := splitHostPort(authority)
-		if _, err := normalizeHost(host); err != nil {
+		if strings.HasPrefix(host, "[") {
+			literal, closed := strings.CutSuffix(host[1:], "]")
+			if !closed {
+				return false
+			}
+			if _, err := normalizeIPv6(literal); err != nil {
+				return false
+			}
+		} else if _, err := normalizeHost(host); err != nil {
 			return false
 		}
 		if _, err := normalizePort(port); err != nil {

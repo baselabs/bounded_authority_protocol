@@ -2,6 +2,22 @@ package verifier
 
 import "testing"
 
+func TestStringOrURIRequiresIPv6BracketedHost(t *testing.T) {
+	for _, input := range []string{
+		"https://[v1.x]/",
+		"https://[V1.x]:443/",
+		"https://[example.test]/",
+		"https://[127.0.0.1]/",
+	} {
+		if validStringOrURI(input, 512) {
+			t.Errorf("accepted StringOrURI %q", input)
+		}
+	}
+	if !validStringOrURI("https://[::1]:443/", 512) {
+		t.Error("rejected StringOrURI with an IPv6 authority host")
+	}
+}
+
 // URI normalization (spec/bap-v1.md § URI normalization; RFC 3986).
 // Representative legs; the full 26-case corpus surface runs in the
 // conformance runner (including the malformed-IPv6 corpus class).

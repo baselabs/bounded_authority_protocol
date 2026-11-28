@@ -294,7 +294,7 @@ The manifest was introduced in 1.1.0.
 | Producer canonicality | 75 |
 | Selector float zero | 161 |
 | Strict Ed25519 | 2,410 |
-| StringOrURI identifiers | 6 |
+| StringOrURI identifiers | 24 |
 
 Each runner pins its index, hashes every indexed file, including `.raw` inputs, and rejects
 extra or missing files, duplicate IDs, and skipped cases. It records computed outcomes,

@@ -3,7 +3,7 @@ defmodule BoundedAuthorityProtocol.HolderCustodyAttestation.V1.DecodedAttestatio
   Closed bounded decode of one holder custody attestation without trust evaluation.
 
   Returned by `BoundedAuthorityProtocol.HolderCustodyAttestation.V1.decode_attestation/2`
-for diagnosis. Its claims are unverified.
+  for diagnosis. Its claims are unverified.
 
   ## Fields
 

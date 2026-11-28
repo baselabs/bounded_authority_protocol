@@ -386,11 +386,11 @@ defmodule BoundedAuthorityProtocol.Conformance.Runner do
 
   # --- strict-Ed25519 corpus ----------------------------------------------
 
-  # v1/v2-shaped cases: the case's own contract-major and surface, the ordinary agreement rule.
+  # Core cases use the case's own contract-major and the ordinary agreement rule.
   defp strict_agrees?(
          %{"major" => major, "surface" => surface, "expected" => expected} = case_obj
        )
-       when major in [1, 2] do
+       when major in [1, 2, 3] do
     actual = dispatch(major, surface, Map.get(case_obj, "input", %{}), %{})
     agrees?(expected, actual)
   end

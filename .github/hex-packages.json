@@ -289,6 +289,7 @@
       "priv/conformance/strict-ed25519/profile.json",
       "priv/conformance/strict-ed25519/revision.json",
       "priv/conformance/string-or-uri/cases/content-assertion/ipvfuture.json",
+      "priv/conformance/string-or-uri/cases/grant-decode/ipvfuture.json",
       "priv/conformance/string-or-uri/cases/role-attestation/ipvfuture.json",
       "priv/conformance/string-or-uri/index.json",
       "priv/conformance/string-or-uri/profile.json",

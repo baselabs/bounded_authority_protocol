@@ -121,7 +121,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
     :strict_ed25519 => "cyEX3-GIG1U5mBJqlSSpW_sRcSV-OI1UMKCgmfIofLk",
     :producer_canonicality => "me5vu_MnWLA9RjBkf3IdjU40nwYo2GBJPWZ_5udixgE",
     :selector_float_zero => "l_16mc2_OswKePW6HGVW4jpj4K1m9TPjH9afgtxfMAM",
-    :string_or_uri => "EcfYuhYsnege7I2691hHt9nAwsQAQwCMgAZu-xxTgaU",
+    :string_or_uri => "O5p9_9ILiGiUrUP8wlenH3t2jPlCapoUnqYMefIYzoI",
     :local_loopback_http => "EPxM8Fr_zdyeY0D_OSwkfiWrA4zZOPJVeCmnzmOxpeQ",
     :role_attestation => "vlJ1xpU5oPMXNCQv8ApITC-FXzkYHFVonYsPZxGV1io",
     :content_assertion => "FLdDbM98yR_s5SoVeMN2DfZyCpNJTRR-5atSPiziGHY",

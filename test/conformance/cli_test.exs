@@ -421,7 +421,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
           {"strict-ed25519", "strict-ed25519", nil},
           {"producer-canonicality", "producer-canonicality", nil},
           {"selector-float-zero", "selector-float-zero", 161},
-          {"string-or-uri", "string-or-uri", 6},
+          {"string-or-uri", "string-or-uri", 24},
           {"application-profiles/local-loopback-http/v1", "local-loopback-http", 46},
           {"attestation-profiles/role-attestation/v1", "role-attestation", 40},
           {"attestation-profiles/content-assertion/v1", "content-assertion", 154}
