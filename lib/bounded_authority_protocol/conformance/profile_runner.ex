@@ -1,4 +1,4 @@
-defmodule BoundedAuthorityProtocol.Conformance.Candidate do
+defmodule BoundedAuthorityProtocol.Conformance.ProfileRunner do
   @moduledoc false
 
   alias BoundedAuthorityProtocol.ActionApproval.V1, as: Approval
@@ -21,13 +21,6 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
   @custody "bap-holder-custody-attestation/1"
   @es256 "bap-content-assertion-es256/1"
 
-  # Source candidate identities. The released corpus catalog remains independently gated.
-  @pins %{
-    "U4S4aA-2dXNgaWxoicXWs7cG6HKO3Mrm3QxcRoqBmmQ" => @approval,
-    "K7Qbj7yfvcAmf3KXbVYoC-BUFCDkwUJBymIvHdBx0Ms" => @es256,
-    "b59Jd5LcqLr3eEuj52ugUHcx54WZhuidhl9fiaBLz6o" => @custody
-  }
-
   @binary_fields ~w(attestor_key_fingerprint content_digest digest prev profile_digest
     public_key revision_digest subject_key_fingerprint)a
   @binary_field_keys Map.new(@binary_fields, &{&1, true})
@@ -44,44 +37,85 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
             fn field -> {Atom.to_string(field), field} end
           )
 
-  def identify(index_bytes), do: Map.get(@pins, Report.index_identity(index_bytes))
+  @index_keys ~w(elixir_verdict_sha256 files private_material_tracked profile revision verdict_sha256)
 
-  def run(files, profile) do
-    index_bytes = Map.fetch!(files, "index.json")
-    index = :json.decode(index_bytes)
-
-    with %{"profile" => ^profile, "files" => entries} <- index,
-         true <- map_size(files) == length(entries) + 1,
-         {:ok, cases, metadata} <- checked_cases(entries, files),
-         true <- known_answer?(profile, metadata) do
-      report(index_bytes, index, cases, metadata)
+  def load(index, files) do
+    with %{
+           "files" => entries,
+           "profile" => profile,
+           "revision" => 1,
+           "private_material_tracked" => false
+         } <- index,
+         true <-
+           map_size(index) == length(@index_keys) and
+             Enum.all?(@index_keys, &is_map_key(index, &1)),
+         true <- is_list(entries) and map_size(files) == length(entries) + 1,
+         true <- Enum.all?(entries, &file_matches?(&1, files)),
+         {:ok, %{"profile" => ^profile, "revision" => 1} = metadata} <-
+           decode_file(files, "profile.json"),
+         {:ok, cases} <- checked_cases(entries, files) do
+      {:ok, cases, metadata}
     else
-      _failure -> {:error, :integrity}
+      _failure -> {:error, :invalid}
     end
   end
 
-  # The pinned index fixes order, names and counts. Verify each file before decoding it.
   defp checked_cases(entries, files) do
-    with true <- Enum.all?(entries, &file_matches?(&1, files)) do
-      cases = Enum.flat_map(entries, &entry_cases(&1, files))
-
-      if Enum.all?(cases, &match?({_path, _item}, &1)),
-        do: {:ok, cases, :json.decode(Map.fetch!(files, "profile.json"))},
-        else: {:error, :integrity}
+    Enum.reduce_while(entries, {:ok, []}, fn entry, {:ok, acc} ->
+      case entry_cases(entry, files) do
+        {:ok, cases} -> {:cont, {:ok, cases ++ acc}}
+        {:error, :invalid} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, cases} -> {:ok, Enum.reverse(cases)}
+      error -> error
     end
   end
 
-  defp entry_cases(%{"path" => path, "cases" => count}, files) do
-    list = :json.decode(Map.fetch!(files, path))
-    if length(list) == count, do: Enum.map(list, &{path, &1}), else: [:wrong_count]
+  defp entry_cases(%{"path" => path, "cases" => count} = entry, files)
+       when map_size(entry) == 3 and is_integer(count) and count > 0 do
+    with {:ok, cases} when is_list(cases) and length(cases) == count <- decode_file(files, path),
+         true <- Enum.all?(cases, &case_shape?/1) do
+      {:ok, [{path, cases}]}
+    else
+      _failure -> {:error, :invalid}
+    end
   end
 
-  defp entry_cases(_metadata, _files), do: []
+  defp entry_cases(%{"path" => "profile.json"} = entry, _files) when map_size(entry) == 2,
+    do: {:ok, []}
+
+  defp entry_cases(_entry, _files), do: {:error, :invalid}
+
+  defp case_shape?(%{"id" => id, "expected" => _}) when is_binary(id), do: true
+  defp case_shape?(_item), do: false
+
+  # The CLI caps fixture files at 1 MiB. Their JSON arrays may contain multiple wire
+  # objects and deliberately over-limit values, so wire bounds are applied by the verifier.
+  defp decode_file(files, path) do
+    case Map.fetch(files, path) do
+      {:ok, bytes} -> {:ok, :json.decode(bytes)}
+      :error -> {:error, :invalid}
+    end
+  catch
+    :error, _reason -> {:error, :invalid}
+  end
 
   defp file_matches?(%{"path" => path, "sha256" => hash}, files) do
     case Map.fetch(files, path) do
-      {:ok, bytes} -> sha(bytes) == hash
-      :error -> false
+      {:ok, bytes} when is_binary(bytes) -> sha(bytes) == hash
+      _missing -> false
+    end
+  end
+
+  defp file_matches?(_entry, _files), do: false
+
+  def run(corpus) do
+    if known_answer?(Map.fetch!(corpus.index, "profile"), corpus.profile) do
+      report(corpus.index_bytes, corpus.index, corpus.cases, corpus.profile)
+    else
+      {:error, :integrity}
     end
   end
 
@@ -117,10 +151,10 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
     end
   end
 
-  defp known_answer?(@custody, _metadata), do: false
+  defp known_answer?(_profile, _metadata), do: false
 
   defp report(index_bytes, index, cases, metadata) do
-    {sdk, elixir} = Enum.split_with(cases, &sdk_case?/1)
+    {sdk, elixir} = partition_cases(cases)
     pure_cases = Map.new(elixir, fn {_path, item} -> {Map.get(item, "id"), item} end)
 
     results =
@@ -131,7 +165,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
     rows = Enum.map(results, &elem(&1, 0))
     ids = Enum.map(rows, &hd/1)
-    digest = sha(canonical(rows))
+    digest = verdict_digest(rows)
     total = length(elixir)
     agreed = Enum.count(results, &elem(&1, 1))
 
@@ -156,6 +190,14 @@ defmodule BoundedAuthorityProtocol.Conformance.Candidate do
 
     {:ok, :erlang.iolist_to_binary(canonical(report)), status}
   end
+
+  def partition_cases(cases) do
+    cases
+    |> Enum.flat_map(fn {path, items} -> Enum.map(items, &{path, &1}) end)
+    |> Enum.split_with(&sdk_case?/1)
+  end
+
+  def verdict_digest(rows), do: sha(canonical(rows))
 
   defp sdk_case?({"helper-cases.json", _item}), do: true
   defp sdk_case?({_path, %{"owner" => "sdk_helper"}}), do: true

@@ -125,3 +125,11 @@ preserves member order: `:null`, `{:boolean, b}`, `{:integer, i}`, `{:float, f}`
 
 **Untrusted key locator.** `untrusted_key_locator/2`: reads only the `kid` from a compact's
 protected header, as a lookup hint with `trust: :not_evaluated`.
+
+**Action approval.** A content profile that binds a canonical record of an exact action and
+resource set to a request and its immutable revision, using a configured EdDSA or ES256
+assertion carrier. See the [profile](../../spec/bap-action-approval-v1.md).
+
+**ES256 content assertion.** A P-256 signed statement over an exact content digest, context,
+lineage and validity window. It has its own protected type and API. See the
+[profile](../../spec/bap-content-assertion-es256-v1.md).

@@ -76,7 +76,7 @@ Submission to IANA for registration is externally gated.
 - **Change controller:** Bounded Authority Protocol maintainers
 - **Wire `typ`:** `ba+role-attestation`
 
-## application/ba-holder-custody-attestation+jwt (candidate)
+## application/ba-holder-custody-attestation+jwt (active)
 
 - **Type name:** application
 - **Subtype name:** ba-holder-custody-attestation+jwt
@@ -112,7 +112,7 @@ Submission to IANA for registration is externally gated.
 - **Change controller:** Bounded Authority Protocol maintainers
 - **Wire `typ`:** `ba+content-assertion`
 
-## application/ba-content-assertion-es256+jwt (candidate)
+## application/ba-content-assertion-es256+jwt (active)
 
 - **Type name:** application
 - **Subtype name:** ba-content-assertion-es256+jwt

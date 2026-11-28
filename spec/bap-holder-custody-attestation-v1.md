@@ -1,6 +1,6 @@
 # BAP Holder Custody Attestation Profile 1
 
-Document status: normative source candidate for `bap-holder-custody-attestation/1`.
+Document status: released in package 1.5.0, the normative contract for `bap-holder-custody-attestation/1`.
 Document revision: rev 1.
 This standalone profile follows [governance § Byte-distinct sibling attestation
 profiles](../docs/governance.md#byte-distinct-sibling-attestation-profiles).
@@ -143,5 +143,6 @@ and corpus identities plus real-substrate evidence (`REQ-HCA1-RELEASE-immutable`
 
 The prepared LIMITED USE template for `application/ba-holder-custody-attestation+jwt` lives
 in the [media type registry source](../docs/design/iana/media-types.json) and its
-[rendered form](../docs/design/iana/media-types.md). The template is a candidate
+[rendered form](../docs/design/iana/media-types.md). The template documents the released wire type. Submission follows the
+protocol's first external submission
 (`REQ-HCA1-IANA-template`).

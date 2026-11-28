@@ -131,7 +131,7 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
        "{:bounded_authority_protocol, \"#{requirement}\"}"},
       {"security support", "SECURITY.md", "`#{series}.x` source release line is supported"},
       {"security current", "SECURITY.md",
-       "`v#{released_version}` is the current tagged source release"},
+       "`baselabs_bounded_authority_protocol-v#{released_version}` is the current tagged source release"},
       {"usage rules install", "usage-rules.md",
        "{:bounded_authority_protocol, \"#{requirement}\"}"},
       {"README CLI install", "README.md",
@@ -243,8 +243,8 @@ defmodule BoundedAuthorityProtocol.DocsCurrencyTest do
           "docs/notebooks/bap-walkthrough.livemd"
         ] do
       refute File.read!(path) =~
-               ~r/bounded_authority_protocol,[\s\S]{0,120}tag: "v#{Regex.escape(version)}"/,
-             "#{path} must not prescribe v#{version} as a package dependency"
+               ~r/bounded_authority_protocol,[\s\S]{0,120}tag: "(?:baselabs_bounded_authority_protocol-)?v#{Regex.escape(version)}"/,
+             "#{path} must use the registry for package #{version}"
     end
   end
 

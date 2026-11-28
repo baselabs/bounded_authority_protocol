@@ -164,9 +164,10 @@ redacted facts. Keep these out of the verifier:
 A verifier result is one input to that decision, never the decision itself
 ([protocol charter](../design/protocol-charter.md)).
 
-Tests and corpus inputs are self-contained under the SDK root. The complete Hex corpus tree
-is vendored at `conformance/priv/conformance/`; copied-alone and unpacked-package checks
-protect that boundary. See the [verdict digest contract](../design/corpus-verdict-digests.md).
+The ten standalone corpora at `conformance/priv/conformance/` run from a copied SDK root
+and its unpacked package. Source-checkout tests also verify ES256 content assertions and
+action approval against the pinned profile indexes. Holder custody is verified by the
+Elixir package. See the [verdict digest contract](../design/corpus-verdict-digests.md).
 
 ## Migration
 

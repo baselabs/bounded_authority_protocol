@@ -350,3 +350,12 @@ This map is a living artifact. It was validated against the corpus revision name
   the requirement; that promotion is the owning slice's job.
 - The corpus-revision qualifier on each row is the drift detector: a row whose qualifier no longer
   matches `index.json`'s `format` field is stale and must be re-validated before the map is cited.
+
+## Package 1.5.0 sibling profiles
+
+The package adds no requirement to a contract-major by activating these separate profiles.
+Use the [custody requirement map](holder-custody-attestation-requirement-map.md), the
+[content assertion map](content-assertion-requirement-map.md#es256-sibling-coverage-in-150),
+and the [action approval conformance table](../../spec/bap-action-approval-v1.md#7-conformance-and-release)
+for the profile-scoped evidence. Erratum 7 has its own StringOrURI corpus and keeps the
+historical affected-version range in the [errata registry](../errata.md).

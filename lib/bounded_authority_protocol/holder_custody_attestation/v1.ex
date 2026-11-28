@@ -1,6 +1,6 @@
 defmodule BoundedAuthorityProtocol.HolderCustodyAttestation.V1 do
   @moduledoc """
-  Source candidate for standalone Ed25519 holder custody attestations
+  Standalone Ed25519 holder custody attestations
   (`bap-holder-custody-attestation/1`).
 
   An attestor signs a holder key's custody class for a bounded window. Callers explicitly choose

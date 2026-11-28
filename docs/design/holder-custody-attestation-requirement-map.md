@@ -32,6 +32,6 @@ case and produces the signed bytes and expected facts.
 | `API-assembly-revalidate`, `API-symmetry` | Assembly acceptance and refusals over the pinned bytes |
 | `SECURITY-custody-semantics`, `SECURITY-not-authority`, `SECURITY-holder-semantics` | The closed class set and exact facts in `valid-standard` and `valid-hosted`. Per-grant holder standing remains in the grant. |
 | `SECURITY-trust-scope`, `SECURITY-runtime-private` | `attestor-id-mismatch`, `outlives-attestor` and `unbounded-attestor`. Caller obligations are in §5. |
-| `CONFORMANCE-complete`, `CONFORMANCE-certified-pin` | Candidate CLI checks the index pin and computed verdict digest. The released corpus runner checks all released verdict digests. |
-| `CONFORMANCE-sdks`, `RELEASE-immutable` | Governance release conditions and source-candidate inventory boundary |
-| `IANA-template` | Candidate registry row and the media type template comparison in `mix spec.facts` |
+| `CONFORMANCE-complete`, `CONFORMANCE-certified-pin` | The packaged CLI checks the index pin and computes the verdict digest over all 76 cases. |
+| `CONFORMANCE-sdks`, `RELEASE-immutable` | Package 1.5.0 corpus inventory and governance release evidence for the shipped SDK |
+| `IANA-template` | Active registry row and the media type template comparison in `mix spec.facts` |

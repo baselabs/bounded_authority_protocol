@@ -25,7 +25,10 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
      "../tests/role_attestation.rs", "role_attestation_test.go"},
     {:content_assertion, "attestation-profiles/content-assertion/v1",
      "../test_content_assertion.py", "../tests/content_assertion.rs",
-     "content_assertion_corpus_test.go"}
+     "content_assertion_corpus_test.go"},
+    {:content_assertion_es256, "attestation-profiles/content-assertion-es256/v1", nil},
+    {:holder_custody_attestation, "attestation-profiles/holder-custody-attestation/v1", nil},
+    {:action_approval, "content-profiles/action-approval/v1", nil}
   ]
 
   @runner_pin ~r/(?m)^\s*(?:const\s+)?(?:_?CERTIFIED_INDEX_SHA(?:256)?|CONTENT_CORPUS_INDEX_SHA256|\w*[Cc]ertified\w*IndexSHA256)\b[^=\n]*=\s*"([^"]*)"/
@@ -33,6 +36,14 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
   # Independently maintained certification evidence. Rotation must never edit these files.
   # A string key names a preservation artifact outside the CLI certification map.
   @preservation [
+    {"test/bounded_authority_protocol/action_approval/corpus_test.exs",
+     [{:action_approval, :hex, 1}, {:content_assertion_es256, :hex, 1}]},
+    {"sdks/python/candidate/test_profiles.py",
+     [{:action_approval, :hex, 1}, {:content_assertion_es256, :hex, 1}]},
+    {"sdks/rust/conformance/run_approval.rs",
+     [{:action_approval, :hex, 1}, {:content_assertion_es256, :hex, 1}]},
+    {"sdks/go/action_approval_corpus_test.go", [{:action_approval, :hex, 1}]},
+    {"sdks/go/content_assertion_es256_corpus_test.go", [{:content_assertion_es256, :hex, 1}]},
     {"scripts/check_role_attestation.exs", [{:role_attestation, :hex, 1}]},
     {"test/bounded_authority_protocol/application_profile/local_loopback_http/v1_test.exs",
      [{:local_loopback_http, :hex, 1}]},
@@ -83,6 +94,9 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
 
   # Published explanations must match certification, but require an explicit editorial update.
   @prose [
+    {"spec/bap-action-approval-v1.md", [{:action_approval, :hex, 1}]},
+    {"spec/bap-content-assertion-es256-v1.md", [{:content_assertion_es256, :hex, 1}]},
+    {"spec/bap-holder-custody-attestation-v1.md", [{:holder_custody_attestation, :hex, 1}]},
     # Released changelog sections record the digest each release certified; history is never
     # rewritten, so a rotation edits this entry, not the changelog.
     {"CHANGELOG.md",
@@ -185,18 +199,29 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
     if keys != MapSet.new(Map.keys(pins)),
       do: raise("corpus catalog differs from CLI certification map")
 
-    Enum.map(@entries, fn {key, source, python, rust, go} ->
+    Enum.map(@entries, fn entry ->
+      {key, source, runners} = snapshot_runners(entry)
+
       %{
         key: key,
         source: "priv/conformance/" <> source,
         certified: Map.fetch!(pins, key),
-        runners: [
-          Path.join("sdks/python/tests/conformance", python) |> Path.expand(@root),
-          Path.join("sdks/rust/conformance", rust) |> Path.expand(@root),
-          Path.join("sdks/go", go) |> Path.expand(@root)
-        ]
+        runners: Enum.map(runners, &Path.expand(&1, @root))
       }
     end)
+  end
+
+  # These paths identify the standalone snapshot runners. Separate source-checkout SDK tests
+  # for approval and ES256 assertions pin their inputs as independent preservation evidence.
+  defp snapshot_runners({key, source, nil}), do: {key, source, []}
+
+  defp snapshot_runners({key, source, python, rust, go}) do
+    {key, source,
+     [
+       Path.join("sdks/python/tests/conformance", python),
+       Path.join("sdks/rust/conformance", rust),
+       Path.join("sdks/go", go)
+     ]}
   end
 
   def snapshots do

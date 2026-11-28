@@ -4,7 +4,7 @@
 [![HexDocs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/bounded_authority_protocol)
 [![CI](https://github.com/baselabs/bounded_authority_protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/baselabs/bounded_authority_protocol/actions/workflows/ci.yml)
 [![License](https://img.shields.io/hexpm/l/bounded_authority_protocol.svg)](LICENSE)
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.1.0%2Fdocs%2Fnotebooks%2Fbap-walkthrough.livemd)
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fbaselabs_bounded_authority_protocol-v1.5.0%2Fdocs%2Fnotebooks%2Fbap-walkthrough.livemd)
 
 The open wire profile, verifier, and conformance suite of the Bounded Authority Protocol: an
 issuer signs a **capability grant** that names exactly which operations a holder may invoke, with
@@ -38,14 +38,16 @@ release carries several profiles.
 
 | What | Version | Namespace | Suite | Specification |
 |---|---|---|---|---|
-| Hex package | 1.1.0 | `BoundedAuthorityProtocol` | | [Changelog](CHANGELOG.md) |
+| Hex package | 1.5.0 | `BoundedAuthorityProtocol` | | [Changelog](CHANGELOG.md) |
 | Contract-major 1 | frozen | `BoundedAuthorityProtocol.V1` | `BAP1-Ed25519-SHA256` | [spec](spec/bap-v1.md) |
 | Contract-major 2 | frozen | `BoundedAuthorityProtocol.V2` | `BAP2-Ed25519-SHA256` | [spec](spec/bap-v2.md) |
 | Contract-major 3 | frozen | `BoundedAuthorityProtocol.V3` | `BAP3-ES256-SHA256` | [spec](spec/bap-v3.md) |
 | Local-loopback HTTP proofs | profile 1 | `...ApplicationProfile.LocalLoopbackHttp.V1` | Ed25519 | [spec](spec/bap-local-loopback-http-v1.md) |
 | Role attestations | profile 1 | `...RoleAttestation.V1` | Ed25519 | [spec](spec/bap-role-attestation-v1.md) |
-| Holder custody attestations (source candidate) | profile 1 | `...HolderCustodyAttestation.V1` | Ed25519 | [spec](spec/bap-holder-custody-attestation-v1.md) |
-| Content assertions | profile 1 | `...ContentAssertion.V1` | Ed25519 | [spec](spec/bap-content-assertion-v1.md) |
+| Holder custody attestations | profile 1 | `...HolderCustodyAttestation.V1` | Ed25519 | [spec](spec/bap-holder-custody-attestation-v1.md) |
+| EdDSA content assertions | profile 1 | `...ContentAssertion.V1` | Ed25519 | [spec](spec/bap-content-assertion-v1.md) |
+| ES256 content assertions | profile 1 | `...ContentAssertion.ES256.V1` | P-256 | [spec](spec/bap-content-assertion-es256-v1.md) |
+| Action approval | profile 1 | `...ActionApproval.V1` | EdDSA or ES256, selected by host policy | [spec](spec/bap-action-approval-v1.md) |
 
 See [Choosing a profile](docs/guides/choosing-a-profile.md) and
 [API stability and versioning](docs/guides/api-stability.md).
@@ -54,7 +56,7 @@ See [Choosing a profile](docs/guides/choosing-a-profile.md) and
 
 ```elixir
 def deps do
-  [{:bounded_authority_protocol, "~> 1.1"}]
+  [{:bounded_authority_protocol, "~> 1.5"}]
 end
 ```
 
@@ -171,8 +173,8 @@ own request. It selects the action approval profile and EdDSA verifier from conf
 supplies its own clock and trusted-key snapshot from enrolled keys. The approval verifier checks
 those inputs against the signed bytes and returns verified facts for the one bound request.
 
-The [offline Elixir example](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/examples/action-approval.exs)
-runs from a source checkout with `sqlite3` on `PATH`. It exercises the candidate approval profile.
+The [offline Elixir example](https://github.com/baselabs/bounded_authority_protocol/blob/baselabs_bounded_authority_protocol-v1.5.0/docs/examples/action-approval.exs)
+runs from a source checkout with `sqlite3` on `PATH`. It exercises the released approval profile.
 
 ```bash
 mix run docs/examples/action-approval.exs
@@ -211,14 +213,16 @@ Every certified corpus ships under `priv/conformance`, with a CLI that exits `0`
 complete agreement. Contract-major 1's corpus alone has 283 cases across 28 surfaces:
 
 ```bash
-mix escript.install hex bounded_authority_protocol 1.1.0
+mix escript.install hex bounded_authority_protocol 1.5.0
 bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus
 ```
 
-TypeScript, Python, Rust, and Go verifiers pass the same corpora
+The Elixir CLI certifies all thirteen packaged corpora. Python, Rust, and Go run ten
+from standalone snapshots and exercise action approval and ES256 content assertions
+in source-checkout tests. TypeScript publishes and certifies its own snapshots
 ([Other languages](docs/guides/other-languages.md)).
 
-The in-tree Python, Rust, and Go SDKs each carry the complete Hex corpus tree at
+The in-tree Python, Rust, and Go SDKs each carry their standalone corpus projection at
 `conformance/priv/conformance/` inside their SDK root. Tests run from copied SDK roots and
 unpacked language packages. Input hashes, exact inventories, complete execution, and computed
 verdict digests bind each runner to the same frozen cases. See the
@@ -237,7 +241,7 @@ verdict digests bind each runner to the same frozen cases. See the
 Each notebook introduces one step per code cell, matches success and refusal results, and
 persists only safe semantic outputs. Download a file and import it into Livebook, then choose
 **Run all**. The launch links open each journey under `docs/notebooks/` at the immutable
-1.1.0 release tag. The [notebook index](docs/guides/notebooks.md) lists each journey and its
+1.5.0 release tag. The [notebook index](docs/guides/notebooks.md) lists each journey and its
 checked output count.
 
 - [Core envelope verification](docs/notebooks/bap-walkthrough.livemd)

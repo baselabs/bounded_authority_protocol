@@ -2,8 +2,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   @moduledoc false
 
   # Internal to the conformance CLI (not public API). Pure loader and integrity verifier for the
-  # portable conformance corpora. Every loader takes `%{path => binary}` (no I/O), decodes every
-  # `.json` file through `V1.Json.decode/2` at `Bounds.maximum()`, verifies the corpus's own
+  # portable conformance corpora. Every loader takes `%{path => binary}` (no I/O), decodes
+  # wire-format JSON with `V1.Json.decode/2` at `Bounds.maximum()`, verifies the corpus's own
   # integrity properties, and returns the fixed value-free `{:error, :invalid}` on any failure.
   #
   # - `load/1`: a contract-major corpus (v1, v2, v3). Per-file SHA-256 (`.json` and `.raw`)
@@ -18,11 +18,14 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   # - `load_local_loopback_http/1`, `load_role_attestation/1`, `load_content_assertion/1`: the
   #   sibling-profile corpora, each with its own closed index (an exact ordered file list with
   #   lowercase-hex SHA-256 and per-kind case counts) and a `profile.json` the runner reads.
+  # - `load_profile/1` loads approval, ES256 assertions, and custody attestations. The index
+  #   bounds the fixture files and counts, and ProfileRunner decodes their tooling JSON.
   #
   # `total_cases` is the census the CLI requires the runner to execute exactly: the index's
   # `total_cases` for contract-major and additive corpora, the sum of the declared per-kind counts
   # for sibling corpora (plus the local-loopback profile's certified proofs, which run as cases).
 
+  alias BoundedAuthorityProtocol.Conformance.ProfileRunner
   alias BoundedAuthorityProtocol.V1.Bounds
   alias BoundedAuthorityProtocol.V1.Json
 
@@ -54,7 +57,10 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
             | :string_or_uri
             | :local_loopback_http
             | :role_attestation
-            | :content_assertion,
+            | :content_assertion
+            | :content_assertion_es256
+            | :holder_custody_attestation
+            | :action_approval,
           profile: map() | nil,
           total_cases: non_neg_integer() | nil
         }
@@ -122,8 +128,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
          {:error, :invalid} <- load_selector_float_zero(map),
          {:error, :invalid} <- load_string_or_uri(map),
          {:error, :invalid} <- load_local_loopback_http(map),
-         {:error, :invalid} <- load_role_attestation(map) do
-      load_content_assertion(map)
+         {:error, :invalid} <- load_role_attestation(map),
+         {:error, :invalid} <- load_content_assertion(map) do
+      load_profile(map)
     end
   end
 
@@ -565,6 +572,26 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   end
 
   def load_content_assertion(_map), do: {:error, :invalid}
+
+  @profiles %{
+    "bap-action-approval/1" => :action_approval,
+    "bap-content-assertion-es256/1" => :content_assertion_es256,
+    "bap-holder-custody-attestation/1" => :holder_custody_attestation
+  }
+
+  defp load_profile(map) when is_map(map) do
+    with {:ok, index_bytes} <- fetch_index(map),
+         {:ok, %{"profile" => profile_name} = index} <- decode_index(index_bytes),
+         {:ok, major} <- Map.fetch(@profiles, profile_name),
+         {:ok, _paths} <- declared_paths(index_bytes),
+         {:ok, cases, profile} <- ProfileRunner.load(index, map) do
+      sibling_corpus(index_bytes, index, profile, cases, %{}, major)
+    else
+      _invalid -> {:error, :invalid}
+    end
+  end
+
+  defp load_profile(_map), do: {:error, :invalid}
 
   defp load_sibling(map, %{profile: profile_name, index_keys: keys, files: paths}) do
     with {:ok, index_bytes} <- fetch_index(map),

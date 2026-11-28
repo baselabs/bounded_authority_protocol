@@ -4,28 +4,29 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ## [Unreleased]
 
+## [1.5.0] (2026-11-28)
+
 - Clarify in erratum 7 that StringOrURI IP-literal hosts require IPv6. Align
   core identifiers and attestation and approval verification in Python, Go, and Rust.
   Pin grant claim and attestation cases.
 
 ### Added
 
-- Add the source candidate `bap-holder-custody-attestation/1`, with a separate Elixir API
+- Release `bap-holder-custody-attestation/1`, with a separate Elixir API
   and pinned conformance corpus for bounded, non-authorizing holder custody evidence.
 
-- Add Rust verification for the candidate ES256 content-assertion and action-approval
+- Add Rust verification for the ES256 content-assertion and action-approval
   profiles, including the bounded canonical record codec and host-local diagnostics.
 
-- Add source-candidate Python verification for `bap-content-assertion-es256/1` and
+- Add source-checkout Python verification for `bap-content-assertion-es256/1` and
   `bap-action-approval/1`, including the canonical approval record codec.
 
-- Implement the candidate ES256 content assertion sibling with a distinct protected
+- Release the ES256 content assertion sibling with a distinct protected
   type, strict low-S verification and assembly, the shared exact-content digest and suite-specific successor verification.
-- Implement the candidate action-approval record codec and pure verification
-  with ordered host-local diagnostics. Pin the record descriptor and both
-  candidate corpora. Specify atomic claims and retry delivery of a durable intent.
-- Run both source candidates through the conformance CLI and report the digest
-  of executed Elixir outcomes and the count of SDK-owned cases.
+- Release the action-approval record codec and pure verification
+  with ordered host-local diagnostics. Pin the record descriptor and corpus. Specify atomic claims and retry delivery of a durable intent.
+- Package all three profile corpora and certify their Elixir outcomes with the
+  conformance CLI. The approval report separately counts SDK-owned cases.
 - Add Go verification for both approval-related candidate profiles, with a canonical
   record codec, ordered host-local diagnostics, and conformance and p99 gates.
 - Execute the README action approval example in CI with file-backed SQLite claims,
@@ -69,7 +70,7 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 - Expose suite-specific Go action approval assertion facts for EdDSA and ES256 successor verification.
 - Reject floating-point overrides for fixed cryptographic widths. Exercise typed bound and
-  malformed snapshot inputs in the candidate action approval corpus.
+  malformed snapshot inputs in the action approval corpus.
 - Limit new-ref identifier checks to commits outside the pushing remote's tracking refs.
   Keep full-history checks for unconfigured remotes and remotes without tracking refs.
 - Make public SDK comments and repository text self-contained: state verification and

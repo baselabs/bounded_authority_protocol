@@ -9,7 +9,7 @@ The docs-currency tests check the contract-major 1 digest, revision, case/surfac
 and local-loopback corpus identity and counts. They do not validate execution dates,
 implementation commit identities, toolchains, or current registry versions.
 
-Last regenerated November 9, 2026. Every result below was re-executed that day at these
+The historical cross-validation results below were regenerated November 9, 2026, at these
 identities:
 
 | Implementation | Identity | Toolchain |
@@ -68,7 +68,7 @@ per-language permissiveness mutation gate proving its closures red-capable.
 | SDK | Language surface | Corpus binding | Contract-major 1 result |
 |---|---|---|---|
 | `@bounded-authority-protocol/verifier` | TypeScript, Node >= 22, `node:crypto` only | graduated repository ([baselabs/bounded_authority_protocol_typescript](https://github.com/baselabs/bounded_authority_protocol_typescript)), vendored snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
-| `bounded-authority-protocol-verifier` | Python >= 3.11, `cryptography` | complete vendored Hex tree, file hashes and verdict digest | **283/283 agreed + census (11 keys)** |
+| `bounded-authority-protocol-verifier` | Python >= 3.11, `cryptography` | standalone vendored corpus snapshot, file hashes and verdict digest | **283/283 agreed + census (11 keys)** |
 | `bounded-authority-protocol` | Rust, MSRV 1.88, `ed25519-dalek`+`p256`+`sha2` | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 | `bounded_authority_protocol_go` | Go 1.25, stdlib only | vendored self-contained snapshot, startup digest assertion | **283/283 agreed + census (11 keys)** |
 
@@ -256,3 +256,20 @@ repository.
   reference and the four SDKs run all of them.
 - The local-profile real-socket drill is implemented in the Elixir release gate. The other SDK
   results certify bytes and verdicts against the shared corpus, not live transport composition.
+
+## Package 1.5.0 certification coverage
+
+This table lists release qualification inputs. The dated execution evidence above covers
+the earlier shared corpora.
+
+| Corpus | Elixir CLI cases | In-tree Python, Rust, and Go coverage |
+|---|---:|---|
+| StringOrURI (erratum 7) | 24 | Standalone snapshots, 24 each |
+| ES256 content assertion | 223 | Source-checkout jobs, 223 each |
+| Holder custody attestation | 76 | No runner |
+| Action approval | 202 of 331 | Source-checkout jobs, 331 each, including 129 SDK-owned cases |
+
+The release gate for the separately published TypeScript verifier requires implementation and
+certification of the three new profiles against the exact indexes. Its published release
+identity and results belong to the [TypeScript verifier repository](https://github.com/baselabs/bounded_authority_protocol_typescript).
+See the [distribution and digest contract](corpus-verdict-digests.md).

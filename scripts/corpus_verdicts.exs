@@ -2,6 +2,7 @@ Code.require_file("corpus_catalog.exs", __DIR__)
 
 defmodule BoundedAuthorityProtocol.CorpusVerdicts do
   @moduledoc false
+  alias BoundedAuthorityProtocol.Conformance.{Corpus, ProfileRunner}
   alias BoundedAuthorityProtocol.CorpusCatalog, as: Catalog
   alias BoundedAuthorityProtocol.V1.{Bounds, Jcs}
 
@@ -102,8 +103,6 @@ defmodule BoundedAuthorityProtocol.CorpusVerdicts do
     corpora =
       Map.new(Catalog.entries(), fn entry ->
         root = Path.join(Catalog.root(), entry.source)
-        index_bytes = File.read!(Path.join(root, "index.json"))
-        index = :json.decode(index_bytes)
 
         files =
           Map.new(
@@ -111,26 +110,44 @@ defmodule BoundedAuthorityProtocol.CorpusVerdicts do
             fn path -> {Path.relative_to(path, root), File.read!(path)} end
           )
 
-        {:ok, _loaded} = BoundedAuthorityProtocol.Conformance.Corpus.load_any(files)
-        cases = cases(root, index)
-        ids = Enum.map(cases, fn {_, case_obj} -> Map.fetch!(case_obj, "id") end)
-        if length(ids) != MapSet.size(MapSet.new(ids)), do: raise("duplicate case IDs")
+        {:ok, loaded} = Corpus.load_any(files)
         corpus = Path.relative_to(entry.source, "priv/conformance")
-
-        pairs =
-          Enum.map(cases, fn {path, case_obj} ->
-            [case_obj["id"], outcome(case_obj, corpus, path)]
-          end)
-
-        {Path.relative_to(entry.source, "priv/conformance"),
-         %{
-           "index_sha256_base64url" => sha(index_bytes),
-           "case_count" => length(cases),
-           "verdict_digest_sha256_base64url" => digest(pairs)
-         }}
+        {corpus, manifest_entry(loaded, root, corpus)}
       end)
 
     canonical(%{"format" => "bap-corpus-verdict-digests/1", "corpora" => corpora})
+  end
+
+  defp manifest_entry(%Corpus{index: %{"elixir_verdict_sha256" => pinned}} = corpus, _, _) do
+    {sdk, elixir} = ProfileRunner.partition_cases(corpus.cases)
+    rows = Enum.map(elixir, fn {path, item} -> [path <> "/" <> item["id"], item["expected"]] end)
+    hex = ProfileRunner.verdict_digest(rows)
+    unless hex == pinned, do: raise("profile verdict digest differs from the certified index")
+    digest = hex |> Base.decode16!(case: :lower) |> Base.url_encode64(padding: false)
+
+    %{
+      "index_sha256_base64url" => sha(corpus.index_bytes),
+      "case_count" => length(elixir),
+      "sdk_owned_case_count" => length(sdk),
+      "verdict_digest_sha256_base64url" => digest
+    }
+  end
+
+  defp manifest_entry(corpus, root, relative) do
+    cases = cases(root, :json.decode(corpus.index_bytes))
+    ids = Enum.map(cases, fn {_, case_obj} -> Map.fetch!(case_obj, "id") end)
+    if length(ids) != MapSet.size(MapSet.new(ids)), do: raise("duplicate case IDs")
+
+    pairs =
+      Enum.map(cases, fn {path, case_obj} ->
+        [case_obj["id"], outcome(case_obj, relative, path)]
+      end)
+
+    %{
+      "index_sha256_base64url" => sha(corpus.index_bytes),
+      "case_count" => length(cases),
+      "verdict_digest_sha256_base64url" => digest(pairs)
+    }
   end
 
   def sha(bytes), do: :crypto.hash(:sha256, bytes) |> Base.url_encode64(padding: false)

@@ -1,23 +1,34 @@
-# Upgrading to 1.0
+# Upgrading to 1.5
 
 Package 1.0.0 is the first release under the 1.x stability contract: from here on, anything that
 would break your code waits for 2.0.0, with two exceptions a minor release may carry. A soundness
 repair can reject inputs that no conforming producer emits, and a raised Elixir or Erlang/OTP floor
 is announced in the changelog ([API stability and versioning](api-stability.md)). This page lists what changes when you move
-from a 0.x release to 1.0, then the extra steps for older starting points. The
+from a 0.x release to 1.0, and how to adopt 1.5.0 from any 1.x release. The
 [changelog](../../CHANGELOG.md) has the full history.
 
 ## Move the requirement
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 1.1"}]
+  [{:bounded_authority_protocol, "~> 1.5"}]
 end
 ```
 
-`~> 1.1` admits every 1.x release at or above 1.1.0. A 0.x requirement such as `~> 0.9.1`
+`~> 1.5` admits every 1.x release at or above 1.5.0. A 0.x requirement such as `~> 0.9.1`
 never selects 1.x, so the change is explicit. Then run `mix deps.update bounded_authority_protocol`
 and the packaged corpora ([Recipes](recipes.md#run-every-packaged-corpus)).
+
+## From 1.0 or 1.1 to 1.5
+
+Existing contract-major selection and pinned corpus index hashes carry forward. Run all
+thirteen packaged corpora with the 1.5.0 CLI. If your fixtures use a bracketed StringOrURI
+host, use a valid IPv6 literal. The StringOrURI suite exercises the erratum 7 clarification.
+
+Select the new profiles explicitly where needed. Use the
+[profile guide](choosing-a-profile.md) to choose an ES256 content assertion, holder custody
+attestation, or action approval. Keep host policy and live state at the same verification
+boundary described in [Facts and authorization](facts-and-authorization.md).
 
 ## What changes in 1.0
 

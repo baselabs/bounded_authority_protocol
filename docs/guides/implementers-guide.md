@@ -174,7 +174,7 @@ declared two-file set and per-file hashes, execute all 40 cases, and prove cross
 rejection in both directions. Derive every fingerprint with the RFC 7638 Ed25519 thumbprint
 preimage. Hashing raw key bytes is not equivalent.
 
-### Holder custody attestation candidate
+### Holder custody attestation
 
 The [holder custody profile](../../spec/bap-holder-custody-attestation-v1.md) uses the same
 BAP1 primitives and caller context. Name its four surfaces separately. The protected header
@@ -183,7 +183,7 @@ is exactly `{v: 1, jti, key_id, public_key, custody_class, nbf, exp}`. The key i
 public JWK `x` value bind the holder. Decode the closed custody class and verify the exact
 signed bytes, expected holder, attestor window, and evaluation time.
 
-Pin the candidate index cited in the specification. Run the signed vectors and compare the
+Pin the certified index cited in the specification. Run the signed vectors and compare the
 exact producer and assembly bytes. Run both rejection legs against each existing profile
 and use the pinned verdict digests to verify the existing corpora. Return `custody_class`
 with the verified facts and leave trust and authorization to the host.
@@ -312,3 +312,14 @@ Keep the sibling verdict manifest outside every corpus directory. Hash every ind
 require exact file and case ID sets, and reject skipped execution. Compute the shared digest
 from actual results in index order using the [projection contract](../design/corpus-verdict-digests.md).
 A language package must carry the tests and inputs its isolated suite needs.
+
+## Profile corpora introduced in 1.5.0
+
+Pin the index and exact files cited in each specification. Run all 223 cases for
+[ES256 content assertions](../../spec/bap-content-assertion-es256-v1.md#8-conformance-and-release),
+including compact separation from contract-major 3. Run the 76 custody cases, including the
+signing known answer and bidirectional profile separation. For
+[action approval](../../spec/bap-action-approval-v1.md#7-conformance-and-release), run the
+202 pure verifier cases and exercise all 129 SDK-owned predicate and presentation cases where
+the SDK exposes those helpers. See the [digest contract](../design/corpus-verdict-digests.md)
+for the projection and the two case counts.

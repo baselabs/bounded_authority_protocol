@@ -1,7 +1,7 @@
 defmodule BoundedAuthorityProtocol.MixProject do
   use Mix.Project
 
-  @version "1.1.0"
+  @version "1.5.0"
   @source_url "https://github.com/baselabs/bounded_authority_protocol"
 
   def project do
@@ -107,6 +107,9 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "priv/conformance/application-profiles/local-loopback-http/v1",
         "priv/conformance/attestation-profiles/role-attestation/v1",
         "priv/conformance/attestation-profiles/content-assertion/v1",
+        "priv/conformance/attestation-profiles/content-assertion-es256/v1",
+        "priv/conformance/attestation-profiles/holder-custody-attestation/v1",
+        "priv/conformance/content-profiles/action-approval/v1",
         "priv/conformance/strict-ed25519",
         "priv/conformance/producer-canonicality",
         "priv/conformance/selector-float-zero",
@@ -213,7 +216,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
     [
       main: "readme",
       assets: %{"spec/profiles" => "profiles"},
-      source_ref: "v#{@version}",
+      source_ref: "baselabs_bounded_authority_protocol-v#{@version}",
       source_url: @source_url,
       # The API stability page names the excluded internals; they are hidden, so never link them.
       skip_code_autolink_to: [
@@ -224,7 +227,7 @@ defmodule BoundedAuthorityProtocol.MixProject do
         "BoundedAuthorityProtocol.Conformance.Corpus",
         "BoundedAuthorityProtocol.Conformance.Runner",
         "BoundedAuthorityProtocol.Conformance.Report",
-        "BoundedAuthorityProtocol.Conformance.Candidate",
+        "BoundedAuthorityProtocol.Conformance.ProfileRunner",
         "BoundedAuthorityProtocol.Conformance.Cli.Main",
         "BoundedAuthorityProtocol.HolderCustodyAttestation.V1.Codec",
         "BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1",

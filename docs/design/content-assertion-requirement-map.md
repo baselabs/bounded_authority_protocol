@@ -92,3 +92,12 @@ A structural traceability check only establishes that requirements have entries.
 Execution receipts establish observed outcomes. Neither proves live revocation,
 trust admission, durable replay state, restored-state continuity, content truth,
 or a host's operational decision.
+
+## ES256 sibling coverage in 1.5.0
+
+The [ES256 sibling](../../spec/bap-content-assertion-es256-v1.md) has its own `REQ-CAE1-`
+range and 223-case corpus. Structure, verification, digest, assembly, successor and separation
+cases cover the corresponding normative rules. The pinned signing known answer covers
+signing-input and compact byte equality. The Elixir CLI and the in-tree Python, Rust and Go
+source-checkout runners exercise the full index. Shipped-SDK certification and independent
+signer evidence remain release conditions.

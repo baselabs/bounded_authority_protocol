@@ -34,7 +34,7 @@ Mix prints the created files and `Your Mix project was created successfully.` Op
 
 ```elixir
 defp deps do
-  [{:bounded_authority_protocol, "~> 1.1"}]
+  [{:bounded_authority_protocol, "~> 1.5"}]
 end
 ```
 
@@ -325,7 +325,7 @@ usage error). Install it once and run it against a packaged corpus from your pro
 `mix deps.get`:
 
 ```sh
-mix escript.install hex bounded_authority_protocol 1.1.0
+mix escript.install hex bounded_authority_protocol 1.5.0
 bounded_authority_conformance --corpus deps/bounded_authority_protocol/priv/conformance/v1/corpus
 ```
 
@@ -363,18 +363,22 @@ The same steps apply to the other namespaces, each with its own specification an
   does not isolate local processes.
 - `BoundedAuthorityProtocol.RoleAttestation.V1` binds a key to the `issuer` or `holder` role
   ([spec](../../spec/bap-role-attestation-v1.md)).
-- The `BoundedAuthorityProtocol.HolderCustodyAttestation.V1` source candidate binds a holder key
+- `BoundedAuthorityProtocol.HolderCustodyAttestation.V1` binds a holder key
   to a custody class for a bounded window. See the [recipe](recipes.md#verify-a-holder-custody-attestation).
 - `BoundedAuthorityProtocol.ContentAssertion.V1` binds the digest of exact content bytes to an
   issuer, audience, lineage subject, and window ([spec](../../spec/bap-content-assertion-v1.md)).
+- `BoundedAuthorityProtocol.ContentAssertion.ES256.V1` performs that kind of standalone
+  verification with P-256 ([recipe](recipes.md#verify-an-es256-content-assertion)).
+- `BoundedAuthorityProtocol.ActionApproval.V1` verifies exact canonical approval records with
+  the host-selected assertion suite ([recipe](recipes.md#verify-an-action-approval)).
 
-Each namespace rejects the others' bytes. Select one explicitly; never infer a profile from the
-input or retry another after a rejection. The
-[notebook collection](notebooks.md) covers each namespace in a focused journey.
+Select each wire profile and approval suite explicitly from host configuration. Keep that
+selection through verification. The [notebook collection](notebooks.md) covers the core
+verification paths and links to recipes for the released profiles.
 The core walkthrough covers contract-major 1; contract-major 2 ranges and contract-major 3 ES256 have their own notebooks.
 Each file has setup instructions, one explained step per code cell, and safe persisted outputs.
 Import a file into Livebook and choose **Run all**; the release launch links open each journey
-under `docs/notebooks/` at the immutable 1.1.0 tag.
+under `docs/notebooks/` at the immutable 1.5.0 tag.
 
 ## Where to go next
 

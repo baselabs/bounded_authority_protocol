@@ -226,31 +226,29 @@ pins it. The spec subsection documents both thresholds and the reference impleme
 
 ## Corpus distribution and computed verdict binding
 
-A Hex build carries the complete `priv/conformance/` tree, including all certified
-corpora and the sibling `verdict-digests.json` manifest, introduced in 1.1.0. Each in-tree SDK
-vendors that exact tree at `conformance/priv/conformance/` beneath its own root. The package
-census, unpacked Hex inventory, and every SDK snapshot must agree in both directions, including
-missing trees.
+Hex carries the complete `priv/conformance/` tree, including the sibling
+`verdict-digests.json` manifest introduced in 1.1.0. The exact package census and the
+CLI's index identities cover all thirteen corpora. Each in-tree SDK carries the ten it
+runs from its standalone archive, with the same shared files and their verdict entries.
+The distribution gate compares both inventories in both directions.
 
-The [verdict digest contract](corpus-verdict-digests.md) defines index ordering and outcome
-projections for cases with and without `expected`. Each runner records actual results by
-unique case ID, rejects missing execution, and compares its computed digest with the manifest.
-The CLI 1.x report retains its existing members. The manifest sits outside every corpus
-folder, so each corpus's refusal of files absent from its index remains intact.
+Each runner records actual results by unique case ID, rejects missing execution, and verifies
+its computed digest. The [verdict digest contract](corpus-verdict-digests.md) defines index
+order and outcome projections. Each corpus closes its indexed file set.
 
-## Source candidate corpora
+## Profiles first released in 1.5.0
 
-The candidate indexes under
-`priv/conformance/attestation-profiles/content-assertion-es256/v1` and
-`priv/conformance/content-profiles/action-approval/v1` bind their exact file sets,
-counts, SHA-256 digests and expected verdict digests. The independent Python
-checker regenerates them from the signature, record and ordered diagnostic
-contracts. Elixir consumes the pure cases by index. The SDK helper fixtures
-supply public predicate observations and the expected call sequence and result.
-SDK adoption and full runner qualification precede adding these indexes to the
-published corpus inventory.
+| Certified profile | Elixir CLI | Python, Rust, and Go source checkout |
+|---|---:|---:|
+| [ES256 content assertion](../../spec/bap-content-assertion-es256-v1.md#8-conformance-and-release) | 223 | 223 each |
+| [Holder custody attestation](../../spec/bap-holder-custody-attestation-v1.md#6-conformance-and-release) | 76 | No runner |
+| [Action approval](../../spec/bap-action-approval-v1.md#7-conformance-and-release) | 202 pure cases | 331 each, including 129 SDK-owned cases |
 
-The [holder custody attestation candidate](../../spec/bap-holder-custody-attestation-v1.md#6-conformance-and-release)
-follows the same inventory rule. Its index under
-`priv/conformance/attestation-profiles/holder-custody-attestation/v1` covers independent signed
-vectors, an exact signing and assembly answer, and two-way rejection across profiles.
+The independent generators check the immutable index, case counts, exact file hashes, and
+expected outputs. The custody corpus includes a signing and assembly answer and two-way
+rejection against other profiles. Approval's SDK-owned fixtures cover the host predicate
+sequence and presenter behavior. The Elixir report counts those fixtures separately and
+hashes the computed outcomes for the cases it executes.
+
+The published TypeScript verifier qualifies its own implementation against these same
+indexes before the Hex release, as required by [governance](../governance.md).

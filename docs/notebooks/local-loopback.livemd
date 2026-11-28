@@ -13,7 +13,7 @@ The host derives the target from its listener and requires its exact server nonc
 HTTP provides neither TLS nor isolation between local processes. Verification grants no
 execution authority. This notebook makes no HTTP calls and creates no listener or files.
 
-[Open this 1.1.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.1.0%2Fdocs%2Fnotebooks%2Flocal-loopback.livemd).
+[Open this 1.5.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fbaselabs_bounded_authority_protocol-v1.5.0%2Fdocs%2Fnotebooks%2Flocal-loopback.livemd).
 The launch opens this journey at its immutable release tag.
 
 ## Setup
@@ -22,7 +22,7 @@ Install the exact published package. Fixed evaluation times keep the results rep
 only safe semantic values are persisted, never keys, signatures, tokens, or nonces.
 
 ```elixir
-Mix.install([{:bounded_authority_protocol, "== 1.1.0"}])
+Mix.install([{:bounded_authority_protocol, "== 1.5.0"}])
 ```
 
 <!-- livebook:{"output":true} -->

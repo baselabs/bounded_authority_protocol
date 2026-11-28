@@ -21,15 +21,18 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   | `v1/corpus`, `v2/corpus`, `v3/corpus` | contract-majors 1, 2 and 3 |
   | `strict-ed25519` | strict Ed25519 (`bap-strict-ed25519/1`) |
   | `producer-canonicality` | producer canonicality (`bap-producer-canonicality/1`) |
+  | `string-or-uri` | StringOrURI IPv6 literals (erratum 7) |
   | `selector-float-zero` | selector float zero (`bap-selector-float-zero/1`) |
   | `application-profiles/local-loopback-http/v1` | local-loopback HTTP proofs |
   | `attestation-profiles/role-attestation/v1` | role attestations |
   | `attestation-profiles/content-assertion/v1` | content assertions |
+  | `attestation-profiles/content-assertion-es256/v1` | ES256 content assertions |
+  | `attestation-profiles/holder-custody-attestation/v1` | holder custody attestations |
+  | `content-profiles/action-approval/v1` | action approval |
 
-  The source tree also contains pinned candidates for ES256 content assertions, action approval
-  and holder custody attestations. Their reports include the profile, executed Elixir verdict
-  digest and SDK-owned case count. The candidate files enter the package inventory after SDK
-  qualification.
+  These three profile reports name their profile, the digest of executed Elixir verdicts, and the
+  SDK-owned case count. Approval's SDK-owned cases cover host predicates and presentation; their
+  results are qualified by the SDK suites that exercise those helpers.
 
   Each directory must be exactly the certified corpus this release was built against: its
   `index.json` bytes must hash to the pinned identity, so a regenerated or edited corpus fails
@@ -62,17 +65,19 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   ## Output
 
   The report goes to `--report PATH`, or to standard output when the flag is absent. It is one
-  line of RFC 8785 (JCS) JSON followed by a newline, with exactly these members:
+  line of RFC 8785 (JCS) JSON followed by a newline, with these common members:
 
   - `format`: `"bounded-authority-protocol-<corpus>-conformance-report"`, where `<corpus>` is
     `v1`, `v2`, `v3`, `strict-ed25519`, `producer-canonicality`, `selector-float-zero`,
-    `local-loopback-http`, `role-attestation` or `content-assertion`;
+    `string-or-uri`, `local-loopback-http`, `role-attestation`, `content-assertion` or
+    `candidate` (the format identifier retained by the three profiles first released in 1.5.0);
   - `agreement`: `true` only for exit 0;
   - `exit_status`: `0` or `1`, the status the run returns when the report is written;
   - `total`, `agreed`, `disagreed`: case counts;
   - `index_sha256_base64url`: base64url SHA-256 of the exact `index.json` bytes.
 
-  These members, the flags and the exit statuses are a stable contract of package 1.x. A failure
+  The three new profile reports also include `profile`, `elixir_verdict_sha256`, and `sdk_owned`.
+  Report members, flags, and exit statuses are stable within package 1.x. A failure
   before a report exists (usage, refusal, integrity, certification) writes no report.
 
   Every failure writes one line to standard error naming its class, for example
@@ -88,8 +93,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   randomness or trust selection is involved.
   """
 
-  alias BoundedAuthorityProtocol.Conformance.Candidate
   alias BoundedAuthorityProtocol.Conformance.Corpus
+  alias BoundedAuthorityProtocol.Conformance.ProfileRunner
   alias BoundedAuthorityProtocol.Conformance.Report
   alias BoundedAuthorityProtocol.Conformance.Runner
 
@@ -106,13 +111,12 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
 
   @prefix "bounded_authority_conformance: "
 
-  # Ceilings on what the CLI will read: the largest packaged file is 65,537 bytes and the largest
-  # corpus has a few hundred entries.
+  # Ceilings on what the CLI will read. The 812,726-byte approval cases fit under 1 MiB.
   @max_file_bytes 1_048_576
   @max_entries 4_096
 
   # The certified corpus identities: base64url SHA-256 of the exact index.json bytes this verifier
-  # was certified against, keyed by corpus. The SDK runners pin the identical values. This closes
+  # was certified against, keyed by corpus. Snapshot runners pin the values for their corpora. This closes
   # the gap a self-consistent but regenerated corpus (for example a shrunken case set with a
   # matching index) would otherwise pass through. To rotate a corpus, bump its constant and every
   # SDK runner's pin in the same change (scripts/regen_corpus_digests.exs). Every corpus in this map
@@ -125,6 +129,9 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
     :local_loopback_http => "EPxM8Fr_zdyeY0D_OSwkfiWrA4zZOPJVeCmnzmOxpeQ",
     :role_attestation => "vlJ1xpU5oPMXNCQv8ApITC-FXzkYHFVonYsPZxGV1io",
     :content_assertion => "FLdDbM98yR_s5SoVeMN2DfZyCpNJTRR-5atSPiziGHY",
+    :content_assertion_es256 => "K7Qbj7yfvcAmf3KXbVYoC-BUFCDkwUJBymIvHdBx0Ms",
+    :holder_custody_attestation => "b59Jd5LcqLr3eEuj52ugUHcx54WZhuidhl9fiaBLz6o",
+    :action_approval => "U4S4aA-2dXNgaWxoicXWs7cG6HKO3Mrm3QxcRoqBmmQ",
     1 => "TLUHKrQP_UsRFlnm1KsgIJICOAUF8fhCS5bSLlM8uRs",
     2 => "beYom39HsOCnjqRhDnhEoPHVJH2OrOAuyc-YQTCPE9A",
     3 => "pcgHXnU0NFw7tmEdC0ApKQS8-jrwcC4HrgFPpmkmQzw"
@@ -194,37 +201,28 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   defp parse_args(_argv, _acc), do: :usage
 
   defp verify(corpus_dir, report_path) do
-    case read_corpus(corpus_dir) do
-      {:ok, %{"index.json" => index} = files} ->
-        case Candidate.identify(index) do
-          nil -> verify_released(files, report_path)
-          profile -> verify_candidate(files, profile, report_path)
-        end
-
-      {:error, class} ->
-        fail(class)
-    end
-  end
-
-  defp verify_released(files, report_path) do
-    with {:ok, corpus} <- load(files),
+    with {:ok, files} <- read_corpus(corpus_dir),
+         {:ok, corpus} <- load(files),
          :ok <- certified(corpus),
-         results = Runner.run(corpus),
-         report = Report.build(corpus, results),
-         {:ok, bytes} <- Report.to_bytes(corpus, results),
-         :ok <- write_report(bytes <> "\n", report_path) do
-      if report.exit_status == 0, do: 0, else: fail(:disagreement)
-    else
-      {:error, class} -> fail(class)
-    end
-  end
-
-  defp verify_candidate(files, profile, report_path) do
-    with {:ok, bytes, status} <- Candidate.run(files, profile),
+         {:ok, bytes, status} <- run_corpus(corpus),
          :ok <- write_report(bytes <> "\n", report_path) do
       if status == 0, do: 0, else: fail(:disagreement)
     else
       {:error, class} -> fail(class)
+    end
+  end
+
+  defp run_corpus(%Corpus{major: major} = corpus)
+       when major in [:content_assertion_es256, :holder_custody_attestation, :action_approval],
+       do: ProfileRunner.run(corpus)
+
+  defp run_corpus(corpus) do
+    results = Runner.run(corpus)
+    report = Report.build(corpus, results)
+
+    case Report.to_bytes(corpus, results) do
+      {:ok, bytes} -> {:ok, bytes, report.exit_status}
+      {:error, _class} = error -> error
     end
   end
 

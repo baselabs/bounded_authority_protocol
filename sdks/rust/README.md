@@ -240,7 +240,7 @@ revocation comparison. The action-approval facade admits the caller's snapshot b
 ## Conformance
 
 `conformance/priv/conformance/` is a complete, byte-identical snapshot of the Hex package built
-from this commit's `priv/conformance/` tree. It includes all certified corpora, schemas, focused
+from this commit's `priv/conformance/` tree. It includes the ten standalone corpora, schemas, focused
 vectors, and `verdict-digests.json`. Copying the SDK directory alone is sufficient to run
 the certified suite.
 The manifest was introduced in 1.1.0.
@@ -264,13 +264,13 @@ Outcome projections and index ordering are specified in the
 [verdict digest contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/corpus-verdict-digests.md).
 The contract-major runners also retain their public-key import censuses.
 
-The candidate ES256 content-assertion (223 cases) and action-approval (331 cases) corpora are
-source-only until every maintained runner executes them, so they are not in the snapshot.
+The ES256 content-assertion (223 cases) and action-approval (331 cases) corpora ship in Hex
+1.5.0. The Rust source-checkout suite reads them alongside the ten standalone corpora.
 `conformance_approval` reads them from the protocol checkout named by `BAP_CANDIDATE_SOURCE`,
 checks each frozen index and its verdict digest, and also checks the Elixir verdict digest for
-cases covered by Elixir. The candidate cases cover erratum 7's IPv6 requirement for bracketed
+cases covered by Elixir. These cases cover erratum 7's IPv6 requirement for bracketed
 StringOrURI authority hosts, including rejection of IPvFuture. Without `BAP_CANDIDATE_SOURCE`,
-the runner reports that it skipped the candidate corpora.
+the runner reports that it skipped the source-checkout corpora.
 
 Run from this SDK directory:
 
@@ -288,7 +288,7 @@ CI runs `cargo package`, unpacks the archive, and runs the full suite from the u
 
 The monorepo's distribution job copies only this SDK root into a temporary directory,
 runs its full suite, checks its package, and removes the temporary artifacts afterward.
-A corpus update replaces the entire snapshot from the verified Hex unpack in one change;
+A corpus update replaces the standalone projection from the verified Hex unpack in one change;
 individual case edits are not a supported update path. These checks do not publish the SDK.
 
 ## What this SDK does not do

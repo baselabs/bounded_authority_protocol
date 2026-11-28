@@ -46,9 +46,9 @@
     argument bytes. Pure verification returns cryptographic facts. The resource server still
     selects trusted keys, reserves replay, checks revocation, and applies its authorization policy.</p>
     <div class="hero-actions">
-      <a class="btn primary" href="https://hexdocs.pm/bounded_authority_protocol/1.1.0/getting-started.html"><svg class="ic"><use href="#i-terminal"/></svg> Verify your first request</a>
-      <a class="btn ghost" href="https://hexdocs.pm/bounded_authority_protocol/1.1.0/">Elixir verifier API</a>
-      <a class="btn ghost" href="https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.1.0%2Fdocs%2Fnotebooks%2Fbap-walkthrough.livemd">Run the released Livebook</a>
+      <a class="btn primary" href="https://hexdocs.pm/bounded_authority_protocol/1.5.0/getting-started.html"><svg class="ic"><use href="#i-terminal"/></svg> Verify your first request</a>
+      <a class="btn ghost" href="https://hexdocs.pm/bounded_authority_protocol/1.5.0/">Elixir verifier API</a>
+      <a class="btn ghost" href="https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fbaselabs_bounded_authority_protocol-v1.5.0%2Fdocs%2Fnotebooks%2Fbap-walkthrough.livemd">Run the released Livebook</a>
       <a class="btn ghost" href="https://baselabs.github.io/bounded_authority_protocol_typescript/">TypeScript verifier bench</a>
       <a class="btn ghost" href="https://baselabs.github.io/bounded_authority_protocol_typescript/api/">TypeScript verifier API</a>
       <a class="btn ghost" href="#specs">Read the specs</a>
@@ -148,6 +148,7 @@
 
 <section id="specs" class="wrap">
   <div class="sec-head"><h2>The wire specs</h2></div>
+  <p>Elixir package 1.5.0 includes thirteen certified corpora, including StringOrURI erratum 7.</p>
   <div class="libgrid">
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v1.md">bap-v1</a><br><small>grants, proofs, and compacts in the frozen v1 wire format</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-local-loopback-http-v1.md">bap-local-loopback-http-v1</a><br><small>the byte-distinct development-listener profile</small></div>
@@ -155,6 +156,9 @@
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-v3.md">bap-v3</a><br><small>the v3 contract-major: the ES256 suite</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-role-attestation-v1.md">bap-role-attestation-v1</a><br><small>a signed binding of a subject key to a role</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-content-assertion-v1.md">bap-content-assertion-v1</a><br><small>a signed binding of exact content to its context and lineage</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-content-assertion-es256-v1.md">bap-content-assertion-es256-v1</a><br><small>standalone P-256 signatures over exact content</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-holder-custody-attestation-v1.md">bap-holder-custody-attestation-v1</a><br><small>bounded evidence of how a holder key is held</small></div>
+    <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/blob/main/spec/bap-action-approval-v1.md">bap-action-approval-v1</a><br><small>approval of an exact action, request revision and resource set</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/tree/main/spec/cddl">cddl</a><br><small>machine-readable structure definitions</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/tree/main/spec/facts">facts</a><br><small>the verification fact definitions</small></div>
     <div class="libcard"><a href="https://github.com/baselabs/bounded_authority_protocol/tree/main/spec/formal">formal</a><br><small>formal treatments</small></div>

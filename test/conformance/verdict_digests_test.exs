@@ -2,7 +2,7 @@ Code.require_file("../../scripts/corpus_verdicts.exs", __DIR__)
 
 defmodule BoundedAuthorityProtocol.Conformance.VerdictDigestsTest do
   use ExUnit.Case, async: true
-  alias BoundedAuthorityProtocol.Conformance.{Corpus, Runner}
+  alias BoundedAuthorityProtocol.Conformance.{Corpus, ProfileRunner, Runner}
   alias BoundedAuthorityProtocol.{CorpusCatalog, CorpusVerdicts}
 
   test "all computed outcomes bind every certified ID in index order" do
@@ -17,35 +17,53 @@ defmodule BoundedAuthorityProtocol.Conformance.VerdictDigestsTest do
         end)
 
       {:ok, corpus} = Corpus.load_any(files)
-      computed = Runner.computed(corpus)
-      assert length(computed) == MapSet.size(MapSet.new(computed, &elem(&1, 0)))
-      results = Map.new(computed, fn {id, file, value} -> {id, {file, value}} end)
-      cases = CorpusVerdicts.cases(root, :json.decode(files["index.json"]))
-      assert map_size(results) == length(cases)
-
-      pairs =
-        Enum.map(cases, fn {path, case_obj} ->
-          {^path, actual} = Map.fetch!(results, case_obj["id"])
-
-          assert CorpusVerdicts.canonical(actual) ==
-                   CorpusVerdicts.canonical(
-                     CorpusVerdicts.outcome(
-                       case_obj,
-                       Path.relative_to(root, "priv/conformance"),
-                       path
-                     )
-                   ),
-                 case_obj["id"]
-
-          [case_obj["id"], actual]
-        end)
-
       key = Path.relative_to(root, "priv/conformance")
-
-      assert CorpusVerdicts.digest(pairs) ==
-               manifest["corpora"][key]["verdict_digest_sha256_base64url"],
-             key
+      pinned = Map.fetch!(manifest["corpora"], key)
+      assert pinned["index_sha256_base64url"] == CorpusVerdicts.sha(corpus.index_bytes)
+      assert_computed(corpus, root, pinned)
     end
+  end
+
+  defp assert_computed(%Corpus{index: %{"elixir_verdict_sha256" => _}} = corpus, root, pinned) do
+    assert {:ok, bytes, 0} = ProfileRunner.run(corpus), root
+    report = :json.decode(bytes)
+    digest =
+      report["elixir_verdict_sha256"]
+      |> Base.decode16!(case: :lower)
+      |> Base.url_encode64(padding: false)
+
+    assert report["total"] == pinned["case_count"], root
+    assert report["sdk_owned"] == pinned["sdk_owned_case_count"], root
+    assert digest == pinned["verdict_digest_sha256_base64url"], root
+  end
+
+  defp assert_computed(corpus, root, pinned) do
+    computed = Runner.computed(corpus)
+    assert length(computed) == MapSet.size(MapSet.new(computed, &elem(&1, 0)))
+    results = Map.new(computed, fn {id, file, value} -> {id, {file, value}} end)
+    cases = CorpusVerdicts.cases(root, :json.decode(corpus.index_bytes))
+    assert map_size(results) == length(cases)
+
+    pairs =
+      Enum.map(cases, fn {path, case_obj} ->
+        {^path, actual} = Map.fetch!(results, case_obj["id"])
+
+        assert CorpusVerdicts.canonical(actual) ==
+                 CorpusVerdicts.canonical(
+                   CorpusVerdicts.outcome(
+                     case_obj,
+                     Path.relative_to(root, "priv/conformance"),
+                     path
+                   )
+                 ),
+               case_obj["id"]
+
+        [case_obj["id"], actual]
+      end)
+
+    assert CorpusVerdicts.digest(pairs) ==
+             pinned["verdict_digest_sha256_base64url"],
+           root
   end
 
   test "the generated manifest rejects stale bytes and undeclared outcome shapes" do

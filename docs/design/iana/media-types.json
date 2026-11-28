@@ -80,7 +80,7 @@
   {
    "type_name": "application",
    "subtype_name": "ba-holder-custody-attestation+jwt",
-   "status": "candidate",
+   "status": "active",
    "required_parameters": "None",
    "optional_parameters": "None",
    "encoding_considerations": "Compact JWS (RFC 7515) with closed, canonical JSON header and payload and base64url segments",
@@ -118,7 +118,7 @@
   {
    "type_name": "application",
    "subtype_name": "ba-content-assertion-es256+jwt",
-   "status": "candidate",
+   "status": "active",
    "required_parameters": "None",
    "optional_parameters": "None",
    "encoding_considerations": "Compact JWS (RFC 7515) serialization of a closed JSON object; UTF-8; base64url segments; binary-safe",

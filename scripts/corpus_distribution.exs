@@ -4,14 +4,6 @@ defmodule BoundedAuthorityProtocol.CorpusDistribution do
   @moduledoc false
   alias BoundedAuthorityProtocol.CorpusCatalog, as: Catalog
 
-  # These source-only candidates join the Hex and SDK inventory when every
-  # maintained runner can execute their complete case sets.
-  @candidate_roots [
-    "attestation-profiles/content-assertion-es256/v1/",
-    "attestation-profiles/holder-custody-attestation/v1/",
-    "content-profiles/action-approval/v1/"
-  ]
-
   def files!(root), do: walk!(root, root) |> MapSet.new()
 
   defp walk!(path, root) do
@@ -22,15 +14,8 @@ defmodule BoundedAuthorityProtocol.CorpusDistribution do
     end
   end
 
-  def compare!(source, snapshot) do
-    compare_files!(source, snapshot, files!(snapshot))
-  end
-
-  defp compare_files!(source, snapshot, snapshot_files) do
-    source_files = files!(source)
-    unless source_files == snapshot_files, do: raise("corpus file set mismatch: #{snapshot}")
-
-    for relative <- source_files do
+  defp compare_files!(source, snapshot, entries) do
+    for relative <- entries do
       unless File.read!(Path.join(source, relative)) == File.read!(Path.join(snapshot, relative)),
         do: raise("#{snapshot}/#{relative}: content differs from the Hex corpus")
     end
@@ -38,7 +23,7 @@ defmodule BoundedAuthorityProtocol.CorpusDistribution do
 
   def inventory!(package_root, source_root \\ Catalog.root()) do
     shipped = files!(Path.join(package_root, "priv/conformance"))
-    source = release_source_files(Path.join(source_root, "priv/conformance"))
+    source = files!(Path.join(source_root, "priv/conformance"))
     unless shipped == source, do: raise("Hex corpus inventory differs from source tree")
 
     # Read the independent exact package census without executing the consumer build gate.
@@ -82,23 +67,54 @@ defmodule BoundedAuthorityProtocol.CorpusDistribution do
   end
 
   def check!(package_root, source_root \\ Catalog.root()) do
-    inventory!(package_root, source_root)
+    shipped = inventory!(package_root, source_root)
     source = Path.join(package_root, "priv/conformance")
     source_tree = Path.join(source_root, "priv/conformance")
-    compare_files!(source, source_tree, release_source_files(source_tree))
+    compare_files!(source, source_tree, shipped)
+
+    entries = Catalog.entries()
+
+    {snapshotted, unsnapshotted} = Enum.split_with(entries, &(&1.runners != []))
+    snapshot_corpora = corpus_paths(snapshotted)
+    unsnapshotted_prefixes = Enum.map(corpus_paths(unsnapshotted), &(&1 <> "/"))
+
+    sdk_files =
+      shipped
+      |> Enum.reject(&String.starts_with?(&1, unsnapshotted_prefixes))
+      |> MapSet.new()
+
+    sdk_manifest =
+      source
+      |> Path.join("verdict-digests.json")
+      |> File.read!()
+      |> :json.decode()
+      |> Map.update!("corpora", &Map.take(&1, snapshot_corpora))
+      |> encode_manifest()
 
     for sdk <- ["python", "rust", "go"] do
       old = Path.wildcard(Path.join(source_root, "sdks/#{sdk}/conformance/corpus*"))
       if old != [], do: raise("uncatalogued SDK snapshots: #{inspect(old)}")
-      compare!(source, Path.join(source_root, "sdks/#{sdk}/conformance/priv/conformance"))
+      snapshot = Path.join(source_root, "sdks/#{sdk}/conformance/priv/conformance")
+
+      unless files!(snapshot) == sdk_files, do: raise("corpus file set mismatch: #{snapshot}")
+
+      compare_files!(source, snapshot, MapSet.delete(sdk_files, "verdict-digests.json"))
+
+      unless File.read!(Path.join(snapshot, "verdict-digests.json")) == sdk_manifest,
+        do: raise("#{snapshot}/verdict-digests.json: content differs from the Hex corpus projection")
     end
   end
 
-  defp release_source_files(root) do
-    root
-    |> files!()
-    |> Enum.reject(&String.starts_with?(&1, @candidate_roots))
-    |> MapSet.new()
+  defp corpus_paths(entries), do: Enum.map(entries, &Path.relative_to(&1.source, "priv/conformance"))
+
+  # Manifest keys and string values are ASCII; sorted keys give the JCS projection.
+  defp encode_manifest(manifest) do
+    manifest
+    |> :json.encode(fn
+      map, encode when is_map(map) -> :json.encode_key_value_list(Enum.sort(map), encode)
+      value, encode -> :json.encode_value(value, encode)
+    end)
+    |> IO.iodata_to_binary()
   end
 
   def with_package!(fun) do

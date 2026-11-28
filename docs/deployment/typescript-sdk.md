@@ -45,8 +45,11 @@ its own.
 
 The SDK vendors certified snapshots of the v1, v2, and v3 corpora and the local-loopback,
 role-attestation, content-assertion, producer-canonicality, selector-float-zero, and strict-Ed25519 corpora, runs them in CI, and asserts
-each `index.json` SHA-256 at load. When this repository rotates a corpus, the SDK repository
-takes a snapshot-bump commit, and the load-time check fails on any drift.
+each `index.json` SHA-256 at load. The separately published verifier qualifies ES256 content
+assertions, action approval and holder custody with the exact 1.5.0 indexes before the Hex
+release. Use the [verifier's release documentation](https://baselabs.github.io/bounded_authority_protocol_typescript/api/)
+to confirm the SDK version that supports your chosen profile. On corpus rotation, update the
+SDK's bound snapshot and verify the load-time pins.
 
 Erratum 3 (producer canonicality) is implemented since release 0.8.0: compact assembly and
 anchored-export encoding (for every profile it implements) refuse a non-canonical signature,

@@ -225,6 +225,8 @@ defmodule BoundedAuthorityProtocol.CorpusToolingTest do
            "content differs"},
           {"missing file", "#{base}/cases/uri/normalize.json", :remove, "file set mismatch"},
           {"extra file", "#{base}/extra.json", :extra, "file set mismatch"},
+          {"SDK manifest byte drift", "sdks/python/conformance/priv/conformance/verdict-digests.json",
+           :change, "verdict-digests.json: content differs"},
           {"omitted inventory entry", "scripts/check_package.exs", :inventory,
            "check_package corpus inventory differs"}
         ] do

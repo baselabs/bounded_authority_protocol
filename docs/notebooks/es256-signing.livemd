@@ -13,8 +13,10 @@ The signer owns conversion and normalization; assembly refuses noncanonical sign
 The host supplies trusted public keys and context and owns replay, revocation, and the decision.
 The generated keys stay in memory; this notebook starts no services and creates no files.
 
-[Open this 1.1.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fv1.1.0%2Fdocs%2Fnotebooks%2Fes256-signing.livemd).
+[Open this 1.5.0 release notebook](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fbaselabs%2Fbounded_authority_protocol%2Fblob%2Fbaselabs_bounded_authority_protocol-v1.5.0%2Fdocs%2Fnotebooks%2Fes256-signing.livemd).
 The launch opens this journey at its immutable release tag.
+
+For a standalone P-256 signature over exact content, see the [ES256 content assertion recipe](../guides/recipes.md#verify-an-es256-content-assertion).
 
 ## Setup
 
@@ -22,7 +24,7 @@ Install the exact published package. Fixed evaluation times keep the results rep
 only safe semantic values are persisted, never keys, signatures, tokens, or nonces.
 
 ```elixir
-Mix.install([{:bounded_authority_protocol, "== 1.1.0"}])
+Mix.install([{:bounded_authority_protocol, "== 1.5.0"}])
 ```
 
 <!-- livebook:{"output":true} -->

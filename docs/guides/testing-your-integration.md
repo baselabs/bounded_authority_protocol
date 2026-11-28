@@ -24,3 +24,9 @@ The [service notebook](../notebooks/service-integration.livemd) is a sequential 
 retention and ordering; its map is not a concurrent or durable store. Your host tests establish
 those properties against your real backend. CI also executes the exact documented Plug recipe
 against the real Plug dependency in a fresh package consumer.
+
+For ES256 content assertions, change the content bytes and suite independently. For custody
+attestations, change the expected holder key and ID and move time to the exclusive expiry.
+For action approval, vary the revision, approver role, exact action and resource set, and
+exercise both identity collisions and recovery after a restart. The
+[SQLite approval example](https://github.com/baselabs/bounded_authority_protocol/blob/baselabs_bounded_authority_protocol-v1.5.0/docs/examples/action-approval.exs) demonstrates those transactional checks.

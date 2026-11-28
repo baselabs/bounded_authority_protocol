@@ -184,3 +184,13 @@ der = :crypto.sign(:ecdsa, :sha256, "message", [es_priv, :prime256v1])
 ```
 
 The value is `{64, true}`.
+
+## Released evidence profiles
+
+| Evidence | Verifier | Expected inputs |
+|---|---|---|
+| P-256 content or lineage | `ContentAssertion.ES256.V1.verify_assertion/2` | Enrolled attestor, exact content digest, context, time |
+| Holder key custody | `HolderCustodyAttestation.V1.verify_attestation/2` | Enrolled attestor, holder key and ID, time |
+| Approval of an exact request revision | `ActionApproval.V1.verify_eddsa/3` or `verify_es256/3` | Canonical record, assertion, host-selected suite and approval context |
+
+See the [recipes](recipes.md#verify-an-es256-content-assertion) for host inputs and safe error handling.

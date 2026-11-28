@@ -47,10 +47,11 @@ All four are pure verification libraries (no I/O, clock, randomness, or network 
 Their verification facades return facts or a single value-free rejection, never an authorization
 decision. Facts exclude raw credentials and secrets; field-redacted display is a separate
 requirement.
-The eight verification facts types are `GrantFacts`, `EnvelopeFacts`, `ChainFacts`,
+The standalone snapshot suites cover `GrantFacts`, `EnvelopeFacts`, `ChainFacts`,
 `AnchorFacts`, `KeyTransitionFacts`, `AnchoredExportFacts`, `AttestationFacts`, and
 `ContentAssertionFacts`. The last two belong to the role-attestation and content-assertion
-profiles. All carry a not-evaluated marker and follow the same redaction contract.
+profiles. All carry a not-evaluated marker and follow the same redaction contract. Action approval
+adds verified approval facts and suite-specific assertion facts in source checkouts.
 
 Decoded diagnostics and redacted facts follow the
 [diagnostic rendering contract](../spec/diagnostic-rendering.md#diagnostic-rendering).
@@ -116,17 +117,22 @@ cargo test --locked
 go test ./...
 ```
 
-The TypeScript verifier runs its vendored corpora in its own repository. Python, Rust, and Go
-each vendor the whole Hex `priv/conformance/` tree under their own
-`conformance/priv/conformance/` directory. Every indexed input is hashed, exact file and ID
+The TypeScript verifier publishes and runs its vendored corpora in its own repository.
+Python, Rust, and Go each carry ten standalone corpora under their own
+`conformance/priv/conformance/` directory, including erratum 7's StringOrURI corpus. Every indexed input is hashed, exact file and ID
 sets are required, and a skipped case fails. Each runner hashes computed outcomes in index
 order and compares the result with the sibling `verdict-digests.json` manifest. See the
 [projection and ordering contract](../docs/design/corpus-verdict-digests.md).
 
 CI copies each SDK root alone and runs its suite there. It also tests the Python sdist and
 Rust crate after unpacking, keeps the Python wheel runtime-only, and checks that the Go
-module zip includes all conformance inputs. The monorepo checks whole-tree byte equality
-against an actual Hex build and verifies every corpus generator's derived inputs.
+module zip includes all standalone conformance inputs. CI compares the shared bytes and
+verdict entries against an actual Hex build and verifies every corpus generator's inputs.
+
+Separate source-checkout suites exercise the 223 ES256 content-assertion cases and all 331
+action-approval cases, including the 129 SDK-owned helper cases. Those two corpora ship
+in Hex, alongside the 76-case holder custody corpus that Elixir executes. The published
+TypeScript verifier qualifies the profiles in its own repository.
 
 Beyond the corpora, each SDK has a permissiveness battery: for every parser closure that guards
 against a host-language trap (duplicate-rejecting decoding, raw numeric-lexeme limits, a single

@@ -4,9 +4,9 @@ The protocol is defined by its specifications and certified corpora, not by this
 code, so a verifier in any language can conform. Four verifiers besides this Elixir reference
 implement contract-majors 1, 2, and 3 and the local-loopback, role-attestation, and
 content-assertion sibling profiles, with strict Ed25519 verification and producer canonicality.
-Each one recomputes every verdict of every certified corpus and asserts each corpus index digest
-when it loads; the [interoperability report](../design/interoperability-report.md) records the
-latest results.
+Each SDK recomputes every applicable verdict in its certified snapshots and asserts the index
+digests at load. The [interoperability report](../design/interoperability-report.md) records
+which runners cover each corpus.
 
 Like this package, each is a pure verification library: no I/O, clock, randomness, or network,
 and no authorization decision. Verification returns facts or one value-free rejection. Facts
@@ -28,9 +28,11 @@ TypeScript verifier did; until then, the commit you install from is the identity
 deployed. A package with one of the planned names on a public registry is not this project's
 until that SDK's README says it is published.
 
-Each in-tree SDK is self-contained. Its `conformance/priv/conformance/` snapshot contains
-the complete Hex corpus tree, and CI runs both copied-alone SDKs and unpacked language
-packages. The [SDK overview](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/README.md#conformance)
+Each in-tree SDK has a self-contained `conformance/priv/conformance/` snapshot of the ten
+corpora it runs in copied SDK roots and unpacked language packages. Separate source-checkout
+jobs exercise ES256 content assertions and action approval in all three languages, including
+approval's SDK-owned cases. The holder custody suite runs in the Elixir package. The published
+TypeScript verifier qualifies its profiles and snapshots in its own repository. The [SDK overview](https://github.com/baselabs/bounded_authority_protocol/blob/main/sdks/README.md#conformance)
 and [verdict digest contract](../design/corpus-verdict-digests.md) describe byte binding,
 execution completeness, and computed outcome digests. These test inputs add no I/O to the libraries.
 

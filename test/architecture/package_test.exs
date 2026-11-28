@@ -16,6 +16,15 @@ defmodule BoundedAuthorityProtocol.Architecture.PackageTest do
     assert output =~ "package archive boundary passed"
     assert output =~ "Generated bounded_authority_protocol app"
     assert output =~ "Generated bounded_authority_protocol_consumer app"
+
+    for corpus <- [
+          "string-or-uri",
+          "attestation-profiles/content-assertion-es256/v1",
+          "attestation-profiles/holder-custody-attestation/v1",
+          "content-profiles/action-approval/v1"
+        ] do
+      assert output =~ "packaged escript certified #{corpus}"
+    end
   end
 
   test "the dependency-license gate goes red when JSONSchex is removed from the tooling SBOM" do

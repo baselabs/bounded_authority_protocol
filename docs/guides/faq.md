@@ -103,3 +103,11 @@ how to report a vulnerability.
 ### Is there a verifier for my language?
 
 TypeScript, Python, Rust, and Go; see [Other languages](other-languages.md).
+
+### Which profile should I choose for a P-256 content signature?
+
+Use `ContentAssertion.ES256.V1` for standalone content, such as a signed dataset
+revision. Use `V3` for P-256 capability grants and holder-bound requests. For an
+exact-action approval, use `ActionApproval.V1` with the host-selected suite. For
+a signed statement about the holder key's custody, use `HolderCustodyAttestation.V1`.
+See [Choosing a profile](choosing-a-profile.md).

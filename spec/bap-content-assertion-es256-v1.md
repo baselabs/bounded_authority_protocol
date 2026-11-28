@@ -1,6 +1,6 @@
 # BAP ES256 Content Assertion Profile 1
 
-Document status: candidate normative contract for `bap-content-assertion-es256/1`.
+Document status: released in package 1.5.0, the normative contract for `bap-content-assertion-es256/1`.
 It is a sibling attestation profile under
 [governance § Byte-distinct sibling attestation profiles](../docs/governance.md#byte-distinct-sibling-attestation-profiles).
 
@@ -246,10 +246,10 @@ and keys. Such guarantees require separately qualified host mechanisms
 
 ## 8. Conformance and release
 
-The candidate corpus location is
+The certified corpus location is
 `priv/conformance/attestation-profiles/content-assertion-es256/v1`. Every consumer
 MUST pin the frozen index and verify the indexed file hashes. Index SHA-256
-(hex) at freeze is `d79329d431de093f162613fbd2a2fe838766b690fa67cfbc1478eafa322b3c63`
+(hex) at freeze is `2bb41b8fbc9fbdc0267f72976d56280be0541420e4c14241ca622f1dd071d0cb`
 (`REQ-CAE1-CONFORMANCE-pin`).
 
 Required cases cover every header and payload rule, canonical encodings, digests,
@@ -264,7 +264,7 @@ pinned deterministic fixtures. For randomized signers, compare the signing input
 and assemble the same accepted signature across implementations. Named safety
 checks require red-capable mutation evidence (`REQ-CAE1-CONFORMANCE-cases`).
 
-All maintained SDKs, including the graduated TypeScript verifier, MUST implement
+Every shipped SDK, including the published TypeScript verifier, MUST implement
 and certify the surface before the first package release bearing it. A real
 companion signer and an independent non-Elixir verifier MUST retain issuance and
 consumption evidence, including content-digest equality, against the same

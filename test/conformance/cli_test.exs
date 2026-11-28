@@ -9,9 +9,9 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   use ExUnit.Case, async: false
 
-  alias BoundedAuthorityProtocol.Conformance.Candidate
   alias BoundedAuthorityProtocol.Conformance.Cli
   alias BoundedAuthorityProtocol.Conformance.Corpus
+  alias BoundedAuthorityProtocol.Conformance.ProfileRunner
   alias BoundedAuthorityProtocol.Conformance.Report
   alias BoundedAuthorityProtocol.TestSupport.Portable
 
@@ -63,7 +63,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     assert Corpus.load_any(:not_a_map) == {:error, :invalid}
   end
 
-  test "candidate CLI reports all applicable Elixir verdicts and the SDK-owned census" do
+  test "profile CLI reports all applicable Elixir verdicts and the SDK-owned census" do
     roots = [
       {"attestation-profiles/content-assertion-es256/v1", 223, 0},
       {@custody_root, 76, 0},
@@ -74,7 +74,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
       path = Path.join(@priv_conformance, root)
       index_bytes = File.read!(Path.join(path, "index.json"))
       index = :json.decode(index_bytes)
-      tmp = unique_tmp("candidate-report")
+      tmp = unique_tmp("profile-report")
       on_exit(fn -> File.rm_rf!(Path.dirname(tmp)) end)
 
       assert Cli.run(["--corpus", path, "--report", tmp]) == 0
@@ -94,20 +94,20 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     end
   end
 
-  test "candidate execution hashes observed verdicts and rejects a different expected digest" do
-    {files, index} = candidate_files("content-profiles/action-approval/v1")
+  test "profile execution hashes observed verdicts and rejects a different expected digest" do
+    {files, index} = profile_files("content-profiles/action-approval/v1")
     different = Map.put(index, "elixir_verdict_sha256", String.duplicate("0", 64))
     edited = Map.put(files, "index.json", json_bytes(different))
 
-    assert {:ok, bytes, 1} = Candidate.run(edited, index["profile"])
+    assert {:ok, bytes, 1} = run_profile(edited)
     report = :json.decode(bytes)
     refute report["agreement"]
     assert report["agreed"] == report["total"]
     assert report["elixir_verdict_sha256"] == index["elixir_verdict_sha256"]
   end
 
-  test "candidate CLI refuses index drift and indexed-file drift" do
-    dst = unique_tmp("candidate-drift") |> Path.dirname()
+  test "profile CLI refuses index drift and indexed-file drift" do
+    dst = unique_tmp("profile-drift") |> Path.dirname()
     path = Path.join(@priv_conformance, "content-profiles/action-approval/v1")
     File.cp_r!(path, dst)
     on_exit(fn -> File.rm_rf!(dst) end)
@@ -115,7 +115,10 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     index = Path.join(dst, "index.json")
     original = File.read!(index)
     File.write!(index, original <> "\n")
-    assert Cli.run(["--corpus", dst]) == 1
+    error =
+      ExUnit.CaptureIO.capture_io(:stderr, fn -> assert Cli.run(["--corpus", dst]) == 1 end)
+
+    assert error =~ "not a certified corpus"
 
     File.write!(index, original)
     file = Path.join(dst, "rendering-cases.json")
@@ -123,17 +126,18 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     assert Cli.run(["--corpus", dst]) == 1
   end
 
-  test "candidate execution rejects changed inventory, case counts and profile known answers" do
-    {files, index} = candidate_files("attestation-profiles/content-assertion-es256/v1")
-    profile = index["profile"]
+  test "profile execution rejects changed inventory, case counts and profile known answers" do
+    {files, index} = profile_files("attestation-profiles/content-assertion-es256/v1")
     file = "profile.json"
 
-    assert {:ok, _, 0} = Candidate.run(files, profile)
-    assert {:error, :integrity} = Candidate.run(files, "bap-action-approval/1")
-    assert {:error, :integrity} = Candidate.run(Map.delete(files, file), profile)
+    assert {:ok, _, 0} = run_profile(files)
+    wrong_profile = %{index | "profile" => "bap-action-approval/1"}
+    assert {:error, :integrity} =
+             run_profile(Map.put(files, "index.json", json_bytes(wrong_profile)))
+    assert {:error, :integrity} = run_profile(Map.delete(files, file))
 
     renamed = files |> Map.delete(file) |> Map.put("other.json", files[file])
-    assert {:error, :integrity} = Candidate.run(renamed, profile)
+    assert {:error, :integrity} = run_profile(renamed)
 
     entries =
       Enum.map(index["files"], fn
@@ -145,7 +149,46 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
       end)
 
     wrong_count = Map.put(files, "index.json", json_bytes(%{index | "files" => entries}))
-    assert {:error, :integrity} = Candidate.run(wrong_count, profile)
+    assert {:error, :integrity} = run_profile(wrong_count)
+
+    wrong_id = [%{"expected" => "invalid"} | tl(:json.decode(files["assembly-cases.json"]))]
+
+    assert {:error, :integrity} =
+             files
+             |> replace_profile_file(index, "assembly-cases.json", wrong_id)
+             |> run_profile()
+
+    invalid_entries =
+      Enum.map(entries, fn
+        %{"path" => "assembly-cases.json"} = entry -> Map.delete(entry, "cases")
+        entry -> entry
+      end)
+
+    invalid_index = %{index | "files" => invalid_entries}
+
+    assert {:error, :integrity} =
+             run_profile(Map.put(files, "index.json", json_bytes(invalid_index)))
+
+    missing_hash = %{
+      index
+      | "files" => Enum.map(index["files"], &Map.delete(&1, "sha256"))
+    }
+
+    assert {:error, :integrity} =
+             run_profile(Map.put(files, "index.json", json_bytes(missing_hash)))
+
+    missing_metadata = %{index | "files" => Enum.reject(entries, &(&1["path"] == file))}
+
+    assert {:error, :integrity} =
+             files
+             |> Map.delete(file)
+             |> Map.put("index.json", json_bytes(missing_metadata))
+             |> run_profile()
+
+    assert {:error, :integrity} =
+             files
+             |> replace_profile_bytes(index, file, "}")
+             |> run_profile()
 
     wrong_answer =
       files[file]
@@ -154,21 +197,21 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
     assert {:error, :integrity} =
              files
-             |> replace_candidate_file(index, file, wrong_answer)
-             |> Candidate.run(profile)
+             |> replace_profile_file(index, file, wrong_answer)
+             |> run_profile()
   end
 
-  test "candidate execution records a failed cross-profile rejection" do
+  test "profile execution records a failed cross-profile rejection" do
     for {root, file} <- [
           {"attestation-profiles/content-assertion-es256/v1", "separation-cases.json"},
           {@custody_root, "custody-separation-cases.json"}
         ] do
-      {files, index} = candidate_files(root)
+      {files, index} = profile_files(root)
       [item | rest] = :json.decode(files[file])
       cases = [%{item | "foreign" => item["candidate"]} | rest]
-      edited = replace_candidate_file(files, index, file, cases)
+      edited = replace_profile_file(files, index, file, cases)
 
-      assert {:ok, bytes, 1} = Candidate.run(edited, index["profile"])
+      assert {:ok, bytes, 1} = run_profile(edited)
       report = :json.decode(bytes)
       assert report["disagreed"] == 1
       refute report["agreement"]
@@ -177,7 +220,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
   end
 
   test "custody corpus refuses a different identity or invalid known-answer input" do
-    {files, index} = candidate_files(@custody_root)
+    {files, index} = profile_files(@custody_root)
     file = "profile.json"
     metadata = :json.decode(files[file])
 
@@ -185,19 +228,29 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
           %{metadata | "revision" => 2},
           put_in(metadata, ["signing", "payload", "custody_class"], "unknown")
         ] do
-      edited = replace_candidate_file(files, index, file, wrong)
-      assert {:error, :integrity} = Candidate.run(edited, index["profile"])
+      edited = replace_profile_file(files, index, file, wrong)
+      assert {:error, :integrity} = run_profile(edited)
     end
   end
 
-  defp candidate_files(profile_path) do
+  defp run_profile(files) do
+    case Corpus.load_any(files) do
+      {:ok, corpus} -> ProfileRunner.run(corpus)
+      {:error, :invalid} -> {:error, :integrity}
+    end
+  end
+
+  defp profile_files(profile_path) do
     root = Path.join(@priv_conformance, profile_path)
     files = Map.new(File.ls!(root), &{&1, File.read!(Path.join(root, &1))})
     {files, :json.decode(Map.fetch!(files, "index.json"))}
   end
 
-  defp replace_candidate_file(files, index, file, term) do
-    bytes = json_bytes(term)
+  defp replace_profile_file(files, index, file, term) do
+    replace_profile_bytes(files, index, file, json_bytes(term))
+  end
+
+  defp replace_profile_bytes(files, index, file, bytes) do
     digest = :sha256 |> :crypto.hash(bytes) |> Base.encode16(case: :lower)
 
     entries =

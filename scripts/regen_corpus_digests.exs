@@ -140,8 +140,13 @@ defmodule BoundedAuthorityProtocol.RegenCorpusDigests do
         Regex.escape("\"" <> corpus <> "\":{") <> "[^}]*\"index_sha256_base64url\":\"([^\"]*)\""
       )
 
+    snapshot_prefixes =
+      if entry.runners == [],
+        do: [],
+        else: Enum.map(["python", "rust", "go"], &"sdks/#{&1}/conformance/")
+
     manifests =
-      for prefix <- ["" | Enum.map(["python", "rust", "go"], &"sdks/#{&1}/conformance/")] do
+      for prefix <- ["" | snapshot_prefixes] do
         pin(
           Path.join(Catalog.root(), prefix <> "priv/conformance/verdict-digests.json"),
           manifest_regex,

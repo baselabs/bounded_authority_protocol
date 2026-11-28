@@ -31,15 +31,15 @@ normative text):
 
 A soundness repair is the one way a verdict changes inside a contract-major: it changes verdicts
 only from accept to reject, only on inputs no conforming producer emits, and it is recorded in
-the [errata registry](../errata.md). Use the major-bounded requirement `~> 1.1`, which admits
-every 1.x release at or above 1.1.0, and run the packaged corpora after each upgrade
+the [errata registry](../errata.md). Use the major-bounded requirement `~> 1.5`, which admits
+every 1.x release at or above 1.5.0, and run the packaged corpora after each upgrade
 ([Recipes](recipes.md#run-every-packaged-corpus)).
 
 Within a contract-major, the accepted bytes and verdicts never change except through such a
 repair. The contract-major and sibling-profile producers, decoders, and credential/evidence
-verifiers return `{:ok, value}` or exactly `{:error, :invalid}`. The pairwise consistency check
-`BoundedAuthorityProtocol.ContentAssertion.V1.verify_successor/3` returns `:ok` or
-`{:error, :invalid}`; it does not establish the provenance of supplied facts. Facts structs keep
+verifiers return `{:ok, value}` or `{:error, :invalid}`. Action approval verification returns
+verified facts or an ordered local diagnostic. Each content assertion suite
+returns `:ok` or `{:error, :invalid}` from `verify_successor/3` after comparing supplied facts. Facts structs keep
 their not-evaluated markers. Public crypto
 predicates, including `BoundedAuthorityProtocol.Ed25519.verify_strict/3` and
 `BoundedAuthorityProtocol.Es256.verify_strict/3`, return booleans instead.
@@ -174,9 +174,10 @@ Conformance:
   usage error), and its report's JSON fields (`format`, `agreement`, `exit_status`, `total`,
   `agreed`, `disagreed`, `index_sha256_base64url`) are part of the contract.
 
-The [ES256 content assertion](../../spec/bap-content-assertion-es256-v1.md) and
-[action approval](../../spec/bap-action-approval-v1.md) surfaces are candidates, as is
-[holder custody attestation](../../spec/bap-holder-custody-attestation-v1.md).
+Package 1.5.0 adds [ES256 content assertions](../../spec/bap-content-assertion-es256-v1.md),
+[action approval](../../spec/bap-action-approval-v1.md), and
+[holder custody attestations](../../spec/bap-holder-custody-attestation-v1.md) to this stable surface.
+Their CLI reports also include `profile`, `elixir_verdict_sha256`, and `sdk_owned`.
 Use `BoundedAuthorityProtocol.ActionApproval.V1.encode_record/4` to author exact
 bytes. The fourth argument explicitly enables resource sorting and deduplication.
 Use `BoundedAuthorityProtocol.ActionApproval.V1.verify_eddsa/3` or
@@ -195,7 +196,7 @@ change in any release:
 - `BoundedAuthorityProtocol.DiagnosticRendering`, the internal diagnostic formatter;
 - `BoundedAuthorityProtocol.Conformance.Corpus`, `BoundedAuthorityProtocol.Conformance.Runner`,
   `BoundedAuthorityProtocol.Conformance.Report`, and
-  `BoundedAuthorityProtocol.Conformance.Candidate`, the CLI's internals;
+  `BoundedAuthorityProtocol.Conformance.ProfileRunner`, the CLI's internals;
 - `BoundedAuthorityProtocol.Conformance.Cli.Main`, the escript entry point;
 - `BoundedAuthorityProtocol.HolderCustodyAttestation.V1.Codec`, the internal codec;
 - `BoundedAuthorityProtocol.V1.Jwk.thumbprint_digest_unchecked/1`;

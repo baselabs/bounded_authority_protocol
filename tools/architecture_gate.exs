@@ -288,14 +288,14 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:side_verdict, 2} => %{variable_call: 3},
       {:strict_agrees?, 1} => %{variable_call: 6}
     },
-    "Elixir.BoundedAuthorityProtocol.Conformance.Candidate.beam" => %{
+    "Elixir.BoundedAuthorityProtocol.Conformance.ProfileRunner.beam" => %{
       {:execute, 4} => %{variable_call: 5},
       {:known_answer?, 2} => %{variable_call: 3},
-      {:run, 2} => %{variable_call: 4}
+      {:entry_cases, 2} => %{variable_call: 2},
+      {:load, 2} => %{variable_call: 6}
     },
     "Elixir.BoundedAuthorityProtocol.Conformance.Cli.beam" => %{
-      {:verify_candidate, 3} => %{variable_call: 2},
-      {:verify_released, 2} => %{variable_call: 4}
+      {:verify, 2} => %{variable_call: 5}
     },
     "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam" => %{
       {:__struct__, 1} => %{enum_reduce: 1},
@@ -312,6 +312,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
       {:load_additive_case_file, 3} => %{variable_call: 7},
       {:load_content_assertion, 1} => %{variable_call: 10},
       {:load_local_loopback_http, 1} => %{variable_call: 6},
+      {:load_profile, 1} => %{variable_call: 5},
       {:load_role_attestation, 1} => %{variable_call: 3},
       {:load_sibling, 2} => %{variable_call: 10},
       {:sibling_corpus, 6} => %{enum_reduce: 1},
@@ -834,7 +835,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
     BoundedAuthorityProtocol.V1.Runtime
     BoundedAuthorityProtocol.V2.Runtime
     BoundedAuthorityProtocol.V3.Runtime
-    BoundedAuthorityProtocol.Conformance.Candidate
+    BoundedAuthorityProtocol.Conformance.ProfileRunner
     BoundedAuthorityProtocol.Conformance.Corpus
     BoundedAuthorityProtocol.Conformance.Runner
     BoundedAuthorityProtocol.Conformance.Report
@@ -2290,7 +2291,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
   defp approved_source_modules(path) when path in @chain_codec_source_paths,
     do: ~w(Access Enum Map String StringOrUri URI)
 
-  defp approved_source_modules("lib/bounded_authority_protocol/conformance/candidate.ex"),
+  defp approved_source_modules("lib/bounded_authority_protocol/conformance/profile_runner.ex"),
     do: ~w(Atom Enum Integer Map)
 
   defp approved_source_modules("lib/bounded_authority_protocol/conformance/corpus.ex"),
@@ -2748,7 +2749,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
        do: true
 
   defp approved_source_call?(
-         "lib/bounded_authority_protocol/conformance/candidate.ex",
+         "lib/bounded_authority_protocol/conformance/profile_runner.ex",
          module,
          function
        ),
@@ -2764,6 +2765,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            {"Enum", :flat_map},
            {"Enum", :intersperse},
            {"Enum", :map},
+           {"Enum", :reduce_while},
+           {"Enum", :reverse},
            {"Enum", :sort},
            {"Enum", :split_with},
            {"Enum", :uniq},
@@ -3467,7 +3470,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {:lists, :member}
         ]
 
-      "Elixir.BoundedAuthorityProtocol.Conformance.Candidate.beam" ->
+      "Elixir.BoundedAuthorityProtocol.Conformance.ProfileRunner.beam" ->
         [
           {Base, :decode16!},
           {Base, :encode16},
@@ -3477,6 +3480,8 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
           {Enum, :flat_map},
           {Enum, :intersperse},
           {Enum, :map},
+          {Enum, :reduce_while},
+          {Enum, :reverse},
           {Enum, :sort},
           {Enum, :split_with},
           {Enum, :uniq},
@@ -3705,7 +3710,7 @@ defmodule BoundedAuthorityProtocol.ArchitectureGate do
            "Elixir.BoundedAuthorityProtocol.Conformance.Corpus.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Runner.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Report.beam",
-           "Elixir.BoundedAuthorityProtocol.Conformance.Candidate.beam",
+           "Elixir.BoundedAuthorityProtocol.Conformance.ProfileRunner.beam",
            "Elixir.BoundedAuthorityProtocol.ActionApproval.V1.RecordCodec.beam",
            "Elixir.BoundedAuthorityProtocol.Conformance.Cli.beam"
          ],

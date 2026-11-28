@@ -102,7 +102,15 @@ defmodule BoundedAuthorityProtocol.Architecture.StableSurfacePinTest do
     end
   end
 
-  test "the role-attestation façade exports are pinned like the other sibling façades" do
-    assert "Elixir.BoundedAuthorityProtocol.RoleAttestation.V1.beam" in ArchitectureGate.pinned_beams()
+  test "the released sibling facades have stable module and compiled export pins" do
+    for facade <- [
+          "BoundedAuthorityProtocol.RoleAttestation.V1",
+          "BoundedAuthorityProtocol.ContentAssertion.ES256.V1",
+          "BoundedAuthorityProtocol.HolderCustodyAttestation.V1",
+          "BoundedAuthorityProtocol.ActionApproval.V1"
+        ] do
+      assert facade in ArchitectureGate.stable_modules()
+      assert "Elixir.#{facade}.beam" in ArchitectureGate.pinned_beams()
+    end
   end
 end

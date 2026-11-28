@@ -263,7 +263,7 @@ signature; verification checks the supplied context without choosing trust or re
 In a device provisioning flow, an attestor can describe a device holder key as `"standard"`.
 A document workflow can use `"hosted"` when the operator holds the key under a non-exporting
 handle and signs on the holder's behalf. The application supplies the expected holder key
-and chooses its trusted attestor. This [source candidate](../../spec/bap-holder-custody-attestation-v1.md)
+and chooses its trusted attestor. This [profile](../../spec/bap-holder-custody-attestation-v1.md)
 grants nothing.
 
 ```elixir
@@ -513,6 +513,52 @@ V1.decode_grant(sign_compact.(protected <> "." <> float_zero_payload), %{})
 The value is `{:error, :invalid}`: the integer zero decodes, and the float zero, signed by the
 same issuer, is refused.
 
+## Verify an ES256 content assertion
+
+For example, a research archive can verify a signed generation of a dataset using its
+enrolled P-256 attestor. Use the exact stored content bytes and the expected profile digest
+from your own descriptor. The attestor's `public_key` is its raw uncompressed SEC1 point.
+
+```elixir
+alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1, as: Assertion
+alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
+
+{:ok, digest} = Assertion.content_digest(dataset_bytes, %{})
+expected = %Assertion.ExpectedContentAssertion{
+  attestor: %HistoricalPublicKey{
+    key_id: "archive-1", public_key: archive_p256_public,
+    valid_from: key_valid_from, valid_before: key_valid_before
+  },
+  issuer: "https://archive.example",
+  audience: "https://research.example",
+  subject: "urn:example:dataset:salinity",
+  profile: descriptor_id,
+  profile_digest: descriptor_digest,
+  content_digest: digest,
+  now: now,
+  bounds: %{}
+}
+{:ok, facts} = Assertion.verify_assertion(compact, expected)
+:not_evaluated = facts.trust
+```
+
+To check succession, verify the predecessor and successor with this same facade before
+calling `Assertion.verify_successor/3`. Store the accepted lineage position at the host.
+See the [profile specification](../../spec/bap-content-assertion-es256-v1.md).
+
+## Verify an action approval
+
+Derive the request ID, immutable revision digest, subject, action and complete resource
+set from the operation your host is preparing to execute. Select `verify_eddsa/3` or
+`verify_es256/3` from the configured approval suite and pass the trusted snapshot, expected
+operation, clock and local limits. Use the approver role required by host policy.
+
+Keep the verifier's ordered diagnostics inside the host and return a uniform refusal to
+presenters. After verification, compare the exact effect and revision against authoritative
+state and commit both claims with the effect or durable delivery intent. The
+[tested offline SQLite example](https://github.com/baselabs/bounded_authority_protocol/blob/baselabs_bounded_authority_protocol-v1.5.0/docs/examples/action-approval.exs) exercises the
+concurrent comparison, rollback and recovery after restart.
+
 ## ES256 from a KMS or HSM
 
 Contract-major 3 signs with ES256 (ECDSA P-256, SHA-256). Cloud KMS and HSM APIs return ECDSA
@@ -700,7 +746,7 @@ bounds how old a proof may be. A proof is accepted from `issued_at - clock_skew`
 The package ships every certified corpus in its `priv` directory, and
 `BoundedAuthorityProtocol.Conformance.Cli.run/1` verifies one and returns the exit status: `0`
 on complete agreement, `1` on any disagreement or integrity failure, `2` on a usage error. Run
-all nine from your own project's test suite, or after each upgrade:
+all thirteen from your own project's test suite, or after each upgrade:
 
 ```elixir
 alias BoundedAuthorityProtocol.Conformance.Cli
@@ -714,7 +760,11 @@ corpora = [
   "selector-float-zero",
   "application-profiles/local-loopback-http/v1",
   "attestation-profiles/role-attestation/v1",
-  "attestation-profiles/content-assertion/v1"
+  "attestation-profiles/content-assertion/v1",
+  "string-or-uri",
+  "attestation-profiles/content-assertion-es256/v1",
+  "attestation-profiles/holder-custody-attestation/v1",
+  "content-profiles/action-approval/v1"
 ]
 
 report = Path.join(System.tmp_dir!(), "bap-conformance-report.json")

@@ -168,6 +168,7 @@ currently carries Erratum 1, the correction for the contract-major 1 `all` selec
 recognized member sets; Erratum 2, the strict Ed25519 verification soundness repair; Erratum 3,
 producer-surface signature canonicality; Erratum 4, an editorial correction of the torsion
 encoding count in `spec/bap-v1.md` § 14.1; Erratum 5, editorial heading anchors and
-cross-reference links in the contract-major specifications; and Erratum 6, the signer-bound
-selector float-zero soundness repair. New errata follow the § [Errata channel](#errata-channel)
+cross-reference links in the contract-major specifications; Erratum 6, the signer-bound
+selector float-zero soundness repair; and Erratum 7, the IPv6-only bracketed StringOrURI host
+clarification for specifications published through package 1.1.0. New errata follow the § [Errata channel](#errata-channel)
 no-verdict-flip process above.

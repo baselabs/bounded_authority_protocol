@@ -1,14 +1,13 @@
 # Corpus verdict digests
 
-The Hex release's complete `priv/conformance/` tree is the distribution boundary. Each
-unpublished verifier SDK vendors that tree at `conformance/priv/conformance/` beneath its own
-root. The snapshot includes schemas, focused vectors, all certified corpora, and the
-sibling `verdict-digests.json` manifest. A corpus directory still contains exactly the files
-its own index names, plus its index. The sibling manifest does not alter that rule or the
-CLI 1.x report contract.
+The Hex release carries the complete `priv/conformance/` tree. Each unpublished verifier SDK
+vendors a standalone projection at `conformance/priv/conformance/` beneath its own root.
+Shared case files, schemas and focused vectors match the Hex bytes. The SDK manifest contains
+the ten entries those standalone suites execute. The Hex manifest also covers three profiles
+first released in 1.5.0. Each corpus directory contains exactly its index plus the files it names.
 
-The manifest was introduced in 1.1.0. The in-tree snapshots match the unpacked Hex package
-built from this commit. Existing frozen case bytes and certified index digests remain unchanged.
+The manifest was introduced in 1.1.0. Adding the three profiles preserves the previous ten
+entries, their certified indexes, and their verdicts.
 
 ## Ordering
 
@@ -82,18 +81,23 @@ Python sdist, Rust crate, and Go module zip. Every SDK suite must pass with only
 available. Mutation controls exercise manifest escapes and representative source-lint bypasses.
 
 
-## Source candidates
+## Profiles first released in 1.5.0
 
-The ES256 content assertion and action approval candidate indexes pin a
-`verdict_sha256` over the complete case inventory. The projection is the JCS
-array of `[file + "/" + id, expected]` pairs in index and case order, with the
-SHA-256 written in lowercase hex. Each case-file hash and count remains
-part of the index identity.
+The ES256 content assertion, holder custody attestation, and action approval indexes pin
+`verdict_sha256` over the full declared inventory. Their projection is the JCS array of
+`[file + "/" + id, expected]` pairs in index and case order. The index stores the SHA-256
+in lowercase hexadecimal.
 
-The source CLI recognizes the exact candidate indexes. It substitutes Elixir's
-observed outcomes for `expected` in that projection, omitting SDK helper cases,
-and checks the resulting hash against `elixir_verdict_sha256`. The report gives
-the count of SDK-owned cases and requires every applicable Elixir case to
-execute and agree. Candidate reports use the format
-`bounded-authority-protocol-candidate-conformance-report`. The packaged corpus
-inventory follows the candidate specs' SDK qualification rule.
+The Elixir CLI substitutes its observed outcomes and checks `elixir_verdict_sha256`.
+It excludes approval's `helper-cases.json` and any case marked `owner: "sdk_helper"`
+from that projection. In the Hex manifest for these profiles, `case_count` counts the
+executed Elixir cases, `sdk_owned_case_count` counts the rest, and the verdict digest
+encodes the Elixir projection as unpadded base64url.
+
+The CLI retains the report format identifier
+`bounded-authority-protocol-candidate-conformance-report` and its fields, including
+`profile`, `elixir_verdict_sha256` and `sdk_owned`. Approval requires all 202 applicable
+Elixir cases to execute and agree. Its 129 SDK-owned cases run in the Python, Rust, and Go
+source-checkout suites, which also run the 223 ES256 assertion cases. All 76 custody cases
+run in Elixir. The published TypeScript verifier qualifies the exact profiles through its
+own release process.

@@ -14,8 +14,10 @@ after a rejection.
 | P-256 keys (ES256), for example keys that live in a cloud KMS or an HSM without Ed25519 | Contract-major 3, `BoundedAuthorityProtocol.V3` | `BAP3-ES256-SHA256` |
 | Proofs to a development listener on `127.0.0.1` or `[::1]` over plain HTTP | Local-loopback HTTP, `BoundedAuthorityProtocol.ApplicationProfile.LocalLoopbackHttp.V1` | Ed25519 |
 | A signed statement that a key holds the `issuer` or `holder` role | Role attestation, `BoundedAuthorityProtocol.RoleAttestation.V1` | Ed25519 |
-| A signed statement about how a holder key is held | Holder custody attestation candidate, `BoundedAuthorityProtocol.HolderCustodyAttestation.V1` | Ed25519 |
+| A signed statement about how a holder key is held | Holder custody attestation, `BoundedAuthorityProtocol.HolderCustodyAttestation.V1` | Ed25519 |
 | A signed statement binding the digest of exact content bytes to a context and lineage | Content assertion, `BoundedAuthorityProtocol.ContentAssertion.V1` | Ed25519 |
+| A standalone assertion binding exact content to a P-256 attestor | ES256 content assertion, `BoundedAuthorityProtocol.ContentAssertion.ES256.V1` | ES256 |
+| Approval of one action for a specific request revision and resource set | Action approval, `BoundedAuthorityProtocol.ActionApproval.V1` | EdDSA or ES256, chosen by the host |
 
 If none of the special cases apply, start with contract-major 1. Move to contract-major 2 when a
 grant must cap a number, and to contract-major 3 when your keys must be P-256.
@@ -83,3 +85,13 @@ KMS or HSM signature into the wire form (`Es256.der_to_raw/1`, then `Es256.norma
 
 Verifiers for TypeScript, Python, Rust, and Go implement the same profiles and pass the same
 corpora; see [Other languages](other-languages.md).
+
+## Select the evidence profile independently of the grant suite
+
+Use [ES256 content assertions](../../spec/bap-content-assertion-es256-v1.md) for
+standalone signed content. Contract-major 3 defines P-256 grants, holder proofs,
+and associated archive artifacts. Its compacts have their own wire contract.
+
+Use [action approval](../../spec/bap-action-approval-v1.md) when the signed
+content must bind an exact host request. The host selects the attestation suite
+before verification and supplies the expected action, revision and resources.

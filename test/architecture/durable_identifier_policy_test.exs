@@ -32,7 +32,7 @@ defmodule BoundedAuthorityProtocol.Architecture.DurableIdentifierPolicyTest do
           %{
             path: "mix.exs",
             kind: :package_source_ref,
-            name: ~s(source_ref: "v\#{@version}")
+            name: ~s(source_ref: "baselabs_bounded_authority_protocol-v\#{@version}")
           },
           %{path: "docs/protocol-v1.md", kind: :wire_suite, name: "BAP1-Ed25519-SHA256"},
           %{
@@ -134,7 +134,7 @@ defmodule BoundedAuthorityProtocol.Architecture.DurableIdentifierPolicyTest do
           %{
             path: "docs/example.md",
             kind: :package_source_ref,
-            name: ~s(source_ref: "v\#{@version}")
+            name: ~s(source_ref: "baselabs_bounded_authority_protocol-v\#{@version}")
           },
           %{
             path: "lib/bounded_authority_protocol/application_profile/local_loopback_http/v2.ex",

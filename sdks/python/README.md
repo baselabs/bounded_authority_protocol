@@ -281,7 +281,7 @@ on the verification path.
 ## Conformance
 
 `conformance/priv/conformance/` is a complete, byte-identical snapshot of the Hex package built
-from this commit's `priv/conformance/` tree. It includes all certified corpora, schemas, focused vectors,
+from this commit's `priv/conformance/` tree. It includes the ten standalone corpora, schemas, focused vectors,
 and `verdict-digests.json`. Every test input is inside this SDK root; copying this directory
 alone is sufficient to run the suite.
 The manifest was introduced in 1.1.0.
@@ -324,14 +324,14 @@ package and its distribution metadata. Test inputs are not installed with the wh
 
 The monorepo's distribution job copies only this SDK root into a temporary directory,
 runs its full suite, checks its package, and removes the temporary artifacts afterward.
-A corpus update replaces the entire snapshot from the verified Hex unpack in one change;
+A corpus update replaces the standalone projection from the verified Hex unpack in one change;
 individual case edits are not a supported update path. These checks do not publish the SDK.
 
 ## Verifying a grant before issuing it
 
-The source candidate includes `bap-action-approval/1` and its ES256 carrier
-`bap-content-assertion-es256/1`. These profiles have separate, pinned candidate corpora
-in the protocol checkout. The SDK's vendored snapshot continues to track released corpora.
+The Python source-checkout suite exercises `bap-action-approval/1` and its ES256 carrier
+`bap-content-assertion-es256/1` against the pinned Hex 1.5.0 corpora in the protocol checkout.
+The standalone SDK suite runs the ten vendored corpora.
 
 In the [offline SQLite example](examples/action_approval.py), the host verifies a content
 assertion over the canonical record for an image-indexing request. The host prepares the request

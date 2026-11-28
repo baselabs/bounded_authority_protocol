@@ -10,7 +10,7 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
                        "test/bounded_authority_protocol/diagnostic_rendering_test.exs",
                        # The README approval example names the V1 historical-key struct.
                        "docs/examples/action-approval.exs",
-                       "lib/bounded_authority_protocol/conformance/candidate.ex",
+                       "lib/bounded_authority_protocol/conformance/profile_runner.ex",
                        "lib/bounded_authority_protocol/conformance/corpus.ex",
                        "lib/bounded_authority_protocol/conformance/report.ex",
                        "lib/bounded_authority_protocol/conformance/runner.ex",
@@ -260,8 +260,12 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
 
   defp under_root?(path, root), do: path == root or String.starts_with?(path, root <> "/")
 
-  defp contract_identity?("mix.exs", :package_source_ref, ~S(source_ref: "v#{@version}")),
-    do: true
+  defp contract_identity?(
+         "mix.exs",
+         :package_source_ref,
+         ~S(source_ref: "baselabs_bounded_authority_protocol-v#{@version}")
+       ),
+       do: true
 
   defp contract_identity?(path, :wire_suite, suite)
        when suite in ["BAP1-Ed25519-SHA256", "BAP2-Ed25519-SHA256", "BAP3-ES256-SHA256"],
@@ -599,7 +603,8 @@ defmodule BoundedAuthorityProtocol.TestSupport.DurableIdentifierPolicy do
 
   defp content_observations(path, source) do
     package =
-      Regex.scan(~r/source_ref:\s*"v(?:#\{@version\}|\d+)"/, source)
+      ~r/source_ref:\s*"(?:baselabs_bounded_authority_protocol-)?v(?:#\{@version\}|\d+)"/
+      |> Regex.scan(source)
       |> Enum.map(fn [name] -> %{path: path, kind: :package_source_ref, name: name} end)
 
     suites =

@@ -76,7 +76,7 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "docs/design/threat-model.md",
                     "hex_metadata.config",
                     "lib/bounded_authority_protocol.ex",
-                    "lib/bounded_authority_protocol/conformance/candidate.ex",
+                    "lib/bounded_authority_protocol/conformance/profile_runner.ex",
                     "lib/bounded_authority_protocol/conformance/cli.ex",
                     "lib/bounded_authority_protocol/conformance/cli/main.ex",
                     "lib/bounded_authority_protocol/conformance/corpus.ex",
@@ -182,6 +182,25 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
                     "priv/conformance/string-or-uri/cases/grant-decode/ipvfuture.json",
                     "priv/conformance/string-or-uri/cases/role-attestation/ipvfuture.json",
                     "priv/conformance/string-or-uri/index.json",
+                    "priv/conformance/attestation-profiles/content-assertion-es256/v1/assembly-cases.json",
+                    "priv/conformance/attestation-profiles/content-assertion-es256/v1/assertion-structure-cases.json",
+                    "priv/conformance/attestation-profiles/content-assertion-es256/v1/assertion-verification-cases.json",
+                    "priv/conformance/attestation-profiles/content-assertion-es256/v1/digest-cases.json",
+                    "priv/conformance/attestation-profiles/content-assertion-es256/v1/index.json",
+                    "priv/conformance/attestation-profiles/content-assertion-es256/v1/profile.json",
+                    "priv/conformance/attestation-profiles/content-assertion-es256/v1/separation-cases.json",
+                    "priv/conformance/attestation-profiles/content-assertion-es256/v1/successor-cases.json",
+                    "priv/conformance/attestation-profiles/holder-custody-attestation/v1/attestation-cases.json",
+                    "priv/conformance/attestation-profiles/holder-custody-attestation/v1/custody-separation-cases.json",
+                    "priv/conformance/attestation-profiles/holder-custody-attestation/v1/index.json",
+                    "priv/conformance/attestation-profiles/holder-custody-attestation/v1/profile.json",
+                    "priv/conformance/content-profiles/action-approval/v1/approval-cases.json",
+                    "priv/conformance/content-profiles/action-approval/v1/helper-cases.json",
+                    "priv/conformance/content-profiles/action-approval/v1/index.json",
+                    "priv/conformance/content-profiles/action-approval/v1/multi-fault-cases.json",
+                    "priv/conformance/content-profiles/action-approval/v1/profile.json",
+                    "priv/conformance/content-profiles/action-approval/v1/record-cases.json",
+                    "priv/conformance/content-profiles/action-approval/v1/rendering-cases.json",
                     "priv/conformance/string-or-uri/profile.json",
                     "priv/conformance/string-or-uri/revision.json",
                     "priv/conformance/v1/schemas/conformance-case.schema.json",
@@ -1044,14 +1063,32 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     run!("mix", ["escript.build"], package_root, environment)
 
     escript_path = Path.join(package_root, "bounded_authority_conformance")
-    packaged_corpus = Path.join(package_root, "priv/conformance/v1/corpus")
+    corpora = [
+      {"v1/corpus", nil, nil, nil},
+      {"string-or-uri", nil, nil, nil},
+      {"attestation-profiles/content-assertion-es256/v1", "bap-content-assertion-es256/1", 223, 0},
+      {"attestation-profiles/holder-custody-attestation/v1", "bap-holder-custody-attestation/1", 76, 0},
+      {"content-profiles/action-approval/v1", "bap-action-approval/1", 202, 129}
+    ]
 
-    # Run through the `escript` command (not direct exec of the shebang file).
-    {output, 0} =
-      System.cmd("escript", [escript_path, "--corpus", packaged_corpus], stderr_to_stdout: true)
+    for {relative, profile, total, sdk_owned} <- corpora do
+      packaged_corpus = Path.join([package_root, "priv/conformance", relative])
 
-    unless output =~ ~s("agreement":true) do
-      fail!("packaged escript did not agree on the packaged corpus:\n#{output}")
+      # Run through the escript command so the check also works on Windows.
+      {output, status} =
+        System.cmd("escript", [escript_path, "--corpus", packaged_corpus], stderr_to_stdout: true)
+
+      unless status == 0, do: fail!("packaged escript failed for #{relative}:\n#{output}")
+
+      report = :json.decode(output)
+
+      unless report["agreement"] and
+               (is_nil(profile) or
+                  (report["profile"] == profile and report["total"] == total and
+                     report["sdk_owned"] == sdk_owned)),
+             do: fail!("packaged escript did not certify #{relative}:\n#{output}")
+
+      IO.puts("packaged escript certified #{relative}")
     end
   end
 

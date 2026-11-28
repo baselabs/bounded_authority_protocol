@@ -108,16 +108,17 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
   @tag :git_history
   test "release launch URLs name notebooks present at their release tag or candidate HEAD" do
     version = Mix.Project.config()[:version]
-    tag = "refs/tags/v#{version}"
+    release_ref = "baselabs_bounded_authority_protocol-v#{version}"
+    tag = "refs/tags/#{release_ref}"
 
     # Publication refuses an existing tag; before publication HEAD is the tree it will name.
     {_output, tag_status} = System.cmd("git", ["rev-parse", "-q", "--verify", "#{tag}^{commit}"])
 
     {source_ref, source_case} =
       if tag_status == 0 do
-        {tag, "release tag v#{version}"}
+        {tag, "release tag #{release_ref}"}
       else
-        {"HEAD", "untagged release candidate v#{version} at HEAD"}
+        {"HEAD", "untagged release candidate #{release_ref} at HEAD"}
       end
 
     paths = ["README.md" | Path.wildcard("docs/notebooks/**/*.livemd")]
@@ -133,7 +134,7 @@ defmodule BoundedAuthorityProtocol.DocumentationContractTest do
         assert ["", "baselabs", "bounded_authority_protocol", "blob", ref | file] =
                  String.split(uri.path, "/")
 
-        assert ref == "v#{version}", "#{path}: expected v#{version} URL for #{source_case}"
+        assert ref == release_ref, "#{path}: expected #{release_ref} URL for #{source_case}"
         target = Enum.join(file, "/")
         assert Path.extname(target) == ".livemd", "#{path}: non-notebook URL for #{source_case}"
 

@@ -2,13 +2,14 @@
 
 ## Supported versions
 
-The `1.1.x` source release line is supported. `v1.1.0` is the current tagged source release and contains
-contract-majors 1, 2, and 3, the local-loopback application profile, the role-attestation and
-content-assertion sibling profiles, the strict Ed25519 verification soundness repair (erratum 2),
-the producer-canonicality signature refusal (erratum 3), and the selector float-zero soundness
-repair (erratum 6). Its public API follows the
+The `1.5.x` source release line is supported. `baselabs_bounded_authority_protocol-v1.5.0` is the current tagged source release and contains
+contract-majors 1, 2, and 3, local-loopback HTTP proofs, role and holder custody attestations,
+EdDSA and ES256 content assertions, and action approval. It incorporates strict Ed25519
+verification (erratum 2), producer-canonicality signature refusal (erratum 3), the selector
+float-zero soundness repair (erratum 6), and the IPv6-only StringOrURI clarification
+(erratum 7). Its public API follows the
 [1.x stability contract](docs/guides/api-stability.md). Registry consumers use the published Hex
-archive: [registry release](https://hex.pm/packages/bounded_authority_protocol/1.1.0).
+archive: [registry release](https://hex.pm/packages/bounded_authority_protocol/1.5.0).
 
 Releases `0.9.1` and earlier accept a float-tagged zero in an `equals` or `one_of` selector value
 (erratum 6); they stay installable and are not supported. Releases `0.7.0` and earlier also
