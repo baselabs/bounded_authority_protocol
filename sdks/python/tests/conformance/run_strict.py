@@ -4,9 +4,9 @@
 Loads ``priv/conformance/strict-ed25519/`` (an additive corpus: every earlier corpus stays byte
 identical), asserts the ``index.json`` SHA-256 and every listed file's SHA-256 before running, then
 recomputes EVERY verdict from scratch through the SDK's public surfaces and requires agreement on all
-cases. The v1/v2-shaped families reuse the existing v1 and v2 runners' dispatch (the SDK calls are
-identical); the primitive, key-acceptance and sibling-profile (loopback, role-attestation,
-content-assertion) cases are dispatched here.
+cases. Core cases reuse the runner dispatch for their contract major. The primitive,
+key-acceptance and sibling-profile (loopback, role-attestation, content-assertion) cases are
+dispatched here.
 
 A disagreement aborts nonzero with the case id. ``--only FAMILY[,FAMILY]`` restricts the run to named
 families (a diagnostic aid; the certified run uses every family).
@@ -158,8 +158,8 @@ def _run_primitive(case: dict[str, Any]) -> dict[str, Any]:
 
 
 def _run_shaped(case: dict[str, Any]) -> dict[str, Any]:
-    module = {1: _RUN_V1, 2: _RUN_V2, 3: _RUN_V3}[case["major"]]
-    if case["major"] not in (1, 2):
+    module = {1: _RUN_V1, 2: _RUN_V2, 3: _RUN_V3}.get(case["major"])
+    if module is None:
         abort(f"{case['id']}: unsupported major {case['major']}")
     surface, inp = case["surface"], case["input"]
     if surface == "jwk.decode_public":

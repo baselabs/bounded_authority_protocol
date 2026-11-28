@@ -276,6 +276,8 @@ def _valid_ipv6_literal(literal: bytes) -> bool:
     if len(parts) == 1:
         return _ipv6_side_length(parts[0]) == 8
     if len(parts) == 2:
+        if b"." in parts[0]:
+            return False  # embedded IPv4 occupies the last 32 bits.
         left = _ipv6_side_length(parts[0])
         right = _ipv6_side_length(parts[1])
         if left is None or right is None:

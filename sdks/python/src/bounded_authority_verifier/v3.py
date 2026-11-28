@@ -90,7 +90,7 @@ from .selector import Selector as _V1Selector
 from .selector import _integral_float_free
 from .selector import parse_selector as _parse_v1_selector
 from .selector import selector_matches as _v1_selector_matches
-from .uri import uri_normalize
+from .uri import _valid_ipv6_literal, uri_normalize
 
 # --- constants (the closed v3 profile header/claim literals; the §2 substitutions over v1) ---
 
@@ -1060,7 +1060,7 @@ def _valid_uri_authority(authority: str) -> bool:
 
 
 def _is_ipv6(literal: str) -> bool:
-    return re.match(r"^[0-9A-Fa-f:.]+$", literal) is not None
+    return _valid_ipv6_literal(literal.encode("ascii"))
 
 
 def _is_well_formed(s: str) -> bool:

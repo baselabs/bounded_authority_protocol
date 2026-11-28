@@ -79,7 +79,7 @@ from .json_alg import (
 from .jwk import OkpPublic, jwk_from_public_key, thumbprint_raw
 from .jwk import jwk_encode_public as jwk_encode_public
 from .selector import _integral_float_free, parse_selector, selector_matches
-from .uri import local_loopback_http_uri_normalize, uri_normalize
+from .uri import _valid_ipv6_literal, local_loopback_http_uri_normalize, uri_normalize
 
 # --- constants (the closed v1 profile header/claim literals) ---
 
@@ -685,7 +685,7 @@ def _valid_uri_authority(authority: str) -> bool:
 
 
 def _is_ipv6(literal: str) -> bool:
-    return re.match(r"^[0-9A-Fa-f:.]+$", literal) is not None
+    return _valid_ipv6_literal(literal.encode("ascii"))
 
 
 def _is_well_formed(s: str) -> bool:

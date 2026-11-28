@@ -11,24 +11,6 @@ fn wire(resources: &[u8]) -> Vec<u8> {
 }
 
 #[test]
-fn approval_request_identifier_requires_ipv6_for_ip_literals() {
-    let bounds = Bounds::maximum();
-    let limits = RecordBounds::default();
-    let base = String::from_utf8(wire(br#""a""#)).unwrap();
-    let mut record = decode_record(base.as_bytes(), &bounds, &limits).unwrap();
-    record.request_id = "https://[v1.a]/".into();
-    let ipvfuture = base.replace("request-1", &record.request_id);
-    assert_eq!(
-        decode_record(ipvfuture.as_bytes(), &bounds, &limits),
-        Err(Invalid)
-    );
-    assert_eq!(
-        encode_record(&record, &bounds, &limits, false),
-        Err(Invalid)
-    );
-}
-
-#[test]
 fn requires_exact_canonical_tokens_and_scalar_utf8() {
     let bounds = Bounds::maximum();
     let limits = RecordBounds::default();
@@ -134,16 +116,11 @@ fn independent_decoded_string_count_and_encoded_byte_ceilings() {
 }
 
 #[test]
-fn request_ids_accept_complete_ip_literal_grammar() {
+fn request_ids_require_ipv6_for_ip_literals() {
     let bounds = Bounds::maximum();
     let limits = RecordBounds::default();
     let original = String::from_utf8(wire(br#""a""#)).unwrap();
-    for request in [
-        "https://[v1.a]/r",
-        "https://[VF.a:b]:42/r",
-        "https://[::1]/r",
-        "https://[::ffff:192.0.2.1]/r",
-    ] {
+    for request in ["https://[::1]/r", "https://[::ffff:192.0.2.1]:42/r"] {
         let wire = original.replace("request-1", request);
         let parsed = decode_record(wire.as_bytes(), &bounds, &limits).unwrap();
         assert_eq!(parsed.request_id, request);
@@ -152,15 +129,24 @@ fn request_ids_accept_complete_ip_literal_grammar() {
             wire.as_bytes()
         );
     }
+    let mut record = decode_record(original.as_bytes(), &bounds, &limits).unwrap();
     for request in [
+        "https://[v1.a]/r",
+        "https://[VF.a:b]:42/r",
         "https://[v1.]/r",
         "https://[v1.a%20]/r",
         "https://[vg.a]/r",
+        "https://[127.0.0.1]/r",
         "https://[::ffff:192.0.02.1]/r",
     ] {
         let wire = original.replace("request-1", request);
         assert_eq!(
             decode_record(wire.as_bytes(), &bounds, &limits),
+            Err(Invalid)
+        );
+        record.request_id = request.into();
+        assert_eq!(
+            encode_record(&record, &bounds, &limits, false),
             Err(Invalid)
         );
     }

@@ -269,8 +269,8 @@ case-sensitive (`REQ1-CLAIM-case-sensitive`).
 | `cnf` | exact object `{jkt: canonical_base64url_sha256}` |
 | `operations` | nonempty array of at most 64 operation objects |
 
-For a StringOrURI identifier, an IP-literal authority host **MUST** be an IPv6
-address. An IPvFuture literal, such as `https://[v1.a]/`, is invalid.
+A StringOrURI identifier permits only IPv6 addresses inside a bracketed
+authority host. An IPvFuture literal, such as `https://[v1.a]/`, is invalid.
 
 An operation is exactly `{name: string, selectors: selector_array}`. Names are unique within the
 grant and contain 1–128 printable ASCII bytes. The ordered selector array has 1–64 members

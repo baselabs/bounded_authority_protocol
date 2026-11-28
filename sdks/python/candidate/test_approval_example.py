@@ -139,8 +139,8 @@ def test_readme_approval_example(databases, operation):
         assert count(host, "artifact_claims") == count(host, "request_claims") == 1
 
 
-@pytest.mark.parametrize("request_id", ["https://[v1.a]/r", "https://[VF.a:b]:42/r", "https://[::1]/r"])
-def test_request_id_accepts_ip_literals(request_id):
+@pytest.mark.parametrize("request_id", ["https://[::1]/r", "https://[::ffff:192.0.2.1]:42/r"])
+def test_request_id_accepts_ipv6_literals(request_id):
     operation = signed_operation(request_id)
     _, _, wire, _ = operation
     record = _unwrap(decode_record(wire))
@@ -150,16 +150,28 @@ def test_request_id_accepts_ip_literals(request_id):
     assert verified.assertion.sub == request_id
 
 
-@pytest.mark.parametrize("request_id", ["https://[v1.]/r", "https://[v1.a%20]/r", "https://[vg.a]/r"])
+@pytest.mark.parametrize(
+    "request_id",
+    [
+        "https://[v1.a]/r",
+        "https://[VF.a:b]:42/r",
+        "https://[v1.]/r",
+        "https://[v1.a%20]/r",
+        "https://[vg.a]/r",
+        "https://[127.0.0.1]/r",
+        "https://[192.0.2.1::]/r",
+    ],
+)
 def test_request_id_rejects_invalid_ip_literals(request_id):
-    _, _, wire, _ = signed_operation("https://[v1.a]/r")
+    valid_request_id = "https://[::1]/r"
+    _, _, wire, _ = signed_operation(valid_request_id)
     record = _unwrap(decode_record(wire))
     invalid = ApprovalRecord(
         record.subject, record.action, request_id, record.approver_role,
         record.resources, record.revision_digest,
     )
     assert not encode_record(invalid).is_ok
-    assert not decode_record(wire.replace(b"https://[v1.a]/r", request_id.encode())).is_ok
+    assert not decode_record(wire.replace(valid_request_id.encode(), request_id.encode())).is_ok
 
 
 def test_approval_values_refuse_reinitialization_and_export(operation):
