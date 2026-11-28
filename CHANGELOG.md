@@ -42,6 +42,8 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 - Rename the unpublished Python verifier distribution to `bounded-authority-protocol-verifier`.
   The `bounded_authority_verifier` import is unchanged.
+- Remove the conformance CLI `:invalid` failure class. Report encoding cannot fail for
+  the fixed, bounded report members, so no run reported it.
 
 - Qualify the Hex package and docs together, publish them through workload identity and
   verify both served archives byte for byte.

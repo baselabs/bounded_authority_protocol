@@ -44,7 +44,6 @@ Each message omits paths, case ids and corpus bytes. Stderr wording is not a sta
 | `:integrity` | The corpus failed integrity verification | Reinstall the exact package; investigate changed input bytes. |
 | `:uncertified` | The corpus is not a certified corpus for this release | Use the corpus certified by the installed release. |
 | `:report` | The report could not be written | Choose a writable output directory and adequate storage. |
-| `:invalid` | The report could not be encoded | Reinstall the release and report a reproducible encoding defect. |
 | `:disagreement` | The corpus run did not reach complete agreement | Do not claim conformance; inspect the report and correct the implementation. |
 
 ## Host failures
