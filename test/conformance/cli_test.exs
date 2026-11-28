@@ -65,12 +65,12 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
   test "profile CLI reports all applicable Elixir verdicts and the SDK-owned census" do
     roots = [
-      {"attestation-profiles/content-assertion-es256/v1", 223, 0},
-      {@custody_root, 76, 0},
-      {"content-profiles/action-approval/v1", 202, 129}
+      {"attestation-profiles/content-assertion-es256/v1", "content-assertion-es256", 223, 0},
+      {@custody_root, "holder-custody-attestation", 76, 0},
+      {"content-profiles/action-approval/v1", "action-approval", 202, 129}
     ]
 
-    for {root, total, sdk_owned} <- roots do
+    for {root, format, total, sdk_owned} <- roots do
       path = Path.join(@priv_conformance, root)
       index_bytes = File.read!(Path.join(path, "index.json"))
       index = :json.decode(index_bytes)
@@ -79,6 +79,12 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
 
       assert Cli.run(["--corpus", path, "--report", tmp]) == 0
       report = tmp |> File.read!() |> :json.decode()
+
+      assert Enum.sort(Map.keys(report)) ==
+               ~w(agreed agreement disagreed elixir_verdict_sha256 exit_status format
+                  index_sha256_base64url profile sdk_owned total)
+
+      assert report["format"] == "bounded-authority-protocol-#{format}-conformance-report"
       assert report["agreement"]
       assert report["profile"] == index["profile"]
       assert report["index_sha256_base64url"] == Report.index_identity(index_bytes)
@@ -470,7 +476,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     refute err =~ corpus
   end
 
-  test "every packaged corpus verifies with a newline-terminated report of its full census" do
+  test "reports with the common fields include the full census and a trailing newline" do
     for {dir, format, total} <- [
           {"v1/corpus", "v1", nil},
           {"v2/corpus", "v2", nil},

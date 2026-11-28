@@ -26,8 +26,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 - Release the action-approval record codec and pure verification
   with ordered host-local diagnostics. Pin the record descriptor and corpus. Specify atomic claims and retry delivery of a durable intent.
 - Package all three profile corpora and certify their Elixir outcomes with the
-  conformance CLI. The approval report separately counts SDK-owned cases.
-- Add Go verification for both approval-related candidate profiles, with a canonical
+  conformance CLI. Each profile has a distinct report format identifier. The approval
+  report separately counts SDK-owned cases.
+- Add Go verification for ES256 content assertions and action approval, with a canonical
   record codec, ordered host-local diagnostics, and conformance and p99 gates.
 - Execute the README action approval example in CI with file-backed SQLite claims,
   revision comparison, and delivery recovery across a worker restart.

@@ -177,7 +177,9 @@ Conformance:
 Package 1.5.0 adds [ES256 content assertions](../../spec/bap-content-assertion-es256-v1.md),
 [action approval](../../spec/bap-action-approval-v1.md), and
 [holder custody attestations](../../spec/bap-holder-custody-attestation-v1.md) to this stable surface.
-Their CLI reports also include `profile`, `elixir_verdict_sha256`, and `sdk_owned`.
+Their CLI reports use [distinct format identifiers](../design/corpus-verdict-digests.md)
+and include `profile`, `elixir_verdict_sha256`, and `sdk_owned`. Their `total` counts only
+Elixir-run cases.
 Use `BoundedAuthorityProtocol.ActionApproval.V1.encode_record/4` to author exact
 bytes. The fourth argument explicitly enables resource sorting and deduplication.
 Use `BoundedAuthorityProtocol.ActionApproval.V1.verify_eddsa/3` or

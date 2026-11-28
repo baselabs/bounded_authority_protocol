@@ -21,6 +21,12 @@ defmodule BoundedAuthorityProtocol.Conformance.ProfileRunner do
   @custody "bap-holder-custody-attestation/1"
   @es256 "bap-content-assertion-es256/1"
 
+  @report_formats %{
+    @approval => "bounded-authority-protocol-action-approval-conformance-report",
+    @custody => "bounded-authority-protocol-holder-custody-attestation-conformance-report",
+    @es256 => "bounded-authority-protocol-content-assertion-es256-conformance-report"
+  }
+
   @binary_fields ~w(attestor_key_fingerprint content_digest digest prev profile_digest
     public_key revision_digest subject_key_fingerprint)a
   @binary_field_keys Map.new(@binary_fields, &{&1, true})
@@ -174,10 +180,11 @@ defmodule BoundedAuthorityProtocol.Conformance.ProfileRunner do
         agreed == total and digest == Map.get(index, "elixir_verdict_sha256")
 
     status = if agreement, do: 0, else: 1
+    profile = Map.fetch!(index, "profile")
 
     report = %{
-      "format" => "bounded-authority-protocol-candidate-conformance-report",
-      "profile" => Map.get(index, "profile"),
+      "format" => Map.fetch!(@report_formats, profile),
+      "profile" => profile,
       "agreement" => agreement,
       "exit_status" => status,
       "total" => total,

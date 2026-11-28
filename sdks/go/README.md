@@ -285,10 +285,10 @@ verification path.
 
 ## Conformance
 
-`conformance/priv/conformance/` is a complete, byte-identical snapshot of the Hex package built
-from this commit's `priv/conformance/` tree. It includes the ten standalone corpora, schemas, focused
-vectors, and `verdict-digests.json`. Copying the SDK directory alone is sufficient to run
-the certified suite.
+`conformance/priv/conformance/` bundles byte-identical copies of ten corpora from the Hex
+package's `priv/conformance/` tree, along with schemas and focused vectors. Its
+`verdict-digests.json` contains the Hex manifest entries for those ten corpora.
+Copying the SDK directory alone is sufficient to run the certified suite.
 The manifest was introduced in 1.1.0.
 
 | Corpus | Cases |

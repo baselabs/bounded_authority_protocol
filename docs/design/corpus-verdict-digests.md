@@ -94,10 +94,14 @@ from that projection. In the Hex manifest for these profiles, `case_count` count
 executed Elixir cases, `sdk_owned_case_count` counts the rest, and the verdict digest
 encodes the Elixir projection as unpadded base64url.
 
-The CLI retains the report format identifier
-`bounded-authority-protocol-candidate-conformance-report` and its fields, including
-`profile`, `elixir_verdict_sha256` and `sdk_owned`. Approval requires all 202 applicable
-Elixir cases to execute and agree. Its 129 SDK-owned cases run in the Python, Rust, and Go
-source-checkout suites, which also run the 223 ES256 assertion cases. All 76 custody cases
-run in Elixir. The published TypeScript verifier qualifies the exact profiles through its
-own release process.
+Each profile has its own CLI report format identifier.
+
+- `bounded-authority-protocol-action-approval-conformance-report`
+- `bounded-authority-protocol-content-assertion-es256-conformance-report`
+- `bounded-authority-protocol-holder-custody-attestation-conformance-report`
+
+These reports include `profile`, `elixir_verdict_sha256`, and `sdk_owned` in addition to the
+common fields. Approval requires all 202 applicable Elixir cases to execute and agree. Its 129
+SDK-owned cases run in the Python, Rust, and Go source-checkout suites, which also run the 223
+ES256 assertion cases. All 76 custody cases run in Elixir. The published TypeScript verifier
+qualifies the exact profiles through its own release process.

@@ -518,29 +518,62 @@ same issuer, is refused.
 For example, a research archive can verify a signed generation of a dataset using its
 enrolled P-256 attestor. Use the exact stored content bytes and the expected profile digest
 from your own descriptor. The attestor's `public_key` is its raw uncompressed SEC1 point.
+Convert the DER signature from `:crypto.sign/4` to raw `r || s` and normalize it to low S
+before assembling the compact assertion.
 
 ```elixir
 alias BoundedAuthorityProtocol.ContentAssertion.ES256.V1, as: Assertion
-alias BoundedAuthorityProtocol.V1.HistoricalPublicKey
 
-{:ok, digest} = Assertion.content_digest(dataset_bytes, %{})
-expected = %Assertion.ExpectedContentAssertion{
+{archive_p256_public, archive_p256_private} = :crypto.generate_key(:ecdh, :secp256r1)
+dataset_bytes = "station,salinity_ppt\nA1,35.1\n"
+descriptor_id = "https://archive.example/profiles/salinity-v1"
+descriptor_digest = :crypto.hash(:sha256, "salinity dataset descriptor v1")
+{:ok, dataset_digest} = Assertion.content_digest(dataset_bytes, %{})
+
+dataset_assertion = %Assertion.ContentAssertion{
+  attestor_key_id: "archive-1",
+  jti: "salinity-1",
+  iss: "https://archive.example",
+  aud: "https://research.example",
+  sub: "urn:example:dataset:salinity",
+  profile: descriptor_id,
+  profile_digest: descriptor_digest,
+  content_digest: dataset_digest,
+  gen: 1,
+  prev: <<0::256>>,
+  iat: now - 100,
+  nbf: now - 100,
+  exp: now + 3_500
+}
+
+{:ok, dataset_input} = Assertion.assertion_signing_input(dataset_assertion, %{})
+dataset_der = :crypto.sign(:ecdsa, :sha256, dataset_input.message, [archive_p256_private, :secp256r1])
+{:ok, dataset_raw} = Es256.der_to_raw(dataset_der)
+{:ok, dataset_low_s} = Es256.normalize_low_s(dataset_raw)
+{:ok, dataset_compact} = Assertion.assemble_compact(dataset_input, dataset_low_s)
+
+dataset_expected = %Assertion.ExpectedContentAssertion{
   attestor: %HistoricalPublicKey{
-    key_id: "archive-1", public_key: archive_p256_public,
-    valid_from: key_valid_from, valid_before: key_valid_before
+    key_id: "archive-1",
+    public_key: archive_p256_public,
+    valid_from: now - 1_000,
+    valid_before: now + 7_200
   },
   issuer: "https://archive.example",
   audience: "https://research.example",
   subject: "urn:example:dataset:salinity",
   profile: descriptor_id,
   profile_digest: descriptor_digest,
-  content_digest: digest,
+  content_digest: dataset_digest,
   now: now,
   bounds: %{}
 }
-{:ok, facts} = Assertion.verify_assertion(compact, expected)
-:not_evaluated = facts.trust
+{:ok, dataset_facts} = Assertion.verify_assertion(dataset_compact, dataset_expected)
+dataset_facts.trust
 ```
+
+The value is `:not_evaluated`. The signature verifies under the supplied attestor key, and
+the archive owns the trust decision.
 
 To check succession, verify the predecessor and successor with this same facade before
 calling `Assertion.verify_successor/3`. Store the accepted lineage position at the host.
@@ -782,8 +815,18 @@ Enum.map(results, fn {_corpus, status, summary} -> {status, summary} end) |> Enu
 
 The value is `[{0, %{"agreement" => true, "disagreed" => 0}}]`: every corpus agrees.
 
-The report is canonical JSON with the fields `format`, `agreement`, `exit_status`, `total`,
-`agreed`, `disagreed`, and `index_sha256_base64url`. From a shell, the same check is the
-`bounded_authority_conformance` command (`mix escript.install hex bounded_authority_protocol`),
-run once per corpus with `--corpus deps/bounded_authority_protocol/priv/conformance/<corpus>`.
+The report is canonical JSON. Every report includes `format`, `agreement`, `exit_status`,
+`total`, `agreed`, `disagreed`, and `index_sha256_base64url`.
+
+The action approval, ES256 content assertion, and holder custody attestation reports use
+`bounded-authority-protocol-<profile>-conformance-report` as their `format`, with
+`action-approval`, `content-assertion-es256`, or `holder-custody-attestation` in place of
+`<profile>`. These reports also include `profile` (the versioned profile identifier),
+`elixir_verdict_sha256` (the lowercase hexadecimal SHA-256 of the canonical Elixir verdicts),
+and `sdk_owned` (the SDK-owned case count). Their `total` counts only cases run in Elixir.
+For action approval, Elixir runs 202 of the 331 cases, and `sdk_owned` is 129.
+
+Install the shell command with `mix escript.install hex bounded_authority_protocol`.
+Run `bounded_authority_conformance` once per corpus with
+`--corpus deps/bounded_authority_protocol/priv/conformance/<corpus>`.
 Exit `0` is conformance evidence, not an authorization.

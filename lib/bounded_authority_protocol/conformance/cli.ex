@@ -69,14 +69,17 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
 
   - `format`: `"bounded-authority-protocol-<corpus>-conformance-report"`, where `<corpus>` is
     `v1`, `v2`, `v3`, `strict-ed25519`, `producer-canonicality`, `selector-float-zero`,
-    `string-or-uri`, `local-loopback-http`, `role-attestation`, `content-assertion` or
-    `candidate` (the format identifier retained by the three profiles first released in 1.5.0);
+    `string-or-uri`, `local-loopback-http`, `role-attestation`, `content-assertion`,
+    `action-approval`, `content-assertion-es256`, or `holder-custody-attestation`;
   - `agreement`: `true` only for exit 0;
   - `exit_status`: `0` or `1`, the status the run returns when the report is written;
   - `total`, `agreed`, `disagreed`: case counts;
   - `index_sha256_base64url`: base64url SHA-256 of the exact `index.json` bytes.
 
-  The three new profile reports also include `profile`, `elixir_verdict_sha256`, and `sdk_owned`.
+  The action approval, ES256 content assertion, and holder custody attestation reports also
+  include `profile` (the versioned profile identifier), `elixir_verdict_sha256` (the lowercase
+  hexadecimal SHA-256 of the canonical Elixir verdicts), and `sdk_owned` (the SDK-owned case count).
+  Their `total` counts only Elixir-run cases.
   Report members, flags, and exit statuses are stable within package 1.x. A failure
   before a report exists (usage, refusal, integrity, certification) writes no report.
 
