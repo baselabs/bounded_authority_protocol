@@ -12,8 +12,8 @@ specifications under [`spec/`](../spec/), and the [errata registry](errata.md).
   repair (erratum 6); and their certified corpora. The public API follows the 1.x stability
   contract ([API stability and versioning](guides/api-stability.md)).
 - **Verifiers in other languages:** TypeScript is published on npm. Python, Rust, and Go live
-  under [`sdks/`](../sdks/) and pass every corpus; each moves to its own repository when it is
-  first published.
+  under [`sdks/`](../sdks/) and pass every corpus. They are not published yet; install them
+  from a pinned commit of this repository.
 - **Transport design:** the [A2A capability-binding profile](design/a2a-capability-binding-profile.md#5-carriage)
   defines `BA-Grant` and `BA-Proof` HTTP carriage and the corresponding gRPC metadata. Reuse
   that carriage rather than introducing a separate BAP-over-HTTP binding. The profile is
@@ -21,6 +21,10 @@ specifications under [`spec/`](../spec/), and the [errata registry](errata.md).
 
 ## Unreleased
 
+- Source-candidate profiles: action approval records, ES256 content assertions, and holder
+  custody attestations, with their corpora, in the Elixir reference and, for action approval
+  and ES256 content assertions, the Python, Rust, and Go verifiers.
+- Erratum 7: a bracketed StringOrURI host must be an IPv6 literal, in every verifier.
 - `Json.from_term/2` converts already-parsed, cast Elixir terms into the bounded tagged JSON
   form shared by all contract-majors. See the [recipe](guides/recipes.md#turn-already-parsed-params-into-tagged-arguments).
 
@@ -28,7 +32,7 @@ specifications under [`spec/`](../spec/), and the [errata registry](errata.md).
 
 Candidates, not commitments; each lands as its own minor release under the governance rules:
 
-- first publication of the Python, Rust, and Go verifiers;
+- first publication of the Python, Rust, and Go verifiers, and of a Python signer;
 - the standards submissions prepared under [`standards/`](standards/) and
   [`extensions/`](extensions/), when a venue accepts the work.
 
