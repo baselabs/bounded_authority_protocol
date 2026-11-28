@@ -171,8 +171,10 @@ defmodule BoundedAuthorityProtocol.CorpusCatalog do
 
   def root, do: @root
   def cli, do: @cli
+
   def runner_pin(:string_or_uri),
-    do: ~r/(?m)^(?:const )?(?:STRING_OR_URI_INDEX_SHA256|stringOrURICorpusIndexSHA256)\b[^=\n]*=\s*"([^"]*)"/
+    do:
+      ~r/(?m)^(?:const )?(?:STRING_OR_URI_INDEX_SHA256|stringOrURICorpusIndexSHA256)\b[^=\n]*=\s*"([^"]*)"/
 
   def runner_pin(_key), do: @runner_pin
 

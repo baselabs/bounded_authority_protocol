@@ -51,6 +51,7 @@ defmodule BoundedAuthorityProtocol.HolderCustodyAttestation.V1Test do
 
     assert V1.assemble_compact(%{input | kind: :role_attestation}, signature) ==
              {:error, :invalid}
+
     assert BoundedAuthorityProtocol.V1.assemble_compact(input, signature) == {:error, :invalid}
     assert BoundedAuthorityProtocol.V2.assemble_compact(input, signature) == {:error, :invalid}
     assert BoundedAuthorityProtocol.V3.assemble_compact(input, signature) == {:error, :invalid}

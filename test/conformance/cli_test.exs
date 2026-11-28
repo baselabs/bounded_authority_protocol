@@ -59,6 +59,10 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     assert Cli.run(["--corpus", @shipped_v3_corpus]) == 0
   end
 
+  test "the corpus dispatcher rejects non-map input" do
+    assert Corpus.load_any(:not_a_map) == {:error, :invalid}
+  end
+
   test "candidate CLI reports all applicable Elixir verdicts and the SDK-owned census" do
     roots = [
       {"attestation-profiles/content-assertion-es256/v1", 223, 0},
