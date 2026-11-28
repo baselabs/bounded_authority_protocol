@@ -121,7 +121,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   format, so at most one can succeed; all fail closed.
   """
   @spec load_any(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
-  def load_any(map) do
+  def load_any(map) when is_map(map) do
     with {:error, :invalid} <- load(map),
          {:error, :invalid} <- load_strict_ed25519(map),
          {:error, :invalid} <- load_producer_canonicality(map),
@@ -133,6 +133,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
       load_profile(map)
     end
   end
+
+  def load_any(_map), do: {:error, :invalid}
 
   @doc """
   The relative paths an index names, for the CLI to read and nothing else. Every path must be a
@@ -579,7 +581,7 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     "bap-holder-custody-attestation/1" => :holder_custody_attestation
   }
 
-  defp load_profile(map) when is_map(map) do
+  defp load_profile(map) do
     with {:ok, index_bytes} <- fetch_index(map),
          {:ok, %{"profile" => profile_name} = index} <- decode_index(index_bytes),
          {:ok, major} <- Map.fetch(@profiles, profile_name),
@@ -590,8 +592,6 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
       _invalid -> {:error, :invalid}
     end
   end
-
-  defp load_profile(_map), do: {:error, :invalid}
 
   defp load_sibling(map, %{profile: profile_name, index_keys: keys, files: paths}) do
     with {:ok, index_bytes} <- fetch_index(map),
