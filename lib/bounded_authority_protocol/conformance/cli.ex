@@ -149,7 +149,6 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
     integrity: "the corpus failed integrity verification",
     uncertified: "the corpus is not a certified corpus for this release",
     report: "the report could not be written",
-    invalid: "the report could not be encoded",
     disagreement: "the corpus run did not reach complete agreement"
   }
 
@@ -222,11 +221,8 @@ defmodule BoundedAuthorityProtocol.Conformance.Cli do
   defp run_corpus(corpus) do
     results = Runner.run(corpus)
     report = Report.build(corpus, results)
-
-    case Report.to_bytes(corpus, results) do
-      {:ok, bytes} -> {:ok, bytes, report.exit_status}
-      {:error, _class} = error -> error
-    end
+    {:ok, bytes} = Report.to_bytes(corpus, results)
+    {:ok, bytes, report.exit_status}
   end
 
   defp fail(class) do

@@ -121,6 +121,7 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     index = Path.join(dst, "index.json")
     original = File.read!(index)
     File.write!(index, original <> "\n")
+
     error =
       ExUnit.CaptureIO.capture_io(:stderr, fn -> assert Cli.run(["--corpus", dst]) == 1 end)
 
@@ -132,14 +133,34 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
     assert Cli.run(["--corpus", dst]) == 1
   end
 
+  test "profile CLI rejects an index missing a required key" do
+    dst = unique_tmp("profile-index") |> Path.dirname()
+    File.cp_r!(Path.join(@priv_conformance, @custody_root), dst)
+    on_exit(fn -> File.rm_rf!(dst) end)
+
+    path = Path.join(dst, "index.json")
+    index = path |> File.read!() |> :json.decode()
+    missing = Map.delete(index, "verdict_sha256")
+    replaced = Map.put(missing, "unexpected_key", index["verdict_sha256"])
+
+    for invalid <- [missing, replaced] do
+      File.write!(path, json_bytes(invalid))
+
+      assert run_captured(["--corpus", dst]) ==
+               {"", "bounded_authority_conformance: the corpus failed integrity verification\n"}
+    end
+  end
+
   test "profile execution rejects changed inventory, case counts and profile known answers" do
     {files, index} = profile_files("attestation-profiles/content-assertion-es256/v1")
     file = "profile.json"
 
     assert {:ok, _, 0} = run_profile(files)
     wrong_profile = %{index | "profile" => "bap-action-approval/1"}
+
     assert {:error, :integrity} =
              run_profile(Map.put(files, "index.json", json_bytes(wrong_profile)))
+
     assert {:error, :integrity} = run_profile(Map.delete(files, file))
 
     renamed = files |> Map.delete(file) |> Map.put("other.json", files[file])
@@ -237,6 +258,16 @@ defmodule BoundedAuthorityProtocol.Conformance.CliTest do
       edited = replace_profile_file(files, index, file, wrong)
       assert {:error, :integrity} = run_profile(edited)
     end
+  end
+
+  test "profile execution refuses loaded metadata without a signing known answer" do
+    {files, index} = profile_files(@custody_root)
+    file = "profile.json"
+    metadata = :json.decode(files[file])
+    edited = replace_profile_file(files, index, file, Map.delete(metadata, "signing"))
+
+    assert {:ok, corpus} = Corpus.load_any(edited)
+    assert {:error, :integrity} = ProfileRunner.run(corpus)
   end
 
   defp run_profile(files) do

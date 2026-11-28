@@ -1063,11 +1063,14 @@ defmodule BoundedAuthorityProtocol.PackageCheck do
     run!("mix", ["escript.build"], package_root, environment)
 
     escript_path = Path.join(package_root, "bounded_authority_conformance")
+
     corpora = [
       {"v1/corpus", nil, nil, nil},
       {"string-or-uri", nil, nil, nil},
-      {"attestation-profiles/content-assertion-es256/v1", "bap-content-assertion-es256/1", 223, 0},
-      {"attestation-profiles/holder-custody-attestation/v1", "bap-holder-custody-attestation/1", 76, 0},
+      {"attestation-profiles/content-assertion-es256/v1", "bap-content-assertion-es256/1", 223,
+       0},
+      {"attestation-profiles/holder-custody-attestation/v1", "bap-holder-custody-attestation/1",
+       76, 0},
       {"content-profiles/action-approval/v1", "bap-action-approval/1", 202, 129}
     ]
 

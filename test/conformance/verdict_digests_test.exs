@@ -27,6 +27,7 @@ defmodule BoundedAuthorityProtocol.Conformance.VerdictDigestsTest do
   defp assert_computed(%Corpus{index: %{"elixir_verdict_sha256" => _}} = corpus, root, pinned) do
     assert {:ok, bytes, 0} = ProfileRunner.run(corpus), root
     report = :json.decode(bytes)
+
     digest =
       report["elixir_verdict_sha256"]
       |> Base.decode16!(case: :lower)

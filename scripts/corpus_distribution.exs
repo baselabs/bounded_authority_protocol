@@ -101,11 +101,15 @@ defmodule BoundedAuthorityProtocol.CorpusDistribution do
       compare_files!(source, snapshot, MapSet.delete(sdk_files, "verdict-digests.json"))
 
       unless File.read!(Path.join(snapshot, "verdict-digests.json")) == sdk_manifest,
-        do: raise("#{snapshot}/verdict-digests.json: content differs from the Hex corpus projection")
+        do:
+          raise(
+            "#{snapshot}/verdict-digests.json: content differs from the Hex corpus projection"
+          )
     end
   end
 
-  defp corpus_paths(entries), do: Enum.map(entries, &Path.relative_to(&1.source, "priv/conformance"))
+  defp corpus_paths(entries),
+    do: Enum.map(entries, &Path.relative_to(&1.source, "priv/conformance"))
 
   # Manifest keys and string values are ASCII; sorted keys give the JCS projection.
   defp encode_manifest(manifest) do
