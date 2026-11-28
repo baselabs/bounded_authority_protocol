@@ -11,9 +11,10 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
   #   case-id uniqueness, applicability totality (every surface 28, every class leaf 16, required
   #   cells nonempty, `n_a` cells empty), tamper verbatim-vs-derived byte equality and `.raw`
   #   hash binding. `.raw` sidecars are hash-verified and carried opaque.
-  # - `load_strict_ed25519/1`, `load_producer_canonicality/1`, `load_selector_float_zero/1`: the
-  #   additive corpora, which share one closed index shape (per-file lowercase-hex SHA-256,
-  #   per-file and per-family counts, profile and revision sidecars, no applicability matrix).
+  # - `load_strict_ed25519/1`, `load_producer_canonicality/1`, `load_selector_float_zero/1`,
+  #   `load_string_or_uri/1`: the additive corpora, which share one closed index shape (per-file
+  #   lowercase-hex SHA-256, per-file and per-family counts, profile and revision sidecars, no
+  #   applicability matrix).
   # - `load_local_loopback_http/1`, `load_role_attestation/1`, `load_content_assertion/1`: the
   #   sibling-profile corpora, each with its own closed index (an exact ordered file list with
   #   lowercase-hex SHA-256 and per-kind case counts) and a `profile.json` the runner reads.
@@ -247,9 +248,6 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     revision_format: "bounded-authority-protocol-string-or-uri-conformance-corpus-revision"
   }
 
-  defp load_string_or_uri(map) when is_map(map), do: load_additive(map, @string_or_uri)
-  defp load_string_or_uri(_map), do: {:error, :invalid}
-
   @additive_sidecars ["profile.json", "revision.json"]
 
   # One clause per sidecar: `in` over a list of binaries compiles to :lists.member/2 on
@@ -286,6 +284,16 @@ defmodule BoundedAuthorityProtocol.Conformance.Corpus do
     do: load_additive(map, @selector_float_zero)
 
   def load_selector_float_zero(_map), do: {:error, :invalid}
+
+  @doc """
+  Loads and integrity-verifies the `%{path => binary}` StringOrURI corpus map (profile
+  `bap-string-or-uri/1`, erratum 7). The loaded corpus carries `major: :string_or_uri`; each
+  case names its own surface.
+  """
+  @spec load_string_or_uri(%{binary() => binary()}) :: {:ok, t()} | {:error, :invalid}
+  def load_string_or_uri(map) when is_map(map), do: load_additive(map, @string_or_uri)
+
+  def load_string_or_uri(_map), do: {:error, :invalid}
 
   defp load_additive(map, %{major: major} = spec) do
     with {:ok, index_bytes} <- fetch_index(map),
