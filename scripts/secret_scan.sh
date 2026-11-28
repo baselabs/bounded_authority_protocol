@@ -336,7 +336,12 @@ spec/bap-v1.md
 priv/conformance/application-profiles/local-loopback-http/v1/profile.json
 priv/conformance/attestation-profiles/role-attestation/v1/attestation-cases.json
 priv/conformance/attestation-profiles/holder-custody-attestation/v1/attestation-cases.json
+priv/conformance/attestation-profiles/holder-custody-attestation/v1/custody-separation-cases.json
+priv/conformance/attestation-profiles/holder-custody-attestation/v1/profile.json
 priv/conformance/attestation-profiles/content-assertion/v1/assertion-structure-cases.json
+priv/conformance/string-or-uri/cases/content-assertion/ipvfuture.json
+priv/conformance/string-or-uri/cases/grant-decode/ipvfuture.json
+priv/conformance/string-or-uri/cases/role-attestation/ipvfuture.json
 priv/conformance/v2/corpus/cases/anchored-export/probe.json
 priv/conformance/v1/vectors/consumption-chain-archive.json
 sdks/go/conformance/corpus-v2/cases/signing-input/probe.json
@@ -433,6 +438,9 @@ PY
   generic_paths_file="$check_dir/generic-paths.txt"
   cat > "$generic_paths_file" <<'EOF'
 priv/conformance/attestation-profiles/content-assertion-es256/v1/assertion-structure-cases.json
+priv/conformance/attestation-profiles/holder-custody-attestation/v1/attestation-cases.json
+priv/conformance/attestation-profiles/holder-custody-attestation/v1/custody-separation-cases.json
+priv/conformance/attestation-profiles/holder-custody-attestation/v1/profile.json
 priv/conformance/content-profiles/action-approval/v1/approval-cases.json
 priv/conformance/v2/corpus/cases/anchored-export/probe.json
 priv/conformance/v1/vectors/consumption-chain-archive.json
@@ -488,12 +496,16 @@ EOF
   jwt_paths_file="$check_dir/jwt-paths.txt"
   cat > "$jwt_paths_file" <<'EOF'
 priv/conformance/attestation-profiles/content-assertion-es256/v1/assembly-cases.json
+priv/conformance/attestation-profiles/content-assertion-es256/v1/assertion-structure-cases.json
 priv/conformance/content-profiles/action-approval/v1/approval-cases.json
 docs/protocol-v1.md
 priv/conformance/application-profiles/local-loopback-http/v1/profile.json
 priv/conformance/attestation-profiles/role-attestation/v1/attestation-cases.json
 priv/conformance/attestation-profiles/holder-custody-attestation/v1/attestation-cases.json
 priv/conformance/attestation-profiles/content-assertion/v1/assertion-structure-cases.json
+priv/conformance/string-or-uri/cases/content-assertion/ipvfuture.json
+priv/conformance/string-or-uri/cases/grant-decode/ipvfuture.json
+priv/conformance/string-or-uri/cases/role-attestation/ipvfuture.json
 priv/conformance/v2/corpus/cases/envelope/probe.json
 priv/conformance/v1/vectors/grant-holder-proof.json
 sdks/go/conformance/corpus-v2/cases/grant-verify/probe.json
