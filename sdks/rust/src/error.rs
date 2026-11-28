@@ -7,7 +7,7 @@
 //! no `From` conversion ladder (there is exactly one error). The `?` operator
 //! works against any function returning [`Result<_>`](Result) directly.
 
-/// The sole error returned by every verification function.
+/// The closed error returned by protocol verification facades.
 ///
 /// A unit struct: it carries no diagnostic information by design: the protocol
 /// forbids value leakage on the error path. Derives only [`Debug`], [`Clone`],
@@ -16,7 +16,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Invalid;
 
-/// The canonical result alias for every public function in the crate.
+/// The canonical result alias for protocol facades and primitives.
 ///
-/// Every facade and versioned primitive returns `Result<T>` = `std::result::Result<T, Invalid>`.
+/// Closed protocol verification returns `Result<T>` = `std::result::Result<T, Invalid>`.
 pub type Result<T> = std::result::Result<T, Invalid>;

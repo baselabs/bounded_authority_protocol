@@ -115,65 +115,70 @@ pub struct Run {
     pub cases: Vec<(String, Value)>,
     actual: BTreeMap<String, Value>,
 }
-impl Run {
-    pub fn new(root: &Path, pin: &str) -> Self {
-        let bytes = fs::read(root.join("index.json")).expect("index missing");
-        let hex = Sha256::digest(&bytes)
-            .iter()
-            .map(|x| format!("{x:02x}"))
-            .collect::<String>();
-        assert!(sha(&bytes) == pin || hex == pin, "index SHA mismatch");
-        let index: Value = serde_json::from_slice(&bytes).unwrap();
-        let mut declared = BTreeSet::from(["index.json".to_owned()]);
-        let mut cases = Vec::new();
-        let mut ids = BTreeSet::new();
-        for entry in index["files"].as_array().unwrap() {
-            let name = entry["path"].as_str().unwrap();
-            assert!(
-                Path::new(name)
-                    .components()
-                    .all(|c| matches!(c, Component::Normal(_))),
-                "unsafe indexed path"
-            );
-            assert!(declared.insert(name.to_owned()), "duplicate indexed path");
-            let body = fs::read(root.join(name)).expect("indexed file missing");
-            let actual = if entry.get("sha256_base64url").is_some() {
-                sha(&body)
-            } else {
-                Sha256::digest(&body)
-                    .iter()
-                    .map(|x| format!("{x:02x}"))
-                    .collect()
-            };
-            let expected = entry.get("sha256_base64url").unwrap_or(&entry["sha256"]);
-            assert_eq!(
-                Some(actual.as_str()),
-                expected.as_str(),
-                "{name}: file SHA mismatch"
-            );
-            if !name.ends_with(".json") || name == "revision.json" {
-                continue;
-            }
-            let doc: Value = serde_json::from_slice(&body).unwrap();
-            let members = doc
-                .as_array()
-                .or_else(|| doc["cases"].as_array())
-                .or_else(|| doc["uri_cases"].as_array());
-            let count = members.map_or(0, Vec::len);
-            if let Some(n) = entry["cases"].as_u64() {
-                assert_eq!(count, n as usize, "case count mismatch");
-            }
-            if let Some(members) = members {
-                for case in members {
-                    assert!(
-                        ids.insert(case["id"].as_str().expect("case ID").to_owned()),
-                        "duplicate case ID"
-                    );
-                    cases.push((name.to_owned(), case.clone()));
-                }
+pub fn load_index(root: &Path, pin: &str) -> (Value, Vec<(String, Value)>) {
+    let bytes = fs::read(root.join("index.json")).expect("index missing");
+    let hex = Sha256::digest(&bytes)
+        .iter()
+        .map(|x| format!("{x:02x}"))
+        .collect::<String>();
+    assert!(sha(&bytes) == pin || hex == pin, "index SHA mismatch");
+    let index: Value = serde_json::from_slice(&bytes).unwrap();
+    let mut declared = BTreeSet::from(["index.json".to_owned()]);
+    let mut cases = Vec::new();
+    let mut ids = BTreeSet::new();
+    for entry in index["files"].as_array().unwrap() {
+        let name = entry["path"].as_str().unwrap();
+        assert!(
+            Path::new(name)
+                .components()
+                .all(|c| matches!(c, Component::Normal(_))),
+            "unsafe indexed path"
+        );
+        assert!(declared.insert(name.to_owned()), "duplicate indexed path");
+        let body = fs::read(root.join(name)).expect("indexed file missing");
+        let actual = if entry.get("sha256_base64url").is_some() {
+            sha(&body)
+        } else {
+            Sha256::digest(&body)
+                .iter()
+                .map(|x| format!("{x:02x}"))
+                .collect()
+        };
+        let expected = entry.get("sha256_base64url").unwrap_or(&entry["sha256"]);
+        assert_eq!(
+            Some(actual.as_str()),
+            expected.as_str(),
+            "{name}: file SHA mismatch"
+        );
+        if !name.ends_with(".json") || name == "revision.json" {
+            continue;
+        }
+        let doc: Value = serde_json::from_slice(&body).unwrap();
+        let members = doc
+            .as_array()
+            .or_else(|| doc["cases"].as_array())
+            .or_else(|| doc["uri_cases"].as_array());
+        let count = members.map_or(0, Vec::len);
+        if let Some(n) = entry["cases"].as_u64() {
+            assert_eq!(count, n as usize, "case count mismatch");
+        }
+        if let Some(members) = members {
+            for case in members {
+                assert!(
+                    ids.insert(case["id"].as_str().expect("case ID").to_owned()),
+                    "duplicate case ID"
+                );
+                cases.push((name.to_owned(), case.clone()));
             }
         }
-        assert_eq!(files(root), declared, "corpus file set mismatch");
+    }
+    assert_eq!(files(root), declared, "corpus file set mismatch");
+    (index, cases)
+}
+
+impl Run {
+    pub fn new(root: &Path, pin: &str) -> Self {
+        let (index, cases) = load_index(root, pin);
         let total = index["total_cases"].as_u64().unwrap_or_else(|| {
             [
                 "uri_cases",

@@ -6,6 +6,9 @@ All notable changes to `bounded_authority_protocol` are documented here.
 
 ### Added
 
+- Add Rust verification for the candidate ES256 content-assertion and action-approval
+  profiles, including the bounded canonical record codec and host-local diagnostics.
+
 - Add source-candidate Python verification for `bap-content-assertion-es256/1` and
   `bap-action-approval/1`, including the canonical approval record codec.
 

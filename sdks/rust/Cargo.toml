@@ -82,3 +82,7 @@ path = "conformance/run_strict.rs"
 [[test]]
 name = "content_assertion"
 path = "tests/content_assertion.rs"
+
+[[test]]
+name = "conformance_approval"
+path = "conformance/run_approval.rs"

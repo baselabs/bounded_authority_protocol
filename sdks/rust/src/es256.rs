@@ -1,4 +1,6 @@
-//! ES256 verify wrapper: the `BAP3-ES256-SHA256` signature backend.
+//! Shared ES256 verification for contract-major 3 and ES256 content assertions.
+//!
+//! This is the `BAP3-ES256-SHA256` signature backend.
 //!
 //! Thin wrapper over `p256` 0.14 with `default-features = false` +
 //! `features = ["ecdsa"]` (verify-only; no `pem`/`pkcs8`/`std`/`serde`/`jwk`).

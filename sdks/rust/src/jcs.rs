@@ -223,45 +223,48 @@ fn encode_float(f: f64, out: &mut Vec<u8>) -> Result<()> {
 /// `char::is_control()` instead would also catch `0x7f` (DEL) and the C1 range,
 /// over-escaping DEL and violating the RFC: DEL is OUTSIDE C0 and is neither
 /// `\` nor `"`, so it serializes "as is" as a raw `0x7f` byte.
-fn encode_string(s: &str, out: &mut Vec<u8>) {
+pub(crate) fn encode_string(s: &str, out: &mut Vec<u8>) {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
     out.push(b'"');
-    for c in s.chars() {
-        let cp = c as u32;
-        if cp <= 0x1f {
-            // C0 control range: the 5 predefined short escapes, else \u00XX.
-            match cp {
-                0x08 => out.extend_from_slice(b"\\b"),
-                0x09 => out.extend_from_slice(b"\\t"),
-                0x0a => out.extend_from_slice(b"\\n"),
-                0x0c => out.extend_from_slice(b"\\f"),
-                0x0d => out.extend_from_slice(b"\\r"),
-                _ => {
-                    out.extend_from_slice(b"\\u00");
-                    out.push(hex_nibble((cp >> 4) as u8));
-                    out.push(hex_nibble((cp & 0x0f) as u8));
-                }
-            }
-        } else if cp == 0x5c {
-            out.extend_from_slice(b"\\\\");
-        } else if cp == 0x22 {
-            out.extend_from_slice(b"\\\"");
+    for byte in s.bytes() {
+        if let Some(escape) = short_escape(byte) {
+            out.extend_from_slice(&[b'\\', escape]);
+        } else if byte < 0x20 {
+            out.extend_from_slice(b"\\u00");
+            out.push(HEX[(byte >> 4) as usize]);
+            out.push(HEX[(byte & 0x0f) as usize]);
         } else {
-            // Everything else: including DEL (0x7f) and astral (>= 0x10000),
-            // emitted as raw UTF-8 bytes. JCS does NOT emit surrogate-pair
-            // escapes for astral code points.
-            let mut buf = [0u8; 4];
-            let s = c.encode_utf8(&mut buf);
-            out.extend_from_slice(s.as_bytes());
+            out.push(byte);
         }
     }
     out.push(b'"');
 }
 
-/// Lowercase hex digit for a nibble in `0..=0x0f`.
-fn hex_nibble(n: u8) -> u8 {
-    match n {
-        0..=9 => b'0' + n,
-        _ => b'a' + (n - 10),
+/// Exact JCS token size, used to bound the encoded record before allocation.
+pub(crate) fn encoded_string_len(s: &str) -> usize {
+    2 + s
+        .bytes()
+        .map(|byte| {
+            if short_escape(byte).is_some() {
+                2
+            } else if byte < 0x20 {
+                6
+            } else {
+                1
+            }
+        })
+        .sum::<usize>()
+}
+
+fn short_escape(byte: u8) -> Option<u8> {
+    match byte {
+        b'"' | b'\\' => Some(byte),
+        0x08 => Some(b'b'),
+        b'\t' => Some(b't'),
+        b'\n' => Some(b'n'),
+        0x0c => Some(b'f'),
+        b'\r' => Some(b'r'),
+        _ => None,
     }
 }
 

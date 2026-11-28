@@ -1,6 +1,6 @@
 //! Bounded proof-of-possession authority verification: contract-majors 1 and 2
 //! (Ed25519), contract-major 3 (ES256), the local-loopback HTTP proof profile,
-//! and the role-attestation and content-assertion profiles.
+//! the role-attestation and content-assertion profiles, and candidate action approval.
 //!
 //! Pure, deterministic, fail-closed implementation of `spec/bap-v1.md`,
 //! `spec/bap-v2.md`, `spec/bap-v3.md`, and the sibling profile specifications,
@@ -11,18 +11,23 @@
 //! context. It never selects keys, reserves replay, grants execution, or
 //! overrides a host policy.
 //!
-//! Every fallible public function returns [`Result<T>`](crate::Result), the
+//! Protocol facades return [`Result<T>`](crate::Result), the
 //! Rust spelling of `{:ok, value}` / `{:error, :invalid}`. There is exactly one
 //! error shape ([`Invalid`]); the protocol forbids variants. A few functions
 //! cannot fail and return plain values (`verify_strict`, `acceptable_public_key`,
 //! and `torsion_free` return `bool`; `base64url_encode` returns bytes).
+//! The candidate [action_approval] facade exposes closed, value-free diagnostics
+//! for the host; its presenter result uses the same [Invalid] error.
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+pub mod action_approval;
+pub mod approval_record;
 pub mod base64url;
 pub mod bounds;
 pub mod content_assertion;
+pub mod content_assertion_es256;
 pub mod error;
 pub mod facts;
 mod inspect;

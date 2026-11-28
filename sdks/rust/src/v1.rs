@@ -639,7 +639,7 @@ fn assemble_compact_for(
         SigningKind::RoleAttestation => {
             return Err(Invalid);
         }
-        SigningKind::ContentAssertion => {
+        SigningKind::ContentAssertion | SigningKind::ContentAssertionEs256 => {
             return Err(Invalid);
         }
         SigningKind::ChainAnchor => {

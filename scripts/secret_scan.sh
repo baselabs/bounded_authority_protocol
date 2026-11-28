@@ -370,6 +370,7 @@ sdks/decoded-wire-rendering.json
 test/fixtures/sdk_rendering/decoded-wire-rendering.json
 sdks/python/tests/fixtures/decoded-wire-rendering.json
 sdks/rust/tests/fixtures/decoded-wire-rendering.json
+sdks/rust/tests/fixtures/approval-benchmark.json
 sdks/go/testdata/decoded-wire-rendering.json
 lib/non_fixture_probe.ex'
   canary_file="$check_dir/root-canaries.txt"
@@ -512,6 +513,7 @@ sdks/decoded-wire-rendering.json
 test/fixtures/sdk_rendering/decoded-wire-rendering.json
 sdks/python/tests/fixtures/decoded-wire-rendering.json
 sdks/rust/tests/fixtures/decoded-wire-rendering.json
+sdks/rust/tests/fixtures/approval-benchmark.json
 sdks/go/testdata/decoded-wire-rendering.json
 EOF
   python3 - "$config" "$generic_paths_file" "$jwt_paths_file" <<'PY'

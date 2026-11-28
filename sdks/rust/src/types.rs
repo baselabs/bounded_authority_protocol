@@ -48,6 +48,8 @@ pub enum SigningKind {
     RoleAttestation,
     /// A content assertion (`typ: "ba+content-assertion"`).
     ContentAssertion,
+    /// An ES256 content assertion (`typ: "ba+content-assertion-es256"`).
+    ContentAssertionEs256,
     /// A signed consumption-chain boundary anchor.
     ChainAnchor,
     /// A signed historical-key transition.
@@ -72,6 +74,7 @@ impl SigningKind {
             "local_loopback_http_proof" => Self::LocalLoopbackHttpProof,
             "role_attestation" => Self::RoleAttestation,
             "content_assertion" => Self::ContentAssertion,
+            "content_assertion_es256" => Self::ContentAssertionEs256,
             "chain_anchor" => Self::ChainAnchor,
             "key_transition" => Self::KeyTransition,
             _ => return Err(Invalid),
@@ -99,6 +102,13 @@ pub struct SigningInput {
     pub protected_segment: Vec<u8>,
     /// The already-canonical base64url ASCII bytes of the payload.
     pub payload_segment: Vec<u8>,
+}
+
+impl SigningInput {
+    /// The exact two-segment JWS signing input.
+    pub fn message(&self) -> Vec<u8> {
+        crate::compact::signing_input_bytes(&self.protected_segment, &self.payload_segment)
+    }
 }
 
 // ============================================================================

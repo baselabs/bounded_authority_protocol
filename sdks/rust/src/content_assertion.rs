@@ -3,19 +3,76 @@
 
 use crate::base64url::{base64url_decode, base64url_encode};
 use crate::bounds::Bounds;
-use crate::ed25519;
+use crate::compact::signing_input_bytes;
 use crate::error::{Invalid, Result};
 use crate::facts::{NotEvaluated, SignatureAndWindow};
 use crate::jcs::jcs_encode;
 use crate::json::{json_decode, JsonValue};
 use crate::jwk::public_key_thumbprint_raw;
-use crate::role_attestation::{validate_identifier, validate_kid};
+use crate::role_attestation::{validate_content_identifier, validate_identifier, validate_kid};
 use crate::types::{
     HistoricalPublicKey, ProducedSigningInput, SigningInput, SigningKind, ValidityUpperBound,
 };
+use crate::{ed25519, es256, v3};
+use p256::elliptic_curve::subtle::ConstantTimeEq;
 use sha2::{Digest, Sha256};
 
 const TYP_CONTENT_ASSERTION: &str = "ba+content-assertion";
+const TYP_CONTENT_ASSERTION_ES256: &str = "ba+content-assertion-es256";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Stage {
+    Malformed,
+    UnsupportedAlgorithm,
+    BadSignature,
+    KeyWindow,
+    NotYetValid,
+    Expired,
+}
+
+impl From<Invalid> for Stage {
+    fn from(_: Invalid) -> Self {
+        Self::Malformed
+    }
+}
+
+impl From<Stage> for Invalid {
+    fn from(_: Stage) -> Self {
+        Self
+    }
+}
+
+type Staged<T> = std::result::Result<T, Stage>;
+
+fn suite<const ES256: bool>() -> (&'static str, &'static str, SigningKind) {
+    if ES256 {
+        (
+            "ES256",
+            TYP_CONTENT_ASSERTION_ES256,
+            SigningKind::ContentAssertionEs256,
+        )
+    } else {
+        (
+            "EdDSA",
+            TYP_CONTENT_ASSERTION,
+            SigningKind::ContentAssertion,
+        )
+    }
+}
+
+type IdentifierCheck = fn(&str, &Bounds) -> Result<()>;
+
+fn identifier_check<const ES256: bool>() -> IdentifierCheck {
+    if ES256 {
+        validate_content_identifier
+    } else {
+        validate_identifier
+    }
+}
+
+pub(crate) fn equal_digest(a: &[u8; 32], b: &[u8; 32]) -> bool {
+    bool::from(a.ct_eq(b))
+}
 const SIGNATURE_SEGMENT_BYTES: usize = 86;
 
 /// Unsigned content-lineage claims. Signing and content storage belong to the caller.
@@ -51,9 +108,9 @@ pub struct ContentAssertionInput {
 
 /// Caller-trusted attestor and exact expected profile, content, subject and evaluation time.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExpectedContentAssertion {
+pub struct ExpectedContentAssertion<K = HistoricalPublicKey> {
     /// Already-trusted historical attestor key selected by the caller.
-    pub attestor: HistoricalPublicKey,
+    pub attestor: K,
     /// Expected issuer identifier supplied by the caller.
     pub issuer: String,
     /// Expected audience identifier supplied by the caller.
@@ -74,7 +131,7 @@ pub struct ExpectedContentAssertion {
 
 /// Canonical decoded claims with no signature verification or trust established.
 #[derive(Clone, PartialEq, Eq)]
-pub struct DecodedContentAssertion {
+pub struct DecodedAssertionClaims<const ES256: bool> {
     /// Contract-major or sibling-profile version; not a package version.
     pub version: i64,
     /// Identifier of the attestor public key.
@@ -109,7 +166,7 @@ pub struct DecodedContentAssertion {
 
 /// Verified signature and time-window facts. Trust and authorization remain caller decisions.
 #[derive(Clone, PartialEq, Eq)]
-pub struct ContentAssertionFacts {
+pub struct AssertionFacts<const ES256: bool> {
     /// Contract-major or sibling-profile version; not a package version.
     pub version: i64,
     /// Identifier of the attestor public key.
@@ -148,28 +205,32 @@ pub struct ContentAssertionFacts {
     pub trust: NotEvaluated,
 }
 
-#[derive(Debug)]
-struct AssertionClaims {
+/// Decoded claims of the EdDSA content-assertion profile.
+pub type DecodedContentAssertion = DecodedAssertionClaims<false>;
+
+/// Verified facts of the EdDSA content-assertion profile.
+pub type ContentAssertionFacts = AssertionFacts<false>;
+
+pub(crate) struct AssertionClaims {
     jti: String,
-    iss: String,
-    aud: String,
-    sub: String,
-    profile: String,
-    profile_digest: [u8; 32],
-    content_digest: [u8; 32],
+    pub(crate) iss: String,
+    pub(crate) aud: String,
+    pub(crate) sub: String,
+    pub(crate) profile: String,
+    pub(crate) profile_digest: [u8; 32],
+    pub(crate) content_digest: [u8; 32],
     generation: i64,
     previous: [u8; 32],
-    issued_at: i64,
-    not_before: i64,
-    expires_at: i64,
+    pub(crate) issued_at: i64,
+    pub(crate) not_before: i64,
+    pub(crate) expires_at: i64,
 }
 
-struct DecodedAssertion<'a> {
-    protected_segment: &'a [u8],
-    payload_segment: &'a [u8],
+pub(crate) struct ParsedAssertion<'a, const ES256: bool> {
+    message: &'a [u8],
     signature: [u8; 64],
-    key_id: String,
-    claims: AssertionClaims,
+    pub(crate) key_id: String,
+    pub(crate) claims: AssertionClaims,
 }
 
 /// Hash nonempty bounded content with the content-assertion domain separator.
@@ -188,6 +249,15 @@ pub fn assertion_signing_input(
     assertion: &ContentAssertionInput,
     bounds: &Bounds,
 ) -> Result<ProducedSigningInput> {
+    produce::<false>(assertion, bounds)
+}
+
+pub(crate) fn produce<const ES256: bool>(
+    assertion: &ContentAssertionInput,
+    bounds: &Bounds,
+) -> Result<ProducedSigningInput> {
+    let (alg, typ, _) = suite::<ES256>();
+    let validate_identifier = identifier_check::<ES256>();
     validate_kid(&assertion.attestor_key_id, bounds)?;
     validate_identifier(&assertion.jti, bounds)?;
     validate_identifier(&assertion.iss, bounds)?;
@@ -203,15 +273,12 @@ pub fn assertion_signing_input(
         bounds,
     )?;
     let header = JsonValue::Object(vec![
-        ("alg".into(), JsonValue::String("EdDSA".into())),
+        ("alg".into(), JsonValue::String(alg.into())),
         (
             "kid".into(),
             JsonValue::String(assertion.attestor_key_id.clone()),
         ),
-        (
-            "typ".into(),
-            JsonValue::String(TYP_CONTENT_ASSERTION.into()),
-        ),
+        ("typ".into(), JsonValue::String(typ.into())),
     ]);
     let payload = JsonValue::Object(vec![
         ("aud".into(), JsonValue::String(assertion.aud.clone())),
@@ -249,7 +316,15 @@ pub fn assemble_content_assertion_compact(
     signature: &[u8; 64],
     bounds: Option<&Bounds>,
 ) -> Result<Vec<u8>> {
-    if input.kind != SigningKind::ContentAssertion {
+    assemble::<false>(input, signature, bounds)
+}
+
+pub(crate) fn assemble<const ES256: bool>(
+    input: &SigningInput,
+    signature: &[u8; 64],
+    bounds: Option<&Bounds>,
+) -> Result<Vec<u8>> {
+    if input.kind != suite::<ES256>().2 {
         return Err(Invalid);
     }
     let bounds = bounds.copied().unwrap_or_else(Bounds::maximum);
@@ -262,7 +337,9 @@ pub fn assemble_content_assertion_compact(
     // Erratum 3 (REQ1/REQ2-SIGNING-ed25519-producer-canonical): assembly is a producer
     // surface (it frames a signature and verifies none) so it refuses a signature that
     // fails the keyless part of rule S1 and emits accepted bytes unchanged.
-    if !ed25519::signature_gate(signature) {
+    if ES256 {
+        es256::validate_rs_range(signature)?;
+    } else if !ed25519::signature_gate(signature) {
         return Err(Invalid);
     }
     let mut compact = Vec::with_capacity(projected_compact_len(
@@ -274,7 +351,7 @@ pub fn assemble_content_assertion_compact(
     compact.extend_from_slice(&input.payload_segment);
     compact.push(b'.');
     compact.extend_from_slice(&base64url_encode(signature));
-    decode_parts(&compact, &bounds)?;
+    parse::<ES256>(&compact, &bounds, identifier_check::<ES256>())?;
     Ok(compact)
 }
 
@@ -283,9 +360,16 @@ pub fn decode_content_assertion(
     compact: &[u8],
     bounds: &Bounds,
 ) -> Result<DecodedContentAssertion> {
-    let decoded = decode_parts(compact, bounds)?;
+    decode::<false>(compact, bounds)
+}
+
+pub(crate) fn decode<const ES256: bool>(
+    compact: &[u8],
+    bounds: &Bounds,
+) -> Result<DecodedAssertionClaims<ES256>> {
+    let decoded = parse::<ES256>(compact, bounds, identifier_check::<ES256>())?;
     let claims = decoded.claims;
-    Ok(DecodedContentAssertion {
+    Ok(DecodedAssertionClaims {
         version: 1,
         attestor_key_id: decoded.key_id,
         jti: claims.jti,
@@ -306,7 +390,11 @@ pub fn decode_content_assertion(
 
 /// Validate canonical assertion bytes and hash the exact compact representation.
 pub fn assertion_digest(compact: &[u8], bounds: &Bounds) -> Result<[u8; 32]> {
-    decode_parts(compact, bounds)?;
+    digest::<false>(compact, bounds)
+}
+
+pub(crate) fn digest<const ES256: bool>(compact: &[u8], bounds: &Bounds) -> Result<[u8; 32]> {
+    parse::<ES256>(compact, bounds, identifier_check::<ES256>())?;
     Ok(Sha256::digest(compact).into())
 }
 
@@ -315,54 +403,154 @@ pub fn verify_content_assertion(
     compact: &[u8],
     expected: &ExpectedContentAssertion,
 ) -> Result<ContentAssertionFacts> {
-    validate_expected(expected)?;
-    let decoded = decode_parts(compact, &expected.bounds)?;
-    let claims = decoded.claims;
-    if decoded.key_id != expected.attestor.key_id
+    verify::<false, _>(compact, expected, (&expected.attestor).into())
+}
+
+pub(crate) struct KeyRef<'a> {
+    pub(crate) key_id: &'a str,
+    pub(crate) public_key: &'a [u8],
+    pub(crate) valid_from: i64,
+    pub(crate) valid_before: &'a ValidityUpperBound,
+}
+
+impl<'a> From<&'a HistoricalPublicKey> for KeyRef<'a> {
+    fn from(key: &'a HistoricalPublicKey) -> Self {
+        Self {
+            key_id: &key.key_id,
+            public_key: &key.public_key,
+            valid_from: key.valid_from,
+            valid_before: &key.valid_before,
+        }
+    }
+}
+
+impl<'a> From<&'a v3::HistoricalPublicKey> for KeyRef<'a> {
+    fn from(key: &'a v3::HistoricalPublicKey) -> Self {
+        Self {
+            key_id: &key.key_id,
+            public_key: &key.public_key,
+            valid_from: key.valid_from,
+            valid_before: &key.valid_before,
+        }
+    }
+}
+
+pub(crate) fn verify<const ES256: bool, K>(
+    compact: &[u8],
+    expected: &ExpectedContentAssertion<K>,
+    key: KeyRef<'_>,
+) -> Result<AssertionFacts<ES256>> {
+    let bounds = &expected.bounds;
+    key.validate_window(bounds)?;
+    let validate_identifier = identifier_check::<ES256>();
+    for value in [
+        &expected.issuer,
+        &expected.audience,
+        &expected.subject,
+        &expected.profile,
+    ] {
+        validate_identifier(value, bounds)?;
+    }
+    validate_magnitude(expected.now, bounds)?;
+
+    let parsed = parse::<ES256>(compact, bounds, identifier_check::<ES256>())?;
+    let claims = &parsed.claims;
+    if parsed.key_id != key.key_id
         || claims.iss != expected.issuer
         || claims.aud != expected.audience
         || claims.sub != expected.subject
         || claims.profile != expected.profile
-        || claims.profile_digest != expected.profile_digest
-        || claims.content_digest != expected.content_digest
+        || !equal_digest(&claims.profile_digest, &expected.profile_digest)
+        || !equal_digest(&claims.content_digest, &expected.content_digest)
     {
         return Err(Invalid);
     }
-    if claims.issued_at < expected.attestor.valid_from
-        || claims.not_before < expected.attestor.valid_from
-    {
-        return Err(Invalid);
+    claims.key_window(&key)?;
+    claims.current_window(expected.now)?;
+    parsed.verify_signature(key.public_key)?;
+    let fingerprint = fingerprint::<ES256>(key.public_key)?;
+    Ok(parsed.facts(compact, fingerprint))
+}
+
+impl KeyRef<'_> {
+    pub(crate) fn validate_window(&self, bounds: &Bounds) -> Result<()> {
+        validate_kid(self.key_id, bounds)?;
+        validate_magnitude(self.valid_from, bounds)?;
+        if let ValidityUpperBound::Bounded(valid_before) = self.valid_before {
+            validate_magnitude(*valid_before, bounds)?;
+            if *valid_before <= self.valid_from {
+                return Err(Invalid);
+            }
+        }
+        Ok(())
     }
-    if let ValidityUpperBound::Bounded(valid_before) = expected.attestor.valid_before {
-        if claims.expires_at > valid_before {
-            return Err(Invalid);
+}
+
+pub(crate) fn fingerprint<const ES256: bool>(raw: &[u8]) -> Result<[u8; 32]> {
+    if ES256 {
+        v3::public_key_thumbprint_raw(raw.try_into().map_err(|_| Invalid)?)
+    } else {
+        public_key_thumbprint_raw(raw.try_into().map_err(|_| Invalid)?)
+    }
+}
+
+impl AssertionClaims {
+    pub(crate) fn key_window(&self, key: &KeyRef<'_>) -> Staged<()> {
+        if self.issued_at < key.valid_from
+            || self.not_before < key.valid_from
+            || matches!(key.valid_before, ValidityUpperBound::Bounded(end) if self.expires_at > *end)
+        {
+            return Err(Stage::KeyWindow);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn current_window(&self, now: i64) -> Staged<()> {
+        if now < self.not_before {
+            return Err(Stage::NotYetValid);
+        }
+        if now >= self.expires_at {
+            return Err(Stage::Expired);
+        }
+        Ok(())
+    }
+}
+
+impl<const ES256: bool> ParsedAssertion<'_, ES256> {
+    pub(crate) fn verify_signature(&self, raw: &[u8]) -> Staged<()> {
+        if ES256 {
+            let key = raw.try_into().map_err(|_| Stage::BadSignature)?;
+            es256::verify(key, self.message, &self.signature)
+        } else {
+            let key = raw.try_into().map_err(|_| Stage::BadSignature)?;
+            ed25519::verify(key, self.message, &self.signature)
+        }
+        .map_err(|_| Stage::BadSignature)
+    }
+
+    pub(crate) fn facts(self, compact: &[u8], fingerprint: [u8; 32]) -> AssertionFacts<ES256> {
+        let claims = self.claims;
+        AssertionFacts {
+            version: 1,
+            attestor_key_id: self.key_id,
+            attestor_key_fingerprint: fingerprint,
+            jti: claims.jti,
+            iss: claims.iss,
+            aud: claims.aud,
+            sub: claims.sub,
+            profile: claims.profile,
+            profile_digest: claims.profile_digest,
+            content_digest: claims.content_digest,
+            generation: claims.generation,
+            previous: claims.previous,
+            issued_at: claims.issued_at,
+            not_before: claims.not_before,
+            expires_at: claims.expires_at,
+            digest: Sha256::digest(compact).into(),
+            verification: SignatureAndWindow,
+            trust: NotEvaluated,
         }
     }
-    if expected.now < claims.not_before || expected.now >= claims.expires_at {
-        return Err(Invalid);
-    }
-    let message = signing_input_bytes(decoded.protected_segment, decoded.payload_segment);
-    ed25519::verify(&expected.attestor.public_key, &message, &decoded.signature)?;
-    Ok(ContentAssertionFacts {
-        version: 1,
-        attestor_key_id: decoded.key_id,
-        attestor_key_fingerprint: public_key_thumbprint_raw(&expected.attestor.public_key)?,
-        jti: claims.jti,
-        iss: claims.iss,
-        aud: claims.aud,
-        sub: claims.sub,
-        profile: claims.profile,
-        profile_digest: claims.profile_digest,
-        content_digest: claims.content_digest,
-        generation: claims.generation,
-        previous: claims.previous,
-        issued_at: claims.issued_at,
-        not_before: claims.not_before,
-        expires_at: claims.expires_at,
-        digest: Sha256::digest(compact).into(),
-        verification: SignatureAndWindow,
-        trust: NotEvaluated,
-    })
 }
 
 /// Check consecutive verified generations and the exact predecessor digest link.
@@ -371,16 +559,24 @@ pub fn verify_content_assertion_successor(
     successor: &ContentAssertionFacts,
     bounds: &Bounds,
 ) -> Result<()> {
+    self::successor::<false>(predecessor, successor, bounds)
+}
+
+pub(crate) fn successor<const ES256: bool>(
+    predecessor: &AssertionFacts<ES256>,
+    successor: &AssertionFacts<ES256>,
+    bounds: &Bounds,
+) -> Result<()> {
     validate_facts(predecessor, bounds)?;
     validate_facts(successor, bounds)?;
     if predecessor.iss != successor.iss
         || predecessor.aud != successor.aud
         || predecessor.sub != successor.sub
         || predecessor.profile != successor.profile
-        || predecessor.profile_digest != successor.profile_digest
+        || !equal_digest(&predecessor.profile_digest, &successor.profile_digest)
         || predecessor.generation >= bounds.integer_magnitude() as i64
         || successor.generation != predecessor.generation + 1
-        || successor.previous != predecessor.digest
+        || !equal_digest(&successor.previous, &predecessor.digest)
         || successor.issued_at < predecessor.issued_at
         || successor.jti == predecessor.jti
     {
@@ -389,61 +585,67 @@ pub fn verify_content_assertion_successor(
     Ok(())
 }
 
-fn decode_parts<'a>(compact: &'a [u8], bounds: &Bounds) -> Result<DecodedAssertion<'a>> {
+pub(crate) fn parse<'a, const ES256: bool>(
+    compact: &'a [u8],
+    bounds: &Bounds,
+    validate_identifier: IdentifierCheck,
+) -> Staged<ParsedAssertion<'a, ES256>> {
     validate_compact_size(compact.len(), bounds)?;
     let (protected_segment, payload_segment, signature_segment) = split_compact(compact, bounds)?;
     let protected_bytes = decode_segment(protected_segment, bounds)?;
     let payload_bytes = decode_segment(payload_segment, bounds)?;
-    let signature_bytes = decode_segment(signature_segment, bounds)?;
-    if signature_bytes.len() != 64 {
-        return Err(Invalid);
+    if signature_segment.len() != SIGNATURE_SEGMENT_BYTES {
+        return Err(Stage::Malformed);
     }
-    let mut signature = [0u8; 64];
-    signature.copy_from_slice(&signature_bytes);
-    let header = json_decode(&protected_bytes, bounds)?;
+    let signature = decode_segment(signature_segment, bounds)?
+        .try_into()
+        .map_err(|_| Stage::Malformed)?;
+    let (alg, typ, key_id) = parse_header(&protected_bytes, bounds)?;
+    let (expected_alg, expected_typ, _) = suite::<ES256>();
+    if alg != expected_alg || typ != expected_typ {
+        return Err(Stage::UnsupportedAlgorithm);
+    }
     let payload = json_decode(&payload_bytes, bounds)?;
-    let key_id = validate_header(&header, &protected_bytes, bounds)?;
-    let claims = validate_payload(&payload, &payload_bytes, bounds)?;
-    Ok(DecodedAssertion {
-        protected_segment,
-        payload_segment,
+    let claims = validate_payload(&payload, &payload_bytes, bounds, validate_identifier)?;
+    let message = &compact[..compact.len() - signature_segment.len() - 1];
+    Ok(ParsedAssertion {
+        message,
         signature,
         key_id,
         claims,
     })
 }
 
-fn validate_header(header: &JsonValue, raw: &[u8], bounds: &Bounds) -> Result<String> {
-    let members = match header {
-        JsonValue::Object(members) if members.len() == 3 => members,
-        _ => return Err(Invalid),
+fn parse_header(raw: &[u8], bounds: &Bounds) -> Result<(String, String, String)> {
+    let header = json_decode(raw, bounds)?;
+    if jcs_encode(&header, bounds)? != raw {
+        return Err(Invalid);
+    }
+    let JsonValue::Object(members) = header else {
+        return Err(Invalid);
     };
-    let (mut alg, mut kid, mut typ) = (None, None, None);
-    for (name, value) in members {
-        match name.as_str() {
-            "alg" => alg = Some(value),
-            "kid" => kid = Some(value),
-            "typ" => typ = Some(value),
-            _ => return Err(Invalid),
+    if members.len() != 3 {
+        return Err(Invalid);
+    }
+    // Canonical bytes imply object member order. All three values are strings.
+    let [alg, kid, typ]: [(String, JsonValue); 3] = members.try_into().map_err(|_| Invalid)?;
+    match (alg, kid, typ) {
+        ((a, JsonValue::String(alg)), (k, JsonValue::String(kid)), (t, JsonValue::String(typ)))
+            if a == "alg" && k == "kid" && t == "typ" =>
+        {
+            validate_kid(&kid, bounds)?;
+            Ok((alg, typ, kid))
         }
+        _ => Err(Invalid),
     }
-    if !matches!(alg, Some(JsonValue::String(value)) if value == "EdDSA")
-        || !matches!(typ, Some(JsonValue::String(value)) if value == TYP_CONTENT_ASSERTION)
-    {
-        return Err(Invalid);
-    }
-    let kid = match kid {
-        Some(JsonValue::String(value)) => value,
-        _ => return Err(Invalid),
-    };
-    validate_kid(kid, bounds)?;
-    if jcs_encode(header, bounds)?.as_slice() != raw {
-        return Err(Invalid);
-    }
-    Ok(kid.clone())
 }
 
-fn validate_payload(payload: &JsonValue, raw: &[u8], bounds: &Bounds) -> Result<AssertionClaims> {
+fn validate_payload(
+    payload: &JsonValue,
+    raw: &[u8],
+    bounds: &Bounds,
+    validate_identifier: IdentifierCheck,
+) -> Result<AssertionClaims> {
     let members = match payload {
         JsonValue::Object(members) if members.len() == 13 => members,
         _ => return Err(Invalid),
@@ -475,11 +677,11 @@ fn validate_payload(payload: &JsonValue, raw: &[u8], bounds: &Bounds) -> Result<
         return Err(Invalid);
     }
     let claims = AssertionClaims {
-        jti: take_identifier(jti, bounds)?,
-        iss: take_identifier(iss, bounds)?,
-        aud: take_identifier(aud, bounds)?,
-        sub: take_identifier(sub, bounds)?,
-        profile: take_identifier(profile, bounds)?,
+        jti: take_identifier(jti, bounds, validate_identifier)?,
+        iss: take_identifier(iss, bounds, validate_identifier)?,
+        aud: take_identifier(aud, bounds, validate_identifier)?,
+        sub: take_identifier(sub, bounds, validate_identifier)?,
+        profile: take_identifier(profile, bounds, validate_identifier)?,
         profile_digest: take_digest(profile_digest)?,
         content_digest: take_digest(content_digest)?,
         generation: take_integer(generation, bounds)?,
@@ -502,30 +704,13 @@ fn validate_payload(payload: &JsonValue, raw: &[u8], bounds: &Bounds) -> Result<
     Ok(claims)
 }
 
-fn validate_expected(expected: &ExpectedContentAssertion) -> Result<()> {
-    let bounds = &expected.bounds;
-    validate_kid(&expected.attestor.key_id, bounds)?;
-    validate_identifier(&expected.issuer, bounds)?;
-    validate_identifier(&expected.audience, bounds)?;
-    validate_identifier(&expected.subject, bounds)?;
-    validate_identifier(&expected.profile, bounds)?;
-    validate_magnitude(expected.now, bounds)?;
-    validate_magnitude(expected.attestor.valid_from, bounds)?;
-    if let ValidityUpperBound::Bounded(valid_before) = expected.attestor.valid_before {
-        validate_magnitude(valid_before, bounds)?;
-        if valid_before <= expected.attestor.valid_from {
-            return Err(Invalid);
-        }
-    }
-    Ok(())
-}
-
-fn validate_facts(facts: &ContentAssertionFacts, bounds: &Bounds) -> Result<()> {
+fn validate_facts<const ES256: bool>(facts: &AssertionFacts<ES256>, bounds: &Bounds) -> Result<()> {
     if facts.version != 1 || facts.verification != SignatureAndWindow || facts.trust != NotEvaluated
     {
         return Err(Invalid);
     }
     validate_kid(&facts.attestor_key_id, bounds)?;
+    let validate_identifier = identifier_check::<ES256>();
     for value in [
         &facts.jti,
         &facts.iss,
@@ -567,7 +752,7 @@ fn validate_numbers(
     Ok(())
 }
 
-fn validate_magnitude(value: i64, bounds: &Bounds) -> Result<()> {
+pub(crate) fn validate_magnitude(value: i64, bounds: &Bounds) -> Result<()> {
     if value.unsigned_abs() > bounds.integer_magnitude() {
         Err(Invalid)
     } else {
@@ -575,7 +760,11 @@ fn validate_magnitude(value: i64, bounds: &Bounds) -> Result<()> {
     }
 }
 
-fn take_identifier(value: Option<&JsonValue>, bounds: &Bounds) -> Result<String> {
+fn take_identifier(
+    value: Option<&JsonValue>,
+    bounds: &Bounds,
+    validate_identifier: IdentifierCheck,
+) -> Result<String> {
     let value = match value {
         Some(JsonValue::String(value)) => value,
         _ => return Err(Invalid),
@@ -698,28 +887,42 @@ fn projected_decoded_len(encoded: usize) -> Result<usize> {
         .ok_or(Invalid)
 }
 
-fn signing_input_bytes(protected: &[u8], payload: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(protected.len() + payload.len() + 1);
-    out.extend_from_slice(protected);
-    out.push(b'.');
-    out.extend_from_slice(payload);
-    out
-}
-
 fn b64_string(bytes: &[u8]) -> Result<String> {
     String::from_utf8(base64url_encode(bytes)).map_err(|_| Invalid)
 }
 
-impl std::fmt::Debug for ContentAssertionFacts {
+impl<const ES256: bool> std::fmt::Debug for AssertionFacts<ES256> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("#BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts<redacted>")
+        if ES256 {
+            f.write_str("#BoundedAuthorityProtocol.ContentAssertion.ES256.V1.ContentAssertionFacts<redacted>")
+        } else {
+            f.write_str(
+                "#BoundedAuthorityProtocol.ContentAssertion.V1.ContentAssertionFacts<redacted>",
+            )
+        }
     }
 }
 
-impl std::fmt::Debug for DecodedContentAssertion {
+impl<const ES256: bool> std::fmt::Debug for DecodedAssertionClaims<ES256> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(
-            "#BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion<redacted>",
-        )
+        if ES256 {
+            f.write_str("#BoundedAuthorityProtocol.ContentAssertion.ES256.V1.DecodedContentAssertion<redacted>")
+        } else {
+            f.write_str(
+                "#BoundedAuthorityProtocol.ContentAssertion.V1.DecodedContentAssertion<redacted>",
+            )
+        }
+    }
+}
+
+impl<const ES256: bool> std::fmt::Display for AssertionFacts<ES256> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, f)
+    }
+}
+
+impl<const ES256: bool> std::fmt::Display for DecodedAssertionClaims<ES256> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, f)
     }
 }

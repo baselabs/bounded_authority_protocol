@@ -333,7 +333,7 @@ fn validate_ip_literal(content: &[u8]) -> Result<Vec<u8>> {
 /// matching the shape is dispatched to IPvFuture and never falls back to
 /// IPv6 (the `.` after the version makes the intent unambiguous).
 fn is_ipvfuture_shape(s: &[u8]) -> bool {
-    if s.len() < 3 || s[0] != b'v' {
+    if s.len() < 3 || !matches!(s[0], b'v' | b'V') {
         return false;
     }
     let mut i = 1;
@@ -343,6 +343,11 @@ fn is_ipvfuture_shape(s: &[u8]) -> bool {
         i += 1;
     }
     hex >= 1 && i < s.len() && s[i] == b'.'
+}
+
+/// Check an IPvFuture literal without normalizing its spelling.
+pub(crate) fn is_ipvfuture_literal(s: &[u8]) -> bool {
+    is_ipvfuture_shape(s) && validate_ipvfuture(s)
 }
 
 /// Full IPvFuture grammar check (shape already confirmed).

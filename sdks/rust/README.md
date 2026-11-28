@@ -6,7 +6,8 @@ profile, and the role-attestation and content-assertion profiles, with strict Ed
 verification on every Ed25519 surface.
 
 It checks the exact bytes of a grant, a holder proof, or an evidence object against public keys
-and expected context that you supply, and returns facts or the single error `Invalid`.
+and expected context that you supply. The protocol facades return facts or `Invalid`. The
+action-approval facade exposes value-free reason codes for local inspection.
 Facts exclude raw credentials and secrets; the logging notes below describe their display limitations.
 It is a **verifier, not an authority**: it never selects trusted keys, reserves replay, checks
 revocation, or decides whether a request may run. Those stay in your service.
@@ -29,7 +30,7 @@ a checkout of this repository.
 - Rust **1.88** or later (`rust-version` in `Cargo.toml`; `rust-toolchain.toml` pins 1.88.0 for
   development and CI).
 - Runtime dependencies: `ed25519-dalek` 3.0 (default features off), `p256` 0.14 (ECDSA only, for
-  contract-major 3), `sha2` 0.11 and `ryu-js` 1.0. `zeroize` is a transitive dependency. See the
+  contract-major 3 and ES256 content assertions), `sha2` 0.11 and `ryu-js` 1.0. `zeroize` is a transitive dependency. See the
   [deployment notes](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/deployment/rust-sdk.md) for the full tree and its `unsafe` use.
 - `#![forbid(unsafe_code)]` covers this crate's own source.
 - **Erratum 3 (producer canonicality) is implemented.** Compact assembly and anchored-export encoding for every profile refuse a signature no
@@ -199,11 +200,31 @@ keys, nonces, or arguments. `GrantFacts` and `EnvelopeFacts` carry
 `trust: NotEvaluated`; `AnchoredExportFacts` carries both; `AttestationFacts` and
 `ContentAssertionFacts` carry `verification: SignatureAndWindow` and `trust: NotEvaluated`.
 Every facts type derives `Clone` and `PartialEq` (`ContentAssertionFacts` also `Eq`),
-and none implements `Display` or `Serialize`. `Debug` matches the specified diagnostic rendering (for example,
+and none implements `Serialize`. Content-assertion and approval facts also support redacted
+`Display`. `Debug` matches the specified diagnostic rendering (for example,
 `#BoundedAuthorityProtocol.V1.GrantFacts<redacted>`), including alternate formatting and
 nested Results. Each contract-major retains its `V1`, `V2`, or `V3` namespace; sibling facts
-use `RoleAttestation.V1` and `ContentAssertion.V1`.
+include `RoleAttestation.V1`, `ContentAssertion.V1`,
+`ContentAssertion.ES256.V1`, and `ActionApproval.V1`.
 Read individual fields explicitly when needed.
+
+## Action approval
+
+Use `approval_record::encode_record` to produce canonical record bytes and
+`approval_record::decode_record` to inspect them. The encoder sorts and deduplicates the
+resources only when explicitly requested. Verification matches the supplied revision, action
+and exact resource set under the operation's expected approver role set.
+
+Choose `action_approval::verify_approval_eddsa` or `verify_approval_es256` from independent
+host configuration. Each requires the expected operation, explicit time and an enrolled key
+snapshot for the selected suite. Errors carry only a stable, host-local diagnostic code.
+`action_approval::verify` adds read-only revocation and replay observations. Use
+`render_presenter_result` for a presenter-facing result. The host owns the atomic claim
+and revision check at execution.
+
+The `content_assertion_es256` module also verifies standalone ES256 assertions over opaque
+content with an explicitly supplied P-256 public key. Its facts type restricts successor checks
+to ES256 lineages.
 
 ## Strict Ed25519
 
@@ -214,7 +235,7 @@ the `ed25519-dalek` backend: exact widths, canonical `A` and `R`, neither of sma
 `acceptable_public_key` is the key-entry check (canonical, not small order, on the curve), and
 the JWK and thumbprint functions return `Err(Invalid)` for a key that fails it. `torsion_free`
 adds `[L]A = O`; call it at key enrollment, at trust install, and before any deny-list or
-revocation comparison, never on the verification path.
+revocation comparison. The action-approval facade admits the caller's snapshot before processing artifacts.
 
 ## Conformance
 
@@ -237,16 +258,27 @@ The manifest was introduced in 1.1.0.
 Each runner pins its index, hashes every indexed file, including `.raw` inputs, and rejects
 extra or missing files, duplicate IDs, and skipped cases. It records computed outcomes,
 orders them by the index's file and case order, and checks their JCS/SHA-256 verdict digest
-against the vendored manifest. Expected-value comparison cannot substitute for this check.
+against the vendored manifest.
 Outcome projections and index ordering are specified in the
 [verdict digest contract](https://github.com/baselabs/bounded_authority_protocol/blob/main/docs/design/corpus-verdict-digests.md).
 The contract-major runners also retain their public-key import censuses.
+
+The candidate ES256 content-assertion (217 cases) and action-approval (309 cases) corpora are
+source-only until every maintained runner executes them, so they are not in the snapshot.
+`conformance_approval` reads them from the protocol checkout named by `BAP_CANDIDATE_SOURCE`,
+checks each frozen index and its verdict digest, and also checks the Elixir verdict digest for
+cases covered by Elixir. Without the variable it reports that it skipped them.
 
 Run from this SDK directory:
 
 ```bash
 cargo test --locked
+BAP_CANDIDATE_SOURCE=../.. cargo test --locked --test conformance_approval -- --nocapture
+cargo test --locked --release --lib approval_verification_p99 -- --ignored --nocapture
 ```
+
+The performance gate reports verification and snapshot admission separately at 500 resources
+of 64 bytes and at the encoded record ceiling.
 
 The crate archive includes its tests and the complete input tree, including `.raw` sidecars.
 CI runs `cargo package`, unpacks the archive, and runs the full suite from the unpacked crate.

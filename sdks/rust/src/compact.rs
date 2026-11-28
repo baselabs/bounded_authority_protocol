@@ -108,6 +108,14 @@ fn validate_segment(seg: &[u8]) -> Result<()> {
     base64url_decode(seg).map(|_| ()).map_err(|_| Invalid)
 }
 
+pub(crate) fn signing_input_bytes(protected: &[u8], payload: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(protected.len() + payload.len() + 1);
+    out.extend_from_slice(protected);
+    out.push(b'.');
+    out.extend_from_slice(payload);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

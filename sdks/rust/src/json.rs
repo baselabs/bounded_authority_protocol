@@ -76,6 +76,18 @@ pub fn json_decode(text: &[u8], bounds: &Bounds) -> Result<JsonValue> {
     Ok(value)
 }
 
+/// Read one bounded JSON string, leaving the remainder of the enclosing grammar.
+pub(crate) fn decode_string_prefix(input: &[u8], byte_limit: usize) -> Result<(String, &[u8])> {
+    let mut decoder = Decoder {
+        input,
+        pos: 0,
+        bounds: &Bounds::maximum(),
+        nodes: 0,
+    };
+    let value = decoder.parse_string(byte_limit as u64)?;
+    Ok((value, &input[decoder.pos..]))
+}
+
 struct Decoder<'a> {
     input: &'a [u8],
     pos: usize,
@@ -220,48 +232,56 @@ impl<'a> Decoder<'a> {
     /// Parses a JSON string (value or member name). `byte_limit` is the decoded
     /// UTF-8 content ceiling (`string_bytes` for values, `key_bytes` for names).
     fn parse_string(&mut self, byte_limit: u64) -> Result<String> {
+        if self.peek() != Some(b'"') {
+            return Err(Invalid);
+        }
         self.pos += 1; // opening quote
-        let mut buf: Vec<u8> = Vec::new();
+        let mut buf = Vec::new();
+        let limit = byte_limit as usize;
         loop {
-            match self.peek() {
-                None => return Err(Invalid), // unterminated
-                Some(b'"') => {
+            let remaining = limit - buf.len();
+            let tail = &self.input[self.pos..];
+            // One lookahead byte distinguishes a closing quote at the exact cap.
+            let scan = &tail[..tail.len().min(remaining + 1)];
+            let end = scan
+                .iter()
+                .position(|&byte| byte < 0x20 || matches!(byte, b'"' | b'\\'))
+                .ok_or(Invalid)?;
+            let marker = scan[end];
+            if marker == b'"' && buf.is_empty() {
+                self.pos += end + 1;
+                return Ok(std::str::from_utf8(&scan[..end])
+                    .map_err(|_| Invalid)?
+                    .to_owned());
+            }
+            buf.extend_from_slice(&scan[..end]);
+            self.pos += end + 1;
+            match marker {
+                b'"' => break,
+                b'\\' if end < remaining => {
+                    let escape = self.peek().ok_or(Invalid)?;
                     self.pos += 1;
-                    break;
-                }
-                Some(b'\\') => {
-                    self.pos += 1;
-                    let esc = self.peek().ok_or(Invalid)?;
-                    self.pos += 1;
-                    match esc {
-                        b'"' => buf.push(b'"'),
-                        b'\\' => buf.push(b'\\'),
-                        b'/' => buf.push(b'/'),
+                    match escape {
+                        b'"' | b'\\' | b'/' => buf.push(escape),
                         b'b' => buf.push(0x08),
                         b'f' => buf.push(0x0c),
                         b'n' => buf.push(b'\n'),
                         b'r' => buf.push(b'\r'),
                         b't' => buf.push(b'\t'),
                         b'u' => {
-                            let cp = self.parse_hex4()?;
-                            self.encode_codepoint(&mut buf, cp)?;
+                            let scalar = self.parse_scalar()?;
+                            if scalar.len_utf8() > remaining - end {
+                                return Err(Invalid);
+                            }
+                            buf.extend_from_slice(scalar.encode_utf8(&mut [0; 4]).as_bytes());
                         }
                         _ => return Err(Invalid),
                     }
                 }
-                Some(b) if b < 0x20 => return Err(Invalid), // unescaped control char
-                Some(b) => {
-                    buf.push(b);
-                    self.pos += 1;
-                }
+                _ => return Err(Invalid),
             }
         }
-        if buf.len() as u64 > byte_limit {
-            return Err(Invalid);
-        }
-        // REQ1-JSON-no-normalization: UTF-8 mandatory, no Unicode normalization.
-        // from_utf8 rejects malformed sequences (e.g. lone 0xff); the result is
-        // stored verbatim (no normalization).
+        // UTF-8 rejects malformed sequences and preserves valid scalars verbatim.
         String::from_utf8(buf).map_err(|_| Invalid)
     }
 
@@ -281,33 +301,21 @@ impl<'a> Decoder<'a> {
         Ok(v)
     }
 
-    /// Encodes a `\uXXXX` code point, handling surrogate pairs. A lone surrogate
-    /// (unpaired high/low) is rejected: it is not a Unicode scalar value and so
-    /// cannot be represented in the mandatory UTF-8 string.
-    fn encode_codepoint(&mut self, buf: &mut Vec<u8>, cp: u32) -> Result<()> {
+    /// Decode a Unicode escape, pairing UTF-16 surrogate code units when necessary.
+    fn parse_scalar(&mut self) -> Result<char> {
+        let mut cp = self.parse_hex4()?;
         if (0xD800..=0xDBFF).contains(&cp) {
-            // high surrogate; require an immediately-following `\uXXXX` low surrogate
-            if self.peek() != Some(b'\\') {
+            if !self.input[self.pos..].starts_with(b"\\u") {
                 return Err(Invalid);
             }
-            self.pos += 1;
-            if self.peek() != Some(b'u') {
-                return Err(Invalid);
-            }
-            self.pos += 1;
+            self.pos += 2;
             let lo = self.parse_hex4()?;
             if !(0xDC00..=0xDFFF).contains(&lo) {
                 return Err(Invalid);
             }
-            let combined = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
-            push_utf8(buf, combined);
-            Ok(())
-        } else if (0xDC00..=0xDFFF).contains(&cp) {
-            Err(Invalid) // lone low surrogate
-        } else {
-            push_utf8(buf, cp);
-            Ok(())
+            cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
         }
+        char::from_u32(cp).ok_or(Invalid)
     }
 
     fn parse_number(&mut self) -> Result<JsonValue> {
@@ -401,25 +409,6 @@ impl<'a> Decoder<'a> {
 // ----------------------------------------------------------------------------
 // Number helpers (raw-lexeme magnitude check: exact decimal, no FP rounding)
 // ----------------------------------------------------------------------------
-
-/// Appends the UTF-8 encoding of `cp` (a validated Unicode scalar value) to buf.
-fn push_utf8(buf: &mut Vec<u8>, cp: u32) {
-    if cp <= 0x7F {
-        buf.push(cp as u8);
-    } else if cp <= 0x7FF {
-        buf.push(0xC0 | (cp >> 6) as u8);
-        buf.push(0x80 | (cp & 0x3F) as u8);
-    } else if cp <= 0xFFFF {
-        buf.push(0xE0 | (cp >> 12) as u8);
-        buf.push(0x80 | ((cp >> 6) & 0x3F) as u8);
-        buf.push(0x80 | (cp & 0x3F) as u8);
-    } else {
-        buf.push(0xF0 | (cp >> 18) as u8);
-        buf.push(0x80 | ((cp >> 12) & 0x3F) as u8);
-        buf.push(0x80 | ((cp >> 6) & 0x3F) as u8);
-        buf.push(0x80 | (cp & 0x3F) as u8);
-    }
-}
 
 /// Decomposes a grammar-valid number lexeme into (digits, frac_count, exp).
 ///

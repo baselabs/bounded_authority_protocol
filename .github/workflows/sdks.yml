@@ -218,6 +218,16 @@ jobs:
         run: cargo test --locked
         working-directory: sdks/rust
 
+      - name: Verify source candidate corpora
+        run: cargo test --locked --test conformance_approval -- --nocapture
+        working-directory: sdks/rust
+        env:
+          BAP_CANDIDATE_SOURCE: ${{ github.workspace }}
+
+      - name: Enforce Rust approval verification p99
+        run: cargo test --locked --release --lib approval_verification_p99 -- --ignored --nocapture
+        working-directory: sdks/rust
+
       - name: purity check
         run: bash tools/purity_check.sh
         working-directory: sdks/rust

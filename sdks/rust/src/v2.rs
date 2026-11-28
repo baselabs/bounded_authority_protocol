@@ -580,7 +580,7 @@ pub fn assemble_compact(
         SigningKind::RoleAttestation => {
             return Err(Invalid);
         }
-        SigningKind::ContentAssertion => {
+        SigningKind::ContentAssertion | SigningKind::ContentAssertionEs256 => {
             return Err(Invalid);
         }
         SigningKind::ChainAnchor => {
